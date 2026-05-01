@@ -510,4 +510,48 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
           : {}),
       },
     });
+  })
+  .post('/subjects/:subjectId/interview/retry-persist', async (c) => {
+    assertNotProxyMode(c);
+    const db = c.get('db');
+    const profileId = requireProfileId(c.get('profileId'));
+    const subjectId = c.req.param('subjectId');
+    const bookId = c.req.query('bookId');
+
+    const subject = await getSubject(db, profileId, subjectId);
+    if (!subject) return notFound(c, 'Subject not found');
+
+    const draft = await getDraftState(db, profileId, subjectId);
+    if (!draft) return notFound(c, 'Draft not found');
+
+    const claimed = await db
+      .update(onboardingDrafts)
+      .set({ status: 'completing', failureCode: null })
+      .where(
+        and(
+          eq(onboardingDrafts.id, draft.id),
+          eq(onboardingDrafts.profileId, profileId),
+          eq(onboardingDrafts.status, 'failed')
+        )
+      )
+      .returning({ id: onboardingDrafts.id });
+
+    if (claimed.length === 0) {
+      return c.json({ error: 'not-failed', status: draft.status }, 409);
+    }
+
+    await inngest.send({
+      id: `persist-${draft.id}-retry-${Date.now()}`,
+      name: 'app/interview.ready_to_persist',
+      data: interviewReadyToPersistEventSchema.parse({
+        version: 1,
+        draftId: draft.id,
+        profileId,
+        subjectId,
+        subjectName: subject.name,
+        bookId,
+      }),
+    });
+
+    return c.json({ status: 'completing' });
   });

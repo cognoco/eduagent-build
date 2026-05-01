@@ -61,8 +61,7 @@ export const interviewStateSchema = z.object({
   resumeSummary: z.string().nullable().optional(),
   exchangeHistory: z.array(exchangeEntrySchema).optional(),
   expiresAt: z.string().datetime().nullable().optional(),
-  // Populated only when status === 'completed'. Mobile reads `interests` to
-  // route into the interests-context picker before the downstream fork.
+  failureCode: persistFailureCodeSchema.nullable().optional(),
   extractedSignals: extractedInterviewSignalsSchema.optional(),
 });
 export type InterviewState = z.infer<typeof interviewStateSchema>;
