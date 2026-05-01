@@ -187,6 +187,56 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
         expect.stringContaining('retry-delivery')
       );
     });
+
+    // [CR-IDEMP-FALLBACK-08] When event.id is undefined (replay path, test
+    // harness, malformed receive), the previous `event.id ?? 'no-event'`
+    // fallback collapsed every distinct delivery failure for the same
+    // profile within Resend's 24h dedup window onto one key — silently
+    // discarding emails 2..N. The fix drops the key entirely in that case.
+    it('[CR-IDEMP-FALLBACK-08] drops idempotencyKey when event.id is missing (no silent dedup collision)', async () => {
+      mockSendEmail.mockResolvedValue({ sent: true });
+
+      // No eventId passed — simulates replay or partial payload.
+      await executeHandler({ profileId: 'profile-no-id', category: 'bug' });
+
+      expect(mockSendEmail).toHaveBeenCalledTimes(1);
+      const [, optsArg] = mockSendEmail.mock.calls[0] as [
+        unknown,
+        { idempotencyKey?: string }
+      ];
+      // Critical: the key must NOT be a literal 'no-event' collision string.
+      // Either undefined (current fix) or a unique value would be acceptable;
+      // the literal 'no-event' fallback is the bug class.
+      expect(optsArg.idempotencyKey).toBeUndefined();
+    });
+
+    // [CR-IDEMP-FALLBACK-08] Two distinct delivery failures for the same
+    // profile with distinct event IDs must produce distinct idempotency
+    // keys — pin the (profileId, eventId) coupling so a future refactor
+    // that drops eventId from the key can't silently collapse them.
+    it('[CR-IDEMP-FALLBACK-08] distinct event IDs produce distinct idempotency keys', async () => {
+      mockSendEmail.mockResolvedValue({ sent: true });
+
+      await executeHandler(
+        { profileId: 'profile-shared', category: 'bug' },
+        'evt-A'
+      );
+      await executeHandler(
+        { profileId: 'profile-shared', category: 'bug' },
+        'evt-B'
+      );
+
+      expect(mockSendEmail).toHaveBeenCalledTimes(2);
+      const keyA = (
+        mockSendEmail.mock.calls[0] as [unknown, { idempotencyKey?: string }]
+      )[1].idempotencyKey;
+      const keyB = (
+        mockSendEmail.mock.calls[1] as [unknown, { idempotencyKey?: string }]
+      )[1].idempotencyKey;
+      expect(keyA).toBeDefined();
+      expect(keyB).toBeDefined();
+      expect(keyA).not.toEqual(keyB);
+    });
   });
 
   describe('valid payload — retry behavior', () => {

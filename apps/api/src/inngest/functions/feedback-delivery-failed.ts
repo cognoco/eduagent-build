@@ -84,9 +84,17 @@ export const feedbackDeliveryFailed = inngest.createFunction(
       // Resend dedupes calls with matching `Idempotency-Key` within 24h.
       // The key is bound to (profileId, eventId) so a genuinely new delivery
       // failure for the same profile in a new run produces a fresh key.
-      const idempotencyKey = `feedback-delivery-failed:${profileId}:${
-        event.id ?? 'no-event'
-      }:retry-delivery`;
+      //
+      // [CR-IDEMP-FALLBACK-08] Drop the key entirely when event.id is missing.
+      // The previous `event.id ?? 'no-event'` fallback collided every distinct
+      // delivery failure for the same profile within Resend's 24h window onto
+      // a single key, so failures 2..N were silently deduped to nothing —
+      // exactly the failure mode the key was meant to prevent. Better to
+      // send (risking a rare double-deliver if Inngest replays without an
+      // event id) than to silently drop a real support email.
+      const idempotencyKey = event.id
+        ? `feedback-delivery-failed:${profileId}:${event.id}:retry-delivery`
+        : undefined;
 
       const result = await sendEmail(
         {
