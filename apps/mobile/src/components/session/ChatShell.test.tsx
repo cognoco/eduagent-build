@@ -1225,6 +1225,30 @@ describe('ChatShell', () => {
       }
     });
 
+    it('Send button does NOT use bg-primary styling when the instance is unfocused [BUG-886]', async () => {
+      // [BUG-886] The disabled prop on the Send Pressable already includes
+      // !isFocused, but the visual class (bg-primary) previously only checked
+      // input.trim() && !isStreaming — so the dormant instance on RN Web still
+      // rendered as a filled primary button, which looks interactive. This
+      // break test asserts the class condition also gates on isFocused.
+      mockIsFocused = false;
+      const onSend = jest.fn();
+      renderChatShell({ onSend });
+
+      // Inject text via fireEvent so the trimmed value is non-empty —
+      // that eliminates input.trim() as the reason for bg-surface-elevated
+      // and isolates the isFocused guard.
+      await act(async () => {
+        fireEvent.changeText(screen.getByTestId('chat-input'), 'hello');
+      });
+
+      const send = screen.getByTestId('send-button');
+      // className is a NativeWind prop available as props.className in RNTL.
+      const className: string = send.props.className ?? '';
+      expect(className).not.toContain('bg-primary');
+      expect(className).toContain('bg-surface-elevated');
+    });
+
     it('still calls onSend when focused [break test for over-strict guard]', async () => {
       // The simplest way for someone to break BUG-886 is to leave
       // !isFocused logic active even on the focused instance. Catch that

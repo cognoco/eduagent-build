@@ -891,7 +891,7 @@ export function ChatShell({
               // wrapping View's pointerEvents/aria-hidden treatment.
               disabled={!input.trim() || isStreaming || !isFocused}
               className={`rounded-button px-5 py-3 min-h-[44px] min-w-[44px] items-center justify-center ${
-                input.trim() && !isStreaming
+                input.trim() && !isStreaming && isFocused
                   ? 'bg-primary'
                   : 'bg-surface-elevated'
               }`}
