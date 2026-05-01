@@ -437,15 +437,19 @@ git push
 - Create: `apps/api/src/inngest/functions/interview-persist-curriculum.ts`
 - Create: `apps/api/src/inngest/functions/interview-persist-curriculum.test.ts`
 
-Reference template: `apps/api/src/inngest/functions/book-pre-generation.ts`. Four steps:
-1. `extract-signals` — read draft; if `extractedSignals.topics?.length > 0`, return cached; else call LLM.
+Reference template: `apps/api/src/inngest/functions/book-pre-generation.ts` (for `getStepDatabase` + `step.run` idiom ONLY — it does NOT use `onFailure` or `NonRetriableError`).
+
+→ R3: **Corrected step design** based on actual data flow:
+1. `extract-signals` — read draft; if `extractedSignals` has meaningful content (`goals.length > 0 || interests.length > 0`), return cached; else call `extractSignals(draft.exchangeHistory)`. Returns `{ goals, experienceLevel, currentKnowledge, interests }` — NOT topics.
 2. `save-signals` — write extracted signals back to the draft (cross-invocation cache for Try Again).
-3. `persist-and-mark-completed` — `db.batch()` all three writes (Task 4).
-4. `send-completion-push` — push notification in its OWN step → R2 — so a push failure does not retry the persist (the persist was idempotent anyway, but doubling pushes is bad UX).
+3. `persist-curriculum` — call the existing `persistCurriculum(db, profileId, subjectId, subjectName, draft, bookId, bookTitle)` which internally calls `generateCurriculum()` to produce topics, then inserts them. Use `db.transaction()` to atomize persist + mark-completed (WS driver supports it).
+4. `send-completion-push` — push notification in its OWN step → R2 — so a push failure does not retry the persist.
 
 `onFailure` maps the thrown error to a `PersistFailureCode` and flips the draft to `failed`.
 
-→ R2: rev 1 cache check used `Object.keys(extractedSignals).length > 0`. That returned true for `{ topics: [] }`, persisting an empty curriculum — strictly *worse* than SUBJECT-09 because there's no recovery surface. The new check is `topics?.length > 0`.
+→ R3: **First usage of `NonRetriableError` and `onFailure` in this codebase.** These are valid Inngest SDK features but have no local precedent to copy from. Import `NonRetriableError` from `'inngest'`. The `onFailure` config goes inside `inngest.createFunction`'s first argument.
+
+→ R3: Cache check corrected — `extractSignals` returns `{ goals: string[], experienceLevel: string, currentKnowledge: string, interests: string[] }`. The "signals are usable" check is `goals.length > 0 || interests.length > 0`, NOT `topics?.length > 0` (there is no `topics` field in the extracted signals).
 
 - [ ] **Step 1: Read the reference**
 
@@ -453,7 +457,7 @@ Reference template: `apps/api/src/inngest/functions/book-pre-generation.ts`. Fou
 cd apps/api && wc -l src/inngest/functions/book-pre-generation.ts
 ```
 
-Read it end-to-end before writing the new one. Key idioms: `getStepDatabase`, `step.run` with named checkpoints, `NonRetriableError`, `onFailure`.
+Read it end-to-end before writing the new one. Key idioms from this file: `getStepDatabase`, `step.run` with named checkpoints. → R3: `NonRetriableError` and `onFailure` are NOT present in this reference — they're new patterns being introduced for the first time. Import `NonRetriableError` from the `'inngest'` package.
 
 - [ ] **Step 2: Build a step-replay test harness** → R2
 
@@ -524,7 +528,7 @@ jest.mock('../../services/interview-persist', () => ({
 
 const mockSendPush = jest.fn();
 jest.mock('../../services/notifications', () => ({
-  sendPushToProfile: (...args: unknown[]) => mockSendPush(...args),
+  sendPushNotification: (...args: unknown[]) => mockSendPush(...args), // → R3: correct function name
 }));
 
 import { interviewPersistCurriculum } from './interview-persist-curriculum';
@@ -692,7 +696,7 @@ import { getStepDatabase } from '../helpers';
 import { createLogger } from '../../services/logger';
 import { extractSignals } from '../../services/interview';
 import { persistCurriculumAndMarkComplete } from '../../services/interview-persist';
-import { sendPushToProfile } from '../../services/notifications';
+import { sendPushNotification } from '../../services/notifications'; // → R3: NOT sendPushToProfile
 import {
   PersistCurriculumError,
   type PersistFailureCode,
