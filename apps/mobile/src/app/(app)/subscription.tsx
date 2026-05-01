@@ -113,11 +113,30 @@ const FAMILY_TIER_ENTRY: { tier: SubscriptionTier; features: string[] } = {
   ],
 };
 
+/**
+ * [BUG-917] Same fix for Pro tier: when the user is already on Pro, append a
+ * Pro card so they can see their entitlements alongside Free/Plus. Pro is not
+ * sold through the public store, so the card is read-only (same reasoning as
+ * FAMILY_TIER_ENTRY above).
+ */
+const PRO_TIER_ENTRY: { tier: SubscriptionTier; features: string[] } = {
+  tier: 'pro',
+  features: [
+    '3,000 questions per month, no daily limit',
+    'All Plus features',
+    'Priority AI mentor',
+    'Advanced analytics',
+  ],
+};
+
 function getTiersToCompare(
   currentTier: SubscriptionTier
 ): Array<{ tier: SubscriptionTier; features: string[] }> {
   if (currentTier === 'family') {
     return [...TIER_FEATURES, FAMILY_TIER_ENTRY];
+  }
+  if (currentTier === 'pro') {
+    return [...TIER_FEATURES, PRO_TIER_ENTRY];
   }
   return TIER_FEATURES;
 }

@@ -466,9 +466,7 @@ describe('SubscriptionScreen', () => {
       tier: 'family',
       status: 'active',
       ownerProfileId: 'profile-1',
-      members: [
-        { profileId: 'profile-1', displayName: 'Alex', isOwner: true },
-      ],
+      members: [{ profileId: 'profile-1', displayName: 'Alex', isOwner: true }],
     };
     mockOfferings = null; // force the no-offerings static fallback path
 
@@ -497,6 +495,39 @@ describe('SubscriptionScreen', () => {
 
     expect(screen.getByTestId('static-tier-free')).toBeTruthy();
     expect(screen.getByTestId('static-tier-plus')).toBeTruthy();
+    expect(screen.queryByTestId('static-tier-family')).toBeNull();
+  });
+
+  // [BUG-917] Pro-tier cascade: same issue as Family — a Pro user landing on
+  // the subscription screen saw only Free/Plus in the static comparison, with
+  // no card for their own Pro tier. Fix mirrors the Family fix exactly.
+  it('shows Pro static card in PLANS comparison when user is on Pro [BUG-917]', () => {
+    mockSubscription = { tier: 'pro', status: 'active' };
+    mockOfferings = null; // force the no-offerings static fallback path
+
+    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+    expect(screen.getByTestId('no-offerings')).toBeTruthy();
+    expect(screen.getByTestId('static-tier-free')).toBeTruthy();
+    expect(screen.getByTestId('static-tier-plus')).toBeTruthy();
+    // The fix:
+    expect(screen.getByTestId('static-tier-pro')).toBeTruthy();
+    expect(screen.getByText(/3,000 questions per month/i)).toBeTruthy();
+    // Family is still hidden — it's not this user's tier and not approved
+    // for general public listing.
+    expect(screen.queryByTestId('static-tier-family')).toBeNull();
+  });
+
+  // [BUG-917] Verify a Pro user does not contaminate Family visibility.
+  it('hides Pro static card for Plus users [BUG-917 + BUG-899 regression]', () => {
+    mockSubscription = { tier: 'plus', status: 'active' };
+    mockOfferings = null;
+
+    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+    expect(screen.getByTestId('static-tier-free')).toBeTruthy();
+    expect(screen.getByTestId('static-tier-plus')).toBeTruthy();
+    expect(screen.queryByTestId('static-tier-pro')).toBeNull();
     expect(screen.queryByTestId('static-tier-family')).toBeNull();
   });
 
