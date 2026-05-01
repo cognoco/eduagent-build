@@ -695,7 +695,7 @@ import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import { createLogger } from '../../services/logger';
 import { extractSignals } from '../../services/interview';
-import { persistCurriculumAndMarkComplete } from '../../services/interview-persist';
+import { persistCurriculum } from '../../services/interview'; // → R3: use existing function, not a new helper
 import { sendPushNotification } from '../../services/notifications'; // → R3: NOT sendPushToProfile
 import {
   PersistCurriculumError,
@@ -796,15 +796,32 @@ export const interviewPersistCurriculum = inngest.createFunction(
         );
     });
 
-    await step.run('persist-and-mark-completed', async () => {
+    // → R3: Call existing persistCurriculum (which internally does generateCurriculum
+    // + topic insert + topicsGenerated update), then mark draft completed, all in
+    // a transaction. WS driver supports db.transaction().
+    await step.run('persist-curriculum', async () => {
       const db = getStepDatabase();
       const draft = await loadDraft(db, profileId, draftId);
       if (!draft) throw new NonRetriableError('draft-disappeared');
       try {
-        await persistCurriculumAndMarkComplete(
-          db, profileId, subjectId, subjectName, draftId,
-          { draft: { ...draft, extractedSignals: signals }, bookId }
-        );
+        await db.transaction(async (tx) => {
+          // persistCurriculum handles: generateCurriculum/generateBookTopics →
+          // insert topics → update topicsGenerated on book
+          await persistCurriculum(
+            tx, profileId, subjectId, subjectName,
+            { ...draft, extractedSignals: signals }, bookId
+          );
+          // Mark completed atomically with the persist
+          await tx
+            .update(onboardingDrafts)
+            .set({ status: 'completed', failureCode: null })
+            .where(
+              and(
+                eq(onboardingDrafts.id, draftId),
+                eq(onboardingDrafts.profileId, profileId),
+              )
+            );
+        });
       } catch (err) {
         if (err instanceof PersistCurriculumError) throw err;
         throw new PersistCurriculumError('persist_failed', (err as Error)?.message);

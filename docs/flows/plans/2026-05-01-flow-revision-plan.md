@@ -413,18 +413,18 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 ## Batch 14 — Parent Setup, Adding Children, Family Gating
 
-**State required:** Slot F (parent owner, Family plan, 0 children). End-state: Slot G with 1 child added.
+**State required:** Slot E (parent owner, Family plan, 0 children → added Timmy age 12).
 **Estimated time:** 45 min.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| HOME-07 | Add-first-child gate | 🚫 | Blocked | | | Plus plan doesn't support child profiles — needs Family plan account |
-| ACCOUNT-02 | Create additional profile (generic) | 🚫 | Blocked | | | Plus plan → 402 PROFILE_LIMIT_EXCEEDED (correctly shows upgrade CTA) |
-| ACCOUNT-03 | Add child profile from More / Profiles | ✅ | Pass | | | Create-profile screen: name, birth date (min 11), Create profile button, Cancel. 402 upgrade gate works correctly. |
+| HOME-07 | Add-first-child gate | ✅ | Pass | | | Family plan parent: "Add a child" in FAMILY section. Create-profile screen shows child-specific copy. Child created successfully (201), parent sees child card on home. |
+| ACCOUNT-02 | Create additional profile (generic) | ✅ | Pass | | | Family plan: POST /v1/profiles → 201. Profile switcher shows both Solo Parent and Timmy. |
+| ACCOUNT-03 | Add child profile from More / Profiles | ✅ | Pass | | | Create-profile screen: "Add a child" title, "Child's display name", "Child's birth date", YYYY-MM-DD input, "Create profile" button, Cancel. |
 | ACCOUNT-05 | Family-plan + max-profile gating | ✅ | Pass | | | Verified: Plus plan correctly blocks child creation with "Upgrade required" alert + "See plans" CTA |
-| ACCOUNT-25 | Parent consent management for a child | 🚫 | Blocked | | | Needs Family plan account with child profile |
-| ACCOUNT-16 | Child mentor memory | 🚫 | Blocked | | | Needs child profile (requires Family plan) |
-| ACCOUNT-17 | Child memory consent prompt | 🚫 | Blocked | | | Needs child profile (requires Family plan) |
+| ACCOUNT-25 | Parent consent management for a child | ✅ | Pass | | | Child detail drill-down shows "Withdraw Consent" button under "Timmy's Account" section. |
+| ACCOUNT-16 | Child mentor memory | ✅ | Pass | | | Child detail shows "Set up mentor memory" + "What the mentor knows" buttons with correct child-specific copy. |
+| ACCOUNT-17 | Child memory consent prompt | ✅ | Pass | | | "Choose what the mentor remembers about Timmy." prompt visible on child detail page. |
 
 ---
 
