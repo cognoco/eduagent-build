@@ -75,6 +75,15 @@ if (verdict.status === 'mismatch') {
   process.exit(1);
 }
 
+if (verdict.status === 'unverifiable' && deployEnv === 'production') {
+  console.error(
+    `✗ ${verdict.reason} — DATABASE_URL_STAGING_HOST / ` +
+      `DATABASE_URL_PRODUCTION_HOST must be set for production deploys. ` +
+      `Refusing to run migrations without cross-environment verification.`,
+  );
+  process.exit(1);
+}
+
 if (verdict.status === 'unverifiable') {
   console.warn(
     `⚠ ${verdict.reason} — set DATABASE_URL_STAGING_HOST / ` +
