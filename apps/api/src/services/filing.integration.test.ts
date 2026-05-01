@@ -9,7 +9,7 @@
  * No mocks of internal services or database.
  */
 
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import {
   accounts,
   profiles,
@@ -395,6 +395,123 @@ describe('resolveFilingResult (integration)', () => {
       where: eq(curriculumTopics.id, result.topicId),
     });
     expect(topic!.sessionId).toBe(session!.id);
+  });
+
+  // ---------------------------------------------------------------------------
+  // [CR-FIL-DEDUP-INDEX-12-FOLLOWUP] Concurrent-write dedup for shelves
+  // Break test: two concurrent first-time-filings for the same shelf name
+  // on the same profile must produce exactly ONE subject row and both callers
+  // must receive the same shelfId.
+  // Red-green verification: this test passes with the unique index in migration
+  // 0044 in place. Removing that index causes a race where both inserts
+  // succeed and the test fails (two rows, possibly different ids).
+  // ---------------------------------------------------------------------------
+  it('[CR-FIL-DEDUP-INDEX-12-FOLLOWUP] concurrent shelf creation produces exactly one row', async () => {
+    const { profile } = await seedAccountAndProfile();
+    const db = createIntegrationDb();
+
+    const makePayload = (topicSuffix: string) => ({
+      profileId: profile.id,
+      filingResponse: {
+        shelf: { name: 'ConcurrentShelf' },
+        book: {
+          name: 'ConcurrentBook',
+          emoji: '📚',
+          description: 'Concurrent book',
+        },
+        chapter: { name: 'Concurrent Chapter' },
+        topic: {
+          title: `Concurrent Topic ${topicSuffix}`,
+          description: 'Race test topic',
+        },
+      } satisfies FilingResponse,
+      filedFrom: 'session_filing' as const,
+    });
+
+    // Fire both concurrently — neither has seen the shelf yet
+    const [resultA, resultB] = await Promise.all([
+      resolveFilingResult(db, makePayload('A')),
+      resolveFilingResult(db, makePayload('B')),
+    ]);
+
+    // Both must resolve to the SAME shelf
+    expect(resultA.shelfId).toBe(resultB.shelfId);
+
+    // Exactly ONE subjects row for this name+profile combination
+    const rows = await db
+      .select()
+      .from(subjects)
+      .where(
+        and(
+          eq(subjects.profileId, profile.id),
+          sql`lower(${subjects.name}) = lower(${'ConcurrentShelf'})`
+        )
+      );
+    expect(rows).toHaveLength(1);
+  });
+
+  // ---------------------------------------------------------------------------
+  // [CR-FIL-DEDUP-INDEX-12-FOLLOWUP] Concurrent-write dedup for books
+  // Break test: two concurrent first-time-filings for the same book title
+  // within the same shelf must produce exactly ONE curriculum_books row and
+  // both callers must receive the same bookId.
+  // Red-green verification: this test passes with the unique index in migration
+  // 0044. Removing that index allows both inserts to succeed and the test fails.
+  // ---------------------------------------------------------------------------
+  it('[CR-FIL-DEDUP-INDEX-12-FOLLOWUP] concurrent book creation produces exactly one row', async () => {
+    const { profile } = await seedAccountAndProfile();
+    const db = createIntegrationDb();
+
+    // Pre-create the shelf so the race is isolated to the book layer
+    const [subject] = await db
+      .insert(subjects)
+      .values({
+        profileId: profile.id,
+        name: 'ConcurrentBookShelf',
+        status: 'active',
+        pedagogyMode: 'socratic',
+      })
+      .returning();
+    await db.insert(curricula).values({ subjectId: subject!.id, version: 1 });
+
+    const makePayload = (topicSuffix: string) => ({
+      profileId: profile.id,
+      filingResponse: {
+        shelf: { id: subject!.id },
+        book: {
+          name: 'ConcurrentBook',
+          emoji: '📖',
+          description: 'Concurrent book',
+        },
+        chapter: { name: 'Concurrent Chapter' },
+        topic: {
+          title: `Concurrent Topic ${topicSuffix}`,
+          description: 'Race test topic',
+        },
+      } satisfies FilingResponse,
+      filedFrom: 'session_filing' as const,
+    });
+
+    // Fire both concurrently — neither has seen the book yet
+    const [resultA, resultB] = await Promise.all([
+      resolveFilingResult(db, makePayload('A')),
+      resolveFilingResult(db, makePayload('B')),
+    ]);
+
+    // Both must resolve to the SAME book
+    expect(resultA.bookId).toBe(resultB.bookId);
+
+    // Exactly ONE curriculum_books row for this (subjectId, title) combination
+    const rows = await db
+      .select()
+      .from(curriculumBooks)
+      .where(
+        and(
+          eq(curriculumBooks.subjectId, subject!.id),
+          sql`lower(${curriculumBooks.title}) = lower(${'ConcurrentBook'})`
+        )
+      );
+    expect(rows).toHaveLength(1);
   });
 
   it('[BUG-841 / F-SVC-008] retry with same topic title is idempotent — no duplicate row', async () => {

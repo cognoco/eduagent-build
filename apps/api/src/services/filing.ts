@@ -463,7 +463,14 @@ export async function resolveFilingResult(
       shelfId = existing.id;
       shelfName = existing.name;
     } else {
-      // Case-insensitive name match + FOR UPDATE to prevent concurrent creation
+      // Case-insensitive name match — re-find before insert for the common
+      // sequential-retry path (avoids a DB round-trip on single-worker retries).
+      // [CR-FIL-DEDUP-INDEX-12-FOLLOWUP] Concurrent-write dedup via DB-level
+      // CREATE UNIQUE INDEX subjects_profile_name_lower_active_uq
+      //   ON subjects (profile_id, lower(name)) WHERE status = 'active'
+      // (drizzle migration 0044). neon-http does not honour .for('update')
+      // in interactive transactions, so the index is the only durable barrier
+      // against two concurrent workers both passing the SELECT and INSERTing.
       const [existing] = await txDb
         .select()
         .from(subjects)
@@ -474,22 +481,55 @@ export async function resolveFilingResult(
             eq(subjects.status, 'active')
           )
         )
-        .for('update')
         .limit(1);
       if (existing) {
         shelfId = existing.id;
         shelfName = existing.name;
       } else {
         const newId = generateUUIDv7();
-        await txDb.insert(subjects).values({
-          id: newId,
-          profileId,
-          name: filingResponse.shelf.name,
-          status: 'active',
-        });
-        shelfId = newId;
-        shelfName = filingResponse.shelf.name;
-        isNewShelf = true;
+        // [CR-FIL-DEDUP-INDEX-12-FOLLOWUP] onConflictDoNothing + .returning()
+        // detects when the unique index suppressed our insert (race lost) so
+        // we can re-find the row the winning worker inserted.
+        const inserted = await txDb
+          .insert(subjects)
+          .values({
+            id: newId,
+            profileId,
+            name: filingResponse.shelf.name,
+            status: 'active',
+          })
+          .onConflictDoNothing()
+          .returning({ id: subjects.id, name: subjects.name });
+
+        if (inserted.length > 0) {
+          // We won the race (or were uncontested).
+          shelfId = (inserted[0] as { id: string; name: string }).id;
+          shelfName = (inserted[0] as { id: string; name: string }).name;
+          isNewShelf = true;
+        } else {
+          // [CR-FIL-DEDUP-INDEX-12-FOLLOWUP] We lost the race. Re-find the row
+          // the winning worker inserted, matching on the same dedup key the
+          // unique index enforces: (profile_id, lower(name)) WHERE status = 'active'.
+          const racedExisting = await txDb.query.subjects.findFirst({
+            where: and(
+              eq(subjects.profileId, profileId),
+              sql`lower(${subjects.name}) = lower(${filingResponse.shelf.name})`,
+              eq(subjects.status, 'active')
+            ),
+            columns: { id: true, name: true },
+          });
+          if (!racedExisting) {
+            // Should be unreachable: the unique index rejected our insert,
+            // so a row with that key MUST exist. Surface as an error rather
+            // than silently continuing.
+            throw new Error(
+              `[CR-FIL-DEDUP-INDEX-12-FOLLOWUP] Shelf insert hit unique-index conflict but no matching row found on re-find. profileId=${profileId} name=${filingResponse.shelf.name}`
+            );
+          }
+          shelfId = racedExisting.id;
+          shelfName = racedExisting.name;
+          // isNewShelf stays false — the other worker created it
+        }
       }
     }
 
@@ -525,7 +565,15 @@ export async function resolveFilingResult(
       bookId = existing.id;
       bookName = existing.title;
     } else {
-      // Case-insensitive book name dedup within shelf
+      // Case-insensitive book name dedup within shelf — re-find before insert
+      // for the common sequential-retry path (avoids a DB round-trip on
+      // single-worker retries).
+      // [CR-FIL-DEDUP-INDEX-12-FOLLOWUP] Concurrent-write dedup via DB-level
+      // CREATE UNIQUE INDEX curriculum_books_subject_title_lower_uq
+      //   ON curriculum_books (subject_id, lower(title))
+      // (drizzle migration 0044). neon-http does not honour .for('update')
+      // in interactive transactions, so the index is the only durable barrier
+      // against two concurrent workers both passing the SELECT and INSERTing.
       const [existing] = await txDb
         .select()
         .from(curriculumBooks)
@@ -535,7 +583,6 @@ export async function resolveFilingResult(
             sql`lower(${curriculumBooks.title}) = lower(${filingResponse.book.name})`
           )
         )
-        .for('update')
         .limit(1);
       if (existing) {
         bookId = existing.id;
@@ -552,18 +599,51 @@ export async function resolveFilingResult(
         const newId = generateUUIDv7();
         // topicsGenerated=true prevents the legacy generateBookTopics pipeline from running.
         // Filed books create topics via the filing mechanism, not pre-generation.
-        await txDb.insert(curriculumBooks).values({
-          id: newId,
-          subjectId: shelfId,
-          title: filingResponse.book.name,
-          description: filingResponse.book.description,
-          emoji: filingResponse.book.emoji,
-          sortOrder: maxOrder + 1,
-          topicsGenerated: true,
-        });
-        bookId = newId;
-        bookName = filingResponse.book.name;
-        isNewBook = true;
+        // [CR-FIL-DEDUP-INDEX-12-FOLLOWUP] onConflictDoNothing + .returning()
+        // detects when the unique index suppressed our insert (race lost) so
+        // we can re-find the row the winning worker inserted.
+        const inserted = await txDb
+          .insert(curriculumBooks)
+          .values({
+            id: newId,
+            subjectId: shelfId,
+            title: filingResponse.book.name,
+            description: filingResponse.book.description,
+            emoji: filingResponse.book.emoji,
+            sortOrder: maxOrder + 1,
+            topicsGenerated: true,
+          })
+          .onConflictDoNothing()
+          .returning({ id: curriculumBooks.id, title: curriculumBooks.title });
+
+        if (inserted.length > 0) {
+          // We won the race (or were uncontested).
+          bookId = (inserted[0] as { id: string; title: string }).id;
+          bookName = (inserted[0] as { id: string; title: string }).title;
+          isNewBook = true;
+        } else {
+          // [CR-FIL-DEDUP-INDEX-12-FOLLOWUP] We lost the race. Re-find the row
+          // the winning worker inserted, matching on the same dedup key the
+          // unique index enforces: (subject_id, lower(title)).
+          const racedExisting = await txDb.query.curriculumBooks.findFirst({
+            where: and(
+              eq(curriculumBooks.subjectId, shelfId),
+              sql`lower(${curriculumBooks.title}) = lower(${filingResponse.book.name})`
+            ),
+            columns: { id: true, title: true },
+          });
+          if (!racedExisting) {
+            // Should be unreachable: the unique index rejected our insert,
+            // so a row with that key MUST exist. Surface as an error rather
+            // than silently continuing.
+            throw new Error(
+              `[CR-FIL-DEDUP-INDEX-12-FOLLOWUP] Book insert hit unique-index conflict but no matching row found on re-find. subjectId=${shelfId} title=${filingResponse.book.name}`
+            );
+          }
+          bookId = racedExisting.id;
+          bookName = racedExisting.title;
+          // isNewBook stays false — the other worker created it
+        }
       }
     }
 

@@ -309,6 +309,13 @@
       "when": 1778457600000,
       "tag": "0043_topic_dedup_unique_index",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1746057600000,
+      "tag": "0044_shelf_book_dedup_unique_indexes",
+      "breakpoints": true
     }
   ]
 }
