@@ -325,15 +325,23 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           }
 
           // [BUG-866] Structured metric on zero-token stream — "silent recovery
-          // without escalation is banned" (CLAUDE.md). This fires even when
-          // onComplete succeeds, so the fallback reason can be correlated with
-          // it in observability tooling.
+          // without escalation is banned" (CLAUDE.md). logger.warn alone is not
+          // queryable; captureException makes this event discoverable in Sentry
+          // so ops can measure how often the failure mode fires in production.
           if (chunkCount === 0) {
             logger.warn('[sessions/stream] Zero-token stream completed', {
               surface: 'sessions.stream',
               sessionId,
               profileId,
               tokensReceived: 0,
+            });
+            captureException(new Error('Zero-token stream completed'), {
+              profileId,
+              extra: {
+                surface: 'sessions.stream',
+                sessionId,
+                tokensReceived: 0,
+              },
             });
           }
 

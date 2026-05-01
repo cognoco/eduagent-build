@@ -1423,6 +1423,50 @@ describe('session routes', () => {
       );
     });
 
+    // [BUG-866] Zero-token stream must escalate to Sentry so ops can query
+    // how often the failure mode fires — logger.warn alone is not queryable.
+    // The rule: "silent recovery without escalation is banned" (CLAUDE.md).
+    it('[BUG-866] captureException is called when the stream completes with zero tokens', async () => {
+      mockCaptureException.mockClear();
+
+      (streamMessage as jest.Mock).mockResolvedValueOnce({
+        stream: (async function* () {
+          // Yield only whitespace — should NOT increment chunkCount.
+          yield '   ';
+        })(),
+        onComplete: jest.fn().mockResolvedValue({
+          exchangeCount: 1,
+          escalationRung: 1,
+        }),
+      });
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'Hello' }),
+        },
+        TEST_ENV
+      );
+
+      // SSE response still opens with 200 — the zero-token detection is
+      // a background escalation, not a client-visible error.
+      expect(res.status).toBe(200);
+      await res.text(); // drain body to ensure the callback ran
+
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'Zero-token stream completed' }),
+        expect.objectContaining({
+          extra: expect.objectContaining({
+            surface: 'sessions.stream',
+            sessionId: SESSION_ID,
+            tokensReceived: 0,
+          }),
+        })
+      );
+    });
+
     it('does not refund quota when processMessage succeeds', async () => {
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/messages`,
