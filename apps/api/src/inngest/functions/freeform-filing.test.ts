@@ -370,5 +370,32 @@ describe('freeformFilingRetry', () => {
         })
       );
     });
+
+    // [CR-FIL-LOOKUP-07] When a topic still references a book that has been
+    // soft-deleted (or curriculumBooks is otherwise unavailable), the payload
+    // must still carry the FK bookId from the topic row — never silently
+    // emit undefined. Pre-fix this test would have failed because the code
+    // re-queried curriculumBooks and used `book?.id ?? undefined`.
+    it('[CR-FIL-LOOKUP-07] preserves bookId from topic row even when book lookup would return nothing', async () => {
+      // Simulate: curriculumBooks.findFirst returning null (book row gone).
+      // The fix ignores this lookup entirely; we keep the mock in place to
+      // prove the new code path doesn't depend on it.
+      mockCurriculumBooksFindFirst.mockResolvedValue(null);
+
+      const { mockStep } = await executeSteps(createEventData());
+
+      const completedCall = (mockStep.sendEvent as jest.Mock).mock.calls.find(
+        (c: unknown[]) => (c[0] as string) === 'notify-filing-completed'
+      );
+      const payload = (completedCall as unknown[])[1] as {
+        data: Record<string, unknown>;
+      };
+      expect(payload.data.bookId).toBe(filedBookId);
+      expect(payload.data.topicTitle).toBe('Newton Laws');
+      // The dropped-query assertion: curriculumBooks must NOT be queried by
+      // the alreadyFiled path now. If a future regression re-introduces the
+      // lookup, this expectation will catch it.
+      expect(mockCurriculumBooksFindFirst).not.toHaveBeenCalled();
+    });
   });
 });

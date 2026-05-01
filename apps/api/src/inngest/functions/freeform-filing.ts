@@ -1,11 +1,7 @@
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import { and, eq } from 'drizzle-orm';
-import {
-  curriculumBooks,
-  curriculumTopics,
-  learningSessions,
-} from '@eduagent/database';
+import { curriculumTopics, learningSessions } from '@eduagent/database';
 import { filingRetryCompletedEventSchema } from '@eduagent/schemas';
 import {
   buildLibraryIndex,
@@ -74,13 +70,14 @@ export const freeformFilingRetry = inngest.createFunction(
               columns: { title: true, bookId: true },
             });
             if (!topic) return noFilingInfo;
-            const book = await db.query.curriculumBooks.findFirst({
-              where: eq(curriculumBooks.id, topic.bookId),
-              columns: { id: true },
-            });
+            // [CR-FIL-LOOKUP-07] topic.bookId is the FK value already on the
+            // row — re-querying curriculumBooks just to read its id is a
+            // pointless round trip, and worse, it leaks `bookId: undefined`
+            // to the payload if the book row was soft-deleted while the
+            // topic still references it. Trust the FK value.
             return {
               topicTitle: topic.title,
-              bookId: book?.id ?? undefined,
+              bookId: topic.bookId,
             };
           })) as FilingInfo)
         : noFilingInfo;
