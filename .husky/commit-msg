@@ -1,2 +1,35 @@
 #!/usr/bin/env sh
-pnpm exec commitlint --edit $1
+set -e
+
+# Conventional-commit format check
+pnpm exec commitlint --edit "$1"
+
+# Sweep-audit guard: when a commit message claims a sweep (extends to all
+# remaining sites, fixes the same bug everywhere, etc.), require a
+# `Sweep audit:` block with the grep query and result list. Catches the
+# class of false-sweep commits where the claim is broader than the diff.
+#
+# Trigger keywords (case-insensitive, word-boundary): sweep, all sites,
+# remaining surfaces, rest of, across all.
+#
+# Escape: the literal string `(no-sweep)` anywhere in the message bypasses
+# this check (use only when the keyword is incidental, e.g., "swept floor"
+# in a chore commit). `git commit --no-verify` also bypasses it.
+MSG_FILE="$1"
+if grep -iqE '\b(sweep|all sites|remaining surfaces|rest of|across all)\b' "$MSG_FILE" \
+   && ! grep -q '(no-sweep)' "$MSG_FILE"; then
+  if ! grep -qE '^Sweep audit:' "$MSG_FILE"; then
+    echo ""
+    echo "commit-msg: sweep claim detected without audit trail."
+    echo ""
+    echo "Add a 'Sweep audit:' block to the commit body, e.g.:"
+    echo ""
+    echo "  Sweep audit:"
+    echo "    rg 'sendPushNotification\\(' apps/api/src/inngest/functions"
+    echo "    -> 7 hits across 7 files; all 7 reach getRecentNotificationCount gate."
+    echo ""
+    echo "Or include the literal '(no-sweep)' if the keyword is incidental."
+    echo "Or pass --no-verify if you genuinely need to bypass."
+    exit 1
+  fi
+fi
