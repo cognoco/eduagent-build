@@ -89,7 +89,7 @@ const mockIncrementQuota = jest.fn().mockResolvedValue(undefined);
 // mock proxies through mockIncrementQuota so existing assertions about
 // "refund happened with subscriptionId" still apply.
 const mockSafeRefundQuota = jest.fn(
-  async (db: unknown, subscriptionId: string) => {
+  async (db: unknown, subscriptionId: string, _context?: unknown) => {
     await mockIncrementQuota(db, subscriptionId);
     return { refunded: true };
   }
@@ -1288,6 +1288,99 @@ describe('session routes', () => {
       // Must NOT contain a regular `done` frame — client must not count this
       // as a successful exchange.
       expect(body).not.toContain('"exchangeCount":1');
+    });
+
+    // [M-3] If safeRefundQuota itself throws in the BUG-941 fallback path,
+    // the fallback frame and done frame must still be emitted so the client
+    // is never left with a truncated stream.
+    it('[M-3] emits fallback and done frames even when safeRefundQuota throws in fallback path', async () => {
+      mockSafeRefundQuota.mockRejectedValueOnce(new Error('quota DB timeout'));
+      mockCaptureException.mockClear();
+
+      (streamMessage as jest.Mock).mockResolvedValueOnce({
+        stream: (async function* () {
+          yield* [];
+        })(),
+        onComplete: jest.fn().mockResolvedValue({
+          exchangeCount: 0,
+          escalationRung: 1,
+          expectedResponseMinutes: 0,
+          fallback: {
+            reason: 'malformed_envelope',
+            fallbackText: "I didn't have a reply — tap to try again.",
+          },
+        }),
+      });
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'Hello' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.text();
+
+      // Fallback frame must be written regardless of the refund failure.
+      expect(body).toContain('"type":"fallback"');
+      expect(body).toContain('"reason":"malformed_envelope"');
+      // Done frame must follow.
+      expect(body).toContain('"type":"done"');
+      // The refund error must be escalated to Sentry.
+      expect(mockCaptureException).toHaveBeenCalled();
+
+      // Restore default mock so later tests are not affected.
+      mockSafeRefundQuota.mockImplementation(
+        async (db: unknown, subscriptionId: string) => {
+          await mockIncrementQuota(db, subscriptionId);
+          return { refunded: true };
+        }
+      );
+    });
+
+    // [M-3] If safeRefundQuota throws in the onComplete catch path, the SSE
+    // error frame must still be written.
+    it('[M-3] emits error frame even when safeRefundQuota throws in onComplete catch', async () => {
+      mockSafeRefundQuota.mockRejectedValueOnce(new Error('quota DB timeout'));
+      mockCaptureException.mockClear();
+
+      const onCompleteErr = new Error('envelope parse failed');
+      (streamMessage as jest.Mock).mockResolvedValueOnce({
+        stream: (async function* () {
+          yield 'partial ';
+        })(),
+        onComplete: jest.fn().mockRejectedValue(onCompleteErr),
+      });
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'Hello' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.text();
+
+      // Error frame must be written regardless of the refund failure.
+      expect(body).toContain('"type":"error"');
+      // captureException should be called at least once (for the refund throw).
+      expect(mockCaptureException).toHaveBeenCalled();
+
+      // Restore default mock so later tests are not affected.
+      mockSafeRefundQuota.mockImplementation(
+        async (db: unknown, subscriptionId: string) => {
+          await mockIncrementQuota(db, subscriptionId);
+          return { refunded: true };
+        }
+      );
     });
   });
 

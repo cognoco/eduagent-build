@@ -360,14 +360,32 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                 reason: result.fallback.reason,
                 fallbackText: result.fallback.fallbackText,
               });
-              // Refund quota before emitting frames — safe to call even if the
-              // refund itself fails (safeRefundQuota escalates internally).
+              // Refund quota before emitting frames. safeRefundQuota escalates
+              // internally, but if it throws we must still emit the SSE frames
+              // so the client is never left with a truncated stream. [M-3]
               if (subscriptionId) {
-                await safeRefundQuota(db, subscriptionId, {
-                  route: 'sessions.stream.fallback',
-                  profileId,
-                  sessionId,
-                });
+                try {
+                  await safeRefundQuota(db, subscriptionId, {
+                    route: 'sessions.stream.fallback',
+                    profileId,
+                    sessionId,
+                  });
+                } catch (refundErr) {
+                  captureException(refundErr, {
+                    profileId,
+                    extra: { sessionId, route: 'sessions.stream.fallback' },
+                  });
+                  logger.error(
+                    '[sessions/stream] safeRefundQuota threw in fallback path',
+                    {
+                      sessionId,
+                      error:
+                        refundErr instanceof Error
+                          ? refundErr.message
+                          : String(refundErr),
+                    }
+                  );
+                }
               }
               await sseStream.writeSSE({ data: JSON.stringify(frame) });
               await sseStream.writeSSE({
@@ -404,14 +422,32 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
               error: err instanceof Error ? err.message : String(err),
             });
             captureException(err, { profileId, extra: { sessionId } });
-            // Refund quota — user should not be charged for a failed exchange
-            // [BUG-661 / A-21] safeRefundQuota escalates if the refund itself fails.
+            // Refund quota — user should not be charged for a failed exchange.
+            // Wrap in try/catch: if safeRefundQuota throws, the error frame
+            // must still be written so the client is never left hanging. [M-3]
             if (subscriptionId) {
-              await safeRefundQuota(db, subscriptionId, {
-                route: 'sessions.stream.onComplete',
-                profileId,
-                sessionId,
-              });
+              try {
+                await safeRefundQuota(db, subscriptionId, {
+                  route: 'sessions.stream.onComplete',
+                  profileId,
+                  sessionId,
+                });
+              } catch (refundErr) {
+                captureException(refundErr, {
+                  profileId,
+                  extra: { sessionId, route: 'sessions.stream.onComplete' },
+                });
+                logger.error(
+                  '[sessions/stream] safeRefundQuota threw in onComplete catch',
+                  {
+                    sessionId,
+                    error:
+                      refundErr instanceof Error
+                        ? refundErr.message
+                        : String(refundErr),
+                  }
+                );
+              }
             }
             await sseStream.writeSSE({
               data: JSON.stringify({
