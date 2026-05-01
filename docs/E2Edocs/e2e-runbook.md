@@ -89,7 +89,7 @@ missing, reinstall via EAS or `npx expo run:android` from `apps/mobile/`.
 From the **main repo** (not a worktree — Metro caches per-checkout):
 
 ```bash
-cd /c/Dev/Projects/Products/Apps/eduagent-build/apps/mobile
+cd apps/mobile
 pnpm exec expo start --port 8081 --dev-client
 ```
 
