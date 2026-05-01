@@ -92,6 +92,35 @@ export const feedbackDeliveryFailed = inngest.createFunction(
       // exactly the failure mode the key was meant to prevent. Better to
       // send (risking a rare double-deliver if Inngest replays without an
       // event id) than to silently drop a real support email.
+      //
+      // [CR-MISSING-EVENT-ID-VISIBILITY] Per global "no silent recovery" rule,
+      // the missing-id fallback must be observable so ops can count occurrences.
+      // logger.warn makes it queryable in log aggregation; captureException
+      // surfaces it in Sentry alerts if the rate becomes significant.
+      if (!event.id) {
+        logger.warn(
+          '[feedback-delivery-failed] dropping idempotency key — event.id missing',
+          {
+            surface: 'feedback-delivery-failed',
+            reason: 'missing_event_id',
+            profileId,
+            category,
+          }
+        );
+        captureException(
+          new Error(
+            'feedback-delivery-failed: missing event.id — idempotency key dropped'
+          ),
+          {
+            extra: {
+              surface: 'feedback-delivery-failed',
+              reason: 'missing_event_id',
+              profileId,
+              category,
+            },
+          }
+        );
+      }
       const idempotencyKey = event.id
         ? `feedback-delivery-failed:${profileId}:${event.id}:retry-delivery`
         : undefined;
