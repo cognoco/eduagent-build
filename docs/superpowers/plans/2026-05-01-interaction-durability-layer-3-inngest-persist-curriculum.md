@@ -44,14 +44,14 @@ Layer 3 can ship standalone, but the SUBJECT-09 ticket should not be closed unti
 | Status | File | Role |
 |--------|------|------|
 | **Create** | `apps/api/drizzle/0047_draft_status_completing_failed.sql` | `ALTER TYPE draft_status ADD VALUE 'completing'; ADD VALUE 'failed';` + `failureCode` column |
-| **Create** | `apps/api/drizzle/0048_curriculum_topics_dedup_index.sql` | Single unique index using `COALESCE(book_id, sentinel)` + `LOWER(TRIM(topic_name))` — no partial predicate (→ R2: rev 1 used two partial indexes; ON CONFLICT against a partial index requires `targetWhere` plumbing the codebase doesn't have) |
+| ~~**Create**~~ | ~~`apps/api/drizzle/0048_curriculum_topics_dedup_index.sql`~~ | → R3: **REMOVED.** Existing migration `0043` already created `curriculum_topics_book_title_lower_uq` on `(book_id, lower(title))`. No new index needed. |
 | **Modify** | `packages/database/src/schema/sessions.ts` | Add `'completing'` and `'failed'` to `draftStatusEnum`; add `failureCode` column |
-| **Modify** | `packages/database/src/schema/curriculum.ts` (or wherever `curriculumTopics` lives) | Add the unique index to the table definition |
-| **Modify** | `packages/schemas/src/errors.ts` | Add `PersistCurriculumError` + `persistFailureCodeSchema` enum |
+| **Modify** | `packages/database/src/schema/subjects.ts` | → R3: correct file — `curriculumTopics` lives here, not in a `curriculum.ts` file. Verify `onConflictDoNothing` target matches existing index columns. |
+| **Modify** | `packages/schemas/src/errors.ts` | → R3: `PersistCurriculumError` already exists with `(message, cause?)` constructor. **Modify** it to add a `code: PersistFailureCode` property. Add `persistFailureCodeSchema` enum. |
 | **Modify** | `packages/schemas/src/inngest-events.ts` | Add `interviewReadyToPersistEventSchema` |
 | **Modify** | `packages/schemas/src/onboarding.ts` (or wherever `OnboardingDraftRow` lives) | Add `failureCode: PersistFailureCode \| null` to the row schema |
-| **Modify** | `apps/api/src/services/curriculum.ts` | Make topic insert idempotent via `onConflictDoNothing` keyed on the new unique index |
-| **Create** | `apps/api/src/services/interview-persist.ts` | New `persistCurriculumAndMarkComplete` helper using `db.batch()` (now including the `topicsGenerated` update — → R2) |
+| **Modify** | `apps/api/src/services/interview.ts` | → R3: `persistCurriculum` lives HERE (line ~797). Add `onConflictDoNothing` to its internal `db.insert(curriculumTopics)` calls. Column is `title` (NOT `topicName`). No `profileId` on table. |
+| ~~**Create**~~ | ~~`apps/api/src/services/interview-persist.ts`~~ | → R3: **REMOVED.** Don't create a new helper. Call existing `persistCurriculum` from the Inngest step. Use `db.transaction()` (WS driver supports it) to atomize persist + mark-completed. |
 | **Create** | `apps/api/src/inngest/functions/interview-persist-curriculum.ts` | The new Inngest function |
 | **Create** | `apps/api/src/inngest/functions/interview-persist-curriculum.test.ts` | Unit tests with a step-replay harness that mirrors Inngest memoization (→ R2) |
 | **Create** | `apps/api/src/inngest/functions/interview-persist-curriculum.integration.test.ts` | Real-Postgres integration test (SUBJECT-09 break test) using the same step-replay harness |
@@ -63,7 +63,7 @@ Layer 3 can ship standalone, but the SUBJECT-09 ticket should not be closed unti
 | **Create** | `apps/mobile/src/components/interview/InterviewCompletingPanel.test.tsx` | Component tests |
 | **Create** | `apps/mobile/src/components/interview/InterviewFailedPanel.tsx` | Failure UX rendering user-facing copy mapped from `failureCode` (→ R2 — no raw error text on screen) |
 | **Create** | `apps/mobile/src/components/interview/InterviewFailedPanel.test.tsx` | Component tests |
-| **Modify** | `apps/api/src/services/notifications.ts` (or equivalent) | Send push on curriculum-completed; lives in its own Inngest step (→ R2) |
+| **Modify** | `apps/api/src/services/notifications.ts` | → R3: Function is `sendPushNotification(db, payload, options?)` — NOT `sendPushToProfile`. Signature: `(db: Database, { profileId, title, body, type }: NotificationPayload)`. The `type` field must be one of 18 literal strings — add `'interview_ready'` to the union. |
 
 ---
 
@@ -78,7 +78,7 @@ Layer 3 can ship standalone, but the SUBJECT-09 ticket should not be closed unti
 | Mobile loses network during `completing` poll | Subway / lift | `useQuery` keeps last `completing` state; backoff continues silently | When network returns + AppState becomes active, foreground invalidate refetches immediately |
 | LLM transient error → Inngest retry succeeds | extractSignals throws once, succeeds on retry 2 | "Building your learning path…" stays up; no failure surface | Built-in Inngest step memoization re-runs only the failed step |
 | LLM persistent error → retries exhausted | extractSignals throws all 3 attempts | After ~Inngest-budget delay, panel transitions to `failed` with code `extract_signals_failed`. Mobile copy: "We couldn't build your learning path right now." | "Try Again" hits the retry endpoint, which re-dispatches a fresh run |
-| `extractSignals` succeeds but returns `{ topics: [] }` | LLM gave up cleanly | Treated as failure: function throws `EmptySignalsError`, `onFailure` writes `failureCode='empty_signals'` | "Try Again" or user re-engages the interview |
+| `extractSignals` succeeds but returns empty/default signals (`goals: [], interests: []`) | LLM gave up cleanly | → R3: `extractSignals` returns `{ goals, experienceLevel, currentKnowledge, interests }` — check `goals.length === 0 && interests.length === 0` for "nothing useful". Treated as failure: function throws `PersistCurriculumError('empty_signals')`, `onFailure` writes `failureCode='empty_signals'` | "Try Again" or user re-engages the interview |
 | Push send fails inside step | Expo API down | Step throws → Inngest retries the push step only (persist already memoized green) | If push step exhausts retries, `onFailure` for the push step logs but does not flip draft to `failed` (data is already persisted) |
 | Two concurrent finalizers (SSE + force-complete) | User force-completes mid-stream | One wins the conditional UPDATE and dispatches; the other gets `null` from `RETURNING` and returns 409 immediately | No duplicate runs; no duplicate LLM cost |
 
@@ -149,24 +149,38 @@ failureCode: text('failure_code'),
 
 - [ ] **Step 3: Typed failure-code enum in schemas**
 
-In `packages/schemas/src/errors.ts` append:
+→ R3: `PersistCurriculumError` **already exists** in `packages/schemas/src/errors.ts` with constructor `(message: string, cause?: unknown)`. MODIFY it — do not recreate from scratch (that would be a duplicate-export compile error).
+
+In `packages/schemas/src/errors.ts`, add the enum and modify the existing class:
 
 ```typescript
 import { z } from 'zod';
 
 export const persistFailureCodeSchema = z.enum([
   'extract_signals_failed',  // LLM failed during signal extraction
-  'empty_signals',            // LLM returned no usable topics
-  'persist_failed',           // db.batch() throw not caused by an LLM
+  'empty_signals',            // LLM returned no usable signals (goals + interests both empty)
+  'generate_curriculum_failed', // → R3: generateCurriculum() threw (distinct from extract)
+  'persist_failed',           // db.transaction throw not caused by an LLM
   'draft_missing',            // draft hard-deleted mid-flight
   'unknown',                  // catch-all; logged with full context server-side
 ]);
 export type PersistFailureCode = z.infer<typeof persistFailureCodeSchema>;
 
+// → R3: MODIFY the existing class — add `code` property while keeping
+// backwards-compat with existing callers that pass (message, cause?).
 export class PersistCurriculumError extends Error {
-  constructor(public code: PersistFailureCode, message?: string) {
-    super(message ?? code);
+  public code: PersistFailureCode;
+  constructor(codeOrMessage: PersistFailureCode | string, messageOrCause?: string | unknown) {
+    const isCode = persistFailureCodeSchema.safeParse(codeOrMessage).success;
+    const code = isCode ? (codeOrMessage as PersistFailureCode) : 'unknown';
+    const message = isCode
+      ? (typeof messageOrCause === 'string' ? messageOrCause : codeOrMessage)
+      : (codeOrMessage as string);
+    super(message);
+    this.code = code;
     this.name = 'PersistCurriculumError';
+    if (!isCode && messageOrCause) this.cause = messageOrCause;
+    Object.setPrototypeOf(this, PersistCurriculumError.prototype);
   }
 }
 ```
@@ -203,96 +217,65 @@ WAIT for the staging migrate step to go green AND for the production deploy / mi
 
 ---
 
-## Task 2: Idempotent topic insert — single non-partial unique index → R2
+## Task 2: Idempotent topic insert — leverage existing unique index → R3
+
+→ R3: **COMPLETE REWRITE of this task.** Rev 2 was built on multiple false assumptions:
+- Column is **`title`**, NOT `topicName` (doesn't exist)
+- **`bookId` is NOT NULL** — always populated via `ensureDefaultBook()`. No COALESCE sentinel needed.
+- Migration `0043` already created `curriculum_topics_book_title_lower_uq` on `(book_id, lower(title))` — **no new migration needed**
+- **No `profileId` column** on `curriculumTopics` — ownership inferred via `curriculum → subject → profile`
+- `persistCurriculum` lives in `apps/api/src/services/interview.ts` (~line 797), NOT in `curriculum.ts`
+- There are 4 insert sites in `curriculum.ts` + 1 in `interview.ts`
 
 **Files:**
-- Create: `apps/api/drizzle/0048_curriculum_topics_dedup_index.sql`
-- Modify: `packages/database/src/schema/curriculum.ts`
-- Modify: `apps/api/src/services/curriculum.ts`
+- Modify: `apps/api/src/services/interview.ts` (the `persistCurriculum` function's insert, ~line 850)
+- Modify: `apps/api/src/services/curriculum.ts` (bulk-insert sites at ~546, ~937, ~1356)
 
-The unique index is on **content-derived key** `(curriculumId, COALESCE(book_id, '00000000-...'), lower(trim(topic_name)))` — NOT `sortOrder`, because LLM jitter on retry produces different orderings without colliding. The `COALESCE` collapses `NULL` `book_id` to a sentinel UUID so a single ordinary unique index covers both cases without needing `WHERE` predicate matching at ON CONFLICT time.
+**No migration needed. No production gate needed.** Existing index already provides idempotency.
 
-→ R2: rev 1 used two **partial** unique indexes (`WHERE book_id IS NOT NULL` / `IS NULL`). Postgres `ON CONFLICT` against a partial index requires the same predicate to be expressible to the planner. Drizzle's `onConflictDoNothing({ target })` API in this codebase has no precedent for emitting `ON CONFLICT (...) WHERE ...` — `Grep` for `targetWhere` returns zero hits. The COALESCE approach needs no predicate matching and works with the existing API shape.
-
-- [ ] **Step 1: Locate the topic-insert site**
+- [ ] **Step 1: Locate ALL topic-insert sites**
 
 ```bash
-cd apps/api && rg -nE "db\.insert\([^)]*curriculumTopics" src/services/curriculum.ts src/services/interview.ts
+cd apps/api && rg -n "db\.insert\(curriculumTopics\)" src/services/
 ```
 
-Note the line numbers. The plan's Task 2.4 patches them.
+- [ ] **Step 2: Patch `persistCurriculum` in `interview.ts`**
 
-- [ ] **Step 2: Migration**
-
-```sql
--- 0048_curriculum_topics_dedup_index.sql
--- Idempotent persistCurriculum requires a content-derived unique key so that
--- a retried Inngest step does not double-insert when LLM ordering jitters.
--- COALESCE(book_id, sentinel) collapses NULL book_id to a fixed UUID so a
--- single non-partial index covers both with-book and without-book topics —
--- avoiding ON CONFLICT-against-partial-index complications.
-
-CREATE UNIQUE INDEX "curriculum_topics_normalised_uniq"
-  ON "curriculum_topics" (
-    "curriculum_id",
-    COALESCE("book_id", '00000000-0000-0000-0000-000000000000'::uuid),
-    LOWER(TRIM("topic_name"))
-  );
-```
-
-- [ ] **Step 3: Drizzle table update**
-
-In the `curriculumTopics` pgTable definition's `(table) => [...]` block, add:
-
-```typescript
-uniqueIndex('curriculum_topics_normalised_uniq')
-  .on(
-    table.curriculumId,
-    sql`COALESCE(${table.bookId}, '00000000-0000-0000-0000-000000000000'::uuid)`,
-    sql`lower(trim(${table.topicName}))`,
-  ),
-```
-
-- [ ] **Step 4: Patch the insert site to use `onConflictDoNothing`**
-
-In `apps/api/src/services/curriculum.ts` (and any other caller that inserts `curriculumTopics`), replace:
-
-```typescript
-await db.insert(curriculumTopics).values(rows);
-```
-
-with:
+In `apps/api/src/services/interview.ts` (~line 850), find the `db.insert(curriculumTopics).values(topicRows)`. Add `onConflictDoNothing`:
 
 ```typescript
 await db
   .insert(curriculumTopics)
-  .values(rows)
+  .values(topicRows)
   .onConflictDoNothing({
-    target: [
-      curriculumTopics.curriculumId,
-      sql`COALESCE(${curriculumTopics.bookId}, '00000000-0000-0000-0000-000000000000'::uuid)`,
-      sql`lower(trim(${curriculumTopics.topicName}))`,
-    ],
+    target: [curriculumTopics.bookId, sql`lower(${curriculumTopics.title})`],
   });
 ```
 
-If the insert is in a loop, prefer one batched insert over N individual inserts.
+→ R3: target columns `bookId` + `lower(title)` match the existing `curriculum_topics_book_title_lower_uq` index from migration 0043.
 
-- [ ] **Step 5: Test — write a regression test that asserts double-insert is idempotent**
+- [ ] **Step 3: Patch bulk-insert sites in `curriculum.ts`**
 
-This requires real Postgres because the unique index is what enforces the semantics. Defer the assertion to the integration test in Task 8 — a unit test against a Drizzle mock would just be testing the mock.
+Apply the same `.onConflictDoNothing({ target: [...] })` to:
+- `persistNarrowTopics` (~line 546)
+- `persistBookTopics` (~line 937)
+- `regenerateLanguageCurriculum` (~line 1356)
 
-- [ ] **Step 6: Apply, test, commit** (production migrate gate same as Task 1)
+Do NOT patch `addCurriculumTopic` (~line 1046) — that's user-initiated and should surface duplicates as errors.
+
+- [ ] **Step 4: Idempotency assertion deferred to integration test (Task 8)**
+
+Requires real Postgres.
+
+- [ ] **Step 5: Typecheck + commit**
 
 ```bash
-pnpm run db:push:dev
-cd apps/api && pnpm exec jest --findRelatedTests src/services/curriculum.ts --no-coverage
-git add apps/api/drizzle/0048_curriculum_topics_dedup_index.sql packages/database/src/schema/curriculum.ts apps/api/src/services/curriculum.ts
-git commit -m "feat(api): idempotent curriculum topic insert via content-derived unique index [INTERACTION-DUR-L3]"
+cd apps/api && pnpm exec jest --findRelatedTests src/services/interview.ts src/services/curriculum.ts --no-coverage
+pnpm exec nx run api:typecheck
+git add apps/api/src/services/interview.ts apps/api/src/services/curriculum.ts
+git commit -m "feat(api): idempotent curriculum topic insert via onConflictDoNothing on existing index [INTERACTION-DUR-L3]"
 git push
 ```
-
-Wait for **production** migrate to go green — same gate as Task 1. The `onConflictDoNothing` references the new index by column expressions, so the index must exist on prod before code lands.
 
 ---
 
@@ -331,12 +314,14 @@ git push
 
 ---
 
-## Task 4: `persistCurriculumAndMarkComplete` helper using `db.batch()`
+## Task 4: ~~`persistCurriculumAndMarkComplete` helper using `db.batch()`~~ → R3: Wrap existing `persistCurriculum` + mark-completed in `db.transaction()`
+
+→ R3: **REVISED.** Do NOT create a new helper file. The existing `persistCurriculum` in `apps/api/src/services/interview.ts` (line ~797) already handles curriculum generation + topic insertion + `topicsGenerated` update. The Inngest step just needs to call it, then update the draft status. Since `getStepDatabase()` returns the neon-serverless WS driver (NOT neon-http), `db.transaction()` IS available and ACID.
 
 **Files:**
-- Create: `apps/api/src/services/interview-persist.ts`
+- No new file. The atomicity will be achieved by wrapping the call to `persistCurriculum` + `updateDraft(status: 'completed')` inside a `db.transaction()` within the Inngest step.
 
-This bundles **all three writes** (curriculum persist + draft `status='completed'` + book `topicsGenerated=true`) into one `db.batch()` so the polling endpoint never observes a partial state. → R2: rev 1 left `topicsGenerated` outside the batch. Per `project_neon_transaction_facts`, `db.batch()` is the only ACID primitive available with neon-http.
+→ R3: The `project_neon_transaction_facts` memory note says "neon-http never supports interactive tx". However, `getStepDatabase()` uses the **neon-serverless WS driver** (verified in `apps/api/src/inngest/helpers.ts`), which DOES support interactive transactions. `db.batch()` is only needed on neon-http route handlers. Inside Inngest functions we have full `db.transaction()` support.
 
 - [ ] **Step 1: Implement**
 

@@ -76,7 +76,7 @@ describe('OutboxFailedBanner', () => {
   it('calls Clipboard.setStringAsync with entry content, then deletePermanentlyFailed, then refreshes', async () => {
     mockListPermanentlyFailed.mockResolvedValue([ENTRY]);
     mockSetStringAsync.mockResolvedValue(true);
-    mockDeletePermanentlyFailed.mockResolvedValue();
+    mockDeletePermanentlyFailed.mockResolvedValue(undefined);
 
     render(<OutboxFailedBanner profileId="p-1" flow="session" />);
 

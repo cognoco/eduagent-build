@@ -33,15 +33,12 @@ const mockAddBreadcrumb = addBreadcrumb as jest.MockedFunction<
 >;
 
 function createApp(options: { profileId?: string } = {}) {
-  const app = new Hono<{
-    Bindings: { IDEMPOTENCY_KV?: KVNamespace };
-    Variables: { db: unknown; profileId: string | undefined };
-  }>();
+  const app = new Hono();
 
   app.use('*', async (c, next) => {
-    c.set('db' as never, {});
+    (c as any).set('db', {});
     if (options.profileId !== undefined) {
-      c.set('profileId' as never, options.profileId);
+      (c as any).set('profileId', options.profileId);
     }
     await next();
   });
@@ -74,7 +71,7 @@ describe('idempotencyPreflight middleware', () => {
       const res = await app.request(
         '/test',
         { method: 'POST' },
-        { IDEMPOTENCY_KV: kv as unknown as KVNamespace }
+        { IDEMPOTENCY_KV: kv }
       );
 
       expect(res.status).toBe(200);
@@ -95,7 +92,7 @@ describe('idempotencyPreflight middleware', () => {
           method: 'POST',
           headers: { 'Idempotency-Key': 'abc-123' },
         },
-        { IDEMPOTENCY_KV: kv as unknown as KVNamespace }
+        { IDEMPOTENCY_KV: kv }
       );
 
       expect(res.status).toBe(200);
@@ -145,7 +142,7 @@ describe('idempotencyPreflight middleware', () => {
           method: 'POST',
           headers: { 'Idempotency-Key': 'abc-123' },
         },
-        { IDEMPOTENCY_KV: kv as unknown as KVNamespace }
+        { IDEMPOTENCY_KV: kv }
       );
 
       expect(res.status).toBe(200);
@@ -168,7 +165,7 @@ describe('idempotencyPreflight middleware', () => {
           method: 'POST',
           headers: { 'Idempotency-Key': 'abc-123' },
         },
-        { IDEMPOTENCY_KV: kv as unknown as KVNamespace }
+        { IDEMPOTENCY_KV: kv }
       );
 
       expect(res.status).toBe(200);
@@ -208,7 +205,7 @@ describe('idempotencyPreflight middleware', () => {
           method: 'POST',
           headers: { 'Idempotency-Key': 'abc-123' },
         },
-        { IDEMPOTENCY_KV: kv as unknown as KVNamespace }
+        { IDEMPOTENCY_KV: kv }
       );
 
       expect(res.headers.get('Idempotency-Replay')).toBe('true');
@@ -246,7 +243,7 @@ describe('idempotencyPreflight middleware', () => {
           method: 'POST',
           headers: { 'Idempotency-Key': 'abc-123' },
         },
-        { IDEMPOTENCY_KV: kv as unknown as KVNamespace }
+        { IDEMPOTENCY_KV: kv }
       );
 
       expect(res.headers.get('Idempotency-Replay')).toBe('true');
