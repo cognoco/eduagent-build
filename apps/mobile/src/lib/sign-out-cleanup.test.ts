@@ -67,6 +67,9 @@ describe('clearProfileSecureStorageOnSignOut [BUG-723 / SEC-7]', () => {
           // The mock above uses the same replacement so the key shape matches.
           `permissionSetupSeen_${id}`,
           `voice-input-mode-${id}`,
+          // [CR-PR129-M6] Accent preset — was previously hidden from registry
+          // enforcement because _layout.tsx was file-scoped in REGISTRY_EXCEPTIONS.
+          `accentPreset_${id}`,
         ])
       );
     }

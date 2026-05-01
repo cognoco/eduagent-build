@@ -241,11 +241,16 @@ describe('[CR-SECURESTORE-REGISTRY-11] sign-out cleanup registry enforcement', (
 
     expect(allCallsites.length).toBeGreaterThan(0);
 
-    const exceptionPaths = new Set(REGISTRY_EXCEPTIONS.map((e) => e.file));
+    // [CR-PR129-M6] Exception lookup is callsite-scoped (file:line), not
+    // file-scoped, so a registered key in an exception-listed file is still
+    // checked against the registry.
+    const exceptionCallsites = new Set(
+      REGISTRY_EXCEPTIONS.map((e) => `${e.file}:${e.line}`)
+    );
 
     const unregistered: Callsite[] = [];
     for (const cs of allCallsites) {
-      if (exceptionPaths.has(cs.relPath)) continue;
+      if (exceptionCallsites.has(`${cs.relPath}:${cs.line}`)) continue;
       if (!isCoveredByPerProfileShape(cs.rawArg)) {
         unregistered.push(cs);
       }
@@ -274,5 +279,57 @@ describe('[CR-SECURESTORE-REGISTRY-11] sign-out cleanup registry enforcement', (
       const abs = path.resolve(__dirname, '..', '..', '..', '..', ex.file);
       expect(fs.existsSync(abs)).toBe(true);
     }
+  });
+
+  // [CR-PR129-M6] Callsite-scoped exception tests.
+  it('exception-listed callsite is allowed even though its key is not in the registry', () => {
+    // apps/mobile/src/app/_layout.tsx line 55 is the Clerk tokenCache saveToken.
+    // The key arg is a bare identifier `key` — this is accepted by the bare-id
+    // fast-path in isCoveredByPerProfileShape regardless. The important thing is
+    // that the callsite is present in REGISTRY_EXCEPTIONS and its file exists.
+    const clerkException = REGISTRY_EXCEPTIONS.find(
+      (e) => e.file === 'apps/mobile/src/app/_layout.tsx' && e.line === 55
+    );
+    expect(clerkException).toBeDefined();
+    const abs = path.resolve(
+      __dirname,
+      '..',
+      '..',
+      '..',
+      '..',
+      clerkException!.file
+    );
+    expect(fs.existsSync(abs)).toBe(true);
+  });
+
+  it('unregistered key on a different line in an exception-listed file is still flagged', () => {
+    // Simulate a callsite in an exception-listed file at a line that is NOT
+    // in REGISTRY_EXCEPTIONS. The callsite uses an unregistered literal key
+    // `totally-unregistered-key`. With file-scoped exceptions this would be
+    // silently ignored; with callsite-scoped exceptions it must be flagged.
+    const exceptionCallsites = new Set(
+      REGISTRY_EXCEPTIONS.map((e) => `${e.file}:${e.line}`)
+    );
+
+    // Pick any file that has at least one exception entry.
+    const firstException = REGISTRY_EXCEPTIONS[0];
+    if (!firstException) throw new Error('REGISTRY_EXCEPTIONS is empty');
+    const exceptionFile = firstException.file;
+    // Use a line number that is NOT in the exception list for that file.
+    const unexceptedLine = 9999;
+    const simulatedCallsite: Callsite = {
+      relPath: exceptionFile,
+      line: unexceptedLine,
+      rawArg: "'totally-unregistered-key'",
+    };
+
+    const isExcepted = exceptionCallsites.has(
+      `${simulatedCallsite.relPath}:${simulatedCallsite.line}`
+    );
+    expect(isExcepted).toBe(false);
+
+    // The key itself must not be covered by the registry either.
+    const isCovered = isCoveredByPerProfileShape(simulatedCallsite.rawArg);
+    expect(isCovered).toBe(false);
   });
 });

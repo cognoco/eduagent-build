@@ -50,6 +50,10 @@ export const PER_PROFILE_KEYS: ReadonlyArray<(profileId: string) => string> = [
   (id) => sanitizeSecureStoreKey(`permissionSetupSeen_${id}`),
   // session-types.ts — getInputModeKey, sanitized
   (id) => sanitizeSecureStoreKey(`voice-input-mode-${id}`),
+  // [CR-PR129-M6] (app)/_layout.tsx — ACCENT_STORE_PREFIX: accent preset per profile, sanitized.
+  // Was previously hidden from registry enforcement because _layout.tsx was
+  // file-scoped in REGISTRY_EXCEPTIONS for its Clerk tokenCache callsite.
+  (id) => sanitizeSecureStoreKey(`accentPreset_${id}`),
 ];
 
 // Global keys that should reset when no one is signed in. Excludes onboarding
@@ -66,31 +70,56 @@ export const GLOBAL_KEYS: ReadonlyArray<string> = [
   'byok-waitlist-joined',
 ];
 
-// [CR-SECURESTORE-REGISTRY-11] Documented exceptions — callsites that the
-// meta-test should ignore. Each entry must justify why the key is NOT in
-// the registry. If a future writer is added that doesn't fit one of these
-// categories, register its key shape above instead of expanding this list.
+// [CR-SECURESTORE-REGISTRY-11] Documented exceptions — specific callsites that
+// the meta-test should ignore. Each entry is scoped to a single callsite
+// (file + line number) rather than an entire file, so that adding a registered
+// key to the same file does not silently bypass the guard for that new key.
+//
+// [CR-PR129-M6] Changed from file-scoped to callsite-scoped (file + line) to
+// prevent a registered key in an exception-listed file from silently swallowing
+// an unregistered key in the same file.
+//
+// If a future writer is added that doesn't fit one of these categories,
+// register its key shape in PER_PROFILE_KEYS / GLOBAL_KEYS above instead of
+// expanding this list.
 export const REGISTRY_EXCEPTIONS: ReadonlyArray<{
   file: string;
+  line: number;
   reason: string;
 }> = [
   {
     file: 'apps/mobile/src/lib/secure-storage.ts',
+    line: 49,
     reason:
-      'Wrapper module — calls ExpoSecureStore.setItemAsync directly. Not a callsite that writes app data.',
+      'Wrapper module — this is the setItemAsync function definition, not a callsite. The scanner matches the function signature; the key parameter is caller-supplied.',
+  },
+  {
+    file: 'apps/mobile/src/lib/secure-storage.ts',
+    line: 60,
+    reason:
+      'Wrapper module — delegates to ExpoSecureStore.setItemAsync (with options). Not a callsite that writes app data; caller-supplied key.',
+  },
+  {
+    file: 'apps/mobile/src/lib/secure-storage.ts',
+    line: 62,
+    reason:
+      'Wrapper module — delegates to ExpoSecureStore.setItemAsync (without options). Not a callsite that writes app data; caller-supplied key.',
   },
   {
     file: 'apps/mobile/src/lib/migrate-secure-store-key.ts',
+    line: 26,
     reason:
       'One-shot migration helper that copies arbitrary oldKey→newKey. Both keys are caller-supplied — registration belongs at the call site of the migration, not here.',
   },
   {
     file: 'apps/mobile/src/app/_layout.tsx',
+    line: 55,
     reason:
       'Clerk tokenCache adapter — keys are Clerk-internal session/JWT tokens, not app data. Clerk manages their lifecycle; signOut() drops them via the SDK.',
   },
   {
     file: 'apps/mobile/src/lib/summary-draft.ts',
+    line: 48,
     reason:
       'Drafts use getDraftKey(profileId, sessionId) — multi-key shape with sessionId we cannot enumerate at sign-out. Drafts self-expire via DRAFT_TTL_MS (7d) on next read, so leakage is bounded; document and accept rather than register a prefix-wipe (expo-secure-store has no listKeys API).',
   },
