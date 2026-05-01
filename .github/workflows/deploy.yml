@@ -157,6 +157,32 @@ jobs:
       # production deploys, allowing a staging deploy to run migrations on prod (and vice
       # versa). Selecting by event/input makes the target unambiguous in the YAML itself
       # and removes the dependency on whoever last set the repo-level fallback secret.
+      # [CR-PR129-HIGH] Fail fast when the STAGING secret is empty during a
+      # staging deploy. GitHub Actions' `cond && A || B` ternary evaluates as
+      # `(cond && A) || B`, so an empty `secrets.DATABASE_URL_STAGING` would
+      # silently fall through to `DATABASE_URL_PRODUCTION` — i.e. a staging
+      # deploy could run migrations on the production database. Verify the
+      # intended secret was actually set before any URL assignment is used.
+      - name: Assert correct DATABASE_URL secret is set for deploy target
+        env:
+          IS_STAGING: ${{ github.event_name == 'push' || inputs.api_environment == 'staging' }}
+          IS_PRODUCTION: ${{ github.event_name == 'workflow_dispatch' && inputs.api_environment == 'production' }}
+          STAGING_SECRET_SET: ${{ secrets.DATABASE_URL_STAGING != '' }}
+          PRODUCTION_SECRET_SET: ${{ secrets.DATABASE_URL_PRODUCTION != '' }}
+        run: |
+          if [ "$IS_STAGING" = "true" ] && [ "$STAGING_SECRET_SET" != "true" ]; then
+            echo "✗ Staging deploy but secrets.DATABASE_URL_STAGING is empty or unset."
+            echo "  The DATABASE_URL ternary would silently fall through to"
+            echo "  secrets.DATABASE_URL_PRODUCTION, mis-migrating the wrong DB."
+            echo "  Add DATABASE_URL_STAGING to GitHub Actions secrets."
+            exit 1
+          fi
+          if [ "$IS_PRODUCTION" = "true" ] && [ "$PRODUCTION_SECRET_SET" != "true" ]; then
+            echo "✗ Production deploy but secrets.DATABASE_URL_PRODUCTION is empty or unset."
+            exit 1
+          fi
+          echo "✓ Expected secret is set for deploy target."
+
       - name: Verify deploy target before migrations
         env:
           DEPLOY_ENV: ${{ github.event_name == 'push' && 'staging' || inputs.api_environment }}
