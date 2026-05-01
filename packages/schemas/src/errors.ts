@@ -114,27 +114,6 @@ export class BadRequestError extends Error {
   }
 }
 
-export class SubjectNotFoundError extends Error {
-  constructor() {
-    super('Subject not found');
-    this.name = 'SubjectNotFoundError';
-  }
-}
-
-export class VocabularyNotFoundError extends Error {
-  constructor() {
-    super('Vocabulary item not found');
-    this.name = 'VocabularyNotFoundError';
-  }
-}
-
-export class TopicNotSkippedError extends Error {
-  constructor() {
-    super('Topic is not skipped');
-    this.name = 'TopicNotSkippedError';
-  }
-}
-
 // Common error codes — single source of truth
 export const ERROR_CODES = {
   VALIDATION_ERROR: 'VALIDATION_ERROR',
