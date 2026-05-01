@@ -231,15 +231,67 @@ export const filingTimedOutObserve = inngest.createFunction(
         '[filing-timed-out-observe] mark-failed no-op: status already advanced, treating as recovered_after_window',
         { sessionId, profileId }
       );
-      await step.sendEvent('emit-resolved-recovered-after-window', {
-        name: 'app/session.filing_resolved',
-        data: filingResolvedEventSchema.parse({
-          sessionId,
-          profileId,
-          resolution: 'recovered_after_window',
-          timestamp: new Date().toISOString(),
-        }),
+
+      // [H-2] Wrap parse + sendEvent inside step.run so that a Zod parse error
+      // is contained within the step rather than escaping as a function-level
+      // throw that would trigger a full function retry. The CAS guard already
+      // fired and mark-failed returned 0 rows — retrying from scratch would
+      // re-enter this same branch and re-emit indefinitely. [CR-FIL-RACE-01]
+      //
+      // [line-243] Re-read the row inside this step to confirm the session is
+      // genuinely in filing_recovered before emitting 'filing.recovered_after_window'.
+      // The CAS no-op could also occur if the row was deleted or transitioned to
+      // some other terminal state — emitting 'recovered_after_window' in those
+      // cases would be incorrect.
+      await step.run('emit-resolved-recovered-after-window', async () => {
+        const db = getStepDatabase();
+        const currentRow = await db.query.learningSessions.findFirst({
+          where: and(
+            eq(learningSessions.id, sessionId),
+            eq(learningSessions.profileId, profileId)
+          ),
+        });
+
+        if (currentRow?.filingStatus !== 'filing_recovered') {
+          logger.warn(
+            '[filing-timed-out-observe] CAS no-op but row is not filing_recovered — skipping recovered_after_window emit',
+            {
+              sessionId,
+              profileId,
+              filingStatus: currentRow?.filingStatus ?? 'row_missing',
+            }
+          );
+          return { emitted: false, reason: 'not_recovered' };
+        }
+
+        try {
+          const payload = filingResolvedEventSchema.parse({
+            sessionId,
+            profileId,
+            resolution: 'recovered_after_window',
+            timestamp: new Date().toISOString(),
+          });
+          await step.sendEvent('emit-resolved-recovered-after-window', {
+            name: 'app/session.filing_resolved',
+            data: payload,
+          });
+          return { emitted: true };
+        } catch (parseErr) {
+          captureException(parseErr as Error, {
+            profileId,
+            extra: {
+              sessionId,
+              hint: 'filingResolvedEventSchema parse failed in recovered_after_window step',
+            },
+          });
+          logger.warn(
+            '[filing-timed-out-observe] filingResolvedEventSchema parse failed — recovered_after_window event not emitted',
+            { sessionId, profileId }
+          );
+          return { emitted: false, reason: 'parse_error' };
+        }
       });
+
       return { resolution: 'recovered_after_window' as const, snapshot };
     }
 
@@ -269,13 +321,28 @@ export const filingTimedOutObserve = inngest.createFunction(
         return { sent: false, reason: 'dedup_24h' };
       }
       const { title, body } = formatFilingFailedPush();
-      await sendPushNotification(db, {
-        profileId,
-        title,
-        body,
-        type: 'session_filing_failed',
-      });
-      return { sent: true };
+      // [line-278] Wrap sendPushNotification in try/catch so a notification
+      // failure does not propagate out of step.run and trigger a full function
+      // retry. The session is already permanently marked filing_failed at this
+      // point — a push failure is non-fatal.
+      try {
+        await sendPushNotification(db, {
+          profileId,
+          title,
+          body,
+          type: 'session_filing_failed',
+        });
+        return { sent: true };
+      } catch (pushErr) {
+        captureException(pushErr as Error, {
+          profileId,
+          extra: {
+            sessionId,
+            hint: 'sendPushNotification failed in send-failure-push step',
+          },
+        });
+        return { sent: false, reason: 'push_error' };
+      }
     });
 
     const escalation = new Error(
