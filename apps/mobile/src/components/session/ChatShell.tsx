@@ -177,6 +177,62 @@ export function ChatShell({
   const [screenReaderEnabled, setScreenReaderEnabled] = useState(false);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
 
+  // [PERF-10 safeguard] FlatList virtualisation only kicks in when its
+  // `data`, `renderItem`, and `keyExtractor` keep stable references across
+  // renders — otherwise React re-mounts every row, defeating the bounded-
+  // memory guarantee BUG-740 was filed to enforce. ChatShell re-renders on
+  // input changes, voice state toggles, screen-reader detection, etc., so
+  // we memoise these three explicitly. The filter expression matches the
+  // previous inline `messages.filter(...)` exactly — system prompts that
+  // have no `kind` are hidden, everything else is shown.
+  const visibleMessages = useMemo(
+    () => messages.filter((msg) => !(msg.isSystemPrompt && !msg.kind)),
+    [messages]
+  );
+  const keyExtractor = useCallback((item: ChatMessage) => item.id, []);
+  const renderMessageItem = useCallback(
+    ({ item: msg }: ListRenderItemInfo<ChatMessage>) => (
+      <View>
+        {msg.imageUri && !failedImages.has(msg.id) && (
+          <View className="self-end max-w-[85%] mb-1">
+            <Image
+              testID={`message-image-${msg.id}`}
+              source={{ uri: msg.imageUri }}
+              className="w-full aspect-[4/3] rounded-lg"
+              resizeMode="contain"
+              accessibilityLabel="Homework image"
+              onError={() => {
+                setFailedImages((prev) => new Set(prev).add(msg.id));
+              }}
+            />
+          </View>
+        )}
+        {msg.imageUri && failedImages.has(msg.id) && (
+          <View className="self-end max-w-[85%] mb-1">
+            <View
+              testID={`message-image-fallback-${msg.id}`}
+              className="w-full aspect-[4/3] rounded-lg bg-surface items-center justify-center"
+            >
+              <Ionicons name="camera-outline" size={32} color={colors.muted} />
+              <Text className="text-body-sm text-text-secondary mt-1">
+                Image no longer available
+              </Text>
+            </View>
+          </View>
+        )}
+        <MessageBubble
+          role={msg.role}
+          content={msg.content}
+          streaming={msg.streaming}
+          escalationRung={msg.escalationRung}
+          verificationBadge={msg.verificationBadge}
+          actions={renderMessageActions?.(msg)}
+        />
+      </View>
+    ),
+    [failedImages, colors.muted, renderMessageActions]
+  );
+
   // Voice toggle — explicit initialVoiceEnabled (from input mode toggle) takes precedence.
   // Falls back to teach_back detection. Session-scoped only — NOT a persistent preference.
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(
@@ -568,8 +624,8 @@ export function ChatShell({
         className="flex-1 px-4 pt-4"
         testID={messagesTestID ?? 'chat-messages'}
         contentContainerStyle={{ paddingBottom: 16 }}
-        data={messages.filter((msg) => !(msg.isSystemPrompt && !msg.kind))}
-        keyExtractor={(item) => item.id}
+        data={visibleMessages}
+        keyExtractor={keyExtractor}
         // Virtualization knobs tuned for chat: keep recent context warm for
         // jump-to-bottom snappiness, drop offscreen older bubbles to bound
         // memory. removeClippedSubviews is intentionally true on Android
@@ -582,49 +638,7 @@ export function ChatShell({
         onContentSizeChange={() =>
           scrollRef.current?.scrollToEnd({ animated: false })
         }
-        renderItem={({ item: msg }: ListRenderItemInfo<ChatMessage>) => (
-          <View>
-            {msg.imageUri && !failedImages.has(msg.id) && (
-              <View className="self-end max-w-[85%] mb-1">
-                <Image
-                  testID={`message-image-${msg.id}`}
-                  source={{ uri: msg.imageUri }}
-                  className="w-full aspect-[4/3] rounded-lg"
-                  resizeMode="contain"
-                  accessibilityLabel="Homework image"
-                  onError={() => {
-                    setFailedImages((prev) => new Set(prev).add(msg.id));
-                  }}
-                />
-              </View>
-            )}
-            {msg.imageUri && failedImages.has(msg.id) && (
-              <View className="self-end max-w-[85%] mb-1">
-                <View
-                  testID={`message-image-fallback-${msg.id}`}
-                  className="w-full aspect-[4/3] rounded-lg bg-surface items-center justify-center"
-                >
-                  <Ionicons
-                    name="camera-outline"
-                    size={32}
-                    color={colors.muted}
-                  />
-                  <Text className="text-body-sm text-text-secondary mt-1">
-                    Image no longer available
-                  </Text>
-                </View>
-              </View>
-            )}
-            <MessageBubble
-              role={msg.role}
-              content={msg.content}
-              streaming={msg.streaming}
-              escalationRung={msg.escalationRung}
-              verificationBadge={msg.verificationBadge}
-              actions={renderMessageActions?.(msg)}
-            />
-          </View>
-        )}
+        renderItem={renderMessageItem}
         ListEmptyComponent={
           <View
             className="flex-1 items-center justify-center py-16"
