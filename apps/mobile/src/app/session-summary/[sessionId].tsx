@@ -904,10 +904,18 @@ export default function SessionSummaryScreen() {
         {!isParentProxy && sessionId ? (
           <Pressable
             onPress={() => {
+              // [M-8] session-transcript is a sibling fullScreenModal in the
+              // root stack (see _layout.tsx), not a child of session-summary.
+              // Both are presented as fullScreenModal, so Expo Router pushes
+              // transcript on top of summary — router.back() inside the
+              // transcript screen returns here correctly via goBackOrReplace.
+              // No ancestor-chain push needed; the cast to `as never` was
+              // masking a false-positive — the object already satisfies
+              // HrefObject (pathname: string, params?: UnknownInputParams).
               router.push({
                 pathname: '/session-transcript/[sessionId]',
                 params: { sessionId },
-              } as never);
+              });
             }}
             className="bg-surface rounded-button py-3 items-center mb-4"
             accessibilityRole="button"
