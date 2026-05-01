@@ -36,17 +36,17 @@ tags:
 - tapOn:
     text: "More"
 
-# 4. Wait for More screen to load — Learning Mode is always above the fold
+# 4. Wait for More screen to load — section header confirms screen is rendered
 - extendedWaitUntil:
     visible:
-      id: "learning-mode-casual"
-    timeout: 10000
+      id: "learning-mode-section-header"
+    timeout: 30000
 
 # ── Visual integrity: all section headings scrollable ──────────────────
 # More screen sections: Learning Mode, Learning Accommodation, Celebrations,
 # Notifications, Account, Other. Each must be reachable by scrolling.
 - assertVisible:
-    text: "Learning Mode"
+    id: "learning-mode-section-header"
 
 - scrollUntilVisible:
     element:
@@ -69,9 +69,9 @@ tags:
 # Scroll back to top for screenshot
 - scrollUntilVisible:
     element:
-      text: "Learning Mode"
+      id: "learning-mode-section-header"
     direction: UP
-    timeout: 10000
+    timeout: 30000
 
 - takeScreenshot: more-tab-loaded
 

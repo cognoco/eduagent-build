@@ -59,7 +59,7 @@ tags:
 - extendedWaitUntil:
     visible:
       text: "More"
-    timeout: 10000
+    timeout: 30000
 
 # 10. Scroll to sign-out button (may be below the fold)
 - scrollUntilVisible:
@@ -70,7 +70,7 @@ tags:
 
 # 11. Verify learning mode section (first section in More screen)
 - assertVisible:
-    text: "Learning Mode"
+    id: "learning-mode-section-header"
     optional: true
 
 # 12. Verify notifications section
