@@ -27,6 +27,11 @@ jest.mock('../../services/settings', () => ({
     mockGetRecentNotificationCount(...args),
 }));
 
+const mockCaptureException = jest.fn();
+jest.mock('../../services/sentry', () => ({
+  captureException: (...args: unknown[]) => mockCaptureException(...args),
+}));
+
 jest.mock('../client', () => ({
   inngest: {
     createFunction: jest.fn((_config, _trigger, handler) => ({
@@ -214,5 +219,73 @@ describe('[BUG-699-FOLLOWUP] recall-nudge-send 24h push dedup', () => {
       profileId: 'p-1',
       ticketId: 'ticket-new',
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [CR-RECALL-DEDUP-GUARD] Break tests: getRecentNotificationCount DB failure
+// ---------------------------------------------------------------------------
+
+describe('[CR-RECALL-DEDUP-GUARD] getRecentNotificationCount DB failure — fail closed', () => {
+  const mockDb = {
+    query: {
+      curriculumTopics: { findMany: jest.fn().mockResolvedValue([]) },
+      familyLinks: { findFirst: jest.fn().mockResolvedValue(null) },
+      profiles: { findFirst: jest.fn().mockResolvedValue(null) },
+    },
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetStepDatabase.mockReturnValue(mockDb);
+    mockResolveProfileRole.mockResolvedValue('learner');
+    mockFormatRecallNudge.mockReturnValue({
+      title: 'Fading',
+      body: 'Topics fading',
+    });
+  });
+
+  it('calls captureException and returns skipped:dedup_check_failed when getRecentNotificationCount throws', async () => {
+    const dbError = new Error('connection timeout');
+    mockGetRecentNotificationCount.mockRejectedValueOnce(dbError);
+
+    const { result } = await executeHandler({
+      profileId: 'p-err',
+      fadingCount: 2,
+      topTopicIds: [],
+    });
+
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      dbError,
+      expect.objectContaining({
+        profileId: 'p-err',
+        extra: expect.objectContaining({
+          context: 'recall-nudge-send:getRecentNotificationCount',
+        }),
+      })
+    );
+    expect(mockSendPushNotification).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      status: 'skipped',
+      reason: 'dedup_check_failed',
+      profileId: 'p-err',
+    });
+  });
+
+  it('does NOT call captureException on the happy path', async () => {
+    mockGetRecentNotificationCount.mockResolvedValueOnce(0);
+    mockSendPushNotification.mockResolvedValueOnce({
+      sent: true,
+      ticketId: 'ticket-ok',
+    });
+
+    await executeHandler({
+      profileId: 'p-ok',
+      fadingCount: 1,
+      topTopicIds: [],
+    });
+
+    expect(mockCaptureException).not.toHaveBeenCalled();
+    expect(mockSendPushNotification).toHaveBeenCalled();
   });
 });
