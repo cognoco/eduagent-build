@@ -19,6 +19,10 @@ import {
   applyStreakDecay,
   type Database,
 } from '@eduagent/database';
+import {
+  engagementSignalSchema,
+  NEW_LEARNER_SESSION_THRESHOLD,
+} from '@eduagent/schemas';
 import type {
   DashboardChild,
   EngagementSignal,
@@ -30,7 +34,6 @@ import type {
   SessionMetadata,
   TopicProgress,
 } from '@eduagent/schemas';
-import { engagementSignalSchema } from '@eduagent/schemas';
 import { getOverallProgress, getTopicProgressBatch } from './progress';
 import {
   buildKnowledgeInventory,
@@ -75,20 +78,11 @@ export interface DashboardInput {
   /**
    * Lifetime session count (exchangeCount >= 1). Optional for backwards-compat
    * with existing callers; when supplied, generateChildSummary uses lifetime
-   * framing for new learners (< NEW_LEARNER_THRESHOLD) so the dashboard
+   * framing for new learners (< NEW_LEARNER_SESSION_THRESHOLD) so the dashboard
    * subtext stops contradicting the "After N more sessions" teaser. [BUG-906]
    */
   totalSessions?: number;
 }
-
-/**
- * Number of completed sessions before the dashboard switches from new-learner
- * framing to weekly cadence. SYNC with mobile constant
- * `PROGRESSIVE_DISCLOSURE_THRESHOLD` in apps/mobile/src/lib/progressive-
- * disclosure.ts — both must agree or the headline subtext and the teaser will
- * tell the parent different stories about the same child. [BUG-906]
- */
-export const NEW_LEARNER_THRESHOLD = 4;
 
 // ---------------------------------------------------------------------------
 // Core functions
@@ -124,7 +118,8 @@ export function generateChildSummary(input: DashboardInput): string {
 
   const sw = (n: number): string => (n === 1 ? 'session' : 'sessions');
   const newLearner =
-    input.totalSessions != null && input.totalSessions < NEW_LEARNER_THRESHOLD;
+    input.totalSessions != null &&
+    input.totalSessions < NEW_LEARNER_SESSION_THRESHOLD;
 
   if (newLearner) {
     // [BUG-906] Lifetime framing \u2014 matches the dashboard teaser. Specifically
