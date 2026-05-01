@@ -106,7 +106,11 @@ async function executeHandler(
     topicId: 'topic-001',
     exchangeCount: 3,
     updatedAt: new Date(),
-  }
+  },
+  // Controls what db.update().returning() resolves to for the mark-failed step.
+  // Defaults to [] (0 rows) — CAS guard fires, recovered_after_window path.
+  // Pass [{ id: SESSION_ID }] to exercise the 1-row / unrecoverable path.
+  markFailedRows: unknown[] = []
 ) {
   const mockStep = {
     run: jest.fn(async (name: string, fn: () => Promise<unknown>) => {
@@ -119,11 +123,13 @@ async function executeHandler(
     waitForEvent: jest.fn().mockResolvedValue(waitForEventResult),
   };
 
-  // Default db: query returns the snapshot session, update chains resolve []
+  // Default db: query returns the snapshot session, update chains resolve [].
+  // mark-failed is the only step that runs db.update() when mark-pending-and-
+  // claim-retry-slot is overridden, so markFailedRows drives its CAS outcome.
   const mockUpdateChain = {
     set: jest.fn().mockReturnThis(),
     where: jest.fn().mockReturnThis(),
-    returning: jest.fn().mockResolvedValue([]),
+    returning: jest.fn().mockResolvedValue(markFailedRows),
   };
 
   // select chain: the source code destructures the awaited result of
@@ -191,18 +197,16 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
   //   Each of these fails on the old code and passes on the fixed code.
   // -------------------------------------------------------------------------
   it('[CR-FIL-RACE-01] mark-failed CAS guard prevents overwriting filing_recovered with filing_failed', async () => {
-    // mark-failed inner fn returns [] (0 rows updated) — simulates the case
-    // where filing-completed-observe already set status to filing_recovered.
-    const markFailedReturnsZeroRows = async () => false;
-
     // mark-pending-and-claim-retry-slot returns attempt 1 so retry is dispatched.
     const claimRetrySlotReturns1 = async () => 1;
 
+    // markFailedRows defaults to [] (0 rows) — real mark-failed step body runs
+    // and sees the DB returning 0 rows, simulating the race where
+    // filing-completed-observe already set the status to filing_recovered.
     const { result, mockStep } = await executeHandler(
       {
-        // Override specific step names; all others run their real inner fns.
+        // Only override the slot-claim; mark-failed runs its real step body.
         'mark-pending-and-claim-retry-slot': claimRetrySlotReturns1,
-        'mark-failed': markFailedReturnsZeroRows,
       },
       // waitForEvent returns null → 60 s window expired
       null
@@ -253,17 +257,19 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
   // Ensures the guard doesn't break the ordinary unrecoverable path.
   // -------------------------------------------------------------------------
   it('proceeds to unrecoverable path when mark-failed CAS matches (filing_pending status)', async () => {
-    // mark-failed inner fn returns true (1 row updated).
-    const markFailedReturnsOneRow = async () => true;
     const claimRetrySlotReturns1 = async () => 1;
 
+    // markFailedRows = [{ id: SESSION_ID }] (1 row) — real mark-failed step body
+    // runs and sees the DB returning 1 row, meaning the CAS guard matched and
+    // the status was successfully flipped to filing_failed.
     const { result, mockStep } = await executeHandler(
       {
         'mark-pending-and-claim-retry-slot': claimRetrySlotReturns1,
-        'mark-failed': markFailedReturnsOneRow,
       },
       // waitForEvent returns null → window expired, retry did not complete in time
-      null
+      null,
+      undefined,
+      [{ id: SESSION_ID }]
     );
 
     expect(result.resolution).toBe('unrecoverable');
@@ -293,13 +299,12 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
   it('[CR-FIL-RACE-01] CAS guard works even without a retry attempt (retry slot exhausted)', async () => {
     // No retry slot — attemptNumber is null.
     const claimRetrySlotExhausted = async () => null;
-    // mark-failed sees status already advanced → 0 rows.
-    const markFailedReturnsZeroRows = async () => false;
 
+    // markFailedRows defaults to [] (0 rows) — real mark-failed step body runs
+    // and sees the DB returning 0 rows (status already advanced to filing_recovered).
     const { result, mockStep } = await executeHandler(
       {
         'mark-pending-and-claim-retry-slot': claimRetrySlotExhausted,
-        'mark-failed': markFailedReturnsZeroRows,
       },
       null
     );
