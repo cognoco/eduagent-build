@@ -56,7 +56,18 @@ const GLOBAL_KEYS: ReadonlyArray<string> = [
  * @param profileIds All profile IDs known to the current account, including
  *   the active profile and any linked child profiles. Passing an empty array
  *   is fine — global keys are always cleared regardless.
+ *
+ * [CR-SIGNOUT-TIMEOUT-10] Bounded best-effort: the entire cleanup races
+ * against SIGNOUT_CLEANUP_TIMEOUT_MS (3s). On Android Keystore lock
+ * contention or iOS Keychain busy-waits, individual deleteItemAsync calls
+ * can stall — without the cap, sign-out would block on those, leaving the
+ * user trapped inside their account. Pre-fix the call was fire-and-forget
+ * (`void deleteItemAsync(...)`) which never blocked but also never finished
+ * cleanup before signOut(); this fix preserves the cleanup-first ordering
+ * while still guaranteeing sign-out completes promptly.
  */
+export const SIGNOUT_CLEANUP_TIMEOUT_MS = 3_000;
+
 export async function clearProfileSecureStorageOnSignOut(
   profileIds: ReadonlyArray<string>
 ): Promise<void> {
@@ -74,7 +85,7 @@ export async function clearProfileSecureStorageOnSignOut(
 
   // Run in parallel with per-key error isolation. SecureStore.deleteItemAsync
   // is a no-op on missing keys, so we never need to check existence first.
-  await Promise.all(
+  const cleanup = Promise.all(
     Array.from(keys).map((key) =>
       SecureStore.deleteItemAsync(key).catch(() => {
         // Per-key failure is non-fatal — better to clear what we can than
@@ -82,4 +93,14 @@ export async function clearProfileSecureStorageOnSignOut(
       })
     )
   );
+
+  // [CR-SIGNOUT-TIMEOUT-10] Hard cap so a stuck Keychain/Keystore can't
+  // trap the user. Whichever finishes first wins; remaining deletes
+  // continue in the background but never block the sign-out flow.
+  await Promise.race([
+    cleanup,
+    new Promise<void>((resolve) =>
+      setTimeout(resolve, SIGNOUT_CLEANUP_TIMEOUT_MS)
+    ),
+  ]);
 }

@@ -86,4 +86,57 @@ describe('clearProfileSecureStorageOnSignOut [BUG-723 / SEC-7]', () => {
     // the helper must filter them out.
     expect(calledWith).not.toContain('dictation-pace-');
   });
+
+  // [CR-SIGNOUT-TIMEOUT-10] If SecureStore.deleteItemAsync hangs (Android
+  // Keystore lock contention, iOS Keychain busy-wait), the helper must
+  // resolve within SIGNOUT_CLEANUP_TIMEOUT_MS so sign-out is never trapped
+  // behind a stuck secure-storage operation.
+  describe('[CR-SIGNOUT-TIMEOUT-10] timeout protection', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('resolves within the 3s cap even if every delete hangs forever', async () => {
+      // Hang every delete with a never-resolving promise.
+      const neverResolves = new Promise<void>(() => {
+        /* deliberately never settle — simulates a stuck Keychain delete */
+      });
+      mockDelete.mockReturnValue(neverResolves);
+
+      let resolved = false;
+      const cleanupPromise = clearProfileSecureStorageOnSignOut([
+        'profile-a',
+      ]).then(() => {
+        resolved = true;
+      });
+
+      // Advance past the timeout cap (3s + tiny margin).
+      await jest.advanceTimersByTimeAsync(3_001);
+      await cleanupPromise;
+
+      expect(resolved).toBe(true);
+    });
+
+    it('resolves promptly when deletes succeed normally', async () => {
+      mockDelete.mockResolvedValue(undefined);
+
+      let resolved = false;
+      const cleanupPromise = clearProfileSecureStorageOnSignOut([
+        'profile-a',
+      ]).then(() => {
+        resolved = true;
+      });
+
+      // Drain microtasks; cleanup should resolve well before the 3s timeout.
+      await jest.advanceTimersByTimeAsync(0);
+      await cleanupPromise;
+
+      expect(resolved).toBe(true);
+      expect(mockDelete).toHaveBeenCalled();
+    });
+  });
 });
