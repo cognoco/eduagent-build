@@ -161,6 +161,8 @@ jobs:
         env:
           DEPLOY_ENV: ${{ github.event_name == 'push' && 'staging' || inputs.api_environment }}
           DATABASE_URL: ${{ (github.event_name == 'push' || inputs.api_environment == 'staging') && secrets.DATABASE_URL_STAGING || secrets.DATABASE_URL_PRODUCTION }}
+          DATABASE_URL_STAGING_HOST: ${{ secrets.DATABASE_URL_STAGING_HOST }}
+          DATABASE_URL_PRODUCTION_HOST: ${{ secrets.DATABASE_URL_PRODUCTION_HOST }}
         run: node packages/database/scripts/verify-db-target.mjs
 
       - name: Baseline migration journal (push→migrate transition)

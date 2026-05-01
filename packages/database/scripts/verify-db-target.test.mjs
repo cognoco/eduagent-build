@@ -108,6 +108,31 @@ test('deploy.yml references both env-suffix-named DATABASE_URL secrets', () => {
   assert.match(yml, /secrets\.DATABASE_URL_PRODUCTION/);
 });
 
+test('deploy.yml passes DATABASE_URL_STAGING_HOST and DATABASE_URL_PRODUCTION_HOST to the verify step', () => {
+  // Regression guard for the silent 'unverifiable' path: if the HOST hint
+  // env vars are missing from the verify step's env: block, the script falls
+  // through to verdict.status === 'unverifiable' and exits 0 without enforcing
+  // any cross-env check. Asserting these expressions appear in the verify step
+  // block ensures the plumbing is wired so that once the Doppler secrets are
+  // configured they actually reach the script.
+  const yml = readFileSync(DEPLOY_YML, 'utf8');
+  const verifyStepStart = yml.indexOf('Verify deploy target before migrations');
+  assert.ok(verifyStepStart >= 0, 'verify deploy target step not found in deploy.yml');
+  // The verify step ends at the next `- name:` line.
+  const afterVerifyStep = yml.indexOf('\n      - name:', verifyStepStart);
+  const verifyBlock = yml.slice(verifyStepStart, afterVerifyStep > 0 ? afterVerifyStep : undefined);
+  assert.match(
+    verifyBlock,
+    /DATABASE_URL_STAGING_HOST/,
+    'verify step env block missing DATABASE_URL_STAGING_HOST',
+  );
+  assert.match(
+    verifyBlock,
+    /DATABASE_URL_PRODUCTION_HOST/,
+    'verify step env block missing DATABASE_URL_PRODUCTION_HOST',
+  );
+});
+
 test('deploy.yml runs verify-db-target before migrations in the api-deploy job', () => {
   // Order matters: the verification step must precede baseline-migrations.mjs
   // and drizzle-kit migrate inside the api-deploy job, otherwise it would log
