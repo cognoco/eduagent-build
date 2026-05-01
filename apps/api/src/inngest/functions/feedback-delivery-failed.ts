@@ -5,6 +5,7 @@
 // and retries delivery via Resend with up to 2 additional attempts.
 // ---------------------------------------------------------------------------
 
+import { createHash } from 'crypto';
 import { z } from 'zod';
 import { inngest } from '../client';
 import {
@@ -85,21 +86,32 @@ export const feedbackDeliveryFailed = inngest.createFunction(
       // The key is bound to (profileId, eventId) so a genuinely new delivery
       // failure for the same profile in a new run produces a fresh key.
       //
-      // [CR-IDEMP-FALLBACK-08] Drop the key entirely when event.id is missing.
-      // The previous `event.id ?? 'no-event'` fallback collided every distinct
-      // delivery failure for the same profile within Resend's 24h window onto
-      // a single key, so failures 2..N were silently deduped to nothing —
-      // exactly the failure mode the key was meant to prevent. Better to
-      // send (risking a rare double-deliver if Inngest replays without an
-      // event id) than to silently drop a real support email.
+      // [CR-IDEMP-FALLBACK-08] When event.id is missing, fall back to a
+      // deterministic per-payload hash so Inngest retries of the *same* event
+      // are still idempotent without colliding across distinct events.
+      // The previous `event.id ?? 'no-event'` fallback collapsed every distinct
+      // delivery failure for the same profile within Resend's 24h dedup window
+      // onto a single key (silently discarding emails 2..N). The previous fix
+      // dropped the key entirely (risking double-sends on replay). A hash of
+      // stable payload fields satisfies both constraints: no cross-event
+      // collision AND idempotent across retries of the same event.
       //
       // [CR-MISSING-EVENT-ID-VISIBILITY] Per global "no silent recovery" rule,
-      // the missing-id fallback must be observable so ops can count occurrences.
+      // the hash-fallback path must be observable so ops can count occurrences.
       // logger.warn makes it queryable in log aggregation; captureException
       // surfaces it in Sentry alerts if the rate becomes significant.
-      if (!event.id) {
+      let idempotencyKey: string;
+      if (event.id) {
+        idempotencyKey = `feedback-delivery-failed:${profileId}:${event.id}:retry-delivery`;
+      } else {
+        const hashInput = JSON.stringify({ profileId, category });
+        const hash = createHash('sha256')
+          .update(hashInput)
+          .digest('hex')
+          .slice(0, 16);
+        idempotencyKey = `feedback-delivery-failed:hash:${hash}:retry-delivery`;
         logger.warn(
-          '[feedback-delivery-failed] dropping idempotency key — event.id missing',
+          '[feedback-delivery-failed] event.id missing — falling back to payload hash idempotency key',
           {
             surface: 'feedback-delivery-failed',
             reason: 'missing_event_id',
@@ -109,7 +121,7 @@ export const feedbackDeliveryFailed = inngest.createFunction(
         );
         captureException(
           new Error(
-            'feedback-delivery-failed: missing event.id — idempotency key dropped'
+            'feedback-delivery-failed: missing event.id — using payload hash idempotency key'
           ),
           {
             extra: {
@@ -121,9 +133,6 @@ export const feedbackDeliveryFailed = inngest.createFunction(
           }
         );
       }
-      const idempotencyKey = event.id
-        ? `feedback-delivery-failed:${profileId}:${event.id}:retry-delivery`
-        : undefined;
 
       const result = await sendEmail(
         {

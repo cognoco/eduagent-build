@@ -198,26 +198,55 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
       );
     });
 
-    // [CR-IDEMP-FALLBACK-08] When event.id is undefined (replay path, test
-    // harness, malformed receive), the previous `event.id ?? 'no-event'`
-    // fallback collapsed every distinct delivery failure for the same
-    // profile within Resend's 24h dedup window onto one key — silently
-    // discarding emails 2..N. The fix drops the key entirely in that case.
-    it('[CR-IDEMP-FALLBACK-08] drops idempotencyKey when event.id is missing (no silent dedup collision)', async () => {
+    // [CR-IDEMP-FALLBACK-08] When event.id is undefined, the code must fall
+    // back to a deterministic payload-hash key rather than `undefined`.
+    // Two retries of the same event (same profileId + category, no event.id)
+    // must receive the SAME idempotency key so Resend dedupes them.
+    it('[CR-IDEMP-FALLBACK-08] two retries with event.id absent receive the same deterministic hash key', async () => {
       mockSendEmail.mockResolvedValue({ sent: true });
 
-      // No eventId passed — simulates replay or partial payload.
+      // Simulate first attempt (no eventId).
+      await executeHandler({ profileId: 'profile-no-id', category: 'bug' });
+      // Simulate second attempt (Inngest retry, same payload, still no eventId).
       await executeHandler({ profileId: 'profile-no-id', category: 'bug' });
 
-      expect(mockSendEmail).toHaveBeenCalledTimes(1);
-      const [, optsArg] = mockSendEmail.mock.calls[0] as [
-        unknown,
-        { idempotencyKey?: string }
-      ];
-      // Critical: the key must NOT be a literal 'no-event' collision string.
-      // Either undefined (current fix) or a unique value would be acceptable;
-      // the literal 'no-event' fallback is the bug class.
-      expect(optsArg.idempotencyKey).toBeUndefined();
+      expect(mockSendEmail).toHaveBeenCalledTimes(2);
+      const keyFirst = (
+        mockSendEmail.mock.calls[0] as [unknown, { idempotencyKey?: string }]
+      )[1].idempotencyKey;
+      const keySecond = (
+        mockSendEmail.mock.calls[1] as [unknown, { idempotencyKey?: string }]
+      )[1].idempotencyKey;
+
+      // Both retries must produce the same non-undefined key.
+      expect(keyFirst).toBeDefined();
+      expect(keySecond).toBeDefined();
+      expect(keyFirst).toEqual(keySecond);
+
+      // Must NOT be the old collision fallback.
+      expect(keyFirst).not.toContain('no-event');
+    });
+
+    // [CR-IDEMP-FALLBACK-08] Two distinct payloads (different profileId) with
+    // no event.id must still produce different hash keys — no cross-event
+    // collision.
+    it('[CR-IDEMP-FALLBACK-08] distinct payloads with no event.id produce distinct hash keys', async () => {
+      mockSendEmail.mockResolvedValue({ sent: true });
+
+      await executeHandler({ profileId: 'profile-A', category: 'bug' });
+      await executeHandler({ profileId: 'profile-B', category: 'bug' });
+
+      expect(mockSendEmail).toHaveBeenCalledTimes(2);
+      const keyA = (
+        mockSendEmail.mock.calls[0] as [unknown, { idempotencyKey?: string }]
+      )[1].idempotencyKey;
+      const keyB = (
+        mockSendEmail.mock.calls[1] as [unknown, { idempotencyKey?: string }]
+      )[1].idempotencyKey;
+
+      expect(keyA).toBeDefined();
+      expect(keyB).toBeDefined();
+      expect(keyA).not.toEqual(keyB);
     });
 
     // [CR-MISSING-EVENT-ID-VISIBILITY] Break test: when event.id is absent the
@@ -239,7 +268,7 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
         string,
         Record<string, unknown>
       ];
-      expect(warnMsg).toContain('dropping idempotency key');
+      expect(warnMsg).toContain('event.id missing');
       expect(warnCtx.surface).toBe('feedback-delivery-failed');
       expect(warnCtx.reason).toBe('missing_event_id');
       expect(warnCtx.profileId).toBe('profile-no-id-visibility');
