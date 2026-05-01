@@ -130,10 +130,33 @@ export class LlmEnvelopeError extends Error {
   }
 }
 
+export const persistFailureCodeSchema = z.enum([
+  'extract_signals_failed',
+  'empty_signals',
+  'generate_curriculum_failed',
+  'persist_failed',
+  'draft_missing',
+  'unknown',
+]);
+export type PersistFailureCode = z.infer<typeof persistFailureCodeSchema>;
+
 export class PersistCurriculumError extends Error {
-  constructor(message: string, public override cause?: unknown) {
+  public code: PersistFailureCode;
+  constructor(
+    codeOrMessage: PersistFailureCode | string,
+    messageOrCause?: string | unknown
+  ) {
+    const isCode = persistFailureCodeSchema.safeParse(codeOrMessage).success;
+    const code = isCode ? (codeOrMessage as PersistFailureCode) : 'unknown';
+    const message = isCode
+      ? typeof messageOrCause === 'string'
+        ? messageOrCause
+        : codeOrMessage
+      : (codeOrMessage as string);
     super(message);
+    this.code = code;
     this.name = 'PersistCurriculumError';
+    if (!isCode && messageOrCause) this.cause = messageOrCause;
     Object.setPrototypeOf(this, PersistCurriculumError.prototype);
   }
 }

@@ -39,3 +39,25 @@ export const filingResolvedEventSchema = z.object({
   timestamp: z.string().datetime(),
 });
 export type FilingResolvedEvent = z.infer<typeof filingResolvedEventSchema>;
+
+export const interviewReadyToPersistEventSchema = z.object({
+  version: z.literal(1),
+  draftId: z.string().uuid(),
+  profileId: z.string().uuid(),
+  subjectId: z.string().uuid(),
+  subjectName: z.string().min(1),
+  bookId: z.string().uuid().optional(),
+});
+export type InterviewReadyToPersistEvent = z.infer<
+  typeof interviewReadyToPersistEventSchema
+>;
+
+export const interviewCompletionPushFailedEventSchema = z.object({
+  version: z.literal(1),
+  profileId: z.string().uuid(),
+  draftId: z.string().uuid(),
+  subjectId: z.string().uuid(),
+});
+export type InterviewCompletionPushFailedEvent = z.infer<
+  typeof interviewCompletionPushFailedEventSchema
+>;

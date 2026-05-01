@@ -34,7 +34,7 @@ Layer 3 can ship standalone, but the SUBJECT-09 ticket should not be closed unti
 
 - Run `git status` first; this plan touches three packages plus a new Inngest function.
 - The `DraftStatus` enum extension is a Postgres `ALTER TYPE ... ADD VALUE`. Postgres requires this to be its OWN transaction — committed before any code that references the new value runs. The migration PR therefore lands and is **deployed to production** before the code PR per `feedback_schema_drift_pattern`. → R2: production gate added (rev 1 only gated on staging).
-- This plan introduces a new prod LLM call site only by relocation — `extractSignals` was already called inline; it now runs inside an Inngest step. No new prompts. Run `pnpm eval:llm` once at the end as a regression guard, plus a determinism check (Task 12).
+- This plan introduces new prod LLM call sites only by relocation — `extractSignals` AND `persistCurriculum` (which internally calls `generateCurriculum`) were already called inline; they now run inside Inngest steps. No new prompts. Run `pnpm eval:llm` once at the end as a regression guard, plus a determinism check (Task 12). → R3: note that `persistCurriculum` also makes an LLM call internally via `generateCurriculum()`/`generateBookTopics()` — this is the more expensive call and the one that exceeds the 30s Worker budget.
 - Inngest functions deploy via the standard sync URL (`/v1/inngest`) per `project_inngest_staging`. After registering, verify the function appears in the Inngest dashboard for staging before merging.
 
 ---
@@ -325,107 +325,22 @@ git push
 
 - [ ] **Step 1: Implement**
 
-```typescript
-// apps/api/src/services/interview-persist.ts
-import {
-  type Database,
-  curriculumTopics,
-  curricula,
-  curriculumBooks,
-  onboardingDrafts,
-} from '@eduagent/database';
-import { eq, and, sql } from 'drizzle-orm';
-import { ensureCurriculum, ensureDefaultBook } from './curriculum';
-import { PersistCurriculumError } from '@eduagent/schemas';
-import type { OnboardingDraftRow } from '@eduagent/schemas';
+→ R3: **This entire implementation is REMOVED.** Do not create `interview-persist.ts`. Instead, the Inngest function's `persist-curriculum` step calls the existing `persistCurriculum(tx, profileId, subjectId, subjectName, draft, bookId, bookTitle)` directly within a `db.transaction()`. See Task 5 for the corrected step implementation.
 
-interface PersistInput {
-  draft: OnboardingDraftRow;
-  bookId?: string;
-  bookTitle?: string;
-}
+The existing `persistCurriculum` (in `apps/api/src/services/interview.ts`, ~line 797) already:
+- Calls `generateCurriculum()` or `generateBookTopics()` based on whether a book is scoped
+- Calls `ensureCurriculum(db, subjectId)` to upsert the curriculum row
+- Calls `ensureDefaultBook(db, subjectId, subjectName)` for the no-book path
+- Inserts topics into `curriculumTopics` with columns: `curriculumId, bookId, title, description, sortOrder, relevance, estimatedMinutes`
+- Updates `curriculumBooks.topicsGenerated = true`
 
-export async function persistCurriculumAndMarkComplete(
-  db: Database,
-  profileId: string,
-  subjectId: string,
-  subjectName: string,
-  draftId: string,
-  input: PersistInput
-): Promise<void> {
-  const { draft, bookId, bookTitle } = input;
+No helper extraction needed. The transaction in the Inngest step handles atomicity with `mark-completed`.
 
-  const topics = (draft.extractedSignals as { topics?: { name: string }[] } | null)?.topics ?? [];
-  if (topics.length === 0) {
-    // Defensive: caller should have rejected earlier, but never persist an
-    // empty curriculum — the user would land on a blank learning path with
-    // no recovery surface (status='completed' hides the failure).
-    throw new PersistCurriculumError('empty_signals');
-  }
-
-  const curriculum = await ensureCurriculum(db, profileId, subjectId, subjectName);
-  const book = bookId
-    ? null
-    : await ensureDefaultBook(db, profileId, curriculum.id, subjectName);
-  const targetBookId = bookId ?? book?.id ?? null;
-
-  const topicRows = topics.map((t, idx) => ({
-    curriculumId: curriculum.id,
-    bookId: targetBookId,
-    topicName: t.name,
-    sortOrder: idx,
-    profileId,
-    sourceTitle: bookTitle ?? null,
-  }));
-
-  // All three writes in one ACID batch: topics + draft status + book flag.
-  // The polling endpoint can never observe a partial state.
-  const batch: unknown[] = [
-    db
-      .insert(curriculumTopics)
-      .values(topicRows)
-      .onConflictDoNothing({
-        target: [
-          curriculumTopics.curriculumId,
-          sql`COALESCE(${curriculumTopics.bookId}, '00000000-0000-0000-0000-000000000000'::uuid)`,
-          sql`lower(trim(${curriculumTopics.topicName}))`,
-        ],
-      }),
-    db
-      .update(onboardingDrafts)
-      .set({ status: 'completed', failureCode: null })
-      .where(
-        and(
-          eq(onboardingDrafts.id, draftId),
-          eq(onboardingDrafts.profileId, profileId)
-        )
-      ),
-  ];
-
-  if (targetBookId) {
-    batch.push(
-      db
-        .update(curriculumBooks)
-        .set({ topicsGenerated: true })
-        .where(
-          and(
-            eq(curriculumBooks.id, targetBookId),
-            eq(curriculumBooks.profileId, profileId)
-          )
-        )
-    );
-  }
-
-  await db.batch(batch as Parameters<typeof db.batch>[0]);
-}
-```
-
-- [ ] **Step 2: Typecheck + commit**
+- [ ] ~~**Step 2: Typecheck + commit**~~ → R3: SKIP — no file to commit.
 
 ```bash
-pnpm exec nx run api:typecheck
-git add apps/api/src/services/interview-persist.ts
-git commit -m "feat(api): persistCurriculumAndMarkComplete via db.batch (incl. topicsGenerated) [INTERACTION-DUR-L3]"
+# No action needed — Task 4 is now a no-op. Proceed to Task 5.
+# → R3: No commit needed — Task 4 is a no-op (see above)
 git push
 ```
 
@@ -515,15 +430,13 @@ jest.mock('../../services/logger', () => ({
   createLogger: () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn() }),
 }));
 
+// → R3: single mock for both extractSignals and persistCurriculum from the same module
 const mockExtractSignals = jest.fn();
+const mockPersistCurriculum = jest.fn();
 jest.mock('../../services/interview', () => ({
+  ...jest.requireActual('../../services/interview'),
   extractSignals: (...args: unknown[]) => mockExtractSignals(...args),
-}));
-
-const mockPersistAndMark = jest.fn();
-jest.mock('../../services/interview-persist', () => ({
-  persistCurriculumAndMarkComplete: (...args: unknown[]) =>
-    mockPersistAndMark(...args),
+  persistCurriculum: (...args: unknown[]) => mockPersistCurriculum(...args),
 }));
 
 const mockSendPush = jest.fn();
@@ -575,8 +488,9 @@ function mockDb({
 describe('interview-persist-curriculum', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('cache hit: extractedSignals with topics returns cached, no LLM call', async () => {
-    const cached = { topics: [{ name: 'Algebra' }] };
+  it('cache hit: extractedSignals with goals returns cached, no LLM call', async () => {
+    // → R3: actual return shape of extractSignals
+    const cached = { goals: ['Learn algebra'], experienceLevel: 'beginner', currentKnowledge: 'basic arithmetic', interests: ['math'] };
     mockGetStepDatabase.mockReturnValue(
       mockDb({ draft: { extractedSignals: cached, exchangeHistory: [] } })
     );
@@ -586,22 +500,23 @@ describe('interview-persist-curriculum', () => {
     await handler({ event: makeEvent(), step: harness.step });
 
     expect(mockExtractSignals).not.toHaveBeenCalled();
-    expect(mockPersistAndMark).toHaveBeenCalled();
+    expect(mockPersistCurriculum).toHaveBeenCalled();
   });
 
-  it('cache miss: empty topics array triggers fresh extraction (rev-1 regression)', async () => {
-    // Critical regression check: rev 1 used Object.keys length > 0 which
-    // returned true for { topics: [] } and persisted an empty curriculum.
+  it('cache miss: empty goals+interests triggers fresh extraction (rev-2 regression)', async () => {
+    // → R3: extractSignals returns { goals, experienceLevel, currentKnowledge, interests }.
+    // Cache check: goals.length > 0 || interests.length > 0.
+    // Empty arrays = unusable signals → must re-extract.
     mockGetStepDatabase.mockReturnValue(
-      mockDb({ draft: { extractedSignals: { topics: [] }, exchangeHistory: ['turn'] } })
+      mockDb({ draft: { extractedSignals: { goals: [], experienceLevel: 'beginner', currentKnowledge: '', interests: [] }, exchangeHistory: ['turn'] } })
     );
-    mockExtractSignals.mockResolvedValue({ topics: [{ name: 'X' }] });
+    mockExtractSignals.mockResolvedValue({ goals: ['Learn algebra'], experienceLevel: 'beginner', currentKnowledge: '', interests: ['math'] });
 
     const handler = (interviewPersistCurriculum as any).fn;
     await handler({ event: makeEvent(), step: makeReplayHarness().step });
 
     expect(mockExtractSignals).toHaveBeenCalled();
-    expect(mockPersistAndMark).toHaveBeenCalled();
+    expect(mockPersistCurriculum).toHaveBeenCalled();
   });
 
   it('extract throws once, replay-harness retry uses memoized result for prior steps', async () => {
@@ -622,7 +537,7 @@ describe('interview-persist-curriculum', () => {
     // succeeds; downstream steps run for the first time.
     await handler({ event: makeEvent(), step: harness.step });
     expect(mockExtractSignals).toHaveBeenCalledTimes(2);
-    expect(mockPersistAndMark).toHaveBeenCalledTimes(1);
+    expect(mockPersistCurriculum).toHaveBeenCalledTimes(1);
   });
 
   it('throws NonRetriableError when draft does not exist', async () => {
@@ -917,9 +832,11 @@ curl -X PUT https://<staging-domain>/v1/inngest
 **Files:**
 - Modify: `apps/api/src/routes/interview.ts`
 
-Two sites: (a) the SSE stream finalizer's `result.isComplete` branch (around line 248), (b) the `POST /subjects/:subjectId/interview/complete` handler (around line 309).
+Two sites: (a) the SSE stream finalizer's `result.isComplete` branch (~line 280–309), (b) the `POST /subjects/:subjectId/interview/complete` handler (~line 392–457).
 
 → R2: rev 1 used a check-then-act pattern (read status, write status, dispatch). Two concurrent finalizers (SSE finalize + force-complete fired near-simultaneously) both observed `in_progress`, both transitioned, both dispatched — two LLM runs. The fix is a single conditional UPDATE with `RETURNING`: only the request that wins the row update dispatches. This is one round-trip and atomic by definition; no interactive transaction needed. (The Inngest `idempotency` config in Task 5 is a second line of defence — but the dispatch-side fix is the primary one.)
+
+→ R3: **CRITICAL — preserve the orphan-handling path.** The current stream finalizer ALREADY has a `try/catch` around `persistCurriculum` that: (1) classifies the error via `classifyOrphanError`, (2) calls `appendOrphanInterviewTurn`, and (3) fires `inngest.send('app/orphan.persist.failed', ...)`. When replacing the inline persist with the Inngest dispatch, **do NOT delete the orphan-handling path**. The orphan path moves to the Inngest function's `onFailure` handler — but the route-level dispatch failure (Inngest API down) still needs a fallback that preserves the user's message. Read the current `try/catch` block fully before replacing it.
 
 The route uses the singleton `inngest` import (per `apps/api/src/routes/consent.ts:181`, `account.ts:31`, etc.) — NOT `c.env.INNGEST_CLIENT`.
 
@@ -1138,9 +1055,13 @@ describe('interview-persist-curriculum integration', () => {
     expect(draft?.status).toBe('completed');
     expect(draft?.failureCode).toBeNull();
 
+    // → R3: no profileId on curriculumTopics — query through curriculum → subject chain
+    const curriculum = await db.query.curricula.findFirst({
+      where: eq(curricula.subjectId, subjectId),
+    });
     const topics = await db.select().from(curriculumTopics)
-      .where(eq(curriculumTopics.profileId, profileId));
-    expect(topics.map((t) => t.topicName).sort()).toEqual(['Algebra', 'Geometry']);
+      .where(eq(curriculumTopics.curriculumId, curriculum!.id));
+    expect(topics.map((t) => t.title).sort()).toEqual(['Algebra', 'Geometry']); // → R3: column is `title`
     expect(extractSignalsCalls).toBe(2);
   });
 
@@ -1163,8 +1084,12 @@ describe('interview-persist-curriculum integration', () => {
       step: makeReplayHarness().step,
     });
 
+    // → R3: no profileId on curriculumTopics — query through curriculum
+    const curriculum = await db.query.curricula.findFirst({
+      where: eq(curricula.subjectId, subjectId),
+    });
     const topics = await db.select().from(curriculumTopics)
-      .where(eq(curriculumTopics.profileId, profileId));
+      .where(eq(curriculumTopics.curriculumId, curriculum!.id));
     expect(topics).toHaveLength(2); // exactly two, not four
   });
 
@@ -1279,6 +1204,8 @@ git push
 ---
 
 ## Task 10: Mobile UX — `completing` and `failed` states with foreground refetch → R2
+
+→ R3: **The current hook uses `isComplete: boolean` (from API responses), NOT a typed status enum.** The hook exports: `useInterviewState`, `useSendInterviewMessage`, `useForceCompleteInterview`, `useStreamInterviewMessage`. The `InterviewState` type and `useInterviewState` query need to be updated to include `status` and `failureCode` fields from the GET response. This is **additional scope** not accounted for in the rev 2 plan — the hook needs a model change, not just a polling addition.
 
 **Files:**
 - Modify: `apps/mobile/src/hooks/use-interview.ts`
@@ -1510,40 +1437,29 @@ git push
 
 ---
 
-## Task 12: Determinism eval check → R2
+## Task 12: Determinism eval check → R3
 
-→ R2: rev 1 only re-ran `pnpm eval:llm` for snapshot stability. The actual regression vector is the *retry distribution* (one extract vs many) and the JSON-round-trip-through-step.run identity. Add a determinism check.
+→ R3: **REVISED.** The eval harness does NOT have a `scenarios/` directory or a `defineScenario()` API. The structure is `apps/api/eval-llm/flows/` with scenario enumeration via the `Scenario<Input>` interface. The determinism check should be a new **flow** file, not a scenario file.
 
 **Files:**
-- Modify: `apps/api/eval-llm/scenarios/extract-signals-determinism.ts` (new scenario)
+- Create: `apps/api/eval-llm/flows/extract-signals-determinism.ts` (new flow)
 
-- [ ] **Step 1: Add the scenario**
+- [ ] **Step 1: Add the flow**
 
-A scenario that runs `extractSignals` on a fixed `exchangeHistory` twice and asserts the returned shape is byte-identical (after JSON round-trip simulation). This catches both:
-1. Non-determinism in the prompt that would cause cached signals to disagree with fresh signals on Try Again.
-2. Date/Map/Set/undefined values that would round-trip differently after the move from inline to `step.run`.
+→ R3: Follow the existing flow pattern in `apps/api/eval-llm/flows/`. A flow exports a function that produces scenarios. This determinism check:
+1. Runs `extractSignals` on a fixed `exchangeHistory` twice.
+2. Asserts the returned shape (`{ goals, experienceLevel, currentKnowledge, interests }`) is byte-identical after JSON round-trip (simulates `step.run` serialization).
+3. Catches non-determinism that would cause cached signals to disagree with fresh signals on Try Again.
+4. Catches Date/Map/Set/undefined values that mutate on JSON round-trip.
 
-Skeleton:
-
-```typescript
-export const extractSignalsDeterminism = defineScenario('extract-signals-determinism', async () => {
-  const fixed = [/* canonical exchange history */];
-  const a = await extractSignals(fixed);
-  const b = await extractSignals(fixed);
-  // Round-trip both through JSON (simulates step.run serialization).
-  const aJ = JSON.parse(JSON.stringify(a));
-  const bJ = JSON.parse(JSON.stringify(b));
-  expect(aJ).toEqual(a); // no Date/Map/Set/undefined that mutate on round-trip
-  expect(bJ).toEqual(aJ);
-});
-```
+Read existing flow files first to match the exact interface pattern (`apps/api/eval-llm/flows/interview-*.ts`).
 
 - [ ] **Step 2: Run + commit**
 
 ```bash
-pnpm eval:llm -- --scenario extract-signals-determinism
-git add apps/api/eval-llm/scenarios/extract-signals-determinism.ts
-git commit -m "test(api): eval determinism check for extractSignals [INTERACTION-DUR-L3]"
+pnpm eval:llm --live
+git add apps/api/eval-llm/flows/extract-signals-determinism.ts
+git commit -m "test(api): eval determinism flow for extractSignals JSON round-trip [INTERACTION-DUR-L3]"
 git push
 ```
 
@@ -1604,7 +1520,7 @@ Read every code-review finding. Treat security/correctness findings as blocking.
 | 3b — Inngest function with three checkpoints + push step | Task 5 |
 | 3b — onFailure handler (A4) maps to typed code | Task 5 |
 | 3b — extractedSignals cached on draft (A3) — structural check | Task 5 (`topics.length > 0`) |
-| 3b — db.batch persist + mark-completed + topicsGenerated (A7) | Task 4 |
+| 3b — db.transaction persist + mark-completed + topicsGenerated (A7) | → R3: Task 5 `persist-curriculum` step (calls existing `persistCurriculum` inside `db.transaction()`) |
 | 3c — content-derived unique key on topics (A5) | Task 2 (single non-partial index via COALESCE) |
 | 3d — singleton guard (A11) | Task 7 (atomic conditional UPDATE + Inngest event idempotency) |
 | 3d — payload validated against zod schema (A12) | Task 3 |
@@ -1651,11 +1567,53 @@ The 14 findings raised against rev 1, and where each is closed:
 
 ### Placeholder scan
 
-Every step has runnable code or commands. Where a project-specific helper (`sendPushToProfile`) may not exist, Task 11 explicitly documents the fallback (defer + ship without push; AppState foreground refetch covers the gap).
+Every step has runnable code or commands. → R3: The push helper EXISTS as `sendPushNotification(db, payload)`. No fallback needed.
 
 ### Type consistency
 
 - `DraftStatus` literal members: `'in_progress' | 'completing' | 'completed' | 'failed' | 'expired'` — used the same way in API + mobile.
-- `PersistFailureCode` literal members: `'extract_signals_failed' | 'empty_signals' | 'persist_failed' | 'draft_missing' | 'unknown'` — defined in `@eduagent/schemas`, used in API DB writes, mobile copy mapping, integration test assertions.
+- `PersistFailureCode` literal members: `'extract_signals_failed' | 'empty_signals' | 'generate_curriculum_failed' | 'persist_failed' | 'draft_missing' | 'unknown'` — defined in `@eduagent/schemas`, used in API DB writes, mobile copy mapping, integration test assertions. → R3: added `generate_curriculum_failed` (distinct from extract failure).
 - Inngest event names: `'app/interview.ready_to_persist'`, `'app/interview.completion_push_failed'` — literal strings, dispatched and handled identically.
 - Refetch interval values: `[3_000, 6_000, 12_000, 30_000]` — used in helper and tests; tests assert each entry.
+
+---
+
+## Adversarial Review Amendments (R3)
+
+The 15 findings raised against rev 2 by codebase-verified adversarial review, and where each is closed:
+
+| # | Finding | Severity | Closed by |
+|---|---|---|---|
+| 1 | `NonRetriableError` not used anywhere in codebase — plan claims it's an established pattern | Low | R3 notes in Tasks 5/7 — first usage, import from `'inngest'` directly |
+| 2 | `onFailure` handler not an established pattern — `book-pre-generation.ts` (the declared "structural twin") doesn't use it | Low | R3 notes in Task 5 — first usage, no local reference exists |
+| 3 | **`extractSignals` returns `{ goals, experienceLevel, currentKnowledge, interests }` — NOT `{ topics }`** | **CRITICAL** | R3 rewrites: Architecture section, Task 5 cache check, Task 5 empty-signals check, Failure Modes table. The actual topic generation happens inside `persistCurriculum` via `generateCurriculum()`. |
+| 4 | **`curriculumTopics` has no `topicName` column — it's `title`** | **CRITICAL** | R3 rewrites Task 2 entirely — correct column is `title`, existing index on `(book_id, lower(title))` |
+| 5 | **`curriculumTopics` has no `profileId` column** | **CRITICAL** | R3 removes all `profileId` references in topic inserts/queries. Ownership via `curriculum → subject → profile` chain. |
+| 6 | `sendPushToProfile` doesn't exist — real function is `sendPushNotification(db, payload)` | High | R3 corrects all references to `sendPushNotification(db, { profileId, title, body, type })` |
+| 7 | File `packages/database/src/schema/curriculum.ts` doesn't exist — table in `subjects.ts` | Medium | R3 corrects File Structure table |
+| 8 | Eval harness has no `scenarios/` dir or `defineScenario()` API — uses `flows/` + `Scenario<Input>` | Medium | R3 rewrites Task 12 to use flow pattern |
+| 9 | `PersistCurriculumError` already exists with `(message, cause?)` constructor | High | R3 rewrites Task 1 Step 3 — modify existing class, don't recreate |
+| 10 | **Stream finalizer already has orphan-handling (`appendOrphanInterviewTurn` + `app/orphan.persist.failed` event) that Task 7's replace diff would silently delete** | **CRITICAL** | R3 adds explicit warning in Task 7 to preserve orphan path |
+| 11 | No `sourceTitle` column on `curriculumTopics` — it's `source` (enum) | Medium | R3 removes `sourceTitle` from Task 4's row mapping (Task 4 itself is now removed) |
+| 12 | Retry endpoint `id: persist-${draft.id}-retry-${Date.now()}` vs function-level `idempotency: 'event.data.draftId'` — unclear interaction | Low | Acknowledged — Inngest idempotency windows are time-boxed (default 24h); retry after window expiry is valid. Document this assumption. |
+| 13 | `db.batch()` with dynamic `unknown[]` array — Drizzle expects specific tuple type | Medium | R3 replaces with `db.transaction()` (WS driver supports it via `getStepDatabase`) |
+| 14 | Mobile hook uses `isComplete: boolean`, not typed status enum — additional refactoring scope not accounted for | Medium | R3 adds note to Task 10 about model change needed |
+| 15 | **`bookId` is NOT NULL on `curriculumTopics`** — COALESCE sentinel approach in Task 2 is wrong | **CRITICAL** | R3 rewrites Task 2 — no COALESCE, no new migration, use existing index directly |
+
+### Summary of structural changes from R2 → R3
+
+| R2 approach | R3 correction | Why |
+|---|---|---|
+| New `interview-persist.ts` helper with `db.batch()` | Call existing `persistCurriculum` inside `db.transaction()` in the Inngest step | WS driver supports real transactions; don't duplicate 90-line function |
+| New migration `0048` for COALESCE index | No migration — existing `0043` index suffices | `bookId` NOT NULL, index already exists |
+| Cache check `topics?.length > 0` | Cache check `goals.length > 0 \|\| interests.length > 0` | `extractSignals` returns signals, not topics |
+| 3 Inngest steps: extract → save → persist+batch | 3 Inngest steps: extract → save → persist-curriculum (calls existing function in transaction) | Don't split `persistCurriculum`'s internal logic into a new location |
+| `sendPushToProfile(profileId, payload)` | `sendPushNotification(db, { profileId, title, body, type })` | Correct existing function signature |
+
+### Remaining risks not addressed by R3
+
+1. **`persistCurriculum` accepts `Database` but `db.transaction()` passes a transaction object.** Verify that `persistCurriculum` (and its internal `ensureCurriculum`/`ensureDefaultBook`) works correctly when called with a transaction context instead of a raw `Database`. If it creates its own nested transactions, the WS driver may not support savepoints — in that case, fall back to calling `persistCurriculum` outside the transaction, then updating draft status separately (relying on the idempotent topic insert to handle retries).
+
+2. **The `bookId` parameter on the Inngest event.** `persistCurriculum` takes an optional `bookId` — but in the full-curriculum path (no book), it calls `ensureDefaultBook` itself. When dispatching the event, the route must include `bookId` only if the interview was book-scoped. Verify the dispatch site correctly infers this.
+
+3. **`extractSignals` on safe-default fallback.** When LLM parsing fails, `extractSignals` returns `goals: [], experienceLevel: 'beginner', currentKnowledge: '', interests: []`. This triggers the "empty signals" failure code and surfaces "Try Again" — which is correct. But verify the user can re-engage the interview (not just retry persist) if their responses genuinely produced no extractable signals.

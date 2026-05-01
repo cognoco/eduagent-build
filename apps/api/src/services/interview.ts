@@ -158,6 +158,7 @@ function mapDraftRow(
       []) as OnboardingDraft['exchangeHistory'],
     extractedSignals: (row.extractedSignals ?? {}) as Record<string, unknown>,
     status: row.status,
+    failureCode: (row.failureCode as OnboardingDraft['failureCode']) ?? null,
     expiresAt: row.expiresAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -835,18 +836,21 @@ export async function persistCurriculum(
     const curriculum = await ensureCurriculum(db, subjectId);
 
     if (result.topics.length > 0) {
-      await db.insert(curriculumTopics).values(
-        result.topics.map((t, i) => ({
-          curriculumId: curriculum.id,
-          bookId,
-          title: t.title,
-          description: t.description,
-          chapter: t.chapter ?? null,
-          sortOrder: t.sortOrder ?? i,
-          relevance: 'core' as const,
-          estimatedMinutes: t.estimatedMinutes ?? 30,
-        }))
-      );
+      await db
+        .insert(curriculumTopics)
+        .values(
+          result.topics.map((t, i) => ({
+            curriculumId: curriculum.id,
+            bookId,
+            title: t.title,
+            description: t.description,
+            chapter: t.chapter ?? null,
+            sortOrder: t.sortOrder ?? i,
+            relevance: 'core' as const,
+            estimatedMinutes: t.estimatedMinutes ?? 30,
+          }))
+        )
+        .onConflictDoNothing();
     }
 
     // Mark book topics as generated
@@ -875,16 +879,19 @@ export async function persistCurriculum(
 
   if (topics.length > 0) {
     const bookId = await ensureDefaultBook(db, subjectId, subjectName);
-    await db.insert(curriculumTopics).values(
-      topics.map((t, i) => ({
-        curriculumId: curriculum.id,
-        bookId,
-        title: t.title,
-        description: t.description,
-        sortOrder: i,
-        relevance: t.relevance,
-        estimatedMinutes: t.estimatedMinutes,
-      }))
-    );
+    await db
+      .insert(curriculumTopics)
+      .values(
+        topics.map((t, i) => ({
+          curriculumId: curriculum.id,
+          bookId,
+          title: t.title,
+          description: t.description,
+          sortOrder: i,
+          relevance: t.relevance,
+          estimatedMinutes: t.estimatedMinutes,
+        }))
+      )
+      .onConflictDoNothing();
   }
 }

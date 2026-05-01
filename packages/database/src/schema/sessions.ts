@@ -17,7 +17,9 @@ import { generateUUIDv7 } from '../utils/uuid';
 
 export const draftStatusEnum = pgEnum('draft_status', [
   'in_progress',
+  'completing',
   'completed',
+  'failed',
   'expired',
 ]);
 
@@ -83,6 +85,7 @@ export const onboardingDrafts = pgTable('onboarding_drafts', {
   exchangeHistory: jsonb('exchange_history').notNull().default([]),
   extractedSignals: jsonb('extracted_signals').notNull().default({}),
   status: draftStatusEnum('status').notNull().default('in_progress'),
+  failureCode: text('failure_code'),
   expiresAt: timestamp('expires_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()

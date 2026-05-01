@@ -92,7 +92,8 @@ function mockDraftRow(
     subjectId: string;
     exchangeHistory: unknown;
     extractedSignals: unknown;
-    status: 'in_progress' | 'completed' | 'expired';
+    status: 'in_progress' | 'completing' | 'completed' | 'failed' | 'expired';
+    failureCode: string | null;
     expiresAt: Date | null;
   }>
 ) {
@@ -103,6 +104,7 @@ function mockDraftRow(
     exchangeHistory: overrides?.exchangeHistory ?? [],
     extractedSignals: overrides?.extractedSignals ?? {},
     status: overrides?.status ?? 'in_progress',
+    failureCode: overrides?.failureCode ?? null,
     expiresAt: overrides?.expiresAt ?? null,
     createdAt: NOW,
     updatedAt: NOW,
@@ -126,6 +128,7 @@ function createMockDb({
             ? insertReturning
             : curriculumInsertReturning
         ),
+      onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
     })),
   }));
 
@@ -1190,6 +1193,7 @@ describe('persistCurriculum', () => {
         experienceLevel: 'beginner',
       },
       status: 'completed',
+      failureCode: null,
       expiresAt: null,
       createdAt: NOW.toISOString(),
       updatedAt: NOW.toISOString(),
@@ -1214,6 +1218,7 @@ describe('persistCurriculum', () => {
       exchangeHistory: [{ role: 'user', content: 'Hello' }],
       extractedSignals: {},
       status: 'completed',
+      failureCode: null,
       expiresAt: null,
       createdAt: NOW.toISOString(),
       updatedAt: NOW.toISOString(),
@@ -1234,6 +1239,7 @@ describe('persistCurriculum', () => {
       exchangeHistory: [],
       extractedSignals: {},
       status: 'completed',
+      failureCode: null,
       expiresAt: null,
       createdAt: NOW.toISOString(),
       updatedAt: NOW.toISOString(),
@@ -1260,6 +1266,7 @@ describe('persistCurriculum', () => {
       exchangeHistory: [],
       extractedSignals: {},
       status: 'completed',
+      failureCode: null,
       expiresAt: null,
       createdAt: NOW.toISOString(),
       updatedAt: NOW.toISOString(),
@@ -1280,6 +1287,7 @@ describe('persistCurriculum', () => {
       exchangeHistory: [{ role: 'user', content: 'Hello' }],
       extractedSignals: {},
       status: 'completed',
+      failureCode: null,
       expiresAt: null,
       createdAt: NOW.toISOString(),
       updatedAt: NOW.toISOString(),

@@ -4,6 +4,7 @@ import {
   celebrationReasonSchema,
   pendingCelebrationSchema,
 } from './progress.ts';
+import { persistFailureCodeSchema } from './errors.ts';
 
 // Interview schemas
 
@@ -14,7 +15,9 @@ export type InterviewMessageInput = z.infer<typeof interviewMessageSchema>;
 
 export const draftStatusSchema = z.enum([
   'in_progress',
+  'completing',
   'completed',
+  'failed',
   'expired',
 ]);
 export type DraftStatus = z.infer<typeof draftStatusSchema>;
@@ -91,6 +94,7 @@ export const onboardingDraftSchema = z.object({
   exchangeHistory: z.array(exchangeEntrySchema),
   extractedSignals: z.record(z.string(), z.unknown()),
   status: draftStatusSchema,
+  failureCode: persistFailureCodeSchema.nullable().default(null),
   expiresAt: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),

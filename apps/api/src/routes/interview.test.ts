@@ -1,4 +1,19 @@
 // ---------------------------------------------------------------------------
+// Mock Inngest — route dispatches curriculum persistence via inngest.send()
+// ---------------------------------------------------------------------------
+
+jest.mock('inngest/hono', () => ({
+  serve: jest.fn().mockReturnValue(jest.fn()),
+}));
+
+jest.mock('../inngest/client', () => ({
+  inngest: {
+    send: jest.fn().mockResolvedValue(undefined),
+    createFunction: jest.fn().mockReturnValue(jest.fn()),
+  },
+}));
+
+// ---------------------------------------------------------------------------
 // Mock JWT module so auth middleware passes with a valid token
 // ---------------------------------------------------------------------------
 
@@ -20,7 +35,11 @@ jest.mock('../middleware/jwt', () => ({
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
 
-const mockDatabaseModule = createDatabaseModuleMock();
+// includeActual: true is required — the route imports `onboardingDrafts` from
+// @eduagent/database (for the atomic claim UPDATE), so it must be a real
+// Drizzle table object. Without it, onboardingDrafts is undefined and
+// `onboardingDrafts.id` throws TypeError → 500 on complete flows.
+const mockDatabaseModule = createDatabaseModuleMock({ includeActual: true });
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
@@ -44,13 +63,16 @@ jest.mock('../services/account', () => ({
 
 jest.mock('../services/profile', () => ({
   getProfile: jest.fn().mockResolvedValue({
-    id: 'test-profile-id',
+    // Must be a valid UUID — interviewReadyToPersistEventSchema validates
+    // profileId as z.string().uuid(), so schema.parse() in the route throws
+    // (500) with a non-UUID string like 'test-profile-id'.
+    id: '00000000-0000-4000-8000-000000000001',
     birthYear: null,
     location: null,
     consentStatus: 'CONSENTED',
   }),
   findOwnerProfile: jest.fn().mockResolvedValue({
-    id: 'test-profile-id',
+    id: '00000000-0000-4000-8000-000000000001',
     birthYear: null,
     location: null,
     consentStatus: 'CONSENTED',
@@ -144,13 +166,8 @@ jest.mock('../services/interview', () => ({
       isComplete: false,
     }),
   }),
-  extractSignals: jest.fn().mockResolvedValue({
-    goals: ['learn calculus'],
-    experienceLevel: 'beginner',
-    currentKnowledge: 'basic algebra',
-  }),
   getOrCreateDraft: jest.fn().mockResolvedValue({
-    id: 'draft-1',
+    id: '00000000-0000-4000-8000-000000000001',
     profileId: 'test-profile-id',
     subjectId: SUBJECT_ID,
     exchangeHistory: [],
@@ -162,20 +179,18 @@ jest.mock('../services/interview', () => ({
   }),
   getDraftState: jest.fn().mockResolvedValue(null),
   updateDraft: jest.fn().mockResolvedValue(undefined),
-  persistCurriculum: jest.fn().mockResolvedValue(undefined),
   buildDraftResumeSummary: jest.fn().mockReturnValue('Resume summary'),
 }));
 
 import { app } from '../index';
+import { inngest } from '../inngest/client';
 import { getSubject } from '../services/subject';
 import {
   processInterviewExchange,
   streamInterviewExchange,
-  extractSignals,
   getOrCreateDraft,
   getDraftState,
   updateDraft,
-  persistCurriculum,
 } from '../services/interview';
 import {
   AUTH_HEADERS as BASE_AUTH_HEADERS,
@@ -183,11 +198,19 @@ import {
 } from '../test-utils/test-env';
 import { ERROR_CODES, errorCodeSchema } from '@eduagent/schemas';
 
-const TEST_ENV = { ...BASE_AUTH_ENV };
+const TEST_ENV = {
+  ...BASE_AUTH_ENV,
+  DATABASE_URL: 'postgres://mock',
+};
+
+// profileId in assertions: the mock getProfile returns this UUID.
+// Non-UUID strings like 'test-profile-id' cause interviewReadyToPersistEventSchema
+// to throw inside the route (500), so a UUID is required here.
+const PROFILE_ID = '00000000-0000-4000-8000-000000000001';
 
 const AUTH_HEADERS = {
   ...BASE_AUTH_HEADERS,
-  'X-Profile-Id': 'test-profile-id',
+  'X-Profile-Id': PROFILE_ID,
 };
 
 describe('interview routes', () => {
@@ -222,7 +245,7 @@ describe('interview routes', () => {
     });
 
     (getOrCreateDraft as jest.Mock).mockResolvedValue({
-      id: 'draft-1',
+      id: '00000000-0000-4000-8000-000000000001',
       profileId: 'test-profile-id',
       subjectId: SUBJECT_ID,
       exchangeHistory: [],
@@ -235,7 +258,14 @@ describe('interview routes', () => {
 
     (getDraftState as jest.Mock).mockResolvedValue(null);
     (updateDraft as jest.Mock).mockResolvedValue(undefined);
-    (persistCurriculum as jest.Mock).mockResolvedValue(undefined);
+    (inngest.send as jest.Mock).mockResolvedValue(undefined);
+
+    // Stub db.update().set().where().returning() for the atomic status claim.
+    // Returns one row by default so inngest.send is called on complete flows.
+    const returningMock = jest.fn().mockResolvedValue([{ id: 'draft-id' }]);
+    const whereMock = jest.fn().mockReturnValue({ returning: returningMock });
+    const setMock = jest.fn().mockReturnValue({ where: whereMock });
+    mockDatabaseModule.db.update = jest.fn().mockReturnValue({ set: setMock });
   });
 
   // -------------------------------------------------------------------------
@@ -314,9 +344,9 @@ describe('interview routes', () => {
       );
 
       expect(updateDraft).toHaveBeenCalledWith(
-        undefined,
-        'test-profile-id',
-        'draft-1',
+        expect.anything(),
+        PROFILE_ID,
+        '00000000-0000-4000-8000-000000000001',
         expect.objectContaining({
           exchangeHistory: expect.arrayContaining([
             { role: 'user', content: 'I want to learn calculus' },
@@ -326,7 +356,7 @@ describe('interview routes', () => {
       );
     });
 
-    it('calls persistCurriculum when interview is complete', async () => {
+    it('dispatches to Inngest when interview is complete', async () => {
       (processInterviewExchange as jest.Mock).mockResolvedValue({
         response: 'Great, I have enough information!',
         isComplete: true,
@@ -350,29 +380,23 @@ describe('interview routes', () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.isComplete).toBe(true);
+      expect(body.status).toBe('completing');
 
-      expect(updateDraft).toHaveBeenNthCalledWith(
-        1,
-        undefined,
-        'test-profile-id',
-        'draft-1',
-        expect.not.objectContaining({
-          status: 'completed',
-        })
+      // Only one updateDraft call — for history + extractedSignals (before claim)
+      expect(updateDraft).toHaveBeenCalledTimes(1);
+      expect(updateDraft).toHaveBeenCalledWith(
+        expect.anything(),
+        PROFILE_ID,
+        '00000000-0000-4000-8000-000000000001',
+        expect.not.objectContaining({ status: expect.anything() })
       );
-      expect(updateDraft).toHaveBeenNthCalledWith(
-        2,
-        undefined,
-        'test-profile-id',
-        'draft-1',
-        expect.objectContaining({
-          status: 'completed',
-        })
+
+      expect(inngest.send).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'app/interview.ready_to_persist' })
       );
-      expect(persistCurriculum).toHaveBeenCalled();
     });
 
-    it('does not call persistCurriculum when interview is not complete', async () => {
+    it('does not dispatch to Inngest when interview is not complete', async () => {
       await app.request(
         `/v1/subjects/${SUBJECT_ID}/interview`,
         {
@@ -383,7 +407,7 @@ describe('interview routes', () => {
         TEST_ENV
       );
 
-      expect(persistCurriculum).not.toHaveBeenCalled();
+      expect(inngest.send).not.toHaveBeenCalled();
     });
 
     it('returns 404 when subject not found', async () => {
@@ -502,9 +526,9 @@ describe('interview routes', () => {
       await res.text();
 
       expect(updateDraft).toHaveBeenCalledWith(
-        undefined,
-        'test-profile-id',
-        'draft-1',
+        expect.anything(),
+        PROFILE_ID,
+        '00000000-0000-4000-8000-000000000001',
         expect.objectContaining({
           exchangeHistory: expect.arrayContaining([
             { role: 'user', content: 'I want to learn calculus' },
@@ -620,11 +644,11 @@ describe('interview routes', () => {
       // settles isStreaming and renders the fallback bubble.
       expect(body).toContain('"type":"done"');
       expect(body).toContain('"isComplete":false');
-      // CRITICAL: the route must NOT mark the draft completed on a fallback.
-      expect(persistCurriculum).not.toHaveBeenCalled();
+      // CRITICAL: the route must NOT dispatch to Inngest on a fallback.
+      expect(inngest.send).not.toHaveBeenCalled();
     });
 
-    it('calls persistCurriculum when interview completes during stream', async () => {
+    it('dispatches to Inngest when interview completes during stream', async () => {
       (streamInterviewExchange as jest.Mock).mockResolvedValue({
         stream: (async function* () {
           yield 'All done!';
@@ -654,14 +678,18 @@ describe('interview routes', () => {
 
       const body = await res.text();
       expect(body).toContain('"isComplete":true');
+      expect(body).toContain('"status":"completing"');
 
+      // updateDraft called once — for history + extractedSignals (before claim)
       expect(updateDraft).toHaveBeenCalledWith(
-        undefined,
-        'test-profile-id',
-        'draft-1',
-        expect.objectContaining({ status: 'completed' })
+        expect.anything(),
+        PROFILE_ID,
+        '00000000-0000-4000-8000-000000000001',
+        expect.not.objectContaining({ status: expect.anything() })
       );
-      expect(persistCurriculum).toHaveBeenCalled();
+      expect(inngest.send).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'app/interview.ready_to_persist' })
+      );
     });
   });
 
@@ -687,7 +715,7 @@ describe('interview routes', () => {
 
     it('returns 200 with state object when draft exists', async () => {
       (getDraftState as jest.Mock).mockResolvedValue({
-        id: 'draft-1',
+        id: '00000000-0000-4000-8000-000000000001',
         profileId: 'test-profile-id',
         subjectId: SUBJECT_ID,
         exchangeHistory: [
@@ -711,7 +739,7 @@ describe('interview routes', () => {
 
       const body = await res.json();
       expect(body.state).toBeDefined();
-      expect(body.state.draftId).toBe('draft-1');
+      expect(body.state.draftId).toBe('00000000-0000-4000-8000-000000000001');
       expect(body.state.status).toBe('in_progress');
       expect(body.state.exchangeCount).toBe(1);
       expect(body.state.subjectName).toBe('Mathematics');
@@ -719,7 +747,7 @@ describe('interview routes', () => {
 
     it('calls getDraftState and getSubject', async () => {
       (getDraftState as jest.Mock).mockResolvedValue({
-        id: 'draft-1',
+        id: '00000000-0000-4000-8000-000000000001',
         profileId: 'test-profile-id',
         subjectId: SUBJECT_ID,
         exchangeHistory: [],
@@ -742,7 +770,7 @@ describe('interview routes', () => {
 
     it('returns Unknown subject name when subject not found', async () => {
       (getDraftState as jest.Mock).mockResolvedValue({
-        id: 'draft-1',
+        id: '00000000-0000-4000-8000-000000000001',
         profileId: 'test-profile-id',
         subjectId: SUBJECT_ID,
         exchangeHistory: [],
@@ -780,9 +808,9 @@ describe('interview routes', () => {
   // -------------------------------------------------------------------------
 
   describe('POST /v1/subjects/:subjectId/interview/complete', () => {
-    it('extracts signals, persists curriculum, and marks draft completed', async () => {
+    it('atomically claims the draft and dispatches to Inngest', async () => {
       (getDraftState as jest.Mock).mockResolvedValue({
-        id: 'draft-1',
+        id: '00000000-0000-4000-8000-000000000001',
         profileId: 'test-profile-id',
         subjectId: SUBJECT_ID,
         exchangeHistory: [
@@ -805,40 +833,21 @@ describe('interview routes', () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.isComplete).toBe(true);
+      expect(body.status).toBe('completing');
       expect(body.exchangeCount).toBe(1);
 
-      // Should extract signals from whatever conversation exists
-      expect(extractSignals).toHaveBeenCalled();
+      // Signals extraction and inline persist are now handled by the Inngest function
+      expect(updateDraft).not.toHaveBeenCalled();
 
-      // Should persist curriculum with the extracted signals
-      expect(persistCurriculum).toHaveBeenCalledWith(
-        undefined,
-        'test-profile-id',
-        SUBJECT_ID,
-        'Mathematics',
-        expect.objectContaining({
-          extractedSignals: {
-            goals: ['learn calculus'],
-            experienceLevel: 'beginner',
-            currentKnowledge: 'basic algebra',
-          },
-        }),
-        undefined,
-        undefined
-      );
-
-      // Should mark draft as completed
-      expect(updateDraft).toHaveBeenCalledWith(
-        undefined,
-        'test-profile-id',
-        'draft-1',
-        expect.objectContaining({ status: 'completed' })
+      // Should dispatch to Inngest for durable curriculum persistence
+      expect(inngest.send).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'app/interview.ready_to_persist' })
       );
     });
 
     it('returns success immediately when draft is already completed', async () => {
       (getDraftState as jest.Mock).mockResolvedValue({
-        id: 'draft-1',
+        id: '00000000-0000-4000-8000-000000000001',
         profileId: 'test-profile-id',
         subjectId: SUBJECT_ID,
         exchangeHistory: [
@@ -862,9 +871,8 @@ describe('interview routes', () => {
       const body = await res.json();
       expect(body.isComplete).toBe(true);
 
-      // Should not re-extract or re-persist when already completed
-      expect(extractSignals).not.toHaveBeenCalled();
-      expect(persistCurriculum).not.toHaveBeenCalled();
+      // Should not re-dispatch to Inngest when already completed
+      expect(inngest.send).not.toHaveBeenCalled();
     });
 
     it('returns 404 when subject not found', async () => {

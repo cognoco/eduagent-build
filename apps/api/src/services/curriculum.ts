@@ -543,21 +543,24 @@ export async function persistNarrowTopics(
 
   const curriculum = await ensureCurriculum(db, subjectId);
   const bookId = await ensureDefaultBook(db, subjectId, subjectName);
-  await db.insert(curriculumTopics).values(
-    topics.map((topic, index) => ({
-      curriculumId: curriculum.id,
-      bookId,
-      title: topic.title,
-      description: topic.description,
-      sortOrder: index,
-      relevance: topic.relevance,
-      estimatedMinutes: topic.estimatedMinutes,
-      cefrLevel: topic.cefrLevel ?? null,
-      cefrSublevel: topic.cefrSublevel ?? null,
-      targetWordCount: topic.targetWordCount ?? null,
-      targetChunkCount: topic.targetChunkCount ?? null,
-    }))
-  );
+  await db
+    .insert(curriculumTopics)
+    .values(
+      topics.map((topic, index) => ({
+        curriculumId: curriculum.id,
+        bookId,
+        title: topic.title,
+        description: topic.description,
+        sortOrder: index,
+        relevance: topic.relevance,
+        estimatedMinutes: topic.estimatedMinutes,
+        cefrLevel: topic.cefrLevel ?? null,
+        cefrSublevel: topic.cefrSublevel ?? null,
+        targetWordCount: topic.targetWordCount ?? null,
+        targetChunkCount: topic.targetChunkCount ?? null,
+      }))
+    )
+    .onConflictDoNothing();
 }
 
 /**
@@ -934,18 +937,21 @@ export async function persistBookTopics(
   // so a partial failure doesn't leave a half-generated book.
   await db.transaction(async (tx) => {
     if (topics.length > 0) {
-      await tx.insert(curriculumTopics).values(
-        topics.map((topic) => ({
-          curriculumId: curriculum.id,
-          title: topic.title,
-          description: topic.description,
-          sortOrder: topic.sortOrder,
-          relevance: 'core' as const,
-          estimatedMinutes: topic.estimatedMinutes,
-          bookId,
-          chapter: topic.chapter,
-        }))
-      );
+      await tx
+        .insert(curriculumTopics)
+        .values(
+          topics.map((topic) => ({
+            curriculumId: curriculum.id,
+            title: topic.title,
+            description: topic.description,
+            sortOrder: topic.sortOrder,
+            relevance: 'core' as const,
+            estimatedMinutes: topic.estimatedMinutes,
+            bookId,
+            chapter: topic.chapter,
+          }))
+        )
+        .onConflictDoNothing();
     }
 
     const insertedTopicRows = await tx.query.curriculumTopics.findMany({
@@ -1353,21 +1359,24 @@ export async function challengeCurriculum(
     );
 
     if (topics.length > 0) {
-      await tx.insert(curriculumTopics).values(
-        topics.map((t, i) => ({
-          curriculumId: newCurriculum.id,
-          bookId,
-          title: t.title,
-          description: t.description,
-          sortOrder: i,
-          relevance: t.relevance,
-          estimatedMinutes: t.estimatedMinutes,
-          cefrLevel: t.cefrLevel ?? null,
-          cefrSublevel: t.cefrSublevel ?? null,
-          targetWordCount: t.targetWordCount ?? null,
-          targetChunkCount: t.targetChunkCount ?? null,
-        }))
-      );
+      await tx
+        .insert(curriculumTopics)
+        .values(
+          topics.map((t, i) => ({
+            curriculumId: newCurriculum.id,
+            bookId,
+            title: t.title,
+            description: t.description,
+            sortOrder: i,
+            relevance: t.relevance,
+            estimatedMinutes: t.estimatedMinutes,
+            cefrLevel: t.cefrLevel ?? null,
+            cefrSublevel: t.cefrSublevel ?? null,
+            targetWordCount: t.targetWordCount ?? null,
+            targetChunkCount: t.targetChunkCount ?? null,
+          }))
+        )
+        .onConflictDoNothing();
     }
   });
 

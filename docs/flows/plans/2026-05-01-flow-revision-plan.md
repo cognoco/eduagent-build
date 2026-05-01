@@ -502,7 +502,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | QA-05 | Return to chat after creating a subject | 🚫 | Blocked | | | Needs LLM |
 | QA-06 | Focused-book generation regression | 🚫 | Blocked | | | Needs LLM |
 | QA-07 | Tab-bar leak regression | ✅ | Pass | | | Tab bar hidden on modal routes (create-subject, create-profile), visible on tab-group routes (subscription, shelf) |
-| QA-08 | Parent add-child regression | 🚫 | Blocked | BUG-947 | | Create-profile API server error |
+| QA-08 | Parent add-child regression | ✅ | Pass | | | Family plan (Slot E): child "Timmy" created successfully (201). Parent stays on own profile, sees confirmation alert, child appears in profile switcher and dashboard. |
 | QA-09 | Consent email URL regression | 🚫 | Blocked | | | Needs email deep-link — not testable on web preview |
 
 ---
@@ -547,12 +547,12 @@ Update this once a batch is complete to track overall progress.
 | 11 | Homework                 |  7 | 🚫 | 1✅ 6🚫 — camera/LLM blocked |
 | 12 | Account / Settings       |  9 | ✅ | 7✅ 1⚠️ 1🚫 — export bug filed |
 | 13 | Account Deletion         |  2 | ⚠️ | 1✅ 1🚫 |
-| 14 | Parent Setup + Children  |  7 | ⚠️ | 2✅ 5🚫 — Plus plan blocks child creation (not a bug). Needs Family plan account. |
-| 15 | Parent Dashboard         | 16 | 🚫 | 16🚫 — needs Family plan account with children |
-| 16 | Billing                  | 11 | ✅ | 6✅ 5🚫 — store/child/quota blocked |
+| 14 | Parent Setup + Children  |  7 | ✅ | 7✅ — Family plan (Slot E) seeded, child Timmy created, all parent setup flows pass |
+| 15 | Parent Dashboard         | 16 | ⚠️ | 7✅ 9🚫 — dashboard/detail/accommodation pass, drill-downs blocked by no learning history |
+| 16 | Billing                  | 11 | ✅ | 7✅ 4🚫 — Family pool verified, store/child-paywall/quota blocked |
 | 17 | Cross-Cutting Final Pass |  3 | ⚠️ | 1✅ 1⚠️ 1🚫 — BUG-948 bare router.back() |
-| 18 | Regression Smoke         |  9 | ⚠️ | 3✅ 6🚫 — LLM/parent/email blocked |
-| **Total** | | **154** | | **51✅ 6⚠️ 1❌ 96🚫 0⬜ — all flows triaged** |
+| 18 | Regression Smoke         |  9 | ⚠️ | 4✅ 5🚫 — LLM/email blocked, parent add-child now passing |
+| **Total** | | **154** | | **64✅ 6⚠️ 1❌ 83🚫 0⬜ — all flows triaged** |
 
 ### Coverage Audit
 
