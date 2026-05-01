@@ -417,6 +417,113 @@ describe('processEvaluateCompletion', () => {
     expect(db.update).not.toHaveBeenCalled();
   });
 
+  it('persists structuredAssessment to the assessment-producing event, not events[0], when a later non-assessment event is first [CR-PR129-M3]', async () => {
+    // events[0] is a later ai_response that has no parseable assessment.
+    // events[1] is the actual assessment-producing event.
+    // The fix must write structuredAssessment to events[1].id, not events[0].id.
+    const assessment = { challengePassed: true, quality: 4 };
+    (parseEvaluateAssessment as jest.Mock)
+      .mockReturnValueOnce(null) // events[0]: no assessment (later non-assessment event)
+      .mockReturnValueOnce(assessment); // events[1]: assessment found here
+    (mapEvaluateQualityToSm2 as jest.Mock).mockReturnValue(4);
+
+    const laterEvent = {
+      id: 'event-latest',
+      content: 'just a follow-up message',
+      createdAt: new Date('2026-01-01T10:05:00Z'),
+    };
+    const assessmentEvent = {
+      id: 'event-assessment',
+      content: '{"challengePassed": true, "quality": 4}',
+      createdAt: new Date('2026-01-01T10:04:00Z'),
+    };
+
+    // Track the id passed into the where() clause of the session event update.
+    // We build a custom update mock that records the structured-assessment set payload
+    // and the where arguments separately for the two update calls (card vs event).
+    const eventUpdateWhereSpy = jest.fn().mockResolvedValue(undefined);
+    const eventUpdateSetSpy = jest
+      .fn()
+      .mockReturnValue({ where: eventUpdateWhereSpy });
+    const cardUpdateWhereSpy = jest.fn().mockResolvedValue(undefined);
+    const cardUpdateSetSpy = jest
+      .fn()
+      .mockReturnValue({ where: cardUpdateWhereSpy });
+
+    let updateCallCount = 0;
+    const updateSpy = jest.fn(() => {
+      // First call = retention card, second call = session event
+      updateCallCount++;
+      return {
+        set: updateCallCount === 1 ? cardUpdateSetSpy : eventUpdateSetSpy,
+      };
+    });
+
+    const db = createMockDb({
+      selectResults: [
+        [laterEvent, assessmentEvent],
+        [{ id: 'card-1', topicId, profileId, evaluateDifficultyRung: 2 }],
+      ],
+    });
+    // Override the update mock with our tracking version
+    (db as unknown as { update: jest.Mock }).update = updateSpy;
+
+    await processEvaluateCompletion(db, profileId, sessionId, topicId);
+
+    // Must have been called twice: once for card, once for event
+    expect(updateSpy).toHaveBeenCalledTimes(2);
+
+    // The event update must carry a structuredAssessment for 'evaluate'
+    expect(eventUpdateSetSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        structuredAssessment: expect.objectContaining({ type: 'evaluate' }),
+      })
+    );
+
+    // The where clause for the event update must reference 'event-assessment', not 'event-latest'.
+    // We inspect via the drizzle eq() call: eq(sessionEvents.id, id) returns an SQL object
+    // whose queryChunks contain the id value as a param.
+    // Extract param values from the drizzle SQL `and(eq(...), eq(...))` passed to .where().
+    // Drizzle SQL objects have a `queryChunks` array; `Param` instances have a `.value` field.
+    // We collect all non-circular leaf string/number values from queryChunks recursively.
+    function extractParamValues(
+      node: unknown,
+      visited = new WeakSet<object>()
+    ): string[] {
+      if (node === null || node === undefined) return [];
+      if (typeof node !== 'object') return [String(node)];
+      if (visited.has(node as object)) return [];
+      visited.add(node as object);
+      const values: string[] = [];
+      const obj = node as Record<string, unknown>;
+      // Drizzle Param has a `.value` property that is the raw SQL parameter
+      if (
+        'value' in obj &&
+        (typeof obj['value'] === 'string' || typeof obj['value'] === 'number')
+      ) {
+        values.push(String(obj['value']));
+      }
+      // Recurse into queryChunks (SQL) and left/right (BinaryOperator / and/or)
+      for (const key of ['queryChunks', 'left', 'right', 'conditions']) {
+        if (key in obj) {
+          const child = obj[key];
+          if (Array.isArray(child)) {
+            for (const item of child)
+              values.push(...extractParamValues(item, visited));
+          } else {
+            values.push(...extractParamValues(child, visited));
+          }
+        }
+      }
+      return values;
+    }
+
+    const whereCallArgs: unknown[] = eventUpdateWhereSpy.mock.calls[0] ?? [];
+    const paramValues = whereCallArgs.flatMap((a) => extractParamValues(a));
+    expect(paramValues).toContain('event-assessment');
+    expect(paramValues).not.toContain('event-latest');
+  });
+
   it('caps difficulty rung at 4 on success', async () => {
     const assessment = {
       challengePassed: true,
@@ -532,5 +639,88 @@ describe('processTeachBackCompletion', () => {
     await processTeachBackCompletion(db, profileId, sessionId, topicId);
 
     expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it('persists structuredAssessment to the assessment-producing event, not events[0], when a later non-assessment event is first [CR-PR129-M3]', async () => {
+    // events[0] is a later ai_response with no parseable assessment.
+    // events[1] is the actual assessment-producing event.
+    const assessment = {
+      completeness: 4,
+      accuracy: 4,
+      clarity: 3,
+      overallQuality: 4,
+      weakestArea: 'clarity' as const,
+      gapIdentified: 'missed friction',
+    };
+    (parseTeachBackAssessment as jest.Mock)
+      .mockReturnValueOnce(null) // events[0]: no assessment
+      .mockReturnValueOnce(assessment); // events[1]: assessment found here
+    (mapTeachBackRubricToSm2 as jest.Mock).mockReturnValue(4);
+
+    const laterEvent = {
+      id: 'event-latest',
+      content: 'follow-up exchange',
+      createdAt: new Date('2026-01-01T10:05:00Z'),
+    };
+    const assessmentEvent = {
+      id: 'event-assessment',
+      content: '{"completeness": 4, "accuracy": 4}',
+      createdAt: new Date('2026-01-01T10:04:00Z'),
+    };
+
+    const eventUpdateWhereSpy = jest.fn().mockResolvedValue(undefined);
+    const eventUpdateSetSpy = jest
+      .fn()
+      .mockReturnValue({ where: eventUpdateWhereSpy });
+    const updateSpy = jest.fn(() => ({ set: eventUpdateSetSpy }));
+
+    const db = createMockDb({
+      selectResults: [[laterEvent, assessmentEvent]],
+    });
+    (db as unknown as { update: jest.Mock }).update = updateSpy;
+
+    await processTeachBackCompletion(db, profileId, sessionId, topicId);
+
+    expect(updateSpy).toHaveBeenCalledTimes(1);
+    expect(eventUpdateSetSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        structuredAssessment: expect.objectContaining({ type: 'teach_back' }),
+      })
+    );
+
+    function extractParamValues(
+      node: unknown,
+      visited = new WeakSet<object>()
+    ): string[] {
+      if (node === null || node === undefined) return [];
+      if (typeof node !== 'object') return [String(node)];
+      if (visited.has(node as object)) return [];
+      visited.add(node as object);
+      const values: string[] = [];
+      const obj = node as Record<string, unknown>;
+      if (
+        'value' in obj &&
+        (typeof obj['value'] === 'string' || typeof obj['value'] === 'number')
+      ) {
+        values.push(String(obj['value']));
+      }
+      for (const key of ['queryChunks', 'left', 'right', 'conditions']) {
+        if (key in obj) {
+          const child = obj[key];
+          if (Array.isArray(child)) {
+            for (const item of child)
+              values.push(...extractParamValues(item, visited));
+          } else {
+            values.push(...extractParamValues(child, visited));
+          }
+        }
+      }
+      return values;
+    }
+
+    const whereCallArgs: unknown[] = eventUpdateWhereSpy.mock.calls[0] ?? [];
+    const paramValues = whereCallArgs.flatMap((a) => extractParamValues(a));
+    expect(paramValues).toContain('event-assessment');
+    expect(paramValues).not.toContain('event-latest');
   });
 });

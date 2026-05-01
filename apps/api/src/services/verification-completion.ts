@@ -57,14 +57,23 @@ export async function processEvaluateCompletion(
     .orderBy(desc(sessionEvents.createdAt), desc(sessionEvents.id))
     .limit(5);
 
-  // Try to parse an EVALUATE assessment from the most recent events
+  // Try to parse an EVALUATE assessment from the most recent events.
+  // Track which event produced the assessment so we write to the correct row.
   let assessment = null;
-  for (const event of events) {
-    assessment = parseEvaluateAssessment(event.content);
-    if (assessment) break;
+  let assessmentEventIndex = -1;
+  for (let i = 0; i < events.length; i++) {
+    const candidate = events[i];
+    if (!candidate) continue;
+    assessment = parseEvaluateAssessment(candidate.content);
+    if (assessment) {
+      assessmentEventIndex = i;
+      break;
+    }
   }
 
-  if (!assessment) return undefined; // No parseable assessment found
+  if (!assessment || assessmentEventIndex === -1) return undefined; // No parseable assessment found
+
+  const assessmentEvent = events[assessmentEventIndex]!;
 
   // Load the retention card
   const cards = await db
@@ -93,11 +102,11 @@ export async function processEvaluateCompletion(
   let newRung = currentRung;
   if (!assessment.challengePassed) {
     // Count consecutive EVALUATE failures from prior events in this session.
-    // events[0] is the most recent (current); walk backward counting failures.
+    // Walk backward from the event *after* the matched assessment event.
     // Parse from event content (not structuredAssessment column) because
-    // the column is only written at the end of this function for events[0].
+    // the column is only written at the end of this function for the matched event.
     let consecutiveFailures = 1; // Current failure counts as 1
-    for (let i = 1; i < events.length; i++) {
+    for (let i = assessmentEventIndex + 1; i < events.length; i++) {
       const evt = events[i];
       if (!evt) break;
       const priorAssessment = parseEvaluateAssessment(evt.content);
@@ -141,26 +150,24 @@ export async function processEvaluateCompletion(
       )
     );
 
-  // Store structured assessment in the event for audit trail
-  if (events[0]) {
-    await db
-      .update(sessionEvents)
-      .set({
-        structuredAssessment: {
-          type: 'evaluate',
-          ...assessment,
-          sm2Quality,
-          difficultyRungBefore: currentRung,
-          difficultyRungAfter: newRung,
-        },
-      })
-      .where(
-        and(
-          eq(sessionEvents.id, events[0].id),
-          eq(sessionEvents.profileId, profileId)
-        )
-      );
-  }
+  // Store structured assessment in the event that produced it (not blindly events[0])
+  await db
+    .update(sessionEvents)
+    .set({
+      structuredAssessment: {
+        type: 'evaluate',
+        ...assessment,
+        sm2Quality,
+        difficultyRungBefore: currentRung,
+        difficultyRungAfter: newRung,
+      },
+    })
+    .where(
+      and(
+        eq(sessionEvents.id, assessmentEvent.id),
+        eq(sessionEvents.profileId, profileId)
+      )
+    );
 
   return sm2Quality;
 }
@@ -203,36 +210,40 @@ export async function processTeachBackCompletion(
     .orderBy(desc(sessionEvents.createdAt), desc(sessionEvents.id))
     .limit(5);
 
-  // Try to parse a TEACH_BACK assessment from the most recent events
+  // Try to parse a TEACH_BACK assessment from the most recent events.
+  // Track which event produced the assessment so we write to the correct row.
   let assessment = null;
+  let assessmentEvent: (typeof events)[number] | null = null;
   for (const event of events) {
-    assessment = parseTeachBackAssessment(event.content);
-    if (assessment) break;
+    const parsed = parseTeachBackAssessment(event.content);
+    if (parsed) {
+      assessment = parsed;
+      assessmentEvent = event;
+      break;
+    }
   }
 
-  if (!assessment) return undefined; // No parseable assessment found
+  if (!assessment || !assessmentEvent) return undefined; // No parseable assessment found
 
   // Map rubric to SM-2 quality
   const sm2Quality = mapTeachBackRubricToSm2(assessment);
 
-  // Store structured assessment in the event for audit trail
-  if (events[0]) {
-    await db
-      .update(sessionEvents)
-      .set({
-        structuredAssessment: {
-          type: 'teach_back',
-          ...assessment,
-          sm2Quality,
-        },
-      })
-      .where(
-        and(
-          eq(sessionEvents.id, events[0].id),
-          eq(sessionEvents.profileId, profileId)
-        )
-      );
-  }
+  // Store structured assessment in the event that produced it (not blindly events[0])
+  await db
+    .update(sessionEvents)
+    .set({
+      structuredAssessment: {
+        type: 'teach_back',
+        ...assessment,
+        sm2Quality,
+      },
+    })
+    .where(
+      and(
+        eq(sessionEvents.id, assessmentEvent.id),
+        eq(sessionEvents.profileId, profileId)
+      )
+    );
 
   return sm2Quality;
 }
