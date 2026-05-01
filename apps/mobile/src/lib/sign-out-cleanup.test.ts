@@ -58,6 +58,15 @@ describe('clearProfileSecureStorageOnSignOut [BUG-723 / SEC-7]', () => {
           `rating-recall-success-count:${id}`,
           `rating-last-prompt:${id}`,
           `session-recovery-marker-${id}`,
+          // [CR-SECURESTORE-REGISTRY-11] Keys added in BUG-723 follow-up.
+          // The assertion list is the literal contract — every new per-profile
+          // SecureStore key must be added here AND to the helper.
+          `postApprovalSeen_${id}`,
+          `child-paywall-notified-at-${id}`,
+          // sanitizeSecureStoreKey replaces non-[a-zA-Z0-9._-] chars with '_'
+          // The mock above uses the same replacement so the key shape matches.
+          `permissionSetupSeen_${id}`,
+          `voice-input-mode-${id}`,
         ])
       );
     }
