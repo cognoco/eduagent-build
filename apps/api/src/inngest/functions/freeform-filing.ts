@@ -79,6 +79,17 @@ export const freeformFilingRetry = inngest.createFunction(
       const existingFilingInfo: FilingInfo = filedTopicId
         ? ((await step.run('lookup-filed-topic', async () => {
             const db = getStepDatabase();
+            // [CR-PR129-MEDIUM] Direct db.query (not createScopedRepository)
+            // is safe here because filedTopicId came from sessionSnapshot,
+            // which was loaded via createScopedRepository(profileId) above —
+            // the topic is already proven to belong to the caller's profile
+            // through the FK chain: curriculumTopics.bookId →
+            // curriculum_books.subjectId → subjects.profileId. There is no
+            // scoped variant for curriculumTopics today (no profileId
+            // column); this comment is the explanation reviewers need
+            // instead of having to re-derive the chain. If filedTopicId
+            // ever stops coming from a scoped read, this query becomes
+            // unsafe and must be revisited.
             const topic = await db.query.curriculumTopics.findFirst({
               where: eq(curriculumTopics.id, filedTopicId),
               columns: { title: true, bookId: true },
