@@ -373,7 +373,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
               await sseStream.writeSSE({
                 data: JSON.stringify({
                   type: 'done',
-                  exchangeCount: 0,
+                  // [CR-PR129-M1] Use the persisted session count — the failed
+                  // exchange was not saved, so this is the correct current total.
+                  exchangeCount: session.exchangeCount,
                   escalationRung: result.escalationRung,
                   expectedResponseMinutes: 0,
                 }),
