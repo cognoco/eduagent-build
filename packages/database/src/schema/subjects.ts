@@ -172,6 +172,15 @@ export const curriculumTopics = pgTable(
       table.sortOrder
     ),
     index('curriculum_topics_book_id_idx').on(table.bookId),
+    // [CR-FIL-DEDUP-INDEX-12] Concurrent-write dedup. Defined in migration
+    // 0043_topic_dedup_unique_index.sql as
+    //   CREATE UNIQUE INDEX curriculum_topics_book_title_lower_uq
+    //     ON curriculum_topics (book_id, lower(title))
+    // — drizzle's index() builder does not support expression-based
+    // indexes (lower(title)), so this lives in raw SQL only. DO NOT add
+    // a uniqueIndex(...) here without the lower() expression; it would
+    // be a different index and would not enforce the dedup contract.
+    // The migration is the source of truth; this comment is a pointer.
   ]
 );
 

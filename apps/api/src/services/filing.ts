@@ -585,15 +585,16 @@ export async function resolveFilingResult(
     }
 
     // --- 5. Resolve or create topic ---
-    // [BUG-841 / F-SVC-008] Dedup on (bookId, lower(title)) so that a retry
-    // from session-completed (or any caller that re-fires the filing event)
-    // returns the existing topic instead of inserting a duplicate. Without
-    // this, every retry produced a new topic row with a fresh UUID — same
-    // title, same book, different id — and the user saw "Photosynthesis"
-    // twice in the same chapter. SELECT FOR UPDATE keeps the dedup atomic
-    // alongside the surrounding shelf/book serialization (transaction
-    // semantics depend on the WS driver swap; until then the dedup at least
-    // collapses sequential retries within the same connection).
+    // [BUG-841 / F-SVC-008] Sequential retry dedup via in-process find().
+    // [CR-FIL-DEDUP-INDEX-12] Concurrent-write dedup via DB-level
+    // CREATE UNIQUE INDEX curriculum_topics_book_title_lower_uq
+    //   ON curriculum_topics (book_id, lower(title))
+    // (drizzle migration 0043) plus INSERT ... ON CONFLICT DO NOTHING below.
+    // Two layers: the in-process find avoids a DB round-trip for the
+    // common single-worker retry path; the DB-level index closes the
+    // multi-worker race window where two concurrent inserts pass the
+    // SELECT and would have produced two rows. neon-http does not support
+    // serializable transactions so the index is the only durable barrier.
     const existingTopics = await txDb.query.curriculumTopics.findMany({
       where: eq(curriculumTopics.bookId, bookId),
     });
@@ -604,24 +605,59 @@ export async function resolveFilingResult(
     if (existingDuplicate) {
       topicId = existingDuplicate.id;
     } else {
-      topicId = generateUUIDv7();
+      const newTopicId = generateUUIDv7();
       const maxTopicOrder = existingTopics.reduce(
         (max, t) => Math.max(max, t.sortOrder),
         -1
       );
-      await txDb.insert(curriculumTopics).values({
-        id: topicId,
-        curriculumId,
-        bookId,
-        title: filingResponse.topic.title,
-        description: filingResponse.topic.description,
-        chapter: chapterName,
-        sortOrder: maxTopicOrder + 1,
-        relevance: 'core',
-        estimatedMinutes: 15,
-        filedFrom,
-        sessionId: sessionId ?? null,
-      });
+      // [CR-FIL-DEDUP-INDEX-12] onConflictDoNothing + .returning() lets us
+      // detect when the unique index suppressed our insert (race lost) so
+      // we can re-find the row that won. If returning() yields a row, our
+      // insert went through. If it's empty, another concurrent worker
+      // inserted the same (book_id, lower(title)) pair first.
+      const inserted = await txDb
+        .insert(curriculumTopics)
+        .values({
+          id: newTopicId,
+          curriculumId,
+          bookId,
+          title: filingResponse.topic.title,
+          description: filingResponse.topic.description,
+          chapter: chapterName,
+          sortOrder: maxTopicOrder + 1,
+          relevance: 'core',
+          estimatedMinutes: 15,
+          filedFrom,
+          sessionId: sessionId ?? null,
+        })
+        .onConflictDoNothing()
+        .returning({ id: curriculumTopics.id });
+
+      if (inserted.length > 0) {
+        // We won the race (or were uncontested). Use the id we just wrote.
+        topicId = (inserted[0] as { id: string }).id;
+      } else {
+        // [CR-FIL-DEDUP-INDEX-12] We lost the race. Re-find the row the
+        // winning worker inserted, matching on the same (bookId, lower(title))
+        // dedup key the unique index enforces.
+        const racedExisting = await txDb.query.curriculumTopics.findFirst({
+          where: and(
+            eq(curriculumTopics.bookId, bookId),
+            sql`lower(${curriculumTopics.title}) = lower(${filingResponse.topic.title})`
+          ),
+          columns: { id: true },
+        });
+        if (!racedExisting) {
+          // Should be unreachable: the unique index rejected our insert,
+          // so a row with that key MUST exist. If it doesn't, something
+          // else is wrong (unrelated constraint, transaction visibility
+          // anomaly) — surface as an error rather than silently continue.
+          throw new Error(
+            `[CR-FIL-DEDUP-INDEX-12] Topic insert hit unique-index conflict but no matching row found on re-find. bookId=${bookId} title=${filingResponse.topic.title}`
+          );
+        }
+        topicId = racedExisting.id;
+      }
     }
 
     if (sessionId) {
