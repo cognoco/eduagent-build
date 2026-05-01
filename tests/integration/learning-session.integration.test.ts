@@ -71,8 +71,15 @@ beforeAll(() => {
   registerProvider({
     id: 'gemini',
     chat: mockChat,
+    // [BUG-941] streamMessage's onComplete now runs classifyExchangeOutcome,
+    // which requires a parseable envelope with a non-empty `reply` field.
+    // Yielding zero chunks routes the response into the fallback bucket and
+    // the exchange is intentionally not persisted. Yield a minimal valid
+    // envelope so the streaming success-path assertions exercise persist.
     async *chatStream() {
-      yield* []; // no-op: streaming not used in these tests
+      yield JSON.stringify({
+        reply: 'Gravity is the force that pulls objects toward each other.',
+      });
     },
   });
 });
