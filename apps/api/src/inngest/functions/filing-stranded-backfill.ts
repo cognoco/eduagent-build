@@ -1,8 +1,16 @@
-import { and, asc, gte, inArray, isNull } from 'drizzle-orm';
+import { and, asc, eq, gt, gte, inArray, isNull, or } from 'drizzle-orm';
 import { learningSessions } from '@eduagent/database';
 import { filingTimedOutEventSchema } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
+
+// Optional cursor passed when a prior capped run self-reinvokes. Using a
+// composite (createdAt, id) cursor guarantees deterministic pagination even
+// when many sessions share the same createdAt timestamp.
+interface BackfillCursor {
+  lastCreatedAt: string; // ISO-8601
+  lastId: string;
+}
 
 export const filingStrandedBackfill = inngest.createFunction(
   {
@@ -10,10 +18,32 @@ export const filingStrandedBackfill = inngest.createFunction(
     name: 'One-shot backfill of stranded filing sessions',
   },
   { event: 'app/maintenance.filing_stranded_backfill' },
-  async ({ step }) => {
+  async ({ event, step }) => {
+    // Cursor is absent on the first run; present on self-reinvoked runs.
+    const rawData = (event.data ?? {}) as Partial<BackfillCursor>;
+    const cursor: BackfillCursor | null =
+      rawData.lastCreatedAt != null && rawData.lastId != null
+        ? { lastCreatedAt: rawData.lastCreatedAt, lastId: rawData.lastId }
+        : null;
+
     const stranded = await step.run('find-stranded', async () => {
       const db = getStepDatabase();
       const cutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+
+      // [CR-PR129-M9] Composite (createdAt, id) cursor keeps the batch
+      // boundary stable when multiple sessions share the same timestamp.
+      // The cursor condition is: (createdAt > lastCreatedAt)
+      //                       OR (createdAt = lastCreatedAt AND id > lastId)
+      const cursorFilter = cursor
+        ? or(
+            gt(learningSessions.createdAt, new Date(cursor.lastCreatedAt)),
+            and(
+              eq(learningSessions.createdAt, new Date(cursor.lastCreatedAt)),
+              gt(learningSessions.id, cursor.lastId)
+            )
+          )
+        : undefined;
+
       return db.query.learningSessions.findMany({
         where: and(
           isNull(learningSessions.topicId),
@@ -21,7 +51,8 @@ export const filingStrandedBackfill = inngest.createFunction(
           isNull(learningSessions.filingStatus),
           inArray(learningSessions.sessionType, ['learning', 'homework']),
           inArray(learningSessions.status, ['completed', 'auto_closed']),
-          gte(learningSessions.createdAt, cutoff)
+          gte(learningSessions.createdAt, cutoff),
+          cursorFilter
         ),
         columns: {
           id: true,
@@ -29,7 +60,9 @@ export const filingStrandedBackfill = inngest.createFunction(
           sessionType: true,
           createdAt: true,
         },
-        orderBy: asc(learningSessions.createdAt),
+        // [CR-PR129-M9] Secondary sort on id breaks ties for rows sharing
+        // the same createdAt, making the batch window fully deterministic.
+        orderBy: [asc(learningSessions.createdAt), asc(learningSessions.id)],
         limit: 500,
       });
     });
@@ -76,12 +109,22 @@ export const filingStrandedBackfill = inngest.createFunction(
     // chain cannot loop indefinitely on a healthy database.
     let selfReinvoked = false;
     if (capped) {
-      await step.sleep('backfill-cooldown', '5m');
-      await step.sendEvent('continue-stranded-backfill', {
-        name: 'app/maintenance.filing_stranded_backfill',
-        data: {},
-      });
-      selfReinvoked = true;
+      // Pass the last row's (createdAt, id) so the next run can use a
+      // composite cursor and skip rows it has already processed, even in
+      // the race window before filingStatus has been flipped.
+      const last = stranded[stranded.length - 1];
+      if (last) {
+        const nextCursor: BackfillCursor = {
+          lastCreatedAt: new Date(last.createdAt).toISOString(),
+          lastId: last.id,
+        };
+        await step.sleep('backfill-cooldown', '5m');
+        await step.sendEvent('continue-stranded-backfill', {
+          name: 'app/maintenance.filing_stranded_backfill',
+          data: nextCursor,
+        });
+        selfReinvoked = true;
+      }
     }
 
     return { dispatched: stranded.length, capped, selfReinvoked };
