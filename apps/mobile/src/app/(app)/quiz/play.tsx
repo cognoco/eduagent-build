@@ -569,6 +569,12 @@ export default function QuizPlayScreen(): React.ReactElement {
     setCorrectAnswer(null);
     setShowContinueHint(false);
     setAnswerCheckFailed(false);
+    // [BUG-929] Also reset freeTextAnswer and guessWhoCluesUsed in the same
+    // React batch so Q+1's first render never shows Q+0's stale typed text or
+    // clue count. The [currentIndex, currentQuestion] useEffect handles these
+    // too, but only runs AFTER the commit — this closes the one-frame window.
+    setFreeTextAnswer('');
+    setGuessWhoCluesUsed(1);
     setCurrentIndex((current) => current + 1);
   }
 

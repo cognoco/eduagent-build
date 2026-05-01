@@ -661,6 +661,56 @@ describe('QuizPlayScreen — tap-to-continue synchronous reset (BUG-929)', () =>
     expect(screen.queryByText('Not quite')).toBeNull();
     expect(screen.queryByText('Tap anywhere to continue')).toBeNull();
   });
+
+  // [BUG-929] freeTextAnswer stale-text break test: after advancing from a
+  // free-text question, the next free-text input must render empty — not with
+  // the previous question's typed text. The [currentIndex, currentQuestion]
+  // useEffect also resets it, but only AFTER the commit, leaving a one-frame
+  // window. The synchronous reset in handleContinue closes that window.
+  it('free-text input renders empty on Q+1 after typing an answer on Q+0', async () => {
+    mockRound = {
+      id: 'round-929-ft',
+      activityType: 'capitals' as const,
+      theme: 'Europe',
+      total: 2,
+      questions: [
+        {
+          type: 'capitals' as const,
+          country: 'Slovakia',
+          options: ['Bratislava', 'Prague', 'Warsaw', 'Budapest'],
+          isLibraryItem: true,
+          freeTextEligible: true,
+        },
+        {
+          type: 'capitals' as const,
+          country: 'France',
+          options: ['Paris', 'Lyon', 'Madrid', 'Rome'],
+          isLibraryItem: true,
+          freeTextEligible: true,
+        },
+      ],
+    };
+
+    mockCheckAnswer.mockResolvedValueOnce({ correct: true });
+    render(<QuizPlayScreen />);
+
+    // Type an answer in Q1's free-text field and submit it.
+    fireEvent.changeText(
+      screen.getByTestId('quiz-free-text-field'),
+      'Bratislava'
+    );
+    fireEvent.press(screen.getByTestId('quiz-free-text-submit'));
+
+    await waitFor(() => expect(screen.getByText('Correct')).toBeTruthy());
+
+    // Advance to Q2.
+    await new Promise((r) => setTimeout(r, 280));
+    fireEvent.press(screen.getByTestId('quiz-play-body'));
+
+    // Q2 is now showing. The free-text field must be EMPTY — not 'Bratislava'.
+    const field = screen.getByTestId('quiz-free-text-field');
+    expect(field.props.value).toBe('');
+  });
 });
 
 // [UX-DE-H1] When no round is loaded, render an error state with Retry and
