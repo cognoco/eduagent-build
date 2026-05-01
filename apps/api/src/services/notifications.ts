@@ -44,7 +44,8 @@ export interface NotificationPayload {
     | 'struggle_flagged'
     | 'struggle_resolved'
     | 'dictation_review'
-    | 'session_filing_failed';
+    | 'session_filing_failed'
+    | 'interview_ready';
 }
 
 export interface NotificationResult {

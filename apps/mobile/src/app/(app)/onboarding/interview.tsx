@@ -19,6 +19,8 @@ import { platformAlert } from '../../../lib/platform-alert';
 import { Sentry } from '../../../lib/sentry';
 import { useProfile } from '../../../lib/profile';
 import { OutboxFailedBanner } from '../../../components/durability/OutboxFailedBanner';
+import { InterviewCompletingPanel } from '../../../components/interview/InterviewCompletingPanel';
+import { InterviewFailedPanel } from '../../../components/interview/InterviewFailedPanel';
 import {
   beginAttempt,
   enqueue,
@@ -681,6 +683,27 @@ export default function InterviewScreen() {
           </Text>
         </Pressable>
       </View>
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Durability layer: drafts can arrive with `completing` (Inngest job running)
+  // or `failed` (job exhausted retries). Both states replace the full chat UI
+  // so the user sees actionable feedback rather than a frozen screen.
+  // ---------------------------------------------------------------------------
+  const draftStatus = interviewState.data?.status;
+
+  if (draftStatus === 'completing') {
+    return <InterviewCompletingPanel />;
+  }
+
+  if (draftStatus === 'failed') {
+    return (
+      <InterviewFailedPanel
+        subjectId={safeSubjectId ?? ''}
+        bookId={bookId}
+        failureCode={interviewState.data?.failureCode ?? null}
+      />
     );
   }
 

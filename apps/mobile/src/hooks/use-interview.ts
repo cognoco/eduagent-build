@@ -260,3 +260,73 @@ export function useStreamInterviewMessage(
 
   return { stream, abort, isStreaming };
 }
+
+// ---------------------------------------------------------------------------
+// Durability layer: polling helpers and retry-persist mutation
+// ---------------------------------------------------------------------------
+
+const POLL_BACKOFF_MS = [3_000, 6_000, 12_000, 30_000];
+
+/**
+ * Returns a React Query `refetchInterval` value (ms or false) for a draft that
+ * is in the `completing` state. Uses exponential back-off to avoid hammering
+ * the API while Inngest processes the persist job.
+ *
+ * Pass `pollAttempt` (number of polls so far) to walk through the back-off
+ * ladder. Pass `appActive` (from AppState or useFocusEffect) so polling halts
+ * when the app is backgrounded.
+ */
+export function computeInterviewRefetchInterval(
+  status: string | undefined | null,
+  pollAttempt: number,
+  appActive: boolean
+): number | false {
+  if (status !== 'completing' || !appActive) return false;
+  const idx = Math.min(pollAttempt, POLL_BACKOFF_MS.length - 1);
+  return POLL_BACKOFF_MS[idx] as number;
+}
+
+/**
+ * Fires the retry-persist endpoint so the server re-queues the Inngest job
+ * when the initial persist run failed. Invalidates the interview query on
+ * success so the screen re-polls for the updated status.
+ */
+export function useRetryInterviewPersist(): UseMutationResult<
+  { status: string },
+  Error,
+  { subjectId: string; bookId?: string }
+> {
+  const { getToken } = useAuth();
+  const { activeProfile } = useProfile();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      subjectId,
+      bookId,
+    }: {
+      subjectId: string;
+      bookId?: string;
+    }) => {
+      const token = await getToken();
+      const query = bookId ? `?bookId=${bookId}` : '';
+      const res = await fetch(
+        `${getApiUrl()}/v1/subjects/${subjectId}/interview/retry-persist${query}`,
+        {
+          method: 'POST',
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            ...(activeProfile?.id ? { 'X-Profile-Id': activeProfile.id } : {}),
+          },
+        }
+      );
+      if (!res.ok) throw new Error(`Retry failed: ${res.status}`);
+      return (await res.json()) as { status: string };
+    },
+    onSuccess: (_, { subjectId }) => {
+      void queryClient.invalidateQueries({
+        queryKey: ['interview', subjectId],
+      });
+    },
+  });
+}

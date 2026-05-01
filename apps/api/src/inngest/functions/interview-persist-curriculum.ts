@@ -179,9 +179,7 @@ export const interviewPersistCurriculum = inngest.createFunction(
           profileId,
           title: 'Your learning path is ready',
           body: `${subjectName} is set up — tap to review`,
-          type: 'interview_ready' as Parameters<
-            typeof sendPushNotification
-          >[1]['type'],
+          type: 'interview_ready',
         });
       } catch (err) {
         logger.warn('completion push failed', {
