@@ -105,10 +105,7 @@ tags:
     id: "create-profile-name"
     optional: true
 
-# 9. Select learner persona
-- tapOn:
-    id: "persona-learner"
-    optional: true
+# 9. Persona is auto-detected from birth date (no selector — removed in persona refactor)
 
 - takeScreenshot: onboarding-04-profile-filled
 

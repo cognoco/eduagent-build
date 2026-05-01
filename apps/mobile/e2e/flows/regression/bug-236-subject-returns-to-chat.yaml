@@ -64,7 +64,7 @@ tags:
 # Type a subject name and submit
 - tapOn:
     id: "create-subject-name"
-- inputText: "World History"
+- inputText: "Photosynthesis"
 - hideKeyboard
 - tapOn:
     id: "create-subject-submit"

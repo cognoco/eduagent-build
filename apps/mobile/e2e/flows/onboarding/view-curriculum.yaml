@@ -18,14 +18,11 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
 
-# 2. Home screen must show subjects section
-- assertVisible: "Your subjects"
-
-# 3. Verify the home scroll view is present
+# 2. Verify the home scroll view is present
 - assertVisible:
     id: "learner-screen"
 
-# 4. Intent card stack should be present on home screen
+# 3. Intent card stack should be present on home screen
 - assertVisible:
     id: "learner-intent-stack"
     optional: true
@@ -70,8 +67,9 @@ tags:
       id: "learner-screen"
     timeout: 10000
 
-# 12. Subjects section still visible after round-trip
-- assertVisible: "Your subjects"
+# 12. Intent card stack still visible after round-trip (replaced "Your subjects" heading)
+- assertVisible:
+    id: "learner-intent-stack"
 
 # 13. Screenshot
 - takeScreenshot: view-curriculum-03-back-home

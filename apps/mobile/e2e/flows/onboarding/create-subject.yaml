@@ -48,7 +48,7 @@ tags:
 # Type a subject name into the input (testID: create-subject-name)
 - tapOn:
     id: "create-subject-name"
-- inputText: "World History"
+- inputText: "Photosynthesis"
 
 # Dismiss keyboard so submit button is visible (autoFocus keeps keyboard open)
 # pressKey: back reliably dismisses keyboard when it IS open (BUG-5 safe here)

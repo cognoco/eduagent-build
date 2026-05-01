@@ -39,7 +39,7 @@ tags:
 
 - tapOn:
     id: "create-subject-name"
-- inputText: "World History"
+- inputText: "Photosynthesis"
 
 - tapOn:
     id: "create-subject-submit"
@@ -58,7 +58,7 @@ tags:
 # Respond to the interview with a detailed message to help the LLM complete faster.
 - tapOn:
     id: "chat-input"
-- inputText: "I want to learn about World War I, World War II, and ancient civilizations (Rome, Greece, Egypt) for my history exam in 3 weeks. I'm aiming for a B+ or better. I know WWII basics but need to learn WWI causes, the interwar period, and ancient governance. I prefer timelines and stories."
+- inputText: "I want to learn about photosynthesis — the light and dark reactions, chlorophyll, and the Calvin cycle. I'm preparing for a biology exam in 3 weeks and aiming for an A. I know plants need sunlight and CO2 but I need to understand the biochemical steps in detail. I prefer diagrams and step-by-step explanations."
 # BUG-35: keyboard covers send button on Android. Use Enter key instead.
 - pressKey: Enter
 
