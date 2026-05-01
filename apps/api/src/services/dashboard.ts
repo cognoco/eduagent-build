@@ -3,7 +3,7 @@
 // Pure business logic + DB-aware query functions, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, gte, inArray, desc, sum, sql } from 'drizzle-orm';
+import { eq, and, gte, ne, inArray, desc, sum, sql } from 'drizzle-orm';
 import {
   familyLinks,
   profiles,
@@ -436,7 +436,11 @@ async function buildChildProgressSummary(
       .where(
         and(
           eq(learningSessions.profileId, childProfileId),
-          gte(learningSessions.exchangeCount, 1)
+          // "Completed session" = exchangeCount >= 1 AND status !== 'active'.
+          // SYNC: apps/mobile/src/lib/progressive-disclosure.ts
+          //       apps/api/src/services/snapshot-aggregation.ts computeProgressMetrics()
+          gte(learningSessions.exchangeCount, 1),
+          ne(learningSessions.status, 'active')
         )
       ),
   ]);
