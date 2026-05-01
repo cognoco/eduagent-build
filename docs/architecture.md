@@ -7,9 +7,9 @@ inputDocuments:
   - 'docs/analysis/architecture-inputs.md'
   - 'docs/analysis/research/market-ai-tutoring-research-2024-12-11.md'
   - 'docs/analysis/research/evidence based learning science.md'
-  - 'docs/FB-Run023-parents.yaml'
-  - 'docs/FB-Run023-learner.yaml'
-  - 'docs/FB-Run023-languages.yaml'
+  - 'docs/_archive/factory-briefs/FB-Run023-parents.yaml'
+  - 'docs/_archive/factory-briefs/FB-Run023-learner.yaml'
+  - 'docs/_archive/factory-briefs/FB-Run023-languages.yaml'
   - 'docs/ux-design-specification.md'
 workflowType: 'architecture'
 lastStep: 8

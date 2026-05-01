@@ -5,9 +5,9 @@ inputDocuments:
   - 'docs/analysis/product-brief-EduAgent-2025-12-11.md'
   - 'docs/analysis/research/market-ai-tutoring-research-2024-12-11.md'
   - 'docs/analysis/epics-inputs.md'
-  - 'docs/FB-Run023-parents.yaml'
-  - 'docs/FB-Run023-learner.yaml'
-  - 'docs/FB-Run023-languages.yaml'
+  - 'docs/_archive/factory-briefs/FB-Run023-parents.yaml'
+  - 'docs/_archive/factory-briefs/FB-Run023-learner.yaml'
+  - 'docs/_archive/factory-briefs/FB-Run023-languages.yaml'
 documentCounts:
   briefs: 1
   research: 1

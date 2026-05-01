@@ -1,7 +1,0 @@
-{
-  "*.{js,jsx,ts,tsx}": [
-    "node --stack-size=65536 node_modules/eslint/bin/eslint.js --fix",
-    "prettier --write"
-  ],
-  "*.{json,css,scss,md}": ["prettier --write"]
-}

@@ -423,43 +423,43 @@ NFR45-47 derive from the architecture's "Offline Boundary" definition (architect
 
 **19 epics + standalone features:**
 
-Completed specs are in `docs/specs/Done/`. Active/in-progress specs are in `docs/specs/`. Deferred specs are in `docs/specs/deffered/`.
+Completed specs are in `docs/_archive/specs/Done/`. Active/in-progress specs are in `docs/specs/`. Deferred specs are in `docs/_archive/specs/deferred/`.
 
 | Epic | Scope | Detailed spec | Status |
 |------|-------|---------------|--------|
 | 0-5 | MVP — Foundation, onboarding, learning, retention, progress, billing | Stories in this file | DONE |
-| 6 | Language learning (Four Strands methodology) | `specs/Done/2026-04-04-epic-6-language-learning-design.md` | DONE |
-| 7 | Self-building library (books, chapters, visual navigation) | `specs/Done/2026-04-04-epic-7-library-design.md` | DONE |
-| 7.8-7.9 | Library UX refactor (shelf/book screens, topic notes) | `specs/Done/2026-04-06-library-ux-refactor-design.md` | DONE |
-| 8 | Full voice mode (STT, TTS, accessibility) | `specs/Done/2026-04-03-epic-8-voice-gap-closure-design.md` | DONE |
+| 6 | Language learning (Four Strands methodology) | `_archive/specs/Done/2026-04-04-epic-6-language-learning-design.md` | DONE |
+| 7 | Self-building library (books, chapters, visual navigation) | `_archive/specs/Done/2026-04-04-epic-7-library-design.md` | DONE |
+| 7.8-7.9 | Library UX refactor (shelf/book screens, topic notes) | `_archive/specs/Done/2026-04-06-library-ux-refactor-design.md` | DONE |
+| 8 | Full voice mode (STT, TTS, accessibility) | `_archive/specs/Done/2026-04-03-epic-8-voice-gap-closure-design.md` | DONE |
 | 9 | Native IAP (RevenueCat, Stripe dormant) | Stories in this file | DONE |
 | 10 | Pre-launch UX polish | Stories in this file | DONE |
 | 11 | Brand identity (teal/lavender, dark-first) | Stories in this file | DONE |
 | 12 | Persona removal (age + role + intent-as-cards) | `plans/epic-12-persona-to-roles.md` | DONE |
 | 13 | Session lifecycle (wall-clock, recovery, celebrations, adaptive silence) | Stories in this file | DONE |
 | 14 | Human agency & feedback | Stories in this file | DONE |
-| 15 | Visible progress (snapshots, milestones, journey screen, reports) | `specs/Done/2026-04-07-epic-15-visible-progress-design.md` | DONE |
-| 16 | Adaptive memory (learner profiles, mentor memory, accommodations) | `specs/Done/2026-04-07-epic-16-adaptive-memory-design.md` | DONE |
+| 15 | Visible progress (snapshots, milestones, journey screen, reports) | `_archive/specs/Done/2026-04-07-epic-15-visible-progress-design.md` | DONE |
+| 16 | Adaptive memory (learner profiles, mentor memory, accommodations) | `_archive/specs/Done/2026-04-07-epic-16-adaptive-memory-design.md` | DONE |
 | 17 | Voice-first learning (server STT/TTS, pronunciation, hands-free) | `specs/2026-04-07-epic-17-voice-first-design.md` | NOT STARTED |
 | 18 | LLM Tuning — Structured Output, Personalization & Reliability | `specs/2026-04-18-llm-*.md` (3 files) | IN PROGRESS |
-| — | Conversation-first learning flow | `specs/Done/2026-04-08-conversation-first-learning-flow-design.md` | DONE |
-| — | Adaptive home screen | `specs/Done/2026-04-04-adaptive-home-screen-design.md` | DONE |
-| — | EAS Update / OTA deploys | `specs/Done/2026-04-02-eas-update-ota-design.md` | DONE |
-| — | Teach-first posture | `specs/Done/2026-04-14-teach-first-posture-design.md` | DONE |
-| — | Conversation stage chips | `specs/Done/2026-04-15-conversation-stage-chips-design.md` | DONE |
-| — | Dictation mode | `specs/Done/2026-04-16-dictation-mode-design.md` | DONE |
-| — | Homework image vision | `specs/Done/2026-04-16-homework-image-vision-design.md` | DONE |
-| — | Quiz activities (capitals, vocab, guess-who) | `specs/Done/2026-04-16-quiz-activities-design.md` | DONE |
-| — | Home IA simplification | `specs/Done/2026-04-18-home-ia-simplification-design.md` | DONE |
-| — | Parent visibility & privacy | `specs/Done/2026-04-18-parent-visibility-privacy-design.md` | DONE |
-| — | Progress empty states & highlights | `specs/Done/2026-04-18-progress-empty-states-highlights-design.md` | DONE |
-| — | Quiz gaps completion | `specs/Done/2026-04-18-quiz-gaps-completion-design.md` | DONE |
-| — | Progressive disclosure | `specs/Done/2026-04-14-progressive-disclosure-design.md` | DONE |
-| — | Proactivity & copy sweep | `specs/Done/2026-04-19-proactivity-copy-sweep-design.md` | DONE |
-| — | Stabilization sprint | `specs/Done/2026-04-14-stabilization-sprint.md` | DONE |
-| — | Code review fixes plan | `specs/Done/plan-code-review-fixes.md` | DONE |
-| — | Animation improvements | `specs/2026-04-16-animation-improvements-design.md` | IN PROGRESS |
-| — | Quiz UI redesign fixes | `specs/2026-04-18-quiz-ui-redesign-finding-fixes.md` | IN PROGRESS |
+| — | Conversation-first learning flow | `_archive/specs/Done/2026-04-08-conversation-first-learning-flow-design.md` | DONE |
+| — | Adaptive home screen | `_archive/specs/Done/2026-04-04-adaptive-home-screen-design.md` | DONE |
+| — | EAS Update / OTA deploys | `_archive/specs/Done/2026-04-02-eas-update-ota-design.md` | DONE |
+| — | Teach-first posture | `_archive/specs/Done/2026-04-14-teach-first-posture-design.md` | DONE |
+| — | Conversation stage chips | `_archive/specs/Done/2026-04-15-conversation-stage-chips-design.md` | DONE |
+| — | Dictation mode | `_archive/specs/Done/2026-04-16-dictation-mode-design.md` | DONE |
+| — | Homework image vision | `_archive/specs/Done/2026-04-16-homework-image-vision-design.md` | DONE |
+| — | Quiz activities (capitals, vocab, guess-who) | `_archive/specs/Done/2026-04-16-quiz-activities-design.md` | DONE |
+| — | Home IA simplification | `_archive/specs/Done/2026-04-18-home-ia-simplification-design.md` | DONE |
+| — | Parent visibility & privacy | `_archive/specs/Done/2026-04-18-parent-visibility-privacy-design.md` | DONE |
+| — | Progress empty states & highlights | `_archive/specs/Done/2026-04-18-progress-empty-states-highlights-design.md` | DONE |
+| — | Quiz gaps completion | `_archive/specs/Done/2026-04-18-quiz-gaps-completion-design.md` | DONE |
+| — | Progressive disclosure | `_archive/specs/Done/2026-04-14-progressive-disclosure-design.md` | DONE |
+| — | Proactivity & copy sweep | `_archive/specs/Done/2026-04-19-proactivity-copy-sweep-design.md` | DONE |
+| — | Stabilization sprint | `_archive/specs/Done/2026-04-14-stabilization-sprint.md` | DONE |
+| — | Code review fixes plan | `_archive/specs/Done/plan-code-review-fixes.md` | DONE |
+| — | Animation improvements | `_archive/specs/2026-04-16-animation-improvements-design.md` | DONE |
+| — | Quiz UI redesign fixes | `_archive/specs/2026-04-18-quiz-ui-redesign-finding-fixes.md` | DONE |
 | — | Prompt tuning design | `specs/2026-04-19-prompt-tuning-design.md` | IN PROGRESS |
 | WEB-A | Parent control center (web) — candidate | Stories in this file | NOT STARTED |
 | WEB-B | Text-mode learning flow (web) — candidate | Stories in this file | NOT STARTED |
@@ -2989,7 +2989,7 @@ So that I can manage my usage and upgrade before hitting the ceiling.
 ## Epic 6: Language Learning — Stories
 
 **Scope:** FR96-FR107 (12 FRs) + FR146 (Language SPEAK/LISTEN Voice)
-Detailed design spec: `docs/specs/Done/2026-04-04-epic-6-language-learning-design.md`
+Detailed design spec: `docs/_archive/specs/Done/2026-04-04-epic-6-language-learning-design.md`
 **Stories:** 6
 **Dependencies:** Epics 0-3 (full learning infrastructure), Epic 8 (voice infrastructure — complete)
 
@@ -6039,7 +6039,7 @@ Phase A all parallelizable. Phase B: 14.10 and 14.9 can be parallel, then 14.11,
 Replace points and streaks with proof-of-understanding progress signals. Daily snapshot aggregation, milestone detection, child-facing journey screen, parent dashboard enhancement, weekly push notifications, monthly learning reports.
 
 **FRs covered:** FR230-FR241 (12 FRs) | **Stories:** 15.1-15.9
-**Detailed spec:** `docs/specs/Done/2026-04-07-epic-15-visible-progress-design.md`
+**Detailed spec:** `docs/_archive/specs/Done/2026-04-07-epic-15-visible-progress-design.md`
 
 **Dependencies:** Epic 3 (retention/SM-2), Epic 6 (language/vocabulary), Epic 7 (library), Epic 13 (session lifecycle), Epic 14 (human agency)
 
@@ -6050,7 +6050,7 @@ Replace points and streaks with proof-of-understanding progress signals. Daily s
 Build a persistent learner memory layer that adapts session style and content over time. Post-session LLM analysis extracts learning style, interests, struggles, and communication preferences. Memory is injected into system prompts with consent controls. "What My Mentor Knows" screens for child and parent. "Tell Your Mentor" free-text input. Learning accommodation modes (short-burst, audio-first, predictable) for ADHD/dyslexia/autism-spectrum learners.
 
 **FRs covered:** FR243-FR255 (13 FRs) | **Stories:** 16.1-16.13
-**Detailed spec:** `docs/specs/Done/2026-04-07-epic-16-adaptive-memory-design.md`
+**Detailed spec:** `docs/_archive/specs/Done/2026-04-07-epic-16-adaptive-memory-design.md`
 
 **Dependencies:** Epic 13 (session events pipeline), Epic 14 (session context)
 
@@ -6122,15 +6122,15 @@ Replace fragile free-text markers and JSON-in-text patterns with a typed respons
 
 ## Standalone Feature Specs
 
-These features are not assigned to a numbered epic. Completed specs live in `docs/specs/Done/`, active specs in `docs/specs/`, deferred specs in `docs/specs/deffered/`.
+These features are not assigned to a numbered epic. Completed specs live in `docs/_archive/specs/Done/`, active specs in `docs/specs/`, deferred specs in `docs/_archive/specs/deferred/`.
 
 ### Conversation-First Learning Flow — DONE
 Redesign of the "learn something new" flow — conversation starts immediately, library structure is created post-session via a shared filing mechanism. Three paths: broad subjects (pick a book), narrow topics (auto-file), freeform/homework (file after session).
-**Spec:** `docs/specs/Done/2026-04-08-conversation-first-learning-flow-design.md`
+**Spec:** `docs/_archive/specs/Done/2026-04-08-conversation-first-learning-flow-design.md`
 
 ### Adaptive Home Screen — DONE
 Replace the monolithic home screen with a state-driven intent router. ParentGateway for profiles with linked children, LearnerScreen for solo learners. Intent cards, session recovery, time-aware greeting.
-**Spec:** `docs/specs/Done/2026-04-04-adaptive-home-screen-design.md`
+**Spec:** `docs/_archive/specs/Done/2026-04-04-adaptive-home-screen-design.md`
 
 ### April 10 UX Improvements
 13 focused feature specs addressing specific UX gaps discovered during code review and dead-end audits:
