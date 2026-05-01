@@ -48,6 +48,28 @@ export const filingStrandedBackfill = inngest.createFunction(
       });
     }
 
-    return { dispatched: stranded.length, capped: stranded.length === 500 };
+    const capped = stranded.length === 500;
+
+    // [CR-FIL-LIMIT-AUTORESUME-09] When the limit was hit, self-trigger another
+    // run so operators don't have to remember to manually re-fire after a
+    // cold-start incident. The 5-minute cooldown gives the prior batch's
+    // filing-timed-out-observe runs time to flip filingStatus on those rows
+    // (default observer waits 60s then marks failed/recovered) so the next
+    // query's `isNull(filingStatus)` filter excludes them.
+    //
+    // Termination: each self-trigger consumes the oldest 500 still-stranded
+    // sessions; the 14-day createdAt cutoff is the natural ceiling, so the
+    // chain cannot loop indefinitely on a healthy database.
+    let selfReinvoked = false;
+    if (capped) {
+      await step.sleep('backfill-cooldown', '5m');
+      await step.sendEvent('continue-stranded-backfill', {
+        name: 'app/maintenance.filing_stranded_backfill',
+        data: {},
+      });
+      selfReinvoked = true;
+    }
+
+    return { dispatched: stranded.length, capped, selfReinvoked };
   }
 );
