@@ -622,18 +622,30 @@ describe('dashboard service integration', () => {
       metadata: { escalationRung: 4 },
     });
 
+    // [TEST-FLAKE-FIX] Anchor retention `nextReviewAt` on real time, not on
+    // `now = getStableMidWeekNow()` (Wed noon UTC). `computeRetentionStatus`
+    // in services/progress.ts evaluates against `new Date()` at call time —
+    // anchoring on midweek means a card "1d in the future from midweek" can
+    // be 1–3 days in the past by Thu–Sun, flipping the bucketed status
+    // (fading → weak) and the aggregate (`[strong, fading]` → `[strong, weak]`).
+    // Use `new Date()` + a margin large enough that the card stays in the
+    // intended bucket regardless of which weekday the test runs on.
+    const realNow = new Date();
     await seedRetentionCard({
       profileId: childProfileId,
       topicId: topicId1!,
       xpStatus: 'verified',
-      nextReviewAt: subtractDays(now, -7),
+      // > 3d future → 'strong' bucket
+      nextReviewAt: subtractDays(realNow, -7),
       intervalDays: 30,
     });
     await seedRetentionCard({
       profileId: childProfileId,
       topicId: topicId2!,
       xpStatus: 'pending',
-      nextReviewAt: subtractDays(now, -1),
+      // 0–3d future → 'fading' bucket. Use 2d to stay in this bucket even
+      // if the suite runs slowly enough to lose a few hours.
+      nextReviewAt: subtractDays(realNow, -2),
       intervalDays: 2,
     });
     await seedStreak({
