@@ -24,8 +24,14 @@ export default [
   ...reactConfig,
   {
     files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'],
-    // Override or add rules here
-    rules: {},
+    rules: {
+      // jsx-a11y/aria-role inherits from nx flat/react and treats every
+      // `role="..."` JSX prop as an ARIA attribute, which is wrong for
+      // custom components that happen to expose a `role` prop (e.g.
+      // `<MessageBubble role="assistant" />`). ignoreNonDOM scopes the
+      // check to lowercase intrinsic elements where ARIA actually applies.
+      'jsx-a11y/aria-role': ['warn', { ignoreNonDOM: true }],
+    },
   },
   // Require visible error handling on every mutateAsync() call.
   {

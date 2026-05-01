@@ -42,7 +42,7 @@ This is the critical step: with nothing left unstaged, lint-staged cannot stash 
 Run `git diff --cached --stat` to see the staged summary. Use the stat output (file names + change counts) to draft the message — do not read the full line-by-line diff unless the stat is ambiguous.
 
 - First line: `<type>(<scope>): <summary>` (max 72 chars)
-- Types: feat, fix, chore, docs, refactor, test, style, perf, ci
+- Types: feat, fix, chore, docs, refactor, cfg, plan, zdx (this repo's commitlint type-enum — `test`/`style`/`perf`/`ci` are rejected; use `chore` for test-only or CI-only commits)
 - Body: 2-4 bullet points summarizing the changes
 - Footer: `Co-Authored-By: Claude <noreply@anthropic.com>`
 - Use a HEREDOC to pass the message (preserves formatting)
