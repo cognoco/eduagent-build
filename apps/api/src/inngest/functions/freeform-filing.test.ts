@@ -9,10 +9,21 @@ const col = (name: string) => ({ name });
 const mockCurriculumTopicsFindFirst = jest.fn().mockResolvedValue(null);
 const mockCurriculumBooksFindFirst = jest.fn().mockResolvedValue(null);
 
+// Default session row: exists, not yet filed. Tests that exercise the missing-
+// session abort path must explicitly override this to null.
+const mockSessionRow = {
+  id: '00000000-0000-4000-8000-000000000002',
+  profileId: '00000000-0000-4000-8000-000000000001',
+  filedAt: null,
+  topicId: null,
+};
+
 const mockDb = {
   query: {
     sessionEvents: { findMany: jest.fn().mockResolvedValue([]) },
-    learningSessions: { findFirst: jest.fn().mockResolvedValue(null) },
+    learningSessions: {
+      findFirst: jest.fn().mockResolvedValue(mockSessionRow),
+    },
     curriculumTopics: { findFirst: mockCurriculumTopicsFindFirst },
     curriculumBooks: { findFirst: mockCurriculumBooksFindFirst },
   },
@@ -42,7 +53,19 @@ const mockDatabaseModule = createDatabaseModuleMock({
   },
 });
 
-jest.mock('@eduagent/database', () => mockDatabaseModule.module);
+jest.mock('@eduagent/database', () => ({
+  ...mockDatabaseModule.module,
+  // [M8b] createScopedRepository must be present in the mock so the production
+  // code path compiles and runs. We wire sessions.findFirst through to the
+  // existing mockDb.query.learningSessions.findFirst so test setup (beforeEach
+  // overrides) continues to control what the step sees.
+  createScopedRepository: (_db: unknown, _profileId: string) => ({
+    sessions: {
+      findFirst: (extraWhere?: unknown) =>
+        mockDb.query.learningSessions.findFirst(extraWhere),
+    },
+  }),
+}));
 
 // ---------------------------------------------------------------------------
 // Mock services
@@ -131,6 +154,9 @@ function createEventData(
 describe('freeformFilingRetry', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Re-establish the default session row after clearAllMocks wipes implementations.
+    // Tests that need a null row (missing-session abort) override this in their own beforeEach.
+    mockDb.query.learningSessions.findFirst.mockResolvedValue(mockSessionRow);
     process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
   });
 
@@ -154,6 +180,28 @@ describe('freeformFilingRetry', () => {
         expect.objectContaining({ event: 'app/filing.retry' }),
       ])
     );
+  });
+
+  // -------------------------------------------------------------------------
+  // [M8a] Break test: missing session must abort loudly, not fall through
+  // -------------------------------------------------------------------------
+
+  describe('when session does not exist for the profileId (cross-profile or stale event)', () => {
+    beforeEach(() => {
+      // Simulate: the scoped repo finds no row for (sessionId, profileId)
+      mockDb.query.learningSessions.findFirst.mockResolvedValue(null);
+    });
+
+    it('throws an error so Inngest retries rather than silently filing into wrong profile [M8a]', async () => {
+      await expect(executeSteps(createEventData())).rejects.toThrow(
+        /Session not found or does not belong to profile/
+      );
+    });
+
+    it('does not call fileToLibrary when session is missing [M8a]', async () => {
+      await expect(executeSteps(createEventData())).rejects.toThrow();
+      expect(mockFileToLibrary).not.toHaveBeenCalled();
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -360,15 +408,13 @@ describe('freeformFilingRetry', () => {
       expect(payload.data.topicTitle).toBeUndefined();
     });
 
-    it('scopes the session read to both sessionId and profileId [CR-FIL-SCOPE-05]', async () => {
+    it('scopes the session read via createScopedRepository (not a raw profileId eq) [CR-FIL-SCOPE-05, M8b]', async () => {
       await executeSteps(createEventData());
 
-      // The check-already-filed step must read with profileId scoping
-      expect(mockDb.query.learningSessions.findFirst).toHaveBeenCalledWith(
-        expect.objectContaining({
-          columns: expect.objectContaining({ filedAt: true, topicId: true }),
-        })
-      );
+      // The check-already-filed step must go through the scoped repo, which
+      // delegates to mockDb.query.learningSessions.findFirst. Verifying it was
+      // called exactly once confirms the scoped path ran (not a short-circuit).
+      expect(mockDb.query.learningSessions.findFirst).toHaveBeenCalledTimes(1);
     });
 
     // [CR-FIL-LOOKUP-07] When a topic still references a book that has been

@@ -1,7 +1,11 @@
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
-import { and, eq } from 'drizzle-orm';
-import { curriculumTopics, learningSessions } from '@eduagent/database';
+import { eq } from 'drizzle-orm';
+import {
+  createScopedRepository,
+  curriculumTopics,
+  learningSessions,
+} from '@eduagent/database';
 import { filingRetryCompletedEventSchema } from '@eduagent/schemas';
 import {
   buildLibraryIndex,
@@ -28,18 +32,28 @@ export const freeformFilingRetry = inngest.createFunction(
 
     const sessionSnapshot = await step.run('check-already-filed', async () => {
       const db = getStepDatabase();
-      // [CR-FIL-SCOPE-05] Scope the read to both id AND profileId to satisfy the
-      // auditable-scoping requirement (CLAUDE.md: "Reads must use profileId scope").
-      const row = await db.query.learningSessions.findFirst({
-        where: and(
-          eq(learningSessions.id, sessionId),
-          eq(learningSessions.profileId, profileId)
-        ),
-        columns: { filedAt: true, topicId: true },
-      });
+      // [M8b] Use createScopedRepository so the profileId filter is enforced by
+      // the shared scoping layer, not an ad-hoc inline eq(). This satisfies
+      // CLAUDE.md: "Reads must use createScopedRepository(profileId)."
+      const repo = createScopedRepository(db, profileId);
+      const row = await repo.sessions.findFirst(
+        eq(learningSessions.id, sessionId)
+      );
+
+      // [M8a] A missing row means the session does not exist for this profileId —
+      // either a stale retry referencing a deleted session, or a cross-profile
+      // event. Falling through and treating this as "not yet filed" would allow
+      // the retry to file content into the wrong profile's library and emit
+      // app/filing.completed for a session they don't own.
+      if (!row) {
+        throw new Error(
+          `Session not found or does not belong to profile: sessionId=${sessionId} profileId=${profileId}`
+        );
+      }
+
       return {
-        alreadyFiled: row?.filedAt != null,
-        topicId: row?.topicId ?? null,
+        alreadyFiled: row.filedAt != null,
+        topicId: row.topicId ?? null,
       };
     });
 
