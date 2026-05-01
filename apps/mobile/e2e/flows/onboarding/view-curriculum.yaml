@@ -48,11 +48,10 @@ tags:
       text: "Library"
     timeout: 10000
 
-# 8. Verify filter tabs are present on Library
-# optional: true — filter tabs only render when multiple subjects exist;
-# learning-active seed may have only one subject
+# 8. Verify Shelves tab is present on Library (default tab in 2-tab Library).
+#     subject-filter-tabs removed — Library is now Shelves/Books tabs.
 - assertVisible:
-    id: "subject-filter-tabs"
+    id: "library-tab-shelves"
     optional: true
 
 # 9. Screenshot: Library content

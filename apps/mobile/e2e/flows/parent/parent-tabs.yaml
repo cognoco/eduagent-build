@@ -6,7 +6,7 @@
 # Journey: UX Journey 4 (Parent Oversight)
 # Tab bar (from (parent)/_layout.tsx):
 #   "Home"          → dashboard.tsx    (testID: dashboard-scroll)
-#   "Library"       → library.tsx      (re-exports learner library; testID: subject-filter-tabs)
+#   "Library"       → library.tsx      (3-tab: Shelves/Books; testID: library-tab-shelves)
 #   "More"          → more.tsx         (testID: sign-out-button)
 appId: com.mentomate.app
 tags:
@@ -40,10 +40,11 @@ tags:
 # 5. Tap "Library" tab (BUG-10: use accessibility label, not truncated text)
 - tapOn: "Library Tab"
 
-# 6. Wait for Library to render
+# 6. Wait for Library to render — Shelves tab is the default view.
+#    Library is now a 2-tab layout (Shelves / Books); subject-filter-tabs is gone.
 - extendedWaitUntil:
     visible:
-      id: "subject-filter-tabs"
+      id: "library-tab-shelves"
     timeout: 10000
     optional: true
 

@@ -36,8 +36,10 @@ tags:
     timeout: 15000
 
 # 3. Tap "View details" on child card (single tap — double-tap causes double navigation)
+#    dashboard-child-${CHILD_PROFILE_ID}-primary is the primary action button
+#    on ParentDashboardSummary (BaseCoachingCard testID-primary pattern).
 - tapOn:
-    id: "parent-dashboard-summary-primary"
+    id: "dashboard-child-${CHILD_PROFILE_ID}-primary"
 
 # 4. Wait for child detail screen
 - extendedWaitUntil:
@@ -53,71 +55,36 @@ tags:
     timeout: 10000
     optional: true
 
-# 6. Tap on a session card (look for "exchanges" text as proxy)
+# 6. Tap on a session card to navigate to session detail screen.
+#     The session detail screen (child/[profileId]/session/[sessionId].tsx) replaced
+#     the old transcript-scroll view. guided-info-{index} is no longer present —
+#     the "Guided" badge was specific to the old transcript rendering.
 - tapOn:
-    text: "exchanges"
+    id: "session-card-${SESSION_ID}"
     optional: true
 
-# 7. Wait for transcript screen
+# 7. Wait for session detail screen (testID: session-metadata)
 - extendedWaitUntil:
     visible:
-      id: "transcript-scroll"
+      id: "session-metadata"
     timeout: 10000
     optional: true
 
-# 8. Verify transcript header
-- assertVisible:
-    text: "Session Transcript"
-    optional: true
+# 8. Screenshot: session detail screen
+- takeScreenshot: guided-tooltip-01-session-detail
 
-# 9. Screenshot: transcript screen
-- takeScreenshot: guided-tooltip-01-transcript
-
-# 10. Scroll to find a "Guided" label (only present if escalationRung >= 3)
-- scrollUntilVisible:
-    element:
-      text: "Guided"
-    direction: DOWN
-    timeout: 10000
-    optional: true
-
-# 11. Screenshot: Guided label visible
-- takeScreenshot: guided-tooltip-02-guided-label
-
-# 12. Tap the Guided info button (testID: guided-info-{index})
-#     Try index 0 first — the first exchange with Guided badge
+# 9. Navigate back to child detail
 - tapOn:
-    id: "guided-info-0"
+    id: "session-detail-back-to-child"
     optional: true
-
-# 13. Verify the Alert dialog appears with explanation text
-#     Alert.alert title: "What does Guided mean?"
-- assertVisible:
-    text: "What does Guided mean?"
-    optional: true
-
-# 14. Verify the explanation body text
-- assertVisible:
-    text: "extra help"
-    optional: true
-
-# 15. Screenshot: Alert dialog with Guided explanation
-- takeScreenshot: guided-tooltip-03-alert-dialog
-
-# 16. Dismiss the Alert dialog
-- tapOn:
-    text: "OK"
-    optional: true
-
-# 17. Navigate back to child detail
 - tapOn:
     id: "back-button"
     optional: true
 
-# 18. Navigate back to dashboard
+# 10. Navigate back to dashboard
 - tapOn:
     id: "back-button"
     optional: true
 
-# 19. Final screenshot
+# 11. Final screenshot
 - takeScreenshot: guided-tooltip-04-complete

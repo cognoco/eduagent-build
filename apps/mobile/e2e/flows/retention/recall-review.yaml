@@ -1,6 +1,6 @@
-# Flow S4: Retention — Recall Prompt to Score
-# Validates: seeded user with due retention cards sees recall prompt,
-# enters answer, receives score feedback.
+# Flow S4: Retention — Recall Test via Topic Detail
+# Validates: user can navigate to a topic detail screen, initiate a recall test,
+# and interact with the recall ChatShell (enter answer, receive feedback).
 # Tags: smoke, retention
 #
 # Journey: UX Journey 2 (recall phase)
@@ -8,10 +8,15 @@
 # Prerequisite: Seeded user with completed sessions + due retention cards
 #               (scenario: retention-due)
 #
-# NOTE: This flow depends on testIDs being added to recall-related screens.
-# Missing testIDs (from tech spec Section 3.2):
-#   - recall-question, recall-answer-input, recall-submit
-# Until those are added, some assertions use text matching as fallback.
+# testIDs verified against:
+#   - apps/mobile/src/app/(app)/_layout.tsx (tab-library)
+#   - apps/mobile/src/components/library/ShelvesTab.tsx (shelves-list, subject-card-*)
+#   - apps/mobile/src/app/(app)/topic/[topicId].tsx (secondary-recall-check)
+#   - apps/mobile/src/app/(app)/topic/recall-test.tsx (recall-test-screen)
+#   - apps/mobile/src/components/session/ChatShell.tsx (chat-input, send-button)
+#
+# NOTE: recall-question, recall-answer-input, recall-submit are removed (KNOWN_DRIFT).
+# The recall screen now uses ChatShell pattern: recall-test-screen + chat-input.
 appId: com.mentomate.app
 tags:
   - smoke
@@ -30,57 +35,102 @@ tags:
       id: "learner-screen"
     timeout: 15000
 
-# 3. Intent card stack should be visible (replaced coaching card in adaptive home refactor).
-# The intent-continue card handles recall/review when topics are due.
-- assertVisible:
-    id: "learner-intent-stack"
-
-# 4. Tap intent-continue to start the review session
+# 3. Navigate to Library tab
 - tapOn:
-    id: "intent-continue"
+    id: "tab-library"
 
-# 5. Recall screen loads — look for either recall-specific testIDs
-# or text indicating a recall prompt
+# 4. Wait for Library (Shelves tab is the default)
 - extendedWaitUntil:
     visible:
-      id: "recall-question"
+      id: "shelves-list"
     timeout: 10000
+
+# 5. Screenshot: Library shelves
+- takeScreenshot: recall-01-library-shelves
+
+# 6. Tap the first subject shelf card.
+#    SUBJECT_ID is injected by the seed helper for the retention-due scenario.
+- tapOn:
+    id: "subject-card-${SUBJECT_ID}"
+
+# 7. Wait for the shelf screen (shows books for the subject)
+- extendedWaitUntil:
+    visible:
+      id: "shelf-screen"
+    timeout: 10000
+
+# 8. Screenshot: shelf with books
+- takeScreenshot: recall-02-shelf
+
+# 9. Tap the first book visible — retention-due seed has one book per subject
+- tapOn:
+    id: "book-screen"
     optional: true
 
-# 5b. Fallback: look for text-based recall prompt
+# 9b. Fallback: if already on book screen, just wait
 - extendedWaitUntil:
     visible:
-      text: "remember"
+      id: "book-screen"
     timeout: 5000
     optional: true
 
-# 6. Enter recall answer
+# 9c. Tap first book by scrolling to it via text (seed names the book "World History")
 - tapOn:
-    id: "recall-answer-input"
+    text: "World History"
     optional: true
-# Fallback: tap on chat-input if recall uses the ChatShell
+
+# 10. Wait for book detail screen
+- extendedWaitUntil:
+    visible:
+      id: "book-screen"
+    timeout: 10000
+    optional: true
+
+# 11. Navigate to a topic that has retention data — tap first topic in the list
+#     The seed creates topics with due retention cards in this book.
+- tapOn:
+    text: "Topic"
+    optional: true
+
+# 12. Wait for topic detail screen
+- extendedWaitUntil:
+    visible:
+      id: "retention-card"
+    timeout: 10000
+
+# 13. Screenshot: topic detail
+- takeScreenshot: recall-03-topic-detail
+
+# 14. Tap the "Test recall" secondary action button
+- tapOn:
+    id: "secondary-recall-check"
+
+# 15. Wait for recall test screen (ChatShell-based)
+- extendedWaitUntil:
+    visible:
+      id: "recall-test-screen"
+    timeout: 10000
+
+# 16. Screenshot: recall test screen
+- takeScreenshot: recall-04-recall-screen
+
+# 17. Enter recall answer via ChatShell input
 - tapOn:
     id: "chat-input"
-    optional: true
+
 - inputText: "I remember the key concept is about how this works in practice"
 
-# 7. Submit answer
-# Two UI paths exist: recall-submit (dedicated button) or ChatShell Enter key.
-# recall-submit is optional (may not exist if using ChatShell for recall).
-# KNOWN LIMITATION: If recall-submit succeeds, pressKey: Enter also fires
-# (Maestro has no conditional execution). This may send an empty follow-up
-# message. The LLM handles empty/duplicate messages gracefully in practice.
-# BUG-35: pressKey: Enter is the ChatShell path (keyboard covers send-button).
+# 18. Submit answer — use send-button or Enter key
 - tapOn:
-    id: "recall-submit"
+    id: "send-button"
     optional: true
 - pressKey: Enter
 
-# 8. Wait for score/feedback
+# 19. Wait for response (chat-input re-enables after LLM streams back)
 - extendedWaitUntil:
     visible:
       id: "chat-input"
     timeout: 15000
 
-# 9. Screenshot
-- takeScreenshot: retention-recall-complete
+# 20. Screenshot: recall answered and feedback received
+- takeScreenshot: recall-05-complete

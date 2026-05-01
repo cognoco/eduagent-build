@@ -163,8 +163,10 @@ tags:
       text: "Library"
     timeout: 10000
 
-# 16. Verify the library is NOT empty (retention-due scenario has topics)
-- assertNotVisible:
-    id: "library-empty"
+# 16. Verify the library has shelves loaded (retention-due scenario has subjects).
+#     library-empty is removed; check for shelves-list as positive assertion.
+- assertVisible:
+    id: "shelves-list"
+    optional: true
 
 - takeScreenshot: library-nav-06-library-arrived

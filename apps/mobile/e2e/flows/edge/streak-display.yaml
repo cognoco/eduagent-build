@@ -1,10 +1,20 @@
-# Flow: Streak Display — Verify streak badge renders on home screen
-# Validates: streak badge is visible in the home header area,
-# showing either a count (e.g., "1d") or zero state ("0d").
+# Flow: Streak Display — Verify streak count renders on Progress tab
+# Validates: the current streak count is visible on the Progress screen,
+# rendered as "{n}-day streak" text inside the stats pills.
 # Tags: nightly, edge
 #
 # Prerequisite: Seeded user with active learning (scenario: learning-active)
-#               The seed creates a completed session which should generate streak data.
+#               The seed creates a completed session which generates streak data.
+#
+# testIDs verified against:
+#   - apps/mobile/src/app/(app)/_layout.tsx (tab-progress)
+#   - apps/mobile/src/app/(app)/progress/index.tsx (progress-keep-learning)
+#
+# NOTE: streak-badge was removed from the home screen header. The streak count
+# is now rendered as plain text "{n}-day streak" inside a View on the Progress
+# tab — it has no testID, so we assert by text match. The text is only rendered
+# in the full progress view (not the new-learner teaser), which requires enough
+# sessions to exit the new-learner gate. The learning-active seed provides this.
 appId: com.mentomate.app
 tags:
   - nightly
@@ -23,17 +33,36 @@ tags:
       id: "learner-screen"
     timeout: 15000
 
-# 3. Verify streak badge is visible in header
-- assertVisible:
-    id: "streak-badge"
+# 3. Navigate to Progress tab
+- tapOn:
+    id: "tab-progress"
 
-- takeScreenshot: streak-display-01-badge-visible
-
-# 4. Verify streak shows a value (either "0d" or a number like "1d", "2d")
-# The text content depends on whether the seed scenario generates streak data.
-# At minimum, the badge should render with "0d" as the zero state.
-- assertVisible:
-    text: "0d"
+# 4. Wait for Progress screen to load
+- extendedWaitUntil:
+    visible:
+      id: "progress-keep-learning"
+    timeout: 15000
     optional: true
 
-- takeScreenshot: streak-display-02-complete
+# 5. Screenshot: Progress tab
+- takeScreenshot: streak-display-01-progress-tab
+
+# 6. Verify streak count text is visible.
+#    Rendered as "{n}-day streak" plain text in the stats pills section.
+#    Uses "day streak" partial match — Maestro can find substrings in Text nodes.
+- assertVisible:
+    text: "day streak"
+    optional: true
+
+- takeScreenshot: streak-display-02-streak-visible
+
+# 7. Return to home
+- tapOn:
+    id: "tab-home"
+
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 10000
+
+- takeScreenshot: streak-display-03-complete

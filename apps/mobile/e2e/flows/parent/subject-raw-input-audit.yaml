@@ -41,8 +41,10 @@ tags:
 
 # 4. Tap "View details" on child card (single tap only — double-tap causes
 #    double router.push past child detail, see consent-management fix)
+#    dashboard-child-${CHILD_PROFILE_ID}-primary is the primary action on
+#    the ParentDashboardSummary card (BaseCoachingCard testID-primary pattern).
 - tapOn:
-    id: "parent-dashboard-summary-primary"
+    id: "dashboard-child-${CHILD_PROFILE_ID}-primary"
 
 # 5. Wait for child detail screen
 - extendedWaitUntil:
