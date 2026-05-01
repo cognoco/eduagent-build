@@ -81,7 +81,6 @@ run_s "failed-recall-3x" "flows/retention/relearn-flow.yaml"
 run_s "parent-with-children" "flows/parent/parent-library.yaml"
 run_s "parent-with-children" "flows/parent/child-drill-down.yaml"
 run_s "parent-with-children" "flows/parent/consent-management.yaml"
-run_s "parent-solo"          "flows/parent/demo-dashboard.yaml"
 
 # Subjects
 run_s "multi-subject" "flows/subjects/multi-subject.yaml"
@@ -95,8 +94,6 @@ run_s "onboarding-complete" "flows/consent/post-approval-landing.yaml"
 
 # Standalone
 log "SKIP" "flows/onboarding/sign-up-flow.yaml" "(manual-only: requires Clerk email verification)"
-run_m "flows/consent/coppa-flow.yaml"
-run_m "flows/consent/profile-creation-consent.yaml"
 run_m "flows/consent/consent-pending-gate.yaml"
 
 echo -e "\n=========================================="

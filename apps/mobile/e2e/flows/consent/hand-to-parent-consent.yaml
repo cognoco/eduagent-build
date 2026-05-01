@@ -50,7 +50,7 @@ tags:
     id: "sign-in-button"
 
 # ============================================================
-# NAVIGATE TO CREATE PROFILE (same as coppa-flow.yaml)
+# NAVIGATE TO CREATE PROFILE
 # ============================================================
 
 # 3. Wait for tabs to render (no profile yet)

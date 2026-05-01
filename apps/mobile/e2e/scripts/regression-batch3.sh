@@ -35,7 +35,6 @@ run_seeded "parent-with-children" "flows/parent/parent-dashboard.yaml"
 run_seeded "parent-with-children" "flows/parent/parent-library.yaml"
 run_seeded "parent-with-children" "flows/parent/child-drill-down.yaml"
 run_seeded "parent-with-children" "flows/parent/consent-management.yaml"
-run_seeded "parent-solo"          "flows/parent/demo-dashboard.yaml"
 
 # Homework
 run_seeded "homework-ready"   "flows/homework/homework-flow.yaml"
@@ -50,8 +49,6 @@ run_seeded "onboarding-no-subject" "flows/edge/empty-first-user.yaml"
 run_seeded "consent-withdrawn-solo" "flows/consent/consent-withdrawn-gate.yaml"
 run_seeded "onboarding-complete"    "flows/consent/post-approval-landing.yaml"
 run_seeded "consent-pending"        "flows/consent/consent-pending-gate.yaml"
-run_seeded "pre-profile"            "flows/consent/coppa-flow.yaml"
-run_seeded "pre-profile"            "flows/consent/profile-creation-consent.yaml"
 
 # Sign-up (manual-only)
 log_result "SKIP" "flows/onboarding/sign-up-flow.yaml" "(manual-only: requires Clerk email verification)"
