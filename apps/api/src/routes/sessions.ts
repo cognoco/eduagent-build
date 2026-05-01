@@ -23,7 +23,7 @@ import { z } from 'zod';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
-import { streamSSEUtf8 } from '../services/llm/sse-utf8';
+import { streamSSEUtf8 } from '../services/streaming/sse-utf8';
 import { captureException } from '../services/sentry';
 import { createLogger } from '../services/logger';
 import {

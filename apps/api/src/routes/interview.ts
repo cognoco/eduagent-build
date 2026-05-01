@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { streamSSEUtf8 } from '../services/llm/sse-utf8';
+import { streamSSEUtf8 } from '../services/streaming/sse-utf8';
 import { zValidator } from '@hono/zod-validator';
 import {
   ERROR_CODES,
