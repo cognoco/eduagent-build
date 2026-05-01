@@ -49,10 +49,6 @@ const KNOWN_DRIFT = new Set([
   'shelf-book-list',
   // Streak display
   'streak-badge',
-  // Homework OCR result
-  'result-text-input',
-  // Chat/session testIDs
-  'chat-messages',
   // Session summary
   'summary-score',
   'summary-topics',
@@ -150,6 +146,11 @@ function extractSourceTestIds(tsxFiles: string[]): {
   // Dynamic template: testID={`prefix-${...}`} — extract the prefix before ${
   const dynamicPattern = /testID=\{`([^$`]+)\$\{/g;
 
+  // String literals inside JSX expression bodies. Skips template literals
+  // (handled separately by dynamicPattern).
+  const stringLiteralPattern =
+    /'([^'\\]*(?:\\.[^'\\]*)*)'|"([^"\\]*(?:\\.[^"\\]*)*)"/g;
+
   for (const file of tsxFiles) {
     const source = fs.readFileSync(file, 'utf-8');
 
@@ -165,6 +166,46 @@ function extractSourceTestIds(tsxFiles: string[]): {
     let match;
     while ((match = dynamicPattern.exec(source)) !== null) {
       dynamicPrefixes.push(match[1]!);
+    }
+
+    // Walk every `testID={...}` expression body with balanced-brace tracking
+    // (so nested template-literal interpolations don't terminate early), then
+    // pull string literals — covers ternary, ??, ||, bare-literal expressions:
+    //   testID={cond ? 'result-text-input' : `problem-input-${i}`} → 'result-text-input'
+    //   testID={messagesTestID ?? 'chat-messages'}                  → 'chat-messages'
+    //   testID={x || 'fallback'}                                    → 'fallback'
+    const startRe = /testID=\{/g;
+    let startMatch;
+    while ((startMatch = startRe.exec(source)) !== null) {
+      let depth = 1;
+      let i = startMatch.index + startMatch[0].length;
+      const start = i;
+      let inString: '"' | "'" | '`' | null = null;
+      while (i < source.length && depth > 0) {
+        const ch = source[i];
+        const prev = i > 0 ? source[i - 1] : '';
+        if (inString) {
+          if (ch === inString && prev !== '\\') inString = null;
+        } else {
+          if (ch === '"' || ch === "'" || ch === '`') {
+            inString = ch as '"' | "'" | '`';
+          } else if (ch === '{') {
+            depth++;
+          } else if (ch === '}') {
+            depth--;
+            if (depth === 0) break;
+          }
+        }
+        i++;
+      }
+      if (depth === 0) {
+        const body = source.slice(start, i);
+        stringLiteralPattern.lastIndex = 0;
+        let litMatch;
+        while ((litMatch = stringLiteralPattern.exec(body)) !== null) {
+          staticIds.add(litMatch[1] ?? litMatch[2]!);
+        }
+      }
     }
   }
 
