@@ -39,9 +39,11 @@ export const filingTimedOutObserve = inngest.createFunction(
         .select({ count: count() })
         .from(sessionEvents)
         .where(eq(sessionEvents.sessionId, sessionId));
+      // [BUG-913 sweep] Tie-break by id when created_at collides — see
+      // session-crud.ts getSessionTranscript for the full rationale.
       const lastEvent = await db.query.sessionEvents.findFirst({
         where: eq(sessionEvents.sessionId, sessionId),
-        orderBy: desc(sessionEvents.createdAt),
+        orderBy: [desc(sessionEvents.createdAt), desc(sessionEvents.id)],
       });
 
       return {

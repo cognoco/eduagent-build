@@ -249,12 +249,16 @@ export async function closeSession(
   );
 
   // FR210: Compute active time from session event gaps (internal analytics only)
+  // [BUG-913 sweep] Tie-break by id when created_at collides — see
+  // getSessionTranscript below for the full rationale. computeActiveSeconds
+  // walks events in order, so a flapping order between batched events would
+  // produce nondeterministic active-time values for the same session.
   const events = await db.query.sessionEvents.findMany({
     where: and(
       eq(sessionEvents.sessionId, sessionId),
       eq(sessionEvents.profileId, profileId)
     ),
-    orderBy: asc(sessionEvents.createdAt),
+    orderBy: [asc(sessionEvents.createdAt), asc(sessionEvents.id)],
   });
   const durationSeconds = computeActiveSeconds(sessionStartedAt, events);
   const escalationRungs = collectEscalationRungs(events);
@@ -441,12 +445,14 @@ export async function getSessionCompletionContext(
     throw new Error('Session not found');
   }
 
+  // [BUG-913 sweep] Tie-break by id when created_at collides — see
+  // getSessionTranscript below for the full rationale.
   const events = await db.query.sessionEvents.findMany({
     where: and(
       eq(sessionEvents.sessionId, sessionId),
       eq(sessionEvents.profileId, profileId)
     ),
-    orderBy: asc(sessionEvents.createdAt),
+    orderBy: [asc(sessionEvents.createdAt), asc(sessionEvents.id)],
   });
 
   return {
@@ -699,7 +705,11 @@ export async function getResumeNudgeCandidate(
         eq(sessionEvents.eventType, 'user_message')
       )
     )
-    .orderBy(asc(sessionEvents.createdAt))
+    // [BUG-913 sweep] Tie-break by id when created_at collides — see
+    // getSessionTranscript above for the full rationale. With limit:1 the
+    // tiebreak makes "first user message" deterministic when a batch insert
+    // landed multiple events at the same NOW() snapshot.
+    .orderBy(asc(sessionEvents.createdAt), asc(sessionEvents.id))
     .limit(1);
 
   return {

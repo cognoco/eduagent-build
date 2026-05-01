@@ -50,7 +50,11 @@ export async function processEvaluateCompletion(
         eq(sessionEvents.eventType, 'ai_response')
       )
     )
-    .orderBy(desc(sessionEvents.createdAt))
+    // [BUG-913 sweep] Tie-break by id when created_at collides — see
+    // session-crud.ts getSessionTranscript for the full rationale. With
+    // limit:5 the tiebreak prevents a flapping "last 5 ai_response events"
+    // set when a batch insert lands several events at the same NOW().
+    .orderBy(desc(sessionEvents.createdAt), desc(sessionEvents.id))
     .limit(5);
 
   // Try to parse an EVALUATE assessment from the most recent events
@@ -192,7 +196,11 @@ export async function processTeachBackCompletion(
         eq(sessionEvents.eventType, 'ai_response')
       )
     )
-    .orderBy(desc(sessionEvents.createdAt))
+    // [BUG-913 sweep] Tie-break by id when created_at collides — see
+    // session-crud.ts getSessionTranscript for the full rationale. With
+    // limit:5 the tiebreak prevents a flapping "last 5 ai_response events"
+    // set when a batch insert lands several events at the same NOW().
+    .orderBy(desc(sessionEvents.createdAt), desc(sessionEvents.id))
     .limit(5);
 
   // Try to parse a TEACH_BACK assessment from the most recent events

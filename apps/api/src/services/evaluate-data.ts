@@ -206,7 +206,9 @@ export async function getEvaluateSessionState(
       eq(sessionEvents.sessionId, sessionId),
       eq(sessionEvents.eventType, 'evaluate_challenge')
     ),
-    orderBy: [desc(sessionEvents.createdAt)],
+    // [BUG-913 sweep] Tie-break by id when created_at collides — see
+    // session-crud.ts getSessionTranscript for the full rationale.
+    orderBy: [desc(sessionEvents.createdAt), desc(sessionEvents.id)],
   });
   let consecutiveFailures = 0;
   for (const evt of evalEvents) {

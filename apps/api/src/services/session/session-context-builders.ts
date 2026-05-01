@@ -297,7 +297,11 @@ export async function buildResumeContext(
         eq(sessionEvents.profileId, profileId),
         inArray(sessionEvents.eventType, ['user_message', 'ai_response'])
       ),
-      orderBy: desc(sessionEvents.createdAt),
+      // [BUG-913 sweep] Tie-break by id when created_at collides — see
+      // session-crud.ts getSessionTranscript for the full rationale. With
+      // limit:4 the tiebreak prevents a flapping "last 4 events" set when
+      // a batch insert lands several events at the same NOW() snapshot.
+      orderBy: [desc(sessionEvents.createdAt), desc(sessionEvents.id)],
       limit: 4,
     }),
   ]);

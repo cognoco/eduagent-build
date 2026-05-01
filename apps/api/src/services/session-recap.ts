@@ -296,7 +296,9 @@ export async function generateLearnerRecap(
       eq(sessionEvents.sessionId, input.sessionId),
       eq(sessionEvents.profileId, input.profileId)
     ),
-    orderBy: asc(sessionEvents.createdAt),
+    // [BUG-913 sweep] Tie-break by id when created_at collides — see
+    // session-crud.ts getSessionTranscript for the full rationale.
+    orderBy: [asc(sessionEvents.createdAt), asc(sessionEvents.id)],
     columns: {
       eventType: true,
       content: true,
