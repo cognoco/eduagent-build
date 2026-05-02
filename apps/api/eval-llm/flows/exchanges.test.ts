@@ -255,13 +255,14 @@ describe('exchangesFlow', () => {
     it('throws when buildPrompt produces no user turn', async () => {
       const scenarios =
         exchangesFlow.enumerateScenarios?.(generalProfile) ?? [];
-      const s1 = scenarios[0];
+      const s1 = scenarios[0]; // S1 has empty history — buildPrompt returns user: undefined by design
       const messages = exchangesFlow.buildPrompt(s1.input);
 
-      // Strip the user field to simulate a flow whose buildPrompt didn't
-      // produce one — runLive should fail loudly rather than silently
-      // send an empty user turn.
-      const messagesWithoutUser = { ...messages, user: undefined };
+      // S1 legitimately has no user turn; runLive must throw rather than
+      // silently send an empty user turn.
+      await expect(
+        exchangesFlow.runLive?.(s1.input, messages)
+      ).rejects.toThrow(/messages\.user is undefined/);
 
       await expect(
         exchangesFlow.runLive?.(s1.input, messagesWithoutUser)
