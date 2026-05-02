@@ -79,7 +79,7 @@ interface SubmitSummaryResult {
     id: string;
     sessionId: string;
     content: string;
-    aiFeedback: string;
+    aiFeedback: string | null;
     status: 'accepted' | 'submitted';
   };
 }
