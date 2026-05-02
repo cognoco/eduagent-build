@@ -6083,7 +6083,7 @@ Replace fragile free-text markers and JSON-in-text patterns with a typed respons
 | Story | Scope | Status |
 |-------|-------|--------|
 | 18.1 | **Envelope schema** — `llmResponseEnvelopeSchema` in `@eduagent/schemas`, `parseEnvelope()` helper in `services/llm/envelope.ts` | DONE |
-| 18.2 | **F1.1 Interview envelope (shadow mode)** — `ready_to_finish` signal parsed, `MAX_INTERVIEW_EXCHANGES = 6` cap, legacy marker as fallback, `logParserDisagreement()` telemetry | DONE |
+| 18.2 | **F1.1 Interview envelope (shadow mode)** — `ready_to_finish` signal parsed, `MAX_INTERVIEW_EXCHANGES = 4` cap, legacy marker as fallback, `logParserDisagreement()` telemetry | DONE |
 | 18.3 | **F1.2 Divergent matchers hotfix** — both `detectPartialProgress` unified to strict own-line regex | DONE |
 | 18.4 | **F3 Tone register** — "learning mate" removed, "dive in" banned, `getAgeVoice()` rewritten to 4-tier register (early-teen / teen / young-adult / adult) | DONE |
 | 18.5 | **P0 Interests injection** — interests wired into all quiz prompts (capitals, vocabulary, guess-who) and dictation-generate | DONE |

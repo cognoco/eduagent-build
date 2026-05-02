@@ -118,7 +118,7 @@ Ref: `docs/superpowers/plans/2026-04-19-pre-launch-ux-fixes.md`
 ### Already Fixed (verified in codebase)
 
 - [x] **F-Q-08** Quiz quit confirm dialog — `platformAlert` in `quiz/play.tsx:159-168`
-- [x] **F-042** Interview deadlock — `MAX_INTERVIEW_EXCHANGES=6` hard cap in `interview.ts:267`
+- [x] **F-042** Interview deadlock — `MAX_INTERVIEW_EXCHANGES=4` hard cap in `interview.ts:399`
 - [x] **F-009** Topic deep-link — `useResolveTopicSubject` in `topic/[topicId].tsx:161-165`
 - [x] **F-Q-02** Wrong answer reveal — green highlight in `quiz/play.tsx:392-393`
 - [x] **F-Q-12** Challenge banner auto-advance — timer removed in `quiz/launch.tsx:117-119`

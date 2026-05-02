@@ -40,7 +40,7 @@ system prompt: "Respond with JSON: {reply, signals: {partial_progress: bool, ...
 parser: validated.signals.partial_progress  // Zod-validated envelope
 ```
 
-Plus server-side cap as belt + suspenders — e.g. `MAX_INTERVIEW_EXCHANGES = 6` forces `ready_to_finish = true` regardless of what the LLM returned.
+Plus server-side cap as belt + suspenders — e.g. `MAX_INTERVIEW_EXCHANGES = 4` forces `ready_to_finish = true` regardless of what the LLM returned.
 
 Full envelope shape in `docs/specs/2026-04-18-llm-response-envelope.md`:
 
