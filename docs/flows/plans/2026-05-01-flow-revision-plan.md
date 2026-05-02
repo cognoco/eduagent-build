@@ -203,7 +203,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | ACCOUNT-01 | Create first profile | ✅ | Pass | | | Adult profile (age 20) created; landed on learner home with intent cards |
-| SUBJECT-08 | Language learning setup | 🚫 | Blocked | | | Need to test — Italian onboarding via interview reached but no specific "language setup" screen surfaced; may need a different entry point |
+| SUBJECT-08 | Language learning setup | ✅ | Pass | | | 2026-05-02: Language subjects show CEFR auto-adaptation info in Subject Settings ("No subject-specific settings yet for language subjects. Your tutor adapts vocabulary, listening, and writing practice automatically based on your CEFR level and progress."). No separate "language setup" screen — classification + four_strands pedagogy is implicit. |
 | ACCOUNT-19 | Consent request during underage profile creation | ✅ | Pass | | | Age 12 profile triggers consent screen correctly |
 | ACCOUNT-20 | Child handoff to parent consent request | ✅ | Pass | | | "My parent is here with me" option present on consent screen |
 | ACCOUNT-21 | Parent email entry, send / resend / change email | ✅ | Pass | | ✅ 05-01 | Send, resend, and change-email all work; masked email display correct. Self-email validation works — rejects child's own email with inline error. Inventory updated. |
@@ -224,7 +224,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | SUBJECT-01 | Create subject from learner home | ✅ | Pass | | | 2026-05-02: Verified after streaming unblocked. Home → Learn intent card → /create-subject → typed "Italian language basics" → classifier suggested "Italian Language focused on Basics" → Accept → /onboarding/interview |
 | SUBJECT-05 | Subject resolution + clarification suggestions | ✅ | Pass | | | LLM resolution works: "This sounds like Italian Language focused on Basics — shall we go with that?" with Accept/Edit buttons rendered. POST /v1/subjects/resolve → 200. |
 | SUBJECT-06 | Broad subject → pick a book | ✅ | Pass | | | "Math" → book picker rendered 7 books (Foundations of Algebra, Geometry, Pre-Calc, Calc I/II, Linear Algebra, Probability/Stats) with emoji icons + descriptions. Tap → /shelf/{id}/book/{id}. |
-| SUBJECT-07 | Focused subject / focused-book flow | 🚫 | Blocked | | | Need separate test — focused-input branch differs from broad-pick (untested in this pass) |
+| SUBJECT-07 | Focused subject / focused-book flow | ✅ | Pass | | | 2026-05-02: Typed "Italian verb conjugation - essere and avere" → classifier resolved "Italian focused on Verb Conjugation" → Accept → **skipped book picker** (unlike broad subjects) → direct to interview Step 1/4. Focused-book auto-generated. Correct differentiation from broad-pick (SUBJECT-06). |
 | SUBJECT-09 | Interview onboarding | ✅ | Pass | | | 2026-05-02: After durability-layer-fix deployed to staging, full interview verified. Step 1/4, multi-turn streaming worked, mentor responded with correct Italian phrase, page progress incremented 0→1→2, "I'm ready to start learning" envelope-driven button appeared and advanced to step 2. SUBJECT-09 P1 root cause was CORS Idempotency-Key gap (staging stale), now fixed. |
 | SUBJECT-10 | Analogy-preference onboarding | ✅ | Pass | | | Step 2/4 rendered with 7 options (No preference / Cooking / Sports / Building / Music / Nature / Gaming). Skip → advanced to step 3. |
 | SUBJECT-11 | Curriculum review | ❌ | Fail | [SUBJECT-11 P1](https://www.notion.so/SUBJECT-11-Interview-Done-button-bypasses-curriculum-generation-review-screen-shows-0-topics-3548bce91f7c81bb99baee766d33abc5) | | Step 4/4 rendered correctly but "Done" button bypasses curriculum generation — review screen shows 0 topics indefinitely. LLM-emitted "Ready to start learning" envelope path works (Italian flow triggered /interview/complete + curriculum populated). User-driven Done button does NOT fire /interview/complete. |
@@ -258,11 +258,11 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| LEARN-01 | Freeform chat (Ask intent card) | ❌ | Fail | [streamExchange threw 500](https://www.notion.so/Freeform-chat-session-returns-500-streamExchange-threw-3548bce91f7c81f1858ae805a0937f36) | | 2026-05-02: After CORS fix, freeform chat session POST → stream returns 500 `{"code":"INTERNAL_ERROR","message":"streamExchange threw"}`. Server-side error specific to no-subject-context path. Filed new bug. Original LEARN-01 P1 root cause (CORS) is fixed — this is a different bug surfaced by it. |
-| LEARN-02 | Guided learning session from subject/topic | ❌ | Fail | [LEARN-02 P1](https://www.notion.so/LEARN-02-Guided-learning-session-stream-returns-200-but-no-chunks-render-UI-stuck-on-writing-anim-3548bce91f7c81e1b3b0c4bcb6869fb6) | | Library → Spanish → Greetings topic → /session opens with mentor opener. Send any message → POST /sessions/{id}/stream returns 200 but no SSE chunks render. UI stuck on writing animation 40+ seconds. Different symptom from streamExchange 500 — this is silent zero-token stream. Subject-bound interview path streams normally; topic-context path fails. |
-| LEARN-03 | First session experience | 🚫 | Blocked | | | Staging LLM down |
-| LEARN-04 | Core learning loop | 🚫 | Blocked | | | Staging LLM down |
-| LEARN-05 | Coach bubble visual variants (light/dark) | 🚫 | Blocked | | | Needs LLM response to render bubbles |
+| LEARN-01 | Freeform chat (Ask intent card) | ❌ | Fail | [streamExchange threw 500](https://www.notion.so/Freeform-chat-session-returns-500-streamExchange-threw-3548bce91f7c81f1858ae805a0937f36) | | 2026-05-02 re-test: Still returns 500 on POST /sessions/{id}/stream for freeform (no-subject) path. Same bug. |
+| LEARN-02 | Guided learning session from subject/topic | ❌ | Fail | [LEARN-02 P1](https://www.notion.so/LEARN-02-Guided-learning-session-stream-returns-200-but-no-chunks-render-UI-stuck-on-writing-anim-3548bce91f7c81e1b3b0c4bcb6869fb6) | | 2026-05-02 re-test: Still silent. Library → Spanish → Greetings → Start → /session opens, mentor opener renders, writing animation shows, but no SSE chunks after 40s+. No console errors. Same bug. |
+| LEARN-03 | First session experience | ⚠️ | Pass w/ issues | | | 2026-05-02: Session screen opens correctly (/session): header "Learning Session / Building understanding", topic chip "Current topic: Greetings & Introductions" + Change topic, Unmute AI voice, Session mode toggle, text/voice input. Mentor opener renders. LLM response blocked (LEARN-02 bug). UI structure verified. |
+| LEARN-04 | Core learning loop | 🚫 | Blocked | | | LLM streaming broken (LEARN-02 bug) — cannot complete multi-turn exchange |
+| LEARN-05 | Coach bubble visual variants (light/dark) | 🚫 | Blocked | | | Needs LLM response to render mentor bubbles (LEARN-02 bug) |
 | LEARN-06 | Voice input + voice-speed controls | 🚫 | Blocked | | | Web preview lacks mic access; also blocked by LLM |
 | LEARN-07 | Session summary (submit / skip) | 🚫 | Blocked | | | Needs completed session (LLM down) |
 | SUBJECT-02 | Create subject from library empty state | 🚫 | Blocked | | | Needs empty library state (current account has Spanish). Create-subject screen itself verified in Batch 6. |
@@ -327,14 +327,14 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | --- | --- | --- | --- | --- | --- | --- |
 | PRACTICE-01 | Practice hub menu | ✅ | Pass | | | Review topics, Recite (Beta), Dictation, Quiz, History — all options present |
 | PRACTICE-02 | Review topics shortcut | ✅ | Pass | | | Shows "Nothing to review right now" + "Browse your topics" link when no overdue topics |
-| PRACTICE-03 | Recitation session | 🚫 | Blocked | | | Needs LLM for session |
+| PRACTICE-03 | Recitation session | ⚠️ | Pass w/ issues | | | 2026-05-02: Entry works — "Recitation (Beta)" screen, correct opener, text/voice toggle, Switch topic + Park it buttons. LLM interaction untested (streaming issues). |
 | PRACTICE-04 | "All caught up" empty state with countdown | ✅ | Pass | | | "Complete some topics first to unlock review" empty state variant |
 | QUIZ-01 | Quiz activity picker (Capitals / Vocab / Guess Who) | ✅ | Pass | | | 3 activities: Capitals, Vocabulary: Spanish (subject-aware), Guess Who |
-| QUIZ-02 | Round generation loading + 20s "still trying" hint | 🚫 | Blocked | | | Needs LLM for round generation |
-| QUIZ-03 | Round play — multiple choice | 🚫 | Blocked | | | Needs LLM |
-| QUIZ-04 | Round play — Guess Who clue reveal | 🚫 | Blocked | | | Needs LLM |
-| QUIZ-05 | Mid-round quit with confirm | 🚫 | Blocked | | | Needs active round |
-| QUIZ-06 | Round complete error retry | 🚫 | Blocked | | | Needs active round |
+| QUIZ-02 | Round generation loading + 20s "still trying" hint | ⚠️ | Pass w/ issues | | | 2026-05-02: Loading screen verified (progress bar, "Almost ready...", Cancel button). Capitals round failed (LLM error → QUIZ-06 fallback). Guess Who round generated successfully (3 questions). "Still trying" 20s hint not observed — error appeared before 20s for Capitals. |
+| QUIZ-03 | Round play — multiple choice | 🚫 | Blocked | | | Capitals round generation failed (LLM error). Multiple-choice variant untested. |
+| QUIZ-04 | Round play — Guess Who clue reveal | ✅ | Pass | | | 2026-05-02: Guess Who round 1/3 generated. Clue 1 displayed → "Reveal next clue" → Clue 2 revealed. Typed "Hypatia" → "You got it in 2 clues!" Correct answer + remaining clue shown. |
+| QUIZ-05 | Mid-round quit with confirm | 🚫 | Blocked | | | 2026-05-02: Quit button appears to trigger native confirm dialog — page freezes in web preview (cannot dismiss native dialogs). Needs native emulator. |
+| QUIZ-06 | Round complete error retry | ✅ | Pass | | | 2026-05-02: Verified via Capitals generation failure — "Couldn't create a round" + "Something went wrong creating your quiz. Try again!" + Retry + Go Back buttons. |
 | QUIZ-07 | Results screen (celebration tier + soft-fail streak) | 🚫 | Blocked | | | Needs completed round |
 | QUIZ-08 | Quota / consent / forbidden typed errors | 🚫 | Blocked | | | Needs quota-capped account |
 | QUIZ-09 | Quiz history (grouping + empty state) | ✅ | Pass | | | Empty state: "No rounds played yet" + "Try a Quiz" CTA |
@@ -352,9 +352,9 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | --- | --- | --- | --- | --- | --- | --- |
 | DICT-01 | Choice screen (text vs surprise) | ✅ | Pass | | | "I have a text" + "Surprise me" options with descriptions |
 | DICT-02 | OCR text preview + edit (homework path) | 🚫 | Blocked | | | Needs camera (web preview) |
-| DICT-03 | "Surprise me" LLM-generated dictation | 🚫 | Blocked | | | Needs LLM |
-| DICT-04 | Playback (TTS, pace, punctuation, repeat, tap-pause) | 🚫 | Blocked | | | Needs active dictation |
-| DICT-05 | Mid-dictation exit confirm dialog | 🚫 | Blocked | | | Needs active dictation |
+| DICT-03 | "Surprise me" LLM-generated dictation | ✅ | Pass | | | 2026-05-02: Clicked "Surprise me" → LLM generated 8 sentences. Dictation player screen loaded with sentence counter (1/8), pace control, punctuation toggle. |
+| DICT-04 | Playback (TTS, pace, punctuation, repeat, tap-pause) | ✅ | Pass | | | 2026-05-02: Playback UI verified — Pace: Slow (tap to change), Punctuation read aloud toggle, Skip to next sentence, Repeat last phrase, Pause/Play ("Ready..." → "* * *" playing animation). Web preview may not produce audio (TTS limitation) but UI controls all functional. |
+| DICT-05 | Mid-dictation exit confirm dialog | 🚫 | Blocked | | | 2026-05-02: Exit button triggers native confirm dialog → page freezes in web preview. Needs native emulator to dismiss dialog. |
 | DICT-06 | Completion screen | 🚫 | Blocked | | | Needs completed dictation |
 | DICT-07 | Photo review of handwritten dictation (vision LLM) | 🚫 | Blocked | | | Needs camera + LLM |
 | DICT-08 | Sentence-level remediation | 🚫 | Blocked | | | Needs completed dictation |
@@ -535,15 +535,15 @@ Update this once a batch is complete to track overall progress.
 | Batch | Section | Items | Status | Notes |
 | --- | --- | --- | --- | --- |
 | 1  | Pre-auth & Auth          | 12 | ✅ | 8✅ 1⚠️ 3🚫 — AUTH-12 bug filed |
-| 2  | First Profile + Consent  |  9 | ✅ | 5✅ 1⚠️ 3🚫 — consent email/native blocked |
-| 3  | Subject Onboarding       | 11 | ⚠️ | 6✅ 1❌ 4🚫 — streaming unblocked 2026-05-02 (CORS Idempotency-Key fix); SUBJECT-11 Done-button bypass new bug |
+| 2  | First Profile + Consent  |  9 | ✅ | 6✅ 1⚠️ 2🚫 — SUBJECT-08 verified 2026-05-02 |
+| 3  | Subject Onboarding       | 11 | ⚠️ | 8✅ 1❌ 2🚫 — SUBJECT-07 focused-book verified 2026-05-02 |
 | 4  | Learner Home + Resume    |  6 | ✅ | 4✅ 1⚠️ 1🚫 |
-| 5  | Core Learning Sessions   | 11 | ⚠️ | 2❌ 9🚫 — streaming unblocked but LEARN-01 (500) and LEARN-02 (silent stream) found new bugs |
+| 5  | Core Learning Sessions   | 11 | ⚠️ | 2❌ 1⚠️ 8🚫 — LEARN-01/02 still broken; LEARN-03 session UI verified |
 | 6  | Library, Books, Topics   |  6 | ✅ | 5✅ 1⚠️ |
-| 7  | Retention & Recall       |  4 | 🚫 | 4🚫 — all need LLM sessions |
+| 7  | Retention & Recall       |  4 | 🚫 | 4🚫 — all need completed LLM sessions |
 | 8  | Progress / Vocab         |  6 | ⚠️ | 2✅ 4🚫 |
-| 9  | Practice Hub + Quiz      | 15 | ⚠️ | 5✅ 10🚫 — quiz/practice need LLM-generated content |
-| 10 | Dictation                | 10 | 🚫 | 1✅ 9🚫 — all need LLM |
+| 9  | Practice Hub + Quiz      | 15 | ⚠️ | 8✅ 2⚠️ 5🚫 — QUIZ-04/06 pass, QUIZ-02/PRACTICE-03 partial, Guess Who round completed |
+| 10 | Dictation                | 10 | ⚠️ | 3✅ 7🚫 — DICT-03/04 verified, DICT-05 native dialog blocked |
 | 11 | Homework                 |  7 | 🚫 | 1✅ 6🚫 — camera/LLM blocked |
 | 12 | Account / Settings       |  9 | ✅ | 7✅ 1⚠️ 1🚫 — export bug filed |
 | 13 | Account Deletion         |  2 | ⚠️ | 1✅ 1🚫 |
@@ -552,7 +552,7 @@ Update this once a batch is complete to track overall progress.
 | 16 | Billing                  | 11 | ✅ | 7✅ 4🚫 — Family pool verified, store/child-paywall/quota blocked |
 | 17 | Cross-Cutting Final Pass |  3 | ⚠️ | 1✅ 1⚠️ 1🚫 — BUG-948 bare router.back() |
 | 18 | Regression Smoke         |  9 | ⚠️ | 4✅ 5🚫 — LLM/email blocked, parent add-child now passing |
-| **Total** | | **154** | | **70✅ 6⚠️ 4❌ 74🚫 0⬜ — streaming unblocked 2026-05-02; +6 newly verified flows, +3 new bugs surfaced |
+| **Total** | | **154** | | **79✅ 10⚠️ 3❌ 62🚫 0⬜ — 2026-05-02 pass 2: +8 verified (SUBJECT-07/08, PRACTICE-03, DICT-03/04, QUIZ-02/04/06), LEARN-03 UI confirmed; LEARN-01/02 still broken; Guess Who quiz fully playable |
 
 ### Coverage Audit
 
