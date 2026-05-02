@@ -6097,6 +6097,7 @@ Replace fragile free-text markers and JSON-in-text patterns with a typed respons
 | 18.13 | **F4 Interview escape button** — "I'm ready to start learning" skip button + `useForceCompleteInterview` | DONE |
 | 18.14 | **F5 Friendly error messages** — `format-api-error.ts` with `FRIENDLY_MESSAGE_MAP` for kid-friendly errors | DONE (partial — no recovery action buttons yet) |
 | 18.15 | **F8 Memory source schema** — `sourceSessionId`/`sourceEventId` fields on `MemoryBlockEntry` | DONE (schema only — all values `null`) |
+| 18.20 | **F7 Shorten interview** — soft target 3 via prompt (`interview-prompts.ts:9, 14-15`), hard cap 4 via `MAX_INTERVIEW_EXCHANGES` (`interview.ts:399`); per PM spec "3, worst case 4" | DONE |
 
 ### Remaining
 
@@ -6106,7 +6107,6 @@ Replace fragile free-text markers and JSON-in-text patterns with a typed respons
 | 18.17 | **F1.2+F1.3 Exchange envelope migration** — migrate `[PARTIAL_PROGRESS]` + `[NEEDS_DEEPENING]` to `signals.*` in main exchange loop | HIGH | 18.16 (reference implementation) |
 | 18.18 | **F2.1+F2.2 UI hints migration** — migrate `notePrompt` + `fluencyDrill` JSON-in-text to `ui_hints.*` | HIGH | 18.17 (same prompt rewrite) |
 | 18.19 | **P1 quiz_missed_items in prompts** — wire SRS missed items into quiz generation prompts | HIGH | None |
-| 18.20 | **F7 Shorten interview** — `MAX_INTERVIEW_EXCHANGES` from 6 to 3, adjust session analysis threshold | MEDIUM | None |
 | 18.21 | **F6 Confidence-aware UI** — surface low/medium confidence as "Is this right?" tap target on mobile | MEDIUM | None |
 | 18.22 | **F5 Recovery action buttons** — error messages include recovery buttons (retry, switch path, go home) | MEDIUM | None |
 | 18.23 | **Dictation review personalization** — inject `ageYears` + struggle history into review prompt | MEDIUM | None |
