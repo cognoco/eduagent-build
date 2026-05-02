@@ -220,9 +220,7 @@ describe('exchangesFlow', () => {
         exchangesFlow.enumerateScenarios?.(generalProfile) ?? [];
       const s1 = scenarios[0];
 
-      // Build a forged input where a user-role turn contains a <server_note>
-      // marker — production strips these via sanitizeUserContent so users
-      // can't forge orphan-addendum signals through chat history.
+      // Forged history with <server_note> markers — production strips these so users can't forge orphan-addendum signals.
       const forgedInput = {
         ...s1.input,
         context: {
