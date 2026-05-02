@@ -113,10 +113,10 @@ export default function CurriculumScreen() {
     return () => {
       if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
     };
-  // curriculum intentionally excluded — we only want to restart the timer
-  // when subjectId changes (new subject). Data arrival is handled by the
-  // early-return branch above.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // curriculum intentionally excluded — we only want to restart the timer
+    // when subjectId changes (new subject). Data arrival is handled by the
+    // early-return branch above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subjectId]);
 
   const skipTopic = useSkipTopic(subjectId ?? '');
@@ -884,6 +884,7 @@ export default function CurriculumScreen() {
           <View
             className="bg-background rounded-t-3xl px-5 pt-6 pb-8"
             style={{ paddingBottom: Math.max(insets.bottom, 24) }}
+            testID="why-modal"
           >
             <Text className="text-h3 font-bold text-text-primary mb-2">
               Why this order?

@@ -331,38 +331,53 @@ describe('SubscriptionScreen', () => {
     jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
 
     // Default fetch routes (most-specific first to avoid prefix collisions)
-    mockFetch.setRoute('/subscription/family', () =>
-      new Response(JSON.stringify({ error: 'Not Found' }), { status: 404 })
+    mockFetch.setRoute(
+      '/subscription/family',
+      () =>
+        new Response(JSON.stringify({ error: 'Not Found' }), { status: 404 })
     );
-    mockFetch.setRoute('/subscription', () =>
-      new Response(
-        JSON.stringify({ subscription: DEFAULT_SUBSCRIPTION }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+    mockFetch.setRoute(
+      '/subscription',
+      () =>
+        new Response(JSON.stringify({ subscription: DEFAULT_SUBSCRIPTION }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
     );
-    mockFetch.setRoute('/usage', () =>
-      new Response(
-        JSON.stringify({ usage: DEFAULT_USAGE }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+    mockFetch.setRoute(
+      '/usage',
+      () =>
+        new Response(JSON.stringify({ usage: DEFAULT_USAGE }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
     );
-    mockFetch.setRoute('/xp', () =>
-      new Response(
-        JSON.stringify({ xp: null }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+    mockFetch.setRoute(
+      '/xp',
+      () =>
+        new Response(JSON.stringify({ xp: null }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
     );
-    mockFetch.setRoute('/byok-waitlist', () =>
-      new Response(
-        JSON.stringify({ message: 'Added to BYOK waitlist', email: 'user@example.com' }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+    mockFetch.setRoute(
+      '/byok-waitlist',
+      () =>
+        new Response(
+          JSON.stringify({
+            message: 'Added to BYOK waitlist',
+            email: 'user@example.com',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
     );
-    mockFetch.setRoute('/settings/notify-parent-subscribe', () =>
-      new Response(
-        JSON.stringify({ sent: true, rateLimited: false }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+    mockFetch.setRoute(
+      '/settings/notify-parent-subscribe',
+      () =>
+        new Response(JSON.stringify({ sent: true, rateLimited: false }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
     );
   });
 
@@ -371,8 +386,14 @@ describe('SubscriptionScreen', () => {
   // -------------------------------------------------------------------------
 
   it('shows loading indicator while data is loading', () => {
-    // Subscription fetch never resolves → isLoading: true
-    mockFetch.setRoute('/subscription', () => new Promise<Response>((_resolve) => { /* never resolves */ }));
+    // Use offeringsLoading=true to assert that isLoading=true shows the spinner
+    // without creating a never-resolving async fetch. A never-resolving fetch
+    // leaves a dangling combinedSignal setTimeout in the event loop (open handle)
+    // that can cause subsequent tests to time out in CI.
+    // isLoading = subLoading || usageLoading || offeringsLoading || customerInfoLoading,
+    // so any loading sub-state triggers the indicator — we don't need the
+    // subscription fetch specifically to be slow here.
+    mockOfferingsLoading = true;
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
@@ -402,8 +423,12 @@ describe('SubscriptionScreen', () => {
       isOwner: false,
     };
     // Return a 500 to trigger assertOk → query enters error state
-    mockFetch.setRoute('/subscription', () =>
-      new Response(JSON.stringify({ message: 'Server error' }), { status: 500 })
+    mockFetch.setRoute(
+      '/subscription',
+      () =>
+        new Response(JSON.stringify({ message: 'Server error' }), {
+          status: 500,
+        })
     );
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
@@ -478,27 +503,39 @@ describe('SubscriptionScreen', () => {
   // BUG-899 hide-all-non-public-tiers rule, leaving them with no plan
   // comparison for the tier they actually pay for.
   it('shows Family static card in PLANS comparison when user is on Family [BUG-917]', async () => {
-    mockFetch.setRoute('/subscription', () =>
-      new Response(
-        JSON.stringify({ subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'family', status: 'active' } }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+    mockFetch.setRoute(
+      '/subscription',
+      () =>
+        new Response(
+          JSON.stringify({
+            subscription: {
+              ...DEFAULT_SUBSCRIPTION,
+              tier: 'family',
+              status: 'active',
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
     );
-    mockFetch.setRoute('/subscription/family', () =>
-      new Response(
-        JSON.stringify({
-          family: {
-            tier: 'family',
-            monthlyLimit: 1500,
-            usedThisMonth: 0,
-            remainingQuestions: 1500,
-            profileCount: 1,
-            maxProfiles: 6,
-            members: [{ profileId: 'profile-1', displayName: 'Alex', isOwner: true }],
-          },
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+    mockFetch.setRoute(
+      '/subscription/family',
+      () =>
+        new Response(
+          JSON.stringify({
+            family: {
+              tier: 'family',
+              monthlyLimit: 1500,
+              usedThisMonth: 0,
+              remainingQuestions: 1500,
+              profileCount: 1,
+              maxProfiles: 6,
+              members: [
+                { profileId: 'profile-1', displayName: 'Alex', isOwner: true },
+              ],
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
     );
     mockOfferings = null; // force the no-offerings static fallback path
 
@@ -520,11 +557,19 @@ describe('SubscriptionScreen', () => {
   // [BUG-917] Verify a non-Family user does not see Family card even if
   // RevenueCat returns no offerings — the BUG-899 rule still holds.
   it('hides Family static card for Plus users [BUG-917 + BUG-899 regression]', async () => {
-    mockFetch.setRoute('/subscription', () =>
-      new Response(
-        JSON.stringify({ subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'plus', status: 'active' } }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+    mockFetch.setRoute(
+      '/subscription',
+      () =>
+        new Response(
+          JSON.stringify({
+            subscription: {
+              ...DEFAULT_SUBSCRIPTION,
+              tier: 'plus',
+              status: 'active',
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
     );
     mockOfferings = null;
 
@@ -541,11 +586,19 @@ describe('SubscriptionScreen', () => {
   // the subscription screen saw only Free/Plus in the static comparison, with
   // no card for their own Pro tier. Fix mirrors the Family fix exactly.
   it('shows Pro static card in PLANS comparison when user is on Pro [BUG-917]', async () => {
-    mockFetch.setRoute('/subscription', () =>
-      new Response(
-        JSON.stringify({ subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'pro', status: 'active' } }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+    mockFetch.setRoute(
+      '/subscription',
+      () =>
+        new Response(
+          JSON.stringify({
+            subscription: {
+              ...DEFAULT_SUBSCRIPTION,
+              tier: 'pro',
+              status: 'active',
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
     );
     mockOfferings = null; // force the no-offerings static fallback path
 
@@ -566,11 +619,19 @@ describe('SubscriptionScreen', () => {
 
   // [BUG-917] Verify a Pro user does not contaminate Family visibility.
   it('hides Pro static card for Plus users [BUG-917 + BUG-899 regression]', async () => {
-    mockFetch.setRoute('/subscription', () =>
-      new Response(
-        JSON.stringify({ subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'plus', status: 'active' } }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+    mockFetch.setRoute(
+      '/subscription',
+      () =>
+        new Response(
+          JSON.stringify({
+            subscription: {
+              ...DEFAULT_SUBSCRIPTION,
+              tier: 'plus',
+              status: 'active',
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
     );
     mockOfferings = null;
 
@@ -588,11 +649,19 @@ describe('SubscriptionScreen', () => {
   // +$15/month price. It must not render even on a paid tier until pricing
   // is approved.
   it('does not show the Premium Mentor +$15/month add-on on paid tiers', async () => {
-    mockFetch.setRoute('/subscription', () =>
-      new Response(
-        JSON.stringify({ subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'plus', status: 'active' } }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+    mockFetch.setRoute(
+      '/subscription',
+      () =>
+        new Response(
+          JSON.stringify({
+            subscription: {
+              ...DEFAULT_SUBSCRIPTION,
+              tier: 'plus',
+              status: 'active',
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
     );
     mockOfferings = makeMockOfferings([makeMockPackage()]);
     mockCustomerInfo = makeMockCustomerInfo({
@@ -612,18 +681,20 @@ describe('SubscriptionScreen', () => {
   // paid, even if RevenueCat hasn't synced an active entitlement. Otherwise
   // a paid parent has no in-app way to cancel.
   it('renders manage billing when API tier is paid even if RevenueCat shows no active entitlement', async () => {
-    mockFetch.setRoute('/subscription', () =>
-      new Response(
-        JSON.stringify({
-          subscription: {
-            ...DEFAULT_SUBSCRIPTION,
-            tier: 'family',
-            status: 'active',
-            currentPeriodEnd: '2026-05-18T00:00:00Z',
-          },
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+    mockFetch.setRoute(
+      '/subscription',
+      () =>
+        new Response(
+          JSON.stringify({
+            subscription: {
+              ...DEFAULT_SUBSCRIPTION,
+              tier: 'family',
+              status: 'active',
+              currentPeriodEnd: '2026-05-18T00:00:00Z',
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
     );
     mockOfferings = null;
     mockCustomerInfo = makeMockCustomerInfo(); // no active entitlements
@@ -636,11 +707,19 @@ describe('SubscriptionScreen', () => {
   });
 
   it('shows current plan info from subscription data', async () => {
-    mockFetch.setRoute('/subscription', () =>
-      new Response(
-        JSON.stringify({ subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'plus', status: 'active' } }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+    mockFetch.setRoute(
+      '/subscription',
+      () =>
+        new Response(
+          JSON.stringify({
+            subscription: {
+              ...DEFAULT_SUBSCRIPTION,
+              tier: 'plus',
+              status: 'active',
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
     );
     mockOfferings = makeMockOfferings([makeMockPackage()]);
 
@@ -704,11 +783,15 @@ describe('SubscriptionScreen', () => {
     // PR-FIX-07: handlePurchase polls the subscription endpoint until the
     // webhook promotes the tier away from 'free'. Return an upgraded tier
     // on the first poll so the loop breaks and the success alert fires.
-    mockFetch.setRoute('/subscription', () =>
-      new Response(
-        JSON.stringify({ subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'plus' } }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+    mockFetch.setRoute(
+      '/subscription',
+      () =>
+        new Response(
+          JSON.stringify({
+            subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'plus' },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
     );
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
@@ -722,8 +805,12 @@ describe('SubscriptionScreen', () => {
       () => {
         expect(mockMutateAsyncPurchase).toHaveBeenCalledWith(monthlyPkg);
         // With real hooks, refetch calls back to mockFetch for /subscription and /usage
-        expect(fetchCallsMatching(mockFetch, '/subscription').length).toBeGreaterThanOrEqual(1);
-        expect(fetchCallsMatching(mockFetch, '/usage').length).toBeGreaterThanOrEqual(1);
+        expect(
+          fetchCallsMatching(mockFetch, '/subscription').length
+        ).toBeGreaterThanOrEqual(1);
+        expect(
+          fetchCallsMatching(mockFetch, '/usage').length
+        ).toBeGreaterThanOrEqual(1);
         expect(Alert.alert).toHaveBeenCalledWith(
           'Success',
           'Your subscription is now active!'
@@ -872,11 +959,15 @@ describe('SubscriptionScreen', () => {
     mockOfferings = makeMockOfferings([makeMockPackage()]);
     mockMutateAsyncRestore.mockResolvedValue(undefined);
     // BUG-397: Restore now polls API to confirm subscription tier
-    mockFetch.setRoute('/subscription', () =>
-      new Response(
-        JSON.stringify({ subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'plus' } }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+    mockFetch.setRoute(
+      '/subscription',
+      () =>
+        new Response(
+          JSON.stringify({
+            subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'plus' },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
     );
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
@@ -903,7 +994,9 @@ describe('SubscriptionScreen', () => {
         'Your subscription has been restored.'
       );
     });
-    expect(fetchCallsMatching(mockFetch, '/usage').length).toBeGreaterThanOrEqual(1);
+    expect(
+      fetchCallsMatching(mockFetch, '/usage').length
+    ).toBeGreaterThanOrEqual(1);
     jest.useRealTimers();
   });
 
@@ -912,11 +1005,15 @@ describe('SubscriptionScreen', () => {
     mockOfferings = makeMockOfferings([makeMockPackage()]);
     mockMutateAsyncRestore.mockResolvedValue(undefined);
     // BUG-397: Polling always returns free tier
-    mockFetch.setRoute('/subscription', () =>
-      new Response(
-        JSON.stringify({ subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'free' } }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+    mockFetch.setRoute(
+      '/subscription',
+      () =>
+        new Response(
+          JSON.stringify({
+            subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'free' },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
     );
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
@@ -1121,31 +1218,41 @@ describe('SubscriptionScreen', () => {
   });
 
   it('shows live family pool details for family subscriptions', async () => {
-    mockFetch.setRoute('/subscription', () =>
-      new Response(
-        JSON.stringify({ subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'family', status: 'active' } }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+    mockFetch.setRoute(
+      '/subscription',
+      () =>
+        new Response(
+          JSON.stringify({
+            subscription: {
+              ...DEFAULT_SUBSCRIPTION,
+              tier: 'family',
+              status: 'active',
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
     );
-    mockFetch.setRoute('/subscription/family', () =>
-      new Response(
-        JSON.stringify({
-          family: {
-            tier: 'family',
-            monthlyLimit: 1500,
-            usedThisMonth: 300,
-            remainingQuestions: 1200,
-            profileCount: 3,
-            maxProfiles: 4,
-            members: [
-              { profileId: 'p1', displayName: 'Parent', isOwner: true },
-              { profileId: 'p2', displayName: 'Alex', isOwner: false },
-              { profileId: 'p3', displayName: 'Mia', isOwner: false },
-            ],
-          },
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+    mockFetch.setRoute(
+      '/subscription/family',
+      () =>
+        new Response(
+          JSON.stringify({
+            family: {
+              tier: 'family',
+              monthlyLimit: 1500,
+              usedThisMonth: 300,
+              remainingQuestions: 1200,
+              profileCount: 3,
+              maxProfiles: 4,
+              members: [
+                { profileId: 'p1', displayName: 'Parent', isOwner: true },
+                { profileId: 'p2', displayName: 'Alex', isOwner: false },
+                { profileId: 'p3', displayName: 'Mia', isOwner: false },
+              ],
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
     );
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
@@ -1167,7 +1274,9 @@ describe('SubscriptionScreen', () => {
     fireEvent.press(screen.getByTestId('join-byok-waitlist-button'));
 
     await waitFor(() => {
-      expect(fetchCallsMatching(mockFetch, '/byok-waitlist').length).toBeGreaterThanOrEqual(1);
+      expect(
+        fetchCallsMatching(mockFetch, '/byok-waitlist').length
+      ).toBeGreaterThanOrEqual(1);
     });
 
     expect(Alert.alert).toHaveBeenCalledWith(
@@ -1177,8 +1286,12 @@ describe('SubscriptionScreen', () => {
   });
 
   it('shows an error alert when joining the BYOK waitlist fails', async () => {
-    mockFetch.setRoute('/byok-waitlist', () =>
-      new Response(JSON.stringify({ message: 'Server error' }), { status: 500 })
+    mockFetch.setRoute(
+      '/byok-waitlist',
+      () =>
+        new Response(JSON.stringify({ message: 'Server error' }), {
+          status: 500,
+        })
     );
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
@@ -1206,13 +1319,15 @@ describe('SubscriptionScreen', () => {
       // Child paywall renders when isChild=true AND trialOrExpired=true.
       // trialOrExpired requires subscription.status='expired'|'cancelled' OR !subscription&&!subLoading.
       // Use 'expired' status so the condition triggers after the query resolves.
-      mockFetch.setRoute('/subscription', () =>
-        new Response(
-          JSON.stringify({
-            subscription: { ...DEFAULT_SUBSCRIPTION, status: 'expired' },
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
+      mockFetch.setRoute(
+        '/subscription',
+        () =>
+          new Response(
+            JSON.stringify({
+              subscription: { ...DEFAULT_SUBSCRIPTION, status: 'expired' },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          )
       );
     });
 
@@ -1257,11 +1372,13 @@ describe('SubscriptionScreen', () => {
     });
 
     it('shows "great start" text when child has no XP data', async () => {
-      mockFetch.setRoute('/xp', () =>
-        new Response(
-          JSON.stringify({ xp: null }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
+      mockFetch.setRoute(
+        '/xp',
+        () =>
+          new Response(JSON.stringify({ xp: null }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          })
       );
 
       render(<SubscriptionScreen />, { wrapper: createWrapper() });
@@ -1270,27 +1387,27 @@ describe('SubscriptionScreen', () => {
         screen.getByTestId('child-paywall');
       });
       expect(
-        screen.getByText(
-          "You've been exploring and learning — great start!"
-        )
+        screen.getByText("You've been exploring and learning — great start!")
       ).toBeTruthy();
     });
 
     it('shows XP stats with "great work" when child has topics and XP', async () => {
-      mockFetch.setRoute('/xp', () =>
-        new Response(
-          JSON.stringify({
-            xp: {
-              totalXp: 250,
-              verifiedXp: 200,
-              pendingXp: 50,
-              decayedXp: 0,
-              topicsCompleted: 5,
-              topicsVerified: 3,
-            },
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
+      mockFetch.setRoute(
+        '/xp',
+        () =>
+          new Response(
+            JSON.stringify({
+              xp: {
+                totalXp: 250,
+                verifiedXp: 200,
+                pendingXp: 50,
+                decayedXp: 0,
+                topicsCompleted: 5,
+                topicsVerified: 3,
+              },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          )
       );
 
       render(<SubscriptionScreen />, { wrapper: createWrapper() });
@@ -1299,27 +1416,27 @@ describe('SubscriptionScreen', () => {
         screen.getByTestId('child-paywall');
       });
       expect(
-        screen.getByText(
-          'You learned 5 topics and earned 250 XP — great work!'
-        )
+        screen.getByText('You learned 5 topics and earned 250 XP — great work!')
       ).toBeTruthy();
     });
 
     it('shows singular "topic" when topicsCompleted is 1', async () => {
-      mockFetch.setRoute('/xp', () =>
-        new Response(
-          JSON.stringify({
-            xp: {
-              totalXp: 50,
-              verifiedXp: 40,
-              pendingXp: 10,
-              decayedXp: 0,
-              topicsCompleted: 1,
-              topicsVerified: 1,
-            },
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
+      mockFetch.setRoute(
+        '/xp',
+        () =>
+          new Response(
+            JSON.stringify({
+              xp: {
+                totalXp: 50,
+                verifiedXp: 40,
+                pendingXp: 10,
+                decayedXp: 0,
+                topicsCompleted: 1,
+                topicsVerified: 1,
+              },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          )
       );
 
       render(<SubscriptionScreen />, { wrapper: createWrapper() });
@@ -1328,9 +1445,7 @@ describe('SubscriptionScreen', () => {
         screen.getByTestId('child-paywall');
       });
       expect(
-        screen.getByText(
-          'You learned 1 topic and earned 50 XP — great work!'
-        )
+        screen.getByText('You learned 1 topic and earned 50 XP — great work!')
       ).toBeTruthy();
     });
   });
@@ -1346,11 +1461,19 @@ describe('SubscriptionScreen', () => {
     });
 
     function setupPaidTierWithTopUp() {
-      mockFetch.setRoute('/subscription', () =>
-        new Response(
-          JSON.stringify({ subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'plus', status: 'active' } }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
+      mockFetch.setRoute(
+        '/subscription',
+        () =>
+          new Response(
+            JSON.stringify({
+              subscription: {
+                ...DEFAULT_SUBSCRIPTION,
+                tier: 'plus',
+                status: 'active',
+              },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          )
       );
       mockOfferings = makeMockOfferings([makeMockPackage(), topUpPkg]);
     }
@@ -1379,11 +1502,19 @@ describe('SubscriptionScreen', () => {
     });
 
     it('shows graceful error when no topup package is in offerings', async () => {
-      mockFetch.setRoute('/subscription', () =>
-        new Response(
-          JSON.stringify({ subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'plus', status: 'active' } }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
+      mockFetch.setRoute(
+        '/subscription',
+        () =>
+          new Response(
+            JSON.stringify({
+              subscription: {
+                ...DEFAULT_SUBSCRIPTION,
+                tier: 'plus',
+                status: 'active',
+              },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          )
       );
       mockOfferings = makeMockOfferings([makeMockPackage()]);
 
@@ -1407,11 +1538,19 @@ describe('SubscriptionScreen', () => {
     });
 
     it('shows connection error with retry when offerings failed to load', async () => {
-      mockFetch.setRoute('/subscription', () =>
-        new Response(
-          JSON.stringify({ subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'plus', status: 'active' } }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
+      mockFetch.setRoute(
+        '/subscription',
+        () =>
+          new Response(
+            JSON.stringify({
+              subscription: {
+                ...DEFAULT_SUBSCRIPTION,
+                tier: 'plus',
+                status: 'active',
+              },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          )
       );
       mockOfferings = null;
       mockOfferingsError = true;

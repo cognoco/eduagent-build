@@ -102,7 +102,10 @@ jest.mock('../../../lib/platform-alert', () => ({
 let capturedRefetchInterval: number | false | undefined;
 
 jest.mock('../../../hooks/use-curriculum', () => ({
-  useCurriculum: (_subjectId: string, options?: { refetchInterval?: number | false }) => {
+  useCurriculum: (
+    _subjectId: string,
+    options?: { refetchInterval?: number | false }
+  ) => {
     capturedRefetchInterval = options?.refetchInterval;
     return {
       data: mockCurriculumIsLoading ? undefined : mockCurriculumData,
@@ -425,10 +428,19 @@ describe('CurriculumReviewScreen', () => {
     fireEvent.press(screen.getByTestId('explain-topic-1'));
     fireEvent.press(screen.getByTestId('curriculum-back'));
 
-    resolveExplain('Algebra is foundational for all other maths.');
-    await new Promise((r) => setTimeout(r, 0));
+    // Resolve the pending explain promise inside act() so that the finally-block
+    // state update (setExplainingTopicId(null)) is processed within the act
+    // boundary and doesn't trigger "not wrapped in act" warnings.
+    await act(async () => {
+      resolveExplain('Algebra is foundational for all other maths.');
+      await new Promise((r) => setTimeout(r, 0));
+    });
 
-    expect(screen.queryByText('Why this order?')).toBeNull();
+    // Assert on the modal container testID, NOT on "Why this order?" text:
+    // that text also appears in the explain button (when explainingTopicId is
+    // null), so queryByText would find the button and give a false failure even
+    // when the modal is correctly closed.
+    expect(screen.queryByTestId('why-modal')).toBeNull();
   });
 
   // [BUG-956] Curriculum generation polling — when curriculum is null (Inngest
