@@ -16,18 +16,6 @@ jest.mock('./retention', () => ({
   canRetestTopic: jest.fn().mockReturnValue(true),
 }));
 
-jest.mock('@eduagent/retention', () => ({
-  sm2: jest.fn().mockReturnValue({
-    card: {
-      easeFactor: 2.6,
-      interval: 6,
-      repetitions: 4,
-      lastReviewedAt: '2026-02-15T10:00:00.000Z',
-      nextReviewAt: '2026-02-21T10:00:00.000Z',
-    },
-  }),
-}));
-
 jest.mock('./adaptive-teaching', () => ({
   canExitNeedsDeepening: jest.fn(),
   checkNeedsDeepeningCapacity: jest

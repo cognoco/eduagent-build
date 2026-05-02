@@ -203,7 +203,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | ACCOUNT-01 | Create first profile | ✅ | Pass | | | Adult profile (age 20) created; landed on learner home with intent cards |
-| SUBJECT-08 | Language learning setup | 🚫 | Blocked | | | Interview fails before reaching language-setup screen (see SUBJECT-09 P1) |
+| SUBJECT-08 | Language learning setup | 🚫 | Blocked | | | Need to test — Italian onboarding via interview reached but no specific "language setup" screen surfaced; may need a different entry point |
 | ACCOUNT-19 | Consent request during underage profile creation | ✅ | Pass | | | Age 12 profile triggers consent screen correctly |
 | ACCOUNT-20 | Child handoff to parent consent request | ✅ | Pass | | | "My parent is here with me" option present on consent screen |
 | ACCOUNT-21 | Parent email entry, send / resend / change email | ✅ | Pass | | ✅ 05-01 | Send, resend, and change-email all work; masked email display correct. Self-email validation works — rejects child's own email with inline error. Inventory updated. |
@@ -221,17 +221,17 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| SUBJECT-01 | Create subject from learner home | 🚫 | Blocked | SUBJECT-09 | | All subject onboarding flows blocked — interview/LLM staging down |
-| SUBJECT-05 | Subject resolution + clarification suggestions | 🚫 | Blocked | | | Needs LLM |
-| SUBJECT-06 | Broad subject → pick a book | 🚫 | Blocked | | | Needs LLM |
-| SUBJECT-07 | Focused subject / focused-book flow | 🚫 | Blocked | | | Needs LLM |
-| SUBJECT-09 | Interview onboarding | 🚫 | Blocked | SUBJECT-09 P1 | | Filed earlier — staging interview saves fail |
-| SUBJECT-10 | Analogy-preference onboarding | 🚫 | Blocked | | | Needs interview to complete first |
-| SUBJECT-11 | Curriculum review | 🚫 | Blocked | | | Needs interview completion |
-| SUBJECT-12 | View curriculum without committing | 🚫 | Blocked | | | Needs interview completion |
-| SUBJECT-13 | Challenge curriculum (skip / add / explain ordering) | 🚫 | Blocked | | | Needs interview completion |
-| SUBJECT-14 | Placement / knowledge assessment | 🚫 | Blocked | | | Needs LLM |
-| SUBJECT-15 | Accommodation-mode onboarding (FR255) | 🚫 | Blocked | | | Needs interview completion |
+| SUBJECT-01 | Create subject from learner home | ✅ | Pass | | | 2026-05-02: Verified after streaming unblocked. Home → Learn intent card → /create-subject → typed "Italian language basics" → classifier suggested "Italian Language focused on Basics" → Accept → /onboarding/interview |
+| SUBJECT-05 | Subject resolution + clarification suggestions | ✅ | Pass | | | LLM resolution works: "This sounds like Italian Language focused on Basics — shall we go with that?" with Accept/Edit buttons rendered. POST /v1/subjects/resolve → 200. |
+| SUBJECT-06 | Broad subject → pick a book | ✅ | Pass | | | "Math" → book picker rendered 7 books (Foundations of Algebra, Geometry, Pre-Calc, Calc I/II, Linear Algebra, Probability/Stats) with emoji icons + descriptions. Tap → /shelf/{id}/book/{id}. |
+| SUBJECT-07 | Focused subject / focused-book flow | 🚫 | Blocked | | | Need separate test — focused-input branch differs from broad-pick (untested in this pass) |
+| SUBJECT-09 | Interview onboarding | ✅ | Pass | | | 2026-05-02: After durability-layer-fix deployed to staging, full interview verified. Step 1/4, multi-turn streaming worked, mentor responded with correct Italian phrase, page progress incremented 0→1→2, "I'm ready to start learning" envelope-driven button appeared and advanced to step 2. SUBJECT-09 P1 root cause was CORS Idempotency-Key gap (staging stale), now fixed. |
+| SUBJECT-10 | Analogy-preference onboarding | ✅ | Pass | | | Step 2/4 rendered with 7 options (No preference / Cooking / Sports / Building / Music / Nature / Gaming). Skip → advanced to step 3. |
+| SUBJECT-11 | Curriculum review | ⚠️ | Pass w/ issues | | | Step 4/4 reached and rendered ("Your Curriculum" / "Suggest changes" / "Add topic" / "Continue to home") but showed "Version 1 — 0 topics" after only 2 interview exchanges. Need to retest with fuller interview to see if topics populate. L3 inngest persist-curriculum may not have time to run when "Ready" is clicked too early. |
+| SUBJECT-12 | View curriculum without committing | 🚫 | Blocked | | | Need a session with topics first (SUBJECT-11 returned 0 topics) |
+| SUBJECT-13 | Challenge curriculum (skip / add / explain ordering) | 🚫 | Blocked | | | Need a session with topics first |
+| SUBJECT-14 | Placement / knowledge assessment | 🚫 | Blocked | | | Need to find the placement entry point — not part of standard 4-step interview flow |
+| SUBJECT-15 | Accommodation-mode onboarding (FR255) | ✅ | Pass | | | Step 3/4 "How do you learn best?" with 4 options (None / Short-Burst / Audio-First / Predictable) plus Continue/Skip. Skip → advanced to curriculum review. |
 
 ---
 
@@ -258,8 +258,8 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| LEARN-01 | Freeform chat (Ask intent card) | ❌ | Fail | [LEARN-01 P1](https://app.notion.com/p/LEARN-01-Freeform-chat-stream-returns-empty-response-AI-never-replies-3538bce91f7c814eba45d87c66611ff2) | | Stream endpoint returns 200 with empty body. AI never responds. Staging LLM integration appears down. |
-| LEARN-02 | Guided learning session from subject/topic | 🚫 | Blocked | | | Staging LLM down — same root cause as LEARN-01 and SUBJECT-09 |
+| LEARN-01 | Freeform chat (Ask intent card) | ❌ | Fail | [streamExchange threw 500](https://www.notion.so/Freeform-chat-session-returns-500-streamExchange-threw-3548bce91f7c81f1858ae805a0937f36) | | 2026-05-02: After CORS fix, freeform chat session POST → stream returns 500 `{"code":"INTERNAL_ERROR","message":"streamExchange threw"}`. Server-side error specific to no-subject-context path. Filed new bug. Original LEARN-01 P1 root cause (CORS) is fixed — this is a different bug surfaced by it. |
+| LEARN-02 | Guided learning session from subject/topic | 🚫 | Blocked | | | Need separate test pass — interview-bound stream works, need to verify post-onboarding /session route streams chunks for the standard learning loop |
 | LEARN-03 | First session experience | 🚫 | Blocked | | | Staging LLM down |
 | LEARN-04 | Core learning loop | 🚫 | Blocked | | | Staging LLM down |
 | LEARN-05 | Coach bubble visual variants (light/dark) | 🚫 | Blocked | | | Needs LLM response to render bubbles |

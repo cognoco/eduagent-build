@@ -39,14 +39,13 @@ tags:
     visible:
       text: "Subscription"
     timeout: 10000
-    optional: true
 
 # 6. Tap on subscription/billing
 - tapOn:
     text: "Subscription"
-    optional: true
 
 # 7. Fallback: look for billing text
+# optional: only fires if "Subscription" label does not exist — text varies by platform
 - tapOn:
     text: "Billing"
     optional: true
@@ -56,17 +55,14 @@ tags:
     visible:
       text: "Trial"
     timeout: 10000
-    optional: true
 
 # 9. Verify trial status is displayed
 - assertVisible:
     text: "trial"
-    optional: true
 
 # 10. Look for upgrade/subscribe option
 - assertVisible:
     text: "Upgrade"
-    optional: true
 
 # 11. Screenshot
 - takeScreenshot: subscription-flow-complete

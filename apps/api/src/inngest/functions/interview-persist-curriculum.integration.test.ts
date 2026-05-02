@@ -3,21 +3,25 @@ import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   accounts,
   createDatabase,
+  curricula,
+  curriculumTopics,
   generateUUIDv7,
   onboardingDrafts,
   profiles,
   subjects,
   type Database,
 } from '@eduagent/database';
-import { eq, and, like } from 'drizzle-orm';
+import { eq, like } from 'drizzle-orm';
 import { PersistCurriculumError } from '@eduagent/schemas';
 
-const mockExtractSignals = jest.fn();
-const mockPersistCurriculum = jest.fn();
-jest.mock('../../services/interview', () => ({
-  ...jest.requireActual('../../services/interview'),
-  extractSignals: (...args: unknown[]) => mockExtractSignals(...args),
-  persistCurriculum: (...args: unknown[]) => mockPersistCurriculum(...args),
+// ── LLM boundary mock ────────────────────────────────────────────────────────
+// routeAndCall is the true external boundary (provider API). Mock it here so
+// extractSignals and generateCurriculum run their real parsing/DB logic while
+// the network call is replaced with a deterministic fixture response.
+const mockRouteAndCall = jest.fn();
+jest.mock('../../services/llm', () => ({
+  ...(jest.requireActual('../../services/llm') as Record<string, unknown>),
+  routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
 }));
 
 const mockSendPush = jest.fn();
@@ -45,6 +49,32 @@ jest.mock('../client', () => ({
 
 import { inngest } from '../client';
 import { interviewPersistCurriculum } from './interview-persist-curriculum';
+
+// ── LLM fixture responses ────────────────────────────────────────────────────
+
+/** Valid JSON response for extractSignals (signal-extraction prompt) */
+const EXTRACT_SIGNALS_RESPONSE = JSON.stringify({
+  goals: ['Learn algebra'],
+  experienceLevel: 'beginner',
+  currentKnowledge: 'basic arithmetic',
+  interests: ['math', 'puzzles'],
+});
+
+/** Valid JSON array response for generateCurriculum (curriculum designer prompt) */
+const GENERATE_CURRICULUM_RESPONSE = JSON.stringify([
+  {
+    title: 'Introduction to Algebra',
+    description: 'Foundations of algebraic thinking',
+    relevance: 'core',
+    estimatedMinutes: 30,
+  },
+  {
+    title: 'Variables and Expressions',
+    description: 'Working with unknowns',
+    relevance: 'core',
+    estimatedMinutes: 45,
+  },
+]);
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -186,7 +216,10 @@ describe('interview-persist-curriculum integration', () => {
       extractedSignals: cached,
       exchangeHistory: [{ role: 'user', content: 'hi' }],
     });
-    mockPersistCurriculum.mockResolvedValue(undefined);
+    // Only generateCurriculum calls routeAndCall when signals are already cached.
+    mockRouteAndCall.mockResolvedValueOnce({
+      response: GENERATE_CURRICULUM_RESPONSE,
+    });
     mockSendPush.mockResolvedValue(undefined);
 
     const handler = getHandler();
@@ -195,14 +228,25 @@ describe('interview-persist-curriculum integration', () => {
       step: makeStep(),
     });
 
-    expect(mockExtractSignals).not.toHaveBeenCalled();
-    expect(mockPersistCurriculum).toHaveBeenCalled();
+    // extractSignals skipped → routeAndCall called exactly once (by generateCurriculum)
+    expect(mockRouteAndCall).toHaveBeenCalledTimes(1);
 
+    // Draft marked completed in the real DB
     const row = await db.query.onboardingDrafts.findFirst({
       where: eq(onboardingDrafts.id, draftId),
     });
     expect(row?.status).toBe('completed');
     expect(row?.failureCode).toBeNull();
+
+    // persistCurriculum ran for real: a curriculum row and topics exist
+    const curriculum = await db.query.curricula.findFirst({
+      where: eq(curricula.subjectId, subjectId),
+    });
+    expect(curriculum).toBeDefined();
+    const topics = await db.query.curriculumTopics.findMany({
+      where: eq(curriculumTopics.curriculumId, curriculum!.id),
+    });
+    expect(topics.length).toBeGreaterThan(0);
   });
 
   it('cache miss: empty signals triggers fresh extraction then persists', async () => {
@@ -221,14 +265,14 @@ describe('interview-persist-curriculum integration', () => {
         { role: 'assistant', content: 'Great choice!' },
       ],
     });
-    const freshSignals = {
-      goals: ['Learn algebra'],
-      experienceLevel: 'beginner',
-      currentKnowledge: '',
-      interests: ['math'],
-    };
-    mockExtractSignals.mockResolvedValue(freshSignals);
-    mockPersistCurriculum.mockResolvedValue(undefined);
+    // Call 1: extractSignals → returns signals JSON
+    mockRouteAndCall.mockResolvedValueOnce({
+      response: EXTRACT_SIGNALS_RESPONSE,
+    });
+    // Call 2: generateCurriculum → returns topics JSON
+    mockRouteAndCall.mockResolvedValueOnce({
+      response: GENERATE_CURRICULUM_RESPONSE,
+    });
     mockSendPush.mockResolvedValue(undefined);
 
     const handler = getHandler();
@@ -237,13 +281,32 @@ describe('interview-persist-curriculum integration', () => {
       step: makeStep(),
     });
 
-    expect(mockExtractSignals).toHaveBeenCalled();
+    // Both extractSignals and generateCurriculum called routeAndCall
+    expect(mockRouteAndCall).toHaveBeenCalledTimes(2);
 
+    // extractedSignals saved into the DB (the 'save-signals' step)
     const row = await db.query.onboardingDrafts.findFirst({
       where: eq(onboardingDrafts.id, draftId),
     });
     expect(row?.status).toBe('completed');
-    expect(row?.extractedSignals).toEqual(freshSignals);
+    const savedSignals = row?.extractedSignals as {
+      goals: string[];
+      experienceLevel: string;
+      currentKnowledge: string;
+      interests: string[];
+    };
+    expect(savedSignals.goals).toEqual(['Learn algebra']);
+    expect(savedSignals.interests).toContain('math');
+
+    // persistCurriculum ran for real: curriculum and topics in the DB
+    const curriculum = await db.query.curricula.findFirst({
+      where: eq(curricula.subjectId, subjectId),
+    });
+    expect(curriculum).toBeDefined();
+    const topics = await db.query.curriculumTopics.findMany({
+      where: eq(curriculumTopics.curriculumId, curriculum!.id),
+    });
+    expect(topics.length).toBeGreaterThan(0);
   });
 
   it('throws NonRetriableError when draft does not exist', async () => {
@@ -348,7 +411,10 @@ describe('interview-persist-curriculum integration', () => {
     const { draftId } = await seedDraft(profileId, subjectId, {
       extractedSignals: cached,
     });
-    mockPersistCurriculum.mockResolvedValue(undefined);
+    // Cached signals → only generateCurriculum calls routeAndCall
+    mockRouteAndCall.mockResolvedValueOnce({
+      response: GENERATE_CURRICULUM_RESPONSE,
+    });
     mockSendPush.mockRejectedValueOnce(new Error('Expo down'));
 
     const handler = getHandler();

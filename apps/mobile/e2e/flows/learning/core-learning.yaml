@@ -153,36 +153,31 @@ tags:
       id: "chat-input"
     timeout: 30000
 
-# 11. Session close — either auto-closes after exchange cap or manual
-# Look for summary screen or close button
-# NOTE: Session auto-close depends on exchange count config. If still active,
-# the flow verifies the session survived 3 exchanges without crashing.
+# 11. Session close — auto-closes after exchange cap (learning-active seed uses default cap)
+# 3 exchanges are enough to trigger the session close on this seed scenario.
 - extendedWaitUntil:
     visible:
       id: "summary-score"
     timeout: 20000
-    optional: true
 
-# 12. If summary screen appeared, verify content
+# 12. Verify summary content
 - assertVisible:
     id: "summary-topics"
-    optional: true
 
 # 13. Close summary and return to home
 - tapOn:
     id: "summary-close"
-    optional: true
 
 # 14. Verify we can reach home
 - extendedWaitUntil:
     visible:
       id: "learner-screen"
     timeout: 10000
-    optional: true
 
 # ── M05 post-session regression: tabs still tappable after session ────
 # After returning from a full session, the tab bar must remain functional.
 # BUG M05 found tabs hidden behind system buttons — this catches it.
+# optional: regression guard; depends on step 14 (learner-screen) succeeding first.
 - tapOn:
     id: "tab-library"
     optional: true

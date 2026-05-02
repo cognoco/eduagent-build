@@ -68,10 +68,9 @@ tags:
     visible:
       text: "daily question limit"
     timeout: 15000
-    # The error text may vary or render partially — optional safety
-    optional: true
 
 # 7b. Alternative: check for the shorter variant
+# optional: only fires if the full text above was rendered differently (partial render)
 - assertVisible:
     text: "Come back tomorrow"
     optional: true

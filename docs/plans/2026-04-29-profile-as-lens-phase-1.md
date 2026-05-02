@@ -1,8 +1,7 @@
 # Profile-as-Lens — Phase 1 Implementation Plan
 
 **Date:** 2026-04-29
-**Status:** Engineering-ready (revised 2026-04-29 after adversarial review)
-**Last status refresh:** 2026-05-01
+**Status:** Engineering-ready (revised 2026-05-02 after codebase reconciliation)
 **Spec:** [`docs/specs/2026-04-28-profile-as-lens.md`](../specs/2026-04-28-profile-as-lens.md)
 **Phase:** 1 of 3 (Foundation — no-regrets refactoring + microcopy + per-profile reporting on `/progress`)
 
@@ -70,26 +69,32 @@ Total estimated duration on the critical path: **~3 sprints (15–18 working day
 PR 1 cannot start without this audit. Findings shape the actual scope.
 
 - [ ] **Source inventory.** Grep `apps/mobile/src/app/(app)/child/[profileId]/` for components rendered today. List each section currently in `index.tsx`, `weekly-report/[id].tsx`, `report/[id].tsx`, `reports.tsx` with file:line references. Output a table mapping current location → proposed component name. Without this table, the "lift" is a rewrite under refactor branding.
-- [ ] **Hook audit.** For each hook the existing pages use (`useChildProfile`, `useWeeklyReport`, `useMonthlyReport`, `useGrowthChart`, etc.), confirm the signature already accepts `profileId` and does not embed guardian-role assumptions. If any hook is child-only, split it before the lift.
+- [ ] **Hook audit.** The existing hooks are `useChildDetail` and `useChildSessions` (in `use-dashboard.ts`), `useChildInventory`, `useChildProgressHistory`, and `useChildReports` (in `use-progress.ts`), and `useChildLearnerProfile` (in `use-learner-profile.ts`). All accept `profileId` as a parameter already. Confirm none embed guardian-role assumptions beyond the `Child` prefix. If any hook is child-only in behavior (not just naming), split it before the lift.
 - [ ] **State coverage audit (UX Resilience compliance).** For each component candidate, document the four required states: loading, error, empty, offline. Anything missing must be added in this PR — the components are about to mount on a second surface (`/progress`) where any dead-end state becomes much more visible.
 
 ### Files touched
 
-**New module:** `apps/mobile/src/components/reporting/`
+**Extend existing module:** `apps/mobile/src/components/progress/`
 
-The 8 component files below are the working set. Pre-flight discovery may merge or split entries; final count is locked at the end of Day 1 and recorded in the PR description.
+> **2026-05-02 reconciliation:** The plan originally proposed a new `components/reporting/` directory, but `components/progress/` already exists and exports `GrowthChart`, `SubjectCard`, `MilestoneCard`, `RetentionSignal`, `ProgressBar`, `RemediationCard`. The child profile page (`child/[profileId]/index.tsx`) already imports `GrowthChart` and `SubjectCard` from there. New reporting components should be added to this existing module rather than creating a parallel directory.
 
+The component files below are the working set. `GrowthChart` and `SubjectCard` are already shared — they stay as-is. Pre-flight discovery may merge or split the remaining entries; final count is locked at the end of Day 1 and recorded in the PR description.
+
+**Already shared (no lift needed):**
+- `GrowthChart.tsx` (already in `components/progress/`)
+- `SubjectCard.tsx` (already in `components/progress/`)
+
+**To extract into `components/progress/`:**
 - `WeeklyReportCard.tsx` + `WeeklyReportCard.test.tsx`
 - `MonthlyReportCard.tsx` + `MonthlyReportCard.test.tsx`
 - `ReportsListCard.tsx` + `ReportsListCard.test.tsx` (lists weekly + monthly snapshots)
-- `GrowthChart.tsx` + `GrowthChart.test.tsx`
 - `RecentSessionsList.tsx` + `RecentSessionsList.test.tsx`
 - `MasteredTopicsByLevel.tsx` + `MasteredTopicsByLevel.test.tsx`
 - `VocabularySummary.tsx` + `VocabularySummary.test.tsx`
 - `StreakBadge.tsx` + `StreakBadge.test.tsx`
-- `index.ts` (barrel re-exports)
+- Update `index.ts` barrel with new re-exports
 
-**Existing files become thin wrappers** (import from `components/reporting/`, supply `profileId` from URL, add page chrome):
+**Existing files become thin wrappers** (import from `components/progress/`, supply `profileId` from URL, add page chrome):
 - `apps/mobile/src/app/(app)/child/[profileId]/index.tsx`
 - `apps/mobile/src/app/(app)/child/[profileId]/weekly-report/[weeklyReportId].tsx`
 - `apps/mobile/src/app/(app)/child/[profileId]/report/[reportId].tsx`
@@ -97,7 +102,7 @@ The 8 component files below are the working set. Pre-flight discovery may merge 
 
 ### Component API contract
 
-Each component takes `profileId: string` as a required prop. Components fetch their own data via existing hooks (`useWeeklyReport(profileId)`, `useGrowthChart(profileId)`, etc.) — they should never derive `profileId` from URL params themselves.
+Each component takes `profileId: string` as a required prop. Components fetch their own data via existing hooks (`useChildReports(profileId)`, `useChildProgressHistory(profileId)`, etc.) — they should never derive `profileId` from URL params themselves.
 
 ```tsx
 type ReportingComponentProps = {
@@ -109,7 +114,7 @@ The previously-proposed `context?: 'self' | 'child'` prop is **removed** (advers
 
 ### Data-loading strategy
 
-Eight components mounting on `/progress` would otherwise trigger eight uncoordinated fetches and produce a "popcorn" load with isolated error UI per card.
+Multiple new components mounting on `/progress` would otherwise trigger uncoordinated fetches and produce a "popcorn" load with isolated error UI per card. (`GrowthChart` and `SubjectCard` already mount there — only the newly-lifted report components add fetch fanout.)
 
 - **Suspense boundary at the consumer level.** `/progress` and `/child/[id]` each wrap the report stack in a single `<Suspense fallback={<ReportStackSkeleton />}>` so cards appear together.
 - **Shared error boundary.** A single `<ReportingErrorBoundary>` wraps the stack with a "Couldn't load reports — Retry / Go home" fallback, conforming to the UX Resilience standard error pattern.
@@ -128,7 +133,7 @@ Per-component test floor: render with valid data, render in loading state, rende
 
 | Criterion | Verified by |
 |---|---|
-| All reporting components live under `apps/mobile/src/components/reporting/` with co-located tests; final count (≤8) recorded in PR description after pre-flight audit. | `manual: PR description lists each component with source file:line.` |
+| All new reporting components live under `apps/mobile/src/components/progress/` (extending existing module) with co-located tests; final count (≤7 new, excluding already-shared `GrowthChart`/`SubjectCard`) recorded in PR description after pre-flight audit. | `manual: PR description lists each component with source file:line.` |
 | `/child/[profileId]/index.tsx`, `/weekly-report/[id].tsx`, `/report/[id].tsx`, `/reports.tsx` render identically before and after PR 1 in isolation (PR 4 lands AFTER PR 1). | `test: visual snapshot tests, baseline = pre-PR-1 main.` |
 | All existing tests pass. | `pnpm exec nx run mobile:test --findRelatedTests <changed files>` |
 | Component API contract: each component takes `profileId` as required prop; no internal URL-param reading; no `context` prop. | `test: per-component test imports component and asserts prop types.` |
@@ -151,7 +156,7 @@ Per-component test floor: render with valid data, render in loading state, rende
 - **Hook coupling.** Pre-flight audit catches this on Day 1.
 - **Persona styling.** Memory `project_persona_removal.md` says personaType is removed and tokens are flat by colorScheme — components should already be persona-unaware. Confirm during lift.
 - **Test reorganization is fiddly.** Plan for ~30% of time on test split + retained integration coverage.
-- **Eight-into-one fetch fanout** stays as-is for PR 1; logged as Phase 2 concern.
+- **Fetch fanout** stays as-is for PR 1; logged as Phase 2 concern. Reduced vs. original plan since `GrowthChart` and `SubjectCard` are already shared.
 
 ## PR 2 — Per-Profile Quota Endpoint + Owner Breakdown
 
@@ -397,23 +402,23 @@ function ProgressTab() {
 
 ## PR 4 — Microcopy Pass
 
-**Goal:** Sentence case + uppercase ban + form-context branching + scaling cross-links. Closes BUG-900 (Add Child wrong pronouns), BUG-909 (Learning Mode unlabeled).
+**Goal:** Sentence case + uppercase ban + form-context branching + scaling cross-links. Closes BUG-900 (Add Child wrong pronouns). Completes BUG-909 (Learning Mode unlabeled — owner-scope prefix already shipped, uppercase removal remaining).
 
 **Effort:** ~1.5 days. **Blocks on PR 1** (PR 1 turns the `/child/[profileId]/*` files into thin wrappers that PR 4 also edits — landing PR 4 first would force PR 1 to re-rebase microcopy and would invalidate PR 1's "snapshot diff = zero" acceptance criterion).
 
 ### Pre-flight discovery
 
-- [ ] **Source of `familyLinks` in More.** Grep `apps/mobile/src/app/(app)/more.tsx` for any existing family/profile context or hook. If the cross-link section needs `familyLinks` and `childName`, document which hook (`useFamilyLinks`, `useFamily`, etc.) supplies them. If neither exists on More today, scope the wiring as part of PR 4.
+- [x] **Source of `linkedChildren` in More.** ~~Grep for `useFamilyLinks` or `useFamily`.~~ **2026-05-02: Resolved.** `more.tsx:402-404` already computes `linkedChildren` from `useProfile()`: `const linkedChildren = activeProfile?.isOwner ? profiles.filter((p) => p.id !== activeProfile.id && !p.isOwner) : []`. No `useFamilyLinks` hook exists or is needed — use this existing pattern for the cross-link section.
 - [ ] **Repo-wide `uppercase` audit.** Run `Grep` for `\\buppercase\\b` and `text-transform:\\s*uppercase` across `apps/mobile/src/`. Categorize every hit into: (a) user-facing copy → fix in this PR, (b) brand/logo asset → exempt, (c) third-party component prop → leave alone. Output the categorized list in PR description before code changes.
 
 ### Files touched
 
-- `apps/mobile/src/app/(app)/more.tsx` — uppercase headers → sentence case; add owner-scope prefix; cross-link section
+- `apps/mobile/src/app/(app)/more.tsx` — uppercase headers → sentence case (owner-scope prefix already present on Learning Mode + Accommodation since BUG-909 partial fix); cross-link section; remaining sections need owner prefix
 - `apps/mobile/src/app/(app)/child/[profileId]/index.tsx` — owner-scope prefix with child name (post-PR-1 thin wrapper)
 - `apps/mobile/src/app/create-profile.tsx` — branch on `?for=child` URL param for pronouns
 - `apps/mobile/src/app/(app)/subscription.tsx` — uppercase headers → sentence case
 - `apps/mobile/src/app/(app)/child/[profileId]/reports.tsx` — fix monthly empty-state redundant text (closes BUG-904)
-- `apps/mobile/src/components/reporting/WeeklyReportCard.tsx` — suppress "up from 0 last week" when both values are zero (closes BUG-903) — note: post-PR-1 lift, this fix lands in the lifted component, not the page wrapper
+- `apps/mobile/src/components/progress/WeeklyReportCard.tsx` — suppress "up from 0 last week" when both values are zero (closes BUG-903) — note: post-PR-1 lift, this fix lands in the lifted component, not the page wrapper
 - `apps/mobile/src/lib/navigation.ts` — add `FAMILY_HOME_PATH` constant (set to `/dashboard` in Phase 1; flips to `/family` later if Phase 2 ships)
 - All test files for the above
 
@@ -426,13 +431,24 @@ For every `tracking-wider uppercase` or `text-transform: uppercase` style on use
 (The "diacritic-bearing strings" check from the prior draft is removed — it was unrelated to uppercase/sentence-case and confused the rule.)
 
 For owner-scoped section headers:
-- `LEARNING MODE` (parent's own More) → `Your learning mode`
-- `LEARNING ACCOMMODATION` (parent's own More) → `Your learning accommodation`
-- `CELEBRATIONS` (parent's own More) → `Your celebrations`
+
+> **2026-05-02 reconciliation:** Learning Mode and Learning Accommodation headers already render `{displayName}'s Learning Mode` / `{displayName}'s Learning Accommodation` with contextual subtitles (BUG-909 partial fix). PR 4's remaining work for these two is removing `uppercase tracking-wider` styling only. The other sections still need both the owner-scope prefix AND the case fix.
+
+**Already owner-scoped (remove `uppercase tracking-wider` only):**
+- `{displayName}'s Learning Mode` (parent's own More, line 432) → remove uppercase class
+- `{displayName}'s Learning Accommodation` (parent's own More, line 456) → remove uppercase class
+
+**Need owner-scope prefix + case fix:**
+- `What My Mentor Knows` (parent's own More, line 482) → `What your mentor knows`
+- `Celebrations` (parent's own More, line 525) → `Your celebrations`
 - `LEARNING ACCOMMODATION` (on `/child/[id]`) → `{Child name}'s learning accommodation`
-- `WHAT MY MENTOR KNOWS` (parent's own More) → `What your mentor knows`
 - `MENTOR MEMORY` (on `/child/[id]`) → `{Child name}'s mentor memory`
-- `FAMILY` (parent's own More) → `Family` (still works as section divider)
+
+**Need case fix only (no owner prefix needed):**
+- `Family` (parent's own More, line 493) → `Family` (remove uppercase class)
+- `Notifications` (parent's own More, line 578) → `Notifications` (remove uppercase class)
+- `Account` (parent's own More, line 595) → `Account` (remove uppercase class)
+- `Other` (parent's own More, line 639) → `Other` (remove uppercase class)
 - All other ALL-CAPS section headers across the app: replaced with sentence case
 
 ### Form context branching
@@ -452,7 +468,7 @@ const dobPlaceholderHint = isAddingChild
   : 'Enter your birth date as YYYY-MM-DD.';
 ```
 
-Update the call site in `apps/mobile/src/app/(app)/more.tsx`'s "Add a child profile" button to navigate with `?for=child`:
+Update the call site in `apps/mobile/src/app/(app)/more.tsx`'s `handleAddChild` (line 399, currently `router.push('/create-profile')`) to navigate with `?for=child`:
 
 ```tsx
 router.push('/create-profile?for=child');
@@ -460,20 +476,20 @@ router.push('/create-profile?for=child');
 
 ### Cross-link rule
 
-Below `Your learning mode` section in More. Source dependencies (`familyLinks`, `childName`) come from `useFamilyLinks()` (existing hook — verify in pre-flight; if missing, wire it up).
+Below `Your learning mode` section in More. Uses the existing `linkedChildren` array (already computed at `more.tsx:402-404` from `useProfile()`). No new hook needed.
+
+> **2026-05-02 reconciliation:** The plan originally called for a `useFamilyLinks()` hook. This hook does not exist, and the existing `linkedChildren` pattern from `useProfile()` already provides what's needed. A contextual subtitle already exists at lines 435-437 ("Applies to your own sessions. To change a child's, open their profile from the dashboard.") — the cross-link below extends this with a tappable navigation target.
 
 ```tsx
-import { useFamilyLinks } from '@/hooks/use-family-links';
 import { FAMILY_HOME_PATH } from '@/lib/navigation';
 
-const { links } = useFamilyLinks();
-const children = links.filter(l => l.role === 'learner');
+// linkedChildren already computed above from useProfile()
 
-if (children.length === 1) {
-  const childName = children[0].displayName;
-  return <Link href={`/child/${children[0].profileId}`}>To change {childName}'s preferences, open their profile →</Link>;
+if (linkedChildren.length === 1) {
+  const child = linkedChildren[0];
+  return <Link href={`/child/${child.id}`}>To change {child.displayName}'s preferences, open their profile →</Link>;
 }
-if (children.length >= 2) {
+if (linkedChildren.length >= 2) {
   return <Link href={FAMILY_HOME_PATH}>To change a child's preferences, open Family →</Link>;
 }
 // Zero children: no link
@@ -531,7 +547,7 @@ The custom test fails immediately on every offending file in `apps/mobile/src/ap
 
 | State | Trigger | User sees | Recovery |
 |---|---|---|---|
-| `useFamilyLinks` errors | API 5xx on More open | Cross-link section is silently hidden (it is decorative) and an inline note "Couldn't load family — pull to refresh" replaces it | Pull-to-refresh refetches |
+| `linkedChildren` empty despite children existing | `useProfile()` returns stale profiles cache | Cross-link section is silently hidden (it is decorative) | Pull-to-refresh invalidates profiles query |
 | `?for=child` param missing on direct deep-link | User shares Add-a-child URL | Default copy (first-person) renders — copy is wrong but flow works; CTA still creates a profile | None needed; URL pattern internal-only |
 | Child has no `displayName` | New child not yet named | Cross-link uses generic "your child" instead of the name | Profile completion flow elsewhere |
 
@@ -648,3 +664,4 @@ Total: 7 + 6 + 3 = 16. Reconciled.
 
 - **2026-04-29 v1:** Initial draft.
 - **2026-04-29 v2:** Adversarial-review revision. Added PR 0 (analytics groundwork). Re-sequenced PR 4 to land after PR 1 (file-overlap fix). Replaced `hasOwnSessions` with stale-profile heuristic. Removed premature `context` prop. Added Failure Modes tables, Verified-by columns, Rollback section for potential PR 2 migration. Hardened privacy guard (aggregate suppression for ≥2 siblings). Specified ISO 8601 + server-formatted labels for `renews_at`/`resets_at`. Replaced "ESLint or grep" with a concrete custom Jest test. Made Phase 2 gate operationally defined. Reconciled audit-bug arithmetic. Estimate revised from 1.5 to ~3 sprints.
+- **2026-05-02 v3:** Codebase reconciliation pass. Key corrections: (1) PR 1 target changed from new `components/reporting/` to extending existing `components/progress/` (already exports `GrowthChart`, `SubjectCard`, etc.); `GrowthChart`/`SubjectCard` removed from lift list since already shared. (2) Hook names corrected to actual names: `useChildDetail`, `useChildSessions`, `useChildInventory`, `useChildProgressHistory`, `useChildReports`, `useChildLearnerProfile`. (3) PR 4 BUG-909 scope reduced — Learning Mode and Learning Accommodation headers already owner-prefixed with `{displayName}'s`; remaining work is uppercase removal + other sections. (4) `useFamilyLinks()` hook replaced with existing `linkedChildren` pattern from `useProfile()`. (5) Failure mode for cross-link updated from hook error to stale profiles cache. (6) Contextual subtitle at lines 435-437 already partially covers cross-link intent — noted.

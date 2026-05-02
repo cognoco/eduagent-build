@@ -52,7 +52,6 @@ tags:
 # 6. Verify the recall prompt is shown
 - assertVisible:
     text: "what you remember"
-    optional: true
 
 # 7. Enter answer
 - tapOn:
