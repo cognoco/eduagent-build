@@ -125,7 +125,7 @@ tags:
 
 # 12. Add first subject via Learn intent card (replaced add-subject-button)
 - tapOn:
-    id: "intent-learn"
+    id: "home-action-study-new"
     optional: true
 
 # 13. Subject creation modal visible

@@ -95,11 +95,11 @@ tags:
 
 # Verify the intent card stack exists (replaced add-subject-button + coaching card)
 - assertVisible:
-    id: "learner-intent-stack"
+    id: "home-subject-carousel"
 
 # Verify "Learn" intent card is visible (always-present, replaces add-subject-button)
 - assertVisible:
-    id: "intent-learn"
+    id: "home-action-study-new"
 
 - takeScreenshot: 03-home-subjects-visible
 

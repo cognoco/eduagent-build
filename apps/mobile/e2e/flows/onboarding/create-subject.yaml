@@ -20,14 +20,14 @@ tags:
 
 # The home screen should show the intent card stack
 - assertVisible:
-    id: "learner-intent-stack"
+    id: "home-subject-carousel"
 
 - takeScreenshot: subject-01-home-with-intent-cards
 
 # Tap "Learn" intent card → navigates to /create-subject
 # (replaced add-subject-button which was removed from home screen)
 - tapOn:
-    id: "intent-learn"
+    id: "home-action-study-new"
 
 # The create-subject screen should appear (autoFocus opens keyboard,
 # pushing "New subject" heading above fold on small screens — BUG-60 side effect).

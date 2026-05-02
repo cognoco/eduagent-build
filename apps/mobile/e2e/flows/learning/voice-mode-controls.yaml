@@ -24,9 +24,9 @@ tags:
       id: "learner-screen"
     timeout: 15000
 
-# 3. Start a learning session via intent card (replaced coaching-card-primary)
+# 3. Start a learning session via coach band continue
 - tapOn:
-    id: "intent-continue"
+    id: "home-coach-band-continue"
 
 # 4. Session screen loads
 - extendedWaitUntil:

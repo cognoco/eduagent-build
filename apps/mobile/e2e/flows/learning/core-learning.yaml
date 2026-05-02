@@ -62,23 +62,23 @@ tags:
     timeout: 5000
 
 # ── M07 regression: home screen has real content (not empty) ──────────
-# Verify intent card stack loaded — catches blank home screen.
+# Verify subject carousel loaded — catches blank home screen.
 - assertVisible:
-    id: "learner-intent-stack"
+    id: "home-subject-carousel"
 
-# Intent-continue proves the user has an active subject (learning-active seed)
+# Coach band proves the user has an active subject (learning-active seed)
 - assertVisible:
-    id: "intent-continue"
+    id: "home-coach-band-continue"
 
 # ── Negative assertions: empty state must not appear ───────────────────
 # Full text match required — Maestro on Android can't reliably match substrings
 # inside React Native <Text> nodes (BUG-57 pattern).
 - assertNotVisible:
-    text: "Start learning — add your first subject"
+    text: "Add your first subject"
 
-# 3. Start session via intent-continue card (replaced coaching-card-primary)
+# 3. Start session via coach band continue button
 - tapOn:
-    id: "intent-continue"
+    id: "home-coach-band-continue"
 
 # 4. Session active — chat input present
 - extendedWaitUntil:

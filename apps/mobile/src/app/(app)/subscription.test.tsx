@@ -177,10 +177,17 @@ let mockActiveProfile: {
 // Test helpers
 // ---------------------------------------------------------------------------
 
-function createWrapper() {
+function createWrapper(opts?: { seedCache?: boolean }) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
+  if (opts?.seedCache) {
+    queryClient.setQueryData(
+      ['subscription', mockActiveProfile.id],
+      DEFAULT_SUBSCRIPTION
+    );
+    queryClient.setQueryData(['usage', mockActiveProfile.id], DEFAULT_USAGE);
+  }
   return function Wrapper({ children }: { children: React.ReactNode }) {
     return React.createElement(
       QueryClientProvider,
@@ -458,7 +465,9 @@ describe('SubscriptionScreen', () => {
 
     mockOfferings = makeMockOfferings([monthlyPkg, annualPkg]);
 
-    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+    render(<SubscriptionScreen />, {
+      wrapper: createWrapper({ seedCache: true }),
+    });
 
     await waitFor(() => {
       screen.getByTestId('offerings-section');

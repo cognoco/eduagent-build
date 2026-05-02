@@ -38,7 +38,7 @@ tags:
 # ── Visual integrity: intent card stack ────────────────────────────────
 # With active subjects, the intent cards must render (not loading spinner forever).
 - assertVisible:
-    id: "learner-intent-stack"
+    id: "home-subject-carousel"
 
 # 3. Screenshot: home screen — captures what's actually rendering
 - takeScreenshot: multi-subject-01-home

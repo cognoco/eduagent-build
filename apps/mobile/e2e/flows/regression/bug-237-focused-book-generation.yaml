@@ -31,7 +31,7 @@ tags:
     id: "tab-home"
     optional: true
 - tapOn:
-    id: "intent-learn"
+    id: "home-action-study-new"
     optional: true
 
 # 3. Type a specific topic

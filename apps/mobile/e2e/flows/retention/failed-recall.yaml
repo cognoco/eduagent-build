@@ -37,11 +37,11 @@ tags:
 
 # 3. Intent card stack should be visible (replaced coaching card)
 - assertVisible:
-    id: "learner-intent-stack"
+    id: "home-subject-carousel"
 
 # 4. Tap intent-continue to start recall (handles review-due topics)
 - tapOn:
-    id: "intent-continue"
+    id: "home-coach-band-continue"
     optional: true
 
 # 5. If coaching card didn't navigate, try direct recall prompt

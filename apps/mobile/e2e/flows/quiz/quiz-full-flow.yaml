@@ -33,12 +33,12 @@ tags:
 
 - scrollUntilVisible:
     element:
-      id: "intent-practice"
+      id: "home-action-practice"
     direction: DOWN
     timeout: 5000
 
 - tapOn:
-    id: "intent-practice"
+    id: "home-action-practice"
 
 - extendedWaitUntil:
     visible:

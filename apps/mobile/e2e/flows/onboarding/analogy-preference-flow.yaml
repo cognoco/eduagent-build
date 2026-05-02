@@ -29,7 +29,7 @@ tags:
 # intent-learn card navigates directly to /create-subject (replaced add-subject-button
 # which was removed from home screen during adaptive home refactor)
 - tapOn:
-    id: "intent-learn"
+    id: "home-action-study-new"
 
 # autoFocus opens keyboard, pushing "New subject" heading above fold (BUG-60 side effect)
 - extendedWaitUntil:

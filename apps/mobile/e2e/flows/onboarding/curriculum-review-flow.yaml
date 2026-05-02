@@ -30,7 +30,7 @@ tags:
 # ── Create a new subject to enter the onboarding funnel ────────────────
 # intent-learn navigates directly to /create-subject (replaced add-subject-button)
 - tapOn:
-    id: "intent-learn"
+    id: "home-action-study-new"
 
 - extendedWaitUntil:
     visible:

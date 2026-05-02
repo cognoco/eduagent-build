@@ -30,7 +30,7 @@ tags:
 
 # 3. Start session via intent card (replaced coaching-card-primary)
 - tapOn:
-    id: "intent-continue"
+    id: "home-coach-band-continue"
 
 # 4. Session active — chat input present
 - extendedWaitUntil:

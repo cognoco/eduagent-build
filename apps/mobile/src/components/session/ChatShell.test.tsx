@@ -150,17 +150,21 @@ describe('ChatShell', () => {
   // [BUG-887] On small phones (Galaxy S10e ~5.8") the Text/Voice mode
   // toggle eats vertical space the composer needs when the soft keyboard
   // opens. Onboarding interview opts in to hide the toggle.
-  it('renders the input mode toggle by default [BUG-887]', () => {
+  it('hides the input mode toggle by default [BUG-887]', () => {
     renderChatShell();
+    expect(screen.queryByTestId('input-mode-toggle')).toBeNull();
+    screen.getByTestId('chat-input');
+    screen.getByTestId('send-button');
+  });
+
+  it('shows the input mode toggle when hideInputModeToggle is false [BUG-887]', () => {
+    renderChatShell({ hideInputModeToggle: false });
     screen.getByTestId('input-mode-toggle');
   });
 
-  it('hides the input mode toggle when hideInputModeToggle is true [BUG-887]', () => {
-    renderChatShell({ hideInputModeToggle: true });
-    expect(screen.queryByTestId('input-mode-toggle')).toBeNull();
-    // Composer itself is still rendered.
-    screen.getByTestId('chat-input');
-    screen.getByTestId('send-button');
+  it('renders mic button in the input row when not in voice mode', () => {
+    renderChatShell();
+    screen.getByTestId('voice-record-button');
   });
 
   it('uses the explicit fallback route when backBehavior is replace', () => {
@@ -245,10 +249,10 @@ describe('ChatShell', () => {
       expect(toggle.props.accessibilityState.checked).toBe(true);
     });
 
-    it('does NOT show voice record button when voice is OFF (standard session)', () => {
+    it('shows compact mic button in input row when voice is OFF (standard session)', () => {
       renderChatShell({ verificationType: undefined });
 
-      expect(screen.queryByTestId('voice-record-button')).toBeNull();
+      screen.getByTestId('voice-record-button');
     });
 
     it('shows voice record button when voice is ON (teach_back)', () => {
@@ -260,10 +264,10 @@ describe('ChatShell', () => {
     it('shows mic button after toggling voice ON in standard session', () => {
       renderChatShell({ verificationType: undefined });
 
-      // Voice is OFF by default — no mic button
-      expect(screen.queryByTestId('voice-record-button')).toBeNull();
+      // Mic button always present (compact mic-in-pill)
+      screen.getByTestId('voice-record-button');
 
-      // Toggle voice ON
+      // Toggle voice ON — mic button stays visible (full VoiceRecordButton)
       fireEvent.press(screen.getByTestId('voice-toggle'));
 
       screen.getByTestId('voice-record-button');
@@ -717,6 +721,7 @@ describe('ChatShell', () => {
     it('suppresses TTS when screen reader becomes active mid-session', async () => {
       renderChatShell({
         verificationType: 'teach_back',
+        hideInputModeToggle: false,
         messages: [
           { id: 'ai-1', role: 'assistant', content: 'Hello learner!' },
         ],
@@ -865,6 +870,7 @@ describe('ChatShell', () => {
     it('transitions from auto to manual TTS when screen reader detected', async () => {
       renderChatShell({
         verificationType: 'teach_back',
+        hideInputModeToggle: false,
         messages: [{ id: 'ai-1', role: 'assistant', content: 'First message' }],
       });
 
@@ -1261,6 +1267,46 @@ describe('ChatShell', () => {
       });
 
       expect(onSend).toHaveBeenCalledWith('hello');
+    });
+  });
+
+  describe('escalation rung strip', () => {
+    it('renders the rung strip when pedagogicalState is provided', () => {
+      const { getByTestId, getByText } = renderChatShell({
+        pedagogicalState: {
+          rung: 2,
+          phase: 'BUILDING',
+          exchangesUsed: 2,
+          exchangesMax: 4,
+        },
+      });
+      expect(getByTestId('escalation-rung-strip')).toBeTruthy();
+      expect(getByText(/RUNG 2/)).toBeTruthy();
+      expect(getByText(/BUILDING/)).toBeTruthy();
+      expect(getByText(/2 of 4/)).toBeTruthy();
+    });
+
+    it('falls back to subtitle when pedagogicalState is absent', () => {
+      const { queryByTestId, getByText } = renderChatShell({
+        subtitle: "I'm here to help",
+      });
+      expect(queryByTestId('escalation-rung-strip')).toBeNull();
+      expect(getByText("I'm here to help")).toBeTruthy();
+    });
+  });
+
+  describe('memory chip', () => {
+    it('renders the memory chip when memoryHint is provided', () => {
+      const { getByTestId, getByText } = renderChatShell({
+        memoryHint: "Last week you mixed up the sign — I'll watch for that.",
+      });
+      expect(getByTestId('chat-memory-hint')).toBeTruthy();
+      expect(getByText(/mixed up the sign/)).toBeTruthy();
+    });
+
+    it('does not render memory chip when memoryHint is absent', () => {
+      const { queryByTestId } = renderChatShell({});
+      expect(queryByTestId('chat-memory-hint')).toBeNull();
     });
   });
 });

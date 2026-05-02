@@ -48,7 +48,7 @@ tags:
 
 # ── 3. Verify intent card stack is loaded (replaced coaching card) ──
 - assertVisible:
-    id: "learner-intent-stack"
+    id: "home-subject-carousel"
 
 # ── 4. Verify both active subjects are shown in subject list ──────────
 - scrollUntilVisible:

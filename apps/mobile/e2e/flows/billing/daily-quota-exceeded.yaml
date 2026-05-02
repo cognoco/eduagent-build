@@ -37,7 +37,7 @@ tags:
 
 # 3. Navigate to the active session via intent card (replaced coaching-card-primary)
 - tapOn:
-    id: "intent-continue"
+    id: "home-coach-band-continue"
     # Intent card may not render if no active subject
     optional: true
 

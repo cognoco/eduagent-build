@@ -15,7 +15,7 @@ export default [
   ...nx.configs['flat/typescript'],
   ...nx.configs['flat/javascript'],
   {
-    ignores: ['**/dist', '**/out-tsc', '**/coverage', '**/.nx', '**/.wrangler'],
+    ignores: ['**/dist', '**/out-tsc', '**/coverage', '**/.nx', '**/.wrangler', 'design_handoff_ui_improvements/**'],
   },
   // React/Expo config for mobile app (with deprecated rule filtered out)
   {
