@@ -7,30 +7,30 @@ import {
 
 describe('curriculumTopics schema', () => {
   it('has filedFrom column', () => {
-    expect(curriculumTopics.filedFrom).toBeDefined();
+    expect(curriculumTopics).toHaveProperty('filedFrom');
   });
 
   it('has sessionId column', () => {
-    expect(curriculumTopics.sessionId).toBeDefined();
+    expect(curriculumTopics).toHaveProperty('sessionId');
   });
 });
 
 describe('bookSuggestions schema', () => {
   it('has required columns', () => {
-    expect(bookSuggestions.id).toBeDefined();
-    expect(bookSuggestions.subjectId).toBeDefined();
-    expect(bookSuggestions.title).toBeDefined();
-    expect(bookSuggestions.emoji).toBeDefined();
-    expect(bookSuggestions.description).toBeDefined();
-    expect(bookSuggestions.pickedAt).toBeDefined();
+    expect(bookSuggestions).toHaveProperty('id');
+    expect(bookSuggestions).toHaveProperty('subjectId');
+    expect(bookSuggestions).toHaveProperty('title');
+    expect(bookSuggestions).toHaveProperty('emoji');
+    expect(bookSuggestions).toHaveProperty('description');
+    expect(bookSuggestions).toHaveProperty('pickedAt');
   });
 });
 
 describe('topicSuggestions schema', () => {
   it('has required columns', () => {
-    expect(topicSuggestions.id).toBeDefined();
-    expect(topicSuggestions.bookId).toBeDefined();
-    expect(topicSuggestions.title).toBeDefined();
-    expect(topicSuggestions.usedAt).toBeDefined();
+    expect(topicSuggestions).toHaveProperty('id');
+    expect(topicSuggestions).toHaveProperty('bookId');
+    expect(topicSuggestions).toHaveProperty('title');
+    expect(topicSuggestions).toHaveProperty('usedAt');
   });
 });

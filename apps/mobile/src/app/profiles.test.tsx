@@ -117,11 +117,11 @@ describe('ProfilesScreen', () => {
 
     render(<ProfilesScreen />);
 
-    expect(screen.getByText('No profiles yet')).toBeTruthy();
+    screen.getByText('No profiles yet');
     expect(
       screen.getByText('Create your first profile to get started')
     ).toBeTruthy();
-    expect(screen.getByTestId('profiles-create-first')).toBeTruthy();
+    screen.getByTestId('profiles-create-first');
   });
 
   it('renders profile list with active checkmark', () => {
@@ -134,10 +134,10 @@ describe('ProfilesScreen', () => {
 
     render(<ProfilesScreen />);
 
-    expect(screen.getByTestId('profile-row-owner-id')).toBeTruthy();
-    expect(screen.getByTestId('profile-row-child-id')).toBeTruthy();
-    expect(screen.getByText('Alex')).toBeTruthy();
-    expect(screen.getByTestId('profile-active-check')).toBeTruthy();
+    screen.getByTestId('profile-row-owner-id');
+    screen.getByTestId('profile-row-child-id');
+    screen.getByText('Alex');
+    screen.getByTestId('profile-active-check');
   });
 
   it('shows confirmation before switching from owner to child', async () => {
@@ -152,8 +152,8 @@ describe('ProfilesScreen', () => {
 
     fireEvent.press(screen.getByTestId('profile-row-child-id'));
 
-    expect(screen.getByTestId('proxy-confirm-modal')).toBeTruthy();
-    expect(screen.getByText("Viewing Alex's account")).toBeTruthy();
+    screen.getByTestId('proxy-confirm-modal');
+    screen.getByText("Viewing Alex's account");
     expect(mockSwitchProfile).not.toHaveBeenCalled();
 
     fireEvent.press(screen.getByTestId('proxy-confirm-view'));
@@ -178,7 +178,7 @@ describe('ProfilesScreen', () => {
     render(<ProfilesScreen />);
 
     fireEvent.press(screen.getByTestId('profile-row-child-id'));
-    expect(screen.getByTestId('proxy-confirm-modal')).toBeTruthy();
+    screen.getByTestId('proxy-confirm-modal');
 
     fireEvent.press(screen.getByTestId('proxy-confirm-cancel'));
 
@@ -235,7 +235,7 @@ describe('ProfilesScreen', () => {
 
     render(<ProfilesScreen />);
 
-    expect(screen.getByTestId('profiles-loading')).toBeTruthy();
+    screen.getByTestId('profiles-loading');
   });
 
   it('replaces home after switching when there is no back history', async () => {
@@ -271,8 +271,8 @@ describe('ProfilesScreen', () => {
 
     render(<ProfilesScreen />);
 
-    expect(screen.getByTestId('profile-rename-owner-id')).toBeTruthy();
-    expect(screen.getByTestId('profile-rename-child-id')).toBeTruthy();
+    screen.getByTestId('profile-rename-owner-id');
+    screen.getByTestId('profile-rename-child-id');
   });
 
   it('shows edit button only on own profile for non-owner', () => {
@@ -285,7 +285,7 @@ describe('ProfilesScreen', () => {
 
     render(<ProfilesScreen />);
 
-    expect(screen.getByTestId('profile-rename-child-id')).toBeTruthy();
+    screen.getByTestId('profile-rename-child-id');
     expect(screen.queryByTestId('profile-rename-owner-id')).toBeNull();
   });
 
@@ -301,8 +301,8 @@ describe('ProfilesScreen', () => {
 
     fireEvent.press(screen.getByTestId('profile-rename-child-id'));
 
-    expect(screen.getByTestId('rename-modal')).toBeTruthy();
-    expect(screen.getByTestId('rename-input')).toBeTruthy();
+    screen.getByTestId('rename-modal');
+    screen.getByTestId('rename-input');
 
     fireEvent.changeText(screen.getByTestId('rename-input'), 'Alexander');
     fireEvent.press(screen.getByTestId('rename-save'));
@@ -389,7 +389,7 @@ describe('ProfilesScreen', () => {
     render(<ProfilesScreen />);
 
     fireEvent.press(screen.getByTestId('profile-rename-owner-id'));
-    expect(screen.getByTestId('rename-modal')).toBeTruthy();
+    screen.getByTestId('rename-modal');
 
     fireEvent.press(screen.getByTestId('rename-cancel'));
 

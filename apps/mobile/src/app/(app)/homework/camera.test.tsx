@@ -207,8 +207,8 @@ describe('CameraScreen', () => {
     ]);
 
     const { getByText, getByTestId } = render(<CameraScreen />);
-    expect(getByText(/camera access/i)).toBeTruthy();
-    expect(getByTestId('grant-permission-button')).toBeTruthy();
+    getByText(/camera access/i);
+    getByTestId('grant-permission-button');
   });
 
   it('permission body copy is jargon-free (U2, copy sweep 2026-04-19)', () => {
@@ -238,8 +238,8 @@ describe('CameraScreen', () => {
     ]);
 
     const { getByTestId, getByText } = render(<CameraScreen />);
-    expect(getByTestId('open-settings-button')).toBeTruthy();
-    expect(getByText(/device settings/i)).toBeTruthy();
+    getByTestId('open-settings-button');
+    getByText(/device settings/i);
   });
 
   it('re-checks permission when app returns from background (e.g. after Settings)', async () => {
@@ -269,11 +269,11 @@ describe('CameraScreen', () => {
 
   it('shows camera viewfinder when permission granted', () => {
     const { getByTestId, getByText } = render(<CameraScreen />);
-    expect(getByTestId('camera-view')).toBeTruthy();
-    expect(getByTestId('capture-button')).toBeTruthy();
-    expect(getByTestId('gallery-button')).toBeTruthy();
-    expect(getByTestId('flash-toggle')).toBeTruthy();
-    expect(getByText(/center your homework/i)).toBeTruthy();
+    getByTestId('camera-view');
+    getByTestId('capture-button');
+    getByTestId('gallery-button');
+    getByTestId('flash-toggle');
+    getByText(/center your homework/i);
   });
 
   it('opens the preview when a gallery image is selected', async () => {
@@ -287,7 +287,7 @@ describe('CameraScreen', () => {
     fireEvent.press(getByTestId('gallery-button'));
 
     await waitFor(() => {
-      expect(getByTestId('photo-preview')).toBeTruthy();
+      getByTestId('photo-preview');
     });
 
     expect(mockLaunchImageLibraryAsync).toHaveBeenCalledWith({
@@ -311,7 +311,7 @@ describe('CameraScreen', () => {
       expect(mockLaunchImageLibraryAsync).toHaveBeenCalled();
     });
 
-    expect(getByTestId('camera-view')).toBeTruthy();
+    getByTestId('camera-view');
     expect(queryByTestId('photo-preview')).toBeNull();
   });
 
@@ -375,7 +375,7 @@ describe('CameraScreen', () => {
     // The component starts in viewfinder (permission granted), not processing.
     // Processing phase is tested via the confirm flow in integration tests.
     // Here we verify the viewfinder renders correctly.
-    expect(getByText(/center your homework/i)).toBeTruthy();
+    getByText(/center your homework/i);
   });
 
   // ---- Error phase (1st failure — manual fallback immediately) ----
@@ -394,8 +394,8 @@ describe('CameraScreen', () => {
     const { getByTestId, getByText } = render(<CameraScreen />);
 
     await waitFor(() => {
-      expect(getByText(/type it out/i)).toBeTruthy();
-      expect(getByTestId('manual-input')).toBeTruthy();
+      getByText(/type it out/i);
+      getByTestId('manual-input');
       expect(
         getByText(/couldn't find a clear homework problem in this photo/i)
       ).toBeTruthy();
@@ -416,8 +416,8 @@ describe('CameraScreen', () => {
     const { getByTestId, getByText } = render(<CameraScreen />);
 
     await waitFor(() => {
-      expect(getByText(/type it out/i)).toBeTruthy();
-      expect(getByTestId('manual-input')).toBeTruthy();
+      getByText(/type it out/i);
+      getByTestId('manual-input');
       expect(
         getByText(/couldn't find a clear homework problem in this photo/i)
       ).toBeTruthy();
@@ -437,7 +437,7 @@ describe('CameraScreen', () => {
     const { getByTestId } = render(<CameraScreen />);
 
     await waitFor(() => {
-      expect(getByTestId('manual-input')).toBeTruthy();
+      getByTestId('manual-input');
     });
 
     fireEvent.changeText(getByTestId('manual-input'), 'x^2 + 3x - 10 = 0');
@@ -476,7 +476,7 @@ describe('CameraScreen', () => {
 
     await waitFor(
       () => {
-        expect(getByTestId('confirm-button')).toBeTruthy();
+        getByTestId('confirm-button');
       },
       { timeout: 5_000 }
     );
@@ -511,11 +511,11 @@ describe('CameraScreen', () => {
     const { getByTestId, getByText } = render(<CameraScreen />);
 
     await waitFor(() => {
-      expect(getByText(/problems I found/i)).toBeTruthy();
-      expect(getByTestId('camera-back-button')).toBeTruthy();
-      expect(getByTestId('result-text-input')).toBeTruthy();
-      expect(getByTestId('problem-card-1')).toBeTruthy();
-      expect(getByTestId('add-problem-button')).toBeTruthy();
+      getByText(/problems I found/i);
+      getByTestId('camera-back-button');
+      getByTestId('result-text-input');
+      getByTestId('problem-card-1');
+      getByTestId('add-problem-button');
     });
   });
 
@@ -532,14 +532,14 @@ describe('CameraScreen', () => {
     const { getByTestId, queryByTestId } = render(<CameraScreen />);
 
     await waitFor(() => {
-      expect(getByTestId('dropped-fragments-chip')).toBeTruthy();
+      getByTestId('dropped-fragments-chip');
       expect(queryByTestId('problem-card-2')).toBeNull();
     });
 
     fireEvent.press(getByTestId('dropped-fragments-chip'));
 
     await waitFor(() => {
-      expect(getByTestId('problem-card-2')).toBeTruthy();
+      getByTestId('problem-card-2');
     });
   });
 
@@ -561,7 +561,7 @@ describe('CameraScreen', () => {
     const { getByTestId } = render(<CameraScreen />);
 
     await waitFor(() => {
-      expect(getByTestId('subject-picker')).toBeTruthy();
+      getByTestId('subject-picker');
     });
 
     fireEvent.changeText(getByTestId('camera-subject-input'), 'Biology');
@@ -609,9 +609,9 @@ describe('CameraScreen', () => {
     const { getByTestId } = render(<CameraScreen />);
 
     await waitFor(() => {
-      expect(getByTestId('subject-picker')).toBeTruthy();
+      getByTestId('subject-picker');
     });
-    expect(getByTestId('subject-picker-loading')).toBeTruthy();
+    getByTestId('subject-picker-loading');
 
     alertSpy.mockRestore();
   });
@@ -648,14 +648,14 @@ describe('CameraScreen', () => {
     const { getByTestId } = render(<CameraScreen />);
 
     await waitFor(() => {
-      expect(getByTestId('manual-input')).toBeTruthy();
+      getByTestId('manual-input');
     });
 
     fireEvent.changeText(getByTestId('manual-input'), 'some homework text');
     fireEvent.press(getByTestId('manual-continue-button'));
 
     await waitFor(() => {
-      expect(getByTestId('manual-subject-picker-loading')).toBeTruthy();
+      getByTestId('manual-subject-picker-loading');
     });
 
     alertSpy.mockRestore();
@@ -687,17 +687,17 @@ describe('CameraScreen', () => {
     const { getByTestId } = render(<CameraScreen />);
 
     await waitFor(() => {
-      expect(getByTestId('manual-input')).toBeTruthy();
+      getByTestId('manual-input');
     });
 
     fireEvent.changeText(getByTestId('manual-input'), 'some homework text');
     fireEvent.press(getByTestId('manual-continue-button'));
 
     await waitFor(() => {
-      expect(getByTestId('manual-subject-picker-empty')).toBeTruthy();
+      getByTestId('manual-subject-picker-empty');
     });
     // Empty state must include an actionable Create button (not a dead end).
-    expect(getByTestId('manual-subject-picker-create')).toBeTruthy();
+    getByTestId('manual-subject-picker-create');
 
     fireEvent.press(getByTestId('manual-subject-picker-create'));
     expect(mockRouter.push).toHaveBeenCalledWith('/create-subject');
@@ -733,7 +733,7 @@ describe('CameraScreen', () => {
 
     // Picker still appears so the user can recover.
     await waitFor(() => {
-      expect(getByTestId('subject-picker')).toBeTruthy();
+      getByTestId('subject-picker');
     });
 
     alertSpy.mockRestore();
@@ -802,7 +802,7 @@ describe('CameraScreen', () => {
     const { getByTestId } = render(<CameraScreen />);
 
     await waitFor(() => {
-      expect(getByTestId('subject-picker')).toBeTruthy();
+      getByTestId('subject-picker');
     });
   });
 
@@ -824,7 +824,7 @@ describe('CameraScreen', () => {
     const { getByTestId } = render(<CameraScreen />);
 
     await waitFor(() => {
-      expect(getByTestId('subject-picker')).toBeTruthy();
+      getByTestId('subject-picker');
     });
   });
 
@@ -911,13 +911,13 @@ describe('CameraScreen', () => {
         fireEvent.press(utils.getByTestId('gallery-button'));
       });
       await waitFor(() => {
-        expect(utils.getByTestId('photo-preview')).toBeTruthy();
+        utils.getByTestId('photo-preview');
       });
       await act(async () => {
         fireEvent.press(utils.getByTestId('camera-use-this-button'));
       });
       await waitFor(() => {
-        expect(utils.getByTestId('camera-cancel-ocr')).toBeTruthy();
+        utils.getByTestId('camera-cancel-ocr');
       });
       return utils;
     }
@@ -933,7 +933,7 @@ describe('CameraScreen', () => {
       });
       expect(mockCancel).toHaveBeenCalledTimes(1);
       await waitFor(() => {
-        expect(getByText(/taking too long/i)).toBeTruthy();
+        getByText(/taking too long/i);
       });
     });
 

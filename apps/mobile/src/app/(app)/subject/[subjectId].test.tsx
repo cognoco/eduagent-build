@@ -97,31 +97,31 @@ describe('SubjectSettingsScreen', () => {
   it('renders the Analogy Preference section header', () => {
     render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByText('Analogy Preference')).toBeTruthy();
+    screen.getByText('Analogy Preference');
   });
 
   it('renders the description text', () => {
     render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByText(/Choose a domain for analogies/)).toBeTruthy();
+    screen.getByText(/Choose a domain for analogies/);
   });
 
   it('renders the analogy domain picker', () => {
     render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('analogy-domain-picker')).toBeTruthy();
+    screen.getByTestId('analogy-domain-picker');
   });
 
   it('renders all domain options', () => {
     render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('analogy-domain-none')).toBeTruthy();
-    expect(screen.getByTestId('analogy-domain-cooking')).toBeTruthy();
-    expect(screen.getByTestId('analogy-domain-sports')).toBeTruthy();
-    expect(screen.getByTestId('analogy-domain-building')).toBeTruthy();
-    expect(screen.getByTestId('analogy-domain-music')).toBeTruthy();
-    expect(screen.getByTestId('analogy-domain-nature')).toBeTruthy();
-    expect(screen.getByTestId('analogy-domain-gaming')).toBeTruthy();
+    screen.getByTestId('analogy-domain-none');
+    screen.getByTestId('analogy-domain-cooking');
+    screen.getByTestId('analogy-domain-sports');
+    screen.getByTestId('analogy-domain-building');
+    screen.getByTestId('analogy-domain-music');
+    screen.getByTestId('analogy-domain-nature');
+    screen.getByTestId('analogy-domain-gaming');
   });
 
   it('shows "No preference" as active when analogyDomain is null', () => {
@@ -179,7 +179,7 @@ describe('SubjectSettingsScreen', () => {
 
     render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('analogy-domain-loading')).toBeTruthy();
+    screen.getByTestId('analogy-domain-loading');
   });
 
   it('returns to the subject shelf when back button is pressed', () => {
@@ -217,7 +217,7 @@ describe('SubjectSettingsScreen', () => {
 
       render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
-      expect(screen.getByText('Analogy Preference')).toBeTruthy();
+      screen.getByText('Analogy Preference');
       expect(
         screen.queryByTestId('subject-settings-language-empty')
       ).toBeNull();
@@ -231,7 +231,7 @@ describe('SubjectSettingsScreen', () => {
       render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
       // Empty state must not be a dead-end — back button is reachable.
-      expect(screen.getByTestId('subject-settings-back')).toBeTruthy();
+      screen.getByTestId('subject-settings-back');
     });
   });
 });

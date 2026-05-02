@@ -144,7 +144,7 @@ describe('Bookmarks (integration)', () => {
     );
     expect(bookmark.subjectName).toBe('Mathematics');
     expect(bookmark.topicTitle).toBeNull();
-    expect(bookmark.createdAt).toBeDefined();
+    expect(bookmark.createdAt).toBeInstanceOf(Date);
   });
 
   it('rejects duplicate eventId for same profile', async () => {
@@ -205,7 +205,7 @@ describe('Bookmarks (integration)', () => {
     const eventIds = sessionBookmarks.map((b) => b.eventId).sort();
     expect(eventIds).toEqual([aiEventId, aiEventId2].sort());
     for (const row of sessionBookmarks) {
-      expect(row.bookmarkId).toBeDefined();
+      expect(typeof row.bookmarkId).toBe('string');
     }
   });
 

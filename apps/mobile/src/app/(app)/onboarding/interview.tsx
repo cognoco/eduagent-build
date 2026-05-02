@@ -591,11 +591,13 @@ export default function InterviewScreen() {
                 );
                 lastOutboxEntryRef.current = null;
               }
-              // Seamlessly transition to a learning session.
-              // Don't set interviewComplete — that disables input and shows
-              // the "Let's Go" card. Instead, silently start a session so the
-              // conversation continues without interruption.
-              void transitionToSession();
+              // [BUG-958] Show the completion card so the user sees the final
+              // LLM reply and has a clear forward action ("Let's Go").
+              // The API route already dispatched the Inngest curriculum-persist
+              // event, so curriculum generation is in-flight. Navigating to the
+              // curriculum-review screen via goToNextStep() shows a "Building
+              // your curriculum…" spinner (BUG-956 fix) until Inngest finishes.
+              setInterviewComplete(true);
             }
           },
           outboxEntry

@@ -37,6 +37,7 @@ on:
 permissions:
   actions: read
   contents: read
+  issues: write
 
 # Never deploy in parallel — one deployment at a time
 concurrency:
@@ -214,7 +215,7 @@ jobs:
         run: |
           DEPLOY_ENV="${{ github.event_name == 'push' && 'staging' || inputs.api_environment }}"
           echo "Deploying API to ${DEPLOY_ENV}"
-          pnpm exec wrangler deploy --env "${DEPLOY_ENV}"
+          pnpm exec wrangler deploy --env "${DEPLOY_ENV}" --var "DEPLOY_SHA:${GITHUB_SHA:0:8}"
 
       - name: Sync secrets from Doppler to Worker
         env:
@@ -232,6 +233,165 @@ jobs:
           echo "Syncing Doppler secrets (${SYNC_TARGET}) → Worker (${DEPLOY_ENV})"
           curl -sL https://cli.doppler.com/install.sh | sh
           pnpm secrets:sync "$SYNC_TARGET"
+
+      # [BUG-953] Notify on deploy failure — creates a GitHub issue so silent
+      # failures (like run 25225160580 which went unnoticed for 24h) surface
+      # immediately without requiring anyone to check the Actions tab.
+      - name: Notify on deploy failure
+        if: failure()
+        env:
+          DEPLOY_ENV: ${{ github.event_name == 'push' && 'staging' || inputs.api_environment }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const deployEnv = process.env.DEPLOY_ENV || 'unknown';
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const branch = context.ref.replace('refs/heads/', '');
+            const sha = context.sha.slice(0, 8);
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Deploy failure: API ${deployEnv} (${sha})`,
+              body: [
+                `## Deploy Failed`,
+                ``,
+                `| Field | Value |`,
+                `|-------|-------|`,
+                `| Environment | \`${deployEnv}\` |`,
+                `| Branch | \`${branch}\` |`,
+                `| Commit | \`${sha}\` |`,
+                `| Run | [View run](${runUrl}) |`,
+                `| Triggered by | @${context.actor} |`,
+                ``,
+                `**Action required:** Check the run log above for the failing step, fix the root cause, and re-trigger the deploy.`,
+                ``,
+                `_This issue was created automatically by the Deploy workflow. Close it once the deploy succeeds._`,
+              ].join('\n'),
+              labels: ['deploy-failure', 'automated'],
+            });
+
+  # ---------------------------------------------------------------------------
+  # API: Post-deploy smoke tests (staging only)
+  # [BUG-952] Regressions like streamExchange 500 and outbox-spillover 404 were
+  # only caught by manual UI testing. These smoke tests verify the staging worker
+  # is actually serving valid responses after every deploy-to-staging.
+  # ---------------------------------------------------------------------------
+
+  api-smoke-test:
+    name: Smoke Test — Staging API
+    needs: api-deploy
+    # Only run after a staging deploy (push-to-main always deploys staging;
+    # manual dispatch to staging also qualifies). Skip for production deploys.
+    if: |
+      needs.api-deploy.result == 'success' &&
+      (github.event_name == 'push' || inputs.api_environment == 'staging')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve staging API URL
+        id: resolve-url
+        run: |
+          # Use the STAGING_API_URL secret if configured; default to workers.dev URL.
+          # The custom domain (api-stg.mentomate.com) is the preferred target but
+          # requires the secret to be set in GitHub Actions.
+          if [ -n "${{ secrets.STAGING_API_URL }}" ]; then
+            RESOLVED_URL="${{ secrets.STAGING_API_URL }}"
+          else
+            RESOLVED_URL="https://mentomate-api-stg.zwizzly.workers.dev"
+          fi
+          echo "url=${RESOLVED_URL}" >> "$GITHUB_OUTPUT"
+          echo "Staging API URL: ${RESOLVED_URL}"
+
+      - name: Wait for Worker propagation
+        # Cloudflare Workers propagate within ~5-10s globally; a short wait
+        # avoids spurious failures on a cold deploy. 20s is conservative.
+        run: sleep 20
+
+      - name: Smoke — GET /v1/health (200, status ok)
+        id: smoke-health
+        env:
+          STAGING_API_URL: ${{ steps.resolve-url.outputs.url }}
+        run: |
+          echo "Hitting ${STAGING_API_URL}/v1/health"
+          HTTP_CODE=$(curl -s --max-time 15 -o /tmp/health.json -w "%{http_code}" \
+            "${STAGING_API_URL}/v1/health")
+          echo "HTTP status: ${HTTP_CODE}"
+          if [ "${HTTP_CODE}" != "200" ]; then
+            echo "✗ /v1/health returned ${HTTP_CODE}, expected 200"
+            cat /tmp/health.json || true
+            exit 1
+          fi
+          STATUS=$(python3 -c "import json; print(json.load(open('/tmp/health.json')).get('status',''))")
+          echo "status field: ${STATUS}"
+          if [ "${STATUS}" != "ok" ]; then
+            echo "✗ /v1/health body.status = '${STATUS}', expected 'ok'"
+            cat /tmp/health.json
+            exit 1
+          fi
+          echo "✓ /v1/health OK"
+
+      - name: Smoke — GET /v1/auth/me (401, unauthenticated)
+        id: smoke-auth
+        env:
+          STAGING_API_URL: ${{ steps.resolve-url.outputs.url }}
+        run: |
+          echo "Hitting ${STAGING_API_URL}/v1/auth/me (expect 401 — not 500/404)"
+          HTTP_CODE=$(curl -s --max-time 15 -o /dev/null -w "%{http_code}" \
+            "${STAGING_API_URL}/v1/auth/me")
+          echo "HTTP status: ${HTTP_CODE}"
+          # 401 means the auth middleware is live; anything 5xx = worker crash.
+          if [ "${HTTP_CODE}" = "500" ] || [ "${HTTP_CODE}" = "502" ] || [ "${HTTP_CODE}" = "503" ]; then
+            echo "✗ /v1/auth/me returned ${HTTP_CODE} — worker is erroring"
+            exit 1
+          fi
+          echo "✓ /v1/auth/me returned ${HTTP_CODE} (non-5xx, auth layer is up)"
+
+      - name: Smoke — GET /v1/sessions (401, unauthenticated)
+        id: smoke-sessions
+        env:
+          STAGING_API_URL: ${{ steps.resolve-url.outputs.url }}
+        run: |
+          echo "Hitting ${STAGING_API_URL}/v1/sessions (expect 401 — not 500/404)"
+          HTTP_CODE=$(curl -s --max-time 15 -o /dev/null -w "%{http_code}" \
+            "${STAGING_API_URL}/v1/sessions")
+          echo "HTTP status: ${HTTP_CODE}"
+          if [ "${HTTP_CODE}" = "500" ] || [ "${HTTP_CODE}" = "502" ] || [ "${HTTP_CODE}" = "503" ]; then
+            echo "✗ /v1/sessions returned ${HTTP_CODE} — sessions route is broken"
+            exit 1
+          fi
+          echo "✓ /v1/sessions returned ${HTTP_CODE} (non-5xx, sessions route is up)"
+
+      # [BUG-953] Re-use the same failure notification pattern for smoke failures.
+      - name: Notify on smoke test failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const branch = context.ref.replace('refs/heads/', '');
+            const sha = context.sha.slice(0, 8);
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🚨 Smoke test failure: staging API (${sha})`,
+              body: [
+                `## Post-Deploy Smoke Test Failed`,
+                ``,
+                `The staging API deployed successfully but failed smoke tests, indicating a live regression.`,
+                ``,
+                `| Field | Value |`,
+                `|-------|-------|`,
+                `| Environment | \`staging\` |`,
+                `| Branch | \`${branch}\` |`,
+                `| Commit | \`${sha}\` |`,
+                `| Run | [View run](${runUrl}) |`,
+                `| Triggered by | @${context.actor} |`,
+                ``,
+                `**Action required:** Check the run log for which smoke check failed, investigate the regression, fix and redeploy.`,
+                ``,
+                `_This issue was created automatically by the Deploy workflow. Close it once staging is healthy._`,
+              ].join('\n'),
+              labels: ['deploy-failure', 'smoke-test', 'automated'],
+            });
 
   # ---------------------------------------------------------------------------
   # Mobile: EAS Build deployment

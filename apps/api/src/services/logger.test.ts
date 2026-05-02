@@ -67,7 +67,7 @@ describe('createLogger', () => {
       const entry = parseEntry(captured.logs[0]);
       expect(entry.level).toBe('info');
       expect(entry.message).toBe('hello');
-      expect(entry.timestamp).toBeDefined();
+      expect(typeof entry.timestamp).toBe('string');
       // ISO 8601 format check
       expect(new Date(entry.timestamp).toISOString()).toBe(entry.timestamp);
     });

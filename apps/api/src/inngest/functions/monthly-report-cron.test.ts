@@ -267,7 +267,7 @@ afterEach(() => {
 
 describe('monthlyReportCron', () => {
   it('should be defined as an Inngest function', () => {
-    expect(monthlyReportCron).toBeDefined();
+    expect(monthlyReportCron).toBeTruthy();
   });
 
   it('should have the correct function id', () => {
@@ -476,7 +476,7 @@ describe('monthlyReportCron', () => {
 
 describe('monthlyReportGenerate', () => {
   it('should be defined as an Inngest function', () => {
-    expect(monthlyReportGenerate).toBeDefined();
+    expect(monthlyReportGenerate).toBeTruthy();
   });
 
   it('should have the correct function id', () => {

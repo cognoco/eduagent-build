@@ -78,10 +78,10 @@ describe('DeleteAccountScreen', () => {
   it('renders warning and delete button', () => {
     render(<DeleteAccountScreen />, { wrapper: Wrapper });
 
-    expect(screen.getByText('Delete account')).toBeTruthy();
-    expect(screen.getByTestId('delete-account-confirm')).toBeTruthy();
-    expect(screen.getByTestId('delete-account-cancel')).toBeTruthy();
-    expect(screen.getByText(/7-day grace period/)).toBeTruthy();
+    screen.getByText('Delete account');
+    screen.getByTestId('delete-account-confirm');
+    screen.getByTestId('delete-account-cancel');
+    screen.getByText(/7-day grace period/);
   });
 
   it('schedules deletion and shows grace period after typed confirmation', async () => {
@@ -100,10 +100,10 @@ describe('DeleteAccountScreen', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByTestId('delete-account-scheduled')).toBeTruthy();
+      screen.getByTestId('delete-account-scheduled');
     });
 
-    expect(screen.getByTestId('delete-account-keep')).toBeTruthy();
+    screen.getByTestId('delete-account-keep');
   });
 
   it('cancels deletion and navigates back', async () => {
@@ -119,7 +119,7 @@ describe('DeleteAccountScreen', () => {
     fireEvent.press(screen.getByTestId('delete-account-confirm-final'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('delete-account-scheduled')).toBeTruthy();
+      screen.getByTestId('delete-account-scheduled');
     });
 
     fireEvent.press(screen.getByTestId('delete-account-keep'));
@@ -142,8 +142,8 @@ describe('DeleteAccountScreen', () => {
     fireEvent.press(screen.getByTestId('delete-account-confirm-final'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('delete-account-error')).toBeTruthy();
-      expect(screen.getByText('API error: 500')).toBeTruthy();
+      screen.getByTestId('delete-account-error');
+      screen.getByText('API error: 500');
     });
   });
 
@@ -198,7 +198,7 @@ describe('DeleteAccountScreen', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByTestId('delete-account-scheduled')).toBeTruthy();
+      screen.getByTestId('delete-account-scheduled');
     });
   });
 
@@ -214,7 +214,7 @@ describe('DeleteAccountScreen', () => {
       fireEvent.press(screen.getByTestId('delete-account-confirm'));
 
       expect(mockDeleteMutateAsync).not.toHaveBeenCalled();
-      expect(screen.getByTestId('delete-account-confirming')).toBeTruthy();
+      screen.getByTestId('delete-account-confirming');
     });
 
     it('shows the family-pool warning in the confirming stage', () => {
@@ -224,7 +224,7 @@ describe('DeleteAccountScreen', () => {
       expect(
         screen.getByTestId('delete-account-family-warning')
       ).toBeTruthy();
-      expect(screen.getByText(/linked child profiles/i)).toBeTruthy();
+      screen.getByText(/linked child profiles/i);
       expect(
         screen.getByText(/permanently deleted along with your account/i)
       ).toBeTruthy();
@@ -237,8 +237,8 @@ describe('DeleteAccountScreen', () => {
       expect(
         screen.getByTestId('delete-account-subscription-warning')
       ).toBeTruthy();
-      expect(screen.getByText(/App Store or Play Store/i)).toBeTruthy();
-      expect(screen.getByText(/not.*automatically cancelled/i)).toBeTruthy();
+      screen.getByText(/App Store or Play Store/i);
+      screen.getByText(/not.*automatically cancelled/i);
     });
 
     it('disables the final delete button until "DELETE" is typed exactly', () => {
@@ -295,12 +295,12 @@ describe('DeleteAccountScreen', () => {
       render(<DeleteAccountScreen />, { wrapper: Wrapper });
       fireEvent.press(screen.getByTestId('delete-account-confirm'));
 
-      expect(screen.getByTestId('delete-account-confirming')).toBeTruthy();
+      screen.getByTestId('delete-account-confirming');
 
       fireEvent.press(screen.getByTestId('delete-account-back-to-warning'));
 
       expect(screen.queryByTestId('delete-account-confirming')).toBeNull();
-      expect(screen.getByTestId('delete-account-confirm')).toBeTruthy();
+      screen.getByTestId('delete-account-confirm');
     });
 
     it('clears the typed phrase when the user goes back to the warning', () => {

@@ -55,7 +55,7 @@ describe('child/[profileId]/_layout.tsx', () => {
   ])('declares %s with getId returning %s from params', (name, paramKey) => {
     render(<ChildDetailLayout />);
     const screen = capturedScreens.find((s) => s.name === name);
-    expect(screen).toBeDefined();
+    expect(screen).not.toBeUndefined();
     expect(screen!.getId).toBeInstanceOf(Function);
     expect(screen!.getId!({ params: { [paramKey]: 'abc-1' } })).toBe('abc-1');
     expect(screen!.getId!({ params: { [paramKey]: 'xyz-2' } })).toBe('xyz-2');

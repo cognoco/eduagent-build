@@ -458,7 +458,7 @@ describe('ChatShell', () => {
       });
 
       // Preview shows the transcript
-      expect(screen.getByText('First attempt')).toBeTruthy();
+      screen.getByText('First attempt');
 
       // User discards the transcript
       fireEvent.press(screen.getByTestId('voice-discard-button'));
@@ -930,7 +930,7 @@ describe('ChatShell', () => {
       const appStateChangedListener = addEventListenerSpy.mock.calls.at(
         -1
       )?.[1] as ((status: string) => void) | undefined;
-      expect(appStateChangedListener).toBeDefined();
+      expect(appStateChangedListener).toBeInstanceOf(Function);
 
       await act(async () => {
         appStateChangedListener?.('active');
@@ -958,7 +958,7 @@ describe('ChatShell', () => {
       const appStateChangedListener = addEventListenerSpy.mock.calls.at(
         -1
       )?.[1] as ((status: string) => void) | undefined;
-      expect(appStateChangedListener).toBeDefined();
+      expect(appStateChangedListener).toBeInstanceOf(Function);
 
       await act(async () => {
         appStateChangedListener?.('active');

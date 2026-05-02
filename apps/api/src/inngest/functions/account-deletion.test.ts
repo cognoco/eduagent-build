@@ -33,7 +33,7 @@ describe('scheduledDeletion', () => {
   });
 
   it('should be defined as an Inngest function', () => {
-    expect(scheduledDeletion).toBeDefined();
+    expect(scheduledDeletion).toBeTruthy();
   });
 
   it('should have the correct function id', () => {

@@ -85,13 +85,13 @@ describe('RelearnScreen', () => {
           "Every topic needs its own approach. Let's find what clicks for you!"
         )
       ).toBeTruthy();
-      expect(screen.getByText('Different Method')).toBeTruthy();
+      screen.getByText('Different Method');
       expect(
         screen.getByText(
           'Choose a new teaching style that might work better for you'
         )
       ).toBeTruthy();
-      expect(screen.getByText('Same Method')).toBeTruthy();
+      screen.getByText('Same Method');
       expect(
         screen.getByText(
           'Review the topic again using your current learning approach'
@@ -108,10 +108,10 @@ describe('RelearnScreen', () => {
       expect(
         screen.getByText('Pick a teaching style that works best for you:')
       ).toBeTruthy();
-      expect(screen.getByText('Visual Diagrams')).toBeTruthy();
-      expect(screen.getByText('Step-by-Step')).toBeTruthy();
-      expect(screen.getByText('Real-World Examples')).toBeTruthy();
-      expect(screen.getByText('Practice Problems')).toBeTruthy();
+      screen.getByText('Visual Diagrams');
+      screen.getByText('Step-by-Step');
+      screen.getByText('Real-World Examples');
+      screen.getByText('Practice Problems');
     });
   });
 
@@ -130,11 +130,11 @@ describe('RelearnScreen', () => {
       expect(
         screen.getByText("Let's find what works best for you!")
       ).toBeTruthy();
-      expect(screen.getByText('Try Something New')).toBeTruthy();
+      screen.getByText('Try Something New');
       expect(
         screen.getByText("Let's try learning this a different way!")
       ).toBeTruthy();
-      expect(screen.getByText('Same Method')).toBeTruthy();
+      screen.getByText('Same Method');
       expect(
         screen.getByText("Let's go over it again the same way")
       ).toBeTruthy();
@@ -149,10 +149,10 @@ describe('RelearnScreen', () => {
       expect(
         screen.getByText('How would you like to learn this time?')
       ).toBeTruthy();
-      expect(screen.getByText('Show Me Pictures')).toBeTruthy();
-      expect(screen.getByText('Walk Me Through It')).toBeTruthy();
-      expect(screen.getByText('Show Me How It Works')).toBeTruthy();
-      expect(screen.getByText('Let Me Try It')).toBeTruthy();
+      screen.getByText('Show Me Pictures');
+      screen.getByText('Walk Me Through It');
+      screen.getByText('Show Me How It Works');
+      screen.getByText('Let Me Try It');
     });
 
     it('does not show default teen labels', () => {
@@ -179,7 +179,7 @@ describe('RelearnScreen', () => {
     it('shows default phase 1 labels, not child-friendly', () => {
       render(<RelearnScreen />, { wrapper: createWrapper() });
 
-      expect(screen.getByText('Different Method')).toBeTruthy();
+      screen.getByText('Different Method');
       expect(
         screen.getByText(
           "Every topic needs its own approach. Let's find what clicks for you!"
@@ -208,7 +208,7 @@ describe('RelearnScreen', () => {
     fireEvent.press(screen.getByTestId('relearn-same-method'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('relearn-error')).toBeTruthy();
+      screen.getByTestId('relearn-error');
       expect(
         screen.getByText('Could not start relearn right now')
       ).toBeTruthy();
@@ -316,7 +316,7 @@ describe('RelearnScreen', () => {
     fireEvent.press(screen.getByTestId('relearn-same-method'));
 
     // Cancel button should appear while pending
-    expect(screen.getByTestId('relearn-cancel')).toBeTruthy();
+    screen.getByTestId('relearn-cancel');
 
     // Tap cancel → spinner + cancel button should disappear
     fireEvent.press(screen.getByTestId('relearn-cancel'));

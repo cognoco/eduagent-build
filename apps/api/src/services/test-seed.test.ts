@@ -129,7 +129,7 @@ describe('seedScenario', () => {
     // The first insert call should be for the accounts table
     // Verify the account insert includes the seed prefix by checking the result
     // (clerkUserId is set internally, but we can verify via the returned accountId)
-    expect(result.accountId).toBeDefined();
+    expect(typeof result.accountId).toBe('string');
     expect(result.accountId.length).toBeGreaterThan(0);
   });
 });

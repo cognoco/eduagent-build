@@ -42,11 +42,11 @@ describe('TopicDetailScreen', () => {
 
     render(<TopicDetailScreen />);
 
-    expect(screen.getByTestId('topic-understanding-card')).toBeTruthy();
-    expect(screen.getByText('Understanding')).toBeTruthy();
-    expect(screen.getByText('Getting comfortable')).toBeTruthy();
-    expect(screen.getByText('Review status')).toBeTruthy();
-    expect(screen.getByText('A few things to refresh')).toBeTruthy();
+    screen.getByTestId('topic-understanding-card');
+    screen.getByText('Understanding');
+    screen.getByText('Getting comfortable');
+    screen.getByText('Review status');
+    screen.getByText('A few things to refresh');
   });
 
   it('hides the review card when review data is not meaningful yet', () => {

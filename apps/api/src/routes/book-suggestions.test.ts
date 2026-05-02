@@ -128,7 +128,7 @@ const TEST_ENV = {
 describe('book-suggestions routes', () => {
   it('exports a Hono instance', async () => {
     const { bookSuggestionRoutes } = await import('./book-suggestions');
-    expect(bookSuggestionRoutes).toBeDefined();
+    expect(typeof bookSuggestionRoutes).toBe('object');
     expect(typeof bookSuggestionRoutes.fetch).toBe('function');
   });
 

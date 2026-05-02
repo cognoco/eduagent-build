@@ -110,25 +110,25 @@ describe('ShelvesTab', () => {
   it('renders shelf cards', () => {
     render(<ShelvesTab {...defaultProps} />);
 
-    expect(screen.getByTestId('subject-card-sub-1')).toBeTruthy();
-    expect(screen.getByTestId('subject-card-sub-2')).toBeTruthy();
-    expect(screen.getByText('Mathematics')).toBeTruthy();
-    expect(screen.getByText('History')).toBeTruthy();
+    screen.getByTestId('subject-card-sub-1');
+    screen.getByTestId('subject-card-sub-2');
+    screen.getByText('Mathematics');
+    screen.getByText('History');
   });
 
   it('shows progress label for subjects with topics', () => {
     render(<ShelvesTab {...defaultProps} />);
-    expect(screen.getByText('10/20 topics started')).toBeTruthy();
+    screen.getByText('10/20 topics started');
   });
 
   it('shows "all done" label when all topics started', () => {
     render(<ShelvesTab {...defaultProps} />);
-    expect(screen.getByText('15/15 topics started')).toBeTruthy();
+    screen.getByText('15/15 topics started');
   });
 
   it('shows status pill for paused/archived subjects but not for active', () => {
     render(<ShelvesTab {...defaultProps} />);
-    expect(screen.getByText('Paused')).toBeTruthy();
+    screen.getByText('Paused');
     // "Active" status pill should NOT be rendered
     expect(screen.queryByTestId('status-pill-active')).toBeNull();
   });
@@ -136,14 +136,14 @@ describe('ShelvesTab', () => {
   it('shows RetentionSignal for active subjects with progress', () => {
     render(<ShelvesTab {...defaultProps} />);
     // Mocked RetentionSignal renders status text
-    expect(screen.getByText('fading')).toBeTruthy();
+    screen.getByText('fading');
   });
 
   it('shows per-subject review indicator when reviews are due', () => {
     render(<ShelvesTab {...defaultProps} />);
 
-    expect(screen.getByTestId('subject-review-due-sub-1')).toBeTruthy();
-    expect(screen.getByText('3 to review')).toBeTruthy();
+    screen.getByTestId('subject-review-due-sub-1');
+    screen.getByText('3 to review');
   });
 
   it('shows search bar that propagates search via onStateChange', () => {
@@ -164,8 +164,8 @@ describe('ShelvesTab', () => {
     };
     render(<ShelvesTab {...defaultProps} state={searchState} />);
 
-    expect(screen.getByTestId('library-no-results')).toBeTruthy();
-    expect(screen.getByText('No shelves match your search')).toBeTruthy();
+    screen.getByTestId('library-no-results');
+    screen.getByText('No shelves match your search');
   });
 
   it('clear button in no-results resets search only', () => {
@@ -203,7 +203,7 @@ describe('ShelvesTab', () => {
       <ShelvesTab {...defaultProps} shelves={[]} onAddSubject={onAddSubject} />
     );
 
-    expect(screen.getByTestId('library-no-content')).toBeTruthy();
+    screen.getByTestId('library-no-content');
     fireEvent.press(screen.getByTestId('library-add-subject-empty'));
     expect(onAddSubject).toHaveBeenCalledTimes(1);
   });
@@ -238,7 +238,7 @@ describe('ShelvesTab', () => {
       />
     );
 
-    expect(screen.getByText('Clear all')).toBeTruthy();
+    screen.getByText('Clear all');
     fireEvent.press(screen.getByTestId('library-clear-search'));
     expect(onStateChange).toHaveBeenCalledWith(SHELVES_TAB_INITIAL_STATE);
   });
@@ -258,7 +258,7 @@ describe('ShelvesTab', () => {
       />
     );
 
-    expect(screen.getByText('Clear filters')).toBeTruthy();
+    screen.getByText('Clear filters');
     fireEvent.press(screen.getByTestId('library-clear-search'));
     expect(onStateChange).toHaveBeenCalledWith({
       ...filterOnlyState,
@@ -347,7 +347,7 @@ describe('ShelvesTab', () => {
         />
       );
 
-      expect(screen.getByText('No books yet')).toBeTruthy();
+      screen.getByText('No books yet');
       expect(screen.queryByText(/Shelf ready to explore/)).toBeNull();
     });
 
@@ -359,7 +359,7 @@ describe('ShelvesTab', () => {
         />
       );
 
-      expect(screen.getByText('0/10 topics started')).toBeTruthy();
+      screen.getByText('0/10 topics started');
       expect(screen.queryByText('No books yet')).toBeNull();
     });
 
@@ -371,7 +371,7 @@ describe('ShelvesTab', () => {
         />
       );
 
-      expect(screen.getByText('No books yet')).toBeTruthy();
+      screen.getByText('No books yet');
     });
 
     it('does not collapse the empty-shelf state into the unstarted-topics state', () => {
@@ -383,8 +383,8 @@ describe('ShelvesTab', () => {
       );
 
       // Both labels are visible — they are NOT the same string.
-      expect(screen.getByText('No books yet')).toBeTruthy();
-      expect(screen.getByText('0/10 topics started')).toBeTruthy();
+      screen.getByText('No books yet');
+      screen.getByText('0/10 topics started');
     });
   });
 });

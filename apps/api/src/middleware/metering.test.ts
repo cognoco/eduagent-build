@@ -686,7 +686,7 @@ describe('metering middleware', () => {
       expect(body.code).toBe('QUOTA_EXCEEDED');
       expect(body.details.tier).toBe('free');
       expect(body.details.reason).toBe('monthly');
-      expect(body.details.upgradeOptions).toBeDefined();
+      expect(Array.isArray(body.details.upgradeOptions)).toBe(true);
       expect(body.details.upgradeOptions.length).toBeGreaterThan(0);
     });
 

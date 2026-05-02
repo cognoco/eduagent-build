@@ -120,7 +120,7 @@ describe('Integration: assessment routes', () => {
       ),
     });
 
-    expect(assessment).toBeDefined();
+    expect(assessment).not.toBeUndefined();
     expect(assessment?.status).toBe('in_progress');
   });
 
@@ -267,10 +267,10 @@ describe('Integration: assessment routes', () => {
       ),
     });
 
-    expect(card).toBeDefined();
+    expect(card).not.toBeUndefined();
     expect(card?.lastReviewedAt).not.toBeNull();
     expect(card?.nextReviewAt).not.toBeNull();
-    expect(xp).toBeDefined();
+    expect(xp).not.toBeUndefined();
     expect(xp?.amount).toBe(45);
     expect(xp?.status).toBe('verified');
   });

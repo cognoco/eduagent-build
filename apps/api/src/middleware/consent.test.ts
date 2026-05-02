@@ -195,4 +195,28 @@ describe('consentMiddleware', () => {
     const res = await app.request('/v1/__test/seed');
     expect(res.status).toBe(200);
   });
+
+  it('allows /v1/support/ paths even with pending consent (outbox spillover must not be blocked)', async () => {
+    const app = createApp({
+      profileId: 'p-1',
+      profileMeta: CHILD_PENDING_META,
+      routePath: '/v1/support/outbox-spillover',
+    });
+    const res = await app.request('/v1/support/outbox-spillover', {
+      method: 'POST',
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it('allows /v1/support/ paths even with withdrawn consent', async () => {
+    const app = createApp({
+      profileId: 'p-1',
+      profileMeta: WITHDRAWN_CHILD_META,
+      routePath: '/v1/support/outbox-spillover',
+    });
+    const res = await app.request('/v1/support/outbox-spillover', {
+      method: 'POST',
+    });
+    expect(res.status).toBe(200);
+  });
 });

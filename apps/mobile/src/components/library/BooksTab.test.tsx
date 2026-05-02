@@ -272,8 +272,8 @@ describe('BooksTab', () => {
     it('renders a shelf heading per subject with book + topic counts', () => {
       render(<BooksTab {...defaultProps} books={[algebraBook, egyptBook]} />);
 
-      expect(screen.getByTestId('books-shelf-heading-sub-1')).toBeTruthy();
-      expect(screen.getByTestId('books-shelf-heading-sub-2')).toBeTruthy();
+      screen.getByTestId('books-shelf-heading-sub-1');
+      screen.getByTestId('books-shelf-heading-sub-2');
       // Per-shelf topic totals come from summing per-book counts:
       // Mathematics shelf (algebraBook) = 8 topics; History shelf (egyptBook) = 6.
       expect(screen.getByTestId('books-shelf-count-sub-1').props.children).toBe(

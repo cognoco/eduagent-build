@@ -97,9 +97,9 @@ describe('CreateProfileScreen', () => {
   it('renders form fields (persona picker hidden, auto-detected)', () => {
     render(<CreateProfileScreen />, { wrapper: Wrapper });
 
-    expect(screen.getByTestId('create-profile-name')).toBeTruthy();
-    expect(screen.getByTestId('create-profile-birthdate')).toBeTruthy();
-    expect(screen.getByTestId('create-profile-submit')).toBeTruthy();
+    screen.getByTestId('create-profile-name');
+    screen.getByTestId('create-profile-birthdate');
+    screen.getByTestId('create-profile-submit');
     // Birth date explanatory copy is visible
     expect(
       screen.getByText(/personalise how your mentor talks to you/)
@@ -134,18 +134,18 @@ describe('CreateProfileScreen', () => {
 
     it('shows minimum age 11 hint up front', () => {
       render(<CreateProfileScreen />, { wrapper: Wrapper });
-      expect(screen.getByText(/Minimum age is 11/)).toBeTruthy();
+      screen.getByText(/Minimum age is 11/);
     });
 
     it('uses "Add a child" as the page title', () => {
       render(<CreateProfileScreen />, { wrapper: Wrapper });
-      expect(screen.getByText('Add a child')).toBeTruthy();
+      screen.getByText('Add a child');
       expect(screen.queryByText('New profile')).toBeNull();
     });
 
     it("uses Child's display name + child-referent placeholder", () => {
       render(<CreateProfileScreen />, { wrapper: Wrapper });
-      expect(screen.getByText("Child's display name")).toBeTruthy();
+      screen.getByText("Child's display name");
       expect(
         screen.getByPlaceholderText("Enter your child's name")
       ).toBeTruthy();
@@ -157,8 +157,8 @@ describe('CreateProfileScreen', () => {
 
     render(<CreateProfileScreen />, { wrapper: Wrapper });
 
-    expect(screen.getByText('Add a child')).toBeTruthy();
-    expect(screen.getByText("Child's display name")).toBeTruthy();
+    screen.getByText('Add a child');
+    screen.getByText("Child's display name");
     expect(
       screen.getByText(/personalise how their mentor talks to them/)
     ).toBeTruthy();
@@ -192,7 +192,7 @@ describe('CreateProfileScreen', () => {
 
     fireEvent.press(screen.getByTestId('create-profile-birthdate'));
 
-    expect(screen.getByTestId('date-picker')).toBeTruthy();
+    screen.getByTestId('date-picker');
   });
 
   it('renders a web birthdate input fallback', () => {
@@ -207,7 +207,7 @@ describe('CreateProfileScreen', () => {
     try {
       render(<CreateProfileScreen />, { wrapper: Wrapper });
 
-      expect(screen.getByTestId('create-profile-birthdate-input')).toBeTruthy();
+      screen.getByTestId('create-profile-birthdate-input');
 
       fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Sam');
       fireEvent.changeText(
@@ -348,7 +348,7 @@ describe('CreateProfileScreen', () => {
     fireEvent.press(screen.getByTestId('create-profile-submit'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('create-profile-error')).toBeTruthy();
+      screen.getByTestId('create-profile-error');
     });
   });
 
@@ -526,7 +526,7 @@ describe('CreateProfileScreen', () => {
       });
 
       // Error message is shown.
-      expect(screen.getByTestId('create-profile-error')).toBeTruthy();
+      screen.getByTestId('create-profile-error');
       // Form is restored so the user can retry — submit button should be
       // enabled again (loading=false, name + date still set).
       const button = screen.getByTestId('create-profile-submit');
@@ -679,7 +679,7 @@ describe('CreateProfileScreen', () => {
       fireEvent.press(screen.getByTestId('create-profile-submit'));
 
       await waitFor(() => {
-        expect(screen.getByTestId('create-profile-error')).toBeTruthy();
+        screen.getByTestId('create-profile-error');
       });
 
       // No confirmation alert or navigation on failure

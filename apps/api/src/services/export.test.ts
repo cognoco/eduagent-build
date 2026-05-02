@@ -159,12 +159,12 @@ describe('generateExport', () => {
     const db = createMockDb();
     const result = await generateExport(db, 'account-1');
 
-    expect(result.account).toBeDefined();
-    expect(result.account.email).toBeDefined();
-    expect(result.account.createdAt).toBeDefined();
+    expect(result.account).toEqual(expect.objectContaining({}));
+    expect(typeof result.account.email).toBe('string');
+    expect(typeof result.account.createdAt).toBe('string');
     expect(result.profiles).toBeInstanceOf(Array);
     expect(result.consentStates).toBeInstanceOf(Array);
-    expect(result.exportedAt).toBeDefined();
+    expect(typeof result.exportedAt).toBe('string');
   });
 
   it('returns a valid ISO 8601 exportedAt date', async () => {
@@ -323,7 +323,7 @@ describe('generateExport', () => {
     const aiRow = result.sessionEvents.find(
       (e) => (e as Record<string, unknown>)['eventType'] === 'ai_response'
     ) as Record<string, unknown> | undefined;
-    expect(aiRow).toBeDefined();
+    expect(aiRow).toEqual(expect.objectContaining({}));
     expect(aiRow!['content']).toBe('Great job today!');
     expect(aiRow!['content']).not.toContain('"signals"');
     expect(aiRow!['content']).not.toContain('"ui_hints"');

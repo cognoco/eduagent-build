@@ -35,7 +35,7 @@ describe('shelf/[subjectId]/_layout.tsx', () => {
     render(<SubjectShelfLayout />);
 
     const screen = capturedScreens.find((s) => s.name === 'book/[bookId]');
-    expect(screen).toBeDefined();
+    expect(screen).not.toBeUndefined();
     expect(screen!.getId).toBeInstanceOf(Function);
   });
 

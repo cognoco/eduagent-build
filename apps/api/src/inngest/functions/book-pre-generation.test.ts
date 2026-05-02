@@ -132,7 +132,7 @@ describe('bookPreGeneration', () => {
   });
 
   it('should be defined as an Inngest function', () => {
-    expect(bookPreGeneration).toBeDefined();
+    expect(bookPreGeneration).toBeTruthy();
   });
 
   it('should have the correct function id', () => {

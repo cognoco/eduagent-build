@@ -563,7 +563,7 @@ describe('sendEmail structured logging', () => {
           (arg): arg is string =>
             typeof arg === 'string' && arg.includes('Resend API error')
         );
-      expect(logArg).toBeDefined();
+      expect(typeof logArg).toBe('string');
       const parsed = JSON.parse(logArg!) as {
         level: string;
         message: string;
@@ -598,7 +598,7 @@ describe('sendEmail structured logging', () => {
           (arg): arg is string =>
             typeof arg === 'string' && arg.includes('Network error')
         );
-      expect(logArg).toBeDefined();
+      expect(typeof logArg).toBe('string');
       const parsed = JSON.parse(logArg!) as { level: string; message: string };
       expect(parsed.level).toBe('error');
       expect(parsed.message).toContain('Network error');

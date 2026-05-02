@@ -115,7 +115,7 @@ describe('dailySnapshotCron', () => {
   });
 
   it('should be defined as an Inngest function', () => {
-    expect(dailySnapshotCron).toBeDefined();
+    expect(dailySnapshotCron).toBeTruthy();
   });
 
   it('should have the correct function id', () => {
@@ -240,7 +240,7 @@ describe('dailySnapshotRefresh', () => {
   });
 
   it('should be defined as an Inngest function', () => {
-    expect(dailySnapshotRefresh).toBeDefined();
+    expect(dailySnapshotRefresh).toBeTruthy();
   });
 
   it('should have the correct function id', () => {

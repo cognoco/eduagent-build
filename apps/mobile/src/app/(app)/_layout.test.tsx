@@ -13,9 +13,17 @@ import {
   rememberPendingAuthRedirect,
   peekPendingAuthRedirect,
 } from '../../lib/pending-auth-redirect';
+import { createRoutedMockFetch } from '../../test-utils/mock-api-routes';
+
+const mockFetch = createRoutedMockFetch();
+
+jest.mock(
+  '../../lib/api-client',
+  () =>
+    require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch)
+);
 
 const mockUseProfile = jest.fn();
-const mockUseConsentStatus = jest.fn();
 const mockUsePathname = jest.fn();
 const mockReplace = jest.fn();
 const mockTabs = Object.assign(
@@ -84,13 +92,8 @@ jest.mock('../../lib/profile', () => ({
   personaFromBirthYear: () => 'learner',
 }));
 
-jest.mock('../../hooks/use-consent', () => ({
-  useConsentStatus: () => mockUseConsentStatus(),
-  useRequestConsent: () => ({
-    mutate: jest.fn(),
-    isPending: false,
-  }),
-}));
+// use-consent uses useApiClient — mocked at the fetch boundary via mockFetch.
+// Routes: GET /consent/my-status, POST /consent/request
 
 jest.mock('../../lib/theme', () => ({
   useThemeColors: () => ({
@@ -105,9 +108,8 @@ jest.mock('../../lib/theme', () => ({
   useTokenVars: () => ({}),
 }));
 
-jest.mock('../../hooks/use-push-token-registration', () => ({
-  usePushTokenRegistration: jest.fn(),
-}));
+// use-push-token-registration indirectly uses useApiClient (via useRegisterPushToken).
+// Mocked at the fetch boundary via mockFetch — route: POST /settings/push-token
 
 jest.mock('../../hooks/use-revenuecat', () => ({
   useRevenueCatIdentity: jest.fn(),
@@ -131,10 +133,8 @@ jest.mock('../../components/feedback/FeedbackProvider', () => ({
   FeedbackProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
-const mockUseSubjects = jest.fn();
-jest.mock('../../hooks/use-subjects', () => ({
-  useSubjects: () => mockUseSubjects(),
-}));
+// use-subjects uses useApiClient — mocked at the fetch boundary via mockFetch.
+// Route: GET /subjects → { subjects: [] }
 
 const AppLayout = require('./_layout').default;
 
@@ -159,7 +159,6 @@ describe('AppLayout', () => {
     clearPendingAuthRedirect();
     mockReplace.mockReset();
     mockUsePathname.mockReturnValue('/home');
-    mockUseSubjects.mockReturnValue({ data: [], isLoading: false });
     mockSpeechGetPermissions.mockResolvedValue({
       granted: true,
       canAskAgain: true,
@@ -196,13 +195,36 @@ describe('AppLayout', () => {
       acknowledgeProfileRemoval: jest.fn(),
       switchProfile: jest.fn(),
     });
-    mockUseConsentStatus.mockReturnValue({
-      data: {
-        consentStatus: null,
-        parentEmail: null,
-        consentType: null,
-      },
-    });
+
+    // Default fetch routes for API hooks
+    mockFetch.setRoute('/consent/my-status', () =>
+      new Response(
+        JSON.stringify({
+          consentStatus: null,
+          parentEmail: null,
+          consentType: null,
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+    mockFetch.setRoute('/consent/request', () =>
+      new Response(
+        JSON.stringify({ sent: true }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+    mockFetch.setRoute('/subjects', () =>
+      new Response(
+        JSON.stringify({ subjects: [] }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+    mockFetch.setRoute('/settings/push-token', () =>
+      new Response(
+        JSON.stringify({ registered: true }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
   });
 
   afterEach(() => {
@@ -212,7 +234,7 @@ describe('AppLayout', () => {
   it('keeps linked-parent accounts in the learner tab shell for adaptive home', () => {
     renderLayout();
 
-    expect(screen.getByTestId('tabs')).toBeTruthy();
+    screen.getByTestId('tabs');
     expect(screen.queryByTestId('redirect')).toBeNull();
   });
 
@@ -287,7 +309,7 @@ describe('AppLayout', () => {
 
     renderLayout();
 
-    expect(screen.getByTestId('auth-redirect-replay')).toBeTruthy();
+    screen.getByTestId('auth-redirect-replay');
     expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');
   });
 
@@ -306,7 +328,7 @@ describe('AppLayout', () => {
     view.rerender(<AppLayout />);
 
     expect(peekPendingAuthRedirect()).toBe('/(app)/quiz');
-    expect(screen.getByTestId('auth-redirect-replay')).toBeTruthy();
+    screen.getByTestId('auth-redirect-replay');
     expect(mockReplace).toHaveBeenLastCalledWith('/(app)/quiz');
   });
 
@@ -364,7 +386,7 @@ describe('AppLayout', () => {
 
     renderLayout();
 
-    expect(screen.getByTestId('profile-loading')).toBeTruthy();
+    screen.getByTestId('profile-loading');
     expect(screen.queryByTestId('tabs')).toBeNull();
     expect(screen.queryByTestId('redirect')).toBeNull();
   });
@@ -397,24 +419,24 @@ describe('AppLayout', () => {
       acknowledgeProfileRemoval: jest.fn(),
       switchProfile: jest.fn(),
     });
-    mockUseConsentStatus.mockReturnValue({
-      data: {
-        consentStatus: 'CONSENTED',
-        parentEmail: null,
-        consentType: null,
-      },
-    });
+    mockFetch.setRoute('/consent/my-status', () =>
+      new Response(
+        JSON.stringify({
+          consentStatus: 'CONSENTED',
+          parentEmail: null,
+          consentType: null,
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
     // No subjects yet — pre-fix this triggered the celebration.
-    mockUseSubjects.mockReturnValue({
-      data: [],
-      isLoading: false,
-    });
+    // Default /subjects route returns [] — no override needed.
 
     renderLayout();
 
     expect(screen.queryByTestId('post-approval-landing')).toBeNull();
     expect(screen.queryByText("You're approved!")).toBeNull();
-    expect(screen.getByTestId('tabs')).toBeTruthy();
+    screen.getByTestId('tabs');
   });
 
   it('does not show post-approval landing when user already has subjects (BUG-544)', () => {
@@ -438,23 +460,28 @@ describe('AppLayout', () => {
       acknowledgeProfileRemoval: jest.fn(),
       switchProfile: jest.fn(),
     });
-    mockUseConsentStatus.mockReturnValue({
-      data: {
-        consentStatus: 'CONSENTED',
-        parentEmail: null,
-        consentType: null,
-      },
-    });
+    mockFetch.setRoute('/consent/my-status', () =>
+      new Response(
+        JSON.stringify({
+          consentStatus: 'CONSENTED',
+          parentEmail: null,
+          consentType: null,
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
     // User already has a subject — post-approval screen should NOT appear
-    mockUseSubjects.mockReturnValue({
-      data: [{ id: 's1', name: 'Spanish', isActive: true }],
-      isLoading: false,
-    });
+    mockFetch.setRoute('/subjects', () =>
+      new Response(
+        JSON.stringify({ subjects: [{ id: 's1', name: 'Spanish', isActive: true }] }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
 
     renderLayout();
 
     expect(screen.queryByTestId('post-approval-landing')).toBeNull();
-    expect(screen.getByTestId('tabs')).toBeTruthy();
+    screen.getByTestId('tabs');
   });
 
   it('renders in-app toast instead of native alert when profile was removed (BUG-548)', () => {
@@ -477,8 +504,8 @@ describe('AppLayout', () => {
 
     renderLayout();
 
-    expect(screen.getByTestId('profile-switched-toast')).toBeTruthy();
-    expect(screen.getByText('Profile switched')).toBeTruthy();
+    screen.getByTestId('profile-switched-toast');
+    screen.getByText('Profile switched');
   });
 
   it('shows proxy banner and switches back to the owner profile', () => {
@@ -503,8 +530,8 @@ describe('AppLayout', () => {
 
     renderLayout();
 
-    expect(screen.getByTestId('proxy-banner')).toBeTruthy();
-    expect(screen.getByText("Viewing Alex's account")).toBeTruthy();
+    screen.getByTestId('proxy-banner');
+    screen.getByText("Viewing Alex's account");
 
     fireEvent.press(screen.getByTestId('proxy-banner-switch-back'));
 
@@ -532,17 +559,20 @@ describe('AppLayout', () => {
       acknowledgeProfileRemoval: jest.fn(),
       switchProfile: jest.fn(),
     });
-    mockUseConsentStatus.mockReturnValue({
-      data: {
-        consentStatus: 'PARENTAL_CONSENT_REQUESTED',
-        parentEmail: 'parent@example.com',
-        consentType: 'GDPR',
-      },
-    });
+    mockFetch.setRoute('/consent/my-status', () =>
+      new Response(
+        JSON.stringify({
+          consentStatus: 'PARENTAL_CONSENT_REQUESTED',
+          parentEmail: 'parent@example.com',
+          consentType: 'GDPR',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
 
     renderLayout();
 
-    expect(screen.getByTestId('consent-pending-gate')).toBeTruthy();
+    screen.getByTestId('consent-pending-gate');
     expect(
       screen.getByText("We'll keep checking automatically while you wait.")
     ).toBeTruthy();
@@ -564,7 +594,7 @@ describe('AppLayout', () => {
     renderLayout();
 
     await waitFor(() => {
-      expect(screen.getByTestId('permission-setup-gate')).toBeTruthy();
+      screen.getByTestId('permission-setup-gate');
     });
     expect(screen.queryByTestId('tabs')).toBeNull();
   });
@@ -585,7 +615,7 @@ describe('AppLayout', () => {
     renderLayout();
 
     await waitFor(() => {
-      expect(screen.getByTestId('tabs')).toBeTruthy();
+      screen.getByTestId('tabs');
     });
     expect(screen.queryByTestId('permission-setup-gate')).toBeNull();
   });
@@ -612,7 +642,7 @@ describe('AppLayout', () => {
     renderLayout();
 
     await waitFor(() => {
-      expect(screen.getByTestId('tabs')).toBeTruthy();
+      screen.getByTestId('tabs');
     });
     expect(screen.queryByTestId('permission-setup-gate')).toBeNull();
   });
@@ -634,7 +664,7 @@ describe('AppLayout', () => {
     renderLayout();
 
     await waitFor(() => {
-      expect(screen.getByTestId('permission-setup-gate')).toBeTruthy();
+      screen.getByTestId('permission-setup-gate');
     });
 
     await act(async () => {
@@ -642,7 +672,7 @@ describe('AppLayout', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByTestId('tabs')).toBeTruthy();
+      screen.getByTestId('tabs');
     });
     expect(SecureStoreMock.setItemAsync).toHaveBeenCalledWith(
       'permissionSetupSeen_p1',
@@ -667,7 +697,7 @@ describe('AppLayout', () => {
     renderLayout();
 
     await waitFor(() => {
-      expect(screen.getByTestId('permission-setup-gate')).toBeTruthy();
+      screen.getByTestId('permission-setup-gate');
     });
 
     await act(async () => {
@@ -675,7 +705,7 @@ describe('AppLayout', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByTestId('tabs')).toBeTruthy();
+      screen.getByTestId('tabs');
     });
   });
 });

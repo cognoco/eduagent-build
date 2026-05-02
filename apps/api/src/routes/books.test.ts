@@ -341,8 +341,8 @@ describe('book routes', () => {
 
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(body.book).toBeDefined();
-      expect(body.topics).toBeDefined();
+      expect(body.book).toEqual(expect.objectContaining({}));
+      expect(Array.isArray(body.topics)).toBe(true);
     });
 
     it('returns existing topics for already-generated book', async () => {

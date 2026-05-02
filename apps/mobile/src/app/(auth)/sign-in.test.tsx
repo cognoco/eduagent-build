@@ -632,7 +632,7 @@ describe('SignInScreen', () => {
 
     // backup_code is supported — should go to code entry, not unsupported message
     await waitFor(() => {
-      expect(screen.getByText('Enter a backup code')).toBeTruthy();
+      screen.getByText('Enter a backup code');
     });
     expect(screen.queryByTestId('sign-in-unsupported-factor-help')).toBeNull();
   });

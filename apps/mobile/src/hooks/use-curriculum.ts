@@ -18,7 +18,15 @@ import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 
 export function useCurriculum(
-  subjectId: string
+  subjectId: string,
+  options?: {
+    /**
+     * React Query refetchInterval — pass a millisecond number to poll while
+     * curriculum generation is in-flight (e.g. after interview completion).
+     * Pass `false` or omit to disable polling (default).
+     */
+    refetchInterval?: number | false;
+  }
 ): UseQueryResult<Curriculum | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -40,6 +48,7 @@ export function useCurriculum(
       }
     },
     enabled: !!activeProfile && !!subjectId,
+    refetchInterval: options?.refetchInterval ?? false,
   });
 }
 

@@ -687,6 +687,22 @@ export function buildSystemPrompt(context: ExchangeContext): string {
       'Every question is a fresh opportunity — treat it that way.'
   );
 
+  // B.3: Adaptive escalation on correct-answer streak
+  if (
+    !isRecitation &&
+    context.correctStreak != null &&
+    context.correctStreak >= 4
+  ) {
+    sections.push(
+      'ADAPTIVE ESCALATION: The learner has answered correctly several times in a row at this level. ' +
+        'In your next response, naturally offer ONE of these — as a brief phrase woven into your reply, not a separate meta-question:\n' +
+        '- A harder question on the same topic\n' +
+        '- A shortcut or different angle they might not have considered\n' +
+        '- A prompt to try a related topic\n' +
+        'If they decline or seem unsure, resume at the current level without comment.'
+    );
+  }
+
   // "Not Yet" framing
   if (!isLanguageMode) {
     sections.push(

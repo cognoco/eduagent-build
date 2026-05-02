@@ -13,7 +13,7 @@ describe('TopicIndexRedirect [BUG-685]', () => {
 
   it('renders the placeholder view', () => {
     const { getByTestId } = render(<TopicIndexRedirect />);
-    expect(getByTestId('topic-index-redirect')).toBeTruthy();
+    getByTestId('topic-index-redirect');
   });
 
   it('replaces with /(app)/library on mount (not /home — closes the BUG-685 fall-through)', () => {

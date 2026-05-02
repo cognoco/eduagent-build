@@ -27,7 +27,7 @@ describe('pick-book/_layout.tsx', () => {
     render(<PickBookLayout />);
 
     const screen = capturedScreens.find((s) => s.name === '[subjectId]');
-    expect(screen).toBeDefined();
+    expect(screen).not.toBeUndefined();
     expect(screen!.getId).toBeInstanceOf(Function);
   });
 

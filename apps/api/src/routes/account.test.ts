@@ -121,7 +121,7 @@ describe('account routes', () => {
 
       const body = await res.json();
       expect(body.message).toBe('Deletion scheduled');
-      expect(body.gracePeriodEnds).toBeDefined();
+      expect(typeof body.gracePeriodEnds).toBe('string');
       expect(() => new Date(body.gracePeriodEnds)).not.toThrow();
     });
 
@@ -228,8 +228,8 @@ describe('account routes', () => {
       expect(res.status).toBe(200);
 
       const body = await res.json();
-      expect(body.account).toBeDefined();
-      expect(body.exportedAt).toBeDefined();
+      expect(body.account).toEqual(expect.objectContaining({}));
+      expect(typeof body.exportedAt).toBe('string');
     });
 
     it('returns 401 without auth header', async () => {

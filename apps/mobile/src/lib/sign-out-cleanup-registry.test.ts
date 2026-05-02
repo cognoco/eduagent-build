@@ -293,7 +293,7 @@ describe('[CR-SECURESTORE-REGISTRY-11] sign-out cleanup registry enforcement', (
       (e: { file: string; line: number }) =>
         e.file === 'apps/mobile/src/app/_layout.tsx' && e.line === 55
     );
-    expect(clerkException).toBeDefined();
+    expect(clerkException).not.toBeUndefined();
     const abs = path.resolve(
       __dirname,
       '..',

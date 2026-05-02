@@ -110,7 +110,7 @@ describe('ChildWeeklyReportDetailScreen', () => {
 
     render(<ChildWeeklyReportDetailScreen />);
 
-    expect(screen.getByTestId('child-weekly-report-hero')).toBeTruthy();
+    screen.getByTestId('child-weekly-report-hero');
     expect(
       screen.getByTestId('child-weekly-report-metric-sessions')
     ).toBeTruthy();
@@ -139,10 +139,10 @@ describe('ChildWeeklyReportDetailScreen', () => {
     // 7-day window (inclusive): Apr 27 -> May 3, 2026.
     // Locale order/separator/punctuation vary across CI runners, so just
     // assert both endpoints + the year + a dash separator are present.
-    expect(screen.getByText(/27\s*Apr|Apr\s*27/)).toBeTruthy();
-    expect(screen.getByText(/3\s*May|May\s*3/)).toBeTruthy();
-    expect(screen.getByText(/2026/)).toBeTruthy();
-    expect(screen.getByText(/[–-]/)).toBeTruthy();
+    screen.getByText(/27\s*Apr|Apr\s*27/);
+    screen.getByText(/3\s*May|May\s*3/);
+    screen.getByText(/2026/);
+    screen.getByText(/[–-]/);
   });
 
   // BUG-903 (b): Every report must have at least one CTA. The "Open child"
@@ -157,8 +157,8 @@ describe('ChildWeeklyReportDetailScreen', () => {
 
     render(<ChildWeeklyReportDetailScreen />);
 
-    expect(screen.getByTestId('child-weekly-report-ctas')).toBeTruthy();
-    expect(screen.getByTestId('child-weekly-report-open-child')).toBeTruthy();
+    screen.getByTestId('child-weekly-report-ctas');
+    screen.getByTestId('child-weekly-report-open-child');
   });
 
   // BUG-903 (d): Empty week shows friendly empty-state copy AND nudge CTA,
@@ -185,8 +185,8 @@ describe('ChildWeeklyReportDetailScreen', () => {
 
     render(<ChildWeeklyReportDetailScreen />);
 
-    expect(screen.getByTestId('child-weekly-report-empty-note')).toBeTruthy();
-    expect(screen.getByText(/Send Emma a nudge/)).toBeTruthy();
+    screen.getByTestId('child-weekly-report-empty-note');
+    screen.getByText(/Send Emma a nudge/);
   });
 
   // BUG-903 (b): "Open child" CTA navigates to /(app)/child/[id].

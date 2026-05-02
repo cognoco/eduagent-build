@@ -67,7 +67,7 @@ describe('createScopedRepository → curriculumTopics', () => {
       // check but fail this reference-identity one — drizzle pgTable objects
       // stringify as "[object Object]", so compare by identity instead.
       const secondJoin = calls.innerJoin[1];
-      expect(secondJoin).toBeDefined();
+      expect(secondJoin).not.toBeUndefined();
       const secondJoinTable = secondJoin![0];
       expect(secondJoinTable).toBe(subjects);
       // Terminal limit(1) ensures we never scan the whole table.

@@ -30,7 +30,7 @@ describe('ShimmerSkeleton', () => {
       </ShimmerSkeleton>
     );
     const container = getByTestId('skel');
-    expect(container.props.style).toBeDefined();
+    expect(container.props.style).not.toBeNull();
   });
 
   it('skips shimmer overlay when reduced motion is enabled', () => {

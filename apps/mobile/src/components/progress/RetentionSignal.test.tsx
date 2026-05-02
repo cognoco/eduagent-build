@@ -5,19 +5,19 @@ describe('RetentionSignal', () => {
   it('renders honest retention labels by default', () => {
     render(<RetentionSignal status="strong" />);
 
-    expect(screen.getByText('Strong')).toBeTruthy();
+    screen.getByText('Strong');
   });
 
   it('renders parent-facing labels when requested', () => {
     render(<RetentionSignal status="fading" parentFacing />);
 
-    expect(screen.getByText('A few things to refresh')).toBeTruthy();
+    screen.getByText('A few things to refresh');
     expect(screen.queryByText('Fading')).toBeNull();
   });
 
   it('maps forgotten to the same parent-facing review copy', () => {
     render(<RetentionSignal status="forgotten" parentFacing />);
 
-    expect(screen.getByText('Needs a review')).toBeTruthy();
+    screen.getByText('Needs a review');
   });
 });

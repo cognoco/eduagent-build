@@ -165,7 +165,7 @@ describe('freeformFilingRetry', () => {
   });
 
   it('should be defined as an Inngest function', () => {
-    expect(freeformFilingRetry).toBeDefined();
+    expect(freeformFilingRetry).toBeTruthy();
   });
 
   it('should have the correct function id', () => {
@@ -370,7 +370,7 @@ describe('freeformFilingRetry', () => {
       const completedCall = (mockStep.sendEvent as jest.Mock).mock.calls.find(
         (c: unknown[]) => (c[0] as string) === 'notify-filing-completed'
       );
-      expect(completedCall).toBeDefined();
+      expect(completedCall).not.toBeUndefined();
       const payload = (completedCall as unknown[])[1] as {
         name: string;
         data: Record<string, unknown>;

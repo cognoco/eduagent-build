@@ -39,7 +39,7 @@ describe('language-learner seed scenario integration', () => {
     const result = await seedScenario(db, 'language-learner', EMAIL);
 
     expect(result.scenario).toBe('language-learner');
-    expect(result.ids.subjectId).toBeDefined();
+    expect(typeof result.ids.subjectId).toBe('string');
 
     const [subject] = await db
       .select()

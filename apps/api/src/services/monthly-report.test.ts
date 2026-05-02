@@ -1071,7 +1071,7 @@ describe('listMonthlyReportsForParentChild', () => {
       reportMonth: '2026-04',
       viewedAt: null,
     });
-    expect(result[0]?.headlineStat).toBeDefined();
+    expect(typeof result[0]?.headlineStat).toBe('string');
   });
 
   it('maps viewedAt as ISO string when set', async () => {

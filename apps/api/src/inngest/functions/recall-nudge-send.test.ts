@@ -104,7 +104,7 @@ describe('recallNudgeSend', () => {
 
   describe('configuration', () => {
     it('is defined as an Inngest function', () => {
-      expect(recallNudgeSend).toBeDefined();
+      expect(recallNudgeSend).toBeTruthy();
     });
 
     it('triggers on app/recall-nudge.send', () => {

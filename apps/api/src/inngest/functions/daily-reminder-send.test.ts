@@ -72,7 +72,7 @@ describe('dailyReminderSend', () => {
 
   describe('configuration', () => {
     it('is defined as an Inngest function', () => {
-      expect(dailyReminderSend).toBeDefined();
+      expect(dailyReminderSend).toBeTruthy();
     });
 
     it('triggers on app/daily-reminder.send', () => {

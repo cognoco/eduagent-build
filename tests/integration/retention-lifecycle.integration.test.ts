@@ -470,7 +470,7 @@ describe('Integration: POST /v1/retention/relearn', () => {
     expect(body.topicId).toBe(topicIds[0]);
     expect(body.method).toBe('same');
     expect(body.resetPerformed).toBe(true);
-    expect(body.sessionId).toBeDefined();
+    expect(typeof body.sessionId).toBe('string');
 
     // Verify the retention card was reset in the DB
     const db = createIntegrationDb();
@@ -478,7 +478,7 @@ describe('Integration: POST /v1/retention/relearn', () => {
       where: (rc, { and, eq }) =>
         and(eq(rc.profileId, profileId), eq(rc.topicId, topicIds[0]!)),
     });
-    expect(card).toBeDefined();
+    expect(card).not.toBeNull();
     expect(Number(card!.easeFactor)).toBe(2.5);
     expect(card!.intervalDays).toBe(1);
     expect(card!.repetitions).toBe(0);

@@ -327,7 +327,7 @@ describe('dashboard routes', () => {
 
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(body.report).toBeDefined();
+      expect(body.report).toEqual(expect.objectContaining({}));
       expect(body.report.id).toBe(REPORT_ID);
     });
 

@@ -173,8 +173,8 @@ describe('ParentDashboardSummary', () => {
       />
     );
 
-    expect(screen.getByTestId('aggregate-signal')).toBeTruthy();
-    expect(screen.getByText('On Track')).toBeTruthy();
+    screen.getByTestId('aggregate-signal');
+    screen.getByText('On Track');
   });
 
   it('renders "Falling Behind" aggregate signal when any subject is weak', () => {
@@ -188,8 +188,8 @@ describe('ParentDashboardSummary', () => {
       />
     );
 
-    expect(screen.getByTestId('aggregate-signal')).toBeTruthy();
-    expect(screen.getByText('Falling Behind')).toBeTruthy();
+    screen.getByTestId('aggregate-signal');
+    screen.getByText('Falling Behind');
   });
 
   it('renders "Falling Behind" aggregate signal when any subject is forgotten', () => {
@@ -200,14 +200,14 @@ describe('ParentDashboardSummary', () => {
       />
     );
 
-    expect(screen.getByTestId('aggregate-signal')).toBeTruthy();
-    expect(screen.getByText('Falling Behind')).toBeTruthy();
+    screen.getByTestId('aggregate-signal');
+    screen.getByText('Falling Behind');
   });
 
   it('renders "No data yet" for aggregate signal when no subjects', () => {
     render(<ParentDashboardSummary {...defaultProps} subjects={[]} />);
 
-    expect(screen.getByTestId('aggregate-signal-empty')).toBeTruthy();
+    screen.getByTestId('aggregate-signal-empty');
     expect(screen.queryByTestId('aggregate-signal')).toBeNull();
   });
 
@@ -236,14 +236,14 @@ describe('ParentDashboardSummary', () => {
     it('shows teaser text for new learner', () => {
       render(<ParentDashboardSummary {...defaultProps} totalSessions={1} />);
 
-      expect(screen.getByTestId('parent-dashboard-teaser')).toBeTruthy();
-      expect(screen.getByText(/3 more sessions/)).toBeTruthy();
+      screen.getByTestId('parent-dashboard-teaser');
+      screen.getByText(/3 more sessions/);
     });
 
     it('shows singular "session" when only 1 remaining', () => {
       render(<ParentDashboardSummary {...defaultProps} totalSessions={3} />);
 
-      expect(screen.getByText(/1 more session,/)).toBeTruthy();
+      screen.getByText(/1 more session,/);
     });
 
     it('shows full signals for established learner (>= 4 sessions)', () => {
@@ -255,8 +255,8 @@ describe('ParentDashboardSummary', () => {
         />
       );
 
-      expect(screen.getByTestId('aggregate-signal')).toBeTruthy();
-      expect(screen.getByTestId('retention-trend-badge')).toBeTruthy();
+      screen.getByTestId('aggregate-signal');
+      screen.getByTestId('retention-trend-badge');
       expect(screen.queryByTestId('parent-dashboard-teaser')).toBeNull();
     });
 
@@ -272,8 +272,8 @@ describe('ParentDashboardSummary', () => {
         <ParentDashboardSummary {...defaultProps} retentionTrend="stable" />
       );
 
-      expect(screen.getByTestId('aggregate-signal')).toBeTruthy();
-      expect(screen.getByTestId('retention-trend-badge')).toBeTruthy();
+      screen.getByTestId('aggregate-signal');
+      screen.getByTestId('retention-trend-badge');
       expect(screen.queryByTestId('parent-dashboard-teaser')).toBeNull();
     });
   });

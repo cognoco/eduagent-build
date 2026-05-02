@@ -163,6 +163,6 @@ describe('useLanguageProgress', () => {
       'test-profile-id',
       'sub-1',
     ]);
-    expect(cachedData).toBeDefined();
+    expect(cachedData).not.toBeNull();
   });
 });

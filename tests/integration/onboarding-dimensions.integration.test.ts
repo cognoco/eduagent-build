@@ -205,7 +205,7 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       .select({ interests: learningProfiles.interests })
       .from(learningProfiles)
       .where(eq(learningProfiles.profileId, profileId));
-    expect(lp).toBeDefined();
+    expect(lp).not.toBeUndefined();
     const stored = lp!.interests as Array<{
       label: string;
       context: string;

@@ -495,6 +495,13 @@ export default function RootLayout() {
     if (fontsLoaded) {
       // Hide native splash — the AnimatedSplash component takes over
       SplashScreen.hideAsync();
+      // [BUG-954] Fire-and-forget drift check — warns in console if the
+      // deployed API is on a different commit than the local mobile build.
+      if (__DEV__) {
+        import('../lib/contract-drift-check').then((m) =>
+          m.checkContractDrift()
+        );
+      }
     }
   }, [fontsLoaded]);
 

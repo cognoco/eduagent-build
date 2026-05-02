@@ -39,14 +39,16 @@ export class ForbiddenError extends Error {
   }
 }
 
+export const CONFLICT_ERROR_NAME = 'ConflictError' as const;
 export class ConflictError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = 'ConflictError';
+    this.name = CONFLICT_ERROR_NAME;
     Object.setPrototypeOf(this, ConflictError.prototype);
   }
 }
 
+export const RATE_LIMITED_ERROR_NAME = 'RateLimitedError' as const;
 export class RateLimitedError extends Error {
   readonly code: string | undefined;
   /** Seconds until the client may retry, usually from a Retry-After header. */
@@ -59,7 +61,7 @@ export class RateLimitedError extends Error {
     retryAfter?: number
   ) {
     super(message);
-    this.name = 'RateLimitedError';
+    this.name = RATE_LIMITED_ERROR_NAME;
     this.code = code;
     this.retryAfter = retryAfter;
     Object.setPrototypeOf(this, RateLimitedError.prototype);

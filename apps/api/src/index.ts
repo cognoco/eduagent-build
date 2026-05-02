@@ -3,7 +3,7 @@ import { cors } from 'hono/cors';
 import { HTTPException } from 'hono/http-exception';
 import * as Sentry from '@sentry/cloudflare';
 
-import { ERROR_CODES } from '@eduagent/schemas';
+import { ERROR_CODES, LlmStreamError } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 
 import { captureException } from './services/sentry';
@@ -101,6 +101,7 @@ type Bindings = {
   TEST_SEED_SECRET?: string;
   REVENUECAT_WEBHOOK_SECRET?: string;
   SUPPORT_EMAIL?: string;
+  DEPLOY_SHA?: string;
 };
 
 type Variables = {
@@ -295,6 +296,41 @@ app.onError((err, c) => {
     return c.json(
       { code: ERROR_CODES.UPSTREAM_ERROR, message: err.message },
       502
+    );
+  }
+
+  // [BUG-950] LlmStreamError wraps the real cause — unwrap so typed errors
+  // (UpstreamLlmError, RateLimitedError, etc.) are classified correctly
+  // instead of falling through to the generic 500.
+  if (err instanceof LlmStreamError && err.cause instanceof Error) {
+    const cause = err.cause;
+    if (cause instanceof UpstreamLlmError) {
+      captureException(cause, {
+        userId: c.get('user')?.userId,
+        profileId: c.get('profileId'),
+        requestPath: c.req.path,
+        extra: { wrapper: err.message },
+      });
+      return c.json(
+        { code: ERROR_CODES.UPSTREAM_ERROR, message: cause.message },
+        502
+      );
+    }
+    captureException(err, {
+      userId: c.get('user')?.userId,
+      profileId: c.get('profileId'),
+      requestPath: c.req.path,
+      extra: { cause: cause.message, causeName: cause.name },
+    });
+    return c.json(
+      {
+        code: ERROR_CODES.LLM_UNAVAILABLE,
+        message:
+          c.env.ENVIRONMENT === 'production'
+            ? 'AI service temporarily unavailable'
+            : `${err.message}: ${cause.message}`,
+      },
+      503
     );
   }
 

@@ -2,10 +2,11 @@
 // Session Exchange — message processing, context preparation, persistence
 // ---------------------------------------------------------------------------
 
-import { eq, and, asc, desc, inArray, lt, sql, gte } from 'drizzle-orm';
+import { eq, and, asc, desc, inArray, lt, sql, gte, ne } from 'drizzle-orm';
 import {
   learningSessions,
   sessionEvents,
+  sessionSummaries,
   curriculumTopics,
   retentionCards,
   vocabulary,
@@ -75,6 +76,40 @@ const LANGUAGE_REGEX =
 const logger = createLogger();
 
 // ---------------------------------------------------------------------------
+// Correct-answer streak computation (pure — testable in isolation)
+// ---------------------------------------------------------------------------
+
+const MAX_CORRECT_STREAK = 5;
+
+/**
+ * Counts the number of consecutive correct answers at `currentRung` from the
+ * end of the event log, scanning backwards and stopping at the first
+ * non-ai_response event that breaks the streak, a wrong answer, or a rung
+ * change. Caps at MAX_CORRECT_STREAK to bound the value passed to the LLM.
+ */
+export function computeCorrectStreak(
+  events: Array<{
+    eventType: string;
+    metadata: unknown;
+  }>,
+  currentRung: number
+): number {
+  let streak = 0;
+  for (let i = events.length - 1; i >= 0; i--) {
+    const event = events[i]!;
+    if (event.eventType !== 'ai_response') continue;
+    const meta = event.metadata;
+    if (!meta || typeof meta !== 'object') break;
+    const m = meta as Record<string, unknown>;
+    if (m.escalationRung !== currentRung) break;
+    if (m.correctAnswer !== true) break;
+    streak++;
+    if (streak >= MAX_CORRECT_STREAK) break;
+  }
+  return streak;
+}
+
+// ---------------------------------------------------------------------------
 // Behavioral metrics data contract — UX-18 (process visibility)
 // ---------------------------------------------------------------------------
 
@@ -93,6 +128,8 @@ export interface ExchangeBehavioralMetrics {
   needsDeepening?: boolean;
   /** F6: LLM self-reported confidence — persisted so the next turn and analytics can read it. */
   confidence?: 'low' | 'medium' | 'high';
+  /** B.3 monitoring: consecutive correct-answer streak at the current escalation rung */
+  correctStreak?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -284,6 +321,7 @@ export async function prepareExchangeContext(
     memory,
     metadataRows,
     rawInputMemory,
+    lastSessionSummaryRows,
     supp,
   ] = await Promise.all([
     Promise.resolve(staticContext.subject),
@@ -341,6 +379,45 @@ export async function prepareExchangeContext(
           5
         )
       : Promise.resolve({ context: '', topicIds: [] }),
+    // B.4: Most recent completed session summary within 14-day freshness window.
+    // Graceful enrichment — never throws; undefined means no usable summary.
+    (async () => {
+      try {
+        const freshnessCutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+        return await db
+          .select({
+            content: sessionSummaries.content,
+            exchangeCount: learningSessions.exchangeCount,
+          })
+          .from(sessionSummaries)
+          .innerJoin(
+            learningSessions,
+            eq(sessionSummaries.sessionId, learningSessions.id)
+          )
+          .where(
+            and(
+              eq(sessionSummaries.profileId, profileId),
+              ne(sessionSummaries.sessionId, sessionId),
+              inArray(sessionSummaries.status, [
+                'submitted',
+                'accepted',
+                'auto_closed',
+              ]),
+              gte(sessionSummaries.createdAt, freshnessCutoff)
+            )
+          )
+          .orderBy(desc(sessionSummaries.createdAt))
+          .limit(1);
+      } catch (err) {
+        logger.warn('[session-exchange] last-session-summary query failed', {
+          event: 'session.last_summary_query_failed',
+          profileId,
+          sessionId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        return [];
+      }
+    })(),
     supplementaryPromise,
   ]);
 
@@ -756,6 +833,10 @@ export async function prepareExchangeContext(
           effectivenessSessionCount:
             learningProfile.effectivenessSessionCount ?? 0,
           activeUrgency,
+          // B.4: Last session summary — quality-gated in buildMemoryBlock
+          lastSessionSummary: lastSessionSummaryRows[0]?.content ?? undefined,
+          lastSessionExchangeCount:
+            lastSessionSummaryRows[0]?.exchangeCount ?? undefined,
         },
         isFreeform
           ? silentClassification?.subjectName ?? null
@@ -773,6 +854,17 @@ export async function prepareExchangeContext(
       )
     : null;
   const learnerMemoryContext = memoryBlock?.text || undefined;
+
+  // B.4 monitoring: memory block size
+  if (learnerMemoryContext) {
+    const sectionCount = (learnerMemoryContext.match(/^- /gm) ?? []).length;
+    logger.info('[session-exchange] memory block size', {
+      event: 'llm.memory_block_size',
+      sessionId,
+      sizeChars: learnerMemoryContext.length,
+      sectionCount,
+    });
+  }
 
   // FR254: Build accommodation block — independent of memory injection toggle
   const accommodationContext = learningProfile
@@ -846,6 +938,9 @@ export async function prepareExchangeContext(
       ?.effectiveMode as string | undefined,
     // Personalisation: learner's display name for the mentor to use naturally
     learnerName: profile?.displayName ?? undefined,
+    // B.3: Consecutive correct-answer streak at the current escalation rung.
+    // Used by the prompt to trigger adaptive escalation when streak >= 4.
+    correctStreak: computeCorrectStreak(events, effectiveRung),
   };
 
   return { session, context, effectiveRung, hintCount, lastAiResponseAt };
@@ -1031,6 +1126,51 @@ export async function persistExchangeResult(
       eventType: 'escalation' as const,
       content: `Escalated from rung ${previousRung} to ${effectiveRung}`,
       metadata: { fromRung: previousRung, toRung: effectiveRung },
+    });
+  }
+
+  // B.1 monitoring: tone check — detect banned filler openers
+  {
+    const words = aiResponse.trim().split(/\s+/);
+    const firstSixWords = words.slice(0, 6).join(' ').toLowerCase();
+    const startsWithFiller = [
+      "i'm so proud",
+      'great job',
+      'amazing',
+      'fantastic',
+      'awesome',
+      "let's dive in",
+      'nice work',
+      'excellent',
+      'wonderful',
+      'perfect',
+      "that's a great question",
+    ].some((opener) => firstSixWords.startsWith(opener));
+    logger.info('[session-exchange] tone check', {
+      event: 'llm.tone_check',
+      sessionId,
+      firstSixWords,
+      wordCount: words.length,
+      startsWithFiller,
+    });
+  }
+
+  // B.2 monitoring: pronunciation leak in text mode
+  if (session.inputMode !== 'voice') {
+    if (/\([^)]*(?:say:|pronounced:?)[^)]*\)/i.test(aiResponse)) {
+      logger.warn('[session-exchange] text mode pronunciation leak', {
+        event: 'llm.text_mode_pronunciation_leak',
+        sessionId,
+      });
+    }
+  }
+
+  // B.3 monitoring: escalation offered on correct streak
+  if (behavioral?.correctStreak != null && behavioral.correctStreak >= 4) {
+    logger.info('[session-exchange] escalation offered', {
+      event: 'llm.escalation_offered',
+      sessionId,
+      correctStreak: behavioral.correctStreak,
     });
   }
 

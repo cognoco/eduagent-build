@@ -5,6 +5,9 @@ import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import { recordOutboxSpillover } from '../services/support/spillover';
+import { createLogger } from '../services/logger';
+
+const logger = createLogger();
 
 const MAX_CONTENT_SIZE = 8_000;
 
@@ -38,7 +41,19 @@ export const supportRoutes = new Hono<SupportRouteEnv>().post(
     const db = c.get('db');
     const { entries } = c.req.valid('json');
 
+    logger.info('outbox_spillover.received', {
+      profileId,
+      count: entries.length,
+      flows: [...new Set(entries.map((e) => e.flow))],
+    });
+
     const result = await recordOutboxSpillover(db, profileId, entries);
+
+    logger.info('outbox_spillover.written', {
+      profileId,
+      written: result.written,
+    });
+
     return c.json(result);
   }
 );

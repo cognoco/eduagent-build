@@ -542,7 +542,7 @@ describe('ConsentScreen', () => {
     fireEvent.press(screen.getByTestId('consent-done'));
     flushFadeAnimation();
     expect(mockBack).not.toHaveBeenCalled();
-    expect(screen.getByTestId('consent-parent-view')).toBeTruthy();
+    screen.getByTestId('consent-parent-view');
   });
 
   // ── Reduced motion ──────────────────────────────────────────────
@@ -577,7 +577,7 @@ describe('ConsentScreen', () => {
 
       // Go to parent view (instant, no animation)
       fireEvent.press(screen.getByTestId('consent-handoff-button'));
-      expect(screen.getByTestId('consent-parent-view')).toBeTruthy();
+      screen.getByTestId('consent-parent-view');
 
       // Fill email and submit
       fireEvent.changeText(
@@ -592,7 +592,7 @@ describe('ConsentScreen', () => {
 
       // Success phase renders instantly without needing flushFadeAnimation
       await waitFor(() => {
-        expect(screen.getByTestId('consent-success')).toBeTruthy();
+        screen.getByTestId('consent-success');
       });
     });
 
@@ -604,7 +604,7 @@ describe('ConsentScreen', () => {
       fireEvent.press(screen.getByTestId('consent-handoff-button'));
 
       // Phase switched instantly — parent view visible
-      expect(screen.getByTestId('consent-parent-view')).toBeTruthy();
+      screen.getByTestId('consent-parent-view');
 
       // No intermediate opacity=0 state; pointerEvents should be 'auto'
       // (isTransitioning stays false when reduced motion skips animation)

@@ -148,11 +148,11 @@ describe('homework routes', () => {
       expect(res.status).toBe(201);
 
       const body = await res.json();
-      expect(body.session).toBeDefined();
+      expect(body.session).toEqual(expect.objectContaining({}));
       expect(body.session.subjectId).toBe(SUBJECT_ID);
       expect(body.session.sessionType).toBe('homework');
       expect(body.session.status).toBe('active');
-      expect(body.session.startedAt).toBeDefined();
+      expect(typeof body.session.startedAt).toBe('string');
       expect(body.session.endedAt).toBeNull();
     });
 
@@ -280,7 +280,7 @@ describe('homework routes', () => {
       expect(body.text).toBe('Stub OCR text for testing');
       expect(body.confidence).toBe(0.95);
       expect(body.regions).toHaveLength(1);
-      expect(body.regions[0].boundingBox).toBeDefined();
+      expect(body.regions[0].boundingBox).toEqual(expect.objectContaining({}));
     });
 
     it('accepts image/png files', async () => {

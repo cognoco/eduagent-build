@@ -66,7 +66,7 @@ describe('BookmarkNudgeTooltip', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('bookmark-nudge-tooltip')).toBeTruthy();
+      screen.getByTestId('bookmark-nudge-tooltip');
     });
   });
 
@@ -105,7 +105,7 @@ describe('BookmarkNudgeTooltip', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('bookmark-nudge-tooltip')).toBeTruthy();
+      screen.getByTestId('bookmark-nudge-tooltip');
     });
 
     expect(screen.queryByTestId('bookmark-nudge-bookmark-now')).toBeNull();
@@ -122,7 +122,7 @@ describe('BookmarkNudgeTooltip', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('bookmark-nudge-bookmark-now')).toBeTruthy();
+      screen.getByTestId('bookmark-nudge-bookmark-now');
     });
   });
 

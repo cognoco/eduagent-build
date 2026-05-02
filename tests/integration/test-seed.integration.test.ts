@@ -115,16 +115,16 @@ describe('Integration: test-seed routes', () => {
     expect(typeof body.ids.sessionId).toBe('string');
 
     const account = await findAccountByEmail(LEARNING_EMAIL);
-    expect(account).toBeDefined();
+    expect(account).not.toBeUndefined();
     expect(account!.id).toBe(body.accountId);
     expect(account!.clerkUserId.startsWith('clerk_seed_')).toBe(true);
 
     const profile = await findProfile(body.profileId as string);
-    expect(profile).toBeDefined();
+    expect(profile).not.toBeUndefined();
     expect(profile!.accountId).toBe(body.accountId);
 
     const session = await findSession(body.ids.sessionId as string);
-    expect(session).toBeDefined();
+    expect(session).not.toBeUndefined();
     expect(session!.status).toBe('active');
   });
 
@@ -217,7 +217,7 @@ describe('Integration: test-seed routes', () => {
 
     expect(await findAccountByEmail(RESET_A_EMAIL)).toBeUndefined();
     expect(await findAccountByEmail(RESET_B_EMAIL)).toBeUndefined();
-    expect(await findAccountByEmail(MANUAL_EMAIL)).toBeDefined();
+    expect(await findAccountByEmail(MANUAL_EMAIL)).not.toBeUndefined();
   });
 
   it('resets only the requested seeded email prefix when prefix is provided', async () => {
@@ -260,6 +260,6 @@ describe('Integration: test-seed routes', () => {
     expect(body.deletedCount).toBe(1);
 
     expect(await findAccountByEmail(RESET_PREFIX_EMAIL)).toBeUndefined();
-    expect(await findAccountByEmail(RESET_OTHER_EMAIL)).toBeDefined();
+    expect(await findAccountByEmail(RESET_OTHER_EMAIL)).not.toBeUndefined();
   });
 });

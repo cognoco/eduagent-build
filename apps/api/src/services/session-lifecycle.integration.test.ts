@@ -152,7 +152,7 @@ describe('Session lifecycle (integration)', () => {
 
     // Verify session row persisted
     // (LearningSession schema omits profileId for privacy — check via DB query instead)
-    expect(session.id).toBeDefined();
+    expect(typeof session.id).toBe('string');
     expect(session.subjectId).toBe(subjectId);
     expect(session.status).toBe('active');
     expect(session.exchangeCount).toBe(0);
@@ -208,7 +208,7 @@ describe('Session lifecycle (integration)', () => {
       message: 'What is 2 + 2?',
     });
 
-    expect(result.response).toBeDefined();
+    expect(typeof result.response).toBe('string');
     expect(result.exchangeCount).toBe(1);
 
     // Verify both user_message and ai_response events are in the DB
@@ -228,7 +228,7 @@ describe('Session lifecycle (integration)', () => {
     expect(userEvent?.content).toBe('What is 2 + 2?');
 
     const aiEvent = events.find((e) => e.eventType === 'ai_response');
-    expect(aiEvent?.content).toBeDefined();
+    expect(typeof aiEvent?.content).toBe('string');
     expect(aiEvent?.content.length).toBeGreaterThan(0);
   });
 

@@ -97,7 +97,7 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
     // outer .parse() would throw before any step.run, causing Inngest to retry
     // a permanently-bad input.
     it('does NOT throw on malformed payload — uses safeParse', async () => {
-      await expect(executeHandler({})).resolves.toBeDefined();
+      await expect(executeHandler({})).resolves.toBeTruthy();
     });
 
     it('returns skipped on malformed payload and does NOT call sendEmail', async () => {
@@ -219,8 +219,8 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
       )[1].idempotencyKey;
 
       // Both retries must produce the same non-undefined key.
-      expect(keyFirst).toBeDefined();
-      expect(keySecond).toBeDefined();
+      expect(typeof keyFirst).toBe('string');
+      expect(typeof keySecond).toBe('string');
       expect(keyFirst).toEqual(keySecond);
 
       // Must NOT be the old collision fallback.
@@ -244,8 +244,8 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
         mockSendEmail.mock.calls[1] as [unknown, { idempotencyKey?: string }]
       )[1].idempotencyKey;
 
-      expect(keyA).toBeDefined();
-      expect(keyB).toBeDefined();
+      expect(typeof keyA).toBe('string');
+      expect(typeof keyB).toBe('string');
       expect(keyA).not.toEqual(keyB);
     });
 
@@ -311,8 +311,8 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
       const keyB = (
         mockSendEmail.mock.calls[1] as [unknown, { idempotencyKey?: string }]
       )[1].idempotencyKey;
-      expect(keyA).toBeDefined();
-      expect(keyB).toBeDefined();
+      expect(typeof keyA).toBe('string');
+      expect(typeof keyB).toBe('string');
       expect(keyA).not.toEqual(keyB);
     });
   });

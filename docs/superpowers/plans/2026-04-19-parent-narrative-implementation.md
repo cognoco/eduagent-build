@@ -25,7 +25,7 @@
 | **Phase 3** — Accommodation Guidance (§4) | Task 9 | **NOT STARTED** — `ACCOMMODATION_GUIDE` export + guide toggle missing |
 | **Phase 4** — Guided-Label Tooltips (§7) | Tasks 10-11 | **NOT STARTED** — `MetricInfoDot` component not created |
 | **Phase 5** — Teaser Empty States (§2) | Tasks 12-13 | **NOT STARTED** — `SamplePreview` component not created |
-| Milestone backfill (F-035) | Task 14 | **NOT STARTED** |
+| ~~Milestone backfill (F-035)~~ | ~~Task 14~~ | **DELETED** — no existing users pre-launch, backfill unnecessary |
 | Integration test | Task 15 | **NOT STARTED** |
 
 **Note:** `ENGAGEMENT_SIGNALS` was exported as `ENGAGEMENT_SIGNALS` (not `VALID_ENGAGEMENT_SIGNALS` as planned) — functionally equivalent, no action needed.
@@ -45,8 +45,8 @@
 | Create | `apps/mobile/src/components/parent/SamplePreview.tsx` | Blurred sample preview for gated empty states |
 | Create | `apps/mobile/src/components/parent/SamplePreview.test.tsx` | Tests for above |
 | Modify | `apps/mobile/src/components/progress/RetentionSignal.tsx` | Add `parentFacing` prop for new labels (used in subject topic rows) |
-| Create | `apps/api/src/inngest/functions/milestone-backfill.ts` | One-off backfill for existing users' milestones (F-035) |
-| Create | `apps/api/src/inngest/functions/milestone-backfill.test.ts` | Tests for above |
+| ~~Create~~ | ~~`apps/api/src/inngest/functions/milestone-backfill.ts`~~ | ~~DELETED — no pre-launch users~~ |
+| ~~Create~~ | ~~`apps/api/src/inngest/functions/milestone-backfill.test.ts`~~ | ~~DELETED — no pre-launch users~~ |
 | Modify | `apps/mobile/src/app/(app)/child/[profileId]/topic/[topicId].tsx` | Understanding card, gated retention |
 | Modify | `apps/mobile/src/app/(app)/child/[profileId]/subjects/[subjectId].tsx` | Gate retention badges on data |
 | Modify | `apps/mobile/src/app/(app)/child/[profileId]/session/[sessionId].tsx` | Narrative + conversation prompt layout |
@@ -1791,180 +1791,9 @@ git commit -m "feat(mobile): teaser empty states with sample previews + next mil
 
 ---
 
-### Task 14: Milestone backfill for existing users (F-035)
+### ~~Task 14: Milestone backfill for existing users (F-035)~~
 
-**Files:**
-- Create: `apps/api/src/inngest/functions/milestone-backfill.ts`
-- Create: `apps/api/src/inngest/functions/milestone-backfill-per-profile.ts`
-- Create: `apps/api/src/inngest/functions/milestone-backfill.test.ts`
-
-This is a one-off Inngest function that backfills milestones for existing users who crossed thresholds before PEH-S1 lowered them. Without this, existing paid users see zero milestones despite meeting criteria.
-
-**Architectural decisions driven by plan review:**
-1. **Fan out, don't loop.** A single function iterating all profiles hits Inngest step/time limits at scale. Dispatcher sends one `app/milestone.backfill.profile` event per profile; a worker function handles each.
-2. **Compute real crossing timestamps.** Using "most recent session" for `crossedAt` dates every backfilled milestone to today and is misleading to parents. Walk the session history in order and record the actual session where each threshold was crossed.
-3. **Use scoped repository.** Per-profile worker must read/write through `createScopedRepository(profileId)` per CLAUDE.md non-negotiable rule.
-4. **Confirm table name before coding.** The milestone table is `milestone_achievements` (verify with `rg "pgTable\('milestone"` before starting) — do not use a placeholder.
-
-- [ ] **Step 1: Write failing test**
-
-```typescript
-// apps/api/src/inngest/functions/milestone-backfill.test.ts
-import { detectMilestones } from '../../services/milestone-detection';
-
-describe('milestone backfill logic', () => {
-  it('detects milestones for a user with 5 sessions starting from zero', () => {
-    const previous = { totalSessions: 0, topicsMastered: 0, vocabularyCount: 0, streakDays: 0, learningTimeHours: 0, topicsExplored: 0, subjects: [] };
-    const current = { totalSessions: 5, topicsMastered: 1, vocabularyCount: 12, streakDays: 0, learningTimeHours: 2, topicsExplored: 3, subjects: [] };
-    const milestones = detectMilestones(previous, current);
-    // Should detect: 1 session, 3 sessions, 5 sessions, 1 topic mastered, 5 vocab, 10 vocab, 1 hour, 1 topic explored, 3 topics explored
-    expect(milestones.length).toBeGreaterThanOrEqual(5);
-    expect(milestones.some((m) => m.type === 'sessions' && m.threshold === 1)).toBe(true);
-    expect(milestones.some((m) => m.type === 'sessions' && m.threshold === 5)).toBe(true);
-  });
-});
-```
-
-- [ ] **Step 2: Run test to verify it passes (validates existing detectMilestones works)**
-
-Run: `cd apps/api && pnpm exec jest src/inngest/functions/milestone-backfill.test.ts --no-coverage`
-Expected: PASS — confirms `detectMilestones` handles the zero→current pattern correctly
-
-- [ ] **Step 3: Implement the dispatcher function (fan-out)**
-
-```typescript
-// apps/api/src/inngest/functions/milestone-backfill.ts
-import { inngest } from '../client';
-import { db } from '@eduagent/database';
-import { profiles } from '@eduagent/database/schema';
-import { sql } from 'drizzle-orm';
-
-/**
- * Dispatcher: finds profiles needing backfill and fans out one event per profile.
- * The per-profile worker does the actual detection and insert.
- *
- * Trigger manually: inngest.send({ name: 'app/milestone.backfill' })
- */
-export const milestoneBackfill = inngest.createFunction(
-  { id: 'milestone-backfill', name: 'Dispatch milestone backfill per profile' },
-  { event: 'app/milestone.backfill' },
-  async ({ step }) => {
-    const profilesToBackfill = await step.run('find-profiles', async () => {
-      return db
-        .select({ id: profiles.id })
-        .from(profiles)
-        .where(sql`EXISTS (
-          SELECT 1 FROM learning_sessions ls
-          WHERE ls.profile_id = profiles.id AND ls.status != 'active'
-        )`);
-    });
-
-    // Fan out — each profile is processed in its own Inngest run.
-    // This avoids step-count and execution-time limits on large workspaces.
-    await step.sendEvent(
-      'dispatch-profile-backfills',
-      profilesToBackfill.map((p) => ({
-        name: 'app/milestone.backfill.profile',
-        data: { profileId: p.id },
-      })),
-    );
-
-    return { profilesDispatched: profilesToBackfill.length };
-  },
-);
-```
-
-- [ ] **Step 3b: Implement the per-profile worker**
-
-```typescript
-// apps/api/src/inngest/functions/milestone-backfill-per-profile.ts
-import { inngest } from '../client';
-import { createScopedRepository } from '@eduagent/database';
-import { milestoneAchievements, learningSessions } from '@eduagent/database/schema';
-import { detectMilestones } from '../../services/milestone-detection';
-import { asc, ne } from 'drizzle-orm';
-
-/**
- * Worker: for one profile, walks session history in order and records the actual
- * session timestamp where each threshold was crossed. This preserves parent-facing
- * truthfulness — a 1-session milestone from February stays dated February, not today.
- */
-export const milestoneBackfillPerProfile = inngest.createFunction(
-  { id: 'milestone-backfill-per-profile', name: 'Backfill milestones for one profile' },
-  { event: 'app/milestone.backfill.profile' },
-  async ({ event, step }) => {
-    const { profileId } = event.data as { profileId: string };
-
-    return step.run('backfill', async () => {
-      const scoped = createScopedRepository(profileId);
-
-      // Walk sessions in chronological order, simulating the metric updates
-      // that would have happened in real time. At each step, detect which
-      // milestones would have been created and insert with that session's timestamp.
-      const sessions = await scoped
-        .select()
-        .from(learningSessions)
-        .where(ne(learningSessions.status, 'active'))
-        .orderBy(asc(learningSessions.startedAt));
-
-      let running = {
-        totalSessions: 0, topicsMastered: 0, vocabularyCount: 0,
-        streakDays: 0, learningTimeHours: 0, topicsExplored: 0, subjects: [] as string[],
-      };
-
-      const toInsert: Array<{ type: string; threshold: number; crossedAt: Date }> = [];
-
-      for (const session of sessions) {
-        const next = applySessionToMetrics(running, session); // helper extracted from existing computation
-        const crossed = detectMilestones(running, next);
-        for (const m of crossed) {
-          toInsert.push({
-            type: m.type,
-            threshold: m.threshold,
-            crossedAt: session.endedAt ?? session.startedAt,
-          });
-        }
-        running = next;
-      }
-
-      if (toInsert.length === 0) return { inserted: 0 };
-
-      // Scoped insert — onConflictDoNothing makes backfill idempotent (safe to re-run).
-      let inserted = 0;
-      for (const m of toInsert) {
-        const result = await scoped
-          .insert(milestoneAchievements)
-          .values({ profileId, ...m })
-          .onConflictDoNothing();
-        inserted += result.rowCount ?? 0;
-      }
-
-      return { inserted };
-    });
-  },
-);
-```
-
-Notes:
-- `applySessionToMetrics` is a helper that must be extracted from the existing session-completed metrics computation. Task 14 Step 2 should grep the codebase to find it — if it's inlined in `session-completed.ts`, extract it to `services/metrics/apply-session.ts` in a separate commit before this task.
-- `milestone_achievements` table name is confirmed by `rg "pgTable\('milestone"` before writing the import.
-- The per-profile function MUST use `createScopedRepository(profileId)` — do not use raw `db.insert(...)`.
-
-- [ ] **Step 4: Register both functions in the Inngest client**
-
-Add BOTH `milestoneBackfill` (dispatcher) AND `milestoneBackfillPerProfile` (worker) to the Inngest functions array in `apps/api/src/inngest/index.ts`. Missing the worker registration is a silent failure — the dispatcher will send events with no listener.
-
-- [ ] **Step 5: Run tests**
-
-Run: `cd apps/api && pnpm exec jest --findRelatedTests src/inngest/functions/milestone-backfill.ts --no-coverage`
-Expected: PASS
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add apps/api/src/inngest/functions/milestone-backfill.ts apps/api/src/inngest/functions/milestone-backfill.test.ts apps/api/src/inngest/index.ts
-git commit -m "feat(api): milestone backfill Inngest job for existing users [PN-§2, F-035]"
-```
+**DELETED 2026-05-02.** No existing users pre-launch — backfill is unnecessary. If users exist before a future milestone threshold change, create a new backfill task at that time.
 
 ---
 
@@ -2079,7 +1908,7 @@ These sections are deferred to a future plan after Phases 1–5 ship:
 | R2 | Injection filter too aggressive — blocks legitimate narratives | High | Task 5 Step 1 (positive tests) + Step 3 (phrase-based regex) |
 | R3 | Session detail had dead-end state (all branches null) | Medium | Task 8 Step 4 (explicit unavailable fallback with Go Back) |
 | R4 | `generateLlmHighlight` kept as dead code after migration | Medium | Task 5 Step 5 (explicit delete + grep + typecheck steps) |
-| R5 | Milestone backfill — misleading timestamps, timeout risk, missing scoping | Medium | Task 14 (split into dispatcher + per-profile worker, chronological walk, scoped repo) |
+| R5 | ~~Milestone backfill — misleading timestamps, timeout risk, missing scoping~~ | ~~Medium~~ | **DELETED** — Task 14 removed (no pre-launch users) |
 | R6 | New dashboard reads bypass `createScopedRepository` | Medium | Task 2 Step 2 + Task 7 Step 2 (explicit scoped repository usage) |
 | R7 | Copy-to-clipboard had no user feedback | Low-Medium | Task 8 Step 4 (copy state with Copied/Copy failed labels) |
 | R8 | Tooltip `metricKey` mismatched visible label ("retention" vs "Review status") | Low | Task 1 (renamed to `review-status`, added `title` field) + Task 11 |
@@ -2105,7 +1934,7 @@ Per `~/.claude/CLAUDE.md` fix-verification rules, every task has an explicit ver
 | 11 — Tooltip wiring | `manual: tap each info dot on topic detail + session detail, confirm modal title matches visible label` |
 | 12 — SamplePreview | `test: SamplePreview.test.tsx` |
 | 13 — Empty state teasers | `manual: 4 surfaces (dashboard, growth chart, reports, milestones) show overlay with unlock copy when data insufficient` |
-| 14 — Milestone backfill | `test: milestone-backfill.test.ts` (dispatcher) + `test: milestone-backfill-per-profile.test.ts` (chronological walk proves real timestamps) + `manual: trigger in dev, verify parent UI shows milestones dated in the past, not today` |
+| ~~14 — Milestone backfill~~ | **DELETED** — no pre-launch users |
 | 15 — Integration test | `test: session-completed.integration.test.ts` — happy path AND short-transcript fallback |
 
 ## Validation Checklist

@@ -38,7 +38,7 @@ describe('createStripeClient', () => {
       apiVersion: expect.any(String),
       httpClient: expect.anything(),
     });
-    expect(client).toBeDefined();
+    expect(typeof client).toBe('object');
   });
 
   it('uses the fetch HTTP client for Workers compatibility', () => {

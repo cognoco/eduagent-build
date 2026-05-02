@@ -187,7 +187,7 @@ describe('buildSystemPrompt', () => {
 
   it('accepts exchangeCount in the context', () => {
     const prompt = buildSystemPrompt({ ...baseContext, exchangeCount: 0 });
-    expect(prompt).toBeDefined();
+    expect(typeof prompt).toBe('string');
   });
 
   it('includes learning session guidance', () => {
@@ -650,6 +650,46 @@ describe('buildSystemPrompt', () => {
       expect(prompt).not.toContain('TEXT MODE');
     });
   });
+
+  describe('correctStreak adaptive escalation (B.3)', () => {
+    it('injects ADAPTIVE ESCALATION when correctStreak >= 4', () => {
+      const prompt = buildSystemPrompt({
+        ...baseContext,
+        correctStreak: 4,
+      });
+      expect(prompt).toContain('ADAPTIVE ESCALATION');
+    });
+
+    it('injects ADAPTIVE ESCALATION when correctStreak is 5', () => {
+      const prompt = buildSystemPrompt({
+        ...baseContext,
+        correctStreak: 5,
+      });
+      expect(prompt).toContain('ADAPTIVE ESCALATION');
+    });
+
+    it('does not inject ADAPTIVE ESCALATION when correctStreak is 3', () => {
+      const prompt = buildSystemPrompt({
+        ...baseContext,
+        correctStreak: 3,
+      });
+      expect(prompt).not.toContain('ADAPTIVE ESCALATION');
+    });
+
+    it('does not inject ADAPTIVE ESCALATION when correctStreak is undefined', () => {
+      const prompt = buildSystemPrompt(baseContext);
+      expect(prompt).not.toContain('ADAPTIVE ESCALATION');
+    });
+
+    it('does not inject ADAPTIVE ESCALATION in recitation mode', () => {
+      const prompt = buildSystemPrompt({
+        ...baseContext,
+        correctStreak: 5,
+        effectiveMode: 'recitation',
+      });
+      expect(prompt).not.toContain('ADAPTIVE ESCALATION');
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -663,7 +703,6 @@ describe('processExchange', () => {
       'What is a quadratic equation?'
     );
 
-    expect(result.response).toBeDefined();
     expect(typeof result.response).toBe('string');
     expect(result.response.length).toBeGreaterThan(0);
   });
@@ -671,8 +710,8 @@ describe('processExchange', () => {
   it('returns provider and model info', async () => {
     const result = await processExchange(baseContext, 'Tell me more');
 
-    expect(result.provider).toBeDefined();
-    expect(result.model).toBeDefined();
+    expect(typeof result.provider).toBe('string');
+    expect(typeof result.model).toBe('string');
   });
 
   it('returns latency in milliseconds', async () => {
@@ -741,9 +780,9 @@ describe('streamExchange', () => {
   it('returns an async iterable stream', async () => {
     const result = await streamExchange(baseContext, 'Explain quadratics');
 
-    expect(result.stream).toBeDefined();
-    expect(result.provider).toBeDefined();
-    expect(result.model).toBeDefined();
+    expect(result.stream).toBeTruthy();
+    expect(typeof result.provider).toBe('string');
+    expect(typeof result.model).toBe('string');
   });
 
   it('stream yields string chunks', async () => {

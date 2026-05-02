@@ -52,10 +52,10 @@ describe('AccommodationsScreen', () => {
   it('renders all four accommodation options', () => {
     render(<AccommodationsScreen />);
 
-    expect(screen.getByText('None')).toBeTruthy();
-    expect(screen.getByText('Short-Burst')).toBeTruthy();
-    expect(screen.getByText('Audio-First')).toBeTruthy();
-    expect(screen.getByText('Predictable')).toBeTruthy();
+    screen.getByText('None');
+    screen.getByText('Short-Burst');
+    screen.getByText('Audio-First');
+    screen.getByText('Predictable');
   });
 
   it('pre-selects None by default', () => {
@@ -69,7 +69,7 @@ describe('AccommodationsScreen', () => {
   it('renders the onboarding step indicator', () => {
     render(<AccommodationsScreen />);
 
-    expect(screen.getByText('Step 3 of 4')).toBeTruthy();
+    screen.getByText('Step 3 of 4');
   });
 
   it('navigates back to the prior onboarding step', () => {

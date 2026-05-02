@@ -484,7 +484,7 @@ describe('QuizPlayScreen — shuffledOptions derived synchronously (BUG-STALE-OP
       // The second call to checkAnswer must use an option from Q2, not Q1.
       const calls = mockCheckAnswer.mock.calls;
       const secondCall = calls[1];
-      expect(secondCall).toBeDefined();
+      expect(secondCall).not.toBeUndefined();
       const answerGiven = secondCall[0].answerGiven;
       expect(q2Options).toContain(answerGiven);
       expect(q1Options).not.toContain(answerGiven);

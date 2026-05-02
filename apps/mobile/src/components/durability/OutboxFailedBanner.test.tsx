@@ -60,17 +60,17 @@ describe('OutboxFailedBanner', () => {
     render(<OutboxFailedBanner profileId="p-1" flow="session" />);
 
     await waitFor(() => {
-      expect(screen.getByTestId('outbox-failed-banner')).toBeTruthy();
+      screen.getByTestId('outbox-failed-banner');
     });
 
-    expect(screen.getByText('Some messages could not be sent')).toBeTruthy();
+    screen.getByText('Some messages could not be sent');
     expect(
       screen.getByText(
         'Copy them or send them to support so nothing gets lost.'
       )
     ).toBeTruthy();
-    expect(screen.getByText('Hello world')).toBeTruthy();
-    expect(screen.getByTestId('outbox-copy-e-1')).toBeTruthy();
+    screen.getByText('Hello world');
+    screen.getByTestId('outbox-copy-e-1');
   });
 
   it('calls Clipboard.setStringAsync with entry content, then deletePermanentlyFailed, then refreshes', async () => {
@@ -81,7 +81,7 @@ describe('OutboxFailedBanner', () => {
     render(<OutboxFailedBanner profileId="p-1" flow="session" />);
 
     await waitFor(() => {
-      expect(screen.getByTestId('outbox-copy-e-1')).toBeTruthy();
+      screen.getByTestId('outbox-copy-e-1');
     });
 
     mockListPermanentlyFailed.mockResolvedValue([]);
@@ -114,7 +114,7 @@ describe('OutboxFailedBanner', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('outbox-escalate-button')).toBeTruthy();
+      screen.getByTestId('outbox-escalate-button');
     });
   });
 
@@ -124,7 +124,7 @@ describe('OutboxFailedBanner', () => {
     render(<OutboxFailedBanner profileId="p-1" flow="session" />);
 
     await waitFor(() => {
-      expect(screen.getByTestId('outbox-failed-banner')).toBeTruthy();
+      screen.getByTestId('outbox-failed-banner');
     });
 
     expect(screen.queryByTestId('outbox-escalate-button')).toBeNull();
@@ -143,7 +143,7 @@ describe('OutboxFailedBanner', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('outbox-escalate-button')).toBeTruthy();
+      screen.getByTestId('outbox-escalate-button');
     });
 
     mockListPermanentlyFailed.mockResolvedValue([]);

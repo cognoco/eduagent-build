@@ -281,7 +281,7 @@ describe('Integration: trial-expiry Inngest function', () => {
       (p: { to: string }) =>
         p.to === `ExponentPushToken[test-${WARNING_USER_ID}]`
     );
-    expect(warningPush).toBeDefined();
+    expect(warningPush).not.toBeUndefined();
     expect(warningPush.title).toBe('Trial ending soon');
     expect(warningPush.data.type).toBe('trial_expiry');
 
@@ -290,7 +290,7 @@ describe('Integration: trial-expiry Inngest function', () => {
       (p: { to: string }) =>
         p.to === `ExponentPushToken[test-${JUST_EXPIRED_USER_ID}]`
     );
-    expect(expiredPush).toBeDefined();
+    expect(expiredPush).not.toBeUndefined();
     expect(expiredPush.title).toBe('Your trial has ended');
 
     // Extended-expired notification (soft landing for extended)
@@ -298,7 +298,7 @@ describe('Integration: trial-expiry Inngest function', () => {
       (p: { to: string }) =>
         p.to === `ExponentPushToken[test-${EXTENDED_USER_ID}]`
     );
-    expect(extendedPush).toBeDefined();
+    expect(extendedPush).not.toBeUndefined();
     expect(extendedPush.title).toBe('Your trial has ended');
   });
 });

@@ -13,13 +13,13 @@ describe('SessionRow', () => {
 
   it('renders title and emoji', () => {
     const { getByText } = render(<SessionRow {...baseProps} />);
-    expect(getByText('Tea & caffeine')).toBeTruthy();
-    expect(getByText('☕')).toBeTruthy();
+    getByText('Tea & caffeine');
+    getByText('☕');
   });
 
   it('shows note indicator when hasNote is true', () => {
     const { getByTestId } = render(<SessionRow {...baseProps} />);
-    expect(getByTestId('session-note-indicator')).toBeTruthy();
+    getByTestId('session-note-indicator');
   });
 
   it('hides note indicator when hasNote is false', () => {
@@ -53,11 +53,11 @@ describe('SessionRow', () => {
 
   it('renders fallback emoji when emoji is null', () => {
     const { getByText } = render(<SessionRow {...baseProps} emoji={null} />);
-    expect(getByText('📖')).toBeTruthy();
+    getByText('📖');
   });
 
   it('renders relative date', () => {
     const { getByText } = render(<SessionRow {...baseProps} />);
-    expect(getByText('2d')).toBeTruthy();
+    getByText('2d');
   });
 });

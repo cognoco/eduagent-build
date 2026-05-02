@@ -5,24 +5,24 @@ describe('EngagementChip', () => {
   it('renders the configured label for a signal', () => {
     render(<EngagementChip signal="focused" />);
 
-    expect(screen.getByText('Focused')).toBeTruthy();
+    screen.getByText('Focused');
   });
 
   it('renders each supported engagement state with a stable test id', () => {
     const { rerender } = render(<EngagementChip signal="curious" />);
 
-    expect(screen.getByTestId('engagement-chip-curious')).toBeTruthy();
+    screen.getByTestId('engagement-chip-curious');
 
     rerender(<EngagementChip signal="stuck" />);
-    expect(screen.getByTestId('engagement-chip-stuck')).toBeTruthy();
+    screen.getByTestId('engagement-chip-stuck');
 
     rerender(<EngagementChip signal="breezing" />);
-    expect(screen.getByTestId('engagement-chip-breezing')).toBeTruthy();
+    screen.getByTestId('engagement-chip-breezing');
 
     rerender(<EngagementChip signal="focused" />);
-    expect(screen.getByTestId('engagement-chip-focused')).toBeTruthy();
+    screen.getByTestId('engagement-chip-focused');
 
     rerender(<EngagementChip signal="scattered" />);
-    expect(screen.getByTestId('engagement-chip-scattered')).toBeTruthy();
+    screen.getByTestId('engagement-chip-scattered');
   });
 });

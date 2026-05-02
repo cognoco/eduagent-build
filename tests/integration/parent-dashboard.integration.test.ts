@@ -16,7 +16,7 @@
  * 7. GET /v1/dashboard — 401 without auth
  */
 
-import { familyLinks, learningSessions, subjects } from '@eduagent/database';
+import { familyLinks, learningSessions } from '@eduagent/database';
 
 import {
   buildIntegrationEnv,
@@ -251,7 +251,7 @@ describe('Integration: GET /v1/dashboard/children/:profileId', () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.child).toBeDefined();
+    expect(body.child).not.toBeNull();
     expect(body.child.profileId).toBe(childProfileId);
     expect(body.child.displayName).toBe('Test Child');
   });
@@ -600,7 +600,7 @@ describe('Integration: GET /v1/dashboard/demo', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.demoMode).toBe(true);
-    expect(body.children).toBeDefined();
+    expect(Array.isArray(body.children)).toBe(true);
     expect(body.children.length).toBeGreaterThanOrEqual(1);
     expect(body.children[0]).toHaveProperty('displayName');
     expect(body.children[0]).toHaveProperty('sessionsThisWeek');

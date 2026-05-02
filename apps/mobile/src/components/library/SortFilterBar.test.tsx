@@ -51,17 +51,16 @@ describe('SortFilterBar', () => {
 
   it('renders sort button with current sort label', () => {
     render(<SortFilterBar {...defaultProps} />);
-    const sortButton = screen.getByTestId('library-sort-button');
-    expect(sortButton).toBeTruthy();
-    expect(screen.getByText('Name (A-Z)')).toBeTruthy();
+    screen.getByTestId('library-sort-button');
+    screen.getByText('Name (A-Z)');
   });
 
   it('renders filter button — "Filter" with zero, "Filter (2)" with 2 active', () => {
     const { rerender } = render(<SortFilterBar {...defaultProps} />);
-    expect(screen.getByText('Filter')).toBeTruthy();
+    screen.getByText('Filter');
 
     rerender(<SortFilterBar {...defaultProps} activeFilterCount={2} />);
-    expect(screen.getByText('Filter (2)')).toBeTruthy();
+    screen.getByText('Filter (2)');
   });
 
   it('shows sort options when sort button pressed, calls onSortChange on selection', () => {
@@ -72,8 +71,8 @@ describe('SortFilterBar', () => {
 
     // "Name (A-Z)" appears both in the button label and in the modal list
     expect(screen.getAllByText('Name (A-Z)').length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText('Name (Z-A)')).toBeTruthy();
-    expect(screen.getByText('Progress')).toBeTruthy();
+    screen.getByText('Name (Z-A)');
+    screen.getByText('Progress');
 
     // Select a different sort option
     fireEvent.press(screen.getByText('Name (Z-A)'));
@@ -87,10 +86,10 @@ describe('SortFilterBar', () => {
     fireEvent.press(screen.getByTestId('library-filter-button'));
 
     // Filter group label should be visible
-    expect(screen.getByText('Status')).toBeTruthy();
+    screen.getByText('Status');
     // Filter options should be visible as chips
-    expect(screen.getByText('Active')).toBeTruthy();
-    expect(screen.getByText('Paused')).toBeTruthy();
+    screen.getByText('Active');
+    screen.getByText('Paused');
 
     // Tap a filter chip
     fireEvent.press(screen.getByText('Active'));

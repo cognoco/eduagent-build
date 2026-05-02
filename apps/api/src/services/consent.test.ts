@@ -186,8 +186,8 @@ describe('requestConsent', () => {
     expect(result.consentState.consentType).toBe('GDPR');
     expect(result.consentState.parentEmail).toBe('parent@example.com');
     expect(result.consentState.respondedAt).toBeNull();
-    expect(result.consentState.id).toBeDefined();
-    expect(result.consentState.requestedAt).toBeDefined();
+    expect(typeof result.consentState.id).toBe('string');
+    expect(typeof result.consentState.requestedAt).toBe('string');
     expect(result.emailDelivered).toBe(true);
   });
 
@@ -334,7 +334,7 @@ describe('processConsentResponse', () => {
     const result = await processConsentResponse(db, 'valid-token', true);
 
     expect(result.status).toBe('CONSENTED');
-    expect(result.respondedAt).toBeDefined();
+    expect(typeof result.respondedAt).toBe('string');
     expect(result.profileId).toBe(row.profileId);
     expect(result.consentType).toBe('GDPR');
   });
@@ -345,7 +345,7 @@ describe('processConsentResponse', () => {
     const result = await processConsentResponse(db, 'valid-token', false);
 
     expect(result.status).toBe('WITHDRAWN');
-    expect(result.respondedAt).toBeDefined();
+    expect(typeof result.respondedAt).toBe('string');
   });
 
   it('throws error when token is not found', async () => {

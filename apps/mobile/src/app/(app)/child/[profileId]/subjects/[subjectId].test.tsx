@@ -87,7 +87,7 @@ describe('SubjectTopicsScreen', () => {
 
     render(<SubjectTopicsScreen />);
 
-    expect(screen.getByTestId('retention-signal-fading')).toBeTruthy();
+    screen.getByTestId('retention-signal-fading');
 
     fireEvent.press(screen.getByTestId('topic-card-topic-1'));
 

@@ -61,7 +61,7 @@ describe('accent preset merging', () => {
     for (const preset of accentPresets) {
       for (const scheme of schemes) {
         const overrides = preset[scheme];
-        expect(overrides).toBeDefined();
+        expect(overrides).not.toBeNull();
         expect(typeof overrides.primary).toBe('string');
         expect(typeof overrides.primarySoft).toBe('string');
         expect(typeof overrides.secondary).toBe('string');
@@ -76,7 +76,7 @@ describe('accent preset merging', () => {
     const baseVars = tokensToCssVars(base);
 
     const nonDefaultPreset = accentPresets.find((p) => p.id === 'electric');
-    expect(nonDefaultPreset).toBeDefined();
+    expect(nonDefaultPreset).not.toBeUndefined();
     if (!nonDefaultPreset) return;
 
     const overrides = nonDefaultPreset.dark;

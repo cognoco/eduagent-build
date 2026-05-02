@@ -10,7 +10,7 @@
  * - LLM provider — via registerProvider (real routeAndCall dispatch, mock chat fn)
  */
 
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import {
   accounts,
   subjects,
@@ -643,7 +643,7 @@ describe('Integration: Learning Session Lifecycle', () => {
 
       const events = await loadSessionEvents(session.id);
       const flagEvent = events.find((event) => event.eventType === 'flag');
-      expect(flagEvent).toBeDefined();
+      expect(flagEvent).not.toBeUndefined();
       expect(flagEvent!.metadata).toMatchObject({
         eventId: FLAG_EVENT_ID,
         reason: 'Incorrect information',

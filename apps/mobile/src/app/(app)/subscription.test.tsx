@@ -8,6 +8,10 @@ import {
 import React from 'react';
 import { Alert, Linking, Platform } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  createRoutedMockFetch,
+  fetchCallsMatching,
+} from '../../test-utils/mock-api-routes';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -46,6 +50,17 @@ jest.mock('../../lib/theme', () => ({
   }),
 }));
 
+// ---------------------------------------------------------------------------
+// Fetch-boundary mock (replaces hook-level mocks for use-subscription,
+// use-settings, use-streaks)
+// ---------------------------------------------------------------------------
+
+const mockFetch = createRoutedMockFetch();
+
+jest.mock('../../lib/api-client', () =>
+  require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch)
+);
+
 jest.mock('../../lib/profile', () => ({
   useProfile: () => ({
     activeProfile: mockActiveProfile,
@@ -56,7 +71,8 @@ jest.mock('../../components/common', () => ({
   UsageMeter: () => null,
 }));
 
-// RevenueCat hooks mocks
+// RevenueCat hooks mocks — these hooks use the RevenueCat SDK directly,
+// NOT useApiClient, so they stay as hook-level mocks.
 const mockMutateAsyncPurchase = jest.fn();
 const mockMutateAsyncRestore = jest.fn();
 let mockOfferings: ReturnType<typeof makeMockOfferings> | null = null;
@@ -89,79 +105,6 @@ jest.mock('../../hooks/use-revenuecat', () => ({
   }),
 }));
 
-// Subscription hooks mocks
-let mockSubscription: Record<string, unknown> | undefined;
-let mockSubLoading = false;
-let mockSubError = false;
-const mockRefetchSub = jest.fn();
-let mockSubRefetching = false;
-let mockUsage: Record<string, unknown> | undefined;
-let mockUsageLoading = false;
-let mockUsageError = false;
-const mockRefetchUsage = jest.fn();
-let mockUsageRefetching = false;
-let mockFamilySubscription: Record<string, unknown> | null = null;
-const mockMutateAsyncByokWaitlist = jest.fn();
-let mockByokWaitlistIsPending = false;
-let mockActiveProfile = {
-  id: 'profile-1',
-  displayName: 'Alex',
-  isOwner: true,
-};
-
-jest.mock('../../hooks/use-subscription', () => ({
-  useSubscription: () => ({
-    data: mockSubscription,
-    isLoading: mockSubLoading,
-    isError: mockSubError,
-    refetch: mockRefetchSub,
-    isRefetching: mockSubRefetching,
-  }),
-  useUsage: () => ({
-    data: mockUsage,
-    isLoading: mockUsageLoading,
-    isError: mockUsageError,
-    refetch: mockRefetchUsage,
-    isRefetching: mockUsageRefetching,
-  }),
-  useFamilySubscription: () => ({
-    data: mockFamilySubscription,
-  }),
-  // BUG-401: usePurchaseTopUp mock removed — it was dead code:
-  // (a) usePurchaseTopUp lives in use-subscription-stripe, not use-subscription
-  // (b) subscription.tsx never imports usePurchaseTopUp (uses usePurchase from RevenueCat)
-  useJoinByokWaitlist: () => ({
-    mutateAsync: mockMutateAsyncByokWaitlist,
-    isPending: mockByokWaitlistIsPending,
-  }),
-}));
-
-jest.mock('../../hooks/use-settings', () => ({
-  useNotifyParentSubscribe: () => ({
-    mutateAsync: jest.fn(),
-    isPending: false,
-  }),
-}));
-
-// BUG-397: Restore now polls the API to confirm subscription tier after RevenueCat restore
-const mockSubscriptionGet = jest.fn();
-jest.mock('../../lib/api-client', () => ({
-  useApiClient: () => ({
-    subscription: { $get: mockSubscriptionGet },
-  }),
-}));
-
-jest.mock('../../lib/assert-ok', () => ({
-  assertOk: jest.fn(),
-}));
-
-let mockXpSummary: { topicsCompleted?: number; totalXp?: number } | undefined =
-  undefined;
-
-jest.mock('../../hooks/use-streaks', () => ({
-  useXpSummary: () => ({ data: mockXpSummary }),
-}));
-
 // Mock react-native-purchases for enum/constant access
 jest.mock('react-native-purchases', () => ({
   __esModule: true,
@@ -185,6 +128,50 @@ jest.mock('react-native-purchases', () => ({
     CUSTOM: 'CUSTOM',
   },
 }));
+
+// ---------------------------------------------------------------------------
+// Default mock data shapes (real API shapes from @eduagent/schemas)
+// ---------------------------------------------------------------------------
+
+const DEFAULT_SUBSCRIPTION = {
+  tier: 'free',
+  status: 'active',
+  trialEndsAt: null,
+  currentPeriodEnd: null,
+  cancelAtPeriodEnd: false,
+  monthlyLimit: 100,
+  usedThisMonth: 0,
+  remainingQuestions: 100,
+  dailyLimit: 10,
+  usedToday: 0,
+  dailyRemainingQuestions: 10,
+};
+
+const DEFAULT_USAGE = {
+  monthlyLimit: 100,
+  usedThisMonth: 0,
+  remainingQuestions: 100,
+  topUpCreditsRemaining: 0,
+  warningLevel: 'none',
+  cycleResetAt: '2026-06-01T00:00:00Z',
+  dailyLimit: 10,
+  usedToday: 0,
+  dailyRemainingQuestions: 10,
+};
+
+// ---------------------------------------------------------------------------
+// Active profile state (mutable for tests that need different profiles)
+// ---------------------------------------------------------------------------
+
+let mockActiveProfile: {
+  id: string;
+  displayName: string;
+  isOwner: boolean;
+} = {
+  id: 'profile-1',
+  displayName: 'Alex',
+  isOwner: true,
+};
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -324,6 +311,7 @@ const SubscriptionScreen = require('./subscription').default;
 describe('SubscriptionScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Reset RevenueCat hook state
     mockOfferings = null;
     mockOfferingsLoading = false;
     mockOfferingsError = false;
@@ -332,28 +320,50 @@ describe('SubscriptionScreen', () => {
     mockCustomerInfoLoading = false;
     mockPurchaseIsPending = false;
     mockRestoreIsPending = false;
-    mockSubscription = { tier: 'free', status: 'active' };
-    mockSubLoading = false;
-    mockSubError = false;
-    mockRefetchSub.mockReset();
-    mockSubRefetching = false;
-    mockUsage = undefined;
-    mockUsageLoading = false;
-    mockUsageError = false;
-    mockRefetchUsage.mockReset();
-    mockUsageRefetching = false;
-    mockFamilySubscription = null;
-    mockMutateAsyncByokWaitlist.mockReset();
-    mockByokWaitlistIsPending = false;
+    // Reset active profile
     mockActiveProfile = {
       id: 'profile-1',
       displayName: 'Alex',
       isOwner: true,
     };
-    mockXpSummary = undefined;
     jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     mockPlatformAlert.mockClear();
     jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+
+    // Default fetch routes (most-specific first to avoid prefix collisions)
+    mockFetch.setRoute('/subscription/family', () =>
+      new Response(JSON.stringify({ error: 'Not Found' }), { status: 404 })
+    );
+    mockFetch.setRoute('/subscription', () =>
+      new Response(
+        JSON.stringify({ subscription: DEFAULT_SUBSCRIPTION }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+    mockFetch.setRoute('/usage', () =>
+      new Response(
+        JSON.stringify({ usage: DEFAULT_USAGE }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+    mockFetch.setRoute('/xp', () =>
+      new Response(
+        JSON.stringify({ xp: null }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+    mockFetch.setRoute('/byok-waitlist', () =>
+      new Response(
+        JSON.stringify({ message: 'Added to BYOK waitlist', email: 'user@example.com' }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+    mockFetch.setRoute('/settings/notify-parent-subscribe', () =>
+      new Response(
+        JSON.stringify({ sent: true, rateLimited: false }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
   });
 
   // -------------------------------------------------------------------------
@@ -361,7 +371,8 @@ describe('SubscriptionScreen', () => {
   // -------------------------------------------------------------------------
 
   it('shows loading indicator while data is loading', () => {
-    mockSubLoading = true;
+    // Subscription fetch never resolves → isLoading: true
+    mockFetch.setRoute('/subscription', () => new Promise<Response>((_resolve) => { /* never resolves */ }));
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
@@ -384,19 +395,22 @@ describe('SubscriptionScreen', () => {
     screen.getByTestId('subscription-loading');
   });
 
-  it('shows the error state instead of the child paywall when subscription loading fails', () => {
+  it('shows the error state instead of the child paywall when subscription loading fails', async () => {
     mockActiveProfile = {
       id: 'child-1',
       displayName: 'Alex',
       isOwner: false,
     };
-    mockSubscription = undefined;
-    mockSubLoading = false;
-    mockSubError = true;
+    // Return a 500 to trigger assertOk → query enters error state
+    mockFetch.setRoute('/subscription', () =>
+      new Response(JSON.stringify({ message: 'Server error' }), { status: 500 })
+    );
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    screen.getByTestId('subscription-error');
+    await waitFor(() => {
+      screen.getByTestId('subscription-error');
+    });
     expect(screen.queryByTestId('child-paywall')).toBeNull();
   });
 
@@ -404,7 +418,7 @@ describe('SubscriptionScreen', () => {
   // Rendering with offerings
   // -------------------------------------------------------------------------
 
-  it('renders available packages from RevenueCat offerings', () => {
+  it('renders available packages from RevenueCat offerings', async () => {
     const monthlyPkg = makeMockPackage();
     const annualPkg = makeMockPackage({
       identifier: '$rc_annual',
@@ -421,7 +435,9 @@ describe('SubscriptionScreen', () => {
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    screen.getByTestId('offerings-section');
+    await waitFor(() => {
+      screen.getByTestId('offerings-section');
+    });
     screen.getByTestId('package-option-$rc_monthly');
     screen.getByTestId('package-option-$rc_annual');
     screen.getByText('MentoMate Plus Monthly');
@@ -430,12 +446,15 @@ describe('SubscriptionScreen', () => {
     screen.getByText('$99.99 / annual');
   });
 
-  it('shows no-offerings fallback with static tier comparison when no packages are available', () => {
+  it('shows no-offerings fallback with static tier comparison when no packages are available', async () => {
     mockOfferings = null;
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    screen.getByTestId('no-offerings');
+    // Wait for subscription data to load (default: free tier)
+    await waitFor(() => {
+      screen.getByTestId('no-offerings');
+    });
     // BUG-897: message must NOT say "plans available soon" while listing
     // plan cards — pick one direction. We keep the cards as informational
     // tier comparison and rephrase the disclaimer to not contradict.
@@ -446,7 +465,7 @@ describe('SubscriptionScreen', () => {
     // BUG-899: only Free and Plus are approved per pricing_dual_cap.md.
     // Family and Pro static cards must not be shown to non-Family users —
     // their store SKUs are not approved for public listing.
-    // (Default mockSubscription tier is 'free' — see beforeEach.)
+    // (Default subscription tier is 'free'.)
     screen.getByTestId('static-tier-free');
     screen.getByTestId('static-tier-plus');
     expect(screen.queryByTestId('static-tier-family')).toBeNull();
@@ -458,19 +477,36 @@ describe('SubscriptionScreen', () => {
   // to lower tiers. Previous behavior collapsed Family users into the
   // BUG-899 hide-all-non-public-tiers rule, leaving them with no plan
   // comparison for the tier they actually pay for.
-  it('shows Family static card in PLANS comparison when user is on Family [BUG-917]', () => {
-    mockSubscription = { tier: 'family', status: 'active' };
-    mockFamilySubscription = {
-      tier: 'family',
-      status: 'active',
-      ownerProfileId: 'profile-1',
-      members: [{ profileId: 'profile-1', displayName: 'Alex', isOwner: true }],
-    };
+  it('shows Family static card in PLANS comparison when user is on Family [BUG-917]', async () => {
+    mockFetch.setRoute('/subscription', () =>
+      new Response(
+        JSON.stringify({ subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'family', status: 'active' } }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+    mockFetch.setRoute('/subscription/family', () =>
+      new Response(
+        JSON.stringify({
+          family: {
+            tier: 'family',
+            monthlyLimit: 1500,
+            usedThisMonth: 0,
+            remainingQuestions: 1500,
+            profileCount: 1,
+            maxProfiles: 6,
+            members: [{ profileId: 'profile-1', displayName: 'Alex', isOwner: true }],
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
     mockOfferings = null; // force the no-offerings static fallback path
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    screen.getByTestId('no-offerings');
+    await waitFor(() => {
+      screen.getByTestId('no-offerings');
+    });
     screen.getByTestId('static-tier-free');
     screen.getByTestId('static-tier-plus');
     // The fix:
@@ -483,13 +519,20 @@ describe('SubscriptionScreen', () => {
 
   // [BUG-917] Verify a non-Family user does not see Family card even if
   // RevenueCat returns no offerings — the BUG-899 rule still holds.
-  it('hides Family static card for Plus users [BUG-917 + BUG-899 regression]', () => {
-    mockSubscription = { tier: 'plus', status: 'active' };
+  it('hides Family static card for Plus users [BUG-917 + BUG-899 regression]', async () => {
+    mockFetch.setRoute('/subscription', () =>
+      new Response(
+        JSON.stringify({ subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'plus', status: 'active' } }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
     mockOfferings = null;
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    screen.getByTestId('static-tier-free');
+    await waitFor(() => {
+      screen.getByTestId('static-tier-free');
+    });
     screen.getByTestId('static-tier-plus');
     expect(screen.queryByTestId('static-tier-family')).toBeNull();
   });
@@ -497,13 +540,20 @@ describe('SubscriptionScreen', () => {
   // [BUG-917] Pro-tier cascade: same issue as Family — a Pro user landing on
   // the subscription screen saw only Free/Plus in the static comparison, with
   // no card for their own Pro tier. Fix mirrors the Family fix exactly.
-  it('shows Pro static card in PLANS comparison when user is on Pro [BUG-917]', () => {
-    mockSubscription = { tier: 'pro', status: 'active' };
+  it('shows Pro static card in PLANS comparison when user is on Pro [BUG-917]', async () => {
+    mockFetch.setRoute('/subscription', () =>
+      new Response(
+        JSON.stringify({ subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'pro', status: 'active' } }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
     mockOfferings = null; // force the no-offerings static fallback path
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    screen.getByTestId('no-offerings');
+    await waitFor(() => {
+      screen.getByTestId('no-offerings');
+    });
     screen.getByTestId('static-tier-free');
     screen.getByTestId('static-tier-plus');
     // The fix:
@@ -515,13 +565,20 @@ describe('SubscriptionScreen', () => {
   });
 
   // [BUG-917] Verify a Pro user does not contaminate Family visibility.
-  it('hides Pro static card for Plus users [BUG-917 + BUG-899 regression]', () => {
-    mockSubscription = { tier: 'plus', status: 'active' };
+  it('hides Pro static card for Plus users [BUG-917 + BUG-899 regression]', async () => {
+    mockFetch.setRoute('/subscription', () =>
+      new Response(
+        JSON.stringify({ subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'plus', status: 'active' } }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
     mockOfferings = null;
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    screen.getByTestId('static-tier-free');
+    await waitFor(() => {
+      screen.getByTestId('static-tier-free');
+    });
     screen.getByTestId('static-tier-plus');
     expect(screen.queryByTestId('static-tier-pro')).toBeNull();
     expect(screen.queryByTestId('static-tier-family')).toBeNull();
@@ -530,8 +587,13 @@ describe('SubscriptionScreen', () => {
   // BUG-899 break test: Premium Mentor add-on advertises an unapproved
   // +$15/month price. It must not render even on a paid tier until pricing
   // is approved.
-  it('does not show the Premium Mentor +$15/month add-on on paid tiers', () => {
-    mockSubscription = { tier: 'plus', status: 'active' };
+  it('does not show the Premium Mentor +$15/month add-on on paid tiers', async () => {
+    mockFetch.setRoute('/subscription', () =>
+      new Response(
+        JSON.stringify({ subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'plus', status: 'active' } }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
     mockOfferings = makeMockOfferings([makeMockPackage()]);
     mockCustomerInfo = makeMockCustomerInfo({
       activeEntitlements: { plus: { isActive: true, identifier: 'plus' } },
@@ -539,6 +601,9 @@ describe('SubscriptionScreen', () => {
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
+    await waitFor(() => {
+      screen.getByTestId('offerings-section');
+    });
     expect(screen.queryByTestId('ai-upgrade-section')).toBeNull();
     expect(screen.queryByText(/\+\$15\/month per profile/)).toBeNull();
   });
@@ -546,27 +611,44 @@ describe('SubscriptionScreen', () => {
   // BUG-896 break test: Manage billing must appear whenever the API tier is
   // paid, even if RevenueCat hasn't synced an active entitlement. Otherwise
   // a paid parent has no in-app way to cancel.
-  it('renders manage billing when API tier is paid even if RevenueCat shows no active entitlement', () => {
-    mockSubscription = {
-      tier: 'family',
-      status: 'active',
-      currentPeriodEnd: '2026-05-18T00:00:00Z',
-    };
+  it('renders manage billing when API tier is paid even if RevenueCat shows no active entitlement', async () => {
+    mockFetch.setRoute('/subscription', () =>
+      new Response(
+        JSON.stringify({
+          subscription: {
+            ...DEFAULT_SUBSCRIPTION,
+            tier: 'family',
+            status: 'active',
+            currentPeriodEnd: '2026-05-18T00:00:00Z',
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
     mockOfferings = null;
     mockCustomerInfo = makeMockCustomerInfo(); // no active entitlements
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    screen.getByTestId('manage-billing-button');
+    await waitFor(() => {
+      screen.getByTestId('manage-billing-button');
+    });
   });
 
-  it('shows current plan info from subscription data', () => {
-    mockSubscription = { tier: 'plus', status: 'active' };
+  it('shows current plan info from subscription data', async () => {
+    mockFetch.setRoute('/subscription', () =>
+      new Response(
+        JSON.stringify({ subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'plus', status: 'active' } }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
     mockOfferings = makeMockOfferings([makeMockPackage()]);
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    screen.getByTestId('current-plan');
+    await waitFor(() => {
+      screen.getByTestId('current-plan');
+    });
     screen.getByText('Plus');
   });
 
@@ -574,7 +656,7 @@ describe('SubscriptionScreen', () => {
   // Current plan highlighting
   // -------------------------------------------------------------------------
 
-  it('highlights the current plan based on active subscriptions', () => {
+  it('highlights the current plan based on active subscriptions', async () => {
     const monthlyPkg = makeMockPackage();
     mockOfferings = makeMockOfferings([monthlyPkg]);
     mockCustomerInfo = makeMockCustomerInfo({
@@ -584,19 +666,23 @@ describe('SubscriptionScreen', () => {
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    // "Current plan" appears in both the section header and the package badge
-    const matches = screen.getAllByText('Current plan');
-    expect(matches.length).toBeGreaterThanOrEqual(2);
+    await waitFor(() => {
+      // "Current plan" appears in both the section header and the package badge
+      const matches = screen.getAllByText('Current plan');
+      expect(matches.length).toBeGreaterThanOrEqual(2);
+    });
   });
 
-  it('shows Subscribe for packages that are not the current plan', () => {
+  it('shows Subscribe for packages that are not the current plan', async () => {
     const monthlyPkg = makeMockPackage();
     mockOfferings = makeMockOfferings([monthlyPkg]);
     mockCustomerInfo = makeMockCustomerInfo(); // no active entitlements
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    screen.getByText('Subscribe');
+    await waitFor(() => {
+      screen.getByText('Subscribe');
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -618,19 +704,26 @@ describe('SubscriptionScreen', () => {
     // PR-FIX-07: handlePurchase polls the subscription endpoint until the
     // webhook promotes the tier away from 'free'. Return an upgraded tier
     // on the first poll so the loop breaks and the success alert fires.
-    mockSubscriptionGet.mockResolvedValue({
-      json: async () => ({ subscription: { tier: 'plus' } }),
-    });
+    mockFetch.setRoute('/subscription', () =>
+      new Response(
+        JSON.stringify({ subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'plus' } }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
+    await waitFor(() => {
+      screen.getByTestId('package-option-$rc_monthly');
+    });
     fireEvent.press(screen.getByTestId('package-option-$rc_monthly'));
 
     await waitFor(
       () => {
         expect(mockMutateAsyncPurchase).toHaveBeenCalledWith(monthlyPkg);
-        expect(mockRefetchSub).toHaveBeenCalled();
-        expect(mockRefetchUsage).toHaveBeenCalled();
+        // With real hooks, refetch calls back to mockFetch for /subscription and /usage
+        expect(fetchCallsMatching(mockFetch, '/subscription').length).toBeGreaterThanOrEqual(1);
+        expect(fetchCallsMatching(mockFetch, '/usage').length).toBeGreaterThanOrEqual(1);
         expect(Alert.alert).toHaveBeenCalledWith(
           'Success',
           'Your subscription is now active!'
@@ -656,6 +749,9 @@ describe('SubscriptionScreen', () => {
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
+    await waitFor(() => {
+      screen.getByTestId('package-option-$rc_monthly');
+    });
     fireEvent.press(screen.getByTestId('package-option-$rc_monthly'));
 
     await waitFor(() => {
@@ -681,6 +777,9 @@ describe('SubscriptionScreen', () => {
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
+    await waitFor(() => {
+      screen.getByTestId('package-option-$rc_monthly');
+    });
     fireEvent.press(screen.getByTestId('package-option-$rc_monthly'));
 
     await waitFor(() => {
@@ -707,6 +806,9 @@ describe('SubscriptionScreen', () => {
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
+    await waitFor(() => {
+      screen.getByTestId('package-option-$rc_monthly');
+    });
     fireEvent.press(screen.getByTestId('package-option-$rc_monthly'));
 
     await waitFor(() => {
@@ -737,6 +839,9 @@ describe('SubscriptionScreen', () => {
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
+    await waitFor(() => {
+      screen.getByTestId('package-option-$rc_monthly');
+    });
     fireEvent.press(screen.getByTestId('package-option-$rc_monthly'));
 
     await waitFor(() => {
@@ -751,12 +856,14 @@ describe('SubscriptionScreen', () => {
   // Restore purchases
   // -------------------------------------------------------------------------
 
-  it('renders restore purchases button', () => {
+  it('renders restore purchases button', async () => {
     mockOfferings = makeMockOfferings([makeMockPackage()]);
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    screen.getByTestId('restore-purchases-button');
+    await waitFor(() => {
+      screen.getByTestId('restore-purchases-button');
+    });
     screen.getByText('Restore Purchases');
   });
 
@@ -765,12 +872,19 @@ describe('SubscriptionScreen', () => {
     mockOfferings = makeMockOfferings([makeMockPackage()]);
     mockMutateAsyncRestore.mockResolvedValue(undefined);
     // BUG-397: Restore now polls API to confirm subscription tier
-    mockSubscriptionGet.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ subscription: { tier: 'plus' } }),
-    });
+    mockFetch.setRoute('/subscription', () =>
+      new Response(
+        JSON.stringify({ subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'plus' } }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
     fireEvent.press(screen.getByTestId('restore-purchases-button'));
 
     // Let restore.mutateAsync resolve
@@ -789,7 +903,7 @@ describe('SubscriptionScreen', () => {
         'Your subscription has been restored.'
       );
     });
-    expect(mockRefetchUsage).toHaveBeenCalled();
+    expect(fetchCallsMatching(mockFetch, '/usage').length).toBeGreaterThanOrEqual(1);
     jest.useRealTimers();
   });
 
@@ -798,12 +912,19 @@ describe('SubscriptionScreen', () => {
     mockOfferings = makeMockOfferings([makeMockPackage()]);
     mockMutateAsyncRestore.mockResolvedValue(undefined);
     // BUG-397: Polling always returns free tier
-    mockSubscriptionGet.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ subscription: { tier: 'free' } }),
-    });
+    mockFetch.setRoute('/subscription', () =>
+      new Response(
+        JSON.stringify({ subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'free' } }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
     fireEvent.press(screen.getByTestId('restore-purchases-button'));
 
     // Let restore.mutateAsync resolve
@@ -834,6 +955,9 @@ describe('SubscriptionScreen', () => {
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
+    await waitFor(() => {
+      screen.getByTestId('restore-purchases-button');
+    });
     fireEvent.press(screen.getByTestId('restore-purchases-button'));
 
     await waitFor(() => {
@@ -845,20 +969,23 @@ describe('SubscriptionScreen', () => {
     );
   });
 
-  it('shows loading state on restore button while restoring', () => {
+  it('shows loading state on restore button while restoring', async () => {
     mockOfferings = makeMockOfferings([makeMockPackage()]);
     mockRestoreIsPending = true;
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('restore-loading')).toBeTruthy();
+    // Wait for subscription data to load so the offerings section renders
+    await waitFor(() => {
+      screen.getByTestId('restore-loading');
+    });
   });
 
   // -------------------------------------------------------------------------
   // Manage billing deep link
   // -------------------------------------------------------------------------
 
-  it('renders manage billing button when user has active subscription', () => {
+  it('renders manage billing button when user has active subscription', async () => {
     mockOfferings = makeMockOfferings([makeMockPackage()]);
     mockCustomerInfo = makeMockCustomerInfo({
       activeEntitlements: { pro: { isActive: true, identifier: 'pro' } },
@@ -866,16 +993,21 @@ describe('SubscriptionScreen', () => {
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('manage-billing-button')).toBeTruthy();
-    expect(screen.getByText('Manage billing')).toBeTruthy();
+    await waitFor(() => {
+      screen.getByTestId('manage-billing-button');
+    });
+    screen.getByText('Manage billing');
   });
 
-  it('does not render manage billing when no active subscription', () => {
+  it('does not render manage billing when no active subscription', async () => {
     mockOfferings = makeMockOfferings([makeMockPackage()]);
     mockCustomerInfo = null;
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
+    await waitFor(() => {
+      screen.getByTestId('offerings-section');
+    });
     expect(screen.queryByTestId('manage-billing-button')).toBeNull();
   });
 
@@ -890,6 +1022,9 @@ describe('SubscriptionScreen', () => {
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
+    await waitFor(() => {
+      screen.getByTestId('manage-billing-button');
+    });
     fireEvent.press(screen.getByTestId('manage-billing-button'));
 
     await waitFor(() => {
@@ -912,6 +1047,9 @@ describe('SubscriptionScreen', () => {
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
+    await waitFor(() => {
+      screen.getByTestId('manage-billing-button');
+    });
     fireEvent.press(screen.getByTestId('manage-billing-button'));
 
     await waitFor(() => {
@@ -927,7 +1065,7 @@ describe('SubscriptionScreen', () => {
   // iOS/Android only and Stripe is dormant for web. The Manage row must show
   // a static "managed on your mobile device" info instead of the misleading
   // "Opens Google Play subscriptions" copy.
-  it('shows static "managed on your mobile device" info on web (BUG-916)', () => {
+  it('shows static "managed on your mobile device" info on web (BUG-916)', async () => {
     const originalPlatform = Platform.OS;
     Object.defineProperty(Platform, 'OS', { get: () => 'web' });
 
@@ -938,7 +1076,9 @@ describe('SubscriptionScreen', () => {
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('manage-billing-web-info')).toBeTruthy();
+    await waitFor(() => {
+      screen.getByTestId('manage-billing-web-info');
+    });
     expect(
       screen.getByText('Subscription is managed on your mobile device')
     ).toBeTruthy();
@@ -968,53 +1108,66 @@ describe('SubscriptionScreen', () => {
   it('renders the Subscription header', () => {
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByText('Subscription')).toBeTruthy();
+    screen.getByText('Subscription');
   });
 
-  it('renders the BYOK waitlist section', () => {
+  it('renders the BYOK waitlist section', async () => {
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('byok-waitlist-section')).toBeTruthy();
-    expect(screen.getByText('Bring your own key')).toBeTruthy();
+    await waitFor(() => {
+      screen.getByTestId('byok-waitlist-section');
+    });
+    screen.getByText('Bring your own key');
   });
 
-  it('shows live family pool details for family subscriptions', () => {
-    mockSubscription = { tier: 'family', status: 'active' };
-    mockFamilySubscription = {
-      tier: 'family',
-      monthlyLimit: 1500,
-      usedThisMonth: 300,
-      remainingQuestions: 1200,
-      profileCount: 3,
-      maxProfiles: 4,
-      members: [
-        { profileId: 'p1', displayName: 'Parent', isOwner: true },
-        { profileId: 'p2', displayName: 'Alex', isOwner: false },
-        { profileId: 'p3', displayName: 'Mia', isOwner: false },
-      ],
-    };
+  it('shows live family pool details for family subscriptions', async () => {
+    mockFetch.setRoute('/subscription', () =>
+      new Response(
+        JSON.stringify({ subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'family', status: 'active' } }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+    mockFetch.setRoute('/subscription/family', () =>
+      new Response(
+        JSON.stringify({
+          family: {
+            tier: 'family',
+            monthlyLimit: 1500,
+            usedThisMonth: 300,
+            remainingQuestions: 1200,
+            profileCount: 3,
+            maxProfiles: 4,
+            members: [
+              { profileId: 'p1', displayName: 'Parent', isOwner: true },
+              { profileId: 'p2', displayName: 'Alex', isOwner: false },
+              { profileId: 'p3', displayName: 'Mia', isOwner: false },
+            ],
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('family-pool-section')).toBeTruthy();
-    expect(screen.getByText('3 of 4 profiles connected')).toBeTruthy();
-    expect(screen.getByText(/1200 shared questions left/i)).toBeTruthy();
-    expect(screen.getByText(/Parent \(owner\), Alex, Mia/)).toBeTruthy();
+    await waitFor(() => {
+      screen.getByTestId('family-pool-section');
+    });
+    screen.getByText('3 of 4 profiles connected');
+    screen.getByText(/1200 shared questions left/i);
+    screen.getByText(/Parent \(owner\), Alex, Mia/);
   });
 
   it('joins the BYOK waitlist using account email on success', async () => {
-    mockMutateAsyncByokWaitlist.mockResolvedValue({
-      message: 'Added to BYOK waitlist',
-      email: 'user@example.com',
-    });
-
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
+    await waitFor(() => {
+      screen.getByTestId('join-byok-waitlist-button');
+    });
     fireEvent.press(screen.getByTestId('join-byok-waitlist-button'));
 
     await waitFor(() => {
-      // No email argument — the API uses the authenticated account email (CR-17)
-      expect(mockMutateAsyncByokWaitlist).toHaveBeenCalledWith();
+      expect(fetchCallsMatching(mockFetch, '/byok-waitlist').length).toBeGreaterThanOrEqual(1);
     });
 
     expect(Alert.alert).toHaveBeenCalledWith(
@@ -1024,20 +1177,23 @@ describe('SubscriptionScreen', () => {
   });
 
   it('shows an error alert when joining the BYOK waitlist fails', async () => {
-    mockMutateAsyncByokWaitlist.mockRejectedValue(new Error('nope'));
+    mockFetch.setRoute('/byok-waitlist', () =>
+      new Response(JSON.stringify({ message: 'Server error' }), { status: 500 })
+    );
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
+    await waitFor(() => {
+      screen.getByTestId('join-byok-waitlist-button');
+    });
     fireEvent.press(screen.getByTestId('join-byok-waitlist-button'));
 
     await waitFor(() => {
-      expect(mockMutateAsyncByokWaitlist).toHaveBeenCalled();
+      expect(Alert.alert).toHaveBeenCalledWith(
+        'Error',
+        'Could not join waitlist. Try again.'
+      );
     });
-
-    expect(Alert.alert).toHaveBeenCalledWith(
-      'Error',
-      'Could not join waitlist. Try again.'
-    );
   });
 
   describe('ChildPaywall', () => {
@@ -1047,72 +1203,133 @@ describe('SubscriptionScreen', () => {
         displayName: 'Alex',
         isOwner: false,
       };
-      mockSubscription = undefined;
-      mockSubLoading = false;
-      mockSubError = false;
+      // Child paywall renders when isChild=true AND trialOrExpired=true.
+      // trialOrExpired requires subscription.status='expired'|'cancelled' OR !subscription&&!subLoading.
+      // Use 'expired' status so the condition triggers after the query resolves.
+      mockFetch.setRoute('/subscription', () =>
+        new Response(
+          JSON.stringify({
+            subscription: { ...DEFAULT_SUBSCRIPTION, status: 'expired' },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
     });
 
-    it('renders "See your progress" and "Go Home" buttons', () => {
+    it('renders "See your progress" and "Go Home" buttons', async () => {
       render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-      expect(screen.getByTestId('child-paywall')).toBeTruthy();
-      expect(screen.getByTestId('see-progress-button')).toBeTruthy();
-      expect(screen.getByTestId('go-home-button')).toBeTruthy();
+      await waitFor(() => {
+        screen.getByTestId('child-paywall');
+      });
+      screen.getByTestId('see-progress-button');
+      screen.getByTestId('go-home-button');
     });
 
-    it('"Go Home" button navigates to /(app)/home', () => {
+    it('"Go Home" button navigates to /(app)/home', async () => {
       render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
+      await waitFor(() => {
+        screen.getByTestId('go-home-button');
+      });
       fireEvent.press(screen.getByTestId('go-home-button'));
       expect(mockPush).toHaveBeenCalledWith('/(app)/home');
     });
 
-    it('"See your progress" button navigates to /(app)/progress', () => {
+    it('"See your progress" button navigates to /(app)/progress', async () => {
       render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
+      await waitFor(() => {
+        screen.getByTestId('see-progress-button');
+      });
       fireEvent.press(screen.getByTestId('see-progress-button'));
       expect(mockPush).toHaveBeenCalledWith('/(app)/progress');
     });
 
-    it('"Browse Library" button navigates to /(app)/library', () => {
+    it('"Browse Library" button navigates to /(app)/library', async () => {
       render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
+      await waitFor(() => {
+        screen.getByTestId('browse-library-button');
+      });
       fireEvent.press(screen.getByTestId('browse-library-button'));
       expect(mockPush).toHaveBeenCalledWith('/(app)/library');
     });
 
-    it('shows "great start" text when child has no XP data', () => {
-      mockXpSummary = undefined;
+    it('shows "great start" text when child has no XP data', async () => {
+      mockFetch.setRoute('/xp', () =>
+        new Response(
+          JSON.stringify({ xp: null }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
 
       render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
+      await waitFor(() => {
+        screen.getByTestId('child-paywall');
+      });
       expect(
         screen.getByText(
-          "You've been exploring and learning \u2014 great start!"
+          "You've been exploring and learning — great start!"
         )
       ).toBeTruthy();
     });
 
-    it('shows XP stats with "great work" when child has topics and XP', () => {
-      mockXpSummary = { topicsCompleted: 5, totalXp: 250 };
+    it('shows XP stats with "great work" when child has topics and XP', async () => {
+      mockFetch.setRoute('/xp', () =>
+        new Response(
+          JSON.stringify({
+            xp: {
+              totalXp: 250,
+              verifiedXp: 200,
+              pendingXp: 50,
+              decayedXp: 0,
+              topicsCompleted: 5,
+              topicsVerified: 3,
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
 
       render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
+      await waitFor(() => {
+        screen.getByTestId('child-paywall');
+      });
       expect(
         screen.getByText(
-          'You learned 5 topics and earned 250 XP \u2014 great work!'
+          'You learned 5 topics and earned 250 XP — great work!'
         )
       ).toBeTruthy();
     });
 
-    it('shows singular "topic" when topicsCompleted is 1', () => {
-      mockXpSummary = { topicsCompleted: 1, totalXp: 50 };
+    it('shows singular "topic" when topicsCompleted is 1', async () => {
+      mockFetch.setRoute('/xp', () =>
+        new Response(
+          JSON.stringify({
+            xp: {
+              totalXp: 50,
+              verifiedXp: 40,
+              pendingXp: 10,
+              decayedXp: 0,
+              topicsCompleted: 1,
+              topicsVerified: 1,
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
 
       render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
+      await waitFor(() => {
+        screen.getByTestId('child-paywall');
+      });
       expect(
         screen.getByText(
-          'You learned 1 topic and earned 50 XP \u2014 great work!'
+          'You learned 1 topic and earned 50 XP — great work!'
         )
       ).toBeTruthy();
     });
@@ -1129,33 +1346,52 @@ describe('SubscriptionScreen', () => {
     });
 
     function setupPaidTierWithTopUp() {
-      mockSubscription = { tier: 'plus', status: 'active' };
+      mockFetch.setRoute('/subscription', () =>
+        new Response(
+          JSON.stringify({ subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'plus', status: 'active' } }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
       mockOfferings = makeMockOfferings([makeMockPackage(), topUpPkg]);
     }
 
-    it('does not render top-up section for free tier users', () => {
-      mockSubscription = { tier: 'free', status: 'active' };
+    it('does not render top-up section for free tier users', async () => {
+      // default subscription is free
       mockOfferings = makeMockOfferings([makeMockPackage()]);
 
       render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
+      await waitFor(() => {
+        screen.getByTestId('offerings-section');
+      });
       expect(screen.queryByTestId('top-up-section')).toBeNull();
     });
 
-    it('renders top-up section with "Buy 500 credits" for paid tier', () => {
+    it('renders top-up section with "Buy 500 credits" for paid tier', async () => {
       setupPaidTierWithTopUp();
 
       render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-      expect(screen.getByTestId('top-up-section')).toBeTruthy();
-      expect(screen.getByText('Buy 500 credits')).toBeTruthy();
+      await waitFor(() => {
+        screen.getByTestId('top-up-section');
+      });
+      screen.getByText('Buy 500 credits');
     });
 
     it('shows graceful error when no topup package is in offerings', async () => {
-      mockSubscription = { tier: 'plus', status: 'active' };
+      mockFetch.setRoute('/subscription', () =>
+        new Response(
+          JSON.stringify({ subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'plus', status: 'active' } }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
       mockOfferings = makeMockOfferings([makeMockPackage()]);
 
       render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+      await waitFor(() => {
+        screen.getByTestId('top-up-button');
+      });
       fireEvent.press(screen.getByTestId('top-up-button'));
 
       await waitFor(() => {
@@ -1171,11 +1407,20 @@ describe('SubscriptionScreen', () => {
     });
 
     it('shows connection error with retry when offerings failed to load', async () => {
-      mockSubscription = { tier: 'plus', status: 'active' };
+      mockFetch.setRoute('/subscription', () =>
+        new Response(
+          JSON.stringify({ subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'plus', status: 'active' } }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
       mockOfferings = null;
       mockOfferingsError = true;
 
       render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+      await waitFor(() => {
+        screen.getByTestId('top-up-button');
+      });
       fireEvent.press(screen.getByTestId('top-up-button'));
 
       await waitFor(() => {
@@ -1201,6 +1446,9 @@ describe('SubscriptionScreen', () => {
 
       render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
+      await waitFor(() => {
+        screen.getByTestId('top-up-button');
+      });
       fireEvent.press(screen.getByTestId('top-up-button'));
 
       await waitFor(() => {
@@ -1223,6 +1471,9 @@ describe('SubscriptionScreen', () => {
 
       render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
+      await waitFor(() => {
+        screen.getByTestId('top-up-button');
+      });
       fireEvent.press(screen.getByTestId('top-up-button'));
 
       await waitFor(() => {
@@ -1247,6 +1498,9 @@ describe('SubscriptionScreen', () => {
 
       render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
+      await waitFor(() => {
+        screen.getByTestId('top-up-button');
+      });
       fireEvent.press(screen.getByTestId('top-up-button'));
 
       await waitFor(() => {

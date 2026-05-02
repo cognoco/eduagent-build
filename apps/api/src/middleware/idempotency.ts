@@ -2,6 +2,7 @@ import { createMiddleware } from 'hono/factory';
 import type { Database } from '@eduagent/database';
 import {
   buildIdempotencyCacheKey,
+  MAX_IDEMPOTENCY_KEY_LENGTH,
   type IdempotencyFlow,
 } from '../services/idempotency-marker';
 import { lookupAssistantTurnState } from '../services/idempotency-assistant-state';
@@ -29,7 +30,6 @@ export function idempotencyPreflight(options: { flow: IdempotencyFlow }) {
       return;
     }
 
-    const MAX_IDEMPOTENCY_KEY_LENGTH = 256;
     if (key.length > MAX_IDEMPOTENCY_KEY_LENGTH) {
       return c.json(
         {
@@ -91,7 +91,9 @@ export function idempotencyPreflight(options: { flow: IdempotencyFlow }) {
           name: 'app/idempotency.preflight_lookup_failed',
           data: { profileId, flow: options.flow },
         })
-        .catch(Function.prototype as () => void);
+        .catch(() => {
+          // Fire-and-forget: failure already captured above via captureException.
+        });
       await next();
       return;
     }

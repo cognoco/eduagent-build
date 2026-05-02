@@ -741,7 +741,7 @@ describe('interview routes', () => {
       expect(res.status).toBe(200);
 
       const body = await res.json();
-      expect(body.state).toBeDefined();
+      expect(body.state).toEqual(expect.objectContaining({}));
       expect(body.state.draftId).toBe('00000000-0000-4000-8000-000000000001');
       expect(body.state.status).toBe('in_progress');
       expect(body.state.exchangeCount).toBe(1);

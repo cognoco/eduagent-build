@@ -228,7 +228,7 @@ describe('extractHomeworkSummary', () => {
 
     // Falls back to 'Homework' when subject is not found for profile
     // (the LLM might override the displayTitle, but the fallback name is 'Homework')
-    expect(result).toBeDefined();
+    expect(result).toEqual(expect.objectContaining({}));
   });
 
   it('falls back to metadata-derived summary when the LLM fails', async () => {

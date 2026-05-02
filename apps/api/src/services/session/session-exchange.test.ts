@@ -1,6 +1,7 @@
 import {
   buildExchangeHistory,
   mergeMemoryContexts,
+  computeCorrectStreak,
   type ExchangeHistoryEvent,
 } from './session-exchange';
 
@@ -120,7 +121,7 @@ describe('buildExchangeHistory', () => {
 
     const history = buildExchangeHistory(events);
     const assistantTurn = history.find((h) => h.role === 'assistant');
-    expect(assistantTurn).toBeDefined();
+    expect(assistantTurn).toEqual(expect.objectContaining({}));
 
     const rewrapped = JSON.parse(assistantTurn!.content) as { reply: string };
     // The reply field must be plain text ("hi"), not the raw envelope JSON string.
@@ -155,5 +156,102 @@ describe('mergeMemoryContexts', () => {
     expect(merged).toContain('A unique');
     expect(merged).toContain('B unique');
     expect(merged).toContain("learner's original question");
+  });
+});
+
+describe('computeCorrectStreak', () => {
+  it('returns 0 for empty events', () => {
+    expect(computeCorrectStreak([], 2)).toBe(0);
+  });
+
+  it('counts consecutive correct answers at the current rung', () => {
+    const events = [
+      {
+        eventType: 'ai_response',
+        metadata: { escalationRung: 2, correctAnswer: true },
+      },
+      { eventType: 'user_message', metadata: null },
+      {
+        eventType: 'ai_response',
+        metadata: { escalationRung: 2, correctAnswer: true },
+      },
+      { eventType: 'user_message', metadata: null },
+      {
+        eventType: 'ai_response',
+        metadata: { escalationRung: 2, correctAnswer: true },
+      },
+    ];
+    expect(computeCorrectStreak(events, 2)).toBe(3);
+  });
+
+  it('breaks on wrong answer', () => {
+    const events = [
+      {
+        eventType: 'ai_response',
+        metadata: { escalationRung: 2, correctAnswer: true },
+      },
+      { eventType: 'user_message', metadata: null },
+      {
+        eventType: 'ai_response',
+        metadata: { escalationRung: 2, correctAnswer: false },
+      },
+      { eventType: 'user_message', metadata: null },
+      {
+        eventType: 'ai_response',
+        metadata: { escalationRung: 2, correctAnswer: true },
+      },
+    ];
+    expect(computeCorrectStreak(events, 2)).toBe(1);
+  });
+
+  it('breaks on rung change', () => {
+    const events = [
+      {
+        eventType: 'ai_response',
+        metadata: { escalationRung: 1, correctAnswer: true },
+      },
+      { eventType: 'user_message', metadata: null },
+      {
+        eventType: 'ai_response',
+        metadata: { escalationRung: 2, correctAnswer: true },
+      },
+    ];
+    expect(computeCorrectStreak(events, 2)).toBe(1);
+  });
+
+  it('caps at MAX_CORRECT_STREAK (5)', () => {
+    const events = Array.from({ length: 10 }, () => ({
+      eventType: 'ai_response' as const,
+      metadata: { escalationRung: 2, correctAnswer: true },
+    }));
+    expect(computeCorrectStreak(events, 2)).toBe(5);
+  });
+
+  it('returns 0 when correctAnswer is not set in metadata', () => {
+    const events = [
+      { eventType: 'ai_response', metadata: { escalationRung: 2 } },
+    ];
+    expect(computeCorrectStreak(events, 2)).toBe(0);
+  });
+
+  it('returns 0 when metadata is null', () => {
+    const events = [{ eventType: 'ai_response', metadata: null }];
+    expect(computeCorrectStreak(events, 2)).toBe(0);
+  });
+
+  it('skips user_message events when counting', () => {
+    const events = [
+      {
+        eventType: 'ai_response',
+        metadata: { escalationRung: 2, correctAnswer: true },
+      },
+      { eventType: 'user_message', metadata: null },
+      { eventType: 'user_message', metadata: null },
+      {
+        eventType: 'ai_response',
+        metadata: { escalationRung: 2, correctAnswer: true },
+      },
+    ];
+    expect(computeCorrectStreak(events, 2)).toBe(2);
   });
 });

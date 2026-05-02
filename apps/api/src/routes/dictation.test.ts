@@ -394,7 +394,7 @@ describe('POST /v1/dictation/result', () => {
 
     expect(res.status).toBe(201);
     const body = await res.json();
-    expect(body.result).toBeDefined();
+    expect(body.result).toEqual(expect.objectContaining({}));
     expect(recordDictationResult).toHaveBeenCalledWith(
       expect.anything(), // db
       'test-profile-id',

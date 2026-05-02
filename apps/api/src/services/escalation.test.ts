@@ -50,7 +50,7 @@ describe('evaluateEscalation', () => {
 
     expect(decision.shouldEscalate).toBe(true);
     expect(decision.newRung).toBe(2);
-    expect(decision.reason).toBeDefined();
+    expect(typeof decision.reason).toBe('string');
   });
 
   it('escalates from rung 2 to rung 3 on threshold', () => {

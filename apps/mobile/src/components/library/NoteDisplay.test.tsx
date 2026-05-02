@@ -20,7 +20,7 @@ describe('NoteDisplay', () => {
         onDelete={jest.fn()}
       />
     );
-    expect(getByText('Pyramids are tombs for pharaohs')).toBeTruthy();
+    getByText('Pyramids are tombs for pharaohs');
   });
 
   it('shows edit and delete buttons', () => {
@@ -31,8 +31,8 @@ describe('NoteDisplay', () => {
         onDelete={jest.fn()}
       />
     );
-    expect(getByTestId('note-edit-button')).toBeTruthy();
-    expect(getByTestId('note-delete-button')).toBeTruthy();
+    getByTestId('note-edit-button');
+    getByTestId('note-delete-button');
   });
 
   it('hides edit/delete in read-only mode', () => {
@@ -46,7 +46,7 @@ describe('NoteDisplay', () => {
   it('renders session separators as visual dividers', () => {
     const content = 'First note\n--- Apr 5 ---\nSecond note';
     const { getByText } = render(<NoteDisplay content={content} readOnly />);
-    expect(getByText('Apr 5')).toBeTruthy();
+    getByText('Apr 5');
   });
 
   // [a11y sweep] Break tests: edit/delete icon wrappers must be a11y-hidden

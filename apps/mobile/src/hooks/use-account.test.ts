@@ -166,7 +166,7 @@ describe('useExportData', () => {
     });
 
     expect(mockFetch).toHaveBeenCalled();
-    expect(data!.exportedAt).toBeDefined();
+    expect(typeof data!.exportedAt).toBe('string');
   });
 
   it('throws when GET /account/export returns non-2xx', async () => {

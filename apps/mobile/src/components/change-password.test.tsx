@@ -40,14 +40,14 @@ describe('ChangePassword', () => {
 
   it('renders all three password fields', () => {
     render(<ChangePassword />);
-    expect(screen.getByTestId('current-password')).toBeTruthy();
-    expect(screen.getByTestId('new-password')).toBeTruthy();
-    expect(screen.getByTestId('confirm-password')).toBeTruthy();
+    screen.getByTestId('current-password');
+    screen.getByTestId('new-password');
+    screen.getByTestId('confirm-password');
   });
 
   it('shows requirements hint on new password field', () => {
     render(<ChangePassword />);
-    expect(screen.getByTestId('new-password-hint')).toBeTruthy();
+    screen.getByTestId('new-password-hint');
   });
 
   it('shows mismatch error when confirm differs from new password', () => {
@@ -55,7 +55,7 @@ describe('ChangePassword', () => {
     fireEvent.changeText(screen.getByTestId('new-password'), 'NewPass123!');
     fireEvent.changeText(screen.getByTestId('confirm-password'), 'Different1!');
     fireEvent.press(screen.getByTestId('update-password-button'));
-    expect(screen.getByText('Passwords do not match')).toBeTruthy();
+    screen.getByText('Passwords do not match');
   });
 
   it('does not submit when new password is too short', () => {
@@ -91,7 +91,7 @@ describe('ChangePassword', () => {
     fireEvent.changeText(screen.getByTestId('confirm-password'), 'NewPass123!');
     fireEvent.press(screen.getByTestId('update-password-button'));
     await waitFor(() => {
-      expect(screen.getByText('Password is incorrect.')).toBeTruthy();
+      screen.getByText('Password is incorrect.');
     });
   });
 
@@ -102,13 +102,13 @@ describe('ChangePassword', () => {
     fireEvent.changeText(screen.getByTestId('confirm-password'), 'NewPass123!');
     fireEvent.press(screen.getByTestId('update-password-button'));
     await waitFor(() => {
-      expect(screen.getByText('Password updated')).toBeTruthy();
+      screen.getByText('Password updated');
     });
   });
 
   it('renders forgot password link', () => {
     render(<ChangePassword />);
-    expect(screen.getByText('Forgot your password?')).toBeTruthy();
+    screen.getByText('Forgot your password?');
   });
 
   it('signs out and redirects when forgot password is tapped', async () => {

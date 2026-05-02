@@ -242,7 +242,7 @@ describe('interview-persist-curriculum integration', () => {
     const curriculum = await db.query.curricula.findFirst({
       where: eq(curricula.subjectId, subjectId),
     });
-    expect(curriculum).toBeDefined();
+    expect(curriculum).not.toBeUndefined();
     const topics = await db.query.curriculumTopics.findMany({
       where: eq(curriculumTopics.curriculumId, curriculum!.id),
     });
@@ -302,7 +302,7 @@ describe('interview-persist-curriculum integration', () => {
     const curriculum = await db.query.curricula.findFirst({
       where: eq(curricula.subjectId, subjectId),
     });
-    expect(curriculum).toBeDefined();
+    expect(curriculum).not.toBeUndefined();
     const topics = await db.query.curriculumTopics.findMany({
       where: eq(curriculumTopics.curriculumId, curriculum!.id),
     });

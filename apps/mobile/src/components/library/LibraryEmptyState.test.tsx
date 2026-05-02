@@ -11,8 +11,8 @@ describe('LibraryEmptyState', () => {
         onClear={onClear}
       />
     );
-    expect(screen.getByText('No books match your search')).toBeTruthy();
-    expect(screen.getByTestId('library-clear-search')).toBeTruthy();
+    screen.getByText('No books match your search');
+    screen.getByTestId('library-clear-search');
     fireEvent.press(screen.getByTestId('library-clear-search'));
     expect(onClear).toHaveBeenCalledTimes(1);
   });
@@ -26,7 +26,7 @@ describe('LibraryEmptyState', () => {
         clearLabel="Clear all"
       />
     );
-    expect(screen.getByText('Clear all')).toBeTruthy();
+    screen.getByText('Clear all');
   });
 
   it('defaults clear label to "Clear search"', () => {
@@ -37,7 +37,7 @@ describe('LibraryEmptyState', () => {
         onClear={jest.fn()}
       />
     );
-    expect(screen.getByText('Clear search')).toBeTruthy();
+    screen.getByText('Clear search');
   });
 
   it('shows no-content message with add subject button', () => {
@@ -48,7 +48,7 @@ describe('LibraryEmptyState', () => {
     expect(
       screen.getByText('Add a subject to start building your library')
     ).toBeTruthy();
-    expect(screen.getByTestId('library-add-subject-empty')).toBeTruthy();
+    screen.getByTestId('library-add-subject-empty');
     fireEvent.press(screen.getByTestId('library-add-subject-empty'));
     expect(onAddSubject).toHaveBeenCalledTimes(1);
   });

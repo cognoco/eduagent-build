@@ -94,7 +94,7 @@ afterEach(() => {
 
 describe('topupExpiryReminder', () => {
   it('should be defined as an Inngest function', () => {
-    expect(topupExpiryReminder).toBeDefined();
+    expect(topupExpiryReminder).toBeTruthy();
   });
 
   it('returns completed status with zero reminders when no credits expiring', async () => {

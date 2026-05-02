@@ -4,14 +4,55 @@ import {
   fireEvent,
   waitFor,
 } from '@testing-library/react-native';
+import React from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  createRoutedMockFetch,
+  fetchCallsMatching,
+  extractJsonBody,
+} from '../test-utils/mock-api-routes';
+
+// Routes most-specific first: /subjects/resolve before /subjects.
+// Handler for /subjects distinguishes GET (list) from POST (create) by method.
+let subjectsListData: Array<{ id: string; name: string }> = [];
+let subjectsListIsError = false;
+let createSubjectResponse: unknown = null;
+let createSubjectShouldError = false;
+let createSubjectErrorMessage = '';
+
+// Placeholder — replaced before each test by beforeEach (see describe block).
+// createRoutedMockFetch requires an initial entry so the map has the right key order.
+const mockFetch = createRoutedMockFetch({
+  '/subjects/resolve': { status: 'direct_match', resolvedName: '', suggestions: [], displayMessage: '' },
+  '/subjects': { subjects: [] },
+});
+
+jest.mock('../lib/api-client', () =>
+  require('../test-utils/mock-api-routes').mockApiClientFactory(mockFetch)
+);
+
+jest.mock('../lib/profile', () => ({
+  useProfile: () => ({
+    activeProfile: {
+      id: 'test-profile-id',
+      accountId: 'test-account-id',
+      displayName: 'Test Learner',
+      isOwner: true,
+      hasPremiumLlm: false,
+      conversationLanguage: 'en',
+      pronouns: null,
+      consentStatus: null,
+    },
+  }),
+  ProfileContext: {
+    Provider: ({ children }: { children: React.ReactNode }) => children,
+  },
+}));
 
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
 const mockPush = jest.fn();
-const mockCreateSubjectMutateAsync = jest.fn();
-const mockResolveSubjectMutateAsync = jest.fn();
 let mockSearchParams: Record<string, string> = {};
-let mockExistingSubjects: Array<{ id: string; name: string }> = [];
 
 let mockCanGoBackValue = true;
 const mockCanGoBack = jest.fn(() => mockCanGoBackValue);
@@ -30,29 +71,6 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-let mockSubjectsIsError = false;
-const mockSubjectsRefetch = jest.fn();
-
-jest.mock('../hooks/use-subjects', () => ({
-  useCreateSubject: () => ({
-    mutateAsync: mockCreateSubjectMutateAsync,
-  }),
-  useSubjects: () => ({
-    data: mockExistingSubjects,
-    isError: mockSubjectsIsError,
-    refetch: mockSubjectsRefetch,
-  }),
-  useUpdateSubject: () => ({
-    mutateAsync: jest.fn().mockResolvedValue({ subject: {} }),
-  }),
-}));
-
-jest.mock('../hooks/use-resolve-subject', () => ({
-  useResolveSubject: () => ({
-    mutateAsync: mockResolveSubjectMutateAsync,
-  }),
-}));
-
 jest.mock('../lib/theme', () => ({
   useThemeColors: () => ({
     muted: '#94a3b8',
@@ -60,6 +78,7 @@ jest.mock('../lib/theme', () => ({
   }),
 }));
 
+// NOT an API hook — keep as-is.
 jest.mock('../hooks/use-keyboard-scroll', () => ({
   useKeyboardScroll: () => ({
     scrollRef: { current: null },
@@ -68,21 +87,78 @@ jest.mock('../hooks/use-keyboard-scroll', () => ({
   }),
 }));
 
+function createWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+  });
+  return function Wrapper({ children }: { children: React.ReactNode }) {
+    return (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+  };
+}
+
+// Helper: configure a single resolve response for one call.
+function setResolveResponse(response: unknown) {
+  mockFetch.setRoute('/subjects/resolve', response);
+}
+
+// Helper: configure sequential resolve responses (for tests that call resolve multiple times).
+function setSequentialResolveResponses(responses: unknown[]) {
+  let callIndex = 0;
+  mockFetch.setRoute('/subjects/resolve', () => {
+    const res = responses[callIndex] ?? responses[responses.length - 1];
+    callIndex++;
+    return res;
+  });
+}
+
 const CreateSubjectScreen = require('./create-subject').default;
 
+// Default handler for /subjects (GET list or POST create).
+// Defined as a named function so beforeEach can restore it after per-test overrides.
+function defaultSubjectsHandler(url: string, init?: RequestInit): unknown {
+  if (init?.method === 'POST') {
+    if (createSubjectShouldError) {
+      return new Response(
+        JSON.stringify({ message: createSubjectErrorMessage }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    return createSubjectResponse ?? { subject: { id: 'subject-default', name: 'Subject' } };
+  }
+  // GET — return list
+  if (subjectsListIsError) {
+    return new Response('{}', { status: 500 });
+  }
+  return { subjects: subjectsListData };
+}
+
+// Default handler for /subjects/resolve.
+const defaultResolveHandler = { status: 'direct_match', resolvedName: '', suggestions: [], displayMessage: '' };
+
 describe('CreateSubjectScreen', () => {
+  let Wrapper: React.ComponentType<{ children: React.ReactNode }>;
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockSearchParams = {};
-    mockExistingSubjects = [];
-    mockSubjectsIsError = false;
+    subjectsListData = [];
+    subjectsListIsError = false;
+    createSubjectResponse = null;
+    createSubjectShouldError = false;
+    createSubjectErrorMessage = '';
     mockCanGoBackValue = true;
+    // Restore routes to defaults so per-test setRoute overrides don't leak.
+    mockFetch.setRoute('/subjects/resolve', defaultResolveHandler);
+    mockFetch.setRoute('/subjects', defaultSubjectsHandler);
+    Wrapper = createWrapper();
   });
 
   it('renders starter chips and fills the input on tap', () => {
-    render(<CreateSubjectScreen />);
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
-    expect(screen.getByTestId('subject-options')).toBeTruthy();
+    screen.getByTestId('subject-options');
 
     // "Math" starter row is present and tappable
     const mathChip = screen.getByTestId('subject-start-math');
@@ -94,29 +170,30 @@ describe('CreateSubjectScreen', () => {
   });
 
   it('tapping a chip immediately triggers resolveInput', async () => {
-    mockResolveSubjectMutateAsync.mockResolvedValueOnce({
+    setResolveResponse({
       status: 'direct_match',
       resolvedName: 'Math',
       suggestions: [],
       displayMessage: 'Math it is.',
     });
-    mockCreateSubjectMutateAsync.mockResolvedValueOnce({
+    createSubjectResponse = {
       subject: { id: 'subject-math', name: 'Math' },
-    });
+    };
 
-    render(<CreateSubjectScreen />);
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
     fireEvent.press(screen.getByTestId('subject-start-math'));
 
     await waitFor(() => {
-      expect(mockResolveSubjectMutateAsync).toHaveBeenCalledWith({
-        rawInput: 'Math',
-      });
+      const resolveCalls = fetchCallsMatching(mockFetch, '/subjects/resolve');
+      expect(resolveCalls.length).toBeGreaterThanOrEqual(1);
+      const body = extractJsonBody<{ rawInput: string }>(resolveCalls[0]?.init);
+      expect(body?.rawInput).toBe('Math');
     });
   });
 
   it('reveals the clarify input when Something else is pressed', async () => {
-    mockResolveSubjectMutateAsync.mockResolvedValueOnce({
+    setResolveResponse({
       status: 'ambiguous',
       displayMessage: 'A few nearby subjects came up.',
       suggestions: [
@@ -125,52 +202,49 @@ describe('CreateSubjectScreen', () => {
       ],
     });
 
-    render(<CreateSubjectScreen />);
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
     fireEvent.changeText(screen.getByTestId('create-subject-name'), 'ants');
     fireEvent.press(screen.getByTestId('create-subject-submit'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('subject-something-else')).toBeTruthy();
+      screen.getByTestId('subject-something-else');
     });
 
     fireEvent.press(screen.getByTestId('subject-something-else'));
 
-    expect(screen.getByTestId('subject-clarify-card')).toBeTruthy();
-    expect(screen.getByTestId('subject-clarify-input')).toBeTruthy();
+    screen.getByTestId('subject-clarify-card');
+    screen.getByTestId('subject-clarify-input');
   });
 
   it('offers and uses "Just use my words" after a second unresolved round', async () => {
-    mockResolveSubjectMutateAsync
-      .mockResolvedValueOnce({
+    setSequentialResolveResponses([
+      {
         status: 'ambiguous',
         displayMessage: 'A few nearby subjects came up.',
         suggestions: [
           { name: 'Ant biology', description: 'Study ants and colonies' },
         ],
-      })
-      .mockResolvedValueOnce({
+      },
+      {
         status: 'ambiguous',
         displayMessage: 'Still not quite sure which one you mean.',
         suggestions: [
           { name: 'Insect ecology', description: 'Ecosystems and insects' },
         ],
-      });
-
-    mockCreateSubjectMutateAsync.mockResolvedValueOnce({
-      subject: {
-        id: 'subject-1',
-        name: 'leaf cutter ants',
       },
-    });
+    ]);
+    createSubjectResponse = {
+      subject: { id: 'subject-1', name: 'leaf cutter ants' },
+    };
 
-    render(<CreateSubjectScreen />);
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
     fireEvent.changeText(screen.getByTestId('create-subject-name'), 'ants');
     fireEvent.press(screen.getByTestId('create-subject-submit'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('subject-something-else')).toBeTruthy();
+      screen.getByTestId('subject-something-else');
     });
 
     fireEvent.press(screen.getByTestId('subject-something-else'));
@@ -181,16 +255,19 @@ describe('CreateSubjectScreen', () => {
     fireEvent.press(screen.getByTestId('subject-clarify-submit'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('subject-use-my-words')).toBeTruthy();
+      screen.getByTestId('subject-use-my-words');
     });
 
     fireEvent.press(screen.getByTestId('subject-use-my-words'));
 
     await waitFor(() => {
-      expect(mockCreateSubjectMutateAsync).toHaveBeenCalledWith({
-        name: 'leaf cutter ants',
-        rawInput: 'leaf cutter ants',
-      });
+      const createCalls = fetchCallsMatching(mockFetch, '/subjects').filter(
+        (c: { url: string; init?: RequestInit }) => c.init?.method === 'POST' && !c.url.includes('/resolve')
+      );
+      expect(createCalls.length).toBeGreaterThanOrEqual(1);
+      const body = extractJsonBody<{ name: string; rawInput: string }>(createCalls[0]?.init);
+      expect(body?.name).toBe('leaf cutter ants');
+      expect(body?.rawInput).toBe('leaf cutter ants');
     });
 
     expect(mockReplace).toHaveBeenCalledWith({
@@ -205,7 +282,7 @@ describe('CreateSubjectScreen', () => {
   });
 
   it('suggestion cards meet minimum 44px touch target size', async () => {
-    mockResolveSubjectMutateAsync.mockResolvedValueOnce({
+    setResolveResponse({
       status: 'ambiguous',
       displayMessage: 'A few nearby subjects came up.',
       suggestions: [
@@ -214,13 +291,13 @@ describe('CreateSubjectScreen', () => {
       ],
     });
 
-    render(<CreateSubjectScreen />);
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
     fireEvent.changeText(screen.getByTestId('create-subject-name'), 'ants');
     fireEvent.press(screen.getByTestId('create-subject-submit'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('subject-suggestion-option-0')).toBeTruthy();
+      screen.getByTestId('subject-suggestion-option-0');
     });
 
     // Suggestion cards have min-h-[52px] which exceeds 44px minimum
@@ -243,7 +320,7 @@ describe('CreateSubjectScreen', () => {
 
   it('[BUG-237] picking ambiguous suggestion derives focus from original input', async () => {
     // User types "Easter", LLM returns ambiguous suggestions WITHOUT explicit focus
-    mockResolveSubjectMutateAsync.mockResolvedValueOnce({
+    setResolveResponse({
       status: 'ambiguous',
       displayMessage: '**Easter** can be studied from different angles.',
       suggestions: [
@@ -252,28 +329,33 @@ describe('CreateSubjectScreen', () => {
       ],
     });
 
-    mockCreateSubjectMutateAsync.mockResolvedValueOnce({
+    createSubjectResponse = {
       subject: { id: 'subject-wh', name: 'World History' },
       structureType: 'focused_book',
       bookId: 'book-easter',
       bookTitle: 'Easter',
       bookCount: 1,
-    });
+    };
 
-    render(<CreateSubjectScreen />);
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
     fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Easter');
     fireEvent.press(screen.getByTestId('create-subject-submit'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('subject-suggestion-option-0')).toBeTruthy();
+      screen.getByTestId('subject-suggestion-option-0');
     });
 
     // Pick "World History"
     fireEvent.press(screen.getByTestId('subject-suggestion-option-0'));
 
     await waitFor(() => {
-      expect(mockCreateSubjectMutateAsync).toHaveBeenCalledWith({
+      const createCalls = fetchCallsMatching(mockFetch, '/subjects').filter(
+        (c: { url: string; init?: RequestInit }) => c.init?.method === 'POST' && !c.url.includes('/resolve')
+      );
+      expect(createCalls.length).toBeGreaterThanOrEqual(1);
+      const body = extractJsonBody<{ name: string; rawInput: string; focus: string; focusDescription: string }>(createCalls[0]?.init);
+      expect(body).toMatchObject({
         name: 'World History',
         rawInput: 'Easter',
         focus: 'Easter',
@@ -297,7 +379,7 @@ describe('CreateSubjectScreen', () => {
 
   it('[BUG-237] picking ambiguous suggestion with explicit focus uses that focus', async () => {
     // LLM returns suggestions WITH explicit focus fields
-    mockResolveSubjectMutateAsync.mockResolvedValueOnce({
+    setResolveResponse({
       status: 'ambiguous',
       displayMessage: '**Easter** can be studied from different angles.',
       suggestions: [
@@ -314,21 +396,21 @@ describe('CreateSubjectScreen', () => {
       ],
     });
 
-    mockCreateSubjectMutateAsync.mockResolvedValueOnce({
+    createSubjectResponse = {
       subject: { id: 'subject-wh', name: 'World History' },
       structureType: 'focused_book',
       bookId: 'book-easter-trad',
       bookTitle: 'Easter Traditions',
       bookCount: 1,
-    });
+    };
 
-    render(<CreateSubjectScreen />);
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
     fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Easter');
     fireEvent.press(screen.getByTestId('create-subject-submit'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('subject-suggestion-option-0')).toBeTruthy();
+      screen.getByTestId('subject-suggestion-option-0');
     });
 
     // Pick "World History"
@@ -336,7 +418,12 @@ describe('CreateSubjectScreen', () => {
 
     await waitFor(() => {
       // When the suggestion has an explicit focus, use that instead of deriving
-      expect(mockCreateSubjectMutateAsync).toHaveBeenCalledWith({
+      const createCalls = fetchCallsMatching(mockFetch, '/subjects').filter(
+        (c: { url: string; init?: RequestInit }) => c.init?.method === 'POST' && !c.url.includes('/resolve')
+      );
+      expect(createCalls.length).toBeGreaterThanOrEqual(1);
+      const body = extractJsonBody<{ name: string; rawInput: string; focus: string; focusDescription: string }>(createCalls[0]?.init);
+      expect(body).toMatchObject({
         name: 'World History',
         rawInput: 'Easter',
         focus: 'Easter Traditions',
@@ -347,7 +434,7 @@ describe('CreateSubjectScreen', () => {
 
   it('splits combined LLM names like "Biology — Botany" and derives focus', async () => {
     // LLM returns combined name despite prompt instructions saying not to
-    mockResolveSubjectMutateAsync.mockResolvedValueOnce({
+    setResolveResponse({
       status: 'ambiguous',
       displayMessage: '**Tea** can be studied from different angles.',
       suggestions: [
@@ -362,28 +449,33 @@ describe('CreateSubjectScreen', () => {
       ],
     });
 
-    mockCreateSubjectMutateAsync.mockResolvedValueOnce({
+    createSubjectResponse = {
       subject: { id: 'subject-botany', name: 'Botany' },
       structureType: 'focused_book',
       bookId: 'book-tea',
       bookTitle: 'tea',
       bookCount: 1,
-    });
+    };
 
-    render(<CreateSubjectScreen />);
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
     fireEvent.changeText(screen.getByTestId('create-subject-name'), 'tea');
     fireEvent.press(screen.getByTestId('create-subject-submit'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('subject-suggestion-option-0')).toBeTruthy();
+      screen.getByTestId('subject-suggestion-option-0');
     });
 
     fireEvent.press(screen.getByTestId('subject-suggestion-option-0'));
 
     await waitFor(() => {
       // Should split "Biology — Botany" → subjectName "Botany", focus "tea"
-      expect(mockCreateSubjectMutateAsync).toHaveBeenCalledWith({
+      const createCalls = fetchCallsMatching(mockFetch, '/subjects').filter(
+        (c: { url: string; init?: RequestInit }) => c.init?.method === 'POST' && !c.url.includes('/resolve')
+      );
+      expect(createCalls.length).toBeGreaterThanOrEqual(1);
+      const body = extractJsonBody<{ name: string; rawInput: string; focus: string; focusDescription: string }>(createCalls[0]?.init);
+      expect(body).toMatchObject({
         name: 'Botany',
         rawInput: 'tea',
         focus: 'tea',
@@ -406,23 +498,20 @@ describe('CreateSubjectScreen', () => {
   });
 
   it('routes broad subjects to the picker screen', async () => {
-    mockResolveSubjectMutateAsync.mockResolvedValueOnce({
+    setResolveResponse({
       status: 'direct_match',
       resolvedName: 'History',
       suggestions: [],
       displayMessage: 'History works well.',
     });
 
-    mockCreateSubjectMutateAsync.mockResolvedValueOnce({
-      subject: {
-        id: 'subject-history',
-        name: 'History',
-      },
+    createSubjectResponse = {
+      subject: { id: 'subject-history', name: 'History' },
       structureType: 'broad',
       bookCount: 6,
-    });
+    };
 
-    render(<CreateSubjectScreen />);
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
     fireEvent.changeText(screen.getByTestId('create-subject-name'), 'history');
     fireEvent.press(screen.getByTestId('create-subject-submit'));
@@ -442,7 +531,7 @@ describe('CreateSubjectScreen', () => {
   it('[BUG-3] Cancel button calls router.back() when returnTo=chat', () => {
     mockSearchParams = { returnTo: 'chat' };
 
-    render(<CreateSubjectScreen />);
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
     fireEvent.press(screen.getByTestId('create-subject-cancel'));
 
@@ -457,7 +546,7 @@ describe('CreateSubjectScreen', () => {
     mockSearchParams = { returnTo: 'chat' };
     mockCanGoBackValue = false;
 
-    render(<CreateSubjectScreen />);
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
     fireEvent.press(screen.getByTestId('create-subject-cancel'));
 
@@ -468,22 +557,21 @@ describe('CreateSubjectScreen', () => {
     mockSearchParams = { returnTo: 'chat' };
     mockCanGoBackValue = false;
 
-    mockResolveSubjectMutateAsync.mockResolvedValueOnce({
+    setResolveResponse({
       status: 'direct_match',
       resolvedName: 'Math',
       suggestions: [],
       displayMessage: 'Math works.',
     });
-    mockCreateSubjectMutateAsync.mockRejectedValueOnce(
-      new Error('You have reached the subject limit for your plan')
-    );
+    createSubjectShouldError = true;
+    createSubjectErrorMessage = 'You have reached the subject limit for your plan';
 
-    render(<CreateSubjectScreen />);
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
     fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Math');
     fireEvent.press(screen.getByTestId('create-subject-submit'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('manage-subjects-button')).toBeTruthy();
+      screen.getByTestId('manage-subjects-button');
     });
     fireEvent.press(screen.getByTestId('manage-subjects-button'));
 
@@ -493,7 +581,7 @@ describe('CreateSubjectScreen', () => {
   it('Cancel button returns to library when returnTo=library', () => {
     mockSearchParams = { returnTo: 'library' };
 
-    render(<CreateSubjectScreen />);
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
     fireEvent.press(screen.getByTestId('create-subject-cancel'));
 
@@ -504,7 +592,7 @@ describe('CreateSubjectScreen', () => {
   it('Cancel button returns to the learner home view when opened from learner home', () => {
     mockSearchParams = { returnTo: 'learner-home' };
 
-    render(<CreateSubjectScreen />);
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
     fireEvent.press(screen.getByTestId('create-subject-cancel'));
 
@@ -515,23 +603,22 @@ describe('CreateSubjectScreen', () => {
   it('[BUG-3] subject-limit "Manage" button calls router.back() when returnTo=chat', async () => {
     mockSearchParams = { returnTo: 'chat' };
 
-    mockResolveSubjectMutateAsync.mockResolvedValueOnce({
+    setResolveResponse({
       status: 'direct_match',
       resolvedName: 'Math',
       suggestions: [],
       displayMessage: 'Math works.',
     });
-    mockCreateSubjectMutateAsync.mockRejectedValueOnce(
-      new Error('You have reached the subject limit for your plan')
-    );
+    createSubjectShouldError = true;
+    createSubjectErrorMessage = 'You have reached the subject limit for your plan';
 
-    render(<CreateSubjectScreen />);
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
     fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Math');
     fireEvent.press(screen.getByTestId('create-subject-submit'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('manage-subjects-button')).toBeTruthy();
+      screen.getByTestId('manage-subjects-button');
     });
 
     fireEvent.press(screen.getByTestId('manage-subjects-button'));
@@ -545,23 +632,22 @@ describe('CreateSubjectScreen', () => {
   it('[BUG-3] subject-limit "Manage" button routes to library when no returnTo', async () => {
     mockSearchParams = {};
 
-    mockResolveSubjectMutateAsync.mockResolvedValueOnce({
+    setResolveResponse({
       status: 'direct_match',
       resolvedName: 'Math',
       suggestions: [],
       displayMessage: 'Math works.',
     });
-    mockCreateSubjectMutateAsync.mockRejectedValueOnce(
-      new Error('You have reached the subject limit for your plan')
-    );
+    createSubjectShouldError = true;
+    createSubjectErrorMessage = 'You have reached the subject limit for your plan';
 
-    render(<CreateSubjectScreen />);
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
     fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Math');
     fireEvent.press(screen.getByTestId('create-subject-submit'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('manage-subjects-button')).toBeTruthy();
+      screen.getByTestId('manage-subjects-button');
     });
 
     fireEvent.press(screen.getByTestId('manage-subjects-button'));
@@ -572,23 +658,20 @@ describe('CreateSubjectScreen', () => {
   it('[BUG-236] returns to chat session when returnTo=chat after subject creation', async () => {
     mockSearchParams = { returnTo: 'chat', chatTopic: 'Easter' };
 
-    mockResolveSubjectMutateAsync.mockResolvedValueOnce({
+    setResolveResponse({
       status: 'direct_match',
       resolvedName: 'World History',
       suggestions: [],
       displayMessage: 'World History works well.',
     });
 
-    mockCreateSubjectMutateAsync.mockResolvedValueOnce({
-      subject: {
-        id: 'subject-world-history',
-        name: 'World History',
-      },
+    createSubjectResponse = {
+      subject: { id: 'subject-world-history', name: 'World History' },
       structureType: 'broad',
       bookCount: 4,
-    });
+    };
 
-    render(<CreateSubjectScreen />);
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
     fireEvent.changeText(
       screen.getByTestId('create-subject-name'),
@@ -618,23 +701,20 @@ describe('CreateSubjectScreen', () => {
     // No returnTo param — normal Library-originated flow
     mockSearchParams = {};
 
-    mockResolveSubjectMutateAsync.mockResolvedValueOnce({
+    setResolveResponse({
       status: 'direct_match',
       resolvedName: 'Biology',
       suggestions: [],
       displayMessage: 'Biology it is.',
     });
 
-    mockCreateSubjectMutateAsync.mockResolvedValueOnce({
-      subject: {
-        id: 'subject-biology',
-        name: 'Biology',
-      },
+    createSubjectResponse = {
+      subject: { id: 'subject-biology', name: 'Biology' },
       structureType: 'broad',
       bookCount: 5,
-    });
+    };
 
-    render(<CreateSubjectScreen />);
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
     fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Biology');
     fireEvent.press(screen.getByTestId('create-subject-submit'));
@@ -657,44 +737,50 @@ describe('CreateSubjectScreen', () => {
   // ----------------------------------------------------------------
 
   it('hides starter chips when input has text', () => {
-    render(<CreateSubjectScreen />);
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
-    expect(screen.getByTestId('subject-options')).toBeTruthy();
+    screen.getByTestId('subject-options');
 
     fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Bio');
 
     expect(screen.queryByTestId('subject-options')).toBeNull();
   });
 
-  it('shows unified subject rows when the user has existing subjects', () => {
-    mockExistingSubjects = [
+  it('shows unified subject rows when the user has existing subjects', async () => {
+    subjectsListData = [
       { id: 'sub-1', name: 'Math' },
       { id: 'sub-2', name: 'History' },
     ];
 
-    render(<CreateSubjectScreen />);
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
-    expect(screen.getByTestId('subject-options')).toBeTruthy();
-    expect(screen.getByText('Continue Math')).toBeTruthy();
-    expect(screen.getByText('Continue History')).toBeTruthy();
-    expect(screen.queryByText('Or continue with')).toBeNull();
-    expect(screen.getByTestId('subject-continue-sub-1')).toBeTruthy();
-    expect(screen.getByTestId('subject-continue-sub-2')).toBeTruthy();
+    await waitFor(() => {
+      screen.getByTestId('subject-options');
+      screen.getByText('Continue Math');
+      screen.getByText('Continue History');
+      expect(screen.queryByText('Or continue with')).toBeNull();
+      screen.getByTestId('subject-continue-sub-1');
+      screen.getByTestId('subject-continue-sub-2');
+    });
   });
 
   it('shows only starter rows for first-time users', () => {
-    mockExistingSubjects = [];
+    subjectsListData = [];
 
-    render(<CreateSubjectScreen />);
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
-    expect(screen.getByTestId('subject-options')).toBeTruthy();
+    screen.getByTestId('subject-options');
     expect(screen.queryByText(/^Continue /)).toBeNull();
   });
 
-  it('tapping a continue row navigates to session with subject', () => {
-    mockExistingSubjects = [{ id: 'sub-1', name: 'Math' }];
+  it('tapping a continue row navigates to session with subject', async () => {
+    subjectsListData = [{ id: 'sub-1', name: 'Math' }];
 
-    render(<CreateSubjectScreen />);
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      screen.getByTestId('subject-continue-sub-1');
+    });
 
     fireEvent.press(screen.getByTestId('subject-continue-sub-1'));
 
@@ -704,12 +790,14 @@ describe('CreateSubjectScreen', () => {
     });
   });
 
-  it('hides unified subject rows when input has text', () => {
-    mockExistingSubjects = [{ id: 'sub-1', name: 'Math' }];
+  it('hides unified subject rows when input has text', async () => {
+    subjectsListData = [{ id: 'sub-1', name: 'Math' }];
 
-    render(<CreateSubjectScreen />);
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
-    expect(screen.getByTestId('subject-options')).toBeTruthy();
+    await waitFor(() => {
+      screen.getByTestId('subject-options');
+    });
 
     fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Science');
 
@@ -717,16 +805,16 @@ describe('CreateSubjectScreen', () => {
   });
 
   it('shows "Not sure?" hint text when input is empty', () => {
-    render(<CreateSubjectScreen />);
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
-    expect(screen.getByTestId('not-sure-hint')).toBeTruthy();
+    screen.getByTestId('not-sure-hint');
     expect(
       screen.getByText(/Not sure\? Just describe what interests you/)
     ).toBeTruthy();
   });
 
   it('hides "Not sure?" hint when input has text', () => {
-    render(<CreateSubjectScreen />);
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
     fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Art');
 
@@ -743,31 +831,40 @@ describe('CreateSubjectScreen', () => {
       resolveCreate = r;
     });
 
-    mockResolveSubjectMutateAsync.mockResolvedValueOnce({
+    setResolveResponse({
       status: 'direct_match',
       resolvedName: 'Math',
       suggestions: [],
       displayMessage: 'Math it is.',
     });
-    mockCreateSubjectMutateAsync.mockReturnValueOnce(pendingCreate);
+    // Make create hang until we resolve it manually.
+    mockFetch.setRoute('/subjects', (url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') {
+        return pendingCreate.then(() => ({
+          subject: { id: 'subject-math', name: 'Math' },
+        }));
+      }
+      return { subjects: [] };
+    });
 
-    render(<CreateSubjectScreen />);
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
     fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Math');
     fireEvent.press(screen.getByTestId('create-subject-submit'));
 
     // Wait for resolve to finish (before create fires)
     await waitFor(() => {
-      expect(mockCreateSubjectMutateAsync).toHaveBeenCalled();
+      const createCalls = fetchCallsMatching(mockFetch, '/subjects').filter(
+        (c: { url: string; init?: RequestInit }) => c.init?.method === 'POST' && !c.url.includes('/resolve')
+      );
+      expect(createCalls.length).toBeGreaterThanOrEqual(1);
     });
 
     // Cancel while create is still pending
     fireEvent.press(screen.getByTestId('create-subject-cancel'));
 
     // Now let the create mutation resolve
-    resolveCreate({
-      subject: { id: 'subject-math', name: 'Math' },
-    });
+    resolveCreate({});
 
     await Promise.resolve();
     await Promise.resolve();
@@ -791,9 +888,14 @@ describe('CreateSubjectScreen', () => {
       resolveResolve = r;
     });
 
-    mockResolveSubjectMutateAsync.mockReturnValueOnce(pendingResolve);
+    mockFetch.setRoute('/subjects/resolve', () => pendingResolve.then(() => ({
+      status: 'direct_match',
+      resolvedName: 'Science',
+      suggestions: [],
+      displayMessage: 'Science it is.',
+    })));
 
-    render(<CreateSubjectScreen />);
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
     fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Science');
     fireEvent.press(screen.getByTestId('create-subject-submit'));
@@ -801,19 +903,17 @@ describe('CreateSubjectScreen', () => {
     // Cancel while resolve is pending
     fireEvent.press(screen.getByTestId('create-subject-cancel'));
 
-    // Now let the resolve mutation resolve with a direct match
-    resolveResolve({
-      status: 'direct_match',
-      resolvedName: 'Science',
-      suggestions: [],
-      displayMessage: 'Science it is.',
-    });
+    // Now let the resolve mutation resolve
+    resolveResolve({});
 
     await Promise.resolve();
     await Promise.resolve();
 
     // createSubject must NOT have been called — cancelled before it ran
-    expect(mockCreateSubjectMutateAsync).not.toHaveBeenCalled();
+    const createCalls = fetchCallsMatching(mockFetch, '/subjects').filter(
+      (c: { url: string; init?: RequestInit }) => c.init?.method === 'POST' && !c.url.includes('/resolve')
+    );
+    expect(createCalls.length).toBe(0);
     // No post-cancel navigation from the mutation result
     expect(mockPush).not.toHaveBeenCalled();
   });
@@ -822,24 +922,31 @@ describe('CreateSubjectScreen', () => {
   // existingSubjects error: inline retry message
   // -----------------------------------------------------------------------
 
-  it('shows inline retry message when existingSubjects fails to load', () => {
-    mockSubjectsIsError = true;
-    mockExistingSubjects = [];
+  it('shows inline retry message when existingSubjects fails to load', async () => {
+    subjectsListIsError = true;
 
-    render(<CreateSubjectScreen />);
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
-    expect(screen.getByTestId('subjects-load-error-retry')).toBeTruthy();
+    await waitFor(() => {
+      screen.getByTestId('subjects-load-error-retry');
+    });
   });
 
-  it('tapping subjects-load-error-retry calls refetch', () => {
-    mockSubjectsIsError = true;
-    mockExistingSubjects = [];
+  it('tapping subjects-load-error-retry calls refetch', async () => {
+    subjectsListIsError = true;
 
-    render(<CreateSubjectScreen />);
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
+    await waitFor(() => {
+      screen.getByTestId('subjects-load-error-retry');
+    });
+
+    const subjectCallsBefore = fetchCallsMatching(mockFetch, '/subjects').length;
     fireEvent.press(screen.getByTestId('subjects-load-error-retry'));
 
-    expect(mockSubjectsRefetch).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(fetchCallsMatching(mockFetch, '/subjects').length).toBeGreaterThan(subjectCallsBefore);
+    });
   });
 });
 
@@ -849,18 +956,35 @@ describe('CreateSubjectScreen', () => {
 // Android-correct value.
 describe('CreateSubjectScreen — keyboard avoiding behavior', () => {
   const { KeyboardAvoidingView } = require('react-native');
+  let Wrapper: React.ComponentType<{ children: React.ReactNode }>;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockSearchParams = {};
-    mockExistingSubjects = [];
+    subjectsListData = [];
+    subjectsListIsError = false;
+    createSubjectResponse = null;
+    createSubjectShouldError = false;
+    createSubjectErrorMessage = '';
+    // Restore routes to defaults so per-test overrides don't leak between suites.
+    mockFetch.setRoute('/subjects/resolve', defaultResolveHandler);
+    mockFetch.setRoute('/subjects', defaultSubjectsHandler);
+    Wrapper = (() => {
+      const queryClient = new QueryClient({
+        defaultOptions: { queries: { retry: false, gcTime: 0 } },
+      });
+      return function W({ children }: { children: React.ReactNode }) {
+        return (
+          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        );
+      };
+    })();
   });
 
   it('uses platform-correct KeyboardAvoidingView behavior (ios → padding)', () => {
     // jest-expo defaults Platform.OS to 'ios' in test, so Platform.select
     // returns the ios branch. The bug was a hardcoded "padding" — fix uses
     // Platform.select with both keys so Android resolves to "height".
-    render(<CreateSubjectScreen />);
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
     const kav = screen.UNSAFE_getByType(KeyboardAvoidingView);
     expect(kav.props.behavior).toBe('padding');
   });

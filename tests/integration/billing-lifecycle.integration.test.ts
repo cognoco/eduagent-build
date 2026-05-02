@@ -285,13 +285,13 @@ describe('Integration: billing lifecycle routes', () => {
     );
 
     const subscription = await loadSubscription(account.id);
-    expect(subscription).toBeDefined();
+    expect(subscription).not.toBeUndefined();
     expect(subscription!.tier).toBe('free');
     expect(subscription!.status).toBe('active');
     expect(subscription!.stripeCustomerId).toBe('cus_checkout');
 
     const quotaPool = await loadQuotaPool(subscription!.id);
-    expect(quotaPool).toBeDefined();
+    expect(quotaPool).not.toBeUndefined();
     expect(quotaPool!.monthlyLimit).toBe(100);
   });
 
@@ -325,7 +325,7 @@ describe('Integration: billing lifecycle routes', () => {
     expect(updated!.stripeSubscriptionId).toBe('sub_cancel');
 
     const quotaPool = await loadQuotaPool(seeded.subscription.id);
-    expect(quotaPool).toBeDefined();
+    expect(quotaPool).not.toBeUndefined();
   });
 
   it('returns 404 when there is no active Stripe subscription to cancel', async () => {
@@ -398,7 +398,7 @@ describe('Integration: billing lifecycle routes', () => {
     expect(body.portalUrl).toBe('https://stripe.test/portal');
 
     const saved = await loadAccount();
-    expect(saved).toBeDefined();
+    expect(saved).not.toBeUndefined();
   });
 
   it('returns 401 without authentication', async () => {

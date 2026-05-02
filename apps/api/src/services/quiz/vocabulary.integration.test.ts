@@ -311,7 +311,7 @@ describe('vocabulary quiz round lifecycle (integration)', () => {
 
     for (const card of afterCards) {
       const before = beforeById.get(card.vocabularyId);
-      expect(before).toBeDefined();
+      expect(before).toEqual(expect.objectContaining({}));
 
       const expected = sm2({
         quality: masteryQualityById.get(card.vocabularyId) ?? 4,

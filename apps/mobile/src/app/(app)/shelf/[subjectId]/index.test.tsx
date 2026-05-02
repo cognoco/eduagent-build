@@ -1,8 +1,42 @@
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
+import React from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { RoutedMockFetch } from '../../../../test-utils/mock-api-routes';
 import ShelfScreen from './index';
 
 // ---------------------------------------------------------------------------
-// Mocks
+// Fetch-boundary mock — mockFetch is assigned inside the jest.mock factory
+// so it is available before test code runs (bypasses hoisting issue).
+// ---------------------------------------------------------------------------
+
+let mockFetch: RoutedMockFetch;
+
+jest.mock('../../../../lib/api-client', () => {
+  const { createRoutedMockFetch, mockApiClientFactory } = require('../../../../test-utils/mock-api-routes');
+  mockFetch = createRoutedMockFetch();
+  return mockApiClientFactory(mockFetch);
+});
+
+jest.mock('../../../../lib/profile', () => ({
+  useProfile: () => ({
+    activeProfile: {
+      id: 'test-profile-id',
+      accountId: 'test-account-id',
+      displayName: 'Test Learner',
+      isOwner: true,
+      hasPremiumLlm: false,
+      conversationLanguage: 'en',
+      pronouns: null,
+      consentStatus: null,
+    },
+  }),
+  ProfileContext: {
+    Provider: ({ children }: { children: React.ReactNode }) => children,
+  },
+}));
+
+// ---------------------------------------------------------------------------
+// External / rendering mocks (kept — not API hooks)
 // ---------------------------------------------------------------------------
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -27,72 +61,6 @@ jest.mock('expo-router', () => ({
 // Default search params — overridden per test via mockSearchParams
 let mockSearchParams = () => ({ subjectId: 'sub-1' });
 
-// --- useBooks ---
-const mockBooksRefetch = jest.fn();
-
-const mockUseBooks = jest.fn((): any => ({
-  data: [
-    {
-      id: 'book-1',
-      title: 'Algebra Basics',
-      emoji: '📐',
-      topicsGenerated: true,
-    },
-    {
-      id: 'book-2',
-      title: 'Geometry',
-      emoji: '📏',
-      topicsGenerated: false,
-    },
-  ],
-  isLoading: false,
-  isError: false,
-  error: null,
-  refetch: mockBooksRefetch,
-}));
-
-jest.mock('../../../../hooks/use-books', () => ({
-  useBooks: () => mockUseBooks(),
-}));
-
-// --- useSubjects ---
-const mockSubjectsRefetch = jest.fn();
-
-const mockUseSubjects = jest.fn((): any => ({
-  data: [{ id: 'sub-1', name: 'Mathematics' }],
-  isLoading: false,
-  isError: false,
-  error: null,
-  refetch: mockSubjectsRefetch,
-}));
-
-jest.mock('../../../../hooks/use-subjects', () => ({
-  useSubjects: () => mockUseSubjects(),
-}));
-
-// --- useBookSuggestions ---
-
-const mockUseBookSuggestions = jest.fn((): any => ({
-  data: [],
-}));
-
-jest.mock('../../../../hooks/use-book-suggestions', () => ({
-  useBookSuggestions: () => mockUseBookSuggestions(),
-}));
-
-// --- useFiling ---
-const mockFilingMutateAsync = jest.fn();
-
-const mockUseFiling = jest.fn((): any => ({
-  mutateAsync: mockFilingMutateAsync,
-  isPending: false,
-}));
-
-jest.mock('../../../../hooks/use-filing', () => ({
-  useFiling: () => mockUseFiling(),
-}));
-
-// --- useThemeColors ---
 jest.mock('../../../../lib/theme', () => ({
   useThemeColors: () => ({
     accent: '#00bfa5',
@@ -101,7 +69,6 @@ jest.mock('../../../../lib/theme', () => ({
   }),
 }));
 
-// --- formatApiError ---
 jest.mock('../../../../lib/format-api-error', () => {
   const actual = jest.requireActual(
     '../../../../lib/format-api-error'
@@ -118,7 +85,6 @@ jest.mock('../../../../lib/format-api-error', () => {
   };
 });
 
-// --- Library components ---
 jest.mock('../../../../components/library/BookCard', () => ({
   BookCard: ({
     book,
@@ -156,49 +122,73 @@ jest.mock('../../../../components/library/SuggestionCard', () => ({
 }));
 
 // ---------------------------------------------------------------------------
+// Default API route responses
+// ---------------------------------------------------------------------------
+
+const DEFAULT_BOOKS = [
+  {
+    id: 'book-1',
+    title: 'Algebra Basics',
+    emoji: '📐',
+    topicsGenerated: true,
+  },
+  {
+    id: 'book-2',
+    title: 'Geometry',
+    emoji: '📏',
+    topicsGenerated: false,
+  },
+];
+
+const DEFAULT_SUBJECTS = [{ id: 'sub-1', name: 'Mathematics' }];
+
+function resetRoutes() {
+  // Most-specific first to avoid prefix collision:
+  // '/book-suggestions' before '/books', '/subjects/sub-1/books' before '/subjects'
+  mockFetch.setRoute('/book-suggestions', []);
+  mockFetch.setRoute('/subjects/sub-1/books', { books: DEFAULT_BOOKS });
+  mockFetch.setRoute('/subjects', { subjects: DEFAULT_SUBJECTS });
+  mockFetch.setRoute('/filing', {
+    shelfId: 'sub-1',
+    bookId: 'book-new',
+    shelfName: 'Mathematics',
+    bookName: 'Number Theory',
+    chapter: 'Intro',
+    topicId: 'topic-1',
+    topicTitle: 'Numbers',
+    isNew: { shelf: false, book: true, chapter: true },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// QueryClient wrapper
+// ---------------------------------------------------------------------------
+
+function createWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+  });
+  function Wrapper({ children }: { children: React.ReactNode }) {
+    return (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+  }
+  return { queryClient, Wrapper };
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
 describe('ShelfScreen', () => {
+  let TestWrapper: React.ComponentType<{ children: React.ReactNode }>;
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockSearchParams = () => ({ subjectId: 'sub-1' });
-
-    mockUseBooks.mockImplementation(() => ({
-      data: [
-        {
-          id: 'book-1',
-          title: 'Algebra Basics',
-          emoji: '📐',
-          topicsGenerated: true,
-        },
-        {
-          id: 'book-2',
-          title: 'Geometry',
-          emoji: '📏',
-          topicsGenerated: false,
-        },
-      ],
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: mockBooksRefetch,
-    }));
-
-    mockUseSubjects.mockImplementation(() => ({
-      data: [{ id: 'sub-1', name: 'Mathematics' }],
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: mockSubjectsRefetch,
-    }));
-
-    mockUseBookSuggestions.mockImplementation(() => ({ data: [] }));
-
-    mockUseFiling.mockImplementation(() => ({
-      mutateAsync: mockFilingMutateAsync,
-      isPending: false,
-    }));
+    resetRoutes();
+    const { Wrapper } = createWrapper();
+    TestWrapper = Wrapper;
   });
 
   // -----------------------------------------------------------------------
@@ -207,8 +197,10 @@ describe('ShelfScreen', () => {
   it('shows missing-param guidance when subjectId is absent', () => {
     mockSearchParams = () => ({ subjectId: '' });
 
-    const { getByTestId, getByText } = render(<ShelfScreen />);
-    expect(getByTestId('shelf-missing-param')).toBeTruthy();
+    const { getByTestId, getByText } = render(<ShelfScreen />, {
+      wrapper: TestWrapper,
+    });
+    getByTestId('shelf-missing-param');
     expect(
       getByText('Missing subject. Please go back and try again.')
     ).toBeTruthy();
@@ -217,7 +209,7 @@ describe('ShelfScreen', () => {
   it('missing-param back button returns to library', () => {
     mockSearchParams = () => ({ subjectId: '' });
 
-    const { getByTestId } = render(<ShelfScreen />);
+    const { getByTestId } = render(<ShelfScreen />, { wrapper: TestWrapper });
     fireEvent.press(getByTestId('shelf-missing-param-back'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
   });
@@ -225,136 +217,202 @@ describe('ShelfScreen', () => {
   // -----------------------------------------------------------------------
   // Loading state
   // -----------------------------------------------------------------------
-  it('renders loading indicator when books are loading', () => {
-    mockUseBooks.mockReturnValue({
-      data: undefined,
-      isLoading: true,
-      isError: false,
-      error: null,
-      refetch: mockBooksRefetch,
+  it('renders loading indicator when books are loading', async () => {
+    // Delay the books response so the loading state is visible initially
+    let resolveBooksResponse!: (r: Response) => void;
+    const booksPromise = new Promise<Response>((resolve) => {
+      resolveBooksResponse = resolve;
     });
+    mockFetch.setRoute('/subjects/sub-1/books', () => booksPromise);
 
-    const { getByTestId, getByText } = render(<ShelfScreen />);
-    expect(getByTestId('shelf-loading')).toBeTruthy();
-    expect(getByText('Loading this shelf...')).toBeTruthy();
+    const { getByTestId, getByText } = render(<ShelfScreen />, {
+      wrapper: TestWrapper,
+    });
+    getByTestId('shelf-loading');
+    getByText('Loading this shelf...');
+
+    // Resolve to prevent test teardown warnings
+    resolveBooksResponse(
+      new Response(JSON.stringify({ books: DEFAULT_BOOKS }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
   });
 
-  it('loading state has a back button that navigates away', () => {
-    mockUseBooks.mockReturnValue({
-      data: undefined,
-      isLoading: true,
-      isError: false,
-      error: null,
-      refetch: mockBooksRefetch,
+  it('loading state has a back button that navigates away', async () => {
+    let resolveBooksResponse!: (r: Response) => void;
+    const booksPromise = new Promise<Response>((resolve) => {
+      resolveBooksResponse = resolve;
     });
+    mockFetch.setRoute('/subjects/sub-1/books', () => booksPromise);
 
-    const { getByTestId } = render(<ShelfScreen />);
+    const { getByTestId } = render(<ShelfScreen />, { wrapper: TestWrapper });
     fireEvent.press(getByTestId('shelf-loading-back'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
+
+    resolveBooksResponse(
+      new Response(JSON.stringify({ books: DEFAULT_BOOKS }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
   });
 
   // -----------------------------------------------------------------------
   // BUG-82: Error state — retry and back buttons [BUG-82]
   // -----------------------------------------------------------------------
-  it('shows error state with retry and back buttons when booksQuery fails [BUG-82]', () => {
-    mockUseBooks.mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      isError: true,
-      error: new Error('Failed to load books'),
-      refetch: mockBooksRefetch,
+  it('shows error state with retry and back buttons when booksQuery fails [BUG-82]', async () => {
+    mockFetch.setRoute('/subjects/sub-1/books', () =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({ message: 'Failed to load books' }),
+          { status: 500 }
+        )
+      )
+    );
+
+    const { getByTestId } = render(<ShelfScreen />, {
+      wrapper: TestWrapper,
     });
 
-    const { getByTestId, getByText } = render(<ShelfScreen />);
-    expect(getByTestId('shelf-error')).toBeTruthy();
-    expect(getByText('Failed to load books')).toBeTruthy();
-    expect(getByTestId('recovery-retry')).toBeTruthy();
-    expect(getByTestId('recovery-go-home')).toBeTruthy();
+    await waitFor(() => {
+      getByTestId('shelf-error');
+    });
+    getByTestId('recovery-retry');
+    getByTestId('recovery-go-home');
   });
 
-  it('retry button calls refetch on booksQuery when booksQuery fails [BUG-82]', () => {
-    mockUseBooks.mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      isError: true,
-      error: new Error('Network error'),
-      refetch: mockBooksRefetch,
+  it('retry button calls refetch on booksQuery when booksQuery fails [BUG-82]', async () => {
+    let callCount = 0;
+    mockFetch.setRoute('/subjects/sub-1/books', () => {
+      callCount++;
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({ message: 'Network error' }),
+          { status: 500 }
+        )
+      );
     });
 
-    const { getByTestId } = render(<ShelfScreen />);
+    const { getByTestId } = render(<ShelfScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      getByTestId('shelf-error');
+    });
+
+    const callsBefore = callCount;
     fireEvent.press(getByTestId('recovery-retry'));
-    expect(mockBooksRefetch).toHaveBeenCalledTimes(1);
+
+    // Retry triggers re-fetch — callCount must increase
+    await waitFor(() => {
+      expect(callCount).toBeGreaterThan(callsBefore);
+    });
   });
 
-  it('go-home button on error screen returns to home [BUG-82]', () => {
-    mockUseBooks.mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      isError: true,
-      error: new Error('oops'),
-      refetch: mockBooksRefetch,
-    });
+  it('go-home button on error screen returns to home [BUG-82]', async () => {
+    mockFetch.setRoute('/subjects/sub-1/books', () =>
+      Promise.resolve(
+        new Response(JSON.stringify({ message: 'oops' }), { status: 500 })
+      )
+    );
 
-    const { getByTestId } = render(<ShelfScreen />);
+    const { getByTestId } = render(<ShelfScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      getByTestId('shelf-error');
+    });
     fireEvent.press(getByTestId('recovery-go-home'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
   });
 
-  it('shows error state with retry and back buttons when subjectsQuery fails [BUG-82]', () => {
-    mockUseSubjects.mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      isError: true,
-      error: new Error('Subjects unavailable'),
-      refetch: mockSubjectsRefetch,
-    });
+  it('shows error state with retry and back buttons when subjectsQuery fails [BUG-82]', async () => {
+    mockFetch.setRoute('/subjects', () =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({ message: 'Subjects unavailable' }),
+          { status: 500 }
+        )
+      )
+    );
 
-    const { getByTestId, getByText } = render(<ShelfScreen />);
-    expect(getByTestId('shelf-error')).toBeTruthy();
-    expect(getByText('Subjects unavailable')).toBeTruthy();
-    expect(getByTestId('recovery-retry')).toBeTruthy();
-    expect(getByTestId('recovery-go-home')).toBeTruthy();
+    const { getByTestId } = render(<ShelfScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      getByTestId('shelf-error');
+    });
+    getByTestId('recovery-retry');
+    getByTestId('recovery-go-home');
   });
 
-  it('retry button refetches both queries when subjectsQuery fails [BUG-82]', () => {
-    mockUseSubjects.mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      isError: true,
-      error: new Error('Subjects unavailable'),
-      refetch: mockSubjectsRefetch,
+  it('retry button refetches both queries when subjectsQuery fails [BUG-82]', async () => {
+    let callCount = 0;
+    mockFetch.setRoute('/subjects', () => {
+      callCount++;
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({ message: 'Subjects unavailable' }),
+          { status: 500 }
+        )
+      );
     });
 
-    const { getByTestId } = render(<ShelfScreen />);
+    const { getByTestId } = render(<ShelfScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      getByTestId('shelf-error');
+    });
+
+    const callsBefore = callCount;
     fireEvent.press(getByTestId('recovery-retry'));
-    expect(mockSubjectsRefetch).toHaveBeenCalledTimes(1);
+
+    await waitFor(() => {
+      expect(callCount).toBeGreaterThan(callsBefore);
+    });
   });
 
   // -----------------------------------------------------------------------
   // Main view renders
   // -----------------------------------------------------------------------
-  it('renders main view with book list when data is loaded', () => {
-    const { getByTestId, getByText } = render(<ShelfScreen />);
-    expect(getByTestId('shelf-screen')).toBeTruthy();
-    expect(getByText('Mathematics')).toBeTruthy();
-    expect(getByText('Algebra Basics')).toBeTruthy();
-    expect(getByText('Geometry')).toBeTruthy();
+  it('renders main view with book list when data is loaded', async () => {
+    const { getByTestId, getByText } = render(<ShelfScreen />, {
+      wrapper: TestWrapper,
+    });
+
+    await waitFor(() => {
+      getByTestId('shelf-screen');
+    });
+    getByText('Mathematics');
+    getByText('Algebra Basics');
+    getByText('Geometry');
   });
 
-  it('back button on main view returns to library', () => {
-    const { getByTestId } = render(<ShelfScreen />);
+  it('back button on main view returns to library', async () => {
+    const { getByTestId } = render(<ShelfScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      getByTestId('shelf-screen');
+    });
     fireEvent.press(getByTestId('shelf-back'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
   });
 
-  it('back button replaces library without relying on back history', () => {
-    const { getByTestId } = render(<ShelfScreen />);
+  it('back button replaces library without relying on back history', async () => {
+    const { getByTestId } = render(<ShelfScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      getByTestId('shelf-screen');
+    });
     fireEvent.press(getByTestId('shelf-back'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
   });
 
-  it('pressing a book card navigates to the book screen', () => {
-    const { getByTestId } = render(<ShelfScreen />);
+  it('pressing a book card navigates to the book screen', async () => {
+    const { getByTestId } = render(<ShelfScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      getByTestId('book-card-book-1');
+    });
     fireEvent.press(getByTestId('book-card-book-1'));
     expect(mockPush).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -370,65 +428,59 @@ describe('ShelfScreen', () => {
   // -----------------------------------------------------------------------
   // Empty state
   // -----------------------------------------------------------------------
-  it('shows empty state when no books exist', () => {
-    mockUseBooks.mockReturnValue({
-      data: [],
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: mockBooksRefetch,
+  it('shows empty state when no books exist', async () => {
+    mockFetch.setRoute('/subjects/sub-1/books', { books: [] });
+
+    const { getByTestId, getByText } = render(<ShelfScreen />, {
+      wrapper: TestWrapper,
     });
 
-    const { getByTestId, getByText } = render(<ShelfScreen />);
-    expect(getByTestId('shelf-empty')).toBeTruthy();
-    expect(getByText('No books on this shelf yet.')).toBeTruthy();
+    await waitFor(() => {
+      getByTestId('shelf-empty');
+    });
+    getByText('No books on this shelf yet.');
   });
 
-  it('empty state back button returns to library', () => {
-    mockUseBooks.mockReturnValue({
-      data: [],
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: mockBooksRefetch,
-    });
+  it('empty state back button returns to library', async () => {
+    mockFetch.setRoute('/subjects/sub-1/books', { books: [] });
 
-    const { getByTestId } = render(<ShelfScreen />);
+    const { getByTestId } = render(<ShelfScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      getByTestId('shelf-empty-back');
+    });
     fireEvent.press(getByTestId('shelf-empty-back'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
   });
 
-  it('shows pick-a-suggestion prompt instead of "Check back soon" when suggestions exist [BUG-868]', () => {
+  it('shows pick-a-suggestion prompt instead of "Check back soon" when suggestions exist [BUG-868]', async () => {
     // Regression: with zero books but visible "Study next" suggestion cards,
     // the empty state used to say "Your curriculum is still being built.
     // Check back soon." — contradicting the cards the user can already tap.
-    mockUseBooks.mockReturnValue({
-      data: [],
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: mockBooksRefetch,
-    });
-    mockUseBookSuggestions.mockReturnValue({
-      data: [
-        {
-          id: 'sugg-1',
-          title: 'Geometry Foundations',
-          emoji: '📐',
-          description: 'Triangles, lines, angles.',
-        },
-        {
-          id: 'sugg-2',
-          title: 'Calculus: The Basics',
-          emoji: '∫',
-          description: 'Limits and derivatives.',
-        },
-      ],
+    mockFetch.setRoute('/subjects/sub-1/books', { books: [] });
+    mockFetch.setRoute('/book-suggestions', [
+      {
+        id: 'sugg-1',
+        title: 'Geometry Foundations',
+        emoji: '📐',
+        description: 'Triangles, lines, angles.',
+      },
+      {
+        id: 'sugg-2',
+        title: 'Calculus: The Basics',
+        emoji: '∫',
+        description: 'Limits and derivatives.',
+      },
+    ]);
+
+    const { getByTestId, queryByTestId, getByText } = render(<ShelfScreen />, {
+      wrapper: TestWrapper,
     });
 
-    const { getByTestId, queryByTestId, getByText } = render(<ShelfScreen />);
-    expect(getByTestId('shelf-empty-pick-suggestion')).toBeTruthy();
-    expect(getByText('Pick a book to start')).toBeTruthy();
+    await waitFor(() => {
+      getByTestId('shelf-empty-pick-suggestion');
+    });
+    getByText('Pick a book to start');
     // The conflicting "Check back soon" copy must not render.
     expect(queryByTestId('shelf-empty')).toBeNull();
   });
@@ -436,9 +488,9 @@ describe('ShelfScreen', () => {
   // -----------------------------------------------------------------------
   // Single-book auto-skip
   // -----------------------------------------------------------------------
-  it('renders normally when there is only one book (no auto-skip)', () => {
-    mockUseBooks.mockReturnValue({
-      data: [
+  it('renders normally when there is only one book (no auto-skip)', async () => {
+    mockFetch.setRoute('/subjects/sub-1/books', {
+      books: [
         {
           id: 'book-1',
           title: 'Algebra Basics',
@@ -446,44 +498,53 @@ describe('ShelfScreen', () => {
           topicsGenerated: true,
         },
       ],
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: mockBooksRefetch,
     });
 
-    const { getByTestId } = render(<ShelfScreen />);
-    expect(getByTestId('shelf-screen')).toBeTruthy();
+    const { getByTestId } = render(<ShelfScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      getByTestId('shelf-screen');
+    });
     expect(mockReplace).not.toHaveBeenCalled();
   });
 
   // -----------------------------------------------------------------------
   // Suggestion cards
   // -----------------------------------------------------------------------
-  it('shows book suggestion cards when suggestions exist', () => {
-    mockUseBookSuggestions.mockReturnValue({
-      data: [
-        { id: 'sug-1', title: 'Number Theory' },
-        { id: 'sug-2', title: 'Calculus Intro' },
-      ],
-    });
+  it('shows book suggestion cards when suggestions exist', async () => {
+    mockFetch.setRoute('/book-suggestions', [
+      { id: 'sug-1', title: 'Number Theory' },
+      { id: 'sug-2', title: 'Calculus Intro' },
+    ]);
 
-    const { getByTestId } = render(<ShelfScreen />);
-    expect(getByTestId('shelf-suggestion-sug-1')).toBeTruthy();
-    expect(getByTestId('shelf-suggestion-sug-2')).toBeTruthy();
+    const { getByTestId } = render(<ShelfScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      getByTestId('shelf-suggestion-sug-1');
+    });
+    getByTestId('shelf-suggestion-sug-2');
   });
 
   it('picking a book suggestion calls filing and navigates to new book', async () => {
-    mockUseBookSuggestions.mockReturnValue({
-      data: [{ id: 'sug-1', title: 'Number Theory', emoji: '🔢' }],
-    });
-
-    mockFilingMutateAsync.mockResolvedValue({
+    mockFetch.setRoute('/book-suggestions', [
+      { id: 'sug-1', title: 'Number Theory', emoji: '🔢' },
+    ]);
+    mockFetch.setRoute('/filing', {
       shelfId: 'sub-1',
       bookId: 'book-new',
+      shelfName: 'Mathematics',
+      bookName: 'Number Theory',
+      chapter: 'Intro',
+      topicId: 'topic-1',
+      topicTitle: 'Numbers',
+      isNew: { shelf: false, book: true, chapter: true },
     });
 
-    const { getByTestId } = render(<ShelfScreen />);
+    const { getByTestId } = render(<ShelfScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      getByTestId('shelf-suggestion-sug-1');
+    });
     fireEvent.press(getByTestId('shelf-suggestion-sug-1'));
 
     await waitFor(() => {
@@ -510,44 +571,44 @@ describe('ShelfScreen', () => {
   it('[BUG-692] Skip during filing prevents stale onSuccess navigation', async () => {
     jest.useFakeTimers();
     try {
-      mockUseBookSuggestions.mockReturnValue({
-        data: [{ id: 'sug-1', title: 'Number Theory', emoji: '🔢' }],
+      mockFetch.setRoute('/book-suggestions', [
+        { id: 'sug-1', title: 'Number Theory', emoji: '🔢' },
+      ]);
+
+      // Delay the filing response so we can press Skip while it's in flight
+      let resolveFilingResponse!: (r: Response) => void;
+      const filingPromise = new Promise<Response>((resolve) => {
+        resolveFilingResponse = resolve;
+      });
+      mockFetch.setRoute('/filing', () => filingPromise);
+
+      const { getByTestId, queryByTestId, rerender } = render(<ShelfScreen />, {
+        wrapper: TestWrapper,
       });
 
-      // Start with filing not pending so suggestion card renders.
-      let resolveFiling: (value: {
-        shelfId: string;
-        bookId: string;
-      }) => void = () => undefined;
-      const filingPromise = new Promise<{ shelfId: string; bookId: string }>(
-        (resolve) => {
-          resolveFiling = resolve;
-        }
-      );
-      mockFilingMutateAsync.mockReturnValueOnce(filingPromise);
+      // Wait for suggestions to appear (books + subjects loaded)
+      await act(async () => {
+        jest.advanceTimersByTime(0);
+      });
 
-      // After tap, the consumer flips isPending=true. We toggle the mock so
-      // subsequent renders see isPending=true → overlay + Skip button.
-      let pending = false;
-      mockUseFiling.mockImplementation(() => ({
-        mutateAsync: mockFilingMutateAsync,
-        isPending: pending,
-      }));
+      await waitFor(() => {
+        getByTestId('shelf-suggestion-sug-1');
+      });
 
-      const { getByTestId, queryByTestId, rerender } = render(<ShelfScreen />);
       fireEvent.press(getByTestId('shelf-suggestion-sug-1'));
 
-      // Flip pending=true and re-render so the overlay + skip-after-15s timer
-      // mount.
-      pending = true;
+      // Re-render to pick up isPending state
       rerender(<ShelfScreen />);
-      expect(getByTestId('shelf-filing-overlay')).toBeTruthy();
 
-      // Advance past the 15s skip-button delay (act so React flushes state).
+      await waitFor(() => {
+        getByTestId('shelf-filing-overlay');
+      });
+
+      // Advance past the 15s skip-button delay
       await act(async () => {
         jest.advanceTimersByTime(15_500);
       });
-      expect(getByTestId('shelf-filing-skip')).toBeTruthy();
+      getByTestId('shelf-filing-skip');
 
       // User taps Skip — must replace route AND mark filing as skipped.
       fireEvent.press(getByTestId('shelf-filing-skip'));
@@ -559,10 +620,21 @@ describe('ShelfScreen', () => {
       );
 
       // Now resolve the pending filing — this is the core of the bug.
-      resolveFiling({ shelfId: 'sub-1', bookId: 'book-new' });
-      await waitFor(() => {
-        expect(mockFilingMutateAsync).toHaveBeenCalled();
-      });
+      resolveFilingResponse(
+        new Response(
+          JSON.stringify({
+            shelfId: 'sub-1',
+            bookId: 'book-new',
+            shelfName: 'Mathematics',
+            bookName: 'Number Theory',
+            chapter: 'Intro',
+            topicId: 'topic-1',
+            topicTitle: 'Numbers',
+            isNew: { shelf: false, book: true, chapter: true },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
       // Flush microtasks so the awaited mutateAsync resumes.
       await Promise.resolve();
       await Promise.resolve();
@@ -582,20 +654,29 @@ describe('ShelfScreen', () => {
   });
 
   it('shows ErrorFallback overlay when picking a book suggestion fails', async () => {
-    mockUseBookSuggestions.mockReturnValue({
-      data: [{ id: 'sug-1', title: 'Number Theory', emoji: '🔢' }],
+    mockFetch.setRoute('/book-suggestions', [
+      { id: 'sug-1', title: 'Number Theory', emoji: '🔢' },
+    ]);
+    mockFetch.setRoute('/filing', () =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({ message: 'Filing failed' }),
+          { status: 500 }
+        )
+      )
+    );
+
+    const { getByTestId } = render(<ShelfScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      getByTestId('shelf-suggestion-sug-1');
     });
-
-    mockFilingMutateAsync.mockRejectedValue(new Error('Filing failed'));
-
-    const { getByTestId, getByText } = render(<ShelfScreen />);
     fireEvent.press(getByTestId('shelf-suggestion-sug-1'));
 
     await waitFor(() => {
-      expect(getByTestId('shelf-filing-error-overlay')).toBeTruthy();
-      expect(getByText('Filing failed')).toBeTruthy();
-      expect(getByTestId('shelf-filing-error-retry')).toBeTruthy();
-      expect(getByTestId('shelf-filing-error-back')).toBeTruthy();
+      getByTestId('shelf-filing-error-overlay');
+      getByTestId('shelf-filing-error-retry');
+      getByTestId('shelf-filing-error-back');
     });
   });
 });

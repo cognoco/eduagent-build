@@ -9,21 +9,216 @@ import {
   screen,
   within,
 } from '@testing-library/react-native';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import {
+  fetchCallsMatching,
+  extractJsonBody,
+  type RoutedMockFetch,
+} from '../../../test-utils/mock-api-routes';
 import SessionScreen from './index';
+
+// ---------------------------------------------------------------------------
+// Fetch boundary mock — API-calling hooks run against this
+// ---------------------------------------------------------------------------
+//
+// IMPORTANT: jest.mock() factories are hoisted above all module-level code by
+// babel-jest. That means `const mockFetch = createRoutedMockFetch(...)` would
+// run AFTER the factory, so `mockFetch` would be undefined inside the factory
+// (Temporal Dead Zone). To avoid this we create the mockFetch instance INSIDE
+// the factory and expose it via `global.__sessionTestMockFetch` so the rest of
+// the test file can reference it through a typed alias below.
+
+jest.mock('../../../lib/api-client', () => {
+  const {
+    createRoutedMockFetch: _create,
+    mockApiClientFactory: _factory,
+  } = require('../../../test-utils/mock-api-routes');
+  // IMPORTANT: Routes are matched by url.includes(pattern) in insertion order.
+  // More-specific patterns must come BEFORE general ones to avoid shadowing.
+  const _mockFetch = _create({
+    '/streaks': { streak: { longestStreak: 1 } },
+    '/progress/overview': { totalTopicsCompleted: 0 },
+    '/progress/inventory': {
+      global: {
+        topicsAttempted: 0,
+        topicsMastered: 0,
+        vocabularyTotal: 0,
+        vocabularyMastered: 0,
+        totalSessions: 0,
+        totalActiveMinutes: 0,
+        totalWallClockMinutes: 0,
+        currentStreak: 0,
+        longestStreak: 0,
+      },
+      subjects: [],
+    },
+    // Default: no active session for topic (null = route not matched → empty 200)
+    // Per-test overrides use mockFetch.setRoute('/progress/topic', ...)
+
+    // --- Subject sub-resources (most specific first) ---
+    // Must precede '/subjects' so they are not shadowed by the general subjects route.
+    '/subjects/classify': { candidates: [], needsConfirmation: false },
+    '/subjects/resolve': {
+      suggestions: [],
+      displayMessage: 'Pick a subject that fits, or create your own.',
+    },
+    // curriculum: subjects/:id/curriculum — must precede '/subjects'
+    '/curriculum': {
+      curriculum: {
+        topics: [
+          { id: 'topic-1', title: 'Topic 1', description: 'Desc', skipped: false },
+        ],
+      },
+    },
+    // sessions: subjects/:id/sessions — must precede '/subjects'
+    '/sessions': { session: { id: 'session-1' } },
+    // homework-state: sessions/:id/homework-state
+    '/homework-state': {
+      metadata: { problemCount: 2, currentProblemIndex: 0, problems: [] },
+    },
+    // General subjects list / create — must come after all /subjects/* specifics
+    '/subjects': {
+      subjects: [{ id: 'subject-1', name: 'Math', status: 'active' }],
+    },
+
+    '/celebration-level': { celebrationLevel: 'full' },
+    // bookmarks/session must precede /bookmarks
+    '/bookmarks/session': { bookmarks: [] },
+    '/bookmarks': { bookmark: { id: 'bookmark-1' } },
+    '/filing': { shelfId: 'shelf-1', bookId: 'book-1' },
+    // direct apiClient calls (use-session-streaming)
+    '/celebrations/pending': { pendingCelebrations: [] },
+    '/celebrations/seen': { ok: true },
+  });
+  // Expose for test assertions — accessed via the `mockFetch` alias below
+  (global as { __sessionTestMockFetch?: typeof _mockFetch }).__sessionTestMockFetch =
+    _mockFetch;
+  return _factory(_mockFetch);
+});
+
+// Typed alias so tests can call mockFetch.setRoute / fetchCallsMatching etc.
+// Safe to read here because jest.mock factories run synchronously before
+// any test code (and before this assignment).
+const mockFetch = (
+  global as { __sessionTestMockFetch?: RoutedMockFetch }
+).__sessionTestMockFetch!;
+
+// ---------------------------------------------------------------------------
+// QueryClient wrapper
+// ---------------------------------------------------------------------------
+
+function createWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+  });
+  return function Wrapper({ children }: { children: React.ReactNode }) {
+    return (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Session hook mocks (use-sessions stays mocked because useStreamMessage uses
+// XHR via streamSSEViaXHR, which bypasses useApiClient and cannot be
+// intercepted through mockFetch).
+// ---------------------------------------------------------------------------
 
 const mockStartSession = jest.fn();
 const mockCloseSession = jest.fn();
 const mockStream = jest.fn();
-const mockHomeworkStatePost = jest.fn();
 const mockRecordSystemPrompt = jest.fn();
 const mockRecordSessionEvent = jest.fn();
 const mockSetSessionInputMode = jest.fn();
 const mockFlagSessionContent = jest.fn();
 const mockReplace = jest.fn();
 const mockSetParams = jest.fn();
-const mockClassifySubject = jest.fn();
-const mockDirectStartSession = jest.fn();
+
+type TranscriptMockReturn = {
+  data: null | {
+    session: {
+      sessionId: string;
+      exchangeCount: number;
+      inputMode: string;
+      milestonesReached: unknown[];
+      verificationType?: unknown;
+    };
+    exchanges: Array<{
+      role: string;
+      content: string;
+      timestamp: string;
+      eventId: string;
+      isSystemPrompt: boolean;
+      escalationRung: number;
+    }>;
+  };
+};
+const mockUseSessionTranscript = jest.fn<TranscriptMockReturn, [string?]>(
+  () => ({ data: null })
+);
+jest.mock('../../../hooks/use-sessions', () => ({
+  useStartSession: () => ({
+    mutateAsync: mockStartSession,
+  }),
+  useCloseSession: () => ({
+    mutateAsync: mockCloseSession,
+  }),
+  useStreamMessage: () => ({
+    stream: mockStream,
+  }),
+  useSessionTranscript: (sessionId: string) =>
+    mockUseSessionTranscript(sessionId),
+  useRecordSystemPrompt: () => ({ mutateAsync: mockRecordSystemPrompt }),
+  useRecordSessionEvent: () => ({ mutateAsync: mockRecordSessionEvent }),
+  useSetSessionInputMode: () => ({ mutateAsync: mockSetSessionInputMode }),
+  useFlagSessionContent: () => ({ mutateAsync: mockFlagSessionContent }),
+  useParkingLot: () => ({ data: [], isLoading: false }),
+  useAddParkingLotItem: () => ({ mutateAsync: jest.fn(), isPending: false }),
+}));
+
+// ---------------------------------------------------------------------------
+// Local-state / device hooks — no useApiClient(), keep as mocks
+// ---------------------------------------------------------------------------
+
+jest.mock('../../../hooks/use-network-status', () => ({
+  useNetworkStatus: () => ({ isOffline: false }),
+}));
+
+jest.mock('../../../hooks/use-api-reachability', () => ({
+  useApiReachability: () => ({ isApiReachable: true, isChecked: true }),
+}));
+
+const mockTrigger = jest.fn();
+const mockCelebrationResult = {
+  CelebrationOverlay: null,
+  trigger: mockTrigger,
+};
+jest.mock('../../../hooks/use-celebration', () => ({
+  useCelebration: () => mockCelebrationResult,
+}));
+
+const mockTrackExchangeResult = { triggered: [] as string[], trackerState: {} };
+const mockTrackExchange = jest.fn().mockReturnValue(mockTrackExchangeResult);
+const mockHydrate = jest.fn();
+const mockResetMilestones = jest.fn();
+const mockMilestoneTracker = {
+  milestonesReached: [] as string[],
+  trackerState: {},
+  trackExchange: mockTrackExchange,
+  hydrate: mockHydrate,
+  reset: mockResetMilestones,
+};
+jest.mock('../../../hooks/use-milestone-tracker', () => ({
+  celebrationForReason: jest.fn(),
+  createMilestoneTrackerStateFromMilestones: jest.fn().mockReturnValue({}),
+  normalizeMilestoneTrackerState: jest.fn().mockReturnValue({}),
+  useMilestoneTracker: () => mockMilestoneTracker,
+}));
+
+// ---------------------------------------------------------------------------
+// External / rendering mocks
+// ---------------------------------------------------------------------------
 
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -150,169 +345,6 @@ jest.mock('../../../components/session', () => ({
   },
 }));
 
-type TranscriptMockReturn = {
-  data: null | {
-    session: {
-      sessionId: string;
-      exchangeCount: number;
-      inputMode: string;
-      milestonesReached: unknown[];
-      verificationType?: unknown;
-    };
-    exchanges: Array<{
-      role: string;
-      content: string;
-      timestamp: string;
-      eventId: string;
-      isSystemPrompt: boolean;
-      escalationRung: number;
-    }>;
-  };
-};
-const mockUseSessionTranscript = jest.fn<TranscriptMockReturn, [string?]>(
-  () => ({ data: null })
-);
-jest.mock('../../../hooks/use-sessions', () => ({
-  useStartSession: () => ({
-    mutateAsync: mockStartSession,
-  }),
-  useCloseSession: () => ({
-    mutateAsync: mockCloseSession,
-  }),
-  useStreamMessage: () => ({
-    stream: mockStream,
-  }),
-  useSessionTranscript: (sessionId: string) =>
-    mockUseSessionTranscript(sessionId),
-  useRecordSystemPrompt: () => ({ mutateAsync: mockRecordSystemPrompt }),
-  useRecordSessionEvent: () => ({ mutateAsync: mockRecordSessionEvent }),
-  useSetSessionInputMode: () => ({ mutateAsync: mockSetSessionInputMode }),
-  useFlagSessionContent: () => ({ mutateAsync: mockFlagSessionContent }),
-  useParkingLot: () => ({ data: [], isLoading: false }),
-  useAddParkingLotItem: () => ({ mutateAsync: jest.fn(), isPending: false }),
-}));
-
-jest.mock('../../../hooks/use-classify-subject', () => ({
-  useClassifySubject: () => ({
-    mutateAsync: mockClassifySubject,
-  }),
-}));
-
-jest.mock('../../../hooks/use-resolve-subject', () => ({
-  useResolveSubject: () => ({
-    mutateAsync: jest.fn().mockResolvedValue({
-      suggestions: [],
-      displayMessage: 'Pick a subject that fits, or create your own.',
-    }),
-    isPending: false,
-  }),
-}));
-
-jest.mock('../../../hooks/use-notes', () => ({
-  useUpsertNote: () => ({
-    mutateAsync: jest.fn(),
-    isPending: false,
-  }),
-}));
-
-const mockFilingMutateAsync = jest.fn();
-jest.mock('../../../hooks/use-filing', () => ({
-  useFiling: () => ({
-    mutateAsync: mockFilingMutateAsync,
-    isPending: false,
-  }),
-}));
-
-jest.mock('../../../hooks/use-streaks', () => ({
-  useStreaks: () => ({ data: { longestStreak: 1 } }),
-}));
-
-const mockUseActiveSessionForTopic = jest.fn<
-  { data: null | { sessionId: string } },
-  [string | undefined]
->(() => ({ data: null }));
-jest.mock('../../../hooks/use-progress', () => ({
-  useOverallProgress: () => ({ data: { totalTopicsCompleted: 0 } }),
-  useProgressInventory: () => ({ data: undefined, isLoading: false }),
-  useActiveSessionForTopic: (topicId: string | undefined) =>
-    mockUseActiveSessionForTopic(topicId),
-}));
-
-jest.mock('../../../hooks/use-subjects', () => ({
-  useSubjects: () => ({
-    data: [{ id: 'subject-1', name: 'Math', status: 'active' }],
-  }),
-  useCreateSubject: () => ({
-    mutateAsync: jest.fn().mockResolvedValue({
-      subject: { id: 'subject-new', name: 'New Subject' },
-    }),
-    isPending: false,
-  }),
-}));
-
-jest.mock('../../../hooks/use-curriculum', () => ({
-  useCurriculum: () => ({
-    data: {
-      topics: [
-        {
-          id: 'topic-1',
-          title: 'Topic 1',
-          description: 'Desc',
-          skipped: false,
-        },
-      ],
-    },
-    isLoading: false,
-  }),
-}));
-
-jest.mock('../../../hooks/use-network-status', () => ({
-  useNetworkStatus: () => ({ isOffline: false }),
-}));
-
-jest.mock('../../../hooks/use-api-reachability', () => ({
-  useApiReachability: () => ({ isApiReachable: true, isChecked: true }),
-}));
-
-const mockCelebrationLevel = { data: 'full' };
-jest.mock('../../../hooks/use-settings', () => ({
-  useCelebrationLevel: () => mockCelebrationLevel,
-}));
-
-const mockTrigger = jest.fn();
-const mockCelebrationResult = {
-  CelebrationOverlay: null,
-  trigger: mockTrigger,
-};
-jest.mock('../../../hooks/use-celebration', () => ({
-  useCelebration: () => mockCelebrationResult,
-}));
-
-const mockTrackExchangeResult = { triggered: [] as string[], trackerState: {} };
-const mockTrackExchange = jest.fn().mockReturnValue(mockTrackExchangeResult);
-const mockHydrate = jest.fn();
-const mockResetMilestones = jest.fn();
-const mockMilestoneTracker = {
-  milestonesReached: [] as string[],
-  trackerState: {},
-  trackExchange: mockTrackExchange,
-  hydrate: mockHydrate,
-  reset: mockResetMilestones,
-};
-jest.mock('../../../hooks/use-milestone-tracker', () => ({
-  celebrationForReason: jest.fn(),
-  createMilestoneTrackerStateFromMilestones: jest.fn().mockReturnValue({}),
-  normalizeMilestoneTrackerState: jest.fn().mockReturnValue({}),
-  useMilestoneTracker: () => mockMilestoneTracker,
-}));
-
-const EMPTY_BOOKMARKS: never[] = [];
-jest.mock('../../../hooks/use-bookmarks', () => ({
-  useCreateBookmark: () => ({ mutateAsync: jest.fn(), isPending: false }),
-  useDeleteBookmark: () => ({ mutateAsync: jest.fn(), isPending: false }),
-  useSessionBookmarks: () => ({ data: EMPTY_BOOKMARKS, isLoading: false }),
-}));
-
 jest.mock('../../../lib/session-recovery', () => ({
   clearSessionRecoveryMarker: jest.fn().mockResolvedValue(undefined),
   readSessionRecoveryMarker: jest.fn().mockResolvedValue(null),
@@ -338,63 +370,6 @@ const { readSessionRecoveryMarker: mockReadSessionRecoveryMarker } =
     readSessionRecoveryMarker: jest.Mock;
   };
 
-const mockCelebrationsPendingGet = jest.fn();
-
-jest.mock('../../../lib/api-client', () => {
-  class QuotaExceededError extends Error {
-    readonly code = 'QUOTA_EXCEEDED' as const;
-    readonly details: unknown;
-    constructor(message: string, details: unknown) {
-      super(message);
-      this.name = 'QuotaExceededError';
-      this.details = details;
-    }
-  }
-
-  class ForbiddenError extends Error {
-    readonly code = 'FORBIDDEN' as const;
-    constructor(message = 'Forbidden') {
-      super(message);
-      this.name = 'ForbiddenError';
-    }
-  }
-
-  return {
-    QuotaExceededError,
-    ForbiddenError,
-    withIdempotencyKey: (
-      headers: Record<string, string>,
-      key: string | undefined
-    ) => (key ? { ...headers, 'Idempotency-Key': key } : headers),
-    isIdempotencyReplay: (response: Response) =>
-      response.headers.get('Idempotency-Replay') === 'true',
-    useApiClient: () => ({
-      sessions: {
-        ':sessionId': {
-          'homework-state': {
-            $post: mockHomeworkStatePost,
-          },
-        },
-      },
-      subjects: {
-        ':subjectId': {
-          sessions: {
-            $post: mockDirectStartSession,
-          },
-        },
-      },
-      celebrations: {
-        pending: {
-          $get: mockCelebrationsPendingGet,
-        },
-        seen: {
-          $post: jest.fn().mockResolvedValue({ ok: true }),
-        },
-      },
-    }),
-  };
-});
-
 jest.mock('../../../lib/format-api-error', () => ({
   formatApiError: (error: unknown) =>
     error instanceof Error ? error.message : 'Unknown error',
@@ -402,8 +377,20 @@ jest.mock('../../../lib/format-api-error', () => ({
 
 jest.mock('../../../lib/profile', () => ({
   useProfile: () => ({
-    activeProfile: { id: 'profile-1', isOwner: true },
+    activeProfile: {
+      id: 'profile-1',
+      accountId: 'test-account-id',
+      displayName: 'Test Learner',
+      isOwner: true,
+      hasPremiumLlm: false,
+      conversationLanguage: 'en',
+      pronouns: null,
+      consentStatus: null,
+    },
   }),
+  ProfileContext: {
+    Provider: ({ children }: { children: React.ReactNode }) => children,
+  },
 }));
 
 describe('SessionScreen homework flow', () => {
@@ -417,8 +404,10 @@ describe('SessionScreen homework flow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
+    mockFetch.mockClear();
     mockUseSessionTranscript.mockReturnValue({ data: null });
-    mockUseActiveSessionForTopic.mockReturnValue({ data: null });
+    // Default: no active session (null response body)
+    mockFetch.setRoute('/progress/topic', null);
     // Clear SecureStore mock data
     Object.keys(secureStore).forEach((key) => delete secureStore[key]);
     let aiEventCount = 0;
@@ -446,16 +435,6 @@ describe('SessionScreen homework flow', () => {
     mockStartSession.mockResolvedValue({
       session: { id: 'session-1' },
     });
-    mockHomeworkStatePost.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        metadata: {
-          problemCount: 2,
-          currentProblemIndex: 0,
-          problems: [],
-        },
-      }),
-    });
     mockStream.mockImplementation(
       async (
         _message: string,
@@ -466,9 +445,7 @@ describe('SessionScreen homework flow', () => {
           aiEventId?: string;
         }) => void
       ) => {
-        // Real SSE streams always emit at least one token before completion;
-        // mirror that so the streaming hook doesn't treat the response as an
-        // empty/failed stream (chunkCount === 0 → reconnect_prompt).
+        // Real SSE streams always emit at least one token before completion
         onChunk('Got it.');
         onDone({
           exchangeCount: 1,
@@ -479,29 +456,11 @@ describe('SessionScreen homework flow', () => {
     );
     mockRecordSystemPrompt.mockResolvedValue({ ok: true });
     mockCloseSession.mockResolvedValue({ wallClockSeconds: 120 });
-    mockCelebrationsPendingGet.mockResolvedValue({
-      ok: true,
-      json: async () => ({ pendingCelebrations: [] }),
-    });
-    mockFilingMutateAsync.mockResolvedValue({
-      shelfId: 'shelf-1',
-      bookId: 'book-1',
-    });
     mockSetSessionInputMode.mockResolvedValue({
       session: { id: 'session-1', inputMode: 'voice' },
     });
     mockFlagSessionContent.mockResolvedValue({
       message: 'Content flagged for review. Thank you!',
-    });
-    mockDirectStartSession.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        session: { id: 'session-1' },
-      }),
-    });
-    mockClassifySubject.mockResolvedValue({
-      candidates: [],
-      needsConfirmation: false,
     });
   });
 
@@ -510,9 +469,10 @@ describe('SessionScreen homework flow', () => {
   });
 
   it('keeps homework progress in one session when moving to the next problem', async () => {
-    const screen = render(<SessionScreen />);
+    const wrapper = createWrapper();
+    const testScreen = render(<SessionScreen />, { wrapper });
 
-    fireEvent.press(screen.getByTestId('manual-send-button'));
+    fireEvent.press(testScreen.getByTestId('manual-send-button'));
     await flushAsyncWork();
 
     await waitFor(() => {
@@ -526,11 +486,11 @@ describe('SessionScreen homework flow', () => {
     });
     expect(mockStartSession).toHaveBeenCalledTimes(1);
 
-    expect(screen.getByTestId('homework-problem-progress')).toHaveTextContent(
-      'Problem 1 of 2'
-    );
+    expect(
+      testScreen.getByTestId('homework-problem-progress')
+    ).toHaveTextContent('Problem 1 of 2');
 
-    fireEvent.press(screen.getByTestId('next-problem-chip'));
+    fireEvent.press(testScreen.getByTestId('next-problem-chip'));
 
     await flushAsyncWork();
     await act(async () => {
@@ -549,9 +509,9 @@ describe('SessionScreen homework flow', () => {
     });
     expect(mockStartSession).toHaveBeenCalledTimes(1);
 
-    expect(screen.getByTestId('homework-problem-progress')).toHaveTextContent(
-      'Problem 2 of 2'
-    );
+    expect(
+      testScreen.getByTestId('homework-problem-progress')
+    ).toHaveTextContent('Problem 2 of 2');
   }, 15000);
 
   it('includes the capture source in homework metadata when homework starts from the gallery', async () => {
@@ -570,9 +530,10 @@ describe('SessionScreen homework flow', () => {
       ]),
     });
 
-    const screen = render(<SessionScreen />);
+    const wrapper = createWrapper();
+    const testScreen = render(<SessionScreen />, { wrapper });
 
-    fireEvent.press(screen.getByTestId('manual-send-button'));
+    fireEvent.press(testScreen.getByTestId('manual-send-button'));
     await flushAsyncWork();
 
     await waitFor(() => {
@@ -586,36 +547,39 @@ describe('SessionScreen homework flow', () => {
           }),
         })
       );
-      expect(mockHomeworkStatePost).toHaveBeenCalledWith(
-        expect.objectContaining({
-          json: expect.objectContaining({
-            metadata: expect.objectContaining({
-              source: 'gallery',
-            }),
-          }),
-        })
+    });
+
+    // homework-state is now called through the hc() client → mockFetch
+    await waitFor(() => {
+      const hwCalls = fetchCallsMatching(mockFetch, '/homework-state');
+      expect(hwCalls.length).toBeGreaterThan(0);
+      const body = extractJsonBody<{ metadata: { source?: string } }>(
+        hwCalls[0]?.init
       );
+      expect(body?.metadata).toMatchObject({ source: 'gallery' });
     });
   });
 
   it('hides contextual chips on greeting but shows session tools', () => {
-    const screen = render(<SessionScreen />);
+    const wrapper = createWrapper();
+    const testScreen = render(<SessionScreen />, { wrapper });
 
     // Contextual quick chips should NOT appear before any user message
-    expect(screen.queryByText('I know this')).toBeNull();
-    expect(screen.queryByText('Explain differently')).toBeNull();
-    expect(screen.queryByText('Too easy')).toBeNull();
-    expect(screen.queryByText('Example')).toBeNull();
+    expect(testScreen.queryByText('I know this')).toBeNull();
+    expect(testScreen.queryByText('Explain differently')).toBeNull();
+    expect(testScreen.queryByText('Too easy')).toBeNull();
+    expect(testScreen.queryByText('Example')).toBeNull();
 
     // Session tool chips should always be present
-    screen.getByText('Switch topic');
-    screen.getByText('Park it');
+    testScreen.getByText('Switch topic');
+    testScreen.getByText('Park it');
   });
 
   it('records quick chips and learner feedback with follow-up prompts', async () => {
-    const screen = render(<SessionScreen />);
+    const wrapper = createWrapper();
+    const testScreen = render(<SessionScreen />, { wrapper });
 
-    fireEvent.press(screen.getByTestId('manual-send-button'));
+    fireEvent.press(testScreen.getByTestId('manual-send-button'));
     await flushAsyncWork();
 
     await waitFor(() => {
@@ -629,7 +593,7 @@ describe('SessionScreen homework flow', () => {
       );
     });
 
-    fireEvent.press(screen.getByTestId('quick-chip-too_easy'));
+    fireEvent.press(testScreen.getByTestId('quick-chip-too_easy'));
     await flushAsyncWork();
 
     await waitFor(() => {
@@ -655,9 +619,11 @@ describe('SessionScreen homework flow', () => {
         expect.objectContaining({ idempotencyKey: expect.any(String) })
       );
     });
-    screen.getByTestId('session-confirmation-toast');
+    testScreen.getByTestId('session-confirmation-toast');
 
-    fireEvent.press(screen.getByTestId('message-feedback-not-helpful-event-2'));
+    fireEvent.press(
+      testScreen.getByTestId('message-feedback-not-helpful-event-2')
+    );
     await flushAsyncWork();
 
     await waitFor(() => {
@@ -689,7 +655,9 @@ describe('SessionScreen homework flow', () => {
       );
     });
 
-    fireEvent.press(screen.getByTestId('message-feedback-incorrect-event-3'));
+    fireEvent.press(
+      testScreen.getByTestId('message-feedback-incorrect-event-3')
+    );
     await flushAsyncWork();
 
     await waitFor(() => {
@@ -745,7 +713,8 @@ describe('SessionScreen homework flow', () => {
       },
     });
 
-    render(<SessionScreen />);
+    const wrapper = createWrapper();
+    render(<SessionScreen />, { wrapper });
 
     await waitFor(() => {
       expect(mockReadSessionRecoveryMarker).toHaveBeenCalled();
@@ -792,13 +761,14 @@ describe('SessionScreen homework flow', () => {
       },
     });
 
-    const screen = render(<SessionScreen />);
+    const wrapper = createWrapper();
+    const testScreen = render(<SessionScreen />, { wrapper });
     await flushAsyncWork();
 
     await waitFor(() => {
-      expect(screen.queryByText('Tell me about Africa')).toBeTruthy();
+      expect(testScreen.queryByText('Tell me about Africa')).toBeTruthy();
       expect(
-        screen.queryByText('Africa is the second-largest continent.')
+        testScreen.queryByText('Africa is the second-largest continent.')
       ).toBeTruthy();
     });
   });
@@ -811,11 +781,11 @@ describe('SessionScreen homework flow', () => {
       topicId: 'topic-1',
       topicName: 'Continents',
     });
-    mockUseActiveSessionForTopic.mockReturnValue({
-      data: { sessionId: 'session-resumed' },
-    });
+    // Return active session for this topic via fetch boundary
+    mockFetch.setRoute('/progress/topic', { sessionId: 'session-resumed' });
 
-    render(<SessionScreen />);
+    const wrapper = createWrapper();
+    render(<SessionScreen />, { wrapper });
     await flushAsyncWork();
 
     await waitFor(() => {
@@ -833,11 +803,13 @@ describe('SessionScreen homework flow', () => {
       topicId: 'topic-1',
       topicName: 'Continents',
     });
-    mockUseActiveSessionForTopic.mockReturnValue({
-      data: { sessionId: 'session-shouldnt-resume' },
+    // Even if the topic has an active session, practice mode should NOT resume it
+    mockFetch.setRoute('/progress/topic', {
+      sessionId: 'session-shouldnt-resume',
     });
 
-    render(<SessionScreen />);
+    const wrapper = createWrapper();
+    render(<SessionScreen />, { wrapper });
     await flushAsyncWork();
 
     expect(mockSetParams).not.toHaveBeenCalled();
@@ -851,9 +823,10 @@ describe('SessionScreen homework flow', () => {
       topicId: 'topic-1',
       topicName: 'Continents',
     });
-    mockUseActiveSessionForTopic.mockReturnValue({ data: null });
+    // Default route already returns null for /progress/topic
 
-    render(<SessionScreen />);
+    const wrapper = createWrapper();
+    render(<SessionScreen />, { wrapper });
     await flushAsyncWork();
 
     expect(mockSetParams).not.toHaveBeenCalled();
@@ -880,30 +853,32 @@ describe('SessionScreen homework flow', () => {
       },
     });
 
-    const screen = render(<SessionScreen />);
+    const wrapper = createWrapper();
+    const testScreen = render(<SessionScreen />, { wrapper });
     await flushAsyncWork();
 
-    const header = screen.getByTestId('session-topic-header');
-    expect(within(header).getByText(/Continents/)).toBeTruthy();
-    expect(within(header).getByText(/Current topic/)).toBeTruthy();
+    const header = testScreen.getByTestId('session-topic-header');
+    within(header).getByText(/Continents/);
+    within(header).getByText(/Current topic/);
 
-    fireEvent.press(screen.getByTestId('session-topic-header-change'));
+    fireEvent.press(testScreen.getByTestId('session-topic-header-change'));
     await flushAsyncWork();
 
-    screen.getByTestId('switch-topic-topic-1');
+    testScreen.getByTestId('switch-topic-topic-1');
   });
 
   it('persists input-mode changes once the session exists', async () => {
-    const screen = render(<SessionScreen />);
+    const wrapper = createWrapper();
+    const testScreen = render(<SessionScreen />, { wrapper });
 
-    fireEvent.press(screen.getByTestId('manual-send-button'));
+    fireEvent.press(testScreen.getByTestId('manual-send-button'));
     await flushAsyncWork();
 
     await waitFor(() => {
       expect(mockStartSession).toHaveBeenCalledTimes(1);
     });
 
-    fireEvent.press(screen.getByTestId('mock-set-voice-mode'));
+    fireEvent.press(testScreen.getByTestId('mock-set-voice-mode'));
 
     await waitFor(() => {
       expect(mockSetSessionInputMode).toHaveBeenCalledWith({
@@ -916,45 +891,49 @@ describe('SessionScreen homework flow', () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'learning',
     });
-    mockClassifySubject.mockResolvedValue({
+    // Override classify to return ambiguous candidates
+    mockFetch.setRoute('/subjects/classify', {
       candidates: [
-        {
-          subjectId: 'subject-1',
-          subjectName: 'Math',
-          confidence: 0.62,
-        },
-        {
-          subjectId: 'subject-2',
-          subjectName: 'Physics',
-          confidence: 0.58,
-        },
+        { subjectId: 'subject-1', subjectName: 'Math', confidence: 0.62 },
+        { subjectId: 'subject-2', subjectName: 'Physics', confidence: 0.58 },
       ],
       needsConfirmation: true,
     });
 
-    const screen = render(<SessionScreen />);
+    const wrapper = createWrapper();
+    const testScreen = render(<SessionScreen />, { wrapper });
 
-    fireEvent.press(screen.getByTestId('manual-send-button'));
+    fireEvent.press(testScreen.getByTestId('manual-send-button'));
     await flushAsyncWork();
 
     await waitFor(() => {
-      screen.getByTestId('session-subject-resolution');
-      expect(screen.getAllByText(/math or physics/i).length).toBeGreaterThan(0);
+      testScreen.getByTestId('session-subject-resolution');
+      expect(
+        testScreen.getAllByText(/math or physics/i).length
+      ).toBeGreaterThan(0);
     });
 
     expect(mockStartSession).not.toHaveBeenCalled();
 
-    fireEvent.press(screen.getByTestId('subject-resolution-subject-2'));
+    fireEvent.press(testScreen.getByTestId('subject-resolution-subject-2'));
     await flushAsyncWork();
 
+    // After picking subject-2, use-session-streaming calls
+    // apiClient.subjects[':subjectId'].sessions.$post via the hc() client,
+    // which routes through mockFetch to /subjects/subject-2/sessions.
     await waitFor(() => {
-      expect(mockDirectStartSession).toHaveBeenCalledWith({
-        param: { subjectId: 'subject-2' },
-        json: expect.objectContaining({
-          subjectId: 'subject-2',
-          inputMode: 'text',
-        }),
-      });
+      const startCalls = fetchCallsMatching(
+        mockFetch,
+        '/subjects/subject-2/sessions'
+      );
+      expect(startCalls.length).toBeGreaterThan(0);
+      const body = extractJsonBody<{ subjectId: string; inputMode: string }>(
+        startCalls[0]?.init
+      );
+      expect(body).toMatchObject({ subjectId: 'subject-2', inputMode: 'text' });
+    });
+
+    await waitFor(() => {
       expect(mockStream).toHaveBeenCalledWith(
         'Solve 2x + 5 = 17',
         expect.any(Function),
@@ -969,17 +948,21 @@ describe('SessionScreen homework flow', () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'learning',
     });
-    mockClassifySubject.mockRejectedValue(new Error('Network error'));
+    // Return a 500 error for classify
+    mockFetch.setRoute(
+      '/subjects/classify',
+      new Response(JSON.stringify({ error: 'Network error' }), { status: 500 })
+    );
 
-    const screen = render(<SessionScreen />);
+    const wrapper = createWrapper();
+    const testScreen = render(<SessionScreen />, { wrapper });
 
-    fireEvent.press(screen.getByTestId('manual-send-button'));
+    fireEvent.press(testScreen.getByTestId('manual-send-button'));
     await flushAsyncWork();
 
     await waitFor(() => {
-      // Fallback candidates from useSubjects mock (Math) are shown in ScrollView,
-      // plus a "+ New subject" chip (BUG-236 testID: subject-resolution-new)
-      screen.getByTestId('subject-resolution-new');
+      // Fallback candidates from useSubjects (Math) shown + "+ New subject" chip
+      testScreen.getByTestId('subject-resolution-new');
     });
 
     expect(mockStartSession).not.toHaveBeenCalled();
@@ -989,22 +972,23 @@ describe('SessionScreen homework flow', () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'learning',
     });
-    mockClassifySubject.mockResolvedValue({
+    mockFetch.setRoute('/subjects/classify', {
       candidates: [
         { subjectId: 'subject-1', subjectName: 'Math', confidence: 0.5 },
       ],
       needsConfirmation: true,
     });
 
-    const screen = render(<SessionScreen />);
+    const wrapper = createWrapper();
+    const testScreen = render(<SessionScreen />, { wrapper });
 
-    fireEvent.press(screen.getByTestId('manual-send-button'));
+    fireEvent.press(testScreen.getByTestId('manual-send-button'));
     await flushAsyncWork();
 
     await waitFor(() => {
-      screen.getByTestId('session-subject-resolution');
-      screen.getByTestId('subject-resolution-new');
-      screen.getByText('+ New subject');
+      testScreen.getByTestId('session-subject-resolution');
+      testScreen.getByTestId('subject-resolution-new');
+      testScreen.getByText('+ New subject');
     });
   });
 
@@ -1019,7 +1003,8 @@ describe('SessionScreen homework flow', () => {
       (useLocalSearchParams as jest.Mock).mockReturnValue({
         mode: 'freeform',
       });
-      mockClassifySubject.mockResolvedValue({
+      // Classify resolves without confirmation needed
+      mockFetch.setRoute('/subjects/classify', {
         candidates: [
           { subjectId: 'subject-1', subjectName: 'Math', confidence: 0.95 },
         ],
@@ -1030,10 +1015,11 @@ describe('SessionScreen homework flow', () => {
       // Spy on Alert.alert so we can invoke the "End Session" button callback
       const alertSpy = jest.spyOn(Alert, 'alert');
 
-      const screen = render(<SessionScreen />);
+      const wrapper = createWrapper();
+      const testScreen = render(<SessionScreen />, { wrapper });
 
       // Send a message to start the session and get exchangeCount > 0
-      fireEvent.press(screen.getByTestId('manual-send-button'));
+      fireEvent.press(testScreen.getByTestId('manual-send-button'));
       await flushAsyncWork();
 
       await waitFor(() => {
@@ -1041,7 +1027,7 @@ describe('SessionScreen homework flow', () => {
       });
 
       // The end-session button should now be visible (exchangeCount > 0)
-      const endButton = screen.getByTestId('end-session-button');
+      const endButton = testScreen.getByTestId('end-session-button');
       fireEvent.press(endButton);
 
       // Alert.alert was called with "End session?" — invoke the "End Session" callback
@@ -1061,7 +1047,7 @@ describe('SessionScreen homework flow', () => {
       }>;
       const doneButton = buttons.find((b) => b.text === 'End Session');
 
-      // Invoke the "End Session" callback — this calls closeSession, then sets showFilingPrompt
+      // Invoke the "End Session" callback
       await act(async () => {
         doneButton?.onPress?.();
       });
@@ -1075,31 +1061,38 @@ describe('SessionScreen homework flow', () => {
 
       alertSpy.mockRestore();
 
-      return screen;
+      return testScreen;
     }
 
     it('renders filing prompt when a freeform session is closed', async () => {
-      const screen = await renderAndTriggerFilingPrompt();
+      const testScreen = await renderAndTriggerFilingPrompt();
 
       await waitFor(() => {
-        screen.getByTestId('filing-prompt');
-        screen.getByTestId('filing-prompt-accept');
-        screen.getByTestId('filing-prompt-dismiss');
+        testScreen.getByTestId('filing-prompt');
+        testScreen.getByTestId('filing-prompt-accept');
+        testScreen.getByTestId('filing-prompt-dismiss');
       });
     }, 15000);
 
-    it('accept button calls filing mutateAsync and navigates to book screen', async () => {
-      const screen = await renderAndTriggerFilingPrompt();
+    it('accept button calls filing and navigates to book screen', async () => {
+      const testScreen = await renderAndTriggerFilingPrompt();
 
       await waitFor(() => {
-        screen.getByTestId('filing-prompt-accept');
+        testScreen.getByTestId('filing-prompt-accept');
       });
 
-      fireEvent.press(screen.getByTestId('filing-prompt-accept'));
+      fireEvent.press(testScreen.getByTestId('filing-prompt-accept'));
       await flushAsyncWork();
 
       await waitFor(() => {
-        expect(mockFilingMutateAsync).toHaveBeenCalledWith({
+        // Filing is now called through hc() → mockFetch to /filing
+        const filingCalls = fetchCallsMatching(mockFetch, '/filing');
+        expect(filingCalls.length).toBeGreaterThan(0);
+        const body = extractJsonBody<{
+          sessionId: string;
+          sessionMode: string;
+        }>(filingCalls[0]?.init);
+        expect(body).toMatchObject({
           sessionId: 'session-1',
           sessionMode: 'freeform',
         });
@@ -1113,13 +1106,13 @@ describe('SessionScreen homework flow', () => {
     }, 15000);
 
     it('dismiss button navigates to session summary', async () => {
-      const screen = await renderAndTriggerFilingPrompt();
+      const testScreen = await renderAndTriggerFilingPrompt();
 
       await waitFor(() => {
-        screen.getByTestId('filing-prompt-dismiss');
+        testScreen.getByTestId('filing-prompt-dismiss');
       });
 
-      fireEvent.press(screen.getByTestId('filing-prompt-dismiss'));
+      fireEvent.press(testScreen.getByTestId('filing-prompt-dismiss'));
       await flushAsyncWork();
 
       await waitFor(() => {
@@ -1137,8 +1130,9 @@ describe('voice mode persistence', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
+    mockFetch.mockClear();
     mockUseSessionTranscript.mockReturnValue({ data: null });
-    mockUseActiveSessionForTopic.mockReturnValue({ data: null });
+    mockFetch.setRoute('/progress/topic', null);
     Object.keys(secureStore).forEach((key) => delete secureStore[key]);
     (useRouter as jest.Mock).mockReturnValue({
       replace: mockReplace,
@@ -1153,12 +1147,6 @@ describe('voice mode persistence', () => {
       ]),
     });
     mockStartSession.mockResolvedValue({ session: { id: 'session-1' } });
-    mockHomeworkStatePost.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        metadata: { problemCount: 1, currentProblemIndex: 0, problems: [] },
-      }),
-    });
     mockStream.mockImplementation(
       async (
         _msg: string,
@@ -1170,27 +1158,11 @@ describe('voice mode persistence', () => {
       }
     );
     mockRecordSystemPrompt.mockResolvedValue({ ok: true });
-    mockCelebrationsPendingGet.mockResolvedValue({
-      ok: true,
-      json: async () => ({ pendingCelebrations: [] }),
-    });
-    mockFilingMutateAsync.mockResolvedValue({
-      shelfId: 'shelf-1',
-      bookId: 'book-1',
-    });
     mockSetSessionInputMode.mockResolvedValue({
       session: { id: 'session-1', inputMode: 'voice' },
     });
     mockFlagSessionContent.mockResolvedValue({
       message: 'Content flagged for review. Thank you!',
-    });
-    mockClassifySubject.mockResolvedValue({
-      candidates: [],
-      needsConfirmation: false,
-    });
-    mockDirectStartSession.mockResolvedValue({
-      ok: true,
-      json: async () => ({ session: { id: 'session-1' } }),
     });
   });
 
@@ -1200,21 +1172,24 @@ describe('voice mode persistence', () => {
 
   it('defaults to voice when SecureStore has voice preference', async () => {
     secureStore['voice-input-mode-profile-1'] = 'voice';
-    const { getByTestId } = render(<SessionScreen />);
+    const wrapper = createWrapper();
+    const { getByTestId } = render(<SessionScreen />, { wrapper });
     await waitFor(() => {
       expect(getByTestId('mock-input-mode').props.children).toBe('voice');
     });
   });
 
   it('defaults to text when SecureStore has no preference', async () => {
-    const { getByTestId } = render(<SessionScreen />);
+    const wrapper = createWrapper();
+    const { getByTestId } = render(<SessionScreen />, { wrapper });
     await waitFor(() => {
       expect(getByTestId('mock-input-mode').props.children).toBe('text');
     });
   });
 
   it('persists voice preference when mode changes to voice', async () => {
-    const { getByTestId } = render(<SessionScreen />);
+    const wrapper = createWrapper();
+    const { getByTestId } = render(<SessionScreen />, { wrapper });
     await act(async () => {
       fireEvent.press(getByTestId('mock-set-voice-mode'));
     });
@@ -1225,7 +1200,8 @@ describe('voice mode persistence', () => {
 
   it('persists text preference when mode changes to text', async () => {
     secureStore['voice-input-mode-profile-1'] = 'voice';
-    const { getByTestId } = render(<SessionScreen />);
+    const wrapper = createWrapper();
+    const { getByTestId } = render(<SessionScreen />, { wrapper });
     // Wait for initial voice mode to load
     await waitFor(() => {
       expect(getByTestId('mock-input-mode').props.children).toBe('voice');
@@ -1254,7 +1230,8 @@ describe('voice mode persistence', () => {
       new QuotaExceededError('Quota exceeded', details)
     );
 
-    const { unmount } = render(<SessionScreen />);
+    const wrapper = createWrapper();
+    const { unmount } = render(<SessionScreen />, { wrapper });
 
     // Flush startup async work
     await act(async () => {

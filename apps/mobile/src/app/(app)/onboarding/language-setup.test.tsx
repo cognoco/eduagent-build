@@ -64,7 +64,7 @@ describe('LanguageSetup', () => {
   it('renders the onboarding step indicator', () => {
     render(<LanguageSetup />);
 
-    expect(screen.getByText('Step 2 of 4')).toBeTruthy();
+    screen.getByText('Step 2 of 4');
   });
 
   it('renders language confirmation card', () => {
@@ -80,7 +80,7 @@ describe('LanguageSetup', () => {
 
     render(<LanguageSetup />);
 
-    expect(screen.getByText(/No language subject selected/i)).toBeTruthy();
+    screen.getByText(/No language subject selected/i);
   });
 
   it('navigates back to interview with the full param shape', () => {

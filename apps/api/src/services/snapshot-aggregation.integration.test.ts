@@ -158,7 +158,7 @@ describe('[BUG-872] buildKnowledgeInventory includes subjects added after the ca
     expect(inventory.subjects.length).toBe(2);
 
     const biology = inventory.subjects.find((s) => s.subjectId === biologyId);
-    expect(biology).toBeDefined();
+    expect(biology).toEqual(expect.objectContaining({}));
     expect(biology?.subjectName).toBe('Biology');
   });
 

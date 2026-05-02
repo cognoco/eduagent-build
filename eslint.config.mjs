@@ -59,6 +59,13 @@ export default [
       '@typescript-eslint/no-non-null-assertion': 'off',
       // Test mocks and fixtures routinely use any.
       '@typescript-eslint/no-explicit-any': 'off',
+      // Re-enabled with allowShortCircuit/allowTernary for common test patterns.
+      // Bare function calls (screen.getByTestId etc.) are already exempt —
+      // the rule only flags non-call expressions with no side effects.
+      '@typescript-eslint/no-unused-expressions': ['error', {
+        allowShortCircuit: true,
+        allowTernary: true,
+      }],
     },
   },
   {

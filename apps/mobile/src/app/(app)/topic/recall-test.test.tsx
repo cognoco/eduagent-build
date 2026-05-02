@@ -161,12 +161,12 @@ describe('RecallTestScreen', () => {
       ).toBeTruthy();
     });
 
-    expect(screen.getByText('Still stuck')).toBeTruthy();
+    screen.getByText('Still stuck');
 
     fireEvent.press(screen.getByTestId('recall-dont-remember-button'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('remediation-card')).toBeTruthy();
+      screen.getByTestId('remediation-card');
     });
 
     expect(screen.queryByTestId('recall-dont-remember-button')).toBeNull();
@@ -190,7 +190,7 @@ describe('RecallTestScreen', () => {
     fireEvent.press(screen.getByTestId('recall-dont-remember-button'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('remediation-card')).toBeTruthy();
+      screen.getByTestId('remediation-card');
     });
   });
 
@@ -220,7 +220,7 @@ describe('RecallTestScreen', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText(/your memory of this is solid/)).toBeTruthy();
+      screen.getByText(/your memory of this is solid/);
     });
   });
 
