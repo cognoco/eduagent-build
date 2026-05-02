@@ -17,7 +17,7 @@ See [`docs/specs/2026-04-18-llm-personalization-audit.md`](../../../docs/specs/2
 
 Use Tier 1 for prompt-regression checks on every push. Use Tier 2 for tuning sessions where you want to see how the model actually responds to personalization.
 
-> **Status note (2026-05-01 audit / [AUDIT-EVAL-1]):** Tier 2 is currently scaffolded but inert for every flow — no flow in this harness implements `runLive`, so `pnpm eval:llm --live` reports `runLive not implemented for this flow` for every flow. The `expectedResponseSchema` is wired on the `exchanges` flow (the largest prompt surface) and will activate envelope-shape validation automatically once a `runLive` is added. Implementing the first `runLive` is an architectural decision (where the LLM client comes from for the harness, streaming-vs-buffered output) and is tracked separately as a follow-up work item.
+> **Status note (2026-05-02 audit / [AUDIT-EVAL-2]):** The `exchanges` flow now implements `runLive` (the first in the harness) — running `pnpm eval:llm --flow exchanges --live` hits the production LLM router via `runner/llm-client.ts`, which tags telemetry with `flow: "eval-harness"` so dashboards can filter eval calls. `expectedResponseSchema: llmResponseEnvelopeSchema` and the per-sample envelope-drift metrics on `exchanges` are now both active. The remaining ~12 flows still report `runLive not implemented for this flow`; copy the `exchanges` pattern when wiring them up. There is one known prompt-fidelity divergence tracked as `AUDIT-EVAL-3`: production `processExchange` concatenates `buildOrphanSystemAddendum(...)` onto the system prompt; the harness does not (yet).
 
 ## Usage
 

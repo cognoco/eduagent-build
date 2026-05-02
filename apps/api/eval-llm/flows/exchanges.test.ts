@@ -1,3 +1,16 @@
+// ---------------------------------------------------------------------------
+// runLive tests mock the harness LLM client wrapper (matches the inline
+// jest.mock pattern from apps/api/src/services/learner-profile.test.ts:19).
+// The mock factory returns a pass-through that captures all arguments so
+// each test can assert on the exact call shape forwarded to routeAndCall.
+// Hoisted to module top so the mock is registered before any import that
+// transitively pulls runner/llm-client.
+// ---------------------------------------------------------------------------
+const mockRunHarnessLlm = jest.fn();
+jest.mock('../runner/llm-client', () => ({
+  runHarnessLlm: (...args: unknown[]) => mockRunHarnessLlm(...args),
+}));
+
 import { exchangesFlow } from './exchanges';
 import { PROFILES, getProfile } from '../fixtures/profiles';
 import { buildMemoryBlock } from '../../src/services/learner-profile';
@@ -160,6 +173,66 @@ describe('exchangesFlow', () => {
       expect(messages.system.length).toBeGreaterThan(200);
       expect(messages.user).toBe('…still not clicking.');
       expect(messages.notes?.[0]).toContain('S5-rung5-exit');
+    });
+  });
+
+  describe('runLive [AUDIT-EVAL-2]', () => {
+    beforeEach(() => {
+      mockRunHarnessLlm.mockReset();
+    });
+
+    it('forwards system prompt, history, and escalationRung to the harness LLM client', async () => {
+      mockRunHarnessLlm.mockResolvedValue('mock response');
+      const scenarios =
+        exchangesFlow.enumerateScenarios?.(generalProfile) ?? [];
+      const s2 = scenarios.find((s) => s.scenarioId === 'S2-rung2-revisit');
+      if (!s2) throw new Error('S2 missing');
+
+      const messages = exchangesFlow.buildPrompt(s2.input);
+      await exchangesFlow.runLive?.(s2.input, messages);
+
+      expect(mockRunHarnessLlm).toHaveBeenCalledTimes(1);
+      const [chatMessages, escalationRung, options] =
+        mockRunHarnessLlm.mock.calls[0];
+
+      // Same escalation rung as production processExchange would receive
+      expect(escalationRung).toBe(s2.input.context.escalationRung);
+
+      // System prompt is the runner-passed `messages.system` — keeps
+      // Tier 1 ↔ Tier 2 prompt aligned (see runLive comment about
+      // AUDIT-EVAL-3 prompt-fidelity divergence).
+      expect(chatMessages[0]).toEqual({
+        role: 'system',
+        content: messages.system,
+      });
+
+      // The last message is the user turn produced by buildPrompt
+      expect(chatMessages[chatMessages.length - 1]).toEqual({
+        role: 'user',
+        content: messages.user ?? '',
+      });
+
+      // Profile-level personalization options propagate
+      expect(options).toMatchObject({
+        llmTier: s2.input.context.llmTier,
+        conversationLanguage: s2.input.context.conversationLanguage,
+        pronouns: s2.input.context.pronouns,
+      });
+      expect(options.ageBracket).toBeDefined();
+    });
+
+    it('returns the LLM response string verbatim', async () => {
+      mockRunHarnessLlm.mockResolvedValue(
+        '{"reply":"hi","signals":{},"ui_hints":{}}'
+      );
+      const scenarios =
+        exchangesFlow.enumerateScenarios?.(generalProfile) ?? [];
+      const s1 = scenarios[0];
+      const messages = exchangesFlow.buildPrompt(s1.input);
+
+      const response = await exchangesFlow.runLive?.(s1.input, messages);
+
+      expect(response).toBe('{"reply":"hi","signals":{},"ui_hints":{}}');
     });
   });
 
