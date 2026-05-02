@@ -391,7 +391,7 @@ One mobile client, one error handling path. RFC 7807 overengineered for this. Bo
 **Route structure:**
 
 ```
-# Authoritative source: `apps/api/src/index.ts` route mountings (40 route files as of 2026-05-01).
+# Authoritative source: `apps/api/src/index.ts` route mountings (41 route files as of 2026-05-01).
 # When this list and the source disagree, the source wins — update this table.
 
 /v1/sessions/*              # Learning sessions, exchanges, session events
