@@ -323,6 +323,13 @@
       "when": 1778600000000,
       "tag": "0045_interaction_durability_l1",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1777671422482,
+      "tag": "0046_stormy_cassandra_nova",
+      "breakpoints": true
     }
   ]
 }

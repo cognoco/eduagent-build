@@ -17,8 +17,7 @@ import {
   RateLimitedError,
   streamFallbackFrameSchema,
 } from '@eduagent/schemas';
-import { learningSessions, type Database } from '@eduagent/database';
-import { and, eq, lt, sql } from 'drizzle-orm';
+import type { Database } from '@eduagent/database';
 import { z } from 'zod';
 import type { AuthUser } from '../middleware/auth';
 import { idempotencyPreflight } from '../middleware/idempotency';
@@ -47,6 +46,7 @@ import {
   setSessionInputMode,
   evaluateSessionDepth,
   getResumeNudgeCandidate,
+  claimSessionForFilingRetry,
 } from '../services/session';
 import type { LLMTier } from '../services/subscription';
 import { notFound, apiError } from '../errors';
@@ -139,22 +139,11 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const session = await getSession(db, profileId, sessionId);
       if (!session) return notFound(c, 'Session not found');
 
-      const [updated] = await db
-        .update(learningSessions)
-        .set({
-          filingStatus: 'filing_pending',
-          filingRetryCount: sql`${learningSessions.filingRetryCount} + 1`,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(learningSessions.id, sessionId),
-            eq(learningSessions.profileId, profileId),
-            eq(learningSessions.filingStatus, 'filing_failed'),
-            lt(learningSessions.filingRetryCount, 3)
-          )
-        )
-        .returning();
+      const updated = await claimSessionForFilingRetry(
+        db,
+        profileId,
+        sessionId
+      );
 
       if (!updated) {
         const fresh = await getSession(db, profileId, sessionId);

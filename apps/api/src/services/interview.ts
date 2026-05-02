@@ -792,6 +792,31 @@ export async function updateDraft(
 }
 
 // ---------------------------------------------------------------------------
+// Atomic draft status transitions (used by route handlers)
+// ---------------------------------------------------------------------------
+
+export type ClaimFromStatus = 'in_progress' | 'failed';
+
+export async function claimDraftForPersisting(
+  db: Database,
+  profileId: string,
+  draftId: string,
+  fromStatus: ClaimFromStatus = 'in_progress'
+): Promise<{ id: string }[]> {
+  return db
+    .update(onboardingDrafts)
+    .set({ status: 'completing', failureCode: null })
+    .where(
+      and(
+        eq(onboardingDrafts.id, draftId),
+        eq(onboardingDrafts.profileId, profileId),
+        eq(onboardingDrafts.status, fromStatus)
+      )
+    )
+    .returning({ id: onboardingDrafts.id });
+}
+
+// ---------------------------------------------------------------------------
 // Curriculum persistence (called on interview completion)
 // ---------------------------------------------------------------------------
 

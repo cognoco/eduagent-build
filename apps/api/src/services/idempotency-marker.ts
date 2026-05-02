@@ -1,5 +1,6 @@
 import { addBreadcrumb, captureException } from './sentry';
 import { createLogger } from './logger';
+import { inngest } from '../inngest/client';
 
 const logger = createLogger();
 
@@ -73,5 +74,11 @@ export async function markPersisted(params: {
         key,
       },
     });
+    inngest
+      .send({
+        name: 'app/idempotency.mark_failed',
+        data: { profileId, flow },
+      })
+      .catch(Function.prototype as () => void);
   }
 }

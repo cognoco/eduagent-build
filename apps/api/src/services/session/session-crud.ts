@@ -667,6 +667,31 @@ export interface ResumeNudgeCandidate {
   createdAt: string;
 }
 
+export async function claimSessionForFilingRetry(
+  db: Database,
+  profileId: string,
+  sessionId: string
+): Promise<{ id: string } | undefined> {
+  const [updated] = await db
+    .update(learningSessions)
+    .set({
+      filingStatus: 'filing_pending',
+      filingRetryCount: sql`${learningSessions.filingRetryCount} + 1`,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(learningSessions.id, sessionId),
+        eq(learningSessions.profileId, profileId),
+        eq(learningSessions.filingStatus, 'filing_failed'),
+        lt(learningSessions.filingRetryCount, 3)
+      )
+    )
+    .returning({ id: learningSessions.id });
+
+  return updated;
+}
+
 export async function getResumeNudgeCandidate(
   db: Database,
   profileId: string

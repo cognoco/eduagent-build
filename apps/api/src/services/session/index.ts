@@ -52,6 +52,7 @@ export {
   recordSystemPrompt,
   recordSessionEvent,
   flagContent,
+  claimSessionForFilingRetry,
   getResumeNudgeCandidate,
 } from './session-crud';
 export type { ResumeNudgeCandidate } from './session-crud';

@@ -7,6 +7,7 @@ import {
 import { lookupAssistantTurnState } from '../services/idempotency-assistant-state';
 import { addBreadcrumb, captureException } from '../services/sentry';
 import { createLogger } from '../services/logger';
+import { inngest } from '../inngest/client';
 
 const logger = createLogger();
 
@@ -74,6 +75,12 @@ export function idempotencyPreflight(options: { flow: IdempotencyFlow }) {
           key,
         },
       });
+      inngest
+        .send({
+          name: 'app/idempotency.preflight_lookup_failed',
+          data: { profileId, flow: options.flow },
+        })
+        .catch(Function.prototype as () => void);
       await next();
       return;
     }

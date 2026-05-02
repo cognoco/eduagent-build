@@ -52,12 +52,13 @@ export type InterviewReadyToPersistEvent = z.infer<
   typeof interviewReadyToPersistEventSchema
 >;
 
-export const interviewCompletionPushFailedEventSchema = z.object({
-  version: z.literal(1),
+export const orphanPersistFailedEventSchema = z.object({
   profileId: z.string().uuid(),
   draftId: z.string().uuid(),
-  subjectId: z.string().uuid(),
+  route: z.string(),
+  reason: z.string().nullable(),
+  error: z.string(),
 });
-export type InterviewCompletionPushFailedEvent = z.infer<
-  typeof interviewCompletionPushFailedEventSchema
+export type OrphanPersistFailedEvent = z.infer<
+  typeof orphanPersistFailedEventSchema
 >;

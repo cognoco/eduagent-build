@@ -298,6 +298,9 @@ jest.mock('../services/session', () => {
         }),
       })
     ),
+    claimSessionForFilingRetry: (
+      jest.requireActual('../services/session') as Record<string, unknown>
+    ).claimSessionForFilingRetry,
   };
 });
 

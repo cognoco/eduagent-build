@@ -9,6 +9,7 @@ import type { ExchangeEntry } from '@eduagent/schemas';
 import type { IdempotencyFlow } from './idempotency-marker';
 import { addBreadcrumb, captureException } from './sentry';
 import { createLogger } from './logger';
+import { inngest } from '../inngest/client';
 
 const logger = createLogger();
 
@@ -111,6 +112,12 @@ export async function lookupAssistantTurnState(params: {
       profileId,
       extra: { context: 'idempotency.lookupAssistantTurnState', flow, key },
     });
+    inngest
+      .send({
+        name: 'app/idempotency.assistant_turn_lookup_failed',
+        data: { profileId, flow },
+      })
+      .catch(Function.prototype as () => void);
     return SAFE_ASSISTANT_TURN_STATE;
   }
 }

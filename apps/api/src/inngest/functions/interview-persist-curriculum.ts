@@ -3,11 +3,14 @@ import { eq, and } from 'drizzle-orm';
 import { onboardingDrafts } from '@eduagent/database';
 import {
   PersistCurriculumError,
+  interviewReadyToPersistEventSchema,
   type PersistFailureCode,
+  type OnboardingDraft,
 } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import { createLogger } from '../../services/logger';
+import { captureException } from '../../services/sentry';
 import { extractSignals, persistCurriculum } from '../../services/interview';
 import { sendPushNotification } from '../../services/notifications';
 
@@ -42,27 +45,40 @@ export const interviewPersistCurriculum = inngest.createFunction(
       event,
       error,
     }: {
-      event: Record<string, unknown>;
+      event: {
+        data: { event: { data: Record<string, unknown> }; error: unknown };
+      };
       error: unknown;
     }) => {
       const db = getStepDatabase();
       const code = classifyError(error);
-      const data = (event.data ?? event) as {
-        draftId: string;
-        profileId: string;
-      };
+      const originalEventData = event.data.event.data;
+      const parsed = interviewReadyToPersistEventSchema
+        .pick({ draftId: true, profileId: true })
+        .safeParse(originalEventData);
+      if (!parsed.success) {
+        logger.error(
+          'interview-persist-curriculum onFailure: unparseable event',
+          {
+            failureCode: code,
+            parseErrors: parsed.error.issues,
+          }
+        );
+        return;
+      }
+      const { draftId, profileId } = parsed.data;
       await db
         .update(onboardingDrafts)
         .set({ status: 'failed', failureCode: code })
         .where(
           and(
-            eq(onboardingDrafts.id, data.draftId),
-            eq(onboardingDrafts.profileId, data.profileId)
+            eq(onboardingDrafts.id, draftId),
+            eq(onboardingDrafts.profileId, profileId)
           )
         );
       logger.error('interview-persist-curriculum exhausted retries', {
-        profileId: data.profileId,
-        draftId: data.draftId,
+        profileId,
+        draftId,
         failureCode: code,
         rawError: (error as Error)?.message,
       });
@@ -90,6 +106,8 @@ export const interviewPersistCurriculum = inngest.createFunction(
       const db = getStepDatabase();
       const draft = await loadDraft(db, profileId, draftId);
       if (!draft) throw new NonRetriableError('draft-disappeared');
+      if (draft.status === 'completed')
+        throw new NonRetriableError('draft-already-completed');
 
       const cached = draft.extractedSignals as ExtractedSignals | null;
       if (
@@ -138,14 +156,20 @@ export const interviewPersistCurriculum = inngest.createFunction(
       if (!draft) throw new NonRetriableError('draft-disappeared');
 
       try {
-        const draftForPersist = {
-          ...draft,
+        const draftForPersist: OnboardingDraft = {
+          id: draft.id,
+          profileId: draft.profileId,
+          subjectId: draft.subjectId,
+          exchangeHistory:
+            draft.exchangeHistory as OnboardingDraft['exchangeHistory'],
           extractedSignals: signals,
-          failureCode: draft.failureCode ?? null,
+          status: draft.status as OnboardingDraft['status'],
+          failureCode: (draft.failureCode ??
+            null) as OnboardingDraft['failureCode'],
           expiresAt: draft.expiresAt?.toISOString() ?? null,
           createdAt: draft.createdAt.toISOString(),
           updatedAt: draft.updatedAt.toISOString(),
-        } as unknown as Parameters<typeof persistCurriculum>[4];
+        };
         await persistCurriculum(
           db,
           profileId,
@@ -182,14 +206,9 @@ export const interviewPersistCurriculum = inngest.createFunction(
           type: 'interview_ready',
         });
       } catch (err) {
-        logger.warn('completion push failed', {
+        captureException(err, {
           profileId,
-          draftId,
-          error: (err as Error)?.message,
-        });
-        await inngest.send({
-          name: 'app/interview.completion_push_failed',
-          data: { profileId, draftId, subjectId, version: 1 as const },
+          extra: { draftId, subjectId, phase: 'completion_push_failed' },
         });
       }
     });

@@ -1,3 +1,6 @@
+// Unit tests for Inngest step replay/memoization behavior.
+// DB-touching scenarios are covered in interview-persist-curriculum.integration.test.ts.
+
 const mockGetStepDatabase = jest.fn();
 
 jest.mock('../helpers', () => ({
@@ -94,67 +97,8 @@ function mockDb({
   };
 }
 
-describe('interview-persist-curriculum', () => {
+describe('interview-persist-curriculum (replay harness)', () => {
   beforeEach(() => jest.clearAllMocks());
-
-  it('cache hit: extractedSignals with goals returns cached, no LLM call', async () => {
-    const cached = {
-      goals: ['Learn algebra'],
-      experienceLevel: 'beginner',
-      currentKnowledge: 'basic arithmetic',
-      interests: ['math'],
-    };
-    mockGetStepDatabase.mockReturnValue(
-      mockDb({ draft: { extractedSignals: cached, exchangeHistory: [] } })
-    );
-    mockPersistCurriculum.mockResolvedValue(undefined);
-    mockSendPush.mockResolvedValue(undefined);
-
-    const handler = (
-      interviewPersistCurriculum as unknown as {
-        fn: (...args: unknown[]) => unknown;
-      }
-    ).fn;
-    const harness = makeReplayHarness();
-    await handler({ event: makeEvent(), step: harness.step });
-
-    expect(mockExtractSignals).not.toHaveBeenCalled();
-    expect(mockPersistCurriculum).toHaveBeenCalled();
-  });
-
-  it('cache miss: empty goals+interests triggers fresh extraction', async () => {
-    mockGetStepDatabase.mockReturnValue(
-      mockDb({
-        draft: {
-          extractedSignals: {
-            goals: [],
-            experienceLevel: 'beginner',
-            currentKnowledge: '',
-            interests: [],
-          },
-          exchangeHistory: ['turn'],
-        },
-      })
-    );
-    mockExtractSignals.mockResolvedValue({
-      goals: ['Learn algebra'],
-      experienceLevel: 'beginner',
-      currentKnowledge: '',
-      interests: ['math'],
-    });
-    mockPersistCurriculum.mockResolvedValue(undefined);
-    mockSendPush.mockResolvedValue(undefined);
-
-    const handler = (
-      interviewPersistCurriculum as unknown as {
-        fn: (...args: unknown[]) => unknown;
-      }
-    ).fn;
-    await handler({ event: makeEvent(), step: makeReplayHarness().step });
-
-    expect(mockExtractSignals).toHaveBeenCalled();
-    expect(mockPersistCurriculum).toHaveBeenCalled();
-  });
 
   it('extract throws once, replay-harness retry uses memoized result for prior steps', async () => {
     mockGetStepDatabase.mockReturnValue(
@@ -188,99 +132,5 @@ describe('interview-persist-curriculum', () => {
     await handler({ event: makeEvent(), step: harness.step });
     expect(mockExtractSignals).toHaveBeenCalledTimes(2);
     expect(mockPersistCurriculum).toHaveBeenCalledTimes(1);
-  });
-
-  it('throws NonRetriableError when draft does not exist', async () => {
-    mockGetStepDatabase.mockReturnValue(mockDb({ draft: undefined }));
-
-    const handler = (
-      interviewPersistCurriculum as unknown as {
-        fn: (...args: unknown[]) => unknown;
-      }
-    ).fn;
-    await expect(
-      handler({ event: makeEvent(), step: makeReplayHarness().step })
-    ).rejects.toThrow(/draft-disappeared/);
-  });
-
-  it('onFailure maps PersistCurriculumError to its code', async () => {
-    const updateChain = {
-      set: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      returning: jest.fn().mockResolvedValue([{ id: DRAFT }]),
-    };
-    mockGetStepDatabase.mockReturnValue({
-      update: jest.fn().mockReturnValue(updateChain),
-    });
-
-    const onFailure = (
-      interviewPersistCurriculum as unknown as {
-        onFailure: (...args: unknown[]) => unknown;
-      }
-    ).onFailure;
-    await onFailure({
-      event: makeEvent(),
-      error: new PersistCurriculumError('extract_signals_failed'),
-    });
-
-    expect(updateChain.set).toHaveBeenCalledWith(
-      expect.objectContaining({
-        status: 'failed',
-        failureCode: 'extract_signals_failed',
-      })
-    );
-  });
-
-  it('onFailure maps unknown errors to "unknown" code (no raw message leak)', async () => {
-    const updateChain = {
-      set: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      returning: jest.fn().mockResolvedValue([{ id: DRAFT }]),
-    };
-    mockGetStepDatabase.mockReturnValue({
-      update: jest.fn().mockReturnValue(updateChain),
-    });
-
-    const onFailure = (
-      interviewPersistCurriculum as unknown as {
-        onFailure: (...args: unknown[]) => unknown;
-      }
-    ).onFailure;
-    await onFailure({
-      event: makeEvent(),
-      error: new Error('LLM api key sk-zzz... leaked'),
-    });
-
-    const setCall = updateChain.set.mock.calls[0][0];
-    expect(setCall.failureCode).toBe('unknown');
-    expect(JSON.stringify(setCall)).not.toMatch(/sk-zzz/);
-  });
-
-  it('emits completion_push_failed event when sendPushNotification throws', async () => {
-    const cached = {
-      goals: ['Learn'],
-      experienceLevel: 'beginner',
-      currentKnowledge: '',
-      interests: ['math'],
-    };
-    mockGetStepDatabase.mockReturnValue(
-      mockDb({ draft: { extractedSignals: cached, exchangeHistory: [] } })
-    );
-    mockPersistCurriculum.mockResolvedValue(undefined);
-    mockSendPush.mockRejectedValueOnce(new Error('Expo down'));
-
-    const { inngest: mockInngest } = require('../client');
-    const handler = (
-      interviewPersistCurriculum as unknown as {
-        fn: (...args: unknown[]) => unknown;
-      }
-    ).fn;
-    await handler({ event: makeEvent(), step: makeReplayHarness().step });
-
-    expect(mockInngest.send).toHaveBeenCalledWith(
-      expect.objectContaining({
-        name: 'app/interview.completion_push_failed',
-      })
-    );
   });
 });

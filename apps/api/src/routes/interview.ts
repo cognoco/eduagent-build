@@ -4,6 +4,7 @@ import { zValidator } from '@hono/zod-validator';
 import {
   ERROR_CODES,
   interviewMessageSchema,
+  interviewReadyToPersistEventSchema,
   type InterviewResult,
   extractedInterviewSignalsSchema,
   streamFallbackFrameSchema,
@@ -11,9 +12,7 @@ import {
   PersistCurriculumError,
   classifyOrphanError,
 } from '@eduagent/schemas';
-import { onboardingDrafts, type Database } from '@eduagent/database';
-import { eq, and } from 'drizzle-orm';
-import { interviewReadyToPersistEventSchema } from '@eduagent/schemas';
+import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
@@ -27,6 +26,7 @@ import {
   getDraftState,
   updateDraft,
   buildDraftResumeSummary,
+  claimDraftForPersisting,
 } from '../services/interview';
 import {
   appendInterviewAssistantExchange,
@@ -122,17 +122,7 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
           extractedSignals: result.extractedSignals ?? draft.extractedSignals,
         });
 
-        const claimed = await db
-          .update(onboardingDrafts)
-          .set({ status: 'completing', failureCode: null })
-          .where(
-            and(
-              eq(onboardingDrafts.id, draft.id),
-              eq(onboardingDrafts.profileId, profileId),
-              eq(onboardingDrafts.status, 'in_progress')
-            )
-          )
-          .returning({ id: onboardingDrafts.id });
+        const claimed = await claimDraftForPersisting(db, profileId, draft.id);
 
         if (claimed.length > 0) {
           await inngest.send({
@@ -294,17 +284,11 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
                   result.extractedSignals ?? draft.extractedSignals,
               });
 
-              const claimed = await db
-                .update(onboardingDrafts)
-                .set({ status: 'completing', failureCode: null })
-                .where(
-                  and(
-                    eq(onboardingDrafts.id, draft.id),
-                    eq(onboardingDrafts.profileId, profileId),
-                    eq(onboardingDrafts.status, 'in_progress')
-                  )
-                )
-                .returning({ id: onboardingDrafts.id });
+              const claimed = await claimDraftForPersisting(
+                db,
+                profileId,
+                draft.id
+              );
 
               if (claimed.length > 0) {
                 await inngest.send({
@@ -435,17 +419,7 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
       });
     }
 
-    const claimed = await db
-      .update(onboardingDrafts)
-      .set({ status: 'completing', failureCode: null })
-      .where(
-        and(
-          eq(onboardingDrafts.id, draft.id),
-          eq(onboardingDrafts.profileId, profileId),
-          eq(onboardingDrafts.status, 'in_progress')
-        )
-      )
-      .returning({ id: onboardingDrafts.id });
+    const claimed = await claimDraftForPersisting(db, profileId, draft.id);
 
     if (claimed.length > 0) {
       await inngest.send({
@@ -524,17 +498,12 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
     const draft = await getDraftState(db, profileId, subjectId);
     if (!draft) return notFound(c, 'Draft not found');
 
-    const claimed = await db
-      .update(onboardingDrafts)
-      .set({ status: 'completing', failureCode: null })
-      .where(
-        and(
-          eq(onboardingDrafts.id, draft.id),
-          eq(onboardingDrafts.profileId, profileId),
-          eq(onboardingDrafts.status, 'failed')
-        )
-      )
-      .returning({ id: onboardingDrafts.id });
+    const claimed = await claimDraftForPersisting(
+      db,
+      profileId,
+      draft.id,
+      'failed'
+    );
 
     if (claimed.length === 0) {
       return c.json({ error: 'not-failed', status: draft.status }, 409);
