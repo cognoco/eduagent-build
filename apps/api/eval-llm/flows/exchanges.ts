@@ -1,5 +1,6 @@
 import {
   buildSystemPrompt,
+  sanitizeUserContent,
   type ExchangeContext,
 } from '../../src/services/exchanges';
 import { resolveAgeBracket } from '../../src/services/exchange-prompts';
@@ -408,13 +409,26 @@ export const exchangesFlow: FlowDefinition<ExchangeScenarioInput> = {
     const priorTurns =
       lastUserIndex >= 0 ? history.slice(0, lastUserIndex) : history;
 
+    // Contract guarantee: buildPrompt above always populates messages.user
+    // for exchanges (last user turn extracted from history). Throw rather
+    // than silently send an empty user turn so other flows copying this
+    // pattern can't regress into invisible misbehaviour.
+    if (!messages.user) {
+      throw new Error(
+        `runLive: messages.user is undefined for scenario ${input.scenarioId} — buildPrompt must produce a user turn`
+      );
+    }
+
     const chatMessages: ChatMessage[] = [
       { role: 'system', content: messages.system },
       ...priorTurns.map((t) => ({
         role: t.role,
-        content: t.content,
+        // Mirror production sanitization (services/exchanges.ts:314) so
+        // user-provided <server_note> markers in fixture history don't
+        // bleed through to the LLM and confuse the orphan-addendum logic.
+        content: t.role === 'user' ? sanitizeUserContent(t.content) : t.content,
       })),
-      { role: 'user' as const, content: messages.user ?? '' },
+      { role: 'user' as const, content: sanitizeUserContent(messages.user) },
     ];
 
     return runHarnessLlm(chatMessages, input.context.escalationRung, {
