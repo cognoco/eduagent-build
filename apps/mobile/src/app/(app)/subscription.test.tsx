@@ -450,7 +450,7 @@ describe('SubscriptionScreen', () => {
   // Rendering with offerings
   // -------------------------------------------------------------------------
 
-  it('renders available packages from RevenueCat offerings', async () => {
+  it('renders available packages from RevenueCat offerings', () => {
     const monthlyPkg = makeMockPackage();
     const annualPkg = makeMockPackage({
       identifier: '$rc_annual',
@@ -469,9 +469,7 @@ describe('SubscriptionScreen', () => {
       wrapper: createWrapper({ seedCache: true }),
     });
 
-    await waitFor(() => {
-      screen.getByTestId('offerings-section');
-    });
+    screen.getByTestId('offerings-section');
     screen.getByTestId('package-option-$rc_monthly');
     screen.getByTestId('package-option-$rc_annual');
     screen.getByText('MentoMate Plus Monthly');
