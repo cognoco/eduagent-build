@@ -32,6 +32,7 @@ import { filingPreSessionFlow } from './flows/filing-pre-session';
 import { exchangesFlow } from './flows/exchanges';
 import { interviewFlow } from './flows/interview';
 import { interviewOrphanFlow } from './flows/interview-orphan';
+import { probesFlow } from './flows/probes';
 import {
   listFlows,
   parseCliArgs,
@@ -46,6 +47,7 @@ import {
   parseBaseline,
   type Baseline,
 } from './runner/metrics';
+import { bootstrapLlmProviders } from './runner/llm-bootstrap';
 
 const BASELINE_PATH = path.resolve(__dirname, 'baseline.json');
 const DEFAULT_TOLERANCE_PP = 0.05; // 5pp — one sample of noise at N≈20
@@ -77,6 +79,7 @@ const FLOWS: FlowDefinition[] = [
   exchangesFlow as FlowDefinition,
   interviewFlow as FlowDefinition,
   interviewOrphanFlow as FlowDefinition,
+  probesFlow as FlowDefinition,
 ];
 
 async function main(): Promise<void> {
@@ -86,6 +89,12 @@ async function main(): Promise<void> {
   if (listOnly) {
     listFlows(FLOWS);
     return;
+  }
+
+  // Bootstrap LLM providers early so any missing-key errors surface before
+  // the run matrix starts. Tier-1 runs skip this — no LLM calls are made.
+  if (options.live) {
+    bootstrapLlmProviders();
   }
 
   console.log(

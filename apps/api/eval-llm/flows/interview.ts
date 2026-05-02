@@ -1,6 +1,7 @@
 import { INTERVIEW_SYSTEM_PROMPT } from '../../src/services/interview-prompts';
 import type { EvalProfile } from '../fixtures/profiles';
 import type { FlowDefinition, PromptMessages } from '../runner/types';
+import { callLlm } from '../runner/llm-bootstrap';
 
 // ---------------------------------------------------------------------------
 // Flow adapter — Interview (diagnostic assessment)
@@ -118,4 +119,17 @@ export const interviewFlow: FlowDefinition<InterviewInput> = {
   },
 
   emitsEnvelope: true,
+
+  async runLive(
+    _input: InterviewInput,
+    messages: PromptMessages
+  ): Promise<string> {
+    return callLlm(
+      [
+        { role: 'system', content: messages.system },
+        { role: 'user', content: messages.user ?? '' },
+      ],
+      { flow: 'interview', rung: 2 }
+    );
+  },
 };

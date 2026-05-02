@@ -2,6 +2,7 @@ import { buildCapitalsPrompt } from '../../src/services/quiz/generate-round';
 import type { Interest } from '../../src/services/quiz/config';
 import type { EvalProfile } from '../fixtures/profiles';
 import type { FlowDefinition, PromptMessages } from '../runner/types';
+import { callLlm } from '../runner/llm-bootstrap';
 
 // ---------------------------------------------------------------------------
 // Flow adapter — Quiz: Capitals
@@ -59,5 +60,18 @@ export const capitalsFlow: FlowDefinition<CapitalsBuilderInput> = {
         }.`,
       ],
     };
+  },
+
+  async runLive(
+    _input: CapitalsBuilderInput,
+    messages: PromptMessages
+  ): Promise<string> {
+    return callLlm(
+      [
+        { role: 'system', content: messages.system },
+        { role: 'user', content: messages.user ?? 'Generate the quiz round.' },
+      ],
+      { flow: 'quiz-capitals', rung: 1 }
+    );
   },
 };

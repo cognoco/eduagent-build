@@ -4,6 +4,7 @@ import {
 } from '../../src/services/dictation/review';
 import type { EvalProfile } from '../fixtures/profiles';
 import type { FlowDefinition, PromptMessages } from '../runner/types';
+import { callLlm } from '../runner/llm-bootstrap';
 
 // ---------------------------------------------------------------------------
 // Flow adapter — Dictation: Review
@@ -43,5 +44,26 @@ export const dictationReviewFlow: FlowDefinition<BuildReviewSystemPromptParams> 
           `Struggle history NOT used (gap flagged in audit P2) — recurring patterns not surfaced to reviewer.`,
         ],
       };
+    },
+
+    async runLive(
+      _input: BuildReviewSystemPromptParams,
+      messages: PromptMessages
+    ): Promise<string> {
+      // Dictation review is multimodal in production (image + text). The eval
+      // harness exercises the system-prompt-only path — the user message is a
+      // placeholder that signals no real image is attached.
+      return callLlm(
+        [
+          { role: 'system', content: messages.system },
+          {
+            role: 'user',
+            content:
+              messages.user ??
+              '(multimodal — image + original sentences supplied at runtime)',
+          },
+        ],
+        { flow: 'dictation-review', rung: 1 }
+      );
     },
   };

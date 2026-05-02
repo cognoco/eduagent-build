@@ -5,6 +5,7 @@ import {
   buildRecapPrompt,
   getAgeVoiceTierLabel,
 } from '../../src/services/session-recap';
+import { callLlm } from '../runner/llm-bootstrap';
 
 interface SessionRecapInput {
   transcriptText: string;
@@ -63,5 +64,18 @@ export const sessionRecapFlow: FlowDefinition<SessionRecapInput> = {
         return { success: false, error };
       }
     },
+  },
+
+  async runLive(
+    _input: SessionRecapInput,
+    messages: PromptMessages
+  ): Promise<string> {
+    return callLlm(
+      [
+        { role: 'system', content: messages.system },
+        { role: 'user', content: messages.user ?? '' },
+      ],
+      { flow: 'session-recap', rung: 2 }
+    );
   },
 };

@@ -58,7 +58,7 @@ describe('exchangesFlow', () => {
         exchangesFlow.enumerateScenarios?.(generalProfile) ?? [];
       for (const s of scenarios) {
         expect(s.scenarioId).toBe(s.input.scenarioId);
-        expect(s.input.context).toBeDefined();
+        expect(typeof s.input.context).toBe('object');
       }
     });
   });

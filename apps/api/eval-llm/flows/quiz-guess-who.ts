@@ -5,6 +5,7 @@ import {
 import type { Interest } from '../../src/services/quiz/config';
 import type { EvalProfile } from '../fixtures/profiles';
 import type { FlowDefinition, PromptMessages } from '../runner/types';
+import { callLlm } from '../runner/llm-bootstrap';
 
 // ---------------------------------------------------------------------------
 // Flow adapter — Quiz: Guess Who
@@ -62,5 +63,18 @@ export const guessWhoFlow: FlowDefinition<GuessWhoPromptParams> = {
         }.`,
       ],
     };
+  },
+
+  async runLive(
+    _input: GuessWhoPromptParams,
+    messages: PromptMessages
+  ): Promise<string> {
+    return callLlm(
+      [
+        { role: 'system', content: messages.system },
+        { role: 'user', content: messages.user ?? 'Generate the quiz round.' },
+      ],
+      { flow: 'quiz-guess-who', rung: 1 }
+    );
   },
 };

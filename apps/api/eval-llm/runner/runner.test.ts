@@ -13,7 +13,7 @@ import * as path from 'node:path';
 describe('parseCliArgs', () => {
   it('parses --scenarios core to the three flagship scenario ids', () => {
     const { options } = parseCliArgs(['--scenarios', 'core']);
-    expect(options.scenarioFilter).toBeDefined();
+    expect(options.scenarioFilter).toBeInstanceOf(Set);
     expect(Array.from(options.scenarioFilter ?? [])).toEqual(
       expect.arrayContaining([
         'S1-rung1-teach-new',

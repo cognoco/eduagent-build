@@ -126,6 +126,27 @@ export const HISTORY_S8_FREEFORM: HistoryTurn[] = [
   },
 ];
 
+/** S9 · correct-streak — learner has answered correctly 4 times straight. */
+export const HISTORY_S9_CORRECT_STREAK: HistoryTurn[] = [
+  { role: 'assistant', content: 'What is the key idea behind {{topic}}?' },
+  { role: 'user', content: 'It works by applying the rule to each part.' },
+  {
+    role: 'assistant',
+    content: 'Right. And what happens when you change the variable?',
+  },
+  { role: 'user', content: 'The relationship stays proportional.' },
+  {
+    role: 'assistant',
+    content: 'Good. Can you give an example from a different context?',
+  },
+  { role: 'user', content: 'Like in physics, when force and acceleration...' },
+  { role: 'assistant', content: 'Exactly. Now, what if we add a constraint?' },
+  {
+    role: 'user',
+    content: 'Then you need to account for the boundary condition.',
+  },
+];
+
 /** Substitute {{topic}} / {{struggle}} tokens. Leaves other text untouched. */
 export function substituteHistory(
   history: HistoryTurn[],
