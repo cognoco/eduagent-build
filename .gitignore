@@ -93,6 +93,9 @@ temp/*
 .worktrees/
 .claude/worktrees/
 
+# Local work-in-progress notes / coordination artifacts
+_wip/
+
 # Local Claude Code settings (personal tool permissions, output style)
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
