@@ -301,25 +301,26 @@ jobs:
           echo "url=${RESOLVED_URL}" >> "$GITHUB_OUTPUT"
           echo "Staging API URL: ${RESOLVED_URL}"
 
-      - name: Wait for Worker propagation
-        # Cloudflare Workers propagate within ~5-10s globally; a short wait
-        # avoids spurious failures on a cold deploy. 20s is conservative.
-        run: sleep 20
-
       - name: Smoke — GET /v1/health (200, status ok)
         id: smoke-health
         env:
           STAGING_API_URL: ${{ steps.resolve-url.outputs.url }}
         run: |
-          echo "Hitting ${STAGING_API_URL}/v1/health"
-          HTTP_CODE=$(curl -s --max-time 15 -o /tmp/health.json -w "%{http_code}" \
-            "${STAGING_API_URL}/v1/health")
-          echo "HTTP status: ${HTTP_CODE}"
-          if [ "${HTTP_CODE}" != "200" ]; then
-            echo "✗ /v1/health returned ${HTTP_CODE}, expected 200"
-            cat /tmp/health.json || true
-            exit 1
-          fi
+          for attempt in 1 2 3 4 5; do
+            echo "Attempt ${attempt}: hitting ${STAGING_API_URL}/v1/health"
+            HTTP_CODE=$(curl -s --max-time 15 -o /tmp/health.json -w "%{http_code}" \
+              "${STAGING_API_URL}/v1/health") || HTTP_CODE=000
+            echo "HTTP status: ${HTTP_CODE}"
+            if [ "${HTTP_CODE}" = "200" ]; then
+              break
+            fi
+            if [ "${attempt}" -eq 5 ]; then
+              echo "✗ /v1/health returned ${HTTP_CODE} after 5 attempts"
+              cat /tmp/health.json || true
+              exit 1
+            fi
+            sleep 5
+          done
           STATUS=$(python3 -c "import json; print(json.load(open('/tmp/health.json')).get('status',''))")
           echo "status field: ${STATUS}"
           if [ "${STATUS}" != "ok" ]; then
