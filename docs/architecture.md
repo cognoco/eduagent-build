@@ -1198,7 +1198,7 @@ All LLM calls that make state-machine decisions (close an interview, hold escala
 
 Key rules for the envelope pattern:
 
-1. **Every signal needs a server-side hard cap.** A model can return `ready_to_finish: false` forever. After N exchanges, the server forces the terminal transition regardless. Examples: `MAX_INTERVIEW_EXCHANGES = 6`, `MAX_PARTIAL_PROGRESS_HOLDS = 2`, `MAX_NEEDS_DEEPENING_PER_SUBJECT = 10`.
+1. **Every signal needs a server-side hard cap.** A model can return `ready_to_finish: false` forever. After N exchanges, the server forces the terminal transition regardless. Examples: `MAX_INTERVIEW_EXCHANGES = 4`, `MAX_PARTIAL_PROGRESS_HOLDS = 2`, `MAX_NEEDS_DEEPENING_PER_SUBJECT = 10`.
 2. **`reply` is never parsed for decisions.** All control flow comes from `signals` or `ui_hints`. The reply streams to the client as-is.
 3. **New decisions are new fields**, not new markers embedded in text. Adding a feature means adding an optional field to the schema and a cap on the server.
 4. **Flows that only return prose** (e.g., dictation-prepare-homework) do not use the envelope. It is strictly for state-machine decisions.

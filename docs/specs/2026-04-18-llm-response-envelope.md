@@ -81,10 +81,10 @@ Structured output alone isn't safe — a model can return `ready_to_finish: fals
 const parsed = llmResponseEnvelopeSchema.parse(JSON.parse(jsonStr));
 const exchangeNumber = draft.exchange_count + 1;
 
-// Belt + suspenders: after exchange 6, force ready_to_finish regardless
+// Belt + suspenders: after exchange 4, force ready_to_finish regardless
 // of what the model returned. Makes the state machine fail-safe in the
 // "model never declares done" case.
-const MAX_INTERVIEW_EXCHANGES = 6;
+const MAX_INTERVIEW_EXCHANGES = 4;
 const isComplete =
   parsed.signals?.ready_to_finish === true ||
   exchangeNumber >= MAX_INTERVIEW_EXCHANGES;
@@ -94,7 +94,7 @@ Each migrating flow defines its own cap:
 
 | Flow | Signal | Cap |
 |---|---|---|
-| Interview | `ready_to_finish` | `MAX_INTERVIEW_EXCHANGES = 6` |
+| Interview | `ready_to_finish` | `MAX_INTERVIEW_EXCHANGES = 4` |
 | Escalation hold | `partial_progress` | `MAX_PARTIAL_PROGRESS_HOLDS = 2` (exists) |
 | Needs-deepening queue | `needs_deepening` | `MAX_NEEDS_DEEPENING_PER_SUBJECT = 10` (exists) |
 
