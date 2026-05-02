@@ -11,13 +11,11 @@
  *   logic all run as normal) [IMP-6]
  */
 
+import { inngestClientMock } from './mocks';
+jest.mock('../../apps/api/src/inngest/client', () => inngestClientMock());
+
 import { and, desc, eq } from 'drizzle-orm';
-import {
-  curricula,
-  curriculumTopics,
-  onboardingDrafts,
-  subjects,
-} from '@eduagent/database';
+import { onboardingDrafts, subjects } from '@eduagent/database';
 
 import {
   buildIntegrationEnv,
@@ -169,21 +167,6 @@ async function loadDraft(profileId: string, subjectId: string) {
   });
 }
 
-async function loadCurriculum(subjectId: string) {
-  const db = createIntegrationDb();
-  const curriculum = await db.query.curricula.findFirst({
-    where: eq(curricula.subjectId, subjectId),
-  });
-
-  const topics = curriculum
-    ? await db.query.curriculumTopics.findMany({
-        where: eq(curriculumTopics.curriculumId, curriculum.id),
-      })
-    : [];
-
-  return { curriculum, topics };
-}
-
 beforeEach(async () => {
   installLlmProvider();
 
@@ -290,7 +273,7 @@ describe('Integration: Onboarding interview routes', () => {
 
     const draft = await loadDraft(profileId, subject.id);
     expect(draft).toBeDefined();
-    expect(draft!.status).toBe('completed');
+    expect(draft!.status).toBe('completing');
     expect(draft!.exchangeHistory).toHaveLength(2);
     expect(draft!.extractedSignals).toEqual({
       goals: ['learn algebra'],
@@ -299,31 +282,17 @@ describe('Integration: Onboarding interview routes', () => {
       interests: [],
     });
 
-    const persisted = await loadCurriculum(subject.id);
-    expect(persisted.curriculum).toBeDefined();
-    expect(persisted.topics).toHaveLength(2);
-    expect(persisted.topics.map((topic) => topic.title)).toEqual([
-      'Algebra Foundations',
-      'Linear Equations',
-    ]);
-
-    const curriculumRes = await app.request(
-      `/v1/subjects/${subject.id}/curriculum`,
-      {
-        method: 'GET',
-        headers: buildAuthHeaders(
-          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-          profileId
-        ),
-      },
-      TEST_ENV
-    );
-
-    expect(curriculumRes.status).toBe(200);
-    const curriculumBody = await curriculumRes.json();
-    expect(curriculumBody.curriculum.topics).toHaveLength(2);
-    expect(curriculumBody.curriculum.topics[0].title).toBe(
-      'Algebra Foundations'
+    // Curriculum persist is now async via Inngest — verify the dispatch happened
+    const { inngest } = jest.requireMock(
+      '../../apps/api/src/inngest/client'
+    ) as {
+      inngest: { send: jest.Mock };
+    };
+    expect(inngest.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'app/interview.ready_to_persist',
+        data: expect.objectContaining({ profileId, subjectId: subject.id }),
+      })
     );
   });
 
@@ -353,11 +322,7 @@ describe('Integration: Onboarding interview routes', () => {
     expect(body).toContain('"isComplete":true');
 
     const draft = await loadDraft(profileId, subject.id);
-    expect(draft!.status).toBe('completed');
-
-    const persisted = await loadCurriculum(subject.id);
-    expect(persisted.curriculum).toBeDefined();
-    expect(persisted.topics).toHaveLength(2);
+    expect(draft!.status).toBe('completing');
   });
 
   it('returns 401 without authentication', async () => {

@@ -8,6 +8,7 @@ import {
   jsonb,
   pgEnum,
   index,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { profiles } from './profiles';
@@ -16,7 +17,9 @@ import { generateUUIDv7 } from '../utils/uuid';
 
 export const draftStatusEnum = pgEnum('draft_status', [
   'in_progress',
+  'completing',
   'completed',
+  'failed',
   'expired',
 ]);
 
@@ -82,6 +85,7 @@ export const onboardingDrafts = pgTable('onboarding_drafts', {
   exchangeHistory: jsonb('exchange_history').notNull().default([]),
   extractedSignals: jsonb('extracted_signals').notNull().default({}),
   status: draftStatusEnum('status').notNull().default('in_progress'),
+  failureCode: text('failure_code'),
   expiresAt: timestamp('expires_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
@@ -169,6 +173,8 @@ export const sessionEvents = pgTable(
     content: text('content').notNull(),
     metadata: jsonb('metadata').default({}),
     structuredAssessment: jsonb('structured_assessment'),
+    clientId: text('client_id'),
+    orphanReason: text('orphan_reason'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -180,6 +186,9 @@ export const sessionEvents = pgTable(
       table.eventType,
       table.createdAt
     ),
+    uniqueIndex('session_events_session_client_id_uniq')
+      .on(table.sessionId, table.clientId)
+      .where(sql`${table.clientId} IS NOT NULL`),
   ]
 );
 

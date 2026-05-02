@@ -4,10 +4,13 @@ import { zValidator } from '@hono/zod-validator';
 import {
   ERROR_CODES,
   interviewMessageSchema,
+  interviewReadyToPersistEventSchema,
   type InterviewResult,
   extractedInterviewSignalsSchema,
   streamFallbackFrameSchema,
   type ExchangeFallback,
+  PersistCurriculumError,
+  classifyOrphanError,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
@@ -19,15 +22,22 @@ import {
   getBookTitle,
   processInterviewExchange,
   streamInterviewExchange,
-  extractSignals,
   getOrCreateDraft,
   getDraftState,
   updateDraft,
-  persistCurriculum,
   buildDraftResumeSummary,
+  claimDraftForPersisting,
 } from '../services/interview';
+import {
+  appendInterviewAssistantExchange,
+  appendInterviewUserExchange,
+} from '../services/onboarding/exchange-history-writer';
+import { idempotencyPreflight } from '../middleware/idempotency';
+import { markPersisted } from '../services/idempotency-marker';
 import { notFound } from '../errors';
 import { captureException } from '../services/sentry';
+import { appendOrphanInterviewTurn } from '../services/interview/append-orphan-interview-turn';
+import { inngest } from '../inngest/client';
 
 type InterviewRouteEnv = {
   Bindings: {
@@ -38,6 +48,7 @@ type InterviewRouteEnv = {
     // the binding as a raw string, but env-validation middleware guarantees
     // it's one of these two values at runtime.
     EMPTY_REPLY_GUARD_ENABLED?: 'true' | 'false';
+    IDEMPOTENCY_KV?: KVNamespace;
   };
   Variables: {
     user: AuthUser;
@@ -51,6 +62,14 @@ type InterviewStreamRouteResult = InterviewResult & {
 };
 
 export const interviewRoutes = new Hono<InterviewRouteEnv>()
+  .use(
+    '/subjects/:subjectId/interview/stream',
+    idempotencyPreflight({ flow: 'interview' })
+  )
+  .use(
+    '/subjects/:subjectId/interview/complete',
+    idempotencyPreflight({ flow: 'interview' })
+  )
   // Start or continue an interview for a subject
   .post(
     '/subjects/:subjectId/interview',
@@ -62,6 +81,7 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
       const subjectId = c.req.param('subjectId');
       const { message } = c.req.valid('json');
       const bookId = c.req.query('bookId');
+      const clientId = c.req.header('Idempotency-Key')?.trim() || undefined;
 
       const subject = await getSubject(db, profileId, subjectId);
       if (!subject) return notFound(c, 'Subject not found');
@@ -90,45 +110,51 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
         learnerName,
       });
 
-      const updatedHistory = [
-        ...draft.exchangeHistory,
-        { role: 'user' as const, content: message },
-        { role: 'assistant' as const, content: result.response },
-      ];
+      const updatedHistory = appendInterviewAssistantExchange(
+        appendInterviewUserExchange(draft.exchangeHistory, message, clientId),
+        result.response,
+        clientId
+      );
 
       if (result.isComplete) {
-        // Save history first without marking complete — if persistCurriculum
-        // fails, the draft stays in-progress and the user can retry.
         await updateDraft(db, profileId, draft.id, {
           exchangeHistory: updatedHistory,
           extractedSignals: result.extractedSignals ?? draft.extractedSignals,
         });
-        await persistCurriculum(
-          db,
-          profileId,
-          subjectId,
-          subject.name,
-          {
-            ...draft,
-            exchangeHistory: updatedHistory,
-            extractedSignals: result.extractedSignals ?? draft.extractedSignals,
-          },
-          bookId,
-          bookTitle
-        );
-        // Only mark complete after curriculum is persisted.
-        await updateDraft(db, profileId, draft.id, {
-          status: 'completed',
-        });
+
+        const claimed = await claimDraftForPersisting(db, profileId, draft.id);
+
+        if (claimed.length > 0) {
+          await inngest.send({
+            id: `persist-${draft.id}`,
+            name: 'app/interview.ready_to_persist',
+            data: interviewReadyToPersistEventSchema.parse({
+              version: 1,
+              draftId: draft.id,
+              profileId,
+              subjectId,
+              subjectName: subject.name,
+              bookId,
+            }),
+          });
+        }
       } else {
         await updateDraft(db, profileId, draft.id, {
           exchangeHistory: updatedHistory,
         });
       }
 
+      await markPersisted({
+        kv: c.env.IDEMPOTENCY_KV,
+        profileId,
+        flow: 'interview',
+        key: clientId,
+      });
+
       return c.json({
         response: result.response,
         isComplete: result.isComplete,
+        status: result.isComplete ? 'completing' : undefined,
         exchangeCount: updatedHistory.filter((e) => e.role === 'user').length,
       });
     }
@@ -144,6 +170,7 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
       const subjectId = c.req.param('subjectId');
       const { message } = c.req.valid('json');
       const bookId = c.req.query('bookId');
+      const clientId = c.req.header('Idempotency-Key')?.trim() || undefined;
 
       const subject = await getSubject(db, profileId, subjectId);
       if (!subject) return notFound(c, 'Subject not found');
@@ -239,53 +266,113 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
             // a metered flow; mirror the quotaRefunded guard in sessions.ts.
           }
 
-          const updatedHistory = [
-            ...draft.exchangeHistory,
-            { role: 'user' as const, content: message },
-            { role: 'assistant' as const, content: result.response },
-          ];
+          const updatedHistory = appendInterviewAssistantExchange(
+            appendInterviewUserExchange(
+              draft.exchangeHistory,
+              message,
+              clientId
+            ),
+            result.response,
+            clientId
+          );
 
           if (result.isComplete) {
-            // Save history first without marking complete — if persistCurriculum
-            // fails, the draft stays in-progress and the user can retry.
-            await updateDraft(db, profileId, draft.id, {
-              exchangeHistory: updatedHistory,
-              extractedSignals:
-                result.extractedSignals ?? draft.extractedSignals,
-            });
-            await persistCurriculum(
-              db,
-              profileId,
-              subjectId,
-              subject.name,
-              {
-                ...draft,
+            try {
+              await updateDraft(db, profileId, draft.id, {
                 exchangeHistory: updatedHistory,
                 extractedSignals:
                   result.extractedSignals ?? draft.extractedSignals,
-              },
-              bookId,
-              bookTitle
-            );
-            // Only mark complete after curriculum is persisted
-            await updateDraft(db, profileId, draft.id, {
-              status: 'completed',
-            });
+              });
+
+              const claimed = await claimDraftForPersisting(
+                db,
+                profileId,
+                draft.id
+              );
+
+              if (claimed.length > 0) {
+                await inngest.send({
+                  id: `persist-${draft.id}`,
+                  name: 'app/interview.ready_to_persist',
+                  data: interviewReadyToPersistEventSchema.parse({
+                    version: 1,
+                    draftId: draft.id,
+                    profileId,
+                    subjectId,
+                    subjectName: subject.name,
+                    bookId,
+                  }),
+                });
+              }
+            } catch (cause) {
+              throw new PersistCurriculumError(
+                'interview/stream: dispatch failed',
+                cause
+              );
+            }
           } else {
             await updateDraft(db, profileId, draft.id, {
               exchangeHistory: updatedHistory,
             });
           }
 
+          await markPersisted({
+            kv: c.env.IDEMPOTENCY_KV,
+            profileId,
+            flow: 'interview',
+            key: clientId,
+          });
+
           await sseStream.writeSSE({
             data: JSON.stringify({
               type: 'done',
               isComplete: result.isComplete,
+              status: result.isComplete ? 'completing' : undefined,
               exchangeCount: updatedHistory.filter((e) => e.role === 'user')
                 .length,
             }),
           });
         } catch (err) {
+          const orphanReason = classifyOrphanError(err);
+
+          if (clientId) {
+            try {
+              await appendOrphanInterviewTurn(
+                db,
+                profileId,
+                draft.id,
+                message,
+                {
+                  clientId,
+                  orphanReason,
+                }
+              );
+            } catch (persistErr) {
+              await inngest.send({
+                name: 'app/orphan.persist.failed',
+                data: {
+                  profileId,
+                  draftId: draft.id,
+                  route: 'interview/stream',
+                  reason: orphanReason,
+                  error: String(persistErr),
+                },
+              });
+              captureException(persistErr, {
+                profileId,
+                extra: { phase: 'orphan_persist_failed' },
+              });
+            }
+          } else {
+            captureException(
+              new Error('interview/stream: clientId missing on orphan path'),
+              {
+                profileId,
+                extra: { draftId: draft.id, phase: 'orphan_clientid_missing' },
+              }
+            );
+          }
+
           captureException(err, {
             profileId,
             extra: {
@@ -332,39 +419,28 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
       });
     }
 
-    const bookTitle = bookId
-      ? await getBookTitle(db, profileId, bookId, subjectId)
-      : undefined;
+    const claimed = await claimDraftForPersisting(db, profileId, draft.id);
 
-    // Extract whatever signals we have from the conversation so far
-    const signals = await extractSignals(draft.exchangeHistory);
+    if (claimed.length > 0) {
+      await inngest.send({
+        id: `persist-${draft.id}`,
+        name: 'app/interview.ready_to_persist',
+        data: interviewReadyToPersistEventSchema.parse({
+          version: 1,
+          draftId: draft.id,
+          profileId,
+          subjectId,
+          subjectName: subject.name,
+          bookId,
+        }),
+      });
+    }
 
-    await updateDraft(db, profileId, draft.id, {
-      extractedSignals: signals,
-    });
-
-    await persistCurriculum(
-      db,
-      profileId,
-      subjectId,
-      subject.name,
-      { ...draft, extractedSignals: signals },
-      bookId,
-      bookTitle
-    );
-
-    await updateDraft(db, profileId, draft.id, {
-      status: 'completed',
-    });
-
-    // Return extracted signals alongside completion so the mobile force-complete
-    // mutation can route into interests-context without waiting for a state
-    // refetch round-trip. The shape matches extractedInterviewSignalsSchema.
     return c.json({
       isComplete: true,
+      status: 'completing',
       exchangeCount: draft.exchangeHistory.filter((e) => e.role === 'user')
         .length,
-      extractedSignals: signals,
     });
   })
   // Get current interview state
@@ -392,6 +468,7 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
       state: {
         draftId: draft.id,
         status: draft.status,
+        failureCode: draft.failureCode ?? null,
         exchangeCount: draft.exchangeHistory.filter((e) => e.role === 'user')
           .length,
         subjectName: subject?.name ?? 'Unknown',
@@ -407,4 +484,43 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
           : {}),
       },
     });
+  })
+  .post('/subjects/:subjectId/interview/retry-persist', async (c) => {
+    assertNotProxyMode(c);
+    const db = c.get('db');
+    const profileId = requireProfileId(c.get('profileId'));
+    const subjectId = c.req.param('subjectId');
+    const bookId = c.req.query('bookId');
+
+    const subject = await getSubject(db, profileId, subjectId);
+    if (!subject) return notFound(c, 'Subject not found');
+
+    const draft = await getDraftState(db, profileId, subjectId);
+    if (!draft) return notFound(c, 'Draft not found');
+
+    const claimed = await claimDraftForPersisting(
+      db,
+      profileId,
+      draft.id,
+      'failed'
+    );
+
+    if (claimed.length === 0) {
+      return c.json({ error: 'not-failed', status: draft.status }, 409);
+    }
+
+    await inngest.send({
+      id: `persist-${draft.id}-retry-${Date.now()}`,
+      name: 'app/interview.ready_to_persist',
+      data: interviewReadyToPersistEventSchema.parse({
+        version: 1,
+        draftId: draft.id,
+        profileId,
+        subjectId,
+        subjectName: subject.name,
+        bookId,
+      }),
+    });
+
+    return c.json({ status: 'completing' });
   });

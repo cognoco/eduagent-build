@@ -22,6 +22,8 @@ import type {
   StruggleEntry,
   VerificationType,
 } from '@eduagent/schemas';
+import { LlmStreamError, classifyOrphanError } from '@eduagent/schemas';
+import { persistUserMessageOnly } from './persist-user-message-only';
 import {
   processExchange,
   streamExchange,
@@ -170,11 +172,14 @@ export function mergeMemoryContexts(
 export interface ExchangeHistoryEvent {
   eventType: string | null;
   content: string;
+  orphanReason?: string | null;
 }
 
-export function buildExchangeHistory(
-  events: ExchangeHistoryEvent[]
-): Array<{ role: 'user' | 'system' | 'assistant'; content: string }> {
+export function buildExchangeHistory(events: ExchangeHistoryEvent[]): Array<{
+  role: 'user' | 'system' | 'assistant';
+  content: string;
+  orphan_reason?: string;
+}> {
   return events
     .filter(
       (e) =>
@@ -189,6 +194,7 @@ export function buildExchangeHistory(
           : e.eventType === 'system_prompt'
           ? ('system' as const)
           : ('assistant' as const),
+      ...(e.orphanReason ? { orphan_reason: e.orphanReason } : {}),
       content:
         e.eventType === 'ai_response'
           ? (() => {
@@ -853,8 +859,13 @@ export async function persistExchangeResult(
   userMessage: string,
   aiResponse: string,
   effectiveRung: EscalationRung,
-  behavioral?: Partial<ExchangeBehavioralMetrics>
-): Promise<{ exchangeCount: number; aiEventId?: string }> {
+  behavioral?: Partial<ExchangeBehavioralMetrics>,
+  clientId?: string
+): Promise<{
+  exchangeCount: number;
+  aiEventId?: string;
+  persistedUserMessage: boolean;
+}> {
   const previousRung = session.escalationRung;
 
   // Build ai_response metadata — always includes escalationRung,
@@ -882,6 +893,33 @@ export async function persistExchangeResult(
       }),
     }),
   };
+
+  let insertedUserEventId: string | undefined;
+  if (clientId) {
+    const insertedUserRows = await db
+      .insert(sessionEvents)
+      .values({
+        sessionId,
+        profileId,
+        subjectId: session.subjectId,
+        eventType: 'user_message' as const,
+        content: userMessage,
+        clientId,
+      })
+      .onConflictDoNothing({
+        target: [sessionEvents.sessionId, sessionEvents.clientId],
+      })
+      .returning({ id: sessionEvents.id });
+
+    insertedUserEventId = insertedUserRows[0]?.id;
+    if (!insertedUserEventId) {
+      const freshSession = await getSession(db, profileId, sessionId);
+      return {
+        exchangeCount: freshSession?.exchangeCount ?? session.exchangeCount,
+        persistedUserMessage: false,
+      };
+    }
+  }
 
   // [S-1 / BUG-626] Run the atomic exchange-count UPDATE FIRST and only
   // insert events if it succeeded. Pre-fix: events were inserted BEFORE the
@@ -920,33 +958,70 @@ export async function persistExchangeResult(
     .returning({ exchangeCount: learningSessions.exchangeCount });
 
   if (!updated) {
+    if (insertedUserEventId) {
+      try {
+        await db
+          .delete(sessionEvents)
+          .where(
+            and(
+              eq(sessionEvents.id, insertedUserEventId),
+              eq(sessionEvents.profileId, profileId)
+            )
+          );
+      } catch (rollbackErr) {
+        captureException(rollbackErr, {
+          profileId,
+          extra: {
+            context: 'session.exchange.user_insert_rollback_failed',
+            sessionId,
+            clientId,
+            userEventId: insertedUserEventId,
+          },
+        });
+      }
+    }
     throw new SessionExchangeLimitError(session.exchangeCount);
   }
 
   // Atomic guard passed — now persist the events.
-  const insertedEvents = await db
-    .insert(sessionEvents)
-    .values([
-      {
-        sessionId,
-        profileId,
-        subjectId: session.subjectId,
-        eventType: 'user_message' as const,
-        content: userMessage,
-      },
-      {
-        sessionId,
-        profileId,
-        subjectId: session.subjectId,
-        eventType: 'ai_response' as const,
-        content: aiResponse,
-        metadata: aiMetadata,
-      },
-    ])
-    .returning({
-      id: sessionEvents.id,
-      eventType: sessionEvents.eventType,
-    });
+  const insertedEvents = clientId
+    ? await db
+        .insert(sessionEvents)
+        .values({
+          sessionId,
+          profileId,
+          subjectId: session.subjectId,
+          eventType: 'ai_response' as const,
+          content: aiResponse,
+          metadata: aiMetadata,
+        })
+        .returning({
+          id: sessionEvents.id,
+          eventType: sessionEvents.eventType,
+        })
+    : await db
+        .insert(sessionEvents)
+        .values([
+          {
+            sessionId,
+            profileId,
+            subjectId: session.subjectId,
+            eventType: 'user_message' as const,
+            content: userMessage,
+          },
+          {
+            sessionId,
+            profileId,
+            subjectId: session.subjectId,
+            eventType: 'ai_response' as const,
+            content: aiResponse,
+            metadata: aiMetadata,
+          },
+        ])
+        .returning({
+          id: sessionEvents.id,
+          eventType: sessionEvents.eventType,
+        });
 
   if (previousRung !== effectiveRung) {
     await db.insert(sessionEvents).values({
@@ -963,6 +1038,7 @@ export async function persistExchangeResult(
     exchangeCount: updated.exchangeCount,
     aiEventId: insertedEvents.find((event) => event.eventType === 'ai_response')
       ?.id,
+    persistedUserMessage: true,
   };
 }
 
@@ -978,6 +1054,7 @@ export async function processMessage(
   options?: {
     voyageApiKey?: string;
     llmTier?: import('../subscription').LLMTier;
+    clientId?: string;
   }
 ): Promise<{
   response: string;
@@ -1001,7 +1078,36 @@ export async function processMessage(
     input.imageBase64 && input.imageMimeType
       ? { base64: input.imageBase64, mimeType: input.imageMimeType }
       : undefined;
-  const result = await processExchange(context, input.message, imageData);
+  let result: Awaited<ReturnType<typeof processExchange>>;
+  try {
+    result = await processExchange(context, input.message, imageData);
+  } catch (cause) {
+    const err = new LlmStreamError('processExchange threw', cause);
+    if (options?.clientId) {
+      try {
+        await persistUserMessageOnly(db, profileId, sessionId, input.message, {
+          clientId: options.clientId,
+          orphanReason: classifyOrphanError(err),
+        });
+      } catch (persistErr) {
+        await inngest.send({
+          name: 'app/orphan.persist.failed',
+          data: {
+            profileId,
+            sessionId,
+            route: 'session-exchange/process',
+            reason: classifyOrphanError(err),
+            error: String(persistErr),
+          },
+        });
+        captureException(persistErr, {
+          profileId,
+          extra: { phase: 'orphan_persist_failed' },
+        });
+      }
+    }
+    throw err;
+  }
 
   // Compute time-to-answer: ms between last AI response and now
   const timeToAnswerMs = lastAiResponseAt
@@ -1025,7 +1131,8 @@ export async function processMessage(
       partialProgress: result.partialProgress,
       needsDeepening: result.needsDeepening,
       confidence: result.confidence,
-    }
+    },
+    options?.clientId
   );
 
   return {
@@ -1050,6 +1157,7 @@ export async function streamMessage(
   options?: {
     voyageApiKey?: string;
     llmTier?: import('../subscription').LLMTier;
+    clientId?: string;
   }
 ): Promise<{
   stream: AsyncIterable<string>;
@@ -1087,7 +1195,12 @@ export async function streamMessage(
     input.imageBase64 && input.imageMimeType
       ? { base64: input.imageBase64, mimeType: input.imageMimeType }
       : undefined;
-  const result = await streamExchange(context, input.message, imageData);
+  let result: Awaited<ReturnType<typeof streamExchange>>;
+  try {
+    result = await streamExchange(context, input.message, imageData);
+  } catch (cause) {
+    throw new LlmStreamError('streamExchange threw', cause);
+  }
 
   return {
     stream: result.stream,
@@ -1096,7 +1209,42 @@ export async function streamMessage(
       // teeEnvelopeStream. The full raw envelope (with signals + ui_hints)
       // is available through `rawResponsePromise` once the caller finishes
       // draining the stream — that's the one classifyExchangeOutcome wants.
-      const rawResponse = await result.rawResponsePromise;
+      let rawResponse: string;
+      try {
+        rawResponse = await result.rawResponsePromise;
+      } catch (cause) {
+        const err = new LlmStreamError('rawResponsePromise rejected', cause);
+        if (options?.clientId) {
+          try {
+            await persistUserMessageOnly(
+              db,
+              profileId,
+              sessionId,
+              input.message,
+              {
+                clientId: options.clientId,
+                orphanReason: classifyOrphanError(err),
+              }
+            );
+          } catch (persistErr) {
+            await inngest.send({
+              name: 'app/orphan.persist.failed',
+              data: {
+                profileId,
+                sessionId,
+                route: 'session-exchange/stream',
+                reason: classifyOrphanError(err),
+                error: String(persistErr),
+              },
+            });
+            captureException(persistErr, {
+              profileId,
+              extra: { phase: 'orphan_persist_failed' },
+            });
+          }
+        }
+        throw err;
+      }
 
       // [BUG-941] Use classifyExchangeOutcome (same as interview path) so that
       // empty / unparseable / orphan-marker responses return a typed fallback
@@ -1114,6 +1262,35 @@ export async function streamMessage(
       // MUST emit a `fallback` SSE frame and refund the quota increment so the
       // exchange is not counted. Raw envelope NEVER touches ai_response.content.
       if (outcome.fallback) {
+        if (options?.clientId) {
+          try {
+            await persistUserMessageOnly(
+              db,
+              profileId,
+              sessionId,
+              input.message,
+              {
+                clientId: options.clientId,
+                orphanReason: 'llm_empty_or_unparseable',
+              }
+            );
+          } catch (persistErr) {
+            await inngest.send({
+              name: 'app/orphan.persist.failed',
+              data: {
+                profileId,
+                sessionId,
+                route: 'session-exchange/fallback',
+                reason: 'llm_empty_or_unparseable',
+                error: String(persistErr),
+              },
+            });
+            captureException(persistErr, {
+              profileId,
+              extra: { phase: 'orphan_persist_failed' },
+            });
+          }
+        }
         return {
           exchangeCount: 0,
           escalationRung: effectiveRung,
@@ -1144,7 +1321,8 @@ export async function streamMessage(
           partialProgress: parsed.partialProgress,
           needsDeepening: parsed.needsDeepening,
           confidence: parsed.confidence,
-        }
+        },
+        options?.clientId
       );
       return {
         exchangeCount: persisted.exchangeCount,

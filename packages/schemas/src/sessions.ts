@@ -1,10 +1,10 @@
 import { z } from 'zod';
-import { chatExchangeSchema } from './common.ts';
 import { verificationTypeSchema } from './assessments.ts';
 import {
   celebrationReasonSchema,
   pendingCelebrationSchema,
 } from './progress.ts';
+import { persistFailureCodeSchema } from './errors.ts';
 
 // Interview schemas
 
@@ -15,10 +15,28 @@ export type InterviewMessageInput = z.infer<typeof interviewMessageSchema>;
 
 export const draftStatusSchema = z.enum([
   'in_progress',
+  'completing',
   'completed',
+  'failed',
   'expired',
 ]);
 export type DraftStatus = z.infer<typeof draftStatusSchema>;
+
+export const orphanReasonSchema = z.enum([
+  'llm_stream_error',
+  'llm_empty_or_unparseable',
+  'persist_curriculum_failed',
+  'unknown_post_stream',
+]);
+export type OrphanReason = z.infer<typeof orphanReasonSchema>;
+
+export const exchangeEntrySchema = z.object({
+  role: z.enum(['user', 'assistant']),
+  content: z.string(),
+  client_id: z.string().min(1).max(128).optional(),
+  orphan_reason: orphanReasonSchema.optional(),
+});
+export type ExchangeEntry = z.infer<typeof exchangeEntrySchema>;
 
 // Extracted signals — structured data parsed from a completed interview.
 // `interests` is surfaced to the interests-context picker on mobile, which
@@ -41,10 +59,9 @@ export const interviewStateSchema = z.object({
   exchangeCount: z.number().int(),
   subjectName: z.string(),
   resumeSummary: z.string().nullable().optional(),
-  exchangeHistory: z.array(chatExchangeSchema).optional(),
+  exchangeHistory: z.array(exchangeEntrySchema).optional(),
   expiresAt: z.string().datetime().nullable().optional(),
-  // Populated only when status === 'completed'. Mobile reads `interests` to
-  // route into the interests-context picker before the downstream fork.
+  failureCode: persistFailureCodeSchema.nullable().optional(),
   extractedSignals: extractedInterviewSignalsSchema.optional(),
 });
 export type InterviewState = z.infer<typeof interviewStateSchema>;
@@ -53,7 +70,7 @@ export type InterviewState = z.infer<typeof interviewStateSchema>;
 
 export const interviewContextSchema = z.object({
   subjectName: z.string(),
-  exchangeHistory: z.array(chatExchangeSchema),
+  exchangeHistory: z.array(exchangeEntrySchema),
   bookTitle: z.string().optional(),
 });
 export type InterviewContext = z.infer<typeof interviewContextSchema>;
@@ -73,9 +90,10 @@ export const onboardingDraftSchema = z.object({
   id: z.string().uuid(),
   profileId: z.string().uuid(),
   subjectId: z.string().uuid(),
-  exchangeHistory: z.array(chatExchangeSchema),
+  exchangeHistory: z.array(exchangeEntrySchema),
   extractedSignals: z.record(z.string(), z.unknown()),
   status: draftStatusSchema,
+  failureCode: persistFailureCodeSchema.nullable().default(null),
   expiresAt: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),

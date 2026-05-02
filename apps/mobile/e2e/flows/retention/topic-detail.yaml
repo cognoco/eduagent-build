@@ -64,9 +64,10 @@ tags:
     timeout: 10000
     optional: true
 
-# 6. Verify topic rows are present (not empty state)
-- assertNotVisible:
-    id: "library-empty"
+# 6. Verify shelves are loaded (not empty state).
+#    library-empty is removed from Library; check shelves-list is visible.
+- assertVisible:
+    id: "shelves-list"
     optional: true
 
 # 7. Tap the first visible topic row. Topic rows in book.tsx show:

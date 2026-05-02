@@ -36,6 +36,35 @@ import { stripPhoneticHints } from './llm/sanitize';
 
 const logger = createLogger();
 
+const SERVER_NOTE_RE = /<\/?server_note[^>]*>/gi;
+
+function sanitizeUserContent(content: string): string {
+  return content.replace(SERVER_NOTE_RE, '');
+}
+
+function buildOrphanSystemAddendum(
+  history: ExchangeContext['exchangeHistory']
+): string {
+  const recentOrphans: ExchangeContext['exchangeHistory'] = [];
+  for (let i = history.length - 1; i >= 0; i--) {
+    const turn = history[i]!;
+    if (turn.role === 'assistant') break;
+    if (turn.role === 'user' && turn.orphan_reason) {
+      recentOrphans.unshift(turn);
+    }
+  }
+  if (recentOrphans.length === 0) return '';
+  return (
+    '\n\n' +
+    recentOrphans
+      .map(
+        (t) =>
+          `<server_note kind="orphan_user_turn" reason="${t.orphan_reason}"/>`
+      )
+      .join('\n')
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Multimodal image support — IMG-VISION
 // ---------------------------------------------------------------------------
@@ -77,6 +106,7 @@ export interface ExchangeContext {
   exchangeHistory: Array<{
     role: 'system' | 'user' | 'assistant';
     content: string;
+    orphan_reason?: string;
   }>;
   birthYear?: number | null;
   priorLearningContext?: string;
@@ -273,17 +303,19 @@ export async function processExchange(
   userMessage: string,
   imageData?: ImageData
 ): Promise<ExchangeResult> {
-  const systemPrompt = _buildSystemPrompt(context);
+  const systemPrompt =
+    _buildSystemPrompt(context) +
+    buildOrphanSystemAddendum(context.exchangeHistory);
 
   const messages: ChatMessage[] = [
     { role: 'system', content: systemPrompt },
     ...context.exchangeHistory.map((e) => ({
       role: e.role,
-      content: e.content,
+      content: e.role === 'user' ? sanitizeUserContent(e.content) : e.content,
     })),
     {
       role: 'user' as const,
-      content: buildUserContent(userMessage, imageData),
+      content: buildUserContent(sanitizeUserContent(userMessage), imageData),
     },
   ];
 
@@ -337,17 +369,19 @@ export async function streamExchange(
   userMessage: string,
   imageData?: ImageData
 ): Promise<ExchangeStreamResult> {
-  const systemPrompt = _buildSystemPrompt(context);
+  const systemPrompt =
+    _buildSystemPrompt(context) +
+    buildOrphanSystemAddendum(context.exchangeHistory);
 
   const messages: ChatMessage[] = [
     { role: 'system', content: systemPrompt },
     ...context.exchangeHistory.map((e) => ({
       role: e.role,
-      content: e.content,
+      content: e.role === 'user' ? sanitizeUserContent(e.content) : e.content,
     })),
     {
       role: 'user' as const,
-      content: buildUserContent(userMessage, imageData),
+      content: buildUserContent(sanitizeUserContent(userMessage), imageData),
     },
   ];
 

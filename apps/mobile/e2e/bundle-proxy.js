@@ -14,8 +14,8 @@
  */
 const http = require('http');
 
-const METRO_PORT = 8081;
-const PROXY_PORT = 8082;
+const METRO_PORT = parseInt(process.env.METRO_PORT, 10) || 8081;
+const PROXY_PORT = parseInt(process.env.PROXY_PORT, 10) || 8082;
 
 const server = http.createServer((req, res) => {
   // Strip Accept: multipart/mixed header — force Metro to send plain response

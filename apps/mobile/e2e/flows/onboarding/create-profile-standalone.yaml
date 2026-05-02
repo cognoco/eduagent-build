@@ -97,29 +97,12 @@ tags:
 
 - takeScreenshot: create-profile-date-selected
 
-# 14. Wait for persona auto-detection hint (optional — appears after date)
-- extendedWaitUntil:
-    visible:
-      id: "persona-auto-hint"
-    timeout: 5000
-    optional: true
+# 14. Persona is auto-detected from birth date (persona-auto-hint removed in persona refactor)
+# Region selector also removed — consent is determined solely from birth date now.
 
 - takeScreenshot: create-profile-persona-hint
 
-# 15. Scroll to Region section
-- scrollUntilVisible:
-    element:
-      text: "Region"
-    direction: DOWN
-    timeout: 10000
-
-# 16. Tap "Other" region (avoids EU/US consent trigger)
-- tapOn:
-    id: "location-other"
-
-- takeScreenshot: create-profile-region-selected
-
-# 17. Scroll to submit button
+# 15. Scroll to submit button
 - scrollUntilVisible:
     element:
       id: "create-profile-submit"

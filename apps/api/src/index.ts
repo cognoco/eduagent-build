@@ -71,6 +71,7 @@ import { learnerProfileRoutes } from './routes/learner-profile';
 import { dictationRoutes } from './routes/dictation';
 import { quizRoutes } from './routes/quiz';
 import { feedbackRoutes } from './routes/feedback';
+import { supportRoutes } from './routes/support';
 
 type Bindings = {
   ENVIRONMENT: string;
@@ -91,6 +92,7 @@ type Bindings = {
   STRIPE_PRICE_PRO_YEARLY?: string;
   STRIPE_CUSTOMER_PORTAL_URL?: string;
   SUBSCRIPTION_KV?: KVNamespace;
+  IDEMPOTENCY_KV?: KVNamespace;
   VOYAGE_API_KEY?: string;
   RESEND_API_KEY?: string;
   RESEND_WEBHOOK_SECRET?: string;
@@ -147,12 +149,14 @@ api.use(
       'Authorization',
       'X-Profile-Id',
       'X-Proxy-Mode',
+      'Idempotency-Key',
     ],
     allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     exposeHeaders: [
       'Content-Type',
       'X-Quota-Remaining',
       'X-Quota-Warning-Level',
+      'Idempotency-Replay',
     ],
     credentials: true,
     maxAge: 3600,
@@ -229,7 +233,8 @@ const routes = api
   .route('/', learnerProfileRoutes)
   .route('/', dictationRoutes)
   .route('/', quizRoutes)
-  .route('/', feedbackRoutes);
+  .route('/', feedbackRoutes)
+  .route('/support', supportRoutes);
 
 // ---------------------------------------------------------------------------
 // App — mounts routes under /v1 for the actual Cloudflare Worker runtime.

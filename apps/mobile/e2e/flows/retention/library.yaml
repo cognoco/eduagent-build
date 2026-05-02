@@ -9,17 +9,19 @@
 # Prerequisite: Seeded user with completed sessions + due retention cards
 #               (scenario: retention-due)
 #
-# testID mapping (home.tsx):
-#   - retention-strip             -> horizontal retention strip on home
-#   - retention-chip-{subjectId}  -> per-subject retention chip
+# testID mapping (home.tsx / LearnerScreen.tsx):
+#   - learner-screen              -> home screen container
+#   - learner-intent-stack        -> intent card stack (replaces coaching cards)
 #
-# testID mapping (library/index.tsx):
-#   - subject-filter-tabs         -> subject filter tab strip
-#   - filter-all                  -> "All" filter tab
-#   - filter-{subjectId}          -> per-subject filter tab
+# testID mapping (library.tsx + components):
+#   - library-tab-shelves         -> Shelves tab button (default)
+#   - library-tab-books           -> Books tab button
 #   - library-loading             -> loading spinner
-#   - library-empty               -> empty state
-#   - topic-row-{topicId}         -> individual topic row with retention signal
+#   - shelves-list                -> subject shelf list (Shelves tab)
+#   - topic-row-{topicId}         -> individual topic row (from TopicsTab component)
+#
+# NOTE: subject-filter-tabs, filter-all, library-empty removed in Library restructure.
+# Library is now a 2-tab layout (Shelves / Books). There is no top-level Topics tab.
 appId: com.mentomate.app
 tags:
   - nightly
@@ -38,12 +40,13 @@ tags:
       id: "learner-screen"
     timeout: 15000
 
-# 3. Verify retention strip is visible on home screen
+# 3. Verify intent card stack is visible on home screen (replaces coaching cards and retention strip)
 - assertVisible:
-    id: "retention-strip"
+    id: "learner-intent-stack"
+    optional: true
 
-# 4. Screenshot of home screen with retention strip
-- takeScreenshot: home-retention-strip
+# 4. Screenshot of home screen
+- takeScreenshot: home-intent-stack
 
 # 5. Navigate to Library via tab (BUG-10: use accessibility label, not truncated text)
 - tapOn: "Library Tab"
@@ -54,60 +57,49 @@ tags:
       text: "Library"
     timeout: 10000
 
-# 7. Wait for topic data to finish loading
+# 7. Wait for subjects/loading to finish
 - extendedWaitUntil:
     notVisible:
       id: "library-loading"
     timeout: 10000
     optional: true
 
-# 8. Verify subject filter tabs are visible (only shows with >1 subject)
+# 8. Verify Shelves tab is visible (default active tab in the 2-tab Library)
 - assertVisible:
-    id: "subject-filter-tabs"
+    id: "library-tab-shelves"
     optional: true
 
-# 9. Verify "All" filter tab is present
+# 9. Verify Books tab is also present
 - assertVisible:
-    id: "filter-all"
+    id: "library-tab-books"
     optional: true
 
-# 10. Verify topic summary text (e.g., "X topics across Y subjects")
-- assertVisible:
-    text: "topics across"
-    optional: true
-
-# 11. Verify topic rows are present (not empty)
-- assertNotVisible:
-    id: "library-empty"
-    optional: true
-
-# 12. Screenshot of Library with topic rows
-- takeScreenshot: library-topics
-
-# 13. Tap a subject filter tab to test filtering (optional — requires >1 subject)
-- tapOn:
-    id: "subject-filter-tabs"
-    optional: true
-
-# 14. Screenshot after filtering
-- takeScreenshot: library-filtered
-
-# 15. Return to home screen (use accessibility label to avoid matching heading)
-- tapOn:
-    text: "Home Tab"
-    optional: true
-
-# 16. Navigate to Library via retention strip chip
-- tapOn:
-    id: "retention-strip"
-    optional: true
-
-# 17. Verify Library loads again (from retention chip navigation)
+# 10. Wait for shelves list to render (subject cards)
 - extendedWaitUntil:
     visible:
-      text: "Library"
+      id: "shelves-list"
     timeout: 10000
     optional: true
 
-# 18. Final screenshot
-- takeScreenshot: library-from-retention-strip
+# 11. Screenshot of Library with shelves
+- takeScreenshot: library-shelves
+
+# 12. Tap Books tab to verify it renders
+- tapOn:
+    id: "library-tab-books"
+    optional: true
+
+# 13. Screenshot after switching tabs
+- takeScreenshot: library-books-tab
+
+# 14. Return to home screen (use accessibility label to avoid matching heading)
+- tapOn: "Home Tab"
+
+# 15. Verify home screen is visible again
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 10000
+
+# 16. Final screenshot
+- takeScreenshot: library-from-home-return

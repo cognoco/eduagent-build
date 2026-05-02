@@ -23,7 +23,12 @@ import type {
   RecallBridgeResult,
   VerificationType,
 } from '@eduagent/schemas';
-import { useApiClient, getProxyMode } from '../lib/api-client';
+import {
+  useApiClient,
+  getProxyMode,
+  withIdempotencyKey,
+  type IdempotencyReplayBody,
+} from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
@@ -256,6 +261,8 @@ export function useStreamMessage(sessionId: string): {
       homeworkMode?: 'help_me' | 'check_answer';
       imageBase64?: string;
       imageMimeType?: 'image/jpeg' | 'image/png' | 'image/webp';
+      idempotencyKey?: string;
+      onReplay?: (result: IdempotencyReplayBody) => void;
     }
   ) => Promise<void>;
   isStreaming: boolean;
@@ -297,6 +304,8 @@ export function useStreamMessage(sessionId: string): {
         homeworkMode?: 'help_me' | 'check_answer';
         imageBase64?: string;
         imageMimeType?: string;
+        idempotencyKey?: string;
+        onReplay?: (result: IdempotencyReplayBody) => void;
       }
     ): Promise<void> => {
       const effectiveSessionId = overrideSessionId ?? sessionIdRef.current;
@@ -323,6 +332,10 @@ export function useStreamMessage(sessionId: string): {
         // [I-1] SSE path builds headers manually so X-Proxy-Mode must be
         // injected here — customFetch is bypassed for the stream request.
         if (proxyMode) headers['X-Proxy-Mode'] = 'true';
+        const finalHeaders = withIdempotencyKey(
+          headers,
+          options?.idempotencyKey
+        );
 
         const url = `${getApiUrl()}/v1/sessions/${effectiveSessionId}/stream`;
         const body: SessionMessageInput = {
@@ -342,7 +355,7 @@ export function useStreamMessage(sessionId: string): {
         };
         const { events, abort } = streamSSEViaXHR(url, {
           method: 'POST',
-          headers,
+          headers: finalHeaders,
           body: JSON.stringify(body),
         });
         abortRef.current = abort;
@@ -355,6 +368,9 @@ export function useStreamMessage(sessionId: string): {
           if (event.type === 'chunk') {
             accumulated += event.content;
             onChunk(accumulated);
+          } else if (event.type === 'replay') {
+            options?.onReplay?.(event);
+            return;
           } else if (event.type === 'fallback') {
             fallback = {
               reason: event.reason,

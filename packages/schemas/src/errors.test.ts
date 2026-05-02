@@ -17,6 +17,10 @@ import {
   RateLimitedError,
   UpstreamLlmError,
   VocabularyContextError,
+  LlmStreamError,
+  LlmEnvelopeError,
+  PersistCurriculumError,
+  classifyOrphanError,
 } from './errors.js';
 
 describe('typed error classes [BUG-644]', () => {
@@ -69,6 +73,48 @@ describe('typed error classes [BUG-644]', () => {
     expect(err).toBeInstanceOf(VocabularyContextError);
     expect(err.name).toBe('VocabularyContextError');
     expect((err as Error & { cause?: unknown }).cause).toBe(cause);
+  });
+
+  describe('orphan error classification [INTERACTION-DUR-L2]', () => {
+    it('LlmStreamError preserves cause and is instanceof Error', () => {
+      const cause = new Error('connection reset');
+      const err = new LlmStreamError('streamExchange threw', cause);
+      expect(err).toBeInstanceOf(Error);
+      expect(err).toBeInstanceOf(LlmStreamError);
+      expect(err.name).toBe('LlmStreamError');
+      expect(err.cause).toBe(cause);
+    });
+
+    it('LlmEnvelopeError preserves cause and is instanceof Error', () => {
+      const err = new LlmEnvelopeError('unparseable envelope');
+      expect(err).toBeInstanceOf(Error);
+      expect(err).toBeInstanceOf(LlmEnvelopeError);
+      expect(err.name).toBe('LlmEnvelopeError');
+    });
+
+    it('PersistCurriculumError preserves cause and is instanceof Error', () => {
+      const cause = new Error('DB timeout');
+      const err = new PersistCurriculumError('persist failed', cause);
+      expect(err).toBeInstanceOf(Error);
+      expect(err).toBeInstanceOf(PersistCurriculumError);
+      expect(err.name).toBe('PersistCurriculumError');
+      expect(err.cause).toBe(cause);
+    });
+
+    it.each([
+      [new LlmStreamError('x'), 'llm_stream_error'],
+      [new LlmEnvelopeError('x'), 'llm_empty_or_unparseable'],
+      [new PersistCurriculumError('x'), 'persist_curriculum_failed'],
+      [new Error('unknown'), 'unknown_post_stream'],
+      [new TypeError('random'), 'unknown_post_stream'],
+      ['string error', 'unknown_post_stream'],
+      [null, 'unknown_post_stream'],
+    ] as const)(
+      'classifyOrphanError(%s) returns %s (no regex)',
+      (err, expected) => {
+        expect(classifyOrphanError(err)).toBe(expected);
+      }
+    );
   });
 
   // The whole point of moving these into schemas: an instance created

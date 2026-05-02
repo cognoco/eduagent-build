@@ -75,6 +75,19 @@ jest.mock('react-native-reanimated', () => {
       ease: undefined,
       bezier: () => undefined,
       inOut: () => undefined,
+      out: () => undefined,
+      in: () => undefined,
+      elastic: () => undefined,
+      bounce: undefined,
+      quad: undefined,
+      cubic: undefined,
+      exp: undefined,
+      circle: undefined,
+      sin: undefined,
+      poly: () => undefined,
+      back: () => undefined,
+      step0: undefined,
+      step1: undefined,
     },
   };
 });
@@ -212,6 +225,29 @@ jest.mock('expo-secure-store', () => ({
   setItemAsync: jest.fn().mockResolvedValue(undefined),
   deleteItemAsync: jest.fn().mockResolvedValue(undefined),
 }));
+
+jest.mock('@react-native-async-storage/async-storage', () => {
+  const store = new Map<string, string>();
+  return {
+    __esModule: true,
+    default: {
+      getItem: jest.fn(async (key: string) => store.get(key) ?? null),
+      setItem: jest.fn(async (key: string, value: string) => {
+        store.set(key, value);
+      }),
+      removeItem: jest.fn(async (key: string) => {
+        store.delete(key);
+      }),
+      multiRemove: jest.fn(async (keys: ReadonlyArray<string>) => {
+        for (const key of keys) store.delete(key);
+      }),
+      getAllKeys: jest.fn(async () => Array.from(store.keys())),
+      clear: jest.fn(async () => {
+        store.clear();
+      }),
+    },
+  };
+});
 
 if (typeof global.structuredClone === 'undefined') {
   global.structuredClone = (object) => JSON.parse(JSON.stringify(object));

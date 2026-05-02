@@ -25,6 +25,12 @@ jest.mock('../lib/api-client', () => ({
       },
     });
   },
+  withIdempotencyKey: (
+    headers: Record<string, string>,
+    key: string | undefined
+  ) => (key ? { ...headers, 'Idempotency-Key': key } : headers),
+  isIdempotencyReplay: (response: Response) =>
+    response.headers.get('Idempotency-Replay') === 'true',
 }));
 
 jest.mock('@clerk/clerk-expo', () => ({

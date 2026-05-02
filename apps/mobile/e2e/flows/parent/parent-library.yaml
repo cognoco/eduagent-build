@@ -1,6 +1,6 @@
-# Flow: Parent Library Tab — Navigate to Library and view topics
-# Validates: parent user can tap Library tab, see subject filter tabs,
-# and view topic list (or empty state if no topics for parent's children).
+# Flow: Parent Library Tab — Navigate to Library and view shelves/books
+# Validates: parent user can tap Library tab, see the Shelves/Books tabs,
+# and the shelves list renders (or loading state if no subjects).
 # Tags: nightly, parent
 #
 # Journey: UX Journey 4 (Parent Oversight — Library)
@@ -9,17 +9,14 @@
 #               (scenario: parent-with-children — child has "Mathematics" subject)
 #
 # testIDs verified against:
-#   - apps/mobile/src/app/(parent)/_layout.tsx (tab-library, tab-home)
-#   - apps/mobile/src/app/(parent)/dashboard.tsx (dashboard-scroll)
-#   - apps/mobile/src/app/(parent)/library.tsx (re-exports learner library)
-#   - apps/mobile/src/app/(learner)/library/index.tsx (subject-filter-tabs,
-#     library-loading, library-empty, topic-row-*)
+#   - apps/mobile/src/app/(app)/_layout.tsx (tab-library, tab-home)
+#   - apps/mobile/src/app/(app)/dashboard.tsx (dashboard-scroll)
+#   - apps/mobile/src/app/(app)/library.tsx (3-tab Library)
+#   - apps/mobile/src/components/library/LibraryTabs.tsx (library-tab-shelves, library-tab-books)
+#   - apps/mobile/src/components/library/ShelvesTab.tsx (shelves-list)
 #
-# NOTE: The parent's Library tab re-exports the learner library component.
-# It will show topics for the parent's own profile (which has none), or the
-# child's profile depending on which profile is active. The subject-filter-tabs
-# testID only appears when there are 2+ subjects. With 1 or 0 subjects, the
-# filter tabs are hidden and we fall back to checking for "Library" heading.
+# NOTE: Library is now a 2-tab layout (Shelves / Books). subject-filter-tabs
+# is gone. The Shelves tab is the default; shelves-list renders subject cards.
 appId: com.mentomate.app
 tags:
   - nightly
@@ -56,9 +53,9 @@ tags:
       text: "Library"
     timeout: 10000
 
-# 7. Check if subject filter tabs are visible (only when 2+ subjects)
+# 7. Check if Shelves tab is visible (default active tab in the new 3-tab Library)
 - assertVisible:
-    id: "subject-filter-tabs"
+    id: "library-tab-shelves"
     optional: true
 
 # 8. Check for loading state (may have already resolved)
@@ -66,19 +63,14 @@ tags:
     id: "library-loading"
     optional: true
 
-# 9. Wait for either topics or empty state to appear
+# 9. Wait for shelves list or loading to resolve
 - extendedWaitUntil:
     visible:
-      text: "topics"
+      id: "shelves-list"
     timeout: 10000
     optional: true
 
-# 10. Check for empty state if no topics loaded
-- assertVisible:
-    id: "library-empty"
-    optional: true
-
-# 11. Screenshot: Library content
+# 10. Screenshot: Library content (Shelves tab — subject cards)
 - takeScreenshot: parent-library-02-content
 
 # 12. Navigate back to Home tab (use accessibility label to avoid matching heading)

@@ -39,9 +39,9 @@ tags:
     id: "tab-library"
 - extendedWaitUntil:
     visible:
-      id: "library-scroll"
+      id: "library-tab-shelves"
     timeout: 5000
-    # library-scroll may not exist if no topics yet — fallback to tab highlight
+    # library-tab-shelves is the default Shelves tab in the new 3-tab Library
     optional: true
 
 # Tap More tab → verify it navigates

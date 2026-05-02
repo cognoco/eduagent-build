@@ -123,9 +123,7 @@ tags:
 
 - takeScreenshot: coppa-under13-01-date-set
 
-# Verify persona auto-detected (12yo → TEEN)
-- assertVisible:
-    id: "persona-auto-hint"
+# Persona auto-detection hint removed from UI (persona refactor) — date set above confirms age.
 
 # Submit profile creation (GDPR-everywhere: age 12 < 16 → consent required)
 - tapOn:

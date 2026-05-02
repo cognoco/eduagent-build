@@ -309,13 +309,17 @@ describe('useSessionStreaming', () => {
 
       // Session was created
       expect(opts.startSession.mutateAsync).toHaveBeenCalled();
-      // Stream was started
+      // Stream was started — durability layer wraps the streamOptions with
+      // idempotencyKey + onReplay (set when an outbox entry is enqueued).
       expect(opts.streamMessage).toHaveBeenCalledWith(
         'What is algebra?',
         expect.any(Function), // onChunk
         expect.any(Function), // onComplete
         'new-session-1',
-        undefined // homework options
+        expect.objectContaining({
+          idempotencyKey: expect.any(String),
+          onReplay: expect.any(Function),
+        })
       );
       // State was updated via onComplete callback
       expect(opts.setExchangeCount).toHaveBeenCalledWith(1);
@@ -334,10 +338,12 @@ describe('useSessionStreaming', () => {
         });
       });
 
-      // Retry payload was set BEFORE ensureSession (for BUG-331 fix)
-      expect(lastRetryPayloadRef.current).toEqual({
+      // Retry payload was set BEFORE ensureSession (for BUG-331 fix). The
+      // durability layer also stamps an outboxEntryId for replay correlation.
+      expect(lastRetryPayloadRef.current).toMatchObject({
         text: 'Hello',
-        options: { sessionSubjectId: 's1' },
+        options: expect.objectContaining({ sessionSubjectId: 's1' }),
+        outboxEntryId: expect.any(String),
       });
     });
 
@@ -609,13 +615,18 @@ describe('useSessionStreaming', () => {
 
       // setMessages should have been called to remove the error message
       expect(opts.setMessages).toHaveBeenCalled();
-      // streamMessage should have been called with the retry payload
+      // streamMessage should have been called with the retry payload — the
+      // durability layer attaches idempotencyKey + onReplay so the reconnect
+      // is dedup'd against any concurrent in-flight attempt.
       expect(opts.streamMessage).toHaveBeenCalledWith(
         'retry me',
         expect.any(Function),
         expect.any(Function),
         expect.any(String),
-        undefined
+        expect.objectContaining({
+          idempotencyKey: expect.any(String),
+          onReplay: expect.any(Function),
+        })
       );
     });
 

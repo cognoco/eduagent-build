@@ -81,12 +81,12 @@ Three more changes reshape the inventory since the last snapshot:
 | ACCOUNT-18 | Subject analogy preference after setup | `/(app)/subject/[subjectId]` | Code-only |
 | ACCOUNT-19 | Consent request during underage profile creation | `/create-profile` -> `/consent` | Partial: profile creation and consent flows both exist in E2E |
 | ACCOUNT-20 | Child handoff to parent consent request | `/consent` | `e2e/flows/consent/hand-to-parent-consent.yaml` |
-| ACCOUNT-21 | Parent email entry, send consent link, resend, and change email | `/consent`, consent pending gate in `/(app)/_layout.tsx` | `e2e/flows/consent/profile-creation-consent.yaml`, `e2e/flows/consent/consent-pending-gate.yaml` |
+| ACCOUNT-21 | Parent email entry, send consent link, resend, and change email. Validates child cannot enter own email as parent (server-side rejection with inline error). | `/consent`, consent pending gate in `/(app)/_layout.tsx` | `e2e/flows/consent/consent-pending-gate.yaml` (parent email entry covered by `consent-coppa-under13.yaml` / `consent-gdpr-under16.yaml`) |
 | ACCOUNT-22 | Consent pending gate | `/(app)/_layout.tsx` | `e2e/flows/consent/consent-pending-gate.yaml` |
 | ACCOUNT-23 | Consent withdrawn gate | `/(app)/_layout.tsx` | `e2e/flows/consent/consent-withdrawn-gate.yaml` |
 | ACCOUNT-24 | Post-approval landing after consent is granted | post-approval surface from app layout | `e2e/flows/consent/post-approval-landing.yaml` |
 | ACCOUNT-25 | Parent consent management for a child | `/(app)/child/[profileId]` withdraw / restore consent | `e2e/flows/parent/consent-management.yaml` |
-| ACCOUNT-26 | Regional consent variants | COPPA, GDPR, and above-threshold create-profile branches | `e2e/flows/consent/consent-coppa-under13.yaml`, `e2e/flows/consent/consent-gdpr-under16.yaml`, `e2e/flows/consent/consent-above-threshold.yaml`, `e2e/flows/consent/coppa-flow.yaml` |
+| ACCOUNT-26 | Regional consent variants | GDPR and above-threshold create-profile branches (COPPA-distinct path removed by 11+ floor) | `e2e/flows/consent/consent-coppa-under13.yaml`, `e2e/flows/consent/consent-gdpr-under16.yaml`, `e2e/flows/consent/consent-above-threshold.yaml` |
 
 ## Home, Navigation, and Subject Setup
 
@@ -198,7 +198,7 @@ Dictation is a five-screen flow under `/(app)/dictation` with its own React cont
 | HOMEWORK-04 | Homework tutoring session with multi-problem navigation | `/(app)/session?mode=homework` | `e2e/flows/homework/homework-flow.yaml` |
 | HOMEWORK-05 | Gallery import (pick existing photo instead of camera capture) | `/(app)/homework/camera` gallery picker | Code-only — see `2026-04-10-homework-gallery-import-design.md` |
 | HOMEWORK-06 | Image pass-through to multimodal LLM (vision) for richer help | session route after homework capture; same image path used by dictation review | Code-only — see `2026-04-16-homework-image-vision-design.md` |
-| PARENT-01 | Parent dashboard (live or demo) | `/(app)/dashboard` | `e2e/flows/parent/parent-dashboard.yaml`, `e2e/flows/parent/demo-dashboard.yaml` |
+| PARENT-01 | Parent dashboard | `/(app)/dashboard` (parents only — solo accounts without linked children render `LearnerScreen`, not a dashboard) | `e2e/flows/parent/parent-dashboard.yaml` |
 | PARENT-02 | Multi-child dashboard | dashboard with multiple linked children | `e2e/flows/parent/multi-child-dashboard.yaml` |
 | PARENT-03 | Child detail drill-down | `/(app)/child/[profileId]` | `e2e/flows/parent/child-drill-down.yaml` |
 | PARENT-04 | Child subject -> topic drill-down | `/(app)/child/[profileId]/subjects/[subjectId]`, `topic/[topicId]` | Covered inside `e2e/flows/parent/child-drill-down.yaml` |

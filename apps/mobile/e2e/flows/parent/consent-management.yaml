@@ -43,10 +43,12 @@ tags:
     timeout: 15000
 
 # 3. Tap "View details" button on child card to navigate to child detail
-#    NOTE: Do NOT also tap the card body (parent-dashboard-summary) — double-tap
-#    causes double router.push, navigating past child detail to session transcript.
+#    NOTE: Do NOT also tap the card body — double-tap causes double router.push,
+#    navigating past child detail to session transcript.
+#    dashboard-child-${CHILD_PROFILE_ID}-primary is the primary action button
+#    on the ParentDashboardSummary card (BaseCoachingCard pattern: testID-primary).
 - tapOn:
-    id: "parent-dashboard-summary-primary"
+    id: "dashboard-child-${CHILD_PROFILE_ID}-primary"
 
 # 4. Wait for child detail screen
 - extendedWaitUntil:

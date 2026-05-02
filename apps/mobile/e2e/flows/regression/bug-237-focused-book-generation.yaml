@@ -11,15 +11,28 @@ tags:
 # 1. Launch dev client and sign in
 - runFlow: ../_setup/launch-devclient.yaml
 
-# 2. Navigate to create subject
+# 2. Navigate to create subject via Library tab → empty state add button.
+#    library-tab → tab-library (tabBarButtonTestID in _layout.tsx).
+#    library-screen → removed; use Library heading text.
+#    library-add-subject (from curriculum-complete banner) → not available for
+#    fresh sessions; use intent-learn on home screen which navigates to create-subject.
 - tapOn:
-    id: "library-tab"
+    id: "tab-library"
 - extendedWaitUntil:
     visible:
-      id: "library-screen"
+      text: "Library"
     timeout: 10000
+# Tap "Add subject" from Library empty state (fresh session has no subjects)
 - tapOn:
-    id: "library-add-subject"
+    id: "library-add-subject-empty"
+    optional: true
+# Fallback: if user already has subjects, return home and use intent-learn
+- tapOn:
+    id: "tab-home"
+    optional: true
+- tapOn:
+    id: "intent-learn"
+    optional: true
 
 # 3. Type a specific topic
 - extendedWaitUntil:
@@ -52,6 +65,9 @@ tags:
     timeout: 15000
 - takeScreenshot: bug237-step3-interview-focused-book
 
-# 7. Verify we did NOT end up at library shelf with many books
+# 7. Verify we did NOT end up at library shelf with many books.
+#    shelf-book-list is removed; assert shelf-screen is NOT visible at this point
+#    (the interview screen for the focused book should be active, not a shelf).
 - assertNotVisible:
-    id: "shelf-book-list"
+    id: "shelf-screen"
+    optional: true

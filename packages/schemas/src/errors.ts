@@ -114,6 +114,62 @@ export class BadRequestError extends Error {
   }
 }
 
+export class LlmStreamError extends Error {
+  constructor(message: string, public override cause?: unknown) {
+    super(message);
+    this.name = 'LlmStreamError';
+    Object.setPrototypeOf(this, LlmStreamError.prototype);
+  }
+}
+
+export class LlmEnvelopeError extends Error {
+  constructor(message: string, public override cause?: unknown) {
+    super(message);
+    this.name = 'LlmEnvelopeError';
+    Object.setPrototypeOf(this, LlmEnvelopeError.prototype);
+  }
+}
+
+export const persistFailureCodeSchema = z.enum([
+  'extract_signals_failed',
+  'empty_signals',
+  'generate_curriculum_failed',
+  'persist_failed',
+  'draft_missing',
+  'unknown',
+]);
+export type PersistFailureCode = z.infer<typeof persistFailureCodeSchema>;
+
+export class PersistCurriculumError extends Error {
+  public code: PersistFailureCode;
+  constructor(
+    codeOrMessage: PersistFailureCode | string,
+    messageOrCause?: string | unknown
+  ) {
+    const isCode = persistFailureCodeSchema.safeParse(codeOrMessage).success;
+    const code = isCode ? (codeOrMessage as PersistFailureCode) : 'unknown';
+    const message = isCode
+      ? typeof messageOrCause === 'string'
+        ? messageOrCause
+        : codeOrMessage
+      : (codeOrMessage as string);
+    super(message);
+    this.code = code;
+    this.name = 'PersistCurriculumError';
+    if (!isCode && messageOrCause) this.cause = messageOrCause;
+    Object.setPrototypeOf(this, PersistCurriculumError.prototype);
+  }
+}
+
+export function classifyOrphanError(
+  err: unknown
+): import('./sessions').OrphanReason {
+  if (err instanceof LlmStreamError) return 'llm_stream_error';
+  if (err instanceof LlmEnvelopeError) return 'llm_empty_or_unparseable';
+  if (err instanceof PersistCurriculumError) return 'persist_curriculum_failed';
+  return 'unknown_post_stream';
+}
+
 // Common error codes — single source of truth
 export const ERROR_CODES = {
   VALIDATION_ERROR: 'VALIDATION_ERROR',

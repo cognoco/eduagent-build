@@ -32,7 +32,7 @@ import type {
   InterviewContext,
   InterviewResult,
   OnboardingDraft,
-  ChatExchange,
+  ExchangeEntry,
   DraftStatus,
 } from '@eduagent/schemas';
 import {
@@ -44,6 +44,33 @@ import { inngest } from '../inngest/client';
 // ---------------------------------------------------------------------------
 // Interview service — pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
+
+const SERVER_NOTE_RE = /<\/?server_note[^>]*>/gi;
+
+function sanitizeUserContent(content: string): string {
+  return content.replace(SERVER_NOTE_RE, '');
+}
+
+function buildOrphanSystemAddendum(history: ExchangeEntry[]): string {
+  const recentOrphans: ExchangeEntry[] = [];
+  for (let i = history.length - 1; i >= 0; i--) {
+    const turn = history[i]!;
+    if (turn.role === 'assistant') break;
+    if (turn.role === 'user' && turn.orphan_reason) {
+      recentOrphans.unshift(turn);
+    }
+  }
+  if (recentOrphans.length === 0) return '';
+  return (
+    '\n\n' +
+    recentOrphans
+      .map(
+        (t) =>
+          `<server_note kind="orphan_user_turn" reason="${t.orphan_reason}"/>`
+      )
+      .join('\n')
+  );
+}
 
 /** Look up a curriculum book's title, verifying ownership through the subject→profile chain. */
 export async function getBookTitle(
@@ -131,6 +158,7 @@ function mapDraftRow(
       []) as OnboardingDraft['exchangeHistory'],
     extractedSignals: (row.extractedSignals ?? {}) as Record<string, unknown>,
     status: row.status,
+    failureCode: (row.failureCode as OnboardingDraft['failureCode']) ?? null,
     expiresAt: row.expiresAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -232,7 +260,7 @@ const MAX_EXTRACTED_INTERESTS = 8;
 const MAX_TRANSCRIPT_CHARS = 12000;
 
 export async function extractSignals(
-  exchangeHistory: ChatExchange[],
+  exchangeHistory: ExchangeEntry[],
   options?: { llmTier?: LLMTier }
 ): Promise<{
   goals: string[];
@@ -467,15 +495,12 @@ export async function processInterviewExchange(
   const safeSubjectName = sanitizeXmlValue(context.subjectName, 200);
   const focusLine = buildFocusLine(context.bookTitle);
   const nameLine = buildInterviewNameLine(options?.learnerName);
+  const orphanAddendum = buildOrphanSystemAddendum(context.exchangeHistory);
   const messages: ChatMessage[] = [
     {
       role: 'system',
-      content: `${INTERVIEW_SYSTEM_PROMPT}\n\nSubject: <subject_name>${safeSubjectName}</subject_name>${focusLine}${nameLine}`,
+      content: `${INTERVIEW_SYSTEM_PROMPT}\n\nSubject: <subject_name>${safeSubjectName}</subject_name>${focusLine}${nameLine}${orphanAddendum}`,
     },
-    // Re-wrap assistant turns in the interview envelope so history is
-    // consistent with the JSON format the system prompt demands. DB stores
-    // cleanResponse (prose only); without re-wrapping, the LLM sees
-    // contradictory history and may produce malformed output.
     ...context.exchangeHistory.map((e) => ({
       role: e.role as 'user' | 'assistant',
       content:
@@ -484,9 +509,9 @@ export async function processInterviewExchange(
               reply: e.content,
               signals: { ready_to_finish: false },
             })
-          : e.content,
+          : sanitizeUserContent(e.content),
     })),
-    { role: 'user' as const, content: userMessage },
+    { role: 'user' as const, content: sanitizeUserContent(userMessage) },
   ];
 
   const result = await routeAndCall(messages, 1, {
@@ -555,12 +580,12 @@ export async function streamInterviewExchange(
   const safeSubjectName = sanitizeXmlValue(context.subjectName, 200);
   const focusLine = buildFocusLine(context.bookTitle);
   const nameLine = buildInterviewNameLine(options?.learnerName);
+  const orphanAddendum = buildOrphanSystemAddendum(context.exchangeHistory);
   const messages: ChatMessage[] = [
     {
       role: 'system',
-      content: `${INTERVIEW_SYSTEM_PROMPT}\n\nSubject: <subject_name>${safeSubjectName}</subject_name>${focusLine}${nameLine}`,
+      content: `${INTERVIEW_SYSTEM_PROMPT}\n\nSubject: <subject_name>${safeSubjectName}</subject_name>${focusLine}${nameLine}${orphanAddendum}`,
     },
-    // Re-wrap assistant turns — same rationale as processInterviewExchange.
     ...context.exchangeHistory.map((e) => ({
       role: e.role as 'user' | 'assistant',
       content:
@@ -569,9 +594,9 @@ export async function streamInterviewExchange(
               reply: e.content,
               signals: { ready_to_finish: false },
             })
-          : e.content,
+          : sanitizeUserContent(e.content),
     })),
-    { role: 'user' as const, content: userMessage },
+    { role: 'user' as const, content: sanitizeUserContent(userMessage) },
   ];
 
   const streamResult = await routeAndStream(messages, 1, {
@@ -738,7 +763,7 @@ export async function updateDraft(
   profileId: string,
   draftId: string,
   updates: {
-    exchangeHistory?: ChatExchange[];
+    exchangeHistory?: ExchangeEntry[];
     extractedSignals?: Record<string, unknown>;
     status?: DraftStatus;
   }
@@ -764,6 +789,31 @@ export async function updateDraft(
         eq(onboardingDrafts.profileId, profileId)
       )
     );
+}
+
+// ---------------------------------------------------------------------------
+// Atomic draft status transitions (used by route handlers)
+// ---------------------------------------------------------------------------
+
+export type ClaimFromStatus = 'in_progress' | 'failed';
+
+export async function claimDraftForPersisting(
+  db: Database,
+  profileId: string,
+  draftId: string,
+  fromStatus: ClaimFromStatus = 'in_progress'
+): Promise<{ id: string }[]> {
+  return db
+    .update(onboardingDrafts)
+    .set({ status: 'completing', failureCode: null })
+    .where(
+      and(
+        eq(onboardingDrafts.id, draftId),
+        eq(onboardingDrafts.profileId, profileId),
+        eq(onboardingDrafts.status, fromStatus)
+      )
+    )
+    .returning({ id: onboardingDrafts.id });
 }
 
 // ---------------------------------------------------------------------------
@@ -811,18 +861,21 @@ export async function persistCurriculum(
     const curriculum = await ensureCurriculum(db, subjectId);
 
     if (result.topics.length > 0) {
-      await db.insert(curriculumTopics).values(
-        result.topics.map((t, i) => ({
-          curriculumId: curriculum.id,
-          bookId,
-          title: t.title,
-          description: t.description,
-          chapter: t.chapter ?? null,
-          sortOrder: t.sortOrder ?? i,
-          relevance: 'core' as const,
-          estimatedMinutes: t.estimatedMinutes ?? 30,
-        }))
-      );
+      await db
+        .insert(curriculumTopics)
+        .values(
+          result.topics.map((t, i) => ({
+            curriculumId: curriculum.id,
+            bookId,
+            title: t.title,
+            description: t.description,
+            chapter: t.chapter ?? null,
+            sortOrder: t.sortOrder ?? i,
+            relevance: 'core' as const,
+            estimatedMinutes: t.estimatedMinutes ?? 30,
+          }))
+        )
+        .onConflictDoNothing();
     }
 
     // Mark book topics as generated
@@ -851,16 +904,19 @@ export async function persistCurriculum(
 
   if (topics.length > 0) {
     const bookId = await ensureDefaultBook(db, subjectId, subjectName);
-    await db.insert(curriculumTopics).values(
-      topics.map((t, i) => ({
-        curriculumId: curriculum.id,
-        bookId,
-        title: t.title,
-        description: t.description,
-        sortOrder: i,
-        relevance: t.relevance,
-        estimatedMinutes: t.estimatedMinutes,
-      }))
-    );
+    await db
+      .insert(curriculumTopics)
+      .values(
+        topics.map((t, i) => ({
+          curriculumId: curriculum.id,
+          bookId,
+          title: t.title,
+          description: t.description,
+          sortOrder: i,
+          relevance: t.relevance,
+          estimatedMinutes: t.estimatedMinutes,
+        }))
+      )
+      .onConflictDoNothing();
   }
 }

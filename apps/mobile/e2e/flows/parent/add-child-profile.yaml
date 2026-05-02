@@ -87,20 +87,8 @@ tags:
 
 - takeScreenshot: add-child-03-date-selected
 
-# 9. Verify persona was auto-detected
-- assertVisible:
-    id: "persona-auto-hint"
-    optional: true
-
-# 10. Select persona explicitly (teen)
-- tapOn:
-    id: "persona-teen"
-    optional: true
-
-# 11. Select region (EU for GDPR path)
-- tapOn:
-    id: "location-eu"
-    optional: true
+# 9. Persona auto-detection hint and region/location selectors removed in persona refactor.
+# Consent is determined from birth date alone — no UI selectors remain.
 
 - takeScreenshot: add-child-04-form-filled
 

@@ -123,9 +123,7 @@ tags:
 
 - takeScreenshot: gdpr-under16-01-date-set
 
-# Verify persona auto-detected (14yo → LEARNER)
-- assertVisible:
-    id: "persona-auto-hint"
+# Persona auto-detection hint removed from UI (persona refactor) — date set above confirms age.
 
 # Submit profile creation (GDPR-everywhere: age 14 < 16 → consent required)
 - tapOn:

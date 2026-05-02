@@ -45,12 +45,12 @@ describe('BookPageFlipAnimation', () => {
     const { unmount } = render(<BookPageFlipAnimation testID="book" />);
     unmount();
 
-    // 2 page rotations + glow = at minimum 3 animations cancelled
+    // page1Rot, page2Rot, page3Rot, glowOp, breathScale, mote1, mote2, mote3 = 8 animations
     expect(cancelSpy).toHaveBeenCalled();
     cancelSpy.mockRestore();
   });
 
-  // The enchanted book uses perspective + rotateY for page turns
+  // The storybook uses perspective + rotateY via translate-rotate-translate for Fabric safety
   it('uses perspective in page turn styles', () => {
     const sourceModule = require('./BookPageFlipAnimation');
     const sourceText = sourceModule.BookPageFlipAnimation.toString();
@@ -61,5 +61,29 @@ describe('BookPageFlipAnimation', () => {
     const sourceModule = require('./BookPageFlipAnimation');
     const sourceText = sourceModule.BookPageFlipAnimation.toString();
     expect(sourceText).toContain('rotateY');
+  });
+
+  it('renders static closed book in reduced motion (no turning pages)', () => {
+    const reanimated = require('react-native-reanimated');
+    const original = reanimated.useReducedMotion;
+    reanimated.useReducedMotion = () => true;
+
+    // Should not throw; covers and pages are rendered but animated pages are hidden
+    const { getByTestId } = render(<BookPageFlipAnimation testID="book" />);
+    expect(getByTestId('book')).toBeTruthy();
+
+    reanimated.useReducedMotion = original;
+  });
+
+  it('renders at small size (80px) without crashing', () => {
+    expect(() => {
+      render(<BookPageFlipAnimation size={80} />);
+    }).not.toThrow();
+  });
+
+  it('renders at large size (200px) without crashing', () => {
+    expect(() => {
+      render(<BookPageFlipAnimation size={200} />);
+    }).not.toThrow();
   });
 });

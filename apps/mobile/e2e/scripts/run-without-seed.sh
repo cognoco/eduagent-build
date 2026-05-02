@@ -13,6 +13,6 @@
 #
 # Examples:
 #   ./run-without-seed.sh flows/onboarding/sign-up-flow.yaml
-#   ./run-without-seed.sh flows/consent/coppa-flow.yaml --debug-output
+#   ./run-without-seed.sh flows/edge/animated-splash.yaml --debug-output
 
 exec "$(dirname "$0")/seed-and-run.sh" --no-seed "$@"

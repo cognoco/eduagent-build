@@ -204,6 +204,7 @@ function createMockDb({
     insert: jest.fn().mockReturnValue({
       values: jest.fn().mockReturnValue({
         returning: jest.fn().mockResolvedValue(insertReturning),
+        onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
       }),
     }),
     delete: jest.fn().mockReturnValue({
@@ -635,6 +636,7 @@ describe('challengeCurriculum', () => {
       insert: jest.fn().mockReturnValue({
         values: jest.fn().mockReturnValue({
           returning: jest.fn().mockResolvedValue([newCurriculum]),
+          onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
         }),
       }),
       delete: jest.fn().mockReturnValue({

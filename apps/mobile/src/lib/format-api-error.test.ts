@@ -120,6 +120,25 @@ describe('classifyApiError', () => {
     expect(result.recovery).toBe('retry');
   });
 
+  // [BUG-947] Without this branch, the 402 PROFILE_LIMIT_EXCEEDED came through
+  // as a generic "Something went wrong on our end" — the symptom QA reported as
+  // a fake 500. The classifier must surface the actionable upgrade message.
+  it('[BUG-947] classifies UpstreamError(402, PROFILE_LIMIT_EXCEEDED) as quota and preserves server message', () => {
+    const err = new UpstreamError(
+      'Your subscription does not support additional profiles. Please upgrade to Family or Pro.',
+      'PROFILE_LIMIT_EXCEEDED',
+      402
+    );
+    const result = classifyApiError(err);
+    expect(result.category).toBe('quota');
+    expect(result.recovery).toBe('go-back');
+    expect(result.message).toBe(
+      'Your subscription does not support additional profiles. Please upgrade to Family or Pro.'
+    );
+    // Critical regression guard: the generic server fallback must NOT win here.
+    expect(result.message).not.toMatch(/Something went wrong on our end/);
+  });
+
   it('NotFoundError with friendly-message pattern applies translation', () => {
     const err = new NotFoundError('Session');
     const result = classifyApiError(err);

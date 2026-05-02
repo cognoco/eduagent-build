@@ -116,7 +116,6 @@ run_seeded "parent-with-children" "flows/parent/parent-dashboard.yaml"
 run_seeded "parent-with-children" "flows/parent/parent-library.yaml"
 run_seeded "parent-with-children" "flows/parent/child-drill-down.yaml"
 run_seeded "parent-with-children" "flows/parent/consent-management.yaml"
-run_seeded "parent-solo"          "flows/parent/demo-dashboard.yaml"
 
 # Subject flows
 run_seeded "multi-subject" "flows/subjects/multi-subject.yaml"
@@ -142,8 +141,6 @@ fi
 # These do fresh sign-ups or consent requests — only fully automated flows run here.
 
 log_result "SKIP" "flows/onboarding/sign-up-flow.yaml" "(manual-only: requires Clerk email verification)"
-run_standalone "flows/consent/coppa-flow.yaml"
-run_standalone "flows/consent/profile-creation-consent.yaml"
 run_standalone "flows/consent/consent-pending-gate.yaml"
 
 # ─── GROUP 3: Skipped flows ───

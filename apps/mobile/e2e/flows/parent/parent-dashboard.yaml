@@ -50,16 +50,17 @@ tags:
     timeout: 10000
     optional: true
 
-# 4. Look for child card element
-# optional: child-card testID only renders after familyLinks API returns data
+# 4. Look for child card element via per-child testID (dashboard-child-${profileId})
+# optional: only renders after familyLinks API returns data
+# CHILD_PROFILE_ID is injected by the seed-and-sign-in helper
 - assertVisible:
-    id: "child-card"
+    id: "dashboard-child-${CHILD_PROFILE_ID}"
     optional: true
 
 # 5. Tap on child card to view detail
-# optional: depends on child-card rendering (step 4); if absent, step 6 is the fallback
+# optional: depends on child card rendering (step 4); if absent, step 6 is the fallback
 - tapOn:
-    id: "child-card"
+    id: "dashboard-child-${CHILD_PROFILE_ID}"
     optional: true
 
 # 6. Fallback: tap on child name text

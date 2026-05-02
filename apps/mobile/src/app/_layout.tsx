@@ -42,6 +42,7 @@ import { clearTransitionState } from '../lib/auth-transition';
 import { clearPendingAuthRedirect } from '../lib/pending-auth-redirect';
 import { sanitizeSecureStoreKey } from '../lib/secure-storage';
 import { ErrorBoundary, OfflineBanner } from '../components/common';
+import { OutboxDrainProvider } from '../providers/OutboxDrainProvider';
 import { useNetworkStatus } from '../hooks/use-network-status';
 import { Sentry } from '../lib/sentry';
 import { configureRevenueCat } from '../lib/revenuecat';
@@ -509,9 +510,11 @@ export default function RootLayout() {
           <ClerkGate onReady={onClerkReady} timedOut={clerkTimedOut}>
             <QueryClientProvider client={queryClient}>
               <ProfileProvider>
-                <ErrorBoundary>
-                  <ThemedApp />
-                </ErrorBoundary>
+                <OutboxDrainProvider>
+                  <ErrorBoundary>
+                    <ThemedApp />
+                  </ErrorBoundary>
+                </OutboxDrainProvider>
               </ProfileProvider>
             </QueryClientProvider>
           </ClerkGate>

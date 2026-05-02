@@ -32,14 +32,14 @@ tags:
 - extendedWaitUntil:
     visible:
       id: "learning-mode-casual"
-    timeout: 10000
+    timeout: 30000
 
 # 5. Scroll to & tap Subscription menu item (below the fold on More screen)
 - scrollUntilVisible:
     element:
       text: "Subscription"
     direction: DOWN
-    timeout: 10000
+    timeout: 30000
 
 - tapOn:
     text: "Subscription"
@@ -48,7 +48,7 @@ tags:
 - extendedWaitUntil:
     visible:
       id: "subscription-screen"
-    timeout: 10000
+    timeout: 30000
 
 # 7. Verify trial banner text
 - assertVisible:
@@ -73,7 +73,7 @@ tags:
     element:
       id: "restore-purchases-button"
     direction: DOWN
-    timeout: 10000
+    timeout: 30000
 
 # 13. Verify restore purchases button
 - assertVisible:

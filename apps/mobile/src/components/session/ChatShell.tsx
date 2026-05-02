@@ -28,7 +28,7 @@ import { useTextToSpeech } from '../../hooks/use-text-to-speech';
 import { useThemeColors } from '../../lib/theme';
 import { goBackOrReplace } from '../../lib/navigation';
 import { platformAlert } from '../../lib/platform-alert';
-import { DeskLampAnimation, MagicPenAnimation } from '../common';
+import { LightBulbAnimation, MagicPenAnimation } from '../common';
 import Animated, { FadeOut } from 'react-native-reanimated';
 
 export interface ChatMessage {
@@ -36,6 +36,7 @@ export interface ChatMessage {
   role: 'assistant' | 'user';
   content: string;
   streaming?: boolean;
+  outboxStatus?: 'pending' | 'permanently-failed';
   kind?: 'reconnect_prompt' | 'session_expired' | 'quota_exceeded';
   escalationRung?: number;
   verificationBadge?: VerificationBadge;
@@ -233,6 +234,7 @@ export function ChatShell({
           role={msg.role}
           content={msg.content}
           streaming={msg.streaming}
+          outboxStatus={msg.outboxStatus}
           escalationRung={msg.escalationRung}
           verificationBadge={msg.verificationBadge}
           actions={renderMessageActions?.(msg)}
@@ -671,7 +673,7 @@ export function ChatShell({
                 className="items-center py-4"
                 testID="thinking-bulb-animation"
               >
-                <DeskLampAnimation size={48} color={colors.muted} />
+                <LightBulbAnimation size={64} color={colors.muted} />
               </View>
             )}
             {showIdleAnim && (

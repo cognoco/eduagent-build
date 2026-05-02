@@ -17,6 +17,17 @@ import { formatApiError } from '../../../lib/format-api-error';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
 import { Sentry } from '../../../lib/sentry';
+import { useProfile } from '../../../lib/profile';
+import { OutboxFailedBanner } from '../../../components/durability/OutboxFailedBanner';
+import { InterviewCompletingPanel } from '../../../components/interview/InterviewCompletingPanel';
+import { InterviewFailedPanel } from '../../../components/interview/InterviewFailedPanel';
+import {
+  beginAttempt,
+  enqueue,
+  markConfirmed,
+  recordFailure,
+  type OutboxEntry,
+} from '../../../lib/message-outbox';
 
 const OPENING_MESSAGE =
   "Hi! I'm your learning mate. Before we build your learning path — what do you already know about this subject? Even a rough sense is helpful.";
@@ -42,6 +53,7 @@ export default function InterviewScreen() {
     totalSteps?: string;
   }>();
   const router = useRouter();
+  const { activeProfile } = useProfile();
   const step = Number(stepParam) || 1;
   const totalSteps = Number(totalStepsParam) || 4;
 
@@ -174,6 +186,7 @@ export default function InterviewScreen() {
   const seededDraftRef = useRef(false);
   // BUG-317: Store last sent text so Try Again can resend the orphaned message
   const lastSentTextRef = useRef<string | null>(null);
+  const lastOutboxEntryRef = useRef<OutboxEntry | null>(null);
   // BUG-692-FOLLOWUP: Guard post-await navigation in handleSkipInterview against
   // the user having navigated away (hardware back) while the mutation was in
   // flight. Set to true when the screen loses focus, reset before each attempt.
@@ -512,6 +525,25 @@ export default function InterviewScreen() {
       // Interview phase: use the interview streaming API.
       // -----------------------------------------------------------------------
       try {
+        const outboxEntry =
+          activeProfile?.id &&
+          (isRetry && lastOutboxEntryRef.current
+            ? lastOutboxEntryRef.current
+            : await enqueue({
+                profileId: activeProfile.id,
+                flow: 'interview',
+                surfaceKey: `${subjectId}:${bookId ?? ''}`,
+                content: text,
+                metadata: {
+                  subjectId,
+                  ...(bookId ? { bookId } : {}),
+                },
+              }));
+        if (outboxEntry && activeProfile?.id) {
+          lastOutboxEntryRef.current = outboxEntry;
+          await beginAttempt(activeProfile.id, 'interview', outboxEntry.id);
+        }
+
         await streamInterview(
           text,
           (accumulated) => {
@@ -528,22 +560,83 @@ export default function InterviewScreen() {
                 m.id === streamMsgId
                   ? {
                       ...m,
-                      content: m.content.trimEnd(),
+                      content:
+                        result.fallback?.fallbackText ?? m.content.trimEnd(),
                       streaming: false,
                     }
                   : m
               )
             );
+            if (result.fallback) {
+              if (activeProfile?.id && outboxEntry) {
+                void recordFailure(
+                  activeProfile.id,
+                  'interview',
+                  outboxEntry.id,
+                  result.fallback.reason
+                );
+              }
+              return;
+            }
+            if (activeProfile?.id && outboxEntry && !result.isComplete) {
+              void markConfirmed(activeProfile.id, 'interview', outboxEntry.id);
+              lastOutboxEntryRef.current = null;
+            }
             if (result.isComplete) {
+              if (activeProfile?.id && outboxEntry) {
+                void markConfirmed(
+                  activeProfile.id,
+                  'interview',
+                  outboxEntry.id
+                );
+                lastOutboxEntryRef.current = null;
+              }
               // Seamlessly transition to a learning session.
               // Don't set interviewComplete — that disables input and shows
               // the "Let's Go" card. Instead, silently start a session so the
               // conversation continues without interruption.
               void transitionToSession();
             }
-          }
+          },
+          outboxEntry
+            ? {
+                idempotencyKey: outboxEntry.id,
+                onReplay: (replay) => {
+                  if (activeProfile?.id) {
+                    void markConfirmed(
+                      activeProfile.id,
+                      'interview',
+                      outboxEntry.id
+                    );
+                  }
+                  lastOutboxEntryRef.current = null;
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.id === streamMsgId
+                        ? {
+                            ...m,
+                            content: replay.assistantTurnReady
+                              ? 'Previous send restored.'
+                              : 'Previous send restored. Waiting for the reply…',
+                            streaming: false,
+                            isSystemPrompt: true,
+                          }
+                        : m
+                    )
+                  );
+                },
+              }
+            : undefined
         );
       } catch (err: unknown) {
+        if (activeProfile?.id && lastOutboxEntryRef.current) {
+          void recordFailure(
+            activeProfile.id,
+            'interview',
+            lastOutboxEntryRef.current.id,
+            err instanceof Error ? err.message : 'stream_failed'
+          );
+        }
         const formattedError = formatApiError(err);
         setStreamError(formattedError);
         // On stream error, replace the streaming placeholder with error text
@@ -566,6 +659,8 @@ export default function InterviewScreen() {
       activeSessionId,
       streamSessionMessage,
       transitionToSession,
+      activeProfile?.id,
+      bookId,
     ]
   );
 
@@ -592,6 +687,27 @@ export default function InterviewScreen() {
   }
 
   // ---------------------------------------------------------------------------
+  // Durability layer: drafts can arrive with `completing` (Inngest job running)
+  // or `failed` (job exhausted retries). Both states replace the full chat UI
+  // so the user sees actionable feedback rather than a frozen screen.
+  // ---------------------------------------------------------------------------
+  const draftStatus = interviewState.data?.status;
+
+  if (draftStatus === 'completing') {
+    return <InterviewCompletingPanel />;
+  }
+
+  if (draftStatus === 'failed') {
+    return (
+      <InterviewFailedPanel
+        subjectId={safeSubjectId ?? ''}
+        bookId={bookId}
+        failureCode={interviewState.data?.failureCode ?? null}
+      />
+    );
+  }
+
+  // ---------------------------------------------------------------------------
   // Title & header: once in session phase, drop the "Interview:" prefix and
   // the step indicator so the screen looks like a normal learning session.
   // ---------------------------------------------------------------------------
@@ -602,251 +718,234 @@ export default function InterviewScreen() {
     : `Interview: ${subjectName ?? 'New Subject'}`;
 
   return (
-    <ChatShell
-      title={title}
-      headerBelow={
-        !sessionPhase ? (
-          <OnboardingStepIndicator step={step} totalSteps={totalSteps} />
-        ) : undefined
-      }
-      messages={messages}
-      onSend={handleSend}
-      isStreaming={isStreaming}
-      // [BUG-887] Voice is not wired in onboarding interview yet, and the
-      // mode toggle eats vertical space that pushes the composer offscreen
-      // on small phones (Galaxy S10e ~5.8" with the soft keyboard open).
-      hideInputModeToggle={!sessionPhase}
-      inputDisabled={
-        // Interview phase: disable when complete (fallback), expired, or errored
-        // Session phase: briefly disable while session is being created
-        (!sessionPhase && interviewComplete) ||
-        (sessionPhase && !activeSessionId) ||
-        restartRequired ||
-        !!streamError
-      }
-      rightAction={
-        sessionPhase ? (
-          // Session phase: show "End session" button instead of LivingBook
-          <Pressable
-            onPress={goToNextStep}
-            className="px-3 py-2"
-            testID="end-session-button"
-            accessibilityRole="button"
-            accessibilityLabel="End session"
-          >
-            <Text className="text-body-sm text-primary font-medium">Done</Text>
-          </Pressable>
-        ) : (
-          <LivingBook
-            exchangeCount={exchangeCount}
-            isComplete={interviewComplete}
-            isExpressive
-            onPress={interviewComplete ? goToNextStep : undefined}
-          />
-        )
-      }
-      footer={
-        // Session phase: show loading indicator while activeSessionId is pending
-        sessionPhase && !activeSessionId ? (
-          <View
-            className="items-center px-4 py-3"
-            testID="session-creating-indicator"
-          >
-            {sessionCreationStuck ? (
-              // [UX-DE-H2] Give the user two escapes when session creation is
-              // stuck: Retry (primary) and Go back (secondary) so they are
-              // never trapped on a spinning dead-end.
-              <View className="items-center gap-2">
-                <Text className="text-body-sm text-danger text-center mb-2">
-                  This is taking longer than expected.
-                </Text>
-                <Pressable
-                  onPress={() => {
-                    setSessionCreationStuck(false);
-                    sessionCreatingRef.current = false;
-                    void transitionToSession();
-                  }}
-                  className="bg-primary rounded-button px-6 py-3 min-h-[44px] items-center justify-center w-full"
-                  testID="session-creating-retry"
-                  accessibilityRole="button"
-                  accessibilityLabel="Try again"
-                >
-                  <Text className="text-body font-semibold text-text-inverse">
-                    Try Again
-                  </Text>
-                </Pressable>
-                <Pressable
-                  onPress={() =>
-                    goBackOrReplace(router, '/(app)/home' as const)
-                  }
-                  className="bg-surface-elevated rounded-button px-6 py-3 min-h-[44px] items-center justify-center w-full"
-                  testID="session-creating-go-back"
-                  accessibilityRole="button"
-                  accessibilityLabel="Go back to home"
-                >
-                  <Text className="text-body font-semibold text-text-primary">
-                    Go Back
-                  </Text>
-                </Pressable>
-              </View>
-            ) : (
-              <>
-                <ActivityIndicator size="small" />
-                <Text className="text-body-sm text-text-secondary mt-2">
-                  Setting things up…
-                </Text>
-              </>
-            )}
-          </View>
-        ) : // interviewComplete is only true as a fallback (session creation failed)
-        // or when returning to an already-completed draft.
-        interviewComplete ? (
-          <View className="bg-coaching-card rounded-card p-4 mt-2 mb-4">
-            <Text className="text-body font-semibold text-text-primary mb-2">
-              Ready to start learning!
-            </Text>
-            <Text className="text-body-sm text-text-secondary mb-3">
-              I've built your first learning path. Review it, make any quick
-              changes you want, and start learning.
-            </Text>
+    <View className="flex-1">
+      <ChatShell
+        title={title}
+        headerBelow={
+          !sessionPhase ? (
+            <OnboardingStepIndicator step={step} totalSteps={totalSteps} />
+          ) : undefined
+        }
+        messages={messages}
+        onSend={handleSend}
+        isStreaming={isStreaming}
+        hideInputModeToggle={!sessionPhase}
+        inputDisabled={
+          (!sessionPhase && interviewComplete) ||
+          (sessionPhase && !activeSessionId) ||
+          restartRequired ||
+          !!streamError
+        }
+        rightAction={
+          sessionPhase ? (
             <Pressable
               onPress={goToNextStep}
-              className="bg-primary rounded-button py-3 items-center"
-              testID="view-curriculum-button"
-              accessibilityLabel="Start learning"
+              className="px-3 py-2"
+              testID="end-session-button"
               accessibilityRole="button"
+              accessibilityLabel="End session"
             >
-              <Text className="text-text-inverse text-body font-semibold">
-                Let's Go
+              <Text className="text-body-sm text-primary font-medium">
+                Done
               </Text>
             </Pressable>
-          </View>
-        ) : streamError ? (
-          <View
-            className="bg-danger/10 rounded-card p-4 mt-2 mb-4"
-            testID="interview-stream-error"
-          >
-            <Text className="text-body font-semibold text-text-primary mb-2">
-              We hit a problem
-            </Text>
-            <Text className="text-body-sm text-text-secondary mb-3">
-              {streamError}
-            </Text>
-            <Pressable
-              onPress={() => {
-                // Retry the stream: remove only the error AI bubble, keep the
-                // user message in place. handleSend with isRetry=true will
-                // add only the streaming placeholder (no duplicate user bubble).
-                const lastText = lastSentTextRef.current;
-                setMessages((prev) => {
-                  const len = prev.length;
-                  // Remove trailing error AI message only
-                  if (len >= 1 && prev[len - 1]?.role === 'assistant') {
-                    return prev.slice(0, -1);
-                  }
-                  return prev;
-                });
-                setStreamError(null);
-                if (lastText) {
-                  void handleSend(lastText, { isRetry: true });
-                }
-              }}
-              className="bg-primary rounded-button py-3 items-center"
-              testID="interview-try-again-button"
-              accessibilityLabel="Try the interview again"
-              accessibilityRole="button"
+          ) : (
+            <LivingBook
+              exchangeCount={exchangeCount}
+              isComplete={interviewComplete}
+              isExpressive
+              onPress={interviewComplete ? goToNextStep : undefined}
+            />
+          )
+        }
+        footer={
+          sessionPhase && !activeSessionId ? (
+            <View
+              className="items-center px-4 py-3"
+              testID="session-creating-indicator"
             >
-              <Text className="text-text-inverse text-body font-semibold">
-                Try Again
-              </Text>
-            </Pressable>
-          </View>
-        ) : !sessionPhase &&
-          !interviewComplete &&
-          !streamError &&
-          !restartRequired &&
-          exchangeCount >= 2 ? (
-          <View className="px-2 mt-1 mb-2">
-            {forceCompleteTimedOut ? (
-              // [BUG-UX-INTERVIEW-SKIP-TIMEOUT] Hard timeout: mutation has been
-              // pending > 30s — show an inline error with a Go Back escape.
-              <View testID="force-complete-timeout-error">
-                <Text className="text-body-sm text-danger text-center mb-2">
-                  Setting up your curriculum is taking too long. Check your
-                  connection and try again.
-                </Text>
-                <Pressable
-                  onPress={() =>
-                    goBackOrReplace(router, '/(app)/home' as const)
-                  }
-                  className="py-2.5 items-center rounded-button bg-surface-elevated"
-                  testID="force-complete-timeout-go-back"
-                  accessibilityRole="button"
-                  accessibilityLabel="Go back to home"
-                >
-                  <Text className="text-body-sm text-primary font-medium">
-                    Go Back
+              {sessionCreationStuck ? (
+                <View className="items-center gap-2">
+                  <Text className="text-body-sm text-danger text-center mb-2">
+                    This is taking longer than expected.
                   </Text>
-                </Pressable>
-              </View>
-            ) : (
-              // BUG-883: After 3+ exchanges the LLM has typically emitted a
-              // wrap-up turn ("we can definitely build a curriculum…"). If
-              // the close envelope was dropped or never sent, the user was
-              // stuck on a subtle text link they often missed. Promote the
-              // skip CTA to a primary-button style at that point so it
-              // reads as an obvious "Continue" affordance.
+                  <Pressable
+                    onPress={() => {
+                      setSessionCreationStuck(false);
+                      sessionCreatingRef.current = false;
+                      void transitionToSession();
+                    }}
+                    className="bg-primary rounded-button px-6 py-3 min-h-[44px] items-center justify-center w-full"
+                    testID="session-creating-retry"
+                    accessibilityRole="button"
+                    accessibilityLabel="Try again"
+                  >
+                    <Text className="text-body font-semibold text-text-inverse">
+                      Try Again
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() =>
+                      goBackOrReplace(router, '/(app)/home' as const)
+                    }
+                    className="bg-surface-elevated rounded-button px-6 py-3 min-h-[44px] items-center justify-center w-full"
+                    testID="session-creating-go-back"
+                    accessibilityRole="button"
+                    accessibilityLabel="Go back to home"
+                  >
+                    <Text className="text-body font-semibold text-text-primary">
+                      Go Back
+                    </Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <>
+                  <ActivityIndicator size="small" />
+                  <Text className="text-body-sm text-text-secondary mt-2">
+                    Setting things up…
+                  </Text>
+                </>
+              )}
+            </View>
+          ) : interviewComplete ? (
+            <View className="bg-coaching-card rounded-card p-4 mt-2 mb-4">
+              <Text className="text-body font-semibold text-text-primary mb-2">
+                Ready to start learning!
+              </Text>
+              <Text className="text-body-sm text-text-secondary mb-3">
+                I've built your first learning path. Review it, make any quick
+                changes you want, and start learning.
+              </Text>
               <Pressable
-                onPress={() => void handleSkipInterview()}
-                disabled={isStreaming || forceComplete.isPending}
-                className={
-                  exchangeCount >= 3
-                    ? 'bg-primary rounded-button py-3 items-center justify-center min-h-[48px]'
-                    : 'py-2.5 items-center rounded-button'
-                }
-                testID="skip-interview-button"
-                accessibilityLabel="Ready to start learning"
+                onPress={goToNextStep}
+                className="bg-primary rounded-button py-3 items-center"
+                testID="view-curriculum-button"
+                accessibilityLabel="Start learning"
                 accessibilityRole="button"
               >
-                <Text
-                  className={
-                    exchangeCount >= 3
-                      ? 'text-body font-semibold text-text-inverse'
-                      : 'text-body-sm text-primary font-medium'
-                  }
-                >
-                  {forceComplete.isPending
-                    ? 'Setting up your curriculum...'
-                    : exchangeCount >= 3
-                    ? "Continue — I'm ready to start learning"
-                    : "I'm ready to start learning"}
+                <Text className="text-text-inverse text-body font-semibold">
+                  Let's Go
                 </Text>
               </Pressable>
-            )}
-          </View>
-        ) : restartRequired ? (
-          <View className="bg-coaching-card rounded-card p-4 mt-2 mb-4">
-            <Text className="text-body font-semibold text-text-primary mb-2">
-              Interview expired
-            </Text>
-            <Text className="text-body-sm text-text-secondary mb-3">
-              After 7 days away, we start fresh so your curriculum still matches
-              where you are now.
-            </Text>
-            <Pressable
-              onPress={handleRestartInterview}
-              className="bg-primary rounded-button py-3 items-center"
-              testID="restart-interview-button"
-              accessibilityLabel="Restart interview"
-              accessibilityRole="button"
+            </View>
+          ) : streamError ? (
+            <View
+              className="bg-danger/10 rounded-card p-4 mt-2 mb-4"
+              testID="interview-stream-error"
             >
-              <Text className="text-text-inverse text-body font-semibold">
-                Restart Interview
+              <Text className="text-body font-semibold text-text-primary mb-2">
+                We hit a problem
               </Text>
-            </Pressable>
-          </View>
-        ) : undefined
-      }
-    />
+              <Text className="text-body-sm text-text-secondary mb-3">
+                {streamError}
+              </Text>
+              <Pressable
+                onPress={() => {
+                  const lastText = lastSentTextRef.current;
+                  setMessages((prev) => {
+                    const len = prev.length;
+                    if (len >= 1 && prev[len - 1]?.role === 'assistant') {
+                      return prev.slice(0, -1);
+                    }
+                    return prev;
+                  });
+                  setStreamError(null);
+                  if (lastText) {
+                    void handleSend(lastText, { isRetry: true });
+                  }
+                }}
+                className="bg-primary rounded-button py-3 items-center"
+                testID="interview-try-again-button"
+                accessibilityLabel="Try the interview again"
+                accessibilityRole="button"
+              >
+                <Text className="text-text-inverse text-body font-semibold">
+                  Try Again
+                </Text>
+              </Pressable>
+            </View>
+          ) : !sessionPhase &&
+            !interviewComplete &&
+            !streamError &&
+            !restartRequired &&
+            exchangeCount >= 2 ? (
+            <View className="px-2 mt-1 mb-2">
+              {forceCompleteTimedOut ? (
+                <View testID="force-complete-timeout-error">
+                  <Text className="text-body-sm text-danger text-center mb-2">
+                    Setting up your curriculum is taking too long. Check your
+                    connection and try again.
+                  </Text>
+                  <Pressable
+                    onPress={() =>
+                      goBackOrReplace(router, '/(app)/home' as const)
+                    }
+                    className="py-2.5 items-center rounded-button bg-surface-elevated"
+                    testID="force-complete-timeout-go-back"
+                    accessibilityRole="button"
+                    accessibilityLabel="Go back to home"
+                  >
+                    <Text className="text-body-sm text-primary font-medium">
+                      Go Back
+                    </Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <Pressable
+                  onPress={() => void handleSkipInterview()}
+                  disabled={isStreaming || forceComplete.isPending}
+                  className={
+                    exchangeCount >= 3
+                      ? 'bg-primary rounded-button py-3 items-center justify-center min-h-[48px]'
+                      : 'py-2.5 items-center rounded-button'
+                  }
+                  testID="skip-interview-button"
+                  accessibilityLabel="Ready to start learning"
+                  accessibilityRole="button"
+                >
+                  <Text
+                    className={
+                      exchangeCount >= 3
+                        ? 'text-body font-semibold text-text-inverse'
+                        : 'text-body-sm text-primary font-medium'
+                    }
+                  >
+                    {forceComplete.isPending
+                      ? 'Setting up your curriculum...'
+                      : exchangeCount >= 3
+                      ? "Continue — I'm ready to start learning"
+                      : "I'm ready to start learning"}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          ) : restartRequired ? (
+            <View className="bg-coaching-card rounded-card p-4 mt-2 mb-4">
+              <Text className="text-body font-semibold text-text-primary mb-2">
+                Interview expired
+              </Text>
+              <Text className="text-body-sm text-text-secondary mb-3">
+                After 7 days away, we start fresh so your curriculum still
+                matches where you are now.
+              </Text>
+              <Pressable
+                onPress={handleRestartInterview}
+                className="bg-primary rounded-button py-3 items-center"
+                testID="restart-interview-button"
+                accessibilityLabel="Restart interview"
+                accessibilityRole="button"
+              >
+                <Text className="text-text-inverse text-body font-semibold">
+                  Restart Interview
+                </Text>
+              </Pressable>
+            </View>
+          ) : undefined
+        }
+      />
+      {activeProfile?.id ? (
+        <OutboxFailedBanner profileId={activeProfile.id} flow="interview" />
+      ) : null}
+    </View>
   );
 }

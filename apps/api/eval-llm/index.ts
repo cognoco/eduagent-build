@@ -31,6 +31,7 @@ import { sessionRecapFlow } from './flows/session-recap';
 import { filingPreSessionFlow } from './flows/filing-pre-session';
 import { exchangesFlow } from './flows/exchanges';
 import { interviewFlow } from './flows/interview';
+import { interviewOrphanFlow } from './flows/interview-orphan';
 import {
   listFlows,
   parseCliArgs,
@@ -75,6 +76,7 @@ const FLOWS: FlowDefinition[] = [
   filingPreSessionFlow as FlowDefinition,
   exchangesFlow as FlowDefinition,
   interviewFlow as FlowDefinition,
+  interviewOrphanFlow as FlowDefinition,
 ];
 
 async function main(): Promise<void> {

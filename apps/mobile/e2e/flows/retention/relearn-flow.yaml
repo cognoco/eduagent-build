@@ -9,6 +9,13 @@
 # Prerequisite: Seeded user with 3 failed recalls + needs-deepening topic
 #               (scenario: failed-recall-3x)
 #
+# testID mapping (library.tsx + components):
+#   - tab-library                 -> Library tab bar button
+#   - shelves-list                -> shelves list (ShelvesTab)
+#   - subject-card-${id}          -> per-subject shelf card
+#   - shelf-screen                -> shelf screen container
+#   - library-loading             -> loading spinner
+#
 # testID mapping (topic/[topicId].tsx):
 #   - primary-action-button       -> smart primary action ("Relearn" here)
 #   - retention-card              -> retention metrics card
@@ -23,6 +30,9 @@
 #   - relearn-method-real_world_examples -> method picker option
 #   - relearn-method-practice_problems  -> method picker option
 #   - relearn-back-to-choice     -> back from method picker to choice phase
+#
+# NOTE: The Library no longer has a top-level Topics tab (library-tab-topics removed).
+# Topics are accessed by drilling into a subject shelf → book → topic detail.
 appId: com.mentomate.app
 tags:
   - nightly
@@ -44,65 +54,85 @@ tags:
 # 3. Navigate to Library tab (BUG-10: use accessibility label, not truncated text)
 - tapOn: "Library Tab"
 
-# 4. Wait for Library to load
+# 4. Wait for Library to load (Shelves tab is the default)
 - extendedWaitUntil:
     visible:
-      text: "Library"
+      id: "shelves-list"
     timeout: 10000
 
-# 5. Wait for library content to load
+# 5. Wait for shelves list loading to finish
 - extendedWaitUntil:
     notVisible:
       id: "library-loading"
     timeout: 10000
     optional: true
 
-# 5b. Switch to Topics tab — Library defaults to Shelves tab which shows
-#     subject-level cards, not individual topic rows (BUG-593).
+# 6. Tap the Chemistry subject shelf card.
+#    The failed-recall-3x seed creates a "Chemistry" subject.
+#    SUBJECT_ID is injected by the seed helper; fallback to text match.
 - tapOn:
-    id: "library-tab-topics"
+    id: "subject-card-${SUBJECT_ID}"
+    optional: true
 
+- tapOn:
+    text: "Chemistry"
+    optional: true
+
+# 7. Wait for shelf screen (books for Chemistry)
 - extendedWaitUntil:
-    notVisible:
-      id: "library-loading"
+    visible:
+      id: "shelf-screen"
+    timeout: 10000
+
+# 8. Screenshot: shelf screen
+- takeScreenshot: relearn-01-shelf
+
+# 9. Tap the first book in the Chemistry shelf
+- tapOn:
+    text: "Chemistry"
+    optional: true
+
+# 10. Wait for book detail screen
+- extendedWaitUntil:
+    visible:
+      id: "book-screen"
     timeout: 10000
     optional: true
 
-# 6. Look for "Needs attention" indicator (3+ failures marker)
-- assertVisible:
-    text: "Needs attention"
-    optional: true
-
-# 7. Tap the first topic row. The failed-recall-3x seed creates topics under
-#    "Chemistry" subject named "Chemistry Topic 1/2/3". The first topic has
-#    failureCount=3, which shows "Needs attention" label. Tap by topic name
-#    since Maestro can't reliably find text inside nested <Text> nodes.
+# 11. Tap the first topic visible — look for "Chemistry Topic 1"
+#     The failed-recall-3x seed creates topics named "Chemistry Topic 1/2/3".
+#     "Chemistry Topic 1" has failureCount=3 → shows "Needs attention".
 - tapOn:
     text: "Chemistry Topic 1"
 
-# 8. Wait for topic detail screen
+# 12. Wait for topic detail screen
 - extendedWaitUntil:
     visible:
       id: "retention-card"
     timeout: 10000
 
-# 9. Verify the smart primary action resolves to Relearn
+# 13. Look for "Needs attention" indicator (3+ failures marker)
+- assertVisible:
+    text: "Needs attention"
+    optional: true
+
+# 14. Verify the smart primary action resolves to Relearn
 - assertVisible:
     id: "primary-action-button"
 - assertVisible:
     text: "Relearn"
 
-# 10. Tap the primary relearn action
+# 15. Tap the primary relearn action
 - tapOn:
     id: "primary-action-button"
 
-# 11. Verify relearn screen loads with choice phase
+# 16. Verify relearn screen loads with choice phase
 - extendedWaitUntil:
     visible:
       text: "Relearn Topic"
     timeout: 10000
 
-# 12. Wait for choice phase to render — verify both options are present.
+# 17. Wait for choice phase to render — verify both options are present.
 #     NOTE: text assertion "Every topic needs its own approach" removed —
 #     Maestro can't match long wrapping text in single <Text> on Android.
 #     The testID checks provide equivalent coverage.
@@ -111,20 +141,20 @@ tags:
       id: "relearn-different-method"
     timeout: 10000
 
-# 13. Verify both choice options are present
+# 18. Verify both choice options are present
 - assertVisible:
     id: "relearn-different-method"
 - assertVisible:
     id: "relearn-same-method"
 
-# 14. Screenshot of relearn choice phase
+# 19. Screenshot of relearn choice phase
 - takeScreenshot: relearn-choice-phase
 
-# 15. Tap "Different Method" (recommended option)
+# 20. Tap "Different Method" (recommended option)
 - tapOn:
     id: "relearn-different-method"
 
-# 16. Verify method picker phase loads — wait for first method option.
+# 21. Verify method picker phase loads — wait for first method option.
 #     NOTE: text "Pick a teaching style that works best for you:" is a long
 #     wrapping <Text> that Maestro can't match on Android. Use testID instead.
 - extendedWaitUntil:
@@ -132,7 +162,7 @@ tags:
       id: "relearn-method-visual_diagrams"
     timeout: 5000
 
-# 17. Verify all 4 method options are present
+# 22. Verify all 4 method options are present
 - assertVisible:
     id: "relearn-method-visual_diagrams"
 - assertVisible:
@@ -142,14 +172,14 @@ tags:
 - assertVisible:
     id: "relearn-method-practice_problems"
 
-# 18. Screenshot of method picker
+# 23. Screenshot of method picker
 - takeScreenshot: relearn-method-picker
 
-# 19. Select "Visual Diagrams" method
+# 24. Select "Visual Diagrams" method
 - tapOn:
     id: "relearn-method-visual_diagrams"
 
-# 20. Wait for relearn session to start (navigates to session screen)
+# 25. Wait for relearn session to start (navigates to session screen)
 # The relearn mutation calls the API and navigates on success.
 # Either loading state or session screen should appear.
 - extendedWaitUntil:
@@ -158,5 +188,5 @@ tags:
     timeout: 5000
     optional: true
 
-# 21. Screenshot after method selection (loading or session)
+# 26. Screenshot after method selection (loading or session)
 - takeScreenshot: relearn-session-starting
