@@ -34,7 +34,11 @@
 
 These deviations from the rules above exist in the codebase as of 2026-05-01. They are listed here so reviewers don't try to "fix" them in unrelated PRs and so new contributors don't take them as precedent. Each exception should either be tracked toward a refactor, or promoted into an explicit rule.
 
-- **`apps/api/src/routes/sessions.ts` imports `drizzle-orm` primitives directly** (`and`, `eq`, `lt`, `sql` at line 21), in violation of the "Route files must not import ORM primitives" rule. This predates the rule and has not been refactored. **New route code must NOT follow this pattern** — keep ORM access inside `services/` and `createScopedRepository`. Treat this file as the *only* sanctioned exception, not as a license. (Earlier drafts of this list also named `routes/quiz.ts`; that was incorrect — `quiz.ts` has zero ORM imports and contains an explicit in-file guard against them.)
+- **`apps/api/src/routes/sessions.ts` imports `drizzle-orm` primitives directly**, in violation of the "Route files must not import ORM primitives" rule. The exact import (verifiable via `grep -n "from 'drizzle-orm'" apps/api/src/routes/sessions.ts`) is:
+  ```ts
+  import { and, eq, lt, sql } from 'drizzle-orm';
+  ```
+  This predates the rule and has not been refactored. **New route code must NOT follow this pattern** — keep ORM access inside `services/` and `createScopedRepository`. Treat this file as the *only* sanctioned exception, not as a license. To re-verify the "only" claim: `grep -lE "from 'drizzle-orm'" apps/api/src/routes/*.ts` should return exactly `apps/api/src/routes/sessions.ts` and nothing else. (Earlier drafts of this list also named `routes/quiz.ts`; that was incorrect — `quiz.ts` has zero ORM imports and contains an explicit in-file guard against them.)
 - **`apps/mobile/tsconfig.json` declares `references[]: [{ "path": "../api" }]`**, in tension with the conceptual "mobile must not depend on api" rule. This is required so `import type { AppType } from '@eduagent/api'` resolves for the Hono RPC client. **Type-only imports** from `@eduagent/api` are accepted; runtime imports remain forbidden (they would pull API server code into the mobile bundle). See `docs/architecture.md` → "AppType" example for the rationale.
 
 ## Schema And Deploy Safety
