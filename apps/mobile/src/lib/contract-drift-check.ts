@@ -50,7 +50,7 @@ export async function checkContractDrift(): Promise<void> {
 
     if (body.deploySha === localSha.slice(0, 8)) {
       console.info(
-        `[contract-drift] API and mobile on same commit (${body.deploySha}) ✓`
+        `[contract-drift] API and mobile on same commit (${body.deploySha}) OK`
       );
       return;
     }
@@ -58,7 +58,7 @@ export async function checkContractDrift(): Promise<void> {
     console.warn(
       '\n' +
         '╔══════════════════════════════════════════════════════════════╗\n' +
-        '║  ⚠ API CONTRACT DRIFT DETECTED                            ║\n' +
+        '║  WARNING: API CONTRACT DRIFT DETECTED                      ║\n' +
         '╠══════════════════════════════════════════════════════════════╣\n' +
         `║  API deployed:  ${body.deploySha.padEnd(40)} ║\n` +
         `║  Local mobile:  ${localSha.slice(0, 8).padEnd(40)} ║\n` +

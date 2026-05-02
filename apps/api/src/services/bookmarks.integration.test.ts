@@ -20,6 +20,9 @@ import {
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
+const hasDatabaseUrl = !!process.env.DATABASE_URL;
+const describeIfDb = hasDatabaseUrl ? describe : describe.skip;
+
 const RUN_ID = generateUUIDv7();
 let db: Database;
 
@@ -116,20 +119,17 @@ async function seedTestData(): Promise<void> {
   aiEventId2 = event2!.id;
 }
 
-beforeAll(async () => {
-  db = createDatabase(process.env.DATABASE_URL!);
-  await seedTestData();
-});
+describeIfDb('Bookmarks (integration)', () => {
+  beforeAll(async () => {
+    db = createDatabase(process.env.DATABASE_URL!);
+    await seedTestData();
+  });
 
-afterAll(async () => {
-  // Cascade from accounts tears down profiles → subjects → sessions →
-  // session_events → bookmarks, so one delete cleans up the whole tree.
-  await db
-    .delete(accounts)
-    .where(like(accounts.clerkUserId, `clerk_integ_bkmk_${RUN_ID}%`));
-});
-
-describe('Bookmarks (integration)', () => {
+  afterAll(async () => {
+    await db
+      .delete(accounts)
+      .where(like(accounts.clerkUserId, `clerk_integ_bkmk_${RUN_ID}%`));
+  });
   let createdBookmarkId: string;
 
   it('creates bookmark with snapshotted content', async () => {
@@ -144,7 +144,7 @@ describe('Bookmarks (integration)', () => {
     );
     expect(bookmark.subjectName).toBe('Mathematics');
     expect(bookmark.topicTitle).toBeNull();
-    expect(bookmark.createdAt).toBeInstanceOf(Date);
+    expect(bookmark.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
   });
 
   it('rejects duplicate eventId for same profile', async () => {

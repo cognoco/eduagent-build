@@ -379,13 +379,9 @@ export async function extractSignals(
         ? parsed.experienceLevel
         : 'beginner',
     currentKnowledge:
-<<<<<<< Updated upstream
       typeof parsed.currentKnowledge === 'string'
         ? parsed.currentKnowledge
         : '',
-=======
-      typeof parsed.currentKnowledge === 'string' ? parsed.currentKnowledge : '',
->>>>>>> Stashed changes
     interests,
   };
 }

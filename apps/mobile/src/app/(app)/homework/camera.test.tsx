@@ -1,7 +1,13 @@
+import React from 'react';
 import { Alert, AppState, type AppStateStatus } from 'react-native';
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import CameraScreen from './camera';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  createRoutedMockFetch,
+  fetchCallsMatching,
+  extractJsonBody,
+} from '../../../test-utils/mock-api-routes';
 
 // Mock expo-router
 jest.mock('expo-router', () => ({
@@ -74,7 +80,8 @@ jest.mock('../../../lib/theme', () => ({
   }),
 }));
 
-// Mock the OCR hook
+// Mock the OCR hook — use-homework-ocr has no useApiClient() calls (processes
+// images locally via expo-camera + Cloudflare R2 upload). Keep as direct mock.
 const mockProcess = jest.fn().mockResolvedValue(undefined);
 const mockRetry = jest.fn().mockResolvedValue(undefined);
 const mockCancel = jest.fn();
@@ -90,23 +97,92 @@ jest.mock('../../../hooks/use-homework-ocr', () => ({
   }),
 }));
 
-// Mock subjects hook (used for inline subject picker when no subjectId provided)
-const mockCreateSubjectMutateAsync = jest.fn();
-jest.mock('../../../hooks/use-subjects', () => ({
-  useSubjects: jest.fn(),
-  useCreateSubject: jest.fn(),
-}));
-
-// Mock classify subject hook (subject auto-detection)
-const mockMutateAsync = jest.fn();
-jest.mock('../../../hooks/use-classify-subject', () => ({
-  useClassifySubject: jest.fn().mockReturnValue({
-    mutateAsync: mockMutateAsync,
-    isPending: false,
-    data: null,
-    error: null,
+jest.mock('../../../lib/profile', () => ({
+  useProfile: () => ({
+    activeProfile: {
+      id: 'test-profile-id',
+      accountId: 'test-account-id',
+      displayName: 'Test Learner',
+      isOwner: true,
+      hasPremiumLlm: false,
+      conversationLanguage: 'en',
+      pronouns: null,
+      consentStatus: null,
+    },
   }),
 }));
+
+// ---------------------------------------------------------------------------
+// Fetch-boundary mock — route handlers close over mutable variables below.
+// ---------------------------------------------------------------------------
+
+// Default subjects list — overridden per-test via setRoute() for isLoading cases.
+const defaultSubjects = [
+  { id: 'sub-123', name: 'Mathematics', status: 'active' },
+  { id: 'sub-456', name: 'Science', status: 'active' },
+];
+
+// Mutable results closed over by route handlers — reset in beforeEach.
+// classify: null → classify route throws (simulate no auto-detection by default)
+let mockClassifyResult: Record<string, unknown> | Response | Error | null =
+  null;
+// createSubject: defaults to a resolved subject
+let mockCreateSubjectResult: Record<string, unknown> | Response = {
+  subject: { id: 'sub-created', name: 'Biology' },
+};
+
+const mockFetch = createRoutedMockFetch({
+  // POST /subjects/classify — must be listed BEFORE /subjects to avoid
+  // the shorter pattern matching the longer URL first.
+  // Async handler (one microtask) so the subjects query sets isLoading = true
+  // before classify resolves or throws — required for BUG-690 loading tests.
+  'subjects/classify': async (_url: string, _init?: RequestInit) => {
+    await Promise.resolve();
+    if (mockClassifyResult instanceof Error) throw mockClassifyResult;
+    if (mockClassifyResult instanceof Response) return mockClassifyResult;
+    return mockClassifyResult;
+  },
+  // GET /subjects (useSubjects) + POST /subjects (useCreateSubject)
+  subjects: (url: string, init?: RequestInit) => {
+    if (init?.method === 'POST') {
+      if (mockCreateSubjectResult instanceof Response)
+        return mockCreateSubjectResult;
+      return mockCreateSubjectResult;
+    }
+    // GET — default to the subjects list
+    return { subjects: defaultSubjects };
+  },
+});
+
+jest.mock('../../../lib/api-client', () =>
+  require('../../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch)
+);
+
+// CameraScreen is required AFTER jest.mock and mockFetch are initialized,
+// so the lib/api-client mock factory runs with mockFetch already defined.
+// A static `import CameraScreen from './camera'` at the top would cause
+// the factory to run during module-load with mockFetch still in TDZ.
+
+const CameraScreen = require('./camera').default as React.ComponentType;
+
+// Create a fresh QueryClient per test to prevent cross-test query cache
+// contamination from async fetch-boundary responses.
+function createWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+        gcTime: 0,
+        refetchOnWindowFocus: false,
+      },
+    },
+  });
+  return function Wrapper({ children }: { children: React.ReactNode }) {
+    return (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+  };
+}
 
 // Import mocks after jest.mock
 const { useCameraPermissions } = require('expo-camera');
@@ -115,10 +191,6 @@ const {
   getMediaLibraryPermissionsAsync: mockGetMediaLibraryPermissionsAsync,
 } = require('expo-image-picker');
 const { useHomeworkOcr } = require('../../../hooks/use-homework-ocr');
-const {
-  useSubjects,
-  useCreateSubject,
-} = require('../../../hooks/use-subjects');
 
 const mockRouter = {
   replace: jest.fn(),
@@ -126,8 +198,6 @@ const mockRouter = {
   back: jest.fn(),
   canGoBack: jest.fn(() => true),
 };
-
-const { useClassifySubject } = require('../../../hooks/use-classify-subject');
 
 // Capture AppState listeners so tests can simulate foreground transitions
 const mockRemove = jest.fn();
@@ -155,27 +225,31 @@ beforeEach(() => {
     canAskAgain: true,
   });
   (useRouter as jest.Mock).mockReturnValue(mockRouter);
-  (useSubjects as jest.Mock).mockReturnValue({
-    data: [
-      { id: 'sub-123', name: 'Mathematics', status: 'active' },
-      { id: 'sub-456', name: 'Science', status: 'active' },
-    ],
-    isLoading: false,
+  // Reset fetch-boundary routes to defaults for each test.
+  // useSubjects() → GET /subjects → default subjects list
+  mockFetch.setRoute('subjects', (url: string, init?: RequestInit) => {
+    if (init?.method === 'POST') {
+      if (mockCreateSubjectResult instanceof Response)
+        return mockCreateSubjectResult;
+      return mockCreateSubjectResult;
+    }
+    return { subjects: defaultSubjects };
   });
-  (useCreateSubject as jest.Mock).mockReturnValue({
-    mutateAsync: mockCreateSubjectMutateAsync,
-    isPending: false,
-  });
-  mockCreateSubjectMutateAsync.mockResolvedValue({
-    subject: { id: 'sub-created', name: 'Biology' },
-  });
-  // Reset classify mock to default (no auto-detection)
-  (useClassifySubject as jest.Mock).mockReturnValue({
-    mutateAsync: mockMutateAsync,
-    isPending: false,
-    data: null,
-    error: null,
-  });
+  // useClassifySubject() → POST /subjects/classify → null (no auto-detection by default).
+  // The handler is async (one microtask tick) so the subjects query has a chance
+  // to start and set isLoading = true before classify resolves or throws. This
+  // matters for BUG-690 tests that assert on isLoading state in the subject picker.
+  mockClassifyResult = null;
+  mockFetch.setRoute(
+    'subjects/classify',
+    async (_url: string, _init?: RequestInit) => {
+      await Promise.resolve(); // yield to let subjects query set isLoading = true
+      if (mockClassifyResult instanceof Error) throw mockClassifyResult;
+      if (mockClassifyResult instanceof Response) return mockClassifyResult;
+      return mockClassifyResult;
+    }
+  );
+  mockCreateSubjectResult = { subject: { id: 'sub-created', name: 'Biology' } };
   (useLocalSearchParams as jest.Mock).mockReturnValue({
     subjectId: 'sub-123',
     subjectName: 'Mathematics',
@@ -206,7 +280,9 @@ describe('CameraScreen', () => {
       jest.fn().mockResolvedValue({ granted: false, canAskAgain: true }),
     ]);
 
-    const { getByText, getByTestId } = render(<CameraScreen />);
+    const { getByText, getByTestId } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
     getByText(/camera access/i);
     getByTestId('grant-permission-button');
   });
@@ -218,7 +294,9 @@ describe('CameraScreen', () => {
       jest.fn().mockResolvedValue({ granted: false, canAskAgain: true }),
     ]);
 
-    const { getByText, queryByText } = render(<CameraScreen />);
+    const { getByText, queryByText } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
     // New first-person, outcome-first copy is present
     expect(
       getByText(
@@ -237,7 +315,9 @@ describe('CameraScreen', () => {
       jest.fn().mockResolvedValue({ granted: false, canAskAgain: false }),
     ]);
 
-    const { getByTestId, getByText } = render(<CameraScreen />);
+    const { getByTestId, getByText } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
     getByTestId('open-settings-button');
     getByText(/device settings/i);
   });
@@ -254,7 +334,7 @@ describe('CameraScreen', () => {
       mockGetPermission,
     ]);
 
-    render(<CameraScreen />);
+    render(<CameraScreen />, { wrapper: createWrapper() });
 
     // Simulate returning from Settings — AppState fires 'active'
     expect(appStateListeners.length).toBeGreaterThan(0);
@@ -268,7 +348,9 @@ describe('CameraScreen', () => {
   // ---- Viewfinder phase ----
 
   it('shows camera viewfinder when permission granted', () => {
-    const { getByTestId, getByText } = render(<CameraScreen />);
+    const { getByTestId, getByText } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
     getByTestId('camera-view');
     getByTestId('capture-button');
     getByTestId('gallery-button');
@@ -282,7 +364,9 @@ describe('CameraScreen', () => {
       assets: [{ uri: 'file:///gallery/homework.png' }],
     });
 
-    const { getByTestId } = render(<CameraScreen />);
+    const { getByTestId } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
 
     fireEvent.press(getByTestId('gallery-button'));
 
@@ -303,7 +387,9 @@ describe('CameraScreen', () => {
       assets: null,
     });
 
-    const { getByTestId, queryByTestId } = render(<CameraScreen />);
+    const { getByTestId, queryByTestId } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
 
     fireEvent.press(getByTestId('gallery-button'));
 
@@ -324,7 +410,9 @@ describe('CameraScreen', () => {
       new Error('Picker crashed')
     );
 
-    const { getByTestId } = render(<CameraScreen />);
+    const { getByTestId } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
 
     fireEvent.press(getByTestId('gallery-button'));
 
@@ -342,7 +430,9 @@ describe('CameraScreen', () => {
   });
 
   it('shows close button that calls router.back()', () => {
-    const { getByTestId } = render(<CameraScreen />);
+    const { getByTestId } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
     fireEvent.press(getByTestId('close-button'));
     expect(mockRouter.back).toHaveBeenCalled();
   });
@@ -370,7 +460,9 @@ describe('CameraScreen', () => {
     // Instead, let's verify the skeleton shimmer elements exist when the
     // reducer is in processing phase. Since we can't directly set reducer
     // state, we test that the processing text matches the spec.
-    const { getByText } = render(<CameraScreen />);
+    const { getByText } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
 
     // The component starts in viewfinder (permission granted), not processing.
     // Processing phase is tested via the confirm flow in integration tests.
@@ -391,7 +483,9 @@ describe('CameraScreen', () => {
       retry: mockRetry,
     });
 
-    const { getByTestId, getByText } = render(<CameraScreen />);
+    const { getByTestId, getByText } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       getByText(/type it out/i);
@@ -413,7 +507,9 @@ describe('CameraScreen', () => {
       retry: mockRetry,
     });
 
-    const { getByTestId, getByText } = render(<CameraScreen />);
+    const { getByTestId, getByText } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       getByText(/type it out/i);
@@ -434,7 +530,9 @@ describe('CameraScreen', () => {
       retry: mockRetry,
     });
 
-    const { getByTestId } = render(<CameraScreen />);
+    const { getByTestId } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       getByTestId('manual-input');
@@ -472,7 +570,9 @@ describe('CameraScreen', () => {
       retry: mockRetry,
     });
 
-    const { getByTestId } = render(<CameraScreen />);
+    const { getByTestId } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(
       () => {
@@ -508,7 +608,9 @@ describe('CameraScreen', () => {
       retry: mockRetry,
     });
 
-    const { getByTestId, getByText } = render(<CameraScreen />);
+    const { getByTestId, getByText } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       getByText(/problems I found/i);
@@ -529,7 +631,9 @@ describe('CameraScreen', () => {
       retry: mockRetry,
     });
 
-    const { getByTestId, queryByTestId } = render(<CameraScreen />);
+    const { getByTestId, queryByTestId } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       getByTestId('dropped-fragments-chip');
@@ -545,10 +649,8 @@ describe('CameraScreen', () => {
 
   it('creates a new subject before continuing when the learner types one manually', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({});
-    mockMutateAsync.mockResolvedValueOnce({
-      needsConfirmation: true,
-      candidates: [],
-    });
+    // Classify returns needsConfirmation → manual picker opens for user to type subject
+    mockClassifyResult = { needsConfirmation: true, candidates: [] };
     (useHomeworkOcr as jest.Mock).mockReturnValue({
       text: 'Photosynthesis worksheet question',
       status: 'done',
@@ -558,7 +660,9 @@ describe('CameraScreen', () => {
       retry: mockRetry,
     });
 
-    const { getByTestId } = render(<CameraScreen />);
+    const { getByTestId } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       getByTestId('subject-picker');
@@ -568,10 +672,19 @@ describe('CameraScreen', () => {
     fireEvent.press(getByTestId('camera-continue-button'));
 
     await waitFor(() => {
-      expect(mockCreateSubjectMutateAsync).toHaveBeenCalledWith({
-        name: 'Biology',
-        rawInput: 'Biology',
-      });
+      const allCalls = fetchCallsMatching(mockFetch, 'subjects');
+      const createCall = allCalls.find(
+        (c) => c.init?.method === 'POST' && !c.url.includes('classify')
+      );
+      const body = extractJsonBody<{ name: string; rawInput: string }>(
+        createCall?.init
+      );
+      expect(body).toEqual(
+        expect.objectContaining({
+          name: 'Biology',
+          rawInput: 'Biology',
+        })
+      );
     });
 
     expect(mockRouter.replace).toHaveBeenCalledWith(
@@ -592,11 +705,16 @@ describe('CameraScreen', () => {
   it('[BUG-690] shows a loading state when subjects are still loading and no candidates yet', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
     (useLocalSearchParams as jest.Mock).mockReturnValue({});
-    (useSubjects as jest.Mock).mockReturnValue({
-      data: undefined,
-      isLoading: true,
-    });
-    mockMutateAsync.mockRejectedValueOnce(new Error('classification down'));
+    // Subjects fetch never resolves → useSubjects() stays in isLoading: true state
+    mockFetch.setRoute(
+      'subjects',
+      () =>
+        new Promise<Response>(() => {
+          /* never resolves */
+        })
+    );
+    // Classify throws → picker opens with no candidates; subjects still loading
+    mockClassifyResult = new Error('classification down');
     (useHomeworkOcr as jest.Mock).mockReturnValue({
       text: 'Some homework problem',
       status: 'done',
@@ -606,12 +724,18 @@ describe('CameraScreen', () => {
       retry: mockRetry,
     });
 
-    const { getByTestId } = render(<CameraScreen />);
+    const { getByTestId } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
 
+    // Wait for BOTH the picker to appear AND the loading indicator within it.
+    // With fetch-boundary, the subjects query may start fetching after the
+    // classify error fires setShowSubjectPicker, so we must wait for the
+    // isLoading state to propagate before asserting the loading testID.
     await waitFor(() => {
       getByTestId('subject-picker');
+      getByTestId('subject-picker-loading');
     });
-    getByTestId('subject-picker-loading');
 
     alertSpy.mockRestore();
   });
@@ -624,10 +748,14 @@ describe('CameraScreen', () => {
   it('[BUG-690] error-phase manual picker shows loading state when subjects still loading', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
     (useLocalSearchParams as jest.Mock).mockReturnValue({});
-    (useSubjects as jest.Mock).mockReturnValue({
-      data: undefined,
-      isLoading: true,
-    });
+    // Subjects fetch never resolves → useSubjects() stays in isLoading: true state
+    mockFetch.setRoute(
+      'subjects',
+      () =>
+        new Promise<Response>(() => {
+          /* never resolves */
+        })
+    );
     (useHomeworkOcr as jest.Mock).mockReturnValue({
       text: null,
       status: 'error',
@@ -636,16 +764,18 @@ describe('CameraScreen', () => {
       process: mockProcess,
       retry: mockRetry,
     });
-    // Classify returns multiple candidates → picker opens
-    mockMutateAsync.mockResolvedValue({
+    // Classify returns multiple candidates → picker opens; subjects still loading
+    mockClassifyResult = {
       needsConfirmation: true,
       candidates: [
         { subjectId: 'a', subjectName: 'A', confidence: 0.5 },
         { subjectId: 'b', subjectName: 'B', confidence: 0.4 },
       ],
-    });
+    };
 
-    const { getByTestId } = render(<CameraScreen />);
+    const { getByTestId } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       getByTestId('manual-input');
@@ -664,9 +794,10 @@ describe('CameraScreen', () => {
   it('[BUG-690] error-phase manual picker shows empty state with Create action when no subjects', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
     (useLocalSearchParams as jest.Mock).mockReturnValue({});
-    (useSubjects as jest.Mock).mockReturnValue({
-      data: [],
-      isLoading: false,
+    // Subjects list is empty
+    mockFetch.setRoute('subjects', (url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') return mockCreateSubjectResult;
+      return { subjects: [] };
     });
     (useHomeworkOcr as jest.Mock).mockReturnValue({
       text: null,
@@ -676,15 +807,17 @@ describe('CameraScreen', () => {
       process: mockProcess,
       retry: mockRetry,
     });
-    mockMutateAsync.mockResolvedValue({
+    mockClassifyResult = {
       needsConfirmation: true,
       candidates: [
         { subjectId: 'a', subjectName: 'A', confidence: 0.5 },
         { subjectId: 'b', subjectName: 'B', confidence: 0.4 },
       ],
-    });
+    };
 
-    const { getByTestId } = render(<CameraScreen />);
+    const { getByTestId } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       getByTestId('manual-input');
@@ -711,7 +844,7 @@ describe('CameraScreen', () => {
   it('[BUG-802] shows an alert when subject classification fails (silent fallback ban)', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
     (useLocalSearchParams as jest.Mock).mockReturnValue({});
-    mockMutateAsync.mockRejectedValueOnce(new Error('Network down'));
+    mockClassifyResult = new Error('Network down');
     (useHomeworkOcr as jest.Mock).mockReturnValue({
       text: 'Some homework problem',
       status: 'done',
@@ -721,7 +854,9 @@ describe('CameraScreen', () => {
       retry: mockRetry,
     });
 
-    const { getByTestId } = render(<CameraScreen />);
+    const { getByTestId } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       expect(alertSpy).toHaveBeenCalled();
@@ -746,13 +881,19 @@ describe('CameraScreen', () => {
   it('[BUG-809] surfaces formatApiError detail when auto-create-subject fails', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
     (useLocalSearchParams as jest.Mock).mockReturnValue({});
-    mockMutateAsync.mockResolvedValueOnce({
+    // Classify returns single suggested subject → auto-create fires
+    mockClassifyResult = {
       needsConfirmation: false,
       candidates: [],
       suggestedSubjectName: 'Biology',
-    });
-    mockCreateSubjectMutateAsync.mockRejectedValueOnce(
-      new Error('Quota exceeded — too many subjects')
+    };
+    // Create-subject POST returns a 500 error
+    mockCreateSubjectResult = new Response(
+      JSON.stringify({
+        message: 'Quota exceeded — too many subjects',
+        code: 'QUOTA',
+      }),
+      { status: 500 }
     );
     (useHomeworkOcr as jest.Mock).mockReturnValue({
       text: 'Photosynthesis worksheet question',
@@ -763,7 +904,7 @@ describe('CameraScreen', () => {
       retry: mockRetry,
     });
 
-    render(<CameraScreen />);
+    render(<CameraScreen />, { wrapper: createWrapper() });
 
     await waitFor(() => {
       expect(alertSpy).toHaveBeenCalled();
@@ -786,10 +927,10 @@ describe('CameraScreen', () => {
   // truthy, and falls through to the manual subject picker when malformed.
   it('[BREAK / BUG-807] falls back to manual picker when candidate is missing subjectId', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({});
-    mockMutateAsync.mockResolvedValueOnce({
+    mockClassifyResult = {
       needsConfirmation: false,
       candidates: [{ subjectName: 'Math', confidence: 0.95 }],
-    });
+    };
     (useHomeworkOcr as jest.Mock).mockReturnValue({
       text: 'Some homework problem',
       status: 'done',
@@ -799,7 +940,9 @@ describe('CameraScreen', () => {
       retry: mockRetry,
     });
 
-    const { getByTestId } = render(<CameraScreen />);
+    const { getByTestId } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       getByTestId('subject-picker');
@@ -808,10 +951,10 @@ describe('CameraScreen', () => {
 
   it('[BREAK / BUG-807] falls back to manual picker when candidates contains a null entry', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({});
-    mockMutateAsync.mockResolvedValueOnce({
+    mockClassifyResult = {
       needsConfirmation: false,
       candidates: [null],
-    });
+    };
     (useHomeworkOcr as jest.Mock).mockReturnValue({
       text: 'Some homework problem',
       status: 'done',
@@ -821,7 +964,9 @@ describe('CameraScreen', () => {
       retry: mockRetry,
     });
 
-    const { getByTestId } = render(<CameraScreen />);
+    const { getByTestId } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       getByTestId('subject-picker');
@@ -833,10 +978,11 @@ describe('CameraScreen', () => {
   // `true` from the previous photo, skipping classification on the next one.
   it('[BUG-824] re-runs classification after the captured image changes', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({});
-    mockMutateAsync.mockResolvedValue({
+    // Classify always returns a single well-formed candidate
+    mockClassifyResult = {
       needsConfirmation: false,
       candidates: [{ subjectId: 'sub-x', subjectName: 'X', confidence: 0.9 }],
-    });
+    };
 
     // First render: image-1 + done OCR → classification fires.
     (useHomeworkOcr as jest.Mock).mockReturnValue({
@@ -848,10 +994,12 @@ describe('CameraScreen', () => {
       retry: mockRetry,
     });
 
-    const { rerender } = render(<CameraScreen />);
+    const { rerender } = render(<CameraScreen />, { wrapper: createWrapper() });
 
     await waitFor(() => {
-      expect(mockMutateAsync).toHaveBeenCalledTimes(1);
+      expect(fetchCallsMatching(mockFetch, 'subjects/classify')).toHaveLength(
+        1
+      );
     });
 
     // Second photo: imageUri changes via gallery pick + new OCR text.
@@ -884,11 +1032,11 @@ describe('CameraScreen', () => {
     // re-runs to re-populate, which goes through the reset path.
     // The simplest signal: the reset effect ran (ref is false), and the
     // classify guard `!classifyTriggeredRef.current` is now satisfied.
-    // We assert mutateAsync stays at 1 (no double-classify on stale state)
-    // — the regression we are guarding against is the OPPOSITE: a stuck
-    // ref preventing a fresh classify. Retake path is covered separately
-    // by handleRetake's explicit reset.
-    expect(mockMutateAsync).toHaveBeenCalled();
+    // We assert classify was called (the regression guards the OPPOSITE: a
+    // stuck ref preventing a fresh classify on the second image).
+    expect(
+      fetchCallsMatching(mockFetch, 'subjects/classify').length
+    ).toBeGreaterThan(0);
   });
 
   // [BUG-689 / M-9] BREAK TESTS — UI-level safety timeout for OCR processing.
@@ -906,7 +1054,7 @@ describe('CameraScreen', () => {
         assets: [{ uri: 'file:///gallery/photo.jpg' }],
       });
       mockProcess.mockImplementationOnce(() => new Promise(() => undefined));
-      const utils = render(<CameraScreen />);
+      const utils = render(<CameraScreen />, { wrapper: createWrapper() });
       await act(async () => {
         fireEvent.press(utils.getByTestId('gallery-button'));
       });

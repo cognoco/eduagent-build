@@ -66,6 +66,21 @@ import { createLogger } from '../logger';
 import { captureException } from '../sentry';
 import { buildResumeContext } from './session-context-builders';
 import { projectAiResponseContent } from '../llm/project-response';
+
+const BANNED_FILLER_OPENERS = [
+  "i'm so proud",
+  'great job',
+  'amazing',
+  'fantastic',
+  'awesome',
+  "let's dive in",
+  'nice work',
+  'excellent',
+  'wonderful',
+  'perfect',
+  "that's a great question",
+] as const;
+
 /**
  * English-language intent pre-classifier used to fast-path four-strands
  * pedagogy for obvious translation / "how do you say" asks.
@@ -1133,19 +1148,9 @@ export async function persistExchangeResult(
   {
     const words = aiResponse.trim().split(/\s+/);
     const firstSixWords = words.slice(0, 6).join(' ').toLowerCase();
-    const startsWithFiller = [
-      "i'm so proud",
-      'great job',
-      'amazing',
-      'fantastic',
-      'awesome',
-      "let's dive in",
-      'nice work',
-      'excellent',
-      'wonderful',
-      'perfect',
-      "that's a great question",
-    ].some((opener) => firstSixWords.startsWith(opener));
+    const startsWithFiller = BANNED_FILLER_OPENERS.some((opener) =>
+      firstSixWords.startsWith(opener)
+    );
     logger.info('[session-exchange] tone check', {
       event: 'llm.tone_check',
       sessionId,

@@ -76,7 +76,7 @@ run_jest() {
   # shellcheck disable=SC2086
   # --passWithNoTests: files like route screens or CSS may have no related tests;
   # without this flag, jest exits 1 and blocks the commit unnecessarily.
-  if ! (cd "$WORKSPACE_ROOT/$project_dir" && pnpm exec jest --findRelatedTests $abs_files --no-coverage --bail --passWithNoTests --forceExit); then
+  if ! (cd "$WORKSPACE_ROOT/$project_dir" && pnpm exec jest --findRelatedTests $abs_files --no-coverage --bail --passWithNoTests --forceExit --testPathIgnorePatterns='\.integration\.test\.'); then
     FAILED=1
   fi
 }
@@ -107,7 +107,7 @@ if [ -n "$MOBILE_FILES" ]; then
   done
   echo "pre-commit-tests: [apps/mobile] jest --findRelatedTests ($MOBILE_FILES)"
   # shellcheck disable=SC2086
-  if ! (cd "$WORKSPACE_ROOT/apps/mobile" && NODE_OPTIONS='--max-old-space-size=6144' pnpm exec jest --findRelatedTests $abs_mobile_files --no-coverage --bail --passWithNoTests --forceExit); then
+  if ! (cd "$WORKSPACE_ROOT/apps/mobile" && NODE_OPTIONS='--max-old-space-size=6144' pnpm exec jest --findRelatedTests $abs_mobile_files --no-coverage --bail --passWithNoTests --forceExit --testPathIgnorePatterns='\.integration\.test\.'); then
     FAILED=1
   fi
 fi

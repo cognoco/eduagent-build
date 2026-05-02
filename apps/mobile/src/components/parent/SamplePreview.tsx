@@ -4,7 +4,6 @@ import { View, Text } from 'react-native';
 interface SamplePreviewProps {
   children: ReactNode;
   unlockMessage: string;
-  countdown?: number;
 }
 
 export function SamplePreview({

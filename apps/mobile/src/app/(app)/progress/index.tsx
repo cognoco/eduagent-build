@@ -129,7 +129,9 @@ export function getNextMilestoneLabel(totalSessions: number): string {
     return "You've reached all session milestones. Keep exploring!";
   }
   const remaining = next - totalSessions;
-  return `Complete ${remaining} more ${remaining === 1 ? 'session' : 'sessions'} to reach your next milestone.`;
+  return `Complete ${remaining} more ${
+    remaining === 1 ? 'session' : 'sessions'
+  } to reach your next milestone.`;
 }
 
 function LoadingBlock(): React.ReactElement {
@@ -432,12 +434,12 @@ export default function ProgressScreen(): React.ReactElement {
                   (inventory?.global.totalSessions ?? 0) >= 3
                     ? "You're building a foundation. Growth will become visible once you master your first topic."
                     : (inventory?.global.totalSessions ?? 0) > 0
-                      ? `You've put in ${
-                          inventory?.global.totalSessions ?? 0
-                        } session${
-                          (inventory?.global.totalSessions ?? 0) === 1 ? '' : 's'
-                        }. Keep going — mastery shows up after repeat exposures.`
-                      : 'You just started. Keep going and your growth will appear here.'
+                    ? `You've put in ${
+                        inventory?.global.totalSessions ?? 0
+                      } session${
+                        (inventory?.global.totalSessions ?? 0) === 1 ? '' : 's'
+                      }. Keep going — mastery shows up after repeat exposures.`
+                    : 'You just started. Keep going and your growth will appear here.'
                 }
               />
             </View>
@@ -488,11 +490,6 @@ export default function ProgressScreen(): React.ReactElement {
                 unlockMessage={getNextMilestoneLabel(
                   inventory?.global.totalSessions ?? 0
                 )}
-                countdown={
-                  MILESTONE_THRESHOLDS.find(
-                    (t) => t > (inventory?.global.totalSessions ?? 0)
-                  ) ?? 0
-                }
               >
                 <View className="bg-surface rounded-card p-4 gap-3">
                   {[1, 2, 3].map((i) => (

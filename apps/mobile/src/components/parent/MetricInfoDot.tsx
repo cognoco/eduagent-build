@@ -27,7 +27,7 @@ export function MetricInfoDot({ metricKey }: MetricInfoDotProps) {
         <Ionicons
           name="information-circle-outline"
           size={16}
-          color={colors.textTertiary}
+          color={colors.textSecondary}
         />
       </Pressable>
 

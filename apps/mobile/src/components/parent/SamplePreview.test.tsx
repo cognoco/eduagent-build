@@ -18,12 +18,9 @@ describe('SamplePreview', () => {
     screen.getByText('Complete 3 more sessions to unlock.');
   });
 
-  it('renders unlock message text when countdown is provided', () => {
+  it('renders unlock message text', () => {
     render(
-      <SamplePreview
-        unlockMessage="After 2 more sessions, you'll see trends here."
-        countdown={2}
-      >
+      <SamplePreview unlockMessage="After 2 more sessions, you'll see trends here.">
         <View testID="sample-content">
           <Text>Mock content</Text>
         </View>
