@@ -1,7 +1,13 @@
 # Library Wiring Fixes & Session Debugging Plan
 
 **Date:** 2026-04-22
-**Status:** In progress — library fixes applied locally (Part 1, 2); progress ghost-session fix committed + pushed (Part 2b, `2e901ac3`); streaming root cause identified but not yet fixed (Part 3)
+**Last status refresh:** 2026-05-01
+
+> **Status (2026-05-01):** Parts 1, 2, and 2b appear to have landed in PR #127 (`1f22ea70` — "Hardening branch: bug fix sweep, CR closures, redesign foundations", 2026-04-29). Subsequent fixes in the library area (e.g. `ddb6c31a` BUG-920 empty-shelf-vs-unstarted-topics) suggest the library wiring is now in `main`. **Part 3 (streaming root cause) status has NOT been re-verified** against `main` and the in-flight `durability-layer-fix` branch — the latter is reworking session/interview streaming and may have absorbed or superseded Part 3. Verify on staging before re-opening this plan, and consider archiving Parts 1/2/2b after that check.
+>
+> The original status header below is preserved for context.
+
+**Status (original, 2026-04-22):** In progress — library fixes applied locally (Part 1, 2); progress ghost-session fix committed + pushed (Part 2b, `2e901ac3`); streaming root cause identified but not yet fixed (Part 3)
 **Branch:** `testing`
 
 ---

@@ -2,7 +2,10 @@
 
 **Status:** Draft
 **Date:** 2026-04-20
+**Last status refresh:** 2026-05-01
 **Relationship to existing spec:** Complements — does not replace — [docs/specs/2026-04-19-prompt-tuning-design.md](../specs/2026-04-19-prompt-tuning-design.md). That spec remains the reference plan for **post-launch continuous tuning** once real traffic exists. This plan covers the 2-3 weeks before launch, when the spec's baseline / rollout / telemetry apparatus cannot be exercised because there are no users.
+
+> **Progress check (2026-05-01):** Some prompt tuning work has shipped under different banners (`de9f55b3` "exchange prompt tuning", `855a632f` PR #125 "exchanges service", `3ce28b45` envelope migration + prompt extraction). None of those commits reference this plan by name — verify whether Track 0 (probe battery), B.2, or B.5 are partially or fully done before treating the plan as untouched. Companion spec `docs/specs/2026-04-19-prompt-tuning-design.md` has stale file/line references (`exchanges.ts:230-245` → moved to `exchange-prompts.ts`) — refresh those when this plan is next picked up.
 
 **Core constraint:** Zero users, zero traffic. The spec's `buildSystemPrompt` changes (B.1-B.5) are mostly still the right changes, but the scaffolding around them (7-day production baselines, 10% rollouts, drift dashboards, compliance-rate measurements across live Tier-2 runs) is premature. This plan reshapes the work for the pre-launch stage while keeping the post-launch plan intact for later.
 

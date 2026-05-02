@@ -24,4 +24,3 @@ Full-app audit (2026-04-05) across code reviews (Epics 1-13), security bug-fix-p
 - BMAD epic step-03 requires failure mode ACs in stories
 - BMAD dev-story checklist has 5 new UX checks
 - BMAD code-review checklist has 6 new UX checks
-- `/ux-dead-end-audit` skill for on-demand audits

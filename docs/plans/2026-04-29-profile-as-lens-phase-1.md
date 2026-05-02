@@ -2,8 +2,11 @@
 
 **Date:** 2026-04-29
 **Status:** Engineering-ready (revised 2026-04-29 after adversarial review)
+**Last status refresh:** 2026-05-01
 **Spec:** [`docs/specs/2026-04-28-profile-as-lens.md`](../specs/2026-04-28-profile-as-lens.md)
 **Phase:** 1 of 3 (Foundation — no-regrets refactoring + microcopy + per-profile reporting on `/progress`)
+
+> **Progress check (2026-05-01):** Plan is 2 days old. No PR-0 / PR-1 / PR-2 / PR-3 / PR-4 commits found — `git log --grep="profile-as-lens"` returns only branch-snapshot chores (`b028ae24`, `4bf519fc`). Treat as awaiting first commit; PR 0 (analytics groundwork) is the unblocker for everything else.
 
 ## Overview
 

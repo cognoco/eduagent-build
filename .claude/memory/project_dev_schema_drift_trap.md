@@ -24,7 +24,7 @@ Running diagnostic queries on the Neon "staging" branch will show clean results 
 
 **Do this, in order:**
 
-1. `pnpm run db:push:stg` — syncs current Drizzle schema to the staging Neon branch
+1. `pnpm run db:push:dev` — syncs current Drizzle schema to the dev Neon branch (script wraps drizzle-kit push with `.env.development.local`, which holds the dev Doppler config)
 2. `pnpm run db:generate` — checks if drift needs a committed migration (commit if it produces a file)
 3. Restart the dev server / reload the mobile preview
 

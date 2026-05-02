@@ -12,4 +12,3 @@ Rule lives in `CLAUDE.md` § "Inherited Rules" → "Spec Failure Modes Before Co
 
 - BMAD story template has a mandatory Failure Modes section
 - BMAD code review checklist includes UX dead-end checks
-- `ux-dead-end-audit` skill available for on-demand audits
