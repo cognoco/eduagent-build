@@ -420,9 +420,7 @@ export const exchangesFlow: FlowDefinition<ExchangeScenarioInput> = {
       { role: 'system', content: messages.system },
       ...priorTurns.map((t) => ({
         role: t.role,
-        // Mirror production sanitization (services/exchanges.ts:314) so
-        // user-provided <server_note> markers in fixture history don't
-        // bleed through to the LLM and confuse the orphan-addendum logic.
+        // Mirror production sanitization (exchanges.ts:314) — strips <server_note> markers from fixture history.
         content: t.role === 'user' ? sanitizeUserContent(t.content) : t.content,
       })),
       { role: 'user' as const, content: sanitizeUserContent(messages.user) },
