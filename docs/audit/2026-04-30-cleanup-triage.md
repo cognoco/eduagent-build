@@ -165,7 +165,7 @@ Per-file evidence is brief ("active workflow rule", "active architecture fact");
 | `docs/pre-launch-checklist.md` | Active checklist; Apple/Google/Env-gate items still open. |
 | `docs/deployment-and-secrets.md` | Live operational guide for Doppler / Workers / Cloudflare. |
 | `docs/ux-todos.md` | Active rolling list (created 2026-04-26); H-priority items unresolved. |
-| `docs/changelog.md` | **User's personal cleanup log** (untracked at HEAD). Self-references this very task as "RUNNING #9". Do not touch. |
+| `docs/audit/_changelog.md` | **User's personal cleanup log** (relocated 2026-05-02 from `docs/changelog.md` as part of audit consolidation). Self-references this very task as "RUNNING #9". Do not touch. |
 | `docs/privacy-policy.html` | Required for both blocked store submissions; will be needed when unblocked. |
 | `docs/logo.svg` | Out of scope (binary asset), but list anyway for completeness. |
 | `docs/screenshots_and_store_info/store description.md` | App / Play Store listing copy; needed when stores unblock. |
@@ -178,8 +178,8 @@ Per-file evidence is brief ("active workflow rule", "active architecture fact");
 | `docs/analysis/product-brief-EduAgent-2025-12-11.md` | Foundation brief; cited by 3 docs. |
 | `docs/analysis/research/evidence based learning science.md` | Pedagogy research input; no superseding doc. |
 | `docs/analysis/research/market-ai-tutoring-research-2024-12-11.md` | Market research baseline; cited by PRD. |
-| `docs/claude-optimization/inherited-rules-skill-mapping.md` | Active 2026-04-30 working doc for ongoing CLAUDE.md cleanup. |
-| `docs/claude-optimization/memory-overlap-flags.md` | Active 2026-04-30 working doc; flags canonical conflicts. |
+| `docs/audit/claude-optimization/inherited-rules-skill-mapping.md` | Active 2026-04-30 working doc for ongoing CLAUDE.md cleanup. (Relocated 2026-05-02 from `docs/claude-optimization/`.) |
+| `docs/audit/claude-optimization/memory-overlap-flags.md` | Active 2026-04-30 working doc; flags canonical conflicts. (Relocated 2026-05-02 from `docs/claude-optimization/`.) |
 | `docs/specs/epics.md` | Canonical FR spec; 6,273 lines covering FR1-FR261. **Note co-change C4.** |
 | `docs/specs/2026-04-07-epic-17-voice-first-design.md` | Master spec for not-yet-shipped Epic 17. |
 | `docs/specs/2026-04-18-llm-personalization-audit.md` | Active LLM tuning reference; Phase 3 in progress. |
