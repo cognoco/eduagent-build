@@ -7,9 +7,8 @@ test('J-01 seeded learner lands on learner home @smoke', async ({ page }) => {
   await expect(page.getByTestId('learner-screen')).toBeVisible({
     timeout: 60_000,
   });
-  await expect(page.getByTestId('intent-learn')).toBeVisible();
-  await expect(page.getByTestId('intent-ask')).toBeVisible();
-  await expect(page.getByTestId('intent-practice')).toBeVisible();
-  await expect(page.getByTestId('intent-homework')).toBeVisible();
+  await expect(page.getByTestId('home-action-study-new')).toBeVisible();
+  await expect(page.getByTestId('home-action-homework')).toBeVisible();
+  await expect(page.getByTestId('home-action-practice')).toBeVisible();
   await expect(page.getByTestId('parent-gateway')).toHaveCount(0);
 });
