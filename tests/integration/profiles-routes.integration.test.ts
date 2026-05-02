@@ -104,7 +104,7 @@ describe('Integration: POST /v1/profiles', () => {
 
     expect(resProfile.displayName).toBe('Test User');
     expect(resProfile.birthYear).toBe(2008);
-    expect(resProfile.accountId).toBeDefined();
+    expect(typeof resProfile.accountId).toBe('string');
   });
 
   it('returns 201 with birthYear-only profile data', async () => {

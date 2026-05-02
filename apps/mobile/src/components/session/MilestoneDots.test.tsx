@@ -26,12 +26,12 @@ describe('MilestoneDots', () => {
   it('renders the indicator on wide screens (>= breakpoint)', () => {
     setWindowWidth(MILESTONE_DOTS_NARROW_BREAKPOINT_PT);
     render(<MilestoneDots count={3} />);
-    expect(screen.getByLabelText('3 milestones reached')).toBeTruthy();
+    screen.getByLabelText('3 milestones reached');
   });
 
   it('uses singular label when count is 1', () => {
     render(<MilestoneDots count={1} />);
-    expect(screen.getByLabelText('1 milestone reached')).toBeTruthy();
+    screen.getByLabelText('1 milestone reached');
   });
 
   it('caps the rendered dots at 6 even when count is higher', () => {
@@ -56,6 +56,6 @@ describe('MilestoneDots', () => {
   it('renders on the boundary width (>= breakpoint)', () => {
     setWindowWidth(MILESTONE_DOTS_NARROW_BREAKPOINT_PT);
     const { getByTestId } = render(<MilestoneDots count={2} />);
-    expect(getByTestId('milestone-dots')).toBeTruthy();
+    getByTestId('milestone-dots');
   });
 });

@@ -4,7 +4,7 @@ import { LightBulbAnimation } from './LightBulbAnimation';
 describe('LightBulbAnimation', () => {
   it('renders without crashing at default size', () => {
     const { getByTestId } = render(<LightBulbAnimation testID="bulb" />);
-    expect(getByTestId('bulb')).toBeTruthy();
+    getByTestId('bulb');
   });
 
   it('renders at 64px (default size)', () => {
@@ -44,7 +44,7 @@ describe('LightBulbAnimation', () => {
 
     try {
       const { getByTestId } = render(<LightBulbAnimation testID="bulb" />);
-      expect(getByTestId('bulb')).toBeTruthy();
+      getByTestId('bulb');
     } finally {
       reanimated.useReducedMotion = original;
     }

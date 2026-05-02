@@ -108,11 +108,11 @@ describe('Integration: test-seed routes', () => {
     const body = await res.json();
     expect(body.scenario).toBe('learning-active');
     expect(body.email).toBe(LEARNING_EMAIL);
-    expect(body.accountId).toBeDefined();
-    expect(body.profileId).toBeDefined();
-    expect(body.password).toBeDefined();
-    expect(body.ids.subjectId).toBeDefined();
-    expect(body.ids.sessionId).toBeDefined();
+    expect(typeof body.accountId).toBe('string');
+    expect(typeof body.profileId).toBe('string');
+    expect(typeof body.password).toBe('string');
+    expect(typeof body.ids.subjectId).toBe('string');
+    expect(typeof body.ids.sessionId).toBe('string');
 
     const account = await findAccountByEmail(LEARNING_EMAIL);
     expect(account).toBeDefined();

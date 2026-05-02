@@ -47,9 +47,9 @@ describe('MilestonesListScreen', () => {
 
   it('renders milestone cards', () => {
     render(<MilestonesListScreen />);
-    expect(screen.getByText('5 topics mastered')).toBeTruthy();
-    expect(screen.getByText('10 learning sessions completed')).toBeTruthy();
-    expect(screen.getByTestId('milestones-back')).toBeTruthy();
+    screen.getByText('5 topics mastered');
+    screen.getByText('10 learning sessions completed');
+    screen.getByTestId('milestones-back');
   });
 
   it('shows empty state when no milestones', () => {
@@ -59,7 +59,7 @@ describe('MilestonesListScreen', () => {
       isError: false,
     });
     render(<MilestonesListScreen />);
-    expect(screen.getByTestId('milestones-empty')).toBeTruthy();
+    screen.getByTestId('milestones-empty');
   });
 
   it('shows error state with retry button', () => {
@@ -71,6 +71,6 @@ describe('MilestonesListScreen', () => {
       refetch: jest.fn(),
     });
     render(<MilestonesListScreen />);
-    expect(screen.getByTestId('milestones-error')).toBeTruthy();
+    screen.getByTestId('milestones-error');
   });
 });

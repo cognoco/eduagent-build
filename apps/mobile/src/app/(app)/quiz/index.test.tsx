@@ -126,10 +126,10 @@ describe('QuizIndexScreen', () => {
   describe('[BUG-752] render states', () => {
     it('renders Capitals and Guess Who cards with default subtitles when no stats', () => {
       render(<QuizIndexScreen />);
-      expect(screen.getByTestId('quiz-capitals')).toBeTruthy();
-      expect(screen.getByTestId('quiz-guess-who')).toBeTruthy();
-      expect(screen.getByText(/test yourself on world capitals/i)).toBeTruthy();
-      expect(screen.getByText(/name the famous person/i)).toBeTruthy();
+      screen.getByTestId('quiz-capitals');
+      screen.getByTestId('quiz-guess-who');
+      screen.getByText(/test yourself on world capitals/i);
+      screen.getByText(/name the famous person/i);
     });
 
     it('renders best-score subtitles when stats include bestScore', () => {
@@ -151,13 +151,13 @@ describe('QuizIndexScreen', () => {
         isError: false,
       };
       render(<QuizIndexScreen />);
-      expect(screen.getByText(/Best: 8\/10 · Played: 5/)).toBeTruthy();
-      expect(screen.getByText(/Best: 4\/5 · Played: 2/)).toBeTruthy();
+      screen.getByText(/Best: 8\/10 · Played: 5/);
+      screen.getByText(/Best: 4\/5 · Played: 2/);
     });
 
     it('shows the locked Vocabulary card when there are no four_strands subjects', () => {
       render(<QuizIndexScreen />);
-      expect(screen.getByTestId('quiz-vocab-locked')).toBeTruthy();
+      screen.getByTestId('quiz-vocab-locked');
     });
 
     // [BUG-926] Per-language stats: stat rows now include languageCode so each
@@ -197,10 +197,10 @@ describe('QuizIndexScreen', () => {
       };
       render(<QuizIndexScreen />);
 
-      expect(screen.getByTestId('quiz-vocabulary-sub-it')).toBeTruthy();
-      expect(screen.getByTestId('quiz-vocabulary-sub-es')).toBeTruthy();
+      screen.getByTestId('quiz-vocabulary-sub-it');
+      screen.getByTestId('quiz-vocabulary-sub-es');
       // Italian card shows its specific stats.
-      expect(screen.getByText(/Best: 2\/6 · Played: 1/)).toBeTruthy();
+      screen.getByText(/Best: 2\/6 · Played: 1/);
       // Spanish card has no stat row — must show neutral fallback, not the Italian stats.
       expect(
         screen.getAllByText(/Practice new words and phrases/).length
@@ -243,9 +243,9 @@ describe('QuizIndexScreen', () => {
       render(<QuizIndexScreen />);
 
       // Spanish card shows its stats.
-      expect(screen.getByText(/Best: 5\/6 · Played: 3/)).toBeTruthy();
+      screen.getByText(/Best: 5\/6 · Played: 3/);
       // Italian card has no stat row — neutral fallback must appear.
-      expect(screen.getByText(/Practice new words and phrases/)).toBeTruthy();
+      screen.getByText(/Practice new words and phrases/);
       // Spanish stats must NOT bleed onto Italian card — there should be
       // exactly one "Best: 5/6" text node (on the Spanish card only).
       expect(screen.getAllByText(/Best: 5\/6 · Played: 3/).length).toBe(1);
@@ -275,12 +275,10 @@ describe('QuizIndexScreen', () => {
       it('uses "<Lang> basics" title and starter-words subtitle when vocab is empty', () => {
         mockVocabularyData = [];
         render(<QuizIndexScreen />);
-        expect(screen.getByText('Italian basics')).toBeTruthy();
-        expect(
-          screen.getByText(
-            /Stock starter words — record 5 of your own to unlock personalised rounds/
-          )
-        ).toBeTruthy();
+        screen.getByText('Italian basics');
+        screen.getByText(
+          /Stock starter words — record 5 of your own to unlock personalised rounds/
+        );
         // The misleading "Vocabulary: Italian" title must NOT appear.
         expect(screen.queryByText('Vocabulary: Italian')).toBeNull();
       });
@@ -288,7 +286,7 @@ describe('QuizIndexScreen', () => {
       it('keeps starter framing when vocab count is below the threshold', () => {
         mockVocabularyData = [{ id: 'v-1' }, { id: 'v-2' }];
         render(<QuizIndexScreen />);
-        expect(screen.getByText('Italian basics')).toBeTruthy();
+        screen.getByText('Italian basics');
       });
 
       it('switches to personalised framing once vocab >= threshold', () => {
@@ -296,7 +294,7 @@ describe('QuizIndexScreen', () => {
           id: `v-${i}`,
         }));
         render(<QuizIndexScreen />);
-        expect(screen.getByText('Vocabulary: Italian')).toBeTruthy();
+        screen.getByText('Vocabulary: Italian');
         expect(screen.queryByText('Italian basics')).toBeNull();
       });
 
@@ -311,7 +309,7 @@ describe('QuizIndexScreen', () => {
         mockVocabularyLoading = true;
         try {
           render(<QuizIndexScreen />);
-          expect(screen.getByText('Italian basics')).toBeTruthy();
+          screen.getByText('Italian basics');
         } finally {
           mockVocabularyLoading = false;
         }
@@ -346,7 +344,7 @@ describe('QuizIndexScreen', () => {
         isError: false,
       };
       render(<QuizIndexScreen />);
-      expect(screen.getByTestId('quiz-vocabulary-sub-fr')).toBeTruthy();
+      screen.getByTestId('quiz-vocabulary-sub-fr');
       expect(screen.queryByTestId('quiz-vocabulary-sub-archived')).toBeNull();
       expect(screen.queryByTestId('quiz-vocab-locked')).toBeNull();
     });
@@ -354,8 +352,8 @@ describe('QuizIndexScreen', () => {
     it('shows the error state with retry + go-back when stats fail to load', () => {
       mockStatsState = { data: undefined, isError: true };
       render(<QuizIndexScreen />);
-      expect(screen.getByTestId('quiz-load-retry')).toBeTruthy();
-      expect(screen.getByTestId('quiz-error-back')).toBeTruthy();
+      screen.getByTestId('quiz-load-retry');
+      screen.getByTestId('quiz-error-back');
       // Activity cards must be hidden in error state.
       expect(screen.queryByTestId('quiz-capitals')).toBeNull();
       expect(screen.queryByTestId('quiz-guess-who')).toBeNull();

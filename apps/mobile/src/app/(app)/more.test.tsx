@@ -190,7 +190,7 @@ describe('MoreScreen — Learning Mode', () => {
     // BUG-909: Section header is prefixed with the active profile's display
     // name to make it unambiguous that the toggle applies to THAT profile,
     // not a child profile selected from elsewhere.
-    expect(screen.getByText("Alex's Learning Mode")).toBeTruthy();
+    screen.getByText("Alex's Learning Mode");
   });
 
   // BUG-909 break test: bare "Learning Mode" / "Learning Accommodation"
@@ -226,10 +226,8 @@ describe('MoreScreen — Learning Mode', () => {
 
     render(<MoreScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('learning-mode-child-link')).toBeTruthy();
-    expect(
-      screen.getByText("To change Mia's preferences, open their profile →")
-    ).toBeTruthy();
+    screen.getByTestId('learning-mode-child-link');
+    screen.getByText("To change Mia's preferences, open their profile →");
   });
 
   it('tracks and navigates to the child profile from the cross-link', () => {
@@ -257,10 +255,8 @@ describe('MoreScreen — Learning Mode', () => {
 
     render(<MoreScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('learning-mode-family-link')).toBeTruthy();
-    expect(
-      screen.getByText("To change a child's preferences, open Family →")
-    ).toBeTruthy();
+    screen.getByTestId('learning-mode-family-link');
+    screen.getByText("To change a child's preferences, open Family →");
   });
 
   it('tracks and navigates to Family from the multi-child cross-link', () => {
@@ -294,25 +290,21 @@ describe('MoreScreen — Learning Mode', () => {
   it('renders both learning mode options', () => {
     render(<MoreScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('learning-mode-serious')).toBeTruthy();
-    expect(screen.getByTestId('learning-mode-casual')).toBeTruthy();
-    expect(screen.getByText('Challenge mode')).toBeTruthy();
-    expect(screen.getByText('Explorer')).toBeTruthy();
+    screen.getByTestId('learning-mode-serious');
+    screen.getByTestId('learning-mode-casual');
+    screen.getByText('Challenge mode');
+    screen.getByText('Explorer');
   });
 
   it('renders descriptions for both modes', () => {
     render(<MoreScreen />, { wrapper: createWrapper() });
 
-    expect(
-      screen.getByText(
-        'Push yourself further. Your mentor keeps you on track. You earn points after proving you remember, and recaps help lock it in.'
-      )
-    ).toBeTruthy();
-    expect(
-      screen.getByText(
-        'Learn at your own pace. Your mentor is relaxed and encouraging. You earn points right away and can skip recaps.'
-      )
-    ).toBeTruthy();
+    screen.getByText(
+      'Push yourself further. Your mentor keeps you on track. You earn points after proving you remember, and recaps help lock it in.'
+    );
+    screen.getByText(
+      'Learn at your own pace. Your mentor is relaxed and encouraging. You earn points right away and can skip recaps.'
+    );
   });
 
   it('shows Active label on current serious mode', () => {
@@ -434,20 +426,20 @@ describe('MoreScreen — Learning Mode', () => {
 
     expect(screen.queryByText('Appearance')).toBeNull();
     // BUG-909: Section labels are now possessive (per active profile).
-    expect(screen.getByText("Alex's Learning Mode")).toBeTruthy();
-    expect(screen.getByText("Alex's Learning Accommodation")).toBeTruthy();
-    expect(screen.getByText('Your celebrations')).toBeTruthy();
-    expect(screen.getByText('Notifications')).toBeTruthy();
-    expect(screen.getByText('Account')).toBeTruthy();
-    expect(screen.getByText('Other')).toBeTruthy();
+    screen.getByText("Alex's Learning Mode");
+    screen.getByText("Alex's Learning Accommodation");
+    screen.getByText('Your celebrations');
+    screen.getByText('Notifications');
+    screen.getByText('Account');
+    screen.getByText('Other');
   });
 
   it('renders celebration level options', () => {
     render(<MoreScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('celebration-level-all')).toBeTruthy();
-    expect(screen.getByTestId('celebration-level-big-only')).toBeTruthy();
-    expect(screen.getByTestId('celebration-level-off')).toBeTruthy();
+    screen.getByTestId('celebration-level-all');
+    screen.getByTestId('celebration-level-big-only');
+    screen.getByTestId('celebration-level-off');
   });
 
   it('updates celebration level when selecting big milestones only', () => {
@@ -605,9 +597,9 @@ describe('MoreScreen — impersonation hides destructive actions (BUG-915)', () 
     mockIsParentProxy = false;
     render(<MoreScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('sign-out-button')).toBeTruthy();
-    expect(screen.getByTestId('more-row-delete-account')).toBeTruthy();
-    expect(screen.getByTestId('more-row-export')).toBeTruthy();
-    expect(screen.getByTestId('more-row-subscription')).toBeTruthy();
+    screen.getByTestId('sign-out-button');
+    screen.getByTestId('more-row-delete-account');
+    screen.getByTestId('more-row-export');
+    screen.getByTestId('more-row-subscription');
   });
 });

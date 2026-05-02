@@ -315,7 +315,7 @@ describe('Integration: POST /v1/retention/recall-test', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.result.passed).toBe(true);
-    expect(body.result.nextReviewAt).toBeDefined();
+    expect(typeof body.result.nextReviewAt).toBe('string');
     expect(body.result.failureCount).toBe(0);
   });
 
@@ -383,7 +383,9 @@ describe('Integration: POST /v1/retention/recall-test', () => {
     expect(body.result.passed).toBe(false);
     expect(body.result.failureCount).toBe(3);
     expect(body.result.failureAction).toBe('redirect_to_library');
-    expect(body.result.remediation).toBeDefined();
+    expect(body.result.remediation).toMatchObject({
+      topicTitle: 'Introduction to Calculus',
+    });
     expect(body.result.remediation.options).toContain('relearn_topic');
     expect(body.result.remediation.topicTitle).toBe('Introduction to Calculus');
   });

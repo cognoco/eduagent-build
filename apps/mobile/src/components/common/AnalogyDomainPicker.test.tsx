@@ -11,40 +11,38 @@ describe('AnalogyDomainPicker', () => {
   it('renders all 7 options (6 domains + no preference)', () => {
     render(<AnalogyDomainPicker value={null} onSelect={mockOnSelect} />);
 
-    expect(screen.getByTestId('analogy-domain-none')).toBeTruthy();
-    expect(screen.getByTestId('analogy-domain-cooking')).toBeTruthy();
-    expect(screen.getByTestId('analogy-domain-sports')).toBeTruthy();
-    expect(screen.getByTestId('analogy-domain-building')).toBeTruthy();
-    expect(screen.getByTestId('analogy-domain-music')).toBeTruthy();
-    expect(screen.getByTestId('analogy-domain-nature')).toBeTruthy();
-    expect(screen.getByTestId('analogy-domain-gaming')).toBeTruthy();
+    screen.getByTestId('analogy-domain-none');
+    screen.getByTestId('analogy-domain-cooking');
+    screen.getByTestId('analogy-domain-sports');
+    screen.getByTestId('analogy-domain-building');
+    screen.getByTestId('analogy-domain-music');
+    screen.getByTestId('analogy-domain-nature');
+    screen.getByTestId('analogy-domain-gaming');
   });
 
   it('renders the picker container', () => {
     render(<AnalogyDomainPicker value={null} onSelect={mockOnSelect} />);
 
-    expect(screen.getByTestId('analogy-domain-picker')).toBeTruthy();
+    screen.getByTestId('analogy-domain-picker');
   });
 
   it('shows domain labels', () => {
     render(<AnalogyDomainPicker value={null} onSelect={mockOnSelect} />);
 
-    expect(screen.getByText('No preference')).toBeTruthy();
-    expect(screen.getByText('Cooking')).toBeTruthy();
-    expect(screen.getByText('Sports')).toBeTruthy();
-    expect(screen.getByText('Building')).toBeTruthy();
-    expect(screen.getByText('Music')).toBeTruthy();
-    expect(screen.getByText('Nature')).toBeTruthy();
-    expect(screen.getByText('Gaming')).toBeTruthy();
+    screen.getByText('No preference');
+    screen.getByText('Cooking');
+    screen.getByText('Sports');
+    screen.getByText('Building');
+    screen.getByText('Music');
+    screen.getByText('Nature');
+    screen.getByText('Gaming');
   });
 
   it('shows domain descriptions', () => {
     render(<AnalogyDomainPicker value={null} onSelect={mockOnSelect} />);
 
-    expect(
-      screen.getByText('Recipes, ingredients, kitchen techniques')
-    ).toBeTruthy();
-    expect(screen.getByText('Games, teams, training strategies')).toBeTruthy();
+    screen.getByText('Recipes, ingredients, kitchen techniques');
+    screen.getByText('Games, teams, training strategies');
   });
 
   it('shows Active label on selected domain', () => {
@@ -104,7 +102,7 @@ describe('AnalogyDomainPicker', () => {
       <AnalogyDomainPicker value={null} onSelect={mockOnSelect} isLoading />
     );
 
-    expect(screen.getByTestId('analogy-domain-loading')).toBeTruthy();
+    screen.getByTestId('analogy-domain-loading');
     expect(screen.queryByTestId('analogy-domain-picker')).toBeNull();
   });
 

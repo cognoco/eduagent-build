@@ -181,8 +181,8 @@ describe('CurriculumReviewScreen', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByTestId('add-topic-description-input')).toBeTruthy();
-      expect(screen.getByTestId('add-topic-minutes-input')).toBeTruthy();
+      screen.getByTestId('add-topic-description-input');
+      screen.getByTestId('add-topic-minutes-input');
     });
 
     expect(screen.getByTestId('add-topic-title-input').props.value).toBe(
@@ -228,7 +228,7 @@ describe('CurriculumReviewScreen', () => {
     fireEvent.press(screen.getByTestId('add-topic-preview'));
 
     await waitFor(() => {
-      expect(screen.getByText(/went wrong on our end/i)).toBeTruthy();
+      screen.getByText(/went wrong on our end/i);
     });
   });
 
@@ -253,14 +253,14 @@ describe('CurriculumReviewScreen', () => {
   it('renders the onboarding step indicator', () => {
     render(<CurriculumReviewScreen />);
 
-    expect(screen.getByText('Step 4 of 4')).toBeTruthy();
+    screen.getByText('Step 4 of 4');
   });
 
   it('cancels add-topic modal without creating', async () => {
     render(<CurriculumReviewScreen />);
 
     fireEvent.press(screen.getByTestId('add-topic-button'));
-    expect(screen.getByTestId('add-topic-title-input')).toBeTruthy();
+    screen.getByTestId('add-topic-title-input');
 
     fireEvent.press(screen.getByTestId('add-topic-cancel'));
 
@@ -401,9 +401,9 @@ describe('CurriculumReviewScreen', () => {
 
     render(<CurriculumReviewScreen />);
 
-    expect(screen.getByTestId('placement-check-button')).toBeTruthy();
-    expect(screen.getByTestId('continue-advanced-button')).toBeTruthy();
-    expect(screen.getByTestId('choose-different-subject-button')).toBeTruthy();
+    screen.getByTestId('placement-check-button');
+    screen.getByTestId('continue-advanced-button');
+    screen.getByTestId('choose-different-subject-button');
   });
 
   it('[BUG-692-FOLLOWUP] setShowWhyModal does not open when user navigates back during explainTopic', async () => {

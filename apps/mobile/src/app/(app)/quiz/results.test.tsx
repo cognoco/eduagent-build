@@ -163,26 +163,26 @@ describe('QuizResultsScreen — [F-040] missed-question cards', () => {
       },
     });
 
-    expect(screen.getByTestId('quiz-results-missed-section')).toBeTruthy();
-    expect(screen.getByText('What you missed')).toBeTruthy();
+    screen.getByTestId('quiz-results-missed-section');
+    screen.getByText('What you missed');
 
     // Wrong answers surfaced as "You said: X"
-    expect(screen.getByText('You said: Munich')).toBeTruthy();
-    expect(screen.getByText('You said: Barcelona')).toBeTruthy();
+    screen.getByText('You said: Munich');
+    screen.getByText('You said: Barcelona');
 
     // Correct answers shown
-    expect(screen.getByText('Berlin')).toBeTruthy();
-    expect(screen.getByText('Madrid')).toBeTruthy();
+    screen.getByText('Berlin');
+    screen.getByText('Madrid');
 
     // Fun facts shown ONLY for missed questions
-    expect(screen.getByText('Berlin has bridges.')).toBeTruthy();
-    expect(screen.getByText('Madrid is in the center.')).toBeTruthy();
+    screen.getByText('Berlin has bridges.');
+    screen.getByText('Madrid is in the center.');
     expect(screen.queryByText('Vienna has coffee houses.')).toBeNull();
     expect(screen.queryByText('Paris has the Eiffel Tower.')).toBeNull();
 
     // Question prompts use real questionPrompt() logic
-    expect(screen.getByText('Capital of Germany')).toBeTruthy();
-    expect(screen.getByText('Capital of Spain')).toBeTruthy();
+    screen.getByText('Capital of Germany');
+    screen.getByText('Capital of Spain');
   });
 
   it('does not render the missed-section on a perfect round', () => {
@@ -310,8 +310,8 @@ describe('QuizResultsScreen — [F-040] missed-question cards', () => {
     // Both missed-card prompts must still resolve — even though indexes 2
     // and 3 are now out of range on the live `newRound` in context. This
     // proves the screen reads from the pinned round, not the live one.
-    expect(screen.getByText('Capital of Germany')).toBeTruthy();
-    expect(screen.getByText('Capital of Spain')).toBeTruthy();
+    screen.getByText('Capital of Germany');
+    screen.getByText('Capital of Spain');
     // And the 'Question' fallback string never leaked.
     expect(screen.queryByText('Question')).toBeNull();
   });
@@ -482,7 +482,7 @@ describe('QuizResultsScreen — [F-040] missed-question cards', () => {
     });
 
     // Section still renders (there IS a missed entry)
-    expect(screen.getByTestId('quiz-results-missed-section')).toBeTruthy();
+    screen.getByTestId('quiz-results-missed-section');
     // But the card body is skipped — no "You said: Munich" leaked without
     // a correct answer to contrast against.
     expect(screen.queryByText('You said: Munich')).toBeNull();

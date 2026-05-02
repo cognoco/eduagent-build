@@ -217,14 +217,14 @@ describe('SessionSummaryScreen', () => {
   it('renders session takeaways', () => {
     render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
-    expect(screen.getByTestId('summary-title')).toBeTruthy();
-    expect(screen.getByText('Session Complete')).toBeTruthy();
-    expect(screen.getByText('Mathematics')).toBeTruthy();
-    expect(screen.getByTestId('session-takeaways')).toBeTruthy();
-    expect(screen.getByText('What happened')).toBeTruthy();
+    screen.getByTestId('summary-title');
+    screen.getByText('Session Complete');
+    screen.getByText('Mathematics');
+    screen.getByTestId('session-takeaways');
+    screen.getByText('What happened');
     // 5 exchanges, rung 2 → "strong independent thinking"
-    expect(screen.getByText(/worked through 5 exchanges/)).toBeTruthy();
-    expect(screen.getByText(/strong independent thinking/)).toBeTruthy();
+    screen.getByText(/worked through 5 exchanges/);
+    screen.getByText(/strong independent thinking/);
   });
 
   // [BUG-801] When the URL passes exchangeCount='0' (legitimate value for
@@ -267,7 +267,7 @@ describe('SessionSummaryScreen', () => {
     // No "minute - great session!" copy must appear when duration is unknown.
     expect(screen.queryByText(/minute.*great session/i)).toBeNull();
     // Other takeaways still render so the user isn't stuck on a blank section.
-    expect(screen.getByTestId('session-takeaways')).toBeTruthy();
+    screen.getByTestId('session-takeaways');
   });
 
   it('[BUG-805] renders the duration takeaway once wallClockSeconds is known', () => {
@@ -275,15 +275,15 @@ describe('SessionSummaryScreen', () => {
 
     render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
-    expect(screen.getByText(/15 minutes - great session!/)).toBeTruthy();
+    screen.getByText(/15 minutes - great session!/);
   });
 
   it('renders summary input', () => {
     render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
-    expect(screen.getByText('Your Words')).toBeTruthy();
-    expect(screen.getByTestId('summary-input')).toBeTruthy();
-    expect(screen.getByTestId('submit-summary-button')).toBeTruthy();
+    screen.getByText('Your Words');
+    screen.getByTestId('summary-input');
+    screen.getByTestId('submit-summary-button');
   });
 
   it('disables submit when summary is too short', () => {
@@ -323,11 +323,9 @@ describe('SessionSummaryScreen', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByTestId('summary-submitted')).toBeTruthy();
-      expect(screen.getByTestId('ai-feedback')).toBeTruthy();
-      expect(
-        screen.getByText('Good summary. You captured the key concepts well.')
-      ).toBeTruthy();
+      screen.getByTestId('summary-submitted');
+      screen.getByTestId('ai-feedback');
+      screen.getByText('Good summary. You captured the key concepts well.');
     });
   });
 
@@ -351,7 +349,7 @@ describe('SessionSummaryScreen', () => {
     fireEvent.press(screen.getByTestId('submit-summary-button'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('continue-button')).toBeTruthy();
+      screen.getByTestId('continue-button');
     });
 
     fireEvent.press(screen.getByTestId('continue-button'));
@@ -394,7 +392,7 @@ describe('SessionSummaryScreen', () => {
     fireEvent.press(screen.getByTestId('submit-summary-button'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('continue-button')).toBeTruthy();
+      screen.getByTestId('continue-button');
     });
 
     fireEvent.press(screen.getByTestId('continue-button'));
@@ -409,8 +407,6 @@ describe('SessionSummaryScreen', () => {
     render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
     const skipButton = screen.getByTestId('skip-summary-button');
-    expect(skipButton).toBeTruthy();
-
     fireEvent.press(skipButton);
 
     await waitFor(() => {
@@ -482,10 +478,10 @@ describe('SessionSummaryScreen', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByTestId('recall-bridge-questions')).toBeTruthy();
-      expect(screen.getByText('Quick recall check')).toBeTruthy();
-      expect(screen.getByText(/What method did you use/)).toBeTruthy();
-      expect(screen.getByText(/Why does it work/)).toBeTruthy();
+      screen.getByTestId('recall-bridge-questions');
+      screen.getByText('Quick recall check');
+      screen.getByText(/What method did you use/);
+      screen.getByText(/Why does it work/);
     });
 
     // Should NOT have navigated home yet
@@ -529,11 +525,11 @@ describe('SessionSummaryScreen', () => {
 
     // The inline error should be visible immediately (driven by isError state)
     await waitFor(() => {
-      expect(screen.getByTestId('summary-error')).toBeTruthy();
+      screen.getByTestId('summary-error');
     });
 
     // Error text tells user what happened
-    expect(screen.getByText(/Couldn't save your summary/)).toBeTruthy();
+    screen.getByText(/Couldn't save your summary/);
   });
 
   // [BUG-800] When submitSummary rejects, the alert must surface the server's
@@ -588,16 +584,12 @@ describe('SessionSummaryScreen', () => {
     it('renders all five sentence starter chips', () => {
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
-      expect(screen.getByTestId('summary-prompt-chips')).toBeTruthy();
-      expect(screen.getByText('Today I learned that...')).toBeTruthy();
-      expect(
-        screen.getByText('The most interesting thing was...')
-      ).toBeTruthy();
-      expect(screen.getByText('I want to learn more about...')).toBeTruthy();
-      expect(
-        screen.getByText('Something that surprised me was...')
-      ).toBeTruthy();
-      expect(screen.getByText('I found it easy/hard to...')).toBeTruthy();
+      screen.getByTestId('summary-prompt-chips');
+      screen.getByText('Today I learned that...');
+      screen.getByText('The most interesting thing was...');
+      screen.getByText('I want to learn more about...');
+      screen.getByText('Something that surprised me was...');
+      screen.getByText('I found it easy/hard to...');
     });
 
     it('tapping a prompt chip pre-fills the text input', () => {
@@ -624,8 +616,7 @@ describe('SessionSummaryScreen', () => {
     it('each prompt chip has an accessible label matching its text', () => {
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
-      const chip = screen.getByLabelText('Today I learned that...');
-      expect(chip).toBeTruthy();
+      screen.getByLabelText('Today I learned that...');
     });
 
     it('prompt chips are not shown after submission', async () => {
@@ -648,7 +639,7 @@ describe('SessionSummaryScreen', () => {
       fireEvent.press(screen.getByTestId('submit-summary-button'));
 
       await waitFor(() => {
-        expect(screen.getByTestId('summary-submitted')).toBeTruthy();
+        screen.getByTestId('summary-submitted');
       });
 
       expect(screen.queryByTestId('summary-prompt-chips')).toBeNull();
@@ -668,12 +659,12 @@ describe('SessionSummaryScreen', () => {
 
     render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
-    expect(screen.getByTestId('milestone-recap')).toBeTruthy();
-    expect(screen.getByText(/Polar Star/)).toBeTruthy();
-    expect(screen.getByText(/Persistent/)).toBeTruthy();
-    expect(screen.getByTestId('fast-celebrations')).toBeTruthy();
-    expect(screen.getByText('Quadratic Equations')).toBeTruthy();
-    expect(screen.getByText(/15 minutes - great session!/)).toBeTruthy();
+    screen.getByTestId('milestone-recap');
+    screen.getByText(/Polar Star/);
+    screen.getByText(/Persistent/);
+    screen.getByTestId('fast-celebrations');
+    screen.getByText('Quadratic Equations');
+    screen.getByText(/15 minutes - great session!/);
   });
 
   // [BREAK / BUG-825] Malformed milestones param (non-string array values) must
@@ -687,9 +678,9 @@ describe('SessionSummaryScreen', () => {
 
     render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
-    expect(screen.getByTestId('milestone-recap')).toBeTruthy();
-    expect(screen.getByText(/Polar Star/)).toBeTruthy();
-    expect(screen.getByText(/Persistent/)).toBeTruthy();
+    screen.getByTestId('milestone-recap');
+    screen.getByText(/Polar Star/);
+    screen.getByText(/Persistent/);
     expect(screen.queryByText(/\[object Object\]/)).toBeNull();
   });
 
@@ -701,8 +692,6 @@ describe('SessionSummaryScreen', () => {
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
       const cta = screen.getByTestId('resume-session-cta');
-      expect(cta).toBeTruthy();
-
       fireEvent.press(cta);
 
       expect(mockPush).toHaveBeenCalledWith({
@@ -736,7 +725,7 @@ describe('SessionSummaryScreen', () => {
       // Default mockUseParentProxy returns isParentProxy: false (set in beforeEach).
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
-      expect(screen.getByTestId('view-transcript-cta')).toBeTruthy();
+      screen.getByTestId('view-transcript-cta');
     });
 
     it('hides the transcript link in parent-proxy mode so parents cannot read the full chat', () => {
@@ -767,15 +756,11 @@ describe('SessionSummaryScreen', () => {
 
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
-      expect(screen.getByTestId('summary-submitted')).toBeTruthy();
-      expect(
-        screen.getByText(
-          'African landscapes vary hugely — from the Sahara to savannah to rainforest.'
-        )
-      ).toBeTruthy();
-      expect(
-        screen.getByText('Nice connection between geography and climate zones.')
-      ).toBeTruthy();
+      screen.getByTestId('summary-submitted');
+      screen.getByText(
+        'African landscapes vary hugely — from the Sahara to savannah to rainforest.'
+      );
+      screen.getByText('Nice connection between geography and climate zones.');
       // Input form and chips must not be rendered for a persisted summary.
       expect(screen.queryByTestId('summary-input')).toBeNull();
       expect(screen.queryByTestId('summary-prompt-chips')).toBeNull();
@@ -795,12 +780,10 @@ describe('SessionSummaryScreen', () => {
 
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
-      expect(screen.getByTestId('summary-submitted')).toBeTruthy();
-      expect(
-        screen.getByText(
-          'I learned about the Atlas Mountains and the Great Rift Valley.'
-        )
-      ).toBeTruthy();
+      screen.getByTestId('summary-submitted');
+      screen.getByText(
+        'I learned about the Atlas Mountains and the Great Rift Valley.'
+      );
       expect(screen.queryByTestId('summary-input')).toBeNull();
     });
 
@@ -815,7 +798,7 @@ describe('SessionSummaryScreen', () => {
 
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
-      expect(screen.getByTestId('summary-skipped-state')).toBeTruthy();
+      screen.getByTestId('summary-skipped-state');
       expect(screen.queryByTestId('summary-input')).toBeNull();
       expect(screen.queryByTestId('summary-prompt-chips')).toBeNull();
       expect(screen.queryByTestId('skip-summary-button')).toBeNull();
@@ -916,9 +899,7 @@ describe('SessionSummaryScreen', () => {
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
       await waitFor(() => {
-        expect(
-          screen.getByDisplayValue('unfinished thought about autotrophs')
-        ).toBeTruthy();
+        screen.getByDisplayValue('unfinished thought about autotrophs');
       });
     });
 
@@ -1055,12 +1036,10 @@ describe('SessionSummaryScreen', () => {
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
       await waitFor(() => {
-        expect(screen.getByTestId('summary-resubmit-banner')).toBeTruthy();
+        screen.getByTestId('summary-resubmit-banner');
       });
       expect(screen.queryByTestId('summary-skipped-state')).toBeNull();
-      expect(
-        screen.getByDisplayValue('text I started last time but never submitted')
-      ).toBeTruthy();
+      screen.getByDisplayValue('text I started last time but never submitted');
     });
 
     it('clears the stale draft when the session is already submitted server-side', async () => {

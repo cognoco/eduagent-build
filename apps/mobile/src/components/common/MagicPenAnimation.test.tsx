@@ -7,7 +7,7 @@ import { MagicPenAnimation } from './MagicPenAnimation';
 describe('MagicPenAnimation', () => {
   it('renders without crashing at default size', () => {
     const { getByTestId } = render(<MagicPenAnimation testID="pen" />);
-    expect(getByTestId('pen')).toBeTruthy();
+    getByTestId('pen');
   });
 
   it('has an accessibility label and role', () => {
@@ -22,7 +22,6 @@ describe('MagicPenAnimation', () => {
       <MagicPenAnimation testID="pen" size={48} />
     );
     const el = getByTestId('pen');
-    expect(el).toBeTruthy();
     expect(el.props.style).toMatchObject({ width: 48, height: 48 });
   });
 
@@ -31,7 +30,6 @@ describe('MagicPenAnimation', () => {
       <MagicPenAnimation testID="pen" size={100} />
     );
     const el = getByTestId('pen');
-    expect(el).toBeTruthy();
     expect(el.props.style).toMatchObject({ width: 100, height: 100 });
   });
 
@@ -56,7 +54,6 @@ describe('MagicPenAnimation', () => {
     try {
       const { getByTestId } = render(<MagicPenAnimation testID="pen" />);
       const el = getByTestId('pen');
-      expect(el).toBeTruthy();
       expect(el.props.accessibilityLabel).toBe('Writing animation');
     } finally {
       reanimated.useReducedMotion = original;

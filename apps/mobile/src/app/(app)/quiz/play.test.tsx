@@ -135,8 +135,8 @@ describe('QuizPlayScreen', () => {
   it('renders a free-text input for freeTextEligible questions', async () => {
     render(<QuizPlayScreen />);
 
-    expect(screen.getByTestId('quiz-free-text-input')).toBeTruthy();
-    expect(screen.getByTestId('quiz-free-text-field')).toBeTruthy();
+    screen.getByTestId('quiz-free-text-input');
+    screen.getByTestId('quiz-free-text-field');
     expect(screen.queryByTestId('quiz-option-0')).toBeNull();
 
     fireEvent.changeText(
@@ -162,7 +162,6 @@ describe('QuizPlayScreen', () => {
     render(<QuizPlayScreen />);
 
     const elapsed = screen.getByTestId('quiz-play-elapsed');
-    expect(elapsed).toBeTruthy();
     // Initial render: timer started from Date.now() in this same tick, so
     // the floored seconds value is 0.
     expect(elapsed.props.children).toEqual([0, 's']);
@@ -218,7 +217,7 @@ describe('QuizPlayScreen — malformed MC dedup', () => {
 
     render(<QuizPlayScreen />);
 
-    expect(screen.getByTestId('quiz-play-malformed')).toBeTruthy();
+    screen.getByTestId('quiz-play-malformed');
     expect(screen.queryByTestId('quiz-option-0')).toBeNull();
   });
 
@@ -241,7 +240,7 @@ describe('QuizPlayScreen — malformed MC dedup', () => {
 
     render(<QuizPlayScreen />);
 
-    expect(screen.getByTestId('quiz-play-malformed')).toBeTruthy();
+    screen.getByTestId('quiz-play-malformed');
   });
 });
 
@@ -338,7 +337,7 @@ describe('QuizPlayScreen — dispute button visibility (BUG-927)', () => {
     fireEvent.press(screen.getByTestId('quiz-option-0'));
 
     await waitFor(() => {
-      expect(screen.getByText('Correct')).toBeTruthy();
+      screen.getByText('Correct');
     });
     expect(screen.queryByTestId('quiz-dispute-button')).toBeNull();
     expect(screen.queryByText('Not quite right?')).toBeNull();
@@ -354,9 +353,9 @@ describe('QuizPlayScreen — dispute button visibility (BUG-927)', () => {
     fireEvent.press(screen.getByTestId('quiz-option-1'));
 
     await waitFor(() => {
-      expect(screen.getByText('Not quite')).toBeTruthy();
+      screen.getByText('Not quite');
     });
-    expect(screen.getByTestId('quiz-dispute-button')).toBeTruthy();
+    screen.getByTestId('quiz-dispute-button');
   });
 });
 
@@ -467,7 +466,7 @@ describe('QuizPlayScreen — shuffledOptions derived synchronously (BUG-STALE-OP
 
     // Tap option-0 on Q1 and wait for the result to commit
     fireEvent.press(screen.getByTestId('quiz-option-0'));
-    await waitFor(() => expect(screen.getByText('Correct')).toBeTruthy());
+    await waitFor(() => screen.getByText('Correct'));
 
     // Advance to Q2 via the body continue Pressable (after 250ms guard)
     await new Promise((r) => setTimeout(r, 280));
@@ -549,7 +548,7 @@ describe('QuizPlayScreen — tap-to-continue synchronous reset (BUG-929)', () =>
     render(<QuizPlayScreen />);
 
     fireEvent.press(screen.getByTestId('quiz-option-0'));
-    await waitFor(() => expect(screen.getByText('Correct')).toBeTruthy());
+    await waitFor(() => screen.getByText('Correct'));
 
     // Wait past the 250ms continue gate, then tap the body to advance.
     await new Promise((r) => setTimeout(r, 280));
@@ -594,7 +593,7 @@ describe('QuizPlayScreen — tap-to-continue synchronous reset (BUG-929)', () =>
     render(<QuizPlayScreen />);
 
     fireEvent.press(screen.getByTestId('quiz-option-0'));
-    await waitFor(() => expect(screen.getByText('Correct')).toBeTruthy());
+    await waitFor(() => screen.getByText('Correct'));
 
     await new Promise((r) => setTimeout(r, 280));
     fireEvent.press(screen.getByTestId('quiz-play-body'));
@@ -652,7 +651,7 @@ describe('QuizPlayScreen — tap-to-continue synchronous reset (BUG-929)', () =>
     render(<QuizPlayScreen />);
 
     fireEvent.press(screen.getByTestId('quiz-option-0'));
-    await waitFor(() => expect(screen.getByText('Correct')).toBeTruthy());
+    await waitFor(() => screen.getByText('Correct'));
 
     await new Promise((r) => setTimeout(r, 280));
     fireEvent.press(screen.getByTestId('quiz-play-body'));
@@ -701,7 +700,7 @@ describe('QuizPlayScreen — tap-to-continue synchronous reset (BUG-929)', () =>
     );
     fireEvent.press(screen.getByTestId('quiz-free-text-submit'));
 
-    await waitFor(() => expect(screen.getByText('Correct')).toBeTruthy());
+    await waitFor(() => screen.getByText('Correct'));
 
     // Advance to Q2.
     await new Promise((r) => setTimeout(r, 280));
@@ -748,7 +747,7 @@ describe('QuizPlayScreen — tap-to-continue synchronous reset (BUG-929)', () =>
 
     // Answer Q1 correctly to reach the 'correct' answerState.
     fireEvent.press(screen.getByTestId('quiz-option-0'));
-    await waitFor(() => expect(screen.getByText('Correct')).toBeTruthy());
+    await waitFor(() => screen.getByText('Correct'));
 
     // Elapsed time ticks — but we don't need to wait for an actual second
     // since the timer only ticks on the setInterval (1000 ms). The critical
@@ -794,9 +793,9 @@ describe('QuizPlayScreen — no round loaded', () => {
 
   it('shows Retry and Go Home buttons when round is null', () => {
     render(<QuizPlayScreen />);
-    expect(screen.getByTestId('quiz-play-no-round')).toBeTruthy();
-    expect(screen.getByTestId('quiz-play-no-round-retry')).toBeTruthy();
-    expect(screen.getByTestId('quiz-play-no-round-home')).toBeTruthy();
+    screen.getByTestId('quiz-play-no-round');
+    screen.getByTestId('quiz-play-no-round-retry');
+    screen.getByTestId('quiz-play-no-round-home');
   });
 });
 
@@ -869,9 +868,7 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
   async function answerAndAdvanceToSubmit(): Promise<void> {
     fireEvent.press(screen.getByTestId('quiz-option-0'));
     // Wait for handleAnswer's `continueEnabledAtRef = Date.now() + 250`.
-    await waitFor(() =>
-      expect(screen.getByTestId('quiz-play-screen')).toBeTruthy()
-    );
+    await waitFor(() => screen.getByTestId('quiz-play-screen'));
     await new Promise((r) => setTimeout(r, 280));
     // [BUG-691] handleContinue is now scoped to the body Pressable so the
     // Quit X in the header can never bubble to it. With a 1-question round,
@@ -923,16 +920,14 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
 
     // Resolve the answer so continueActive is true
     fireEvent.press(screen.getByTestId('quiz-option-0'));
-    await waitFor(() =>
-      expect(screen.getByTestId('quiz-play-screen')).toBeTruthy()
-    );
+    await waitFor(() => screen.getByTestId('quiz-play-screen'));
     await new Promise((r) => setTimeout(r, 280));
 
     // [BUG-892] Press the Quit button. This must open the styled in-app
     // confirmation modal (NOT call platformAlert/window.confirm) and must
     // NOT submit the round (which would mean handleContinue also fired).
     fireEvent.press(screen.getByTestId('quiz-play-quit'));
-    expect(screen.getByTestId('quiz-quit-confirm')).toBeTruthy();
+    screen.getByTestId('quiz-quit-confirm');
     expect(mockPlatformAlert).not.toHaveBeenCalledWith(
       'Quit this round?',
       expect.any(String),
@@ -953,8 +948,8 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
 
     fireEvent.press(screen.getByTestId('quiz-play-quit'));
 
-    expect(screen.getByTestId('quiz-quit-confirm')).toBeTruthy();
-    expect(screen.getByTestId('quiz-quit-cancel')).toBeTruthy();
+    screen.getByTestId('quiz-quit-confirm');
+    screen.getByTestId('quiz-quit-cancel');
     // Critically: platformAlert (which would hit window.confirm on web) is NOT
     // invoked for the quit-confirm flow.
     expect(mockPlatformAlert).not.toHaveBeenCalledWith(

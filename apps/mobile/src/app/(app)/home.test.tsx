@@ -82,7 +82,7 @@ describe('HomeScreen intent router', () => {
 
     // BUG-522: owners without children always see LearnerScreen — no forced
     // add-child gate regardless of subscription tier
-    expect(screen.getByTestId('learner-screen')).toBeTruthy();
+    screen.getByTestId('learner-screen');
     expect(screen.queryByTestId('parent-gateway')).toBeNull();
   });
 
@@ -95,7 +95,7 @@ describe('HomeScreen intent router', () => {
 
     render(<HomeScreen />);
 
-    expect(screen.getByTestId('parent-gateway')).toBeTruthy();
+    screen.getByTestId('parent-gateway');
     expect(screen.queryByTestId('learner-screen')).toBeNull();
   });
 
@@ -109,7 +109,7 @@ describe('HomeScreen intent router', () => {
 
     render(<HomeScreen />);
 
-    expect(screen.getByTestId('learner-screen')).toBeTruthy();
+    screen.getByTestId('learner-screen');
     expect(screen.queryByTestId('parent-gateway')).toBeNull();
   });
 
@@ -122,7 +122,7 @@ describe('HomeScreen intent router', () => {
 
     render(<HomeScreen />);
 
-    expect(screen.getByTestId('learner-screen')).toBeTruthy();
+    screen.getByTestId('learner-screen');
     expect(screen.queryByTestId('parent-gateway')).toBeNull();
   });
 
@@ -159,10 +159,10 @@ describe('HomeScreen 3B.11: timeout error state secondary navigation', () => {
       jest.advanceTimersByTime(10_000);
     });
 
-    expect(screen.getByTestId('home-loading-timeout')).toBeTruthy();
-    expect(screen.getByTestId('home-loading-retry')).toBeTruthy();
-    expect(screen.getByTestId('timeout-library-button')).toBeTruthy();
-    expect(screen.getByTestId('timeout-more-button')).toBeTruthy();
+    screen.getByTestId('home-loading-timeout');
+    screen.getByTestId('home-loading-retry');
+    screen.getByTestId('timeout-library-button');
+    screen.getByTestId('timeout-more-button');
   });
 
   it('navigates to library when "Go to Library" is pressed [3B.11]', () => {
@@ -196,7 +196,7 @@ describe('HomeScreen 3B.11: timeout error state secondary navigation', () => {
       jest.advanceTimersByTime(10_000);
     });
 
-    expect(screen.getByTestId('home-loading-timeout')).toBeTruthy();
+    screen.getByTestId('home-loading-timeout');
 
     fireEvent.press(screen.getByTestId('home-loading-retry'));
 

@@ -34,8 +34,8 @@ describe('VoicePlaybackBar', () => {
   it('renders replay and rate buttons', () => {
     render(<VoicePlaybackBar {...defaultProps} />);
 
-    expect(screen.getByTestId('voice-replay-button')).toBeTruthy();
-    expect(screen.getByTestId('voice-rate-button')).toBeTruthy();
+    screen.getByTestId('voice-replay-button');
+    screen.getByTestId('voice-rate-button');
   });
 
   it('hides stop and pause/resume buttons when not speaking', () => {
@@ -48,8 +48,8 @@ describe('VoicePlaybackBar', () => {
   it('shows stop and pause buttons when speaking', () => {
     render(<VoicePlaybackBar {...defaultProps} isSpeaking={true} />);
 
-    expect(screen.getByTestId('voice-stop-button')).toBeTruthy();
-    expect(screen.getByTestId('voice-pause-resume-button')).toBeTruthy();
+    screen.getByTestId('voice-stop-button');
+    screen.getByTestId('voice-pause-resume-button');
   });
 
   it('shows pause icon when speaking and not paused', () => {
@@ -57,9 +57,8 @@ describe('VoicePlaybackBar', () => {
       <VoicePlaybackBar {...defaultProps} isSpeaking={true} isPaused={false} />
     );
 
-    const pauseResumeButton = screen.getByTestId('voice-pause-resume-button');
-    expect(pauseResumeButton).toBeTruthy();
-    expect(screen.getByLabelText('Pause speaking')).toBeTruthy();
+    screen.getByTestId('voice-pause-resume-button');
+    screen.getByLabelText('Pause speaking');
   });
 
   it('shows play icon when paused', () => {
@@ -67,7 +66,7 @@ describe('VoicePlaybackBar', () => {
       <VoicePlaybackBar {...defaultProps} isSpeaking={true} isPaused={true} />
     );
 
-    expect(screen.getByLabelText('Resume speaking')).toBeTruthy();
+    screen.getByLabelText('Resume speaking');
   });
 
   it('calls onPause when pause button is pressed', () => {
@@ -107,7 +106,7 @@ describe('VoicePlaybackBar', () => {
       <VoicePlaybackBar {...defaultProps} isSpeaking={true} isPaused={true} />
     );
 
-    expect(screen.getByTestId('voice-stop-button')).toBeTruthy();
+    screen.getByTestId('voice-stop-button');
   });
 
   it('calls onReplay when replay is pressed', () => {
@@ -178,7 +177,7 @@ describe('VoicePlaybackBar', () => {
   it('displays current rate', () => {
     render(<VoicePlaybackBar {...defaultProps} rate={0.75} />);
 
-    expect(screen.getByText('0.75x')).toBeTruthy();
+    screen.getByText('0.75x');
   });
 
   it('disables replay while speaking and not paused', () => {

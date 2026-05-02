@@ -94,19 +94,19 @@ describe('BooksTab', () => {
   it('renders book cards with parent subject name', () => {
     render(<BooksTab {...defaultProps} />);
 
-    expect(screen.getByTestId('book-card-book-1')).toBeTruthy();
-    expect(screen.getByTestId('book-card-book-2')).toBeTruthy();
-    expect(screen.getByText('Algebra Basics')).toBeTruthy();
-    expect(screen.getByText('Ancient Egypt')).toBeTruthy();
+    screen.getByTestId('book-card-book-1');
+    screen.getByTestId('book-card-book-2');
+    screen.getByText('Algebra Basics');
+    screen.getByText('Ancient Egypt');
     // Parent subject names shown
-    expect(screen.getByText('Mathematics')).toBeTruthy();
-    expect(screen.getByText('History')).toBeTruthy();
+    screen.getByText('Mathematics');
+    screen.getByText('History');
     // Status labels
-    expect(screen.getByText('In progress')).toBeTruthy();
-    expect(screen.getByText('Complete')).toBeTruthy();
+    screen.getByText('In progress');
+    screen.getByText('Complete');
     // Progress labels
-    expect(screen.getByText('4/8 topics')).toBeTruthy();
-    expect(screen.getByText('6/6 topics')).toBeTruthy();
+    screen.getByText('4/8 topics');
+    screen.getByText('6/6 topics');
   });
 
   it('calls onBookPress with subjectId and bookId when tapped', () => {
@@ -138,8 +138,8 @@ describe('BooksTab', () => {
     };
     render(<BooksTab {...defaultProps} state={searchState} />);
 
-    expect(screen.getByTestId('library-no-results')).toBeTruthy();
-    expect(screen.getByText('No books match your search')).toBeTruthy();
+    screen.getByTestId('library-no-results');
+    screen.getByText('No books match your search');
   });
 
   it('shows empty state when no books exist', () => {
@@ -148,21 +148,21 @@ describe('BooksTab', () => {
       <BooksTab {...defaultProps} books={[]} onAddSubject={onAddSubject} />
     );
 
-    expect(screen.getByTestId('library-no-content')).toBeTruthy();
+    screen.getByTestId('library-no-content');
     fireEvent.press(screen.getByTestId('library-add-subject-empty'));
     expect(onAddSubject).toHaveBeenCalledTimes(1);
   });
 
   it('shows book description when present', () => {
     render(<BooksTab {...defaultProps} />);
-    expect(screen.getByText('Intro to algebra')).toBeTruthy();
-    expect(screen.getByText('Pyramids')).toBeTruthy();
+    screen.getByText('Intro to algebra');
+    screen.getByText('Pyramids');
   });
 
   it('shows emoji badge from book data', () => {
     render(<BooksTab {...defaultProps} />);
-    expect(screen.getByText('📐')).toBeTruthy();
-    expect(screen.getByText('🏛️')).toBeTruthy();
+    screen.getByText('📐');
+    screen.getByText('🏛️');
   });
 
   it('propagates sort changes via onStateChange', () => {
@@ -192,7 +192,7 @@ describe('BooksTab', () => {
       />
     );
 
-    expect(screen.getByText('Clear search')).toBeTruthy();
+    screen.getByText('Clear search');
     fireEvent.press(screen.getByTestId('library-clear-search'));
     expect(onStateChange).toHaveBeenCalledWith({
       ...searchState,
@@ -215,7 +215,7 @@ describe('BooksTab', () => {
       />
     );
 
-    expect(screen.getByText('Clear all')).toBeTruthy();
+    screen.getByText('Clear all');
     fireEvent.press(screen.getByTestId('library-clear-search'));
     expect(onStateChange).toHaveBeenCalledWith(BOOKS_TAB_INITIAL_STATE);
   });
@@ -247,7 +247,7 @@ describe('BooksTab', () => {
       />
     );
 
-    expect(screen.getByText('Clear filters')).toBeTruthy();
+    screen.getByText('Clear filters');
     fireEvent.press(screen.getByTestId('library-clear-search'));
     expect(onStateChange).toHaveBeenCalledWith({
       ...filterOnlyState,

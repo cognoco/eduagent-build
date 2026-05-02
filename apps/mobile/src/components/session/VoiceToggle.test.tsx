@@ -35,13 +35,13 @@ describe('VoiceToggle', () => {
   it('shows "Mute AI voice" label when voice is enabled', () => {
     render(<VoiceToggle isVoiceEnabled={true} onToggle={jest.fn()} />);
 
-    expect(screen.getByLabelText('Mute AI voice')).toBeTruthy();
+    screen.getByLabelText('Mute AI voice');
   });
 
   it('shows "Unmute AI voice" label when voice is disabled', () => {
     render(<VoiceToggle isVoiceEnabled={false} onToggle={jest.fn()} />);
 
-    expect(screen.getByLabelText('Unmute AI voice')).toBeTruthy();
+    screen.getByLabelText('Unmute AI voice');
   });
 
   it('has button accessibility role', () => {
@@ -72,13 +72,13 @@ describe('VoiceToggle', () => {
   it('shows volume-high icon when voice is enabled', () => {
     render(<VoiceToggle isVoiceEnabled={true} onToggle={jest.fn()} />);
 
-    expect(screen.getByText('volume-high')).toBeTruthy();
+    screen.getByText('volume-high');
   });
 
   it('shows volume-mute icon when voice is disabled', () => {
     render(<VoiceToggle isVoiceEnabled={false} onToggle={jest.fn()} />);
 
-    expect(screen.getByText('volume-mute')).toBeTruthy();
+    screen.getByText('volume-mute');
   });
 
   it('calls onToggle when pressed', () => {
@@ -109,13 +109,13 @@ describe('VoiceToggle', () => {
       <VoiceToggle isVoiceEnabled={false} onToggle={jest.fn()} />
     );
 
-    expect(screen.getByText('volume-mute')).toBeTruthy();
-    expect(screen.getByLabelText('Unmute AI voice')).toBeTruthy();
+    screen.getByText('volume-mute');
+    screen.getByLabelText('Unmute AI voice');
 
     rerender(<VoiceToggle isVoiceEnabled={true} onToggle={jest.fn()} />);
 
-    expect(screen.getByText('volume-high')).toBeTruthy();
-    expect(screen.getByLabelText('Mute AI voice')).toBeTruthy();
+    screen.getByText('volume-high');
+    screen.getByLabelText('Mute AI voice');
   });
 
   it('re-renders correctly when isVoiceEnabled changes from true to false', () => {
@@ -123,11 +123,11 @@ describe('VoiceToggle', () => {
       <VoiceToggle isVoiceEnabled={true} onToggle={jest.fn()} />
     );
 
-    expect(screen.getByText('volume-high')).toBeTruthy();
+    screen.getByText('volume-high');
 
     rerender(<VoiceToggle isVoiceEnabled={false} onToggle={jest.fn()} />);
 
-    expect(screen.getByText('volume-mute')).toBeTruthy();
+    screen.getByText('volume-mute');
   });
 
   // -----------------------------------------------------------------------
@@ -139,6 +139,6 @@ describe('VoiceToggle', () => {
 
     // The component uses min-h-[44px] min-w-[44px] — verify via testID presence
     // (NativeWind applies the style; we trust the className, but verify render)
-    expect(screen.getByTestId('voice-toggle')).toBeTruthy();
+    screen.getByTestId('voice-toggle');
   });
 });

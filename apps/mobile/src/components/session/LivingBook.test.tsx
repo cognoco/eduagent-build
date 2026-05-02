@@ -13,7 +13,7 @@ describe('LivingBook', () => {
   it('renders with zero exchanges (no counter text)', () => {
     render(<LivingBook exchangeCount={0} isComplete={false} isExpressive />);
 
-    expect(screen.getByTestId('living-book')).toBeTruthy();
+    screen.getByTestId('living-book');
     const counter = screen.getByTestId('living-book-counter');
     expect(counter.props.children).toBe('');
   });
@@ -35,7 +35,7 @@ describe('LivingBook', () => {
   it('renders sparkle element when isExpressive is true', () => {
     render(<LivingBook exchangeCount={2} isComplete={false} isExpressive />);
 
-    expect(screen.getByTestId('living-book-sparkle')).toBeTruthy();
+    screen.getByTestId('living-book-sparkle');
   });
 
   it('does not render sparkle element when isExpressive is false', () => {
@@ -47,7 +47,7 @@ describe('LivingBook', () => {
   it('renders correctly in complete state', () => {
     render(<LivingBook exchangeCount={5} isComplete={true} isExpressive />);
 
-    expect(screen.getByTestId('living-book')).toBeTruthy();
+    screen.getByTestId('living-book');
     const counter = screen.getByTestId('living-book-counter');
     expect(counter.props.children).toBe('5 pages');
   });

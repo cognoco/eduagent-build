@@ -160,14 +160,14 @@ describe('ProgressSubjectScreen', () => {
     it('shows "No subject selected" view with correct testID', () => {
       mockHooks();
       render(<ProgressSubjectScreen />);
-      expect(screen.getByTestId('progress-subject-missing')).toBeTruthy();
-      expect(screen.getByText('No subject selected')).toBeTruthy();
+      screen.getByTestId('progress-subject-missing');
+      screen.getByText('No subject selected');
     });
 
     it('shows a "Back to progress" action button', () => {
       mockHooks();
       render(<ProgressSubjectScreen />);
-      expect(screen.getByTestId('progress-subject-missing-back')).toBeTruthy();
+      screen.getByTestId('progress-subject-missing-back');
     });
 
     it('navigates to progress list when back button pressed', () => {
@@ -183,7 +183,7 @@ describe('ProgressSubjectScreen', () => {
     it('shows skeleton placeholder with correct testID', () => {
       mockHooks({ inventoryIsLoading: true });
       render(<ProgressSubjectScreen />);
-      expect(screen.getByTestId('progress-subject-loading')).toBeTruthy();
+      screen.getByTestId('progress-subject-loading');
     });
 
     it('does not show subject content while loading', () => {
@@ -198,13 +198,13 @@ describe('ProgressSubjectScreen', () => {
     it('shows ErrorFallback with correct testID', () => {
       mockHooks({ inventoryIsError: true });
       render(<ProgressSubjectScreen />);
-      expect(screen.getByTestId('progress-subject-error')).toBeTruthy();
+      screen.getByTestId('progress-subject-error');
     });
 
     it('shows error title', () => {
       mockHooks({ inventoryIsError: true });
       render(<ProgressSubjectScreen />);
-      expect(screen.getByText("We couldn't load this subject")).toBeTruthy();
+      screen.getByText("We couldn't load this subject");
     });
 
     it('calls refetch when retry button pressed', () => {
@@ -227,9 +227,7 @@ describe('ProgressSubjectScreen', () => {
         inventoryError: new Error('network error'),
       });
       render(<ProgressSubjectScreen />);
-      expect(
-        screen.getByText('Check your connection and try again.')
-      ).toBeTruthy();
+      screen.getByText('Check your connection and try again.');
     });
 
     it('shows server error message when error message includes "API error"', () => {
@@ -238,9 +236,7 @@ describe('ProgressSubjectScreen', () => {
         inventoryError: new Error('API error 500'),
       });
       render(<ProgressSubjectScreen />);
-      expect(
-        screen.getByText('Something went wrong on our end. Tap below to retry.')
-      ).toBeTruthy();
+      screen.getByText('Something went wrong on our end. Tap below to retry.');
     });
   });
 
@@ -249,42 +245,42 @@ describe('ProgressSubjectScreen', () => {
     it('displays the subject name', () => {
       mockHooks();
       render(<ProgressSubjectScreen />);
-      expect(screen.getByText('Math')).toBeTruthy();
+      screen.getByText('Math');
     });
 
     it('shows topics mastered / total heading', () => {
       mockHooks();
       render(<ProgressSubjectScreen />);
-      expect(screen.getByText('3/10 planned topics mastered')).toBeTruthy();
+      screen.getByText('3/10 planned topics mastered');
     });
 
     it('shows sessions count when vocabulary total is 0', () => {
       mockHooks();
       render(<ProgressSubjectScreen />);
-      expect(screen.getByText('5 sessions completed')).toBeTruthy();
+      screen.getByText('5 sessions completed');
     });
 
     it('shows stat cards — Started, Not started, Time spent, Sessions', () => {
       mockHooks();
       render(<ProgressSubjectScreen />);
-      expect(screen.getByText('Started')).toBeTruthy();
-      expect(screen.getByText('Not started')).toBeTruthy();
-      expect(screen.getByText('Time spent')).toBeTruthy();
-      expect(screen.getByText('Sessions')).toBeTruthy();
+      screen.getByText('Started');
+      screen.getByText('Not started');
+      screen.getByText('Time spent');
+      screen.getByText('Sessions');
     });
 
     it('shows formatted wallClockMinutes in Time spent stat card (priority over activeMinutes)', () => {
       mockHooks();
       render(<ProgressSubjectScreen />);
       // wallClockMinutes=45 takes priority over activeMinutes=30; formatMinutes(45) → "45 min"
-      expect(screen.getByText('45 min')).toBeTruthy();
+      screen.getByText('45 min');
     });
 
     it('shows "Keep learning" and "Open shelf" buttons', () => {
       mockHooks();
       render(<ProgressSubjectScreen />);
-      expect(screen.getByText('Keep learning')).toBeTruthy();
-      expect(screen.getByText('Open shelf')).toBeTruthy();
+      screen.getByText('Keep learning');
+      screen.getByText('Open shelf');
     });
 
     it('navigates to session on "Keep learning" press', () => {
@@ -357,7 +353,7 @@ describe('ProgressSubjectScreen', () => {
       mockHooks({ inventoryData: { subjects: [subjectNoTotal] } });
       render(<ProgressSubjectScreen />);
       // max(explored, mastered+inProgress) = max(7, 5) = 7 topics explored
-      expect(screen.getByText('7 topics explored')).toBeTruthy();
+      screen.getByText('7 topics explored');
     });
   });
 
@@ -377,21 +373,21 @@ describe('ProgressSubjectScreen', () => {
     it('shows vocabulary word count when total > 0', () => {
       mockHooks({ inventoryData: { subjects: [subjectWithVocab] } });
       render(<ProgressSubjectScreen />);
-      expect(screen.getByText('42 words tracked in this subject')).toBeTruthy();
+      screen.getByText('42 words tracked in this subject');
     });
 
     it('shows mastered / learning / new breakdown', () => {
       mockHooks({ inventoryData: { subjects: [subjectWithVocab] } });
       render(<ProgressSubjectScreen />);
-      expect(screen.getByText(/20 mastered/)).toBeTruthy();
-      expect(screen.getByText(/15 learning/)).toBeTruthy();
-      expect(screen.getByText(/7 new/)).toBeTruthy();
+      screen.getByText(/20 mastered/);
+      screen.getByText(/15 learning/);
+      screen.getByText(/7 new/);
     });
 
     it('shows "View all vocabulary" button', () => {
       mockHooks({ inventoryData: { subjects: [subjectWithVocab] } });
       render(<ProgressSubjectScreen />);
-      expect(screen.getByTestId('vocab-view-all')).toBeTruthy();
+      screen.getByTestId('vocab-view-all');
     });
 
     it('does not show vocabulary section when total is 0', () => {
@@ -406,15 +402,13 @@ describe('ProgressSubjectScreen', () => {
     it('shows "no longer available" card with correct testID', () => {
       mockHooks({ inventoryData: { subjects: [] } });
       render(<ProgressSubjectScreen />);
-      expect(screen.getByTestId('progress-subject-gone')).toBeTruthy();
+      screen.getByTestId('progress-subject-gone');
     });
 
     it('shows explanatory text', () => {
       mockHooks({ inventoryData: { subjects: [] } });
       render(<ProgressSubjectScreen />);
-      expect(
-        screen.getByText('This subject is no longer available')
-      ).toBeTruthy();
+      screen.getByText('This subject is no longer available');
     });
 
     it('navigates to progress list when gone-back button pressed', () => {
@@ -451,7 +445,7 @@ describe('ProgressSubjectScreen', () => {
         languageProgressData: milestoneData,
       });
       render(<ProgressSubjectScreen />);
-      expect(screen.getByTestId('cefr-milestone-card')).toBeTruthy();
+      screen.getByTestId('cefr-milestone-card');
     });
 
     it('shows current level and milestone title', () => {
@@ -460,8 +454,8 @@ describe('ProgressSubjectScreen', () => {
         languageProgressData: milestoneData,
       });
       render(<ProgressSubjectScreen />);
-      expect(screen.getByText(/A2/)).toBeTruthy();
-      expect(screen.getByText(/Everyday conversations/)).toBeTruthy();
+      screen.getByText(/A2/);
+      screen.getByText(/Everyday conversations/);
     });
 
     it('shows words and phrases progress counts', () => {
@@ -470,8 +464,8 @@ describe('ProgressSubjectScreen', () => {
         languageProgressData: milestoneData,
       });
       render(<ProgressSubjectScreen />);
-      expect(screen.getByText('80/150 words')).toBeTruthy();
-      expect(screen.getByText('20/40 phrases')).toBeTruthy();
+      screen.getByText('80/150 words');
+      screen.getByText('20/40 phrases');
     });
 
     it('shows next milestone label when present', () => {
@@ -480,7 +474,7 @@ describe('ProgressSubjectScreen', () => {
         languageProgressData: milestoneData,
       });
       render(<ProgressSubjectScreen />);
-      expect(screen.getByText(/Up next: B1/)).toBeTruthy();
+      screen.getByText(/Up next: B1/);
     });
 
     it('shows "Complete a session" prompt when no milestone data yet', () => {
@@ -489,18 +483,16 @@ describe('ProgressSubjectScreen', () => {
         languageProgressData: { currentLevel: 'A1', currentMilestone: null },
       });
       render(<ProgressSubjectScreen />);
-      expect(
-        screen.getByText(
-          'Complete a session to start tracking your milestone progress.'
-        )
-      ).toBeTruthy();
+      screen.getByText(
+        'Complete a session to start tracking your milestone progress.'
+      );
     });
 
     it('shows CEFR card for general subject when languageProgress is present', () => {
       // isLanguageSubject = pedagogyMode four_strands OR !!languageProgress
       mockHooks({ languageProgressData: milestoneData });
       render(<ProgressSubjectScreen />);
-      expect(screen.getByTestId('cefr-milestone-card')).toBeTruthy();
+      screen.getByTestId('cefr-milestone-card');
     });
 
     it('shows retry button when language progress query errors', () => {
@@ -509,9 +501,8 @@ describe('ProgressSubjectScreen', () => {
         languageProgressIsError: true,
       });
       render(<ProgressSubjectScreen />);
-      expect(screen.getByTestId('cefr-milestone-card')).toBeTruthy();
+      screen.getByTestId('cefr-milestone-card');
       const retryBtn = screen.getByTestId('cefr-milestone-retry');
-      expect(retryBtn).toBeTruthy();
       fireEvent.press(retryBtn);
       expect(languageProgressRefetch).toHaveBeenCalled();
     });
@@ -522,15 +513,13 @@ describe('ProgressSubjectScreen', () => {
     it('shows retention error card with correct testID', () => {
       mockHooks({ subjectProgressIsError: true });
       render(<ProgressSubjectScreen />);
-      expect(
-        screen.getByTestId('progress-subject-retention-error')
-      ).toBeTruthy();
+      screen.getByTestId('progress-subject-retention-error');
     });
 
     it('shows retention error heading', () => {
       mockHooks({ subjectProgressIsError: true });
       render(<ProgressSubjectScreen />);
-      expect(screen.getByText('Current retention')).toBeTruthy();
+      screen.getByText('Current retention');
     });
 
     it('calls subjectProgressQuery.refetch on retry press', () => {
@@ -548,27 +537,19 @@ describe('ProgressSubjectScreen', () => {
     it('shows "Knowledge feels stable" for strong retention', () => {
       mockHooks({ subjectProgressData: { retentionStatus: 'strong' } });
       render(<ProgressSubjectScreen />);
-      expect(
-        screen.getByText('Knowledge feels stable right now.')
-      ).toBeTruthy();
+      screen.getByText('Knowledge feels stable right now.');
     });
 
     it('shows review suggestion for fading retention', () => {
       mockHooks({ subjectProgressData: { retentionStatus: 'fading' } });
       render(<ProgressSubjectScreen />);
-      expect(
-        screen.getByText('A light review would help keep this fresh.')
-      ).toBeTruthy();
+      screen.getByText('A light review would help keep this fresh.');
     });
 
     it('shows extra attention message for weak retention', () => {
       mockHooks({ subjectProgressData: { retentionStatus: 'weak' } });
       render(<ProgressSubjectScreen />);
-      expect(
-        screen.getByText(
-          'This subject would benefit from some extra attention.'
-        )
-      ).toBeTruthy();
+      screen.getByText('This subject would benefit from some extra attention.');
     });
   });
 });

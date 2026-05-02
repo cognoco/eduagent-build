@@ -119,9 +119,9 @@ describe('DictationCompleteScreen', () => {
 
   it('renders the completion screen with valid session data', () => {
     const { getByTestId } = render(<DictationCompleteScreen />);
-    expect(getByTestId('dictation-complete-screen')).toBeTruthy();
-    expect(getByTestId('complete-check-writing')).toBeTruthy();
-    expect(getByTestId('complete-done')).toBeTruthy();
+    getByTestId('dictation-complete-screen');
+    getByTestId('complete-check-writing');
+    getByTestId('complete-done');
   });
 
   // -----------------------------------------------------------------------

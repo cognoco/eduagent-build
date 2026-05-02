@@ -38,17 +38,17 @@ describe('FilingFailedBanner', () => {
 
   it('renders pending state with spinner when filingStatus is filing_pending', () => {
     render(<FilingFailedBanner session={makeSession('filing_pending')} />);
-    expect(screen.getByTestId('filing-failed-banner')).toBeTruthy();
-    expect(screen.getByText('Retrying topic placement...')).toBeTruthy();
+    screen.getByTestId('filing-failed-banner');
+    screen.getByText('Retrying topic placement...');
     expect(screen.queryByTestId('filing-retry-button')).toBeNull();
   });
 
   it('renders Try again button when filingStatus is filing_failed and retry_count < 3', () => {
     render(<FilingFailedBanner session={makeSession('filing_failed', 0)} />);
-    expect(screen.getByTestId('filing-failed-banner')).toBeTruthy();
-    expect(screen.getByTestId('filing-retry-button')).toBeTruthy();
-    expect(screen.getByText('Try again')).toBeTruthy();
-    expect(screen.getByText('Topic placement needs attention')).toBeTruthy();
+    screen.getByTestId('filing-failed-banner');
+    screen.getByTestId('filing-retry-button');
+    screen.getByText('Try again');
+    screen.getByText('Topic placement needs attention');
   });
 
   it('disables retry button when filing_retry_count >= 3', () => {
@@ -68,7 +68,7 @@ describe('FilingFailedBanner', () => {
 
     fireEvent.press(screen.getByTestId('filing-retry-button'));
 
-    expect(await screen.findByText('Retry already in progress.')).toBeTruthy();
+    await screen.findByText('Retry already in progress.');
     expect(mockMutateAsync).toHaveBeenCalledWith({ sessionId: 'session-1' });
   });
 
@@ -93,7 +93,7 @@ describe('FilingFailedBanner', () => {
 
     // Banner should be visible immediately on filing_recovered
     expect(screen.queryByTestId('filing-failed-banner')).toBeTruthy();
-    expect(screen.getByText('Topic placement recovered.')).toBeTruthy();
+    screen.getByText('Topic placement recovered.');
 
     // Advance past 3 000 ms — timer fires, setHidden(true), banner unmounts
     act(() => {

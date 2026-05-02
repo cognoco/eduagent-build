@@ -22,21 +22,21 @@ describe('FluencyDrillStrip', () => {
   it('renders timer with the full countdown when drill is active', () => {
     const drill: FluencyDrillEvent = { active: true, durationSeconds: 90 };
     render(<FluencyDrillStrip drill={drill} onDismissScore={jest.fn()} />);
-    expect(screen.getByTestId('fluency-drill-timer')).toBeTruthy();
-    expect(screen.getByText('01:30')).toBeTruthy();
+    screen.getByTestId('fluency-drill-timer');
+    screen.getByText('01:30');
   });
 
   it('decrements displayed countdown as time elapses', () => {
     const drill: FluencyDrillEvent = { active: true, durationSeconds: 60 };
     render(<FluencyDrillStrip drill={drill} onDismissScore={jest.fn()} />);
 
-    expect(screen.getByText('01:00')).toBeTruthy();
+    screen.getByText('01:00');
 
     act(() => {
       jest.advanceTimersByTime(15_000);
     });
 
-    expect(screen.getByText('00:45')).toBeTruthy();
+    screen.getByText('00:45');
   });
 
   it('shows score card when drill ended with a score', () => {
@@ -46,9 +46,9 @@ describe('FluencyDrillStrip', () => {
     };
     render(<FluencyDrillStrip drill={drill} onDismissScore={jest.fn()} />);
 
-    expect(screen.getByTestId('fluency-drill-score')).toBeTruthy();
-    expect(screen.getByText('7/10')).toBeTruthy();
-    expect(screen.getByText(/70% correct/)).toBeTruthy();
+    screen.getByTestId('fluency-drill-score');
+    screen.getByText('7/10');
+    screen.getByText(/70% correct/);
   });
 
   it('dismiss press invokes onDismissScore', () => {
@@ -79,7 +79,7 @@ describe('FluencyDrillStrip', () => {
         onSkipDrill={jest.fn()}
       />
     );
-    expect(screen.getByTestId('fluency-drill-skip')).toBeTruthy();
+    screen.getByTestId('fluency-drill-skip');
   });
 
   it('pressing skip button invokes onSkipDrill callback [M7]', () => {

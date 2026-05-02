@@ -126,7 +126,7 @@ describe('InterviewScreen', () => {
   it('renders the onboarding step indicator', () => {
     render(<InterviewScreen />);
 
-    expect(screen.getByText('Step 1 of 4')).toBeTruthy();
+    screen.getByText('Step 1 of 4');
   });
 
   it('transitions to session phase after interview completes (input stays enabled)', async () => {
@@ -182,8 +182,8 @@ describe('InterviewScreen', () => {
     fireEvent.press(screen.getByTestId('chat-shell-send'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('session-creating-retry')).toBeTruthy();
-      expect(screen.getByTestId('session-creating-go-back')).toBeTruthy();
+      screen.getByTestId('session-creating-retry');
+      screen.getByTestId('session-creating-go-back');
     });
 
     // Pre-fix Let's Go card must NOT appear — it is the regressed behavior.
@@ -222,8 +222,8 @@ describe('InterviewScreen', () => {
     fireEvent.press(screen.getByTestId('chat-shell-send'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('session-creating-retry')).toBeTruthy();
-      expect(screen.getByTestId('session-creating-go-back')).toBeTruthy();
+      screen.getByTestId('session-creating-retry');
+      screen.getByTestId('session-creating-go-back');
     });
 
     expect(screen.queryByTestId('view-curriculum-button')).toBeNull();
@@ -254,7 +254,7 @@ describe('InterviewScreen', () => {
     fireEvent.press(screen.getByTestId('chat-shell-send'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('session-creating-retry')).toBeTruthy();
+      screen.getByTestId('session-creating-retry');
     });
 
     // First attempt failed.
@@ -290,7 +290,7 @@ describe('InterviewScreen', () => {
     fireEvent.press(screen.getByTestId('chat-shell-send'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('interview-stream-error')).toBeTruthy();
+      screen.getByTestId('interview-stream-error');
       expect(
         screen.getByText(
           "Looks like you're offline or our servers can't be reached. Check your internet connection and try again."
@@ -370,7 +370,7 @@ describe('InterviewScreen', () => {
 
       // Press skip — forceComplete goes pending and stays pending.
       await waitFor(() => {
-        expect(screen.getByTestId('skip-interview-button')).toBeTruthy();
+        screen.getByTestId('skip-interview-button');
       });
       fireEvent.press(screen.getByTestId('skip-interview-button'));
 
@@ -390,7 +390,7 @@ describe('InterviewScreen', () => {
       await waitFor(() => expect(mockStream).toHaveBeenCalledTimes(2));
 
       await waitFor(() => {
-        expect(screen.getByTestId('skip-interview-button')).toBeTruthy();
+        screen.getByTestId('skip-interview-button');
       });
       fireEvent.press(screen.getByTestId('skip-interview-button'));
 
@@ -398,8 +398,8 @@ describe('InterviewScreen', () => {
         jest.advanceTimersByTime(30_000);
       });
 
-      expect(screen.getByTestId('force-complete-timeout-error')).toBeTruthy();
-      expect(screen.getByTestId('force-complete-timeout-go-back')).toBeTruthy();
+      screen.getByTestId('force-complete-timeout-error');
+      screen.getByTestId('force-complete-timeout-go-back');
     });
 
     it('clears the safety timeout when forceComplete resolves before 30s (cleanup)', async () => {
@@ -459,7 +459,7 @@ describe('InterviewScreen', () => {
 
     // Skip button should now be visible.
     await waitFor(() => {
-      expect(screen.getByTestId('skip-interview-button')).toBeTruthy();
+      screen.getByTestId('skip-interview-button');
     });
 
     // Press skip — starts the in-flight mutation.

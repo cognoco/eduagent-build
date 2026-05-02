@@ -170,7 +170,7 @@ describe('LibraryScreen', () => {
 
     render(<LibraryScreen />, { wrapper: TestWrapper });
 
-    expect(screen.getByTestId('library-loading')).toBeTruthy();
+    screen.getByTestId('library-loading');
   });
 
   it('[BUG-634 / M-2] does not crash when subjectsQuery.data is a non-array (stale shape / error payload)', () => {
@@ -278,10 +278,8 @@ describe('LibraryScreen', () => {
 
     render(<LibraryScreen />, { wrapper: TestWrapper });
 
-    expect(screen.getByTestId('library-no-content')).toBeTruthy();
-    expect(
-      screen.getByText('Add a subject to start building your library')
-    ).toBeTruthy();
+    screen.getByTestId('library-no-content');
+    screen.getByText('Add a subject to start building your library');
   });
 
   it('opens create-subject with a library return target from the empty state', () => {
@@ -328,9 +326,9 @@ describe('LibraryScreen', () => {
 
     render(<LibraryScreen />, { wrapper: TestWrapper });
 
-    expect(screen.getByTestId('subject-card-sub-1')).toBeTruthy();
-    expect(screen.getByText('History')).toBeTruthy();
-    expect(screen.getByText('3/12 topics started')).toBeTruthy();
+    screen.getByTestId('subject-card-sub-1');
+    screen.getByText('History');
+    screen.getByText('3/12 topics started');
   });
 
   it('hides the Topics tab from top-level Library navigation', () => {
@@ -431,11 +429,11 @@ describe('LibraryScreen', () => {
 
     render(<LibraryScreen />, { wrapper: TestWrapper });
 
-    expect(screen.getByTestId('library-tab-shelves')).toBeTruthy();
-    expect(screen.getByTestId('library-tab-books')).toBeTruthy();
+    screen.getByTestId('library-tab-shelves');
+    screen.getByTestId('library-tab-books');
     expect(screen.queryByTestId('library-tab-topics')).toBeNull();
-    expect(screen.getByText('Shelves (2)')).toBeTruthy();
-    expect(screen.getByText('Books (1)')).toBeTruthy();
+    screen.getByText('Shelves (2)');
+    screen.getByText('Books (1)');
   });
 
   it('shows review urgency on the matching shelf card (topics badge is hidden)', () => {
@@ -471,7 +469,7 @@ describe('LibraryScreen', () => {
     // Topics tab (and its review badge) is intentionally hidden from the
     // top-level Library. Review urgency still surfaces on the shelf card.
     expect(screen.queryByTestId('library-tab-topics-review-badge')).toBeNull();
-    expect(screen.getByText('4 to review')).toBeTruthy();
+    screen.getByText('4 to review');
   });
 
   it('shows books tab with all books across subjects', () => {
@@ -513,8 +511,8 @@ describe('LibraryScreen', () => {
 
     fireEvent.press(screen.getByTestId('library-tab-books'));
 
-    expect(screen.getByText('Algebra')).toBeTruthy();
-    expect(screen.getByText('Math')).toBeTruthy();
+    screen.getByText('Algebra');
+    screen.getByText('Math');
   });
 
   it('downgrades book status to NOT_STARTED when 0 topics are verified [BUG-870]', () => {
@@ -583,9 +581,9 @@ describe('LibraryScreen', () => {
 
     // Status label rendered next to the book card must say "Not started"
     // (matching the 0/10 topics text), not "In progress".
-    expect(screen.getByText('Not started')).toBeTruthy();
+    screen.getByText('Not started');
     expect(screen.queryByText('In progress')).toBeNull();
-    expect(screen.getByText('0/10 topics')).toBeTruthy();
+    screen.getByText('0/10 topics');
   });
 
   // [CLAUDE.md cross-tab nav rule] Shelf layout has no
@@ -684,7 +682,7 @@ describe('LibraryScreen', () => {
       fireEvent.press(screen.getByTestId('library-tab-books'));
 
       // Spinner should be visible before timeout
-      expect(screen.getByTestId('books-tab-loading')).toBeTruthy();
+      screen.getByTestId('books-tab-loading');
       expect(screen.queryByTestId('books-tab-load-timeout')).toBeNull();
 
       // Advance timers past 15s — wrapped in act to flush state updates
@@ -693,9 +691,9 @@ describe('LibraryScreen', () => {
       });
 
       // Timeout error surface must now be visible with Retry button
-      expect(screen.getByTestId('books-tab-load-timeout')).toBeTruthy();
-      expect(screen.getByTestId('books-tab-load-timeout-retry')).toBeTruthy();
-      expect(screen.getByTestId('books-tab-load-timeout-home')).toBeTruthy();
+      screen.getByTestId('books-tab-load-timeout');
+      screen.getByTestId('books-tab-load-timeout-retry');
+      screen.getByTestId('books-tab-load-timeout-home');
     });
   });
 
@@ -729,7 +727,7 @@ describe('LibraryScreen', () => {
 
     // Library renders normally — tabs and header are visible
     expect(screen.queryByTestId('library-error')).toBeNull();
-    expect(screen.getByTestId('library-tab-shelves')).toBeTruthy();
+    screen.getByTestId('library-tab-shelves');
   });
 
   describe('Manage Subjects modal — backdrop close [BUG-510]', () => {
@@ -756,7 +754,7 @@ describe('LibraryScreen', () => {
       render(<LibraryScreen />, { wrapper: TestWrapper });
 
       fireEvent.press(screen.getByTestId('manage-subjects-button'));
-      expect(screen.getByTestId('manage-subjects-backdrop')).toBeTruthy();
+      screen.getByTestId('manage-subjects-backdrop');
 
       act(() => {
         fireEvent.press(screen.getByTestId('manage-subjects-backdrop'));

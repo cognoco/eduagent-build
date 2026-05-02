@@ -4,7 +4,7 @@ import { DeskLampAnimation } from './DeskLampAnimation';
 describe('DeskLampAnimation', () => {
   it('renders without crashing', () => {
     const { getByTestId } = render(<DeskLampAnimation testID="lamp" />);
-    expect(getByTestId('lamp')).toBeTruthy();
+    getByTestId('lamp');
   });
 
   it('applies accessibility attributes', () => {
@@ -18,7 +18,7 @@ describe('DeskLampAnimation', () => {
     const { getByTestId } = render(
       <DeskLampAnimation testID="lamp" size={80} color="#3b82f6" />
     );
-    expect(getByTestId('lamp')).toBeTruthy();
+    getByTestId('lamp');
   });
 
   it('renders in reduced motion mode without crashing', () => {
@@ -27,7 +27,7 @@ describe('DeskLampAnimation', () => {
     reanimated.useReducedMotion = () => true;
 
     const { getByTestId } = render(<DeskLampAnimation testID="lamp" />);
-    expect(getByTestId('lamp')).toBeTruthy();
+    getByTestId('lamp');
 
     reanimated.useReducedMotion = original;
   });

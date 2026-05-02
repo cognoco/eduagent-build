@@ -25,27 +25,23 @@ describe('ParentDashboardSummary', () => {
   it('renders child name as headline', () => {
     render(<ParentDashboardSummary {...defaultProps} />);
 
-    expect(screen.getByText('Alex')).toBeTruthy();
+    screen.getByText('Alex');
   });
 
   it('renders summary as subtext', () => {
     render(<ParentDashboardSummary {...defaultProps} />);
 
-    expect(
-      screen.getByText(
-        'Alex: Math strong, Science fading. 4 sessions this week.'
-      )
-    ).toBeTruthy();
+    screen.getByText(
+      'Alex: Math strong, Science fading. 4 sessions this week.'
+    );
   });
 
   it('renders temporal comparison with trend arrow', () => {
     render(<ParentDashboardSummary {...defaultProps} />);
 
-    expect(
-      screen.getByText(
-        '4 sessions, 1h 25m this week (\u2191 up from 2 sessions, 40m last week)'
-      )
-    ).toBeTruthy();
+    screen.getByText(
+      '4 sessions, 1h 25m this week (\u2191 up from 2 sessions, 40m last week)'
+    );
   });
 
   it('renders down trend correctly', () => {
@@ -60,11 +56,9 @@ describe('ParentDashboardSummary', () => {
       />
     );
 
-    expect(
-      screen.getByText(
-        '1 session, 12m this week (\u2193 down from 4 sessions, 1h 30m last week)'
-      )
-    ).toBeTruthy();
+    screen.getByText(
+      '1 session, 12m this week (\u2193 down from 4 sessions, 1h 30m last week)'
+    );
   });
 
   it('renders stable trend correctly', () => {
@@ -79,20 +73,18 @@ describe('ParentDashboardSummary', () => {
       />
     );
 
-    expect(
-      screen.getByText(
-        '3 sessions, 1h this week (\u2192 same as 3 sessions, 1h last week)'
-      )
-    ).toBeTruthy();
+    screen.getByText(
+      '3 sessions, 1h this week (\u2192 same as 3 sessions, 1h last week)'
+    );
   });
 
   it('renders subject retention signals', () => {
     render(<ParentDashboardSummary {...defaultProps} />);
 
-    expect(screen.getByText('Mathematics')).toBeTruthy();
-    expect(screen.getByText('Science')).toBeTruthy();
-    expect(screen.getByText('Remembering well')).toBeTruthy();
-    expect(screen.getByText('A few things to refresh')).toBeTruthy();
+    screen.getByText('Mathematics');
+    screen.getByText('Science');
+    screen.getByText('Remembering well');
+    screen.getByText('A few things to refresh');
   });
 
   it('card wrapper is not pressable (navigation via View details button only) [BUG-517]', () => {
@@ -116,16 +108,16 @@ describe('ParentDashboardSummary', () => {
   it('renders skeleton when loading', () => {
     render(<ParentDashboardSummary {...defaultProps} isLoading />);
 
-    expect(screen.getByTestId('coaching-card-skeleton')).toBeTruthy();
+    screen.getByTestId('coaching-card-skeleton');
     expect(screen.queryByText('Alex')).toBeNull();
   });
 
   it('handles empty subjects array', () => {
     render(<ParentDashboardSummary {...defaultProps} subjects={[]} />);
 
-    expect(screen.getByText('Alex')).toBeTruthy();
+    screen.getByText('Alex');
     expect(screen.queryByText('Mathematics')).toBeNull();
-    expect(screen.getByTestId('aggregate-signal-empty')).toBeTruthy();
+    screen.getByTestId('aggregate-signal-empty');
   });
 
   it('renders retention trend badge when improving', () => {
@@ -133,9 +125,9 @@ describe('ParentDashboardSummary', () => {
       <ParentDashboardSummary {...defaultProps} retentionTrend="improving" />
     );
 
-    expect(screen.getByTestId('retention-trend-badge')).toBeTruthy();
-    expect(screen.getByText(/Review health:/)).toBeTruthy();
-    expect(screen.getByText(/Improving/)).toBeTruthy();
+    screen.getByTestId('retention-trend-badge');
+    screen.getByText(/Review health:/);
+    screen.getByText(/Improving/);
   });
 
   it('renders retention trend badge when declining', () => {
@@ -143,8 +135,8 @@ describe('ParentDashboardSummary', () => {
       <ParentDashboardSummary {...defaultProps} retentionTrend="declining" />
     );
 
-    expect(screen.getByTestId('retention-trend-badge')).toBeTruthy();
-    expect(screen.getByText(/Declining/)).toBeTruthy();
+    screen.getByTestId('retention-trend-badge');
+    screen.getByText(/Declining/);
   });
 
   it('renders retention trend badge when stable', () => {
@@ -152,22 +144,22 @@ describe('ParentDashboardSummary', () => {
       <ParentDashboardSummary {...defaultProps} retentionTrend="stable" />
     );
 
-    expect(screen.getByTestId('retention-trend-badge')).toBeTruthy();
-    expect(screen.getByText(/Stable/)).toBeTruthy();
+    screen.getByTestId('retention-trend-badge');
+    screen.getByText(/Stable/);
   });
 
   it('shows "No data yet" when retention trend not provided', () => {
     render(<ParentDashboardSummary {...defaultProps} />);
 
     expect(screen.queryByTestId('retention-trend-badge')).toBeNull();
-    expect(screen.getByTestId('retention-trend-empty')).toBeTruthy();
+    screen.getByTestId('retention-trend-empty');
   });
 
   it('renders "Needs Attention" aggregate signal when any subject is fading', () => {
     render(<ParentDashboardSummary {...defaultProps} />);
 
-    expect(screen.getByTestId('aggregate-signal')).toBeTruthy();
-    expect(screen.getByText('Needs Attention')).toBeTruthy();
+    screen.getByTestId('aggregate-signal');
+    screen.getByText('Needs Attention');
   });
 
   it('renders "On Track" aggregate signal when all subjects are strong', () => {

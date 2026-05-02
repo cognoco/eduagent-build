@@ -43,15 +43,15 @@ describe('ForgotPasswordScreen', () => {
   it('renders email input and send button', () => {
     render(<ForgotPasswordScreen />);
 
-    expect(screen.getByTestId('forgot-password-email')).toBeTruthy();
-    expect(screen.getByTestId('send-reset-code-button')).toBeTruthy();
-    expect(screen.getByText('Forgot password?')).toBeTruthy();
+    screen.getByTestId('forgot-password-email');
+    screen.getByTestId('send-reset-code-button');
+    screen.getByText('Forgot password?');
   });
 
   it('renders back to sign in link', () => {
     render(<ForgotPasswordScreen />);
 
-    expect(screen.getByTestId('back-to-sign-in')).toBeTruthy();
+    screen.getByTestId('back-to-sign-in');
   });
 
   it('calls signIn.create with reset_password_email_code strategy', async () => {
@@ -85,9 +85,9 @@ describe('ForgotPasswordScreen', () => {
     fireEvent.press(screen.getByTestId('send-reset-code-button'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('reset-code')).toBeTruthy();
-      expect(screen.getByTestId('reset-new-password')).toBeTruthy();
-      expect(screen.getByTestId('reset-password-button')).toBeTruthy();
+      screen.getByTestId('reset-code');
+      screen.getByTestId('reset-new-password');
+      screen.getByTestId('reset-password-button');
     });
   });
 
@@ -109,7 +109,7 @@ describe('ForgotPasswordScreen', () => {
     fireEvent.press(screen.getByTestId('send-reset-code-button'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('reset-code')).toBeTruthy();
+      screen.getByTestId('reset-code');
     });
 
     // Phase 2: reset password
@@ -152,7 +152,7 @@ describe('ForgotPasswordScreen', () => {
     fireEvent.press(screen.getByTestId('send-reset-code-button'));
 
     await waitFor(() => {
-      expect(screen.getByText('User not found')).toBeTruthy();
+      screen.getByText('User not found');
     });
   });
 
@@ -171,7 +171,7 @@ describe('ForgotPasswordScreen', () => {
     fireEvent.press(screen.getByTestId('send-reset-code-button'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('reset-code')).toBeTruthy();
+      screen.getByTestId('reset-code');
     });
 
     fireEvent.changeText(screen.getByTestId('reset-code'), '000000');
@@ -182,7 +182,7 @@ describe('ForgotPasswordScreen', () => {
     fireEvent.press(screen.getByTestId('reset-password-button'));
 
     await waitFor(() => {
-      expect(screen.getByText('Invalid code')).toBeTruthy();
+      screen.getByText('Invalid code');
     });
   });
 });

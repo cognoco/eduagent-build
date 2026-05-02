@@ -91,7 +91,7 @@ describe('SubjectSettingsScreen', () => {
   it('renders the subject name in the header', () => {
     render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByText('Mathematics')).toBeTruthy();
+    screen.getByText('Mathematics');
   });
 
   it('renders the Analogy Preference section header', () => {
@@ -205,7 +205,9 @@ describe('SubjectSettingsScreen', () => {
 
       expect(screen.queryByText('Analogy Preference')).toBeNull();
       expect(screen.queryByTestId('analogy-domain-picker')).toBeNull();
-      expect(screen.getByTestId('subject-settings-language-empty')).toBeTruthy();
+      expect(
+        screen.getByTestId('subject-settings-language-empty')
+      ).toBeTruthy();
     });
 
     it('shows Analogy Preference for non-language subjects', () => {
@@ -216,7 +218,9 @@ describe('SubjectSettingsScreen', () => {
       render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
       expect(screen.getByText('Analogy Preference')).toBeTruthy();
-      expect(screen.queryByTestId('subject-settings-language-empty')).toBeNull();
+      expect(
+        screen.queryByTestId('subject-settings-language-empty')
+      ).toBeNull();
     });
 
     it('still shows the back button on the language-subject empty state', () => {

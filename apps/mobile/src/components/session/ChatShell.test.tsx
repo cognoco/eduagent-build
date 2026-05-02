@@ -152,15 +152,15 @@ describe('ChatShell', () => {
   // opens. Onboarding interview opts in to hide the toggle.
   it('renders the input mode toggle by default [BUG-887]', () => {
     renderChatShell();
-    expect(screen.getByTestId('input-mode-toggle')).toBeTruthy();
+    screen.getByTestId('input-mode-toggle');
   });
 
   it('hides the input mode toggle when hideInputModeToggle is true [BUG-887]', () => {
     renderChatShell({ hideInputModeToggle: true });
     expect(screen.queryByTestId('input-mode-toggle')).toBeNull();
     // Composer itself is still rendered.
-    expect(screen.getByTestId('chat-input')).toBeTruthy();
-    expect(screen.getByTestId('send-button')).toBeTruthy();
+    screen.getByTestId('chat-input');
+    screen.getByTestId('send-button');
   });
 
   it('uses the explicit fallback route when backBehavior is replace', () => {
@@ -198,16 +198,16 @@ describe('ChatShell', () => {
   it('renders title, subtitle, and messages', () => {
     renderChatShell({ title: 'Learning Session', subtitle: 'Math' });
 
-    expect(screen.getByText('Learning Session')).toBeTruthy();
-    expect(screen.getByText('Math')).toBeTruthy();
-    expect(screen.getByText('Hello student!')).toBeTruthy();
+    screen.getByText('Learning Session');
+    screen.getByText('Math');
+    screen.getByText('Hello student!');
   });
 
   it('renders text input and send button', () => {
     renderChatShell();
 
-    expect(screen.getByTestId('chat-input')).toBeTruthy();
-    expect(screen.getByTestId('send-button')).toBeTruthy();
+    screen.getByTestId('chat-input');
+    screen.getByTestId('send-button');
   });
 
   it('calls onSend when send button is pressed with text', () => {
@@ -228,7 +228,7 @@ describe('ChatShell', () => {
     it('always shows voice toggle regardless of session type', () => {
       renderChatShell({ verificationType: undefined });
 
-      expect(screen.getByTestId('voice-toggle')).toBeTruthy();
+      screen.getByTestId('voice-toggle');
     });
 
     it('voice toggle defaults OFF for standard sessions', () => {
@@ -254,7 +254,7 @@ describe('ChatShell', () => {
     it('shows voice record button when voice is ON (teach_back)', () => {
       renderChatShell({ verificationType: 'teach_back' });
 
-      expect(screen.getByTestId('voice-record-button')).toBeTruthy();
+      screen.getByTestId('voice-record-button');
     });
 
     it('shows mic button after toggling voice ON in standard session', () => {
@@ -266,13 +266,13 @@ describe('ChatShell', () => {
       // Toggle voice ON
       fireEvent.press(screen.getByTestId('voice-toggle'));
 
-      expect(screen.getByTestId('voice-record-button')).toBeTruthy();
+      screen.getByTestId('voice-record-button');
     });
 
     it('shows playback bar when voice is enabled', () => {
       renderChatShell({ verificationType: 'teach_back' });
 
-      expect(screen.getByTestId('voice-playback-bar')).toBeTruthy();
+      screen.getByTestId('voice-playback-bar');
     });
 
     it('hides playback bar when voice is OFF', () => {
@@ -372,10 +372,10 @@ describe('ChatShell', () => {
       };
       renderChatShell({ verificationType: 'teach_back' });
 
-      expect(screen.getByText('Photosynthesis is the process...')).toBeTruthy();
-      expect(screen.getByTestId('voice-send-button')).toBeTruthy();
-      expect(screen.getByTestId('voice-discard-button')).toBeTruthy();
-      expect(screen.getByTestId('voice-rerecord-button')).toBeTruthy();
+      screen.getByText('Photosynthesis is the process...');
+      screen.getByTestId('voice-send-button');
+      screen.getByTestId('voice-discard-button');
+      screen.getByTestId('voice-rerecord-button');
     });
 
     it('does NOT show transcript preview when listening', () => {
@@ -442,8 +442,8 @@ describe('ChatShell', () => {
       rerender(<ChatShell {...props} />);
 
       // The useEffect([isListening, transcript]) should sync to pendingTranscript
-      expect(screen.getByText('Delayed recognition result')).toBeTruthy();
-      expect(screen.getByTestId('voice-send-button')).toBeTruthy();
+      screen.getByText('Delayed recognition result');
+      screen.getByTestId('voice-send-button');
     });
 
     it('does not re-populate preview with late STT after discard', () => {
@@ -508,8 +508,8 @@ describe('ChatShell', () => {
 
       // discardedRef should have been cleared by handleVoicePress,
       // allowing the effect to capture this new transcript
-      expect(screen.getByText('New attempt after discard')).toBeTruthy();
-      expect(screen.getByTestId('voice-send-button')).toBeTruthy();
+      screen.getByText('New attempt after discard');
+      screen.getByTestId('voice-send-button');
     });
 
     it('clears and restarts listening on Re-record press', async () => {
@@ -629,7 +629,7 @@ describe('ChatShell', () => {
     });
 
     // The accessory must remain visible so subject resolution chips are actionable
-    expect(screen.getByTestId('subject-chips')).toBeTruthy();
+    screen.getByTestId('subject-chips');
     // But the text input itself should be hidden
     expect(screen.queryByTestId('chat-input')).toBeNull();
   });
@@ -644,8 +644,8 @@ describe('ChatShell', () => {
       rightAction: <Text testID="custom-action">Done</Text>,
     });
 
-    expect(screen.getByTestId('voice-toggle')).toBeTruthy();
-    expect(screen.getByTestId('custom-action')).toBeTruthy();
+    screen.getByTestId('voice-toggle');
+    screen.getByTestId('custom-action');
   });
 
   // -----------------------------------------------------------------------
@@ -737,11 +737,9 @@ describe('ChatShell', () => {
       });
 
       // Shows the manual-playback notice instead of auto-speaking
-      expect(
-        screen.getByText(
-          'Screen reader is on, so voice mode keeps manual playback only.'
-        )
-      ).toBeTruthy();
+      screen.getByText(
+        'Screen reader is on, so voice mode keeps manual playback only.'
+      );
     });
 
     it('cleans up listener subscription on unmount', async () => {
@@ -889,11 +887,9 @@ describe('ChatShell', () => {
       expect(toggle.props.accessibilityState.checked).toBe(true);
 
       // The manual-playback notice appears
-      expect(
-        screen.getByText(
-          'Screen reader is on, so voice mode keeps manual playback only.'
-        )
-      ).toBeTruthy();
+      screen.getByText(
+        'Screen reader is on, so voice mode keeps manual playback only.'
+      );
     });
   });
 
@@ -999,7 +995,7 @@ describe('ChatShell', () => {
       />
     );
 
-    expect(getByTestId('message-image-msg-img')).toBeTruthy();
+    getByTestId('message-image-msg-img');
   });
 
   // -----------------------------------------------------------------------
@@ -1024,8 +1020,8 @@ describe('ChatShell', () => {
     renderChatShell({ messages });
 
     expect(screen.queryByText('Looks like Spanish.')).toBeNull();
-    expect(screen.getByText('Great question!')).toBeTruthy();
-    expect(screen.getByText('What is ser vs estar?')).toBeTruthy();
+    screen.getByText('Great question!');
+    screen.getByText('What is ser vs estar?');
   });
 
   it('shows isSystemPrompt messages that have a kind (error/reconnect)', () => {
@@ -1040,13 +1036,13 @@ describe('ChatShell', () => {
     ];
     renderChatShell({ messages });
 
-    expect(screen.getByText('Connection lost. Tap to retry.')).toBeTruthy();
+    screen.getByText('Connection lost. Tap to retry.');
   });
 
   describe('animation wiring (ANIM-IMPROVE)', () => {
     it('shows LightBulbAnimation (thinking-bulb-animation) when streaming', () => {
       renderChatShell({ isStreaming: true });
-      expect(screen.getByTestId('thinking-bulb-animation')).toBeTruthy();
+      screen.getByTestId('thinking-bulb-animation');
       expect(screen.queryByTestId('idle-pen-animation')).toBeNull();
     });
 
@@ -1065,15 +1061,15 @@ describe('ChatShell', () => {
     it('shows generic fallback when inputDisabled=true and no disabledReason given', () => {
       renderChatShell({ inputDisabled: true });
 
-      expect(screen.getByTestId('input-disabled-banner')).toBeTruthy();
-      expect(screen.getByText('Input is currently unavailable')).toBeTruthy();
+      screen.getByTestId('input-disabled-banner');
+      screen.getByText('Input is currently unavailable');
     });
 
     it('shows provided disabledReason when given', () => {
       renderChatShell({ inputDisabled: true, disabledReason: 'Session ended' });
 
-      expect(screen.getByTestId('input-disabled-banner')).toBeTruthy();
-      expect(screen.getByText('Session ended')).toBeTruthy();
+      screen.getByTestId('input-disabled-banner');
+      screen.getByText('Session ended');
     });
 
     it('does NOT show disabled banner when input is enabled', () => {
@@ -1096,7 +1092,7 @@ describe('ChatShell', () => {
       };
       renderChatShell({ verificationType: 'teach_back' });
 
-      expect(screen.getByTestId('voice-error-indicator')).toBeTruthy();
+      screen.getByTestId('voice-error-indicator');
     });
 
     it('retries STT when user taps the error indicator', async () => {

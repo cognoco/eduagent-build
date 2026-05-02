@@ -56,9 +56,9 @@ describe('SessionFooter', () => {
   it('shows filing prompt with accept/dismiss for freeform sessions', () => {
     render(<SessionFooter {...(createProps() as any)} />);
 
-    expect(screen.getByTestId('filing-prompt')).toBeTruthy();
-    expect(screen.getByTestId('filing-prompt-accept')).toBeTruthy();
-    expect(screen.getByTestId('filing-prompt-dismiss')).toBeTruthy();
+    screen.getByTestId('filing-prompt');
+    screen.getByTestId('filing-prompt-accept');
+    screen.getByTestId('filing-prompt-dismiss');
   });
 
   it('accept button calls filing mutateAsync and navigates to book', async () => {

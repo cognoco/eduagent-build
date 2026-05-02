@@ -60,10 +60,10 @@ describe('SignUpScreen', () => {
     // On iOS (default test platform), Google SSO is hidden; Apple SSO is shown instead
     expect(screen.queryByTestId('sign-up-google-sso')).toBeNull();
     expect(screen.queryByTestId('sign-up-openai-sso')).toBeNull();
-    expect(screen.getByTestId('sign-up-email')).toBeTruthy();
-    expect(screen.getByTestId('sign-up-password')).toBeTruthy();
-    expect(screen.getByTestId('sign-up-button')).toBeTruthy();
-    expect(screen.getByText('or continue with email')).toBeTruthy();
+    screen.getByTestId('sign-up-email');
+    screen.getByTestId('sign-up-password');
+    screen.getByTestId('sign-up-button');
+    screen.getByText('or continue with email');
   });
 
   it('renders OpenAI SSO when configured', () => {
@@ -71,8 +71,8 @@ describe('SignUpScreen', () => {
 
     render(<SignUpScreen />);
 
-    expect(screen.getByTestId('sign-up-openai-sso')).toBeTruthy();
-    expect(screen.getByText('Continue with OpenAI')).toBeTruthy();
+    screen.getByTestId('sign-up-openai-sso');
+    screen.getByText('Continue with OpenAI');
   });
 
   it('handles Google SSO sign-up', async () => {
@@ -129,8 +129,8 @@ describe('SignUpScreen', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByTestId('sign-up-code')).toBeTruthy();
-      expect(screen.getByTestId('sign-up-verify-button')).toBeTruthy();
+      screen.getByTestId('sign-up-code');
+      screen.getByTestId('sign-up-verify-button');
     });
   });
 
@@ -155,7 +155,7 @@ describe('SignUpScreen', () => {
 
     // Phase 2: verification
     await waitFor(() => {
-      expect(screen.getByTestId('sign-up-code')).toBeTruthy();
+      screen.getByTestId('sign-up-code');
     });
 
     fireEvent.changeText(screen.getByTestId('sign-up-code'), '123456');
@@ -192,7 +192,7 @@ describe('SignUpScreen', () => {
     fireEvent.press(screen.getByTestId('sign-up-button'));
 
     await waitFor(() => {
-      expect(screen.getByText('Email already in use')).toBeTruthy();
+      screen.getByText('Email already in use');
     });
   });
 
@@ -214,14 +214,14 @@ describe('SignUpScreen', () => {
     fireEvent.press(screen.getByTestId('sign-up-button'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('sign-up-code')).toBeTruthy();
+      screen.getByTestId('sign-up-code');
     });
 
     fireEvent.changeText(screen.getByTestId('sign-up-code'), '000000');
     fireEvent.press(screen.getByTestId('sign-up-verify-button'));
 
     await waitFor(() => {
-      expect(screen.getByText('Incorrect code')).toBeTruthy();
+      screen.getByText('Incorrect code');
     });
   });
 

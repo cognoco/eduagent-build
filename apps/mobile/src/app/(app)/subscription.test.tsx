@@ -365,7 +365,7 @@ describe('SubscriptionScreen', () => {
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('subscription-loading')).toBeTruthy();
+    screen.getByTestId('subscription-loading');
   });
 
   it('shows loading indicator while offerings load', () => {
@@ -373,7 +373,7 @@ describe('SubscriptionScreen', () => {
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('subscription-loading')).toBeTruthy();
+    screen.getByTestId('subscription-loading');
   });
 
   it('shows loading indicator while customer info loads', () => {
@@ -381,7 +381,7 @@ describe('SubscriptionScreen', () => {
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('subscription-loading')).toBeTruthy();
+    screen.getByTestId('subscription-loading');
   });
 
   it('shows the error state instead of the child paywall when subscription loading fails', () => {
@@ -396,7 +396,7 @@ describe('SubscriptionScreen', () => {
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('subscription-error')).toBeTruthy();
+    screen.getByTestId('subscription-error');
     expect(screen.queryByTestId('child-paywall')).toBeNull();
   });
 
@@ -421,13 +421,13 @@ describe('SubscriptionScreen', () => {
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('offerings-section')).toBeTruthy();
-    expect(screen.getByTestId('package-option-$rc_monthly')).toBeTruthy();
-    expect(screen.getByTestId('package-option-$rc_annual')).toBeTruthy();
-    expect(screen.getByText('MentoMate Plus Monthly')).toBeTruthy();
-    expect(screen.getByText('MentoMate Plus Annual')).toBeTruthy();
-    expect(screen.getByText('$9.99 / monthly')).toBeTruthy();
-    expect(screen.getByText('$99.99 / annual')).toBeTruthy();
+    screen.getByTestId('offerings-section');
+    screen.getByTestId('package-option-$rc_monthly');
+    screen.getByTestId('package-option-$rc_annual');
+    screen.getByText('MentoMate Plus Monthly');
+    screen.getByText('MentoMate Plus Annual');
+    screen.getByText('$9.99 / monthly');
+    screen.getByText('$99.99 / annual');
   });
 
   it('shows no-offerings fallback with static tier comparison when no packages are available', () => {
@@ -435,22 +435,20 @@ describe('SubscriptionScreen', () => {
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('no-offerings')).toBeTruthy();
+    screen.getByTestId('no-offerings');
     // BUG-897: message must NOT say "plans available soon" while listing
     // plan cards — pick one direction. We keep the cards as informational
     // tier comparison and rephrase the disclaimer to not contradict.
     expect(
       screen.queryByText(/Subscription plans will be available soon/)
     ).toBeNull();
-    expect(
-      screen.getByText(/store purchasing isn't available on this device yet/i)
-    ).toBeTruthy();
+    screen.getByText(/store purchasing isn't available on this device yet/i);
     // BUG-899: only Free and Plus are approved per pricing_dual_cap.md.
     // Family and Pro static cards must not be shown to non-Family users —
     // their store SKUs are not approved for public listing.
     // (Default mockSubscription tier is 'free' — see beforeEach.)
-    expect(screen.getByTestId('static-tier-free')).toBeTruthy();
-    expect(screen.getByTestId('static-tier-plus')).toBeTruthy();
+    screen.getByTestId('static-tier-free');
+    screen.getByTestId('static-tier-plus');
     expect(screen.queryByTestId('static-tier-family')).toBeNull();
     expect(screen.queryByTestId('static-tier-pro')).toBeNull();
   });
@@ -472,14 +470,12 @@ describe('SubscriptionScreen', () => {
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('no-offerings')).toBeTruthy();
-    expect(screen.getByTestId('static-tier-free')).toBeTruthy();
-    expect(screen.getByTestId('static-tier-plus')).toBeTruthy();
+    screen.getByTestId('no-offerings');
+    screen.getByTestId('static-tier-free');
+    screen.getByTestId('static-tier-plus');
     // The fix:
-    expect(screen.getByTestId('static-tier-family')).toBeTruthy();
-    expect(
-      screen.getByText(/1,500 questions per month \(shared/i)
-    ).toBeTruthy();
+    screen.getByTestId('static-tier-family');
+    screen.getByText(/1,500 questions per month \(shared/i);
     // Pro is still hidden — it's not the user's tier and not approved
     // for public listing.
     expect(screen.queryByTestId('static-tier-pro')).toBeNull();
@@ -493,8 +489,8 @@ describe('SubscriptionScreen', () => {
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('static-tier-free')).toBeTruthy();
-    expect(screen.getByTestId('static-tier-plus')).toBeTruthy();
+    screen.getByTestId('static-tier-free');
+    screen.getByTestId('static-tier-plus');
     expect(screen.queryByTestId('static-tier-family')).toBeNull();
   });
 
@@ -507,12 +503,12 @@ describe('SubscriptionScreen', () => {
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('no-offerings')).toBeTruthy();
-    expect(screen.getByTestId('static-tier-free')).toBeTruthy();
-    expect(screen.getByTestId('static-tier-plus')).toBeTruthy();
+    screen.getByTestId('no-offerings');
+    screen.getByTestId('static-tier-free');
+    screen.getByTestId('static-tier-plus');
     // The fix:
-    expect(screen.getByTestId('static-tier-pro')).toBeTruthy();
-    expect(screen.getByText(/3,000 questions per month/i)).toBeTruthy();
+    screen.getByTestId('static-tier-pro');
+    screen.getByText(/3,000 questions per month/i);
     // Family is still hidden — it's not this user's tier and not approved
     // for general public listing.
     expect(screen.queryByTestId('static-tier-family')).toBeNull();
@@ -525,8 +521,8 @@ describe('SubscriptionScreen', () => {
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('static-tier-free')).toBeTruthy();
-    expect(screen.getByTestId('static-tier-plus')).toBeTruthy();
+    screen.getByTestId('static-tier-free');
+    screen.getByTestId('static-tier-plus');
     expect(screen.queryByTestId('static-tier-pro')).toBeNull();
     expect(screen.queryByTestId('static-tier-family')).toBeNull();
   });
@@ -561,7 +557,7 @@ describe('SubscriptionScreen', () => {
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('manage-billing-button')).toBeTruthy();
+    screen.getByTestId('manage-billing-button');
   });
 
   it('shows current plan info from subscription data', () => {
@@ -570,8 +566,8 @@ describe('SubscriptionScreen', () => {
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('current-plan')).toBeTruthy();
-    expect(screen.getByText('Plus')).toBeTruthy();
+    screen.getByTestId('current-plan');
+    screen.getByText('Plus');
   });
 
   // -------------------------------------------------------------------------
@@ -600,7 +596,7 @@ describe('SubscriptionScreen', () => {
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByText('Subscribe')).toBeTruthy();
+    screen.getByText('Subscribe');
   });
 
   // -------------------------------------------------------------------------
@@ -760,8 +756,8 @@ describe('SubscriptionScreen', () => {
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('restore-purchases-button')).toBeTruthy();
-    expect(screen.getByText('Restore Purchases')).toBeTruthy();
+    screen.getByTestId('restore-purchases-button');
+    screen.getByText('Restore Purchases');
   });
 
   it('restores purchases and shows success when polling confirms paid tier', async () => {

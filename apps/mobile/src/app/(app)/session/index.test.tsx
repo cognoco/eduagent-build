@@ -608,8 +608,8 @@ describe('SessionScreen homework flow', () => {
     expect(screen.queryByText('Example')).toBeNull();
 
     // Session tool chips should always be present
-    expect(screen.getByText('Switch topic')).toBeTruthy();
-    expect(screen.getByText('Park it')).toBeTruthy();
+    screen.getByText('Switch topic');
+    screen.getByText('Park it');
   });
 
   it('records quick chips and learner feedback with follow-up prompts', async () => {
@@ -655,7 +655,7 @@ describe('SessionScreen homework flow', () => {
         expect.objectContaining({ idempotencyKey: expect.any(String) })
       );
     });
-    expect(screen.getByTestId('session-confirmation-toast')).toBeTruthy();
+    screen.getByTestId('session-confirmation-toast');
 
     fireEvent.press(screen.getByTestId('message-feedback-not-helpful-event-2'));
     await flushAsyncWork();
@@ -890,7 +890,7 @@ describe('SessionScreen homework flow', () => {
     fireEvent.press(screen.getByTestId('session-topic-header-change'));
     await flushAsyncWork();
 
-    expect(screen.getByTestId('switch-topic-topic-1')).toBeTruthy();
+    screen.getByTestId('switch-topic-topic-1');
   });
 
   it('persists input-mode changes once the session exists', async () => {
@@ -938,7 +938,7 @@ describe('SessionScreen homework flow', () => {
     await flushAsyncWork();
 
     await waitFor(() => {
-      expect(screen.getByTestId('session-subject-resolution')).toBeTruthy();
+      screen.getByTestId('session-subject-resolution');
       expect(screen.getAllByText(/math or physics/i).length).toBeGreaterThan(0);
     });
 
@@ -979,7 +979,7 @@ describe('SessionScreen homework flow', () => {
     await waitFor(() => {
       // Fallback candidates from useSubjects mock (Math) are shown in ScrollView,
       // plus a "+ New subject" chip (BUG-236 testID: subject-resolution-new)
-      expect(screen.getByTestId('subject-resolution-new')).toBeTruthy();
+      screen.getByTestId('subject-resolution-new');
     });
 
     expect(mockStartSession).not.toHaveBeenCalled();
@@ -1002,9 +1002,9 @@ describe('SessionScreen homework flow', () => {
     await flushAsyncWork();
 
     await waitFor(() => {
-      expect(screen.getByTestId('session-subject-resolution')).toBeTruthy();
-      expect(screen.getByTestId('subject-resolution-new')).toBeTruthy();
-      expect(screen.getByText('+ New subject')).toBeTruthy();
+      screen.getByTestId('session-subject-resolution');
+      screen.getByTestId('subject-resolution-new');
+      screen.getByText('+ New subject');
     });
   });
 
@@ -1082,9 +1082,9 @@ describe('SessionScreen homework flow', () => {
       const screen = await renderAndTriggerFilingPrompt();
 
       await waitFor(() => {
-        expect(screen.getByTestId('filing-prompt')).toBeTruthy();
-        expect(screen.getByTestId('filing-prompt-accept')).toBeTruthy();
-        expect(screen.getByTestId('filing-prompt-dismiss')).toBeTruthy();
+        screen.getByTestId('filing-prompt');
+        screen.getByTestId('filing-prompt-accept');
+        screen.getByTestId('filing-prompt-dismiss');
       });
     }, 15000);
 
@@ -1092,7 +1092,7 @@ describe('SessionScreen homework flow', () => {
       const screen = await renderAndTriggerFilingPrompt();
 
       await waitFor(() => {
-        expect(screen.getByTestId('filing-prompt-accept')).toBeTruthy();
+        screen.getByTestId('filing-prompt-accept');
       });
 
       fireEvent.press(screen.getByTestId('filing-prompt-accept'));
@@ -1116,7 +1116,7 @@ describe('SessionScreen homework flow', () => {
       const screen = await renderAndTriggerFilingPrompt();
 
       await waitFor(() => {
-        expect(screen.getByTestId('filing-prompt-dismiss')).toBeTruthy();
+        screen.getByTestId('filing-prompt-dismiss');
       });
 
       fireEvent.press(screen.getByTestId('filing-prompt-dismiss'));
@@ -1266,8 +1266,8 @@ describe('voice mode persistence', () => {
     fireEvent.press(screen.getByTestId('manual-send-button'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('quota-exceeded-card')).toBeTruthy();
-      expect(screen.getByTestId('input-disabled-banner')).toBeTruthy();
+      screen.getByTestId('quota-exceeded-card');
+      screen.getByTestId('input-disabled-banner');
     });
 
     unmount();

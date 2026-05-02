@@ -102,9 +102,9 @@ describe('ProgressScreen — progressive disclosure', () => {
     });
     render(<ProgressScreen />);
 
-    expect(screen.getByTestId('progress-new-learner-teaser')).toBeTruthy();
-    expect(screen.getByText(/2 more sessions/)).toBeTruthy();
-    expect(screen.getByTestId('progress-new-learner-start')).toBeTruthy();
+    screen.getByTestId('progress-new-learner-teaser');
+    screen.getByText(/2 more sessions/);
+    screen.getByTestId('progress-new-learner-start');
   });
 
   it('shows full progress view when totalSessions >= 4', () => {
@@ -118,7 +118,7 @@ describe('ProgressScreen — progressive disclosure', () => {
 
     expect(screen.queryByTestId('progress-new-learner-teaser')).toBeNull();
     // heroCopy: topicsMastered < 20 && vocabularyTotal === 0 → "You're building your knowledge"
-    expect(screen.getByText("You're building your knowledge")).toBeTruthy();
+    screen.getByText("You're building your knowledge");
   });
 
   it('shows teaser with "1 more session" when totalSessions is 3', () => {
@@ -130,7 +130,7 @@ describe('ProgressScreen — progressive disclosure', () => {
     });
     render(<ProgressScreen />);
 
-    expect(screen.getByText(/1 more session to/)).toBeTruthy();
+    screen.getByText(/1 more session to/);
   });
 
   it('shows empty state (not teaser) when totalSessions is 0 and no subjects', () => {
@@ -139,7 +139,7 @@ describe('ProgressScreen — progressive disclosure', () => {
     });
     render(<ProgressScreen />);
 
-    expect(screen.getByTestId('progress-start-learning')).toBeTruthy();
+    screen.getByTestId('progress-start-learning');
     expect(screen.queryByTestId('progress-new-learner-teaser')).toBeNull();
   });
 
@@ -152,8 +152,8 @@ describe('ProgressScreen — progressive disclosure', () => {
     });
     render(<ProgressScreen />);
 
-    expect(screen.getByTestId('progress-new-learner-teaser')).toBeTruthy();
-    expect(screen.getByText(/3 more sessions/)).toBeTruthy();
+    screen.getByTestId('progress-new-learner-teaser');
+    screen.getByText(/3 more sessions/);
   });
 
   it('shows full view when totalSessions is exactly 4', () => {

@@ -11,7 +11,7 @@ describe('ShimmerSkeleton', () => {
         <Text>Placeholder</Text>
       </ShimmerSkeleton>
     );
-    expect(getByText('Placeholder')).toBeTruthy();
+    getByText('Placeholder');
   });
 
   it('passes testID to container', () => {
@@ -20,7 +20,7 @@ describe('ShimmerSkeleton', () => {
         <View />
       </ShimmerSkeleton>
     );
-    expect(getByTestId('skel')).toBeTruthy();
+    getByTestId('skel');
   });
 
   it('renders shimmer overlay in normal mode', () => {
@@ -44,7 +44,7 @@ describe('ShimmerSkeleton', () => {
       </ShimmerSkeleton>
     );
 
-    expect(getByTestId('skel')).toBeTruthy();
+    getByTestId('skel');
     expect(queryByTestId('skel-shimmer')).toBeNull();
 
     reanimated.useReducedMotion = original;
@@ -56,7 +56,7 @@ describe('ShimmerSkeleton', () => {
         <Text>Fast shimmer</Text>
       </ShimmerSkeleton>
     );
-    expect(getByText('Fast shimmer')).toBeTruthy();
+    getByText('Fast shimmer');
   });
 
   // BR-01: animation must be cancelled on unmount to prevent leaked UI-thread work.

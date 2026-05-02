@@ -53,11 +53,9 @@ describe('VoiceRecordButton', () => {
       />
     );
 
-    expect(screen.getByTestId('voice-record-button')).toBeTruthy();
+    screen.getByTestId('voice-record-button');
     // Icon is a11y-hidden — must use includeHiddenElements to find it
-    expect(
-      screen.getByText('mic', { includeHiddenElements: true })
-    ).toBeTruthy();
+    screen.getByText('mic', { includeHiddenElements: true });
   });
 
   it('renders with stop icon when listening', () => {
@@ -70,9 +68,7 @@ describe('VoiceRecordButton', () => {
     );
 
     // Icon is a11y-hidden — must use includeHiddenElements to find it
-    expect(
-      screen.getByText('stop', { includeHiddenElements: true })
-    ).toBeTruthy();
+    screen.getByText('stop', { includeHiddenElements: true });
   });
 
   // -----------------------------------------------------------------------
@@ -150,7 +146,7 @@ describe('VoiceRecordButton', () => {
       />
     );
 
-    expect(screen.getByLabelText('Start recording')).toBeTruthy();
+    screen.getByLabelText('Start recording');
   });
 
   it('has correct accessibility label when listening', () => {
@@ -162,7 +158,7 @@ describe('VoiceRecordButton', () => {
       />
     );
 
-    expect(screen.getByLabelText('Stop recording')).toBeTruthy();
+    screen.getByLabelText('Stop recording');
   });
 
   // -----------------------------------------------------------------------
@@ -181,7 +177,7 @@ describe('VoiceRecordButton', () => {
     // The component renders — Animated.View wraps the Pressable.
     // Reanimated is mocked by jest-expo, so we verify the tree renders
     // without crashing and the button is accessible.
-    expect(screen.getByTestId('voice-record-button')).toBeTruthy();
+    screen.getByTestId('voice-record-button');
     expect(toJSON()).toBeTruthy();
   });
 
@@ -195,7 +191,7 @@ describe('VoiceRecordButton', () => {
     );
 
     expect(toJSON()).toBeTruthy();
-    expect(screen.getByTestId('voice-record-button')).toBeTruthy();
+    screen.getByTestId('voice-record-button');
   });
 
   // [a11y sweep] Break tests: decorative mic/stop icon must be hidden from
@@ -245,10 +241,10 @@ describe('VoiceTranscriptPreview', () => {
       />
     );
 
-    expect(screen.getByText('Plants use sunlight')).toBeTruthy();
-    expect(screen.getByTestId('voice-send-button')).toBeTruthy();
-    expect(screen.getByTestId('voice-discard-button')).toBeTruthy();
-    expect(screen.getByTestId('voice-rerecord-button')).toBeTruthy();
+    screen.getByText('Plants use sunlight');
+    screen.getByTestId('voice-send-button');
+    screen.getByTestId('voice-discard-button');
+    screen.getByTestId('voice-rerecord-button');
   });
 
   it('returns null when transcript is empty', () => {
@@ -327,8 +323,8 @@ describe('VoiceTranscriptPreview', () => {
     expect(screen.queryByText('Discard')).toBeNull();
     expect(screen.queryByText('Re-record')).toBeNull();
     // Icons rendered (the @expo/vector-icons mock prints icon name as Text)
-    expect(screen.getByText('refresh-outline')).toBeTruthy();
-    expect(screen.getByText('trash-outline')).toBeTruthy();
+    screen.getByText('refresh-outline');
+    screen.getByText('trash-outline');
     // Screen-reader labels and tap targets preserved
     const reRecord = screen.getByTestId('voice-rerecord-button');
     const discard = screen.getByTestId('voice-discard-button');

@@ -12,12 +12,12 @@ jest.mock('../../lib/theme', () => ({
 describe('OfflineBanner', () => {
   it('renders the offline message', () => {
     const { getByText } = render(<OfflineBanner />);
-    expect(getByText('No internet connection')).toBeTruthy();
+    getByText('No internet connection');
   });
 
   it('has testID for integration tests', () => {
     const { getByTestId } = render(<OfflineBanner />);
-    expect(getByTestId('offline-banner')).toBeTruthy();
+    getByTestId('offline-banner');
   });
 
   it('has alert accessibility role', () => {

@@ -88,9 +88,9 @@ describe('TextPreviewScreen', () => {
 
   it('renders text input and start button', () => {
     const { getByTestId } = render(<TextPreviewScreen />);
-    expect(getByTestId('dictation-text-preview-screen')).toBeTruthy();
-    expect(getByTestId('text-preview-input')).toBeTruthy();
-    expect(getByTestId('text-preview-start')).toBeTruthy();
+    getByTestId('dictation-text-preview-screen');
+    getByTestId('text-preview-input');
+    getByTestId('text-preview-start');
   });
 
   it('calls prepareMutation when Start is pressed with text', async () => {

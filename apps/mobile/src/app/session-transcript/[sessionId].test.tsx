@@ -69,7 +69,7 @@ describe('SessionTranscriptScreen [BUG-889]', () => {
 
   it('shows the loading state while transcript is fetching', () => {
     render(<SessionTranscriptScreen />);
-    expect(screen.getByTestId('session-transcript-loading')).toBeTruthy();
+    screen.getByTestId('session-transcript-loading');
   });
 
   it('renders an actionable error fallback on transcript error', () => {
@@ -81,9 +81,9 @@ describe('SessionTranscriptScreen [BUG-889]', () => {
       refetch: jest.fn(),
     };
     render(<SessionTranscriptScreen />);
-    expect(screen.getByTestId('session-transcript-error')).toBeTruthy();
-    expect(screen.getByTestId('session-transcript-retry')).toBeTruthy();
-    expect(screen.getByTestId('session-transcript-error-back')).toBeTruthy();
+    screen.getByTestId('session-transcript-error');
+    screen.getByTestId('session-transcript-retry');
+    screen.getByTestId('session-transcript-error-back');
   });
 
   it('renders an empty state when there are no exchanges', () => {
@@ -105,7 +105,7 @@ describe('SessionTranscriptScreen [BUG-889]', () => {
       refetch: jest.fn(),
     };
     render(<SessionTranscriptScreen />);
-    expect(screen.getByTestId('session-transcript-empty')).toBeTruthy();
+    screen.getByTestId('session-transcript-empty');
   });
 
   it('renders user and assistant exchanges in order, hiding system-prompt rows', () => {
@@ -145,25 +145,23 @@ describe('SessionTranscriptScreen [BUG-889]', () => {
     };
     render(<SessionTranscriptScreen />);
 
-    expect(screen.getByTestId('session-transcript-screen')).toBeTruthy();
-    expect(screen.getByText('Hello, can you teach me fractions?')).toBeTruthy();
-    expect(
-      screen.getByText('Of course — let us start with halves.')
-    ).toBeTruthy();
+    screen.getByTestId('session-transcript-screen');
+    screen.getByText('Hello, can you teach me fractions?');
+    screen.getByText('Of course — let us start with halves.');
     // System-prompt row must NOT leak through.
     expect(screen.queryByText('__SYSTEM_PROMPT__')).toBeNull();
-    expect(screen.getByText('2 messages')).toBeTruthy();
+    screen.getByText('2 messages');
 
     // [BUG-889] Break test: visible user/assistant rows must each get an
     // exchange testID so the rendered tree is observable in regression tests.
-    expect(screen.getByTestId('transcript-exchange-0')).toBeTruthy();
-    expect(screen.getByTestId('transcript-exchange-1')).toBeTruthy();
+    screen.getByTestId('transcript-exchange-0');
+    screen.getByTestId('transcript-exchange-1');
   });
 
   it('falls back gracefully when sessionId param is missing', () => {
     mockUseLocalSearchParams.mockReturnValue({ sessionId: undefined });
     render(<SessionTranscriptScreen />);
-    expect(screen.getByTestId('session-transcript-no-id')).toBeTruthy();
+    screen.getByTestId('session-transcript-no-id');
   });
 
   it('Back button routes to library', () => {
@@ -254,7 +252,7 @@ describe('SessionTranscriptScreen [BUG-889]', () => {
       render(<SessionTranscriptScreen />);
 
       // The clean reply must be visible.
-      expect(screen.getByText(STRIPPED_REPLY)).toBeTruthy();
+      screen.getByText(STRIPPED_REPLY);
 
       // The raw JSON blob must NOT appear anywhere on screen.
       expect(screen.queryByText(LEAKED_ENVELOPE)).toBeNull();
@@ -282,9 +280,9 @@ describe('SessionTranscriptScreen [BUG-889]', () => {
       render(<SessionTranscriptScreen />);
 
       // User content must appear verbatim — no stripping.
-      expect(screen.getByText(userJson)).toBeTruthy();
+      screen.getByText(userJson);
       // The assistant plain-text message also passes through unchanged.
-      expect(screen.getByText('Interesting paste!')).toBeTruthy();
+      screen.getByText('Interesting paste!');
     });
 
     it('renders plain-text assistant content unchanged when no envelope is present', () => {
@@ -296,7 +294,7 @@ describe('SessionTranscriptScreen [BUG-889]', () => {
         },
       ]);
       render(<SessionTranscriptScreen />);
-      expect(screen.getByText('Great work on fractions today!')).toBeTruthy();
+      screen.getByText('Great work on fractions today!');
     });
   });
 });
