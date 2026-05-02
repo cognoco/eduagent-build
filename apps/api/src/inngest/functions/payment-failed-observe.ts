@@ -49,9 +49,9 @@ export const paymentFailedObserve = inngest.createFunction(
 
     logger.error('billing.payment_failed.received', {
       source,
-      subscriptionId: data.subscriptionId ?? 'unknown',
+      subscriptionId: data.subscriptionId ?? null,
       stripeSubscriptionId: data.stripeSubscriptionId ?? null,
-      accountId: data.accountId ?? 'unknown',
+      accountId: data.accountId ?? null,
       attempt: data.attempt ?? null,
       eventTimestamp: data.timestamp ?? null,
       receivedAt: new Date().toISOString(),
