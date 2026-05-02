@@ -140,8 +140,13 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
     const db = c.get('db');
     const account = c.get('account');
     if (!account) {
-      await next();
-      return;
+      return c.json(
+        {
+          code: 'UNAUTHORIZED',
+          message: 'Authentication required to use X-Profile-Id',
+        },
+        401
+      );
     }
     const profile = await getProfile(db, profileIdHeader, account.id);
     if (!profile) {

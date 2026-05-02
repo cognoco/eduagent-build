@@ -6,7 +6,7 @@ describe('auth routes', () => {
   // -------------------------------------------------------------------------
 
   describe('POST /v1/auth/register', () => {
-    it('returns 201 with valid registration data', async () => {
+    it('returns 501 with valid registration data (Clerk handles registration)', async () => {
       const res = await app.request('/v1/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -16,14 +16,14 @@ describe('auth routes', () => {
         }),
       });
 
-      expect(res.status).toBe(201);
+      expect(res.status).toBe(501);
 
       const body = await res.json();
-      expect(body.message).toBe('Registration initiated');
-      expect(body.email).toBe('new@example.com');
+      expect(body.code).toBe('NOT_IMPLEMENTED');
+      expect(body.message).toMatch(/Clerk/i);
     });
 
-    it('returns 201 with optional fields', async () => {
+    it('returns 501 with optional fields (Clerk handles registration)', async () => {
       const res = await app.request('/v1/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -35,7 +35,7 @@ describe('auth routes', () => {
         }),
       });
 
-      expect(res.status).toBe(201);
+      expect(res.status).toBe(501);
     });
 
     it('returns 400 for invalid email', async () => {
@@ -74,8 +74,8 @@ describe('auth routes', () => {
       expect(res.status).toBe(400);
     });
 
-    it('does not require auth (public path)', async () => {
-      // No Authorization header — should still succeed with valid body
+    it('does not require auth (public path) — still returns 501 as not implemented', async () => {
+      // No Authorization header — schema validation passes, endpoint returns 501
       const res = await app.request('/v1/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -85,7 +85,7 @@ describe('auth routes', () => {
         }),
       });
 
-      expect(res.status).toBe(201);
+      expect(res.status).toBe(501);
     });
   });
 
@@ -94,19 +94,18 @@ describe('auth routes', () => {
   // -------------------------------------------------------------------------
 
   describe('POST /v1/auth/password-reset-request', () => {
-    it('returns 200 with valid email', async () => {
+    it('returns 501 with valid email (Clerk handles password reset)', async () => {
       const res = await app.request('/v1/auth/password-reset-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: 'user@example.com' }),
       });
 
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(501);
 
       const body = await res.json();
-      expect(body.message).toBe(
-        'If an account exists, a reset email has been sent'
-      );
+      expect(body.code).toBe('NOT_IMPLEMENTED');
+      expect(body.message).toMatch(/Clerk/i);
     });
 
     it('returns 400 for invalid email', async () => {
@@ -125,7 +124,7 @@ describe('auth routes', () => {
   // -------------------------------------------------------------------------
 
   describe('POST /v1/auth/password-reset', () => {
-    it('returns 200 with valid token and new password', async () => {
+    it('returns 501 with valid token and new password (Clerk handles reset)', async () => {
       const res = await app.request('/v1/auth/password-reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -135,10 +134,11 @@ describe('auth routes', () => {
         }),
       });
 
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(501);
 
       const body = await res.json();
-      expect(body.message).toBe('Password has been reset');
+      expect(body.code).toBe('NOT_IMPLEMENTED');
+      expect(body.message).toMatch(/Clerk/i);
     });
 
     it('returns 400 when new password is too short', async () => {

@@ -204,7 +204,10 @@ describe('fetchJWKS', () => {
       .fn()
       .mockRejectedValue(abortError) as unknown as typeof fetch;
 
-    await expect(fetchJWKS(JWKS_URL)).rejects.toThrow('AbortError');
+    await expect(fetchJWKS(JWKS_URL)).rejects.toMatchObject({
+      name: 'AbortError',
+      message: 'The user aborted a request.',
+    });
   });
 
   it('uses cache on second call within TTL', async () => {

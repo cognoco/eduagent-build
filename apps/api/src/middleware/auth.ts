@@ -2,6 +2,10 @@ import { createMiddleware } from 'hono/factory';
 import { ERROR_CODES } from '@eduagent/schemas';
 import { decodeJWTHeader, fetchJWKS, verifyJWT } from './jwt';
 import type { JWK } from './jwt';
+import { captureException, addBreadcrumb } from '../services/sentry';
+import { createLogger } from '../services/logger';
+
+const logger = createLogger();
 
 // ---------------------------------------------------------------------------
 // Types
@@ -136,7 +140,22 @@ export const authMiddleware = createMiddleware<AuthEnv>(async (c, next) => {
       email: result.email,
     });
     return next();
-  } catch {
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const isInfraFailure =
+      /fetch|JWKS|network|abort/i.test(message) ||
+      (err instanceof Error && err.name === 'AbortError');
+
+    if (isInfraFailure) {
+      logger.warn('JWKS/network failure during JWT verification', {
+        error: message,
+        path: c.req.path,
+      });
+      captureException(err, { requestPath: c.req.path });
+    } else {
+      addBreadcrumb('JWT validation failed', 'auth');
+    }
+
     return c.json(
       { code: ERROR_CODES.UNAUTHORIZED, message: 'Invalid or expired token' },
       401

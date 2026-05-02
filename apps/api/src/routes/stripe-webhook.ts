@@ -359,7 +359,34 @@ async function handlePaymentSucceeded(
 ): Promise<void> {
   const stripeSubscriptionId = extractSubscriptionIdFromInvoice(invoice);
 
-  if (!stripeSubscriptionId) return;
+  // Mirror handlePaymentFailed escalation pattern [ultrareview finding]:
+  // If Stripe SDK v21 (or later) refactors the invoice payload again,
+  // extractSubscriptionIdFromInvoice() will return undefined and we will
+  // silently skip re-activating the subscription after a successful payment —
+  // subscriptions get stuck in past_due with zero observability. Escalate so
+  // we detect the schema drift before users notice.
+  if (!stripeSubscriptionId) {
+    logger.warn(
+      `[stripe-webhook] invoice.payment_succeeded dropped — could not extract subscription id (invoiceId=${invoice.id})`
+    );
+    captureException(
+      new Error(
+        'Stripe invoice.payment_succeeded missing subscription id (possible Stripe schema change)'
+      ),
+      {
+        extra: {
+          context: 'stripe.webhook.payment_succeeded.missing_subscription_id',
+          invoiceId: invoice.id,
+          customerId:
+            typeof invoice.customer === 'string'
+              ? invoice.customer
+              : invoice.customer?.id,
+          billingReason: invoice.billing_reason,
+        },
+      }
+    );
+    return;
+  }
 
   const updated = await updateSubscriptionFromWebhook(
     db,

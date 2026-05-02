@@ -5,6 +5,10 @@ import { inngest } from '../inngest/client';
 const logger = createLogger();
 
 export const IDEMPOTENCY_TTL_SECONDS = 24 * 60 * 60;
+// Matches the middleware enforcement limit; KV key prefix uses ~53 chars
+// (idem:<36-char-uuid>:<flow>:), so 256 keeps the full key well under the
+// 512-byte Cloudflare KV limit.
+export const MAX_IDEMPOTENCY_KEY_LENGTH = 256;
 
 export type IdempotencyFlow = 'session' | 'interview';
 

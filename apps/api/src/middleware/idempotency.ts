@@ -29,6 +29,17 @@ export function idempotencyPreflight(options: { flow: IdempotencyFlow }) {
       return;
     }
 
+    const MAX_IDEMPOTENCY_KEY_LENGTH = 256;
+    if (key.length > MAX_IDEMPOTENCY_KEY_LENGTH) {
+      return c.json(
+        {
+          code: 'INVALID_IDEMPOTENCY_KEY',
+          message: `Idempotency-Key exceeds ${MAX_IDEMPOTENCY_KEY_LENGTH} characters`,
+        },
+        400
+      );
+    }
+
     const profileId = c.get('profileId');
     if (!profileId) {
       addBreadcrumb(

@@ -81,6 +81,51 @@ describe('idempotencyPreflight middleware', () => {
     });
   });
 
+  describe('key present but exceeds 256 characters', () => {
+    it('returns 400 with INVALID_IDEMPOTENCY_KEY and does not hit KV', async () => {
+      const app = createApp({ profileId: 'profile-1' });
+      const kv = makeKv();
+      const longKey = 'a'.repeat(257);
+
+      const res = await app.request(
+        '/test',
+        {
+          method: 'POST',
+          headers: { 'Idempotency-Key': longKey },
+        },
+        { IDEMPOTENCY_KV: kv }
+      );
+
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body).toEqual({
+        code: 'INVALID_IDEMPOTENCY_KEY',
+        message: 'Idempotency-Key exceeds 256 characters',
+      });
+      expect(kv.get).not.toHaveBeenCalled();
+    });
+
+    it('accepts a key of exactly 256 characters', async () => {
+      const app = createApp({ profileId: 'profile-1' });
+      const kv = makeKv({ get: jest.fn().mockResolvedValue(null) });
+      const exactKey = 'b'.repeat(256);
+
+      const res = await app.request(
+        '/test',
+        {
+          method: 'POST',
+          headers: { 'Idempotency-Key': exactKey },
+        },
+        { IDEMPOTENCY_KV: kv }
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toEqual({ ok: true });
+      expect(kv.get).toHaveBeenCalled();
+    });
+  });
+
   describe('key present but profileId missing', () => {
     it('passes through to downstream handler and logs a breadcrumb', async () => {
       const app = createApp();
