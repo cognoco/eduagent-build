@@ -409,10 +409,7 @@ export const exchangesFlow: FlowDefinition<ExchangeScenarioInput> = {
     const priorTurns =
       lastUserIndex >= 0 ? history.slice(0, lastUserIndex) : history;
 
-    // Contract guarantee: buildPrompt above always populates messages.user
-    // for exchanges (last user turn extracted from history). Throw rather
-    // than silently send an empty user turn so other flows copying this
-    // pattern can't regress into invisible misbehaviour.
+    // Throw rather than silently forward an empty user turn — enforces buildPrompt contract for flows that copy this pattern.
     if (!messages.user) {
       throw new Error(
         `runLive: messages.user is undefined for scenario ${input.scenarioId} — buildPrompt must produce a user turn`
