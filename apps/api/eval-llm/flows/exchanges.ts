@@ -2,9 +2,12 @@ import {
   buildSystemPrompt,
   type ExchangeContext,
 } from '../../src/services/exchanges';
+import { resolveAgeBracket } from '../../src/services/exchange-prompts';
 import { buildMemoryBlock } from '../../src/services/learner-profile';
+import type { ChatMessage } from '../../src/services/llm/types';
 import { llmResponseEnvelopeSchema } from '@eduagent/schemas';
 import type { EvalProfile } from '../fixtures/profiles';
+import { runHarnessLlm } from '../runner/llm-client';
 import {
   HISTORY_S1_RUNG1,
   HISTORY_S2_RUNG2,
@@ -371,5 +374,54 @@ export const exchangesFlow: FlowDefinition<ExchangeScenarioInput> = {
     };
   },
 
-  // runLive not yet implemented for this flow — see eval-harness README for status.
+  // -------------------------------------------------------------------------
+  // [AUDIT-EVAL-2 / 2026-05-02] First runLive in the harness — sets the
+  // pattern for the other ~12 flows. Mirrors production processExchange
+  // (apps/api/src/services/exchanges.ts:301) — same routeAndCall signature,
+  // same per-context options (llmTier, ageBracket, conversationLanguage,
+  // pronouns), same escalationRung. The wrapper tags telemetry with
+  // flow: "eval-harness" so dashboards can filter eval calls out.
+  //
+  // Known divergence (tracked separately as AUDIT-EVAL-3): production
+  // concatenates `buildOrphanSystemAddendum(...)` onto the system prompt;
+  // this harness only sends `buildSystemPrompt(context)` (matching what
+  // buildPrompt above produces, and what the Tier-1 snapshot displays).
+  // We deliberately use messages.system here so the live call validates
+  // the same prompt the snapshot shows — fixing the addendum gap means
+  // updating buildPrompt too, which is its own scope.
+  // -------------------------------------------------------------------------
+  async runLive(
+    input: ExchangeScenarioInput,
+    messages: PromptMessages
+  ): Promise<string> {
+    const history = input.context.exchangeHistory;
+    // The runner-passed `messages.user` was extracted from the last user
+    // turn in history (see buildPrompt above). Send the rest of history as
+    // prior context so the LLM sees the same multi-turn shape production
+    // sees — otherwise envelope validation only covers single-turn replies.
+    const lastUserIndex = (() => {
+      for (let i = history.length - 1; i >= 0; i--) {
+        if (history[i].role === 'user') return i;
+      }
+      return -1;
+    })();
+    const priorTurns =
+      lastUserIndex >= 0 ? history.slice(0, lastUserIndex) : history;
+
+    const chatMessages: ChatMessage[] = [
+      { role: 'system', content: messages.system },
+      ...priorTurns.map((t) => ({
+        role: t.role,
+        content: t.content,
+      })),
+      { role: 'user' as const, content: messages.user ?? '' },
+    ];
+
+    return runHarnessLlm(chatMessages, input.context.escalationRung, {
+      llmTier: input.context.llmTier,
+      ageBracket: resolveAgeBracket(input.context.birthYear),
+      conversationLanguage: input.context.conversationLanguage,
+      pronouns: input.context.pronouns,
+    });
+  },
 };
