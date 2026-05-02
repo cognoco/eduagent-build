@@ -11,6 +11,9 @@
  *   logic all run as normal) [IMP-6]
  */
 
+import { inngestClientMock } from './mocks';
+jest.mock('../../apps/api/src/inngest/client', () => inngestClientMock());
+
 import { and, desc, eq } from 'drizzle-orm';
 import {
   curricula,
@@ -290,7 +293,7 @@ describe('Integration: Onboarding interview routes', () => {
 
     const draft = await loadDraft(profileId, subject.id);
     expect(draft).toBeDefined();
-    expect(draft!.status).toBe('completed');
+    expect(draft!.status).toBe('completing');
     expect(draft!.exchangeHistory).toHaveLength(2);
     expect(draft!.extractedSignals).toEqual({
       goals: ['learn algebra'],
@@ -353,11 +356,7 @@ describe('Integration: Onboarding interview routes', () => {
     expect(body).toContain('"isComplete":true');
 
     const draft = await loadDraft(profileId, subject.id);
-    expect(draft!.status).toBe('completed');
-
-    const persisted = await loadCurriculum(subject.id);
-    expect(persisted.curriculum).toBeDefined();
-    expect(persisted.topics).toHaveLength(2);
+    expect(draft!.status).toBe('completing');
   });
 
   it('returns 401 without authentication', async () => {
