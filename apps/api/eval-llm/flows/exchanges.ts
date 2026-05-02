@@ -371,6 +371,13 @@ export const exchangesFlow: FlowDefinition<ExchangeScenarioInput> = {
     };
   },
 
-  // No runLive yet — main loop is streaming. expectedResponseSchema is set
-  // so Tier 2 validates envelope shape automatically once runLive is added.
+  // No runLive yet for this flow. Note (2026-05-01 audit / [AUDIT-EVAL-1]):
+  // no flow in this harness implements runLive — Tier 2 (`pnpm eval:llm
+  // --live`) reports "runLive not implemented for this flow" for every flow.
+  // The expectedResponseSchema above is wired so envelope-shape validation
+  // and runner/metrics.ts baseline-drift detection will activate
+  // automatically once a runLive is added. Implementing the first runLive
+  // is its own architectural decision (streaming-vs-buffered, where the
+  // LLM client comes from) and is tracked separately — see the eval-harness
+  // README for status.
 };
