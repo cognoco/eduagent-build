@@ -10,6 +10,23 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mockPush = jest.fn();
 const mockExportMutateAsync = jest.fn();
+const mockTrack = jest.fn();
+const mockOpenFeedback = jest.fn();
+const mockAccommodationMutate = jest.fn();
+let mockSubscription: { tier: string } | null = { tier: 'free' };
+let mockFamilySubscription: {
+  profileCount: number;
+  maxProfiles: number;
+} | null = null;
+let mockActiveProfile = {
+  id: 'profile-1',
+  displayName: 'Alex',
+  isOwner: true,
+};
+let mockProfiles = [mockActiveProfile];
+let mockLearnerProfile: { accommodationMode?: string } | null = {
+  accommodationMode: 'none',
+};
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
@@ -29,8 +46,8 @@ jest.mock('../../lib/theme', () => ({
 
 jest.mock('../../lib/profile', () => ({
   useProfile: () => ({
-    activeProfile: { id: 'profile-1', displayName: 'Alex', isOwner: true },
-    profiles: [{ id: 'profile-1', displayName: 'Alex', isOwner: true }],
+    activeProfile: mockActiveProfile,
+    profiles: mockProfiles,
   }),
 }));
 
@@ -48,8 +65,35 @@ jest.mock('../../hooks/use-account', () => ({
 }));
 
 jest.mock('../../hooks/use-subscription', () => ({
-  useSubscription: () => ({ data: { tier: 'free' } }),
-  useFamilySubscription: () => ({ data: null }),
+  useSubscription: () => ({ data: mockSubscription }),
+  useFamilySubscription: () => ({ data: mockFamilySubscription }),
+}));
+
+jest.mock('../../hooks/use-learner-profile', () => ({
+  useLearnerProfile: () => ({ data: mockLearnerProfile }),
+  useUpdateAccommodationMode: () => ({
+    mutate: mockAccommodationMutate,
+    isPending: false,
+  }),
+}));
+
+jest.mock('../../components/feedback/FeedbackProvider', () => ({
+  useFeedbackContext: () => ({ openFeedback: mockOpenFeedback }),
+}));
+
+jest.mock('../../lib/analytics', () => ({
+  track: (...args: unknown[]) => mockTrack(...args),
+}));
+
+jest.mock('@clerk/clerk-expo', () => ({
+  useAuth: () => ({ signOut: jest.fn() }),
+  useUser: () => ({
+    user: {
+      fullName: 'Alex',
+      firstName: 'Alex',
+      primaryEmailAddress: { emailAddress: 'alex@example.com' },
+    },
+  }),
 }));
 
 const mockNotifData = {
@@ -113,6 +157,16 @@ const MoreScreen = require('./more').default;
 describe('MoreScreen — Learning Mode', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSubscription = { tier: 'free' };
+    mockFamilySubscription = null;
+    mockActiveProfile = {
+      id: 'profile-1',
+      displayName: 'Alex',
+      isOwner: true,
+    };
+    mockProfiles = [mockActiveProfile];
+    mockLearnerProfile = { accommodationMode: 'none' };
+    mockIsParentProxy = false;
     mockExportMutateAsync.mockResolvedValue({
       account: {
         email: 'alex@example.com',
@@ -155,6 +209,75 @@ describe('MoreScreen — Learning Mode', () => {
     // The bare uppercase label must not appear in the rendered tree.
     expect(screen.queryByText('Learning Mode')).toBeNull();
     expect(screen.queryByText('Learning Accommodation')).toBeNull();
+  });
+
+  it('does not render a child-preferences cross-link when there are no linked children', () => {
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    expect(screen.queryByTestId('learning-mode-child-link')).toBeNull();
+    expect(screen.queryByTestId('learning-mode-family-link')).toBeNull();
+  });
+
+  it('renders a direct child-preferences link when there is one linked child', () => {
+    mockProfiles = [
+      mockActiveProfile,
+      { id: 'child-1', displayName: 'Mia', isOwner: false },
+    ];
+
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    expect(screen.getByTestId('learning-mode-child-link')).toBeTruthy();
+    expect(
+      screen.getByText("To change Mia's preferences, open their profile →")
+    ).toBeTruthy();
+  });
+
+  it('tracks and navigates to the child profile from the cross-link', () => {
+    mockProfiles = [
+      mockActiveProfile,
+      { id: 'child-1', displayName: 'Mia', isOwner: false },
+    ];
+
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    fireEvent.press(screen.getByTestId('learning-mode-child-link'));
+
+    expect(mockTrack).toHaveBeenCalledWith('child_progress_navigated', {
+      source: 'more_section',
+    });
+    expect(mockPush).toHaveBeenCalledWith('/(app)/child/child-1');
+  });
+
+  it('renders a Family cross-link when there are multiple linked children', () => {
+    mockProfiles = [
+      mockActiveProfile,
+      { id: 'child-1', displayName: 'Mia', isOwner: false },
+      { id: 'child-2', displayName: 'Leo', isOwner: false },
+    ];
+
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    expect(screen.getByTestId('learning-mode-family-link')).toBeTruthy();
+    expect(
+      screen.getByText("To change a child's preferences, open Family →")
+    ).toBeTruthy();
+  });
+
+  it('tracks and navigates to Family from the multi-child cross-link', () => {
+    mockProfiles = [
+      mockActiveProfile,
+      { id: 'child-1', displayName: 'Mia', isOwner: false },
+      { id: 'child-2', displayName: 'Leo', isOwner: false },
+    ];
+
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    fireEvent.press(screen.getByTestId('learning-mode-family-link'));
+
+    expect(mockTrack).toHaveBeenCalledWith('child_progress_navigated', {
+      source: 'more_section',
+    });
+    expect(mockPush).toHaveBeenCalledWith('/(app)/dashboard');
   });
 
   // BUG-909: When the profile is an owner with linked children, the
@@ -313,7 +436,7 @@ describe('MoreScreen — Learning Mode', () => {
     // BUG-909: Section labels are now possessive (per active profile).
     expect(screen.getByText("Alex's Learning Mode")).toBeTruthy();
     expect(screen.getByText("Alex's Learning Accommodation")).toBeTruthy();
-    expect(screen.getByText('Celebrations')).toBeTruthy();
+    expect(screen.getByText('Your celebrations')).toBeTruthy();
     expect(screen.getByText('Notifications')).toBeTruthy();
     expect(screen.getByText('Account')).toBeTruthy();
     expect(screen.getByText('Other')).toBeTruthy();
@@ -343,6 +466,14 @@ describe('MoreScreen — Account Actions', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockIsParentProxy = false;
+    mockSubscription = { tier: 'free' };
+    mockFamilySubscription = null;
+    mockActiveProfile = {
+      id: 'profile-1',
+      displayName: 'Alex',
+      isOwner: true,
+    };
+    mockProfiles = [mockActiveProfile];
     mockExportMutateAsync.mockResolvedValue({
       account: {
         email: 'alex@example.com',
@@ -422,6 +553,28 @@ describe('MoreScreen — Account Actions', () => {
         undefined
       );
     });
+  });
+});
+
+describe('MoreScreen — family actions', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSubscription = { tier: 'family' };
+    mockFamilySubscription = { profileCount: 1, maxProfiles: 4 };
+    mockActiveProfile = {
+      id: 'profile-1',
+      displayName: 'Alex',
+      isOwner: true,
+    };
+    mockProfiles = [mockActiveProfile];
+  });
+
+  it('navigates to create-profile with for=child when Add a child is pressed', () => {
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    fireEvent.press(screen.getByTestId('add-child-link'));
+
+    expect(mockPush).toHaveBeenCalledWith('/create-profile?for=child');
   });
 });
 

@@ -18,16 +18,61 @@
  * - TypeError from native fetch for network failures (legacy path)
  * - Standard Error for other caught exceptions
  */
-import {
-  BadRequestError,
-  ForbiddenError,
-  NetworkError,
-  NotFoundError,
-  QuotaExceededError,
-  RateLimitedError,
-  ResourceGoneError,
-  UpstreamError,
-} from './api-errors';
+// ---------------------------------------------------------------------------
+// HMR-safe type guards [BUG-947]
+//
+// Metro HMR can reload api-errors.ts and create a new class identity without
+// updating all consumers, breaking instanceof. These guards match on the stable
+// .name string (set in every constructor) plus required property shape, so error
+// classification survives hot reloads. Built-in `instanceof Error` is stable.
+// ---------------------------------------------------------------------------
+
+type UpstreamLike = Error & { code: string; status: number };
+function isUpstreamError(error: unknown): error is UpstreamLike {
+  return (
+    error instanceof Error &&
+    error.name === 'UpstreamError' &&
+    'code' in error &&
+    'status' in error
+  );
+}
+
+function isNetworkError(error: unknown): error is Error {
+  return error instanceof Error && error.name === 'NetworkError';
+}
+
+function isNotFoundError(error: unknown): error is Error {
+  return error instanceof Error && error.name === 'NotFoundError';
+}
+
+function isResourceGoneError(error: unknown): error is Error {
+  return error instanceof Error && error.name === 'ResourceGoneError';
+}
+
+function isRateLimitedError(error: unknown): error is Error {
+  return error instanceof Error && error.name === 'RateLimitedError';
+}
+
+function isBadRequestError(error: unknown): error is Error {
+  return error instanceof Error && error.name === 'BadRequestError';
+}
+
+type QuotaExceededLike = Error & { code: string; details: unknown };
+function isQuotaExceededError(error: unknown): error is QuotaExceededLike {
+  return (
+    error instanceof Error &&
+    error.name === 'QuotaExceededError' &&
+    'code' in error &&
+    'details' in error
+  );
+}
+
+type ForbiddenLike = Error & { code: string; apiCode?: string };
+function isForbiddenError(error: unknown): error is ForbiddenLike {
+  return (
+    error instanceof Error && error.name === 'ForbiddenError' && 'code' in error
+  );
+}
 
 const NETWORK_MESSAGE =
   "Looks like you're offline or our servers can't be reached. Check your internet connection and try again.";
@@ -261,7 +306,7 @@ export function recoveryActions(
  * Classification order (each step narrows the raw error, NOT the formatted
  * message — per the "Classify Before Format" rule):
  *  1. Typed NetworkError / TypeError network failures → network / retry
- *  2. Typed error classes from api-client.ts boundary (instanceof checks)
+ *  2. Typed error classes from api-client.ts boundary (HMR-safe name guards)
  *  3. Error codes on the error object (apiCode, code)
  *  4. HTTP status from the "API error {status}: …" shape (plain Error fallback)
  *  5. Message pattern heuristics (network keywords)
@@ -272,7 +317,7 @@ export function recoveryActions(
  */
 export function classifyApiError(error: unknown): FormattedApiError {
   // 1. Typed NetworkError — thrown by customFetch on fetch rejection
-  if (error instanceof NetworkError) {
+  if (isNetworkError(error)) {
     return { message: NETWORK_MESSAGE, category: 'network', recovery: 'retry' };
   }
 
@@ -291,8 +336,8 @@ export function classifyApiError(error: unknown): FormattedApiError {
   // [I-13] UpstreamError — typed 5xx from api-client.ts. Classify before the
   // generic `instanceof Error` path so any .code value (not just
   // UPSTREAM_ERROR/INTERNAL_ERROR) is caught here rather than falling through
-  // to parseApiBody heuristics. Uses instanceof for type safety + .status/.code access.
-  if (error instanceof UpstreamError) {
+  // to parseApiBody heuristics.
+  if (isUpstreamError(error)) {
     // [BUG-947] 402 PROFILE_LIMIT_EXCEEDED is a subscription-tier upgrade gate,
     // not a server fault. The route layer returns 402 with a clear actionable
     // message ("Please upgrade to Family or Pro"), but the generic UpstreamError
@@ -318,7 +363,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
   }
 
   // Typed 404 — NotFoundError from api-client.ts
-  if (error instanceof NotFoundError) {
+  if (isNotFoundError(error)) {
     return {
       message:
         friendlyMessage(error.message) ?? 'That page or item no longer exists.',
@@ -328,7 +373,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
   }
 
   // Typed 410 — ResourceGoneError from api-client.ts
-  if (error instanceof ResourceGoneError) {
+  if (isResourceGoneError(error)) {
     return {
       message:
         friendlyMessage(error.message) ??
@@ -339,7 +384,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
   }
 
   // Typed 429 — RateLimitedError from api-client.ts
-  if (error instanceof RateLimitedError) {
+  if (isRateLimitedError(error)) {
     return {
       message:
         friendlyMessage(error.message) ??
@@ -352,7 +397,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
   // Typed 400 — BadRequestError from api-client.ts. Pass through the server
   // message when it's short and non-technical (same logic as the short
   // user-facing message passthrough below), with a friendly override if matched.
-  if (error instanceof BadRequestError) {
+  if (isBadRequestError(error)) {
     const msg = error.message;
     const looksLikeStack =
       /\n\s+at /.test(msg) || /at [A-Z]\w*\./.test(msg) || /^at \S/.test(msg);
@@ -370,6 +415,35 @@ export function classifyApiError(error: unknown): FormattedApiError {
     };
   }
 
+  // Typed 402 — QuotaExceededError from api-client.ts
+  // [BUG-774 / I-11] Spoofing guard: name-based guard requires .code + .details,
+  // so a plain Error with a spoofed .name won't match.
+  if (isQuotaExceededError(error)) {
+    return { message: error.message, category: 'quota', recovery: 'none' };
+  }
+
+  // Typed 403 — ForbiddenError from api-client.ts
+  if (isForbiddenError(error)) {
+    const effectiveCode = error.apiCode ?? error.code;
+    if (
+      effectiveCode === 'SUBJECT_INACTIVE' ||
+      effectiveCode === 'SUBJECT_PAUSED'
+    ) {
+      return {
+        message: friendlyMessage(error.message) ?? error.message,
+        category: 'not-found',
+        recovery: 'go-back',
+      };
+    }
+    return {
+      message:
+        friendlyMessage(error.message) ??
+        (error.message || 'You do not have permission to view this.'),
+      category: 'auth',
+      recovery: 'sign-out',
+    };
+  }
+
   if (error instanceof Error) {
     const msg = error.message;
     const msgLower = msg.toLowerCase();
@@ -380,33 +454,6 @@ export function classifyApiError(error: unknown): FormattedApiError {
     };
 
     const effectiveCode = apiErrorLike.apiCode ?? apiErrorLike.code;
-
-    // 2. Named error types
-    // [BUG-774 / I-11] instanceof so spoofed .name strings cannot trick the classifier; both classes share identity via @eduagent/schemas (BUG-644 / P-4).
-    if (error instanceof QuotaExceededError) {
-      return { message: msg, category: 'quota', recovery: 'none' };
-    }
-
-    if (error instanceof ForbiddenError) {
-      // Sub-classify by apiCode: SUBJECT_INACTIVE is a content state, not auth
-      if (
-        effectiveCode === 'SUBJECT_INACTIVE' ||
-        effectiveCode === 'SUBJECT_PAUSED'
-      ) {
-        return {
-          message: friendlyMessage(msg) ?? msg,
-          category: 'not-found',
-          recovery: 'go-back',
-        };
-      }
-      return {
-        message:
-          friendlyMessage(msg) ??
-          (msg || 'You do not have permission to view this.'),
-        category: 'auth',
-        recovery: 'sign-out',
-      };
-    }
 
     // 3. Typed error codes
     if (effectiveCode === 'EXCHANGE_LIMIT_EXCEEDED') {

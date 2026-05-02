@@ -227,9 +227,9 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | SUBJECT-07 | Focused subject / focused-book flow | 🚫 | Blocked | | | Need separate test — focused-input branch differs from broad-pick (untested in this pass) |
 | SUBJECT-09 | Interview onboarding | ✅ | Pass | | | 2026-05-02: After durability-layer-fix deployed to staging, full interview verified. Step 1/4, multi-turn streaming worked, mentor responded with correct Italian phrase, page progress incremented 0→1→2, "I'm ready to start learning" envelope-driven button appeared and advanced to step 2. SUBJECT-09 P1 root cause was CORS Idempotency-Key gap (staging stale), now fixed. |
 | SUBJECT-10 | Analogy-preference onboarding | ✅ | Pass | | | Step 2/4 rendered with 7 options (No preference / Cooking / Sports / Building / Music / Nature / Gaming). Skip → advanced to step 3. |
-| SUBJECT-11 | Curriculum review | ⚠️ | Pass w/ issues | | | Step 4/4 reached and rendered ("Your Curriculum" / "Suggest changes" / "Add topic" / "Continue to home") but showed "Version 1 — 0 topics" after only 2 interview exchanges. Need to retest with fuller interview to see if topics populate. L3 inngest persist-curriculum may not have time to run when "Ready" is clicked too early. |
-| SUBJECT-12 | View curriculum without committing | 🚫 | Blocked | | | Need a session with topics first (SUBJECT-11 returned 0 topics) |
-| SUBJECT-13 | Challenge curriculum (skip / add / explain ordering) | 🚫 | Blocked | | | Need a session with topics first |
+| SUBJECT-11 | Curriculum review | ❌ | Fail | [SUBJECT-11 P1](https://www.notion.so/SUBJECT-11-Interview-Done-button-bypasses-curriculum-generation-review-screen-shows-0-topics-3548bce91f7c81bb99baee766d33abc5) | | Step 4/4 rendered correctly but "Done" button bypasses curriculum generation — review screen shows 0 topics indefinitely. LLM-emitted "Ready to start learning" envelope path works (Italian flow triggered /interview/complete + curriculum populated). User-driven Done button does NOT fire /interview/complete. |
+| SUBJECT-12 | View curriculum without committing | ✅ | Pass | | | Verified via Spanish shelf (seeded with 10 topics): Library → Spanish → book → all 10 topics rendered (Greetings, Numbers, Food, Home, Directions, Daily Routine, Shopping, Travel, Health, Past Experiences) without committing to start. |
+| SUBJECT-13 | Challenge curriculum (skip / add / explain ordering) | 🚫 | Blocked | | | "Suggest changes" button only available on curriculum-review screen during onboarding — would need a successful onboarding to test (currently blocked by SUBJECT-11). |
 | SUBJECT-14 | Placement / knowledge assessment | 🚫 | Blocked | | | Need to find the placement entry point — not part of standard 4-step interview flow |
 | SUBJECT-15 | Accommodation-mode onboarding (FR255) | ✅ | Pass | | | Step 3/4 "How do you learn best?" with 4 options (None / Short-Burst / Audio-First / Predictable) plus Continue/Skip. Skip → advanced to curriculum review. |
 
@@ -259,7 +259,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | LEARN-01 | Freeform chat (Ask intent card) | ❌ | Fail | [streamExchange threw 500](https://www.notion.so/Freeform-chat-session-returns-500-streamExchange-threw-3548bce91f7c81f1858ae805a0937f36) | | 2026-05-02: After CORS fix, freeform chat session POST → stream returns 500 `{"code":"INTERNAL_ERROR","message":"streamExchange threw"}`. Server-side error specific to no-subject-context path. Filed new bug. Original LEARN-01 P1 root cause (CORS) is fixed — this is a different bug surfaced by it. |
-| LEARN-02 | Guided learning session from subject/topic | 🚫 | Blocked | | | Need separate test pass — interview-bound stream works, need to verify post-onboarding /session route streams chunks for the standard learning loop |
+| LEARN-02 | Guided learning session from subject/topic | ❌ | Fail | [LEARN-02 P1](https://www.notion.so/LEARN-02-Guided-learning-session-stream-returns-200-but-no-chunks-render-UI-stuck-on-writing-anim-3548bce91f7c81e1b3b0c4bcb6869fb6) | | Library → Spanish → Greetings topic → /session opens with mentor opener. Send any message → POST /sessions/{id}/stream returns 200 but no SSE chunks render. UI stuck on writing animation 40+ seconds. Different symptom from streamExchange 500 — this is silent zero-token stream. Subject-bound interview path streams normally; topic-context path fails. |
 | LEARN-03 | First session experience | 🚫 | Blocked | | | Staging LLM down |
 | LEARN-04 | Core learning loop | 🚫 | Blocked | | | Staging LLM down |
 | LEARN-05 | Coach bubble visual variants (light/dark) | 🚫 | Blocked | | | Needs LLM response to render bubbles |
@@ -536,9 +536,9 @@ Update this once a batch is complete to track overall progress.
 | --- | --- | --- | --- | --- |
 | 1  | Pre-auth & Auth          | 12 | ✅ | 8✅ 1⚠️ 3🚫 — AUTH-12 bug filed |
 | 2  | First Profile + Consent  |  9 | ✅ | 5✅ 1⚠️ 3🚫 — consent email/native blocked |
-| 3  | Subject Onboarding       | 11 | 🚫 | 11🚫 — all blocked by SUBJECT-09 P1 (interview failure) |
+| 3  | Subject Onboarding       | 11 | ⚠️ | 6✅ 1❌ 4🚫 — streaming unblocked 2026-05-02 (CORS Idempotency-Key fix); SUBJECT-11 Done-button bypass new bug |
 | 4  | Learner Home + Resume    |  6 | ✅ | 4✅ 1⚠️ 1🚫 |
-| 5  | Core Learning Sessions   | 11 | 🚫 | 1❌ 10🚫 — LLM staging down |
+| 5  | Core Learning Sessions   | 11 | ⚠️ | 2❌ 9🚫 — streaming unblocked but LEARN-01 (500) and LEARN-02 (silent stream) found new bugs |
 | 6  | Library, Books, Topics   |  6 | ✅ | 5✅ 1⚠️ |
 | 7  | Retention & Recall       |  4 | 🚫 | 4🚫 — all need LLM sessions |
 | 8  | Progress / Vocab         |  6 | ⚠️ | 2✅ 4🚫 |
@@ -552,7 +552,7 @@ Update this once a batch is complete to track overall progress.
 | 16 | Billing                  | 11 | ✅ | 7✅ 4🚫 — Family pool verified, store/child-paywall/quota blocked |
 | 17 | Cross-Cutting Final Pass |  3 | ⚠️ | 1✅ 1⚠️ 1🚫 — BUG-948 bare router.back() |
 | 18 | Regression Smoke         |  9 | ⚠️ | 4✅ 5🚫 — LLM/email blocked, parent add-child now passing |
-| **Total** | | **154** | | **64✅ 6⚠️ 1❌ 83🚫 0⬜ — all flows triaged** |
+| **Total** | | **154** | | **70✅ 6⚠️ 4❌ 74🚫 0⬜ — streaming unblocked 2026-05-02; +6 newly verified flows, +3 new bugs surfaced |
 
 ### Coverage Audit
 

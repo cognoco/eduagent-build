@@ -18,6 +18,7 @@ import {
   type TopicsSortKey,
   type TopicsFilters,
 } from '../../lib/library-filters';
+import { goBackOrReplace } from '../../lib/navigation';
 
 // ---------------------------------------------------------------------------
 // State types (exported for parent to own)
@@ -256,7 +257,7 @@ export function TopicsTab({
           </Pressable>
         ) : (
           <Pressable
-            onPress={() => router.back()}
+            onPress={() => goBackOrReplace(router, '/(app)/library')}
             className="bg-surface-elevated rounded-button px-5 py-3 items-center min-h-[48px] justify-center"
             accessibilityRole="button"
             testID="topics-tab-go-back"

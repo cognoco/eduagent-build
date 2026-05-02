@@ -11,9 +11,15 @@ import type { EnrichedTopic } from '../../lib/library-filters';
 // ---------------------------------------------------------------------------
 
 const mockBack = jest.fn();
+const mockReplace = jest.fn();
+const mockCanGoBack = jest.fn();
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ back: mockBack }),
+  useRouter: () => ({
+    back: mockBack,
+    replace: mockReplace,
+    canGoBack: mockCanGoBack,
+  }),
 }));
 
 jest.mock('../../lib/theme', () => ({
@@ -358,7 +364,8 @@ describe('TopicsTab', () => {
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
-  it('[UX-DE-M4] shows Go Back button when isError=true and onRetry is not provided', () => {
+  it('[UX-DE-M4] Go Back button calls router.back() when history exists (canGoBack=true)', () => {
+    mockCanGoBack.mockReturnValue(true);
     render(<TopicsTab {...defaultProps} topics={[]} isError />);
 
     expect(screen.getByTestId('topics-tab-error')).toBeTruthy();
@@ -366,5 +373,18 @@ describe('TopicsTab', () => {
 
     fireEvent.press(screen.getByTestId('topics-tab-go-back'));
     expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('[UX-DE-M4][BUG-948] Go Back button replaces to /(app)/library when deep-linked (canGoBack=false)', () => {
+    mockCanGoBack.mockReturnValue(false);
+    render(<TopicsTab {...defaultProps} topics={[]} isError />);
+
+    expect(screen.getByTestId('topics-tab-go-back')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('topics-tab-go-back'));
+    expect(mockBack).not.toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledTimes(1);
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
   });
 });

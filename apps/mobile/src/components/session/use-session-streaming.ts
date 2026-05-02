@@ -13,11 +13,7 @@ import type {
   useStartSession,
   useRecordSystemPrompt,
 } from '../../hooks/use-sessions';
-import {
-  useApiClient,
-  QuotaExceededError,
-  type QuotaExceededDetails,
-} from '../../lib/api-client';
+import { useApiClient, type QuotaExceededDetails } from '../../lib/api-client';
 import { formatApiError } from '../../lib/format-api-error';
 import { writeSessionRecoveryMarker } from '../../lib/session-recovery';
 import {
@@ -795,9 +791,16 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
         }
         // Detect quota before reconnect classification — QuotaExceededError is
         // never reconnectable and needs a structured card, not a text bubble.
-        if (err instanceof QuotaExceededError) {
+        // [BUG-947] Name guard instead of instanceof for Metro HMR resilience.
+        if (
+          err instanceof Error &&
+          err.name === 'QuotaExceededError' &&
+          'details' in err
+        ) {
           setIsStreaming(false);
-          setQuotaError(err.details);
+          setQuotaError(
+            (err as Error & { details: QuotaExceededDetails }).details
+          );
           if (streamId) {
             setMessages((prev) =>
               prev.map((message) =>

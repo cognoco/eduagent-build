@@ -28,24 +28,30 @@ test('J-10 learner → Practice → Quiz → launch → play → results → hom
     timeout: 30_000,
   });
 
-  // Wait for the first option to render (real API generates questions)
   const quizScreen = page.getByTestId('quiz-play-screen');
-  await expect(quizScreen.getByTestId('quiz-option-0')).toBeVisible({
-    timeout: 30_000,
-  });
 
-  // Pick the first option — we don't know if it's correct, both outcomes
-  // ("Correct" / "Not quite") are valid and lead to the same continue path
-  await quizScreen.getByTestId('quiz-option-0').click();
-  await expect(page.getByText(/Correct|Not quite/i)).toBeVisible({
-    timeout: 30_000,
-  });
+  // Answer every question in the round until the results screen appears
+  for (let q = 0; q < 20; q++) {
+    const resultsVisible = await page
+      .getByTestId('quiz-results-screen')
+      .isVisible()
+      .catch(() => false);
+    if (resultsVisible) break;
 
-  // "Tap anywhere to continue" appears shortly after the answer feedback
-  await expect(page.getByText('Tap anywhere to continue')).toBeVisible({
-    timeout: 30_000,
-  });
-  await quizScreen.click();
+    await expect(quizScreen.getByTestId('quiz-option-0')).toBeVisible({
+      timeout: 30_000,
+    });
+
+    await quizScreen.getByTestId('quiz-option-0').click();
+    await expect(page.getByTestId('quiz-answer-feedback')).toBeVisible({
+      timeout: 30_000,
+    });
+
+    await expect(page.getByText('Tap anywhere to continue')).toBeVisible({
+      timeout: 30_000,
+    });
+    await quizScreen.click();
+  }
 
   // Results screen
   await expect(page.getByTestId('quiz-results-screen')).toBeVisible({

@@ -632,7 +632,9 @@ export default function ChildDetailScreen() {
         )}
 
         <Text className="text-h3 font-semibold text-text-primary mt-6 mb-2">
-          Mentor Memory
+          {child?.displayName
+            ? `${child.displayName}'s mentor memory`
+            : "Your child's mentor memory"}
         </Text>
         {/* [F-PV-08] Consent prompt lives on mentor-memory only; show CTA here */}
         {learnerProfile?.memoryConsentStatus === 'pending' && profileId ? (
@@ -678,8 +680,10 @@ export default function ChildDetailScreen() {
           </Text>
         </Pressable>
 
-        <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
-          Learning Accommodation
+        <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6">
+          {child?.displayName
+            ? `${child.displayName}'s learning accommodation`
+            : "Your child's learning accommodation"}
         </Text>
         <Text className="text-body-sm text-text-secondary mb-2">
           Choose how the mentor adapts its teaching style. This takes effect on

@@ -60,13 +60,12 @@ describe('ChildReportsScreen', () => {
       });
     });
 
-    it('renders the spec heading and body with child name', () => {
+    it('renders the condensed empty-state body with child name', () => {
       render(<ChildReportsScreen />);
 
-      expect(screen.getByText('Your first report is on its way')).toBeTruthy();
       expect(screen.getByTestId('child-reports-empty')).toBeTruthy();
-      // Body includes child name
       expect(screen.getByText(/Emma's first report/)).toBeTruthy();
+      expect(screen.queryByText('Your first report is on its way')).toBeNull();
     });
 
     it('shows action button with child name that navigates to child detail', () => {

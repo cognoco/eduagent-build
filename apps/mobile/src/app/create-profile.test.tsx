@@ -13,6 +13,7 @@ const mockBack = jest.fn();
 const mockReplace = jest.fn();
 const mockCanGoBack = jest.fn();
 const mockPush = jest.fn();
+let mockSearchParams: { for?: string } = {};
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
@@ -21,6 +22,7 @@ jest.mock('expo-router', () => ({
     canGoBack: mockCanGoBack,
     push: mockPush,
   }),
+  useLocalSearchParams: () => mockSearchParams,
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -76,6 +78,7 @@ describe('CreateProfileScreen', () => {
   beforeEach(() => {
     mockFetch.mockReset();
     jest.clearAllMocks();
+    mockSearchParams = {};
     datePickerOnChange = null;
     mockCanGoBack.mockReturnValue(true);
     // Default: non-parent flow (first-time user / child self-registering)
@@ -147,6 +150,21 @@ describe('CreateProfileScreen', () => {
         screen.getByPlaceholderText("Enter your child's name")
       ).toBeTruthy();
     });
+  });
+
+  it('uses child-referent copy when opened with ?for=child even before parent state resolves', () => {
+    mockSearchParams = { for: 'child' };
+
+    render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+    expect(screen.getByText('Add a child')).toBeTruthy();
+    expect(screen.getByText("Child's display name")).toBeTruthy();
+    expect(
+      screen.getByText(/personalise how their mentor talks to them/)
+    ).toBeTruthy();
+    expect(
+      screen.queryByText(/personalise how your mentor talks to you/)
+    ).toBeNull();
   });
 
   it('disables submit when name is empty', () => {
@@ -387,6 +405,61 @@ describe('CreateProfileScreen', () => {
     expect(mockPush).toHaveBeenCalledWith('/(app)/subscription');
 
     // The inline error banner must NOT be shown — the alert is the surface.
+    expect(screen.queryByTestId('create-profile-error')).toBeNull();
+  });
+
+  // [BUG-947] HMR resilience: Metro HMR can reload api-errors.ts and create a
+  // new class identity, breaking `instanceof UpstreamError`. The fix reads
+  // `.message` via plain property access, so PROFILE_LIMIT_EXCEEDED is
+  // classified correctly even when instanceof would return false.
+  it('[BUG-947] surfaces upgrade alert with correct message when instanceof would fail (HMR)', async () => {
+    const upgradeMessage = 'Server-provided upgrade message for HMR test.';
+    // Simulate HMR identity mismatch: throw a plain Error with the same shape
+    // as UpstreamError but constructed from a *different* Error class (as if
+    // api-errors.ts was reloaded). `instanceof UpstreamError` would return false
+    // for this object, but `.code` is still readable.
+    const hmrError = Object.assign(new Error(upgradeMessage), {
+      name: 'UpstreamError',
+      code: 'PROFILE_LIMIT_EXCEEDED',
+      status: 402,
+    });
+    mockFetch.mockImplementationOnce(() => {
+      throw hmrError;
+    });
+
+    render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(
+      screen.getByTestId('create-profile-name'),
+      'Test Child'
+    );
+    fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+    await act(() => {
+      datePickerOnChange?.({ type: 'set' }, new Date(2013, 4, 1));
+    });
+    fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+    await waitFor(() => {
+      expect(Alert.alert).toHaveBeenCalledTimes(1);
+    });
+
+    const alertCall = (Alert.alert as jest.Mock).mock.calls[0];
+    expect(alertCall[0]).toBe('Upgrade required');
+    // Server-provided message must be surfaced — NOT the fallback string.
+    expect(alertCall[1]).toBe(upgradeMessage);
+    const buttons = alertCall[2] as Array<{
+      text?: string;
+      style?: string;
+      onPress?: () => void;
+    }>;
+    expect(buttons).toHaveLength(2);
+    expect(buttons[1]?.text).toBe('See plans');
+
+    // Pressing "See plans" routes to the subscription screen
+    buttons[1]?.onPress?.();
+    expect(mockPush).toHaveBeenCalledWith('/(app)/subscription');
+
+    // No inline error banner — alert is the surface.
     expect(screen.queryByTestId('create-profile-error')).toBeNull();
   });
 

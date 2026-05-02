@@ -199,7 +199,7 @@ export default function QuizResultsScreen(): React.ReactElement {
           correction without shaming. */}
       {missed.length > 0 && (
         <View className="mt-8 w-full" testID="quiz-results-missed-section">
-          <Text className="mb-3 text-body-sm font-semibold uppercase tracking-wide text-text-secondary">
+          <Text className="mb-3 text-body-sm font-semibold tracking-wide text-text-secondary">
             What you missed
           </Text>
           {missed.map((qr) => {

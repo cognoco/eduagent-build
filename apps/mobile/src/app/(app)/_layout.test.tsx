@@ -5,6 +5,8 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react-native';
+import React from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-expo';
 import {
   clearPendingAuthRedirect,
@@ -14,7 +16,6 @@ import {
 
 const mockUseProfile = jest.fn();
 const mockUseConsentStatus = jest.fn();
-const mockInvalidateQueries = jest.fn();
 const mockUsePathname = jest.fn();
 const mockReplace = jest.fn();
 const mockTabs = Object.assign(
@@ -83,12 +84,6 @@ jest.mock('../../lib/profile', () => ({
   personaFromBirthYear: () => 'learner',
 }));
 
-jest.mock('@tanstack/react-query', () => ({
-  useQueryClient: () => ({
-    invalidateQueries: mockInvalidateQueries,
-  }),
-}));
-
 jest.mock('../../hooks/use-consent', () => ({
   useConsentStatus: () => mockUseConsentStatus(),
   useRequestConsent: () => ({
@@ -144,8 +139,23 @@ jest.mock('../../hooks/use-subjects', () => ({
 const AppLayout = require('./_layout').default;
 
 describe('AppLayout', () => {
+  let testQueryClient: QueryClient;
+
+  function renderLayout() {
+    return render(<AppLayout />, {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={testQueryClient}>
+          {children}
+        </QueryClientProvider>
+      ),
+    });
+  }
+
   beforeEach(() => {
     jest.clearAllMocks();
+    testQueryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
     clearPendingAuthRedirect();
     mockReplace.mockReset();
     mockUsePathname.mockReturnValue('/home');
@@ -200,7 +210,7 @@ describe('AppLayout', () => {
   });
 
   it('keeps linked-parent accounts in the learner tab shell for adaptive home', () => {
-    render(<AppLayout />);
+    renderLayout();
 
     expect(screen.getByTestId('tabs')).toBeTruthy();
     expect(screen.queryByTestId('redirect')).toBeNull();
@@ -212,7 +222,7 @@ describe('AppLayout', () => {
   it('logs AUTH-DEBUG only once per mount when auth state is stable (BUG-923)', () => {
     const logSpy = jest.spyOn(console, 'log').mockImplementation(jest.fn());
     try {
-      const { rerender } = render(<AppLayout />);
+      const { rerender } = renderLayout();
       const initialAuthLogs = logSpy.mock.calls.filter(
         (args) =>
           typeof args[0] === 'string' &&
@@ -250,7 +260,7 @@ describe('AppLayout', () => {
       isSignedIn: false,
     });
 
-    render(<AppLayout />);
+    renderLayout();
 
     const redirect = screen.getByTestId('redirect');
     expect(redirect.props.href).toBe('/sign-in?redirectTo=%2F(app)%2Fhome');
@@ -264,7 +274,7 @@ describe('AppLayout', () => {
       isSignedIn: false,
     });
 
-    render(<AppLayout />);
+    renderLayout();
 
     const redirect = screen.getByTestId('redirect');
     expect(redirect.props.href).toBe('/sign-in?redirectTo=%2F(app)%2Fquiz');
@@ -275,7 +285,7 @@ describe('AppLayout', () => {
     rememberPendingAuthRedirect('/(app)/quiz');
     mockUsePathname.mockReturnValue('/home');
 
-    render(<AppLayout />);
+    renderLayout();
 
     expect(screen.getByTestId('auth-redirect-replay')).toBeTruthy();
     expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');
@@ -286,7 +296,7 @@ describe('AppLayout', () => {
     rememberPendingAuthRedirect('/(app)/quiz');
     mockUsePathname.mockReturnValue('/quiz');
 
-    const view = render(<AppLayout />);
+    const view = renderLayout();
 
     act(() => {
       jest.advanceTimersByTime(500);
@@ -305,7 +315,7 @@ describe('AppLayout', () => {
     rememberPendingAuthRedirect('/(app)/quiz');
     mockUsePathname.mockReturnValue('/quiz');
 
-    render(<AppLayout />);
+    renderLayout();
 
     expect(peekPendingAuthRedirect()).toBe('/(app)/quiz');
 
@@ -323,7 +333,7 @@ describe('AppLayout', () => {
       isSignedIn: false,
     });
 
-    render(<AppLayout />);
+    renderLayout();
 
     const redirect = screen.getByTestId('redirect');
     expect(redirect.props.href).toBe('/sign-in?redirectTo=%2F(app)%2Fquiz');
@@ -335,7 +345,7 @@ describe('AppLayout', () => {
       isSignedIn: undefined,
     });
 
-    render(<AppLayout />);
+    renderLayout();
 
     // Should render nothing — no redirect, no tabs, no flash
     expect(screen.queryByTestId('redirect')).toBeNull();
@@ -352,7 +362,7 @@ describe('AppLayout', () => {
       switchProfile: jest.fn(),
     });
 
-    render(<AppLayout />);
+    renderLayout();
 
     expect(screen.getByTestId('profile-loading')).toBeTruthy();
     expect(screen.queryByTestId('tabs')).toBeNull();
@@ -400,7 +410,7 @@ describe('AppLayout', () => {
       isLoading: false,
     });
 
-    render(<AppLayout />);
+    renderLayout();
 
     expect(screen.queryByTestId('post-approval-landing')).toBeNull();
     expect(screen.queryByText("You're approved!")).toBeNull();
@@ -441,7 +451,7 @@ describe('AppLayout', () => {
       isLoading: false,
     });
 
-    render(<AppLayout />);
+    renderLayout();
 
     expect(screen.queryByTestId('post-approval-landing')).toBeNull();
     expect(screen.getByTestId('tabs')).toBeTruthy();
@@ -465,7 +475,7 @@ describe('AppLayout', () => {
       switchProfile: jest.fn(),
     });
 
-    render(<AppLayout />);
+    renderLayout();
 
     expect(screen.getByTestId('profile-switched-toast')).toBeTruthy();
     expect(screen.getByText('Profile switched')).toBeTruthy();
@@ -491,7 +501,7 @@ describe('AppLayout', () => {
       switchProfile,
     });
 
-    render(<AppLayout />);
+    renderLayout();
 
     expect(screen.getByTestId('proxy-banner')).toBeTruthy();
     expect(screen.getByText("Viewing Alex's account")).toBeTruthy();
@@ -530,7 +540,7 @@ describe('AppLayout', () => {
       },
     });
 
-    render(<AppLayout />);
+    renderLayout();
 
     expect(screen.getByTestId('consent-pending-gate')).toBeTruthy();
     expect(
@@ -551,7 +561,7 @@ describe('AppLayout', () => {
     const SecureStoreMock = require('expo-secure-store');
     (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
 
-    render(<AppLayout />);
+    renderLayout();
 
     await waitFor(() => {
       expect(screen.getByTestId('permission-setup-gate')).toBeTruthy();
@@ -572,7 +582,7 @@ describe('AppLayout', () => {
     const SecureStoreMock = require('expo-secure-store');
     (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
 
-    render(<AppLayout />);
+    renderLayout();
 
     await waitFor(() => {
       expect(screen.getByTestId('tabs')).toBeTruthy();
@@ -599,7 +609,7 @@ describe('AppLayout', () => {
       }
     );
 
-    render(<AppLayout />);
+    renderLayout();
 
     await waitFor(() => {
       expect(screen.getByTestId('tabs')).toBeTruthy();
@@ -621,7 +631,7 @@ describe('AppLayout', () => {
     (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
     (SecureStoreMock.setItemAsync as jest.Mock).mockResolvedValue(undefined);
 
-    render(<AppLayout />);
+    renderLayout();
 
     await waitFor(() => {
       expect(screen.getByTestId('permission-setup-gate')).toBeTruthy();
@@ -654,7 +664,7 @@ describe('AppLayout', () => {
     (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
     (SecureStoreMock.setItemAsync as jest.Mock).mockResolvedValue(undefined);
 
-    render(<AppLayout />);
+    renderLayout();
 
     await waitFor(() => {
       expect(screen.getByTestId('permission-setup-gate')).toBeTruthy();

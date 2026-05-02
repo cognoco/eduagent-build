@@ -224,6 +224,58 @@ describe('classifyApiError', () => {
     expect(result.recovery).toBe('go-back');
   });
 
+  // --- HMR resilience [BUG-947] ---
+  // Metro HMR can reload api-errors.ts creating new class identities. These
+  // tests simulate that by using plain Error + Object.assign instead of
+  // constructing real instances, verifying classification survives.
+
+  it('[BUG-947] classifies UpstreamError-shaped error when instanceof fails (HMR)', () => {
+    const err = Object.assign(new Error('Please upgrade to Family or Pro.'), {
+      name: 'UpstreamError',
+      code: 'PROFILE_LIMIT_EXCEEDED',
+      status: 402,
+    });
+    const result = classifyApiError(err);
+    expect(result.category).toBe('quota');
+    expect(result.recovery).toBe('go-back');
+    expect(result.message).not.toMatch(/Something went wrong/);
+  });
+
+  it('[BUG-947] classifies generic UpstreamError-shaped 5xx when instanceof fails (HMR)', () => {
+    const err = Object.assign(new Error('Internal failure'), {
+      name: 'UpstreamError',
+      code: 'INTERNAL_ERROR',
+      status: 503,
+    });
+    const result = classifyApiError(err);
+    expect(result.category).toBe('server');
+    expect(result.recovery).toBe('retry');
+  });
+
+  it('[BUG-947] classifies QuotaExceededError-shaped error when instanceof fails (HMR)', () => {
+    const err = Object.assign(new Error('Monthly limit reached'), {
+      name: 'QuotaExceededError',
+      code: 'QUOTA_EXCEEDED',
+      details: { tier: 'free', reason: 'monthly' },
+    });
+    const result = classifyApiError(err);
+    expect(result.category).toBe('quota');
+    expect(result.recovery).toBe('none');
+  });
+
+  it('[BUG-947] classifies ForbiddenError-shaped error when instanceof fails (HMR)', () => {
+    const err = Object.assign(new Error('No permission'), {
+      name: 'ForbiddenError',
+      code: 'FORBIDDEN',
+      apiCode: undefined,
+    });
+    const result = classifyApiError(err);
+    expect(result.category).toBe('auth');
+    expect(result.recovery).toBe('sign-out');
+  });
+
+  // --- Anti-spoofing guards ---
+
   it('does NOT classify a spoofed error.name="QuotaExceededError" as quota', () => {
     const err = new Error('attacker-supplied message');
     err.name = 'QuotaExceededError';

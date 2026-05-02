@@ -33,11 +33,6 @@ jest.mock('../../hooks/use-notes', () => ({
   useNoteTopicIds: () => mockUseNoteTopicIds(),
 }));
 
-jest.mock('@tanstack/react-query', () => {
-  const actual = jest.requireActual('@tanstack/react-query');
-  return { ...actual, useQueries: jest.fn(), useQuery: jest.fn() };
-});
-
 jest.mock('../../components/progress', () => ({
   RetentionSignal: ({ status }: { status: string }) => {
     const { Text } = require('react-native');
@@ -109,12 +104,6 @@ jest.mock('../../lib/profile', () => ({
   isGuardianProfile: () => false,
 }));
 
-const { useQueries: mockUseQueries, useQuery: mockUseQuery } =
-  require('@tanstack/react-query') as {
-    useQueries: jest.Mock;
-    useQuery: jest.Mock;
-  };
-
 interface AggregateLibRetention {
   subjects: Array<{
     subjectId: string;
@@ -123,33 +112,43 @@ interface AggregateLibRetention {
   }>;
 }
 
-function setLibraryRetention(payload: AggregateLibRetention | undefined) {
-  mockUseQuery.mockReturnValue({
-    data: payload,
-    isLoading: false,
-    isError: false,
-    refetch: jest.fn(),
-  });
-}
+// The active profile ID used by the profile mock below.
+const ACTIVE_PROFILE_ID = 'profile-1';
 
 function createWrapper() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
-  return function Wrapper({ children }: { children: React.ReactNode }) {
+  function Wrapper({ children }: { children: React.ReactNode }) {
     return (
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );
-  };
+  }
+  return { queryClient, Wrapper };
+}
+
+function setLibraryRetention(
+  queryClient: QueryClient,
+  payload: AggregateLibRetention | undefined
+) {
+  queryClient.setQueryData(
+    ['library', 'retention', ACTIVE_PROFILE_ID],
+    payload
+  );
 }
 
 const LibraryScreen = require('./library').default;
 
 describe('LibraryScreen', () => {
+  let testQueryClient: QueryClient;
+  let TestWrapper: React.ComponentType<{ children: React.ReactNode }>;
+
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseQueries.mockReturnValue([]);
-    setLibraryRetention({ subjects: [] });
+    const { queryClient, Wrapper } = createWrapper();
+    testQueryClient = queryClient;
+    TestWrapper = Wrapper;
+    setLibraryRetention(testQueryClient, { subjects: [] });
     mockUseAllBooks.mockReturnValue({
       books: [],
       isLoading: false,
@@ -169,7 +168,7 @@ describe('LibraryScreen', () => {
       isLoading: true,
     });
 
-    render(<LibraryScreen />, { wrapper: createWrapper() });
+    render(<LibraryScreen />, { wrapper: TestWrapper });
 
     expect(screen.getByTestId('library-loading')).toBeTruthy();
   });
@@ -188,7 +187,7 @@ describe('LibraryScreen', () => {
     });
 
     expect(() =>
-      render(<LibraryScreen />, { wrapper: createWrapper() })
+      render(<LibraryScreen />, { wrapper: TestWrapper })
     ).not.toThrow();
   });
 
@@ -202,7 +201,7 @@ describe('LibraryScreen', () => {
       isLoading: false,
     });
     expect(() =>
-      render(<LibraryScreen />, { wrapper: createWrapper() })
+      render(<LibraryScreen />, { wrapper: TestWrapper })
     ).not.toThrow();
   });
 
@@ -225,7 +224,7 @@ describe('LibraryScreen', () => {
       data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
       isLoading: false,
     });
-    setLibraryRetention({
+    setLibraryRetention(testQueryClient, {
       subjects: [
         {
           subjectId: 'sub-1',
@@ -236,7 +235,7 @@ describe('LibraryScreen', () => {
     });
 
     expect(() =>
-      render(<LibraryScreen />, { wrapper: createWrapper() })
+      render(<LibraryScreen />, { wrapper: TestWrapper })
     ).not.toThrow();
   });
 
@@ -255,7 +254,7 @@ describe('LibraryScreen', () => {
       data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
       isLoading: false,
     });
-    setLibraryRetention({
+    setLibraryRetention(testQueryClient, {
       subjects: [
         {
           subjectId: 'sub-1',
@@ -266,7 +265,7 @@ describe('LibraryScreen', () => {
     });
 
     expect(() =>
-      render(<LibraryScreen />, { wrapper: createWrapper() })
+      render(<LibraryScreen />, { wrapper: TestWrapper })
     ).not.toThrow();
   });
 
@@ -277,7 +276,7 @@ describe('LibraryScreen', () => {
       isLoading: false,
     });
 
-    render(<LibraryScreen />, { wrapper: createWrapper() });
+    render(<LibraryScreen />, { wrapper: TestWrapper });
 
     expect(screen.getByTestId('library-no-content')).toBeTruthy();
     expect(
@@ -292,7 +291,7 @@ describe('LibraryScreen', () => {
       isLoading: false,
     });
 
-    render(<LibraryScreen />, { wrapper: createWrapper() });
+    render(<LibraryScreen />, { wrapper: TestWrapper });
 
     fireEvent.press(screen.getByTestId('library-add-subject-empty'));
 
@@ -327,7 +326,7 @@ describe('LibraryScreen', () => {
       isLoading: false,
     });
 
-    render(<LibraryScreen />, { wrapper: createWrapper() });
+    render(<LibraryScreen />, { wrapper: TestWrapper });
 
     expect(screen.getByTestId('subject-card-sub-1')).toBeTruthy();
     expect(screen.getByText('History')).toBeTruthy();
@@ -344,7 +343,7 @@ describe('LibraryScreen', () => {
       isLoading: false,
     });
 
-    render(<LibraryScreen />, { wrapper: createWrapper() });
+    render(<LibraryScreen />, { wrapper: TestWrapper });
 
     // Topics tab is intentionally hidden — users reach topics by opening a
     // book (shelf/[subjectId]/book/[bookId]) which shows its chapter/topic
@@ -362,7 +361,7 @@ describe('LibraryScreen', () => {
       isLoading: false,
     });
 
-    render(<LibraryScreen />, { wrapper: createWrapper() });
+    render(<LibraryScreen />, { wrapper: TestWrapper });
 
     fireEvent.press(screen.getByTestId('subject-card-sub-1'));
 
@@ -384,7 +383,7 @@ describe('LibraryScreen', () => {
       data: { subjects: [] },
       isLoading: false,
     });
-    setLibraryRetention({
+    setLibraryRetention(testQueryClient, {
       subjects: [
         {
           subjectId: 'sub-1',
@@ -430,7 +429,7 @@ describe('LibraryScreen', () => {
       refetch: jest.fn(),
     });
 
-    render(<LibraryScreen />, { wrapper: createWrapper() });
+    render(<LibraryScreen />, { wrapper: TestWrapper });
 
     expect(screen.getByTestId('library-tab-shelves')).toBeTruthy();
     expect(screen.getByTestId('library-tab-books')).toBeTruthy();
@@ -463,11 +462,11 @@ describe('LibraryScreen', () => {
       },
       isLoading: false,
     });
-    setLibraryRetention({
+    setLibraryRetention(testQueryClient, {
       subjects: [{ subjectId: 'sub-1', topics: [], reviewDueCount: 4 }],
     });
 
-    render(<LibraryScreen />, { wrapper: createWrapper() });
+    render(<LibraryScreen />, { wrapper: TestWrapper });
 
     // Topics tab (and its review badge) is intentionally hidden from the
     // top-level Library. Review urgency still surfaces on the shelf card.
@@ -510,7 +509,7 @@ describe('LibraryScreen', () => {
       refetch: jest.fn(),
     });
 
-    render(<LibraryScreen />, { wrapper: createWrapper() });
+    render(<LibraryScreen />, { wrapper: TestWrapper });
 
     fireEvent.press(screen.getByTestId('library-tab-books'));
 
@@ -532,7 +531,7 @@ describe('LibraryScreen', () => {
       data: { subjects: [] },
       isLoading: false,
     });
-    setLibraryRetention({
+    setLibraryRetention(testQueryClient, {
       subjects: [
         {
           subjectId: 'sub-1',
@@ -578,7 +577,7 @@ describe('LibraryScreen', () => {
       refetch: jest.fn(),
     });
 
-    render(<LibraryScreen />, { wrapper: createWrapper() });
+    render(<LibraryScreen />, { wrapper: TestWrapper });
 
     fireEvent.press(screen.getByTestId('library-tab-books'));
 
@@ -628,7 +627,7 @@ describe('LibraryScreen', () => {
       refetch: jest.fn(),
     });
 
-    render(<LibraryScreen />, { wrapper: createWrapper() });
+    render(<LibraryScreen />, { wrapper: TestWrapper });
 
     fireEvent.press(screen.getByTestId('library-tab-books'));
     fireEvent.press(screen.getByTestId('book-card-book-1'));
@@ -679,7 +678,7 @@ describe('LibraryScreen', () => {
         refetch: mockRefetch,
       });
 
-      render(<LibraryScreen />, { wrapper: createWrapper() });
+      render(<LibraryScreen />, { wrapper: TestWrapper });
 
       // Switch to Books tab to trigger that rendering branch
       fireEvent.press(screen.getByTestId('library-tab-books'));
@@ -726,7 +725,7 @@ describe('LibraryScreen', () => {
       refetch: jest.fn(),
     });
 
-    render(<LibraryScreen />, { wrapper: createWrapper() });
+    render(<LibraryScreen />, { wrapper: TestWrapper });
 
     // Library renders normally — tabs and header are visible
     expect(screen.queryByTestId('library-error')).toBeNull();
@@ -754,7 +753,7 @@ describe('LibraryScreen', () => {
       // pointer events never reach it; the modal had no other dismiss path
       // because the backdrop was a plain View with no onPress.
       arrangeWithOneSubject();
-      render(<LibraryScreen />, { wrapper: createWrapper() });
+      render(<LibraryScreen />, { wrapper: TestWrapper });
 
       fireEvent.press(screen.getByTestId('manage-subjects-button'));
       expect(screen.getByTestId('manage-subjects-backdrop')).toBeTruthy();
@@ -770,7 +769,7 @@ describe('LibraryScreen', () => {
 
     it('exposes an accessible label so assistive tech can dismiss the modal [BUG-510]', () => {
       arrangeWithOneSubject();
-      render(<LibraryScreen />, { wrapper: createWrapper() });
+      render(<LibraryScreen />, { wrapper: TestWrapper });
 
       fireEvent.press(screen.getByTestId('manage-subjects-button'));
 
