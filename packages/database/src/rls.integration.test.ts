@@ -33,6 +33,9 @@ const PROFILE_ROLLBACK = '33333333-3333-3333-3333-333333333333';
 // DB setup — real connection (DATABASE_URL loaded by jest.setup.ts)
 // ---------------------------------------------------------------------------
 
+const hasDatabaseUrl = !!process.env.DATABASE_URL;
+const describeIfDb = hasDatabaseUrl ? describe : describe.skip;
+
 function requireDatabaseUrl(): string {
   const url = process.env.DATABASE_URL;
   if (!url) {
@@ -67,7 +70,7 @@ async function getCurrentProfileId(db: DbInstance): Promise<string | null> {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('withProfileScope — integration against real Postgres', () => {
+describeIfDb('withProfileScope — integration against real Postgres', () => {
   it('SET LOCAL propagates inside the transaction callback', async () => {
     const db = createIntegrationDb();
     let seenInside: string | null = null;
