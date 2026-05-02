@@ -66,6 +66,20 @@
     - 4 internal step-chaining signals (`filing.retry_completed`, `filing.auto_retry_attempted`, `session.completed_with_errors`, `session.filing_resolved`) — `step.sendEvent` not external Inngest emission
     - 3 infrastructure events (`idempotency.assistant_turn_lookup_failed`, `idempotency.mark_failed`, `idempotency.preflight_lookup_failed`) — instrumentation-only, intentional
 
+- **AUDIT-SPECS-2** RLS plan status-table refresh (escalated 2026-05-02 from unclassified after concrete recon)
+  - Severity: YELLOW (doc consistency — plan internally contradicts itself)
+  - Effort: ~30-40 min (verify each Phase row in the status table, refresh wording, archive stale "Implication" paragraph)
+  - Files: `docs/plans/2026-04-15-S06-rls-phase-0-1-preparatory.md`
+  - Concrete state vs plan claim:
+    | Phase | Plan table says (2026-04-27) | Code reality (verified 2026-05-02) | Action |
+    |---|---|---|---|
+    | 0.0 driver swap | NOT DONE | DONE — `client.ts` uses dual-driver `looksLikeNeon()` selector since PR #126 | Header at top already says this; refresh table row |
+    | 0.1 remove fallback | NOT DONE | DONE — `client.ts:60-62` explicitly: "The silent non-atomic fallback... has been removed" | Refresh table row |
+    | 0.3 integration test | NOT DONE | LIKELY DONE — `packages/database/src/rls.integration.test.ts` exists (content not verified in this recon) | Spot-check test content; refresh row |
+    | 1.3 deploy + verify | unverified | unverified — needs `pg_tables.rowsecurity` query against staging/prod | Run query, document |
+    | "Implication" paragraph | "ticking-bomb state" | Stale — header marks it stale but body unchanged | Move paragraph into a `## Historical context` section |
+  - Why it matters: plan's reconciliation in PR #131 added a "Phase 0.0 is DONE" header but didn't update the inline status table, creating an internal contradiction that confuses readers about RLS rollout state. Not security-critical (the wording is over-stated, not under-stated), but exactly the "team detects new drift, doesn't sweep backward" pattern this audit was meant to catch.
+
 ## Track C cleanups
 
 - **AUDIT-MIGRATIONS-1** Regenerate 10 missing snapshot files in `apps/api/drizzle/meta/`
@@ -96,11 +110,9 @@
 
 ## Findings I could not classify confidently (still)
 
-- **AUDIT-SPECS-2** RLS plan "ticking-bomb" wording — recon flagged YELLOW-leaning-RED but transcript also says "fix shipped in PR #126." If PR #126 actually fixed the underlying tickets, this is just stale wording (Track B/C); if the wording reflects an unresolved security issue still on the books, it's RED.
-  - Unclear: whether PR #126 closed the substantive issue or just the symptom
-  - Needed: read `docs/plans/2026-04-15-S06-rls-phase-0-1-preparatory.md` head-to-head against PR #126 diff
-
 _(AUDIT-INNGEST-2 recon completed 2026-05-02; promoted to Track B above with concrete file list.)_
+
+_(AUDIT-SPECS-2 recon completed 2026-05-02; promoted to Track B above with concrete scope.)_
 
 ---
 
@@ -108,4 +120,5 @@ _(AUDIT-INNGEST-2 recon completed 2026-05-02; promoted to Track B above with con
 
 1. Of the original 4 explicit `[AUDIT-*]` IDs in the recon transcript, all shipped in PR #132. Every other ID was synthesized post-hoc by the recon-replay agent (2026-05-02) and tagged `(synthesized)` where applicable.
 2. AUDIT-SCHEMA-2 was escalated from "unclassified" after concrete recon found 88% gap, not 25%. The original heatmap underweighted this finding; treat similar "we don't have a file list yet" entries with that caveat.
-3. AUDIT-INNGEST-2 was also escalated from "unclassified" after recon — original signal was real, found 3 confirmed orphans matching the same pattern PR #132 fixed for `app/payment.failed`. Two of three unclassified items have so far validated the original recon's signal.
+3. AUDIT-INNGEST-2 was also escalated from "unclassified" after recon — original signal was real, found 3 confirmed orphans matching the same pattern PR #132 fixed for `app/payment.failed`.
+4. AUDIT-SPECS-2 was also escalated from "unclassified" after recon — plan was partially reconciled in PR #131 (header) but not fully (inline status table), creating an internal contradiction. **All three originally-unclassified items validated the original recon's signal** — the unclassified bucket was real signal, not noise. Future "we don't have a file list yet" entries should be treated with that prior.
