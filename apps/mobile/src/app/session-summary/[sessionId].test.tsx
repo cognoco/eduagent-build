@@ -164,6 +164,26 @@ const mockFetch = createRoutedMockFetch({
   // GET /bookmarks/session — useSessionBookmarks needs { bookmarks: [] } not {}
   // (React Query throws "query data cannot be undefined" when data.bookmarks === undefined)
   'bookmarks/session': () => ({ bookmarks: [] }),
+  // GET /progress/inventory — useProgressInventory returns KnowledgeInventory directly.
+  // Screen accesses progressInventory.data?.global.totalSessions — if the default
+  // `{}` response is returned, `{}.global` is undefined and `.totalSessions` throws
+  // a TypeError, crashing the component on every re-render after fetch resolves.
+  'progress/inventory': () => ({
+    profileId: 'test-profile-id',
+    snapshotDate: '2026-05-02',
+    global: {
+      topicsAttempted: 0,
+      topicsMastered: 0,
+      vocabularyTotal: 0,
+      vocabularyMastered: 0,
+      totalSessions: 0,
+      totalActiveMinutes: 0,
+      totalWallClockMinutes: 0,
+      currentStreak: 0,
+      longestStreak: 0,
+    },
+    subjects: [],
+  }),
   // GET /sessions/:id/summary — returns persisted summary (or null for fresh sessions).
   // Distinguishable from POST /summary by checking init.method.
   // POST /sessions/:id/summary/skip — distinct URL suffix.
@@ -192,12 +212,20 @@ const mockFetch = createRoutedMockFetch({
         { status: 500 }
       );
     }
-    // GET /sessions/:id/summary → persisted summary lookup
+    // GET /sessions/:id/summary → persisted summary lookup.
+    // Always include learnerRecap in the response so refetchInterval returns
+    // false and stops polling. Without it, useSessionSummary polls every 2s
+    // with the synchronous notifyManager, creating continuous re-renders that
+    // overwhelm React 19 and trigger its infinite-update guard.
+    // For null: return status-less object (isAlreadyPersisted stays false,
+    // so the input form renders as expected).
     if (url.includes('/summary')) {
       if (mockSessionSummaryData === null) {
-        return new Response(JSON.stringify({ summary: null }), { status: 200 });
+        return { summary: { learnerRecap: 'mock-recap' } };
       }
-      return { summary: mockSessionSummaryData };
+      return {
+        summary: { ...mockSessionSummaryData, learnerRecap: 'mock-recap' },
+      };
     }
     // GET /sessions/:id (session entity)
     return { session: null };
@@ -219,14 +247,11 @@ function createWrapper() {
       queries: {
         retry: false,
         gcTime: 0,
-        // Disable automatic refetching and polling in tests.
-        // useSessionSummary uses refetchInterval (polls for learnerRecap) —
-        // with the synchronous notifyManager this causes continuous re-renders
-        // that overwhelm React 19 and trigger its infinite-update guard.
-        refetchInterval: false,
+        // refetchInterval: false here only sets the default; useSessionSummary
+        // overrides it per-query to poll until learnerRecap is set. We supply
+        // learnerRecap in every session-summary response so the polling stops
+        // immediately on the first response.
         refetchOnWindowFocus: false,
-        refetchOnMount: false,
-        refetchOnReconnect: false,
       },
     },
   });
@@ -284,6 +309,28 @@ describe('SessionSummaryScreen', () => {
     mockFetch.setRoute('recall-bridge', () =>
       new Response(JSON.stringify({ message: 'not homework' }), { status: 404 })
     );
+    // Reset sessions route to default — tests like [BUG-800] call setRoute('sessions', ...)
+    // to inject error responses. Without resetting, the override bleeds into subsequent
+    // tests and the submit/summary routes return wrong shapes, causing waitFor timeouts.
+    mockFetch.setRoute('sessions', (url: string, init?: RequestInit) => {
+      if (url.includes('/summary') && init?.method === 'POST') {
+        if (mockSubmitResult instanceof Response) return mockSubmitResult;
+        if (mockSubmitResult !== null) return mockSubmitResult;
+        return new Response(
+          JSON.stringify({ message: 'Not configured', code: 'TEST_ERROR' }),
+          { status: 500 }
+        );
+      }
+      if (url.includes('/summary')) {
+        if (mockSessionSummaryData === null) {
+          return { summary: { learnerRecap: 'mock-recap' } };
+        }
+        return {
+          summary: { ...mockSessionSummaryData, learnerRecap: 'mock-recap' },
+        };
+      }
+      return { session: null };
+    });
     // Create a fresh wrapper (and QueryClient) per test to prevent cross-test
     // query cache contamination from async fetch-boundary responses.
     Wrapper = createWrapper();

@@ -12,6 +12,7 @@ import { useEffect, useState } from 'react';
 import { useChildSessionDetail } from '../../../../../hooks/use-dashboard';
 import { goBackOrReplace } from '../../../../../lib/navigation';
 import { EngagementChip } from '../../../../../components/parent/EngagementChip';
+import { MetricInfoDot } from '../../../../../components/parent/MetricInfoDot';
 let Clipboard: typeof import('expo-clipboard') | null = null;
 try {
   Clipboard = require('expo-clipboard');
@@ -197,7 +198,10 @@ export default function SessionDetailScreen() {
       >
         <View className="flex-row justify-between">
           <View>
-            <Text className="text-text-secondary text-xs">Duration</Text>
+            <View className="flex-row items-center gap-1">
+              <Text className="text-text-secondary text-xs">Duration</Text>
+              <MetricInfoDot metricKey="time-on-app" />
+            </View>
             <Text className="text-text-primary text-base font-medium">
               {duration || '—'}
             </Text>

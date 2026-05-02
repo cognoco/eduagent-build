@@ -141,8 +141,12 @@ import { app } from '../index';
 import { resolveSubjectName } from '../services/subject-resolve';
 import { classifySubject } from '../services/subject-classify';
 import { captureException } from '../services/sentry';
+<<<<<<< Updated upstream
 import { UpstreamLlmError, SubjectNotFoundError } from '@eduagent/schemas';
 import { SubjectNotLanguageLearningError } from '../services/subject';
+=======
+import { UpstreamLlmError } from '@eduagent/schemas';
+>>>>>>> Stashed changes
 import {
   AUTH_HEADERS as BASE_AUTH_HEADERS,
   BASE_AUTH_ENV,

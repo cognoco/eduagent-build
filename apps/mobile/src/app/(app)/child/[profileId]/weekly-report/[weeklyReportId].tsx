@@ -205,7 +205,7 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
                 testID="child-weekly-report-metric-sessions"
               />
               <MetricCard
-                label="Active minutes"
+                label="Time on app"
                 value={String(report.reportData.thisWeek.totalActiveMinutes)}
                 testID="child-weekly-report-metric-minutes"
               />

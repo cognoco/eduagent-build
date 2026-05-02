@@ -87,7 +87,14 @@ export function mockApiClientFactory(mockFetch: jest.Mock) {
     ConflictError: class ConflictError extends Error {},
     ForbiddenError: class ForbiddenError extends Error {},
     NotFoundError: class NotFoundError extends Error {},
-    QuotaExceededError: class QuotaExceededError extends Error {},
+    QuotaExceededError: class QuotaExceededError extends Error {
+      readonly details: unknown;
+      constructor(message: string, details?: unknown) {
+        super(message);
+        this.name = 'QuotaExceededError';
+        this.details = details;
+      }
+    },
     RateLimitedError: class RateLimitedError extends Error {},
     ResourceGoneError: class ResourceGoneError extends Error {},
     UpstreamError: class UpstreamError extends Error {},

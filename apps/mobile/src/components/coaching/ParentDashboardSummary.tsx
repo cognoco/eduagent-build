@@ -8,6 +8,7 @@ import {
   isNewLearner,
   sessionsUntilFullProgress,
 } from '../../lib/progressive-disclosure';
+import { SamplePreview } from '../parent/SamplePreview';
 
 interface SubjectInfo {
   name: string;
@@ -276,13 +277,22 @@ export function ParentDashboardSummary({
         </View>
       ) : null}
       {!showFullSignals ? (
-        <Text
-          className="text-caption text-text-secondary mt-2"
-          testID="parent-dashboard-teaser"
-        >
-          After {remaining} more {remaining === 1 ? 'session' : 'sessions'},
-          you'll see {childName}'s retention trends and detailed progress here.
-        </Text>
+        <View className="mt-2" testID="parent-dashboard-teaser">
+          <SamplePreview
+            unlockMessage={`After ${remaining} more ${remaining === 1 ? 'session' : 'sessions'}, you'll see ${childName}'s learning trends here.`}
+            countdown={remaining}
+          >
+            <View className="flex-row items-end gap-3 h-16 px-2 pt-2">
+              {[40, 60, 35, 75, 50].map((height, i) => (
+                <View
+                  key={i}
+                  className="flex-1 rounded-t-full bg-primary"
+                  style={{ height }}
+                />
+              ))}
+            </View>
+          </SamplePreview>
+        </View>
       ) : null}
     </>
   );

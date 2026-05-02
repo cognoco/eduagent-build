@@ -961,8 +961,10 @@ describe('SessionScreen homework flow', () => {
     await flushAsyncWork();
 
     await waitFor(() => {
-      // Fallback candidates from useSubjects (Math) shown + "+ New subject" chip
-      testScreen.getByTestId('subject-resolution-new');
+      // When classify fails and subjects haven't loaded yet, the screen falls
+      // back to the resolve API flow which shows the "Create a new subject"
+      // button (subject-resolution-create-new) as the zero-candidates escape hatch.
+      testScreen.getByTestId('subject-resolution-create-new');
     });
 
     expect(mockStartSession).not.toHaveBeenCalled();

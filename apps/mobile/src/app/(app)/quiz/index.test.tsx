@@ -285,7 +285,7 @@ describe('QuizIndexScreen', () => {
         // <Lang>" unconditionally, which is what made the bug reproducible
         // across empty subjects.
         // Simulate loading by making the vocabulary fetch never resolve.
-        mockFetch.setRoute('/vocabulary', () => new Promise(() => {}));
+        mockFetch.setRoute('/vocabulary', () => new Promise(() => { /* never resolves */ }));
         render(<QuizIndexScreen />, { wrapper: Wrapper });
         // The card must appear immediately in starter framing — before vocab resolves.
         await waitFor(() => {

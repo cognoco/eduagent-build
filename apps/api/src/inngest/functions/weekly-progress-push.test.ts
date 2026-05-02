@@ -111,7 +111,11 @@ describe('[BUG-850 / F-SVC-021] weekly-progress-push fan-out error escalation', 
     const parentIds = Array.from({ length: 401 }, (_, i) => `parent-${i}`);
     let sendEventCalls = 0;
     const mockStep = {
+<<<<<<< Updated upstream
       run: jest.fn(async (_name: string, _fn: () => Promise<unknown>) => {
+=======
+      run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => {
+>>>>>>> Stashed changes
         // The handler's first step.run resolves the parent list; later steps
         // are only used inside the per-event handler (not under test here).
         return parentIds;
@@ -123,11 +127,15 @@ describe('[BUG-850 / F-SVC-021] weekly-progress-push fan-out error escalation', 
         }
       }),
     };
+<<<<<<< Updated upstream
     const handler = (
       weeklyProgressPushCron as unknown as {
         fn: (ctx: { step: typeof mockStep }) => Promise<unknown>;
       }
     ).fn;
+=======
+    const handler = (weeklyProgressPushCron as unknown as { fn: Function }).fn;
+>>>>>>> Stashed changes
     const result = (await handler({ step: mockStep })) as {
       status: string;
       queuedParents: number;
