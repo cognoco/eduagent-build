@@ -2,10 +2,13 @@
 
 ## Snapshot
 
-- Mobile: 38+ screens (117 test suites), 1,228 mobile tests
-- API: All 33 route groups, 2,136 API tests, 19 integration test suites, 16 Inngest functions
+- Mobile: ~80 screens, 194 test suites, ~2,150 tests
+- API: 40 route groups, 187 test suites, ~3,220 tests, 31 Inngest functions
+- Cross-package integration tests: 32 suites in `tests/integration/`, ~290 cases
 - Monorepo: `apps/api`, `apps/mobile`, shared packages in `packages/`
 - Core docs: `docs/project_context.md`, `docs/architecture.md`, relevant spec/plan under `docs/plans/` or `docs/specs/`
+
+> Counts verified 2026-05-01. Test-case totals are a heuristic grep of `it(` / `test(` line starts; jest-reported totals may be slightly higher due to `it.each(...)` expansion at runtime. Re-verify with `git ls-files | grep '\.test\.'` for suite counts.
 
 ## Read This Before Editing
 
@@ -26,6 +29,13 @@
 - LLM responses that drive state-machine decisions (close interview, hold escalation, trigger UI widget) must use the structured response envelope (`llmResponseEnvelopeSchema` from `@eduagent/schemas`). Parse with `parseEnvelope()` from `services/llm/envelope.ts`. Never embed `[MARKER]` tokens or JSON blobs in free-text replies. Every envelope signal must have a server-side hard cap (e.g., `MAX_INTERVIEW_EXCHANGES = 6`) so the flow terminates even if the LLM never emits the signal. See `docs/architecture.md` → "LLM Response Envelope" for the full contract.
 - When changing LLM prompts, run the eval harness (`pnpm eval:llm`) to snapshot before/after across the 5 fixture profiles. Use `pnpm eval:llm --live` (Tier 2) to validate real LLM responses against `expectedResponseSchema` when set. Harness code: `apps/api/eval-llm/`.
 - Subagents (agents spawned via the Agent tool) must NEVER run `git add`, `git commit`, or `git push`. Only the coordinator (main conversation) commits. Subagents write code, run tests, and report which files they changed — the coordinator commits their work sequentially using `/commit`.
+
+## Known Exceptions to Engineering Rules
+
+These deviations from the rules above exist in the codebase as of 2026-05-01. They are listed here so reviewers don't try to "fix" them in unrelated PRs and so new contributors don't take them as precedent. Each exception should either be tracked toward a refactor, or promoted into an explicit rule.
+
+- **`apps/api/src/routes/sessions.ts` and `apps/api/src/routes/quiz.ts` import `drizzle-orm` primitives directly** (`and`, `eq`, `lt`, `sql`, etc.), in violation of the "Route files must not import ORM primitives" rule. These predate the rule and have not been refactored. **New route code must NOT follow this pattern** — keep ORM access inside `services/` and `createScopedRepository`. Treat these two files as the *only* sanctioned exceptions, not as a license.
+- **`apps/mobile/tsconfig.json` declares `references[]: [{ "path": "../api" }]`**, in tension with the conceptual "mobile must not depend on api" rule. This is required so `import type { AppType } from '@eduagent/api'` resolves for the Hono RPC client. **Type-only imports** from `@eduagent/api` are accepted; runtime imports remain forbidden (they would pull API server code into the mobile bundle). See `docs/architecture.md` → "AppType" example for the rationale.
 
 ## Schema And Deploy Safety
 
@@ -60,7 +70,7 @@ Do not call work complete if related tests, lint, typecheck, or required migrati
 
 ## UX Resilience Rules
 
-These rules prevent dead-end states where users get stuck with no actionable escape. Learned from a full-app UX audit (2026-04-05) that found 44 dead-end issues across all flows. Screen-state checklist (mutateAsync catch feedback, guarded navigation, etc.) lives in the `ux-dead-end-audit` skill.
+These rules prevent dead-end states where users get stuck with no actionable escape. Learned from a full-app UX audit (2026-04-05) that found 44 dead-end issues across all flows.
 
 - **Classify errors at the API client boundary, not per-screen.** Distinguish quota exhausted, forbidden, gone, network error, etc. in middleware. Screens must never parse HTTP status codes.
 - **Typed error hierarchy.** Define a shared error class hierarchy in the schema package (e.g., `QuotaExhaustedError`, `ResourceGoneError`, `ForbiddenError`). The API client middleware classifies HTTP responses into typed errors ONCE. Screens switch on error type.
@@ -147,7 +157,7 @@ cd apps/mobile && pnpm exec jest --findRelatedTests src/path/to/file.tsx --no-co
 cd apps/mobile && pnpm exec tsc --noEmit
 
 # Database
-pnpm run db:push:stg
+pnpm run db:push:dev
 pnpm run db:generate
 pnpm run db:migrate:dev
 

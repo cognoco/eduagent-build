@@ -9,6 +9,16 @@
 
 ---
 
+## Status Update (2026-05-01) — PR #126 landed the driver swap
+
+**Phase 0.0 is DONE.** Commit `c80bb903` (2026-04-28, PR #126 — "RLS-driver-swap") landed the dual-driver `looksLikeNeon()` selector in `packages/database/src/client.ts`. The "ticking-bomb" framing in the 2026-04-27 update below is therefore **stale** — the most acute risk (no real driver to fall back to when removing the fallback) is resolved.
+
+**Re-verify before resuming work on this plan:** Phases 0.1 (remove fallback), 0.3 (integration test for context propagation), and 1.3 (deploy + verify) were all blocked on Phase 0.0 and may have moved partway. Read `packages/database/src/client.ts` and `packages/database/src/rls.ts` against the current `main`, and re-grep for any remaining `db.transaction()` callers, before treating the 2026-04-27 status table or "ticking-bomb" Implication paragraph as accurate.
+
+The 2026-04-27 update below is preserved for context but should not be acted on without first re-verifying against PR #126's changes.
+
+---
+
 ## Status Update (2026-04-27)
 
 12 days after this plan was written, parts of it shipped out of order, and a fresh audit found two factual errors in the original Context table. The current ground truth:
