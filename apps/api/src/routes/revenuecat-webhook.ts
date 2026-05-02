@@ -413,7 +413,7 @@ async function handleBillingIssue(
   if (updated) {
     await refreshKvCache(kv, db, updated.accountId);
 
-    // Telemetry-only event — no Inngest handler registered; consumed by observability tooling.
+    // Observed by payment-failed-observe.ts (queryable terminus for billing alerts).
     await inngest.send({
       name: 'app/payment.failed',
       data: {

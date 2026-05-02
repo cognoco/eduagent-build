@@ -10,6 +10,7 @@ import { topupExpiryReminder } from './functions/topup-expiry-reminder';
 import { topupExpiryReminderSend } from './functions/topup-expiry-reminder-send';
 import { billingTrialSubscriptionFailed } from './functions/billing-trial-subscription-failed';
 import { trialExpiryFailureObserve } from './functions/trial-expiry-failure-observe';
+import { paymentFailedObserve } from './functions/payment-failed-observe';
 import { exchangeEmptyReplyFallback } from './functions/exchange-empty-reply-fallback';
 import {
   askClassificationCompletedObserve,
@@ -67,6 +68,7 @@ export {
   topupExpiryReminderSend,
   billingTrialSubscriptionFailed,
   trialExpiryFailureObserve,
+  paymentFailedObserve,
   exchangeEmptyReplyFallback,
   askClassificationCompletedObserve,
   askClassificationSkippedObserve,
@@ -108,6 +110,7 @@ export const functions = [
   topupExpiryReminderSend,
   billingTrialSubscriptionFailed,
   trialExpiryFailureObserve,
+  paymentFailedObserve,
   exchangeEmptyReplyFallback,
   askClassificationCompletedObserve,
   askClassificationSkippedObserve,
