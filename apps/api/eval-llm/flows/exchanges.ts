@@ -371,6 +371,5 @@ export const exchangesFlow: FlowDefinition<ExchangeScenarioInput> = {
     };
   },
 
-  // No runLive yet — main loop is streaming. expectedResponseSchema is set
-  // so Tier 2 validates envelope shape automatically once runLive is added.
+  // runLive not yet implemented for this flow — see eval-harness README for status.
 };
