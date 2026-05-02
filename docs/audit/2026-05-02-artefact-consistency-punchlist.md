@@ -50,6 +50,22 @@
   - Effort: multi-PR (~2-4 PRs over the course of the initiative)
   - Why it matters: 36 of 41 route files (88%) violate the CLAUDE.md non-negotiable "`@eduagent/schemas` is the shared contract." Contract exists, ~50 response schemas defined, only `bookmarks.ts` actually uses them.
 
+- **AUDIT-INNGEST-2** Inngest event orphan sweep (escalated 2026-05-02 from unclassified after concrete recon)
+  - Severity: YELLOW (silent recovery without escalation per CLAUDE.md)
+  - Effort: ~10 min, single PR
+  - Files: 2 new observer functions in `apps/api/src/inngest/functions/` (mirror `payment-failed-observe.ts`), wire into `inngest/index.ts`
+  - Concrete orphans found:
+    | Event | Emitted at | Observer to ship |
+    |---|---|---|
+    | `app/ask.gate_decision` | `routes/sessions.ts:260` | `ask-gate-observe.ts` (handles both ask.gate_* events) |
+    | `app/ask.gate_timeout` | `routes/sessions.ts:274` | (same observer as above) |
+    | `app/email.bounced` | `routes/resend-webhook.ts:199` | `email-bounced-observe.ts` |
+  - Why it matters: same "consumed by observability tooling but no consumer exists" pattern PR #132 fixed for `app/payment.failed`. The team caught the new drift in #132 but didn't sweep backward; these three are the leftovers.
+  - Explicitly cleared as fine (do not re-audit):
+    - 27 properly-handled events (full table in `_wip/audit-inngest-2-recon.md` if needed)
+    - 4 internal step-chaining signals (`filing.retry_completed`, `filing.auto_retry_attempted`, `session.completed_with_errors`, `session.filing_resolved`) — `step.sendEvent` not external Inngest emission
+    - 3 infrastructure events (`idempotency.assistant_turn_lookup_failed`, `idempotency.mark_failed`, `idempotency.preflight_lookup_failed`) — instrumentation-only, intentional
+
 ## Track C cleanups
 
 - **AUDIT-MIGRATIONS-1** Regenerate 10 missing snapshot files in `apps/api/drizzle/meta/`
@@ -84,9 +100,7 @@
   - Unclear: whether PR #126 closed the substantive issue or just the symptom
   - Needed: read `docs/plans/2026-04-15-S06-rls-phase-0-1-preparatory.md` head-to-head against PR #126 diff
 
-- **AUDIT-INNGEST-2** Telemetry-only event handler audit — recon flagged ambiguous "telemetry-only events with no Inngest handler" comments, but never enumerated the events or verified each had either a handler or a documented "by design no handler" rationale.
-  - Unclear: are these documented terminuses (fine) or undocumented orphans (need observers)?
-  - Status: **scheduled for recon next** — fork to enumerate emit-vs-handle cross-reference; will replace this entry with a concrete per-event table when done.
+_(AUDIT-INNGEST-2 recon completed 2026-05-02; promoted to Track B above with concrete file list.)_
 
 ---
 
@@ -94,4 +108,4 @@
 
 1. Of the original 4 explicit `[AUDIT-*]` IDs in the recon transcript, all shipped in PR #132. Every other ID was synthesized post-hoc by the recon-replay agent (2026-05-02) and tagged `(synthesized)` where applicable.
 2. AUDIT-SCHEMA-2 was escalated from "unclassified" after concrete recon found 88% gap, not 25%. The original heatmap underweighted this finding; treat similar "we don't have a file list yet" entries with that caveat.
-3. AUDIT-INNGEST-2 may turn out similarly underweighted — recon underway.
+3. AUDIT-INNGEST-2 was also escalated from "unclassified" after recon — original signal was real, found 3 confirmed orphans matching the same pattern PR #132 fixed for `app/payment.failed`. Two of three unclassified items have so far validated the original recon's signal.
