@@ -12,6 +12,8 @@
 
 **Phase C executed (2026-04-30):** All 8 MEDIUM and 8 NONE items KEPT after skill-body verification. Holding section "Inherited Rules (To Be Reorganized in Step 2)" dissolved — subsections promoted to top-level project sections. Destructive Migrations rule moved into Schema And Deploy Safety. Break Test rule now points at `verification-before-completion` skill's red-green regression pattern (the only real linkage that survived body reading). See "Phase C findings" below.
 
+> **Update (2026-05-02):** The `ux-dead-end-audit` skill referenced throughout this analysis (rows for "Every Screen State Must Have an Action", "Error Handling Rules", "Standard Error Fallback Pattern", and the Step-2 verification list) was found NOT to exist in `~/.claude/skills/` when verification was attempted. Treat any HIGH/MEDIUM mapping below that depends on it as **unresolved** — the rules in question stayed in `CLAUDE.md` § "UX Resilience Rules" because no skill ever materialized to absorb them. Rows are preserved as-is to keep the historical analysis intact.
+
 ---
 
 ## Phase C findings — methodology lesson
