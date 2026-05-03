@@ -358,10 +358,10 @@ export default function LibraryScreen() {
   const handleBookPress = useCallback(
     (subjectId: string, bookId: string) => {
       navigatingToChild.current = true;
-      router.push({
-        pathname: '/(app)/shelf/[subjectId]',
-        params: { subjectId },
-      } as never);
+      // Single deep push: the [subjectId] layout exports
+      // `unstable_settings = { initialRouteName: 'index' }`, so this
+      // synthesizes a 2-deep stack (shelf index underneath book) without
+      // racing two synchronous router.push calls.
       router.push({
         pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
         params: { subjectId, bookId },

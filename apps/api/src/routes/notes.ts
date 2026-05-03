@@ -210,6 +210,8 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
+      // subjectId is validated for URL consistency; topic ownership is
+      // enforced via the subjects join inside getTopicSessions.
       const { topicId } = c.req.valid('param');
 
       const sessions = await getTopicSessions(db, profileId, topicId);

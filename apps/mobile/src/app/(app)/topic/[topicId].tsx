@@ -38,6 +38,8 @@ import { showNoteContextMenu } from '../../../components/library/NoteContextMenu
 import { TopicSessionRow } from '../../../components/library/TopicSessionRow';
 import { StudyCTA } from '../../../components/library/StudyCTA';
 import { NoteInput } from '../../../components/library/NoteInput';
+import { formatApiError } from '../../../lib/format-api-error';
+import { platformAlert } from '../../../lib/platform-alert';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -270,7 +272,12 @@ export default function TopicDetailScreen() {
         setEditingNoteContent(currentContent);
         setNoteInputMode(id);
       },
-      onDelete: (id) => deleteNote(id),
+      onDelete: (id) =>
+        deleteNote(id, {
+          onError: (err) => {
+            platformAlert('Could not delete note', formatApiError(err));
+          },
+        }),
     });
   };
 

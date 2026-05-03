@@ -128,7 +128,13 @@ function createMockXpDb(): {
   insertValues: jest.Mock;
   queryAssessmentsFindFirst: jest.Mock;
 } {
-  const insertValues = jest.fn().mockResolvedValue(undefined);
+  // insertSessionXpEntry now chains onConflictDoNothing after .values(...)
+  // so the mock's .values must return an object with onConflictDoNothing
+  // that resolves. We expose insertValues for assertions on the values
+  // payload by routing it through a wrapper.
+  const insertValues = jest.fn();
+  const onConflictDoNothing = jest.fn().mockResolvedValue(undefined);
+  insertValues.mockReturnValue({ onConflictDoNothing });
   const queryAssessmentsFindFirst = jest.fn().mockResolvedValue(null);
 
   const db = {

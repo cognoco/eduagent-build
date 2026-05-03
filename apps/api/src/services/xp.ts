@@ -112,7 +112,11 @@ export async function insertSessionXpEntry(
   const rules = getLearningModeRules(mode);
   const xpStatus = rules.verifiedXpOnly ? 'pending' : 'verified';
 
-  // 4. Calculate and insert
+  // 4. Calculate and insert. onConflictDoNothing closes the TOCTOU window
+  // between the findFirst above and the insert: two concurrent session
+  // closes for the same topic would both see existing=null but only one
+  // can land thanks to the (profile_id, topic_id) unique index added in
+  // migration 0051.
   const mastery = Number(assessment.masteryScore);
   const depth = (assessment.verificationDepth ?? 'recall') as
     | 'recall'
@@ -120,14 +124,19 @@ export async function insertSessionXpEntry(
     | 'transfer';
   const amount = calculateTopicXp(mastery, depth);
 
-  await db.insert(xpLedger).values({
-    profileId,
-    topicId,
-    subjectId,
-    amount,
-    status: xpStatus,
-    verifiedAt: xpStatus === 'verified' ? new Date() : undefined,
-  });
+  await db
+    .insert(xpLedger)
+    .values({
+      profileId,
+      topicId,
+      subjectId,
+      amount,
+      status: xpStatus,
+      verifiedAt: xpStatus === 'verified' ? new Date() : undefined,
+    })
+    .onConflictDoNothing({
+      target: [xpLedger.profileId, xpLedger.topicId],
+    });
 }
 
 /**

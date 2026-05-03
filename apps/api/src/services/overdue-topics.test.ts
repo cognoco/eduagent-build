@@ -19,6 +19,7 @@ const NOW = new Date('2026-05-03T10:00:00.000Z');
 function createSelectChain(resolvedRows: unknown[]) {
   const chain = {
     from: jest.fn().mockReturnThis(),
+    innerJoin: jest.fn().mockReturnThis(),
     where: jest.fn().mockResolvedValue(resolvedRows),
   };
   return chain;
@@ -27,9 +28,17 @@ function createSelectChain(resolvedRows: unknown[]) {
 function createMockDb(options: {
   topicsRows?: { id: string; title: string; curriculumId: string }[];
   curriculaRows?: { id: string; subjectId: string }[];
+  totalOverdue?: number;
 }): Database {
+  // Order of select() calls in getOverdueTopicsGrouped:
+  // 1. count(*) for totalOverdue
+  // 2. curriculumTopics ⋈ curricula ⋈ subjects (scoped)
+  // 3. curricula ⋈ subjects (scoped)
+  const totalOverdueRows =
+    options.totalOverdue != null ? [{ count: options.totalOverdue }] : [];
   const selectFn = jest.fn();
   selectFn
+    .mockReturnValueOnce(createSelectChain(totalOverdueRows))
     .mockReturnValueOnce(createSelectChain(options.topicsRows ?? []))
     .mockReturnValueOnce(createSelectChain(options.curriculaRows ?? []));
 
