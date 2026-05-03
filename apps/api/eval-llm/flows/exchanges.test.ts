@@ -218,7 +218,8 @@ describe('exchangesFlow', () => {
       mockRunHarnessLlm.mockResolvedValue('ok');
       const scenarios =
         exchangesFlow.enumerateScenarios?.(generalProfile) ?? [];
-      const s1 = scenarios[0];
+      const s1 = scenarios.find((s) => s.scenarioId === 'S1-rung1-teach-new');
+      if (!s1) throw new Error('S1 missing');
 
       const forgedInput = {
         ...s1.input,
@@ -252,16 +253,20 @@ describe('exchangesFlow', () => {
     it('throws when buildPrompt produces no user turn', async () => {
       const scenarios =
         exchangesFlow.enumerateScenarios?.(generalProfile) ?? [];
-      const s1 = scenarios[0];
+      const s1 = scenarios.find((s) => s.scenarioId === 'S1-rung1-teach-new');
+      if (!s1) throw new Error('S1 missing');
       const messages = exchangesFlow.buildPrompt(s1.input);
 
       await expect(exchangesFlow.runLive?.(s1.input, messages)).rejects.toThrow(
-        /messages\.user is undefined/
+        /messages\.user is undefined or empty/
       );
 
       await expect(
-        exchangesFlow.runLive?.(s1.input, { system: 'test', user: undefined })
-      ).rejects.toThrow(/messages\.user is undefined/);
+        exchangesFlow.runLive?.(s1.input, {
+          system: messages.system,
+          user: undefined,
+        })
+      ).rejects.toThrow(/messages\.user is undefined or empty/);
       expect(mockRunHarnessLlm).not.toHaveBeenCalled();
     });
 

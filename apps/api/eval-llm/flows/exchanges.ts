@@ -22,7 +22,6 @@ import {
   type HistoryTurn,
 } from '../fixtures/exchange-histories';
 import type { FlowDefinition, PromptMessages, Scenario } from '../runner/types';
-import { callLlm } from '../runner/llm-bootstrap';
 
 // ---------------------------------------------------------------------------
 // Flow adapter — Main tutoring loop (exchanges.buildSystemPrompt)
@@ -376,6 +375,22 @@ export const exchangesFlow: FlowDefinition<ExchangeScenarioInput> = {
     };
   },
 
+  // -------------------------------------------------------------------------
+  // [AUDIT-EVAL-2 / 2026-05-02] First runLive in the harness — sets the
+  // pattern for the other ~12 flows. Mirrors production processExchange
+  // (apps/api/src/services/exchanges.ts) — same routeAndCall signature,
+  // same per-context options (llmTier, ageBracket, conversationLanguage,
+  // pronouns), same escalationRung. The wrapper tags telemetry with
+  // flow: "eval-harness" so dashboards can filter eval calls out.
+  //
+  // Known divergence (tracked separately as AUDIT-EVAL-3): production
+  // concatenates `buildOrphanSystemAddendum(...)` onto the system prompt;
+  // this harness only sends `buildSystemPrompt(context)` (matching what
+  // buildPrompt above produces, and what the Tier-1 snapshot displays).
+  // We deliberately use messages.system here so the live call validates
+  // the same prompt the snapshot shows — fixing the addendum gap means
+  // updating buildPrompt too, which is its own scope.
+  // -------------------------------------------------------------------------
   async runLive(
     input: ExchangeScenarioInput,
     messages: PromptMessages
@@ -390,9 +405,10 @@ export const exchangesFlow: FlowDefinition<ExchangeScenarioInput> = {
     const priorTurns =
       lastUserIndex >= 0 ? history.slice(0, lastUserIndex) : history;
 
+    // Throw rather than silently forward an empty user turn — enforces buildPrompt contract for flows that copy this pattern.
     if (!messages.user) {
       throw new Error(
-        `runLive: messages.user is undefined for scenario ${input.scenarioId} — buildPrompt must produce a user turn`
+        `runLive: messages.user is undefined or empty for scenario ${input.scenarioId} — buildPrompt must produce a user turn`
       );
     }
 
@@ -400,6 +416,7 @@ export const exchangesFlow: FlowDefinition<ExchangeScenarioInput> = {
       { role: 'system', content: messages.system },
       ...priorTurns.map((t) => ({
         role: t.role,
+        // Mirror production sanitization: sanitizeUserContent in processExchange — strips <server_note> markers from fixture history.
         content: t.role === 'user' ? sanitizeUserContent(t.content) : t.content,
       })),
       { role: 'user' as const, content: sanitizeUserContent(messages.user) },
