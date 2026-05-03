@@ -149,9 +149,7 @@ export const learningResumeTargetSchema = z.object({
   lastActivityAt: z.string().datetime().nullable(),
   reason: z.string(),
 });
-export type LearningResumeTarget = z.infer<
-  typeof learningResumeTargetSchema
->;
+export type LearningResumeTarget = z.infer<typeof learningResumeTargetSchema>;
 
 export const dashboardChildProgressSchema = z.object({
   snapshotDate: z.string(),
@@ -422,3 +420,29 @@ export const dailyPlanSchema = z.object({
   streakDays: z.number().int(),
 });
 export type DailyPlan = z.infer<typeof dailyPlanSchema>;
+
+// ---------------------------------------------------------------------------
+// Overdue Topics (relearn flow)
+// ---------------------------------------------------------------------------
+
+export const overdueTopicSchema = z.object({
+  topicId: z.string().uuid(),
+  topicTitle: z.string(),
+  overdueDays: z.number().int().min(0),
+  failureCount: z.number().int().min(0),
+});
+export type OverdueTopic = z.infer<typeof overdueTopicSchema>;
+
+export const overdueSubjectSchema = z.object({
+  subjectId: z.string().uuid(),
+  subjectName: z.string(),
+  overdueCount: z.number().int().min(0),
+  topics: z.array(overdueTopicSchema),
+});
+export type OverdueSubject = z.infer<typeof overdueSubjectSchema>;
+
+export const overdueTopicsResponseSchema = z.object({
+  totalOverdue: z.number().int().min(0),
+  subjects: z.array(overdueSubjectSchema),
+});
+export type OverdueTopicsResponse = z.infer<typeof overdueTopicsResponseSchema>;

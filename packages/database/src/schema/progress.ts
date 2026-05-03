@@ -65,6 +65,9 @@ export const xpLedger = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
+    reflectionMultiplierApplied: boolean('reflection_multiplier_applied')
+      .notNull()
+      .default(false),
   },
   (table) => [
     index('xp_ledger_profile_id_idx').on(table.profileId),

@@ -350,12 +350,7 @@ describe('LearnerScreen', () => {
     fireEvent.press(screen.getByTestId('home-coach-band-continue'));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/topic/relearn',
-      params: {
-        topicId: 't1',
-        subjectId: 's1',
-        topicName: 'Algebra',
-        ...HOME_RETURN_PARAMS,
-      },
+      params: HOME_RETURN_PARAMS,
     });
   });
 

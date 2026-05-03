@@ -76,7 +76,6 @@ interface CloseResult {
     | 'accepted'
     | 'skipped'
     | 'auto_closed';
-  shouldPromptCasualSwitch?: boolean;
 }
 
 interface SubmitSummaryResult {
@@ -86,6 +85,8 @@ interface SubmitSummaryResult {
     content: string;
     aiFeedback: string | null;
     status: 'accepted' | 'submitted';
+    baseXp: number | null;
+    reflectionBonusXp: number | null;
   };
 }
 
@@ -97,8 +98,7 @@ interface SkipSummaryResult {
     aiFeedback: string | null;
     status: 'skipped' | 'submitted' | 'accepted';
   };
-  shouldWarnSummarySkip?: boolean;
-  shouldPromptCasualSwitch?: boolean;
+  consecutiveSummarySkips?: number;
 }
 
 export function useStartSession(subjectId: string): UseMutationResult<

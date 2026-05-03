@@ -524,7 +524,7 @@ describe('Integration: Learning Session Lifecycle', () => {
       const body = await res.json();
       expect(body.sessionId).toBe(session.id);
       expect(body.summaryStatus).toBe('pending');
-      expect(body.shouldPromptCasualSwitch).toBe(false);
+      expect(body.wallClockSeconds).toBeDefined();
       expect(mockInngestSend).not.toHaveBeenCalled();
 
       const persistedSession = await loadSession(session.id);

@@ -25,6 +25,9 @@ import {
   decayXp,
   insertSessionXpEntry,
   syncXpLedgerStatus,
+  applyReflectionMultiplier,
+  getSessionXpEntry,
+  REFLECTION_XP_MULTIPLIER,
 } from './xp';
 import { getLearningMode, getLearningModeRules } from './settings';
 
@@ -400,5 +403,175 @@ describe('syncXpLedgerStatus', () => {
     );
 
     expect(updated).toBe(false);
+  });
+});
+
+function createMockReflectionDb({
+  session = {
+    id: 'session-1',
+    profileId: 'profile-001',
+    topicId: 'topic-001',
+  },
+  entry = {
+    id: 'xp-001',
+    amount: 100,
+    reflectionMultiplierApplied: false,
+  },
+  updatedRows = [{ id: 'xp-001' }],
+}: {
+  session?: Record<string, unknown> | null;
+  entry?: Record<string, unknown> | null;
+  updatedRows?: Array<{ id: string }>;
+} = {}) {
+  const updateReturning = jest.fn().mockResolvedValue(updatedRows);
+  const updateWhere = jest.fn().mockReturnValue({ returning: updateReturning });
+  const updateSet = jest.fn().mockReturnValue({ where: updateWhere });
+
+  const db = {
+    query: {
+      learningSessions: {
+        findFirst: jest.fn().mockResolvedValue(session),
+      },
+    },
+    update: jest.fn().mockReturnValue({ set: updateSet }),
+  } as unknown as Database;
+
+  (createScopedRepository as jest.Mock).mockReturnValue({
+    xpLedger: {
+      findFirst: jest.fn().mockResolvedValue(entry),
+    },
+  });
+
+  return { db, updateSet };
+}
+
+describe('REFLECTION_XP_MULTIPLIER', () => {
+  it('equals 1.5', () => {
+    expect(REFLECTION_XP_MULTIPLIER).toBe(1.5);
+  });
+});
+
+describe('applyReflectionMultiplier', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('multiplies base XP by 1.5 and rounds', async () => {
+    const { db, updateSet } = createMockReflectionDb();
+
+    const result = await applyReflectionMultiplier(
+      db,
+      'profile-001',
+      'session-1'
+    );
+
+    expect(result).toEqual({ applied: true, newAmount: 150 });
+    expect(updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        amount: 150,
+        reflectionMultiplierApplied: true,
+      })
+    );
+  });
+
+  it('rounds .5 values up', async () => {
+    const { db } = createMockReflectionDb({
+      entry: {
+        id: 'xp-001',
+        amount: 133,
+        reflectionMultiplierApplied: false,
+      },
+    });
+
+    const result = await applyReflectionMultiplier(
+      db,
+      'profile-001',
+      'session-1'
+    );
+
+    expect(result).toEqual({ applied: true, newAmount: 200 });
+  });
+
+  it('is idempotent when reflectionMultiplierApplied is already true', async () => {
+    const { db } = createMockReflectionDb({
+      entry: {
+        id: 'xp-001',
+        amount: 150,
+        reflectionMultiplierApplied: true,
+      },
+    });
+
+    const result = await applyReflectionMultiplier(
+      db,
+      'profile-001',
+      'session-1'
+    );
+
+    expect(result).toEqual({ applied: false, newAmount: 150 });
+  });
+
+  it('returns false when the session has no topicId', async () => {
+    const { db } = createMockReflectionDb({
+      session: {
+        id: 'session-1',
+        profileId: 'profile-001',
+        topicId: null,
+      },
+      entry: null,
+    });
+
+    const result = await applyReflectionMultiplier(
+      db,
+      'profile-001',
+      'session-1'
+    );
+
+    expect(result).toEqual({ applied: false, newAmount: 0 });
+  });
+
+  it('returns false when no xp_ledger row exists', async () => {
+    const { db } = createMockReflectionDb({ entry: null });
+
+    const result = await applyReflectionMultiplier(
+      db,
+      'profile-001',
+      'session-1'
+    );
+
+    expect(result).toEqual({ applied: false, newAmount: 0 });
+  });
+});
+
+describe('getSessionXpEntry', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('returns base and bonus XP before reflection is applied', async () => {
+    const { db } = createMockReflectionDb({
+      entry: {
+        id: 'xp-001',
+        amount: 100,
+        reflectionMultiplierApplied: false,
+      },
+    });
+
+    const result = await getSessionXpEntry(db, 'profile-001', 'session-1');
+
+    expect(result).toEqual({ baseXp: 100, reflectionBonusXp: 50 });
+  });
+
+  it('derives the original base XP after reflection is applied', async () => {
+    const { db } = createMockReflectionDb({
+      entry: {
+        id: 'xp-001',
+        amount: 150,
+        reflectionMultiplierApplied: true,
+      },
+    });
+
+    const result = await getSessionXpEntry(db, 'profile-001', 'session-1');
+
+    expect(result).toEqual({ baseXp: 100, reflectionBonusXp: 50 });
   });
 });

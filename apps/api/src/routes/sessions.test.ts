@@ -304,14 +304,6 @@ jest.mock('../services/session', () => {
   };
 });
 
-jest.mock('../services/settings', () => ({
-  shouldPromptCasualSwitch: jest.fn().mockResolvedValue(false),
-  getSkipWarningFlags: jest.fn().mockResolvedValue({
-    shouldPromptCasualSwitch: false,
-    shouldWarnSummarySkip: false,
-  }),
-}));
-
 const mockStartInterleavedSession = jest.fn().mockResolvedValue({
   sessionId: 'interleaved-session-001',
   topics: [
@@ -374,12 +366,9 @@ import {
   recordSystemPrompt,
   recordSessionEvent,
   setSessionInputMode,
+  skipSummary,
   SessionExchangeLimitError,
 } from '../services/session';
-import {
-  shouldPromptCasualSwitch,
-  getSkipWarningFlags,
-} from '../services/settings';
 import { app } from '../index';
 import {
   AUTH_HEADERS as BASE_AUTH_HEADERS,
@@ -691,7 +680,7 @@ describe('session routes', () => {
       sendSpy.mockRestore();
     });
 
-    it('returns 200 with session closed and shouldPromptCasualSwitch', async () => {
+    it('returns 200 with session closed', async () => {
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/close`,
         {
@@ -707,7 +696,7 @@ describe('session routes', () => {
       const body = await res.json();
       expect(body.message).toBe('Session closed');
       expect(body.sessionId).toBe(SESSION_ID);
-      expect(body.shouldPromptCasualSwitch).toBe(false);
+      expect(body.pipelineQueued).toBe(false);
     });
 
     it('dispatches app/session.completed when close ends with a final summary status', async () => {
@@ -767,25 +756,6 @@ describe('session routes', () => {
           milestonesReached: ['polar_star', 'comet'],
         })
       );
-    });
-
-    it('returns shouldPromptCasualSwitch true when threshold exceeded', async () => {
-      (shouldPromptCasualSwitch as jest.Mock).mockResolvedValueOnce(true);
-
-      const res = await app.request(
-        `/v1/sessions/${SESSION_ID}/close`,
-        {
-          method: 'POST',
-          headers: AUTH_HEADERS,
-          body: JSON.stringify({}),
-        },
-        TEST_ENV
-      );
-
-      expect(res.status).toBe(200);
-
-      const body = await res.json();
-      expect(body.shouldPromptCasualSwitch).toBe(true);
     });
 
     it('returns 401 without auth header', async () => {
@@ -1082,8 +1052,7 @@ describe('session routes', () => {
 
       const body = await res.json();
       expect(body.summary.status).toBe('skipped');
-      expect(body.shouldPromptCasualSwitch).toBe(false);
-      expect(body.shouldWarnSummarySkip).toBe(false);
+      expect(body.consecutiveSummarySkips).toBeUndefined();
       expect(mockInngestSend).toHaveBeenCalledWith({
         name: 'app/session.completed',
         data: expect.objectContaining({
@@ -1094,10 +1063,17 @@ describe('session routes', () => {
       });
     });
 
-    it('returns shouldWarnSummarySkip true when warning threshold reached', async () => {
-      (getSkipWarningFlags as jest.Mock).mockResolvedValueOnce({
-        shouldPromptCasualSwitch: false,
-        shouldWarnSummarySkip: true,
+    it('returns consecutiveSummarySkips when the counter increments', async () => {
+      const mockedSkipSummary = skipSummary as jest.Mock;
+      mockedSkipSummary.mockResolvedValueOnce({
+        summary: {
+          id: 'summary-1',
+          sessionId: SESSION_ID,
+          content: '',
+          aiFeedback: null,
+          status: 'skipped',
+        },
+        consecutiveSummarySkips: 5,
       });
 
       const res = await app.request(
@@ -1112,30 +1088,7 @@ describe('session routes', () => {
       expect(res.status).toBe(200);
 
       const body = await res.json();
-      expect(body.shouldWarnSummarySkip).toBe(true);
-      expect(body.shouldPromptCasualSwitch).toBe(false);
-    });
-
-    it('shouldWarnSummarySkip is false when casual switch prompt takes over', async () => {
-      (getSkipWarningFlags as jest.Mock).mockResolvedValueOnce({
-        shouldPromptCasualSwitch: true,
-        shouldWarnSummarySkip: false,
-      });
-
-      const res = await app.request(
-        `/v1/sessions/${SESSION_ID}/summary/skip`,
-        {
-          method: 'POST',
-          headers: AUTH_HEADERS,
-        },
-        TEST_ENV
-      );
-
-      expect(res.status).toBe(200);
-
-      const body = await res.json();
-      expect(body.shouldPromptCasualSwitch).toBe(true);
-      expect(body.shouldWarnSummarySkip).toBe(false);
+      expect(body.consecutiveSummarySkips).toBe(5);
     });
   });
 

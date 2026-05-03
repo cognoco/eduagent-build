@@ -11,6 +11,7 @@ import {
   getActiveSessionForTopic,
   resolveTopicSubject,
 } from '../services/progress';
+import { getOverdueTopicsGrouped } from '../services/overdue-topics';
 import { getProfileOverdueCount } from '../services/retention-data';
 import { notFound } from '../errors';
 
@@ -68,6 +69,14 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
       nextReviewTopic,
       nextUpcomingReviewAt,
     });
+  })
+
+  .get('/progress/overdue-topics', async (c) => {
+    const db = c.get('db');
+    const profileId = requireProfileId(c.get('profileId'));
+
+    const result = await getOverdueTopicsGrouped(db, profileId);
+    return c.json(result);
   })
 
   // Get active/paused session for a specific topic [F-4]

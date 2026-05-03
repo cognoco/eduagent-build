@@ -4,7 +4,18 @@
 // services/retention.ts (pure SM-2 logic).
 // ---------------------------------------------------------------------------
 
-import { asc, eq, and, gt, or, isNull, lt, inArray, sql } from 'drizzle-orm';
+import {
+  asc,
+  desc,
+  eq,
+  and,
+  gt,
+  or,
+  isNull,
+  lt,
+  inArray,
+  sql,
+} from 'drizzle-orm';
 import {
   subjects,
   curricula,
@@ -13,6 +24,7 @@ import {
   needsDeepeningTopics,
   teachingPreferences,
   learningSessions,
+  sessionSummaries,
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
@@ -712,7 +724,7 @@ export interface RelearnResponse {
   method: string;
   preferredMethod?: string;
   sessionId: string | null;
-  resetPerformed: boolean;
+  recap: string | null;
 }
 
 export async function startRelearn(
@@ -789,29 +801,6 @@ export async function startRelearn(
     });
   }
 
-  // Reset retention card to initial SM-2 state (mastery reset)
-  const resetRows = await db
-    .update(retentionCards)
-    .set({
-      easeFactor: 2.5,
-      intervalDays: 1,
-      repetitions: 0,
-      failureCount: 0,
-      consecutiveSuccesses: 0,
-      xpStatus: 'pending',
-      nextReviewAt: null,
-      lastReviewedAt: null,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(retentionCards.topicId, input.topicId),
-        eq(retentionCards.profileId, profileId)
-      )
-    )
-    .returning();
-  const resetPerformed = resetRows.length > 0;
-
   // Create a new learning session linked to this topic
   let sessionId: string | null = null;
   if (subjectId) {
@@ -823,18 +812,28 @@ export async function startRelearn(
         topicId: input.topicId,
         sessionType: 'learning',
         status: 'active',
+        metadata: { effectiveMode: 'relearn' },
       })
       .returning();
 
     sessionId = session?.id ?? null;
   }
 
+  const latestSummary = await db.query.sessionSummaries.findFirst({
+    where: and(
+      eq(sessionSummaries.profileId, profileId),
+      eq(sessionSummaries.topicId, input.topicId)
+    ),
+    orderBy: [desc(sessionSummaries.createdAt)],
+  });
+  const recap = latestSummary?.learnerRecap ?? null;
+
   const response: RelearnResponse = {
     message: 'Relearn started',
     topicId: input.topicId,
     method: input.method,
     sessionId,
-    resetPerformed,
+    recap,
   };
 
   // Look up the prior teaching preference when the learner wants

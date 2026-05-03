@@ -12,6 +12,9 @@ import type {
   MilestoneRecord,
   MonthlyReportRecord,
   MonthlyReportSummary,
+  OverdueSubject,
+  OverdueTopic,
+  OverdueTopicsResponse,
   ProgressHistory,
   SubjectProgress,
   TopicProgress,
@@ -41,6 +44,8 @@ export interface ReviewSummary {
   nextReviewTopic: NextReviewTopic | null;
   nextUpcomingReviewAt: string | null;
 }
+
+export type { OverdueTopic, OverdueSubject, OverdueTopicsResponse };
 
 export function useSubjectProgress(
   subjectId: string
@@ -290,6 +295,29 @@ export function useReviewSummary(): UseQueryResult<ReviewSummary> {
         );
         await assertOk(res);
         return (await res.json()) as ReviewSummary;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled: !!activeProfile,
+  });
+}
+
+export function useOverdueTopics(): UseQueryResult<OverdueTopicsResponse> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['progress', 'overdue-topics', activeProfile?.id],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.progress['overdue-topics'].$get(
+          {},
+          { init: { signal } }
+        );
+        await assertOk(res);
+        return (await res.json()) as OverdueTopicsResponse;
       } finally {
         cleanup();
       }

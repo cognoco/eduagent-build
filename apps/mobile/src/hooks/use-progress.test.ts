@@ -7,6 +7,7 @@ import {
   useContinueSuggestion,
   useLearningResumeTarget,
   useReviewSummary,
+  useOverdueTopics,
   useTopicProgress,
 } from './use-progress';
 
@@ -284,6 +285,54 @@ describe('useReviewSummary', () => {
 
     expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data?.totalOverdue).toBe(6);
+  });
+});
+
+describe('useOverdueTopics', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    queryClient.clear();
+  });
+
+  it('fetches overdue topics grouped by subject from API', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          totalOverdue: 2,
+          subjects: [
+            {
+              subjectId: 'sub-1',
+              subjectName: 'Math',
+              overdueCount: 2,
+              topics: [
+                {
+                  topicId: 'topic-1',
+                  topicTitle: 'Algebra',
+                  overdueDays: 3,
+                  failureCount: 1,
+                },
+              ],
+            },
+          ],
+        }),
+        { status: 200 }
+      )
+    );
+
+    const { result } = renderHook(() => useOverdueTopics(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(result.current.data?.totalOverdue).toBe(2);
+    expect(result.current.data?.subjects[0]?.subjectName).toBe('Math');
   });
 });
 

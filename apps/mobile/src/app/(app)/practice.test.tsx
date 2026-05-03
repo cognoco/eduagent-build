@@ -87,21 +87,17 @@ describe('PracticeScreen', () => {
     );
   });
 
-  it('navigates to the next overdue review topic when available', () => {
+  it('navigates to the relearn picker when review topics are available', () => {
     render(<PracticeScreen />);
 
     fireEvent.press(screen.getByTestId('practice-review'));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/topic/relearn',
-      params: {
-        topicId: 'topic-1',
-        subjectId: 'subject-1',
-        topicName: 'Algebra',
-      },
+      params: {},
     });
   });
 
-  it('keeps the learner home return target when opening an overdue review topic', () => {
+  it('keeps the learner home return target when opening relearn from practice', () => {
     mockSearchParams = { returnTo: 'learner-home' };
 
     render(<PracticeScreen />);
@@ -110,9 +106,6 @@ describe('PracticeScreen', () => {
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/topic/relearn',
       params: {
-        topicId: 'topic-1',
-        subjectId: 'subject-1',
-        topicName: 'Algebra',
         returnTo: 'learner-home',
       },
     });

@@ -7,9 +7,7 @@ import {
 import React from 'react';
 import { platformAlert } from '../../lib/platform-alert';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import {
-  createRoutedMockFetch,
-} from '../../test-utils/mock-api-routes';
+import { createRoutedMockFetch } from '../../test-utils/mock-api-routes';
 
 const mockReplace = jest.fn();
 const mockPush = jest.fn();
@@ -157,7 +155,7 @@ let mockSkipResult: Record<string, unknown> | Response = {
     aiFeedback: null,
     status: 'skipped',
   },
-  shouldPromptCasualSwitch: false,
+  consecutiveSummarySkips: 1,
 };
 // The single mockFetch instance — its route map is updated per-test via setRoute().
 const mockFetch = createRoutedMockFetch({
@@ -288,7 +286,7 @@ describe('SessionSummaryScreen', () => {
         aiFeedback: null,
         status: 'skipped',
       },
-      shouldPromptCasualSwitch: false,
+      consecutiveSummarySkips: 1,
     };
     mockParams.subjectName = 'Mathematics';
     mockParams.exchangeCount = '5';
@@ -306,8 +304,12 @@ describe('SessionSummaryScreen', () => {
     mockCanGoBack.mockReturnValue(false);
     mockOnSuccessfulRecall.mockResolvedValue(undefined);
     // Reset recall-bridge to the default rejection
-    mockFetch.setRoute('recall-bridge', () =>
-      new Response(JSON.stringify({ message: 'not homework' }), { status: 404 })
+    mockFetch.setRoute(
+      'recall-bridge',
+      () =>
+        new Response(JSON.stringify({ message: 'not homework' }), {
+          status: 404,
+        })
     );
     // Reset sessions route to default — tests like [BUG-800] call setRoute('sessions', ...)
     // to inject error responses. Without resetting, the override bleeds into subsequent
@@ -530,7 +532,7 @@ describe('SessionSummaryScreen', () => {
     });
   });
 
-  it('prompts to switch to Casual Explorer when skip threshold is reached', async () => {
+  it('shows a summary warning when the skip threshold is reached', async () => {
     mockSkipResult = {
       summary: {
         id: 'summary-1',
@@ -539,7 +541,7 @@ describe('SessionSummaryScreen', () => {
         aiFeedback: null,
         status: 'skipped',
       },
-      shouldPromptCasualSwitch: true,
+      consecutiveSummarySkips: 5,
     };
 
     render(<SessionSummaryScreen />, { wrapper: Wrapper });
@@ -548,12 +550,9 @@ describe('SessionSummaryScreen', () => {
 
     await waitFor(() => {
       expect(platformAlert).toHaveBeenCalledWith(
-        'Try Casual Explorer?',
-        'You can keep learning without writing a summary each time. Switch now?',
-        expect.arrayContaining([
-          expect.objectContaining({ text: 'Not now' }),
-          expect.objectContaining({ text: 'Switch' }),
-        ])
+        'Summaries help you learn',
+        'Students who reflect remember 2x more. Try it next time!',
+        expect.arrayContaining([expect.objectContaining({ text: 'Got it' })])
       );
     });
     expect(mockReplace).not.toHaveBeenCalled();
@@ -561,12 +560,10 @@ describe('SessionSummaryScreen', () => {
     const promptButtons = (platformAlert as jest.Mock).mock.calls[0]?.[2] as
       | Array<{ text?: string; onPress?: () => void }>
       | undefined;
-    const switchButton = promptButtons?.find(
-      (button) => button.text === 'Switch'
-    );
-    expect(switchButton?.onPress).toBeInstanceOf(Function);
+    const okButton = promptButtons?.find((button) => button.text === 'Got it');
+    expect(okButton?.onPress).toBeInstanceOf(Function);
 
-    switchButton?.onPress?.();
+    okButton?.onPress?.();
 
     await waitFor(() => {
       expect(mockReplace).toHaveBeenCalledWith('/(app)/home');

@@ -130,6 +130,9 @@ function createMockDb(options?: {
       teachingPreferences: {
         findFirst: jest.fn().mockResolvedValue(null),
       },
+      sessionSummaries: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
     },
     update: jest.fn().mockReturnValue({
       set: jest.fn().mockReturnValue({
@@ -844,9 +847,13 @@ describe('processRecallTest', () => {
 // ---------------------------------------------------------------------------
 
 describe('startRelearn', () => {
-  it('returns relearn confirmation with resetPerformed', async () => {
+  it('returns relearn confirmation with recap when a prior summary exists', async () => {
     setupScopedRepo({ needsDeepeningFindMany: [] });
     const db = createMockDb();
+    (db.query.sessionSummaries.findFirst as jest.Mock).mockResolvedValue({
+      id: 'summary-1',
+      learnerRecap: 'You already covered the core ideas last time.',
+    });
     // Mock session creation with returning
     (db.insert as jest.Mock).mockReturnValue({
       values: jest.fn().mockReturnValue({
@@ -862,10 +869,10 @@ describe('startRelearn', () => {
     expect(result.message).toBe('Relearn started');
     expect(result.topicId).toBe(topicId);
     expect(result.method).toBe('different');
-    expect(result.resetPerformed).toBe(true);
+    expect(result.recap).toBe('You already covered the core ideas last time.');
   });
 
-  it('resets the retention card to initial SM-2 state', async () => {
+  it('does NOT reset the retention card during startRelearn', async () => {
     setupScopedRepo({ needsDeepeningFindMany: [] });
     const db = createMockDb();
     (db.insert as jest.Mock).mockReturnValue({
@@ -876,17 +883,7 @@ describe('startRelearn', () => {
 
     await startRelearn(db, profileId, { topicId, method: 'same' });
 
-    expect(db.update).toHaveBeenCalled();
-    const setArg = (db.update as jest.Mock).mock.results[0].value.set.mock
-      .calls[0][0];
-    expect(setArg.easeFactor).toBe(2.5);
-    expect(setArg.intervalDays).toBe(1);
-    expect(setArg.repetitions).toBe(0);
-    expect(setArg.failureCount).toBe(0);
-    expect(setArg.consecutiveSuccesses).toBe(0);
-    expect(setArg.xpStatus).toBe('pending');
-    expect(setArg.nextReviewAt).toBeNull();
-    expect(setArg.lastReviewedAt).toBeNull();
+    expect(db.update).not.toHaveBeenCalled();
   });
 
   it('creates a new learning session linked to topic', async () => {
@@ -942,6 +939,7 @@ describe('startRelearn', () => {
 
     expect(result.method).toBe('same');
     expect(result.preferredMethod).toBeUndefined();
+    expect(result.recap).toBeNull();
   });
 
   it('marks topic as needs-deepening when not already active', async () => {

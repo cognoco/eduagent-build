@@ -432,7 +432,7 @@ describe('Integration: POST /v1/retention/recall-test', () => {
 // ---------------------------------------------------------------------------
 
 describe('Integration: POST /v1/retention/relearn', () => {
-  it('starts relearning with same method and resets retention card', async () => {
+  it('starts relearning with same method without resetting the retention card yet', async () => {
     const profileId = await createOwnerProfile();
 
     const subjectId = await createSubject(profileId, 'Physics');
@@ -469,21 +469,21 @@ describe('Integration: POST /v1/retention/relearn', () => {
     expect(body.message).toBe('Relearn started');
     expect(body.topicId).toBe(topicIds[0]);
     expect(body.method).toBe('same');
-    expect(body.resetPerformed).toBe(true);
+    expect(body.recap).toBeNull();
     expect(typeof body.sessionId).toBe('string');
 
-    // Verify the retention card was reset in the DB
+    // Verify the retention card keeps its existing state until session completion
     const db = createIntegrationDb();
     const card = await db.query.retentionCards.findFirst({
       where: (rc, { and, eq }) =>
         and(eq(rc.profileId, profileId), eq(rc.topicId, topicIds[0]!)),
     });
     expect(card).not.toBeNull();
-    expect(Number(card!.easeFactor)).toBe(2.5);
-    expect(card!.intervalDays).toBe(1);
-    expect(card!.repetitions).toBe(0);
-    expect(card!.failureCount).toBe(0);
-    expect(card!.consecutiveSuccesses).toBe(0);
+    expect(Number(card!.easeFactor)).toBe(2.7);
+    expect(card!.intervalDays).toBe(10);
+    expect(card!.repetitions).toBe(5);
+    expect(card!.failureCount).toBe(3);
+    expect(card!.consecutiveSuccesses).toBe(2);
   });
 });
 

@@ -224,7 +224,12 @@ export async function createNote(
     const [session] = await db
       .select({ topicId: learningSessions.topicId })
       .from(learningSessions)
-      .where(eq(learningSessions.id, sessionId))
+      .where(
+        and(
+          eq(learningSessions.id, sessionId),
+          eq(learningSessions.profileId, profileId)
+        )
+      )
       .limit(1);
     if (!session || session.topicId !== topicId) {
       throw new NotFoundError('Session does not belong to this topic');
@@ -250,7 +255,6 @@ export async function createNote(
       profileId,
       sessionId: sessionId ?? null,
       content,
-      updatedAt: new Date(),
     })
     .returning({
       id: topicNotes.id,

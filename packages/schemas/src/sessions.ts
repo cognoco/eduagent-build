@@ -378,8 +378,24 @@ export const sessionSummarySchema = z.object({
   nextTopicId: z.string().uuid().nullable(),
   nextTopicTitle: z.string().nullable(),
   nextTopicReason: z.string().nullable(),
+  baseXp: z.number().nullable().optional(),
+  reflectionBonusXp: z.number().nullable().optional(),
+  consecutiveSummarySkips: z.number().optional(),
 });
 export type SessionSummary = z.infer<typeof sessionSummarySchema>;
+
+export const skipSummaryResponseSchema = z.object({
+  summary: sessionSummarySchema.pick({
+    id: true,
+    sessionId: true,
+    content: true,
+    aiFeedback: true,
+    status: true,
+  }),
+  consecutiveSummarySkips: z.number().optional(),
+  pipelineQueued: z.boolean().optional(),
+});
+export type SkipSummaryResponse = z.infer<typeof skipSummaryResponseSchema>;
 
 export const learnerRecapResponseSchema = z.object({
   closingLine: z.string().min(1).max(150),

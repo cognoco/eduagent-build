@@ -26,6 +26,9 @@ jest.mock('./logger', () => ({
     debug: jest.fn(),
   }),
 }));
+jest.mock('../inngest/client', () => ({
+  inngest: { send: jest.fn().mockResolvedValue(undefined) },
+}));
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -86,7 +89,13 @@ afterAll(async () => {
 
 beforeEach(() => jest.clearAllMocks());
 
-describe('lookupAssistantTurnState (integration)', () => {
+const describeIf = process.env.DATABASE_URL ? describe : describe.skip;
+
+describeIf('lookupAssistantTurnState (integration)', () => {
+  // Neon HTTP round-trips on first connection can be slow. 30 s matches the
+  // integration test suite default in tests/integration/setup.ts.
+  jest.setTimeout(30_000);
+
   it('returns safe default when db is undefined', async () => {
     const result = await lookupAssistantTurnState({
       db: undefined,

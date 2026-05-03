@@ -336,6 +336,39 @@ describe('Integration: progress routes', () => {
     );
   });
 
+  it('returns overdue topics grouped by subject for the relearn picker', async () => {
+    const scenario = await createProgressScenario();
+
+    const res = await app.request(
+      '/v1/progress/overdue-topics',
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: PROGRESS_USER.userId, email: PROGRESS_USER.email },
+          scenario.profile.id
+        ),
+      },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.totalOverdue).toBe(1);
+    expect(body.subjects).toEqual([
+      expect.objectContaining({
+        subjectId: scenario.subject.id,
+        subjectName: 'Mathematics',
+        overdueCount: 1,
+        topics: [
+          expect.objectContaining({
+            topicId: scenario.reviewTopicId,
+            topicTitle: 'Geometry',
+          }),
+        ],
+      }),
+    ]);
+  });
+
   it('returns the next incomplete topic and keeps lastSessionId aligned to that topic', async () => {
     const scenario = await createProgressScenario();
 

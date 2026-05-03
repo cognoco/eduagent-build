@@ -119,31 +119,21 @@ export default function PracticeScreen(): React.ReactElement {
           title="Review topics"
           subtitle={reviewSubtitle}
           icon="refresh-outline"
-          // [BUG-686 / M-6] Only show the badge when the action will actually
-          // do something. Previously the badge could read "5 overdue" while
-          // nextReviewTopic was null (e.g., server returned counts but no
-          // resolvable next topic), so tapping the card was a silent no-op.
-          // Tying the badge to nextReviewTopic existence aligns the UI
-          // promise with the action.
+          // Keep the badge aligned with the review-summary API, but let the
+          // relearn screen own topic selection and empty states.
           badge={
             !reviewError && hasOverdue && reviewSummary?.nextReviewTopic
               ? reviewDueCount
               : undefined
           }
-          onPress={() => {
-            const nextReviewTopic = reviewSummary?.nextReviewTopic ?? null;
-            if (nextReviewTopic) {
-              router.push({
-                pathname: '/(app)/topic/relearn',
-                params: {
-                  topicId: nextReviewTopic.topicId,
-                  subjectId: nextReviewTopic.subjectId,
-                  topicName: nextReviewTopic.topicTitle,
-                  ...(returnTo ? { returnTo } : {}),
-                },
-              } as never);
-            }
-          }}
+          onPress={() =>
+            router.push({
+              pathname: '/(app)/topic/relearn',
+              params: {
+                ...(returnTo ? { returnTo } : {}),
+              },
+            } as never)
+          }
           testID="practice-review"
         />
         {!reviewError && !hasOverdue && reviewSummary ? (

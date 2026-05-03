@@ -300,14 +300,10 @@ export function getLearningModeRules(mode: LearningMode): LearningModeRules {
 }
 
 // ---------------------------------------------------------------------------
-// Summary Skip Tracking (FR37 5-skip warning + FR94 10-skip casual-switch prompt)
+// Summary Skip Tracking
 // ---------------------------------------------------------------------------
 
-/** Threshold for showing a warning before the full casual-switch prompt */
 export const SKIP_WARNING_THRESHOLD = 5;
-
-/** Threshold for prompting the learner to switch to Casual Explorer */
-export const CASUAL_SWITCH_PROMPT_THRESHOLD = 10;
 
 export async function getConsecutiveSummarySkips(
   db: Database,
@@ -367,78 +363,6 @@ export async function resetSummarySkips(
       .set({ consecutiveSummarySkips: 0, updatedAt: new Date() })
       .where(eq(learningModes.profileId, profileId));
   }
-}
-
-/**
- * Returns true when the learner has skipped >= 10 consecutive summaries
- * AND is currently in 'serious' mode. Used to prompt switching to Casual Explorer.
- */
-export async function shouldPromptCasualSwitch(
-  db: Database,
-  profileId: string
-): Promise<boolean> {
-  const row = await db.query.learningModes.findFirst({
-    where: eq(learningModes.profileId, profileId),
-  });
-
-  const mode = row?.mode ?? 'serious';
-  const skips = row?.consecutiveSummarySkips ?? 0;
-
-  return mode === 'serious' && skips >= CASUAL_SWITCH_PROMPT_THRESHOLD;
-}
-
-/**
- * Returns true when the learner has skipped >= 5 but < 10 consecutive summaries
- * AND is in 'serious' mode. Used for an early warning before the casual-switch prompt.
- */
-export async function shouldWarnSummarySkip(
-  db: Database,
-  profileId: string
-): Promise<boolean> {
-  const row = await db.query.learningModes.findFirst({
-    where: eq(learningModes.profileId, profileId),
-  });
-
-  const mode = row?.mode ?? 'serious';
-  const skips = row?.consecutiveSummarySkips ?? 0;
-
-  return (
-    mode === 'serious' &&
-    skips >= SKIP_WARNING_THRESHOLD &&
-    skips < CASUAL_SWITCH_PROMPT_THRESHOLD
-  );
-}
-
-/**
- * Single-query replacement for calling shouldPromptCasualSwitch() and
- * shouldWarnSummarySkip() independently. Returns both flags from one DB read.
- */
-export async function getSkipWarningFlags(
-  db: Database,
-  profileId: string
-): Promise<{
-  shouldPromptCasualSwitch: boolean;
-  shouldWarnSummarySkip: boolean;
-}> {
-  const row = await db.query.learningModes.findFirst({
-    where: eq(learningModes.profileId, profileId),
-  });
-
-  const mode = row?.mode ?? 'serious';
-  const skips = row?.consecutiveSummarySkips ?? 0;
-
-  const promptCasualSwitch =
-    mode === 'serious' && skips >= CASUAL_SWITCH_PROMPT_THRESHOLD;
-  const warnSummarySkip =
-    !promptCasualSwitch &&
-    mode === 'serious' &&
-    skips >= SKIP_WARNING_THRESHOLD &&
-    skips < CASUAL_SWITCH_PROMPT_THRESHOLD;
-
-  return {
-    shouldPromptCasualSwitch: promptCasualSwitch,
-    shouldWarnSummarySkip: warnSummarySkip,
-  };
 }
 
 // ---------------------------------------------------------------------------

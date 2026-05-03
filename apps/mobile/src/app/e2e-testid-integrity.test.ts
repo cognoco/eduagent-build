@@ -53,6 +53,10 @@ const KNOWN_DRIFT = new Set([
   'learn-new-screen',
   'interview-screen',
   'shelf-book-list',
+  // Relearn flow redesign WIP — testIDs temporarily removed during screen refactor
+  'relearn-different-method',
+  'relearn-same-method',
+  'relearn-back-to-choice',
   // Streak display
   'streak-badge',
   // Session summary

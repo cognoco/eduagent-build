@@ -7,6 +7,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   ActivityIndicator,
+  InteractionManager,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,7 +15,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../lib/theme';
 import { useProfile, personaFromBirthYear } from '../../lib/profile';
 import { useParentProxy } from '../../hooks/use-parent-proxy';
-import { useUpdateLearningMode } from '../../hooks/use-settings';
 import { useRatingPrompt } from '../../hooks/use-rating-prompt';
 import {
   useSession,
@@ -36,6 +36,7 @@ import {
   writeSummaryDraft,
   clearSummaryDraft,
 } from '../../lib/summary-draft';
+import { getReflectionStarters } from '../../lib/reflection-starters';
 import {
   CheckmarkPopAnimation,
   BrandCelebration,
@@ -44,15 +45,8 @@ import {
 } from '../../components/common';
 import { FilingFailedBanner } from '../../components/session/FilingFailedBanner';
 
-// BUG-33 Phase 1: Structured sentence starters shown as suggestion chips
-// above the text input to reduce skip rate. Kid-friendly, plain language.
-const SUMMARY_PROMPTS = [
-  'Today I learned that...',
-  'The most interesting thing was...',
-  'I want to learn more about...',
-  'Something that surprised me was...',
-  'I found it easy/hard to...',
-] as const;
+const SKIP_NUDGE_THRESHOLD = 3;
+const SKIP_WARNING_THRESHOLD = 5;
 
 export default function SessionSummaryScreen() {
   const {
@@ -66,6 +60,8 @@ export default function SessionSummaryScreen() {
     milestones,
     fastCelebrations,
     sessionType: sessionTypeParam,
+    filedSubjectId,
+    filedBookId,
   } = useLocalSearchParams<{
     sessionId: string;
     subjectName?: string;
@@ -77,6 +73,8 @@ export default function SessionSummaryScreen() {
     milestones?: string;
     fastCelebrations?: string;
     sessionType?: string;
+    filedSubjectId?: string;
+    filedBookId?: string;
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -85,6 +83,10 @@ export default function SessionSummaryScreen() {
   const [summaryText, setSummaryText] = useState('');
   const [aiFeedback, setAiFeedback] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [submittedXp, setSubmittedXp] = useState<{
+    baseXp: number | null;
+    reflectionBonusXp: number | null;
+  } | null>(null);
   const [recapTimedOut, setRecapTimedOut] = useState(false);
   // UX-DE-M2: timeout guard — escape from unbounded loading spinner
   const [loadingTimedOut, setLoadingTimedOut] = useState(false);
@@ -103,7 +105,6 @@ export default function SessionSummaryScreen() {
 
   const submitSummary = useSubmitSummary(sessionId ?? '');
   const skipSummary = useSkipSummary(sessionId ?? '');
-  const updateLearningMode = useUpdateLearningMode();
   const session = useSession(sessionId ?? '');
   const transcript = useSessionTranscript(sessionId ?? '');
   const { onSuccessfulRecall } = useRatingPrompt();
@@ -247,10 +248,38 @@ export default function SessionSummaryScreen() {
   const displayAiFeedback = submitted
     ? aiFeedback
     : persisted?.aiFeedback ?? null;
+  const transcriptSessionType = transcript.data?.session.sessionType;
+  const sessionType: 'learning' | 'freeform' | 'homework' =
+    sessionTypeParam === 'homework' || transcriptSessionType === 'homework'
+      ? 'homework'
+      : sessionTypeParam === 'freeform'
+      ? 'freeform'
+      : 'learning';
+  const conversationLanguage = activeProfile?.conversationLanguage ?? 'en';
+  const summaryPrompts = getReflectionStarters(
+    sessionType,
+    conversationLanguage
+  );
+  const recapHeader =
+    sessionType === 'homework'
+      ? 'What you practiced'
+      : sessionType === 'freeform'
+      ? 'What you asked about'
+      : 'What you explored';
+  const reflectionPlaceholder =
+    sessionType === 'homework'
+      ? 'What I practiced...'
+      : sessionType === 'freeform'
+      ? 'What I found out...'
+      : 'In my own words...';
+  const baseXp = (submitted ? submittedXp?.baseXp : persisted?.baseXp) ?? null;
+  const reflectionBonusXp =
+    (submitted
+      ? submittedXp?.reflectionBonusXp
+      : persisted?.reflectionBonusXp) ?? null;
+  const hasXpIncentive = baseXp != null && baseXp > 0;
 
-  const isHomeworkSession =
-    sessionTypeParam === 'homework' ||
-    transcript.data?.session.sessionType === 'homework';
+  const isHomeworkSession = sessionType === 'homework';
 
   const fallbackSession = transcript.data?.session;
   // [BUG-801] Same parseInt-||-fallback anti-pattern as exchangeCountForRecap
@@ -321,6 +350,31 @@ export default function SessionSummaryScreen() {
     } catch {
       // Best effort only — store review availability varies by device/store.
     }
+  };
+
+  const finishSummaryNavigation = (): void => {
+    if (filedSubjectId && filedBookId) {
+      router.replace('/(app)/library' as never);
+      InteractionManager.runAfterInteractions(() => {
+        router.push({
+          pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
+          params: { subjectId: filedSubjectId, bookId: filedBookId },
+        } as never);
+      });
+      return;
+    }
+
+    const effectiveTopicId = topicId ?? fallbackSession?.topicId;
+    const effectiveSubjectId = subjectId ?? fallbackSession?.subjectId;
+    if (isAlreadyPersisted && effectiveTopicId && effectiveSubjectId) {
+      router.replace({
+        pathname: '/(app)/topic/[topicId]',
+        params: { topicId: effectiveTopicId, subjectId: effectiveSubjectId },
+      } as never);
+      return;
+    }
+
+    goBackOrReplace(router, '/(app)/home');
   };
 
   if (!sessionId) {
@@ -479,6 +533,10 @@ export default function SessionSummaryScreen() {
       });
       setAiFeedback(result.summary.aiFeedback);
       setSubmitted(true);
+      setSubmittedXp({
+        baseXp: result.summary.baseXp,
+        reflectionBonusXp: result.summary.reflectionBonusXp,
+      });
       // Server accepted the reflection — the local draft is redundant.
       if (activeProfile?.id && sessionId) {
         void clearSummaryDraft(activeProfile.id, sessionId);
@@ -622,21 +680,17 @@ export default function SessionSummaryScreen() {
         }
       }
 
-      // 5-skip warning (FR37) — early nudge before the 10-skip casual-switch prompt
-      if (
-        skipResult?.shouldWarnSummarySkip &&
-        !skipResult?.shouldPromptCasualSwitch
-      ) {
+      if (skipResult?.consecutiveSummarySkips === SKIP_NUDGE_THRESHOLD) {
         platformAlert(
-          'Summaries help you learn',
-          'Writing a quick summary after each session strengthens your memory. Try it next time!',
+          'Give it a try?',
+          'Reflecting helps you remember. Give it a try next time?',
           [
             {
-              text: 'Got it',
+              text: 'OK',
               onPress: () => {
                 void (async () => {
                   await maybePromptForRecall();
-                  goBackOrReplace(router, '/(app)/home');
+                  finishSummaryNavigation();
                 })();
               },
             },
@@ -645,46 +699,20 @@ export default function SessionSummaryScreen() {
         return;
       }
 
-      if (skipResult?.shouldPromptCasualSwitch) {
+      if (
+        skipResult?.consecutiveSummarySkips != null &&
+        skipResult.consecutiveSummarySkips >= SKIP_WARNING_THRESHOLD
+      ) {
         platformAlert(
-          'Try Casual Explorer?',
-          'You can keep learning without writing a summary each time. Switch now?',
+          'Summaries help you learn',
+          'Students who reflect remember 2x more. Try it next time!',
           [
             {
-              text: 'Not now',
-              style: 'cancel',
+              text: 'Got it',
               onPress: () => {
                 void (async () => {
                   await maybePromptForRecall();
-                  goBackOrReplace(router, '/(app)/home');
-                })();
-              },
-            },
-            {
-              text: 'Switch',
-              onPress: () => {
-                void (async () => {
-                  try {
-                    await updateLearningMode.mutateAsync('casual');
-                    await maybePromptForRecall();
-                    goBackOrReplace(router, '/(app)/home');
-                  } catch {
-                    platformAlert(
-                      "Couldn't switch right now",
-                      'You can change your learning mode later in More.',
-                      [
-                        {
-                          text: 'OK',
-                          onPress: () => {
-                            void (async () => {
-                              await maybePromptForRecall();
-                              goBackOrReplace(router, '/(app)/home');
-                            })();
-                          },
-                        },
-                      ]
-                    );
-                  }
+                  finishSummaryNavigation();
                 })();
               },
             },
@@ -695,19 +723,7 @@ export default function SessionSummaryScreen() {
     }
 
     await maybePromptForRecall();
-
-    // Past session view → navigate to topic to continue learning
-    const effectiveTopicId = topicId ?? fallbackSession?.topicId;
-    const effectiveSubjectId = subjectId ?? fallbackSession?.subjectId;
-    if (isAlreadyPersisted && effectiveTopicId && effectiveSubjectId) {
-      router.replace({
-        pathname: '/(app)/topic/[topicId]',
-        params: { topicId: effectiveTopicId, subjectId: effectiveSubjectId },
-      } as never);
-      return;
-    }
-
-    goBackOrReplace(router, '/(app)/home');
+    finishSummaryNavigation();
   };
 
   const handleGoToLibrary = (): void => {
@@ -934,7 +950,7 @@ export default function SessionSummaryScreen() {
             testID="session-recap-card"
           >
             <Text className="text-body font-semibold text-text-primary mb-2">
-              What you explored
+              {recapHeader}
             </Text>
             {persisted.learnerRecap
               .split('\n')
@@ -1085,6 +1101,47 @@ export default function SessionSummaryScreen() {
           </View>
         ) : null}
 
+        {hasXpIncentive && !showSubmittedView && !isPersistedSkipped ? (
+          <View
+            className="bg-surface-elevated rounded-card p-4 mb-4 flex-row items-center"
+            testID="xp-incentive-banner"
+          >
+            <Text className="text-body-sm mr-2">+</Text>
+            <View className="flex-1">
+              <Text className="text-body-sm font-semibold text-text-primary">
+                Write a reflection to earn 1.5x XP
+              </Text>
+              <Text className="text-caption text-text-secondary">
+                Base: {baseXp} XP → With reflection:{' '}
+                {baseXp + (reflectionBonusXp ?? 0)} XP
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
+        {hasXpIncentive && showSubmittedView && reflectionBonusXp != null ? (
+          <View
+            className="bg-success/10 rounded-card p-4 mb-4 flex-row items-center"
+            testID="xp-bonus-earned"
+          >
+            <Text className="text-body-sm mr-2">+</Text>
+            <Text className="text-body-sm font-semibold text-success">
+              +{reflectionBonusXp} bonus XP earned!
+            </Text>
+          </View>
+        ) : null}
+
+        {hasXpIncentive &&
+        isPersistedSkipped &&
+        summaryText.length === 0 &&
+        reflectionBonusXp != null ? (
+          <View className="rounded-card p-4 mb-4" testID="xp-bonus-missed">
+            <Text className="text-body-sm text-text-secondary">
+              You missed +{reflectionBonusXp} XP
+            </Text>
+          </View>
+        ) : null}
+
         {/* Recall bridge questions — shown after homework summary submit/skip (Story 2.7) */}
         {recallQuestions && (
           <View
@@ -1110,7 +1167,7 @@ export default function SessionSummaryScreen() {
               onPress={() => {
                 void (async () => {
                   await maybePromptForRecall();
-                  router.replace('/(app)/home');
+                  finishSummaryNavigation();
                 })();
               }}
               testID="recall-bridge-done-button"
@@ -1199,7 +1256,7 @@ export default function SessionSummaryScreen() {
               testID="summary-prompt-chips"
               accessibilityLabel="Sentence starter suggestions"
             >
-              {SUMMARY_PROMPTS.map((prompt) => (
+              {summaryPrompts.map((prompt) => (
                 <Pressable
                   key={prompt}
                   onPress={() => setSummaryText(prompt)}
@@ -1218,7 +1275,7 @@ export default function SessionSummaryScreen() {
 
             <TextInput
               className="bg-surface rounded-card px-4 py-3 text-body text-text-primary min-h-[120px]"
-              placeholder="In my own words, I learned that..."
+              placeholder={reflectionPlaceholder}
               placeholderTextColor={colors.muted}
               value={summaryText}
               onChangeText={setSummaryText}

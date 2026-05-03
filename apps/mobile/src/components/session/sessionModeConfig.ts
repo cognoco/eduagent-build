@@ -141,8 +141,21 @@ export function getOpeningMessage(
   problemText?: string,
   topicName?: string,
   subjectName?: string,
-  rawInput?: string
+  rawInput?: string,
+  recap?: string
 ): string {
+  if (mode === 'relearn' && recap) {
+    return `Last time you learned about ${
+      topicName ?? 'this topic'
+    }, we covered:\n\n${recap}\n\nLet's see what you remember! Want to do a quick quiz on these before we dive in?`;
+  }
+
+  if (mode === 'relearn') {
+    return `Let's approach ${
+      topicName ?? 'this topic'
+    } from a fresh angle. What do you remember about it?`;
+  }
+
   if (problemText) {
     return "Got it — I can see your problem. Want me to walk you through how to solve it, or have you got an answer you'd like me to check?";
   }

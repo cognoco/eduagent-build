@@ -6,6 +6,7 @@
 import { eq, and } from 'drizzle-orm';
 import {
   assessments,
+  learningSessions,
   xpLedger,
   createScopedRepository,
   type Database,
@@ -19,6 +20,8 @@ export interface XpEvent {
   amount: number;
   status: 'pending' | 'verified' | 'decayed';
 }
+
+export const REFLECTION_XP_MULTIPLIER = 1.5;
 
 // ---------------------------------------------------------------------------
 // Core functions
@@ -157,4 +160,91 @@ export async function syncXpLedgerStatus(
     return false;
   }
   return true;
+}
+
+export async function applyReflectionMultiplier(
+  db: Database,
+  profileId: string,
+  sessionId: string
+): Promise<{ applied: boolean; newAmount: number }> {
+  const session = await db.query.learningSessions.findFirst({
+    where: and(
+      eq(learningSessions.id, sessionId),
+      eq(learningSessions.profileId, profileId)
+    ),
+  });
+  if (!session?.topicId) {
+    return { applied: false, newAmount: 0 };
+  }
+
+  const repo = createScopedRepository(db, profileId);
+  const entry = await repo.xpLedger.findFirst(
+    eq(xpLedger.topicId, session.topicId)
+  );
+  if (!entry) {
+    return { applied: false, newAmount: 0 };
+  }
+  if (entry.reflectionMultiplierApplied) {
+    return { applied: false, newAmount: entry.amount };
+  }
+
+  const newAmount = Math.round(entry.amount * REFLECTION_XP_MULTIPLIER);
+  const updated = await db
+    .update(xpLedger)
+    .set({
+      amount: newAmount,
+      reflectionMultiplierApplied: true,
+    })
+    .where(
+      and(
+        eq(xpLedger.id, entry.id),
+        eq(xpLedger.profileId, profileId),
+        eq(xpLedger.reflectionMultiplierApplied, false)
+      )
+    )
+    .returning({ id: xpLedger.id });
+
+  if (updated.length === 0) {
+    return { applied: false, newAmount: entry.amount };
+  }
+
+  return { applied: true, newAmount };
+}
+
+export async function getSessionXpEntry(
+  db: Database,
+  profileId: string,
+  sessionId: string
+): Promise<{ baseXp: number; reflectionBonusXp: number } | null> {
+  const session = await db.query.learningSessions.findFirst({
+    where: and(
+      eq(learningSessions.id, sessionId),
+      eq(learningSessions.profileId, profileId)
+    ),
+  });
+  if (!session?.topicId) {
+    return null;
+  }
+
+  const repo = createScopedRepository(db, profileId);
+  const entry = await repo.xpLedger.findFirst(
+    eq(xpLedger.topicId, session.topicId)
+  );
+  if (!entry) {
+    return null;
+  }
+
+  if (entry.reflectionMultiplierApplied) {
+    const baseXp = Math.round(entry.amount / REFLECTION_XP_MULTIPLIER);
+    return {
+      baseXp,
+      reflectionBonusXp: entry.amount - baseXp,
+    };
+  }
+
+  const reflectedAmount = Math.round(entry.amount * REFLECTION_XP_MULTIPLIER);
+  return {
+    baseXp: entry.amount,
+    reflectionBonusXp: reflectedAmount - entry.amount,
+  };
 }

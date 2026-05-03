@@ -200,7 +200,7 @@ export function useCreateNote(
   return useMutation({
     mutationFn: async ({ topicId, content, sessionId }) => {
       if (!subjectId || !topicId)
-        throw new Error('subjectId and topicId required');
+        throw new Error('subjectId and topicId are required');
       const res = await client.subjects[':subjectId'].topics[
         ':topicId'
       ].notes.$post({

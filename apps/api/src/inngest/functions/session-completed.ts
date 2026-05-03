@@ -463,6 +463,45 @@ export const sessionCompleted = inngest.createFunction(
     );
 
     outcomes.push(
+      await step.run('relearn-retention-reset', async () => {
+        const sessionMode = event.data.mode as string | undefined;
+        if (
+          sessionMode !== 'relearn' ||
+          (exchangeCount ?? 0) <= 0 ||
+          !topicId
+        ) {
+          return {
+            step: 'relearn-retention-reset',
+            status: 'skipped' as const,
+          };
+        }
+
+        return runCritical('relearn-retention-reset', async () => {
+          const db = getStepDatabase();
+          await db
+            .update(retentionCards)
+            .set({
+              easeFactor: 2.5,
+              intervalDays: 1,
+              repetitions: 0,
+              failureCount: 0,
+              consecutiveSuccesses: 0,
+              xpStatus: 'pending',
+              nextReviewAt: null,
+              lastReviewedAt: null,
+              updatedAt: new Date(),
+            })
+            .where(
+              and(
+                eq(retentionCards.topicId, topicId),
+                eq(retentionCards.profileId, profileId)
+              )
+            );
+        });
+      })
+    );
+
+    outcomes.push(
       await step.run('update-vocabulary-retention', async () => {
         if (!subjectId) {
           return {

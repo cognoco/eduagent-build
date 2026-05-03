@@ -6,14 +6,24 @@ import { eq, and } from 'drizzle-orm';
 import {
   curriculumTopics,
   sessionSummaries,
+  topicNotes,
   type Database,
 } from '@eduagent/database';
 import type { SessionSummary, SummarySubmitInput } from '@eduagent/schemas';
 import { createPendingSessionSummary, evaluateSummary } from '../summaries';
 import { getSubject } from '../subject';
-import { incrementSummarySkips, resetSummarySkips } from '../settings';
+import {
+  getConsecutiveSummarySkips,
+  incrementSummarySkips,
+  resetSummarySkips,
+} from '../settings';
+import { applyReflectionMultiplier, getSessionXpEntry } from '../xp';
+import { createLogger } from '../logger';
+import { captureException } from '../sentry';
 import { getSession } from './session-crud';
 import { findSessionSummaryRow, mapSummaryRow } from './session-events';
+
+const logger = createLogger();
 
 export async function getSessionSummary(
   db: Database,
@@ -25,9 +35,20 @@ export async function getSessionSummary(
     return null;
   }
 
+  const xpInfo = await getSessionXpEntry(db, profileId, sessionId);
+  const consecutiveSummarySkips = await getConsecutiveSummarySkips(
+    db,
+    profileId
+  );
   const summary = mapSummaryRow(row);
+  const enrichedSummary: SessionSummary = {
+    ...summary,
+    baseXp: xpInfo?.baseXp ?? null,
+    reflectionBonusXp: xpInfo?.reflectionBonusXp ?? null,
+    consecutiveSummarySkips,
+  };
   if (!row.nextTopicId) {
-    return summary;
+    return enrichedSummary;
   }
 
   const [topic] = await db
@@ -37,7 +58,7 @@ export async function getSessionSummary(
     .limit(1);
 
   return {
-    ...summary,
+    ...enrichedSummary,
     nextTopicTitle: topic?.title ?? null,
   };
 }
@@ -54,6 +75,7 @@ export async function skipSummary(
     aiFeedback: string | null;
     status: 'skipped' | 'submitted' | 'accepted';
   };
+  consecutiveSummarySkips?: number;
 }> {
   const session = await getSession(db, profileId, sessionId);
   if (!session) {
@@ -92,8 +114,9 @@ export async function skipSummary(
     'skipped'
   );
 
+  let consecutiveSummarySkips: number | undefined;
   if (existingStatus !== 'skipped') {
-    await incrementSummarySkips(db, profileId);
+    consecutiveSummarySkips = await incrementSummarySkips(db, profileId);
   }
 
   return {
@@ -104,6 +127,7 @@ export async function skipSummary(
       aiFeedback: row.aiFeedback ?? null,
       status: 'skipped',
     },
+    ...(consecutiveSummarySkips != null ? { consecutiveSummarySkips } : {}),
   };
 }
 
@@ -119,6 +143,8 @@ export async function submitSummary(
     content: string;
     aiFeedback: string;
     status: 'accepted' | 'submitted';
+    baseXp: number | null;
+    reflectionBonusXp: number | null;
   };
 }> {
   // Fetch session for topicId and subject name
@@ -184,6 +210,33 @@ export async function submitSummary(
   }
 
   await resetSummarySkips(db, profileId);
+  await applyReflectionMultiplier(db, profileId, sessionId);
+  const xpInfo = await getSessionXpEntry(db, profileId, sessionId);
+
+  if (session.topicId) {
+    try {
+      await db.insert(topicNotes).values({
+        topicId: session.topicId,
+        profileId,
+        sessionId,
+        content: input.content,
+      });
+    } catch (err) {
+      logger.error('[submitSummary] Note creation failed (non-fatal)', {
+        sessionId,
+        topicId: session.topicId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      captureException(err, {
+        profileId,
+        extra: {
+          site: 'submitSummary.autoNoteCreation',
+          sessionId,
+          topicId: session.topicId,
+        },
+      });
+    }
+  }
 
   return {
     summary: {
@@ -192,6 +245,8 @@ export async function submitSummary(
       content: finalRow.content ?? input.content,
       aiFeedback: evaluation.feedback,
       status: finalStatus,
+      baseXp: xpInfo?.baseXp ?? null,
+      reflectionBonusXp: xpInfo?.reflectionBonusXp ?? null,
     },
   };
 }
