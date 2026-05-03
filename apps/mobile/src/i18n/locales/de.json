@@ -1,0 +1,76 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "save": "Save",
+    "done": "Done",
+    "loading": "Loading...",
+    "retry": "Retry",
+    "goBack": "Go Back",
+    "goHome": "Go Home",
+    "tryAgain": "Try Again",
+    "signOut": "Sign Out",
+    "continue": "Continue",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close",
+    "next": "Next",
+    "back": "Back",
+    "search": "Search",
+    "noResults": "No results found"
+  },
+  "errors": {
+    "generic": "Something unexpected happened. Please try again.",
+    "networkError": "Looks like you're offline or our servers can't be reached. Check your internet connection and try again.",
+    "serverError": "Something went wrong on our end. Please try again in a moment.",
+    "notFound": "That page or item no longer exists.",
+    "resourceGone": "This resource is no longer available.",
+    "rateLimited": "You've hit the limit. Wait a moment and try again.",
+    "forbidden": "You do not have permission to view this.",
+    "quotaExhausted": "You've used all your sessions for today. Come back tomorrow!",
+    "sessionNotFound": "That session isn't available anymore. Start a new one.",
+    "sessionLimitReached": "Session limit reached. Start a new session to keep going.",
+    "badRequest": "That didn't work. Please check your input and try again.",
+    "exchangeLimitExceeded": "Session limit reached. Start a new session to keep going.",
+    "subjectInactive": "This subject is on pause right now. You can resume it from your subjects list.",
+    "notLanguageLearning": "This subject isn't set up for language learning. Try the standard learning path instead.",
+    "curriculumNotFound": "We haven't set up your learning path yet. Go back and start the interview first.",
+    "topicNotFound": "That topic isn't available right now. Try picking a different one.",
+    "draftNotFound": "Your progress was lost. Please start again.",
+    "profileNotFound": "We had trouble loading your profile. Please sign out and back in.",
+    "alreadyCompleted": "You've already finished this. Head back and pick something new.",
+    "validationFailed": "Something didn't look right. Please check what you entered and try again.",
+    "timedOut": "That reply took too long. Tap reconnect to try again."
+  },
+  "errorBoundary": {
+    "title": "Something went wrong",
+    "message": "An unexpected error occurred. You can try again or go back to the home screen.",
+    "sessionCrashTitle": "Session screen crashed"
+  },
+  "recovery": {
+    "tryAgain": "Try Again",
+    "goBack": "Go Back",
+    "goHome": "Go Home",
+    "signOut": "Sign Out"
+  },
+  "autoSuggest": {
+    "title": "Chat in {{language}}?",
+    "message": "Would you like your tutor to talk to you in {{language}}?",
+    "accept": "Yes, switch",
+    "dismiss": "No thanks"
+  },
+  "settings": {
+    "appLanguage": "App Language",
+    "appLanguageDescription": "Change the language of the app interface"
+  },
+  "friendlyErrors": {
+    "notLanguageLearning": "This subject isn't set up for language learning. Try the standard learning path instead.",
+    "subjectPaused": "This subject is on pause right now. You can resume it from your subjects list.",
+    "curriculumNotFound": "We haven't set up your learning path yet. Go back and start the interview first.",
+    "topicNotFound": "That topic isn't available right now. Try picking a different one.",
+    "draftNotFound": "Your progress was lost. Please start again.",
+    "profileNotFound": "We had trouble loading your profile. Please sign out and back in.",
+    "sessionNotFound": "That session isn't available anymore. Start a new one.",
+    "alreadyCompleted": "You've already finished this. Head back and pick something new.",
+    "validationFailed": "Something didn't look right. Please check what you entered and try again."
+  }
+}

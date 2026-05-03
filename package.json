@@ -23,18 +23,20 @@
     "db:migrate:dev": "C:/Tools/doppler/doppler.exe run -- pnpm --filter @eduagent/database exec tsx node_modules/drizzle-kit/bin.cjs migrate",
     "db:studio:dev": "C:/Tools/doppler/doppler.exe run -- pnpm --filter @eduagent/database exec tsx node_modules/drizzle-kit/bin.cjs studio",
     "test:integration": "C:/Tools/doppler/doppler.exe run -- jest --config tests/integration/jest.config.cjs --no-coverage",
-    "pretest:e2e": "node -e \"console.error('\\n❌ pnpm test:e2e is broken: bare maestro resolves via PATH to a Unicode-broken install.\\nUse C:/Tools/maestro/bin/maestro.bat directly. See docs/E2Edocs/e2e-runbook.md\\n'); process.exit(1)\"",
+    "pretest:e2e": "node -e \"if (process.env.SKIP_E2E_GUARD) { process.exit(0); } console.error('\\n❌ pnpm test:e2e is broken: bare maestro resolves via PATH to a Unicode-broken install.\\nUse C:/Tools/maestro/bin/maestro.bat directly. See docs/E2Edocs/e2e-runbook.md\\nSet SKIP_E2E_GUARD=1 in CI to bypass this guard.\\n'); process.exit(1)\"",
     "test:e2e": "maestro test apps/mobile/e2e/flows/",
-    "pretest:e2e:smoke": "node -e \"console.error('\\n❌ pnpm test:e2e:smoke is broken: bare maestro resolves via PATH to a Unicode-broken install.\\nUse C:/Tools/maestro/bin/maestro.bat directly. See docs/E2Edocs/e2e-runbook.md\\n'); process.exit(1)\"",
+    "pretest:e2e:smoke": "node -e \"if (process.env.SKIP_E2E_GUARD) { process.exit(0); } console.error('\\n❌ pnpm test:e2e:smoke is broken: bare maestro resolves via PATH to a Unicode-broken install.\\nUse C:/Tools/maestro/bin/maestro.bat directly. See docs/E2Edocs/e2e-runbook.md\\nSet SKIP_E2E_GUARD=1 in CI to bypass this guard.\\n'); process.exit(1)\"",
     "test:e2e:smoke": "maestro test apps/mobile/e2e/flows/ --include-tags=smoke",
     "test:e2e:web": "pnpm exec playwright test -c apps/mobile/playwright.config.ts",
     "test:e2e:web:smoke": "pnpm exec playwright test -c apps/mobile/playwright.config.ts --project=smoke-auth --project=smoke-learner --project=smoke-parent",
-    "pretest:e2e:record": "node -e \"console.error('\\n❌ pnpm test:e2e:record is broken: bare maestro resolves via PATH to a Unicode-broken install.\\nUse C:/Tools/maestro/bin/maestro.bat directly. See docs/E2Edocs/e2e-runbook.md\\n'); process.exit(1)\"",
+    "pretest:e2e:record": "node -e \"if (process.env.SKIP_E2E_GUARD) { process.exit(0); } console.error('\\n❌ pnpm test:e2e:record is broken: bare maestro resolves via PATH to a Unicode-broken install.\\nUse C:/Tools/maestro/bin/maestro.bat directly. See docs/E2Edocs/e2e-runbook.md\\nSet SKIP_E2E_GUARD=1 in CI to bypass this guard.\\n'); process.exit(1)\"",
     "test:e2e:record": "maestro record apps/mobile/e2e/flows/",
     "env:sync": "node scripts/setup-env.js",
     "verify:postinstall-safety": "node scripts/verify-no-secret-postinstall.cjs",
     "secrets:sync": "node scripts/sync-secrets.js",
-    "eval:llm": "tsx apps/api/eval-llm/index.ts"
+    "eval:llm": "tsx apps/api/eval-llm/index.ts",
+    "translate": "C:/Tools/doppler/doppler.exe run -- tsx scripts/translate.ts",
+    "check:i18n": "tsx scripts/check-i18n-staleness.ts"
   },
   "private": true,
   "dependencies": {
@@ -60,6 +62,7 @@
     "react-native-svg-transformer": "~1.5.1"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "^0.92.0",
     "@babel/plugin-transform-react-jsx": "^7.27.1",
     "@babel/runtime": "~7.27.6",
     "@cloudflare/workers-types": "^4.0.0",
