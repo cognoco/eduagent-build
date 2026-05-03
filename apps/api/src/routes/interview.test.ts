@@ -183,6 +183,12 @@ jest.mock('../services/interview', () => ({
   claimDraftForPersisting: (
     jest.requireActual('../services/interview') as Record<string, unknown>
   ).claimDraftForPersisting,
+  // Pass-through so route handlers exercise the real helper, which calls the
+  // mocked inngest.send. The existing `expect(inngest.send).toHaveBeenCalled…`
+  // assertions in this file rely on the real schema-parse + dispatch shape.
+  dispatchInterviewPersist: (
+    jest.requireActual('../services/interview') as Record<string, unknown>
+  ).dispatchInterviewPersist,
 }));
 
 import { app } from '../index';
