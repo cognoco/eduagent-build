@@ -29,8 +29,24 @@ export function assertNotProxyMode(
     | { isOwner: boolean }
     | undefined;
 
+  // [BUG-975 / CCR-PR126-H-1] Fail closed when profileMeta is absent.
+  //
+  // profileScopeMiddleware sets profileMeta whenever it can resolve a profile
+  // (explicit X-Profile-Id or auto-resolved owner). When profileMeta is
+  // undefined, ownership cannot be verified server-side — historically the
+  // function silently passed through, which meant a route mounted without
+  // profileScopeMiddleware (or a path where auto-resolve failed silently)
+  // had only the client-controlled X-Proxy-Mode header guarding writes.
+  // That is the exact failure mode SEC-2 was meant to eliminate.
+  if (!profileMeta) {
+    throw new HTTPException(403, {
+      message: PROXY_MODE_MESSAGE,
+      res: c.json({ message: PROXY_MODE_MESSAGE }, 403),
+    });
+  }
+
   // Server-derived: any non-owner profile is a proxy session.
-  if (profileMeta && profileMeta.isOwner === false) {
+  if (profileMeta.isOwner === false) {
     throw new HTTPException(403, {
       message: PROXY_MODE_MESSAGE,
       res: c.json({ message: PROXY_MODE_MESSAGE }, 403),

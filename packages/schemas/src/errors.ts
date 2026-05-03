@@ -18,6 +18,7 @@ import { z } from 'zod';
  * `Context` from Hono.
  */
 export class NotFoundError extends Error {
+  readonly errorCode = 'NOT_FOUND' as const;
   constructor(resource: string) {
     super(`${resource} not found`);
     this.name = 'NotFoundError';
@@ -26,6 +27,7 @@ export class NotFoundError extends Error {
 }
 
 export class ForbiddenError extends Error {
+  readonly errorCode = 'FORBIDDEN' as const;
   /** Generic 403 marker — stable for code-side detection regardless of message. */
   readonly code = 'FORBIDDEN' as const;
   /** Server-side application code (e.g. SUBJECT_INACTIVE) when distinct from the generic FORBIDDEN code. */
@@ -41,6 +43,7 @@ export class ForbiddenError extends Error {
 
 export const CONFLICT_ERROR_NAME = 'ConflictError' as const;
 export class ConflictError extends Error {
+  readonly errorCode = 'CONFLICT' as const;
   constructor(message: string) {
     super(message);
     this.name = CONFLICT_ERROR_NAME;
@@ -50,6 +53,7 @@ export class ConflictError extends Error {
 
 export const RATE_LIMITED_ERROR_NAME = 'RateLimitedError' as const;
 export class RateLimitedError extends Error {
+  readonly errorCode = 'RATE_LIMITED' as const;
   readonly code: string | undefined;
   /** Seconds until the client may retry, usually from a Retry-After header. */
   readonly retryAfter: number | undefined;
@@ -69,6 +73,7 @@ export class RateLimitedError extends Error {
 }
 
 export class UpstreamLlmError extends Error {
+  readonly errorCode = 'UPSTREAM_LLM_ERROR' as const;
   constructor(message: string) {
     super(message);
     this.name = 'UpstreamLlmError';
@@ -109,6 +114,7 @@ export class TopicNotSkippedError extends Error {
 }
 
 export class BadRequestError extends Error {
+  readonly errorCode = 'BAD_REQUEST' as const;
   constructor(message: string) {
     super(message);
     this.name = 'BadRequestError';
@@ -117,6 +123,7 @@ export class BadRequestError extends Error {
 }
 
 export class LlmStreamError extends Error {
+  readonly errorCode = 'LLM_STREAM_ERROR' as const;
   constructor(message: string, public override cause?: unknown) {
     super(message);
     this.name = 'LlmStreamError';
@@ -125,6 +132,7 @@ export class LlmStreamError extends Error {
 }
 
 export class LlmEnvelopeError extends Error {
+  readonly errorCode = 'LLM_ENVELOPE_ERROR' as const;
   constructor(message: string, public override cause?: unknown) {
     super(message);
     this.name = 'LlmEnvelopeError';

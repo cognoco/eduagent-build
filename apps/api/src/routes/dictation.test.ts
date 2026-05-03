@@ -330,8 +330,11 @@ describe('POST /v1/dictation/generate', () => {
     expect(generateDictation).toHaveBeenCalledWith(mockCtx);
   });
 
-  // RF-01: Missing X-Profile-Id header must return 400
-  it('returns 400 when X-Profile-Id header is missing [RF-01]', async () => {
+  // RF-01 / BUG-975: Missing X-Profile-Id header — proxy-guard fails closed
+  // because profileMeta cannot be set (no profile resolved). Earlier behavior
+  // was 400 from requireProfileId; the fail-closed change in proxy-guard.ts
+  // now refuses with 403 before the route reaches requireProfileId.
+  it('returns 403 when X-Profile-Id header is missing [RF-01 / BUG-975]', async () => {
     const res = await app.request(
       '/v1/dictation/generate',
       {
@@ -344,7 +347,7 @@ describe('POST /v1/dictation/generate', () => {
       TEST_ENV
     );
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(generateDictation).not.toHaveBeenCalled();
   });
 
@@ -467,8 +470,11 @@ describe('POST /v1/dictation/result', () => {
     expect(body.code).toBe('VALIDATION_ERROR');
   });
 
-  // RF-01: Missing X-Profile-Id header must return 400
-  it('returns 400 when X-Profile-Id header is missing [RF-01]', async () => {
+  // RF-01 / BUG-975: Missing X-Profile-Id header — proxy-guard fails closed
+  // because profileMeta cannot be set (no profile resolved). zValidator runs
+  // first and the body is valid, so proxy-guard is the next gate and returns
+  // 403 (not the previous 400 from requireProfileId).
+  it('returns 403 when X-Profile-Id header is missing [RF-01 / BUG-975]', async () => {
     const res = await app.request(
       '/v1/dictation/result',
       {
@@ -486,7 +492,7 @@ describe('POST /v1/dictation/result', () => {
       TEST_ENV
     );
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
   });
 
   it('returns 401 without auth header', async () => {

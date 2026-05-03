@@ -12,6 +12,7 @@ import {
   sendPushNotification,
 } from '../../services/notifications';
 import { getRecentNotificationCount } from '../../services/settings';
+import { captureException } from '../../services/sentry';
 
 export const reviewDueSend = inngest.createFunction(
   {
@@ -31,12 +32,30 @@ export const reviewDueSend = inngest.createFunction(
       // [BUG-699-FOLLOWUP] 24h notification-log dedup. Same pattern as the
       // other cron-driven push paths: idempotency covers same-event.id
       // replays; this covers new events for the same recipient within 24h.
-      const recentCount = await getRecentNotificationCount(
-        db,
-        profileId,
-        'review_reminder',
-        24
-      );
+      // [BUG-976 / CCR-PR129-M-3] Fail closed on DB error: skip this cycle
+      // rather than throwing uncaught (which would cause Inngest to retry
+      // indefinitely and block the notification pipeline). captureException
+      // makes the failure queryable in Sentry so we can measure transient
+      // DB hiccup frequency. Mirrors the recall-nudge-send pattern.
+      let recentCount: number;
+      try {
+        recentCount = await getRecentNotificationCount(
+          db,
+          profileId,
+          'review_reminder',
+          24
+        );
+      } catch (err) {
+        captureException(err, {
+          profileId,
+          extra: { context: 'review-due-send:getRecentNotificationCount' },
+        });
+        return {
+          status: 'skipped' as const,
+          reason: 'dedup_check_failed',
+          profileId,
+        };
+      }
       if (recentCount > 0) {
         return { status: 'skipped' as const, reason: 'dedup_24h', profileId };
       }
