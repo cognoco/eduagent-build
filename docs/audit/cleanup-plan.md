@@ -1,6 +1,6 @@
 # Consistency Cleanup Plan
 
-**Last updated:** 2026-05-03 22:00 UTC
+**Last updated:** 2026-05-03 23:00 UTC
 **Branch:** `consistency`
 **Replaces:** `docs/audit/2026-05-02-artefact-consistency-punchlist.md` (superseded; preserved as historical record only)
 **Maintained by:** `/my:audit-status` skill (read mode refreshes PR/file claims; deviation mode appends to Deviations Log)
@@ -275,6 +275,10 @@ Structural information only — sequencing decisions belong to the user.
 - **C3 is independent** of all other clusters. Smallest dispatch surface.
 - **C4 now couples to C7 P3** (CLAUDE.md persona-rule tightening). C4 P7 (root migration) should land before C7 P3 (CLAUDE.md edit) so the rule wording aligns with the actual code state. C4 P3 (RemediationCard dead branch) and C4 P6 (guard test) are independent and can land anytime.
 - **C8 is independent** of all others. Each phase ships standalone.
+
+### Parallel-work conflict gate (MANDATORY before Stage 3)
+
+Before starting Stage 3 execution, re-sweep `origin/language-add` (320 files, i18n + library v3 + relearn redesign + post-session reflection) against the plan's Files-claimed columns. Initial sweep (2026-05-03) confirmed no decision inputs are invalidated, but **execution-time file conflicts are significant** — particularly C1 (schema/route files), C4 P7 (`_layout.tsx`), C5 (manifest/lockfile), and C7 P3 (CLAUDE.md). Run `git diff --name-only origin/main...origin/language-add` and cross-reference before claiming any phase that touches overlapping files. If language-add has merged to main by then, rebase `consistency` first.
 
 ---
 
