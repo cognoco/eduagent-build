@@ -209,7 +209,9 @@ describe('ShelfScreen', () => {
       wrapper: TestWrapper,
     });
     getByTestId('shelf-missing-param');
-    expect(getByText('library.shelf.missingParam')).toBeTruthy();
+    expect(
+      getByText('Missing subject. Please go back and try again.')
+    ).toBeTruthy();
   });
 
   it('missing-param back button returns to library', () => {
@@ -235,7 +237,7 @@ describe('ShelfScreen', () => {
       wrapper: TestWrapper,
     });
     getByTestId('shelf-loading');
-    getByText('library.shelf.loading');
+    getByText('Loading this shelf...');
 
     // Resolve to prevent test teardown warnings
     resolveBooksResponse(
@@ -440,7 +442,7 @@ describe('ShelfScreen', () => {
     await waitFor(() => {
       getByTestId('shelf-empty');
     });
-    getByText('library.shelf.emptyTitle');
+    getByText('No books on this shelf yet.');
   });
 
   it('empty state back button returns to library', async () => {
@@ -482,7 +484,7 @@ describe('ShelfScreen', () => {
     await waitFor(() => {
       getByTestId('shelf-empty-pick-suggestion');
     });
-    getByText('library.shelf.emptyPickTitle');
+    getByText('Pick a book to start');
     // The conflicting "Check back soon" copy must not render.
     expect(queryByTestId('shelf-empty')).toBeNull();
   });

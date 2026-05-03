@@ -170,7 +170,7 @@ describe('RecallTestScreen', () => {
       ).toBeTruthy();
     });
 
-    screen.getByText('topic.recallTest.stillStuck');
+    screen.getByText('Still stuck');
 
     fireEvent.press(screen.getByTestId('recall-dont-remember-button'));
 

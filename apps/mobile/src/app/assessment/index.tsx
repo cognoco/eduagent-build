@@ -18,7 +18,7 @@ import { ErrorFallback } from '../../components/common/ErrorFallback';
 
 export default function AssessmentScreen() {
   const router = useRouter();
-  const { t } = useTranslation('assessment');
+  const { t } = useTranslation();
   const { subjectId, topicId } = useLocalSearchParams<{
     subjectId?: string;
     topicId?: string;
@@ -29,7 +29,11 @@ export default function AssessmentScreen() {
   const submitAnswer = useSubmitAnswer(assessmentId ?? '');
 
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: 'opening', role: 'assistant', content: t('openingMessage') },
+    {
+      id: 'opening',
+      role: 'assistant',
+      content: t('assessment.openingMessage'),
+    },
   ]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
@@ -66,7 +70,7 @@ export default function AssessmentScreen() {
               {
                 id: `assessment-done-${Date.now()}`,
                 role: 'assistant',
-                content: t('passedMessage', {
+                content: t('assessment.passedMessage', {
                   mastery: Math.round(evaluation.masteryScore * 100),
                 }),
               },
@@ -100,11 +104,11 @@ export default function AssessmentScreen() {
         }}
       >
         <Text className="text-text-primary text-body mb-4">
-          {t('missingParams')}
+          {t('assessment.missingParams')}
         </Text>
         <Button
           variant="primary"
-          label={t('common:goBack')}
+          label={t('common.goBack')}
           onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
           testID="assessment-go-back"
         />
@@ -114,7 +118,7 @@ export default function AssessmentScreen() {
 
   return (
     <ChatShell
-      title={t('title')}
+      title={t('assessment.title')}
       messages={messages}
       onSend={handleSend}
       isStreaming={isStreaming}
@@ -122,10 +126,9 @@ export default function AssessmentScreen() {
         lastError ? (
           <ErrorFallback
             variant="card"
-            title={t('common:errorBoundary.title')}
             message={lastError}
             primaryAction={{
-              label: t('common:tryAgain'),
+              label: t('common.tryAgain'),
               testID: 'assessment-error-retry',
               // [UX-DE-H3] Disable retry while streaming to prevent double-submit
               // on rapid taps during an in-flight answer check.
@@ -139,7 +142,7 @@ export default function AssessmentScreen() {
               },
             }}
             secondaryAction={{
-              label: t('common:goHome'),
+              label: t('common.goHome'),
               testID: 'assessment-error-home',
               onPress: () => goBackOrReplace(router, '/(app)/home' as const),
             }}

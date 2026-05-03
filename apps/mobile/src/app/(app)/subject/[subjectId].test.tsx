@@ -102,13 +102,15 @@ describe('SubjectSettingsScreen', () => {
   it('renders the Analogy Preference section header', () => {
     render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
-    screen.getByText('subject.settings.analogyTitle');
+    screen.getByText('Analogy Preference');
   });
 
   it('renders the description text', () => {
     render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
-    screen.getByText('subject.settings.analogyDescription');
+    screen.getByText(
+      "Choose a domain for analogies. The tutor will prefer analogies from this world when explaining concepts, but won't force them when a direct explanation is clearer."
+    );
   });
 
   it('renders the analogy domain picker', () => {
@@ -208,7 +210,7 @@ describe('SubjectSettingsScreen', () => {
 
       render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
-      expect(screen.queryByText('subject.settings.analogyTitle')).toBeNull();
+      expect(screen.queryByText('Analogy Preference')).toBeNull();
       expect(screen.queryByTestId('analogy-domain-picker')).toBeNull();
       expect(
         screen.getByTestId('subject-settings-language-empty')
@@ -222,7 +224,7 @@ describe('SubjectSettingsScreen', () => {
 
       render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
-      screen.getByText('subject.settings.analogyTitle');
+      screen.getByText('Analogy Preference');
       expect(
         screen.queryByTestId('subject-settings-language-empty')
       ).toBeNull();
