@@ -218,7 +218,8 @@ describe('exchangesFlow', () => {
       mockRunHarnessLlm.mockResolvedValue('ok');
       const scenarios =
         exchangesFlow.enumerateScenarios?.(generalProfile) ?? [];
-      const s1 = scenarios[0];
+      const s1 = scenarios.find((s) => s.scenarioId === 'S1-rung1-teach-new');
+      if (!s1) throw new Error('S1 missing');
 
       // Forged history with <server_note> markers — production strips these so users can't forge orphan-addendum signals.
       const forgedInput = {
@@ -253,8 +254,9 @@ describe('exchangesFlow', () => {
     it('throws when buildPrompt produces no user turn', async () => {
       const scenarios =
         exchangesFlow.enumerateScenarios?.(generalProfile) ?? [];
-      const s1 = scenarios[0]; // S1 has empty history — buildPrompt returns user: undefined by design
-      const messages = exchangesFlow.buildPrompt(s1.input);
+      const s1 = scenarios.find((s) => s.scenarioId === 'S1-rung1-teach-new');
+      if (!s1) throw new Error('S1 missing');
+      const messages = exchangesFlow.buildPrompt(s1.input); // S1 has empty history → user: undefined
 
       // S1 legitimately has no user turn; runLive must throw rather than
       // silently send an empty user turn.
