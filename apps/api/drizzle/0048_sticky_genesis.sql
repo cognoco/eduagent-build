@@ -1,0 +1,2 @@
+ALTER TABLE "topic_notes" DROP CONSTRAINT "topic_notes_topic_id_profile_id_unique";--> statement-breakpoint
+CREATE INDEX "topic_notes_topic_profile_idx" ON "topic_notes" USING btree ("topic_id","profile_id");

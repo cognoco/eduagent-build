@@ -427,11 +427,62 @@ export const sessionCompleted = inngest.createFunction(
       }
     }
 
+    // Step 1a: Relearn retention reset — must run BEFORE SM-2 update.
+    // Pre-redesign, startRelearn reset the card at session start; SM-2 then
+    // advanced it at session end. The redesign deferred the reset to here, but
+    // running it AFTER update-retention overwrote SM-2's freshly written
+    // schedule (intervalDays / nextReviewAt / repetitions) back to baseline,
+    // leaving relearn cards with nextReviewAt=null and never re-surfacing.
+    // Reset first, then SM-2 advances from baseline using effectiveQuality.
+    //
+    // Note: we intentionally do NOT bump `updatedAt` here. The next step
+    // (update-retention) reads the card and uses `updatedAt` for both the
+    // D-01 double-counting guard and the optimistic-lock WHERE clause; bumping
+    // it here would cause SM-2 to short-circuit and skip the advance.
+    outcomes.push(
+      await step.run('relearn-retention-reset', async () => {
+        const sessionMode = event.data.mode as string | undefined;
+        if (
+          sessionMode !== 'relearn' ||
+          (exchangeCount ?? 0) <= 0 ||
+          !topicId
+        ) {
+          return {
+            step: 'relearn-retention-reset',
+            status: 'skipped' as const,
+          };
+        }
+
+        return runCritical('relearn-retention-reset', async () => {
+          const db = getStepDatabase();
+          await db
+            .update(retentionCards)
+            .set({
+              easeFactor: 2.5,
+              intervalDays: 1,
+              repetitions: 0,
+              failureCount: 0,
+              consecutiveSuccesses: 0,
+              xpStatus: 'pending',
+              nextReviewAt: null,
+              lastReviewedAt: null,
+            })
+            .where(
+              and(
+                eq(retentionCards.topicId, topicId),
+                eq(retentionCards.profileId, profileId)
+              )
+            );
+        });
+      })
+    );
+
     // Step 1b: Update retention data via SM-2
     // Conservative: skip retention update when no quality rating was provided,
     // rather than defaulting to 3 (which inflates metrics). Issue #19.
     // F-8/F-9: effectiveQuality applies a fallback=3 for user-closed sessions
-    // without a summary so relearn cards are not stuck at intervalDays=1.
+    // without a summary so relearn cards are not stuck at intervalDays=1
+    // after the relearn-retention-reset above.
     outcomes.push(
       await step.run('update-retention', async () => {
         if (retentionTopicIds.length === 0)

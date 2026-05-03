@@ -137,6 +137,10 @@ export default function ForgotPasswordScreen() {
         <ScrollView
           ref={resetScrollRef}
           className="flex-1"
+          style={{
+            width: '100%',
+            ...(Platform.OS === 'web' ? { maxWidth: 480 } : undefined),
+          }}
           contentContainerStyle={{
             minHeight: SCREEN_HEIGHT,
             paddingTop: insets.top + 24,
@@ -262,9 +266,10 @@ export default function ForgotPasswordScreen() {
       <ScrollView
         ref={scrollRef}
         className="flex-1"
-        style={
-          Platform.OS === 'web' ? { maxWidth: 480, width: '100%' } : undefined
-        }
+        style={{
+          width: '100%',
+          ...(Platform.OS === 'web' ? { maxWidth: 480 } : undefined),
+        }}
         contentContainerStyle={{
           minHeight: SCREEN_HEIGHT,
           paddingTop: insets.top + 24,

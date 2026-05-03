@@ -51,6 +51,9 @@ jest.mock('../../../../../hooks/use-book-sessions', () => ({
 
 jest.mock('../../../../../hooks/use-notes', () => ({
   useBookNotes: () => mockUseBookNotes(),
+  useCreateNote: () => ({ mutate: jest.fn(), isPending: false }),
+  useUpdateNote: () => ({ mutate: jest.fn(), isPending: false }),
+  useDeleteNoteById: () => ({ mutate: jest.fn() }),
 }));
 
 jest.mock('../../../../../hooks/use-retention', () => ({
@@ -233,10 +236,10 @@ describe('BookScreen', () => {
       })
     );
 
-    const { getByTestId, getByText } = render(<BookScreen />);
+    const { getByTestId } = render(<BookScreen />);
 
+    // New book screen shows a shimmer skeleton during loading, not a text label
     getByTestId('book-loading');
-    getByText('Loading book...');
   });
 
   it('shows the error state and wires retry plus back', () => {
@@ -328,10 +331,11 @@ describe('BookScreen', () => {
   it('renders the compact header on the main view', () => {
     const { getByTestId, getByText } = render(<BookScreen />);
 
+    // New book screen: compact header shows book title and topics progress.
+    // Subject name and session count are no longer in the header — these were
+    // removed during the Library v3 redesign.
     getByTestId('book-screen');
     getByText('Algebra');
-    getByText('Mathematics');
-    getByText('0 sessions');
     getByText('0 of 2 topics done');
   });
 
@@ -420,7 +424,10 @@ describe('BookScreen', () => {
     });
   });
 
-  it('shows and expands the started overflow control', () => {
+  it('renders all started topics inline without an overflow control', () => {
+    // The library-redesign removed the "started" overflow/show-more control.
+    // All started topics now render immediately inside the chapter-grouped
+    // topic list with no truncation or expand affordance.
     const topics = Array.from({ length: 6 }, (_, index) =>
       makeTopic({
         id: `topic-${index + 1}`,
@@ -444,17 +451,16 @@ describe('BookScreen', () => {
 
     const { getByTestId, queryByTestId } = render(<BookScreen />);
 
-    getByTestId('started-show-more');
-    expect(queryByTestId('started-row-topic-6')).toBeNull();
-
-    fireEvent.press(getByTestId('started-show-more'));
+    // No overflow control — all started rows visible immediately
+    expect(queryByTestId('started-show-more')).toBeNull();
+    // All 6 started topics are rendered inline (topic-6 visible without any expand)
     getByTestId('started-row-topic-6');
   });
 
   it('renders the hero up-next state on a fresh book and starts a session', () => {
     const { getByTestId, getByText } = render(<BookScreen />);
 
-    getByTestId('up-next-row');
+    getByTestId('up-next-row-topic-1');
     getByText('▶ Start: Linear Equations');
 
     fireEvent.press(getByTestId('book-start-learning'));
@@ -523,7 +529,7 @@ describe('BookScreen', () => {
 
     getByTestId('sessions-error-banner');
     getByTestId('done-row-topic-1');
-    getByTestId('up-next-row');
+    getByTestId('up-next-row-topic-2');
 
     fireEvent.press(getByTestId('sessions-error-retry'));
     expect(refetchSpy).toHaveBeenCalledTimes(1);
@@ -627,9 +633,11 @@ describe('BookScreen', () => {
       })
     );
 
-    const { getByText, getByTestId } = render(<BookScreen />);
+    const { getByTestId } = render(<BookScreen />);
 
-    getByText('Past conversations');
+    // Past conversations section is collapsed by default — expand it first.
+    // The toggle label includes the session count, so we match via testID.
+    fireEvent.press(getByTestId('book-sessions-toggle'));
 
     fireEvent.press(getByTestId('session-sess-1'));
     expect(mockPush).toHaveBeenCalledWith({
@@ -669,7 +677,10 @@ describe('BookScreen', () => {
       })
     );
 
-    const { getByText } = render(<BookScreen />);
+    const { getByText, getByTestId } = render(<BookScreen />);
+
+    // Past conversations section is collapsed by default — expand it to see chapter dividers
+    fireEvent.press(getByTestId('book-sessions-toggle'));
 
     getByText('Chapter A');
     getByText('Chapter B');
@@ -985,6 +996,6 @@ describe('BookScreen', () => {
       })
     );
     expect(queryByTestId('continue-now-row')).toBeNull();
-    getByTestId('up-next-row');
+    getByTestId('up-next-row-topic-1');
   });
 });

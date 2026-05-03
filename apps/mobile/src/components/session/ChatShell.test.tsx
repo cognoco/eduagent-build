@@ -30,6 +30,7 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 
 jest.mock('../../lib/theme', () => ({
+  useTheme: () => ({ colorScheme: 'dark' }),
   useThemeColors: () => ({
     muted: '#888',
     primary: '#007AFF',
@@ -95,7 +96,7 @@ jest.mock('../../hooks/use-text-to-speech', () => ({
 
 // Stub animated SVG components to avoid reanimated timer leaks in tests
 jest.mock('../common', () => ({
-  LightBulbAnimation: () => null,
+  DeskLampAnimation: () => null,
   MagicPenAnimation: () => null,
 }));
 
@@ -1046,7 +1047,7 @@ describe('ChatShell', () => {
   });
 
   describe('animation wiring (ANIM-IMPROVE)', () => {
-    it('shows LightBulbAnimation (thinking-bulb-animation) when streaming', () => {
+    it('shows DeskLampAnimation (thinking-bulb-animation) when streaming', () => {
       renderChatShell({ isStreaming: true });
       screen.getByTestId('thinking-bulb-animation');
       expect(screen.queryByTestId('idle-pen-animation')).toBeNull();

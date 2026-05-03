@@ -102,6 +102,61 @@ export const familySubscriptionSchema = z.object({
 });
 export type FamilySubscription = z.infer<typeof familySubscriptionSchema>;
 
+// ---------------------------------------------------------------------------
+// Endpoint response schemas (wrapped shapes returned by c.json())
+// ---------------------------------------------------------------------------
+
+export const subscriptionResponseSchema = z.object({
+  subscription: subscriptionSchema,
+});
+export type SubscriptionResponse = z.infer<typeof subscriptionResponseSchema>;
+
+export const usageResponseSchema = z.object({
+  usage: usageSchema,
+});
+export type UsageResponse = z.infer<typeof usageResponseSchema>;
+
+export const subscriptionStatusResponseSchema = z.object({
+  status: z.object({
+    tier: subscriptionTierSchema,
+    status: subscriptionStatusSchema,
+    monthlyLimit: z.number().int(),
+    usedThisMonth: z.number().int(),
+    dailyLimit: z.number().int().nullable(),
+    usedToday: z.number().int(),
+  }),
+});
+export type SubscriptionStatusResponse = z.infer<
+  typeof subscriptionStatusResponseSchema
+>;
+
+export const topUpResponseSchema = z.object({
+  topUp: z.object({
+    amount: z.number().int(),
+    priceCents: z.number().int(),
+    clientSecret: z.string().nullable(),
+    paymentIntentId: z.string().min(1),
+  }),
+});
+export type TopUpResponse = z.infer<typeof topUpResponseSchema>;
+
+export const familyResponseSchema = z.object({
+  family: familySubscriptionSchema,
+});
+export type FamilyResponse = z.infer<typeof familyResponseSchema>;
+
+export const familyAddResponseSchema = z.object({
+  message: z.string(),
+  profileCount: z.number().int(),
+});
+export type FamilyAddResponse = z.infer<typeof familyAddResponseSchema>;
+
+export const byokWaitlistResponseSchema = z.object({
+  message: z.string(),
+  email: z.string().email(),
+});
+export type ByokWaitlistResponse = z.infer<typeof byokWaitlistResponseSchema>;
+
 export const quotaExceededSchema = z.object({
   code: z.literal('QUOTA_EXCEEDED'),
   message: z.string(),

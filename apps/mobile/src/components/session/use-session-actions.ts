@@ -236,35 +236,45 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
     setHomeworkMode,
   ]);
 
-  const navigateToSessionSummary = useCallback(() => {
-    const saved = closedSessionRef.current;
-    if (!activeSessionId || !saved) return;
-    router.replace({
-      pathname: `/session-summary/${activeSessionId}`,
-      params: {
-        subjectName: effectiveSubjectName ?? '',
-        exchangeCount: String(exchangeCount),
-        escalationRung: String(escalationRung),
-        subjectId: effectiveSubjectId ?? '',
-        topicId: topicId ?? '',
-        wallClockSeconds: String(saved.wallClockSeconds),
-        milestones: serializeMilestones(milestonesReached),
-        fastCelebrations: serializeCelebrations(saved.fastCelebrations),
-        sessionType: effectiveMode === 'homework' ? 'homework' : 'learning',
-      },
-    } as never);
-  }, [
-    activeSessionId,
-    router,
-    effectiveSubjectName,
-    effectiveSubjectId,
-    topicId,
-    exchangeCount,
-    escalationRung,
-    milestonesReached,
-    effectiveMode,
-    closedSessionRef,
-  ]);
+  const navigateToSessionSummary = useCallback(
+    (filedSubjectId?: string, filedBookId?: string) => {
+      const saved = closedSessionRef.current;
+      if (!activeSessionId || !saved) return;
+      router.replace({
+        pathname: `/session-summary/${activeSessionId}`,
+        params: {
+          subjectName: effectiveSubjectName ?? '',
+          exchangeCount: String(exchangeCount),
+          escalationRung: String(escalationRung),
+          subjectId: effectiveSubjectId ?? '',
+          topicId: topicId ?? '',
+          wallClockSeconds: String(saved.wallClockSeconds),
+          milestones: serializeMilestones(milestonesReached),
+          fastCelebrations: serializeCelebrations(saved.fastCelebrations),
+          sessionType:
+            effectiveMode === 'homework'
+              ? 'homework'
+              : effectiveMode === 'freeform'
+              ? 'freeform'
+              : 'learning',
+          ...(filedSubjectId ? { filedSubjectId } : {}),
+          ...(filedBookId ? { filedBookId } : {}),
+        },
+      } as never);
+    },
+    [
+      activeSessionId,
+      router,
+      effectiveSubjectName,
+      effectiveSubjectId,
+      topicId,
+      exchangeCount,
+      escalationRung,
+      milestonesReached,
+      effectiveMode,
+      closedSessionRef,
+    ]
+  );
 
   const navigateToSummary = useCallback(
     (
@@ -283,7 +293,12 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
           wallClockSeconds: String(wallClockSeconds),
           milestones: serializeMilestones(milestonesReached),
           fastCelebrations: serializeCelebrations(fastCelebrations),
-          sessionType: effectiveMode,
+          sessionType:
+            effectiveMode === 'homework'
+              ? 'homework'
+              : effectiveMode === 'freeform'
+              ? 'freeform'
+              : 'learning',
         },
       } as never);
     },

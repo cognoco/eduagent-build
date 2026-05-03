@@ -466,6 +466,7 @@ describe('sessionCompleted', () => {
     const stepNames = result.outcomes.map((o: any) => o.step);
     expect(stepNames).toEqual([
       'process-verification-completion',
+      'relearn-retention-reset',
       'update-retention',
       'update-vocabulary-retention',
       'update-needs-deepening',
@@ -635,6 +636,54 @@ describe('sessionCompleted', () => {
         expect.anything(),
         expect.anything()
       );
+    });
+  });
+
+  describe('relearn-retention-reset step', () => {
+    it('resets the retention card after a relearn session with exchanges', async () => {
+      const { result } = (await executeSteps(
+        createEventData({
+          mode: 'relearn',
+          exchangeCount: 3,
+          qualityRating: 4,
+        })
+      )) as any;
+
+      const resetOutcome = result.outcomes.find(
+        (o: any) => o.step === 'relearn-retention-reset'
+      );
+      expect(resetOutcome.status).toBe('ok');
+      expect(mockSessionCompletedDb.update).toHaveBeenCalled();
+    });
+
+    it('skips the reset when relearn has zero exchanges', async () => {
+      const { result } = (await executeSteps(
+        createEventData({
+          mode: 'relearn',
+          exchangeCount: 0,
+          qualityRating: 4,
+        })
+      )) as any;
+
+      const resetOutcome = result.outcomes.find(
+        (o: any) => o.step === 'relearn-retention-reset'
+      );
+      expect(resetOutcome.status).toBe('skipped');
+    });
+
+    it('skips the reset for non-relearn sessions', async () => {
+      const { result } = (await executeSteps(
+        createEventData({
+          mode: 'learning',
+          exchangeCount: 3,
+          qualityRating: 4,
+        })
+      )) as any;
+
+      const resetOutcome = result.outcomes.find(
+        (o: any) => o.step === 'relearn-retention-reset'
+      );
+      expect(resetOutcome.status).toBe('skipped');
     });
   });
 

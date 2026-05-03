@@ -57,7 +57,10 @@ function makeEntry(
   };
 }
 
-describe('recordOutboxSpillover (integration)', () => {
+const hasDb = !!process.env.DATABASE_URL;
+const describeIf = hasDb ? describe : describe.skip;
+
+describeIf('recordOutboxSpillover (integration)', () => {
   it('inserts entries and returns correct written count', async () => {
     const { db, profile } = await seedProfile('write');
     const entries = [makeEntry('entry-a1'), makeEntry('entry-a2')];

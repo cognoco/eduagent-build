@@ -6,6 +6,7 @@ import {
   useTopicRetention,
   useEvaluateEligibility,
   useSubmitRecallTest,
+  useTeachingPreference,
 } from './use-retention';
 
 const mockFetch = jest.fn();
@@ -266,5 +267,42 @@ describe('useSubmitRecallTest', () => {
       hint: 'Start from the main idea.',
       failureAction: 'feedback_only',
     });
+  });
+});
+
+describe('useTeachingPreference', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    queryClient.clear();
+  });
+
+  it('fetches the preferred teaching method for a subject', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          preference: {
+            subjectId: 'sub-1',
+            method: 'visual_diagrams',
+            analogyDomain: null,
+            nativeLanguage: null,
+          },
+        }),
+        { status: 200 }
+      )
+    );
+
+    const { result } = renderHook(() => useTeachingPreference('sub-1'), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(result.current.data?.method).toBe('visual_diagrams');
   });
 });

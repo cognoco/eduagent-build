@@ -15,6 +15,27 @@ jest.mock('../../lib/format-api-error', () => ({
   formatApiError: (e: unknown) => String(e),
 }));
 
+jest.mock('../../lib/theme', () => ({
+  useThemeColors: () => ({
+    primary: '#00b4d8',
+    textSecondary: '#999',
+    error: '#f44',
+    warning: '#ff9800',
+    success: '#4caf50',
+  }),
+}));
+
+jest.mock('../../hooks/use-speech-recognition', () => ({
+  useSpeechRecognition: () => ({
+    status: 'idle',
+    transcript: '',
+    isListening: false,
+    startListening: jest.fn(),
+    stopListening: jest.fn(),
+    clearTranscript: jest.fn(),
+  }),
+}));
+
 function createProps(overrides: Record<string, unknown> = {}) {
   return {
     showFilingPrompt: true,
@@ -39,7 +60,8 @@ function createProps(overrides: Record<string, unknown> = {}) {
     setShowNoteInput: jest.fn(),
     sessionNoteSavedRef: { current: false },
     topicId: undefined,
-    upsertNote: { mutate: jest.fn(), isPending: false },
+    sessionId: undefined,
+    createNote: { mutate: jest.fn(), isPending: false },
     colors: { primary: '#00b4d8' },
     userMessageCount: 0,
     showQuestionCount: false,
@@ -61,7 +83,7 @@ describe('SessionFooter', () => {
     screen.getByTestId('filing-prompt-dismiss');
   });
 
-  it('accept button calls filing mutateAsync and navigates to book', async () => {
+  it('accept button calls filing mutateAsync and continues to summary with filed ids', async () => {
     const props = createProps();
     render(<SessionFooter {...(props as any)} />);
 
@@ -72,11 +94,9 @@ describe('SessionFooter', () => {
         sessionId: 'session-1',
         sessionMode: 'freeform',
       });
-      expect(props.router.replace).toHaveBeenCalledWith(
-        expect.objectContaining({
-          pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
-          params: { subjectId: 'shelf-1', bookId: 'book-1' },
-        })
+      expect(props.navigateToSessionSummary).toHaveBeenCalledWith(
+        'shelf-1',
+        'book-1'
       );
     });
   });
@@ -89,5 +109,34 @@ describe('SessionFooter', () => {
 
     expect(props.setFilingDismissed).toHaveBeenCalledWith(true);
     expect(props.navigateToSessionSummary).toHaveBeenCalledTimes(1);
+  });
+
+  it('note input calls createNote.mutate with topicId, content, and sessionId', () => {
+    const props = createProps({
+      showFilingPrompt: false,
+      notePromptOffered: true,
+      showNoteInput: true,
+      topicId: 'topic-1',
+      sessionId: 'session-1',
+    });
+    render(<SessionFooter {...(props as any)} />);
+
+    fireEvent.changeText(
+      screen.getByTestId('note-text-input'),
+      'My note content'
+    );
+    fireEvent.press(screen.getByText('Save'));
+
+    expect(props.createNote.mutate).toHaveBeenCalledWith(
+      {
+        topicId: 'topic-1',
+        content: 'My note content',
+        sessionId: 'session-1',
+      },
+      expect.objectContaining({
+        onSuccess: expect.any(Function),
+        onError: expect.any(Function),
+      })
+    );
   });
 });

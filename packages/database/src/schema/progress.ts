@@ -11,6 +11,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { profiles } from './profiles';
 import { curriculumTopics, subjects } from './subjects';
+import { learningSessions } from './sessions';
 import { xpStatusEnum } from './assessments';
 import { generateUUIDv7 } from '../utils/uuid';
 
@@ -65,6 +66,12 @@ export const xpLedger = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
+    reflectionMultiplierApplied: boolean('reflection_multiplier_applied')
+      .notNull()
+      .default(false),
+    reflectionAppliedBySessionId: uuid(
+      'reflection_applied_by_session_id'
+    ).references(() => learningSessions.id, { onDelete: 'set null' }),
   },
   (table) => [
     index('xp_ledger_profile_id_idx').on(table.profileId),

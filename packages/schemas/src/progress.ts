@@ -149,9 +149,7 @@ export const learningResumeTargetSchema = z.object({
   lastActivityAt: z.string().datetime().nullable(),
   reason: z.string(),
 });
-export type LearningResumeTarget = z.infer<
-  typeof learningResumeTargetSchema
->;
+export type LearningResumeTarget = z.infer<typeof learningResumeTargetSchema>;
 
 export const dashboardChildProgressSchema = z.object({
   snapshotDate: z.string(),
@@ -422,3 +420,105 @@ export const dailyPlanSchema = z.object({
   streakDays: z.number().int(),
 });
 export type DailyPlan = z.infer<typeof dailyPlanSchema>;
+
+// ---------------------------------------------------------------------------
+// Overdue Topics (relearn flow)
+// ---------------------------------------------------------------------------
+
+export const overdueTopicSchema = z.object({
+  topicId: z.string().uuid(),
+  topicTitle: z.string(),
+  overdueDays: z.number().int().min(0),
+  failureCount: z.number().int().min(0),
+});
+export type OverdueTopic = z.infer<typeof overdueTopicSchema>;
+
+export const overdueSubjectSchema = z.object({
+  subjectId: z.string().uuid(),
+  subjectName: z.string(),
+  overdueCount: z.number().int().min(0),
+  topics: z.array(overdueTopicSchema),
+});
+export type OverdueSubject = z.infer<typeof overdueSubjectSchema>;
+
+export const overdueTopicsResponseSchema = z.object({
+  totalOverdue: z.number().int().min(0),
+  subjects: z.array(overdueSubjectSchema),
+});
+export type OverdueTopicsResponse = z.infer<typeof overdueTopicsResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// Route-level response schemas (progress routes)
+// ---------------------------------------------------------------------------
+
+export const subjectProgressEndpointResponseSchema = z.object({
+  progress: subjectProgressSchema,
+});
+export type SubjectProgressEndpointResponse = z.infer<
+  typeof subjectProgressEndpointResponseSchema
+>;
+
+export const topicProgressEndpointResponseSchema = z.object({
+  topic: topicProgressSchema,
+});
+export type TopicProgressEndpointResponse = z.infer<
+  typeof topicProgressEndpointResponseSchema
+>;
+
+export const progressOverviewResponseSchema = z.object({
+  subjects: z.array(subjectProgressSchema),
+  totalTopicsCompleted: z.number().int(),
+  totalTopicsVerified: z.number().int(),
+});
+export type ProgressOverviewResponse = z.infer<
+  typeof progressOverviewResponseSchema
+>;
+
+export const nextReviewTopicSchema = z.object({
+  topicId: z.string().uuid(),
+  subjectId: z.string().uuid(),
+  subjectName: z.string(),
+  topicTitle: z.string(),
+});
+export type NextReviewTopic = z.infer<typeof nextReviewTopicSchema>;
+
+export const reviewSummaryResponseSchema = z.object({
+  totalOverdue: z.number().int().min(0),
+  nextReviewTopic: nextReviewTopicSchema.nullable(),
+  nextUpcomingReviewAt: z.string().nullable(),
+});
+export type ReviewSummaryResponse = z.infer<typeof reviewSummaryResponseSchema>;
+
+export const activeSessionResponseSchema = z
+  .object({ sessionId: z.string().uuid() })
+  .nullable();
+export type ActiveSessionResponse = z.infer<typeof activeSessionResponseSchema>;
+
+export const topicResolveResponseSchema = z.object({
+  subjectId: z.string().uuid(),
+  subjectName: z.string(),
+  topicTitle: z.string(),
+});
+export type TopicResolveResponse = z.infer<typeof topicResolveResponseSchema>;
+
+export const resumeTargetResponseSchema = z.object({
+  target: learningResumeTargetSchema.nullable(),
+});
+export type ResumeTargetResponse = z.infer<typeof resumeTargetResponseSchema>;
+
+export const continueSuggestionSchema = z
+  .object({
+    subjectId: z.string().uuid(),
+    subjectName: z.string(),
+    topicId: z.string().uuid(),
+    topicTitle: z.string(),
+    lastSessionId: z.string().uuid().nullable(),
+  })
+  .nullable();
+
+export const continueSuggestionResponseSchema = z.object({
+  suggestion: continueSuggestionSchema,
+});
+export type ContinueSuggestionResponse = z.infer<
+  typeof continueSuggestionResponseSchema
+>;

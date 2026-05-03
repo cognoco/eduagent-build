@@ -1,26 +1,28 @@
 import {
+  fireEvent,
   render,
   screen,
-  fireEvent,
   waitFor,
 } from '@testing-library/react-native';
-import React from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-const mockBack = jest.fn();
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
+const mockBack = jest.fn();
 const mockMutate = jest.fn();
-let mockSearchParams: Record<string, string> = {
-  topicId: 'topic-1',
-  subjectId: 'sub-1',
-};
+const mockRefetch = jest.fn();
+
+let mockSearchParams: Record<string, string> = {};
+let mockOverdueTopicsReturn: Record<string, unknown> = {};
+let mockTeachingPreferenceReturn: Record<string, unknown> = {};
+let mockIsParentProxy = false;
+let mockPersona = 'teen';
 
 jest.mock('expo-router', () => ({
+  Redirect: () => null,
   useRouter: () => ({
-    back: mockBack,
     push: mockPush,
     replace: mockReplace,
+    back: mockBack,
     canGoBack: jest.fn(() => true),
   }),
   useLocalSearchParams: () => mockSearchParams,
@@ -30,299 +32,299 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
+jest.mock('../../../hooks/use-progress', () => ({
+  useOverdueTopics: () => mockOverdueTopicsReturn,
+}));
+
 jest.mock('../../../hooks/use-retention', () => ({
   useStartRelearn: () => ({
     mutate: mockMutate,
     isPending: false,
   }),
+  useTeachingPreference: () => mockTeachingPreferenceReturn,
 }));
 
-let mockPersona = 'teen';
+jest.mock('../../../hooks/use-parent-proxy', () => ({
+  useParentProxy: () => ({ isParentProxy: mockIsParentProxy }),
+}));
 
 jest.mock('../../../lib/profile', () => ({
   useProfile: () => ({
-    profiles: [{ id: 'owner-id', isOwner: true, birthYear: null }],
     activeProfile: { id: 'owner-id', isOwner: true, birthYear: null },
   }),
   personaFromBirthYear: () => mockPersona,
 }));
 
-function createWrapper(): React.ComponentType<{ children: React.ReactNode }> {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
-  });
-  return function Wrapper({ children }: { children: React.ReactNode }) {
-    return React.createElement(
-      QueryClientProvider,
-      { client: queryClient },
-      children
-    );
-  };
-}
+jest.mock('../../../lib/navigation', () => ({
+  goBackOrReplace: (...args: unknown[]) => mockBack(...args),
+  homeHrefForReturnTo: (returnTo: string | undefined) =>
+    returnTo === 'learner-home' ? '/(app)/home?view=learner' : '/(app)/home',
+}));
 
 const RelearnScreen = require('./relearn').default;
+
+function makeOverdueData(totalOverdue = 4) {
+  return {
+    totalOverdue,
+    subjects: [
+      {
+        subjectId: 'sub-1',
+        subjectName: 'Math',
+        overdueCount: totalOverdue > 10 ? 6 : 2,
+        topics: [
+          {
+            topicId: 'topic-1',
+            topicTitle: 'Algebra',
+            overdueDays: 3,
+            failureCount: 1,
+          },
+          {
+            topicId: 'topic-2',
+            topicTitle: 'Fractions',
+            overdueDays: 1,
+            failureCount: 0,
+          },
+        ],
+      },
+      {
+        subjectId: 'sub-2',
+        subjectName: 'Science',
+        overdueCount: totalOverdue > 10 ? 5 : 2,
+        topics: [
+          {
+            topicId: 'topic-3',
+            topicTitle: 'Cells',
+            overdueDays: 4,
+            failureCount: 2,
+          },
+          {
+            topicId: 'topic-4',
+            topicTitle: 'Atoms',
+            overdueDays: 2,
+            failureCount: 0,
+          },
+        ],
+      },
+    ],
+  };
+}
 
 describe('RelearnScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSearchParams = {};
     mockPersona = 'teen';
-    mockSearchParams = {
-      topicId: 'topic-1',
-      subjectId: 'sub-1',
+    mockIsParentProxy = false;
+    mockOverdueTopicsReturn = {
+      data: makeOverdueData(),
+      isLoading: false,
+      isError: false,
+      refetch: mockRefetch,
+    };
+    mockTeachingPreferenceReturn = {
+      data: {
+        subjectId: 'sub-1',
+        method: 'visual_diagrams',
+        analogyDomain: null,
+        nativeLanguage: null,
+      },
     };
   });
 
-  // ---------------------------------------------------------------------------
-  // Default (teen) persona — uses standard copy
-  // ---------------------------------------------------------------------------
+  it('renders a subject picker when more than 10 topics are overdue across subjects', async () => {
+    mockOverdueTopicsReturn = {
+      data: makeOverdueData(11),
+      isLoading: false,
+      isError: false,
+      refetch: mockRefetch,
+    };
 
-  describe('teen persona (default copy)', () => {
-    it('shows default phase 1 intro and choice labels', () => {
-      render(<RelearnScreen />, { wrapper: createWrapper() });
-
-      expect(
-        screen.getByText(
-          "Every topic needs its own approach. Let's find what clicks for you!"
-        )
-      ).toBeTruthy();
-      screen.getByText('Different Method');
-      expect(
-        screen.getByText(
-          'Choose a new teaching style that might work better for you'
-        )
-      ).toBeTruthy();
-      screen.getByText('Same Method');
-      expect(
-        screen.getByText(
-          'Review the topic again using your current learning approach'
-        )
-      ).toBeTruthy();
-    });
-
-    it('shows default method labels in phase 2', () => {
-      render(<RelearnScreen />, { wrapper: createWrapper() });
-
-      // Transition to method picker phase
-      fireEvent.press(screen.getByTestId('relearn-different-method'));
-
-      expect(
-        screen.getByText('Pick a teaching style that works best for you:')
-      ).toBeTruthy();
-      screen.getByText('Visual Diagrams');
-      screen.getByText('Step-by-Step');
-      screen.getByText('Real-World Examples');
-      screen.getByText('Practice Problems');
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  // Learner persona — child-friendly copy
-  // ---------------------------------------------------------------------------
-
-  describe('learner persona (child-friendly copy)', () => {
-    beforeEach(() => {
-      mockPersona = 'learner';
-    });
-
-    it('shows child-friendly phase 1 intro and choice labels', () => {
-      render(<RelearnScreen />, { wrapper: createWrapper() });
-
-      expect(
-        screen.getByText("Let's find what works best for you!")
-      ).toBeTruthy();
-      screen.getByText('Try Something New');
-      expect(
-        screen.getByText("Let's try learning this a different way!")
-      ).toBeTruthy();
-      screen.getByText('Same Method');
-      expect(
-        screen.getByText("Let's go over it again the same way")
-      ).toBeTruthy();
-    });
-
-    it('shows child-friendly method labels in phase 2', () => {
-      render(<RelearnScreen />, { wrapper: createWrapper() });
-
-      // Transition to method picker phase
-      fireEvent.press(screen.getByTestId('relearn-different-method'));
-
-      expect(
-        screen.getByText('How would you like to learn this time?')
-      ).toBeTruthy();
-      screen.getByText('Show Me Pictures');
-      screen.getByText('Walk Me Through It');
-      screen.getByText('Show Me How It Works');
-      screen.getByText('Let Me Try It');
-    });
-
-    it('does not show default teen labels', () => {
-      render(<RelearnScreen />, { wrapper: createWrapper() });
-
-      expect(screen.queryByText('Different Method')).toBeNull();
-      expect(
-        screen.queryByText(
-          "Every topic needs its own approach. Let's find what clicks for you!"
-        )
-      ).toBeNull();
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  // Parent persona — uses default (same as teen) copy
-  // ---------------------------------------------------------------------------
-
-  describe('parent persona (default copy)', () => {
-    beforeEach(() => {
-      mockPersona = 'parent';
-    });
-
-    it('shows default phase 1 labels, not child-friendly', () => {
-      render(<RelearnScreen />, { wrapper: createWrapper() });
-
-      screen.getByText('Different Method');
-      expect(
-        screen.getByText(
-          "Every topic needs its own approach. Let's find what clicks for you!"
-        )
-      ).toBeTruthy();
-      expect(screen.queryByText('Try Something New')).toBeNull();
-    });
-  });
-
-  it('shows an error when starting relearn fails', async () => {
-    mockMutate.mockImplementation(
-      (
-        _input: unknown,
-        callbacks?: {
-          onError?: (error: Error) => void;
-          onSettled?: () => void;
-        }
-      ) => {
-        callbacks?.onError?.(new Error('Could not start relearn right now'));
-        callbacks?.onSettled?.();
-      }
-    );
-
-    render(<RelearnScreen />, { wrapper: createWrapper() });
-
-    fireEvent.press(screen.getByTestId('relearn-same-method'));
+    render(<RelearnScreen />);
 
     await waitFor(() => {
-      screen.getByTestId('relearn-error');
-      expect(
-        screen.getByText('Could not start relearn right now')
-      ).toBeTruthy();
+      screen.getByTestId('relearn-subjects-phase');
     });
+
+    screen.getByTestId('relearn-subject-sub-1');
+    screen.getByTestId('relearn-subject-sub-2');
   });
 
-  it('returns to the learner home view when opened from learner home', () => {
-    mockSearchParams = {
-      topicId: 'topic-1',
-      subjectId: 'sub-1',
-      returnTo: 'learner-home',
-    };
+  it('renders a flat grouped topic list when 10 or fewer topics are overdue', async () => {
+    render(<RelearnScreen />);
 
-    render(<RelearnScreen />, { wrapper: createWrapper() });
+    await waitFor(() => {
+      screen.getByTestId('relearn-topics-phase');
+    });
 
-    fireEvent.press(screen.getByTestId('relearn-back'));
-
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/home?view=learner');
-    expect(mockBack).not.toHaveBeenCalled();
+    screen.getByTestId('relearn-topic-topic-1');
+    screen.getByTestId('relearn-topic-topic-3');
   });
 
-  it('keeps the learner home return target when starting a relearn session', async () => {
+  it('skips straight to the method phase for direct topic entry', async () => {
     mockSearchParams = {
       topicId: 'topic-1',
       subjectId: 'sub-1',
       topicName: 'Algebra',
+      subjectName: 'Math',
+    };
+
+    render(<RelearnScreen />);
+
+    await waitFor(() => {
+      screen.getByTestId('relearn-method-phase');
+    });
+
+    screen.getByTestId('relearn-method-visual_diagrams');
+    screen.getByText('Usual method');
+  });
+
+  it('moves from the topic phase to the method phase when a topic is selected', async () => {
+    render(<RelearnScreen />);
+
+    await waitFor(() => {
+      screen.getByTestId('relearn-topics-phase');
+    });
+
+    fireEvent.press(screen.getByTestId('relearn-topic-topic-1'));
+
+    await waitFor(() => {
+      screen.getByTestId('relearn-method-phase');
+    });
+  });
+
+  it('starts relearn and navigates to session with recap', async () => {
+    mockSearchParams = {
+      topicId: 'topic-1',
+      subjectId: 'sub-1',
+      topicName: 'Algebra',
+      subjectName: 'Math',
       returnTo: 'learner-home',
     };
     mockMutate.mockImplementation(
       (
-        _input: unknown,
+        input: unknown,
         callbacks?: {
-          onSuccess?: (result: { sessionId: string }) => void;
+          onSuccess?: (result: {
+            sessionId: string;
+            recap: string | null;
+          }) => void;
           onSettled?: () => void;
         }
       ) => {
-        callbacks?.onSuccess?.({ sessionId: 'sess-1' });
+        callbacks?.onSuccess?.({
+          sessionId: 'sess-1',
+          recap: 'You reviewed variables and equations.',
+        });
         callbacks?.onSettled?.();
       }
     );
 
-    render(<RelearnScreen />, { wrapper: createWrapper() });
+    render(<RelearnScreen />);
 
-    fireEvent.press(screen.getByTestId('relearn-same-method'));
+    fireEvent.press(screen.getByTestId('relearn-method-visual_diagrams'));
 
     await waitFor(() => {
+      expect(mockMutate).toHaveBeenCalledWith(
+        { topicId: 'topic-1', method: 'same' },
+        expect.any(Object)
+      );
       expect(mockPush).toHaveBeenCalledWith({
         pathname: '/(app)/session',
         params: {
           sessionId: 'sess-1',
           subjectId: 'sub-1',
+          subjectName: 'Math',
           topicId: 'topic-1',
           topicName: 'Algebra',
           mode: 'relearn',
+          recap: 'You reviewed variables and equations.',
           returnTo: 'learner-home',
         },
       });
     });
   });
 
-  // [UX-DE-L1] Retry pressable meets 44×44 tap target
-  it('retry pressable has min-h-[44px] class after an error', async () => {
-    mockMutate.mockImplementation(
-      (
-        _input: unknown,
-        callbacks?: {
-          onError?: (error: Error) => void;
-          onSettled?: () => void;
-        }
-      ) => {
-        callbacks?.onError?.(new Error('Network error'));
-        callbacks?.onSettled?.();
-      }
-    );
-
-    render(<RelearnScreen />, { wrapper: createWrapper() });
-    fireEvent.press(screen.getByTestId('relearn-same-method'));
+  it('goes back from method phase to topics phase', async () => {
+    render(<RelearnScreen />);
 
     await waitFor(() => {
-      const retryBtn = screen.getByTestId('relearn-retry');
-      expect(retryBtn.props.className).toContain('min-h-[44px]');
+      screen.getByTestId('relearn-topics-phase');
+    });
+
+    fireEvent.press(screen.getByTestId('relearn-topic-topic-1'));
+    await waitFor(() => {
+      screen.getByTestId('relearn-method-phase');
+    });
+
+    fireEvent.press(screen.getByTestId('relearn-back'));
+
+    await waitFor(() => {
+      screen.getByTestId('relearn-topics-phase');
     });
   });
 
-  // [UX-DE-M1] Cancel button is visible during submit so user isn't trapped
-  it('shows a cancel button while the relearn API call is pending', async () => {
-    let resolveSubmit!: () => void;
-    mockMutate.mockImplementation(
-      (
-        _input: unknown,
-        callbacks?: {
-          onSuccess?: (result: { sessionId: string }) => void;
-          onSettled?: () => void;
-        }
-      ) => {
-        // Hang indefinitely until resolveSubmit is called
-        resolveSubmit = () => {
-          callbacks?.onSuccess?.({ sessionId: 'sess-1' });
-          callbacks?.onSettled?.();
-        };
-      }
-    );
+  it('goes back from topics phase to subjects phase when the subject picker was used', async () => {
+    mockOverdueTopicsReturn = {
+      data: makeOverdueData(11),
+      isLoading: false,
+      isError: false,
+      refetch: mockRefetch,
+    };
 
-    render(<RelearnScreen />, { wrapper: createWrapper() });
-    fireEvent.press(screen.getByTestId('relearn-same-method'));
+    render(<RelearnScreen />);
 
-    // Cancel button should appear while pending
-    screen.getByTestId('relearn-cancel');
+    await waitFor(() => {
+      screen.getByTestId('relearn-subjects-phase');
+    });
 
-    // Tap cancel → spinner + cancel button should disappear
-    fireEvent.press(screen.getByTestId('relearn-cancel'));
-    expect(screen.queryByTestId('relearn-cancel')).toBeNull();
+    fireEvent.press(screen.getByTestId('relearn-subject-sub-1'));
+    await waitFor(() => {
+      screen.getByTestId('relearn-topics-phase');
+    });
 
-    // Clean up hanging mock
-    resolveSubmit?.();
+    fireEvent.press(screen.getByTestId('relearn-back'));
+
+    await waitFor(() => {
+      screen.getByTestId('relearn-subjects-phase');
+    });
+  });
+
+  it('renders a fetch error state and retries', async () => {
+    mockOverdueTopicsReturn = {
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      refetch: mockRefetch,
+    };
+
+    render(<RelearnScreen />);
+
+    screen.getByTestId('relearn-overdue-error');
+    fireEvent.press(screen.getByTestId('relearn-overdue-retry'));
+    expect(mockRefetch).toHaveBeenCalled();
+  });
+
+  it('renders an empty state when there are no overdue topics', async () => {
+    mockOverdueTopicsReturn = {
+      data: { totalOverdue: 0, subjects: [] },
+      isLoading: false,
+      isError: false,
+      refetch: mockRefetch,
+    };
+
+    render(<RelearnScreen />);
+
+    await waitFor(() => {
+      screen.getByTestId('relearn-empty-state');
+    });
+  });
+
+  it('redirects in parent proxy mode', () => {
+    mockIsParentProxy = true;
+
+    render(<RelearnScreen />);
+
+    expect(screen.queryByTestId('relearn-topics-phase')).toBeNull();
+    expect(screen.queryByTestId('relearn-method-phase')).toBeNull();
   });
 });

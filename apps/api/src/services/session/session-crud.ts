@@ -435,6 +435,7 @@ export async function getSessionCompletionContext(
   topicId: string | null;
   subjectId: string;
   sessionType: string;
+  mode?: string;
   verificationType: string | null;
   exchangeCount: number;
   interleavedTopicIds?: string[];
@@ -460,6 +461,8 @@ export async function getSessionCompletionContext(
     topicId: session.topicId ?? null,
     subjectId: session.subjectId,
     sessionType: session.sessionType,
+    mode: (session.metadata as Record<string, unknown> | undefined)
+      ?.effectiveMode as string | undefined,
     verificationType: session.verificationType ?? null,
     exchangeCount: session.exchangeCount,
     interleavedTopicIds: await resolveInterleavedTopicIds(

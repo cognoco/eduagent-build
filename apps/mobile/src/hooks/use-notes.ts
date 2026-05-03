@@ -9,7 +9,12 @@ import {
   type UseQueryResult,
   type UseMutationResult,
 } from '@tanstack/react-query';
-import type { BookNotesResponse, UpsertNoteInput } from '@eduagent/schemas';
+import type {
+  BookNotesResponse,
+  TopicNotesResponse,
+  CreateNoteInput,
+  NoteResponse,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
@@ -92,41 +97,6 @@ export function useGetTopicNote(
 }
 
 // ---------------------------------------------------------------------------
-// useUpsertNote — create or update a note for a topic
-// ---------------------------------------------------------------------------
-
-type UpsertNoteVariables = { topicId: string } & UpsertNoteInput;
-
-export function useUpsertNote(
-  subjectId: string | undefined,
-  bookId: string | undefined
-): UseMutationResult<unknown, Error, UpsertNoteVariables> {
-  const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({ topicId, content, append }: UpsertNoteVariables) => {
-      if (!subjectId || !topicId)
-        throw new Error('subjectId and topicId are required');
-      const res = await client.subjects[':subjectId'].topics[
-        ':topicId'
-      ].note.$put({
-        param: { subjectId, topicId },
-        json: { content, ...(append !== undefined ? { append } : {}) },
-      });
-      await assertOk(res);
-      return res.json();
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: ['book-notes', subjectId, bookId, activeProfile?.id],
-      });
-    },
-  });
-}
-
-// ---------------------------------------------------------------------------
 // useNoteTopicIds — get the set of topic IDs that have notes for this profile
 // ---------------------------------------------------------------------------
 
@@ -154,7 +124,7 @@ export function useNoteTopicIds(): UseQueryResult<{ topicIds: string[] }> {
 }
 
 // ---------------------------------------------------------------------------
-// useDeleteNote — delete a note for a topic
+// useDeleteNote — delete a note for a topic (deprecated — old composite-key)
 // ---------------------------------------------------------------------------
 
 export function useDeleteNote(
@@ -180,6 +150,125 @@ export function useDeleteNote(
       void queryClient.invalidateQueries({
         queryKey: ['book-notes', subjectId, bookId, activeProfile?.id],
       });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Multi-note CRUD hooks (Library v3)
+// ---------------------------------------------------------------------------
+
+export function useTopicNotes(
+  subjectId: string | undefined,
+  topicId: string | undefined
+): UseQueryResult<TopicNotesResponse> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['topic-notes', subjectId, topicId, activeProfile?.id],
+    queryFn: async ({ signal: querySignal }) => {
+      if (!subjectId || !topicId)
+        throw new Error('subjectId and topicId required');
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.subjects[':subjectId'].topics[
+          ':topicId'
+        ].notes.$get({ param: { subjectId, topicId } }, { init: { signal } });
+        await assertOk(res);
+        return (await res.json()) as TopicNotesResponse;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled: !!activeProfile && !!subjectId && !!topicId,
+  });
+}
+
+export function useCreateNote(
+  subjectId: string | undefined,
+  bookId: string | undefined
+): UseMutationResult<
+  { note: NoteResponse },
+  Error,
+  { topicId: string } & CreateNoteInput
+> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ topicId, content, sessionId }) => {
+      if (!subjectId || !topicId)
+        throw new Error('subjectId and topicId are required');
+      const res = await client.subjects[':subjectId'].topics[
+        ':topicId'
+      ].notes.$post({
+        param: { subjectId, topicId },
+        json: { content, ...(sessionId ? { sessionId } : {}) },
+      });
+      await assertOk(res);
+      return (await res.json()) as { note: NoteResponse };
+    },
+    onSuccess: (_data, { topicId }) => {
+      if (bookId) {
+        void queryClient.invalidateQueries({
+          queryKey: ['book-notes', subjectId, bookId, activeProfile?.id],
+        });
+      } else {
+        void queryClient.invalidateQueries({
+          queryKey: ['book-notes', subjectId],
+        });
+      }
+      void queryClient.invalidateQueries({
+        queryKey: ['topic-notes', subjectId, topicId, activeProfile?.id],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['note-topic-ids', activeProfile?.id],
+      });
+    },
+  });
+}
+
+export function useUpdateNote(): UseMutationResult<
+  { note: NoteResponse },
+  Error,
+  { noteId: string; content: string }
+> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ noteId, content }) => {
+      const res = await client.notes[':noteId'].$patch({
+        param: { noteId },
+        json: { content },
+      });
+      await assertOk(res);
+      return (await res.json()) as { note: NoteResponse };
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['book-notes'] });
+      void queryClient.invalidateQueries({ queryKey: ['topic-notes'] });
+    },
+  });
+}
+
+export function useDeleteNoteById(): UseMutationResult<void, Error, string> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (noteId: string) => {
+      const res = await client.notes[':noteId'].$delete({
+        param: { noteId },
+      });
+      await assertOk(res);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['book-notes'] });
+      void queryClient.invalidateQueries({ queryKey: ['topic-notes'] });
+      void queryClient.invalidateQueries({ queryKey: ['note-topic-ids'] });
     },
   });
 }

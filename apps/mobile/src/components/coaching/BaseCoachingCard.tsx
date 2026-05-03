@@ -21,7 +21,7 @@ function Skeleton(): ReactNode {
     <ShimmerSkeleton testID="coaching-card-skeleton">
       <View
         className="bg-coaching-card rounded-card p-5 mt-4"
-        accessibilityLabel="Loading coaching card"
+        accessibilityLabel="Loading mentor card"
       >
         <View className="bg-border rounded h-6 w-3/4 mb-3" />
         <View className="bg-border rounded h-4 w-1/2 mb-5" />

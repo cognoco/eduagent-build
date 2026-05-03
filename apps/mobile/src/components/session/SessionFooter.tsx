@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { QuestionCounter, LibraryPrompt } from '../session';
 import { NoteInput } from '../library/NoteInput';
 import type { useFiling } from '../../hooks/use-filing';
-import type { useUpsertNote } from '../../hooks/use-notes';
+import type { useCreateNote } from '../../hooks/use-notes';
 import { formatApiError } from '../../lib/format-api-error';
 import { platformAlert } from '../../lib/platform-alert';
 import type { Router } from 'expo-router';
@@ -18,7 +18,10 @@ export interface SessionFooterProps {
   filingTopicHint?: string;
   setShowFilingPrompt: React.Dispatch<React.SetStateAction<boolean>>;
   setFilingDismissed: React.Dispatch<React.SetStateAction<boolean>>;
-  navigateToSessionSummary: () => void;
+  navigateToSessionSummary: (
+    filedSubjectId?: string,
+    filedBookId?: string
+  ) => void;
   router: Router;
   sessionExpired: boolean;
   notePromptOffered: boolean;
@@ -26,7 +29,8 @@ export interface SessionFooterProps {
   setShowNoteInput: React.Dispatch<React.SetStateAction<boolean>>;
   sessionNoteSavedRef: React.MutableRefObject<boolean>;
   topicId: string | undefined;
-  upsertNote: ReturnType<typeof useUpsertNote>;
+  sessionId: string | undefined;
+  createNote: ReturnType<typeof useCreateNote>;
   colors: ReturnType<typeof useThemeColors>;
   userMessageCount: number;
   showQuestionCount: boolean;
@@ -50,7 +54,8 @@ export function SessionFooter({
   setShowNoteInput,
   sessionNoteSavedRef,
   topicId,
-  upsertNote,
+  sessionId,
+  createNote,
   colors,
   userMessageCount,
   showQuestionCount,
@@ -67,7 +72,6 @@ export function SessionFooter({
           setShowFilingPrompt={setShowFilingPrompt}
           setFilingDismissed={setFilingDismissed}
           navigateToSessionSummary={navigateToSessionSummary}
-          router={router}
         />
       ) : null}
       {sessionExpired ? (
@@ -121,17 +125,11 @@ export function SessionFooter({
                 );
                 return;
               }
-              const separator = !sessionNoteSavedRef.current
-                ? `--- ${new Date().toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                  })} ---\n`
-                : '';
-              upsertNote.mutate(
+              createNote.mutate(
                 {
                   topicId,
-                  content: `${separator}${content}`,
-                  append: true,
+                  content,
+                  sessionId,
                 },
                 {
                   onSuccess: () => {
@@ -148,7 +146,7 @@ export function SessionFooter({
               );
             }}
             onCancel={() => setShowNoteInput(false)}
-            saving={upsertNote.isPending}
+            saving={createNote.isPending}
           />
         </View>
       ) : null}
@@ -166,7 +164,6 @@ function StandardFilingPrompt({
   setShowFilingPrompt,
   setFilingDismissed,
   navigateToSessionSummary,
-  router,
 }: {
   filing: ReturnType<typeof useFiling>;
   activeSessionId: string | null;
@@ -174,8 +171,10 @@ function StandardFilingPrompt({
   filingTopicHint?: string;
   setShowFilingPrompt: React.Dispatch<React.SetStateAction<boolean>>;
   setFilingDismissed: React.Dispatch<React.SetStateAction<boolean>>;
-  navigateToSessionSummary: () => void;
-  router: Router;
+  navigateToSessionSummary: (
+    filedSubjectId?: string,
+    filedBookId?: string
+  ) => void;
 }) {
   return (
     <View
@@ -199,13 +198,7 @@ function StandardFilingPrompt({
                 sessionMode: effectiveMode as 'freeform' | 'homework',
               });
               setShowFilingPrompt(false);
-              router.replace({
-                pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
-                params: {
-                  subjectId: result.shelfId,
-                  bookId: result.bookId,
-                },
-              } as never);
+              navigateToSessionSummary(result.shelfId, result.bookId);
             } catch {
               platformAlert(
                 "Couldn't add to library",

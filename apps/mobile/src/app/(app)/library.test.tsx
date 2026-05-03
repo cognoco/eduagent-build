@@ -9,7 +9,12 @@ const mockUseAllBooks = jest.fn();
 const mockUseNoteTopicIds = jest.fn();
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: mockPush }),
+  useRouter: () => ({ push: mockPush, replace: jest.fn() }),
+  useFocusEffect: (cb: () => void) => {
+    // Execute focus effect synchronously in tests so expansion state is set
+    const React = require('react');
+    React.useEffect(cb, []);
+  },
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -81,19 +86,114 @@ jest.mock('../../lib/navigation', () => ({
 }));
 
 jest.mock('../../lib/theme', () => ({
-  useThemeColors: () => ({ accent: '#2563eb' }),
+  useThemeColors: () => ({
+    accent: '#2563eb',
+    border: '#e5e7eb',
+    primary: '#2563eb',
+    textPrimary: '#111827',
+    textSecondary: '#6b7280',
+    surfaceElevated: '#f9fafb',
+    warning: '#f59e0b',
+  }),
 }));
 
 jest.mock('../../lib/api-client', () => ({
   useApiClient: () => ({
-    subjects: {
-      ':subjectId': {
-        retention: {
-          $get: jest.fn(),
-        },
+    library: {
+      retention: {
+        $get: jest.fn().mockResolvedValue({
+          ok: true,
+          json: jest.fn().mockResolvedValue({ subjects: [] }),
+        }),
       },
     },
   }),
+}));
+
+jest.mock('../../hooks/use-library-search', () => ({
+  useLibrarySearch: () => ({
+    data: null,
+    isLoading: false,
+    isError: false,
+  }),
+}));
+
+jest.mock('../../components/common/ShimmerSkeleton', () => ({
+  ShimmerSkeleton: ({
+    children,
+    testID,
+  }: {
+    children: React.ReactNode;
+    testID?: string;
+  }) => {
+    const { View } = require('react-native');
+    return <View testID={testID}>{children}</View>;
+  },
+}));
+
+jest.mock('../../components/library/ShelfRow', () => ({
+  ShelfRow: ({
+    subjectId,
+    name,
+    expanded,
+    books,
+    onToggle,
+    onBookPress,
+  }: {
+    subjectId: string;
+    name: string;
+    expanded: boolean;
+    books: Array<{ bookId: string; title: string }>;
+    onToggle: (id: string) => void;
+    onBookPress: (subjectId: string, bookId: string) => void;
+  }) => {
+    const { View, Text, Pressable } = require('react-native');
+    return (
+      <View>
+        <Pressable
+          testID={`shelf-row-header-${subjectId}`}
+          onPress={() => onToggle(subjectId)}
+          accessibilityRole="button"
+        >
+          <Text>{name}</Text>
+        </Pressable>
+        {expanded &&
+          books.map((book) => (
+            <Pressable
+              key={book.bookId}
+              testID={`book-row-${book.bookId}`}
+              onPress={() => onBookPress(subjectId, book.bookId)}
+            >
+              <Text>{book.title}</Text>
+            </Pressable>
+          ))}
+      </View>
+    );
+  },
+}));
+
+jest.mock('../../components/library/LibrarySearchBar', () => ({
+  LibrarySearchBar: ({
+    value,
+    onChangeText,
+    placeholder,
+  }: {
+    value: string;
+    onChangeText: (text: string) => void;
+    placeholder?: string;
+  }) => {
+    const { View, TextInput } = require('react-native');
+    return (
+      <View>
+        <TextInput
+          testID="library-search-input"
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+        />
+      </View>
+    );
+  },
 }));
 
 jest.mock('../../lib/profile', () => ({
@@ -278,28 +378,12 @@ describe('LibraryScreen', () => {
 
     render(<LibraryScreen />, { wrapper: TestWrapper });
 
-    screen.getByTestId('library-no-content');
-    screen.getByText('Add a subject to start building your library');
+    // New library v3 design: empty state uses library-empty testID
+    screen.getByTestId('library-empty');
+    screen.getByText('Your library is empty');
   });
 
-  it('opens create-subject with a library return target from the empty state', () => {
-    mockUseSubjects.mockReturnValue({ data: [], isLoading: false });
-    mockUseOverallProgress.mockReturnValue({
-      data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
-      isLoading: false,
-    });
-
-    render(<LibraryScreen />, { wrapper: TestWrapper });
-
-    fireEvent.press(screen.getByTestId('library-add-subject-empty'));
-
-    expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/create-subject',
-      params: { returnTo: 'library' },
-    });
-  });
-
-  it('renders subject cards as shelves by default', () => {
+  it('renders shelf rows for each subject', () => {
     mockUseSubjects.mockReturnValue({
       data: [{ id: 'sub-1', name: 'History', status: 'active' }],
       isLoading: false,
@@ -326,12 +410,14 @@ describe('LibraryScreen', () => {
 
     render(<LibraryScreen />, { wrapper: TestWrapper });
 
-    screen.getByTestId('subject-card-sub-1');
+    // Library v3: subject is a shelf row, not a card
+    screen.getByTestId('shelf-row-header-sub-1');
     screen.getByText('History');
-    screen.getByText('3/12 topics started');
   });
 
-  it('hides the Topics tab from top-level Library navigation', () => {
+  it('has no top-level tabs — library uses expandable shelf layout', () => {
+    // Library v3 redesign replaced Shelves/Books/Topics tabs with a single
+    // expandable shelf list. There are no tab controls at the library level.
     mockUseSubjects.mockReturnValue({
       data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
       isLoading: false,
@@ -343,63 +429,24 @@ describe('LibraryScreen', () => {
 
     render(<LibraryScreen />, { wrapper: TestWrapper });
 
-    // Topics tab is intentionally hidden — users reach topics by opening a
-    // book (shelf/[subjectId]/book/[bookId]) which shows its chapter/topic
-    // list. This keeps the top-level Library focused on Shelves + Books.
+    expect(screen.queryByTestId('library-tab-shelves')).toBeNull();
+    expect(screen.queryByTestId('library-tab-books')).toBeNull();
     expect(screen.queryByTestId('library-tab-topics')).toBeNull();
+    // Instead, the shelf list is the root navigation
+    screen.getByTestId('shelves-list');
   });
 
-  it('navigates to shelf route when a subject is pressed', () => {
+  it('navigates to book screen when a book row inside an expanded shelf is pressed', () => {
+    // Library v3: books are accessed by expanding a shelf row, not via a
+    // separate Books tab. Tapping a book inside the expanded shelf triggers
+    // the cross-tab nav pattern (parent route pushed first).
     mockUseSubjects.mockReturnValue({
-      data: [{ id: 'sub-1', name: 'History', status: 'active' }],
-      isLoading: false,
-    });
-    mockUseOverallProgress.mockReturnValue({
-      data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
-      isLoading: false,
-    });
-
-    render(<LibraryScreen />, { wrapper: TestWrapper });
-
-    fireEvent.press(screen.getByTestId('subject-card-sub-1'));
-
-    expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(app)/shelf/[subjectId]',
-      params: { subjectId: 'sub-1' },
-    });
-  });
-
-  it('renders Shelves and Books tab badges with counts', () => {
-    mockUseSubjects.mockReturnValue({
-      data: [
-        { id: 'sub-1', name: 'Math', status: 'active' },
-        { id: 'sub-2', name: 'History', status: 'active' },
-      ],
+      data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
       isLoading: false,
     });
     mockUseOverallProgress.mockReturnValue({
       data: { subjects: [] },
       isLoading: false,
-    });
-    setLibraryRetention(testQueryClient, {
-      subjects: [
-        {
-          subjectId: 'sub-1',
-          topics: [
-            {
-              topicId: 't1',
-              topicTitle: 'A',
-              easeFactor: 2.5,
-              repetitions: 1,
-              lastReviewedAt: null,
-              xpStatus: 'pending',
-              failureCount: 0,
-            },
-          ],
-          reviewDueCount: 0,
-        },
-        { subjectId: 'sub-2', topics: [], reviewDueCount: 0 },
-      ],
     });
     mockUseAllBooks.mockReturnValue({
       books: [
@@ -409,7 +456,7 @@ describe('LibraryScreen', () => {
             subjectId: 'sub-1',
             title: 'Algebra',
             description: null,
-            emoji: null,
+            emoji: '📐',
             sortOrder: 1,
             topicsGenerated: true,
             createdAt: '2026-01-01T00:00:00Z',
@@ -429,213 +476,15 @@ describe('LibraryScreen', () => {
 
     render(<LibraryScreen />, { wrapper: TestWrapper });
 
-    screen.getByTestId('library-tab-shelves');
-    screen.getByTestId('library-tab-books');
-    expect(screen.queryByTestId('library-tab-topics')).toBeNull();
-    screen.getByText('Shelves (2)');
-    screen.getByText('Books (1)');
-  });
+    // The focus effect expands the first active subject automatically.
+    // The ShelfRow mock renders book-row-book-1 when expanded=true.
+    fireEvent.press(screen.getByTestId('book-row-book-1'));
 
-  it('shows review urgency on the matching shelf card (topics badge is hidden)', () => {
-    mockUseSubjects.mockReturnValue({
-      data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
-      isLoading: false,
-    });
-    mockUseOverallProgress.mockReturnValue({
-      data: {
-        subjects: [
-          {
-            subjectId: 'sub-1',
-            name: 'Math',
-            topicsTotal: 5,
-            topicsCompleted: 2,
-            topicsVerified: 1,
-            urgencyScore: 0,
-            retentionStatus: 'fading',
-            lastSessionAt: null,
-          },
-        ],
-        totalTopicsCompleted: 2,
-        totalTopicsVerified: 1,
-      },
-      isLoading: false,
-    });
-    setLibraryRetention(testQueryClient, {
-      subjects: [{ subjectId: 'sub-1', topics: [], reviewDueCount: 4 }],
-    });
-
-    render(<LibraryScreen />, { wrapper: TestWrapper });
-
-    // Topics tab (and its review badge) is intentionally hidden from the
-    // top-level Library. Review urgency still surfaces on the shelf card.
-    expect(screen.queryByTestId('library-tab-topics-review-badge')).toBeNull();
-    screen.getByText('4 to review');
-  });
-
-  it('shows books tab with all books across subjects', () => {
-    mockUseSubjects.mockReturnValue({
-      data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
-      isLoading: false,
-    });
-    mockUseOverallProgress.mockReturnValue({
-      data: { subjects: [] },
-      isLoading: false,
-    });
-    mockUseAllBooks.mockReturnValue({
-      books: [
-        {
-          book: {
-            id: 'book-1',
-            subjectId: 'sub-1',
-            title: 'Algebra',
-            description: null,
-            emoji: null,
-            sortOrder: 1,
-            topicsGenerated: true,
-            createdAt: '2026-01-01T00:00:00Z',
-            updatedAt: '2026-01-01T00:00:00Z',
-          },
-          subjectId: 'sub-1',
-          subjectName: 'Math',
-          topicCount: 5,
-          completedCount: 2,
-          status: 'IN_PROGRESS',
-        },
-      ],
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
-    });
-
-    render(<LibraryScreen />, { wrapper: TestWrapper });
-
-    fireEvent.press(screen.getByTestId('library-tab-books'));
-
-    screen.getByText('Algebra');
-    screen.getByText('Math');
-  });
-
-  it('downgrades book status to NOT_STARTED when 0 topics are verified [BUG-870]', () => {
-    // Regression: API returned book.status='IN_PROGRESS' (because at least
-    // one session row exists) but the shelf-side retention payload showed
-    // zero verified topics. The visible "0/10 topics" string conflicted
-    // with the "In progress" badge. Reconcile: the badge follows the
-    // client-derived completed/total count.
-    mockUseSubjects.mockReturnValue({
-      data: [{ id: 'sub-1', name: 'Biology', status: 'active' }],
-      isLoading: false,
-    });
-    mockUseOverallProgress.mockReturnValue({
-      data: { subjects: [] },
-      isLoading: false,
-    });
-    setLibraryRetention(testQueryClient, {
-      subjects: [
-        {
-          subjectId: 'sub-1',
-          topics: Array.from({ length: 10 }, (_, i) => ({
-            topicId: `t${i}`,
-            topicTitle: `Topic ${i}`,
-            bookId: 'book-1',
-            easeFactor: 2.5,
-            repetitions: 0,
-            lastReviewedAt: null,
-            // Zero verified topics — the badge MUST follow this signal.
-            xpStatus: 'pending',
-            failureCount: 0,
-          })),
-          reviewDueCount: 0,
-        },
-      ],
-    });
-    mockUseAllBooks.mockReturnValue({
-      books: [
-        {
-          book: {
-            id: 'book-1',
-            subjectId: 'sub-1',
-            title: 'Photosynthesis',
-            description: null,
-            emoji: null,
-            sortOrder: 1,
-            topicsGenerated: true,
-            createdAt: '2026-01-01T00:00:00Z',
-            updatedAt: '2026-01-01T00:00:00Z',
-          },
-          subjectId: 'sub-1',
-          subjectName: 'Biology',
-          topicCount: 0,
-          completedCount: 0,
-          // API marked it IN_PROGRESS based on session existence.
-          status: 'IN_PROGRESS',
-        },
-      ],
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
-    });
-
-    render(<LibraryScreen />, { wrapper: TestWrapper });
-
-    fireEvent.press(screen.getByTestId('library-tab-books'));
-
-    // Status label rendered next to the book card must say "Not started"
-    // (matching the 0/10 topics text), not "In progress".
-    screen.getByText('Not started');
-    expect(screen.queryByText('In progress')).toBeNull();
-    screen.getByText('0/10 topics');
-  });
-
-  // [CLAUDE.md cross-tab nav rule] Shelf layout has no
-  // unstable_settings.initialRouteName so the parent route must be pushed
-  // FIRST before the deep book path. Without the parent push, router.back()
-  // skips to the Tabs first-route (Home) instead of returning to the shelf.
-  it('pushes parent shelf route THEN book route when a book is pressed from books tab [cross-tab-nav]', () => {
-    mockUseSubjects.mockReturnValue({
-      data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
-      isLoading: false,
-    });
-    mockUseOverallProgress.mockReturnValue({
-      data: { subjects: [] },
-      isLoading: false,
-    });
-    mockUseAllBooks.mockReturnValue({
-      books: [
-        {
-          book: {
-            id: 'book-1',
-            subjectId: 'sub-1',
-            title: 'Algebra',
-            description: null,
-            emoji: null,
-            sortOrder: 1,
-            topicsGenerated: true,
-            createdAt: '2026-01-01T00:00:00Z',
-            updatedAt: '2026-01-01T00:00:00Z',
-          },
-          subjectId: 'sub-1',
-          subjectName: 'Math',
-          topicCount: 5,
-          completedCount: 2,
-          status: 'IN_PROGRESS',
-        },
-      ],
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
-    });
-
-    render(<LibraryScreen />, { wrapper: TestWrapper });
-
-    fireEvent.press(screen.getByTestId('library-tab-books'));
-    fireEvent.press(screen.getByTestId('book-card-book-1'));
-
-    // First call: parent shelf route (builds back-stack)
+    // [CLAUDE.md cross-tab nav] Parent shelf pushed first, then book
     expect(mockPush).toHaveBeenNthCalledWith(1, {
       pathname: '/(app)/shelf/[subjectId]',
       params: { subjectId: 'sub-1' },
     });
-    // Second call: the deep book route
     expect(mockPush).toHaveBeenNthCalledWith(2, {
       pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
       params: { subjectId: 'sub-1', bookId: 'book-1' },
@@ -644,64 +493,7 @@ describe('LibraryScreen', () => {
   });
 
   // -----------------------------------------------------------------------
-  // [IMP-3] Books-tab loading timeout escape — mirrors subjects/progress pattern
-  // -----------------------------------------------------------------------
-  describe('books-tab loading timeout [IMP-3]', () => {
-    beforeEach(() => {
-      jest.useFakeTimers();
-    });
-
-    afterEach(() => {
-      jest.useRealTimers();
-    });
-
-    it('shows books-tab timeout error after 15s of loading [IMP-3]', () => {
-      mockUseSubjects.mockReturnValue({
-        data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
-        isLoading: false,
-        isError: false,
-        refetch: jest.fn(),
-      });
-      mockUseOverallProgress.mockReturnValue({
-        data: { subjects: [] },
-        isLoading: false,
-        isError: false,
-        refetch: jest.fn(),
-      });
-      const mockRefetch = jest.fn();
-      mockUseAllBooks.mockReturnValue({
-        books: [],
-        isLoading: true,
-        isError: false,
-        refetch: mockRefetch,
-      });
-
-      render(<LibraryScreen />, { wrapper: TestWrapper });
-
-      // Switch to Books tab to trigger that rendering branch
-      fireEvent.press(screen.getByTestId('library-tab-books'));
-
-      // Spinner should be visible before timeout
-      screen.getByTestId('books-tab-loading');
-      expect(screen.queryByTestId('books-tab-load-timeout')).toBeNull();
-
-      // Advance timers past 15s — wrapped in act to flush state updates
-      act(() => {
-        jest.advanceTimersByTime(16_000);
-      });
-
-      // Timeout error surface must now be visible with Retry button
-      screen.getByTestId('books-tab-load-timeout');
-      screen.getByTestId('books-tab-load-timeout-retry');
-      screen.getByTestId('books-tab-load-timeout-home');
-    });
-  });
-
-  // -----------------------------------------------------------------------
   // BUG-82: allBooksQuery failure is non-fatal — library still renders [BUG-82]
-  // Previously allBooksQuery.isError triggered a full-page error state.
-  // Now book-fetch errors are non-fatal: subjects/progress errors block the
-  // view, but a book-fetch failure only degrades the Books tab gracefully.
   // -----------------------------------------------------------------------
   it('does not show full-page error when only allBooksQuery fails', () => {
     mockUseSubjects.mockReturnValue({
@@ -725,9 +517,9 @@ describe('LibraryScreen', () => {
 
     render(<LibraryScreen />, { wrapper: TestWrapper });
 
-    // Library renders normally — tabs and header are visible
+    // Library renders normally — subjects still visible as shelf rows
     expect(screen.queryByTestId('library-error')).toBeNull();
-    screen.getByTestId('library-tab-shelves');
+    screen.getByTestId('shelves-list');
   });
 
   describe('Manage Subjects modal — backdrop close [BUG-510]', () => {

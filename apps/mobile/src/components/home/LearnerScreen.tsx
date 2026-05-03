@@ -252,12 +252,7 @@ export function LearnerScreen({
         onContinue: () =>
           router.push({
             pathname: '/(app)/topic/relearn',
-            params: {
-              topicId: topic.topicId,
-              subjectId: topic.subjectId,
-              topicName: topic.topicTitle,
-              ...HOME_RETURN_PARAMS,
-            },
+            params: HOME_RETURN_PARAMS,
           } as never),
       };
     }

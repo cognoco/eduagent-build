@@ -67,7 +67,12 @@ jest.mock('../../../lib/api-client', () => {
     '/curriculum': {
       curriculum: {
         topics: [
-          { id: 'topic-1', title: 'Topic 1', description: 'Desc', skipped: false },
+          {
+            id: 'topic-1',
+            title: 'Topic 1',
+            description: 'Desc',
+            skipped: false,
+          },
         ],
       },
     },
@@ -92,17 +97,17 @@ jest.mock('../../../lib/api-client', () => {
     '/celebrations/seen': { ok: true },
   });
   // Expose for test assertions — accessed via the `mockFetch` alias below
-  (global as { __sessionTestMockFetch?: typeof _mockFetch }).__sessionTestMockFetch =
-    _mockFetch;
+  (
+    global as { __sessionTestMockFetch?: typeof _mockFetch }
+  ).__sessionTestMockFetch = _mockFetch;
   return _factory(_mockFetch);
 });
 
 // Typed alias so tests can call mockFetch.setRoute / fetchCallsMatching etc.
 // Safe to read here because jest.mock factories run synchronously before
 // any test code (and before this assignment).
-const mockFetch = (
-  global as { __sessionTestMockFetch?: RoutedMockFetch }
-).__sessionTestMockFetch!;
+const mockFetch = (global as { __sessionTestMockFetch?: RoutedMockFetch })
+  .__sessionTestMockFetch!;
 
 // ---------------------------------------------------------------------------
 // QueryClient wrapper
@@ -1076,7 +1081,7 @@ describe('SessionScreen homework flow', () => {
       });
     }, 15000);
 
-    it('accept button calls filing and navigates to book screen', async () => {
+    it('accept button calls filing and navigates to session summary with filed subject/book params', async () => {
       const testScreen = await renderAndTriggerFilingPrompt();
 
       await waitFor(() => {
@@ -1098,10 +1103,16 @@ describe('SessionScreen homework flow', () => {
           sessionId: 'session-1',
           sessionMode: 'freeform',
         });
+        // After filing, the library redesign navigates to the session summary
+        // with filedSubjectId + filedBookId params (not directly to the book screen).
+        // The session-summary screen uses those params to show a "View in library" link.
         expect(mockReplace).toHaveBeenCalledWith(
           expect.objectContaining({
-            pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
-            params: { subjectId: 'shelf-1', bookId: 'book-1' },
+            pathname: '/session-summary/session-1',
+            params: expect.objectContaining({
+              filedSubjectId: 'shelf-1',
+              filedBookId: 'book-1',
+            }),
           })
         );
       });

@@ -7,6 +7,16 @@ import {
   familyAddProfileSchema,
   // familyRemoveProfileSchema, // disabled until invite/claim flow exists (CR-21)
   ERROR_CODES,
+  subscriptionResponseSchema,
+  checkoutResponseSchema,
+  cancelResponseSchema,
+  topUpResponseSchema,
+  usageResponseSchema,
+  portalResponseSchema,
+  subscriptionStatusResponseSchema,
+  familyResponseSchema,
+  familyAddResponseSchema,
+  byokWaitlistResponseSchema,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
@@ -84,21 +94,23 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
 
     if (!subscription) {
       // No subscription yet — return free-tier defaults
-      return c.json({
-        subscription: {
-          tier: 'free' as const,
-          status: 'trial' as const,
-          trialEndsAt: null,
-          currentPeriodEnd: null,
-          cancelAtPeriodEnd: false,
-          monthlyLimit: freeTier.monthlyQuota,
-          usedThisMonth: 0,
-          remainingQuestions: freeTier.monthlyQuota,
-          dailyLimit: freeTier.dailyLimit,
-          usedToday: 0,
-          dailyRemainingQuestions: freeTier.dailyLimit,
-        },
-      });
+      return c.json(
+        subscriptionResponseSchema.parse({
+          subscription: {
+            tier: 'free',
+            status: 'trial',
+            trialEndsAt: null,
+            currentPeriodEnd: null,
+            cancelAtPeriodEnd: false,
+            monthlyLimit: freeTier.monthlyQuota,
+            usedThisMonth: 0,
+            remainingQuestions: freeTier.monthlyQuota,
+            dailyLimit: freeTier.dailyLimit,
+            usedToday: 0,
+            dailyRemainingQuestions: freeTier.dailyLimit,
+          },
+        })
+      );
     }
 
     // Fetch quota pool for enriched response
@@ -115,21 +127,23 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     const cancelAtPeriodEnd =
       subscription.cancelledAt !== null && subscription.status === 'active';
 
-    return c.json({
-      subscription: {
-        tier: subscription.tier,
-        status: subscription.status,
-        trialEndsAt: subscription.trialEndsAt,
-        currentPeriodEnd: subscription.currentPeriodEnd,
-        cancelAtPeriodEnd,
-        monthlyLimit,
-        usedThisMonth,
-        remainingQuestions: remaining,
-        dailyLimit,
-        usedToday,
-        dailyRemainingQuestions,
-      },
-    });
+    return c.json(
+      subscriptionResponseSchema.parse({
+        subscription: {
+          tier: subscription.tier,
+          status: subscription.status,
+          trialEndsAt: subscription.trialEndsAt,
+          currentPeriodEnd: subscription.currentPeriodEnd,
+          cancelAtPeriodEnd,
+          monthlyLimit,
+          usedThisMonth,
+          remainingQuestions: remaining,
+          dailyLimit,
+          usedToday,
+          dailyRemainingQuestions,
+        },
+      })
+    );
   })
 
   // Create Stripe Checkout session
@@ -200,10 +214,12 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         );
       }
 
-      return c.json({
-        checkoutUrl: session.url,
-        sessionId: session.id,
-      });
+      return c.json(
+        checkoutResponseSchema.parse({
+          checkoutUrl: session.url,
+          sessionId: session.id,
+        })
+      );
     }
   )
 
@@ -257,11 +273,13 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     // Mark local DB row so cancelAtPeriodEnd is reflected immediately
     await markSubscriptionCancelled(db, subscription.id);
 
-    return c.json({
-      message:
-        'Subscription cancelled. Access continues until end of billing period.',
-      currentPeriodEnd,
-    });
+    return c.json(
+      cancelResponseSchema.parse({
+        message:
+          'Subscription cancelled. Access continues until end of billing period.',
+        currentPeriodEnd,
+      })
+    );
   })
 
   // Purchase top-up credits via Stripe Payment Intent
@@ -321,14 +339,16 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         },
       });
 
-      return c.json({
-        topUp: {
-          amount,
-          priceCents,
-          clientSecret: paymentIntent.client_secret,
-          paymentIntentId: paymentIntent.id,
-        },
-      });
+      return c.json(
+        topUpResponseSchema.parse({
+          topUp: {
+            amount,
+            priceCents,
+            clientSecret: paymentIntent.client_secret,
+            paymentIntentId: paymentIntent.id,
+          },
+        })
+      );
     }
   )
 
@@ -341,19 +361,21 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     const subscription = await getSubscriptionByAccountId(db, account.id);
 
     if (!subscription) {
-      return c.json({
-        usage: {
-          monthlyLimit: freeTier.monthlyQuota,
-          usedThisMonth: 0,
-          remainingQuestions: freeTier.monthlyQuota,
-          topUpCreditsRemaining: 0,
-          warningLevel: 'none' as const,
-          cycleResetAt: new Date().toISOString(),
-          dailyLimit: freeTier.dailyLimit,
-          usedToday: 0,
-          dailyRemainingQuestions: freeTier.dailyLimit,
-        },
-      });
+      return c.json(
+        usageResponseSchema.parse({
+          usage: {
+            monthlyLimit: freeTier.monthlyQuota,
+            usedThisMonth: 0,
+            remainingQuestions: freeTier.monthlyQuota,
+            topUpCreditsRemaining: 0,
+            warningLevel: 'none',
+            cycleResetAt: new Date().toISOString(),
+            dailyLimit: freeTier.dailyLimit,
+            usedToday: 0,
+            dailyRemainingQuestions: freeTier.dailyLimit,
+          },
+        })
+      );
     }
 
     const quota = await getQuotaPool(db, subscription.id);
@@ -376,19 +398,21 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     const dailyRemainingQuestions =
       dailyLimit !== null ? Math.max(0, dailyLimit - usedToday) : null;
 
-    return c.json({
-      usage: {
-        monthlyLimit,
-        usedThisMonth,
-        remainingQuestions: remaining,
-        topUpCreditsRemaining,
-        warningLevel,
-        cycleResetAt: quota?.cycleResetAt ?? new Date().toISOString(),
-        dailyLimit,
-        usedToday,
-        dailyRemainingQuestions,
-      },
-    });
+    return c.json(
+      usageResponseSchema.parse({
+        usage: {
+          monthlyLimit,
+          usedThisMonth,
+          remainingQuestions: remaining,
+          topUpCreditsRemaining,
+          warningLevel,
+          cycleResetAt: quota?.cycleResetAt ?? new Date().toISOString(),
+          dailyLimit,
+          usedToday,
+          dailyRemainingQuestions,
+        },
+      })
+    );
   })
 
   // Create Stripe Customer Portal session
@@ -417,7 +441,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       return_url: `${appUrl}/billing`,
     });
 
-    return c.json({ portalUrl: portalSession.url });
+    return c.json(portalResponseSchema.parse({ portalUrl: portalSession.url }));
   })
 
   // Fast KV-backed subscription status (for header display)
@@ -431,46 +455,52 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     if (kv) {
       const cached = await readSubscriptionStatus(kv, account.id);
       if (cached) {
-        return c.json({
-          status: {
-            tier: cached.tier,
-            status: cached.status,
-            monthlyLimit: cached.monthlyLimit,
-            usedThisMonth: cached.usedThisMonth,
-            dailyLimit: cached.dailyLimit,
-            usedToday: cached.usedToday,
-          },
-        });
+        return c.json(
+          subscriptionStatusResponseSchema.parse({
+            status: {
+              tier: cached.tier,
+              status: cached.status,
+              monthlyLimit: cached.monthlyLimit,
+              usedThisMonth: cached.usedThisMonth,
+              dailyLimit: cached.dailyLimit,
+              usedToday: cached.usedToday,
+            },
+          })
+        );
       }
     }
 
     // Fallback to DB
     const subscription = await getSubscriptionByAccountId(db, account.id);
     if (!subscription) {
-      return c.json({
-        status: {
-          tier: 'free' as const,
-          status: 'trial' as const,
-          monthlyLimit: freeTier.monthlyQuota,
-          usedThisMonth: 0,
-          dailyLimit: freeTier.dailyLimit,
-          usedToday: 0,
-        },
-      });
+      return c.json(
+        subscriptionStatusResponseSchema.parse({
+          status: {
+            tier: 'free',
+            status: 'trial',
+            monthlyLimit: freeTier.monthlyQuota,
+            usedThisMonth: 0,
+            dailyLimit: freeTier.dailyLimit,
+            usedToday: 0,
+          },
+        })
+      );
     }
 
     const quota = await getQuotaPool(db, subscription.id);
 
-    return c.json({
-      status: {
-        tier: subscription.tier,
-        status: subscription.status,
-        monthlyLimit: quota?.monthlyLimit ?? freeTier.monthlyQuota,
-        usedThisMonth: quota?.usedThisMonth ?? 0,
-        dailyLimit: quota?.dailyLimit ?? null,
-        usedToday: quota?.usedToday ?? 0,
-      },
-    });
+    return c.json(
+      subscriptionStatusResponseSchema.parse({
+        status: {
+          tier: subscription.tier,
+          status: subscription.status,
+          monthlyLimit: quota?.monthlyLimit ?? freeTier.monthlyQuota,
+          usedThisMonth: quota?.usedThisMonth ?? 0,
+          dailyLimit: quota?.dailyLimit ?? null,
+          usedToday: quota?.usedToday ?? 0,
+        },
+      })
+    );
   })
 
   // Get family members and pool status
@@ -490,12 +520,14 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
 
     const members = await listFamilyMembers(db, subscription.id);
 
-    return c.json({
-      family: {
-        ...poolStatus,
-        members,
-      },
-    });
+    return c.json(
+      familyResponseSchema.parse({
+        family: {
+          ...poolStatus,
+          members,
+        },
+      })
+    );
   })
 
   // Add a profile to the family subscription
@@ -527,10 +559,12 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         );
       }
 
-      return c.json({
-        message: 'Profile added to family subscription',
-        profileCount: result.profileCount,
-      });
+      return c.json(
+        familyAddResponseSchema.parse({
+          message: 'Profile added to family subscription',
+          profileCount: result.profileCount,
+        })
+      );
     }
   )
 
@@ -596,7 +630,13 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
 
     await addToByokWaitlist(db, email);
 
-    return c.json({ message: 'Added to BYOK waitlist', email }, 201);
+    return c.json(
+      byokWaitlistResponseSchema.parse({
+        message: 'Added to BYOK waitlist',
+        email,
+      }),
+      201
+    );
   })
 
   // ---------------------------------------------------------------------------

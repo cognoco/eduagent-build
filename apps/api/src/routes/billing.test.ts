@@ -727,9 +727,21 @@ describe('billing routes', () => {
         maxProfiles: 4,
       });
       mockListFamilyMembers.mockResolvedValue([
-        { profileId: 'p-1', displayName: 'Parent', isOwner: true },
-        { profileId: 'p-2', displayName: 'Child 1', isOwner: false },
-        { profileId: 'p-3', displayName: 'Child 2', isOwner: false },
+        {
+          profileId: 'a0000000-0000-4000-a000-000000000001',
+          displayName: 'Parent',
+          isOwner: true,
+        },
+        {
+          profileId: 'a0000000-0000-4000-a000-000000000002',
+          displayName: 'Child 1',
+          isOwner: false,
+        },
+        {
+          profileId: 'a0000000-0000-4000-a000-000000000003',
+          displayName: 'Child 2',
+          isOwner: false,
+        },
       ]);
 
       const res = await app.request(

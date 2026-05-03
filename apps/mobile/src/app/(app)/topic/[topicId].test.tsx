@@ -1,4 +1,9 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { RoutedMockFetch } from '../../../test-utils/mock-api-routes';
@@ -10,7 +15,10 @@ import type { RoutedMockFetch } from '../../../test-utils/mock-api-routes';
 let mockFetch: RoutedMockFetch;
 
 jest.mock('../../../lib/api-client', () => {
-  const { createRoutedMockFetch, mockApiClientFactory } = require('../../../test-utils/mock-api-routes');
+  const {
+    createRoutedMockFetch,
+    mockApiClientFactory,
+  } = require('../../../test-utils/mock-api-routes');
   mockFetch = createRoutedMockFetch();
   return mockApiClientFactory(mockFetch);
 });
@@ -62,10 +70,20 @@ jest.mock('react-native-safe-area-context', () => ({
 jest.mock('../../../lib/theme', () => ({
   useThemeColors: () => ({
     primary: '#00b4d8',
+    accent: '#00b4d8',
     muted: '#888888',
+    background: '#ffffff',
+    border: '#e8e0d4',
+    surface: '#f5f5f5',
+    surfaceElevated: '#eeeeee',
+    textPrimary: '#1a1a1a',
+    textSecondary: '#666666',
     retentionWeak: '#ff0000',
     retentionFading: '#ffaa00',
     retentionStrong: '#00ff00',
+    success: '#00c851',
+    warning: '#ffbb33',
+    danger: '#ff4444',
   }),
 }));
 
@@ -110,69 +128,64 @@ interface SetupOptions {
   completionStatus?: string;
   failureCount?: number;
   struggleStatus?: string;
-  evaluateEligible?: boolean;
   repetitions?: number;
   easeFactor?: number;
   nextReviewAt?: string | null;
+  lastReviewedAt?: string | null;
   activeSessionId?: string | null;
   progressOverride?: object | null;
   retentionOverride?: object | null;
-  parkingLotItems?: object[];
   resumeTarget?: object | null;
   resolveResult?: object | null | false;
+  notes?: object[];
+  sessions?: object[];
 }
 
 function setupRoutes(opts: SetupOptions = {}) {
   const {
     completionStatus = 'not_started',
     failureCount = 0,
-    struggleStatus = 'normal',
-    evaluateEligible = false,
     repetitions = 0,
     easeFactor = 2.5,
     nextReviewAt = null,
+    lastReviewedAt = null,
     activeSessionId = null,
     progressOverride,
     retentionOverride,
-    parkingLotItems = [],
     resumeTarget = null,
     resolveResult = false,
+    notes = [],
+    sessions = [],
   } = opts;
 
-  // GET /subjects/s1/topics/t1/progress → { topic }
+  // GET /topics/t1/progress → { topic }
   mockFetch.setRoute('/topics/t1/progress', {
-    topic: progressOverride !== undefined
-      ? progressOverride
-      : { ...DEFAULT_TOPIC_PROGRESS, completionStatus, struggleStatus },
+    topic:
+      progressOverride !== undefined
+        ? progressOverride
+        : { ...DEFAULT_TOPIC_PROGRESS, completionStatus },
   });
 
   // GET /topics/t1/retention → { card }
   mockFetch.setRoute('/topics/t1/retention', {
-    card: retentionOverride !== undefined
-      ? retentionOverride
-      : { ...DEFAULT_RETENTION_CARD, failureCount, repetitions, easeFactor, nextReviewAt },
-  });
-
-  // GET /topics/t1/evaluate-eligibility → EvaluateEligibility
-  mockFetch.setRoute('/evaluate-eligibility', {
-    eligible: evaluateEligible,
-    topicId: 't1',
-    topicTitle: 'Algebra',
-    currentRung: 1,
-    easeFactor,
-    repetitions,
+    card:
+      retentionOverride !== undefined
+        ? retentionOverride
+        : {
+            ...DEFAULT_RETENTION_CARD,
+            failureCount,
+            repetitions,
+            easeFactor,
+            nextReviewAt,
+            lastReviewedAt,
+          },
   });
 
   // GET /progress/topic/t1/active-session → { sessionId } | null
-  mockFetch.setRoute('/active-session',
+  mockFetch.setRoute(
+    '/active-session',
     activeSessionId ? { sessionId: activeSessionId } : null
   );
-
-  // GET /subjects/s1/topics/t1/parking-lot → { items }
-  mockFetch.setRoute('/parking-lot', { items: parkingLotItems });
-
-  // GET /subjects/s1/topics/t1/note → { note }
-  mockFetch.setRoute('/note', { note: null });
 
   // GET /progress/resume-target → { target }
   mockFetch.setRoute('/resume-target', { target: resumeTarget });
@@ -181,6 +194,12 @@ function setupRoutes(opts: SetupOptions = {}) {
   if (resolveResult !== false) {
     mockFetch.setRoute('/resolve', resolveResult);
   }
+
+  // GET /subjects/s1/topics/t1/notes → { notes }
+  mockFetch.setRoute('/topics/t1/notes', { notes });
+
+  // GET /subjects/s1/topics/t1/sessions → { sessions }
+  mockFetch.setRoute('/topics/t1/sessions', { sessions });
 }
 
 // ---------------------------------------------------------------------------
@@ -210,7 +229,10 @@ describe('TopicDetailScreen action buttons', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseLocalSearchParams.mockReturnValue({ subjectId: 's1', topicId: 't1' });
+    mockUseLocalSearchParams.mockReturnValue({
+      subjectId: 's1',
+      topicId: 't1',
+    });
     setupRoutes();
     const { Wrapper } = createWrapper();
     TestWrapper = Wrapper;
@@ -228,33 +250,33 @@ describe('TopicDetailScreen action buttons', () => {
     screen.getByTestId('topic-detail-loading');
 
     resolveProgress(
-      new Response(
-        JSON.stringify({ topic: { ...DEFAULT_TOPIC_PROGRESS } }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+      new Response(JSON.stringify({ topic: { ...DEFAULT_TOPIC_PROGRESS } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
     );
   });
 
-  it('shows "Start learning" as primary for not_started topics', async () => {
+  it('shows "Start studying" as the CTA for not_started topics', async () => {
     setupRoutes({ completionStatus: 'not_started' });
 
     render(<TopicDetailScreen />, { wrapper: TestWrapper });
 
     await waitFor(() => {
-      screen.getByTestId('primary-action-button');
+      screen.getByTestId('study-cta');
     });
-    screen.getByText('Start learning');
+    screen.getByText('Start studying');
   });
 
-  it('navigates into a new learning session from the start button', async () => {
+  it('navigates into a new learning session from the study CTA', async () => {
     setupRoutes({ completionStatus: 'not_started' });
 
     render(<TopicDetailScreen />, { wrapper: TestWrapper });
 
     await waitFor(() => {
-      screen.getByTestId('primary-action-button');
+      screen.getByTestId('study-cta');
     });
-    fireEvent.press(screen.getByTestId('primary-action-button'));
+    fireEvent.press(screen.getByTestId('study-cta'));
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/session',
@@ -267,24 +289,16 @@ describe('TopicDetailScreen action buttons', () => {
     });
   });
 
-  it('shows "Continue learning" as primary for in_progress topics', async () => {
-    setupRoutes({ completionStatus: 'in_progress', activeSessionId: 'session-123' });
+  it('shows "Review this topic" as CTA for in_progress topics', async () => {
+    setupRoutes({
+      completionStatus: 'in_progress',
+      activeSessionId: 'session-123',
+    });
 
     render(<TopicDetailScreen />, { wrapper: TestWrapper });
 
     await waitFor(() => {
-      screen.getByText('Continue learning');
-    });
-    fireEvent.press(screen.getByTestId('primary-action-button'));
-    expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(app)/session',
-      params: {
-        mode: 'learning',
-        subjectId: 's1',
-        topicId: 't1',
-        topicName: 'Algebra',
-        sessionId: 'session-123',
-      },
+      screen.getByText('Review this topic');
     });
   });
 
@@ -309,9 +323,9 @@ describe('TopicDetailScreen action buttons', () => {
     render(<TopicDetailScreen />, { wrapper: TestWrapper });
 
     await waitFor(() => {
-      screen.getByTestId('primary-action-button');
+      screen.getByTestId('study-cta');
     });
-    fireEvent.press(screen.getByTestId('primary-action-button'));
+    fireEvent.press(screen.getByTestId('study-cta'));
     expect(mockPushLearningResumeTarget).toHaveBeenCalledWith(
       expect.anything(),
       target
@@ -319,21 +333,20 @@ describe('TopicDetailScreen action buttons', () => {
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it('shows "Relearn" as primary when the learner is struggling', async () => {
+  it('shows "Review this topic" when the learner has high failure count', async () => {
     setupRoutes({
       completionStatus: 'completed',
       failureCount: 3,
-      struggleStatus: 'needs_deepening',
     });
 
     render(<TopicDetailScreen />, { wrapper: TestWrapper });
 
     await waitFor(() => {
-      screen.getByText('Relearn');
+      screen.getByText('Review this topic');
     });
   });
 
-  it('shows "Review" as primary when a completed topic is overdue', async () => {
+  it('shows "Review this topic" when a completed topic is overdue', async () => {
     setupRoutes({
       completionStatus: 'completed',
       nextReviewAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
@@ -342,68 +355,24 @@ describe('TopicDetailScreen action buttons', () => {
     render(<TopicDetailScreen />, { wrapper: TestWrapper });
 
     await waitFor(() => {
-      screen.getByText('Review');
+      screen.getByText('Review this topic');
     });
   });
 
-  it('hides the secondary section when no secondary actions apply', async () => {
-    setupRoutes({ completionStatus: 'not_started' });
-
-    render(<TopicDetailScreen />, { wrapper: TestWrapper });
-
-    await waitFor(() => {
-      screen.getByTestId('primary-action-button');
-    });
-    expect(screen.queryByTestId('more-ways-toggle')).toBeNull();
-  });
-
-  it('shows expandable secondary section with Recall Check', async () => {
-    setupRoutes({ completionStatus: 'in_progress' });
-
-    render(<TopicDetailScreen />, { wrapper: TestWrapper });
-
-    await waitFor(() => {
-      screen.getByTestId('more-ways-toggle');
-    });
-    fireEvent.press(screen.getByTestId('more-ways-toggle'));
-    screen.getByText('Recall Check');
-    fireEvent.press(screen.getByTestId('secondary-recall-check'));
-    expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(app)/topic/recall-test',
-      params: {
-        subjectId: 's1',
-        topicId: 't1',
-        topicName: 'Algebra',
-      },
-    });
-  });
-
-  it('shows Challenge yourself when eligible', async () => {
-    setupRoutes({ completionStatus: 'completed', evaluateEligible: true });
-
-    render(<TopicDetailScreen />, { wrapper: TestWrapper });
-
-    await waitFor(() => {
-      screen.getByTestId('more-ways-toggle');
-    });
-    fireEvent.press(screen.getByTestId('more-ways-toggle'));
-    screen.getByText('Challenge yourself');
-  });
-
-  it('shows Teach it back when retention qualifies', async () => {
+  it('shows "Practice again" for strong-retention completed topics', async () => {
     setupRoutes({
       completionStatus: 'completed',
       repetitions: 3,
-      easeFactor: 2.5,
+      nextReviewAt: new Date(
+        Date.now() + 5 * 24 * 60 * 60 * 1000
+      ).toISOString(),
     });
 
     render(<TopicDetailScreen />, { wrapper: TestWrapper });
 
     await waitFor(() => {
-      screen.getByTestId('more-ways-toggle');
+      screen.getByText('Practice again');
     });
-    fireEvent.press(screen.getByTestId('more-ways-toggle'));
-    screen.getByText('Teach it back');
   });
 });
 
@@ -416,7 +385,10 @@ describe('TopicDetailScreen error / empty / missing-params states', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseLocalSearchParams.mockReturnValue({ subjectId: 's1', topicId: 't1' });
+    mockUseLocalSearchParams.mockReturnValue({
+      subjectId: 's1',
+      topicId: 't1',
+    });
     setupRoutes();
     const { Wrapper } = createWrapper();
     TestWrapper = Wrapper;
@@ -460,7 +432,9 @@ describe('TopicDetailScreen error / empty / missing-params states', () => {
     );
     mockFetch.setRoute('/topics/t1/retention', () =>
       Promise.resolve(
-        new Response(JSON.stringify({ message: 'Retention error' }), { status: 500 })
+        new Response(JSON.stringify({ message: 'Retention error' }), {
+          status: 500,
+        })
       )
     );
 
@@ -494,7 +468,11 @@ describe('TopicDetailScreen error / empty / missing-params states', () => {
 
     resolveResponse(
       new Response(
-        JSON.stringify({ subjectId: 's1', subjectName: 'Mathematics', topicTitle: 'Algebra' }),
+        JSON.stringify({
+          subjectId: 's1',
+          subjectName: 'Mathematics',
+          topicTitle: 'Algebra',
+        }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
       )
     );
@@ -516,14 +494,14 @@ describe('TopicDetailScreen error / empty / missing-params states', () => {
     render(<TopicDetailScreen />, { wrapper: TestWrapper });
 
     await waitFor(() => {
-      screen.getByTestId('primary-action-button');
+      screen.getByTestId('study-cta');
     });
-    screen.getByText('Continue learning');
+    screen.getByText('Review this topic');
   });
 });
 
 // ---------------------------------------------------------------------------
-// Rendering: retention details, parking lot, back navigation
+// Rendering: topic header, last studied, notes, sessions
 // ---------------------------------------------------------------------------
 
 describe('TopicDetailScreen rendering details', () => {
@@ -531,90 +509,41 @@ describe('TopicDetailScreen rendering details', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseLocalSearchParams.mockReturnValue({ subjectId: 's1', topicId: 't1' });
+    mockUseLocalSearchParams.mockReturnValue({
+      subjectId: 's1',
+      topicId: 't1',
+    });
     setupRoutes();
     const { Wrapper } = createWrapper();
     TestWrapper = Wrapper;
   });
 
-  it('renders retention card with interval, repetitions, and next review', async () => {
-    mockFetch.setRoute('/topics/t1/progress', {
-      topic: {
-        topicId: 't1',
-        title: 'Algebra Basics',
-        description: 'Introduction to algebraic expressions',
-        completionStatus: 'completed',
-        retentionStatus: 'strong',
-        struggleStatus: 'normal',
-        masteryScore: 0.85,
-        summaryExcerpt: 'Learned about variables and equations',
-        xpStatus: 'verified',
-      },
-    });
-    mockFetch.setRoute('/topics/t1/retention', {
-      card: {
-        topicId: 't1',
-        easeFactor: 2.7,
-        intervalDays: 14,
-        repetitions: 5,
-        nextReviewAt: new Date(
-          Date.now() + 7 * 24 * 60 * 60 * 1000
-        ).toISOString(),
-        lastReviewedAt: null,
-        xpStatus: 'verified',
-        failureCount: 0,
-      },
-    });
-    mockFetch.setRoute('/parking-lot', {
-      items: [
-        {
-          id: 'parked-1',
-          question: 'Why does factoring help here?',
-          explored: false,
-          createdAt: '2026-02-15T10:00:00.000Z',
-        },
-      ],
-    });
-
+  it('renders topic title from progress data', async () => {
     render(<TopicDetailScreen />, { wrapper: TestWrapper });
 
     await waitFor(() => {
-      screen.getByText('Algebra Basics');
+      screen.getByText('Algebra');
     });
-    expect(
-      screen.getByText('Introduction to algebraic expressions')
-    ).toBeTruthy();
-    screen.getByText('Completed');
-    screen.getByText('85%');
-    screen.getByText('14 days');
-    screen.getByText('5');
-    expect(
-      screen.getByText('Learned about variables and equations')
-    ).toBeTruthy();
-    screen.getByText('Parking Lot');
-    screen.getByText('Why does factoring help here?');
   });
 
-  it('shows struggle status when not normal', async () => {
-    mockFetch.setRoute('/topics/t1/progress', {
-      topic: {
-        topicId: 't1',
-        title: 'Calculus',
-        description: 'Derivatives and integrals',
-        completionStatus: 'in_progress',
-        retentionStatus: 'weak',
-        struggleStatus: 'needs_deepening',
-        masteryScore: null,
-        summaryExcerpt: null,
-        xpStatus: null,
-      },
-    });
-    mockFetch.setRoute('/topics/t1/retention', { card: null });
+  it('shows "Never studied" italic when topic has never been reviewed', async () => {
+    setupRoutes({ lastReviewedAt: null });
 
     render(<TopicDetailScreen />, { wrapper: TestWrapper });
 
     await waitFor(() => {
-      screen.getByText('Exploring further');
+      screen.getByText('Never studied');
+    });
+  });
+
+  it('shows last studied date when topic has been reviewed', async () => {
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    setupRoutes({ lastReviewedAt: yesterday });
+
+    render(<TopicDetailScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      screen.getByText('Last studied yesterday');
     });
   });
 
@@ -630,15 +559,64 @@ describe('TopicDetailScreen rendering details', () => {
     expect(mockGoBackOrReplace).toHaveBeenCalled();
   });
 
-  it('does not show parked questions when parking lot is empty', async () => {
-    mockFetch.setRoute('/parking-lot', { items: [] });
-    setupRoutes({ completionStatus: 'completed' });
+  it('shows "No sessions yet. Start one below!" when sessions are empty', async () => {
+    setupRoutes({ completionStatus: 'not_started', sessions: [] });
 
     render(<TopicDetailScreen />, { wrapper: TestWrapper });
 
     await waitFor(() => {
-      screen.getByTestId('topic-detail-back');
+      screen.getByTestId('topic-sessions-empty');
     });
-    expect(screen.queryByText('Why does factoring help here?')).toBeNull();
+    screen.getByText('No sessions yet. Start one below!');
+  });
+
+  it('shows "+ Add your first note for this topic" when no notes exist', async () => {
+    setupRoutes({ notes: [] });
+
+    render(<TopicDetailScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      screen.getByText('+ Add your first note for this topic');
+    });
+  });
+
+  it('shows "+ Add a note" when notes already exist', async () => {
+    setupRoutes({
+      notes: [
+        {
+          id: 'note-1',
+          topicId: 't1',
+          content: 'My first note',
+          sessionId: null,
+          createdAt: '2026-01-01T10:00:00.000Z',
+          updatedAt: '2026-01-01T10:00:00.000Z',
+        },
+      ],
+    });
+
+    render(<TopicDetailScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      screen.getByText('+ Add a note');
+    });
+  });
+
+  it('shows "Loading…" disabled CTA while critical data is loading', async () => {
+    let resolveProgress!: (r: Response) => void;
+    const progressPromise = new Promise<Response>((resolve) => {
+      resolveProgress = resolve;
+    });
+    mockFetch.setRoute('/topics/t1/progress', () => progressPromise);
+
+    render(<TopicDetailScreen />, { wrapper: TestWrapper });
+
+    screen.getByText('Loading…');
+
+    resolveProgress(
+      new Response(JSON.stringify({ topic: { ...DEFAULT_TOPIC_PROGRESS } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
   });
 });

@@ -292,6 +292,10 @@ export default function SignUpScreen() {
         <ScrollView
           ref={verifyScrollRef}
           className="flex-1"
+          style={{
+            width: '100%',
+            ...(Platform.OS === 'web' ? { maxWidth: 480 } : undefined),
+          }}
           contentContainerStyle={{
             minHeight: SCREEN_HEIGHT,
             paddingTop: insets.top + 24,
@@ -301,7 +305,6 @@ export default function SignUpScreen() {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
         >
-          {/* Top spacer: see sign-in.tsx BUG-24 comment */}
           <View className="flex-1" style={{ minHeight: 40 }} />
           <Text className="text-h2 font-bold text-text-primary mb-1">
             Verify your email
@@ -409,9 +412,10 @@ export default function SignUpScreen() {
       <ScrollView
         ref={scrollRef}
         className="flex-1"
-        style={
-          Platform.OS === 'web' ? { maxWidth: 480, width: '100%' } : undefined
-        }
+        style={{
+          width: '100%',
+          ...(Platform.OS === 'web' ? { maxWidth: 480 } : undefined),
+        }}
         contentContainerStyle={{
           minHeight: SCREEN_HEIGHT,
           paddingTop: insets.top + 24,

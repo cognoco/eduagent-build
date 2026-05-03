@@ -30,8 +30,15 @@ interface RecallTestResult {
 
 interface RelearnResult {
   sessionId: string;
-  resetPerformed: boolean;
   message: string;
+  recap: string | null;
+}
+
+interface TeachingPreference {
+  subjectId: string;
+  method: string;
+  analogyDomain: string | null;
+  nativeLanguage: string | null;
 }
 
 export function useRetentionTopics(subjectId: string) {
@@ -166,5 +173,37 @@ export function useStartRelearn() {
       void queryClient.invalidateQueries({ queryKey: ['progress'] });
       void queryClient.invalidateQueries({ queryKey: ['sessions'] });
     },
+  });
+}
+
+export function useTeachingPreference(
+  subjectId: string | undefined
+): UseQueryResult<TeachingPreference | null> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: [
+      'retention',
+      'teaching-preference',
+      subjectId,
+      activeProfile?.id,
+    ],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.subjects[':subjectId'][
+          'teaching-preference'
+        ].$get({ param: { subjectId: subjectId ?? '' } }, { init: { signal } });
+        await assertOk(res);
+        const data = (await res.json()) as {
+          preference: TeachingPreference | null;
+        };
+        return data.preference;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled: !!activeProfile && !!subjectId,
   });
 }

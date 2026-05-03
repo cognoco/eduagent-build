@@ -139,9 +139,16 @@ export function createScopedRepository(db: Database, profileId: string) {
     },
 
     retentionCards: {
-      async findMany(extraWhere?: SQL) {
+      async findMany(
+        extraWhere?: SQL,
+        options?: { limit?: number; orderBy?: 'nextReviewAtAsc' }
+      ) {
         return db.query.retentionCards.findMany({
           where: scopedWhere(retentionCards, extraWhere),
+          ...(options?.limit ? { limit: options.limit } : {}),
+          ...(options?.orderBy === 'nextReviewAtAsc'
+            ? { orderBy: asc(retentionCards.nextReviewAt) }
+            : {}),
         });
       },
       async findFirst(extraWhere?: SQL) {

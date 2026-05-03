@@ -1,37 +1,71 @@
 /**
  * Load Database Environment Variables
  *
- * Loads environment-specific .env files to ensure tests have access to:
- * - DATABASE_URL (Neon PostgreSQL connection string)
+ * Resolution order:
+ * 1. DATABASE_URL already in env (CI, Docker, `doppler run --`)  → use it
+ * 2. .env.test.local / .env.development.local file exists        → load it
+ * 3. Doppler CLI available (`C:/Tools/doppler/doppler.exe`)      → fetch from Doppler
  *
- * Environment file loaded depends on NODE_ENV:
- * - NODE_ENV=test → .env.test.local
- * - NODE_ENV=development → .env.development.local
- *
- * When the env file is missing, a warning is logged but execution continues.
- * Tests using mocks will run normally; tests requiring a real database will
- * fail at connection time with a clear error.
- *
- * @param workspaceRoot - Absolute path to workspace root. Callers MUST use
- *                        resolve(__dirname, '../..') to compute this from their
- *                        location, NOT process.cwd() which varies based on which
- *                        project runs tests.
+ * This guarantees integration tests get DATABASE_URL regardless of how
+ * Jest is invoked (NX target, direct jest, pnpm script, etc.).
  */
 
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { existsSync } from 'fs';
+import { execSync } from 'child_process';
+
+const DOPPLER_CLI = 'C:/Tools/doppler/doppler.exe';
+
+const DOPPLER_SECRETS = [
+  'DATABASE_URL',
+  'CLERK_SECRET_KEY',
+  'CLERK_PUBLISHABLE_KEY',
+  'INNGEST_EVENT_KEY',
+  'INNGEST_SIGNING_KEY',
+  'TEST_SEED_SECRET',
+] as const;
+
+function loadFromDoppler(): boolean {
+  if (!existsSync(DOPPLER_CLI)) {
+    return false;
+  }
+
+  try {
+    const json = execSync(
+      `"${DOPPLER_CLI}" secrets download --no-file --format json`,
+      {
+        encoding: 'utf-8',
+        timeout: 15_000,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }
+    );
+
+    const secrets = JSON.parse(json) as Record<string, string>;
+
+    for (const key of DOPPLER_SECRETS) {
+      if (secrets[key] && !process.env[key]) {
+        process.env[key] = secrets[key];
+      }
+    }
+
+    if (process.env.DATABASE_URL) {
+      console.log('✅ Loaded test secrets from Doppler CLI');
+      return true;
+    }
+  } catch {
+    // Doppler CLI failed (not logged in, network issue) — fall through
+  }
+
+  return false;
+}
 
 export function loadDatabaseEnv(workspaceRoot: string): void {
-  // If DATABASE_URL already exists (CI, Docker, cloud platforms), skip file loading
   if (process.env.DATABASE_URL) {
-    console.log(
-      '✅ DATABASE_URL already set (CI or pre-configured environment)'
-    );
     return;
   }
 
-  // Otherwise, load from .env file (local development)
+  // Try .env files first (fast, no subprocess)
   const env = process.env.NODE_ENV || 'development';
   const envFiles =
     env === 'test'
@@ -45,14 +79,19 @@ export function loadDatabaseEnv(workspaceRoot: string): void {
     }
 
     config({ path: envPath });
-    console.log(`✅ Loaded environment variables from: ${envFile}`);
+    if (process.env.DATABASE_URL) {
+      return;
+    }
+  }
+
+  // Fallback: fetch directly from Doppler
+  if (loadFromDoppler()) {
     return;
   }
 
-  const attemptedFiles = envFiles.join(', ');
   console.warn(
-    `⚠️  ${attemptedFiles} not found — DATABASE_URL is unset.\n` +
-      `   Tests requiring a real database connection will fail.\n` +
-      `   See .env.example for required variables.`
+    `⚠️  DATABASE_URL is unset and Doppler CLI unavailable.\n` +
+      `   Integration tests requiring a real database will fail.\n` +
+      `   Fix: run tests via \`pnpm test\` or ensure Doppler is configured.`
   );
 }

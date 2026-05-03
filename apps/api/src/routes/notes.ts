@@ -2,17 +2,30 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import type { Database } from '@eduagent/database';
-import { upsertNoteInputSchema } from '@eduagent/schemas';
+import {
+  createNoteInputSchema,
+  updateNoteInputSchema,
+  bookNotesResponseSchema,
+  noteGetResponseSchema,
+  topicIdsResponseSchema,
+  topicNotesResponseSchema,
+  noteMutationResponseSchema,
+  topicSessionsResponseSchema,
+} from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import { notFound, NotFoundError } from '../errors';
 import {
   getNote,
   getNotesForBook,
-  upsertNote,
+  getNotesForTopic,
+  createNote,
+  updateNote,
   deleteNote,
+  deleteNoteById,
   getTopicIdsWithNotes,
 } from '../services/notes';
+import { getTopicSessions } from '../services/session';
 
 type NotesRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -33,6 +46,10 @@ const topicParamSchema = z.object({
   topicId: z.string().uuid(),
 });
 
+const noteIdParamSchema = z.object({
+  noteId: z.string().uuid(),
+});
+
 export const noteRoutes = new Hono<NotesRouteEnv>()
   // GET /subjects/:subjectId/books/:bookId/notes
   .get(
@@ -45,7 +62,7 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
 
       try {
         const notes = await getNotesForBook(db, profileId, subjectId, bookId);
-        return c.json({ notes });
+        return c.json(bookNotesResponseSchema.parse({ notes }));
       } catch (error) {
         if (error instanceof NotFoundError) {
           return notFound(c, error.message);
@@ -65,36 +82,7 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
 
       try {
         const note = await getNote(db, profileId, subjectId, topicId);
-        return c.json({ note });
-      } catch (error) {
-        if (error instanceof NotFoundError) {
-          return notFound(c, error.message);
-        }
-        throw error;
-      }
-    }
-  )
-  // PUT /subjects/:subjectId/topics/:topicId/note
-  .put(
-    '/subjects/:subjectId/topics/:topicId/note',
-    zValidator('param', topicParamSchema),
-    zValidator('json', upsertNoteInputSchema),
-    async (c) => {
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
-      const { subjectId, topicId } = c.req.valid('param');
-      const { content, append } = c.req.valid('json');
-
-      try {
-        const note = await upsertNote(
-          db,
-          profileId,
-          subjectId,
-          topicId,
-          content,
-          append
-        );
-        return c.json({ note });
+        return c.json(noteGetResponseSchema.parse({ note }));
       } catch (error) {
         if (error instanceof NotFoundError) {
           return notFound(c, error.message);
@@ -109,9 +97,90 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
     const profileId = requireProfileId(c.get('profileId'));
 
     const topicIds = await getTopicIdsWithNotes(db, profileId);
-    return c.json({ topicIds });
+    return c.json(topicIdsResponseSchema.parse({ topicIds }));
   })
+  // GET /subjects/:subjectId/topics/:topicId/notes (list all notes for topic)
+  .get(
+    '/subjects/:subjectId/topics/:topicId/notes',
+    zValidator('param', topicParamSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { subjectId, topicId } = c.req.valid('param');
+
+      try {
+        const notes = await getNotesForTopic(db, profileId, subjectId, topicId);
+        return c.json(topicNotesResponseSchema.parse({ notes }));
+      } catch (error) {
+        if (error instanceof NotFoundError) return notFound(c, error.message);
+        throw error;
+      }
+    }
+  )
+  // POST /subjects/:subjectId/topics/:topicId/notes
+  .post(
+    '/subjects/:subjectId/topics/:topicId/notes',
+    zValidator('param', topicParamSchema),
+    zValidator('json', createNoteInputSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { subjectId, topicId } = c.req.valid('param');
+      const { content, sessionId } = c.req.valid('json');
+
+      try {
+        const note = await createNote(
+          db,
+          profileId,
+          subjectId,
+          topicId,
+          content,
+          sessionId
+        );
+        return c.json(noteMutationResponseSchema.parse({ note }), 201);
+      } catch (error) {
+        if (error instanceof NotFoundError) return notFound(c, error.message);
+        throw error;
+      }
+    }
+  )
+  // PATCH /notes/:noteId
+  .patch(
+    '/notes/:noteId',
+    zValidator('param', noteIdParamSchema),
+    zValidator('json', updateNoteInputSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { noteId } = c.req.valid('param');
+      const { content } = c.req.valid('json');
+
+      try {
+        const note = await updateNote(db, profileId, noteId, content);
+        return c.json(noteMutationResponseSchema.parse({ note }));
+      } catch (error) {
+        if (error instanceof NotFoundError) return notFound(c, error.message);
+        throw error;
+      }
+    }
+  )
+  // DELETE /notes/:noteId
+  .delete(
+    '/notes/:noteId',
+    zValidator('param', noteIdParamSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { noteId } = c.req.valid('param');
+
+      const deleted = await deleteNoteById(db, profileId, noteId);
+      if (!deleted) return notFound(c, 'Note not found');
+      return c.body(null, 204);
+    }
+  )
   // DELETE /subjects/:subjectId/topics/:topicId/note
+  // @deprecated — old composite-key delete; superseded by DELETE /notes/:noteId.
+  // Kept for backwards compatibility with older mobile versions.
   .delete(
     '/subjects/:subjectId/topics/:topicId/note',
     zValidator('param', topicParamSchema),
@@ -132,5 +201,18 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
         }
         throw error;
       }
+    }
+  )
+  // GET /subjects/:subjectId/topics/:topicId/sessions
+  .get(
+    '/subjects/:subjectId/topics/:topicId/sessions',
+    zValidator('param', topicParamSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { topicId } = c.req.valid('param');
+
+      const sessions = await getTopicSessions(db, profileId, topicId);
+      return c.json(topicSessionsResponseSchema.parse({ sessions }));
     }
   );

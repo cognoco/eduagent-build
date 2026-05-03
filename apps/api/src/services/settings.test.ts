@@ -12,9 +12,6 @@ import {
   getConsecutiveSummarySkips,
   incrementSummarySkips,
   resetSummarySkips,
-  shouldPromptCasualSwitch,
-  shouldWarnSummarySkip,
-  CASUAL_SWITCH_PROMPT_THRESHOLD,
   SKIP_WARNING_THRESHOLD,
   registerPushToken,
   getPushToken,
@@ -398,130 +395,8 @@ describe('resetSummarySkips', () => {
   });
 });
 
-describe('shouldPromptCasualSwitch', () => {
-  it('returns false when no row exists (defaults: serious, 0 skips)', async () => {
-    const db = createMockDb({ findFirstResult: undefined });
-    const result = await shouldPromptCasualSwitch(db, profileId);
-
-    expect(result).toBe(false);
-  });
-
-  it('returns false when mode is casual (even with many skips)', async () => {
-    const db = createMockDb({
-      findFirstResult: { mode: 'casual', consecutiveSummarySkips: 15 },
-    });
-    const result = await shouldPromptCasualSwitch(db, profileId);
-
-    expect(result).toBe(false);
-  });
-
-  it('returns false when serious mode but skips below threshold', async () => {
-    const db = createMockDb({
-      findFirstResult: {
-        mode: 'serious',
-        consecutiveSummarySkips: CASUAL_SWITCH_PROMPT_THRESHOLD - 1,
-      },
-    });
-    const result = await shouldPromptCasualSwitch(db, profileId);
-
-    expect(result).toBe(false);
-  });
-
-  it('returns true when serious mode and skips at threshold', async () => {
-    const db = createMockDb({
-      findFirstResult: {
-        mode: 'serious',
-        consecutiveSummarySkips: CASUAL_SWITCH_PROMPT_THRESHOLD,
-      },
-    });
-    const result = await shouldPromptCasualSwitch(db, profileId);
-
-    expect(result).toBe(true);
-  });
-
-  it('returns true when serious mode and skips above threshold', async () => {
-    const db = createMockDb({
-      findFirstResult: {
-        mode: 'serious',
-        consecutiveSummarySkips: CASUAL_SWITCH_PROMPT_THRESHOLD + 5,
-      },
-    });
-    const result = await shouldPromptCasualSwitch(db, profileId);
-
-    expect(result).toBe(true);
-  });
-
-  it('threshold constant is 10', () => {
-    expect(CASUAL_SWITCH_PROMPT_THRESHOLD).toBe(10);
-  });
-});
-
-describe('shouldWarnSummarySkip', () => {
-  it('returns false when no row exists (defaults: serious, 0 skips)', async () => {
-    const db = createMockDb({ findFirstResult: undefined });
-    expect(
-      await shouldWarnSummarySkip(db as unknown as Database, profileId)
-    ).toBe(false);
-  });
-
-  it('returns false when mode is casual', async () => {
-    const db = createMockDb({
-      findFirstResult: { mode: 'casual', consecutiveSummarySkips: 7 },
-    });
-    expect(
-      await shouldWarnSummarySkip(db as unknown as Database, profileId)
-    ).toBe(false);
-  });
-
-  it('returns false when serious mode but skips < 5', async () => {
-    const db = createMockDb({
-      findFirstResult: {
-        mode: 'serious',
-        consecutiveSummarySkips: SKIP_WARNING_THRESHOLD - 1,
-      },
-    });
-    expect(
-      await shouldWarnSummarySkip(db as unknown as Database, profileId)
-    ).toBe(false);
-  });
-
-  it('returns true when serious mode and skips at warning threshold', async () => {
-    const db = createMockDb({
-      findFirstResult: {
-        mode: 'serious',
-        consecutiveSummarySkips: SKIP_WARNING_THRESHOLD,
-      },
-    });
-    expect(
-      await shouldWarnSummarySkip(db as unknown as Database, profileId)
-    ).toBe(true);
-  });
-
-  it('returns true at boundary (9 skips)', async () => {
-    const db = createMockDb({
-      findFirstResult: {
-        mode: 'serious',
-        consecutiveSummarySkips: CASUAL_SWITCH_PROMPT_THRESHOLD - 1,
-      },
-    });
-    expect(
-      await shouldWarnSummarySkip(db as unknown as Database, profileId)
-    ).toBe(true);
-  });
-
-  it('returns false when skips >= 10 (casual switch takes over)', async () => {
-    const db = createMockDb({
-      findFirstResult: {
-        mode: 'serious',
-        consecutiveSummarySkips: CASUAL_SWITCH_PROMPT_THRESHOLD,
-      },
-    });
-    expect(
-      await shouldWarnSummarySkip(db as unknown as Database, profileId)
-    ).toBe(false);
-  });
-
-  it('warning threshold constant is 5', () => {
+describe('SKIP_WARNING_THRESHOLD', () => {
+  it('remains 5', () => {
     expect(SKIP_WARNING_THRESHOLD).toBe(5);
   });
 });

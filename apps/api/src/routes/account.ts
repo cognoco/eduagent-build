@@ -1,5 +1,10 @@
 import { Hono } from 'hono';
 import type { Database } from '@eduagent/database';
+import {
+  accountDeletionResponseSchema,
+  cancelDeletionResponseSchema,
+  dataExportSchema,
+} from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
 import { createLogger } from '../services/logger';
@@ -52,20 +57,24 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
       });
     }
 
-    return c.json({
-      message: 'Deletion scheduled',
-      gracePeriodEnds,
-    });
+    return c.json(
+      accountDeletionResponseSchema.parse({
+        message: 'Deletion scheduled',
+        gracePeriodEnds,
+      })
+    );
   })
   .post('/account/cancel-deletion', async (c) => {
     const db = c.get('db');
     const account = c.get('account');
     await cancelDeletion(db, account.id);
-    return c.json({ message: 'Deletion cancelled' });
+    return c.json(
+      cancelDeletionResponseSchema.parse({ message: 'Deletion cancelled' })
+    );
   })
   .get('/account/export', async (c) => {
     const db = c.get('db');
     const account = c.get('account');
     const data = await generateExport(db, account.id);
-    return c.json(data);
+    return c.json(dataExportSchema.parse(data));
   });

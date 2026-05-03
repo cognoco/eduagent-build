@@ -13,225 +13,351 @@ import Animated, {
   cancelAnimation,
   Easing,
 } from 'react-native-reanimated';
+import Svg, {
+  Defs,
+  Rect as SvgRect,
+  LinearGradient,
+  Stop,
+} from 'react-native-svg';
 
 interface BookPageFlipAnimationProps {
-  /** Overall size in pixels (default: 140) */
   size?: number;
-  /** Cover color (default: brand violet #8b5cf6) */
   color?: string;
   testID?: string;
 }
 
-// ─── Timing constants ────────────────────────────────────────────────────────
-// Per-page flip duration
-const FLIP_MS = 500;
-// Pause at fully flipped before resetting
-const PAUSE_AFTER_FLIP_MS = 400;
-// Stagger between page 1 and page 2
+const TEAL = '#2dd4bf';
+const PURPLE = '#a855f7';
+const PURPLE_DARK = '#581c87';
+const DARK_BLUE = '#07111f';
+const INK = '#1e293b';
+const PAGE_LIGHT = '#f8f1df';
+const PAGE_DARK = '#2a2520';
+const PAGE_EDGE_LIGHT = '#d9c7a2';
+const PAGE_EDGE_DARK = '#1e1a17';
+const PAGE_ALT_LIGHT = '#f4ead2';
+const PAGE_ALT_DARK = '#241f1b';
+const GLOW_COLOR = '#fbbf24';
+
+const FLIP_SEG_MS = 560;
 const STAGGER_MS = 300;
-// Reset (flutter back) — slower, gentler
-const RESET_MS = 300;
-// Breathing period for idle state
-const BREATH_MS = 2200;
-// Dust mote rise duration range
-const MOTE_PERIOD_MS = 2700; // base; per-mote stagger applied via withDelay
+const ISO_HALF_MS = 1500;
+const MOTE_PERIOD_MS = 2700;
 
-// ─── Colors ──────────────────────────────────────────────────────────────────
-const GLOW_COLOR = '#fbbf24'; // warm amber inside glow + dust motes
-const GILT_COLOR = '#d4a73a'; // gold edge highlight strip on covers
-const SPINE_DARKEN = 0.7; // relative opacity to darken spine vs cover
-const PAGE_FRONT_LIGHT = '#faf5eb'; // cream front face
-const PAGE_FRONT_DARK = '#2a2520'; // aged paper front, dark mode
-const PAGE_BACK_LIGHT = '#ede8d8'; // slightly darker aged paper for back face
-const PAGE_BACK_DARK = '#1e1a17'; // darker back, dark mode
+function PageTextLines({
+  w,
+  h,
+  dark,
+}: {
+  w: number;
+  h: number;
+  dark: boolean;
+}) {
+  const c = dark ? '#64748b' : INK;
+  return (
+    <>
+      {[0.18, 0.28, 0.39, 0.5, 0.66, 0.77].map((frac, i) => (
+        <View
+          key={frac}
+          style={{
+            position: 'absolute',
+            top: h * frac,
+            left: w * 0.14,
+            width: w * (0.6 + (i % 2) * 0.1),
+            height: Math.max(1.5, w * 0.04),
+            borderRadius: w * 0.02,
+            backgroundColor: c,
+            opacity: i % 2 ? 0.25 : 0.35,
+          }}
+        />
+      ))}
+    </>
+  );
+}
 
-// ─── Layout proportions ──────────────────────────────────────────────────────
-// All expressed as fractions of `size` so proportions are stable at any size.
-const BOOK_TOP_FRAC = 0.18; // top of covers (fraction of size)
-const BOOK_H_FRAC = 0.65; // height of covers
-const COVER_W_FRAC = 0.38; // width of each cover half
-const SPINE_W_FRAC = 0.06; // width of spine strip
-const PAGE_INSET = 0.02; // inset from cover edge to page area
-const GILT_H_FRAC = 0.012; // gilt edge strip height
+function TurningPage({
+  flip,
+  shadow,
+  pw,
+  ph,
+  pl,
+  pt,
+  dark,
+  z,
+}: {
+  flip: SharedValue<number>;
+  shadow: SharedValue<number>;
+  pw: number;
+  ph: number;
+  pl: number;
+  pt: number;
+  dark: boolean;
+  z: number;
+}) {
+  const pageC = dark ? PAGE_DARK : PAGE_LIGHT;
+  const edgeC = dark ? PAGE_EDGE_DARK : PAGE_EDGE_LIGHT;
 
-/**
- * Cartoon storybook page-flip loading animation.
- *
- * A leather-bound book opens itself with genuine 3D page turns, warm amber
- * inside-glow, subtle breathing idle, and floating dust motes.
- *
- * ## Transform approach (Fabric safety)
- * We use the translate→rotateY→translate fallback instead of transformOrigin
- * percentage values, because `transformOrigin: ['0%', '50%', 0]` + rotateY
- * has been observed to misbehave with some Fabric/RN versions on Android
- * (the origin collapses to center instead of the left edge). The explicit
- * translate-rotate-translate chain is deterministic on both architectures:
- *
- *   transform: [
- *     { translateX: -pageW / 2 },   // shift pivot to left edge
- *     { perspective: 800 },
- *     { rotateY: `${rot}deg` },
- *     { translateX: pageW / 2 },    // shift back so left edge stays in place
- *   ]
- *
- * ## Reduced motion
- * When useReducedMotion() returns true, the component renders a static closed
- * book with no breathing, no flip, no glow, and no motes.
- */
+  const flipStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: -pw / 2 },
+      { perspective: 800 },
+      { rotateY: `${flip.value}deg` },
+      { translateX: pw / 2 },
+    ],
+  }));
+
+  const frontOp = useAnimatedStyle(() => ({
+    opacity: Math.abs(flip.value) <= 90 ? 1 : 0,
+  }));
+
+  const backOp = useAnimatedStyle(() => ({
+    opacity: Math.abs(flip.value) > 90 ? 1 : 0,
+  }));
+
+  const shadowOp = useAnimatedStyle(() => ({
+    opacity: shadow.value,
+  }));
+
+  const r = Math.max(2, pw * 0.06);
+
+  return (
+    <Animated.View
+      style={[
+        {
+          position: 'absolute',
+          left: pl,
+          top: pt,
+          width: pw,
+          height: ph,
+          zIndex: z,
+        },
+        flipStyle,
+        { pointerEvents: 'none' },
+      ]}
+    >
+      {/* Back face (mirrored so text reads correctly when flipped) */}
+      <Animated.View
+        style={[
+          {
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: pw,
+            height: ph,
+            borderTopLeftRadius: r,
+            borderBottomLeftRadius: r,
+            borderTopRightRadius: 2,
+            borderBottomRightRadius: 2,
+            overflow: 'hidden',
+            transform: [{ scaleX: -1 }],
+          },
+          backOp,
+        ]}
+      >
+        <View style={{ flex: 1, backgroundColor: edgeC }}>
+          <View
+            style={{
+              position: 'absolute',
+              top: 0,
+              right: 0,
+              width: '70%',
+              height: '100%',
+              backgroundColor: pageC,
+            }}
+          />
+        </View>
+        <PageTextLines w={pw} h={ph} dark={dark} />
+      </Animated.View>
+
+      {/* Front face */}
+      <Animated.View
+        style={[
+          {
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: pw,
+            height: ph,
+            borderTopLeftRadius: 2,
+            borderBottomLeftRadius: 2,
+            borderTopRightRadius: r,
+            borderBottomRightRadius: r,
+            overflow: 'hidden',
+          },
+          frontOp,
+        ]}
+      >
+        <View style={{ flex: 1, backgroundColor: pageC }}>
+          <View
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '30%',
+              height: '100%',
+              backgroundColor: edgeC,
+            }}
+          />
+        </View>
+        <PageTextLines w={pw} h={ph} dark={dark} />
+      </Animated.View>
+
+      {/* Shadow cast during turn */}
+      <Animated.View
+        style={[
+          {
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: pw,
+            height: ph,
+            backgroundColor: 'rgba(0,0,0,0.4)',
+            borderRadius: 3,
+          },
+          shadowOp,
+        ]}
+      />
+    </Animated.View>
+  );
+}
+
 export function BookPageFlipAnimation({
   size = 140,
-  color = '#8b5cf6',
+  color,
   testID,
 }: BookPageFlipAnimationProps): ReactNode {
   const reduceMotion = useReducedMotion();
   const isDark = useColorScheme() === 'dark';
 
-  // ── Derived layout values ──────────────────────────────────────────────────
-  const bookTop = size * BOOK_TOP_FRAC;
-  const bookH = size * BOOK_H_FRAC;
-  const coverW = size * COVER_W_FRAC;
-  const spineW = size * SPINE_W_FRAC;
-  const giltH = size * GILT_H_FRAC;
+  // Colors
+  const pageC = isDark ? PAGE_DARK : PAGE_LIGHT;
+  const edgeC = isDark ? PAGE_EDGE_DARK : PAGE_EDGE_LIGHT;
+  const altC = isDark ? PAGE_ALT_DARK : PAGE_ALT_LIGHT;
+  void color;
 
-  // Left cover starts at left edge of book area; right cover after spine
-  const bookLeft = (size - (coverW * 2 + spineW)) / 2;
-  const spineLeft = bookLeft + coverW;
-  const rightCoverLeft = spineLeft + spineW;
-
-  // Page dimensions — slightly inset from cover
-  const pageInset = size * PAGE_INSET;
-  const pageW = coverW - pageInset;
-  const pageH = bookH - pageInset * 2;
-  const pageTop = bookTop + pageInset;
-
-  // Pages originate at the spine (right edge of left page area)
-  // Using translate-rotate-translate: left edge of page at spineLeft
-  const pageLeft = spineLeft - pageW;
-
-  // Glow ellipse behind the spine
-  const glowW = spineW * 5;
-  const glowH = bookH * 0.8;
-  const glowLeft = spineLeft - glowW / 2 + spineW / 2;
-  const glowTop = bookTop + bookH * 0.1;
-
-  // Page colors
-  const pageFrontColor = isDark ? PAGE_FRONT_DARK : PAGE_FRONT_LIGHT;
-  const pageBackColor = isDark ? PAGE_BACK_DARK : PAGE_BACK_LIGHT;
-
-  // Dot (mote) size
+  // Layout (fractions of size)
+  const coverW = size * 0.38;
+  const coverH = size * 0.5;
+  const coverTop = size * 0.3;
+  const leftX = size * 0.12;
+  const rightX = size * 0.52;
+  const spineX = size * 0.49;
+  const spineW = size * 0.05;
+  const spineH = size * 0.54;
+  const spineTop = size * 0.28;
+  const blockX = size * 0.2;
+  const blockTop = size * 0.28;
+  const blockW = size * 0.6;
+  const blockH = size * 0.5;
+  const pgTop = size * 0.3;
+  const pgH = size * 0.46;
+  const pgW = size * 0.28;
+  const pgLeftX = size * 0.22;
+  const pgRightX = size * 0.52;
+  const coverR = Math.max(4, size * 0.06);
   const moteSize = Math.max(3, size * 0.028);
 
-  // ── Shared values ──────────────────────────────────────────────────────────
-  // Page rotations: 0 = front (right-side page position), -180 = fully flipped left
-  const page1Rot = useSharedValue(0);
-  const page2Rot = useSharedValue(0);
-  const page3Rot = useSharedValue(0);
+  // Glow behind spine
+  const glowW = spineW * 5;
+  const glowH = coverH * 0.8;
+  const glowX = spineX - glowW / 2 + spineW / 2;
+  const glowTop = coverTop + coverH * 0.1;
 
-  // Inside glow opacity
-  const glowOp = useSharedValue(0.1);
-
-  // Breathing scale (Y axis, idle closed book feel)
-  const breathScale = useSharedValue(1.0);
-
-  // Dust motes: each is a progress value 0→1 (0 = bottom, 1 = top + faded)
+  // Shared values
+  const isoX = useSharedValue(reduceMotion ? 44 : 42);
+  const isoY = useSharedValue(reduceMotion ? 5 : 6);
+  const flip1 = useSharedValue(0);
+  const flip2 = useSharedValue(0);
+  const flip3 = useSharedValue(0);
+  const shd1 = useSharedValue(0);
+  const shd2 = useSharedValue(0);
+  const shd3 = useSharedValue(0);
+  const glowOp = useSharedValue(reduceMotion ? 0.15 : 0.1);
   const mote1 = useSharedValue(0);
   const mote2 = useSharedValue(0);
   const mote3 = useSharedValue(0);
 
-  // ── Animation orchestration ────────────────────────────────────────────────
   useEffect(() => {
-    if (reduceMotion) return;
+    if (reduceMotion) {
+      isoX.value = 44;
+      isoY.value = 5;
+      glowOp.value = 0.15;
+      return;
+    }
 
-    const flipEase = Easing.inOut(Easing.ease);
+    const ease = Easing.inOut(Easing.ease);
 
-    // Each page flips 0 → -180 over FLIP_MS, holds PAUSE_AFTER_FLIP_MS,
-    // then resets -180 → 0 over RESET_MS (gentle "sigh closed").
-    // Page 2 and 3 are staggered so they feel like continuous turning.
-    // Cycle length must be equal across all three so withRepeat stays in sync.
-
-    // Page 1: flips first
-    page1Rot.value = withRepeat(
+    // Isometric breathing
+    isoX.value = withRepeat(
       withSequence(
-        withTiming(-180, { duration: FLIP_MS, easing: flipEase }),
-        withDelay(
-          PAUSE_AFTER_FLIP_MS,
-          withTiming(0, { duration: RESET_MS, easing: flipEase })
-        ),
-        // pad out to equal cycle length for pages 2 & 3
-        withDelay(STAGGER_MS * 2, withTiming(0, { duration: 0 }))
+        withTiming(46, { duration: ISO_HALF_MS, easing: ease }),
+        withTiming(42, { duration: ISO_HALF_MS, easing: ease })
+      ),
+      -1,
+      false
+    );
+    isoY.value = withRepeat(
+      withSequence(
+        withTiming(4, { duration: ISO_HALF_MS, easing: ease }),
+        withTiming(6, { duration: ISO_HALF_MS, easing: ease })
       ),
       -1,
       false
     );
 
-    // Page 2: delayed STAGGER_MS after page 1
-    page2Rot.value = withRepeat(
-      withSequence(
-        withDelay(
-          STAGGER_MS,
-          withTiming(-180, { duration: FLIP_MS, easing: flipEase })
+    // Page flips (staggered, each page has own cycle for organic drift)
+    const mkFlip = (delay: number) =>
+      withRepeat(
+        withSequence(
+          ...(delay > 0 ? [withTiming(0, { duration: delay })] : []),
+          withTiming(-60, { duration: FLIP_SEG_MS, easing: ease }),
+          withTiming(-140, { duration: FLIP_SEG_MS, easing: ease }),
+          withTiming(-180, { duration: FLIP_SEG_MS, easing: ease }),
+          withTiming(-180, { duration: FLIP_SEG_MS }),
+          withTiming(0, { duration: FLIP_SEG_MS, easing: ease })
         ),
-        withDelay(
-          PAUSE_AFTER_FLIP_MS,
-          withTiming(0, { duration: RESET_MS, easing: flipEase })
-        ),
-        withDelay(STAGGER_MS, withTiming(0, { duration: 0 }))
-      ),
-      -1,
-      false
-    );
+        -1,
+        false
+      );
 
-    // Page 3: delayed STAGGER_MS * 2 after page 1
-    page3Rot.value = withRepeat(
-      withSequence(
-        withDelay(
-          STAGGER_MS * 2,
-          withTiming(-180, { duration: FLIP_MS, easing: flipEase })
+    const mkShadow = (delay: number) =>
+      withRepeat(
+        withSequence(
+          ...(delay > 0 ? [withTiming(0, { duration: delay })] : []),
+          withTiming(0.25, { duration: FLIP_SEG_MS }),
+          withTiming(0.5, { duration: FLIP_SEG_MS }),
+          withTiming(0.15, { duration: FLIP_SEG_MS }),
+          withTiming(0, { duration: FLIP_SEG_MS }),
+          withTiming(0, { duration: FLIP_SEG_MS })
         ),
-        withDelay(
-          PAUSE_AFTER_FLIP_MS,
-          withTiming(0, { duration: RESET_MS, easing: flipEase })
-        ),
-        withTiming(0, { duration: 0 })
-      ),
-      -1,
-      false
-    );
+        -1,
+        false
+      );
 
-    // Glow pulses in sync with the flip sequence: rises as pages start turning
+    flip1.value = mkFlip(0);
+    flip2.value = mkFlip(STAGGER_MS);
+    flip3.value = mkFlip(STAGGER_MS * 2);
+    shd1.value = mkShadow(0);
+    shd2.value = mkShadow(STAGGER_MS);
+    shd3.value = mkShadow(STAGGER_MS * 2);
+
+    // Glow synced with page flips
     glowOp.value = withRepeat(
       withSequence(
         withTiming(0.45, {
-          duration: FLIP_MS + STAGGER_MS,
-          easing: Easing.inOut(Easing.ease),
+          duration: FLIP_SEG_MS + STAGGER_MS,
+          easing: ease,
         }),
         withTiming(0.1, {
-          duration: FLIP_MS + PAUSE_AFTER_FLIP_MS + RESET_MS,
-          easing: Easing.inOut(Easing.ease),
+          duration: FLIP_SEG_MS * 3,
+          easing: ease,
         })
       ),
       -1,
       false
     );
 
-    // Breathing: very gentle scale Y oscillation while closed (period ~2200ms)
-    breathScale.value = withRepeat(
-      withSequence(
-        withTiming(1.008, {
-          duration: BREATH_MS / 2,
-          easing: Easing.inOut(Easing.ease),
-        }),
-        withTiming(0.993, {
-          duration: BREATH_MS / 2,
-          easing: Easing.inOut(Easing.ease),
-        })
-      ),
-      -1,
-      true
-    );
-
-    // Dust motes: each rises (translateY from 0 to -35px) and fades, loops
-    // They use slightly different periods so they don't move in unison.
+    // Dust motes
     mote1.value = withRepeat(
       withSequence(
         withTiming(1, { duration: MOTE_PERIOD_MS }),
@@ -264,64 +390,48 @@ export function BookPageFlipAnimation({
     );
 
     return () => {
-      cancelAnimation(page1Rot);
-      cancelAnimation(page2Rot);
-      cancelAnimation(page3Rot);
+      cancelAnimation(isoX);
+      cancelAnimation(isoY);
+      cancelAnimation(flip1);
+      cancelAnimation(flip2);
+      cancelAnimation(flip3);
+      cancelAnimation(shd1);
+      cancelAnimation(shd2);
+      cancelAnimation(shd3);
       cancelAnimation(glowOp);
-      cancelAnimation(breathScale);
       cancelAnimation(mote1);
       cancelAnimation(mote2);
       cancelAnimation(mote3);
     };
   }, [
     reduceMotion,
-    page1Rot,
-    page2Rot,
-    page3Rot,
+    isoX,
+    isoY,
+    flip1,
+    flip2,
+    flip3,
+    shd1,
+    shd2,
+    shd3,
     glowOp,
-    breathScale,
     mote1,
     mote2,
     mote3,
   ]);
 
-  // ── Animated styles ────────────────────────────────────────────────────────
-
-  // Page transform: translate-rotate-translate to anchor rotation at left edge.
-  // This is the Fabric-safe fallback for transformOrigin: ['0%', '50%', 0].
-  // perspective: 800 gives depth without too much foreshortening at small sizes.
-  function usePageFrontStyle(sv: SharedValue<number>) {
-    return useAnimatedStyle(() => ({
-      transform: [
-        { translateX: -pageW / 2 },
-        { perspective: 800 },
-        { rotateY: `${sv.value}deg` },
-        { translateX: pageW / 2 },
-      ],
-    }));
-  }
-
-  // Back-face overlay: same transform but opacity only visible when rotated past 90deg.
-  // We use a simple approach: the back-face view is always rendered behind the front face,
-  // and we rely on the natural 3D flip so the back color shows through once rotated.
-  // Since RN doesn't natively backface-cull without native driver complexity, we simply
-  // show two overlapping views with matching transforms and use opacity to fade each face
-  // at the crossover point. In practice the depth effect reads as "page turning" even
-  // without perfect back-face hiding.
-
-  const page1FrontStyle = usePageFrontStyle(page1Rot);
-  const page2FrontStyle = usePageFrontStyle(page2Rot);
-  const page3FrontStyle = usePageFrontStyle(page3Rot);
+  // Styles
+  const isoStyle = useAnimatedStyle(() => ({
+    transform: [
+      { perspective: 1000 },
+      { rotateX: `${isoX.value}deg` },
+      { rotateY: `${isoY.value}deg` },
+    ],
+  }));
 
   const glowStyle = useAnimatedStyle(() => ({
     opacity: glowOp.value,
   }));
 
-  const breathStyle = useAnimatedStyle(() => ({
-    transform: [{ scaleY: breathScale.value }],
-  }));
-
-  // Mote styles: translateY upward, drift X, fade out as they rise
   const MOTE_RISE = size * 0.28;
   const mote1Style = useAnimatedStyle(() => ({
     opacity: (1 - mote1.value) * 0.7,
@@ -345,71 +455,13 @@ export function BookPageFlipAnimation({
     ],
   }));
 
-  // ── Render helpers ─────────────────────────────────────────────────────────
-
-  // A single turning page: front face with back-face color behind it
-  function TurningPage({
-    pageStyle,
-    zIndex,
-  }: {
-    pageStyle: ReturnType<typeof useAnimatedStyle>;
-    zIndex: number;
-  }) {
-    return (
-      <Animated.View
-        style={[
-          {
-            position: 'absolute',
-            left: pageLeft,
-            top: pageTop,
-            width: pageW,
-            height: pageH,
-            zIndex,
-          },
-          pageStyle,
-          { pointerEvents: 'none' },
-        ]}
-      >
-        {/* Back face (aged paper) — rendered behind front */}
-        <View
-          style={{
-            position: 'absolute',
-            inset: 0,
-            backgroundColor: pageBackColor,
-            borderRadius: 2,
-          }}
-        />
-        {/* Front face (cream) — rendered on top */}
-        <View
-          style={{
-            position: 'absolute',
-            inset: 0,
-            backgroundColor: pageFrontColor,
-            borderRadius: 2,
-          }}
-        />
-        {/* Decorative text lines on front */}
-        {[0.22, 0.35, 0.48, 0.61, 0.74].map((frac) => (
-          <View
-            key={frac}
-            style={{
-              position: 'absolute',
-              left: pageW * 0.1,
-              top: pageH * frac,
-              width: pageW * 0.8,
-              height: 1,
-              backgroundColor: isDark ? '#4a3f35' : '#d4c4a8',
-              opacity: 0.35,
-            }}
-          />
-        ))}
-      </Animated.View>
-    );
-  }
-
-  // ── Static spine color: darker shade of cover color ────────────────────────
-  // We approximate "darken" by wrapping a semi-transparent black overlay
-  // rather than parsing hex — avoids any color math in the component.
+  const staticIso = {
+    transform: [
+      { perspective: 1000 as number },
+      { rotateX: '44deg' },
+      { rotateY: '5deg' },
+    ],
+  };
 
   return (
     <View
@@ -418,189 +470,236 @@ export function BookPageFlipAnimation({
       accessibilityRole="image"
       style={{ width: size, height: size }}
     >
-      {/* Breathing wrapper — wraps the entire book for the idle scale */}
+      {/* Isometric wrapper */}
       <Animated.View
         style={[
           { position: 'absolute', left: 0, top: 0, width: size, height: size },
-          !reduceMotion ? breathStyle : undefined,
+          !reduceMotion ? isoStyle : staticIso,
           { pointerEvents: 'none' },
         ]}
       >
-        {/* ── Left cover ─────────────────────────────────────────────────── */}
+        {/* Left cover (dark blue → purple dark) */}
         <View
           style={{
             position: 'absolute',
-            left: bookLeft,
-            top: bookTop,
+            left: leftX,
+            top: coverTop,
             width: coverW,
-            height: bookH,
-            backgroundColor: color,
-            borderTopLeftRadius: 4,
-            borderBottomLeftRadius: 4,
-            opacity: 0.9,
+            height: coverH,
+            borderTopLeftRadius: coverR,
+            borderBottomLeftRadius: coverR,
+            overflow: 'hidden',
           }}
         >
-          {/* Gilt edge strip — top of left cover */}
-          <View
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 4,
-              right: 4,
-              height: giltH,
-              backgroundColor: GILT_COLOR,
-              opacity: 0.65,
-              borderRadius: 1,
-            }}
-          />
-          {/* Inset border for leather texture suggestion */}
-          <View
-            style={{
-              position: 'absolute',
-              top: 4,
-              left: 4,
-              bottom: 4,
-              right: 4,
-              borderWidth: 1,
-              borderColor: '#ffffff',
-              opacity: 0.1,
-              borderRadius: 2,
-            }}
-          />
+          <Svg width={coverW} height={coverH}>
+            <Defs>
+              <LinearGradient id="blc" x1="0" y1="0" x2="0.7" y2="0.9">
+                <Stop offset="0" stopColor={DARK_BLUE} />
+                <Stop offset="1" stopColor={PURPLE_DARK} />
+              </LinearGradient>
+            </Defs>
+            <SvgRect
+              x={0}
+              y={0}
+              width={coverW}
+              height={coverH}
+              fill="url(#blc)"
+            />
+          </Svg>
         </View>
 
-        {/* ── Spine ──────────────────────────────────────────────────────── */}
+        {/* Page block (stacked pages visible between covers) */}
         <View
           style={{
             position: 'absolute',
-            left: spineLeft,
-            top: bookTop - size * 0.01,
-            width: spineW,
-            height: bookH + size * 0.02,
-            backgroundColor: color,
-            opacity: SPINE_DARKEN,
-          }}
-        />
-        {/* Spine shadow overlay for depth */}
-        <View
-          style={{
-            position: 'absolute',
-            left: spineLeft,
-            top: bookTop - size * 0.01,
-            width: spineW,
-            height: bookH + size * 0.02,
-            backgroundColor: '#000000',
-            opacity: 0.25,
-          }}
-        />
-
-        {/* ── Right cover ────────────────────────────────────────────────── */}
-        <View
-          style={{
-            position: 'absolute',
-            left: rightCoverLeft,
-            top: bookTop,
-            width: coverW,
-            height: bookH,
-            backgroundColor: color,
-            borderTopRightRadius: 4,
-            borderBottomRightRadius: 4,
-            opacity: 0.9,
+            left: blockX,
+            top: blockTop,
+            width: blockW,
+            height: blockH,
+            borderRadius: 4,
+            overflow: 'hidden',
+            backgroundColor: edgeC,
           }}
         >
-          {/* Gilt edge strip — top of right cover */}
-          <View
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 4,
-              right: 4,
-              height: giltH,
-              backgroundColor: GILT_COLOR,
-              opacity: 0.65,
-              borderRadius: 1,
-            }}
-          />
-          {/* Inset border */}
-          <View
-            style={{
-              position: 'absolute',
-              top: 4,
-              left: 4,
-              bottom: 4,
-              right: 4,
-              borderWidth: 1,
-              borderColor: '#ffffff',
-              opacity: 0.1,
-              borderRadius: 2,
-            }}
-          />
-        </View>
-
-        {/* ── Static left page (visible under the turning pages) ─────────── */}
-        <View
-          style={{
-            position: 'absolute',
-            left: pageLeft,
-            top: pageTop,
-            width: pageW,
-            height: pageH,
-            backgroundColor: pageFrontColor,
-            borderRadius: 2,
-          }}
-        >
-          {[0.22, 0.35, 0.48, 0.61, 0.74].map((frac) => (
+          {Array.from({ length: 10 }, (_, i) => (
             <View
-              key={frac}
+              key={i}
               style={{
                 position: 'absolute',
-                left: pageW * 0.1,
-                top: pageH * frac,
-                width: pageW * 0.8,
-                height: 1,
-                backgroundColor: isDark ? '#4a3f35' : '#d4c4a8',
-                opacity: 0.35,
+                left: 0,
+                top: i * blockH * 0.007,
+                width: blockW,
+                height: blockH,
+                backgroundColor: i % 2 ? pageC : altC,
+                opacity: 0.92 - i * 0.015,
+                transform: [{ translateX: i * 0.7 }],
               }}
             />
           ))}
         </View>
 
-        {/* ── Static right page (background, visible when pages not flipped) */}
+        {/* Spine (teal → purple gradient) */}
         <View
           style={{
             position: 'absolute',
-            left: rightCoverLeft + pageInset,
-            top: pageTop,
-            width: pageW,
-            height: pageH,
-            backgroundColor: pageFrontColor,
-            borderRadius: 2,
+            left: spineX,
+            top: spineTop,
+            width: spineW,
+            height: spineH,
+            overflow: 'hidden',
           }}
         >
-          {[0.22, 0.35, 0.48, 0.61, 0.74].map((frac) => (
+          <Svg width={spineW} height={spineH}>
+            <Defs>
+              <LinearGradient id="bsp" x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0" stopColor={TEAL} />
+                <Stop offset="1" stopColor={PURPLE} />
+              </LinearGradient>
+            </Defs>
+            <SvgRect
+              x={0}
+              y={0}
+              width={spineW}
+              height={spineH}
+              fill="url(#bsp)"
+            />
+          </Svg>
+        </View>
+
+        {/* Right cover (purple → dark blue) */}
+        <View
+          style={{
+            position: 'absolute',
+            left: rightX,
+            top: spineTop,
+            width: coverW,
+            height: coverH,
+            borderTopRightRadius: coverR,
+            borderBottomRightRadius: coverR,
+            overflow: 'hidden',
+          }}
+        >
+          <Svg width={coverW} height={coverH}>
+            <Defs>
+              <LinearGradient id="brc" x1="0" y1="0" x2="0.7" y2="0.9">
+                <Stop offset="0" stopColor={PURPLE} />
+                <Stop offset="1" stopColor={DARK_BLUE} />
+              </LinearGradient>
+            </Defs>
+            <SvgRect
+              x={0}
+              y={0}
+              width={coverW}
+              height={coverH}
+              fill="url(#brc)"
+            />
+          </Svg>
+        </View>
+
+        {/* Static left page */}
+        <View
+          style={{
+            position: 'absolute',
+            left: pgLeftX,
+            top: pgTop,
+            width: pgW,
+            height: pgH,
+            borderTopLeftRadius: 6,
+            borderBottomLeftRadius: 6,
+            borderTopRightRadius: 2,
+            borderBottomRightRadius: 2,
+            overflow: 'hidden',
+          }}
+        >
+          <View style={{ flex: 1, backgroundColor: edgeC }}>
             <View
-              key={frac}
               style={{
                 position: 'absolute',
-                left: pageW * 0.1,
-                top: pageH * frac,
-                width: pageW * 0.8,
-                height: 1,
-                backgroundColor: isDark ? '#4a3f35' : '#d4c4a8',
-                opacity: 0.35,
+                top: 0,
+                right: 0,
+                width: '70%',
+                height: '100%',
+                backgroundColor: pageC,
               }}
             />
-          ))}
+          </View>
+          <PageTextLines w={pgW} h={pgH} dark={isDark} />
         </View>
+
+        {/* Static right page */}
+        <View
+          style={{
+            position: 'absolute',
+            left: pgRightX,
+            top: pgTop,
+            width: pgW,
+            height: pgH,
+            borderTopLeftRadius: 2,
+            borderBottomLeftRadius: 2,
+            borderTopRightRadius: 6,
+            borderBottomRightRadius: 6,
+            overflow: 'hidden',
+          }}
+        >
+          <View style={{ flex: 1, backgroundColor: pageC }}>
+            <View
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '30%',
+                height: '100%',
+                backgroundColor: edgeC,
+              }}
+            />
+          </View>
+          <PageTextLines w={pgW} h={pgH} dark={isDark} />
+        </View>
+
+        {/* Turning pages */}
+        {!reduceMotion && (
+          <>
+            <TurningPage
+              flip={flip3}
+              shadow={shd3}
+              pw={pgW}
+              ph={pgH}
+              pl={pgRightX}
+              pt={pgTop}
+              dark={isDark}
+              z={20}
+            />
+            <TurningPage
+              flip={flip2}
+              shadow={shd2}
+              pw={pgW}
+              ph={pgH}
+              pl={pgRightX}
+              pt={pgTop}
+              dark={isDark}
+              z={25}
+            />
+            <TurningPage
+              flip={flip1}
+              shadow={shd1}
+              pw={pgW}
+              ph={pgH}
+              pl={pgRightX}
+              pt={pgTop}
+              dark={isDark}
+              z={30}
+            />
+          </>
+        )}
       </Animated.View>
 
-      {/* ── Inside glow — behind the pages, in the spine gap ─────────────── */}
+      {/* Warm glow behind spine */}
       {!reduceMotion && (
         <Animated.View
           style={[
             {
               position: 'absolute',
-              left: glowLeft,
+              left: glowX,
               top: glowTop,
               width: glowW,
               height: glowH,
@@ -613,25 +712,15 @@ export function BookPageFlipAnimation({
         />
       )}
 
-      {/* ── Turning pages (3D flip using translate-rotate-translate) ─────── */}
-      {!reduceMotion && (
-        <>
-          {/* Page 3 renders lowest (flips last, should appear behind page 2) */}
-          <TurningPage pageStyle={page3FrontStyle} zIndex={3} />
-          <TurningPage pageStyle={page2FrontStyle} zIndex={4} />
-          <TurningPage pageStyle={page1FrontStyle} zIndex={5} />
-        </>
-      )}
-
-      {/* ── Dust motes near spine ─────────────────────────────────────────── */}
+      {/* Dust motes */}
       {!reduceMotion && (
         <>
           <Animated.View
             style={[
               {
                 position: 'absolute',
-                left: spineLeft + spineW * 0.2,
-                top: bookTop + bookH * 0.55,
+                left: spineX + spineW * 0.2,
+                top: coverTop + coverH * 0.55,
                 width: moteSize,
                 height: moteSize,
                 borderRadius: moteSize / 2,
@@ -645,8 +734,8 @@ export function BookPageFlipAnimation({
             style={[
               {
                 position: 'absolute',
-                left: spineLeft + spineW * 0.6,
-                top: bookTop + bookH * 0.45,
+                left: spineX + spineW * 0.6,
+                top: coverTop + coverH * 0.45,
                 width: moteSize * 0.85,
                 height: moteSize * 0.85,
                 borderRadius: moteSize / 2,
@@ -660,8 +749,8 @@ export function BookPageFlipAnimation({
             style={[
               {
                 position: 'absolute',
-                left: spineLeft - spineW * 0.2,
-                top: bookTop + bookH * 0.65,
+                left: spineX - spineW * 0.2,
+                top: coverTop + coverH * 0.65,
                 width: moteSize * 0.7,
                 height: moteSize * 0.7,
                 borderRadius: moteSize / 2,

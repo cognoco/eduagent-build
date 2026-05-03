@@ -3,7 +3,7 @@ import { useThemeColors } from '../../lib/theme';
 import { withOpacity } from '../../lib/color-opacity';
 
 interface TopicStatusRowProps {
-  state: 'continue-now' | 'started' | 'up-next' | 'done';
+  state: 'continue-now' | 'started' | 'up-next' | 'done' | 'later';
   variant?: 'hero';
   title: string;
   chapterName?: string;
@@ -17,6 +17,7 @@ const STATE_GLYPH: Record<TopicStatusRowProps['state'], string> = {
   started: '●',
   'up-next': '→',
   done: '✓',
+  later: '○',
 };
 
 const STATE_LABEL: Record<TopicStatusRowProps['state'], string> = {
@@ -24,6 +25,7 @@ const STATE_LABEL: Record<TopicStatusRowProps['state'], string> = {
   started: 'Started',
   'up-next': 'Up next',
   done: 'Done',
+  later: 'Later',
 };
 
 export function TopicStatusRow({
@@ -73,6 +75,12 @@ export function TopicStatusRow({
           backgroundColor: doneBackgroundColor,
           borderWidth: 0,
         };
+      case 'later':
+        return {
+          backgroundColor: 'transparent',
+          borderColor: withOpacity(colors.textSecondary, 0.125),
+          borderWidth: 1,
+        };
     }
   })();
 
@@ -86,6 +94,8 @@ export function TopicStatusRow({
         return accentColor;
       case 'done':
         return colors.success;
+      case 'later':
+        return colors.textSecondary;
     }
   })();
 

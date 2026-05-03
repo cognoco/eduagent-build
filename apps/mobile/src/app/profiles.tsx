@@ -364,7 +364,7 @@ export default function ProfilesScreen() {
           accessibilityRole="none"
         >
           <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           >
             <Pressable
               onPress={() => {

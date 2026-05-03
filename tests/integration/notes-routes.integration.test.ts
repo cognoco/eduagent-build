@@ -135,13 +135,13 @@ describe('Integration: note routes', () => {
     expect(body.note).toBeNull();
   });
 
-  it('creates and appends to a note with real persistence', async () => {
+  it('creates and updates a note with real persistence', async () => {
     const { profile, subject, topicId } = await createTopicFixture();
 
     const createRes = await app.request(
-      `/v1/subjects/${subject.id}/topics/${topicId}/note`,
+      `/v1/subjects/${subject.id}/topics/${topicId}/notes`,
       {
-        method: 'PUT',
+        method: 'POST',
         headers: buildAuthHeaders(
           { sub: NOTES_USER.userId, email: NOTES_USER.email },
           profile.id
@@ -151,29 +151,28 @@ describe('Integration: note routes', () => {
       TEST_ENV
     );
 
-    expect(createRes.status).toBe(200);
+    expect(createRes.status).toBe(201);
     const createdBody = await createRes.json();
     expect(createdBody.note.content).toBe('First line');
 
-    const appendRes = await app.request(
-      `/v1/subjects/${subject.id}/topics/${topicId}/note`,
+    const noteId = createdBody.note.id;
+
+    const updateRes = await app.request(
+      `/v1/notes/${noteId}`,
       {
-        method: 'PUT',
+        method: 'PATCH',
         headers: buildAuthHeaders(
           { sub: NOTES_USER.userId, email: NOTES_USER.email },
           profile.id
         ),
-        body: JSON.stringify({
-          content: 'Second line',
-          append: true,
-        }),
+        body: JSON.stringify({ content: 'First line\nSecond line' }),
       },
       TEST_ENV
     );
 
-    expect(appendRes.status).toBe(200);
-    const appendedBody = await appendRes.json();
-    expect(appendedBody.note.content).toBe('First line\nSecond line');
+    expect(updateRes.status).toBe(200);
+    const updatedBody = await updateRes.json();
+    expect(updatedBody.note.content).toBe('First line\nSecond line');
 
     const db = getIntegrationDb();
     const saved = await db.query.topicNotes.findFirst({
@@ -189,9 +188,9 @@ describe('Integration: note routes', () => {
     const { profile, subject, topicId } = await createTopicFixture();
 
     const res = await app.request(
-      `/v1/subjects/${subject.id}/topics/${topicId}/note`,
+      `/v1/subjects/${subject.id}/topics/${topicId}/notes`,
       {
-        method: 'PUT',
+        method: 'POST',
         headers: buildAuthHeaders(
           { sub: NOTES_USER.userId, email: NOTES_USER.email },
           profile.id

@@ -1,0 +1,2 @@
+ALTER TABLE "xp_ledger" ADD COLUMN "reflection_applied_by_session_id" uuid;--> statement-breakpoint
+ALTER TABLE "xp_ledger" ADD CONSTRAINT "xp_ledger_reflection_applied_by_session_id_learning_sessions_id_fk" FOREIGN KEY ("reflection_applied_by_session_id") REFERENCES "public"."learning_sessions"("id") ON DELETE set null ON UPDATE no action;

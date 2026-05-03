@@ -93,7 +93,7 @@ describe('BaseCoachingCard', () => {
   it('skeleton has loading accessibility label', () => {
     render(<BaseCoachingCard {...defaultProps} isLoading />);
 
-    screen.getByLabelText('Loading coaching card');
+    screen.getByLabelText('Loading mentor card');
   });
 
   it('wraps in Pressable when onPress is provided', () => {

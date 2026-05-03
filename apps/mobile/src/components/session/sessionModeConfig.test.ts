@@ -9,6 +9,30 @@ import {
 describe('getOpeningMessage', () => {
   const modes = ['homework', 'learning', 'practice', 'freeform'];
 
+  it('uses recap-specific opening copy for relearn sessions', () => {
+    const msg = getOpeningMessage(
+      'relearn',
+      2,
+      undefined,
+      'Fractions',
+      undefined,
+      undefined,
+      'We covered numerators and denominators.'
+    );
+
+    expect(msg).toContain('Last time you learned about Fractions');
+    expect(msg).toContain('We covered numerators and denominators.');
+    expect(msg).toContain('Want to do a quick quiz');
+  });
+
+  it('falls back to generic relearn opening when no recap is available', () => {
+    const msg = getOpeningMessage('relearn', 2, undefined, 'Fractions');
+
+    expect(msg).toBe(
+      "Let's approach Fractions from a fresh angle. What do you remember about it?"
+    );
+  });
+
   it('returns problem-text override regardless of experience', () => {
     const msg = getOpeningMessage('homework', 0, 'Solve 2+2');
     expect(msg).toBe(

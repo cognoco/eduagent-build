@@ -1,13 +1,105 @@
-import { eq, and, inArray, sql } from 'drizzle-orm';
+import { eq, and, inArray, sql, desc } from 'drizzle-orm';
 import {
   topicNotes,
   curriculumTopics,
   curriculumBooks,
   subjects,
+  learningSessions,
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
-import { NotFoundError } from '../errors';
+import { ConflictError, NotFoundError } from '../errors';
+
+const MAX_NOTES_PER_TOPIC = 50;
+
+type NoteRow = {
+  id: string;
+  topicId: string;
+  sessionId: string | null;
+  content: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+/**
+ * Atomic count-and-insert for topic notes. Wraps the cap check + insert in
+ * a transaction with a per-(profile, topic) advisory lock so two concurrent
+ * inserts cannot both observe count = MAX-1 and exceed the cap. Mirrors the
+ * BUG-860 pattern in `parking-lot-data.ts`.
+ *
+ * Throws ConflictError when the cap is reached. Callers that treat this as
+ * non-fatal (e.g. auto-note from session summary) must catch ConflictError
+ * specifically rather than swallowing all errors.
+ */
+async function insertNoteWithCap(
+  db: Database,
+  values: {
+    topicId: string;
+    profileId: string;
+    sessionId: string | null;
+    content: string;
+  }
+): Promise<NoteRow> {
+  return db.transaction(async (tx) => {
+    const lockKey = `notes:${values.profileId}:${values.topicId}`;
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`
+    );
+
+    const [countRow] = await tx
+      .select({ count: sql<number>`count(*)` })
+      .from(topicNotes)
+      .where(
+        and(
+          eq(topicNotes.topicId, values.topicId),
+          eq(topicNotes.profileId, values.profileId)
+        )
+      );
+    if (countRow && Number(countRow.count) >= MAX_NOTES_PER_TOPIC) {
+      throw new ConflictError(
+        `Note limit reached: maximum ${MAX_NOTES_PER_TOPIC} notes per topic`
+      );
+    }
+
+    const [row] = await tx.insert(topicNotes).values(values).returning({
+      id: topicNotes.id,
+      topicId: topicNotes.topicId,
+      sessionId: topicNotes.sessionId,
+      content: topicNotes.content,
+      createdAt: topicNotes.createdAt,
+      updatedAt: topicNotes.updatedAt,
+    });
+
+    if (!row) throw new Error('Insert topic note did not return a row');
+    return row;
+  });
+}
+
+/**
+ * Create a note as a side-effect of a session summary submission. The caller
+ * must have already verified that `sessionId` (and therefore `topicId`)
+ * belongs to `profileId` — this helper skips the redundant topic-ownership
+ * round-trip that `createNote` performs.
+ *
+ * Throws ConflictError when the cap is reached. The caller decides whether
+ * that is fatal.
+ */
+export async function createNoteForSession(
+  db: Database,
+  params: {
+    profileId: string;
+    topicId: string;
+    sessionId: string;
+    content: string;
+  }
+): Promise<NoteRow> {
+  return insertNoteWithCap(db, {
+    topicId: params.topicId,
+    profileId: params.profileId,
+    sessionId: params.sessionId,
+    content: params.content,
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Notes service — CRUD for per-topic, per-profile notes
@@ -83,6 +175,7 @@ export async function getNote(
     .where(
       and(eq(topicNotes.topicId, topicId), eq(topicNotes.profileId, profileId))
     )
+    .orderBy(desc(topicNotes.updatedAt))
     .limit(1);
 
   return row ?? null;
@@ -97,7 +190,16 @@ export async function getNotesForBook(
   profileId: string,
   subjectId: string,
   bookId: string
-): Promise<{ topicId: string; content: string; updatedAt: Date }[]> {
+): Promise<
+  {
+    id: string;
+    topicId: string;
+    sessionId: string | null;
+    content: string;
+    createdAt: Date;
+    updatedAt: Date;
+  }[]
+> {
   // Verify subject belongs to profile
   const repo = createScopedRepository(db, profileId);
   const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
@@ -128,11 +230,13 @@ export async function getNotesForBook(
 
   const topicIds = topics.map((t) => t.id);
 
-  // Fetch notes for those topics, scoped to profileId
-  const notes = await db
+  return db
     .select({
+      id: topicNotes.id,
       topicId: topicNotes.topicId,
+      sessionId: topicNotes.sessionId,
       content: topicNotes.content,
+      createdAt: topicNotes.createdAt,
       updatedAt: topicNotes.updatedAt,
     })
     .from(topicNotes)
@@ -141,61 +245,8 @@ export async function getNotesForBook(
         inArray(topicNotes.topicId, topicIds),
         eq(topicNotes.profileId, profileId)
       )
-    );
-
-  return notes;
-}
-
-/**
- * Upsert a note for a topic+profile pair.
- * When `append` is true, concatenates new content atomically in SQL.
- * Uses onConflictDoUpdate on the (topicId, profileId) unique constraint.
- *
- * Verifies subject → book → topic ownership to prevent IDOR.
- */
-export async function upsertNote(
-  db: Database,
-  profileId: string,
-  subjectId: string,
-  topicId: string,
-  content: string,
-  append?: boolean
-): Promise<{
-  id: string;
-  topicId: string;
-  content: string;
-  updatedAt: Date;
-}> {
-  await verifyTopicOwnership(db, profileId, subjectId, topicId);
-
-  const rows = await db
-    .insert(topicNotes)
-    .values({
-      topicId,
-      profileId,
-      content,
-      updatedAt: new Date(),
-    })
-    .onConflictDoUpdate({
-      target: [topicNotes.topicId, topicNotes.profileId],
-      set: {
-        content: append
-          ? sql`${topicNotes.content} || E'\n' || ${content}`
-          : content,
-        updatedAt: new Date(),
-      },
-    })
-    .returning({
-      id: topicNotes.id,
-      topicId: topicNotes.topicId,
-      content: topicNotes.content,
-      updatedAt: topicNotes.updatedAt,
-    });
-
-  // Insert + onConflictDoUpdate always returns exactly one row
-  const row = rows[0];
-  if (!row) throw new Error('Upsert topic notes did not return a row');
-  return row;
+    )
+    .orderBy(desc(topicNotes.createdAt));
 }
 
 /**
@@ -236,4 +287,118 @@ export async function getTopicIdsWithNotes(
     .where(eq(topicNotes.profileId, profileId));
 
   return rows.map((r) => r.topicId);
+}
+
+// ---------------------------------------------------------------------------
+// Multi-note CRUD (Library v3)
+// ---------------------------------------------------------------------------
+
+export async function createNote(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+  topicId: string,
+  content: string,
+  sessionId?: string
+): Promise<NoteRow> {
+  await verifyTopicOwnership(db, profileId, subjectId, topicId);
+
+  if (sessionId) {
+    const [session] = await db
+      .select({ topicId: learningSessions.topicId })
+      .from(learningSessions)
+      .where(
+        and(
+          eq(learningSessions.id, sessionId),
+          eq(learningSessions.profileId, profileId)
+        )
+      )
+      .limit(1);
+    if (!session || session.topicId !== topicId) {
+      throw new NotFoundError('Session does not belong to this topic');
+    }
+  }
+
+  return insertNoteWithCap(db, {
+    topicId,
+    profileId,
+    sessionId: sessionId ?? null,
+    content,
+  });
+}
+
+export async function updateNote(
+  db: Database,
+  profileId: string,
+  noteId: string,
+  content: string
+): Promise<{
+  id: string;
+  topicId: string;
+  sessionId: string | null;
+  content: string;
+  createdAt: Date;
+  updatedAt: Date;
+}> {
+  const [row] = await db
+    .update(topicNotes)
+    .set({ content, updatedAt: new Date() })
+    .where(and(eq(topicNotes.id, noteId), eq(topicNotes.profileId, profileId)))
+    .returning({
+      id: topicNotes.id,
+      topicId: topicNotes.topicId,
+      sessionId: topicNotes.sessionId,
+      content: topicNotes.content,
+      createdAt: topicNotes.createdAt,
+      updatedAt: topicNotes.updatedAt,
+    });
+
+  if (!row) throw new NotFoundError('Note');
+  return row;
+}
+
+export async function deleteNoteById(
+  db: Database,
+  profileId: string,
+  noteId: string
+): Promise<boolean> {
+  const result = await db
+    .delete(topicNotes)
+    .where(and(eq(topicNotes.id, noteId), eq(topicNotes.profileId, profileId)))
+    .returning({ id: topicNotes.id });
+
+  return result.length > 0;
+}
+
+export async function getNotesForTopic(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+  topicId: string
+): Promise<
+  {
+    id: string;
+    topicId: string;
+    sessionId: string | null;
+    content: string;
+    createdAt: Date;
+    updatedAt: Date;
+  }[]
+> {
+  await verifyTopicOwnership(db, profileId, subjectId, topicId);
+
+  return db
+    .select({
+      id: topicNotes.id,
+      topicId: topicNotes.topicId,
+      sessionId: topicNotes.sessionId,
+      content: topicNotes.content,
+      createdAt: topicNotes.createdAt,
+      updatedAt: topicNotes.updatedAt,
+    })
+    .from(topicNotes)
+    .where(
+      and(eq(topicNotes.topicId, topicId), eq(topicNotes.profileId, profileId))
+    )
+    .orderBy(desc(topicNotes.createdAt));
 }

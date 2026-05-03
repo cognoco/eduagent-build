@@ -567,7 +567,7 @@ describe('useSkipSummary', () => {
             aiFeedback: null,
             status: 'skipped',
           },
-          shouldPromptCasualSwitch: false,
+          consecutiveSummarySkips: 1,
         }),
         { status: 200 }
       )

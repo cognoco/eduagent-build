@@ -7,7 +7,7 @@ import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   useBookNotes,
-  useUpsertNote,
+  useCreateNote,
   useNoteTopicIds,
   useDeleteNote,
 } from './use-notes';
@@ -156,10 +156,10 @@ describe('useBookNotes', () => {
 });
 
 // ---------------------------------------------------------------------------
-// useUpsertNote
+// useCreateNote
 // ---------------------------------------------------------------------------
 
-describe('useUpsertNote', () => {
+describe('useCreateNote', () => {
   beforeEach(() => {
     mockFetch.mockReset();
     jest.clearAllMocks();
@@ -185,7 +185,7 @@ describe('useUpsertNote', () => {
     const wrapper = createWrapper();
     const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
 
-    const { result } = renderHook(() => useUpsertNote('subject-1', 'book-1'), {
+    const { result } = renderHook(() => useCreateNote('subject-1', 'book-1'), {
       wrapper,
     });
 
@@ -221,7 +221,7 @@ describe('useUpsertNote', () => {
       new Response(JSON.stringify({ note: mockNote }), { status: 200 })
     );
 
-    const { result } = renderHook(() => useUpsertNote('subject-1', 'book-1'), {
+    const { result } = renderHook(() => useCreateNote('subject-1', 'book-1'), {
       wrapper: createWrapper(),
     });
 
@@ -229,7 +229,6 @@ describe('useUpsertNote', () => {
       await result.current.mutateAsync({
         topicId: 'topic-1',
         content: 'Appended content',
-        append: true,
       });
     });
 
@@ -241,7 +240,7 @@ describe('useUpsertNote', () => {
   });
 
   it('throws when subjectId is undefined', async () => {
-    const { result } = renderHook(() => useUpsertNote(undefined, 'book-1'), {
+    const { result } = renderHook(() => useCreateNote(undefined, 'book-1'), {
       wrapper: createWrapper(),
     });
 
@@ -265,7 +264,7 @@ describe('useUpsertNote', () => {
       )
     );
 
-    const { result } = renderHook(() => useUpsertNote('subject-1', 'book-1'), {
+    const { result } = renderHook(() => useCreateNote('subject-1', 'book-1'), {
       wrapper: createWrapper(),
     });
 

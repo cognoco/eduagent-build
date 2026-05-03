@@ -74,7 +74,7 @@ import {
   type QuotaExceededDetails,
 } from '../../../lib/api-client';
 import { useThemeColors } from '../../../lib/theme';
-import { useUpsertNote } from '../../../hooks/use-notes';
+import { useCreateNote } from '../../../hooks/use-notes';
 import { getVoiceLocaleForLanguage } from '../../../lib/language-locales';
 import { useProfile } from '../../../lib/profile';
 import {
@@ -294,6 +294,7 @@ function SessionScreenInner() {
     ocrText,
     captureSource,
     rawInput,
+    recap,
     resumeFromSessionId,
     returnTo,
     verificationType: routeVerificationType,
@@ -311,6 +312,7 @@ function SessionScreenInner() {
     ocrText?: string;
     captureSource?: HomeworkCaptureSource;
     rawInput?: string;
+    recap?: string;
     resumeFromSessionId?: string;
     returnTo?: string;
     verificationType?: string;
@@ -388,7 +390,8 @@ function SessionScreenInner() {
     initialProblemText,
     topicName ?? undefined,
     subjectName ?? undefined,
-    rawInput ?? undefined
+    rawInput ?? undefined,
+    recap ?? undefined
   );
   // [M-7] Capture openingContent in a ref at render time so the transcript
   // hydration effect can use a stable reference. Without this, streak data
@@ -701,7 +704,7 @@ function SessionScreenInner() {
   const apiClient = useApiClient();
   const classifySubject = useClassifySubject();
   const resolveSubject = useResolveSubject();
-  const upsertNote = useUpsertNote(effectiveSubjectId || undefined, undefined);
+  const createNote = useCreateNote(effectiveSubjectId || undefined, undefined);
   const filing = useFiling();
   const startSession = useStartSession(effectiveSubjectId);
   const closeSession = useCloseSession(activeSessionId ?? '');
@@ -1487,7 +1490,8 @@ function SessionScreenInner() {
               setShowNoteInput={setShowNoteInput}
               sessionNoteSavedRef={sessionNoteSavedRef}
               topicId={topicId ?? undefined}
-              upsertNote={upsertNote}
+              sessionId={activeSessionId ?? undefined}
+              createNote={createNote}
               colors={colors}
               userMessageCount={userMessageCount}
               showQuestionCount={modeConfig.showQuestionCount}

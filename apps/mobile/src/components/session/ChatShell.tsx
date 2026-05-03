@@ -28,7 +28,7 @@ import { useTextToSpeech } from '../../hooks/use-text-to-speech';
 import { useThemeColors } from '../../lib/theme';
 import { goBackOrReplace } from '../../lib/navigation';
 import { platformAlert } from '../../lib/platform-alert';
-import { LightBulbAnimation, MagicPenAnimation } from '../common';
+import { DeskLampAnimation, MagicPenAnimation } from '../common';
 import Animated, { FadeOut } from 'react-native-reanimated';
 
 export interface ChatMessage {
@@ -584,10 +584,7 @@ export function ChatShell({
   return (
     <KeyboardAvoidingView
       className="flex-1 bg-background"
-      // [BUG-887] iOS responds best to "padding"; Android relies on the OS-level
-      // adjustResize behaviour (the default in app.json), so passing a behaviour
-      // there can fight the resize and leave the composer offscreen.
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior="padding"
       keyboardVerticalOffset={0}
     >
       {/* Header */}
@@ -715,7 +712,7 @@ export function ChatShell({
                 className="items-center py-4"
                 testID="thinking-bulb-animation"
               >
-                <LightBulbAnimation size={64} color={colors.muted} />
+                <DeskLampAnimation size={80} />
               </View>
             )}
             {showIdleAnim && (
