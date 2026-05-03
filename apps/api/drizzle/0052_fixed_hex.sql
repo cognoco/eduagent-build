@@ -1,0 +1,1 @@
+ALTER TABLE "profiles" ADD CONSTRAINT "profiles_pronouns_length_check" CHECK ("profiles"."pronouns" IS NULL OR char_length("profiles"."pronouns") <= 32);

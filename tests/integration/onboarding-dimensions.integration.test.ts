@@ -477,6 +477,39 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
     expect(res.status).toBe(400);
   });
 
+  // [BREAK / BUG-978 / CCR-PR123-DB-1] Direct DB write that bypasses the API
+  // layer must still be rejected by the profiles_pronouns_length_check
+  // constraint. The Zod schema is the primary boundary; this CHECK is the
+  // last-resort guard for paths that bypass the API (raw SQL, seed scripts,
+  // admin patches). Without the CHECK, a 33-char string would land in the row.
+  it('[BREAK] Postgres CHECK rejects pronouns > 32 chars on direct DB write', async () => {
+    const profileId = await createProfileForUser(
+      USER_A_CLERK_ID,
+      USER_A_EMAIL,
+      'Direct DB Bypass',
+      2010
+    );
+
+    const db = createIntegrationDb();
+    await expect(
+      db
+        .update(profiles)
+        .set({ pronouns: 'a'.repeat(33) })
+        .where(eq(profiles.id, profileId))
+    ).rejects.toThrow(/profiles_pronouns_length_check/);
+
+    // Sanity: 32 chars exactly is allowed.
+    await db
+      .update(profiles)
+      .set({ pronouns: 'a'.repeat(32) })
+      .where(eq(profiles.id, profileId));
+    const [row] = await db
+      .select({ pronouns: profiles.pronouns })
+      .from(profiles)
+      .where(eq(profiles.id, profileId));
+    expect(row!.pronouns).toBe('a'.repeat(32));
+  });
+
   it('rejects interests with empty label', async () => {
     const profileId = await createProfileForUser(
       USER_A_CLERK_ID,
