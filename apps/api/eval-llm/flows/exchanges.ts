@@ -412,7 +412,7 @@ export const exchangesFlow: FlowDefinition<ExchangeScenarioInput> = {
     // Throw rather than silently forward an empty user turn — enforces buildPrompt contract for flows that copy this pattern.
     if (!messages.user) {
       throw new Error(
-        `runLive: messages.user is undefined for scenario ${input.scenarioId} — buildPrompt must produce a user turn`
+        `runLive: messages.user is undefined or empty for scenario ${input.scenarioId} — buildPrompt must produce a user turn`
       );
     }
 

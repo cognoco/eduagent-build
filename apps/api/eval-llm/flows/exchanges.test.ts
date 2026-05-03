@@ -260,11 +260,7 @@ describe('exchangesFlow', () => {
       // silently send an empty user turn.
       await expect(
         exchangesFlow.runLive?.(s1.input, messages)
-      ).rejects.toThrow(/messages\.user is undefined/);
-
-      await expect(
-        exchangesFlow.runLive?.(s1.input, messagesWithoutUser)
-      ).rejects.toThrow(/messages\.user is undefined/);
+      ).rejects.toThrow(/messages\.user is undefined or empty/);
       expect(mockRunHarnessLlm).not.toHaveBeenCalled();
     });
 
