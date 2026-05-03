@@ -135,7 +135,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
       platformAlert(
         t('dictation.complete.cameraErrorTitle'),
         t('dictation.complete.cameraErrorMessage'),
-        [{ text: 'OK' }]
+        [{ text: t('common.ok') }]
       );
       return;
     }
@@ -166,7 +166,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
       platformAlert(
         t('dictation.complete.photoErrorTitle'),
         t('dictation.complete.photoErrorMessage'),
-        [{ text: 'OK' }]
+        [{ text: t('common.ok') }]
       );
       return;
     }
@@ -195,8 +195,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
     } catch (err) {
       // [BUG-692] Don't pop an alert if the user already navigated away.
       if (reviewCancelledRef.current) return;
-      const message =
-        err instanceof Error ? err.message : 'Something went wrong.';
+      const message = err instanceof Error ? err.message : t('errors.generic');
       platformAlert(t('dictation.complete.reviewFailedTitle'), message, [
         {
           text: t('dictation.complete.tryAgain'),
