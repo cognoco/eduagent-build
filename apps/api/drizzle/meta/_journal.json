@@ -351,6 +351,13 @@
       "when": 1777810531138,
       "tag": "0049_flimsy_sister_grimm",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1777817311627,
+      "tag": "0050_romantic_demogoblin",
+      "breakpoints": true
     }
   ]
 }

@@ -2,9 +2,15 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add full i18n infrastructure with build-time LLM translation to support 7 languages (en, nb, de, es, pt, pl, ja), then migrate all ~70 screens to externalized strings.
+**Goal:** Add full i18n infrastructure with build-time LLM translation to support 7 languages (en, nb, de, es, pt, pl, ja), then migrate all ~80 user-facing screens to externalized strings.
 
-**Architecture:** i18next + react-i18next for runtime string resolution. expo-localization for device locale detection. AsyncStorage for manual language override. Build-time translation via Claude Sonnet API with diff-mode, prompt caching, back-translation QA, and glossary enforcement. Feature flag gates the language picker until migration is 100% complete — users see English-only during the migration period.
+**Architecture:** i18next + react-i18next for runtime string resolution. expo-localization for device locale detection. AsyncStorage for manual language override. Build-time translation via Claude Sonnet API with diff-mode, prompt caching, structural validation (key parity, interpolation preservation, length thresholds), and glossary enforcement (both prompt-side instruction AND post-translation verification). Feature flag gates the language picker until migration is 100% complete — users see English-only during the migration period. The flag is removed in a final cleanup task once stable.
+
+**Out of scope (acknowledged tradeoffs, not silently dropped):**
+- **Back-translation / semantic QA.** Earlier drafts of the spec mentioned back-translation sampling with embedding similarity. This is removed from v1: structural validation + glossary enforcement + mandatory human review for `nb`/`de` is the QA bar. Add semantic QA as a v2 task if review surfaces quality drift.
+- **Pluralization.** Key naming reserves `_one`/`_other`/`_few`/`_many` suffixes (per i18next convention). No plural-form keys ship in v1. The first feature requiring plurals must add a follow-up task to wire `i18next` count interpolation and update the translation prompt to handle plural families.
+- **RTL.** None of the 7 v1 languages are RTL. Adding Arabic/Hebrew later requires a separate layout audit.
+- **Date / number / currency formatting.** `Intl.*` integration deferred to v2.
 
 **Tech Stack:** i18next, react-i18next, expo-localization, @anthropic-ai/sdk (devDep for translation script), tsx (script runner, already installed)
 
@@ -292,33 +298,55 @@ export function resolveLanguage(stored: string | null, deviceLang: string): Supp
   return 'en';
 }
 
-i18next.use(initReactI18next).init({
-  lng: 'en',
-  fallbackLng: 'en',
-  resources: {
-    en: { translation: en },
-    nb: { translation: nb },
-    de: { translation: de },
-    es: { translation: es },
-    pt: { translation: pt },
-    pl: { translation: pl },
-    ja: { translation: ja },
-  },
-  interpolation: { escapeValue: false },
-});
-
-if (FEATURE_FLAGS.I18N_ENABLED) {
-  getStoredLanguage().then((stored) => {
-    const deviceLang = getDeviceLanguage();
-    const resolved = resolveLanguage(stored, deviceLang);
-    if (resolved !== i18next.language) {
-      i18next.changeLanguage(resolved);
+// Resolve the language BEFORE init so the first render is in the correct
+// language. Initializing with `lng: 'en'` and then async-switching produces
+// a flash-of-English for non-English users (jarring on cold start).
+const initPromise = (async () => {
+  let resolved: SupportedLanguage = 'en';
+  if (FEATURE_FLAGS.I18N_ENABLED) {
+    try {
+      const stored = await getStoredLanguage();
+      const deviceLang = getDeviceLanguage();
+      resolved = resolveLanguage(stored, deviceLang);
+    } catch {
+      // AsyncStorage failure → fall through to 'en'. Logged at higher level
+      // if needed; never block app boot on i18n.
+      resolved = 'en';
     }
+  }
+  await i18next.use(initReactI18next).init({
+    lng: resolved,
+    fallbackLng: 'en',
+    resources: {
+      en: { translation: en },
+      nb: { translation: nb },
+      de: { translation: de },
+      es: { translation: es },
+      pt: { translation: pt },
+      pl: { translation: pl },
+      ja: { translation: ja },
+    },
+    interpolation: { escapeValue: false },
   });
+})();
+
+/**
+ * Awaitable handle to the in-flight i18n init. The app root MUST await this
+ * before rendering any tree that uses `useTranslation()` — otherwise
+ * non-English users see a flash of English on cold start.
+ */
+export function ensureI18nReady(): Promise<void> {
+  return initPromise;
 }
 
 export default i18next;
 ```
+
+Note on bundle size: importing all 7 locale JSON files eagerly is the standard
+i18next-RN pattern. With ~700 keys × 7 languages, bundled size is well under
+1 MB for v1. If bundle growth becomes a concern as the catalog scales, switch
+to `i18next-resources-to-backend` with dynamic `import()` per locale — out of
+scope here.
 
 - [ ] **Step 6: Run the test to verify it passes**
 
@@ -342,17 +370,33 @@ git commit -m "feat(mobile): add i18n initialization module with locale resoluti
 **Files:**
 - Modify: `apps/mobile/src/app/_layout.tsx`
 
-- [ ] **Step 1: Add the i18n side-effect import**
+- [ ] **Step 1: Add the i18n import and gate render on init**
 
 At the top of `apps/mobile/src/app/_layout.tsx`, after the `import '../../global.css';` line (line 1), add:
 
 ```typescript
-import '../i18n';
+import { ensureI18nReady } from '../i18n';
 ```
 
-This import must come before any component that uses `useTranslation()`. The side-effect initializes i18next and registers the `initReactI18next` plugin.
+Inside the root layout component, gate the rendered tree behind a `useState(false)` flag flipped after `ensureI18nReady()` resolves. Reuse whatever splash-screen / `SplashScreen.preventAutoHideAsync()` pattern the layout already uses; if there is no existing pattern, add a `useEffect` that awaits `ensureI18nReady()` then sets `setI18nReady(true)`, and render `null` (or the existing loading splash) until ready.
+
+Why awaited init: i18next initialization reads AsyncStorage to detect the user's language preference. Initializing synchronously with `lng: 'en'` and async-switching afterward produces a visible flash of English text on the first render for non-English users. Awaiting init eliminates the flash at the cost of a few ms on cold start (negligible — the read is local).
 
 No `I18nextProvider` wrapper is needed — `react-i18next` uses a singleton pattern when initialized via `i18next.use(initReactI18next).init(...)`. The `useTranslation()` hook reads from the global i18next instance.
+
+- [ ] **Step 1b: Set per-platform accessibility language on language change**
+
+When `i18next.language` changes, screen readers (TalkBack, VoiceOver) need to know — otherwise Japanese text is read aloud by an English speech engine and is unintelligible. React Native exposes `accessibilityLanguage` per `Text` component (no global setting). For v1, add a single line in the i18n init module that subscribes to language changes and logs them; full per-component `accessibilityLanguage` propagation is deferred to a follow-up task. Document this as a known limitation:
+
+In `apps/mobile/src/i18n/index.ts`, append:
+
+```typescript
+i18next.on('languageChanged', (lang) => {
+  // Per-component accessibilityLanguage propagation deferred. Track:
+  // GitHub issue / TODO for full screen-reader locale wiring.
+  if (__DEV__) console.log(`[i18n] languageChanged → ${lang}`);
+});
+```
 
 - [ ] **Step 2: Verify the app still builds**
 
@@ -387,7 +431,14 @@ git commit -m "feat(mobile): wire i18n init into app root layout"
 - Create: `apps/mobile/src/i18n/error-keys.ts`
 - Create: `apps/mobile/src/i18n/error-keys.test.ts`
 
-The spec requires a stable `errorCode` property on all error classes that survive Hermes minification (class names get mangled). Currently only `ForbiddenError`, `QuotaExceededError`, and `UpstreamError` have a `code` property. We standardize to a `readonly errorCode` string literal on every class.
+The spec requires a stable string property on all error classes that survives Hermes minification (class names get mangled in production). The codebase already has a `code` field on some classes — but its semantics are inconsistent: `ForbiddenError.code` is a `'FORBIDDEN' as const` string literal, `RateLimitedError.code` is `string | undefined`, `UpstreamError.code` is a free-form `string`, and `NetworkError` / `BadRequestError` / `ConflictError` / `NotFoundError` have no `code` at all.
+
+We add a *new* `errorCode` property — distinct from `code` — with two strict guarantees:
+
+1. **Always present.** Every error class declares it as `readonly errorCode = '...' as const`.
+2. **Always a stable string literal.** Never `undefined`, never variable. Safe to switch on.
+
+`code` is left untouched (it serves the existing API-wire-format contract). The i18n layer uses *only* `errorCode`. Future consolidation (deprecate `code`, fold into `errorCode`) is a follow-up refactor — out of scope here to keep this plan focused.
 
 - [ ] **Step 1: Write the error-keys test**
 
@@ -547,6 +598,8 @@ git commit -m "feat: add stable errorCode property to all error classes for i18n
 - Modify: `apps/mobile/src/i18n/locales/en.json`
 
 This task replaces all hardcoded English strings in the error formatting layer and error display components with `t()` calls. These are non-React utility functions, so they use `i18next.t()` directly (not the `useTranslation` hook).
+
+> **Known fragility — flagged, not fixed here.** `FRIENDLY_MESSAGE_MAP` matches regex patterns against the **raw English text of the API response body** (`/curriculum.*not.*found/i` etc.). This means: (a) any backend wording change silently breaks the friendly-message lookup, and (b) the regex-on-English approach is incompatible with the `errorCode`-based mapping introduced in Task 4. The right long-term shape is errorCode-only — all friendly variants keyed off the stable code, no regex on English bodies. That refactor is *out of scope* for this plan to keep the i18n migration mechanical. We preserve the existing regex map and externalize the messages it produces. A follow-up task should retire the regex map by emitting structured `friendlyReason` codes from the API layer.
 
 - [ ] **Step 1: Add recovery action keys to en.json**
 
@@ -896,6 +949,25 @@ describe('validateTranslation', () => {
     );
   });
 
+  it('flags glossary violation when translated string omits the locked term', () => {
+    const glossarySource = { home: { streak: 'Your streak is on!' } };
+    const glossaryTranslated = { home: { streak: '¡Tu serie está activa!' } };
+    const glossary = { streak: { es: 'racha' } };
+    const result = validateTranslation(glossarySource, glossaryTranslated, 'es', glossary);
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContainEqual(
+      expect.objectContaining({ type: 'glossary_violation', key: 'home.streak' })
+    );
+  });
+
+  it('passes when translated string contains the glossary-locked term', () => {
+    const glossarySource = { home: { streak: 'Your streak is on!' } };
+    const glossaryTranslated = { home: { streak: '¡Tu racha está activa!' } };
+    const glossary = { streak: { es: 'racha' } };
+    const result = validateTranslation(glossarySource, glossaryTranslated, 'es', glossary);
+    expect(result.valid).toBe(true);
+  });
+
   it('hard-fails when translation exceeds 200% of source length', () => {
     const translated = {
       common: { save: 'S'.repeat(200), cancel: 'Abbrechen' },
@@ -974,7 +1046,12 @@ import * as path from 'node:path';
 // ---------------------------------------------------------------------------
 
 interface ValidationError {
-  type: 'missing_key' | 'extra_key' | 'missing_variable' | 'length_exceeded';
+  type:
+    | 'missing_key'
+    | 'extra_key'
+    | 'missing_variable'
+    | 'length_exceeded'
+    | 'glossary_violation';
   key: string;
   variable?: string;
   detail?: string;
@@ -1007,6 +1084,11 @@ const MAX_RETRIES = 3;
 const RETRY_DELAYS = [1000, 4000, 16000];
 const LENGTH_WARN_RATIO = 1.5;
 const LENGTH_FAIL_RATIO = 2.0;
+
+// Model ID is env-overridable so the script doesn't break silently when a
+// model is retired/superseded. Default tracks the current Sonnet snapshot;
+// CI/devs can pin a different version via TRANSLATE_MODEL=claude-...-YYYYMMDD.
+const TRANSLATE_MODEL = process.env.TRANSLATE_MODEL ?? 'claude-sonnet-4-20250514';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -1046,6 +1128,10 @@ function extractVariables(str: string): string[] {
   return matches ?? [];
 }
 
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export function computeChangedKeys(
   current: NestedStrings,
   previous: NestedStrings | null
@@ -1073,12 +1159,41 @@ export function computeChangedKeys(
 export function validateTranslation(
   source: NestedStrings,
   translated: NestedStrings,
-  lang: string
+  lang: string,
+  glossary?: Record<string, Record<string, string>>
 ): ValidationResult {
   const sourceFlat = flattenKeys(source);
   const translatedFlat = flattenKeys(translated);
   const errors: ValidationError[] = [];
   const warnings: ValidationWarning[] = [];
+
+  // Glossary post-validation: when an English source string contains a glossary
+  // term as a whole word, the translated string MUST contain the glossary's
+  // locked translation for that language. Catches LLM drift even when the
+  // term was injected into the system prompt. Case-insensitive match on source,
+  // exact match on target — glossary entries define the canonical form.
+  const glossaryEntries =
+    glossary
+      ? Object.entries(glossary).filter(
+          ([term, translations]) => term !== '_meta' && lang in translations
+        )
+      : [];
+
+  for (const [term, translations] of glossaryEntries) {
+    const expected = translations[lang];
+    const sourceWordRe = new RegExp(`\\b${escapeRegex(term)}\\b`, 'i');
+    for (const key of Object.keys(sourceFlat)) {
+      if (!sourceWordRe.test(sourceFlat[key])) continue;
+      if (!(key in translatedFlat)) continue;
+      if (!translatedFlat[key].includes(expected)) {
+        errors.push({
+          type: 'glossary_violation',
+          key,
+          detail: `source contains "${term}" but translation is missing locked term "${expected}"`,
+        });
+      }
+    }
+  }
 
   for (const key of Object.keys(sourceFlat)) {
     if (!(key in translatedFlat)) {
@@ -1160,7 +1275,7 @@ async function translateWithRetry(
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
       const response = await client.messages.create({
-        model: 'claude-sonnet-4-20250514',
+        model: TRANSLATE_MODEL,
         max_tokens: 8192,
         system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
         messages: [
@@ -1237,21 +1352,34 @@ async function main(): Promise<void> {
   const failed: string[] = [];
   const succeeded: string[] = [];
 
-  const semaphore = { count: 0 };
-
-  async function acquireSemaphore(): Promise<void> {
-    while (semaphore.count >= MAX_CONCURRENCY) {
-      await new Promise((r) => setTimeout(r, 50));
-    }
-    semaphore.count++;
+  // Proper async limiter: queue-based, no polling. When a slot frees up the
+  // next waiter is resolved directly, so there's no 50ms polling jitter.
+  function createLimiter(maxConcurrency: number) {
+    let active = 0;
+    const queue: Array<() => void> = [];
+    const acquire = (): Promise<void> =>
+      new Promise((resolve) => {
+        const tryRun = () => {
+          if (active < maxConcurrency) {
+            active++;
+            resolve();
+          } else {
+            queue.push(tryRun);
+          }
+        };
+        tryRun();
+      });
+    const release = () => {
+      active--;
+      const next = queue.shift();
+      if (next) next();
+    };
+    return { acquire, release };
   }
-
-  function releaseSemaphore(): void {
-    semaphore.count--;
-  }
+  const limiter = createLimiter(MAX_CONCURRENCY);
 
   const tasks = languages.map(async (lang) => {
-    await acquireSemaphore();
+    await limiter.acquire();
     try {
       const targetPath = path.join(LOCALES_DIR, `${lang}.json`);
       const previousExists = fs.existsSync(targetPath);
@@ -1311,7 +1439,7 @@ async function main(): Promise<void> {
         translated = unflattenKeys(merged);
       }
 
-      const validation = validateTranslation(source, translated, lang);
+      const validation = validateTranslation(source, translated, lang, glossary);
 
       if (validation.warnings.length > 0) {
         for (const w of validation.warnings) {
@@ -1350,7 +1478,7 @@ async function main(): Promise<void> {
       console.error(`[${lang}] FAILED: ${msg}`);
       failed.push(lang);
     } finally {
-      releaseSemaphore();
+      limiter.release();
     }
   });
 
@@ -1770,6 +1898,7 @@ git commit -m "feat(mobile): add language picker to settings, gated behind I18N_
 - Create: `apps/mobile/src/hooks/use-conversation-language-suggest.ts`
 - Create: `apps/mobile/src/hooks/use-conversation-language-suggest.test.ts`
 - Modify: `apps/mobile/src/i18n/locales/en.json`
+- Modify: `apps/mobile/src/lib/sign-out-cleanup.ts` (register the new AsyncStorage key — see Step 6)
 
 This hook fires a one-time suggestion when the UI language differs from the user's `conversationLanguage` and certain conditions are met. See spec section "ConversationLanguage Auto-Suggest" for the full condition list.
 
@@ -1939,10 +2068,31 @@ cd apps/mobile && pnpm exec jest --no-coverage src/hooks/use-conversation-langua
 
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: Register the auto-suggest dismissal key with sign-out cleanup**
+
+The codebase has `apps/mobile/src/lib/sign-out-cleanup.ts` as the single source of truth for SecureStore/AsyncStorage cleanup at sign-out, plus a `sign-out-cleanup-registry.test.ts` meta-test that scans callsites for unregistered keys. The new `i18n-auto-suggest-dismissed` key MUST be registered there or the meta-test fails on CI.
+
+Add the constant to whatever exported registry the file uses (the existing pattern — match it; do NOT invent a new one). On sign-out, the key should be **cleared** so the next user gets the auto-suggest fresh.
+
+The `app-ui-language` key, by contrast, must NOT be cleared on sign-out — it's a device-level UI preference, not user-tied data. Document this distinction in a one-line comment next to the registration:
+
+```typescript
+// app-ui-language: device preference, preserved across sign-out
+// i18n-auto-suggest-dismissed: per-user, cleared on sign-out
+```
+
+- [ ] **Step 7: Run the sign-out-cleanup-registry meta-test**
 
 ```bash
-git add apps/mobile/src/hooks/use-conversation-language-suggest.ts apps/mobile/src/hooks/use-conversation-language-suggest.test.ts apps/mobile/src/i18n/locales/en.json
+cd apps/mobile && pnpm exec jest --no-coverage src/lib/sign-out-cleanup-registry.test.ts
+```
+
+Expected: PASS — both new AsyncStorage callsites must be registered.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add apps/mobile/src/hooks/use-conversation-language-suggest.ts apps/mobile/src/hooks/use-conversation-language-suggest.test.ts apps/mobile/src/i18n/locales/en.json apps/mobile/src/lib/sign-out-cleanup.ts
 git commit -m "feat(mobile): add conversationLanguage auto-suggest hook for post-onboarding language alignment"
 ```
 
@@ -1986,7 +2136,9 @@ git commit -m "chore(mobile): add i18next-parser config for t() call validation"
 
 ### Task 11: Screen Migration — Pattern and Batches
 
-This task defines the migration pattern and organizes all ~70 screens into parallelizable batches. Each batch is independent and can be dispatched to a separate agent.
+This task defines the migration pattern and organizes all user-facing screens into parallelizable batches. The `apps/mobile/src/app/` tree contains ~146 `.tsx` files total, including layout files, dynamic-route segments, and helper modules under `_components/` / `_hooks/` directories that have no user-facing strings. The batches below cover ~80 screens with user-visible text. The remaining ~66 files (layouts with no UI text, helper modules, route stubs) are scanned during Batch L's component sweep and either migrated or confirmed string-free.
+
+Each batch is independent and can be dispatched to a separate agent.
 
 **Migration pattern for each screen file:**
 
@@ -2115,15 +2267,30 @@ Each batch below is a single agent task. Agents must NOT commit — they write c
   - `apps/mobile/src/app/(app)/pick-book/_layout.tsx`
   - Namespaces: `"consent"`, `"subject"`, `"account"`, `"legal"`, `"assessment"`, `"homework"`, `"pickBook"`
 
-- [ ] **Batch L: Shared components with user-facing strings**
+- [ ] **Batch L: Shared components and remaining strings**
 
-  After screen migration, grep for remaining hardcoded strings in shared components:
+  Concrete file list (do not invent — these are the components/files known to contain user-facing text after the screen sweep):
+
+  - `apps/mobile/src/components/common/ErrorFallback.tsx` (already partially done in Task 5 — verify all strings externalized)
+  - `apps/mobile/src/components/common/ErrorBoundary.tsx` (already partially done in Task 5 — verify)
+  - `apps/mobile/src/components/common/LoadingIndicator.tsx` (if it contains text)
+  - `apps/mobile/src/components/common/EmptyState.tsx` (or equivalent — empty-state message components)
+  - `apps/mobile/src/components/common/ConfirmDialog.tsx` (or equivalent — confirmation dialog component)
+  - All `apps/mobile/src/components/coaching/*.tsx` (intent cards, coaching prompts)
+  - All `apps/mobile/src/components/session/*.tsx` (session UI fragments)
+  - Tab labels in `apps/mobile/src/app/(app)/_layout.tsx`
+
+  Discovery sweep (use to find anything missed, NOT as the sole source of files):
 
   ```bash
-  cd apps/mobile && rg -l "\"[A-Z][a-z]" src/components/ --type tsx | head -20
+  cd apps/mobile && rg -n '"[A-Z][a-zA-Z ,.!?\']{3,}"' src/components/ src/app/ --type tsx \
+    | rg -v 'testID=|accessibilityRole|accessibilityHint=|console\.(log|warn|error)|require\(' \
+    | head -100
   ```
 
-  Common components that likely have strings: loading indicators, empty states, confirmation dialogs, tab labels. Each component that has user-facing text gets the same `useTranslation()` + `t()` treatment.
+  Each result must be either: (a) wrapped in `t()`, (b) a non-user-visible string (testID, route path, log message, type discriminator), or (c) explicitly justified in a code comment. No silent dismissal.
+
+  Completion criterion: zero results from the discovery sweep that aren't accounted for. Do NOT mark this batch done until the grep is clean.
 
 - [ ] **After all batches: Run full validation**
 
@@ -2163,6 +2330,8 @@ C:/Tools/doppler/doppler.exe run -- pnpm translate --review --lang nb
 ```
 
 Human-review the output diff for Norwegian. Make manual corrections directly in `nb.json` as needed.
+
+> **Diff-mode quality tradeoff — flagged.** Subsequent runs of `pnpm translate` (without `--full`) only re-translate keys that changed in `en.json`. Because the LLM sees changed keys in isolation, it can't match the register/tone of the rest of the file written months earlier. Over many iterative runs, the file drifts toward an inconsistent patchwork of formality and term choice. Mitigations: (a) run `pnpm translate --full --lang nb` quarterly to re-baseline reviewed languages, (b) treat any large feature merge (>50 changed keys) as a `--full` event rather than diff-mode.
 
 - [ ] **Step 3: Run staleness check**
 
@@ -2256,9 +2425,50 @@ git commit -m "feat(mobile): enable i18n — flip I18N_ENABLED flag after full m
 
 ---
 
-## Appendix: Sign-Out Cleanup
+### Task 14: Remove the I18N_ENABLED Feature Flag
 
-When the user signs out, the `app-ui-language` AsyncStorage key should be preserved (it's a device preference, not user data). However, the `i18n-auto-suggest-dismissed` key should be cleared so the next user gets the auto-suggest. Add this to `apps/mobile/src/lib/sign-out-cleanup.ts` as part of the onboarding/auth cleanup list.
+This task runs **after** at least one full release cycle on `I18N_ENABLED: true` with no rollback signals. Feature flags that ship and stay become permanent dead branches; we remove the flag once stable to keep the code honest.
+
+**Files:**
+- Modify: `apps/mobile/src/lib/feature-flags.ts`
+- Modify: `apps/mobile/src/i18n/index.ts` (remove the `if (FEATURE_FLAGS.I18N_ENABLED)` guard around the AsyncStorage read)
+- Modify: `apps/mobile/src/app/(app)/more.tsx` (remove the `{FEATURE_FLAGS.I18N_ENABLED && ...}` guard around the language picker row)
+- Modify: `apps/mobile/src/hooks/use-conversation-language-suggest.ts` (remove the `FEATURE_FLAGS.I18N_ENABLED` guard in both the `useEffect` and `show` derivation)
+
+- [ ] **Step 1: Find every reference**
+
+```bash
+cd apps/mobile && rg -n 'I18N_ENABLED' src/
+```
+
+Every match must be removed: the flag definition, every conditional, every test that asserts on flag-off behavior.
+
+- [ ] **Step 2: Remove the flag and unwrap each conditional**
+
+In each file, delete the `if (FEATURE_FLAGS.I18N_ENABLED)` wrapping (keep the body). In `feature-flags.ts`, delete the `I18N_ENABLED` line.
+
+- [ ] **Step 3: Update tests that previously covered both flag states**
+
+Any test asserting "language picker is hidden when flag is off" can be deleted — that path no longer exists. Tests asserting "language picker is visible" stay.
+
+- [ ] **Step 4: Validate**
+
+```bash
+cd apps/mobile && pnpm exec tsc --noEmit
+cd apps/mobile && pnpm exec jest --no-coverage
+pnpm exec nx lint mobile
+```
+
+Expected: PASS. The grep from Step 1 must now return zero matches.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add apps/mobile/src/
+git commit -m "chore(mobile): remove I18N_ENABLED feature flag — i18n is now permanent"
+```
+
+---
 
 ## Appendix: Test Gotchas
 
