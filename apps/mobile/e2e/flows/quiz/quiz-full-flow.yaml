@@ -47,6 +47,15 @@ tags:
 
 - takeScreenshot: quiz-01-practice
 
+# [BUG-967] practice-quiz is the 4th IntentCard in the Practice scroll
+# (Review → Recite → Dictation → Quiz → History). On 5.8" devices it sits
+# below the fold; scroll it into view before tapping.
+- scrollUntilVisible:
+    element:
+      id: "practice-quiz"
+    direction: DOWN
+    timeout: 5000
+
 - tapOn:
     id: "practice-quiz"
 
@@ -156,6 +165,15 @@ tags:
 - extendedWaitUntil:
     visible:
       id: "practice-screen"
+    timeout: 5000
+
+# [BUG-967] On return to Practice, scroll position may not be at the top —
+# explicitly bring practice-quiz back into view so the screenshot is
+# meaningful and the test ends in a known scroll state.
+- scrollUntilVisible:
+    element:
+      id: "practice-quiz"
+    direction: DOWN
     timeout: 5000
 
 - takeScreenshot: quiz-07-back-at-practice

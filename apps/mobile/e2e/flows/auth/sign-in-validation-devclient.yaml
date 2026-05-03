@@ -9,11 +9,19 @@ tags:
 # ── Verify sign-in screen ──────────────────────────────────────────
 # NOTE: Do NOT use `hideKeyboard` without a preceding input —
 # on Android it sends BACK which can exit the app (BUG-5).
+# [BUG-959] Wait on the screen container (always above-fold), then scroll
+# to bring the primary CTA into view before tapping it.
 
 - extendedWaitUntil:
     visible:
-      id: "sign-in-button"
+      id: "sign-in-screen"
     timeout: 10000
+
+- scrollUntilVisible:
+    element:
+      id: "sign-in-button"
+    direction: DOWN
+    timeout: 5000
 
 # ── Test 1: Tap sign-in with empty fields ───────────────────────────
 
@@ -23,7 +31,7 @@ tags:
 # Should show validation error or stay on same screen
 - extendedWaitUntil:
     visible:
-      id: "sign-in-button"
+      id: "sign-in-screen"
     timeout: 5000
 
 - takeScreenshot: sign-in-empty-submit
@@ -37,13 +45,20 @@ tags:
 # BUG-3: Keyboard covers buttons — must dismiss before tapping
 - hideKeyboard
 
+# After dismissing keyboard, ensure CTA is in view before tapping.
+- scrollUntilVisible:
+    element:
+      id: "sign-in-button"
+    direction: DOWN
+    timeout: 5000
+
 - tapOn:
     id: "sign-in-button"
 
 # Should still be on sign-in screen (password required)
 - extendedWaitUntil:
     visible:
-      id: "sign-in-button"
+      id: "sign-in-screen"
     timeout: 5000
 
 - takeScreenshot: sign-in-email-only
@@ -90,5 +105,5 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: "sign-in-button"
+      id: "sign-in-screen"
     timeout: 10000

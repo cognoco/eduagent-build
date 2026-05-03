@@ -40,32 +40,46 @@ tags:
 
 # ── Notifications section ──
 
-# 5. Scroll to Notifications section
+# 5. Scroll to Notifications section header
 - scrollUntilVisible:
     element:
-      text: "Notifications"
+      id: "notifications-section-header"
     direction: DOWN
     timeout: 10000
 
+# 5b. Ensure Push notifications row itself is in view before tapping
+# (small phones can leave the toggle just below the section header).
+- scrollUntilVisible:
+    element:
+      id: "push-notifications-toggle"
+    direction: DOWN
+    timeout: 5000
+
 # 6. Tap "Push notifications" toggle (toggle on)
 - tapOn:
-    text: "Push notifications"
+    id: "push-notifications-toggle"
 
 - takeScreenshot: settings-push-toggled
 
 # 7. Tap "Push notifications" toggle again (toggle off)
 - tapOn:
-    text: "Push notifications"
+    id: "push-notifications-toggle"
 
-# 8. Tap "Weekly progress digest" toggle (toggle on)
+# 8. Scroll Weekly digest into view, then tap (toggle on)
+- scrollUntilVisible:
+    element:
+      id: "weekly-digest-toggle"
+    direction: DOWN
+    timeout: 5000
+
 - tapOn:
-    text: "Weekly progress digest"
+    id: "weekly-digest-toggle"
 
 - takeScreenshot: settings-digest-toggled
 
 # 9. Tap "Weekly progress digest" toggle again (toggle off)
 - tapOn:
-    text: "Weekly progress digest"
+    id: "weekly-digest-toggle"
 
 - takeScreenshot: settings-notifications-reset
 

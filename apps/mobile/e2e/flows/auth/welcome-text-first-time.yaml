@@ -41,6 +41,14 @@ tags:
     id: "sign-in-email"
 - assertVisible:
     id: "sign-in-password"
+
+# [BUG-959] Sign in button + Sign up link sit below the fold on 1080x1920.
+- scrollUntilVisible:
+    element:
+      id: "sign-in-button"
+    direction: DOWN
+    timeout: 5000
+
 - assertVisible:
     id: "sign-in-button"
 - assertVisible: "Sign up"

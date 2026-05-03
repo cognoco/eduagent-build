@@ -50,13 +50,13 @@ tags:
 
 - scrollUntilVisible:
     element:
-      text: "Celebrations"
+      id: "celebrations-section-header"
     direction: DOWN
     timeout: 5000
 
 - scrollUntilVisible:
     element:
-      text: "Notifications"
+      id: "notifications-section-header"
     direction: DOWN
     timeout: 5000
 

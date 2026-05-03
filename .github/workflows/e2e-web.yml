@@ -53,6 +53,39 @@ jobs:
       - name: Run Playwright smoke suite
         run: pnpm run test:e2e:web:smoke
 
+      # [BUG-979 / CCR-PR123-M-3] Reset seeded staging accounts independently
+      # of Playwright's globalTeardown. Reason: this workflow uses
+      # cancel-in-progress (line 13), and a pushed update may cancel a
+      # currently-running run before Playwright reaches its teardown — leaving
+      # seeded accounts in the staging DB. This step uses if: always() so it
+      # runs after success, failure, AND graceful cancellation. The PLAYWRIGHT_*
+      # vars resolve to the same prefix the suite uses to seed, so the reset is
+      # narrowly scoped to *this* run's accounts and cannot collide with a
+      # parallel job's data.
+      #
+      # Caveat: a hard SIGKILL (rare; only after the runner's grace window
+      # elapses) may still skip this step. The scheduled nightly cleanup
+      # workflow (e2e-web-cleanup.yml) is the safety net for that case.
+      - name: Reset seeded staging accounts (always)
+        if: always()
+        env:
+          PLAYWRIGHT_API_URL: ${{ vars.E2E_API_URL || 'https://api-stg.mentomate.com' }}
+          PLAYWRIGHT_TEST_SEED_SECRET: ${{ secrets.TEST_SEED_SECRET }}
+          PLAYWRIGHT_RUN_ID: ${{ env.PLAYWRIGHT_RUN_ID }}
+        run: |
+          # Derive the seed prefix the same way runtime.ts does so the reset
+          # call hits exactly this run's seeded rows.
+          PREFIX="${PLAYWRIGHT_EMAIL_PREFIX:-pw-${PLAYWRIGHT_RUN_ID:-fallback}-}"
+          echo "Resetting seeded accounts with prefix: ${PREFIX}"
+          # --fail-with-body so a non-2xx surfaces in logs without breaking
+          # if the endpoint is unreachable mid-incident; the nightly cleanup
+          # job will catch anything missed here.
+          curl --fail-with-body --silent --show-error \
+            -X POST \
+            -H "X-Test-Secret: ${PLAYWRIGHT_TEST_SEED_SECRET}" \
+            "${PLAYWRIGHT_API_URL}/v1/__test/reset?prefix=${PREFIX}" \
+            || echo "::warning::seed reset returned non-2xx; nightly cleanup will sweep"
+
       - name: Upload Playwright artifacts
         if: always()
         uses: actions/upload-artifact@v4

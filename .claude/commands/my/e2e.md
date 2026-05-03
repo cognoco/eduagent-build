@@ -28,9 +28,11 @@ as a smoke test against current UI state.
    ```bash
    curl -s http://localhost:8081/status   # expect: packager-status:running
    ```
-   If absent, start in background (this is OK to do unprompted):
+   If absent, start in background (this is OK to do unprompted). Run from
+   the repo root — `apps/mobile` is a relative path so the snippet works on
+   any contributor's machine:
    ```bash
-   cd /c/Dev/Projects/Products/Apps/eduagent-build/apps/mobile
+   cd apps/mobile
    pnpm exec expo start --port 8081 --dev-client
    ```
    (Run in background; wait until `/status` responds.)

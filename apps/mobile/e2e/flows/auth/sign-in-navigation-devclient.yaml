@@ -7,10 +7,14 @@ tags:
   - auth
 ---
 # ── Sign-in screen ──────────────────────────────────────────────────
+# [BUG-959] On 1080x1920 (~5.8" devices) the Sign in button + Sign up link
+# render below the fold once logo + Google SSO + form fields stack up. The
+# screen is in a ScrollView with minHeight: SCREEN_HEIGHT, so they're always
+# reachable — but the test must scrollUntilVisible before asserting/tapping.
 
 - extendedWaitUntil:
     visible:
-      id: "sign-in-button"
+      id: "sign-in-screen"
     timeout: 10000
 
 - assertVisible: "Sign in to start learning"
@@ -20,6 +24,14 @@ tags:
     id: "sign-in-email"
 - assertVisible:
     id: "sign-in-password"
+
+# Scroll to bottom of the form so primary CTA + sign-up link are in view.
+- scrollUntilVisible:
+    element:
+      id: "sign-in-button"
+    direction: DOWN
+    timeout: 5000
+
 - assertVisible:
     id: "sign-in-button"
 - assertVisible:
@@ -44,6 +56,15 @@ tags:
     id: "sign-up-email"
 - assertVisible:
     id: "sign-up-password"
+
+# [BUG-959] sign-up CTA + sign-in link sit below the fold on smaller
+# screens — same root cause as the sign-in form.
+- scrollUntilVisible:
+    element:
+      id: "sign-up-button"
+    direction: DOWN
+    timeout: 5000
+
 - assertVisible:
     id: "sign-up-button"
 - assertVisible:
@@ -58,11 +79,18 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: "sign-in-button"
+      id: "sign-in-screen"
     timeout: 10000
 
 - assertVisible:
     id: "sign-in-email"
+
+- scrollUntilVisible:
+    element:
+      id: "sign-in-button"
+    direction: DOWN
+    timeout: 5000
+
 - assertVisible:
     id: "sign-in-button"
 
@@ -93,11 +121,18 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: "sign-in-button"
+      id: "sign-in-screen"
     timeout: 10000
 
 - assertVisible:
     id: "sign-in-email"
+
+- scrollUntilVisible:
+    element:
+      id: "sign-in-button"
+    direction: DOWN
+    timeout: 5000
+
 - assertVisible:
     id: "sign-in-button"
 

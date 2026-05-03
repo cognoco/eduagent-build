@@ -108,7 +108,17 @@ tags:
 - assertVisible:
     id: "session-takeaways"
 
-# 17. Tap summary input and write a summary
+# 17. summary-input lives below session-takeaways (and below an optional
+# resume-session button + XP incentive copy). On smaller phones it sits
+# below the fold once the screen has loaded. Scroll it into view before
+# tapping. [BUG-964]
+- scrollUntilVisible:
+    element:
+      id: "summary-input"
+    direction: DOWN
+    timeout: 5000
+
+# 18. Tap summary input and write a summary
 - tapOn:
     id: "summary-input"
 - inputText: "I learned about the key concepts and how they apply in practice"

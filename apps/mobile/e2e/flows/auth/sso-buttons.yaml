@@ -17,9 +17,11 @@ tags:
   - nightly
   - auth
 ---
+# [BUG-959] sign-in-button can render below the fold on 1080x1920 — wait
+# on the always-above-fold screen container, then scroll the CTA into view.
 - extendedWaitUntil:
     visible:
-      id: "sign-in-button"
+      id: "sign-in-screen"
     timeout: 120000
 
 - takeScreenshot: sso-01-sign-in
@@ -35,6 +37,12 @@ tags:
 
 - assertVisible:
     id: "sign-in-password"
+
+- scrollUntilVisible:
+    element:
+      id: "sign-in-button"
+    direction: DOWN
+    timeout: 5000
 
 - assertVisible:
     id: "sign-in-button"

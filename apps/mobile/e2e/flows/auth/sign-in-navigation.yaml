@@ -17,6 +17,15 @@ tags:
 - runFlow: ../_setup/launch-devclient.yaml
 
 # ── Sign-in screen ──────────────────────────────────────────────────
+# [BUG-959] On 1080x1920 the Sign in button + Sign up link sit below the
+# fold once logo + Google SSO + form fields stack up. Wait on the screen
+# container (always above-fold), then scroll the CTA + sign-up link into
+# view before asserting/tapping.
+
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-screen"
+    timeout: 10000
 
 # 3. Verify all sign-in screen elements
 - assertVisible: "Sign in to start learning"
@@ -26,6 +35,13 @@ tags:
     id: "sign-in-email"
 - assertVisible:
     id: "sign-in-password"
+
+- scrollUntilVisible:
+    element:
+      id: "sign-in-button"
+    direction: DOWN
+    timeout: 5000
+
 - assertVisible:
     id: "sign-in-button"
 - assertVisible:
@@ -39,6 +55,14 @@ tags:
 - tapOn:
     id: "sign-in-email"
 - takeScreenshot: auth-nav-sign-in-keyboard
+
+# Bring CTA back into view after keyboard interaction.
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: "sign-in-button"
+    direction: DOWN
+    timeout: 5000
 - tapOn:
     id: "sign-in-button"
 
@@ -59,6 +83,13 @@ tags:
     id: "sign-up-email"
 - assertVisible:
     id: "sign-up-password"
+
+- scrollUntilVisible:
+    element:
+      id: "sign-up-button"
+    direction: DOWN
+    timeout: 5000
+
 - assertVisible:
     id: "sign-up-button"
 - assertVisible:
@@ -75,11 +106,18 @@ tags:
 # 7. Verify back on sign-in screen
 - extendedWaitUntil:
     visible:
-      id: "sign-in-button"
+      id: "sign-in-screen"
     timeout: 5000
 
 - assertVisible:
     id: "sign-in-email"
+
+- scrollUntilVisible:
+    element:
+      id: "sign-in-button"
+    direction: DOWN
+    timeout: 5000
+
 - assertVisible:
     id: "sign-in-button"
 
@@ -112,13 +150,23 @@ tags:
     id: "back-to-sign-in"
 
 # 11. Verify back on sign-in screen
+# [BUG-963] After back-nav from forgot-password the form re-mounts at the
+# top, leaving the Sign in button below the fold. Use the screen container
+# as the loaded signal, then scroll the CTA into view.
 - extendedWaitUntil:
     visible:
-      id: "sign-in-button"
+      id: "sign-in-screen"
     timeout: 5000
 
 - assertVisible:
     id: "sign-in-email"
+
+- scrollUntilVisible:
+    element:
+      id: "sign-in-button"
+    direction: DOWN
+    timeout: 5000
+
 - assertVisible:
     id: "sign-in-button"
 
