@@ -375,22 +375,7 @@ export const exchangesFlow: FlowDefinition<ExchangeScenarioInput> = {
     };
   },
 
-  // -------------------------------------------------------------------------
-  // [AUDIT-EVAL-2 / 2026-05-02] First runLive in the harness — sets the
-  // pattern for the other ~12 flows. Mirrors production processExchange
-  // (apps/api/src/services/exchanges.ts) — same routeAndCall signature,
-  // same per-context options (llmTier, ageBracket, conversationLanguage,
-  // pronouns), same escalationRung. The wrapper tags telemetry with
-  // flow: "eval-harness" so dashboards can filter eval calls out.
-  //
-  // Known divergence (tracked separately as AUDIT-EVAL-3): production
-  // concatenates `buildOrphanSystemAddendum(...)` onto the system prompt;
-  // this harness only sends `buildSystemPrompt(context)` (matching what
-  // buildPrompt above produces, and what the Tier-1 snapshot displays).
-  // We deliberately use messages.system here so the live call validates
-  // the same prompt the snapshot shows — fixing the addendum gap means
-  // updating buildPrompt too, which is its own scope.
-  // -------------------------------------------------------------------------
+  // Uses messages.system as-is — production adds buildOrphanSystemAddendum but the harness omits it so the live run validates the same prompt the Tier-1 snapshot displays.
   async runLive(
     input: ExchangeScenarioInput,
     messages: PromptMessages
