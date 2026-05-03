@@ -86,6 +86,7 @@ export async function getNote(
     .where(
       and(eq(topicNotes.topicId, topicId), eq(topicNotes.profileId, profileId))
     )
+    .orderBy(desc(topicNotes.updatedAt))
     .limit(1);
 
   return row ?? null;

@@ -14,6 +14,17 @@ import {
 import { getOverdueTopicsGrouped } from '../services/overdue-topics';
 import { getProfileOverdueCount } from '../services/retention-data';
 import { notFound } from '../errors';
+import {
+  subjectProgressEndpointResponseSchema,
+  topicProgressEndpointResponseSchema,
+  progressOverviewResponseSchema,
+  reviewSummaryResponseSchema,
+  overdueTopicsResponseSchema,
+  activeSessionResponseSchema,
+  topicResolveResponseSchema,
+  resumeTargetResponseSchema,
+  continueSuggestionResponseSchema,
+} from '@eduagent/schemas';
 
 type ProgressRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -33,7 +44,7 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
 
     const progress = await getSubjectProgress(db, profileId, subjectId);
     if (!progress) return notFound(c, 'Subject not found');
-    return c.json({ progress });
+    return c.json(subjectProgressEndpointResponseSchema.parse({ progress }));
   })
 
   // Get detailed topic progress
@@ -45,7 +56,7 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
 
     const topic = await getTopicProgress(db, profileId, subjectId, topicId);
     if (!topic) return notFound(c, 'Topic not found');
-    return c.json({ topic });
+    return c.json(topicProgressEndpointResponseSchema.parse({ topic }));
   })
 
   // Get overall progress across all subjects
@@ -54,7 +65,7 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
     const profileId = requireProfileId(c.get('profileId'));
 
     const overview = await getOverallProgress(db, profileId);
-    return c.json(overview);
+    return c.json(progressOverviewResponseSchema.parse(overview));
   })
 
   // Get total overdue review count across the active profile
@@ -64,11 +75,13 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
 
     const { overdueCount, nextReviewTopic, nextUpcomingReviewAt } =
       await getProfileOverdueCount(db, profileId);
-    return c.json({
-      totalOverdue: overdueCount,
-      nextReviewTopic,
-      nextUpcomingReviewAt,
-    });
+    return c.json(
+      reviewSummaryResponseSchema.parse({
+        totalOverdue: overdueCount,
+        nextReviewTopic,
+        nextUpcomingReviewAt,
+      })
+    );
   })
 
   .get('/progress/overdue-topics', async (c) => {
@@ -76,7 +89,7 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
     const profileId = requireProfileId(c.get('profileId'));
 
     const result = await getOverdueTopicsGrouped(db, profileId);
-    return c.json(result);
+    return c.json(overdueTopicsResponseSchema.parse(result));
   })
 
   // Get active/paused session for a specific topic [F-4]
@@ -86,7 +99,7 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
     const topicId = c.req.param('topicId');
 
     const result = await getActiveSessionForTopic(db, profileId, topicId);
-    return c.json(result);
+    return c.json(activeSessionResponseSchema.parse(result));
   })
 
   // [F-009] Resolve a topic's parent subject — enables deep-links with topicId only
@@ -97,7 +110,7 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
 
     const result = await resolveTopicSubject(db, profileId, topicId);
     if (!result) return notFound(c, 'Topic not found');
-    return c.json(result);
+    return c.json(topicResolveResponseSchema.parse(result));
   })
 
   // Get unified "continue learning" target for Home/Library/Progress.
@@ -113,7 +126,7 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
       ...(bookId ? { bookId } : {}),
       ...(topicId ? { topicId } : {}),
     });
-    return c.json({ target });
+    return c.json(resumeTargetResponseSchema.parse({ target }));
   })
 
   // Get "continue where I left off" suggestion
@@ -122,5 +135,5 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
     const profileId = requireProfileId(c.get('profileId'));
 
     const suggestion = await getContinueSuggestion(db, profileId);
-    return c.json({ suggestion });
+    return c.json(continueSuggestionResponseSchema.parse({ suggestion }));
   });

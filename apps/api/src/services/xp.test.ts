@@ -561,17 +561,33 @@ describe('getSessionXpEntry', () => {
     expect(result).toEqual({ baseXp: 100, reflectionBonusXp: 50 });
   });
 
-  it('derives the original base XP after reflection is applied', async () => {
+  it('derives the original base XP after reflection is applied by this session', async () => {
     const { db } = createMockReflectionDb({
       entry: {
         id: 'xp-001',
         amount: 150,
         reflectionMultiplierApplied: true,
+        reflectionAppliedBySessionId: 'session-1',
       },
     });
 
     const result = await getSessionXpEntry(db, 'profile-001', 'session-1');
 
     expect(result).toEqual({ baseXp: 100, reflectionBonusXp: 50 });
+  });
+
+  it('returns zero bonus when reflection was applied by a different session', async () => {
+    const { db } = createMockReflectionDb({
+      entry: {
+        id: 'xp-001',
+        amount: 150,
+        reflectionMultiplierApplied: true,
+        reflectionAppliedBySessionId: 'session-other',
+      },
+    });
+
+    const result = await getSessionXpEntry(db, 'profile-001', 'session-1');
+
+    expect(result).toEqual({ baseXp: 100, reflectionBonusXp: 0 });
   });
 });

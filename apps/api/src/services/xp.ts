@@ -194,6 +194,7 @@ export async function applyReflectionMultiplier(
     .set({
       amount: newAmount,
       reflectionMultiplierApplied: true,
+      reflectionAppliedBySessionId: sessionId,
     })
     .where(
       and(
@@ -236,9 +237,11 @@ export async function getSessionXpEntry(
 
   if (entry.reflectionMultiplierApplied) {
     const baseXp = Math.round(entry.amount / REFLECTION_XP_MULTIPLIER);
+    const thisSessionEarnedBonus =
+      entry.reflectionAppliedBySessionId === sessionId;
     return {
       baseXp,
-      reflectionBonusXp: entry.amount - baseXp,
+      reflectionBonusXp: thisSessionEarnedBonus ? entry.amount - baseXp : 0,
     };
   }
 

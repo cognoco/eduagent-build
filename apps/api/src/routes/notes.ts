@@ -5,6 +5,12 @@ import type { Database } from '@eduagent/database';
 import {
   createNoteInputSchema,
   updateNoteInputSchema,
+  bookNotesResponseSchema,
+  noteGetResponseSchema,
+  topicIdsResponseSchema,
+  topicNotesResponseSchema,
+  noteMutationResponseSchema,
+  topicSessionsResponseSchema,
 } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
@@ -56,7 +62,7 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
 
       try {
         const notes = await getNotesForBook(db, profileId, subjectId, bookId);
-        return c.json({ notes });
+        return c.json(bookNotesResponseSchema.parse({ notes }));
       } catch (error) {
         if (error instanceof NotFoundError) {
           return notFound(c, error.message);
@@ -76,7 +82,7 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
 
       try {
         const note = await getNote(db, profileId, subjectId, topicId);
-        return c.json({ note });
+        return c.json(noteGetResponseSchema.parse({ note }));
       } catch (error) {
         if (error instanceof NotFoundError) {
           return notFound(c, error.message);
@@ -91,7 +97,7 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
     const profileId = requireProfileId(c.get('profileId'));
 
     const topicIds = await getTopicIdsWithNotes(db, profileId);
-    return c.json({ topicIds });
+    return c.json(topicIdsResponseSchema.parse({ topicIds }));
   })
   // GET /subjects/:subjectId/topics/:topicId/notes (list all notes for topic)
   .get(
@@ -104,7 +110,7 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
 
       try {
         const notes = await getNotesForTopic(db, profileId, subjectId, topicId);
-        return c.json({ notes });
+        return c.json(topicNotesResponseSchema.parse({ notes }));
       } catch (error) {
         if (error instanceof NotFoundError) return notFound(c, error.message);
         throw error;
@@ -131,7 +137,7 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
           content,
           sessionId
         );
-        return c.json({ note }, 201);
+        return c.json(noteMutationResponseSchema.parse({ note }), 201);
       } catch (error) {
         if (error instanceof NotFoundError) return notFound(c, error.message);
         throw error;
@@ -151,7 +157,7 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
 
       try {
         const note = await updateNote(db, profileId, noteId, content);
-        return c.json({ note });
+        return c.json(noteMutationResponseSchema.parse({ note }));
       } catch (error) {
         if (error instanceof NotFoundError) return notFound(c, error.message);
         throw error;
@@ -207,6 +213,6 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
       const { topicId } = c.req.valid('param');
 
       const sessions = await getTopicSessions(db, profileId, topicId);
-      return c.json({ sessions });
+      return c.json(topicSessionsResponseSchema.parse({ sessions }));
     }
   );
