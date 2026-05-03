@@ -6,6 +6,8 @@ import {
   ScrollView,
   TextInput,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import type {
   useParkingLot,
@@ -43,7 +45,10 @@ export function ParkingLotModal({
       animationType="slide"
       onRequestClose={onClose}
     >
-      <View className="flex-1 bg-black/40 justify-end">
+      <KeyboardAvoidingView
+        className="flex-1 bg-black/40 justify-end"
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
         <View
           className="bg-background rounded-t-3xl px-5 pt-5"
           style={{ paddingBottom: Math.max(insetsBottom, 24) }}
@@ -133,7 +138,7 @@ export function ParkingLotModal({
             </Text>
           </Pressable>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

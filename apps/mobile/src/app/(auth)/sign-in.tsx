@@ -957,6 +957,10 @@ export default function SignInScreen() {
         <ScrollView
           ref={verifyScrollRef}
           className="flex-1"
+          style={{
+            width: '100%',
+            ...(Platform.OS === 'web' ? { maxWidth: 480 } : undefined),
+          }}
           contentContainerStyle={{
             minHeight: SCREEN_HEIGHT,
             paddingTop: insets.top + 24,
@@ -1087,25 +1091,22 @@ export default function SignInScreen() {
       <ScrollView
         ref={scrollRef}
         className="flex-1"
-        style={
-          Platform.OS === 'web' ? { maxWidth: 480, width: '100%' } : undefined
-        }
+        style={{
+          width: '100%',
+          ...(Platform.OS === 'web' ? { maxWidth: 480 } : undefined),
+        }}
         contentContainerStyle={{
           minHeight: SCREEN_HEIGHT,
-          paddingTop: insets.top + 24,
-          paddingBottom: insets.bottom + 24,
+          paddingTop: insets.top + 16,
+          paddingBottom: insets.bottom + 16,
           paddingHorizontal: 24,
         }}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
       >
-        {/* Brand logo at top of screen */}
-        <View className="items-center mt-8 mb-8">
-          <MentomateLogo size="md" />
+        <View className="items-center mt-2 mb-1">
+          <MentomateLogo size="sm" />
         </View>
-        {/* Spacer: pushes form content toward center. maxHeight caps the gap
-            on tall screens so the logo and form stay visually connected. */}
-        <View className="flex-1" style={{ minHeight: 16, maxHeight: 32 }} />
         <Text className="text-h2 font-bold text-text-primary mb-1 text-center">
           {isReturningUser === null
             ? 'Welcome'
@@ -1113,7 +1114,7 @@ export default function SignInScreen() {
             ? 'Welcome back'
             : 'Welcome to MentoMate'}
         </Text>
-        <Text className="text-body-sm text-text-secondary mb-6 text-center">
+        <Text className="text-body-sm text-text-secondary mb-2 text-center">
           {isReturningUser === null
             ? 'Sign in to get started'
             : isReturningUser
@@ -1167,7 +1168,7 @@ export default function SignInScreen() {
         ) : null}
 
         {Platform.OS !== 'ios' && (
-          <View className="mb-6">
+          <View className="mb-2">
             <Button
               variant="secondary"
               label="Continue with Google"
@@ -1180,7 +1181,7 @@ export default function SignInScreen() {
         )}
 
         {Platform.OS === 'ios' && (
-          <View className="mb-6">
+          <View className="mb-2">
             <Button
               variant="secondary"
               label="Continue with Apple"
@@ -1193,7 +1194,7 @@ export default function SignInScreen() {
         )}
 
         {openAIStrategy ? (
-          <View className="mb-6">
+          <View className="mb-2">
             <Button
               variant="secondary"
               label="Continue with OpenAI"
@@ -1205,7 +1206,7 @@ export default function SignInScreen() {
           </View>
         ) : null}
 
-        <View className="flex-row items-center mb-6">
+        <View className="flex-row items-center mb-2">
           <View className="flex-1 h-px bg-border" />
           <Text className="text-body-sm text-text-secondary mx-4">or</Text>
           <View className="flex-1 h-px bg-border" />
@@ -1216,7 +1217,7 @@ export default function SignInScreen() {
             Email
           </Text>
           <TextInput
-            className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-4"
+            className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-2"
             autoCapitalize="none"
             autoComplete="email"
             keyboardType="email-address"
@@ -1253,7 +1254,7 @@ export default function SignInScreen() {
           </View>
         </View>
 
-        <View className="items-end mb-4">
+        <View className="items-end mb-2">
           <Button
             variant="tertiary"
             size="small"
@@ -1315,7 +1316,7 @@ export default function SignInScreen() {
           </View>
         )}
 
-        <View className="flex-row justify-center items-center mt-6">
+        <View className="flex-row justify-center items-center mt-4">
           <Text className="text-body-sm text-text-secondary">
             Don&apos;t have an account?{' '}
           </Text>
