@@ -1,6 +1,8 @@
-import { pgTable, uuid, text, timestamp, unique } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { pgTable, uuid, text, timestamp, index } from 'drizzle-orm/pg-core';
 import { curriculumTopics } from './subjects';
 import { profiles } from './profiles';
+import { learningSessions } from './sessions';
 import { generateUUIDv7 } from '../utils/uuid';
 
 export const topicNotes = pgTable(
@@ -15,6 +17,9 @@ export const topicNotes = pgTable(
     profileId: uuid('profile_id')
       .notNull()
       .references(() => profiles.id, { onDelete: 'cascade' }),
+    sessionId: uuid('session_id').references(() => learningSessions.id, {
+      onDelete: 'set null',
+    }),
     content: text('content').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
@@ -23,5 +28,11 @@ export const topicNotes = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [unique().on(t.topicId, t.profileId)]
+  (t) => [
+    index('topic_notes_topic_profile_idx').on(t.topicId, t.profileId),
+    index('topic_notes_content_trgm_idx').using(
+      'gin',
+      sql`${t.content} gin_trgm_ops`
+    ),
+  ]
 );

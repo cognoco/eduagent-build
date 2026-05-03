@@ -1,54 +1,57 @@
 // Common
-export * from './common.ts';
-export * from './errors.ts';
-export * from './age.ts';
+export * from './common';
+export * from './errors';
+export * from './age';
 
 // Auth & Profiles
-export * from './auth.ts';
-export * from './profiles.ts';
-export * from './consent.ts';
-export * from './account.ts';
+export * from './auth';
+export * from './profiles';
+export * from './consent';
+export * from './account';
 
 // Onboarding & Curriculum (Epic 1)
-export * from './subjects.ts';
-export * from './sessions.ts';
-export * from './language.ts';
-export * from './bookmarks.ts';
+export * from './subjects';
+export * from './sessions';
+export * from './language';
+export * from './bookmarks';
 
 // Assessment & Retention (Epic 3)
-export * from './assessments.ts';
+export * from './assessments';
 
 // Progress, Motivation & Dashboard (Epic 4)
-export * from './progress.ts';
-export * from './retention-status.ts';
-export * from './snapshots.ts';
+export * from './progress';
+export * from './retention-status';
+export * from './snapshots';
 
 // Subscription & Billing (Epic 5)
-export * from './billing.ts';
+export * from './billing';
 
 // Filing (Conversation-First Flow)
-export * from './filing.ts';
-export * from './inngest-events.ts';
-export * from './depth-evaluation.ts';
+export * from './filing';
+export * from './inngest-events';
+export * from './depth-evaluation';
 
 // Topic Notes
-export * from './notes.ts';
+export * from './notes';
+
+// Library Search
+export * from './library-search';
 
 // Adaptive Memory (Epic 16)
-export * from './learning-profiles.ts';
+export * from './learning-profiles';
 
 // Dictation (Practice)
-export * from './dictation.ts';
+export * from './dictation';
 
 // Quiz Activities (Practice)
-export * from './quiz.ts';
-export * from './quiz-utils.ts';
+export * from './quiz';
+export * from './quiz-utils';
 
 // LLM Response Envelope (shared contract for all structured-output LLM flows)
-export * from './llm-envelope.ts';
+export * from './llm-envelope';
 
 // Stream fallback contract — SSE frame + typed reasons shared with mobile
-export * from './stream-fallback.ts';
+export * from './stream-fallback';
 
 // Feedback (in-app feedback + shake-to-report)
-export * from './feedback.ts';
+export * from './feedback';

@@ -89,3 +89,7 @@ export type { BookSession } from './session-book';
 
 // Depth evaluation
 export { evaluateSessionDepth } from './session-depth';
+
+// Topic sessions (Library v3)
+export { getTopicSessions } from './session-topic';
+export type { TopicSession } from './session-topic';

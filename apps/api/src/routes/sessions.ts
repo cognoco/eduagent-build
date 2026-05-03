@@ -53,10 +53,6 @@ import { notFound, apiError } from '../errors';
 import { inngest } from '../inngest/client';
 import { safeRefundQuota } from '../services/billing';
 import {
-  shouldPromptCasualSwitch,
-  getSkipWarningFlags,
-} from '../services/settings';
-import {
   startInterleavedSession,
   NoInterleavedTopicsError,
 } from '../services/interleaved';
@@ -75,6 +71,7 @@ type SessionRouteEnv = {
     CLERK_JWKS_URL?: string;
     VOYAGE_API_KEY?: string;
     IDEMPOTENCY_KV?: KVNamespace;
+    ENVIRONMENT?: string;
   };
   Variables: {
     user: AuthUser;
@@ -335,12 +332,18 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
               });
             }
           } catch (streamErr) {
+            const errMsg =
+              streamErr instanceof Error
+                ? streamErr.message
+                : String(streamErr);
+            const errStack =
+              streamErr instanceof Error ? streamErr.stack : undefined;
             logger.error('[sessions/stream] LLM stream failed', {
               sessionId,
-              error:
-                streamErr instanceof Error
-                  ? streamErr.message
-                  : String(streamErr),
+              error: errMsg,
+              errorName:
+                streamErr instanceof Error ? streamErr.name : typeof streamErr,
+              stack: errStack,
             });
             captureException(streamErr, {
               profileId,
@@ -366,7 +369,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                 message:
                   streamErr instanceof Error &&
                   streamErr.message.includes('safety filters')
-                    ? streamErr.message
+                    ? errMsg
                     : 'Something went wrong while generating a reply. Please try again.',
               }),
             });
@@ -513,6 +516,12 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           }
         });
       } catch (err) {
+        logger.error('[sessions/stream] Pre-stream setup failed', {
+          sessionId,
+          error: err instanceof Error ? err.message : String(err),
+          errorName: err instanceof Error ? err.name : typeof err,
+          stack: err instanceof Error ? err.stack : undefined,
+        });
         if (err instanceof SessionExchangeLimitError) {
           return apiError(
             c,
@@ -585,12 +594,8 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         pipelineQueued = dispatch.pipelineQueued;
       }
 
-      // Check if we should prompt the learner to switch to Casual Explorer
-      const promptCasualSwitch = await shouldPromptCasualSwitch(db, profileId);
-
       return c.json({
         ...result,
-        shouldPromptCasualSwitch: promptCasualSwitch,
         pipelineQueued,
       });
     }
@@ -721,14 +726,8 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       );
       pipelineQueued = dispatch.pipelineQueued;
     }
-    const {
-      shouldPromptCasualSwitch: promptCasualSwitch,
-      shouldWarnSummarySkip: warnSummarySkip,
-    } = await getSkipWarningFlags(db, profileId);
     return c.json({
       ...result,
-      shouldPromptCasualSwitch: promptCasualSwitch,
-      shouldWarnSummarySkip: warnSummarySkip,
       pipelineQueued,
     });
   })
@@ -862,6 +861,7 @@ async function dispatchSessionCompletedEvent(
         topicId: completion.topicId,
         subjectId: completion.subjectId,
         sessionType: completion.sessionType,
+        ...(completion.mode ? { mode: completion.mode } : {}),
         verificationType: completion.verificationType,
         interleavedTopicIds: completion.interleavedTopicIds,
         escalationRungs: completion.escalationRungs,
