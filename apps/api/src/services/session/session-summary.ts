@@ -6,10 +6,13 @@ import { eq, and } from 'drizzle-orm';
 import {
   curriculumTopics,
   sessionSummaries,
-  topicNotes,
   type Database,
 } from '@eduagent/database';
-import type { SessionSummary, SummarySubmitInput } from '@eduagent/schemas';
+import {
+  ConflictError,
+  type SessionSummary,
+  type SummarySubmitInput,
+} from '@eduagent/schemas';
 import { createPendingSessionSummary, evaluateSummary } from '../summaries';
 import { getSubject } from '../subject';
 import {
@@ -20,6 +23,7 @@ import {
 import { applyReflectionMultiplier, getSessionXpEntry } from '../xp';
 import { createLogger } from '../logger';
 import { captureException } from '../sentry';
+import { createNoteForSession } from '../notes';
 import { getSession } from './session-crud';
 import { findSessionSummaryRow, mapSummaryRow } from './session-events';
 
@@ -215,26 +219,38 @@ export async function submitSummary(
 
   if (session.topicId) {
     try {
-      await db.insert(topicNotes).values({
-        topicId: session.topicId,
+      await createNoteForSession(db, {
         profileId,
+        topicId: session.topicId,
         sessionId,
         content: input.content,
       });
     } catch (err) {
-      logger.error('[submitSummary] Note creation failed (non-fatal)', {
-        sessionId,
-        topicId: session.topicId,
-        error: err instanceof Error ? err.message : String(err),
-      });
-      captureException(err, {
-        profileId,
-        extra: {
-          site: 'submitSummary.autoNoteCreation',
+      // Cap-reached is expected (50 notes per topic) — log at info, don't
+      // page Sentry. Any other error is unexpected and worth capturing.
+      if (err instanceof ConflictError) {
+        logger.info(
+          '[submitSummary] Auto-note skipped — topic note cap reached',
+          {
+            sessionId,
+            topicId: session.topicId,
+          }
+        );
+      } else {
+        logger.error('[submitSummary] Note creation failed (non-fatal)', {
           sessionId,
           topicId: session.topicId,
-        },
-      });
+          error: err instanceof Error ? err.message : String(err),
+        });
+        captureException(err, {
+          profileId,
+          extra: {
+            site: 'submitSummary.autoNoteCreation',
+            sessionId,
+            topicId: session.topicId,
+          },
+        });
+      }
     }
   }
 

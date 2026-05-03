@@ -8,9 +8,98 @@ import {
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
-import { NotFoundError } from '../errors';
+import { ConflictError, NotFoundError } from '../errors';
 
 const MAX_NOTES_PER_TOPIC = 50;
+
+type NoteRow = {
+  id: string;
+  topicId: string;
+  sessionId: string | null;
+  content: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+/**
+ * Atomic count-and-insert for topic notes. Wraps the cap check + insert in
+ * a transaction with a per-(profile, topic) advisory lock so two concurrent
+ * inserts cannot both observe count = MAX-1 and exceed the cap. Mirrors the
+ * BUG-860 pattern in `parking-lot-data.ts`.
+ *
+ * Throws ConflictError when the cap is reached. Callers that treat this as
+ * non-fatal (e.g. auto-note from session summary) must catch ConflictError
+ * specifically rather than swallowing all errors.
+ */
+async function insertNoteWithCap(
+  db: Database,
+  values: {
+    topicId: string;
+    profileId: string;
+    sessionId: string | null;
+    content: string;
+  }
+): Promise<NoteRow> {
+  return db.transaction(async (tx) => {
+    const lockKey = `notes:${values.profileId}:${values.topicId}`;
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`
+    );
+
+    const [countRow] = await tx
+      .select({ count: sql<number>`count(*)` })
+      .from(topicNotes)
+      .where(
+        and(
+          eq(topicNotes.topicId, values.topicId),
+          eq(topicNotes.profileId, values.profileId)
+        )
+      );
+    if (countRow && Number(countRow.count) >= MAX_NOTES_PER_TOPIC) {
+      throw new ConflictError(
+        `Note limit reached: maximum ${MAX_NOTES_PER_TOPIC} notes per topic`
+      );
+    }
+
+    const [row] = await tx.insert(topicNotes).values(values).returning({
+      id: topicNotes.id,
+      topicId: topicNotes.topicId,
+      sessionId: topicNotes.sessionId,
+      content: topicNotes.content,
+      createdAt: topicNotes.createdAt,
+      updatedAt: topicNotes.updatedAt,
+    });
+
+    if (!row) throw new Error('Insert topic note did not return a row');
+    return row;
+  });
+}
+
+/**
+ * Create a note as a side-effect of a session summary submission. The caller
+ * must have already verified that `sessionId` (and therefore `topicId`)
+ * belongs to `profileId` — this helper skips the redundant topic-ownership
+ * round-trip that `createNote` performs.
+ *
+ * Throws ConflictError when the cap is reached. The caller decides whether
+ * that is fatal.
+ */
+export async function createNoteForSession(
+  db: Database,
+  params: {
+    profileId: string;
+    topicId: string;
+    sessionId: string;
+    content: string;
+  }
+): Promise<NoteRow> {
+  return insertNoteWithCap(db, {
+    topicId: params.topicId,
+    profileId: params.profileId,
+    sessionId: params.sessionId,
+    content: params.content,
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Notes service — CRUD for per-topic, per-profile notes
@@ -211,14 +300,7 @@ export async function createNote(
   topicId: string,
   content: string,
   sessionId?: string
-): Promise<{
-  id: string;
-  topicId: string;
-  sessionId: string | null;
-  content: string;
-  createdAt: Date;
-  updatedAt: Date;
-}> {
+): Promise<NoteRow> {
   await verifyTopicOwnership(db, profileId, subjectId, topicId);
 
   if (sessionId) {
@@ -237,37 +319,12 @@ export async function createNote(
     }
   }
 
-  const [countRow] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(topicNotes)
-    .where(
-      and(eq(topicNotes.topicId, topicId), eq(topicNotes.profileId, profileId))
-    );
-  if (countRow && countRow.count >= MAX_NOTES_PER_TOPIC) {
-    throw new Error(
-      `Note limit reached: maximum ${MAX_NOTES_PER_TOPIC} notes per topic`
-    );
-  }
-
-  const [row] = await db
-    .insert(topicNotes)
-    .values({
-      topicId,
-      profileId,
-      sessionId: sessionId ?? null,
-      content,
-    })
-    .returning({
-      id: topicNotes.id,
-      topicId: topicNotes.topicId,
-      sessionId: topicNotes.sessionId,
-      content: topicNotes.content,
-      createdAt: topicNotes.createdAt,
-      updatedAt: topicNotes.updatedAt,
-    });
-
-  if (!row) throw new Error('Insert topic note did not return a row');
-  return row;
+  return insertNoteWithCap(db, {
+    topicId,
+    profileId,
+    sessionId: sessionId ?? null,
+    content,
+  });
 }
 
 export async function updateNote(

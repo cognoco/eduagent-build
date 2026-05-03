@@ -1,4 +1,4 @@
-import { eq, and, ilike } from 'drizzle-orm';
+import { eq, and, ilike, asc } from 'drizzle-orm';
 import {
   subjects,
   curriculumBooks,
@@ -44,6 +44,7 @@ export async function searchLibrary(
         .where(
           and(eq(subjects.profileId, profileId), ilike(subjects.name, pattern))
         )
+        .orderBy(asc(subjects.name), asc(subjects.id))
         .limit(20),
 
       repo.db
@@ -60,6 +61,7 @@ export async function searchLibrary(
             ilike(curriculumBooks.title, pattern)
           )
         )
+        .orderBy(asc(curriculumBooks.title), asc(curriculumBooks.id))
         .limit(20),
 
       repo.db
@@ -81,6 +83,7 @@ export async function searchLibrary(
             ilike(curriculumTopics.title, pattern)
           )
         )
+        .orderBy(asc(curriculumTopics.title), asc(curriculumTopics.id))
         .limit(20),
 
       repo.db
@@ -108,6 +111,7 @@ export async function searchLibrary(
             ilike(topicNotes.content, pattern)
           )
         )
+        .orderBy(asc(topicNotes.id))
         .limit(20),
     ]);
 

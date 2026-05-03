@@ -24,7 +24,8 @@ export async function getOverdueTopicsGrouped(
   const now = new Date();
 
   const overdueCards = await repo.retentionCards.findMany(
-    lt(retentionCards.nextReviewAt, now)
+    lt(retentionCards.nextReviewAt, now),
+    { limit: 500, orderBy: 'nextReviewAtAsc' }
   );
 
   if (overdueCards.length === 0) {

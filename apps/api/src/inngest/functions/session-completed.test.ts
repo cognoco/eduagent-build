@@ -466,8 +466,8 @@ describe('sessionCompleted', () => {
     const stepNames = result.outcomes.map((o: any) => o.step);
     expect(stepNames).toEqual([
       'process-verification-completion',
-      'update-retention',
       'relearn-retention-reset',
+      'update-retention',
       'update-vocabulary-retention',
       'update-needs-deepening',
       'check-milestone-completion',

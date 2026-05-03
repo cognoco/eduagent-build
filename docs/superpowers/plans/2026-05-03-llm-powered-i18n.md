@@ -370,7 +370,7 @@ git commit -m "feat(mobile): add i18n initialization module with locale resoluti
 **Files:**
 - Modify: `apps/mobile/src/app/_layout.tsx`
 
-- [ ] **Step 1: Add the i18n import and gate render on init**
+- [ ] **Step 1: Add the i18n import**
 
 At the top of `apps/mobile/src/app/_layout.tsx`, after the `import '../../global.css';` line (line 1), add:
 
@@ -378,13 +378,39 @@ At the top of `apps/mobile/src/app/_layout.tsx`, after the `import '../../global
 import { ensureI18nReady } from '../i18n';
 ```
 
-Inside the root layout component, gate the rendered tree behind a `useState(false)` flag flipped after `ensureI18nReady()` resolves. Reuse whatever splash-screen / `SplashScreen.preventAutoHideAsync()` pattern the layout already uses; if there is no existing pattern, add a `useEffect` that awaits `ensureI18nReady()` then sets `setI18nReady(true)`, and render `null` (or the existing loading splash) until ready.
+No `I18nextProvider` wrapper is needed — `react-i18next` uses a singleton pattern when initialized via `i18next.use(initReactI18next).init(...)`. The `useTranslation()` hook reads from the global i18next instance.
+
+- [ ] **Step 2: Gate render on init readiness**
 
 Why awaited init: i18next initialization reads AsyncStorage to detect the user's language preference. Initializing synchronously with `lng: 'en'` and async-switching afterward produces a visible flash of English text on the first render for non-English users. Awaiting init eliminates the flash at the cost of a few ms on cold start (negligible — the read is local).
 
-No `I18nextProvider` wrapper is needed — `react-i18next` uses a singleton pattern when initialized via `i18next.use(initReactI18next).init(...)`. The `useTranslation()` hook reads from the global i18next instance.
+**Decision tree (do exactly one of these — pick based on what the layout already does):**
 
-- [ ] **Step 1b: Set per-platform accessibility language on language change**
+**(a) If `_layout.tsx` already calls `SplashScreen.preventAutoHideAsync()` and hides the splash via `SplashScreen.hideAsync()` after some readiness check:** add `await ensureI18nReady()` to that existing readiness path *before* the existing `hideAsync()` call. Do NOT add a second gate. The native splash stays visible until i18n is ready, no separate render gate is needed.
+
+**(b) If the layout has its own `isReady` / loading state already (e.g., for fonts, auth bootstrap):** add `ensureI18nReady()` to the same `Promise.all(...)` (or sequential await) that flips that state. Do NOT add a parallel state.
+
+**(c) If neither pattern exists** (fresh layout with no readiness gate at all): add a minimal local gate. Inside the root layout component:
+
+```typescript
+const [i18nReady, setI18nReady] = useState(false);
+
+useEffect(() => {
+  let cancelled = false;
+  ensureI18nReady().then(() => {
+    if (!cancelled) setI18nReady(true);
+  });
+  return () => { cancelled = true; };
+}, []);
+
+if (!i18nReady) return null;
+```
+
+Render `null` (not a custom loading view) so the native Expo splash stays visible until React mounts the real tree. Document the choice in a one-line comment at the top of the gate so future contributors know which pattern (a/b/c) was used.
+
+**Verification before moving on:** confirm via the discovery grep `rg -n 'SplashScreen|preventAutoHideAsync|isReady' apps/mobile/src/app/_layout.tsx` which pattern actually exists. Do not assume.
+
+- [ ] **Step 3: Set per-platform accessibility language on language change**
 
 When `i18next.language` changes, screen readers (TalkBack, VoiceOver) need to know — otherwise Japanese text is read aloud by an English speech engine and is unintelligible. React Native exposes `accessibilityLanguage` per `Text` component (no global setting). For v1, add a single line in the i18n init module that subscribes to language changes and logs them; full per-component `accessibilityLanguage` propagation is deferred to a follow-up task. Document this as a known limitation:
 
@@ -398,7 +424,7 @@ i18next.on('languageChanged', (lang) => {
 });
 ```
 
-- [ ] **Step 2: Verify the app still builds**
+- [ ] **Step 4: Verify the app still builds**
 
 ```bash
 cd apps/mobile && pnpm exec tsc --noEmit
@@ -406,15 +432,15 @@ cd apps/mobile && pnpm exec tsc --noEmit
 
 Expected: PASS
 
-- [ ] **Step 3: Run existing layout tests**
+- [ ] **Step 5: Run existing layout tests**
 
 ```bash
 cd apps/mobile && pnpm exec jest --no-coverage src/app/_layout.test.tsx
 ```
 
-Expected: PASS (no regression)
+Expected: PASS — if any test mounts the layout and asserts on rendered content, it may need to await `ensureI18nReady()` or the `i18nReady` state flip. If a test fails because the gate renders `null`, update the test to await readiness; do NOT remove the gate.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add apps/mobile/src/app/_layout.tsx
@@ -1181,11 +1207,17 @@ export function validateTranslation(
 
   for (const [term, translations] of glossaryEntries) {
     const expected = translations[lang];
+    const expectedLower = expected.toLowerCase();
     const sourceWordRe = new RegExp(`\\b${escapeRegex(term)}\\b`, 'i');
     for (const key of Object.keys(sourceFlat)) {
       if (!sourceWordRe.test(sourceFlat[key])) continue;
       if (!(key in translatedFlat)) continue;
-      if (!translatedFlat[key].includes(expected)) {
+      // Case-insensitive containment: handles sentence-initial capitalization
+      // (e.g. glossary "racha" vs. translation "Racha está activa"). Inflected
+      // forms still pass via substring (e.g. "økten" contains "økt"). Word-
+      // boundary matching is intentionally NOT used on the target — Japanese
+      // and other non-space-delimited scripts have no reliable \b semantics.
+      if (!translatedFlat[key].toLowerCase().includes(expectedLower)) {
         errors.push({
           type: 'glossary_violation',
           key,
