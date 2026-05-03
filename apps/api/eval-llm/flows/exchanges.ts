@@ -22,7 +22,6 @@ import {
   type HistoryTurn,
 } from '../fixtures/exchange-histories';
 import type { FlowDefinition, PromptMessages, Scenario } from '../runner/types';
-import { callLlm } from '../runner/llm-bootstrap';
 
 // ---------------------------------------------------------------------------
 // Flow adapter — Main tutoring loop (exchanges.buildSystemPrompt)
@@ -376,6 +375,7 @@ export const exchangesFlow: FlowDefinition<ExchangeScenarioInput> = {
     };
   },
 
+  // Uses messages.system as-is — production adds buildOrphanSystemAddendum but the harness omits it so the live run validates the same prompt the Tier-1 snapshot displays.
   async runLive(
     input: ExchangeScenarioInput,
     messages: PromptMessages
@@ -390,9 +390,10 @@ export const exchangesFlow: FlowDefinition<ExchangeScenarioInput> = {
     const priorTurns =
       lastUserIndex >= 0 ? history.slice(0, lastUserIndex) : history;
 
+    // Throw rather than silently forward an empty user turn — enforces buildPrompt contract for flows that copy this pattern.
     if (!messages.user) {
       throw new Error(
-        `runLive: messages.user is undefined for scenario ${input.scenarioId} — buildPrompt must produce a user turn`
+        `runLive: messages.user is undefined or empty for scenario ${input.scenarioId} — buildPrompt must produce a user turn`
       );
     }
 
@@ -400,6 +401,7 @@ export const exchangesFlow: FlowDefinition<ExchangeScenarioInput> = {
       { role: 'system', content: messages.system },
       ...priorTurns.map((t) => ({
         role: t.role,
+        // Mirror production sanitization: sanitizeUserContent in processExchange — strips <server_note> markers from fixture history.
         content: t.role === 'user' ? sanitizeUserContent(t.content) : t.content,
       })),
       { role: 'user' as const, content: sanitizeUserContent(messages.user) },
