@@ -1,7 +1,7 @@
 # Artefact-consistency audit — punch list
 
 **Source recon:** 9-agent audit, 2 rounds, 2026-05-01.
-**Last updated:** 2026-05-02 (post AUDIT-SCHEMA-2 recon).
+**Last updated:** 2026-05-02 (post extended-scope recons: TYPES-1, TESTS-1, MOBILE-1, PACKAGE-SCRIPTS-1 all complete).
 **Coordination branch:** `artefact-consistency` (carries audit-only tracking docs; not merged to main).
 
 ---
@@ -24,14 +24,43 @@
 | INTERACTION-DUR-L1 | MAX_INTERVIEW_EXCHANGES docs → 4 | PR #134 |
 | AUDIT-MIGRATIONS-3 | Migration 0017 rollback notes | PR #135 |
 | AUDIT-WORKFLOW | `_wip/` gitignored | direct push to main (`55cd30df`) |
+| AUDIT-EVAL-2 | First `runLive` — exchanges flow | PR #137 (merged 2026-05-02 18:18 UTC) |
 
 ## In flight
 
 | ID | What | Where |
 |---|---|---|
-| AUDIT-EVAL-2 | Implement `runLive` for one production flow | Branched session, worktree `audit-eval-runlive` |
+| AUDIT-EVAL-2.1 | Post-merge review fixups for PR #137 | Branched session, branch `audit/eval-runlive-fixup`, PR #139. **Not subject to the audit-extension pause** below — this is hygiene on already-shipped code, not new remediation. |
+
+## Extended-scope recons — complete (2026-05-02)
+
+> All four extended-scope audits completed 2026-05-02. Reports written to `docs/audit/2026-05-02-audit-{types|tests|mobile|package-scripts}-1-recon.md` using the shared template at `docs/audit/_audit-report-template.md`.
+>
+> **Execution remains paused** pending: (a) user review of the four reports, (b) consolidation pass to promote each report's "Recommended punch-list entries" into Track B / Track C below, (c) update of `2026-05-02-audit-schema-2-plan.md` with TYPES-1's corrected schema-count figure. Once those three are done and the user lifts the pause, Track B / Track C work can resume.
+>
+> Original rationale (preserved for context): SCHEMA-2 had known cross-coupling with the schemas package and test infrastructure; mobile and package-scripts had non-zero cross-coupling. Decision was to see the full picture before remediating en masse, rather than discover cross-issues mid-execution and have to reshape plans midway. The recons validated that decision — TYPES-1 in particular surfaced a 2x error in SCHEMA-2's surface estimate that would have reshaped its PRs mid-flight.
+
+- **AUDIT-TYPES-1** — RECON DONE — see [`2026-05-02-audit-types-1-recon.md`](./2026-05-02-audit-types-1-recon.md)
+  - Severity confirmed: **YELLOW-RED** (matched anticipation; SCHEMA-2 plan needs revision)
+  - Findings pending review and Track B / Track C promotion
+
+- **AUDIT-TESTS-1** — RECON DONE — see [`2026-05-02-audit-tests-1-recon.md`](./2026-05-02-audit-tests-1-recon.md)
+  - Severity confirmed: **YELLOW** (matched anticipation)
+  - Findings pending review and Track B / Track C promotion
+
+- **AUDIT-MOBILE-1** — RECON DONE — see [`2026-05-02-audit-mobile-1-recon.md`](./2026-05-02-audit-mobile-1-recon.md)
+  - Severity confirmed: **YELLOW** (matched anticipation)
+  - Findings pending review and Track B / Track C promotion
+
+- **AUDIT-PACKAGE-SCRIPTS-1** — RECON DONE — see [`2026-05-02-audit-package-scripts-1-recon.md`](./2026-05-02-audit-package-scripts-1-recon.md)
+  - Severity confirmed: **YELLOW** (matched anticipation)
+  - Findings pending review and Track B / Track C promotion
 
 ## Track B remaining
+
+> ⚠️ Track B and Track C items below are **on hold** until the four pending audits above complete. New cross-issues surfaced by those audits may reshape these plans. Do not spawn execution worktrees for items below without first reconciling against the extended audit findings.
+
+
 
 - **AUDIT-GOVERNING-2** Resolve `apps/api/src/routes/sessions.ts` direct drizzle-orm import
   - Severity: YELLOW (governance)
