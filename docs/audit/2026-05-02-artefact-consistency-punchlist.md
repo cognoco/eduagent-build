@@ -1,7 +1,7 @@
 # Artefact-consistency audit — punch list
 
 **Source recon:** 9-agent audit, 2 rounds, 2026-05-01.
-**Last updated:** 2026-05-02 (post AUDIT-SCHEMA-2 recon).
+**Last updated:** 2026-05-02 (post extended-scope recons: TYPES-1, TESTS-1, MOBILE-1, PACKAGE-SCRIPTS-1 all complete).
 **Coordination branch:** `artefact-consistency` (carries audit-only tracking docs; not merged to main).
 
 ---
@@ -32,31 +32,29 @@
 |---|---|---|
 | AUDIT-EVAL-2.1 | Post-merge review fixups for PR #137 | Branched session, branch `audit/eval-runlive-fixup`, PR #139. **Not subject to the audit-extension pause** below — this is hygiene on already-shipped code, not new remediation. |
 
-## Pending audit — extended scope (decided 2026-05-02)
+## Extended-scope recons — complete (2026-05-02)
 
-> **All execution work is paused** pending completion of the four audits below. Reason: SCHEMA-2 in particular has known cross-coupling with the schemas package and test infrastructure; mobile and package-scripts also have non-zero cross-coupling. Decision was to see the full picture before remediating en masse, rather than discover cross-issues mid-execution and have to reshape plans midway.
+> All four extended-scope audits completed 2026-05-02. Reports written to `docs/audit/2026-05-02-audit-{types|tests|mobile|package-scripts}-1-recon.md` using the shared template at `docs/audit/_audit-report-template.md`.
 >
-> These are the **next four audits in line**, in priority order. Each is a focused recon (~30 min, read-only) producing a finding entry in this punch list. Same audit-vs-execution separation rule applies: the session that conducts the audit does not execute the fix.
+> **Execution remains paused** pending: (a) user review of the four reports, (b) consolidation pass to promote each report's "Recommended punch-list entries" into Track B / Track C below, (c) update of `2026-05-02-audit-schema-2-plan.md` with TYPES-1's corrected schema-count figure. Once those three are done and the user lifts the pause, Track B / Track C work can resume.
+>
+> Original rationale (preserved for context): SCHEMA-2 had known cross-coupling with the schemas package and test infrastructure; mobile and package-scripts had non-zero cross-coupling. Decision was to see the full picture before remediating en masse, rather than discover cross-issues mid-execution and have to reshape plans midway. The recons validated that decision — TYPES-1 in particular surfaced a 2x error in SCHEMA-2's surface estimate that would have reshaped its PRs mid-flight.
 
-- **AUDIT-TYPES-1** (synthesized) — `packages/schemas/` audit: response-schema completeness vs. the 36 RAW route files in SCHEMA-2; typed error hierarchy presence/shape; stale or inconsistent schema definitions
-  - Severity: pending recon (anticipated YELLOW-RED given direct SCHEMA-2 coupling)
-  - Effort: ~30 min recon
-  - Why it matters: direct prerequisite for SCHEMA-2 execution. Without this, every SCHEMA-2 PR may detour to write missing schemas mid-fix.
+- **AUDIT-TYPES-1** — RECON DONE — see [`2026-05-02-audit-types-1-recon.md`](./2026-05-02-audit-types-1-recon.md)
+  - Severity confirmed: **YELLOW-RED** (matched anticipation; SCHEMA-2 plan needs revision)
+  - Findings pending review and Track B / Track C promotion
 
-- **AUDIT-TESTS-1** (synthesized) — test convention compliance audit: test density on top SCHEMA-2 surfaces (`learner-profile.ts`, `sessions.ts`, `dashboard.ts`); `jest.mock` of internal modules in integration tests (CLAUDE.md "no internal mocks" rule); `__tests__/` directory violations of the co-location rule
-  - Severity: pending recon (anticipated YELLOW)
-  - Effort: ~30 min recon
-  - Why it matters: SCHEMA-2 wraps `c.json` with runtime parsing — existing tests must catch shape mismatches or the migration ships silent regressions
+- **AUDIT-TESTS-1** — RECON DONE — see [`2026-05-02-audit-tests-1-recon.md`](./2026-05-02-audit-tests-1-recon.md)
+  - Severity confirmed: **YELLOW** (matched anticipation)
+  - Findings pending review and Track B / Track C promotion
 
-- **AUDIT-MOBILE-1** (synthesized) — mobile artefact audit: persona-system rule compliance (`shared components stay persona-unaware`), semantic-token vs. hardcoded-color drift, screen-router convention drift (`unstable_settings`, full-ancestor-chain push rule), `apps/mobile/docs/` if any
-  - Severity: pending recon (anticipated YELLOW)
-  - Effort: ~30 min recon
-  - Why it matters: mobile-specific CLAUDE.md rules have not been swept; latent drift could surface during mobile-touching execution. Lower urgency than TYPES/TESTS but worth front-loading per "full picture" mandate.
+- **AUDIT-MOBILE-1** — RECON DONE — see [`2026-05-02-audit-mobile-1-recon.md`](./2026-05-02-audit-mobile-1-recon.md)
+  - Severity confirmed: **YELLOW** (matched anticipation)
+  - Findings pending review and Track B / Track C promotion
 
-- **AUDIT-PACKAGE-SCRIPTS-1** (synthesized) — `package.json` script audit across root + `apps/api` + `apps/mobile` + `packages/*`: orphaned scripts, duplicates, references to renamed/removed tools, naming inconsistency, drift from CLAUDE.md Handy Commands block
-  - Severity: pending recon (anticipated YELLOW)
-  - Effort: ~30 min recon
-  - Why it matters: PR #131 found one drift instance (`db:*:stg` rename); evidence this class has more. Lowest cross-coupling with SCHEMA-2 but standalone audit value confirmed.
+- **AUDIT-PACKAGE-SCRIPTS-1** — RECON DONE — see [`2026-05-02-audit-package-scripts-1-recon.md`](./2026-05-02-audit-package-scripts-1-recon.md)
+  - Severity confirmed: **YELLOW** (matched anticipation)
+  - Findings pending review and Track B / Track C promotion
 
 ## Track B remaining
 
