@@ -3,16 +3,18 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import type { CurriculumTopic } from '@eduagent/schemas';
+import type { CurriculumTopic, RetentionStatus } from '@eduagent/schemas';
 import * as Sentry from '@sentry/react-native';
-import {
-  BookPageFlipAnimation,
-  MagicPenAnimation,
-} from '../../../../../components/common';
-import { CollapsibleChapter } from '../../../../../components/library/CollapsibleChapter';
+import { MagicPenAnimation } from '../../../../../components/common';
+import { ShimmerSkeleton } from '../../../../../components/common/ShimmerSkeleton';
 import { SessionRow } from '../../../../../components/library/SessionRow';
 import { ChapterDivider } from '../../../../../components/library/ChapterDivider';
 import { TopicStatusRow } from '../../../../../components/library/TopicStatusRow';
+import { InlineNoteCard } from '../../../../../components/library/InlineNoteCard';
+import { NoteInput } from '../../../../../components/library/NoteInput';
+import { RetentionPill } from '../../../../../components/library/RetentionPill';
+import { TopicPickerSheet } from '../../../../../components/library/TopicPickerSheet';
+import { showNoteContextMenu } from '../../../../../components/library/NoteContextMenu';
 import {
   useBookWithTopics,
   useBooks,
@@ -23,14 +25,19 @@ import {
   type BookSession,
 } from '../../../../../hooks/use-book-sessions';
 import { useMoveTopic } from '../../../../../hooks/use-move-topic';
-import { useBookNotes } from '../../../../../hooks/use-notes';
+import {
+  useBookNotes,
+  useCreateNote,
+  useUpdateNote,
+  useDeleteNoteById,
+} from '../../../../../hooks/use-notes';
 import { useRetentionTopics } from '../../../../../hooks/use-retention';
 import { useCurriculum } from '../../../../../hooks/use-curriculum';
 import { useLearningResumeTarget } from '../../../../../hooks/use-progress';
-import { useSubjects } from '../../../../../hooks/use-subjects';
-import { InlineNoteCard } from '../../../../../components/library/InlineNoteCard';
+
 import { formatApiError } from '../../../../../lib/format-api-error';
 import { formatRelativeDate } from '../../../../../lib/format-relative-date';
+import { formatSourceLine } from '../../../../../lib/format-note-source';
 import { platformAlert } from '../../../../../lib/platform-alert';
 import { useThemeColors } from '../../../../../lib/theme';
 import { computeUpNextTopic } from '../../../../../lib/up-next-topic';
@@ -43,9 +50,38 @@ import {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function formatMonthYear(isoDate: string): string {
-  const d = new Date(isoDate);
-  return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+/**
+ * Derive a book-level retention status from per-topic nextReviewAt values.
+ * Uses the same thresholds as services/progress.ts computeRetentionStatus:
+ *   > 3 days until review = strong
+ *   > 0 days = fading
+ *   > -7 days = weak
+ *   else = forgotten
+ * Aggregation: if >30% forgotten → forgotten, >30% weak+forgotten → weak,
+ * >30% fading+weak+forgotten → fading, else strong.
+ */
+function computeBookRetentionStatus(
+  nextReviewAtValues: (string | null)[]
+): RetentionStatus | null {
+  if (nextReviewAtValues.length === 0) return null;
+  const now = Date.now();
+  const statuses = nextReviewAtValues.map((v): RetentionStatus => {
+    if (!v) return 'forgotten';
+    const daysUntilReview =
+      (new Date(v).getTime() - now) / (1000 * 60 * 60 * 24);
+    if (daysUntilReview > 3) return 'strong';
+    if (daysUntilReview > 0) return 'fading';
+    if (daysUntilReview > -7) return 'weak';
+    return 'forgotten';
+  });
+  const forgottenCount = statuses.filter((s) => s === 'forgotten').length;
+  const weakCount = statuses.filter((s) => s === 'weak').length;
+  const fadingCount = statuses.filter((s) => s === 'fading').length;
+  const n = statuses.length;
+  if (forgottenCount > n * 0.3) return 'forgotten';
+  if (weakCount + forgottenCount > n * 0.3) return 'weak';
+  if (fadingCount + weakCount + forgottenCount > n * 0.3) return 'fading';
+  return 'strong';
 }
 
 interface GroupedChapter {
@@ -80,7 +116,8 @@ function groupTopicsByChapter(
 ): GroupedTopicChapter[] {
   const map = new Map<string, CurriculumTopic[]>();
   for (const t of topics) {
-    const key = t.chapter ?? 'Topics';
+    // null chapter → "Other" per spec (Book | Topics with null chapter)
+    const key = t.chapter ?? 'Other';
     const group = map.get(key);
     if (group) {
       group.push(t);
@@ -102,9 +139,6 @@ type GenerationPhase = 'idle' | 'slow' | 'timed_out';
 
 const SLOW_THRESHOLD_MS = 30_000;
 const TIMEOUT_THRESHOLD_MS = 60_000;
-const DONE_COLLAPSE_THRESHOLD = 8;
-const STARTED_COLLAPSE_THRESHOLD = 4;
-
 // ---------------------------------------------------------------------------
 // Book Screen
 // ---------------------------------------------------------------------------
@@ -133,10 +167,11 @@ export default function BookScreen() {
   const curriculumQuery = useCurriculum(subjectId);
   const hasCurriculum = (curriculumQuery.data?.topics?.length ?? 0) > 0;
   const retentionTopicsQuery = useRetentionTopics(subjectId ?? '');
-  const subjectsQuery = useSubjects();
-  const subjectName = subjectsQuery.data?.find((s) => s.id === subjectId)?.name;
   const allBooksQuery = useBooks(subjectId);
   const moveTopic = useMoveTopic();
+  const createNote = useCreateNote(subjectId, bookId);
+  const updateNote = useUpdateNote();
+  const deleteNoteById = useDeleteNoteById();
 
   // One screen up = the per-subject shelf grid. router.back() falls through
   // to the Tabs navigator's `firstRoute` (Home) when the inner stack is empty
@@ -162,6 +197,15 @@ export default function BookScreen() {
   // --- Generation auto-trigger ---
   const [genPhase, setGenPhase] = useState<GenerationPhase>('idle');
   const alreadyPending = useRef(false);
+
+  // --- Note add flow state ---
+  const [showTopicPicker, setShowTopicPicker] = useState(false);
+  const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
+  const [showNoteInput, setShowNoteInput] = useState(false);
+  const [editingNote, setEditingNote] = useState<{
+    noteId: string;
+    content: string;
+  } | null>(null);
 
   const book = bookQuery.data?.book ?? null;
   const topics = useMemo(
@@ -288,6 +332,17 @@ export default function BookScreen() {
     [notes]
   );
 
+  // --- Book-level retention status (derived from retention topics) ---
+  const bookRetentionStatus = useMemo((): RetentionStatus | null => {
+    const retentionTopics = retentionTopicsQuery.data?.topics ?? [];
+    // Only consider topics that have been studied (have a real retention card)
+    const studiedTopics = retentionTopics.filter((rt) => rt.repetitions > 0);
+    if (studiedTopics.length === 0) return null;
+    return computeBookRetentionStatus(
+      studiedTopics.map((rt) => rt.nextReviewAt)
+    );
+  }, [retentionTopicsQuery.data]);
+
   // Topics that have been studied at least once (repetitions > 0)
   const topicStudiedIds = useMemo((): Set<string> => {
     const retentionTopics = retentionTopicsQuery.data?.topics ?? [];
@@ -403,42 +458,53 @@ export default function BookScreen() {
     [activeTopics, topicStudiedIds, inProgressTopicIds, sessions]
   );
 
-  const laterChapters = useMemo(() => {
-    return groupTopicsByChapter(activeTopics)
-      .map((group) => {
-        const unstartedTopics = group.topics.filter(
-          (topic) =>
-            !topicStudiedIds.has(topic.id) &&
-            !inProgressTopicIds.has(topic.id) &&
-            !topic.skipped
-        );
-
-        if (unstartedTopics.length === 0) {
-          return null;
+  // --- Chapter-first topic grouping ---
+  // Groups ALL active topics by chapter, with each topic annotated by its state.
+  const chapterSections = useMemo(() => {
+    const upNextId = upNextTopic?.id ?? null;
+    const groups = groupTopicsByChapter(activeTopics);
+    return groups.map((group) => {
+      type TopicWithState = {
+        topic: CurriculumTopic;
+        state: 'started' | 'up-next' | 'done' | 'later';
+        sessionCount: number;
+      };
+      const items: TopicWithState[] = [];
+      for (const topic of group.topics) {
+        if (topic.skipped) continue;
+        let state: TopicWithState['state'];
+        if (topic.id === upNextId) {
+          state = 'up-next';
+        } else if (topicStudiedIds.has(topic.id)) {
+          state = 'done';
+        } else if (inProgressTopicIds.has(topic.id)) {
+          state = 'started';
+        } else {
+          state = 'later';
         }
-
-        const hasProgress = group.topics.some(
-          (topic) =>
-            topicStudiedIds.has(topic.id) || inProgressTopicIds.has(topic.id)
-        );
-
-        return {
-          chapter: group.chapter,
-          unstartedTopics,
-          totalTopicCount: group.topics.length,
-          chapterState: hasProgress
-            ? ('partial' as const)
-            : ('untouched' as const),
-        };
-      })
-      .filter((group): group is NonNullable<typeof group> => group !== null);
-  }, [activeTopics, topicStudiedIds, inProgressTopicIds]);
-
-  const totalLaterTopics = laterChapters.reduce(
-    (sum, chapter) => sum + chapter.unstartedTopics.length,
-    0
-  );
-  const autoExpandLater = laterChapters.length <= 3 && totalLaterTopics <= 12;
+        items.push({
+          topic,
+          state,
+          sessionCount: sessionCountByTopicId.get(topic.id) ?? 0,
+        });
+      }
+      // Sort: up-next first, then started, then later, then done
+      const stateOrder = { 'up-next': 0, started: 1, later: 2, done: 3 };
+      items.sort(
+        (a, b) =>
+          stateOrder[a.state] - stateOrder[b.state] ||
+          a.topic.sortOrder - b.topic.sortOrder
+      );
+      return { chapter: group.chapter, items };
+    });
+  }, [
+    activeTopics,
+    upNextTopic,
+    topicStudiedIds,
+    inProgressTopicIds,
+    sessionCountByTopicId,
+  ]);
+  const hasMultipleChapters = chapterSections.length > 1;
 
   const isBookComplete = useMemo(
     () =>
@@ -501,18 +567,22 @@ export default function BookScreen() {
     doneTopics,
   ]);
 
-  const [showAllDone, setShowAllDone] = useState(false);
-  const [showAllStarted, setShowAllStarted] = useState(false);
+  const [showPastConversations, setShowPastConversations] = useState(false);
 
   // --- Topic press: navigate to Topic Detail ---
   const handleTopicPress = useCallback(
     (topicId: string) => {
+      const topic = topicById.get(topicId);
       router.push({
         pathname: '/(app)/topic/[topicId]',
-        params: { topicId, subjectId },
+        params: {
+          topicId,
+          subjectId,
+          ...(topic?.chapter ? { chapter: topic.chapter } : {}),
+        },
       } as never);
     },
-    [router, subjectId]
+    [router, subjectId, topicById]
   );
 
   // --- Session list grouped by chapter ---
@@ -687,6 +757,87 @@ export default function BookScreen() {
     } as never);
   }, [router, subjectId]);
 
+  // --- Note handlers ---
+  const handleNoteAddPress = useCallback(() => {
+    setShowTopicPicker(true);
+  }, []);
+
+  const handleTopicPickerSelect = useCallback((topicId: string) => {
+    setSelectedTopicId(topicId);
+    setShowTopicPicker(false);
+    setShowNoteInput(true);
+  }, []);
+
+  const handleTopicPickerClose = useCallback(() => {
+    setShowTopicPicker(false);
+  }, []);
+
+  const handleNoteSave = useCallback(
+    (content: string) => {
+      if (!selectedTopicId) return;
+      createNote.mutate(
+        { topicId: selectedTopicId, content },
+        {
+          onSuccess: () => {
+            setShowNoteInput(false);
+            setSelectedTopicId(null);
+          },
+          onError: (err) => {
+            platformAlert('Could not save note', formatApiError(err));
+          },
+        }
+      );
+    },
+    [selectedTopicId, createNote]
+  );
+
+  const handleNoteInputCancel = useCallback(() => {
+    setShowNoteInput(false);
+    setSelectedTopicId(null);
+  }, []);
+
+  const handleNoteEditSave = useCallback(
+    (content: string) => {
+      if (!editingNote) return;
+      updateNote.mutate(
+        { noteId: editingNote.noteId, content },
+        {
+          onSuccess: () => setEditingNote(null),
+          onError: (err) => {
+            platformAlert('Could not update note', formatApiError(err));
+          },
+        }
+      );
+    },
+    [editingNote, updateNote]
+  );
+
+  const handleNoteEditCancel = useCallback(() => {
+    setEditingNote(null);
+  }, []);
+
+  const handleNoteLongPress = useCallback(
+    (noteId: string) => {
+      const note = notes.find((n) => n.id === noteId);
+      if (!note) return;
+      showNoteContextMenu({
+        noteId,
+        content: note.content,
+        onEdit: (id, currentContent) => {
+          setEditingNote({ noteId: id, content: currentContent });
+        },
+        onDelete: (id) => {
+          deleteNoteById.mutate(id, {
+            onError: (err) => {
+              platformAlert('Could not delete note', formatApiError(err));
+            },
+          });
+        },
+      });
+    },
+    [notes, deleteNoteById]
+  );
+
   // --- Auto-start session when navigated with autoStart=true (M-12) ---
   const autoStartTriggered = useRef(false);
   useEffect(() => {
@@ -734,27 +885,96 @@ export default function BookScreen() {
     );
   }
 
-  // 1. Loading
+  // 1. Loading — show hero immediately from navigation params, sections shimmer
   if (bookQuery.isLoading) {
+    // Extract title/emoji from the books list query if available (already cached)
+    const cachedBook = allBooksQuery.data?.find?.((b) => b.id === bookId);
+    const heroTitle = cachedBook?.title ?? params.bookId ?? 'Book';
+    const heroEmoji = cachedBook?.emoji ?? null;
+
     return (
       <View
-        className="flex-1 bg-background items-center justify-center"
+        className="flex-1 bg-background"
         style={{ paddingTop: insets.top }}
         testID="book-loading"
       >
-        <BookPageFlipAnimation size={140} color={themeColors.accent} />
-        <Text className="text-body-sm text-text-secondary mt-3">
-          Loading book...
-        </Text>
-        <Pressable
-          onPress={handleBack}
-          className="mt-6 px-5 py-3"
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-          testID="book-loading-back"
+        <ScrollView
+          contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
         >
-          <Text className="text-body text-primary font-semibold">Go back</Text>
-        </Pressable>
+          {/* Back button */}
+          <View className="px-5 pt-4 pb-3 flex-row items-center">
+            <Pressable
+              onPress={handleBack}
+              className="p-2 -ms-2 me-2"
+              accessibilityRole="button"
+              accessibilityLabel="Back"
+              testID="book-loading-back"
+            >
+              <Ionicons
+                name="arrow-back"
+                size={24}
+                color={themeColors.accent}
+              />
+            </Pressable>
+          </View>
+
+          {/* Book hero — from nav params */}
+          <View className="px-5 pb-4" testID="book-hero-loading">
+            {heroEmoji ? (
+              <Text style={{ fontSize: 56, lineHeight: 68 }}>{heroEmoji}</Text>
+            ) : null}
+            <Text
+              className="text-h2 font-bold text-text-primary mt-2"
+              numberOfLines={3}
+            >
+              {heroTitle}
+            </Text>
+          </View>
+
+          {/* Notes section shimmer */}
+          <View className="mb-4">
+            <Text className="mb-2 px-5 text-body-sm font-semibold text-text-secondary tracking-wide">
+              Your Notes
+            </Text>
+            <ShimmerSkeleton testID="book-notes-loading">
+              <View className="px-5">
+                {[0, 1].map((i) => (
+                  <View
+                    key={i}
+                    style={{
+                      height: 56,
+                      borderRadius: 8,
+                      marginBottom: 8,
+                      backgroundColor: themeColors.border,
+                    }}
+                  />
+                ))}
+              </View>
+            </ShimmerSkeleton>
+          </View>
+
+          {/* Topics section shimmer */}
+          <View className="px-5 mb-4">
+            <Text className="mb-2 text-body-sm font-semibold text-text-secondary">
+              Topics
+            </Text>
+            <ShimmerSkeleton testID="book-topics-loading">
+              <View>
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <View
+                    key={i}
+                    style={{
+                      height: 40,
+                      borderRadius: 8,
+                      marginBottom: 8,
+                      backgroundColor: themeColors.border,
+                    }}
+                  />
+                ))}
+              </View>
+            </ShimmerSkeleton>
+          </View>
+        </ScrollView>
       </View>
     );
   }
@@ -807,7 +1027,7 @@ export default function BookScreen() {
         style={{ paddingTop: insets.top }}
         testID="book-generating"
       >
-        <MagicPenAnimation size={140} color={themeColors.accent} />
+        <MagicPenAnimation size={100} color={themeColors.accent} />
         {book?.emoji && <Text className="text-3xl mt-4">{book.emoji}</Text>}
         <Text className="text-h2 font-bold text-text-primary mt-3 text-center">
           {book?.title ?? 'Writing your book...'}
@@ -897,33 +1117,37 @@ export default function BookScreen() {
           </Pressable>
         </View>
 
-        {/* Book info - compact header */}
-        <View className="px-5 pb-3">
-          <View className="flex-row items-center mb-1">
-            {book?.emoji ? (
-              <Text className="text-3xl me-3">{book.emoji}</Text>
-            ) : null}
-            <View className="flex-1">
-              <Text
-                className="text-h2 font-bold text-text-primary"
-                numberOfLines={2}
-              >
-                {book?.title ?? 'Book'}
-              </Text>
-              {subjectName ? (
-                <Text className="mt-0.5 text-body-sm text-text-secondary">
-                  {subjectName}
-                </Text>
-              ) : null}
-            </View>
-          </View>
-
-          <Text className="mt-2 text-caption text-text-secondary">
-            {sessionCount} {sessionCount === 1 ? 'session' : 'sessions'}
+        {/* Book hero */}
+        <View className="px-5 pb-4" testID="book-hero">
+          {book?.emoji ? (
+            <Text style={{ fontSize: 56, lineHeight: 68 }}>{book.emoji}</Text>
+          ) : null}
+          <Text
+            className="text-h2 font-bold text-text-primary mt-2"
+            numberOfLines={3}
+            testID="book-hero-title"
+          >
+            {book?.title ?? 'Book'}
           </Text>
+          {book?.description ? (
+            <Text
+              className="mt-1 text-body-sm text-text-secondary"
+              numberOfLines={3}
+            >
+              {book.description}
+            </Text>
+          ) : null}
+          {bookRetentionStatus !== null ? (
+            <View className="mt-2">
+              <RetentionPill
+                status={bookRetentionStatus}
+                testID="book-retention-pill"
+              />
+            </View>
+          ) : null}
 
           {activeTopics.length > 0 ? (
-            <View className="mt-2">
+            <View className="mt-3">
               <View className="h-1.5 overflow-hidden rounded-full bg-surface-elevated">
                 <View
                   className="h-full rounded-full bg-success"
@@ -940,6 +1164,90 @@ export default function BookScreen() {
               </Text>
             </View>
           ) : null}
+        </View>
+
+        {/* YOUR NOTES section */}
+        <View className="mb-4" testID="book-notes-section">
+          <Text className="mb-2 px-5 text-body-sm font-semibold text-text-secondary tracking-wide">
+            Your Notes
+          </Text>
+          {notesQuery.isLoading ? (
+            <ShimmerSkeleton testID="book-notes-loading">
+              <View className="px-5">
+                {[0, 1].map((i) => (
+                  <View
+                    key={i}
+                    style={{
+                      height: 56,
+                      borderRadius: 8,
+                      marginBottom: 8,
+                      backgroundColor: themeColors.border,
+                    }}
+                  />
+                ))}
+              </View>
+            </ShimmerSkeleton>
+          ) : (
+            <>
+              {sortedNotes.map((note) => {
+                if (editingNote?.noteId === note.id) {
+                  return (
+                    <View key={note.id} className="px-5 mb-2">
+                      <NoteInput
+                        initialValue={editingNote.content}
+                        saving={updateNote.isPending}
+                        onSave={handleNoteEditSave}
+                        onCancel={handleNoteEditCancel}
+                      />
+                    </View>
+                  );
+                }
+                return (
+                  <InlineNoteCard
+                    key={note.id}
+                    noteId={note.id}
+                    topicTitle={topicTitleMap.get(note.topicId) ?? 'Topic'}
+                    content={note.content}
+                    sourceLine={formatSourceLine(note)}
+                    updatedAt={note.updatedAt}
+                    onLongPress={handleNoteLongPress}
+                    testID={`note-${note.id}`}
+                  />
+                );
+              })}
+              {showNoteInput && (
+                <View className="px-5 mb-2">
+                  <NoteInput
+                    saving={createNote.isPending}
+                    onSave={handleNoteSave}
+                    onCancel={handleNoteInputCancel}
+                  />
+                </View>
+              )}
+              <Pressable
+                onPress={handleNoteAddPress}
+                className="mx-5 mt-1 flex-row items-center py-2"
+                testID="book-add-note"
+                accessibilityRole="button"
+                accessibilityLabel={
+                  sortedNotes.length === 0
+                    ? 'Add your first note'
+                    : 'Add a note'
+                }
+              >
+                <Ionicons
+                  name="add-circle-outline"
+                  size={18}
+                  color={themeColors.primary}
+                />
+                <Text className="ms-1.5 text-body-sm font-semibold text-primary">
+                  {sortedNotes.length === 0
+                    ? '+ Add your first note'
+                    : '+ Add a note'}
+                </Text>
+              </Pressable>
+            </>
+          )}
         </View>
 
         {/* Error banners */}
@@ -1028,91 +1336,44 @@ export default function BookScreen() {
             includes the topic title (▶ Continue: {title}). Keeping both
             duplicated the affordance and bloated decision time. */}
 
-        {/* Section 3: Started */}
-        {visibleStartedTopicIds.length > 0 ? (
-          <View className="px-5 mb-1">
-            <Text className="mb-2 text-body-sm font-semibold text-text-secondary">
-              Started
-            </Text>
-            {(showAllStarted
-              ? visibleStartedTopicIds
-              : visibleStartedTopicIds.slice(0, STARTED_COLLAPSE_THRESHOLD)
-            ).map((topicId) => {
-              const topic = topicById.get(topicId);
-              if (!topic) return null;
-
-              return (
-                <TopicStatusRow
-                  key={topicId}
-                  state="started"
-                  title={topic.title}
-                  chapterName={topic.chapter ?? undefined}
-                  sessionCount={sessionCountByTopicId.get(topicId) ?? 0}
-                  onPress={() => handleTopicPress(topicId)}
-                  testID={`started-row-${topicId}`}
-                />
-              );
-            })}
-            {!showAllStarted &&
-            visibleStartedTopicIds.length > STARTED_COLLAPSE_THRESHOLD ? (
-              <Pressable
-                onPress={() => setShowAllStarted(true)}
-                className="items-center py-2"
-                testID="started-show-more"
-                accessibilityRole="button"
-              >
-                <Text className="text-body-sm font-semibold text-primary">
-                  Show{' '}
-                  {visibleStartedTopicIds.length - STARTED_COLLAPSE_THRESHOLD}{' '}
-                  more started
-                </Text>
-              </Pressable>
-            ) : null}
+        {/* Topics grouped by chapter, then state within chapter */}
+        {chapterSections.length > 0 ? (
+          <View className="px-5 mb-1" testID="chapter-topics">
+            {chapterSections.map((section) => (
+              <View key={section.chapter} className="mb-3">
+                {hasMultipleChapters ? (
+                  <Text className="mb-2 text-body-sm font-semibold text-text-secondary">
+                    {section.chapter}
+                  </Text>
+                ) : null}
+                {section.items.map(({ topic, state, sessionCount: count }) => (
+                  <TopicStatusRow
+                    key={topic.id}
+                    state={state}
+                    variant={
+                      state === 'up-next' && sessionCount === 0
+                        ? 'hero'
+                        : undefined
+                    }
+                    title={topic.title}
+                    sessionCount={state === 'started' ? count : undefined}
+                    onPress={
+                      state === 'up-next'
+                        ? () => handleTopicStart(topic.id, topic.title)
+                        : () => handleTopicPress(topic.id)
+                    }
+                    testID={`${state}-row-${topic.id}`}
+                  />
+                ))}
+              </View>
+            ))}
           </View>
         ) : null}
 
-        {/* Section 4: Up next */}
-        {upNextTopic ? (
-          <View className="px-5 mb-1">
-            <Text className="mb-2 text-body-sm font-semibold text-text-secondary">
-              Up next
-            </Text>
-            {(() => {
-              const distinctChapters = new Set(
-                activeTopics
-                  .map((topic) => topic.chapter)
-                  .filter((chapter): chapter is string => !!chapter)
-              );
-              const isSingleChapterBook = distinctChapters.size <= 1;
-
-              return (
-                <TopicStatusRow
-                  state="up-next"
-                  variant={sessionCount === 0 ? 'hero' : undefined}
-                  title={upNextTopic.title}
-                  chapterName={
-                    isSingleChapterBook
-                      ? undefined
-                      : upNextTopic.chapter ?? undefined
-                  }
-                  onPress={() =>
-                    handleTopicStart(upNextTopic.id, upNextTopic.title)
-                  }
-                  testID="up-next-row"
-                />
-              );
-            })()}
-          </View>
-        ) : null}
-
-        {/* Fallback: every section short-circuited but topics exist */}
+        {/* Fallback: topics exist but none are active/visible */}
         {topics.length > 0 &&
         !isBookComplete &&
-        !continueNowTopic &&
-        visibleStartedTopicIds.length === 0 &&
-        !upNextTopic &&
-        doneTopics.length === 0 &&
-        laterChapters.length === 0 ? (
+        chapterSections.every((s) => s.items.length === 0) ? (
           <View className="px-5 mb-3" testID="all-sections-fallback">
             <View className="rounded-card bg-surface-elevated p-5">
               <Text className="mb-2 text-body font-semibold text-text-primary">
@@ -1197,142 +1458,100 @@ export default function BookScreen() {
           </View>
         ) : null}
 
-        {/* Section 5: Done */}
-        {doneTopics.length > 0 ? (
-          <View className="px-5 mb-1">
-            <Text className="mb-2 text-body-sm font-semibold text-text-secondary">
-              Done
-            </Text>
-            {(doneTopics.length <= DONE_COLLAPSE_THRESHOLD || showAllDone
-              ? doneTopics
-              : doneTopics.slice(0, DONE_COLLAPSE_THRESHOLD)
-            ).map((topic) => (
-              <TopicStatusRow
-                key={topic.id}
-                state="done"
-                title={topic.title}
-                chapterName={topic.chapter ?? undefined}
-                onPress={() => handleTopicPress(topic.id)}
-                testID={`done-row-${topic.id}`}
-              />
-            ))}
-            {doneTopics.length > DONE_COLLAPSE_THRESHOLD && !showAllDone ? (
-              <Pressable
-                onPress={() => setShowAllDone(true)}
-                className="items-center py-2"
-                testID="done-show-all"
-                accessibilityRole="button"
-              >
-                <Text className="text-body-sm font-semibold text-primary">
-                  Show all {doneTopics.length} done
-                </Text>
-              </Pressable>
-            ) : null}
-          </View>
-        ) : null}
-
-        {/* Section 6: Later */}
-        {laterChapters.length > 0 ? (
-          <View className="px-5 mb-1">
-            <Text className="mb-2 text-body-sm font-semibold text-text-secondary">
-              Later
-            </Text>
-            {laterChapters.map((group) => (
-              <CollapsibleChapter
-                key={group.chapter}
-                title={group.chapter}
-                topics={group.unstartedTopics}
-                totalTopicCount={group.totalTopicCount}
-                chapterState={group.chapterState}
-                initiallyExpanded={autoExpandLater}
-                onTopicPress={handleTopicPress}
-              />
-            ))}
-          </View>
-        ) : null}
-
-        {/* Section 7: Past conversations */}
-        {sessions.length > 0 ? (
-          <View className="mb-4">
-            <Text className="mb-1 px-5 text-body-sm font-semibold text-text-secondary">
+        {/* Section 7: Past conversations (collapsed by default) */}
+        <View className="mb-4" testID="book-sessions-section">
+          <Pressable
+            onPress={() => setShowPastConversations((v) => !v)}
+            className="flex-row items-center justify-between px-5 py-2"
+            testID="book-sessions-toggle"
+            accessibilityRole="button"
+            accessibilityLabel={
+              showPastConversations
+                ? 'Collapse past conversations'
+                : 'Expand past conversations'
+            }
+          >
+            <Text className="text-body-sm font-semibold text-text-secondary">
               Past conversations
+              {!sessionsQuery.isLoading && sessions.length > 0
+                ? ` (${sessions.length})`
+                : ''}
             </Text>
-            {showChapterDividers
-              ? groupedSessions.map((group) => (
-                  <View key={group.chapter}>
-                    <ChapterDivider name={group.chapter} />
-                    {group.sessions.map((session) => (
-                      <SessionRow
-                        key={session.id}
-                        title={session.topicTitle}
-                        relativeDate={formatRelativeDate(session.createdAt)}
-                        hasNote={
-                          session.topicId != null &&
-                          noteTopicIds.has(session.topicId)
-                        }
-                        onPress={() => handleSessionPress(session)}
-                        onLongPress={
-                          session.topicId
-                            ? () => handleSessionLongPress(session)
-                            : undefined
-                        }
-                        testID={`session-${session.id}`}
-                      />
-                    ))}
-                  </View>
-                ))
-              : sessions.map((session) => (
-                  <SessionRow
-                    key={session.id}
-                    title={session.topicTitle}
-                    relativeDate={formatRelativeDate(session.createdAt)}
-                    hasNote={
-                      session.topicId != null &&
-                      noteTopicIds.has(session.topicId)
-                    }
-                    onPress={() => handleSessionPress(session)}
-                    onLongPress={
-                      session.topicId
-                        ? () => handleSessionLongPress(session)
-                        : undefined
-                    }
-                    testID={`session-${session.id}`}
-                  />
-                ))}
-          </View>
-        ) : null}
-
-        {/* Inline notes */}
-        {sortedNotes.length > 0 && (
-          <View className="mb-4" testID="book-notes-section">
-            <Text className="mb-1 px-5 text-body-sm font-semibold text-text-secondary">
-              My notes
-            </Text>
-            {(() => {
-              let lastMonth = '';
-              return sortedNotes.map((note) => {
-                const month = formatMonthYear(note.updatedAt);
-                const showSeparator = month !== lastMonth;
-                lastMonth = month;
-                return (
-                  <View key={note.topicId}>
-                    {showSeparator && (
-                      <Text className="text-caption text-text-tertiary px-5 mt-2 mb-1">
-                        {month}
-                      </Text>
-                    )}
-                    <InlineNoteCard
-                      topicTitle={topicTitleMap.get(note.topicId) ?? 'Topic'}
-                      content={note.content}
-                      updatedAt={note.updatedAt}
-                      testID={`note-${note.topicId}`}
+            <Ionicons
+              name={showPastConversations ? 'chevron-up' : 'chevron-down'}
+              size={16}
+              color={themeColors.textSecondary}
+            />
+          </Pressable>
+          {showPastConversations ? (
+            sessionsQuery.isLoading ? (
+              <ShimmerSkeleton testID="book-sessions-loading">
+                <View className="px-5">
+                  {[0, 1, 2].map((i) => (
+                    <View
+                      key={i}
+                      style={{
+                        height: 44,
+                        borderRadius: 8,
+                        marginBottom: 8,
+                        backgroundColor: themeColors.border,
+                      }}
                     />
-                  </View>
-                );
-              });
-            })()}
-          </View>
-        )}
+                  ))}
+                </View>
+              </ShimmerSkeleton>
+            ) : sessions.length === 0 ? (
+              <Text
+                className="px-5 py-2 text-body-sm text-text-secondary"
+                testID="book-sessions-empty"
+              >
+                No conversations yet
+              </Text>
+            ) : showChapterDividers ? (
+              groupedSessions.map((group) => (
+                <View key={group.chapter}>
+                  <ChapterDivider name={group.chapter} />
+                  {group.sessions.map((session) => (
+                    <SessionRow
+                      key={session.id}
+                      title={session.topicTitle}
+                      relativeDate={formatRelativeDate(session.createdAt)}
+                      hasNote={
+                        session.topicId != null &&
+                        noteTopicIds.has(session.topicId)
+                      }
+                      onPress={() => handleSessionPress(session)}
+                      onLongPress={
+                        session.topicId
+                          ? () => handleSessionLongPress(session)
+                          : undefined
+                      }
+                      testID={`session-${session.id}`}
+                    />
+                  ))}
+                </View>
+              ))
+            ) : (
+              sessions.map((session) => (
+                <SessionRow
+                  key={session.id}
+                  title={session.topicTitle}
+                  relativeDate={formatRelativeDate(session.createdAt)}
+                  hasNote={
+                    session.topicId != null && noteTopicIds.has(session.topicId)
+                  }
+                  onPress={() => handleSessionPress(session)}
+                  onLongPress={
+                    session.topicId
+                      ? () => handleSessionLongPress(session)
+                      : undefined
+                  }
+                  testID={`session-${session.id}`}
+                />
+              ))
+            )
+          ) : null}
+        </View>
       </ScrollView>
 
       {/* Sticky CTA - adapts to learner state */}
@@ -1418,6 +1637,19 @@ export default function BookScreen() {
             );
           })()
         : null}
+
+      {/* Topic picker for note add flow */}
+      <TopicPickerSheet
+        visible={showTopicPicker}
+        topics={activeTopics.map((t) => ({
+          topicId: t.id,
+          name: t.title,
+          chapter: t.chapter ?? null,
+        }))}
+        defaultTopicId={selectedTopicId ?? undefined}
+        onSelect={handleTopicPickerSelect}
+        onClose={handleTopicPickerClose}
+      />
     </View>
   );
 }

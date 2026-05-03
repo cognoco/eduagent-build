@@ -40,9 +40,15 @@ const KNOWN_DRIFT = new Set([
   'location-other',
   // Library/learning screens renamed during route restructuring
   'library-scroll',
-  'library-empty',
   'library-screen',
   'library-tab',
+  // Library v3 redesign removed tabs and old topic screen elements — Maestro flows need updating
+  'library-tab-shelves',
+  'library-tab-books',
+  'retention-card',
+  'secondary-recall-check',
+  'primary-action-button',
+  'more-ways-toggle',
   'home-screen',
   'learn-new-screen',
   'interview-screen',
