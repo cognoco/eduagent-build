@@ -10,8 +10,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors } from '../../lib/theme';
 import { useSpeechRecognition } from '../../hooks/use-speech-recognition';
 
-const MAX_CHARS = 2000;
-const WARN_THRESHOLD = 1800;
+const MAX_CHARS = 5000;
+const WARN_THRESHOLD = 4500;
 
 interface NoteInputProps {
   onSave: (content: string) => void;

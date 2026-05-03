@@ -66,7 +66,7 @@ describe('NoteInput', () => {
   });
 
   it('shows character count nudge near limit', () => {
-    const longText = 'a'.repeat(1900);
+    const longText = 'a'.repeat(4600);
     const { getByTestId, getByText } = render(
       <NoteInput onSave={jest.fn()} onCancel={jest.fn()} />
     );

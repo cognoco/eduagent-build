@@ -1,57 +1,88 @@
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { formatRelativeDate } from '../../lib/format-relative-date';
 import { useThemeColors } from '../../lib/theme';
+import { withOpacity } from '../../lib/color-opacity';
 
 interface InlineNoteCardProps {
+  noteId: string;
   topicTitle: string;
   content: string;
+  sourceLine: string;
   updatedAt: string;
   defaultExpanded?: boolean;
+  onLongPress?: (noteId: string) => void;
   testID?: string;
 }
 
 export function InlineNoteCard({
+  noteId,
   topicTitle,
   content,
-  updatedAt,
+  sourceLine,
+  updatedAt: _updatedAt,
   defaultExpanded = false,
+  onLongPress,
   testID,
 }: InlineNoteCardProps): React.ReactElement {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const themeColors = useThemeColors();
 
+  const cardTestID = testID ?? `note-card-${noteId}`;
+  const accentBg = withOpacity(themeColors.accent, 0.08);
+  const accentBorder = withOpacity(themeColors.accent, 0.35);
+
   return (
     <Pressable
       onPress={() => setExpanded((v) => !v)}
-      className="mx-5 mb-2 bg-surface rounded-card px-4 py-3"
+      onLongPress={() => onLongPress?.(noteId)}
+      testID={cardTestID}
       accessibilityRole="button"
-      accessibilityLabel={`Note for ${topicTitle}. Tap to ${
+      accessibilityLabel={`Note for ${topicTitle}. ${sourceLine}. Tap to ${
         expanded ? 'collapse' : 'expand'
       }.`}
-      testID={testID}
+      style={{
+        marginHorizontal: 20,
+        marginBottom: 8,
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        backgroundColor: accentBg,
+        borderWidth: 1,
+        borderStyle: 'dashed',
+        borderColor: accentBorder,
+      }}
     >
-      <View className="flex-row items-center justify-between mb-1">
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 4,
+        }}
+      >
         <Text
-          className="text-caption font-semibold text-text-secondary flex-1 me-2"
+          style={{
+            fontSize: 12,
+            color: themeColors.textSecondary,
+            flex: 1,
+            marginEnd: 8,
+          }}
           numberOfLines={1}
         >
-          {topicTitle}
-        </Text>
-        <Text className="text-caption text-text-tertiary me-1">
-          {formatRelativeDate(updatedAt)}
+          {sourceLine}
         </Text>
         <Ionicons
           name={expanded ? 'chevron-up' : 'chevron-down'}
           size={14}
           color={themeColors.textSecondary}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
         />
       </View>
       <Text
-        className="text-body-sm text-text-primary"
+        style={{ fontSize: 14, color: themeColors.textPrimary }}
         numberOfLines={expanded ? undefined : 2}
-        testID={testID ? `${testID}-content` : undefined}
       >
         {content}
       </Text>
