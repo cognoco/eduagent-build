@@ -46,8 +46,8 @@ describe('AnalogyPreferenceScreen', () => {
   it('renders the title and onboarding step indicator', () => {
     render(<AnalogyPreferenceScreen />);
 
-    expect(screen.getByText('How do you like things explained?')).toBeTruthy();
-    expect(screen.getByText('Step 2 of 4')).toBeTruthy();
+    screen.getByText('How do you like things explained?');
+    screen.getByText('Step 2 of 4');
   });
 
   it('navigates back to interview with full params', () => {

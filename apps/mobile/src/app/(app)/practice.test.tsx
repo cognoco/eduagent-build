@@ -130,9 +130,9 @@ describe('PracticeScreen', () => {
 
     render(<PracticeScreen />);
 
-    expect(screen.getByTestId('review-empty-state')).toBeTruthy();
-    expect(screen.getByText('Nothing to review right now')).toBeTruthy();
-    expect(screen.getByText('Your next review is in 3 hours')).toBeTruthy();
+    screen.getByTestId('review-empty-state');
+    screen.getByText('Nothing to review right now');
+    screen.getByText('Your next review is in 3 hours');
   });
 
   it('lets the learner browse topics from the empty state', () => {

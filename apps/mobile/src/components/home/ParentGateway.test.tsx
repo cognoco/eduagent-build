@@ -66,21 +66,21 @@ describe('ParentGateway', () => {
   it('renders greeting with active profile name', () => {
     render(<ParentGateway {...defaultProps} />);
 
-    expect(screen.getByText('Good morning, Maria!')).toBeTruthy();
-    expect(screen.getByText('Fresh mind, fresh start')).toBeTruthy();
+    screen.getByText('Good morning, Maria!');
+    screen.getByText('Fresh mind, fresh start');
   });
 
   it('renders both intent cards', () => {
     render(<ParentGateway {...defaultProps} />);
 
-    expect(screen.getByText("Check child's progress")).toBeTruthy();
-    expect(screen.getByText('Learn something')).toBeTruthy();
+    screen.getByText("Check child's progress");
+    screen.getByText('Learn something');
   });
 
   it('shows child activity highlight with time', () => {
     render(<ParentGateway {...defaultProps} />);
 
-    expect(screen.getByText('Emma practiced 45 min this week')).toBeTruthy();
+    screen.getByText('Emma practiced 45 min this week');
   });
 
   it('shows fallback highlight when no activity', () => {
@@ -92,7 +92,7 @@ describe('ParentGateway', () => {
 
     render(<ParentGateway {...defaultProps} />);
 
-    expect(screen.getByText("Emma hasn't practiced this week")).toBeTruthy();
+    screen.getByText("Emma hasn't practiced this week");
   });
 
   it('shows fallback highlight when dashboard not loaded', () => {
@@ -100,7 +100,7 @@ describe('ParentGateway', () => {
 
     render(<ParentGateway {...defaultProps} />);
 
-    expect(screen.getByText("See how they're doing")).toBeTruthy();
+    screen.getByText("See how they're doing");
   });
 
   it('picks most active child for highlight', () => {
@@ -113,7 +113,7 @@ describe('ParentGateway', () => {
 
     render(<ParentGateway {...defaultProps} />);
 
-    expect(screen.getByText('Tomas practiced 900 min this week')).toBeTruthy();
+    screen.getByText('Tomas practiced 900 min this week');
   });
 
   it('navigates to parent dashboard on "Check child\'s progress" with returnTo=home [BUG-905]', () => {
@@ -147,9 +147,9 @@ describe('ParentGateway', () => {
 
     render(<ParentGateway {...defaultProps} />);
 
-    expect(screen.getByTestId('parent-dashboard-error')).toBeTruthy();
-    expect(screen.getByText("We couldn't load the dashboard")).toBeTruthy();
-    expect(screen.getByText('Tap to retry')).toBeTruthy();
+    screen.getByTestId('parent-dashboard-error');
+    screen.getByText("We couldn't load the dashboard");
+    screen.getByText('Tap to retry');
 
     fireEvent.press(screen.getByTestId('parent-dashboard-error'));
     expect(mockRefetch).toHaveBeenCalledTimes(1);

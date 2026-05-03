@@ -46,6 +46,13 @@ const RELEVANCE_LABEL: Record<string, string> = {
   emerging: 'Cutting-edge',
 };
 
+// [BUG-956] Curriculum generation is async (Inngest). When the user arrives
+// from the interview flow, the curriculum may not be persisted yet. Poll every
+// 3s while curriculum is null so the screen self-resolves once Inngest finishes.
+// Cap polling at 90s to avoid an infinite spinner.
+const CURRICULUM_POLL_INTERVAL_MS = 3_000;
+const CURRICULUM_POLL_TIMEOUT_MS = 90_000;
+
 export default function CurriculumScreen() {
   const {
     subjectId,
@@ -67,12 +74,51 @@ export default function CurriculumScreen() {
   const colors = useThemeColors();
   const step = Number(stepParam) || 4;
   const totalSteps = Number(totalStepsParam) || 4;
+
+  // [BUG-956] Poll while curriculum is null (Inngest generation in-flight).
+  // Stop polling once data arrives or after the 90s timeout.
+  const [pollTimedOut, setPollTimedOut] = useState(false);
+  const [shouldPoll, setShouldPoll] = useState(true);
+  const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const {
     data: curriculum,
     isLoading,
     isError,
     refetch,
-  } = useCurriculum(subjectId ?? '');
+  } = useCurriculum(subjectId ?? '', {
+    refetchInterval:
+      !pollTimedOut && shouldPoll ? CURRICULUM_POLL_INTERVAL_MS : false,
+  });
+
+  useEffect(() => {
+    if (curriculum) setShouldPoll(false);
+  }, [curriculum]);
+
+  // Start the 90s polling timeout when we mount (or subjectId changes).
+  // Clear it once curriculum data arrives so a stale timeout doesn't fire.
+  useEffect(() => {
+    if (curriculum) {
+      if (pollTimeoutRef.current) {
+        clearTimeout(pollTimeoutRef.current);
+        pollTimeoutRef.current = null;
+      }
+      setPollTimedOut(false);
+      return;
+    }
+    setPollTimedOut(false);
+    pollTimeoutRef.current = setTimeout(() => {
+      setPollTimedOut(true);
+    }, CURRICULUM_POLL_TIMEOUT_MS);
+    return () => {
+      if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
+    };
+    // curriculum intentionally excluded — we only want to restart the timer
+    // when subjectId changes (new subject). Data arrival is handled by the
+    // early-return branch above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subjectId]);
+
   const skipTopic = useSkipTopic(subjectId ?? '');
   const unskipTopic = useUnskipTopic(subjectId ?? '');
   const challengeCurriculum = useChallengeCurriculum(subjectId ?? '');
@@ -365,6 +411,22 @@ export default function CurriculumScreen() {
             </Text>
           </Pressable>
         </View>
+      ) : !curriculum && !pollTimedOut ? (
+        // [BUG-956] Curriculum generation is still in-flight (Inngest job
+        // running). Show a spinner — the hook polls every 3s and will
+        // auto-refresh once data arrives, without any user action.
+        <View
+          className="flex-1 items-center justify-center px-8"
+          testID="curriculum-generating"
+        >
+          <ActivityIndicator size="large" className="mb-4" />
+          <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
+            Building your curriculum…
+          </Text>
+          <Text className="text-body text-text-secondary text-center">
+            This usually takes about 10–20 seconds.
+          </Text>
+        </View>
       ) : !curriculum ? (
         <View
           className="flex-1 items-center justify-center px-8"
@@ -377,7 +439,10 @@ export default function CurriculumScreen() {
             primaryAction={{
               label: 'Retry',
               testID: 'curriculum-empty-retry',
-              onPress: () => void refetch(),
+              onPress: () => {
+                setPollTimedOut(false);
+                void refetch();
+              },
             }}
             secondaryAction={{
               label: 'Go Home',
@@ -819,6 +884,7 @@ export default function CurriculumScreen() {
           <View
             className="bg-background rounded-t-3xl px-5 pt-6 pb-8"
             style={{ paddingBottom: Math.max(insets.bottom, 24) }}
+            testID="why-modal"
           >
             <Text className="text-h3 font-bold text-text-primary mb-2">
               Why this order?

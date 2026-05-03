@@ -28,9 +28,9 @@ describe('QuotaExceededCard', () => {
   it('owner view: shows usage and upgrade button', () => {
     render(<QuotaExceededCard details={ownerDetails} isOwner={true} />);
 
-    expect(screen.getByTestId('quota-exceeded-card')).toBeTruthy();
-    expect(screen.getByText(/used 100 of 100/i)).toBeTruthy();
-    expect(screen.getByTestId('quota-upgrade-btn')).toBeTruthy();
+    screen.getByTestId('quota-exceeded-card');
+    screen.getByText(/used 100 of 100/i);
+    screen.getByTestId('quota-upgrade-btn');
   });
 
   it('owner view: upgrade button navigates to subscription screen', () => {
@@ -42,8 +42,8 @@ describe('QuotaExceededCard', () => {
   it('child view: shows ask-your-parent message', () => {
     render(<QuotaExceededCard details={ownerDetails} isOwner={false} />);
 
-    expect(screen.getByTestId('quota-exceeded-card')).toBeTruthy();
-    expect(screen.getByText(/ask your parent/i)).toBeTruthy();
+    screen.getByTestId('quota-exceeded-card');
+    screen.getByText(/ask your parent/i);
     expect(screen.queryByTestId('quota-upgrade-btn')).toBeNull();
   });
 
@@ -51,16 +51,16 @@ describe('QuotaExceededCard', () => {
     const dailyDetails = { ...ownerDetails, reason: 'daily' as const };
     render(<QuotaExceededCard details={dailyDetails} isOwner={true} />);
 
-    expect(screen.getByText(/today's limit/i)).toBeTruthy();
-    expect(screen.getByText(/used 10 of 10/i)).toBeTruthy();
+    screen.getByText(/today's limit/i);
+    screen.getByText(/used 10 of 10/i);
   });
 
   // H5: Child variant must have a navigation escape
   it('child view: shows Go home button so child is not stuck [H5]', () => {
     render(<QuotaExceededCard details={ownerDetails} isOwner={false} />);
 
-    expect(screen.getByTestId('quota-go-home-btn')).toBeTruthy();
-    expect(screen.getByText(/go home/i)).toBeTruthy();
+    screen.getByTestId('quota-go-home-btn');
+    screen.getByText(/go home/i);
   });
 
   it('child view: Go home button navigates to home screen [H5]', () => {

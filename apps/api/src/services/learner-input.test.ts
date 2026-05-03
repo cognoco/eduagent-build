@@ -325,7 +325,7 @@ describe('parseLearnerInput structured logging', () => {
           (arg): arg is string =>
             typeof arg === 'string' && arg.includes('parseLearnerInput failed')
         );
-      expect(logArg).toBeDefined();
+      expect(typeof logArg).toBe('string');
       const parsed = JSON.parse(logArg!) as {
         level: string;
         message: string;

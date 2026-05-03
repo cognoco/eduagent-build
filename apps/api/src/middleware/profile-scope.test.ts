@@ -111,6 +111,33 @@ describe('profileScopeMiddleware', () => {
     });
   });
 
+  // [Finding #5] Break test: when X-Profile-Id is explicitly supplied but no
+  // account was resolved (auth middleware didn't run / failed), the middleware
+  // must return 401 rather than silently passing through and producing a
+  // confusing 400 deep in the route handler.
+  it('returns 401 when X-Profile-Id header is present but account is not resolved', async () => {
+    const app = new Hono();
+    // Deliberately do NOT set account — simulates auth middleware not running
+    app.use('*', async (c, next) => {
+      c.set('db' as never, {});
+      // account is intentionally left unset
+      await next();
+    });
+    app.use('*', profileScopeMiddleware);
+    app.get('/test', (c) => c.json({ reached: true }));
+
+    const res = await app.request('/test', {
+      headers: { 'X-Profile-Id': 'some-profile-id' },
+    });
+
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body).toEqual({
+      code: 'UNAUTHORIZED',
+      message: 'Authentication required to use X-Profile-Id',
+    });
+  });
+
   // [CR-SILENT-RECOVERY-1] Break test: verifies the auto-resolve catch block
   // emits BOTH a structured log (queryable observability) AND a Sentry capture
   // (aggregate alerting) — not just a raw console.error. The rule "silent

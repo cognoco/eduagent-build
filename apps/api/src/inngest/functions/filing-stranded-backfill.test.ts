@@ -153,7 +153,7 @@ describe('filingStrandedBackfill', () => {
           (call[1] as { name: string }).name ===
           'app/maintenance.filing_stranded_backfill'
       );
-      expect(continueCall).toBeDefined();
+      expect(continueCall).not.toBeUndefined();
       expect(step.sleep).toHaveBeenCalledTimes(1);
       expect(step.sleep).toHaveBeenCalledWith('backfill-cooldown', '5m');
     });
@@ -255,7 +255,7 @@ describe('filingStrandedBackfill', () => {
           (call[1] as { name: string }).name ===
           'app/maintenance.filing_stranded_backfill'
       );
-      expect(continueCall).toBeDefined();
+      expect(continueCall).not.toBeUndefined();
       const eventData = (
         continueCall![1] as { data: { lastCreatedAt: string; lastId: string } }
       ).data;
@@ -282,7 +282,7 @@ describe('filingStrandedBackfill', () => {
         where: unknown;
       };
       // The where clause must be non-null — it includes the cursor filter.
-      expect(callArg.where).toBeDefined();
+      expect(callArg.where).toEqual(expect.any(Object));
       expect(callArg.where).not.toBeNull();
     });
 
@@ -296,7 +296,7 @@ describe('filingStrandedBackfill', () => {
       // The call must have happened — spot-check that findMany received a
       // where clause (the base filters are always present).
       const callArg = mockFindMany.mock.calls[0][0] as { where: unknown };
-      expect(callArg.where).toBeDefined();
+      expect(callArg.where).toEqual(expect.any(Object));
     });
   });
 });

@@ -82,8 +82,8 @@ describe('SessionDetailScreen (summary-only)', () => {
 
     render(<SessionDetailScreen />);
 
-    expect(screen.getByText('Practiced light reactions')).toBeTruthy();
-    expect(screen.getByTestId('session-metadata')).toBeTruthy();
+    screen.getByText('Practiced light reactions');
+    screen.getByTestId('session-metadata');
   });
 
   it('shows recap content when the new narrative fields are present', () => {
@@ -105,8 +105,8 @@ describe('SessionDetailScreen (summary-only)', () => {
         'They compared equivalent fractions and fixed one shaky step.'
       )
     ).toBeTruthy();
-    expect(screen.getByText('Practiced equivalent fractions')).toBeTruthy();
-    expect(screen.getByText('Focused')).toBeTruthy();
+    screen.getByText('Practiced equivalent fractions');
+    screen.getByText('Focused');
     expect(
       screen.getByText('Which fraction felt easiest to compare today?')
     ).toBeTruthy();
@@ -120,10 +120,10 @@ describe('SessionDetailScreen (summary-only)', () => {
 
     render(<SessionDetailScreen />);
 
-    expect(screen.getByTestId('narrative-unavailable')).toBeTruthy();
+    screen.getByTestId('narrative-unavailable');
     // BUG-901: friendlier "missing summary" microcopy + the empty-state
     // testID stays stable so other surfaces can detect the case.
-    expect(screen.getByTestId('session-summary-empty-note')).toBeTruthy();
+    screen.getByTestId('session-summary-empty-note');
     // The bare "No summary available for this session." string is replaced
     // by an explanation + pointer to the always-on CTAs at the bottom.
     expect(
@@ -140,8 +140,8 @@ describe('SessionDetailScreen (summary-only)', () => {
 
     render(<SessionDetailScreen />);
 
-    expect(screen.getByTestId('session-detail-ctas')).toBeTruthy();
-    expect(screen.getByTestId('session-detail-back-to-child')).toBeTruthy();
+    screen.getByTestId('session-detail-ctas');
+    screen.getByTestId('session-detail-back-to-child');
   });
 
   // BUG-901 break test: when topic context is available, "Open this topic"
@@ -184,7 +184,7 @@ describe('SessionDetailScreen (summary-only)', () => {
     render(<SessionDetailScreen />);
 
     // 5 min — not 30 min — must be shown.
-    expect(screen.getByText('5 min')).toBeTruthy();
+    screen.getByText('5 min');
     expect(screen.queryByText('30 min')).toBeNull();
   });
 
@@ -202,7 +202,7 @@ describe('SessionDetailScreen (summary-only)', () => {
 
     render(<SessionDetailScreen />);
 
-    expect(screen.getByText('12 min')).toBeTruthy();
+    screen.getByText('12 min');
   });
 
   it('shows homework summary when present', () => {
@@ -220,7 +220,7 @@ describe('SessionDetailScreen (summary-only)', () => {
 
     render(<SessionDetailScreen />);
 
-    expect(screen.getByText('Helped with fractions')).toBeTruthy();
+    screen.getByText('Helped with fractions');
     expect(
       screen.getByText('Walked through fraction simplification step by step')
     ).toBeTruthy();
@@ -234,7 +234,7 @@ describe('SessionDetailScreen (summary-only)', () => {
 
     render(<SessionDetailScreen />);
 
-    expect(screen.getByTestId('session-not-found')).toBeTruthy();
+    screen.getByTestId('session-not-found');
   });
 
   it('does NOT render transcript exchanges', () => {
@@ -261,7 +261,7 @@ describe('SessionDetailScreen (summary-only)', () => {
 
     fireEvent.press(screen.getByTestId('copy-conversation-prompt'));
 
-    await waitFor(() => expect(screen.getByText('Copied ✓')).toBeTruthy());
+    await waitFor(() => screen.getByText('Copied ✓'));
     expect(Clipboard.setStringAsync).toHaveBeenCalledWith(
       'Can you teach this back to me?'
     );

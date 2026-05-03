@@ -60,13 +60,12 @@ describe('ChildReportsScreen', () => {
       });
     });
 
-    it('renders the spec heading and body with child name', () => {
+    it('renders the condensed empty-state body with child name', () => {
       render(<ChildReportsScreen />);
 
-      expect(screen.getByText('Your first report is on its way')).toBeTruthy();
-      expect(screen.getByTestId('child-reports-empty')).toBeTruthy();
-      // Body includes child name
-      expect(screen.getByText(/Emma's first report/)).toBeTruthy();
+      screen.getByTestId('child-reports-empty');
+      screen.getByText(/Emma's first report/);
+      expect(screen.queryByText('Your first report is on its way')).toBeNull();
     });
 
     it('shows action button with child name that navigates to child detail', () => {
@@ -74,7 +73,7 @@ describe('ChildReportsScreen', () => {
 
       const button = screen.getByTestId('child-reports-empty-progress');
       expect(button).toBeTruthy();
-      expect(screen.getByText("See Emma's progress now")).toBeTruthy();
+      screen.getByText("See Emma's progress now");
 
       fireEvent.press(button);
       expect(mockGoBackOrReplace).toHaveBeenCalledWith(
@@ -119,7 +118,7 @@ describe('ChildReportsScreen', () => {
 
       render(<ChildReportsScreen />);
 
-      expect(screen.getByText("See Your child's progress now")).toBeTruthy();
+      screen.getByText("See Your child's progress now");
     });
   });
 
@@ -134,7 +133,7 @@ describe('ChildReportsScreen', () => {
 
       render(<ChildReportsScreen />);
 
-      expect(screen.getByText('Loading reports...')).toBeTruthy();
+      screen.getByText('Loading reports...');
     });
   });
 
@@ -150,8 +149,8 @@ describe('ChildReportsScreen', () => {
 
       render(<ChildReportsScreen />);
 
-      expect(screen.getByTestId('child-reports-error')).toBeTruthy();
-      expect(screen.getByText("We couldn't load the reports")).toBeTruthy();
+      screen.getByTestId('child-reports-error');
+      screen.getByText("We couldn't load the reports");
 
       fireEvent.press(screen.getByTestId('child-reports-error-retry'));
       expect(refetch).toHaveBeenCalled();
@@ -187,9 +186,9 @@ describe('ChildReportsScreen', () => {
 
       render(<ChildReportsScreen />);
 
-      expect(screen.getByTestId('report-card-report-001')).toBeTruthy();
-      expect(screen.getByText('New')).toBeTruthy();
-      expect(screen.getByText('Sessions: 12')).toBeTruthy();
+      screen.getByTestId('report-card-report-001');
+      screen.getByText('New');
+      screen.getByText('Sessions: 12');
     });
 
     it('navigates to report detail when pressed', () => {
@@ -265,7 +264,7 @@ describe('ChildReportsScreen', () => {
       });
 
       render(<ChildReportsScreen />);
-      expect(screen.getByTestId('report-card-report-002')).toBeTruthy();
+      screen.getByTestId('report-card-report-002');
       expect(screen.queryByText('New')).toBeNull();
     });
   });

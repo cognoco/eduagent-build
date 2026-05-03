@@ -426,7 +426,7 @@ describe('addCurriculumTopic', () => {
       .mock.calls[0][0];
     expect(insertedValues.source).toBe('user');
     // BD-08: sortOrder is now a SQL expression (atomic COALESCE), not a JS number
-    expect(insertedValues.sortOrder).toBeDefined();
+    expect(insertedValues.sortOrder).not.toBeUndefined();
   });
 
   it('throws when subject not found', async () => {
@@ -1157,8 +1157,8 @@ describe('persistBookTopics', () => {
       expect(db.update).toHaveBeenCalled();
 
       // Should return a BookWithTopics result
-      expect(result).toBeDefined();
-      expect(result.book).toBeDefined();
+      expect(result).toEqual(expect.objectContaining({}));
+      expect(result.book).toEqual(expect.objectContaining({}));
     });
 
     it('calling twice with same data does not duplicate topics', async () => {

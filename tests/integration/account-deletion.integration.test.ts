@@ -106,7 +106,7 @@ describe('Integration: POST /v1/account/delete (P0-004)', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.message).toBe('Deletion scheduled');
-    expect(body.gracePeriodEnds).toBeDefined();
+    expect(typeof body.gracePeriodEnds).toBe('string');
 
     // Grace period should be ~7 days from now
     const grace = new Date(body.gracePeriodEnds);
@@ -125,7 +125,7 @@ describe('Integration: POST /v1/account/delete (P0-004)', () => {
     const before = await db.query.accounts.findFirst({
       where: eq(accounts.clerkUserId, AUTH_USER_ID),
     });
-    expect(before).toBeDefined();
+    expect(before).not.toBeUndefined();
     expect(before!.deletionScheduledAt).toBeNull();
 
     await app.request(
@@ -274,8 +274,8 @@ describe('Integration: GET /v1/account/export', () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.account).toBeDefined();
-    expect(body.profiles).toBeDefined();
+    expect(body.account).not.toBeNull();
+    expect(Array.isArray(body.profiles)).toBe(true);
     expect(body.profiles.length).toBeGreaterThanOrEqual(1);
     expect(body.profiles.some((p: { id: string }) => p.id === profileId)).toBe(
       true

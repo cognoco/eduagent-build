@@ -235,8 +235,8 @@ describe('BookScreen', () => {
 
     const { getByTestId, getByText } = render(<BookScreen />);
 
-    expect(getByTestId('book-loading')).toBeTruthy();
-    expect(getByText('Loading book...')).toBeTruthy();
+    getByTestId('book-loading');
+    getByText('Loading book...');
   });
 
   it('shows the error state and wires retry plus back', () => {
@@ -250,8 +250,8 @@ describe('BookScreen', () => {
 
     const { getByTestId, getByText } = render(<BookScreen />);
 
-    expect(getByTestId('book-error')).toBeTruthy();
-    expect(getByText('Server exploded')).toBeTruthy();
+    getByTestId('book-error');
+    getByText('Server exploded');
 
     fireEvent.press(getByTestId('book-retry-button'));
     fireEvent.press(getByTestId('book-back-button'));
@@ -268,7 +268,7 @@ describe('BookScreen', () => {
 
     const { getByTestId, getByText } = render(<BookScreen />);
 
-    expect(getByTestId('book-missing-param')).toBeTruthy();
+    getByTestId('book-missing-param');
     expect(
       getByText('Missing book details. Please go back and try again.')
     ).toBeTruthy();
@@ -328,11 +328,11 @@ describe('BookScreen', () => {
   it('renders the compact header on the main view', () => {
     const { getByTestId, getByText } = render(<BookScreen />);
 
-    expect(getByTestId('book-screen')).toBeTruthy();
-    expect(getByText('Algebra')).toBeTruthy();
-    expect(getByText('Mathematics')).toBeTruthy();
-    expect(getByText('0 sessions')).toBeTruthy();
-    expect(getByText('0 of 2 topics done')).toBeTruthy();
+    getByTestId('book-screen');
+    getByText('Algebra');
+    getByText('Mathematics');
+    getByText('0 sessions');
+    getByText('0 of 2 topics done');
   });
 
   it('derives header progress from retention topics', () => {
@@ -362,7 +362,7 @@ describe('BookScreen', () => {
 
     const { getByText } = render(<BookScreen />);
 
-    expect(getByText('2 of 3 topics done')).toBeTruthy();
+    getByText('2 of 3 topics done');
   });
 
   it('renders continue now and started from in-progress sessions', () => {
@@ -408,10 +408,10 @@ describe('BookScreen', () => {
     // sticky "▶ Continue: <title>" CTA at the bottom of the screen. The
     // started topic still surfaces in its own section.
     expect(queryByTestId('continue-now-row')).toBeNull();
-    expect(getByTestId('started-row-topic-2')).toBeTruthy();
-    expect(getByText('2 sessions')).toBeTruthy();
+    getByTestId('started-row-topic-2');
+    getByText('2 sessions');
     // Sticky CTA names the continue topic explicitly.
-    expect(getByText('▶ Continue: Linear Equations')).toBeTruthy();
+    getByText('▶ Continue: Linear Equations');
 
     fireEvent.press(getByTestId('book-start-learning'));
     expect(mockPush).toHaveBeenCalledWith({
@@ -444,18 +444,18 @@ describe('BookScreen', () => {
 
     const { getByTestId, queryByTestId } = render(<BookScreen />);
 
-    expect(getByTestId('started-show-more')).toBeTruthy();
+    getByTestId('started-show-more');
     expect(queryByTestId('started-row-topic-6')).toBeNull();
 
     fireEvent.press(getByTestId('started-show-more'));
-    expect(getByTestId('started-row-topic-6')).toBeTruthy();
+    getByTestId('started-row-topic-6');
   });
 
   it('renders the hero up-next state on a fresh book and starts a session', () => {
     const { getByTestId, getByText } = render(<BookScreen />);
 
-    expect(getByTestId('up-next-row')).toBeTruthy();
-    expect(getByText('▶ Start: Linear Equations')).toBeTruthy();
+    getByTestId('up-next-row');
+    getByText('▶ Start: Linear Equations');
 
     fireEvent.press(getByTestId('book-start-learning'));
     expect(mockPush).toHaveBeenCalledWith({
@@ -521,9 +521,9 @@ describe('BookScreen', () => {
 
     const { getByTestId } = render(<BookScreen />);
 
-    expect(getByTestId('sessions-error-banner')).toBeTruthy();
-    expect(getByTestId('done-row-topic-1')).toBeTruthy();
-    expect(getByTestId('up-next-row')).toBeTruthy();
+    getByTestId('sessions-error-banner');
+    getByTestId('done-row-topic-1');
+    getByTestId('up-next-row');
 
     fireEvent.press(getByTestId('sessions-error-retry'));
     expect(refetchSpy).toHaveBeenCalledTimes(1);
@@ -549,10 +549,10 @@ describe('BookScreen', () => {
 
     const { getByTestId } = render(<BookScreen />);
 
-    expect(getByTestId('retention-error-banner')).toBeTruthy();
+    getByTestId('retention-error-banner');
     // [BUG-895] continue-now-row removed; the sticky CTA still surfaces a
     // way to resume the topic, so the page stays actionable on retention error.
-    expect(getByTestId('book-start-learning')).toBeTruthy();
+    getByTestId('book-start-learning');
 
     fireEvent.press(getByTestId('retention-error-retry'));
     expect(refetchSpy).toHaveBeenCalledTimes(1);
@@ -577,8 +577,8 @@ describe('BookScreen', () => {
 
     const { getByTestId, getByText } = render(<BookScreen />);
 
-    expect(getByTestId('topics-empty-state')).toBeTruthy();
-    expect(getByText('No topics yet')).toBeTruthy();
+    getByTestId('topics-empty-state');
+    getByText('No topics yet');
 
     fireEvent.press(getByTestId('topics-empty-build'));
     expect(mockPush).toHaveBeenCalledWith(
@@ -608,8 +608,8 @@ describe('BookScreen', () => {
 
     const { getByTestId } = render(<BookScreen />);
 
-    expect(getByTestId('all-sections-fallback')).toBeTruthy();
-    expect(getByTestId('fallback-start')).toBeTruthy();
+    getByTestId('all-sections-fallback');
+    getByTestId('fallback-start');
   });
 
   it('renders past conversations and opens session summaries', () => {
@@ -629,7 +629,7 @@ describe('BookScreen', () => {
 
     const { getByText, getByTestId } = render(<BookScreen />);
 
-    expect(getByText('Past conversations')).toBeTruthy();
+    getByText('Past conversations');
 
     fireEvent.press(getByTestId('session-sess-1'));
     expect(mockPush).toHaveBeenCalledWith({
@@ -671,8 +671,8 @@ describe('BookScreen', () => {
 
     const { getByText } = render(<BookScreen />);
 
-    expect(getByText('Chapter A')).toBeTruthy();
-    expect(getByText('Chapter B')).toBeTruthy();
+    getByText('Chapter A');
+    getByText('Chapter B');
   });
 
   it('shows the book complete card and routes review to the relearn flow', () => {
@@ -706,7 +706,7 @@ describe('BookScreen', () => {
 
     const { getByTestId, queryByTestId } = render(<BookScreen />);
 
-    expect(getByTestId('book-complete-card')).toBeTruthy();
+    getByTestId('book-complete-card');
     expect(queryByTestId('book-start-learning')).toBeNull();
 
     fireEvent.press(getByTestId('book-complete-review'));
@@ -754,7 +754,7 @@ describe('BookScreen', () => {
 
     // [BUG-895] Sticky CTA names the topic so the duplicated "Continue now"
     // section in-list could be removed without losing context.
-    expect(getByText('▶ Continue: Linear Equations')).toBeTruthy();
+    getByText('▶ Continue: Linear Equations');
     expect(queryByTestId('continue-now-row')).toBeNull();
   });
 
@@ -784,7 +784,7 @@ describe('BookScreen', () => {
     const { getByText } = render(<BookScreen />);
 
     const truncated = `▶ Continue: ${longTitle.slice(0, 24)}...`;
-    expect(getByText(truncated)).toBeTruthy();
+    getByText(truncated);
   });
 
   it('shows and wires the build-learning-path link when no curriculum exists', () => {
@@ -867,8 +867,8 @@ describe('BookScreen', () => {
 
     const { getByTestId, getByText } = render(<BookScreen />);
 
-    expect(getByTestId('book-generating')).toBeTruthy();
-    expect(getByText('Algebra')).toBeTruthy();
+    getByTestId('book-generating');
+    getByText('Algebra');
   });
 
   it('shows an alert when the initial generation request fails', async () => {
@@ -933,7 +933,7 @@ describe('BookScreen', () => {
     const { getByTestId } = render(<BookScreen />);
 
     await waitFor(() => {
-      expect(getByTestId('book-gen-retry')).toBeTruthy();
+      getByTestId('book-gen-retry');
     });
 
     let retryCallCount = 0;
@@ -985,6 +985,6 @@ describe('BookScreen', () => {
       })
     );
     expect(queryByTestId('continue-now-row')).toBeNull();
-    expect(getByTestId('up-next-row')).toBeTruthy();
+    getByTestId('up-next-row');
   });
 });

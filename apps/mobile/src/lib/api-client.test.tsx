@@ -55,13 +55,14 @@ describe('api-client auth-expired guard [BUG-630 / I-2]', () => {
   });
 
   it('does not throw when reset is called repeatedly across registrations', () => {
-    setOnAuthExpired(jest.fn());
-    resetAuthExpiredGuard();
-    clearOnAuthExpired();
-    resetAuthExpiredGuard();
-    setOnAuthExpired(jest.fn());
-    resetAuthExpiredGuard();
-    expect(true).toBe(true);
+    expect(() => {
+      setOnAuthExpired(jest.fn());
+      resetAuthExpiredGuard();
+      clearOnAuthExpired();
+      resetAuthExpiredGuard();
+      setOnAuthExpired(jest.fn());
+      resetAuthExpiredGuard();
+    }).not.toThrow();
   });
 });
 

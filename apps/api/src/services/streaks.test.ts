@@ -145,7 +145,7 @@ describe('recordDailyActivity', () => {
     expect(result.streakBroken).toBe(true);
     expect(result.newState.currentStreak).toBe(1);
     expect(result.newState.longestStreak).toBe(10); // preserved
-    expect(result.message).toBeDefined();
+    expect(typeof result.message).toBe('string');
     expect(result.message).toContain('fresh start');
   });
 

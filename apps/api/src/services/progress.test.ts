@@ -652,11 +652,11 @@ describe('getOverallProgress', () => {
 
     const math = result.subjects.find((s) => s.name === 'Math');
     const science = result.subjects.find((s) => s.name === 'Science');
-    expect(math).toBeDefined();
+    expect(math).toEqual(expect.objectContaining({}));
     expect(math!.topicsTotal).toBe(1);
     expect(math!.topicsCompleted).toBe(1);
     expect(math!.topicsVerified).toBe(1);
-    expect(science).toBeDefined();
+    expect(science).toEqual(expect.objectContaining({}));
     expect(science!.topicsTotal).toBe(1);
     expect(science!.topicsCompleted).toBe(1);
     expect(science!.topicsVerified).toBe(0);

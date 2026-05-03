@@ -1,6 +1,7 @@
 import { buildPreSessionPrompt } from '../../src/services/filing';
 import type { EvalProfile } from '../fixtures/profiles';
 import type { FlowDefinition, PromptMessages } from '../runner/types';
+import { callLlm } from '../runner/llm-bootstrap';
 
 // ---------------------------------------------------------------------------
 // Flow adapter — Filing (pre-session variant)
@@ -72,5 +73,18 @@ export const filingPreSessionFlow: FlowDefinition<FilingPreSessionInput> = {
         `Sparse-library seed taxonomy is included when libraryTopics < 5.`,
       ],
     };
+  },
+
+  async runLive(
+    _input: FilingPreSessionInput,
+    messages: PromptMessages
+  ): Promise<string> {
+    return callLlm(
+      [
+        { role: 'system', content: messages.system },
+        { role: 'user', content: messages.user ?? 'File this request.' },
+      ],
+      { flow: 'filing-pre-session', rung: 2 }
+    );
   },
 };

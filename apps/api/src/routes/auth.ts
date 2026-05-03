@@ -8,30 +8,43 @@ import {
 
 export const auth = new Hono()
   .post('/auth/register', zValidator('json', registerSchema), async (c) => {
-    const input = c.req.valid('json');
-    // In production, Clerk handles registration via webhook.
-    // This endpoint receives the validated data and creates the local account record.
-    // For now, return the validated input to prove the route works.
+    // Registration is handled by Clerk — this server-side stub is not implemented.
     return c.json(
-      { message: 'Registration initiated', email: input.email },
-      201
+      {
+        code: 'NOT_IMPLEMENTED',
+        message:
+          'Registration is handled by Clerk — this endpoint is not implemented',
+      },
+      501
     );
   })
   .post(
     '/auth/password-reset-request',
     zValidator('json', passwordResetRequestSchema),
     async (c) => {
-      // Clerk handles the actual reset email. This endpoint is for client-side validation.
-      return c.json({
-        message: 'If an account exists, a reset email has been sent',
-      });
+      // Password reset requests are handled by Clerk — this stub is not implemented.
+      return c.json(
+        {
+          code: 'NOT_IMPLEMENTED',
+          message:
+            'Password reset is handled by Clerk — this endpoint is not implemented',
+        },
+        501
+      );
     }
   )
   .post(
     '/auth/password-reset',
     zValidator('json', passwordResetSchema),
     async (c) => {
-      // Clerk handles token verification. This validates the new password meets requirements.
-      return c.json({ message: 'Password has been reset' });
+      // Password reset token verification is handled by Clerk — this stub is not implemented.
+      return c.json(
+        {
+          code: 'NOT_IMPLEMENTED',
+          message:
+            'Password reset is handled by Clerk — this endpoint is not implemented',
+        },
+        501
+      );
     }
   );

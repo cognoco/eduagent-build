@@ -108,7 +108,7 @@ describe('listSubjects', () => {
 
     // Should pass a SQL where clause (not undefined)
     expect(findMany).toHaveBeenCalledTimes(1);
-    expect(findMany.mock.calls[0][0]).toBeDefined();
+    expect(findMany.mock.calls[0][0]).not.toBeUndefined();
   });
 
   it('passes no status filter when includeInactive is true', async () => {
@@ -157,8 +157,8 @@ describe('createSubject', () => {
     const db = createMockDb({ insertReturning: [row] });
     const result = await createSubject(db, profileId, { name: 'Science' });
 
-    expect(result.createdAt).toBeDefined();
-    expect(result.updatedAt).toBeDefined();
+    expect(typeof result.createdAt).toBe('string');
+    expect(typeof result.updatedAt).toBe('string');
     expect(() => new Date(result.createdAt)).not.toThrow();
     expect(() => new Date(result.updatedAt)).not.toThrow();
   });

@@ -1039,7 +1039,9 @@ describe('refreshProgressSnapshot', () => {
     const db = createSnapshotDb({ findFirst: undefined });
 
     // refreshProgressSnapshot must not propagate the celebration error
-    await expect(refreshProgressSnapshot(db, profileId)).resolves.toBeDefined();
+    await expect(refreshProgressSnapshot(db, profileId)).resolves.toEqual(
+      expect.objectContaining({})
+    );
   });
 
   // -------------------------------------------------------------------------

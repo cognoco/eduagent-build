@@ -33,6 +33,10 @@ const EXEMPT_PREFIXES = [
   '/v1/revenuecat/webhook',
   '/v1/inngest',
   '/v1/__test/',
+  // Outbox spillover is a durability safety-net — failed messages must be
+  // escalatable even when a profile's consent is pending or withdrawn.
+  // Blocking this path would lose irrecoverable user data in the outbox.
+  '/v1/support/',
 ];
 
 function isExempt(path: string): boolean {

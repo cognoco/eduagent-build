@@ -383,7 +383,7 @@ describe('useHomeworkOcr', () => {
     });
 
     expect(mockFetch).toHaveBeenCalled();
-    expect(capturedSignal).toBeDefined();
+    expect(capturedSignal).toBeInstanceOf(AbortSignal);
     expect(capturedSignal!.aborted).toBe(false);
 
     // Cancel — the signal we passed to fetch must transition to aborted.

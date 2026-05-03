@@ -35,7 +35,7 @@ describe('topic/_layout.tsx', () => {
     render(<TopicLayout />);
 
     const screen = capturedScreens.find((s) => s.name === '[topicId]');
-    expect(screen).toBeDefined();
+    expect(screen).not.toBeUndefined();
     expect(screen!.getId).toBeInstanceOf(Function);
   });
 

@@ -40,7 +40,7 @@ describe('medium-priority seed scenarios integration', () => {
     const result = await seedScenario(db, 'language-subject-active', email);
 
     expect(result.scenario).toBe('language-subject-active');
-    expect(result.ids.subjectId).toBeDefined();
+    expect(typeof result.ids.subjectId).toBe('string');
 
     const vocabRows = await db
       .select()
@@ -76,14 +76,14 @@ describe('medium-priority seed scenarios integration', () => {
     const result = await seedScenario(db, 'parent-with-reports', email);
 
     expect(result.scenario).toBe('parent-with-reports');
-    expect(result.ids.reportId).toBeDefined();
+    expect(typeof result.ids.reportId).toBe('string');
 
     const [report] = await db
       .select()
       .from(monthlyReports)
       .where(eq(monthlyReports.id, result.ids.reportId));
 
-    expect(report).toBeDefined();
+    expect(report).toEqual(expect.objectContaining({}));
     expect(report).toEqual(
       expect.objectContaining({
         id: result.ids.reportId,
@@ -100,14 +100,14 @@ describe('medium-priority seed scenarios integration', () => {
     const result = await seedScenario(db, 'mentor-memory-populated', email);
 
     expect(result.scenario).toBe('mentor-memory-populated');
-    expect(result.ids.childProfileId).toBeDefined();
+    expect(typeof result.ids.childProfileId).toBe('string');
 
     const [profile] = await db
       .select()
       .from(learningProfiles)
       .where(eq(learningProfiles.profileId, result.ids.childProfileId));
 
-    expect(profile).toBeDefined();
+    expect(profile).toEqual(expect.objectContaining({}));
     expect(profile).toEqual(
       expect.objectContaining({
         profileId: result.ids.childProfileId,

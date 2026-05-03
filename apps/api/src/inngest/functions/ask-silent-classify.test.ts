@@ -64,7 +64,7 @@ describe('ask-silent-classify Inngest function', () => {
     it('does NOT throw when event.data is missing required fields', async () => {
       // No sessionId / profileId / classifyInput / exchangeCount — the legacy
       // .parse() path threw ZodError here. Now we expect a clean resolve.
-      await expect(executeHandler({})).resolves.toBeDefined();
+      await expect(executeHandler({})).resolves.toBeTruthy();
     });
 
     it('returns skipped:true with reason:invalid_payload', async () => {

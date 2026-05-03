@@ -168,7 +168,7 @@ const TEST_ENV = {
 describe('filing routes', () => {
   it('exports a Hono instance', async () => {
     const { filingRoutes } = await import('./filing');
-    expect(filingRoutes).toBeDefined();
+    expect(typeof filingRoutes).toBe('object');
     expect(typeof filingRoutes.fetch).toBe('function');
   });
 

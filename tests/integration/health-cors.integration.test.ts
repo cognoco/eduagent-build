@@ -29,7 +29,6 @@ describe('Integration: Health endpoint', () => {
 
     const body = await res.json();
     expect(body.status).toBe('ok');
-    expect(body.timestamp).toBeDefined();
     expect(typeof body.timestamp).toBe('string');
   });
 

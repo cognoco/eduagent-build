@@ -212,7 +212,7 @@ describe('compareAgainstBaseline', () => {
       0.05
     );
     const envelopeDrift = drifts.find((d) => d.metric === 'envelopeOk');
-    expect(envelopeDrift).toBeDefined();
+    expect(envelopeDrift).not.toBeUndefined();
     expect(envelopeDrift?.deltaPp).toBeCloseTo(0.5, 5);
   });
 

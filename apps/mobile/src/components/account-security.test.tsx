@@ -24,7 +24,7 @@ describe('AccountSecurity', () => {
 
   it('renders Change Password row for password users', () => {
     render(<AccountSecurity visible />);
-    expect(screen.getByText('Change Password')).toBeTruthy();
+    screen.getByText('Change Password');
   });
 
   it('shows SSO message when passwordEnabled is false', () => {
@@ -33,7 +33,7 @@ describe('AccountSecurity', () => {
       externalAccounts: [{ provider: 'google' }],
     };
     render(<AccountSecurity visible />);
-    expect(screen.getByText(/Secured via Google/)).toBeTruthy();
+    screen.getByText(/Secured via Google/);
     expect(screen.queryByText('Change Password')).toBeNull();
   });
 
@@ -43,13 +43,13 @@ describe('AccountSecurity', () => {
       externalAccounts: [{ provider: 'apple' }],
     };
     render(<AccountSecurity visible />);
-    expect(screen.getByText(/Secured via Apple/)).toBeTruthy();
+    screen.getByText(/Secured via Apple/);
   });
 
   it('expands password form when Change Password is tapped', () => {
     render(<AccountSecurity visible />);
     fireEvent.press(screen.getByText('Change Password'));
-    expect(screen.getByTestId('current-password')).toBeTruthy();
+    screen.getByTestId('current-password');
   });
 
   it('does not render when visible is false', () => {

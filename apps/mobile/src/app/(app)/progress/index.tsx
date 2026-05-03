@@ -12,6 +12,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ErrorFallback } from '../../../components/common';
+import { SamplePreview } from '../../../components/parent/SamplePreview';
 import {
   isNewLearner,
   sessionsUntilFullProgress,
@@ -118,6 +119,19 @@ function buildGrowthData(
           : undefined,
     };
   });
+}
+
+const MILESTONE_THRESHOLDS = [1, 3, 5, 10, 25, 50, 100];
+
+export function getNextMilestoneLabel(totalSessions: number): string {
+  const next = MILESTONE_THRESHOLDS.find((t) => t > totalSessions);
+  if (next === undefined) {
+    return "You've reached all session milestones. Keep exploring!";
+  }
+  const remaining = next - totalSessions;
+  return `Complete ${remaining} more ${
+    remaining === 1 ? 'session' : 'sessions'
+  } to reach your next milestone.`;
 }
 
 function LoadingBlock(): React.ReactElement {
@@ -416,7 +430,10 @@ export default function ProgressScreen(): React.ReactElement {
                 emptyMessage={
                   // [F-043] Distinguish brand-new users from users who have
                   // sessions but no mastery data yet (mastery takes repeat exposures).
-                  (inventory?.global.totalSessions ?? 0) > 0
+                  // When totalSessions >= 3, hint that topic mastery unlocks the chart.
+                  (inventory?.global.totalSessions ?? 0) >= 3
+                    ? "You're building a foundation. Growth will become visible once you master your first topic."
+                    : (inventory?.global.totalSessions ?? 0) > 0
                     ? `You've put in ${
                         inventory?.global.totalSessions ?? 0
                       } session${
@@ -469,16 +486,26 @@ export default function ProgressScreen(): React.ReactElement {
                 </View>
               ))
             ) : (
-              <View className="bg-surface rounded-card p-4">
-                <Text className="text-body-sm text-text-secondary">
-                  {/* [F-043] Distinguish users who have sessions from true newcomers.
-                      Milestones backfill on the next progress refresh — if none appear
-                      yet, encourage the user without implying they haven't started. */}
-                  {(inventory?.global.totalSessions ?? 0) > 0
-                    ? 'Milestones will collect here as you grow. Pull down to refresh.'
-                    : 'Complete your first session to earn your first milestone'}
-                </Text>
-              </View>
+              <SamplePreview
+                unlockMessage={getNextMilestoneLabel(
+                  inventory?.global.totalSessions ?? 0
+                )}
+              >
+                <View className="bg-surface rounded-card p-4 gap-3">
+                  {[1, 2, 3].map((i) => (
+                    <View
+                      key={i}
+                      className="flex-row items-center bg-background rounded-card p-3"
+                    >
+                      <View className="bg-border rounded-full w-8 h-8 me-3" />
+                      <View className="flex-1">
+                        <View className="bg-border rounded h-4 w-2/3 mb-1.5" />
+                        <View className="bg-border rounded h-3 w-1/4" />
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              </SamplePreview>
             )}
 
             <Pressable

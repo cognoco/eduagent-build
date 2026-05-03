@@ -843,7 +843,10 @@ export default function QuizPlayScreen(): React.ReactElement {
                 </Text>
               </View>
             ) : null}
-            <Text className="mt-3 text-center text-caption text-text-secondary">
+            <Text
+              className="mt-3 text-center text-caption text-text-secondary"
+              testID="quiz-answer-feedback"
+            >
               {showContinueHint
                 ? 'Tap anywhere to continue'
                 : answerState === 'correct'

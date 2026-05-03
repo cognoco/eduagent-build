@@ -90,3 +90,38 @@ describe('MessageBubble — envelope leak regression [BUG-941]', () => {
     expect(queryByText(/Half a sent/)).toBeTruthy();
   });
 });
+
+describe('verification badge styling', () => {
+  it('renders evaluate badge as inline text below the bubble', () => {
+    const { getByText } = render(
+      <MessageBubble
+        role="assistant"
+        content="Good work!"
+        verificationBadge="evaluate"
+      />
+    );
+    expect(getByText('✓ THINK-DEEPER CLEARED')).toBeTruthy();
+  });
+
+  it('renders teach_back badge as inline text below the bubble', () => {
+    const { getByText } = render(
+      <MessageBubble
+        role="assistant"
+        content="Good work!"
+        verificationBadge="teach_back"
+      />
+    );
+    expect(getByText('✓ TEACH-BACK CLEARED')).toBeTruthy();
+  });
+
+  it('does not render badge for user messages', () => {
+    const { queryByText } = render(
+      <MessageBubble
+        role="user"
+        content="My answer"
+        verificationBadge="evaluate"
+      />
+    );
+    expect(queryByText(/CLEARED/)).toBeNull();
+  });
+});

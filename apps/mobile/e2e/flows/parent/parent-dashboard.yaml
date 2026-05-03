@@ -42,46 +42,36 @@ tags:
 - assertVisible:
     text: "How your children are doing"
 
-# 3. Verify children list is visible — look for child display name
-# optional: seed data may not yet be fetched from API when assertion runs
+# 3. Verify children list is visible — wait for API data to load
 - extendedWaitUntil:
     visible:
       text: "Test Teen"
     timeout: 10000
-    optional: true
 
 # 4. Look for child card element via per-child testID (dashboard-child-${profileId})
-# optional: only renders after familyLinks API returns data
 # CHILD_PROFILE_ID is injected by the seed-and-sign-in helper
 - assertVisible:
     id: "dashboard-child-${CHILD_PROFILE_ID}"
-    optional: true
 
 # 5. Tap on child card to view detail
-# optional: depends on child card rendering (step 4); if absent, step 6 is the fallback
 - tapOn:
     id: "dashboard-child-${CHILD_PROFILE_ID}"
-    optional: true
 
 # 6. Fallback: tap on child name text
-# optional: fallback for step 5 — one of the two tap targets should succeed
+# optional: only fires if testID-based tap in step 5 did not navigate (e.g. testID not rendered)
 - tapOn:
     text: "Test Teen"
     optional: true
 
 # 7. Wait for child detail view
-# optional: only reachable if step 5 or 6 succeeded (tap landed on a child card)
 - extendedWaitUntil:
     visible:
       text: "Sessions"
     timeout: 10000
-    optional: true
 
 # 8. Verify session count or time information is visible
-# optional: only reachable if child detail screen loaded (step 7)
 - assertVisible:
     text: "sessions"
-    optional: true
 
 # 9. Navigate back to dashboard
 # optional: back button only present if we navigated into child detail (step 7)

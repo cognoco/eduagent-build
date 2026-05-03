@@ -68,7 +68,7 @@ export function RetentionSignal({
     <View
       className="flex-row items-center"
       testID={`retention-signal-${status}`}
-      accessibilityLabel={`Retention: ${displayLabel}`}
+      accessibilityLabel={`Review status: ${displayLabel}`}
       accessibilityRole="text"
     >
       <Ionicons

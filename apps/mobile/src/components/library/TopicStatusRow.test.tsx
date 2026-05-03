@@ -45,9 +45,9 @@ describe('TopicStatusRow', () => {
       />
     );
 
-    expect(getByText('Photosynthesis')).toBeTruthy();
-    expect(getByText('Green Factories')).toBeTruthy();
-    expect(getByText('3 sessions')).toBeTruthy();
+    getByText('Photosynthesis');
+    getByText('Green Factories');
+    getByText('3 sessions');
   });
 
   it('renders an up-next row', () => {
@@ -61,7 +61,7 @@ describe('TopicStatusRow', () => {
       />
     );
 
-    expect(getByTestId('row-up-next')).toBeTruthy();
+    getByTestId('row-up-next');
   });
 
   it('renders the hero up-next variant', () => {
@@ -76,7 +76,7 @@ describe('TopicStatusRow', () => {
       />
     );
 
-    expect(getByTestId('row-up-next-hero')).toBeTruthy();
+    getByTestId('row-up-next-hero');
   });
 
   it('renders a done row with the chapter inline', () => {
@@ -89,8 +89,8 @@ describe('TopicStatusRow', () => {
       />
     );
 
-    expect(getByText('Algebra Basics')).toBeTruthy();
-    expect(getByText('Chapter 1')).toBeTruthy();
+    getByText('Algebra Basics');
+    getByText('Chapter 1');
   });
 
   it('uses singular session copy when sessionCount is 1', () => {
@@ -104,6 +104,6 @@ describe('TopicStatusRow', () => {
       />
     );
 
-    expect(getByText('1 session')).toBeTruthy();
+    getByText('1 session');
   });
 });

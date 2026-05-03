@@ -64,7 +64,6 @@ describe('CelestialCelebration', () => {
     );
 
     const element = screen.getByTestId('test-celebration');
-    expect(element).toBeTruthy();
     expect(element.props.accessibilityRole).toBe('image');
     expect(element.props.accessibilityLabel).toBe('Celebration animation');
   });
@@ -144,12 +143,12 @@ describe('PolarStar', () => {
 
   it('renders with default testID', () => {
     render(<PolarStar />);
-    expect(screen.getByTestId('celebration-polar-star')).toBeTruthy();
+    screen.getByTestId('celebration-polar-star');
   });
 
   it('accepts custom testID', () => {
     render(<PolarStar testID="custom-polar" />);
-    expect(screen.getByTestId('custom-polar')).toBeTruthy();
+    screen.getByTestId('custom-polar');
   });
 
   it('passes onComplete to CelestialCelebration', () => {
@@ -164,35 +163,35 @@ describe('PolarStar', () => {
 describe('TwinStars', () => {
   it('renders with default testID', () => {
     render(<TwinStars />);
-    expect(screen.getByTestId('celebration-twin-stars')).toBeTruthy();
+    screen.getByTestId('celebration-twin-stars');
   });
 
   it('accepts custom testID', () => {
     render(<TwinStars testID="custom-twins" />);
-    expect(screen.getByTestId('custom-twins')).toBeTruthy();
+    screen.getByTestId('custom-twins');
   });
 });
 
 describe('Comet', () => {
   it('renders with default testID', () => {
     render(<Comet />);
-    expect(screen.getByTestId('celebration-comet')).toBeTruthy();
+    screen.getByTestId('celebration-comet');
   });
 
   it('accepts custom testID', () => {
     render(<Comet testID="custom-comet" />);
-    expect(screen.getByTestId('custom-comet')).toBeTruthy();
+    screen.getByTestId('custom-comet');
   });
 });
 
 describe('OrionsBelt', () => {
   it('renders with default testID', () => {
     render(<OrionsBelt />);
-    expect(screen.getByTestId('celebration-orions-belt')).toBeTruthy();
+    screen.getByTestId('celebration-orions-belt');
   });
 
   it('accepts custom testID', () => {
     render(<OrionsBelt testID="custom-orion" />);
-    expect(screen.getByTestId('custom-orion')).toBeTruthy();
+    screen.getByTestId('custom-orion');
   });
 });

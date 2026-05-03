@@ -140,7 +140,7 @@ describe('useAllBooks', () => {
 
     // Verify enrichment: each book has subjectId + subjectName attached
     const algebra = result.current.books.find((b) => b.book.id === 'b1');
-    expect(algebra).toBeDefined();
+    expect(algebra).not.toBeUndefined();
     expect(algebra!.subjectId).toBe('s1');
     expect(algebra!.subjectName).toBe('Math');
     expect(algebra!.status).toBe('IN_PROGRESS'); // topicsGenerated = true
@@ -150,7 +150,7 @@ describe('useAllBooks', () => {
     expect(geometry).toBeUndefined();
 
     const physics = result.current.books.find((b) => b.book.id === 'b3');
-    expect(physics).toBeDefined();
+    expect(physics).not.toBeUndefined();
     expect(physics!.subjectId).toBe('s2');
     expect(physics!.subjectName).toBe('Science');
     expect(physics!.status).toBe('IN_PROGRESS');
@@ -259,7 +259,7 @@ describe('useAllBooks', () => {
 
     // Per-book topic counts are 0 at the list level (detail requires BookWithTopics fetch)
     const first = result.current.books[0];
-    expect(first).toBeDefined();
+    expect(first).not.toBeUndefined();
     expect(first!.topicCount).toBe(0);
     expect(first!.completedCount).toBe(0);
   });

@@ -55,7 +55,7 @@ afterEach(() => {
 
 describe('subjectAutoArchive', () => {
   it('should be defined as an Inngest function', () => {
-    expect(subjectAutoArchive).toBeDefined();
+    expect(subjectAutoArchive).toBeTruthy();
   });
 
   it('should have the correct function id', () => {

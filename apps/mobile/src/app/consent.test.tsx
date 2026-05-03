@@ -138,25 +138,23 @@ describe('ConsentScreen', () => {
   it('renders child view by default with hand-off message and button', () => {
     render(<ConsentScreen />, { wrapper: Wrapper });
 
-    expect(screen.getByTestId('consent-child-view')).toBeTruthy();
-    expect(screen.getByText('Almost there!')).toBeTruthy();
-    expect(
-      screen.getByText(
-        "We need your parent or guardian to say it's OK. Enter their email and we'll send them a quick link."
-      )
-    ).toBeTruthy();
-    expect(screen.getByTestId('consent-handoff-button')).toBeTruthy();
+    screen.getByTestId('consent-child-view');
+    screen.getByText('Almost there!');
+    screen.getByText(
+      "We need your parent or guardian to say it's OK. Enter their email and we'll send them a quick link."
+    );
+    screen.getByTestId('consent-handoff-button');
   });
 
   it('shows email input, submit button, and parent escape hatch in child view', () => {
     render(<ConsentScreen />, { wrapper: Wrapper });
 
     // Child can now enter parent email directly — no phone handoff required.
-    expect(screen.getByTestId('consent-email')).toBeTruthy();
-    expect(screen.getByTestId('consent-submit')).toBeTruthy();
+    screen.getByTestId('consent-email');
+    screen.getByTestId('consent-submit');
     // Optional escape hatch for when parent is physically present
-    expect(screen.getByTestId('consent-handoff-button')).toBeTruthy();
-    expect(screen.getByText('My parent is here with me')).toBeTruthy();
+    screen.getByTestId('consent-handoff-button');
+    screen.getByText('My parent is here with me');
   });
 
   // ── Child view email validation ──────────────────────────────────
@@ -204,7 +202,7 @@ describe('ConsentScreen', () => {
       'child@example.com'
     );
 
-    expect(screen.getByTestId('consent-same-email-warning')).toBeTruthy();
+    screen.getByTestId('consent-same-email-warning');
     const button = screen.getByTestId('consent-submit');
     expect(
       button.props.accessibilityState?.disabled ?? button.props.disabled
@@ -237,7 +235,7 @@ describe('ConsentScreen', () => {
     flushFadeAnimation();
 
     await waitFor(() => {
-      expect(screen.getByTestId('consent-success')).toBeTruthy();
+      screen.getByTestId('consent-success');
     });
   });
 
@@ -259,11 +257,11 @@ describe('ConsentScreen', () => {
     flushFadeAnimation();
 
     await waitFor(() => {
-      expect(screen.getByTestId('consent-success')).toBeTruthy();
+      screen.getByTestId('consent-success');
     });
 
-    expect(screen.getByText('Link sent!')).toBeTruthy();
-    expect(screen.getByText(/mum@example\.com/)).toBeTruthy();
+    screen.getByText('Link sent!');
+    screen.getByText(/mum@example\.com/);
   });
 
   it('"Got it" button calls router.back() after child direct submit', async () => {
@@ -284,7 +282,7 @@ describe('ConsentScreen', () => {
     flushFadeAnimation();
 
     await waitFor(() => {
-      expect(screen.getByTestId('consent-done')).toBeTruthy();
+      screen.getByTestId('consent-done');
     });
 
     fireEvent.press(screen.getByTestId('consent-done'));
@@ -299,7 +297,7 @@ describe('ConsentScreen', () => {
     fireEvent.press(screen.getByTestId('consent-handoff-button'));
     flushFadeAnimation();
 
-    expect(screen.getByTestId('consent-parent-view')).toBeTruthy();
+    screen.getByTestId('consent-parent-view');
     expect(screen.queryByTestId('consent-child-view')).toBeNull();
   });
 
@@ -309,14 +307,14 @@ describe('ConsentScreen', () => {
     fireEvent.press(screen.getByTestId('consent-handoff-button'));
     flushFadeAnimation();
 
-    expect(screen.getByTestId('consent-email')).toBeTruthy();
-    expect(screen.getByTestId('consent-submit')).toBeTruthy();
+    screen.getByTestId('consent-email');
+    screen.getByTestId('consent-submit');
     // Jurisdiction-neutral regulation text (default/parent variant)
-    expect(screen.getByText(/under 16/i)).toBeTruthy();
+    screen.getByText(/under 16/i);
     // Spam warning
-    expect(screen.getByText(/check your spam folder/i)).toBeTruthy();
+    screen.getByText(/check your spam folder/i);
     // Email label
-    expect(screen.getByText('Your email address')).toBeTruthy();
+    screen.getByText('Your email address');
   });
 
   it('shows professional (non-learner) regulation text for the parent', () => {
@@ -326,9 +324,7 @@ describe('ConsentScreen', () => {
     flushFadeAnimation();
 
     // Default variant says "parental consent" not "grown-up"
-    expect(
-      screen.getByText(/parental consent to use this service/i)
-    ).toBeTruthy();
+    screen.getByText(/parental consent to use this service/i);
   });
 
   // ── Email validation ─────────────────────────────────────────────
@@ -408,11 +404,11 @@ describe('ConsentScreen', () => {
     flushFadeAnimation();
 
     await waitFor(() => {
-      expect(screen.getByTestId('consent-success')).toBeTruthy();
+      screen.getByTestId('consent-success');
     });
 
-    expect(screen.getByText('Link sent!')).toBeTruthy();
-    expect(screen.getByText(/parent@example\.com/)).toBeTruthy();
+    screen.getByText('Link sent!');
+    screen.getByText(/parent@example\.com/);
   });
 
   it('success view shows spam hint and resend button', async () => {
@@ -434,14 +430,12 @@ describe('ConsentScreen', () => {
 
     flushFadeAnimation();
     await waitFor(() => {
-      expect(screen.getByTestId('consent-success')).toBeTruthy();
+      screen.getByTestId('consent-success');
     });
 
     // Success body now tells the child their parent will be notified.
-    expect(
-      screen.getByText(/we'll let you know as soon as they approve/i)
-    ).toBeTruthy();
-    expect(screen.getByTestId('consent-resend-email')).toBeTruthy();
+    screen.getByText(/we'll let you know as soon as they approve/i);
+    screen.getByTestId('consent-resend-email');
   });
 
   it('hand-back button calls router.back()', async () => {
@@ -463,7 +457,7 @@ describe('ConsentScreen', () => {
 
     flushFadeAnimation();
     await waitFor(() => {
-      expect(screen.getByTestId('consent-done')).toBeTruthy();
+      screen.getByTestId('consent-done');
     });
 
     fireEvent.press(screen.getByTestId('consent-done'));
@@ -489,7 +483,7 @@ describe('ConsentScreen', () => {
     flushFadeAnimation();
 
     await waitFor(() => {
-      expect(screen.getByTestId('consent-done')).toBeTruthy();
+      screen.getByTestId('consent-done');
     });
 
     fireEvent.press(screen.getByTestId('consent-done'));
@@ -512,12 +506,12 @@ describe('ConsentScreen', () => {
     fireEvent.press(screen.getByTestId('consent-submit'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('consent-error')).toBeTruthy();
-      expect(screen.getByText('API error: 500')).toBeTruthy();
+      screen.getByTestId('consent-error');
+      screen.getByText('API error: 500');
     });
 
     // Should remain on parent view, not transition to success
-    expect(screen.getByTestId('consent-parent-view')).toBeTruthy();
+    screen.getByTestId('consent-parent-view');
   });
 
   it('shows a non-delivery fallback when the API reports failed email delivery', async () => {
@@ -539,18 +533,16 @@ describe('ConsentScreen', () => {
 
     flushFadeAnimation();
     await waitFor(() => {
-      expect(screen.getByTestId('consent-success')).toBeTruthy();
+      screen.getByTestId('consent-success');
     });
 
-    expect(screen.getByText("We couldn't confirm delivery yet")).toBeTruthy();
-    expect(
-      screen.getByText(/could not confirm that the consent email reached/i)
-    ).toBeTruthy();
+    screen.getByText("We couldn't confirm delivery yet");
+    screen.getByText(/could not confirm that the consent email reached/i);
 
     fireEvent.press(screen.getByTestId('consent-done'));
     flushFadeAnimation();
     expect(mockBack).not.toHaveBeenCalled();
-    expect(screen.getByTestId('consent-parent-view')).toBeTruthy();
+    screen.getByTestId('consent-parent-view');
   });
 
   // ── Reduced motion ──────────────────────────────────────────────
@@ -570,7 +562,7 @@ describe('ConsentScreen', () => {
       fireEvent.press(screen.getByTestId('consent-handoff-button'));
       // No flushFadeAnimation() needed — reduced motion skips the animation
 
-      expect(screen.getByTestId('consent-parent-view')).toBeTruthy();
+      screen.getByTestId('consent-parent-view');
       expect(screen.queryByTestId('consent-child-view')).toBeNull();
     });
 
@@ -585,7 +577,7 @@ describe('ConsentScreen', () => {
 
       // Go to parent view (instant, no animation)
       fireEvent.press(screen.getByTestId('consent-handoff-button'));
-      expect(screen.getByTestId('consent-parent-view')).toBeTruthy();
+      screen.getByTestId('consent-parent-view');
 
       // Fill email and submit
       fireEvent.changeText(
@@ -600,7 +592,7 @@ describe('ConsentScreen', () => {
 
       // Success phase renders instantly without needing flushFadeAnimation
       await waitFor(() => {
-        expect(screen.getByTestId('consent-success')).toBeTruthy();
+        screen.getByTestId('consent-success');
       });
     });
 
@@ -612,7 +604,7 @@ describe('ConsentScreen', () => {
       fireEvent.press(screen.getByTestId('consent-handoff-button'));
 
       // Phase switched instantly — parent view visible
-      expect(screen.getByTestId('consent-parent-view')).toBeTruthy();
+      screen.getByTestId('consent-parent-view');
 
       // No intermediate opacity=0 state; pointerEvents should be 'auto'
       // (isTransitioning stays false when reduced motion skips animation)

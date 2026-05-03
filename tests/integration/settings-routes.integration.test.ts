@@ -133,7 +133,7 @@ describe('Integration: settings routes', () => {
     const saved = await db.query.notificationPreferences.findFirst({
       where: eq(notificationPreferences.profileId, profile.id),
     });
-    expect(saved).toBeDefined();
+    expect(saved).not.toBeNull();
     expect(saved).toMatchObject({
       reviewReminders: false,
       dailyReminders: true,

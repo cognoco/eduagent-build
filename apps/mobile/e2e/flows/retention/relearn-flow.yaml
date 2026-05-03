@@ -90,14 +90,12 @@ tags:
 # 9. Tap the first book in the Chemistry shelf
 - tapOn:
     text: "Chemistry"
-    optional: true
 
 # 10. Wait for book detail screen
 - extendedWaitUntil:
     visible:
       id: "book-screen"
     timeout: 10000
-    optional: true
 
 # 11. Tap the first topic visible — look for "Chemistry Topic 1"
 #     The failed-recall-3x seed creates topics named "Chemistry Topic 1/2/3".

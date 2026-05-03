@@ -1124,6 +1124,7 @@ export default function CameraScreen(): React.ReactNode {
             {/* Show classification candidates first (sorted by confidence) */}
             {classifyMutation.data?.candidates
               ?.slice()
+              .filter((c): c is NonNullable<typeof c> => c != null)
               .sort((a, b) => b.confidence - a.confidence)
               .map((candidate, index) => (
                 <Pressable
@@ -1153,7 +1154,7 @@ export default function CameraScreen(): React.ReactNode {
               ?.filter(
                 (s) =>
                   !classifyMutation.data?.candidates?.some(
-                    (c) => c.subjectId === s.id
+                    (c) => c != null && c.subjectId === s.id
                   )
               )
               .map((s) => (

@@ -44,6 +44,8 @@ import {
 import { useSubscription } from '../../hooks/use-subscription';
 import { ACCOMMODATION_OPTIONS } from '../../lib/accommodation-options';
 import { formatApiError } from '../../lib/format-api-error';
+import { track } from '../../lib/analytics';
+import { FAMILY_HOME_PATH } from '../../lib/navigation';
 
 function SettingsRow({
   label,
@@ -396,8 +398,16 @@ export default function MoreScreen() {
       return;
     }
 
-    router.push('/create-profile');
+    router.push('/create-profile?for=child');
   }, [subscription, familyData, router]);
+
+  const handleChildProgressNavigation = useCallback(
+    (href: string) => {
+      track('child_progress_navigated', { source: 'more_section' });
+      router.push(href as never);
+    },
+    [router]
+  );
 
   const linkedChildren = activeProfile?.isOwner
     ? profiles.filter((p) => p.id !== activeProfile.id && !p.isOwner)
@@ -426,7 +436,7 @@ export default function MoreScreen() {
         {/* OWN learning sessions, not their child's. The child's settings */}
         {/* live on /child/[id] (per-profile surface). */}
         <Text
-          className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-1 mt-4"
+          className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-1 mt-4"
           testID="learning-mode-section-header"
         >
           {`${displayName}'s Learning Mode`}
@@ -436,6 +446,39 @@ export default function MoreScreen() {
             ? "Applies to your own sessions. To change a child's, open their profile from the dashboard."
             : 'Applies to your own learning sessions.'}
         </Text>
+        {activeProfile?.isOwner && linkedChildren.length === 1 ? (
+          <Pressable
+            onPress={() =>
+              handleChildProgressNavigation(
+                `/(app)/child/${linkedChildren[0]?.id ?? ''}`
+              )
+            }
+            className="self-start mb-3"
+            accessibilityRole="button"
+            accessibilityLabel={`Open ${
+              linkedChildren[0]?.displayName ?? 'your child'
+            }'s profile preferences`}
+            testID="learning-mode-child-link"
+          >
+            <Text className="text-caption font-semibold text-primary">
+              To change {linkedChildren[0]?.displayName ?? 'your child'}
+              {"'s"} preferences, open their profile →
+            </Text>
+          </Pressable>
+        ) : null}
+        {activeProfile?.isOwner && linkedChildren.length >= 2 ? (
+          <Pressable
+            onPress={() => handleChildProgressNavigation(FAMILY_HOME_PATH)}
+            className="self-start mb-3"
+            accessibilityRole="button"
+            accessibilityLabel="Open family preferences"
+            testID="learning-mode-family-link"
+          >
+            <Text className="text-caption font-semibold text-primary">
+              To change a child&apos;s preferences, open Family →
+            </Text>
+          </Pressable>
+        ) : null}
         {LEARNING_MODE_OPTIONS.map((opt) => (
           <LearningModeOption
             key={opt.mode}
@@ -450,7 +493,7 @@ export default function MoreScreen() {
 
         {/* 2. Learning Accommodation */}
         <Text
-          className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-1 mt-6"
+          className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-1 mt-6"
           testID="learning-accommodation-section-header"
         >
           {`${displayName}'s Learning Accommodation`}
@@ -477,8 +520,8 @@ export default function MoreScreen() {
         {/* 3. What My Mentor Knows — shown after learning prefs, hidden for new learners */}
         {!hideMentorMemory ? (
           <>
-            <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
-              What My Mentor Knows
+            <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6">
+              What your mentor knows
             </Text>
             <SettingsRow
               label="View & manage"
@@ -490,7 +533,7 @@ export default function MoreScreen() {
         {/* 4. Family — conditional on profile owner */}
         {activeProfile?.isOwner && (
           <>
-            <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
+            <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6">
               Family
             </Text>
             {linkedChildren.length > 0 && (
@@ -522,8 +565,8 @@ export default function MoreScreen() {
         )}
 
         {/* 5. Celebrations */}
-        <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
-          Celebrations
+        <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6">
+          Your celebrations
         </Text>
         <LearningModeOption
           title="All celebrations"
@@ -575,7 +618,7 @@ export default function MoreScreen() {
         />
 
         {/* 6. Notifications */}
-        <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
+        <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6">
           Notifications
         </Text>
         <ToggleRow
@@ -592,7 +635,7 @@ export default function MoreScreen() {
         />
 
         {/* 7. Account — identity, language, subscription only */}
-        <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
+        <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6">
           Account
         </Text>
         <SettingsRow
@@ -636,7 +679,7 @@ export default function MoreScreen() {
         )}
 
         {/* 8. Other — support, legal, data management */}
-        <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
+        <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6">
           Other
         </Text>
         <SettingsRow label="Help & Support" onPress={() => void handleHelp()} />

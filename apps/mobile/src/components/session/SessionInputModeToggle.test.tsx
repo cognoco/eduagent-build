@@ -23,8 +23,8 @@ describe('SessionInputModeToggle', () => {
   it('renders text and voice options', () => {
     render(<SessionInputModeToggle mode="text" onModeChange={jest.fn()} />);
 
-    expect(screen.getByTestId('input-mode-text')).toBeTruthy();
-    expect(screen.getByTestId('input-mode-voice')).toBeTruthy();
+    screen.getByTestId('input-mode-text');
+    screen.getByTestId('input-mode-voice');
   });
 
   it('marks text as selected when mode is text', () => {
@@ -66,8 +66,8 @@ describe('SessionInputModeToggle', () => {
   it('has correct accessibility labels', () => {
     render(<SessionInputModeToggle mode="text" onModeChange={jest.fn()} />);
 
-    expect(screen.getByLabelText('Text mode')).toBeTruthy();
-    expect(screen.getByLabelText('Voice mode')).toBeTruthy();
+    screen.getByLabelText('Text mode');
+    screen.getByLabelText('Voice mode');
   });
 
   // [a11y sweep] Break tests: decorative mode icons must be hidden so screen

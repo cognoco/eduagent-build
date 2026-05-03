@@ -50,7 +50,7 @@ describe('progress/_layout.tsx', () => {
   it('declares a Stack.Screen for [subjectId] with getId', () => {
     render(<ProgressLayout />);
     const screen = capturedScreens.find((s) => s.name === '[subjectId]');
-    expect(screen).toBeDefined();
+    expect(screen).not.toBeUndefined();
     expect(screen!.getId).toBeInstanceOf(Function);
   });
 

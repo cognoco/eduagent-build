@@ -9,11 +9,13 @@ describe('GET /v1/health', () => {
     const body = (await res.json()) as {
       status: string;
       timestamp: string;
+      deploySha: string | null;
       llm: { providers: string[] };
     };
     expect(body.status).toBe('ok');
-    expect(body.timestamp).toBeDefined();
+    expect(typeof body.timestamp).toBe('string');
     expect(() => new Date(body.timestamp)).not.toThrow();
+    expect(body).toHaveProperty('deploySha');
     expect(body.llm.providers).toEqual(expect.any(Array));
   });
 });

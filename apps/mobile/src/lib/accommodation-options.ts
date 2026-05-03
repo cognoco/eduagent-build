@@ -28,3 +28,27 @@ export const ACCOMMODATION_OPTIONS: AccommodationOption[] = [
     description: 'Consistent structure and clear expectations',
   },
 ];
+
+export interface AccommodationGuideRow {
+  condition: string;
+  recommendation: AccommodationMode;
+}
+
+export const ACCOMMODATION_GUIDE: AccommodationGuideRow[] = [
+  {
+    condition: 'Loses focus after 10 minutes',
+    recommendation: 'short-burst',
+  },
+  {
+    condition: 'Prefers listening over reading',
+    recommendation: 'audio-first',
+  },
+  {
+    condition: 'Gets anxious with surprises or open-ended tasks',
+    recommendation: 'predictable',
+  },
+  {
+    condition: 'None of the above',
+    recommendation: 'none',
+  },
+];

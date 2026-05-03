@@ -33,10 +33,10 @@ tags:
       id: "learner-screen"
     timeout: 15000
 
-# 3. Tap intent card to start a session (replaced coaching-card-primary in adaptive home refactor)
-# learning-active seed provides an active subject → intent-continue is shown
+# 3. Tap coach band continue button to start a session
+# learning-active seed provides an active subject → coach band is shown
 - tapOn:
-    id: "intent-continue"
+    id: "home-coach-band-continue"
 
 # 4. Wait for session screen — chat input is always present
 - extendedWaitUntil:

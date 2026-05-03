@@ -85,7 +85,7 @@ describe('Integration: Auth chain — protected paths', () => {
     expect(res.status).toBe(401);
     const body = await res.json();
     expect(body.code).toBe('UNAUTHORIZED');
-    expect(body.message).toBeDefined();
+    expect(typeof body.message).toBe('string');
   });
 
   it('returns 401 with non-Bearer auth scheme', async () => {

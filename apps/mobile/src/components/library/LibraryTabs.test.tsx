@@ -11,10 +11,10 @@ describe('LibraryTabs', () => {
 
   it('renders Shelves and Books tabs with count badges', () => {
     render(<LibraryTabs {...defaultProps} />);
-    expect(screen.getByTestId('library-tab-shelves')).toBeTruthy();
-    expect(screen.getByTestId('library-tab-books')).toBeTruthy();
-    expect(screen.getByText('Shelves (4)')).toBeTruthy();
-    expect(screen.getByText('Books (12)')).toBeTruthy();
+    screen.getByTestId('library-tab-shelves');
+    screen.getByTestId('library-tab-books');
+    screen.getByText('Shelves (4)');
+    screen.getByText('Books (12)');
   });
 
   it('hides the Topics tab from top-level Library navigation', () => {
@@ -38,8 +38,8 @@ describe('LibraryTabs', () => {
         counts={{ shelves: 0, books: 0, topics: 0 }}
       />
     );
-    expect(screen.getByText('Shelves (0)')).toBeTruthy();
-    expect(screen.getByText('Books (0)')).toBeTruthy();
+    screen.getByText('Shelves (0)');
+    screen.getByText('Books (0)');
   });
 
   it('does not render the overdue review badge (Topics tab is hidden)', () => {

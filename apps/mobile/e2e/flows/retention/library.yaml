@@ -42,7 +42,7 @@ tags:
 
 # 3. Verify intent card stack is visible on home screen (replaces coaching cards and retention strip)
 - assertVisible:
-    id: "learner-intent-stack"
+    id: "home-subject-carousel"
     optional: true
 
 # 4. Screenshot of home screen

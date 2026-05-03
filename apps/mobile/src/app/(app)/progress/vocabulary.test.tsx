@@ -62,10 +62,10 @@ describe('VocabularyBrowserScreen', () => {
 
   it('renders subject section and CEFR breakdown', () => {
     render(<VocabularyBrowserScreen />);
-    expect(screen.getByText('Spanish')).toBeTruthy();
-    expect(screen.getByText('A1')).toBeTruthy();
-    expect(screen.getByText('6 words')).toBeTruthy();
-    expect(screen.getByTestId('vocab-browser-back')).toBeTruthy();
+    screen.getByText('Spanish');
+    screen.getByText('A1');
+    screen.getByText('6 words');
+    screen.getByTestId('vocab-browser-back');
   });
 
   it('shows empty state when no vocabulary but has language subject', () => {
@@ -90,7 +90,7 @@ describe('VocabularyBrowserScreen', () => {
       isError: false,
     });
     render(<VocabularyBrowserScreen />);
-    expect(screen.getByTestId('vocab-browser-empty')).toBeTruthy();
+    screen.getByTestId('vocab-browser-empty');
   });
 
   it('shows no-language gate when no language subjects', () => {
@@ -104,7 +104,7 @@ describe('VocabularyBrowserScreen', () => {
       isError: false,
     });
     render(<VocabularyBrowserScreen />);
-    expect(screen.getByTestId('vocab-browser-no-language')).toBeTruthy();
+    screen.getByTestId('vocab-browser-no-language');
   });
 
   it('shows error state with retry and back buttons', () => {
@@ -116,7 +116,7 @@ describe('VocabularyBrowserScreen', () => {
       refetch: jest.fn(),
     });
     render(<VocabularyBrowserScreen />);
-    expect(screen.getByTestId('vocab-browser-error')).toBeTruthy();
+    screen.getByTestId('vocab-browser-error');
   });
 
   it('shows new learner empty state when no vocab and < 4 sessions', () => {
@@ -145,8 +145,8 @@ describe('VocabularyBrowserScreen', () => {
       isError: false,
     });
     render(<VocabularyBrowserScreen />);
-    expect(screen.getByTestId('vocab-browser-new-learner')).toBeTruthy();
-    expect(screen.getByText('Your vocabulary will grow here')).toBeTruthy();
+    screen.getByTestId('vocab-browser-new-learner');
+    screen.getByText('Your vocabulary will grow here');
   });
 
   it('shows standard empty state when no vocab and >= 4 sessions', () => {
@@ -175,7 +175,7 @@ describe('VocabularyBrowserScreen', () => {
       isError: false,
     });
     render(<VocabularyBrowserScreen />);
-    expect(screen.getByTestId('vocab-browser-empty')).toBeTruthy();
+    screen.getByTestId('vocab-browser-empty');
     expect(screen.queryByTestId('vocab-browser-new-learner')).toBeNull();
   });
 });

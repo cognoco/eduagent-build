@@ -770,6 +770,12 @@ export interface MemoryBlockProfile {
     reason: string;
     boostUntil: Date;
   } | null;
+  /** B.4: Last completed session's summary content, if within 14-day freshness window */
+  lastSessionSummary?: string | null;
+  /** B.4: Exchange count from the session that produced lastSessionSummary — quality gate */
+  lastSessionExchangeCount?: number | null;
+  /** B.4: Questions the learner asked that were out-of-scope or parked for later */
+  parkedQuestions?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -1034,6 +1040,36 @@ export function buildMemoryBlock(
         sourceEventId: null,
       });
     }
+  }
+
+  // B.4: Last session summary — quality-gated
+  const summaryQualityOk =
+    profile.lastSessionSummary &&
+    profile.lastSessionSummary.length <= 200 &&
+    (profile.lastSessionExchangeCount == null ||
+      profile.lastSessionExchangeCount >= 4);
+  if (summaryQualityOk) {
+    const text = `- Last session summary: ${profile.lastSessionSummary}`;
+    addSection(text, {
+      kind: 'learning_style',
+      text,
+      sourceSessionId: null,
+      sourceEventId: null,
+    });
+  }
+
+  // B.4: Parked questions from recent sessions
+  const parked = (profile.parkedQuestions ?? []).slice(0, 5);
+  if (parked.length > 0) {
+    const text = `- Parked questions from recent sessions: ${parked.join(
+      '; '
+    )}`;
+    addSection(text, {
+      kind: 'communication_note',
+      text,
+      sourceSessionId: null,
+      sourceEventId: null,
+    });
   }
 
   if (sections.length === 0) return { text: '', entries: [] };

@@ -35,7 +35,7 @@ tags:
 
 # 3. Navigate to freeform session via intent-ask (replaced coaching-card-primary)
 - tapOn:
-    id: "intent-ask"
+    id: "home-ask-anything"
 
 # 4. Wait for the chat input to be visible
 - extendedWaitUntil:

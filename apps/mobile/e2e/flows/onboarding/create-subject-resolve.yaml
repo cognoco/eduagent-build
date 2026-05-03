@@ -26,7 +26,7 @@ tags:
 
 # 3. Navigate to create-subject via Learn intent card (replaced add-subject-button)
 - tapOn:
-    id: "intent-learn"
+    id: "home-action-study-new"
 
 # 4. Wait for create-subject screen
 - extendedWaitUntil:

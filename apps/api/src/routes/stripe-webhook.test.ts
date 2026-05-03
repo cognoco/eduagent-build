@@ -712,6 +712,42 @@ describe('invoice.payment_succeeded', () => {
 
     expect(writeSubscriptionStatus).toHaveBeenCalled();
   });
+
+  // [ultrareview finding] If Stripe SDK v21 (or later) refactors the invoice
+  // payload again, extractSubscriptionIdFromInvoice() returns undefined and
+  // we silently skip re-activating the subscription — stuck in past_due with
+  // zero observability. The fix mirrors handlePaymentFailed escalation.
+  it('escalates missing subscription id to Sentry [payment_succeeded]', async () => {
+    // Simulate a Stripe payload shape that does NOT include the expected
+    // subscription pointer (e.g. one-off invoice or a future schema change).
+    const invoice = makeInvoice({ parent: undefined });
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(
+      makeStripeEvent('invoice.payment_succeeded', invoice)
+    );
+
+    const res = await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(200);
+    // Service must NOT be invoked, AND the drop must be escalated.
+    expect(updateSubscriptionFromWebhook).not.toHaveBeenCalled();
+    expect(captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          context: 'stripe.webhook.payment_succeeded.missing_subscription_id',
+          invoiceId: 'in_123',
+        }),
+      })
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------

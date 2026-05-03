@@ -27,7 +27,7 @@ describe('subject/_layout.tsx', () => {
     render(<SubjectLayout />);
 
     const screen = capturedScreens.find((s) => s.name === '[subjectId]');
-    expect(screen).toBeDefined();
+    expect(screen).not.toBeUndefined();
     expect(screen!.getId).toBeInstanceOf(Function);
   });
 

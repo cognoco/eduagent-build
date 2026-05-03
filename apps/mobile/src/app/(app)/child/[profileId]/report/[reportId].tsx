@@ -151,7 +151,7 @@ export default function ChildReportDetailScreen(): React.ReactElement {
                 testID="child-report-metric-sessions"
               />
               <MetricCard
-                label="Active minutes"
+                label="Time on app"
                 value={String(report.reportData.thisMonth.totalActiveMinutes)}
                 testID="child-report-metric-minutes"
               />

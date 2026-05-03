@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
-import { ConflictError, RateLimitedError } from '@eduagent/schemas';
+import {
+  CONFLICT_ERROR_NAME,
+  RATE_LIMITED_ERROR_NAME,
+} from '@eduagent/schemas';
 import { Sentry } from '../../lib/sentry';
 import { useRetryFiling } from '../../hooks/use-retry-filing';
 
@@ -48,9 +51,9 @@ export function FilingFailedBanner({ session }: { session: SessionLike }) {
     try {
       await retry.mutateAsync({ sessionId: session.id });
     } catch (err) {
-      if (err instanceof ConflictError) {
+      if (err instanceof Error && err.name === CONFLICT_ERROR_NAME) {
         setMessage('Retry already in progress.');
-      } else if (err instanceof RateLimitedError) {
+      } else if (err instanceof Error && err.name === RATE_LIMITED_ERROR_NAME) {
         setMessage('Retry limit reached for this session.');
       } else {
         setMessage('Could not start retry. Please try again in a moment.');

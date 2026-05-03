@@ -15,6 +15,7 @@ import {
   getUnderstandingLabel,
 } from '../../../../../lib/parent-vocab';
 import { useThemeColors } from '../../../../../lib/theme';
+import { MetricInfoDot } from '../../../../../components/parent/MetricInfoDot';
 
 const COMPLETION_LABELS: Record<string, string> = {
   not_started: 'Not started',
@@ -158,9 +159,12 @@ export default function TopicDetailScreen() {
               testID="topic-understanding-card"
             >
               <View className="flex-row items-center justify-between mb-2">
-                <Text className="text-body-sm font-medium text-text-secondary">
-                  Understanding
-                </Text>
+                <View className="flex-row items-center gap-1">
+                  <Text className="text-body-sm font-medium text-text-secondary">
+                    Understanding
+                  </Text>
+                  <MetricInfoDot metricKey="understanding" />
+                </View>
                 <Text className="text-body font-semibold text-text-primary">
                   {getUnderstandingLabel(masteryPercent)}
                 </Text>
@@ -196,9 +200,12 @@ export default function TopicDetailScreen() {
                 className="bg-surface rounded-card p-4 mt-3"
                 testID="topic-retention-card"
               >
-                <Text className="text-body-sm font-medium text-text-secondary mb-2">
-                  Review status
-                </Text>
+                <View className="flex-row items-center gap-1 mb-2">
+                  <Text className="text-body-sm font-medium text-text-secondary">
+                    Review status
+                  </Text>
+                  <MetricInfoDot metricKey="review-status" />
+                </View>
                 <View className="flex-row items-center">
                   <View
                     className="w-2.5 h-2.5 rounded-full mr-2"

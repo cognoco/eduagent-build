@@ -136,12 +136,22 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
       return;
     }
 
-    // Verify explicitly-provided profile belongs to this account
+    // Verify explicitly-provided profile belongs to this account.
+    // Intentional narrowing: returns 401 when X-Profile-Id is present but no
+    // authenticated account exists. All public paths (webhooks, health, billing
+    // redirects, consent-page, test-seed) never send X-Profile-Id — verified
+    // against PUBLIC_PATHS in auth.ts. If a future public route needs optional
+    // profile context, it must be handled before this guard.
     const db = c.get('db');
     const account = c.get('account');
     if (!account) {
-      await next();
-      return;
+      return c.json(
+        {
+          code: 'UNAUTHORIZED',
+          message: 'Authentication required to use X-Profile-Id',
+        },
+        401
+      );
     }
     const profile = await getProfile(db, profileIdHeader, account.id);
     if (!profile) {

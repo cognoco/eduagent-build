@@ -483,7 +483,7 @@ describe('session-completed Inngest pipeline (integration)', () => {
     });
 
     // Handler must not throw — always returns a structured result
-    expect(result).toBeDefined();
+    expect(result).toMatchObject({ sessionId: scenario.sessionId });
     expect(result.sessionId).toBe(scenario.sessionId);
     expect(['completed', 'completed-with-errors']).toContain(result.status);
 

@@ -101,7 +101,15 @@ export async function fetchJWKS(url: string): Promise<JWKS> {
     return { keys: cached.keys };
   }
 
-  const res = await fetch(url);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5_000);
+  let res: Response;
+  try {
+    res = await fetch(url, { signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+
   if (!res.ok) {
     throw new Error(`Failed to fetch JWKS: ${res.status} ${res.statusText}`);
   }

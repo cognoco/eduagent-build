@@ -1,17 +1,48 @@
 import { render, screen, act, fireEvent } from '@testing-library/react-native';
+import React from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { createRoutedMockFetch } from '../../test-utils/mock-api-routes';
 
-let mockProfiles: Array<{
+const mockFetch = createRoutedMockFetch({
+  '/celebrations/pending': { pendingCelebrations: [] },
+  '/settings/celebration-level': { celebrationLevel: 'all' },
+});
+
+jest.mock('../../lib/api-client', () =>
+  require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch)
+);
+
+type MockProfile = {
   id: string;
   displayName: string;
   isOwner: boolean;
-}> = [];
-let mockActiveProfile: {
+};
+
+type MockActiveProfile = {
   id: string;
+  accountId: string;
   displayName: string;
   isOwner: boolean;
-} | null = null;
+  hasPremiumLlm: boolean;
+  conversationLanguage: string;
+  pronouns: string | null;
+  consentStatus: string | null;
+};
+
+function makeActiveProfile(partial: MockProfile): MockActiveProfile {
+  return {
+    accountId: 'test-account-id',
+    hasPremiumLlm: false,
+    conversationLanguage: 'en',
+    pronouns: null,
+    consentStatus: null,
+    ...partial,
+  };
+}
+
+let mockProfiles: MockProfile[] = [];
+let mockActiveProfile: MockActiveProfile | null = null;
 let mockIsLoading = false;
-let mockMarkCelebrationsSeen = { mutateAsync: jest.fn() };
 let mockOnAllComplete: (() => void) | null = null;
 let mockSearchParams: Record<string, string> = {};
 
@@ -24,11 +55,6 @@ jest.mock('../../lib/profile', () => ({
   }),
 }));
 
-jest.mock('../../hooks/use-celebrations', () => ({
-  usePendingCelebrations: () => ({ data: [] }),
-  useMarkCelebrationsSeen: () => mockMarkCelebrationsSeen,
-}));
-
 jest.mock('../../hooks/use-celebration', () => ({
   useCelebration: ({ onAllComplete }: { onAllComplete: () => void }) => {
     mockOnAllComplete = onAllComplete;
@@ -36,9 +62,16 @@ jest.mock('../../hooks/use-celebration', () => ({
   },
 }));
 
-jest.mock('../../hooks/use-settings', () => ({
-  useCelebrationLevel: () => ({ data: 'all' }),
-}));
+function createWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+  });
+  return function Wrapper({ children }: { children: React.ReactNode }) {
+    return (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+  };
+}
 
 const mockRouterPush = jest.fn();
 const mockRouterReplace = jest.fn();
@@ -70,19 +103,19 @@ describe('HomeScreen intent router', () => {
     jest.clearAllMocks();
     mockIsLoading = false;
     mockSearchParams = {};
-    mockMarkCelebrationsSeen = { mutateAsync: jest.fn() };
     mockOnAllComplete = null;
   });
 
   it('renders LearnerScreen for owner with no children [BUG-522]', () => {
     mockProfiles = [{ id: 'p1', displayName: 'Alex', isOwner: true }];
-    mockActiveProfile = mockProfiles[0] ?? null;
+    mockActiveProfile = makeActiveProfile(mockProfiles[0]!);
+    const Wrapper = createWrapper();
 
-    render(<HomeScreen />);
+    render(<HomeScreen />, { wrapper: Wrapper });
 
     // BUG-522: owners without children always see LearnerScreen — no forced
     // add-child gate regardless of subscription tier
-    expect(screen.getByTestId('learner-screen')).toBeTruthy();
+    screen.getByTestId('learner-screen');
     expect(screen.queryByTestId('parent-gateway')).toBeNull();
   });
 
@@ -91,11 +124,12 @@ describe('HomeScreen intent router', () => {
       { id: 'p1', displayName: 'Maria', isOwner: true },
       { id: 'c1', displayName: 'Emma', isOwner: false },
     ];
-    mockActiveProfile = mockProfiles[0] ?? null;
+    mockActiveProfile = makeActiveProfile(mockProfiles[0]!);
+    const Wrapper = createWrapper();
 
-    render(<HomeScreen />);
+    render(<HomeScreen />, { wrapper: Wrapper });
 
-    expect(screen.getByTestId('parent-gateway')).toBeTruthy();
+    screen.getByTestId('parent-gateway');
     expect(screen.queryByTestId('learner-screen')).toBeNull();
   });
 
@@ -104,12 +138,13 @@ describe('HomeScreen intent router', () => {
       { id: 'p1', displayName: 'Maria', isOwner: true },
       { id: 'c1', displayName: 'Emma', isOwner: false },
     ];
-    mockActiveProfile = mockProfiles[0] ?? null;
+    mockActiveProfile = makeActiveProfile(mockProfiles[0]!);
     mockSearchParams = { view: 'learner' };
+    const Wrapper = createWrapper();
 
-    render(<HomeScreen />);
+    render(<HomeScreen />, { wrapper: Wrapper });
 
-    expect(screen.getByTestId('learner-screen')).toBeTruthy();
+    screen.getByTestId('learner-screen');
     expect(screen.queryByTestId('parent-gateway')).toBeNull();
   });
 
@@ -118,11 +153,12 @@ describe('HomeScreen intent router', () => {
       { id: 'p1', displayName: 'Maria', isOwner: true },
       { id: 'c1', displayName: 'Emma', isOwner: false },
     ];
-    mockActiveProfile = mockProfiles[1] ?? null;
+    mockActiveProfile = makeActiveProfile(mockProfiles[1]!);
+    const Wrapper = createWrapper();
 
-    render(<HomeScreen />);
+    render(<HomeScreen />, { wrapper: Wrapper });
 
-    expect(screen.getByTestId('learner-screen')).toBeTruthy();
+    screen.getByTestId('learner-screen');
     expect(screen.queryByTestId('parent-gateway')).toBeNull();
   });
 
@@ -130,8 +166,9 @@ describe('HomeScreen intent router', () => {
     mockProfiles = [];
     mockActiveProfile = null;
     mockIsLoading = true;
+    const Wrapper = createWrapper();
 
-    render(<HomeScreen />);
+    render(<HomeScreen />, { wrapper: Wrapper });
 
     expect(screen.queryByTestId('learner-screen')).toBeNull();
     expect(screen.queryByTestId('parent-gateway')).toBeNull();
@@ -139,6 +176,8 @@ describe('HomeScreen intent router', () => {
 });
 
 describe('HomeScreen 3B.11: timeout error state secondary navigation', () => {
+  let Wrapper: React.ComponentType<{ children: React.ReactNode }>;
+
   beforeEach(() => {
     jest.useFakeTimers();
     jest.clearAllMocks();
@@ -146,6 +185,7 @@ describe('HomeScreen 3B.11: timeout error state secondary navigation', () => {
     mockIsLoading = true;
     mockProfiles = [];
     mockActiveProfile = null;
+    Wrapper = createWrapper();
   });
 
   afterEach(() => {
@@ -153,20 +193,20 @@ describe('HomeScreen 3B.11: timeout error state secondary navigation', () => {
   });
 
   it('shows the timeout error UI after 10s of loading', () => {
-    render(<HomeScreen />);
+    render(<HomeScreen />, { wrapper: Wrapper });
 
     act(() => {
       jest.advanceTimersByTime(10_000);
     });
 
-    expect(screen.getByTestId('home-loading-timeout')).toBeTruthy();
-    expect(screen.getByTestId('home-loading-retry')).toBeTruthy();
-    expect(screen.getByTestId('timeout-library-button')).toBeTruthy();
-    expect(screen.getByTestId('timeout-more-button')).toBeTruthy();
+    screen.getByTestId('home-loading-timeout');
+    screen.getByTestId('home-loading-retry');
+    screen.getByTestId('timeout-library-button');
+    screen.getByTestId('timeout-more-button');
   });
 
   it('navigates to library when "Go to Library" is pressed [3B.11]', () => {
-    render(<HomeScreen />);
+    render(<HomeScreen />, { wrapper: Wrapper });
 
     act(() => {
       jest.advanceTimersByTime(10_000);
@@ -178,7 +218,7 @@ describe('HomeScreen 3B.11: timeout error state secondary navigation', () => {
   });
 
   it('navigates to more when "More options" is pressed [3B.11]', () => {
-    render(<HomeScreen />);
+    render(<HomeScreen />, { wrapper: Wrapper });
 
     act(() => {
       jest.advanceTimersByTime(10_000);
@@ -190,13 +230,13 @@ describe('HomeScreen 3B.11: timeout error state secondary navigation', () => {
   });
 
   it('resets the timeout flag when Retry is pressed', () => {
-    render(<HomeScreen />);
+    render(<HomeScreen />, { wrapper: Wrapper });
 
     act(() => {
       jest.advanceTimersByTime(10_000);
     });
 
-    expect(screen.getByTestId('home-loading-timeout')).toBeTruthy();
+    screen.getByTestId('home-loading-timeout');
 
     fireEvent.press(screen.getByTestId('home-loading-retry'));
 
@@ -210,7 +250,7 @@ describe('HomeScreen SF-1: markCelebrationsSeen error handling', () => {
     mockIsLoading = false;
     mockSearchParams = {};
     mockProfiles = [{ id: 'p1', displayName: 'Alex', isOwner: true }];
-    mockActiveProfile = mockProfiles[0] ?? null;
+    mockActiveProfile = makeActiveProfile(mockProfiles[0]!);
     mockOnAllComplete = null;
   });
 
@@ -219,12 +259,12 @@ describe('HomeScreen SF-1: markCelebrationsSeen error handling', () => {
       .spyOn(console, 'warn')
       // eslint-disable-next-line @typescript-eslint/no-empty-function
       .mockImplementation(() => {});
-    // In jsdom, unhandledrejection is not fully supported; we verify via console.error
-    mockMarkCelebrationsSeen = {
-      mutateAsync: jest.fn().mockRejectedValue(new Error('network failure')),
-    };
+    // Make the /celebrations/seen endpoint return a server error so the real
+    // useMarkCelebrationsSeen mutation rejects.
+    mockFetch.setRoute('/celebrations/seen', new Response('{}', { status: 500 }));
+    const Wrapper = createWrapper();
 
-    render(<HomeScreen />);
+    render(<HomeScreen />, { wrapper: Wrapper });
 
     // Trigger the onAllComplete callback to simulate celebration completion
     expect(mockOnAllComplete).not.toBeNull();

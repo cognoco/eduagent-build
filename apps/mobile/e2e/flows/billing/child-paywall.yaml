@@ -137,8 +137,6 @@ tags:
     visible:
       text: "Library"
     timeout: 15000
-    # Library screen may not load if subscription gate blocks navigation
-    optional: true
 
 # 19. Final screenshot
 - takeScreenshot: child-paywall-library

@@ -110,7 +110,7 @@ afterEach(() => {
 
 describe('quotaReset', () => {
   it('should be defined as an Inngest function', () => {
-    expect(quotaReset).toBeDefined();
+    expect(quotaReset).toBeTruthy();
   });
 
   it('should have the correct function id', () => {
@@ -202,7 +202,7 @@ describe('quotaReset', () => {
 
       // Reset should still run successfully — cron uses UTC, unaffected by DST
       expect(result.status).toBe('completed');
-      expect(result.dailyResetCount).toBeDefined();
+      expect(typeof result.dailyResetCount).toBe('number');
       expect(result.monthlyResetCount).toBe(5);
     });
 
@@ -216,7 +216,7 @@ describe('quotaReset', () => {
       const { result } = await executeSteps();
 
       expect(result.status).toBe('completed');
-      expect(result.dailyResetCount).toBeDefined();
+      expect(typeof result.dailyResetCount).toBe('number');
       expect(result.monthlyResetCount).toBe(3);
     });
 

@@ -61,8 +61,8 @@ describe('ProfileSwitcher', () => {
       />
     );
 
-    expect(screen.getByText('Alex')).toBeTruthy();
-    expect(screen.getByTestId('profile-switcher-chip')).toBeTruthy();
+    screen.getByText('Alex');
+    screen.getByTestId('profile-switcher-chip');
   });
 
   it('renders initials in the avatar', () => {
@@ -75,7 +75,7 @@ describe('ProfileSwitcher', () => {
     );
 
     // "Sam Jones" -> "SJ"
-    expect(screen.getByText('SJ')).toBeTruthy();
+    screen.getByText('SJ');
   });
 
   it('does not show dropdown menu initially', () => {
@@ -100,7 +100,7 @@ describe('ProfileSwitcher', () => {
     );
 
     fireEvent.press(screen.getByTestId('profile-switcher-chip'));
-    expect(screen.getByTestId('profile-switcher-menu')).toBeTruthy();
+    screen.getByTestId('profile-switcher-menu');
   });
 
   it('shows all profile options in dropdown', () => {
@@ -113,8 +113,8 @@ describe('ProfileSwitcher', () => {
     );
 
     fireEvent.press(screen.getByTestId('profile-switcher-chip'));
-    expect(screen.getByTestId('profile-option-p1')).toBeTruthy();
-    expect(screen.getByTestId('profile-option-p2')).toBeTruthy();
+    screen.getByTestId('profile-option-p1');
+    screen.getByTestId('profile-option-p2');
   });
 
   it('calls onSwitch when selecting a different profile', async () => {
@@ -165,7 +165,7 @@ describe('ProfileSwitcher', () => {
     );
 
     fireEvent.press(screen.getByTestId('profile-switcher-chip'));
-    expect(screen.getByTestId('profile-switcher-menu')).toBeTruthy();
+    screen.getByTestId('profile-switcher-menu');
 
     fireEvent.press(screen.getByTestId('profile-switcher-backdrop'));
     expect(screen.queryByTestId('profile-switcher-menu')).toBeNull();
@@ -202,7 +202,7 @@ describe('ProfileSwitcher', () => {
 
     fireEvent.press(screen.getByTestId('profile-switcher-chip'));
     // LEARNER displays as "Student", PARENT stays "Parent"
-    expect(screen.getByText('Student')).toBeTruthy();
-    expect(screen.getByText('Parent')).toBeTruthy();
+    screen.getByText('Student');
+    screen.getByText('Parent');
   });
 });

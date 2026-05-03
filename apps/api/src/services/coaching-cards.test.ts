@@ -159,7 +159,7 @@ describe('precomputeCoachingCard', () => {
     if (card.type === 'review_due') {
       expect(card.topicId).toBe(topicId);
       expect(card.easeFactor).toBe(2.5);
-      expect(card.dueAt).toBeDefined();
+      expect(typeof card.dueAt).toBe('string');
     }
   });
 
@@ -470,10 +470,10 @@ describe('precomputeCoachingCard', () => {
 
     expect(card.id).toBe('mock-uuid-v7');
     expect(card.profileId).toBe(profileId);
-    expect(card.title).toBeDefined();
-    expect(card.body).toBeDefined();
-    expect(card.expiresAt).toBeDefined();
-    expect(card.createdAt).toBeDefined();
+    expect(typeof card.title).toBe('string');
+    expect(typeof card.body).toBe('string');
+    expect(typeof card.expiresAt).toBe('string');
+    expect(typeof card.createdAt).toBe('string');
   });
 
   it('sets expiresAt to 24 hours from now', async () => {

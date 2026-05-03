@@ -260,21 +260,11 @@ function buildMarkdownStyles(
   };
 }
 
-const VERIFICATION_BADGE_CONFIG: Record<
-  VerificationBadge,
-  { label: string; bgClass: string; textClass: string }
-> = {
-  evaluate: {
-    label: 'THINK DEEPER',
-    bgClass: 'bg-info/20',
-    textClass: 'text-info',
-  },
-  teach_back: {
-    label: 'TEACH ME',
-    bgClass: 'bg-accent/20',
-    textClass: 'text-accent',
-  },
-};
+const VERIFICATION_BADGE_CONFIG: Record<VerificationBadge, { label: string }> =
+  {
+    evaluate: { label: 'THINK-DEEPER CLEARED' },
+    teach_back: { label: 'TEACH-BACK CLEARED' },
+  };
 
 export function MessageBubble({
   role,
@@ -301,10 +291,6 @@ export function MessageBubble({
     : projectedContent;
   const escalation =
     isAI && escalationRung ? ESCALATION_STYLES[escalationRung] : undefined;
-  const badge =
-    isAI && verificationBadge
-      ? VERIFICATION_BADGE_CONFIG[verificationBadge]
-      : undefined;
   const isThinking = streaming && !content;
 
   // Collapse / expand for long AI messages
@@ -340,18 +326,6 @@ export function MessageBubble({
       className={`mb-3 max-w-[85%] ${isAI ? 'self-start' : 'self-end'}`}
     >
       <View className={`rounded-2xl px-4 py-3 ${bubbleBg}`}>
-        {badge && (
-          <View
-            className={`self-start rounded-full px-2 py-0.5 mb-1 ${badge.bgClass}`}
-          >
-            <Text
-              className={`text-xs font-bold ${badge.textClass}`}
-              accessibilityLabel={`${badge.label} message`}
-            >
-              {badge.label}
-            </Text>
-          </View>
-        )}
         {escalation && (
           <View
             className="flex-row items-center mb-1"
@@ -441,6 +415,13 @@ export function MessageBubble({
         )}
         {actions ? <View className="mt-3">{actions}</View> : null}
       </View>
+      {isAI &&
+        verificationBadge &&
+        VERIFICATION_BADGE_CONFIG[verificationBadge] && (
+          <Text className="text-[10px] font-bold uppercase tracking-wide text-success mt-1 ml-1">
+            ✓ {VERIFICATION_BADGE_CONFIG[verificationBadge].label}
+          </Text>
+        )}
       {!isAI && outboxStatus === 'pending' ? (
         <View
           className="self-end mt-1"

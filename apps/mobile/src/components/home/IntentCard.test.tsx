@@ -9,7 +9,7 @@ describe('IntentCard', () => {
       <IntentCard title="Learn something" onPress={onPress} testID="card" />
     );
 
-    expect(screen.getByText('Learn something')).toBeTruthy();
+    screen.getByText('Learn something');
     fireEvent.press(screen.getByTestId('card'));
     expect(onPress).toHaveBeenCalledTimes(1);
   });
@@ -44,8 +44,8 @@ describe('IntentCard', () => {
       />
     );
 
-    expect(screen.getByTestId('card-badge')).toBeTruthy();
-    expect(screen.getByText('6')).toBeTruthy();
+    screen.getByTestId('card-badge');
+    screen.getByText('6');
   });
 
   it('renders icon when provided', () => {

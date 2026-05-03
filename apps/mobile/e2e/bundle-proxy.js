@@ -25,11 +25,17 @@ const server = http.createServer((req, res) => {
   // Remove host header to avoid issues
   delete headers['host'];
 
+  // Rewrite /index.bundle to /apps/mobile/index.bundle for unstable_serverRoot monorepo config
+  let proxyPath = req.url;
+  if (proxyPath.startsWith('/index.bundle')) {
+    proxyPath = '/apps/mobile' + proxyPath;
+  }
+
   const proxyReq = http.request(
     {
       hostname: 'localhost',
       port: METRO_PORT,
-      path: req.url,
+      path: proxyPath,
       method: req.method,
       headers,
     },

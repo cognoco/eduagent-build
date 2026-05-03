@@ -56,8 +56,8 @@ describe('HomeworkModeChips M6: zero-problems fallback action', () => {
 
   it('shows End session button when no problems are loaded [M6]', () => {
     const { getByTestId } = render(<HomeworkModeChips {...baseProps} />);
-    expect(getByTestId('homework-no-problems')).toBeTruthy();
-    expect(getByTestId('homework-no-problems-end-btn')).toBeTruthy();
+    getByTestId('homework-no-problems');
+    getByTestId('homework-no-problems-end-btn');
   });
 
   it('End session button calls handleEndSession [M6]', () => {

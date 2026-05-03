@@ -38,7 +38,7 @@ describe('AuthRoutesLayout', () => {
 
     render(<AuthLayout />);
 
-    expect(screen.getByTestId('auth-redirecting')).toBeTruthy();
+    screen.getByTestId('auth-redirecting');
     expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
   });
 
@@ -51,7 +51,7 @@ describe('AuthRoutesLayout', () => {
 
     render(<AuthLayout />);
 
-    expect(screen.getByTestId('auth-redirecting')).toBeTruthy();
+    screen.getByTestId('auth-redirecting');
     expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');
   });
 
@@ -64,7 +64,7 @@ describe('AuthRoutesLayout', () => {
     });
 
     const { rerender } = render(<AuthLayout />);
-    expect(screen.getByTestId('stack')).toBeTruthy();
+    screen.getByTestId('stack');
 
     mockUseLocalSearchParams.mockReturnValue({});
     mockUseGlobalSearchParams.mockReturnValue({});
@@ -75,7 +75,7 @@ describe('AuthRoutesLayout', () => {
 
     rerender(<AuthLayout />);
 
-    expect(screen.getByTestId('auth-redirecting')).toBeTruthy();
+    screen.getByTestId('auth-redirecting');
     expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');
   });
 
@@ -87,7 +87,7 @@ describe('AuthRoutesLayout', () => {
 
     render(<AuthLayout />);
 
-    expect(screen.getByTestId('stack')).toBeTruthy();
+    screen.getByTestId('stack');
     expect(screen.queryByTestId('auth-redirecting')).toBeNull();
     expect(mockReplace).not.toHaveBeenCalled();
   });
@@ -110,7 +110,7 @@ describe('AuthRoutesLayout', () => {
     });
 
     const { rerender } = render(<AuthLayout />);
-    expect(screen.getByTestId('stack')).toBeTruthy();
+    screen.getByTestId('stack');
     expect(screen.queryByTestId('redirect')).toBeNull();
 
     // Clerk processes setActive() → isSignedIn flips to true on next render
@@ -122,7 +122,7 @@ describe('AuthRoutesLayout', () => {
     rerender(<AuthLayout />);
 
     // Guard fires → user lands in app home
-    expect(screen.getByTestId('auth-redirecting')).toBeTruthy();
+    screen.getByTestId('auth-redirecting');
     expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
     expect(screen.queryByTestId('stack')).toBeNull();
   });
@@ -138,7 +138,7 @@ describe('AuthRoutesLayout', () => {
 
     render(<AuthLayout />);
 
-    expect(screen.getByTestId('auth-redirecting')).toBeTruthy();
+    screen.getByTestId('auth-redirecting');
     expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
   });
 
@@ -151,7 +151,7 @@ describe('AuthRoutesLayout', () => {
 
     render(<AuthLayout />);
 
-    expect(screen.getByTestId('auth-redirecting')).toBeTruthy();
+    screen.getByTestId('auth-redirecting');
     expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');
   });
 
@@ -164,7 +164,7 @@ describe('AuthRoutesLayout', () => {
 
     render(<AuthLayout />);
 
-    expect(screen.getByTestId('auth-redirecting')).toBeTruthy();
+    screen.getByTestId('auth-redirecting');
     expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');
   });
 
@@ -177,7 +177,7 @@ describe('AuthRoutesLayout', () => {
 
     render(<AuthLayout />);
 
-    expect(screen.getByTestId('auth-redirecting')).toBeTruthy();
+    screen.getByTestId('auth-redirecting');
     expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');
   });
 

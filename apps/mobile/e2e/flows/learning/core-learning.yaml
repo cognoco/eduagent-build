@@ -62,23 +62,23 @@ tags:
     timeout: 5000
 
 # ── M07 regression: home screen has real content (not empty) ──────────
-# Verify intent card stack loaded — catches blank home screen.
+# Verify subject carousel loaded — catches blank home screen.
 - assertVisible:
-    id: "learner-intent-stack"
+    id: "home-subject-carousel"
 
-# Intent-continue proves the user has an active subject (learning-active seed)
+# Coach band proves the user has an active subject (learning-active seed)
 - assertVisible:
-    id: "intent-continue"
+    id: "home-coach-band-continue"
 
 # ── Negative assertions: empty state must not appear ───────────────────
 # Full text match required — Maestro on Android can't reliably match substrings
 # inside React Native <Text> nodes (BUG-57 pattern).
 - assertNotVisible:
-    text: "Start learning — add your first subject"
+    text: "Add your first subject"
 
-# 3. Start session via intent-continue card (replaced coaching-card-primary)
+# 3. Start session via coach band continue button
 - tapOn:
-    id: "intent-continue"
+    id: "home-coach-band-continue"
 
 # 4. Session active — chat input present
 - extendedWaitUntil:
@@ -153,36 +153,31 @@ tags:
       id: "chat-input"
     timeout: 30000
 
-# 11. Session close — either auto-closes after exchange cap or manual
-# Look for summary screen or close button
-# NOTE: Session auto-close depends on exchange count config. If still active,
-# the flow verifies the session survived 3 exchanges without crashing.
+# 11. Session close — auto-closes after exchange cap (learning-active seed uses default cap)
+# 3 exchanges are enough to trigger the session close on this seed scenario.
 - extendedWaitUntil:
     visible:
       id: "summary-score"
     timeout: 20000
-    optional: true
 
-# 12. If summary screen appeared, verify content
+# 12. Verify summary content
 - assertVisible:
     id: "summary-topics"
-    optional: true
 
 # 13. Close summary and return to home
 - tapOn:
     id: "summary-close"
-    optional: true
 
 # 14. Verify we can reach home
 - extendedWaitUntil:
     visible:
       id: "learner-screen"
     timeout: 10000
-    optional: true
 
 # ── M05 post-session regression: tabs still tappable after session ────
 # After returning from a full session, the tab bar must remain functional.
 # BUG M05 found tabs hidden behind system buttons — this catches it.
+# optional: regression guard; depends on step 14 (learner-screen) succeeding first.
 - tapOn:
     id: "tab-library"
     optional: true

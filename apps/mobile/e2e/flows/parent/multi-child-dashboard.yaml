@@ -73,10 +73,9 @@ tags:
       text: "Emma"
     timeout: 10000
 
-# Verify subject and session info
+# Verify subject info — Mathematics is seeded for Emma
 - assertVisible:
     text: "Mathematics"
-    optional: true
 
 - takeScreenshot: multi-child-03-emma-detail
 
@@ -105,9 +104,9 @@ tags:
       text: "Lucas"
     timeout: 10000
 
+# Verify subject info — Science is seeded for Lucas
 - assertVisible:
     text: "Science"
-    optional: true
 
 - takeScreenshot: multi-child-04-lucas-detail
 
@@ -135,9 +134,9 @@ tags:
       text: "Sofia"
     timeout: 10000
 
+# Verify subject info — History is seeded for Sofia
 - assertVisible:
     text: "History"
-    optional: true
 
 - takeScreenshot: multi-child-05-sofia-detail
 

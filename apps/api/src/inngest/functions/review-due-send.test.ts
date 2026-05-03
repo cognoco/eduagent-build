@@ -98,7 +98,7 @@ describe('reviewDueSend', () => {
 
   describe('configuration', () => {
     it('is defined as an Inngest function', () => {
-      expect(reviewDueSend).toBeDefined();
+      expect(reviewDueSend).toBeTruthy();
     });
 
     it('triggers on app/retention.review-due', () => {

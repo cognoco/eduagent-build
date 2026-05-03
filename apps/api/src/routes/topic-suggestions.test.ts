@@ -119,7 +119,7 @@ const TEST_ENV = {
 describe('topic-suggestions routes', () => {
   it('exports a Hono instance', async () => {
     const { topicSuggestionRoutes } = await import('./topic-suggestions');
-    expect(topicSuggestionRoutes).toBeDefined();
+    expect(typeof topicSuggestionRoutes).toBe('object');
   });
 
   // -------------------------------------------------------------------------

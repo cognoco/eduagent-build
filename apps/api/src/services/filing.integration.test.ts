@@ -147,19 +147,19 @@ describe('resolveFilingResult (integration)', () => {
     const createdSubject = await db.query.subjects.findFirst({
       where: eq(subjects.id, result.shelfId),
     });
-    expect(createdSubject).toBeDefined();
+    expect(createdSubject).toEqual(expect.objectContaining({}));
     expect(createdSubject!.name).toBe('Geography');
     expect(createdSubject!.profileId).toBe(profile.id);
 
     const createdCurriculum = await db.query.curricula.findFirst({
       where: eq(curricula.subjectId, result.shelfId),
     });
-    expect(createdCurriculum).toBeDefined();
+    expect(createdCurriculum).toEqual(expect.objectContaining({}));
 
     const createdBook = await db.query.curriculumBooks.findFirst({
       where: eq(curriculumBooks.id, result.bookId),
     });
-    expect(createdBook).toBeDefined();
+    expect(createdBook).toEqual(expect.objectContaining({}));
     expect(createdBook!.title).toBe('Europe');
     expect(createdBook!.emoji).toBe('🌍');
     expect(createdBook!.topicsGenerated).toBe(true);
@@ -167,7 +167,7 @@ describe('resolveFilingResult (integration)', () => {
     const createdTopic = await db.query.curriculumTopics.findFirst({
       where: eq(curriculumTopics.id, result.topicId),
     });
-    expect(createdTopic).toBeDefined();
+    expect(createdTopic).toEqual(expect.objectContaining({}));
     expect(createdTopic!.title).toBe('Danube');
     expect(createdTopic!.filedFrom).toBe('session_filing');
     expect(createdTopic!.chapter).toBe('Rivers');

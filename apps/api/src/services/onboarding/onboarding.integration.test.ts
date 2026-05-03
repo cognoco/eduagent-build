@@ -207,7 +207,7 @@ describe('updateInterestsContext (integration)', () => {
     const lp = await db.query.learningProfiles.findFirst({
       where: eq(learningProfiles.profileId, profile.id),
     });
-    expect(lp).toBeDefined();
+    expect(lp).toEqual(expect.objectContaining({}));
     expect(lp?.interests).toEqual(interests);
   });
 

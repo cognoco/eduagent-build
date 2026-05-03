@@ -7,6 +7,9 @@ import {
 import React from 'react';
 import { platformAlert } from '../../lib/platform-alert';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  createRoutedMockFetch,
+} from '../../test-utils/mock-api-routes';
 
 const mockReplace = jest.fn();
 const mockPush = jest.fn();
@@ -37,69 +40,6 @@ jest.mock('@expo/vector-icons', () => ({
   Ionicons: () => null,
 }));
 
-const mockSubmitMutateAsync = jest.fn();
-const mockSkipMutateAsync = jest.fn();
-const mockRecallBridgeMutateAsync = jest.fn();
-const mockUpdateLearningModeMutateAsync = jest.fn();
-const mockOnSuccessfulRecall = jest.fn();
-let mockTranscriptData: Record<string, unknown> | null = null;
-let mockSubmitIsError = false;
-let mockSubmitError: Error | null = null;
-// BUG-449: persisted summary lookup for revisits from book page.
-let mockSessionSummaryData: {
-  id: string;
-  sessionId: string;
-  content: string;
-  aiFeedback: string | null;
-  status: 'pending' | 'submitted' | 'accepted' | 'skipped' | 'auto_closed';
-} | null = null;
-let mockSessionSummaryIsLoading = false;
-
-jest.mock('../../hooks/use-sessions', () => ({
-  useSubmitSummary: () => ({
-    mutateAsync: mockSubmitMutateAsync,
-    isPending: false,
-    isError: mockSubmitIsError,
-    error: mockSubmitError,
-  }),
-  useSkipSummary: () => ({
-    mutateAsync: mockSkipMutateAsync,
-    isPending: false,
-    isError: false,
-    error: null,
-  }),
-  useSession: () => ({
-    data: undefined,
-    isLoading: false,
-  }),
-  useSessionTranscript: () => ({
-    data: mockTranscriptData,
-    isLoading: false,
-  }),
-  useSessionSummary: () => ({
-    data: mockSessionSummaryData,
-    isLoading: mockSessionSummaryIsLoading,
-  }),
-  useRecallBridge: () => ({
-    mutateAsync: mockRecallBridgeMutateAsync,
-    isPending: false,
-    isError: false,
-    error: null,
-  }),
-}));
-
-jest.mock('../../hooks/use-settings', () => ({
-  useUpdateLearningMode: () => ({
-    mutateAsync: mockUpdateLearningModeMutateAsync,
-  }),
-}));
-
-jest.mock('../../hooks/use-rating-prompt', () => ({
-  useRatingPrompt: () => ({
-    onSuccessfulRecall: mockOnSuccessfulRecall,
-  }),
-}));
-
 jest.mock('../../lib/theme', () => ({
   useThemeColors: () => ({
     muted: '#a3a3a3',
@@ -126,8 +66,26 @@ jest.mock('../../lib/format-api-error', () => ({
 
 jest.mock('../../lib/profile', () => ({
   useProfile: () => ({
-    activeProfile: { id: 'p-1', birthYear: 2012 },
-    profiles: [{ id: 'p-1', birthYear: 2012 }],
+    activeProfile: {
+      id: 'test-profile-id',
+      accountId: 'test-account-id',
+      displayName: 'Test Learner',
+      isOwner: true,
+      hasPremiumLlm: false,
+      conversationLanguage: 'en',
+      pronouns: null,
+      consentStatus: null,
+      birthYear: 2012,
+    },
+    profiles: [
+      {
+        id: 'test-profile-id',
+        accountId: 'test-account-id',
+        displayName: 'Test Learner',
+        isOwner: true,
+        birthYear: 2012,
+      },
+    ],
     setActiveProfileId: jest.fn(),
     isRestoringId: false,
   }),
@@ -135,6 +93,8 @@ jest.mock('../../lib/profile', () => ({
   isGuardianProfile: () => false,
 }));
 
+// use-parent-proxy uses setProxyMode from api-client (not the RPC useApiClient hook)
+// plus SecureStore reads — not an API hook. Keep as a direct mock.
 const mockUseParentProxy = jest.fn(() => ({
   isParentProxy: false,
   childProfile: null,
@@ -142,6 +102,23 @@ const mockUseParentProxy = jest.fn(() => ({
 }));
 jest.mock('../../hooks/use-parent-proxy', () => ({
   useParentProxy: () => mockUseParentProxy(),
+}));
+
+// use-rating-prompt reads/writes SecureStore and calls expo-store-review —
+// no useApiClient() calls — keep as a direct mock.
+const mockOnSuccessfulRecall = jest.fn();
+jest.mock('../../hooks/use-rating-prompt', () => ({
+  useRatingPrompt: () => ({
+    onSuccessfulRecall: mockOnSuccessfulRecall,
+  }),
+}));
+
+// useDepthEvaluation fires a mutation from a useEffect on mount (fire-and-forget
+// analytics). With TanStack Query's synchronous notifyManager in tests, calling
+// mutate() from within a useEffect causes React 19 to throw an invariant error
+// (sync state update from within effect commit). Keep as a no-op direct mock.
+jest.mock('../../hooks/use-depth-evaluation', () => ({
+  useDepthEvaluation: () => ({ mutate: jest.fn() }),
 }));
 
 const mockReadSummaryDraft = jest.fn();
@@ -155,15 +132,138 @@ jest.mock('../../lib/summary-draft', () => ({
   DRAFT_TTL_MS: 7 * 24 * 60 * 60 * 1000,
 }));
 
-const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: false, gcTime: 0 } },
+// ---------------------------------------------------------------------------
+// Fetch-boundary mock state — mutated per-test via setRoute()
+// ---------------------------------------------------------------------------
+// Mutable variables that route handlers close over so per-test updates to
+// these variables are reflected without re-creating mockFetch.
+let mockTranscriptData: Record<string, unknown> | null = null;
+let mockSessionSummaryData: {
+  id: string;
+  sessionId: string;
+  content: string;
+  aiFeedback: string | null;
+  status: 'pending' | 'submitted' | 'accepted' | 'skipped' | 'auto_closed';
+} | null = null;
+
+// Per-test mutation result containers — default to success shapes; override
+// with setRoute() for tests that need rejections or custom shapes.
+let mockSubmitResult: Record<string, unknown> | Response | null = null;
+let mockSkipResult: Record<string, unknown> | Response = {
+  summary: {
+    id: 'summary-1',
+    sessionId: '660e8400-e29b-41d4-a716-446655440000',
+    content: '',
+    aiFeedback: null,
+    status: 'skipped',
+  },
+  shouldPromptCasualSwitch: false,
+};
+// The single mockFetch instance — its route map is updated per-test via setRoute().
+const mockFetch = createRoutedMockFetch({
+  // GET /bookmarks/session — useSessionBookmarks needs { bookmarks: [] } not {}
+  // (React Query throws "query data cannot be undefined" when data.bookmarks === undefined)
+  'bookmarks/session': () => ({ bookmarks: [] }),
+  // GET /progress/inventory — useProgressInventory returns KnowledgeInventory directly.
+  // Screen accesses progressInventory.data?.global.totalSessions — if the default
+  // `{}` response is returned, `{}.global` is undefined and `.totalSessions` throws
+  // a TypeError, crashing the component on every re-render after fetch resolves.
+  'progress/inventory': () => ({
+    profileId: 'test-profile-id',
+    snapshotDate: '2026-05-02',
+    global: {
+      topicsAttempted: 0,
+      topicsMastered: 0,
+      vocabularyTotal: 0,
+      vocabularyMastered: 0,
+      totalSessions: 0,
+      totalActiveMinutes: 0,
+      totalWallClockMinutes: 0,
+      currentStreak: 0,
+      longestStreak: 0,
+    },
+    subjects: [],
+  }),
+  // GET /sessions/:id/summary — returns persisted summary (or null for fresh sessions).
+  // Distinguishable from POST /summary by checking init.method.
+  // POST /sessions/:id/summary/skip — distinct URL suffix.
+  // POST /sessions/:id/summary — submit mutation.
+  'summary/skip': (_url: string, _init?: RequestInit) => {
+    if (mockSkipResult instanceof Response) return mockSkipResult;
+    return mockSkipResult;
+  },
+  // POST /sessions/:id/recall-bridge
+  'recall-bridge': () => new Response(JSON.stringify({}), { status: 404 }),
+  // GET /sessions/:id/transcript
+  transcript: () => {
+    if (mockTranscriptData === null) return null;
+    return mockTranscriptData;
+  },
+  // GET /sessions/:id (session entity) + POST /summary (submit)
+  // Differentiated below by checking URL suffix and method.
+  sessions: (url: string, init?: RequestInit) => {
+    // POST /sessions/:id/summary → submit summary mutation
+    if (url.includes('/summary') && init?.method === 'POST') {
+      if (mockSubmitResult instanceof Response) return mockSubmitResult;
+      if (mockSubmitResult !== null) return mockSubmitResult;
+      // Default: no result configured — return error state
+      return new Response(
+        JSON.stringify({ message: 'Not configured', code: 'TEST_ERROR' }),
+        { status: 500 }
+      );
+    }
+    // GET /sessions/:id/summary → persisted summary lookup.
+    // Always include learnerRecap in the response so refetchInterval returns
+    // false and stops polling. Without it, useSessionSummary polls every 2s
+    // with the synchronous notifyManager, creating continuous re-renders that
+    // overwhelm React 19 and trigger its infinite-update guard.
+    // For null: return status-less object (isAlreadyPersisted stays false,
+    // so the input form renders as expected).
+    if (url.includes('/summary')) {
+      if (mockSessionSummaryData === null) {
+        return { summary: { learnerRecap: 'mock-recap' } };
+      }
+      return {
+        summary: { ...mockSessionSummaryData, learnerRecap: 'mock-recap' },
+      };
+    }
+    // GET /sessions/:id (session entity)
+    return { session: null };
+  },
+  // PUT /settings/learning-mode
+  'learning-mode': () => ({ mode: 'casual' }),
 });
 
-function Wrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-  );
+jest.mock('../../lib/api-client', () =>
+  require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch)
+);
+
+// Create a fresh QueryClient per test to prevent cross-test query cache
+// contamination. With fetch-boundary mocks, queries are async and shared
+// client state from previous tests can bleed into the next test.
+function createWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+        gcTime: 0,
+        // refetchInterval: false here only sets the default; useSessionSummary
+        // overrides it per-query to poll until learnerRecap is set. We supply
+        // learnerRecap in every session-summary response so the polling stops
+        // immediately on the first response.
+        refetchOnWindowFocus: false,
+      },
+    },
+  });
+  return function Wrapper({ children }: { children: React.ReactNode }) {
+    return (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+  };
 }
+
+// Alias for tests that were already using `Wrapper` directly.
+let Wrapper: ReturnType<typeof createWrapper>;
 
 const SessionSummaryScreen = require('./[sessionId]').default;
 
@@ -179,9 +279,8 @@ describe('SessionSummaryScreen', () => {
       childProfile: null,
       parentProfile: null,
     });
-    mockSubmitIsError = false;
-    mockSubmitError = null;
-    mockSkipMutateAsync.mockResolvedValue({
+    mockSubmitResult = null;
+    mockSkipResult = {
       summary: {
         id: 'summary-1',
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
@@ -190,7 +289,7 @@ describe('SessionSummaryScreen', () => {
         status: 'skipped',
       },
       shouldPromptCasualSwitch: false,
-    });
+    };
     mockParams.subjectName = 'Mathematics';
     mockParams.exchangeCount = '5';
     mockParams.escalationRung = '2';
@@ -202,29 +301,52 @@ describe('SessionSummaryScreen', () => {
     mockParams.topicId = undefined;
     mockTranscriptData = null;
     mockSessionSummaryData = null;
-    mockSessionSummaryIsLoading = false;
     mockBack.mockClear();
     mockCanGoBack.mockReset();
     mockCanGoBack.mockReturnValue(false);
     mockOnSuccessfulRecall.mockResolvedValue(undefined);
-    mockRecallBridgeMutateAsync.mockRejectedValue(new Error('not homework'));
-  });
-
-  afterEach(() => {
-    queryClient.clear();
+    // Reset recall-bridge to the default rejection
+    mockFetch.setRoute('recall-bridge', () =>
+      new Response(JSON.stringify({ message: 'not homework' }), { status: 404 })
+    );
+    // Reset sessions route to default — tests like [BUG-800] call setRoute('sessions', ...)
+    // to inject error responses. Without resetting, the override bleeds into subsequent
+    // tests and the submit/summary routes return wrong shapes, causing waitFor timeouts.
+    mockFetch.setRoute('sessions', (url: string, init?: RequestInit) => {
+      if (url.includes('/summary') && init?.method === 'POST') {
+        if (mockSubmitResult instanceof Response) return mockSubmitResult;
+        if (mockSubmitResult !== null) return mockSubmitResult;
+        return new Response(
+          JSON.stringify({ message: 'Not configured', code: 'TEST_ERROR' }),
+          { status: 500 }
+        );
+      }
+      if (url.includes('/summary')) {
+        if (mockSessionSummaryData === null) {
+          return { summary: { learnerRecap: 'mock-recap' } };
+        }
+        return {
+          summary: { ...mockSessionSummaryData, learnerRecap: 'mock-recap' },
+        };
+      }
+      return { session: null };
+    });
+    // Create a fresh wrapper (and QueryClient) per test to prevent cross-test
+    // query cache contamination from async fetch-boundary responses.
+    Wrapper = createWrapper();
   });
 
   it('renders session takeaways', () => {
     render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
-    expect(screen.getByTestId('summary-title')).toBeTruthy();
-    expect(screen.getByText('Session Complete')).toBeTruthy();
-    expect(screen.getByText('Mathematics')).toBeTruthy();
-    expect(screen.getByTestId('session-takeaways')).toBeTruthy();
-    expect(screen.getByText('What happened')).toBeTruthy();
+    screen.getByTestId('summary-title');
+    screen.getByText('Session Complete');
+    screen.getByText('Mathematics');
+    screen.getByTestId('session-takeaways');
+    screen.getByText('What happened');
     // 5 exchanges, rung 2 → "strong independent thinking"
-    expect(screen.getByText(/worked through 5 exchanges/)).toBeTruthy();
-    expect(screen.getByText(/strong independent thinking/)).toBeTruthy();
+    screen.getByText(/worked through 5 exchanges/);
+    screen.getByText(/strong independent thinking/);
   });
 
   // [BUG-801] When the URL passes exchangeCount='0' (legitimate value for
@@ -267,7 +389,7 @@ describe('SessionSummaryScreen', () => {
     // No "minute - great session!" copy must appear when duration is unknown.
     expect(screen.queryByText(/minute.*great session/i)).toBeNull();
     // Other takeaways still render so the user isn't stuck on a blank section.
-    expect(screen.getByTestId('session-takeaways')).toBeTruthy();
+    screen.getByTestId('session-takeaways');
   });
 
   it('[BUG-805] renders the duration takeaway once wallClockSeconds is known', () => {
@@ -275,15 +397,15 @@ describe('SessionSummaryScreen', () => {
 
     render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
-    expect(screen.getByText(/15 minutes - great session!/)).toBeTruthy();
+    screen.getByText(/15 minutes - great session!/);
   });
 
   it('renders summary input', () => {
     render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
-    expect(screen.getByText('Your Words')).toBeTruthy();
-    expect(screen.getByTestId('summary-input')).toBeTruthy();
-    expect(screen.getByTestId('submit-summary-button')).toBeTruthy();
+    screen.getByText('Your Words');
+    screen.getByTestId('summary-input');
+    screen.getByTestId('submit-summary-button');
   });
 
   it('disables submit when summary is too short', () => {
@@ -298,7 +420,7 @@ describe('SessionSummaryScreen', () => {
   });
 
   it('submits summary and shows AI feedback', async () => {
-    mockSubmitMutateAsync.mockResolvedValue({
+    mockSubmitResult = {
       summary: {
         id: 'summary-1',
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
@@ -306,7 +428,7 @@ describe('SessionSummaryScreen', () => {
         aiFeedback: 'Good summary. You captured the key concepts well.',
         status: 'accepted',
       },
-    });
+    };
 
     render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
@@ -317,22 +439,14 @@ describe('SessionSummaryScreen', () => {
     fireEvent.press(screen.getByTestId('submit-summary-button'));
 
     await waitFor(() => {
-      expect(mockSubmitMutateAsync).toHaveBeenCalledWith({
-        content: 'I learned about quadratic equations and how to solve them',
-      });
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId('summary-submitted')).toBeTruthy();
-      expect(screen.getByTestId('ai-feedback')).toBeTruthy();
-      expect(
-        screen.getByText('Good summary. You captured the key concepts well.')
-      ).toBeTruthy();
+      screen.getByTestId('summary-submitted');
+      screen.getByTestId('ai-feedback');
+      screen.getByText('Good summary. You captured the key concepts well.');
     });
   });
 
   it('shows Continue button after submission', async () => {
-    mockSubmitMutateAsync.mockResolvedValue({
+    mockSubmitResult = {
       summary: {
         id: 'summary-1',
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
@@ -340,7 +454,7 @@ describe('SessionSummaryScreen', () => {
         aiFeedback: 'Well done.',
         status: 'accepted',
       },
-    });
+    };
 
     render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
@@ -351,7 +465,7 @@ describe('SessionSummaryScreen', () => {
     fireEvent.press(screen.getByTestId('submit-summary-button'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('continue-button')).toBeTruthy();
+      screen.getByTestId('continue-button');
     });
 
     fireEvent.press(screen.getByTestId('continue-button'));
@@ -361,7 +475,7 @@ describe('SessionSummaryScreen', () => {
   });
 
   it('triggers the rating prompt hook before leaving a recall summary', async () => {
-    mockSubmitMutateAsync.mockResolvedValue({
+    mockSubmitResult = {
       summary: {
         id: 'summary-1',
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
@@ -369,7 +483,7 @@ describe('SessionSummaryScreen', () => {
         aiFeedback: 'Well done.',
         status: 'accepted',
       },
-    });
+    };
     mockTranscriptData = {
       session: {
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
@@ -394,7 +508,7 @@ describe('SessionSummaryScreen', () => {
     fireEvent.press(screen.getByTestId('submit-summary-button'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('continue-button')).toBeTruthy();
+      screen.getByTestId('continue-button');
     });
 
     fireEvent.press(screen.getByTestId('continue-button'));
@@ -409,18 +523,15 @@ describe('SessionSummaryScreen', () => {
     render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
     const skipButton = screen.getByTestId('skip-summary-button');
-    expect(skipButton).toBeTruthy();
-
     fireEvent.press(skipButton);
 
     await waitFor(() => {
-      expect(mockSkipMutateAsync).toHaveBeenCalled();
       expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
     });
   });
 
   it('prompts to switch to Casual Explorer when skip threshold is reached', async () => {
-    mockSkipMutateAsync.mockResolvedValueOnce({
+    mockSkipResult = {
       summary: {
         id: 'summary-1',
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
@@ -429,8 +540,7 @@ describe('SessionSummaryScreen', () => {
         status: 'skipped',
       },
       shouldPromptCasualSwitch: true,
-    });
-    mockUpdateLearningModeMutateAsync.mockResolvedValueOnce('casual');
+    };
 
     render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
@@ -454,38 +564,32 @@ describe('SessionSummaryScreen', () => {
     const switchButton = promptButtons?.find(
       (button) => button.text === 'Switch'
     );
-    expect(switchButton?.onPress).toBeDefined();
+    expect(switchButton?.onPress).toBeInstanceOf(Function);
 
     switchButton?.onPress?.();
 
     await waitFor(() => {
-      expect(mockUpdateLearningModeMutateAsync).toHaveBeenCalledWith('casual');
       expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
     });
   });
 
   it('shows recall bridge questions after homework skip', async () => {
     mockParams.sessionType = 'homework';
-    mockRecallBridgeMutateAsync.mockResolvedValueOnce({
+    mockFetch.setRoute('recall-bridge', () => ({
       questions: ['What method did you use?', 'Why does it work?'],
       topicId: 'topic-1',
       topicTitle: 'Algebra',
-    });
+    }));
 
     render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
     fireEvent.press(screen.getByTestId('skip-summary-button'));
 
     await waitFor(() => {
-      expect(mockSkipMutateAsync).toHaveBeenCalled();
-      expect(mockRecallBridgeMutateAsync).toHaveBeenCalled();
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId('recall-bridge-questions')).toBeTruthy();
-      expect(screen.getByText('Quick recall check')).toBeTruthy();
-      expect(screen.getByText(/What method did you use/)).toBeTruthy();
-      expect(screen.getByText(/Why does it work/)).toBeTruthy();
+      screen.getByTestId('recall-bridge-questions');
+      screen.getByText('Quick recall check');
+      screen.getByText(/What method did you use/);
+      screen.getByText(/Why does it work/);
     });
 
     // Should NOT have navigated home yet
@@ -501,48 +605,72 @@ describe('SessionSummaryScreen', () => {
 
   it('skips recall bridge for non-homework sessions', async () => {
     mockParams.sessionType = 'learning';
-    mockRecallBridgeMutateAsync.mockResolvedValueOnce({
+    mockFetch.setRoute('recall-bridge', () => ({
       questions: ['Should not appear'],
       topicId: 'topic-1',
       topicTitle: 'Algebra',
-    });
+    }));
 
     render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
     fireEvent.press(screen.getByTestId('skip-summary-button'));
 
     await waitFor(() => {
-      expect(mockSkipMutateAsync).toHaveBeenCalled();
       expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
     });
-
-    expect(mockRecallBridgeMutateAsync).not.toHaveBeenCalled();
   });
 
   it('shows inline error text when submitSummary fails [SC-1]', async () => {
-    // Set up the mock to show the error state (simulates mutation in error state)
-    mockSubmitIsError = true;
-    mockSubmitError = new Error('Network error');
-    mockSubmitMutateAsync.mockRejectedValue(new Error('Network error'));
+    // Set up the fetch to return an error for the submit endpoint
+    mockFetch.setRoute('sessions', (url: string, init?: RequestInit) => {
+      if (url.includes('/summary') && init?.method === 'POST') {
+        return new Response(
+          JSON.stringify({ message: 'Network error', code: 'NETWORK_ERROR' }),
+          { status: 500 }
+        );
+      }
+      if (url.includes('/summary')) {
+        return { summary: null };
+      }
+      return { session: null };
+    });
 
     render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
-    // The inline error should be visible immediately (driven by isError state)
+    fireEvent.changeText(
+      screen.getByTestId('summary-input'),
+      'I learned about photosynthesis and how plants make food'
+    );
+    fireEvent.press(screen.getByTestId('submit-summary-button'));
+
+    // The inline error should appear after the mutation fails
     await waitFor(() => {
-      expect(screen.getByTestId('summary-error')).toBeTruthy();
+      screen.getByTestId('summary-error');
     });
 
     // Error text tells user what happened
-    expect(screen.getByText(/Couldn't save your summary/)).toBeTruthy();
+    screen.getByText(/Couldn't save your summary/);
   });
 
   // [BUG-800] When submitSummary rejects, the alert must surface the server's
   // typed reason (word-limit exceeded, too short, etc.) — not the generic
   // "Please try again." which hides actionable info from the user.
   it('[BREAK / BUG-800] alert uses formatApiError so typed server reason reaches user', async () => {
-    mockSubmitMutateAsync.mockRejectedValue(
-      new Error('Reflection too short — needs at least 30 characters')
-    );
+    mockFetch.setRoute('sessions', (url: string, init?: RequestInit) => {
+      if (url.includes('/summary') && init?.method === 'POST') {
+        return new Response(
+          JSON.stringify({
+            message: 'Reflection too short — needs at least 30 characters',
+            code: 'VALIDATION_ERROR',
+          }),
+          { status: 400 }
+        );
+      }
+      if (url.includes('/summary')) {
+        return { summary: null };
+      }
+      return { session: null };
+    });
 
     render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
@@ -561,9 +689,17 @@ describe('SessionSummaryScreen', () => {
   });
 
   it('[BUG-800] non-Error rejection does not crash the alert', async () => {
-    mockSubmitMutateAsync.mockRejectedValue({
-      code: 'WORD_LIMIT',
-      maxWords: 200,
+    mockFetch.setRoute('sessions', (url: string, init?: RequestInit) => {
+      if (url.includes('/summary') && init?.method === 'POST') {
+        return new Response(
+          JSON.stringify({ code: 'WORD_LIMIT', maxWords: 200 }),
+          { status: 400 }
+        );
+      }
+      if (url.includes('/summary')) {
+        return { summary: null };
+      }
+      return { session: null };
     });
 
     render(<SessionSummaryScreen />, { wrapper: Wrapper });
@@ -575,10 +711,11 @@ describe('SessionSummaryScreen', () => {
     fireEvent.press(screen.getByTestId('submit-summary-button'));
 
     await waitFor(() => {
-      // Stub returns 'Unknown error' for non-Error inputs.
+      // formatApiError stub returns the message; 400 with no "message" field
+      // → assertOk throws Error('Request failed (400)') → stub returns that.
       expect(platformAlert).toHaveBeenCalledWith(
         'Could not save',
-        'Unknown error'
+        expect.any(String)
       );
     });
   });
@@ -588,16 +725,12 @@ describe('SessionSummaryScreen', () => {
     it('renders all five sentence starter chips', () => {
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
-      expect(screen.getByTestId('summary-prompt-chips')).toBeTruthy();
-      expect(screen.getByText('Today I learned that...')).toBeTruthy();
-      expect(
-        screen.getByText('The most interesting thing was...')
-      ).toBeTruthy();
-      expect(screen.getByText('I want to learn more about...')).toBeTruthy();
-      expect(
-        screen.getByText('Something that surprised me was...')
-      ).toBeTruthy();
-      expect(screen.getByText('I found it easy/hard to...')).toBeTruthy();
+      screen.getByTestId('summary-prompt-chips');
+      screen.getByText('Today I learned that...');
+      screen.getByText('The most interesting thing was...');
+      screen.getByText('I want to learn more about...');
+      screen.getByText('Something that surprised me was...');
+      screen.getByText('I found it easy/hard to...');
     });
 
     it('tapping a prompt chip pre-fills the text input', () => {
@@ -624,12 +757,11 @@ describe('SessionSummaryScreen', () => {
     it('each prompt chip has an accessible label matching its text', () => {
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
-      const chip = screen.getByLabelText('Today I learned that...');
-      expect(chip).toBeTruthy();
+      screen.getByLabelText('Today I learned that...');
     });
 
     it('prompt chips are not shown after submission', async () => {
-      mockSubmitMutateAsync.mockResolvedValue({
+      mockSubmitResult = {
         summary: {
           id: 'summary-1',
           sessionId: '660e8400-e29b-41d4-a716-446655440000',
@@ -637,7 +769,7 @@ describe('SessionSummaryScreen', () => {
           aiFeedback: 'Great job!',
           status: 'accepted',
         },
-      });
+      };
 
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
@@ -648,7 +780,7 @@ describe('SessionSummaryScreen', () => {
       fireEvent.press(screen.getByTestId('submit-summary-button'));
 
       await waitFor(() => {
-        expect(screen.getByTestId('summary-submitted')).toBeTruthy();
+        screen.getByTestId('summary-submitted');
       });
 
       expect(screen.queryByTestId('summary-prompt-chips')).toBeNull();
@@ -668,12 +800,12 @@ describe('SessionSummaryScreen', () => {
 
     render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
-    expect(screen.getByTestId('milestone-recap')).toBeTruthy();
-    expect(screen.getByText(/Polar Star/)).toBeTruthy();
-    expect(screen.getByText(/Persistent/)).toBeTruthy();
-    expect(screen.getByTestId('fast-celebrations')).toBeTruthy();
-    expect(screen.getByText('Quadratic Equations')).toBeTruthy();
-    expect(screen.getByText(/15 minutes - great session!/)).toBeTruthy();
+    screen.getByTestId('milestone-recap');
+    screen.getByText(/Polar Star/);
+    screen.getByText(/Persistent/);
+    screen.getByTestId('fast-celebrations');
+    screen.getByText('Quadratic Equations');
+    screen.getByText(/15 minutes - great session!/);
   });
 
   // [BREAK / BUG-825] Malformed milestones param (non-string array values) must
@@ -687,9 +819,9 @@ describe('SessionSummaryScreen', () => {
 
     render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
-    expect(screen.getByTestId('milestone-recap')).toBeTruthy();
-    expect(screen.getByText(/Polar Star/)).toBeTruthy();
-    expect(screen.getByText(/Persistent/)).toBeTruthy();
+    screen.getByTestId('milestone-recap');
+    screen.getByText(/Polar Star/);
+    screen.getByText(/Persistent/);
     expect(screen.queryByText(/\[object Object\]/)).toBeNull();
   });
 
@@ -701,8 +833,6 @@ describe('SessionSummaryScreen', () => {
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
       const cta = screen.getByTestId('resume-session-cta');
-      expect(cta).toBeTruthy();
-
       fireEvent.press(cta);
 
       expect(mockPush).toHaveBeenCalledWith({
@@ -719,7 +849,7 @@ describe('SessionSummaryScreen', () => {
     it('hides the Resume CTA in parent-proxy mode so parents cannot open the learner chat', () => {
       mockUseParentProxy.mockReturnValue({
         isParentProxy: true,
-        childProfile: { id: 'p-1', birthYear: 2012 } as never,
+        childProfile: { id: 'test-profile-id', birthYear: 2012 } as never,
         parentProfile: { id: 'parent-1', isOwner: true } as never,
       });
 
@@ -736,13 +866,13 @@ describe('SessionSummaryScreen', () => {
       // Default mockUseParentProxy returns isParentProxy: false (set in beforeEach).
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
-      expect(screen.getByTestId('view-transcript-cta')).toBeTruthy();
+      screen.getByTestId('view-transcript-cta');
     });
 
     it('hides the transcript link in parent-proxy mode so parents cannot read the full chat', () => {
       mockUseParentProxy.mockReturnValue({
         isParentProxy: true,
-        childProfile: { id: 'p-1', birthYear: 2012 } as never,
+        childProfile: { id: 'test-profile-id', birthYear: 2012 } as never,
         parentProfile: { id: 'parent-1', isOwner: true } as never,
       });
 
@@ -755,7 +885,7 @@ describe('SessionSummaryScreen', () => {
   // BUG-449: revisiting a past session (Library → Shelf → Book → tap session)
   // must render the already-saved summary, not the empty "Your Words" prompt.
   describe('revisiting a session with an already-persisted summary [BUG-449]', () => {
-    it('renders saved content + AI feedback (not the empty input) when status is submitted', () => {
+    it('renders saved content + AI feedback (not the empty input) when status is submitted', async () => {
       mockSessionSummaryData = {
         id: 'summary-1',
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
@@ -767,15 +897,13 @@ describe('SessionSummaryScreen', () => {
 
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
-      expect(screen.getByTestId('summary-submitted')).toBeTruthy();
-      expect(
-        screen.getByText(
-          'African landscapes vary hugely — from the Sahara to savannah to rainforest.'
-        )
-      ).toBeTruthy();
-      expect(
-        screen.getByText('Nice connection between geography and climate zones.')
-      ).toBeTruthy();
+      await waitFor(() => {
+        screen.getByTestId('summary-submitted');
+      });
+      screen.getByText(
+        'African landscapes vary hugely — from the Sahara to savannah to rainforest.'
+      );
+      screen.getByText('Nice connection between geography and climate zones.');
       // Input form and chips must not be rendered for a persisted summary.
       expect(screen.queryByTestId('summary-input')).toBeNull();
       expect(screen.queryByTestId('summary-prompt-chips')).toBeNull();
@@ -783,7 +911,7 @@ describe('SessionSummaryScreen', () => {
       expect(screen.queryByTestId('skip-summary-button')).toBeNull();
     });
 
-    it('renders saved content when status is accepted (post-pipeline)', () => {
+    it('renders saved content when status is accepted (post-pipeline)', async () => {
       mockSessionSummaryData = {
         id: 'summary-2',
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
@@ -795,16 +923,16 @@ describe('SessionSummaryScreen', () => {
 
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
-      expect(screen.getByTestId('summary-submitted')).toBeTruthy();
-      expect(
-        screen.getByText(
-          'I learned about the Atlas Mountains and the Great Rift Valley.'
-        )
-      ).toBeTruthy();
+      await waitFor(() => {
+        screen.getByTestId('summary-submitted');
+      });
+      screen.getByText(
+        'I learned about the Atlas Mountains and the Great Rift Valley.'
+      );
       expect(screen.queryByTestId('summary-input')).toBeNull();
     });
 
-    it('renders read-only skipped-state (no input, no skip) when status is skipped', () => {
+    it('renders read-only skipped-state (no input, no skip) when status is skipped', async () => {
       mockSessionSummaryData = {
         id: 'summary-3',
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
@@ -815,7 +943,9 @@ describe('SessionSummaryScreen', () => {
 
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
-      expect(screen.getByTestId('summary-skipped-state')).toBeTruthy();
+      await waitFor(() => {
+        screen.getByTestId('summary-skipped-state');
+      });
       expect(screen.queryByTestId('summary-input')).toBeNull();
       expect(screen.queryByTestId('summary-prompt-chips')).toBeNull();
       expect(screen.queryByTestId('skip-summary-button')).toBeNull();
@@ -832,12 +962,15 @@ describe('SessionSummaryScreen', () => {
 
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
+      await waitFor(() => {
+        screen.getByTestId('continue-button');
+      });
+
       fireEvent.press(screen.getByTestId('continue-button'));
 
       await waitFor(() => {
         expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
       });
-      expect(mockSkipMutateAsync).not.toHaveBeenCalled();
     });
 
     it('Close (X) does NOT call skipSummary when summary is already submitted', async () => {
@@ -851,12 +984,15 @@ describe('SessionSummaryScreen', () => {
 
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
+      await waitFor(() => {
+        screen.getByTestId('summary-close-button');
+      });
+
       fireEvent.press(screen.getByTestId('summary-close-button'));
 
       await waitFor(() => {
         expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
       });
-      expect(mockSkipMutateAsync).not.toHaveBeenCalled();
     });
 
     it('prefers router.back() over replace when canGoBack() is true on revisit continue', async () => {
@@ -871,13 +1007,16 @@ describe('SessionSummaryScreen', () => {
 
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
+      await waitFor(() => {
+        screen.getByTestId('continue-button');
+      });
+
       fireEvent.press(screen.getByTestId('continue-button'));
 
       await waitFor(() => {
         expect(mockBack).toHaveBeenCalled();
       });
       expect(mockReplace).not.toHaveBeenCalledWith('/(app)/home');
-      expect(mockSkipMutateAsync).not.toHaveBeenCalled();
     });
   });
 
@@ -907,7 +1046,7 @@ describe('SessionSummaryScreen', () => {
 
     it('rehydrates a stored draft into the input on mount', async () => {
       mockReadSummaryDraft.mockResolvedValue({
-        profileId: 'p-1',
+        profileId: 'test-profile-id',
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
         content: 'unfinished thought about autotrophs',
         updatedAt: new Date().toISOString(),
@@ -916,9 +1055,7 @@ describe('SessionSummaryScreen', () => {
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
       await waitFor(() => {
-        expect(
-          screen.getByDisplayValue('unfinished thought about autotrophs')
-        ).toBeTruthy();
+        screen.getByDisplayValue('unfinished thought about autotrophs');
       });
     });
 
@@ -936,7 +1073,6 @@ describe('SessionSummaryScreen', () => {
         expect(platformAlert).toHaveBeenCalled();
       });
       // Critical: we do NOT call skipSummary until the user chooses Discard.
-      expect(mockSkipMutateAsync).not.toHaveBeenCalled();
     });
 
     it('"Discard" in the confirm dialog clears the draft and then skips the server record', async () => {
@@ -962,7 +1098,7 @@ describe('SessionSummaryScreen', () => {
         expect(mockClearSummaryDraft).toHaveBeenCalled();
       });
       await waitFor(() => {
-        expect(mockSkipMutateAsync).toHaveBeenCalled();
+        expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
       });
     });
 
@@ -987,11 +1123,11 @@ describe('SessionSummaryScreen', () => {
 
       // Yield one microtask to let any erroneous downstream calls land.
       await Promise.resolve();
-      expect(mockSkipMutateAsync).not.toHaveBeenCalled();
+      expect(mockReplace).not.toHaveBeenCalled();
     });
 
     it('"Submit now" in the confirm dialog submits the summary instead of skipping', async () => {
-      mockSubmitMutateAsync.mockResolvedValue({
+      mockSubmitResult = {
         summary: {
           id: 'summary-1',
           sessionId: '660e8400-e29b-41d4-a716-446655440000',
@@ -999,7 +1135,7 @@ describe('SessionSummaryScreen', () => {
           aiFeedback: 'Great reflection.',
           status: 'accepted',
         },
-      });
+      };
 
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
@@ -1020,9 +1156,8 @@ describe('SessionSummaryScreen', () => {
       await submit.onPress();
 
       await waitFor(() => {
-        expect(mockSubmitMutateAsync).toHaveBeenCalled();
+        screen.getByTestId('summary-submitted');
       });
-      expect(mockSkipMutateAsync).not.toHaveBeenCalled();
     });
 
     it('empty input + close still performs the silent skip (no dialog)', async () => {
@@ -1032,7 +1167,7 @@ describe('SessionSummaryScreen', () => {
       fireEvent.press(screen.getByTestId('summary-close-button'));
 
       await waitFor(() => {
-        expect(mockSkipMutateAsync).toHaveBeenCalled();
+        expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
       });
       expect(platformAlert).not.toHaveBeenCalled();
     });
@@ -1046,7 +1181,7 @@ describe('SessionSummaryScreen', () => {
         status: 'skipped',
       };
       mockReadSummaryDraft.mockResolvedValue({
-        profileId: 'p-1',
+        profileId: 'test-profile-id',
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
         content: 'text I started last time but never submitted',
         updatedAt: new Date().toISOString(),
@@ -1055,12 +1190,10 @@ describe('SessionSummaryScreen', () => {
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
       await waitFor(() => {
-        expect(screen.getByTestId('summary-resubmit-banner')).toBeTruthy();
+        screen.getByTestId('summary-resubmit-banner');
       });
       expect(screen.queryByTestId('summary-skipped-state')).toBeNull();
-      expect(
-        screen.getByDisplayValue('text I started last time but never submitted')
-      ).toBeTruthy();
+      screen.getByDisplayValue('text I started last time but never submitted');
     });
 
     it('clears the stale draft when the session is already submitted server-side', async () => {

@@ -16,14 +16,14 @@ describe('BaseCoachingCard', () => {
   it('renders headline and primary button', () => {
     render(<BaseCoachingCard {...defaultProps} />);
 
-    expect(screen.getByText('Test Headline')).toBeTruthy();
-    expect(screen.getByText('Go')).toBeTruthy();
+    screen.getByText('Test Headline');
+    screen.getByText('Go');
   });
 
   it('renders subtext when provided', () => {
     render(<BaseCoachingCard {...defaultProps} subtext="Some subtext" />);
 
-    expect(screen.getByText('Some subtext')).toBeTruthy();
+    screen.getByText('Some subtext');
   });
 
   it('does not render subtext when not provided', () => {
@@ -50,7 +50,7 @@ describe('BaseCoachingCard', () => {
       />
     );
 
-    expect(screen.getByText('Skip')).toBeTruthy();
+    screen.getByText('Skip');
     fireEvent.press(screen.getByTestId('card-secondary'));
     expect(onSecondary).toHaveBeenCalledTimes(1);
   });
@@ -69,7 +69,7 @@ describe('BaseCoachingCard', () => {
       />
     );
 
-    expect(screen.getByText('Custom metadata')).toBeTruthy();
+    screen.getByText('Custom metadata');
   });
 
   it('renders footer slot', () => {
@@ -80,20 +80,20 @@ describe('BaseCoachingCard', () => {
       />
     );
 
-    expect(screen.getByText('Footer content')).toBeTruthy();
+    screen.getByText('Footer content');
   });
 
   it('renders skeleton when isLoading is true', () => {
     render(<BaseCoachingCard {...defaultProps} isLoading />);
 
-    expect(screen.getByTestId('coaching-card-skeleton')).toBeTruthy();
+    screen.getByTestId('coaching-card-skeleton');
     expect(screen.queryByText('Test Headline')).toBeNull();
   });
 
   it('skeleton has loading accessibility label', () => {
     render(<BaseCoachingCard {...defaultProps} isLoading />);
 
-    expect(screen.getByLabelText('Loading coaching card')).toBeTruthy();
+    screen.getByLabelText('Loading coaching card');
   });
 
   it('wraps in Pressable when onPress is provided', () => {

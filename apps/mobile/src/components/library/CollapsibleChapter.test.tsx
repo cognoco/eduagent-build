@@ -29,8 +29,8 @@ describe('CollapsibleChapter (Later section)', () => {
       />
     );
 
-    expect(getByText('Green Factories')).toBeTruthy();
-    expect(getByText('2 / 5 not started')).toBeTruthy();
+    getByText('Green Factories');
+    getByText('2 / 5 not started');
   });
 
   it('shows the untouched chapter glyph', () => {
@@ -45,7 +45,7 @@ describe('CollapsibleChapter (Later section)', () => {
       />
     );
 
-    expect(getByText('○')).toBeTruthy();
+    getByText('○');
   });
 
   it('shows the partial-progress chapter glyph', () => {
@@ -60,7 +60,7 @@ describe('CollapsibleChapter (Later section)', () => {
       />
     );
 
-    expect(getByText('◐')).toBeTruthy();
+    getByText('◐');
   });
 
   it('is collapsed by default when initiallyExpanded is false', () => {
@@ -91,8 +91,8 @@ describe('CollapsibleChapter (Later section)', () => {
     );
 
     fireEvent.press(getByTestId('chapter-header-Chapter D'));
-    expect(getByText('Cell Walls')).toBeTruthy();
-    expect(getByText('Chloroplasts')).toBeTruthy();
+    getByText('Cell Walls');
+    getByText('Chloroplasts');
   });
 
   it('calls onTopicPress with topic id and title', () => {
@@ -125,6 +125,6 @@ describe('CollapsibleChapter (Later section)', () => {
       />
     );
 
-    expect(getByText('Cell Walls')).toBeTruthy();
+    getByText('Cell Walls');
   });
 });

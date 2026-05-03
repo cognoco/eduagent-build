@@ -169,7 +169,6 @@ describe('processInterviewExchange', () => {
       exchangeCount: 1,
     });
 
-    expect(result.response).toBeDefined();
     expect(typeof result.response).toBe('string');
     expect(result.response.length).toBeGreaterThan(0);
   });
@@ -204,7 +203,7 @@ describe('processInterviewExchange', () => {
     expect(result.isComplete).toBe(true);
     expect(result.response).toBe('Great session!');
     expect(result.response).not.toContain('[INTERVIEW_COMPLETE]');
-    expect(result.extractedSignals).toBeDefined();
+    expect(result.extractedSignals).toEqual(expect.objectContaining({}));
     expect(result.extractedSignals?.goals).toEqual(['learn TypeScript']);
   });
 
@@ -252,7 +251,7 @@ describe('processInterviewExchange', () => {
     });
 
     expect(result.isComplete).toBe(true);
-    expect(result.extractedSignals).toBeDefined();
+    expect(result.extractedSignals).toEqual(expect.objectContaining({}));
     expect(result.extractedSignals?.goals).toEqual(['capped']);
     // Visible reply is the envelope's reply, not the marker form.
     expect(result.response).toBe('Tell me more about that.');
@@ -446,8 +445,7 @@ describe('streamInterviewExchange', () => {
       exchangeCount: 1,
     });
 
-    expect(result.stream).toBeDefined();
-    expect(result.onComplete).toBeDefined();
+    expect(result.stream).toBeTruthy();
     expect(typeof result.onComplete).toBe('function');
   });
 
@@ -508,7 +506,7 @@ describe('streamInterviewExchange', () => {
 
     expect(result.isComplete).toBe(true);
     expect(result.response).toBe('Great session!');
-    expect(result.extractedSignals).toBeDefined();
+    expect(result.extractedSignals).toEqual(expect.objectContaining({}));
     expect(result.extractedSignals?.goals).toEqual(['learn TS']);
   });
 
@@ -537,7 +535,7 @@ describe('streamInterviewExchange', () => {
 
     expect(result.isComplete).toBe(true);
     expect(result.response).toBe('And another question?');
-    expect(result.extractedSignals).toBeDefined();
+    expect(result.extractedSignals).toEqual(expect.objectContaining({}));
   });
 
   it('calls routeAndStream at rung 1', async () => {

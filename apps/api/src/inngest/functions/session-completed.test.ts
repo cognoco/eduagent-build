@@ -344,7 +344,7 @@ describe('sessionCompleted', () => {
   });
 
   it('should be defined as an Inngest function', () => {
-    expect(sessionCompleted).toBeDefined();
+    expect(sessionCompleted).toBeTruthy();
   });
 
   it('should have the correct function id', () => {

@@ -1,4 +1,4 @@
-jest.mock('../middleware/jwt', () => ({
+﻿jest.mock('../middleware/jwt', () => ({
   decodeJWTHeader: jest.fn().mockReturnValue({ alg: 'RS256', kid: 'test-kid' }),
   fetchJWKS: jest.fn().mockResolvedValue({
     keys: [{ kty: 'RSA', kid: 'test-kid', n: 'fake-n', e: 'AQAB' }],
@@ -279,12 +279,12 @@ describe('Quiz routes', () => {
 
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(body.id).toBeDefined();
+      expect(typeof body.id).toBe('string');
       expect(body.theme).toBe('Central European Capitals');
       expect(body.questions.length).toBeGreaterThanOrEqual(1);
       // [CR-1] Answer fields (correctAnswer, acceptedAliases) are now stripped.
       // Client receives pre-shuffled `options` instead.
-      expect(body.questions[0].options).toBeDefined();
+      expect(Array.isArray(body.questions[0].options)).toBe(true);
       expect(body.questions[0].options.length).toBeGreaterThanOrEqual(2);
       expect(body.questions[0].correctAnswer).toBeUndefined();
       expect(body.questions[0].acceptedAliases).toBeUndefined();
@@ -467,7 +467,6 @@ describe('Quiz routes', () => {
       // bearing field. This catches a stale deploy regression where the
       // client sees correctAnswer/acceptedAnswers/distractors in DevTools.
       for (const q of body.questions) {
-        expect(q.options).toBeDefined();
         expect(Array.isArray(q.options)).toBe(true);
         expect(q.options.length).toBeGreaterThanOrEqual(2);
         expect(q.correctAnswer).toBeUndefined();
@@ -492,7 +491,7 @@ describe('Quiz routes', () => {
 
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(body.id).toBeDefined();
+      expect(typeof body.id).toBe('string');
       // prefetch must NOT leak questions/theme to the response
       expect(body.questions).toBeUndefined();
       expect(body.theme).toBeUndefined();
@@ -593,7 +592,7 @@ describe('Quiz routes', () => {
       expect(body.activityType).toBe('guess_who');
       expect(body.questions[0].type).toBe('guess_who');
       expect(body.questions[0].clues).toHaveLength(5);
-      expect(body.questions[0].mcFallbackOptions).toBeDefined();
+      expect(Array.isArray(body.questions[0].mcFallbackOptions)).toBe(true);
       // [F-014 break test] Guess Who questions leak correctAnswer +
       // canonicalName + acceptedAliases if the answer-stripping projection
       // is bypassed. Users can peek the answer in DevTools before the first
@@ -659,7 +658,7 @@ describe('Quiz routes', () => {
       expect(body.total).toBe(2);
       expect(body.xpEarned).toBe(15);
       expect(body.celebrationTier).toBe('nice');
-      expect(body.completedAt).toBeDefined();
+      expect(typeof body.completedAt).toBe('string');
       expect(body.results).toHaveLength(2);
       // Completed rounds expose the grading context
       expect(body.questions[0].correctAnswer).toBe('Vienna');
@@ -739,7 +738,6 @@ describe('Quiz routes', () => {
       const body = await res.json();
       expect(body.questions.length).toBeGreaterThanOrEqual(1);
       for (const q of body.questions) {
-        expect(q.options).toBeDefined();
         expect(Array.isArray(q.options)).toBe(true);
         expect(q.options.length).toBeGreaterThanOrEqual(2);
         expect(q.correctAnswer).toBeUndefined();

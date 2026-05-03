@@ -61,7 +61,7 @@ async function createSubject(
 
   expect(res.status).toBe(201);
   const body = await res.json();
-  expect(body.subject).toBeDefined();
+  expect(body.subject).toMatchObject({ id: expect.any(String), name });
   return body.subject as { id: string; name: string };
 }
 
@@ -177,8 +177,10 @@ describe('Integration: POST /v1/subjects', () => {
 
     expect(res.status).toBe(201);
     const body = await res.json();
-    expect(body.subject).toBeDefined();
-    expect(body.subject.name).toBe('Mathematics');
+    expect(body.subject).toMatchObject({
+      id: expect.any(String),
+      name: 'Mathematics',
+    });
     expect(body.structureType).toBe('narrow');
   });
 
@@ -225,9 +227,7 @@ describe('Integration: GET /v1/subjects/:id', () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.subject).toBeDefined();
-    expect(body.subject.id).toBe(subject.id);
-    expect(body.subject.name).toBe('Mathematics');
+    expect(body.subject).toMatchObject({ id: subject.id, name: 'Mathematics' });
   });
 
   it('returns 404 when not found', async () => {
@@ -275,8 +275,10 @@ describe('Integration: PATCH /v1/subjects/:id', () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.subject).toBeDefined();
-    expect(body.subject.name).toBe('Advanced Mathematics');
+    expect(body.subject).toMatchObject({
+      id: subject.id,
+      name: 'Advanced Mathematics',
+    });
   });
 
   it('returns 404 when not found', async () => {

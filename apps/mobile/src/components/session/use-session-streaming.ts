@@ -13,11 +13,7 @@ import type {
   useStartSession,
   useRecordSystemPrompt,
 } from '../../hooks/use-sessions';
-import {
-  useApiClient,
-  QuotaExceededError,
-  type QuotaExceededDetails,
-} from '../../lib/api-client';
+import { useApiClient, type QuotaExceededDetails } from '../../lib/api-client';
 import { formatApiError } from '../../lib/format-api-error';
 import { writeSessionRecoveryMarker } from '../../lib/session-recovery';
 import {
@@ -32,9 +28,7 @@ import type { useCelebration } from '../../hooks/use-celebration';
 import {
   computePaceMultiplier,
   isReconnectableSessionError,
-  isTimeoutError,
-  RECONNECT_PROMPT,
-  TIMEOUT_PROMPT,
+  reconnectPromptForError,
 } from './session-types';
 import {
   beginAttempt,
@@ -795,9 +789,16 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
         }
         // Detect quota before reconnect classification — QuotaExceededError is
         // never reconnectable and needs a structured card, not a text bubble.
-        if (err instanceof QuotaExceededError) {
+        // [BUG-947] Name guard instead of instanceof for Metro HMR resilience.
+        if (
+          err instanceof Error &&
+          err.name === 'QuotaExceededError' &&
+          'details' in err
+        ) {
           setIsStreaming(false);
-          setQuotaError(err.details);
+          setQuotaError(
+            (err as Error & { details: QuotaExceededDetails }).details
+          );
           if (streamId) {
             setMessages((prev) =>
               prev.map((message) =>
@@ -829,11 +830,10 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
 
         const reconnectable = isReconnectableSessionError(err);
         const formattedError = formatApiError(err);
-        // [3B.1] Classify: timeout -> specific message, network -> reconnect, fatal -> server msg
+        // [3B.1] Classify: timeout → timeout msg, 5xx → server error, network → reconnect,
+        // CORS/config → config error, fatal 4xx → formatted api error (non-reconnectable).
         const errorMessage = reconnectable
-          ? isTimeoutError(err)
-            ? TIMEOUT_PROMPT
-            : RECONNECT_PROMPT
+          ? reconnectPromptForError(err)
           : formattedError;
 
         setIsStreaming(false);

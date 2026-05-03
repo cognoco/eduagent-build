@@ -1,6 +1,7 @@
 import { INTERVIEW_SYSTEM_PROMPT } from '../../src/services/interview-prompts';
 import type { EvalProfile } from '../fixtures/profiles';
 import type { FlowDefinition, PromptMessages } from '../runner/types';
+import { callLlm } from '../runner/llm-bootstrap';
 
 interface OrphanInterviewInput {
   subjectName: string;
@@ -63,4 +64,17 @@ export const interviewOrphanFlow: FlowDefinition<OrphanInterviewInput> = {
   },
 
   emitsEnvelope: false,
+
+  async runLive(
+    _input: OrphanInterviewInput,
+    messages: PromptMessages
+  ): Promise<string> {
+    return callLlm(
+      [
+        { role: 'system', content: messages.system },
+        { role: 'user', content: messages.user ?? '' },
+      ],
+      { flow: 'interview-orphan', rung: 2 }
+    );
+  },
 };

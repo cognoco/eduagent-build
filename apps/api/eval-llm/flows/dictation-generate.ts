@@ -4,6 +4,7 @@ import {
 } from '../../src/services/dictation/generate';
 import type { EvalProfile } from '../fixtures/profiles';
 import type { FlowDefinition, PromptMessages } from '../runner/types';
+import { callLlm } from '../runner/llm-bootstrap';
 
 // ---------------------------------------------------------------------------
 // Flow adapter — Dictation: Generate
@@ -54,5 +55,21 @@ export const dictationGenerateFlow: FlowDefinition<GenerateContext> = {
           : `No library topics — theme not constrained by curriculum.`,
       ],
     };
+  },
+
+  async runLive(
+    _input: GenerateContext,
+    messages: PromptMessages
+  ): Promise<string> {
+    return callLlm(
+      [
+        { role: 'system', content: messages.system },
+        {
+          role: 'user',
+          content: messages.user ?? 'Generate a dictation for me.',
+        },
+      ],
+      { flow: 'dictation-generate', rung: 1 }
+    );
   },
 };

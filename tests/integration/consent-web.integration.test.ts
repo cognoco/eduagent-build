@@ -185,7 +185,7 @@ describe('Integration: POST /v1/consent-page/confirm', () => {
 
     expect(consent?.status).toBe('CONSENTED');
     expect(consent?.respondedAt).not.toBeNull();
-    expect(profile).toBeDefined();
+    expect(profile).not.toBeUndefined();
   });
 
   it('denies consent and deletes the profile via the real cascade', async () => {

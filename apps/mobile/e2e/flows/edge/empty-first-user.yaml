@@ -63,10 +63,10 @@ tags:
       id: "learner-screen"
     timeout: 30000
 
-# 2b. Tap the Learn intent card to navigate to /create-subject.
-#     LearnerScreen.tsx pushes to /create-subject on intent-learn press.
+# 2b. Tap the add-subject tile to navigate to /create-subject.
+#     LearnerScreen.tsx pushes to /create-subject on add-subject tile press.
 - tapOn:
-    id: "intent-learn"
+    id: "home-add-subject-tile"
 
 # 2c. Wait for create-subject screen.
 - extendedWaitUntil:

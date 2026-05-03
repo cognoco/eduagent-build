@@ -96,6 +96,13 @@ interface ChatShellProps {
    * (Galaxy S10e ~5.8" with the soft keyboard open).
    */
   hideInputModeToggle?: boolean;
+  pedagogicalState?: {
+    rung: 1 | 2 | 3 | 4 | 5;
+    phase: string;
+    exchangesUsed: number;
+    exchangesMax: number;
+  };
+  memoryHint?: string;
 }
 
 /**
@@ -166,7 +173,9 @@ export function ChatShell({
   backFallback,
   backBehavior = 'history',
   onBackPress,
-  hideInputModeToggle = false,
+  hideInputModeToggle = true,
+  pedagogicalState,
+  memoryHint,
 }: ChatShellProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -618,17 +627,50 @@ export function ChatShell({
             >
               {title}
             </Text>
-            <Text
-              className="text-caption text-text-secondary"
-              numberOfLines={1}
-            >
-              {subtitle}
-            </Text>
+            {pedagogicalState ? (
+              <View
+                testID="escalation-rung-strip"
+                className="flex-row items-center gap-1.5 mt-1"
+              >
+                <Text
+                  className="text-[10px] text-text-tertiary tracking-wide"
+                  style={{
+                    fontFamily: Platform.select({
+                      ios: 'Menlo',
+                      android: 'monospace',
+                      default: 'monospace',
+                    }),
+                  }}
+                >
+                  RUNG {pedagogicalState.rung} · {pedagogicalState.phase}
+                </Text>
+                <View className="w-[3px] h-[3px] rounded-full bg-text-tertiary" />
+                <Text className="text-[10px] text-text-tertiary tracking-wide">
+                  {pedagogicalState.exchangesUsed} of{' '}
+                  {pedagogicalState.exchangesMax} exchanges
+                </Text>
+              </View>
+            ) : subtitle ? (
+              <Text className="text-xs text-text-secondary">{subtitle}</Text>
+            ) : null}
           </View>
           {headerRightContent}
         </View>
         {headerBelow ? <View className="px-4 pb-3">{headerBelow}</View> : null}
       </View>
+
+      {memoryHint ? (
+        <View
+          testID="chat-memory-hint"
+          className="bg-surface rounded-xl px-3 py-2 mx-4 mb-2 flex-row items-center"
+          style={{ gap: 8 }}
+        >
+          <View className="w-1.5 h-1.5 rounded-full bg-accent" />
+          <Text className="text-xs text-text-secondary flex-1">
+            {memoryHint}
+          </Text>
+        </View>
+      ) : null}
 
       {/* Messages — [BUG-740 / PERF-10] FlatList virtualises the message list
           so the bubble tree stays bounded on long sessions. The ScrollView
@@ -875,7 +917,7 @@ export function ChatShell({
               testID="chat-input"
               accessibilityLabel="Message input"
             />
-            {isVoiceEnabled && (
+            {isVoiceEnabled ? (
               <View className="me-2">
                 <VoiceRecordButton
                   isListening={isListening}
@@ -885,6 +927,27 @@ export function ChatShell({
                   }
                 />
               </View>
+            ) : (
+              <Pressable
+                testID="voice-record-button"
+                onPress={handleVoicePress}
+                onLongPress={() => {
+                  setIsVoiceEnabled(true);
+                  void handleVoicePress();
+                }}
+                disabled={
+                  isStreaming || speechStatus === 'requesting_permission'
+                }
+                className="w-9 h-9 rounded-full bg-surface-elevated items-center justify-center me-2"
+                accessibilityLabel="Record voice message"
+                accessibilityRole="button"
+              >
+                <Ionicons
+                  name={isListening ? 'mic' : 'mic-outline'}
+                  size={18}
+                  color={isListening ? colors.primary : colors.muted}
+                />
+              </Pressable>
             )}
             <Pressable
               onPress={handleSend}

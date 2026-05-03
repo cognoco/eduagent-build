@@ -362,11 +362,11 @@ describe('subject routes', () => {
       expect(res.status).toBe(201);
 
       const body = await res.json();
-      expect(body.subject).toBeDefined();
+      expect(body.subject).toEqual(expect.objectContaining({}));
       expect(body.subject.name).toBe('Mathematics');
       expect(body.subject.status).toBe('active');
-      expect(body.subject.createdAt).toBeDefined();
-      expect(body.subject.updatedAt).toBeDefined();
+      expect(typeof body.subject.createdAt).toBe('string');
+      expect(typeof body.subject.updatedAt).toBe('string');
       expect(body.structureType).toBe('narrow');
     });
 
@@ -439,7 +439,7 @@ describe('subject routes', () => {
       expect(res.status).toBe(201);
 
       const body = await res.json();
-      expect(body.subject).toBeDefined();
+      expect(body.subject).toEqual(expect.objectContaining({}));
       expect(body.subject.name).toBe('Biology — Entomology');
       expect(body.subject.rawInput).toBe('ants');
     });
@@ -481,7 +481,7 @@ describe('subject routes', () => {
       expect(res.status).toBe(200);
 
       const body = await res.json();
-      expect(body.subject).toBeDefined();
+      expect(body.subject).toEqual(expect.objectContaining({}));
       expect(body.subject.pedagogyMode).toBe('four_strands');
       expect(body.subject.languageCode).toBe('es');
     });

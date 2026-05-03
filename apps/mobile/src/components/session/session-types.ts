@@ -127,9 +127,37 @@ export const QUICK_CHIP_CONFIG: Record<
 };
 
 export const RECONNECT_PROMPT =
-  'Lost connection to your session. Use the Reconnect button below to try again.';
+  'Lost connection — check your network and use the Reconnect button below to try again.';
 
 export const TIMEOUT_PROMPT = 'Your session timed out. Please try again.';
+
+export const SERVER_ERROR_PROMPT =
+  'Server error — tap the Reconnect button to try again.';
+
+export const CONFIG_ERROR_PROMPT =
+  'Server configuration error — try again in a moment.';
+
+export function reconnectPromptForError(error: unknown): string {
+  if (isTimeoutError(error)) return TIMEOUT_PROMPT;
+
+  if (error instanceof Error) {
+    if (error.name === 'UpstreamError') return SERVER_ERROR_PROMPT;
+    if (error.name === 'NetworkError' || error.name === 'TypeError')
+      return RECONNECT_PROMPT;
+  }
+
+  const status =
+    typeof error === 'object' &&
+    error !== null &&
+    'status' in error &&
+    typeof (error as { status?: unknown }).status === 'number'
+      ? ((error as { status: number }).status as number)
+      : undefined;
+
+  if (status !== undefined && status >= 500) return SERVER_ERROR_PROMPT;
+
+  return RECONNECT_PROMPT;
+}
 
 export function isTimeoutError(error: unknown): boolean {
   if (

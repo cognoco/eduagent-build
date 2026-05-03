@@ -21,7 +21,7 @@ describe('SSOCallbackScreen', () => {
   it('renders loading indicator and text', () => {
     render(<SSOCallbackScreen />);
 
-    expect(screen.getByText('Finishing sign-in...')).toBeTruthy();
+    screen.getByText('Finishing sign-in...');
   });
 
   it('calls maybeCompleteAuthSession unconditionally on mount [BUG-261]', () => {

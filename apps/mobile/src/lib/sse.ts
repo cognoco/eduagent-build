@@ -342,6 +342,16 @@ export function streamSSEViaXHR(
     if (status === 400) {
       return new BadRequestError(apiMessage ?? (responseText || 'Bad request'));
     }
+    if (status === 401) {
+      // Session expired mid-stream — surface a typed error so
+      // isReconnectableSessionError can classify it as non-reconnectable and
+      // the UI can show "Session expired" rather than a generic reconnect card.
+      const err = new Error(
+        apiMessage ?? 'Session expired — please sign in again'
+      ) as Error & { status: number };
+      err.status = 401;
+      return err;
+    }
     if (status === 402) {
       if (code === 'QUOTA_EXCEEDED' && parsed?.details) {
         return new QuotaExceededError(
@@ -374,6 +384,17 @@ export function streamSSEViaXHR(
         code ?? undefined,
         undefined,
         undefined
+      );
+    }
+    if (status >= 500) {
+      // 5xx — always surface as UpstreamError so callers can distinguish a
+      // server fault from a network drop. Use code when present, otherwise
+      // synthesise 'UPSTREAM_ERROR' so isReconnectableSessionError can
+      // classify by .name rather than by message heuristics.
+      return new UpstreamError(
+        apiMessage ?? (responseText || 'Server error'),
+        code ?? 'UPSTREAM_ERROR',
+        status
       );
     }
     if (code) {

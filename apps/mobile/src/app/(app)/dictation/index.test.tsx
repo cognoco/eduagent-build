@@ -109,8 +109,8 @@ describe('DictationChoiceScreen', () => {
 
   it('renders choice cards', () => {
     const { getByTestId } = render(<DictationChoiceScreen />);
-    expect(getByTestId('dictation-homework')).toBeTruthy();
-    expect(getByTestId('dictation-surprise')).toBeTruthy();
+    getByTestId('dictation-homework');
+    getByTestId('dictation-surprise');
   });
 
   it('calls generateMutation when Surprise Me is pressed', async () => {

@@ -78,9 +78,9 @@ describe('SignInScreen', () => {
     render(<SignInScreen />);
     await act(async () => undefined);
 
-    expect(screen.getByTestId('sign-in-email')).toBeTruthy();
-    expect(screen.getByTestId('sign-in-password')).toBeTruthy();
-    expect(screen.getByTestId('sign-in-button')).toBeTruthy();
+    screen.getByTestId('sign-in-email');
+    screen.getByTestId('sign-in-password');
+    screen.getByTestId('sign-in-button');
   });
 
   it('renders Apple SSO button on iOS (Google hidden)', async () => {
@@ -88,9 +88,9 @@ describe('SignInScreen', () => {
     await act(async () => undefined);
 
     expect(screen.queryByTestId('google-sso-button')).toBeNull();
-    expect(screen.getByTestId('apple-sso-button')).toBeTruthy();
+    screen.getByTestId('apple-sso-button');
     expect(screen.queryByTestId('openai-sso-button')).toBeNull();
-    expect(screen.getByText('Continue with Apple')).toBeTruthy();
+    screen.getByText('Continue with Apple');
   });
 
   it('renders Google SSO button on Android (Apple hidden)', async () => {
@@ -102,9 +102,9 @@ describe('SignInScreen', () => {
     render(<SignInScreen />);
     await act(async () => undefined);
 
-    expect(screen.getByTestId('google-sso-button')).toBeTruthy();
+    screen.getByTestId('google-sso-button');
     expect(screen.queryByTestId('apple-sso-button')).toBeNull();
-    expect(screen.getByText('Continue with Google')).toBeTruthy();
+    screen.getByText('Continue with Google');
     Object.defineProperty(Platform, 'OS', {
       value: 'ios',
       configurable: true,
@@ -118,16 +118,16 @@ describe('SignInScreen', () => {
     render(<SignInScreen />);
     await act(async () => undefined);
 
-    expect(screen.getByTestId('openai-sso-button')).toBeTruthy();
-    expect(screen.getByText('Continue with OpenAI')).toBeTruthy();
+    screen.getByTestId('openai-sso-button');
+    screen.getByText('Continue with OpenAI');
   });
 
   it('renders forgot password link', async () => {
     render(<SignInScreen />);
     await act(async () => undefined);
 
-    expect(screen.getByTestId('forgot-password-link')).toBeTruthy();
-    expect(screen.getByText('Forgot password?')).toBeTruthy();
+    screen.getByTestId('forgot-password-link');
+    screen.getByText('Forgot password?');
   });
 
   it('disables sign-in button when fields are empty', async () => {
@@ -189,7 +189,7 @@ describe('SignInScreen', () => {
     fireEvent.press(screen.getByTestId('sign-in-button'));
 
     await waitFor(() => {
-      expect(screen.getByText('Invalid credentials')).toBeTruthy();
+      screen.getByText('Invalid credentials');
     });
   });
 
@@ -230,7 +230,7 @@ describe('SignInScreen', () => {
 
     // Goes straight to code entry screen (no intermediate banner)
     await waitFor(() => {
-      expect(screen.getByTestId('sign-in-verify-code')).toBeTruthy();
+      screen.getByTestId('sign-in-verify-code');
     });
     expect(screen.queryByTestId('sign-in-verification-offer')).toBeNull();
   });
@@ -265,7 +265,7 @@ describe('SignInScreen', () => {
 
     // Wait for auto-send → code entry screen
     await waitFor(() => {
-      expect(screen.getByTestId('sign-in-verify-code')).toBeTruthy();
+      screen.getByTestId('sign-in-verify-code');
     });
 
     // Enter code and verify
@@ -317,10 +317,10 @@ describe('SignInScreen', () => {
 
     // Falls back to the passive banner (no code entry screen yet)
     await waitFor(() => {
-      expect(screen.getByTestId('sign-in-verification-offer')).toBeTruthy();
+      screen.getByTestId('sign-in-verification-offer');
     });
     expect(screen.queryByTestId('sign-in-verify-code')).toBeNull();
-    expect(screen.getByText('Send verification code')).toBeTruthy();
+    screen.getByText('Send verification code');
 
     // User can manually retry from the banner
     mockPrepareFirstFactor.mockResolvedValueOnce(undefined);
@@ -332,7 +332,7 @@ describe('SignInScreen', () => {
 
     // Now shows code entry screen
     await waitFor(() => {
-      expect(screen.getByTestId('sign-in-verify-code')).toBeTruthy();
+      screen.getByTestId('sign-in-verify-code');
     });
   });
 
@@ -374,7 +374,7 @@ describe('SignInScreen', () => {
 
     // Goes straight to code entry screen
     await waitFor(() => {
-      expect(screen.getByTestId('sign-in-verify-code')).toBeTruthy();
+      screen.getByTestId('sign-in-verify-code');
     });
 
     // Enter code and verify
@@ -420,14 +420,10 @@ describe('SignInScreen', () => {
 
     // Goes straight to code entry — no prepare call needed for TOTP
     await waitFor(() => {
-      expect(screen.getByTestId('sign-in-verify-code')).toBeTruthy();
+      screen.getByTestId('sign-in-verify-code');
     });
-    expect(screen.getByText('Enter authenticator code')).toBeTruthy();
-    expect(
-      screen.getByText(
-        'Open your authenticator app and enter the 6-digit code.'
-      )
-    ).toBeTruthy();
+    screen.getByText('Enter authenticator code');
+    screen.getByText('Open your authenticator app and enter the 6-digit code.');
 
     // No prepare calls — TOTP codes are generated locally
     expect(mockPrepareFirstFactor).not.toHaveBeenCalled();
@@ -460,7 +456,7 @@ describe('SignInScreen', () => {
 
     // Wait for code entry screen
     await waitFor(() => {
-      expect(screen.getByTestId('sign-in-verify-code')).toBeTruthy();
+      screen.getByTestId('sign-in-verify-code');
     });
 
     // Enter TOTP code and verify
@@ -509,7 +505,7 @@ describe('SignInScreen', () => {
 
     // Should use TOTP (no prepare, no email sent)
     await waitFor(() => {
-      expect(screen.getByText('Enter authenticator code')).toBeTruthy();
+      screen.getByText('Enter authenticator code');
     });
     expect(mockPrepareSecondFactor).not.toHaveBeenCalled();
   });
@@ -532,14 +528,12 @@ describe('SignInScreen', () => {
     fireEvent.press(screen.getByTestId('sign-in-button'));
 
     await waitFor(() => {
-      expect(
-        screen.getByText(
-          "This account requires a security key or passkey which isn't available on mobile yet."
-        )
-      ).toBeTruthy();
+      screen.getByText(
+        "This account requires a security key or passkey which isn't available on mobile yet."
+      );
     });
 
-    expect(screen.getByTestId('sign-in-unsupported-factor-help')).toBeTruthy();
+    screen.getByTestId('sign-in-unsupported-factor-help');
     // No SSO providers: help text should NOT mention "Google or Apple"
     expect(screen.queryByText(/Google or Apple/)).toBeNull();
   });
@@ -560,9 +554,9 @@ describe('SignInScreen', () => {
     fireEvent.press(screen.getByTestId('sign-in-button'));
 
     await waitFor(() => {
-      expect(screen.getByText('Enter a backup code')).toBeTruthy();
+      screen.getByText('Enter a backup code');
     });
-    expect(screen.getByTestId('sign-in-verify-code')).toBeTruthy();
+    screen.getByTestId('sign-in-verify-code');
   });
 
   it('successfully verifies with backup_code strategy', async () => {
@@ -587,14 +581,12 @@ describe('SignInScreen', () => {
     fireEvent.press(screen.getByTestId('sign-in-button'));
 
     await waitFor(() => {
-      expect(screen.getByText('Enter a backup code')).toBeTruthy();
+      screen.getByText('Enter a backup code');
     });
 
-    expect(
-      screen.getByText(
-        'Enter one of the backup codes you saved when you set up two-factor authentication.'
-      )
-    ).toBeTruthy();
+    screen.getByText(
+      'Enter one of the backup codes you saved when you set up two-factor authentication.'
+    );
 
     // No "Resend code" button for backup_code
     expect(screen.queryByTestId('sign-in-resend-code')).toBeNull();
@@ -640,7 +632,7 @@ describe('SignInScreen', () => {
 
     // backup_code is supported — should go to code entry, not unsupported message
     await waitFor(() => {
-      expect(screen.getByText('Enter a backup code')).toBeTruthy();
+      screen.getByText('Enter a backup code');
     });
     expect(screen.queryByTestId('sign-in-unsupported-factor-help')).toBeNull();
   });
@@ -666,12 +658,10 @@ describe('SignInScreen', () => {
     fireEvent.press(screen.getByTestId('sign-in-button'));
 
     await waitFor(() => {
-      expect(
-        screen.getByTestId('sign-in-unsupported-factor-help')
-      ).toBeTruthy();
+      screen.getByTestId('sign-in-unsupported-factor-help');
     });
 
-    expect(screen.getByText(/Google or Apple/)).toBeTruthy();
+    screen.getByText(/Google or Apple/);
   });
 
   it('opens support email when unsupported MFA help is used', async () => {
@@ -692,7 +682,7 @@ describe('SignInScreen', () => {
     fireEvent.press(screen.getByTestId('sign-in-button'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('sign-in-contact-support')).toBeTruthy();
+      screen.getByTestId('sign-in-contact-support');
     });
 
     fireEvent.press(screen.getByTestId('sign-in-contact-support'));
@@ -710,11 +700,9 @@ describe('SignInScreen', () => {
     render(<SignInScreen />);
 
     await waitFor(() => {
-      expect(
-        screen.getByText(
-          'Your session expired. Sign in again to continue learning.'
-        )
-      ).toBeTruthy();
+      screen.getByText(
+        'Your session expired. Sign in again to continue learning.'
+      );
     });
   });
 
@@ -788,7 +776,7 @@ describe('SignInScreen', () => {
     fireEvent.press(screen.getByTestId('google-sso-button'));
 
     await waitFor(() => {
-      expect(screen.getByText('OAuth provider error')).toBeTruthy();
+      screen.getByText('OAuth provider error');
     });
   });
 
@@ -806,9 +794,7 @@ describe('SignInScreen', () => {
     fireEvent.press(screen.getByTestId('google-sso-button'));
 
     await waitFor(() => {
-      expect(
-        screen.getByText('Sign-in could not be completed. Please try again.')
-      ).toBeTruthy();
+      screen.getByText('Sign-in could not be completed. Please try again.');
     });
     expect(mockSetActive).not.toHaveBeenCalled();
   });
@@ -879,9 +865,7 @@ describe('SignInScreen', () => {
       fireEvent.changeText(screen.getByTestId('sign-in-password'), 'pw');
       fireEvent.press(screen.getByTestId('sign-in-button'));
 
-      await waitFor(() =>
-        expect(screen.getByTestId('sign-in-verify-code')).toBeTruthy()
-      );
+      await waitFor(() => screen.getByTestId('sign-in-verify-code'));
 
       fireEvent.changeText(screen.getByTestId('sign-in-verify-code'), '111111');
       fireEvent.press(screen.getByTestId('sign-in-verify-button'));
@@ -946,9 +930,7 @@ describe('SignInScreen', () => {
       fireEvent.changeText(screen.getByTestId('sign-in-password'), 'pw');
       fireEvent.press(screen.getByTestId('sign-in-button'));
 
-      await waitFor(() =>
-        expect(screen.getByTestId('sign-in-verify-code')).toBeTruthy()
-      );
+      await waitFor(() => screen.getByTestId('sign-in-verify-code'));
 
       fireEvent.changeText(screen.getByTestId('sign-in-verify-code'), '222222');
       fireEvent.press(screen.getByTestId('sign-in-verify-button'));
@@ -981,9 +963,7 @@ describe('SignInScreen', () => {
       fireEvent.changeText(screen.getByTestId('sign-in-password'), 'pw');
       fireEvent.press(screen.getByTestId('sign-in-button'));
 
-      await waitFor(() =>
-        expect(screen.getByTestId('sign-in-verify-code')).toBeTruthy()
-      );
+      await waitFor(() => screen.getByTestId('sign-in-verify-code'));
 
       fireEvent.changeText(screen.getByTestId('sign-in-verify-code'), '333333');
       fireEvent.press(screen.getByTestId('sign-in-verify-button'));

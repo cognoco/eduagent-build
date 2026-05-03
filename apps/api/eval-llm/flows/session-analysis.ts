@@ -1,6 +1,7 @@
 import { SESSION_ANALYSIS_PROMPT } from '../../src/services/learner-profile';
 import type { EvalProfile } from '../fixtures/profiles';
 import type { FlowDefinition, PromptMessages } from '../runner/types';
+import { callLlm } from '../runner/llm-bootstrap';
 
 // ---------------------------------------------------------------------------
 // Flow adapter — Session Analysis
@@ -102,5 +103,18 @@ export const sessionAnalysisFlow: FlowDefinition<SessionAnalysisInput> = {
         `Transcript (user msg) is a synthetic 5-turn fake for snapshot purposes.`,
       ],
     };
+  },
+
+  async runLive(
+    _input: SessionAnalysisInput,
+    messages: PromptMessages
+  ): Promise<string> {
+    return callLlm(
+      [
+        { role: 'system', content: messages.system },
+        { role: 'user', content: messages.user ?? '' },
+      ],
+      { flow: 'session-analysis', rung: 2 }
+    );
   },
 };

@@ -98,13 +98,22 @@ jest.mock('../../../lib/platform-alert', () => ({
   platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
 }));
 
+// Track whether useCurriculum was called with a refetchInterval option.
+let capturedRefetchInterval: number | false | undefined;
+
 jest.mock('../../../hooks/use-curriculum', () => ({
-  useCurriculum: () => ({
-    data: mockCurriculumIsLoading ? undefined : mockCurriculumData,
-    isLoading: mockCurriculumIsLoading,
-    isError: false,
-    refetch: mockCurriculumRefetch,
-  }),
+  useCurriculum: (
+    _subjectId: string,
+    options?: { refetchInterval?: number | false }
+  ) => {
+    capturedRefetchInterval = options?.refetchInterval;
+    return {
+      data: mockCurriculumIsLoading ? undefined : mockCurriculumData,
+      isLoading: mockCurriculumIsLoading,
+      isError: false,
+      refetch: mockCurriculumRefetch,
+    };
+  },
   useSkipTopic: () => ({ mutate: mockSkipMutate, isPending: false }),
   useUnskipTopic: () => ({ mutate: mockUnskipMutate, isPending: false }),
   useChallengeCurriculum: () => ({
@@ -181,8 +190,8 @@ describe('CurriculumReviewScreen', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByTestId('add-topic-description-input')).toBeTruthy();
-      expect(screen.getByTestId('add-topic-minutes-input')).toBeTruthy();
+      screen.getByTestId('add-topic-description-input');
+      screen.getByTestId('add-topic-minutes-input');
     });
 
     expect(screen.getByTestId('add-topic-title-input').props.value).toBe(
@@ -228,7 +237,7 @@ describe('CurriculumReviewScreen', () => {
     fireEvent.press(screen.getByTestId('add-topic-preview'));
 
     await waitFor(() => {
-      expect(screen.getByText(/went wrong on our end/i)).toBeTruthy();
+      screen.getByText(/went wrong on our end/i);
     });
   });
 
@@ -253,14 +262,14 @@ describe('CurriculumReviewScreen', () => {
   it('renders the onboarding step indicator', () => {
     render(<CurriculumReviewScreen />);
 
-    expect(screen.getByText('Step 4 of 4')).toBeTruthy();
+    screen.getByText('Step 4 of 4');
   });
 
   it('cancels add-topic modal without creating', async () => {
     render(<CurriculumReviewScreen />);
 
     fireEvent.press(screen.getByTestId('add-topic-button'));
-    expect(screen.getByTestId('add-topic-title-input')).toBeTruthy();
+    screen.getByTestId('add-topic-title-input');
 
     fireEvent.press(screen.getByTestId('add-topic-cancel'));
 
@@ -401,9 +410,9 @@ describe('CurriculumReviewScreen', () => {
 
     render(<CurriculumReviewScreen />);
 
-    expect(screen.getByTestId('placement-check-button')).toBeTruthy();
-    expect(screen.getByTestId('continue-advanced-button')).toBeTruthy();
-    expect(screen.getByTestId('choose-different-subject-button')).toBeTruthy();
+    screen.getByTestId('placement-check-button');
+    screen.getByTestId('continue-advanced-button');
+    screen.getByTestId('choose-different-subject-button');
   });
 
   it('[BUG-692-FOLLOWUP] setShowWhyModal does not open when user navigates back during explainTopic', async () => {
@@ -419,10 +428,125 @@ describe('CurriculumReviewScreen', () => {
     fireEvent.press(screen.getByTestId('explain-topic-1'));
     fireEvent.press(screen.getByTestId('curriculum-back'));
 
-    resolveExplain('Algebra is foundational for all other maths.');
-    await new Promise((r) => setTimeout(r, 0));
+    // Resolve the pending explain promise inside act() so that the finally-block
+    // state update (setExplainingTopicId(null)) is processed within the act
+    // boundary and doesn't trigger "not wrapped in act" warnings.
+    await act(async () => {
+      resolveExplain('Algebra is foundational for all other maths.');
+      await new Promise((r) => setTimeout(r, 0));
+    });
 
-    expect(screen.queryByText('Why this order?')).toBeNull();
+    // Assert on the modal container testID, NOT on "Why this order?" text:
+    // that text also appears in the explain button (when explainingTopicId is
+    // null), so queryByText would find the button and give a false failure even
+    // when the modal is correctly closed.
+    expect(screen.queryByTestId('why-modal')).toBeNull();
+  });
+
+  // [BUG-956] Curriculum generation polling — when curriculum is null (Inngest
+  // job still running), the screen should show a "Building your curriculum…"
+  // spinner instead of the "No curriculum yet" error state and poll until data arrives.
+  describe('[BUG-956] Curriculum generation polling', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+      capturedRefetchInterval = undefined;
+      // Simulate: server has no curriculum yet (Inngest in-flight).
+      mockCurriculumData = null as unknown as typeof mockCurriculumData;
+      mockCurriculumIsLoading = false;
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+      // Restore default curriculum data for subsequent tests.
+      mockCurriculumData = {
+        id: 'curriculum-1',
+        subjectId: 'subject-1',
+        version: 1,
+        topics: [
+          {
+            id: 'topic-1',
+            title: 'Algebra Basics',
+            description: 'Intro to expressions',
+            sortOrder: 0,
+            relevance: 'core',
+            estimatedMinutes: 20,
+            skipped: false,
+          },
+        ],
+      };
+    });
+
+    it('shows generating spinner instead of "No curriculum yet" when curriculum is null', () => {
+      render(<CurriculumReviewScreen />);
+
+      // Should show the generating panel, not the "No curriculum yet" error.
+      screen.getByTestId('curriculum-generating');
+      expect(screen.queryByTestId('curriculum-empty')).toBeNull();
+    });
+
+    it('passes a refetchInterval to useCurriculum while polling', () => {
+      render(<CurriculumReviewScreen />);
+
+      // The hook must receive a numeric refetchInterval (>0) so React Query polls.
+      expect(typeof capturedRefetchInterval).toBe('number');
+      expect(capturedRefetchInterval).toBeGreaterThan(0);
+    });
+
+    it('shows "No curriculum yet" error after 90s poll timeout', () => {
+      render(<CurriculumReviewScreen />);
+
+      // Before timeout: generating panel visible.
+      screen.getByTestId('curriculum-generating');
+
+      act(() => {
+        jest.advanceTimersByTime(90_000);
+      });
+
+      // After timeout: error fallback visible with retry.
+      screen.getByTestId('curriculum-empty');
+      expect(screen.queryByTestId('curriculum-generating')).toBeNull();
+    });
+
+    it('does NOT show the error panel before the 90s timeout elapses', () => {
+      render(<CurriculumReviewScreen />);
+
+      act(() => {
+        jest.advanceTimersByTime(89_999);
+      });
+
+      screen.getByTestId('curriculum-generating');
+      expect(screen.queryByTestId('curriculum-empty')).toBeNull();
+    });
+
+    it('stops polling and shows curriculum once data arrives', async () => {
+      const { rerender } = render(<CurriculumReviewScreen />);
+
+      screen.getByTestId('curriculum-generating');
+
+      // Simulate Inngest finishing — set curriculum data and re-render.
+      mockCurriculumData = {
+        id: 'curriculum-1',
+        subjectId: 'subject-1',
+        version: 1,
+        topics: [
+          {
+            id: 'topic-1',
+            title: 'Algebra Basics',
+            description: 'Intro to expressions',
+            sortOrder: 0,
+            relevance: 'core',
+            estimatedMinutes: 20,
+            skipped: false,
+          },
+        ],
+      };
+      rerender(<CurriculumReviewScreen />);
+
+      // Curriculum is now rendered; generating panel is gone.
+      expect(screen.queryByTestId('curriculum-generating')).toBeNull();
+      expect(screen.queryByTestId('curriculum-empty')).toBeNull();
+      screen.getByTestId('topic-topic-1');
+    });
   });
 
   // [BUG-UX-CURRICULUM-TIMEOUT] 30s hard UI-level timeout on curriculum load.
@@ -446,7 +570,7 @@ describe('CurriculumReviewScreen', () => {
 
       expect(screen.queryByTestId('curriculum-loading-timeout')).toBeNull();
       // Normal loading spinner is still present.
-      expect(screen.getByTestId('curriculum-loading')).toBeTruthy();
+      screen.getByTestId('curriculum-loading');
     });
 
     it('shows timeout panel with Try again and Go home after 30s', () => {
@@ -456,9 +580,9 @@ describe('CurriculumReviewScreen', () => {
         jest.advanceTimersByTime(30_000);
       });
 
-      expect(screen.getByTestId('curriculum-loading-timeout')).toBeTruthy();
-      expect(screen.getByTestId('curriculum-timeout-retry')).toBeTruthy();
-      expect(screen.getByTestId('curriculum-timeout-home')).toBeTruthy();
+      screen.getByTestId('curriculum-loading-timeout');
+      screen.getByTestId('curriculum-timeout-retry');
+      screen.getByTestId('curriculum-timeout-home');
     });
 
     it('clears the safety timeout when loading finishes before 30s (cleanup)', () => {

@@ -13,7 +13,7 @@ import {
 import DateTimePicker, {
   type DateTimePickerEvent,
 } from '@react-native-community/datetimepicker';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
 import { useApiClient } from '../lib/api-client';
@@ -71,6 +71,7 @@ function parseWebBirthDate(value: string): Date | null {
 export default function CreateProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const params = useLocalSearchParams<{ for?: 'child' }>();
   const colors = useThemeColors();
   const queryClient = useQueryClient();
   const client = useApiClient();
@@ -83,6 +84,7 @@ export default function CreateProfileScreen() {
   // to the child profile afterwards.
   const isParentAddingChild =
     activeProfile?.isOwner === true && profiles.length > 0;
+  const isAddingChild = params.for === 'child' || isParentAddingChild;
 
   const [displayName, setDisplayName] = useState('');
   const [birthDate, setBirthDate] = useState<Date | null>(null);
@@ -220,11 +222,21 @@ export default function CreateProfileScreen() {
       // as "Something went wrong on our end" — exactly what QA reported as a
       // fake 500. Surface the upgrade CTA inline so the user can act.
       if (errorHasCode(err, 'PROFILE_LIMIT_EXCEEDED')) {
+        // [BUG-947] Do NOT use `instanceof Error` here — Metro HMR can break
+        // module identity so instanceof fails even for genuine Error objects.
+        // Read `.message` via property access on the raw value instead; the
+        // `errorHasCode` guard above already confirmed the object shape is valid.
+        const rawMessage =
+          typeof err === 'object' &&
+          err !== null &&
+          'message' in err &&
+          typeof (err as { message?: unknown }).message === 'string'
+            ? (err as { message: string }).message
+            : '';
         platformAlert(
           'Upgrade required',
-          err instanceof Error && err.message
-            ? err.message
-            : 'Your subscription does not support additional profiles. Please upgrade to Family or Pro.',
+          rawMessage ||
+            'Your subscription does not support additional profiles. Please upgrade to Family or Pro.',
           [
             { text: 'Not now', style: 'cancel' },
             {
@@ -273,7 +285,7 @@ export default function CreateProfileScreen() {
       >
         <View className="flex-row items-center justify-between mb-8">
           <Text className="text-h1 font-bold text-text-primary">
-            {isParentAddingChild ? 'Add a child' : 'New profile'}
+            {isAddingChild ? 'Add a child' : 'New profile'}
           </Text>
           <Button
             variant="tertiary"
@@ -300,12 +312,12 @@ export default function CreateProfileScreen() {
 
         <View onLayout={onFieldLayout('name')}>
           <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-            {isParentAddingChild ? "Child's display name" : 'Display name'}
+            {isAddingChild ? "Child's display name" : 'Display name'}
           </Text>
           <TextInput
             className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-4"
             placeholder={
-              isParentAddingChild ? "Enter your child's name" : 'Enter name'
+              isAddingChild ? "Enter your child's name" : 'Enter name'
             }
             placeholderTextColor={colors.muted}
             value={displayName}
@@ -321,10 +333,10 @@ export default function CreateProfileScreen() {
         </View>
 
         <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-          {isParentAddingChild ? "Child's birth date" : 'Birth date'}
+          {isAddingChild ? "Child's birth date" : 'Birth date'}
         </Text>
         <Text className="text-body-sm text-text-secondary mb-2">
-          {isParentAddingChild
+          {isAddingChild
             ? "We use your child's age to personalise how their mentor talks to them and to comply with privacy laws. Minimum age is 11."
             : 'We use your age to personalise how your mentor talks to you and to comply with privacy laws. Minimum age is 11.'}
         </Text>
@@ -340,12 +352,12 @@ export default function CreateProfileScreen() {
               autoComplete="birthdate-full"
               testID="create-profile-birthdate-input"
               accessibilityLabel={
-                isParentAddingChild ? "Child's birth date" : 'Birth date'
+                isAddingChild ? "Child's birth date" : 'Birth date'
               }
               onFocus={onFieldFocus('birthdate')}
             />
             <Text className="text-caption text-text-secondary mt-2">
-              {isParentAddingChild
+              {isAddingChild
                 ? "Enter your child's birth date as YYYY-MM-DD."
                 : 'Enter your birth date as YYYY-MM-DD.'}
             </Text>
@@ -356,9 +368,7 @@ export default function CreateProfileScreen() {
             className="bg-surface rounded-input px-4 py-3 mb-2"
             disabled={loading}
             accessibilityLabel={
-              isParentAddingChild
-                ? "Select child's birth date"
-                : 'Select birth date'
+              isAddingChild ? "Select child's birth date" : 'Select birth date'
             }
             testID="create-profile-birthdate"
           >
@@ -370,7 +380,7 @@ export default function CreateProfileScreen() {
             >
               {birthDate
                 ? formatDateForDisplay(birthDate)
-                : isParentAddingChild
+                : isAddingChild
                 ? "Select your child's date of birth"
                 : 'Select date of birth'}
             </Text>

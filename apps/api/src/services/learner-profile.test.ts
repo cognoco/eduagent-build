@@ -61,7 +61,7 @@ describe('mergeInterests', () => {
       { space: oldTimestamp }
     );
     expect(interests).toEqual(['Space', 'Football']);
-    expect(timestamps['football']).toBeDefined();
+    expect(typeof timestamps['football']).toBe('string');
     // Re-mentioned interest gets its timestamp refreshed
     expect(timestamps['space']).not.toBe(oldTimestamp);
   });
@@ -1036,7 +1036,7 @@ describe('buildMemoryBlock', () => {
     };
     const result = buildMemoryBlock(profile, null, null);
     const strengthEntry = result.entries.find((e) => e.kind === 'strength');
-    expect(strengthEntry).toBeDefined();
+    expect(strengthEntry).toEqual(expect.objectContaining({}));
     expect(strengthEntry!.text).toContain('fractions');
     // Entry text must appear as substring in the full .text
     expect(result.text).toContain(strengthEntry!.text);
@@ -1110,7 +1110,7 @@ describe('buildMemoryBlock', () => {
     };
     const result = buildMemoryBlock(profile, null, null);
     const urgencyEntry = result.entries.find((e) => e.kind === 'urgency');
-    expect(urgencyEntry).toBeDefined();
+    expect(urgencyEntry).toEqual(expect.objectContaining({}));
     expect(urgencyEntry!.text).toContain('Science test');
     // Entry text must appear as substring in the full .text
     expect(result.text).toContain(urgencyEntry!.text);
@@ -1152,6 +1152,131 @@ describe('buildMemoryBlock', () => {
     expect(kinds).toContain('interest');
     expect(kinds).toContain('communication_note');
     expect(kinds).toContain('urgency');
+  });
+
+  describe('lastSessionSummary injection (B.4)', () => {
+    const summaryBase: MemoryBlockProfile = {
+      learningStyle: null,
+      interests: ['space'],
+      strengths: [],
+      struggles: [],
+      communicationNotes: [],
+      memoryEnabled: true,
+      memoryInjectionEnabled: true,
+      memoryConsentStatus: 'granted',
+      effectivenessSessionCount: 5,
+    };
+
+    it('injects last session summary when present and within char limit', () => {
+      const profile = {
+        ...summaryBase,
+        lastSessionSummary: 'Learned about quadratic equations and factoring.',
+      };
+      const block = buildMemoryBlock(profile, 'Math', null);
+      expect(block.text).toContain('Last session summary:');
+      expect(block.text).toContain('quadratic equations and factoring');
+    });
+
+    it('does not inject summary longer than 200 chars', () => {
+      const profile = {
+        ...summaryBase,
+        lastSessionSummary: 'A'.repeat(201),
+      };
+      const block = buildMemoryBlock(profile, 'Math', null);
+      expect(block.text).not.toContain('Last session summary:');
+    });
+
+    it('does not inject summary when session had fewer than 4 exchanges', () => {
+      const profile = {
+        ...summaryBase,
+        lastSessionSummary: 'Short session.',
+        lastSessionExchangeCount: 3,
+      };
+      const block = buildMemoryBlock(profile, 'Math', null);
+      expect(block.text).not.toContain('Last session summary:');
+    });
+
+    it('injects summary when session had 4+ exchanges', () => {
+      const profile = {
+        ...summaryBase,
+        lastSessionSummary: 'Covered fractions and percentages.',
+        lastSessionExchangeCount: 4,
+      };
+      const block = buildMemoryBlock(profile, 'Math', null);
+      expect(block.text).toContain('Last session summary:');
+    });
+
+    it('injects summary when exchangeCount is not provided (backwards compat)', () => {
+      const profile = {
+        ...summaryBase,
+        lastSessionSummary: 'Good progress on algebra.',
+      };
+      const block = buildMemoryBlock(profile, 'Math', null);
+      expect(block.text).toContain('Last session summary:');
+    });
+
+    it('does not inject null summary', () => {
+      const profile = {
+        ...summaryBase,
+        lastSessionSummary: null,
+      };
+      const block = buildMemoryBlock(profile, 'Math', null);
+      expect(block.text).not.toContain('Last session summary:');
+    });
+  });
+
+  describe('parkedQuestions injection (B.4)', () => {
+    const parkedBase: MemoryBlockProfile = {
+      learningStyle: null,
+      interests: [],
+      strengths: [],
+      struggles: [],
+      communicationNotes: [],
+      memoryEnabled: true,
+      memoryInjectionEnabled: true,
+      memoryConsentStatus: 'granted',
+      effectivenessSessionCount: 5,
+    };
+
+    it('injects parked questions when present', () => {
+      const profile = {
+        ...parkedBase,
+        parkedQuestions: [
+          'What is the derivative of sin(x)?',
+          'Why does gravity curve spacetime?',
+        ],
+      };
+      const block = buildMemoryBlock(profile, 'Math', null);
+      expect(block.text).toContain('Parked questions');
+      expect(block.text).toContain('derivative of sin(x)');
+    });
+
+    it('does not inject parked questions when array is empty', () => {
+      const profile = {
+        ...parkedBase,
+        parkedQuestions: [],
+      };
+      const block = buildMemoryBlock(profile, 'Math', null);
+      expect(block.text).not.toContain('Parked questions');
+    });
+
+    it('does not inject parked questions when undefined', () => {
+      const block = buildMemoryBlock(parkedBase, 'Math', null);
+      expect(block.text).not.toContain('Parked questions');
+    });
+
+    it('caps at 5 parked questions', () => {
+      const profile = {
+        ...parkedBase,
+        parkedQuestions: Array.from(
+          { length: 8 },
+          (_, i) => `Question ${i + 1}`
+        ),
+      };
+      const block = buildMemoryBlock(profile, 'Math', null);
+      expect(block.text).toContain('Question 5');
+      expect(block.text).not.toContain('Question 6');
+    });
   });
 });
 

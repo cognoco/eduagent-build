@@ -168,6 +168,12 @@ export interface ExchangeContext {
   inputMode?: InputMode;
   /** Number of completed exchanges in this session — 0 means the LLM's first turn */
   exchangeCount?: number;
+  /**
+   * Consecutive correct answers at the current escalation rung, capped at 5.
+   * Drives the ADAPTIVE ESCALATION prompt section (B.3). Computed server-side
+   * in session-exchange.ts from session_events. Undefined means no streak data.
+   */
+  correctStreak?: number;
   /** Client-side effective mode — drives mode-specific prompt sections (e.g. recitation) */
   effectiveMode?: string;
   /** Learner's display name — used to personalise the mentor's voice */

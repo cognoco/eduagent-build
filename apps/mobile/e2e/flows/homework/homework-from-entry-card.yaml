@@ -37,9 +37,9 @@ tags:
       id: "learner-screen"
     timeout: 15000
 
-# 3. Tap homework intent card (replaced coaching-card-primary)
+# 3. Tap homework action button
 - tapOn:
-    id: "intent-homework"
+    id: "home-action-homework"
 
 # 4. Camera permission screen may appear — grant it (optional, may not appear)
 - tapOn:

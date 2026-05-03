@@ -27,7 +27,7 @@ describe('vocabulary/_layout.tsx', () => {
     render(<VocabularyLayout />);
 
     const screen = capturedScreens.find((s) => s.name === '[subjectId]');
-    expect(screen).toBeDefined();
+    expect(screen).not.toBeUndefined();
     expect(screen!.getId).toBeInstanceOf(Function);
   });
 

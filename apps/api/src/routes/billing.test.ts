@@ -399,7 +399,7 @@ describe('billing routes', () => {
 
       const body = await res.json();
       expect(body.message).toContain('Subscription cancelled');
-      expect(body.currentPeriodEnd).toBeDefined();
+      expect(typeof body.currentPeriodEnd).toBe('string');
       expect(mockSubscriptionsUpdate).toHaveBeenCalledWith('sub_test123', {
         cancel_at_period_end: true,
       });
@@ -533,7 +533,7 @@ describe('billing routes', () => {
       expect(body.usage.remainingQuestions).toBe(100);
       expect(body.usage.topUpCreditsRemaining).toBe(0);
       expect(body.usage.warningLevel).toBe('none');
-      expect(body.usage.cycleResetAt).toBeDefined();
+      expect(typeof body.usage.cycleResetAt).toBe('string');
       expect(body.usage.dailyLimit).toBe(10);
       expect(body.usage.usedToday).toBe(0);
       expect(body.usage.dailyRemainingQuestions).toBe(10);

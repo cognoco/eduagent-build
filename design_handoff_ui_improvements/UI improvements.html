@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>EduAgent — UI improvement directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  html, body, #root { height: 100%; margin: 0; }
+  body { background: #ECECEF; font-family: 'Atkinson Hyperlegible', system-ui, sans-serif; }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="screens.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+const { useState } = React;
+
+function Phone({ children }) {
+  return (
+    <div style={{
+      width: 360, height: 740, borderRadius: 44, overflow: 'hidden',
+      background: '#000', border: '8px solid #1a1a1a',
+      boxShadow: '0 24px 60px rgba(0,0,0,0.4), inset 0 0 0 2px #2a2a2a',
+      position: 'relative',
+    }}>
+      <div style={{ width: '100%', height: '100%', overflow: 'hidden', borderRadius: 36 }}>
+        {children}
+      </div>
+      <div style={{
+        position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)',
+        width: 120, height: 4, borderRadius: 2, background: '#fff', opacity: 0.5,
+      }} />
+    </div>
+  );
+}
+
+function PairLabel({ kind, children }) {
+  const palette = kind === 'before'
+    ? { bg: '#f3f3f5', fg: '#6e6e92', dot: '#a0a0c0' }
+    : { bg: '#0e8f80', fg: '#fff', dot: '#2dd4bf' };
+  return (
+    <div style={{
+      display: 'inline-flex', alignItems: 'center', gap: 8,
+      padding: '6px 14px', borderRadius: 999, fontSize: 12, fontWeight: 700,
+      letterSpacing: 0.4, textTransform: 'uppercase',
+      background: palette.bg, color: palette.fg,
+    }}>
+      <span style={{ width: 8, height: 8, borderRadius: 4, background: palette.dot }} />
+      {children}
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <DesignCanvas
+      title="EduAgent — UI improvement directions"
+      subtitle="Three high-leverage screens, current vs. proposed. Each pairing isolates a specific belief about where the product is leaving value on the table."
+    >
+      {/* ────────────────── INTRO ─────────────────── */}
+      <DCSection id="intro" title="01 · The thesis">
+        <DCArtboard id="thesis" label="Where the UI is leaving value on the table" width={1080} height={520}>
+          <div style={{
+            width: '100%', height: '100%', padding: '40px 56px',
+            background: '#fff', color: '#16162e',
+            fontFamily: "'Atkinson Hyperlegible', system-ui, sans-serif",
+            display: 'flex', flexDirection: 'column', gap: 18,
+          }}>
+            <div style={{ fontSize: 14, color: '#6e6e92', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>Five observations</div>
+            <h1 style={{ fontSize: 36, fontWeight: 700, margin: 0, lineHeight: 1.15, maxWidth: 880 }}>
+              The current UI looks polished, but it presents EduAgent as <em style={{ fontStyle: 'normal', textDecoration: 'underline', textDecorationColor: '#f97316', textDecorationThickness: 3 }}>a chat app with shortcuts</em>.
+              The product spec promises <em style={{ fontStyle: 'normal', textDecoration: 'underline', textDecorationColor: '#2dd4bf', textDecorationThickness: 3 }}>a coach who has already done the thinking</em>. That gap is the opportunity.
+            </h1>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 18, marginTop: 6 }}>
+              {[
+                { n: '01', t: 'Home is a list of buttons', b: 'Six cards of equal weight. The AI\u2019s plan for tonight is invisible.' },
+                { n: '02', t: 'Memory isn\u2019t shown', b: 'The differentiator vs ChatGPT is "I remember." Currently, you have to take that on faith.' },
+                { n: '03', t: 'Session has no spine', b: 'Which escalation rung am I on? How many of my 4 exchanges left? The engine knows; the UI doesn\u2019t show it.' },
+                { n: '04', t: 'Dashboard buries the answer', b: 'Parents skim paragraphs. The retention model is the answer — make it the visual.' },
+                { n: '05', t: 'Voice toggle is a tax', b: 'A persistent ~50px toggle row for a feature most users won\u2019t flip mid-session.' },
+              ].map((x) => (
+                <div key={x.n} style={{ padding: 16, background: '#f7f7fa', borderRadius: 12, borderTop: '3px solid #2dd4bf' }}>
+                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: '#6e6e92' }}>{x.n}</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, marginTop: 6 }}>{x.t}</div>
+                  <div style={{ fontSize: 12, color: '#4a4a6a', marginTop: 6, lineHeight: 1.5 }}>{x.b}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      {/* ────────────────── HOME ─────────────────── */}
+      <DCSection id="home" title="02 · Home — Three directions, increasing in restraint">
+        <DCArtboard id="home-before" label="A · Current — LearnerScreen" width={420} height={900}>
+          <div style={{ padding: 12, background: '#f3f3f5', height: '100%', display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
+            <PairLabel kind="before">Current</PairLabel>
+            <Phone><HomeCurrent /></Phone>
+          </div>
+        </DCArtboard>
+
+        <DCArtboard id="home-after" label="B · Opinionated — Coach's plan" width={420} height={900}>
+          <div style={{ padding: 12, background: '#7f5af0', height: '100%', display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
+            <PairLabel kind="after">Direction B</PairLabel>
+            <Phone><HomeImproved /></Phone>
+          </div>
+        </DCArtboard>
+
+        <DCArtboard id="home-hybrid" label="C · Hybrid — Coach band + subject shelf" width={420} height={900}>
+          <div style={{ padding: 12, background: '#0e8f80', height: '100%', display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
+            <PairLabel kind="after">Direction C — recommended</PairLabel>
+            <Phone><HomeHybrid /></Phone>
+          </div>
+        </DCArtboard>
+
+        <DCArtboard id="home-notes" label="Comparing the directions" width={400} height={900}>
+          <div style={{ padding: 20, background: '#fff', height: '100%', overflow: 'auto' }}>
+            <Notes items={[
+              { title: 'B vs. C \u2014 what we\u2019re trading', body: 'B replaces the menu with a single AI-authored sentence. High conviction; falls apart on cold start, on disagreement, and on "I want to start something new." C keeps a predictable subject carousel as the spine and adds the coach band only when the AI has something to say.' },
+              { title: 'Continuation hint, not a topic count', body: 'Each subject card surfaces what you\u2019ll actually do if you tap \u2014 "Continue Linear equations," "Quiz: Photosynthesis," "Practice: Past tense" \u2014 not a generic "9 topics" number. Tells the kid the verb, not the inventory.' },
+              { title: 'Per-subject progress bar', body: 'Single-color, subject-tinted progress bar at the bottom of each card. Reads as momentum (how far through the current arc) rather than retention diagnostics. The strong/fading/stuck palette lives where it earns its keep \u2014 Library and Dashboard.' },
+              { title: 'Tinted icon tile', body: 'Each subject gets a rounded square icon tile in the subject\u2019s tint color. Gives subjects visual identity at a glance and matches the reference pattern Zuzana shared.' },
+              { title: 'Horizontal carousel with peek', body: 'Two cards visible at a time with a peek of a third \u2014 signals "scroll for more." "+ New subject" tile at the end, sized like a real subject card, so adding a subject is a real action not a tail-end placeholder.' },
+              { title: 'Ask anything is a chat input', body: 'Sits between subjects (what to study) and actions (what to do). Tapping drops you into a freeform Ask session. Composer-shape invites the open-ended question.' },
+              { title: 'Three actions \u2014 Study new, Homework, Practice', body: 'Equal-weight, low-stakes. "Study new" is the explicit entry to /create-subject. Practice stays first-class.' },
+              { title: 'Coach band is conditional', body: 'Data-driven: appears only when recoveryMarker, resumeTarget, or reviewSummary.totalOverdue exists. Cold start sees greeting + carousel + ask + actions. Dismissible.' },
+            ]} />
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      {/* ────────────────── SESSION ─────────────────── */}
+      <DCSection id="session" title="03 · Session — Make the pedagogy legible">
+        <DCArtboard id="session-before" label="Current — ChatShell" width={420} height={900}>
+          <div style={{ padding: 12, background: '#f3f3f5', height: '100%', display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
+            <PairLabel kind="before">Before</PairLabel>
+            <Phone><SessionCurrent /></Phone>
+          </div>
+        </DCArtboard>
+
+        <DCArtboard id="session-after" label="Improved — Escalation rung + memory chip" width={420} height={900}>
+          <div style={{ padding: 12, background: '#0e8f80', height: '100%', display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
+            <PairLabel kind="after">After</PairLabel>
+            <Phone><SessionImproved /></Phone>
+          </div>
+        </DCArtboard>
+
+        <DCArtboard id="session-notes" label="Rationale" width={400} height={900}>
+          <div style={{ padding: 20, background: '#fff', height: '100%', overflow: 'auto' }}>
+            <Notes items={[
+              { title: 'Escalation rung made visible', body: '"RUNG 2 · BUILDING · 2 of 4 exchanges" replaces "I\u2019m here to help." Maps directly to the escalation rungs (1\u20135) the engine already tracks, plus the MAX_INTERVIEW_EXCHANGES hard cap. Tells the student where they are without preaching.' },
+              { title: 'Memory chip below the header', body: '"Last week you mixed up the sign \u2014 I\u2019ll watch for that." Pulled from the topic\u2019s historical struggles. Continuity becomes felt, not promised. Drives the "I remember" differentiator.' },
+              { title: 'Verification badges, not invented signals', body: 'Badges like "TEACH-BACK CLEARED" are produced when the LLM\u2019s envelope emits the corresponding signal (evaluate / teach_back). No new state to manage \u2014 just rendering what the engine already decides.' },
+              { title: 'Mic moved into the input', body: 'Removes the persistent Text/Voice toggle row \u2014 BUG-887 already added hideInputModeToggle, so this direction matches the codebase\u2019s own conclusion. Voice toggle stays in the header for explicit mode switches.' },
+              { title: 'Inline math styling', body: 'Equations get a monospace-on-pill treatment, giving math sessions a "homework-grade" feel without forcing a full LaTeX dependency upstream.' },
+              { title: 'Animations stay earned', body: 'LightBulbAnimation while streaming and MagicPenAnimation on idle are kept \u2014 they read as rewards. New chrome doesn\u2019t replace them.' },
+            ]} />
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      {/* ────────────────── DASHBOARD ─────────────────── */}
+      <DCSection id="dashboard" title="04 · Parent dashboard — Lead with the answer">
+        <DCArtboard id="dash-before" label="Current — narrative cards" width={420} height={900}>
+          <div style={{ padding: 12, background: '#f3f3f5', height: '100%', display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
+            <PairLabel kind="before">Before</PairLabel>
+            <Phone><DashboardCurrent /></Phone>
+          </div>
+        </DCArtboard>
+
+        <DCArtboard id="dash-after" label="Improved — retention as visual spine" width={420} height={900}>
+          <div style={{ padding: 12, background: '#0e8f80', height: '100%', display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
+            <PairLabel kind="after">After</PairLabel>
+            <Phone><DashboardImproved /></Phone>
+          </div>
+        </DCArtboard>
+
+        <DCArtboard id="dash-notes" label="Rationale" width={400} height={900}>
+          <div style={{ padding: 20, background: '#fff', height: '100%', overflow: 'auto' }}>
+            <Notes items={[
+              { title: 'Headline answer first', body: '"72 min learned, 9 topics stuck." A parent gets the punchline in 2 seconds. All numbers come straight from ParentDashboardSummary fields the API already returns (progress.topicsMastered, weeklyDeltaTopicsMastered, engagementTrend).' },
+              { title: 'Retention bar = the spine', body: 'Each child gets a horizontal stacked bar \u2014 strong / fading / stuck \u2014 rolling up the per-subject retentionStatus already on the summary. The four-state palette earns its keep visually.' },
+              { title: 'Color is information, not decoration', body: 'Green strong / yellow fading / orange stuck. Identical palette to Library\u2019s topic chips and Home\u2019s subject cards \u2014 building a single visual vocabulary across the app.' },
+              { title: 'Action only when there\u2019s an action', body: 'The orange "1 topic stuck \u2014 Open \u203a" row appears only when weakCount > 0 and routes to the existing /(app)/topic/relearn flow. No "everything\u2019s great!" filler.' },
+              { title: 'Density without clutter', body: 'Two children fit comfortably above the fold on a 6.1" screen. The current narrative-card design pushes the second child below the fold on most phones.' },
+              { title: 'Numbers over narrative', body: '"Maya practiced 42 minutes this week, up from 28..." \u2192 42m, +14 vs last wk. Scannable. The sentence can live inside the per-child detail screen.' },
+              { title: 'Preserves isParentProxy guard', body: 'When viewing a child\u2019s profile in proxy mode, the existing "Sessions are private to {name}" placeholder still takes precedence \u2014 this redesign affects the rollup view only.' },
+            ]} />
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      {/* ────────────────── PRINCIPLES ─────────────────── */}
+      <DCSection id="principles" title="05 · Cross-cutting principles">
+        <DCArtboard id="principles-card" label="Apply these wherever they fit" width={1080} height={620}>
+          <div style={{
+            width: '100%', height: '100%', padding: '40px 56px',
+            background: '#16162e', color: '#f4f4f8',
+            fontFamily: "'Atkinson Hyperlegible', system-ui, sans-serif",
+            display: 'flex', flexDirection: 'column', gap: 22,
+          }}>
+            <div style={{ fontSize: 14, color: '#a0a0c0', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>Six rules to extend across the app</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24 }}>
+              {[
+                { n: '01', h: 'One primary per screen', b: 'Pick the single most important action, make it big, accent-colored, with elevation. Everything else is quieter.' },
+                { n: '02', h: 'Show, don\u2019t promise', b: 'Instead of "I remember you," surface a memory chip with a real recalled fact. Demonstration > assertion.' },
+                { n: '03', h: 'Retention palette = the brand', b: 'Strong / fading / stuck / forgotten — these four colors are your most distinctive visual asset. Use them as legend across home, session, library, dashboard.' },
+                { n: '04', h: 'Numbers over narrative', b: '42m, +14 vs last wk. The story can live in a tap-to-expand. Dashboards are scannable, not readable.' },
+                { n: '05', h: 'Reclaim space when keyboard\u2019s up', b: 'Composer takes priority. Toggles, mode-pickers, breadcrumbs all collapse or move into the input itself.' },
+                { n: '06', h: 'Earned ornament', b: 'Animations (your magic-pen, light-bulb, page-flip) appear as rewards or micro-context — not as ambient decoration.' },
+              ].map((x) => (
+                <div key={x.n} style={{ padding: 18, background: '#22224A', borderRadius: 14 }}>
+                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: '#2dd4bf', fontWeight: 700 }}>{x.n}</div>
+                  <div style={{ fontSize: 17, fontWeight: 700, marginTop: 8 }}>{x.h}</div>
+                  <div style={{ fontSize: 13, color: '#a0a0c0', marginTop: 8, lineHeight: 1.55 }}>{x.b}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ marginTop: 'auto', display: 'flex', gap: 12, alignItems: 'center', paddingTop: 18, borderTop: '1px solid #2e2e5c' }}>
+              <span style={{ fontSize: 12, color: '#6e6e92', fontFamily: "'JetBrains Mono', monospace" }}>NEXT</span>
+              <span style={{ fontSize: 13, color: '#a0a0c0' }}>Pick a direction to develop. Likely first targets: Home, then Session header, then Dashboard. Library and Practice can follow the same retention-palette rules.</span>
+            </div>
+          </div>
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

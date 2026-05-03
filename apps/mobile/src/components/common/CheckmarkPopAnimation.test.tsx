@@ -6,7 +6,7 @@ describe('CheckmarkPopAnimation', () => {
     const { getByTestId } = render(
       <CheckmarkPopAnimation testID="checkmark" />
     );
-    expect(getByTestId('checkmark')).toBeTruthy();
+    getByTestId('checkmark');
   });
 
   it('applies accessibility attributes', () => {
@@ -27,7 +27,7 @@ describe('CheckmarkPopAnimation', () => {
         strokeWidth={4}
       />
     );
-    expect(getByTestId('checkmark')).toBeTruthy();
+    getByTestId('checkmark');
   });
 
   it('calls onComplete in reduced motion mode', () => {

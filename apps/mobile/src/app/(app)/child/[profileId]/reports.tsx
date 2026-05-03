@@ -310,20 +310,11 @@ export default function ChildReportsScreen(): React.ReactElement {
             className="bg-surface rounded-card p-5 mt-4 items-center"
             testID="child-reports-empty"
           >
-            <Text className="text-4xl mb-3">📊</Text>
-            <Text className="text-h3 font-semibold text-text-primary text-center">
-              Your first report is on its way
-            </Text>
-            {/* [BUG-904] Empty state previously stacked four near-duplicate
-                copies of the same fact ("first report coming soon"). Collapse
-                to a single information line + the time context, keep the one
-                CTA. The push-notification claim was removed because it isn't
-                accurate when the parent has Push Notifications switched off. */}
             {(() => {
               const { date, timeContext } = getNextReportInfo();
               return (
                 <Text
-                  className="text-body-sm text-text-secondary text-center mt-2"
+                  className="text-body-sm text-text-secondary text-center"
                   testID="child-reports-empty-time-context"
                 >
                   {date

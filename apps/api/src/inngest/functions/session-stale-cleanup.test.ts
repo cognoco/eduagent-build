@@ -275,8 +275,8 @@ describe('session-stale-cleanup Inngest function', () => {
 
     expect(result.status).toBe('completed');
     expect(result.closedCount).toBe(1);
-    expect(result.cutoff).toBeDefined();
-    expect(result.timestamp).toBeDefined();
+    expect(typeof result.cutoff).toBe('string');
+    expect(typeof result.timestamp).toBe('string');
     // Timestamp should be between before and after
     expect(result.timestamp >= before).toBe(true);
     expect(result.timestamp <= after).toBe(true);

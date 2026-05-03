@@ -416,13 +416,13 @@ describe('session routes', () => {
       expect(res.status).toBe(201);
 
       const body = await res.json();
-      expect(body.session).toBeDefined();
+      expect(body.session).toEqual(expect.objectContaining({}));
       expect(body.session.subjectId).toBe(SUBJECT_ID);
       expect(body.session.sessionType).toBe('learning');
       expect(body.session.status).toBe('active');
       expect(body.session.escalationRung).toBe(1);
       expect(body.session.exchangeCount).toBe(0);
-      expect(body.session.startedAt).toBeDefined();
+      expect(typeof body.session.startedAt).toBe('string');
       expect(body.session.endedAt).toBeNull();
       expect(body.session.durationSeconds).toBeNull();
     });
@@ -500,7 +500,7 @@ describe('session routes', () => {
       expect(res.status).toBe(200);
 
       const body = await res.json();
-      expect(body.response).toBeDefined();
+      expect(typeof body.response).toBe('string');
       expect(body.escalationRung).toBe(1);
       expect(body.isUnderstandingCheck).toBe(false);
       expect(body.exchangeCount).toBe(1);
@@ -1021,9 +1021,9 @@ describe('session routes', () => {
       expect(res.status).toBe(200);
 
       const body = await res.json();
-      expect(body.summary).toBeDefined();
+      expect(body.summary).toEqual(expect.objectContaining({}));
       expect(body.summary.sessionId).toBe(SESSION_ID);
-      expect(body.summary.aiFeedback).toBeDefined();
+      expect(typeof body.summary.aiFeedback).toBe('string');
       expect(body.summary.status).toBe('accepted');
       expect(mockInngestSend).toHaveBeenCalledWith({
         name: 'app/session.completed',
@@ -1855,7 +1855,7 @@ describe('session routes', () => {
 
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(body.session).toBeDefined();
+      expect(body.session).toEqual(expect.objectContaining({}));
       expect(mockInngestSend).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'app/filing.retry' })
       );

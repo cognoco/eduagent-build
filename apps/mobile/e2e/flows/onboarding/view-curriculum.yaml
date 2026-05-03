@@ -24,7 +24,7 @@ tags:
 
 # 3. Intent card stack should be present on home screen
 - assertVisible:
-    id: "learner-intent-stack"
+    id: "home-subject-carousel"
     optional: true
 
 # REMOVED (Rule 3): "Your coach has a plan" assertion dropped — this heading
@@ -68,7 +68,7 @@ tags:
 
 # 12. Intent card stack still visible after round-trip (replaced "Your subjects" heading)
 - assertVisible:
-    id: "learner-intent-stack"
+    id: "home-subject-carousel"
 
 # 13. Screenshot
 - takeScreenshot: view-curriculum-03-back-home

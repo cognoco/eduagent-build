@@ -141,7 +141,7 @@ afterEach(() => {
 
 describe('trialExpiry', () => {
   it('should be defined as an Inngest function', () => {
-    expect(trialExpiry).toBeDefined();
+    expect(trialExpiry).toBeTruthy();
   });
 
   it('should have the correct function id', () => {

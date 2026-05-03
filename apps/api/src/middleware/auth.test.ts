@@ -4,6 +4,29 @@ import type { AuthEnv } from './auth';
 import { BASE_AUTH_ENV } from '../test-utils/test-env';
 
 // ---------------------------------------------------------------------------
+// Mock sentry + logger — external observability boundaries
+// ---------------------------------------------------------------------------
+
+jest.mock('../services/sentry', () => ({
+  captureException: jest.fn(),
+  addBreadcrumb: jest.fn(),
+}));
+
+jest.mock('../services/logger', () => ({
+  createLogger: jest.fn(() => ({
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+  })),
+}));
+
+const sentryMock = require('../services/sentry') as {
+  captureException: jest.Mock;
+  addBreadcrumb: jest.Mock;
+};
+
+// ---------------------------------------------------------------------------
 // Mock jwt.ts — avoids real Web Crypto / JWKS calls in unit tests
 // ---------------------------------------------------------------------------
 
@@ -68,6 +91,7 @@ describe('authMiddleware', () => {
       sub: 'user_default',
       exp: Math.floor(Date.now() / 1000) + 3600,
     });
+    // sentry mocks are cleared by clearAllMocks(); no persistent implementations needed
   });
 
   describe('public paths', () => {
@@ -188,6 +212,78 @@ describe('authMiddleware', () => {
       );
 
       expect(res.status).toBe(200);
+    });
+  });
+
+  // [Finding #3] Structured logging for JWKS/network failures vs. normal token failures
+  describe('error classification: JWKS/network failures vs. token validation failures', () => {
+    it('calls captureException when verifyJWT rejects with a JWKS fetch error', async () => {
+      jwtMock.verifyJWT.mockRejectedValueOnce(
+        new Error('Failed to fetch JWKS: 503 Service Unavailable')
+      );
+
+      const app = createTestApp();
+      await app.request(
+        '/v1/me',
+        { headers: { Authorization: 'Bearer some.jwt.token' } },
+        TEST_ENV
+      );
+
+      expect(sentryMock.captureException).toHaveBeenCalledTimes(1);
+      expect(sentryMock.addBreadcrumb).not.toHaveBeenCalled();
+    });
+
+    it('calls captureException when verifyJWT rejects with an AbortError (timeout)', async () => {
+      const abortError = new DOMException(
+        'The user aborted a request.',
+        'AbortError'
+      );
+      jwtMock.verifyJWT.mockRejectedValueOnce(abortError);
+
+      const app = createTestApp();
+      await app.request(
+        '/v1/me',
+        { headers: { Authorization: 'Bearer some.jwt.token' } },
+        TEST_ENV
+      );
+
+      expect(sentryMock.captureException).toHaveBeenCalledTimes(1);
+      expect(sentryMock.addBreadcrumb).not.toHaveBeenCalled();
+    });
+
+    it('does NOT call captureException for normal token validation failures', async () => {
+      jwtMock.verifyJWT.mockRejectedValueOnce(
+        new Error('Invalid JWT: expired')
+      );
+
+      const app = createTestApp();
+      const res = await app.request(
+        '/v1/me',
+        { headers: { Authorization: 'Bearer some.jwt.token' } },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(401);
+      expect(sentryMock.captureException).not.toHaveBeenCalled();
+      expect(sentryMock.addBreadcrumb).toHaveBeenCalledTimes(1);
+    });
+
+    it('always returns 401 regardless of error type', async () => {
+      jwtMock.verifyJWT.mockRejectedValueOnce(
+        new Error('Failed to fetch JWKS: network error')
+      );
+
+      const app = createTestApp();
+      const res = await app.request(
+        '/v1/me',
+        { headers: { Authorization: 'Bearer some.jwt.token' } },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(401);
+      const body = await res.json();
+      expect(body.code).toBe('UNAUTHORIZED');
+      expect(body.message).toBe('Invalid or expired token');
     });
   });
 

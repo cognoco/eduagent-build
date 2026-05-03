@@ -68,11 +68,26 @@ export function useSubjectProgress(
   });
 }
 
-export function useOverallProgress() {
+export interface OverallProgressResponse {
+  subjects: {
+    subjectId: string;
+    name: string;
+    topicsTotal: number;
+    topicsCompleted: number;
+    topicsVerified: number;
+    urgencyScore: number;
+    retentionStatus: 'strong' | 'fading' | 'weak' | 'forgotten';
+    lastSessionAt: string | null;
+  }[];
+  totalTopicsCompleted: number;
+  totalTopicsVerified: number;
+}
+
+export function useOverallProgress(): UseQueryResult<OverallProgressResponse> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
-  return useQuery({
+  return useQuery<OverallProgressResponse>({
     queryKey: ['progress', 'overview', activeProfile?.id],
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
@@ -82,7 +97,7 @@ export function useOverallProgress() {
           { init: { signal } }
         );
         await assertOk(res);
-        return await res.json();
+        return (await res.json()) as OverallProgressResponse;
       } finally {
         cleanup();
       }

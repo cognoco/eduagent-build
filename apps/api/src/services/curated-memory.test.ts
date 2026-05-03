@@ -54,7 +54,7 @@ describe('buildCuratedMemoryView', () => {
     const struggleCategory = result.categories.find(
       (c) => c.label === 'Struggles with'
     );
-    expect(struggleCategory).toBeDefined();
+    expect(struggleCategory).toEqual(expect.objectContaining({}));
     expect(struggleCategory!.items[0]).toEqual({
       category: 'struggles',
       value: 'fractions',
@@ -71,7 +71,7 @@ describe('buildCuratedMemoryView', () => {
     const strengthCategory = result.categories.find(
       (c) => c.label === 'Strengths'
     );
-    expect(strengthCategory).toBeDefined();
+    expect(strengthCategory).toEqual(expect.objectContaining({}));
     expect(strengthCategory!.items[0]).toEqual({
       category: 'strengths',
       value: 'Science',
@@ -88,7 +88,7 @@ describe('buildCuratedMemoryView', () => {
     const styleCategory = result.categories.find(
       (c) => c.label === 'Learning style'
     );
-    expect(styleCategory).toBeDefined();
+    expect(styleCategory).toEqual(expect.objectContaining({}));
     expect(styleCategory!.items).toHaveLength(2);
     expect(styleCategory!.items[0]!.category).toBe('learningStyle');
     expect(styleCategory!.items[0]!.value).toBe('modality');
@@ -114,7 +114,7 @@ describe('buildCuratedMemoryView', () => {
     const notesCategory = result.categories.find(
       (c) => c.label === 'Learning pace & notes'
     );
-    expect(notesCategory).toBeDefined();
+    expect(notesCategory).toEqual(expect.objectContaining({}));
     expect(notesCategory!.items).toHaveLength(2);
     expect(notesCategory!.items[0]!.statement).toBe('Needs extra think time');
   });

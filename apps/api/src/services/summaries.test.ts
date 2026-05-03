@@ -81,7 +81,7 @@ describe('evaluateSummary', () => {
     );
 
     expect(result.hasUnderstandingGaps).toBe(true);
-    expect(result.gapAreas).toBeDefined();
+    expect(Array.isArray(result.gapAreas)).toBe(true);
     expect(result.gapAreas).toContain('let vs const distinction');
     expect(result.isAccepted).toBe(false);
   });

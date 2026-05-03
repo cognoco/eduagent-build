@@ -169,11 +169,11 @@ describe('AccordionTopicList', () => {
       />
     );
 
-    expect(screen.getByText('Started')).toBeTruthy();
-    expect(screen.getByText('Mastered')).toBeTruthy();
-    expect(screen.getByText('Covered')).toBeTruthy();
-    expect(screen.getByText('Needs review')).toBeTruthy();
-    expect(screen.getByTestId('retention-signal-fading')).toBeTruthy();
+    screen.getByText('Started');
+    screen.getByText('Mastered');
+    screen.getByText('Covered');
+    screen.getByText('Needs review');
+    screen.getByTestId('retention-signal-fading');
 
     fireEvent.press(screen.getByTestId('accordion-topic-topic-1'));
 
@@ -208,7 +208,7 @@ describe('AccordionTopicList', () => {
       />
     );
 
-    expect(screen.getByText('No topics yet')).toBeTruthy();
+    screen.getByText('No topics yet');
   });
 
   it('[UX-DE-M5] empty state shows Browse topics CTA that navigates to library', () => {
@@ -228,8 +228,8 @@ describe('AccordionTopicList', () => {
       />
     );
 
-    expect(screen.getByTestId('accordion-topics-empty')).toBeTruthy();
-    expect(screen.getByTestId('accordion-topics-browse')).toBeTruthy();
+    screen.getByTestId('accordion-topics-empty');
+    screen.getByTestId('accordion-topics-browse');
 
     fireEvent.press(screen.getByTestId('accordion-topics-browse'));
 

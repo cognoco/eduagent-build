@@ -348,7 +348,7 @@ describe('C7 subject classification ack is tentative (copy sweep 2026-04-19)', (
         (m) => typeof m.content === 'string' && m.content.includes('Geography')
       );
     });
-    expect(ackCall).toBeDefined();
+    expect(ackCall).not.toBeUndefined();
 
     const updater = ackCall![0] as (
       prev: Array<{ content?: string }>

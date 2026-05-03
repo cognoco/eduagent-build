@@ -425,8 +425,8 @@ describe('reviewVocabulary', () => {
       quality: 4,
     });
 
-    expect(result.vocabulary).toBeDefined();
-    expect(result.retention).toBeDefined();
+    expect(result.vocabulary).toEqual(expect.objectContaining({}));
+    expect(result.retention).toEqual(expect.objectContaining({}));
     expect(result.retention.vocabularyId).toBe(VOCAB_ID);
   });
 
@@ -467,8 +467,8 @@ describe('reviewVocabulary', () => {
 
     // The update was called — we verify the shape
     expect(db.update).toHaveBeenCalledTimes(2);
-    expect(result.vocabulary).toBeDefined();
-    expect(result.retention).toBeDefined();
+    expect(result.vocabulary).toEqual(expect.objectContaining({}));
+    expect(result.retention).toEqual(expect.objectContaining({}));
   });
 });
 

@@ -215,7 +215,7 @@ describe('Integration: Onboarding interview routes', () => {
     });
 
     const draft = await loadDraft(profileId, subject.id);
-    expect(draft).toBeDefined();
+    expect(draft).not.toBeUndefined();
     expect(draft!.status).toBe('in_progress');
     expect(draft!.exchangeHistory).toEqual([
       { role: 'user', content: 'Hello, I just started' },
@@ -272,7 +272,7 @@ describe('Integration: Onboarding interview routes', () => {
     expect(body.response).toBe('What specific topics interest you?');
 
     const draft = await loadDraft(profileId, subject.id);
-    expect(draft).toBeDefined();
+    expect(draft).not.toBeUndefined();
     expect(draft!.status).toBe('completing');
     expect(draft!.exchangeHistory).toHaveLength(2);
     expect(draft!.extractedSignals).toEqual({

@@ -126,10 +126,15 @@ describe('InterviewScreen', () => {
   it('renders the onboarding step indicator', () => {
     render(<InterviewScreen />);
 
-    expect(screen.getByText('Step 1 of 4')).toBeTruthy();
+    screen.getByText('Step 1 of 4');
   });
 
-  it('transitions to session phase after interview completes (input stays enabled)', async () => {
+  it('[BUG-958] shows completion card when LLM signals isComplete (no session transition)', async () => {
+    // [BUG-958] Pre-fix: LLM isComplete called transitionToSession() silently,
+    // leaving the user in a chat loop with a "Done" header button and no clear
+    // path to curriculum-review. Post-fix: the completion card ("Ready to start
+    // learning!" + "Let's Go") is shown immediately so the user has an
+    // unambiguous forward action, and no session is created on interview completion.
     mockStream.mockImplementation(
       async (
         _msg: string,
@@ -144,36 +149,24 @@ describe('InterviewScreen', () => {
     render(<InterviewScreen />);
     fireEvent.press(screen.getByTestId('chat-shell-send'));
 
-    // After interview completes, session is created and input stays enabled
     await waitFor(() => {
-      expect(mockStartSessionMutateAsync).toHaveBeenCalledWith({
-        subjectId: 'subject-1',
-        sessionType: 'learning',
-        inputMode: 'text',
-      });
-      expect(screen.getByTestId('chat-shell-input-disabled')).toHaveTextContent(
-        'false'
-      );
+      // The completion card must appear with the "Let's Go" forward action.
+      screen.getByTestId('view-curriculum-button');
     });
+
+    // startSession must NOT be called — interview completion no longer
+    // silently enters a session phase. [BUG-958]
+    expect(mockStartSessionMutateAsync).not.toHaveBeenCalled();
   });
 
-  it('surfaces retry UX when session creation fails [BUG-803]', async () => {
-    // [BUG-803] Pre-fix: failure silently swapped to a "Let's Go" card,
-    // making the user think the interview succeeded when no session ever
-    // started — and there was no retry path. Post-fix: failure surfaces
-    // the existing session-creation-stuck retry UX (Try Again + Go Back)
-    // so the user can recover.
-    mockStartSessionMutateAsync.mockRejectedValueOnce(
-      new Error('Session creation failed')
-    );
-
+  it('[BUG-958] "Let\'s Go" button on completion card navigates to the next onboarding step', async () => {
     mockStream.mockImplementation(
       async (
         _msg: string,
         onChunk: (accumulated: string) => void,
         onDone: (result: { isComplete: boolean; exchangeCount: number }) => void
       ) => {
-        onChunk('Great summary!');
+        onChunk('Done!');
         onDone({ isComplete: true, exchangeCount: 1 });
       }
     );
@@ -182,92 +175,13 @@ describe('InterviewScreen', () => {
     fireEvent.press(screen.getByTestId('chat-shell-send'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('session-creating-retry')).toBeTruthy();
-      expect(screen.getByTestId('session-creating-go-back')).toBeTruthy();
+      screen.getByTestId('view-curriculum-button');
     });
 
-    // Pre-fix Let's Go card must NOT appear — it is the regressed behavior.
-    expect(screen.queryByTestId('view-curriculum-button')).toBeNull();
-    expect(screen.queryByText("Let's Go")).toBeNull();
-  });
+    fireEvent.press(screen.getByTestId('view-curriculum-button'));
 
-  it('surfaces retry UX on session failure for language subjects too [BUG-803]', async () => {
-    // [BUG-803] Same retry-UX guarantee regardless of subject language —
-    // the failure path is language-agnostic; routing to language-setup vs
-    // analogy-preference happens only on the success path via extracted
-    // interests, not via the (now-removed) fallback card.
-    mockSearchParams = {
-      subjectId: 'subject-1',
-      subjectName: 'Spanish',
-      languageCode: 'es',
-      languageName: 'Spanish',
-      step: '1',
-      totalSteps: '4',
-    };
-    mockStartSessionMutateAsync.mockRejectedValueOnce(
-      new Error('Session creation failed')
-    );
-    mockStream.mockImplementation(
-      async (
-        _msg: string,
-        onChunk: (accumulated: string) => void,
-        onDone: (result: { isComplete: boolean; exchangeCount: number }) => void
-      ) => {
-        onChunk('Ready!');
-        onDone({ isComplete: true, exchangeCount: 1 });
-      }
-    );
-
-    render(<InterviewScreen />);
-    fireEvent.press(screen.getByTestId('chat-shell-send'));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('session-creating-retry')).toBeTruthy();
-      expect(screen.getByTestId('session-creating-go-back')).toBeTruthy();
-    });
-
-    expect(screen.queryByTestId('view-curriculum-button')).toBeNull();
-    expect(mockReplace).not.toHaveBeenCalled();
-  });
-
-  it('[BUG-817 / F-MOB-19] retry button actually re-attempts session creation', async () => {
-    // BUG-817 acceptance criterion: the failure path is recoverable. Tapping
-    // "Try Again" must call startSession again — not just show a button that
-    // looks actionable. Pre-fix the catch silently set interviewComplete and
-    // there was no retry path at all.
-    mockStartSessionMutateAsync
-      .mockRejectedValueOnce(new Error('Network blip'))
-      .mockResolvedValueOnce({ session: { id: 'sess-recovered' } });
-
-    mockStream.mockImplementation(
-      async (
-        _msg: string,
-        onChunk: (accumulated: string) => void,
-        onDone: (result: { isComplete: boolean; exchangeCount: number }) => void
-      ) => {
-        onChunk('All done!');
-        onDone({ isComplete: true, exchangeCount: 1 });
-      }
-    );
-
-    render(<InterviewScreen />);
-    fireEvent.press(screen.getByTestId('chat-shell-send'));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('session-creating-retry')).toBeTruthy();
-    });
-
-    // First attempt failed.
-    expect(mockStartSessionMutateAsync).toHaveBeenCalledTimes(1);
-
-    // Tap retry.
-    fireEvent.press(screen.getByTestId('session-creating-retry'));
-
-    // Retry must trigger a SECOND startSession call. If the retry button is
-    // wired to a no-op (the regression we are guarding against), this fails.
-    await waitFor(() => {
-      expect(mockStartSessionMutateAsync).toHaveBeenCalledTimes(2);
-    });
+    // Must navigate forward (router.replace) — not stay on the interview screen.
+    expect(mockReplace).toHaveBeenCalled();
   });
 
   it('disables input after a stream error and lets the learner retry', async () => {
@@ -290,7 +204,7 @@ describe('InterviewScreen', () => {
     fireEvent.press(screen.getByTestId('chat-shell-send'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('interview-stream-error')).toBeTruthy();
+      screen.getByTestId('interview-stream-error');
       expect(
         screen.getByText(
           "Looks like you're offline or our servers can't be reached. Check your internet connection and try again."
@@ -370,7 +284,7 @@ describe('InterviewScreen', () => {
 
       // Press skip — forceComplete goes pending and stays pending.
       await waitFor(() => {
-        expect(screen.getByTestId('skip-interview-button')).toBeTruthy();
+        screen.getByTestId('skip-interview-button');
       });
       fireEvent.press(screen.getByTestId('skip-interview-button'));
 
@@ -390,7 +304,7 @@ describe('InterviewScreen', () => {
       await waitFor(() => expect(mockStream).toHaveBeenCalledTimes(2));
 
       await waitFor(() => {
-        expect(screen.getByTestId('skip-interview-button')).toBeTruthy();
+        screen.getByTestId('skip-interview-button');
       });
       fireEvent.press(screen.getByTestId('skip-interview-button'));
 
@@ -398,8 +312,8 @@ describe('InterviewScreen', () => {
         jest.advanceTimersByTime(30_000);
       });
 
-      expect(screen.getByTestId('force-complete-timeout-error')).toBeTruthy();
-      expect(screen.getByTestId('force-complete-timeout-go-back')).toBeTruthy();
+      screen.getByTestId('force-complete-timeout-error');
+      screen.getByTestId('force-complete-timeout-go-back');
     });
 
     it('clears the safety timeout when forceComplete resolves before 30s (cleanup)', async () => {
@@ -459,14 +373,14 @@ describe('InterviewScreen', () => {
 
     // Skip button should now be visible.
     await waitFor(() => {
-      expect(screen.getByTestId('skip-interview-button')).toBeTruthy();
+      screen.getByTestId('skip-interview-button');
     });
 
     // Press skip — starts the in-flight mutation.
     fireEvent.press(screen.getByTestId('skip-interview-button'));
 
     // Simulate user navigating away (hardware back triggers useFocusEffect cleanup).
-    expect(capturedFocusCleanup).toBeDefined();
+    expect(capturedFocusCleanup).toBeInstanceOf(Function);
     capturedFocusCleanup!();
 
     // Now resolve the mutation — goToNextStep (router.replace) must NOT fire.

@@ -11,9 +11,15 @@ import type { EnrichedTopic } from '../../lib/library-filters';
 // ---------------------------------------------------------------------------
 
 const mockBack = jest.fn();
+const mockReplace = jest.fn();
+const mockCanGoBack = jest.fn();
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ back: mockBack }),
+  useRouter: () => ({
+    back: mockBack,
+    replace: mockReplace,
+    canGoBack: mockCanGoBack,
+  }),
 }));
 
 jest.mock('../../lib/theme', () => ({
@@ -109,32 +115,32 @@ describe('TopicsTab', () => {
   it('renders topic rows with subject, book, and retention info', () => {
     render(<TopicsTab {...defaultProps} />);
 
-    expect(screen.getByTestId('topic-row-topic-1')).toBeTruthy();
-    expect(screen.getByTestId('topic-row-topic-2')).toBeTruthy();
+    screen.getByTestId('topic-row-topic-1');
+    screen.getByTestId('topic-row-topic-2');
     // Topic names
-    expect(screen.getByText('Fractions')).toBeTruthy();
-    expect(screen.getByText('Pharaohs')).toBeTruthy();
+    screen.getByText('Fractions');
+    screen.getByText('Pharaohs');
     // Subject names
-    expect(screen.getByText('Mathematics')).toBeTruthy();
-    expect(screen.getByText('History')).toBeTruthy();
+    screen.getByText('Mathematics');
+    screen.getByText('History');
     // Book titles
-    expect(screen.getByText('Algebra Basics')).toBeTruthy();
-    expect(screen.getByText('Ancient Egypt')).toBeTruthy();
+    screen.getByText('Algebra Basics');
+    screen.getByText('Ancient Egypt');
     // Retention signals
-    expect(screen.getByTestId('retention-strong')).toBeTruthy();
-    expect(screen.getByTestId('retention-forgotten')).toBeTruthy();
+    screen.getByTestId('retention-strong');
+    screen.getByTestId('retention-forgotten');
     // Session counts
-    expect(screen.getByText('5 sessions')).toBeTruthy();
-    expect(screen.getByText('1 session')).toBeTruthy();
+    screen.getByText('5 sessions');
+    screen.getByText('1 session');
     // Chapter shown for topic1
-    expect(screen.getByText('Ch 1')).toBeTruthy();
+    screen.getByText('Ch 1');
   });
 
   it('shows needs-attention warning for high failure count', () => {
     render(<TopicsTab {...defaultProps} />);
 
     // topic2 has failureCount 4 (>= 3)
-    expect(screen.getByText('Needs attention')).toBeTruthy();
+    screen.getByText('Needs attention');
     // topic1 has failureCount 0, should not show warning
     const attentionTexts = screen.queryAllByText('Needs attention');
     expect(attentionTexts).toHaveLength(1);
@@ -161,8 +167,8 @@ describe('TopicsTab', () => {
     };
     render(<TopicsTab {...defaultProps} state={searchState} />);
 
-    expect(screen.getByTestId('library-no-results')).toBeTruthy();
-    expect(screen.getByText('No topics match your search')).toBeTruthy();
+    screen.getByTestId('library-no-results');
+    screen.getByText('No topics match your search');
   });
 
   it('shows "filters" message when only filter applied (BUG-512)', () => {
@@ -179,8 +185,8 @@ describe('TopicsTab', () => {
     };
     render(<TopicsTab {...defaultProps} state={filterOnlyState} />);
 
-    expect(screen.getByTestId('library-no-results')).toBeTruthy();
-    expect(screen.getByText('No topics match your filters')).toBeTruthy();
+    screen.getByTestId('library-no-results');
+    screen.getByText('No topics match your filters');
   });
 
   it('book filter matches topics by bookId (BUG-511)', () => {
@@ -198,7 +204,7 @@ describe('TopicsTab', () => {
     render(<TopicsTab {...defaultProps} state={bookFilterState} />);
 
     // topic1 has bookId 'book-1', topic2 has bookId 'book-2'
-    expect(screen.getByTestId('topic-row-topic-1')).toBeTruthy();
+    screen.getByTestId('topic-row-topic-1');
     expect(screen.queryByTestId('topic-row-topic-2')).toBeNull();
   });
 
@@ -213,8 +219,8 @@ describe('TopicsTab', () => {
     fireEvent.press(screen.getByTestId('library-filter-button'));
 
     // Disambiguated labels should appear
-    expect(screen.getByText('Uncategorized (Mathematics)')).toBeTruthy();
-    expect(screen.getByText('Uncategorized (History)')).toBeTruthy();
+    screen.getByText('Uncategorized (Mathematics)');
+    screen.getByText('Uncategorized (History)');
   });
 
   it('calls onTopicPress with topicId and subjectId', () => {
@@ -244,7 +250,7 @@ describe('TopicsTab', () => {
       <TopicsTab {...defaultProps} topics={[]} onAddSubject={onAddSubject} />
     );
 
-    expect(screen.getByTestId('library-no-content')).toBeTruthy();
+    screen.getByTestId('library-no-content');
     fireEvent.press(screen.getByTestId('library-add-subject-empty'));
     expect(onAddSubject).toHaveBeenCalledTimes(1);
   });
@@ -263,7 +269,7 @@ describe('TopicsTab', () => {
       />
     );
 
-    expect(screen.getByText('Clear search')).toBeTruthy();
+    screen.getByText('Clear search');
     fireEvent.press(screen.getByTestId('library-clear-search'));
     expect(onStateChange).toHaveBeenCalledWith({
       ...searchState,
@@ -292,7 +298,7 @@ describe('TopicsTab', () => {
       />
     );
 
-    expect(screen.getByText('Clear all')).toBeTruthy();
+    screen.getByText('Clear all');
     fireEvent.press(screen.getByTestId('library-clear-search'));
     expect(onStateChange).toHaveBeenCalledWith(TOPICS_TAB_INITIAL_STATE);
   });
@@ -318,7 +324,7 @@ describe('TopicsTab', () => {
       />
     );
 
-    expect(screen.getByText('Clear filters')).toBeTruthy();
+    screen.getByText('Clear filters');
     fireEvent.press(screen.getByTestId('library-clear-search'));
     expect(onStateChange).toHaveBeenCalledWith({
       ...filterOnlyState,
@@ -353,18 +359,32 @@ describe('TopicsTab', () => {
       <TopicsTab {...defaultProps} topics={[]} isError onRetry={onRetry} />
     );
 
-    expect(screen.getByTestId('topics-tab-error')).toBeTruthy();
+    screen.getByTestId('topics-tab-error');
     fireEvent.press(screen.getByTestId('topics-tab-retry'));
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
-  it('[UX-DE-M4] shows Go Back button when isError=true and onRetry is not provided', () => {
+  it('[UX-DE-M4] Go Back button calls router.back() when history exists (canGoBack=true)', () => {
+    mockCanGoBack.mockReturnValue(true);
     render(<TopicsTab {...defaultProps} topics={[]} isError />);
 
-    expect(screen.getByTestId('topics-tab-error')).toBeTruthy();
-    expect(screen.getByTestId('topics-tab-go-back')).toBeTruthy();
+    screen.getByTestId('topics-tab-error');
+    screen.getByTestId('topics-tab-go-back');
 
     fireEvent.press(screen.getByTestId('topics-tab-go-back'));
     expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('[UX-DE-M4][BUG-948] Go Back button replaces to /(app)/library when deep-linked (canGoBack=false)', () => {
+    mockCanGoBack.mockReturnValue(false);
+    render(<TopicsTab {...defaultProps} topics={[]} isError />);
+
+    screen.getByTestId('topics-tab-go-back');
+
+    fireEvent.press(screen.getByTestId('topics-tab-go-back'));
+    expect(mockBack).not.toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledTimes(1);
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
   });
 });

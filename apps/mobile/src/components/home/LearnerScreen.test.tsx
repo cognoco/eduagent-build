@@ -3,21 +3,57 @@ import {
   render,
   screen,
   waitFor,
-  within,
 } from '@testing-library/react-native';
+import React from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  createRoutedMockFetch,
+  extractJsonBody,
+} from '../../test-utils/mock-api-routes';
+
+const mockFetch = createRoutedMockFetch({
+  '/coaching-card': { coldStart: false, card: null, fallback: null },
+  '/quiz/missed-items/mark-surfaced': { markedCount: 1 },
+  '/progress/resume-target': { target: null },
+  '/progress/review-summary': {
+    totalOverdue: 0,
+    nextReviewTopic: null,
+    nextUpcomingReviewAt: null,
+  },
+  '/progress/overview': {
+    subjects: [],
+    totalTopicsCompleted: 0,
+    totalTopicsVerified: 0,
+  },
+  '/subjects': { subjects: [] },
+});
+
+jest.mock('../../lib/api-client', () =>
+  require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch)
+);
+
+jest.mock('../../lib/profile', () => ({
+  useProfile: () => ({
+    activeProfile: {
+      id: 'test-profile-id',
+      accountId: 'test-account-id',
+      displayName: 'Test Learner',
+      isOwner: true,
+      hasPremiumLlm: false,
+      conversationLanguage: 'en',
+      pronouns: null,
+      consentStatus: null,
+    },
+  }),
+  ProfileContext: {
+    Provider: ({ children }: { children: React.ReactNode }) => children,
+  },
+}));
 
 const mockPush = jest.fn();
 const mockReadSessionRecoveryMarker = jest.fn();
 const mockClearSessionRecoveryMarker = jest.fn();
 const mockIsRecoveryMarkerFresh = jest.fn();
-const mockUseLearningResumeTarget = jest.fn();
-const mockUseReviewSummary = jest.fn();
-const mockMarkQuizDiscoverySurfaced = jest.fn();
-
-// [CR-757] LearnerScreen uses the direct `router` singleton from expo-router
-// instead of useRouter(). Mock the singleton + the hook so any indirect
-// callers in the screen still get the same mockPush. (Hook is unused after
-// CR-757 but kept for backward compat with sibling components.)
 jest.mock('expo-router', () => ({
   router: { push: mockPush, replace: jest.fn() },
   useRouter: () => ({ push: mockPush }),
@@ -33,44 +69,22 @@ jest.mock('../common', () => ({
 }));
 
 jest.mock('../../lib/theme', () => ({
-  useThemeColors: () => ({ textPrimary: '#ffffff', primary: '#00b4d8' }),
+  useThemeColors: () => ({
+    textPrimary: '#ffffff',
+    textSecondary: '#94a3b8',
+    textTertiary: '#94a3b8',
+    primary: '#00b4d8',
+    primarySoft: 'rgba(0,180,216,0.16)',
+    border: '#2a2a54',
+  }),
+  useTheme: () => ({ colorScheme: 'dark' }),
 }));
 
 jest.mock('../../lib/greeting', () => ({
-  getGreeting: (name: string) => ({
-    title: `Good morning, ${name}!`,
+  getGreeting: (_name: string) => ({
+    title: 'Good morning!',
     subtitle: 'Fresh mind, fresh start',
   }),
-}));
-
-let mockSubjects: Array<{ id: string; name: string; status: string }> = [];
-let mockSubjectsIsLoading = false;
-let mockSubjectsIsError = false;
-const mockRefetchSubjects = jest.fn();
-
-jest.mock('../../hooks/use-subjects', () => ({
-  useSubjects: () => ({
-    data: mockSubjects,
-    isLoading: mockSubjectsIsLoading,
-    isError: mockSubjectsIsError,
-    refetch: mockRefetchSubjects,
-  }),
-}));
-
-jest.mock('../../hooks/use-progress', () => ({
-  useLearningResumeTarget: () => mockUseLearningResumeTarget(),
-  useReviewSummary: () => mockUseReviewSummary(),
-}));
-
-const mockUseQuizDiscoveryCard = jest.fn();
-const mockUseMarkQuizDiscoverySurfaced = jest.fn();
-jest.mock('../../hooks/use-coaching-card', () => ({
-  useQuizDiscoveryCard: () => mockUseQuizDiscoveryCard(),
-  useMarkQuizDiscoverySurfaced: () => mockUseMarkQuizDiscoverySurfaced(),
-}));
-
-jest.mock('./EarlyAdopterCard', () => ({
-  EarlyAdopterCard: () => null,
 }));
 
 jest.mock('../../lib/session-recovery', () => ({
@@ -82,7 +96,19 @@ jest.mock('../../lib/session-recovery', () => ({
     mockIsRecoveryMarkerFresh(...args),
 }));
 
+function createWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+  });
+  return function Wrapper({ children }: { children: React.ReactNode }) {
+    return (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+  };
+}
+
 const { LearnerScreen } = require('./LearnerScreen');
+const { fetchCallsMatching } = require('../../test-utils/mock-api-routes');
 
 const HOME_RETURN_PARAMS = { returnTo: 'learner-home' };
 
@@ -92,69 +118,85 @@ const defaultProps = {
   switchProfile: jest.fn(),
 };
 
+const QUIZ_DISCOVERY_CARD = {
+  id: 'quiz-card-1',
+  type: 'quiz_discovery',
+  title: 'Discover more',
+  body: 'Try a capitals quiz',
+  activityType: 'capitals',
+  missedItemCount: 3,
+};
+
 describe('LearnerScreen', () => {
+  let Wrapper: React.ComponentType<{ children: React.ReactNode }>;
+
   beforeEach(() => {
     jest.clearAllMocks();
-    mockSubjects = [];
-    mockSubjectsIsLoading = false;
-    mockSubjectsIsError = false;
+    mockFetch.setRoute('/coaching-card', {
+      coldStart: false,
+      card: null,
+      fallback: null,
+    });
+    mockFetch.setRoute('/quiz/missed-items/mark-surfaced', { markedCount: 1 });
+    mockFetch.setRoute('/progress/resume-target', { target: null });
+    mockFetch.setRoute('/progress/review-summary', {
+      totalOverdue: 0,
+      nextReviewTopic: null,
+      nextUpcomingReviewAt: null,
+    });
+    mockFetch.setRoute('/progress/overview', {
+      subjects: [],
+      totalTopicsCompleted: 0,
+      totalTopicsVerified: 0,
+    });
+    mockFetch.setRoute('/subjects', { subjects: [] });
     mockReadSessionRecoveryMarker.mockResolvedValue(null);
     mockClearSessionRecoveryMarker.mockResolvedValue(undefined);
     mockIsRecoveryMarkerFresh.mockReturnValue(true);
-    mockUseLearningResumeTarget.mockReturnValue({ data: null });
-    mockUseReviewSummary.mockReturnValue({ data: null });
-    mockUseQuizDiscoveryCard.mockReturnValue({ data: undefined });
-    mockUseMarkQuizDiscoverySurfaced.mockReturnValue({
-      mutate: mockMarkQuizDiscoverySurfaced,
+    Wrapper = createWrapper();
+  });
+
+  it('renders greeting with first name', async () => {
+    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      screen.getByText('Hey Alex!');
+      screen.getByText('Fresh mind, fresh start');
     });
   });
 
-  it('renders greeting with profile name', () => {
-    render(<LearnerScreen {...defaultProps} />);
+  it('shows action grid and ask-anything when no subjects', async () => {
+    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
 
-    expect(screen.getByText('Good morning, Alex!')).toBeTruthy();
-    expect(screen.getByText('Fresh mind, fresh start')).toBeTruthy();
+    await waitFor(() => {
+      screen.getByTestId('home-subject-carousel');
+      screen.getByTestId('home-ask-anything');
+      screen.getByTestId('home-action-study-new');
+      screen.getByTestId('home-action-homework');
+      screen.getByTestId('home-action-practice');
+      screen.getByTestId('home-add-subject-tile');
+    });
   });
 
-  it('shows the four always-visible intent cards in order when continue is hidden', () => {
-    render(<LearnerScreen {...defaultProps} />);
+  it('renders subject cards in carousel', async () => {
+    mockFetch.setRoute('/subjects', {
+      subjects: [
+        { id: 'sub-1', name: 'Math', status: 'active' },
+        { id: 'sub-2', name: 'Physics', status: 'active' },
+      ],
+    });
 
-    const cardIds = within(screen.getByTestId('learner-intent-stack'))
-      .getAllByRole('button')
-      .map((card) => card.props.testID);
+    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
 
-    expect(cardIds).toEqual([
-      'intent-learn',
-      'intent-ask',
-      'intent-practice',
-      'intent-homework',
-    ]);
+    await waitFor(() => {
+      screen.getByTestId('home-subject-card-sub-1');
+      screen.getByTestId('home-subject-card-sub-2');
+      screen.getByText('Math');
+      screen.getByText('Physics');
+    });
   });
 
-  it('filters session-starting intent cards in parent proxy mode', () => {
-    mockUseLearningResumeTarget.mockReturnValue({
-      data: {
-        subjectId: 's1',
-        subjectName: 'Math',
-        topicId: 't1',
-        topicTitle: 'Fractions',
-        sessionId: null,
-        resumeFromSessionId: null,
-        resumeKind: 'next_topic',
-        lastActivityAt: null,
-        reason: 'Start Fractions',
-      },
-    });
-    mockUseQuizDiscoveryCard.mockReturnValue({
-      data: {
-        id: 'quiz-card-1',
-        type: 'quiz_discovery',
-        title: 'Discover more',
-        body: 'Try a capitals quiz',
-        activityType: 'capitals',
-      },
-    });
-
+  it('hides learner-only elements in parent proxy mode', async () => {
     render(
       <LearnerScreen
         {...defaultProps}
@@ -167,64 +209,68 @@ describe('LearnerScreen', () => {
           displayName: 'Alex',
           isOwner: false,
         }}
-      />
+      />,
+      { wrapper: Wrapper }
     );
 
-    const cardIds = within(screen.getByTestId('learner-intent-stack'))
-      .getAllByRole('button')
-      .map((card) => card.props.testID);
-
-    expect(cardIds).toEqual(['intent-learn']);
-    expect(screen.queryByTestId('intent-continue')).toBeNull();
-    expect(screen.queryByTestId('intent-quiz-discovery')).toBeNull();
-    expect(screen.queryByTestId('intent-ask')).toBeNull();
-    expect(screen.getByTestId('intent-proxy-placeholder')).toBeTruthy();
-    expect(screen.getByText('Sessions are private to Alex')).toBeTruthy();
+    await waitFor(() => {
+      screen.getByTestId('home-subject-carousel');
+      expect(screen.queryByTestId('home-coach-band')).toBeNull();
+      expect(screen.queryByTestId('home-ask-anything')).toBeNull();
+      expect(screen.queryByTestId('home-action-study-new')).toBeNull();
+      expect(screen.queryByTestId('home-add-subject-tile')).toBeNull();
+      screen.getByTestId('intent-proxy-placeholder');
+      screen.getByText(/Sessions are private to Alex/);
+    });
   });
 
-  it('navigates to create-subject on the Learn card', () => {
-    render(<LearnerScreen {...defaultProps} />);
+  it('navigates to create-subject on Study new action', async () => {
+    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
 
-    fireEvent.press(screen.getByTestId('intent-learn'));
+    await waitFor(() => screen.getByTestId('home-action-study-new'));
+    fireEvent.press(screen.getByTestId('home-action-study-new'));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/create-subject',
       params: HOME_RETURN_PARAMS,
     });
   });
 
-  it('navigates to freeform session on the Ask card', () => {
-    render(<LearnerScreen {...defaultProps} />);
+  it('navigates to freeform session on Ask anything', async () => {
+    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
 
-    fireEvent.press(screen.getByTestId('intent-ask'));
+    await waitFor(() => screen.getByTestId('home-ask-anything'));
+    fireEvent.press(screen.getByTestId('home-ask-anything'));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/session',
       params: { mode: 'freeform', ...HOME_RETURN_PARAMS },
     });
   });
 
-  it('navigates to practice on the Practice card', () => {
-    render(<LearnerScreen {...defaultProps} />);
+  it('navigates to practice on Practice action', async () => {
+    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
 
-    fireEvent.press(screen.getByTestId('intent-practice'));
+    await waitFor(() => screen.getByTestId('home-action-practice'));
+    fireEvent.press(screen.getByTestId('home-action-practice'));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/practice',
       params: HOME_RETURN_PARAMS,
     });
   });
 
-  it('navigates to homework camera on the Homework card', () => {
-    render(<LearnerScreen {...defaultProps} />);
+  it('navigates to homework camera on Homework action', async () => {
+    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
 
-    fireEvent.press(screen.getByTestId('intent-homework'));
+    await waitFor(() => screen.getByTestId('home-action-homework'));
+    fireEvent.press(screen.getByTestId('home-action-homework'));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/homework/camera',
       params: HOME_RETURN_PARAMS,
     });
   });
 
-  it('shows continue card from continue suggestion when available', () => {
-    mockUseLearningResumeTarget.mockReturnValue({
-      data: {
+  it('shows coach band from resume target', async () => {
+    mockFetch.setRoute('/progress/resume-target', {
+      target: {
         subjectId: 's1',
         subjectName: 'Math',
         topicId: 't1',
@@ -237,15 +283,14 @@ describe('LearnerScreen', () => {
       },
     });
 
-    render(<LearnerScreen {...defaultProps} />);
+    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
 
-    expect(screen.getByTestId('intent-continue')).toBeTruthy();
-    expect(screen.getByText('Continue')).toBeTruthy();
-    // U1 copy sweep 2026-04-19: subtitle leads with topic, drops subject label
-    expect(screen.getByText('Pick up Fractions')).toBeTruthy();
-    expect(screen.queryByText('Math · Fractions')).toBeNull();
+    await waitFor(() => {
+      screen.getByTestId('home-coach-band');
+      screen.getByText(/Pick up where you left off in Fractions/);
+    });
 
-    fireEvent.press(screen.getByTestId('intent-continue'));
+    fireEvent.press(screen.getByTestId('home-coach-band-continue'));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/session',
       params: {
@@ -260,26 +305,26 @@ describe('LearnerScreen', () => {
     });
   });
 
-  it('shows continue card when overdue topics exist', () => {
-    mockUseReviewSummary.mockReturnValue({
-      data: {
-        totalOverdue: 3,
-        nextReviewTopic: {
-          topicId: 't1',
-          subjectId: 's1',
-          subjectName: 'Math',
-          topicTitle: 'Algebra',
-        },
-        nextUpcomingReviewAt: null,
+  it('shows coach band when overdue topics exist', async () => {
+    mockFetch.setRoute('/progress/review-summary', {
+      totalOverdue: 3,
+      nextReviewTopic: {
+        topicId: 't1',
+        subjectId: 's1',
+        subjectName: 'Math',
+        topicTitle: 'Algebra',
       },
+      nextUpcomingReviewAt: null,
     });
 
-    render(<LearnerScreen {...defaultProps} />);
+    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
 
-    expect(screen.getByTestId('intent-continue')).toBeTruthy();
-    expect(screen.getByText('Math · 3 topics to review')).toBeTruthy();
+    await waitFor(() => {
+      screen.getByTestId('home-coach-band');
+      screen.getByText(/Revisit Algebra/);
+    });
 
-    fireEvent.press(screen.getByTestId('intent-continue'));
+    fireEvent.press(screen.getByTestId('home-coach-band-continue'));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/topic/relearn',
       params: {
@@ -291,9 +336,131 @@ describe('LearnerScreen', () => {
     });
   });
 
-  it('shows recovery continue card first and clears the marker before resuming', async () => {
-    mockUseLearningResumeTarget.mockReturnValue({
-      data: {
+  it('shows recovery coach band and clears marker on Continue', async () => {
+    mockReadSessionRecoveryMarker.mockResolvedValue({
+      sessionId: 'session-1',
+      subjectId: 's1',
+      subjectName: 'Physics',
+      topicId: 't1',
+      topicName: 'Velocity',
+      mode: 'learning',
+      updatedAt: new Date().toISOString(),
+    });
+
+    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      screen.getByTestId('home-coach-band');
+      screen.getByText(/Pick up where you stopped in Velocity/);
+    });
+
+    fireEvent.press(screen.getByTestId('home-coach-band-continue'));
+    expect(mockClearSessionRecoveryMarker).toHaveBeenCalledWith('p1');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/session',
+      params: {
+        sessionId: 'session-1',
+        subjectId: 's1',
+        subjectName: 'Physics',
+        mode: 'learning',
+        topicId: 't1',
+        topicName: 'Velocity',
+        ...HOME_RETURN_PARAMS,
+      },
+    });
+  });
+
+  it('silently clears stale markers without showing coach band', async () => {
+    mockReadSessionRecoveryMarker.mockResolvedValue({
+      sessionId: 'session-1',
+      updatedAt: new Date().toISOString(),
+    });
+    mockIsRecoveryMarkerFresh.mockReturnValue(false);
+
+    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(mockClearSessionRecoveryMarker).toHaveBeenCalledWith('p1');
+    });
+
+    expect(screen.queryByTestId('home-coach-band')).toBeNull();
+  });
+
+  it('renders fallback greeting when activeProfile is null', async () => {
+    render(<LearnerScreen {...defaultProps} activeProfile={null} />, {
+      wrapper: Wrapper,
+    });
+
+    await waitFor(() => {
+      screen.getByText('Hey there!');
+    });
+  });
+
+  it('reads recovery marker with undefined profileId when activeProfile is null', async () => {
+    render(<LearnerScreen {...defaultProps} activeProfile={null} />, {
+      wrapper: Wrapper,
+    });
+
+    await waitFor(() => {
+      expect(mockReadSessionRecoveryMarker).toHaveBeenCalledWith(undefined);
+    });
+  });
+
+  it('shows back button when onBack is provided', async () => {
+    const onBack = jest.fn();
+
+    render(<LearnerScreen {...defaultProps} onBack={onBack} />, {
+      wrapper: Wrapper,
+    });
+
+    await waitFor(() => screen.getByTestId('learner-back'));
+    fireEvent.press(screen.getByTestId('learner-back'));
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides back button when onBack is not provided', async () => {
+    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+
+    await waitFor(() => screen.getByTestId('home-action-study-new'));
+    expect(screen.queryByTestId('learner-back')).toBeNull();
+  });
+
+  it('shows quiz discovery in coach band and marks surfaced on Continue', async () => {
+    mockFetch.setRoute('/coaching-card', {
+      coldStart: false,
+      card: QUIZ_DISCOVERY_CARD,
+      fallback: null,
+    });
+
+    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      screen.getByTestId('home-coach-band');
+      screen.getByText('Discover more');
+    });
+
+    fireEvent.press(screen.getByTestId('home-coach-band-continue'));
+
+    await waitFor(() => {
+      const surfacedCalls = fetchCallsMatching(
+        mockFetch,
+        '/quiz/missed-items/mark-surfaced'
+      );
+      expect(surfacedCalls.length).toBeGreaterThanOrEqual(1);
+      const body = extractJsonBody<{ activityType: string }>(
+        surfacedCalls[0]?.init
+      );
+      expect(body?.activityType).toBe('capitals');
+    });
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/quiz',
+      params: { activityType: 'capitals', ...HOME_RETURN_PARAMS },
+    });
+  });
+
+  it('dismisses coach band on dismiss tap', async () => {
+    mockFetch.setRoute('/progress/resume-target', {
+      target: {
         subjectId: 's1',
         subjectName: 'Math',
         topicId: 't1',
@@ -305,135 +472,76 @@ describe('LearnerScreen', () => {
         reason: 'Start Fractions',
       },
     });
-    mockReadSessionRecoveryMarker.mockResolvedValue({
-      sessionId: 'session-1',
-      subjectId: 's1',
-      subjectName: 'Physics',
-      topicId: 't1',
-      mode: 'learning',
-      updatedAt: new Date().toISOString(),
-    });
 
-    render(<LearnerScreen {...defaultProps} />);
+    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
 
     await waitFor(() => {
-      expect(screen.getByText('Physics · resume')).toBeTruthy();
+      screen.getByTestId('home-coach-band');
     });
 
-    const cardIds = within(screen.getByTestId('learner-intent-stack'))
-      .getAllByRole('button')
-      .map((card) => card.props.testID);
+    fireEvent.press(screen.getByTestId('home-coach-band-dismiss'));
 
-    expect(cardIds).toEqual([
-      'intent-continue',
-      'intent-learn',
-      'intent-ask',
-      'intent-practice',
-      'intent-homework',
-    ]);
+    await waitFor(() => {
+      expect(screen.queryByTestId('home-coach-band')).toBeNull();
+    });
+  });
 
-    fireEvent.press(screen.getByTestId('intent-continue'));
-    expect(mockClearSessionRecoveryMarker).toHaveBeenCalledWith('p1');
+  it('navigates to session when subject card is tapped', async () => {
+    mockFetch.setRoute('/subjects', {
+      subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+    });
+
+    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+
+    await waitFor(() => screen.getByTestId('home-subject-card-sub-1'));
+    fireEvent.press(screen.getByTestId('home-subject-card-sub-1'));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/session',
       params: {
-        sessionId: 'session-1',
-        subjectId: 's1',
-        subjectName: 'Physics',
+        subjectId: 'sub-1',
+        subjectName: 'Math',
         mode: 'learning',
-        topicId: 't1',
         ...HOME_RETURN_PARAMS,
       },
     });
   });
 
-  it('silently clears stale markers without showing the continue card', async () => {
-    mockReadSessionRecoveryMarker.mockResolvedValue({
-      sessionId: 'session-1',
-      updatedAt: new Date().toISOString(),
-    });
-    mockIsRecoveryMarkerFresh.mockReturnValue(false);
-
-    render(<LearnerScreen {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(mockClearSessionRecoveryMarker).toHaveBeenCalledWith('p1');
+  it('navigates to shelf when subject card is tapped in proxy mode', async () => {
+    mockFetch.setRoute('/subjects', {
+      subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
     });
 
-    expect(screen.queryByTestId('intent-continue')).toBeNull();
-  });
+    render(
+      <LearnerScreen
+        {...defaultProps}
+        profiles={[
+          { id: 'owner-id', displayName: 'Parent', isOwner: true },
+          { id: 'child-id', displayName: 'Alex', isOwner: false },
+        ]}
+        activeProfile={{
+          id: 'child-id',
+          displayName: 'Alex',
+          isOwner: false,
+        }}
+      />,
+      { wrapper: Wrapper }
+    );
 
-  it('renders fallback greeting when activeProfile is null', () => {
-    render(<LearnerScreen {...defaultProps} activeProfile={null} />);
-
-    expect(screen.getByText('Good morning, !')).toBeTruthy();
-  });
-
-  it('reads recovery marker with undefined profileId when activeProfile is null', async () => {
-    render(<LearnerScreen {...defaultProps} activeProfile={null} />);
-
-    await waitFor(() => {
-      expect(mockReadSessionRecoveryMarker).toHaveBeenCalledWith(undefined);
-    });
-  });
-
-  it('shows back button when onBack is provided', () => {
-    const onBack = jest.fn();
-
-    render(<LearnerScreen {...defaultProps} onBack={onBack} />);
-
-    fireEvent.press(screen.getByTestId('learner-back'));
-    expect(onBack).toHaveBeenCalledTimes(1);
-  });
-
-  it('hides back button when onBack is not provided', () => {
-    render(<LearnerScreen {...defaultProps} />);
-
-    expect(screen.queryByTestId('learner-back')).toBeNull();
-  });
-
-  it('marks quiz discovery surfaced when the card is tapped', () => {
-    mockUseQuizDiscoveryCard.mockReturnValue({
-      data: {
-        id: 'quiz-card-1',
-        type: 'quiz_discovery',
-        title: 'Discover more',
-        body: 'Try a capitals quiz',
-        activityType: 'capitals',
-      },
-    });
-
-    render(<LearnerScreen {...defaultProps} />);
-
-    fireEvent.press(screen.getByTestId('intent-quiz-discovery'));
-
-    expect(mockMarkQuizDiscoverySurfaced).toHaveBeenCalledWith('capitals');
+    await waitFor(() => screen.getByTestId('home-subject-card-sub-1'));
+    fireEvent.press(screen.getByTestId('home-subject-card-sub-1'));
     expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(app)/quiz',
-      params: { activityType: 'capitals', ...HOME_RETURN_PARAMS },
+      pathname: '/(app)/shelf/[subjectId]',
+      params: { subjectId: 'sub-1' },
     });
   });
 
-  it('marks quiz discovery surfaced and hides the card when dismissed', async () => {
-    mockUseQuizDiscoveryCard.mockReturnValue({
-      data: {
-        id: 'quiz-card-1',
-        type: 'quiz_discovery',
-        title: 'Discover more',
-        body: 'Try a capitals quiz',
-        activityType: 'capitals',
-      },
-    });
-
-    render(<LearnerScreen {...defaultProps} />);
-
-    fireEvent.press(screen.getByTestId('intent-quiz-discovery-dismiss'));
-
-    expect(mockMarkQuizDiscoverySurfaced).toHaveBeenCalledWith('capitals');
-    expect(mockPush).not.toHaveBeenCalled();
+  it('shows add-subject tile as wide card when no subjects', async () => {
+    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
 
     await waitFor(() => {
-      expect(screen.queryByTestId('intent-quiz-discovery')).toBeNull();
+      const tile = screen.getByTestId('home-add-subject-tile');
+      expect(tile).toBeTruthy();
+      screen.getByText('Add your first subject');
     });
   });
 });

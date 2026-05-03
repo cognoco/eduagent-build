@@ -1,6 +1,7 @@
 import { SYSTEM_PROMPT } from '../../src/services/dictation/prepare-homework';
 import type { EvalProfile } from '../fixtures/profiles';
 import type { FlowDefinition, PromptMessages } from '../runner/types';
+import { callLlm } from '../runner/llm-bootstrap';
 
 // ---------------------------------------------------------------------------
 // Flow adapter — Dictation: Prepare Homework
@@ -54,5 +55,18 @@ export const prepareHomeworkFlow: FlowDefinition<PrepareHomeworkInput> = {
         `No personalization surface at all. Appropriate for a pure utility.`,
       ],
     };
+  },
+
+  async runLive(
+    _input: PrepareHomeworkInput,
+    messages: PromptMessages
+  ): Promise<string> {
+    return callLlm(
+      [
+        { role: 'system', content: messages.system },
+        { role: 'user', content: messages.user ?? '' },
+      ],
+      { flow: 'dictation-prepare-homework', rung: 1 }
+    );
   },
 };

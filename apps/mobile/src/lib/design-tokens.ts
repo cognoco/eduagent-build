@@ -104,6 +104,27 @@ export const tokens: Record<ColorScheme, ThemeTokens> = {
   },
 };
 
+export const SUBJECT_TINT_PALETTE = {
+  light: [
+    { name: 'teal', solid: '#0f766e', soft: 'rgba(15,118,110,0.14)' },
+    { name: 'purple', solid: '#7c3aed', soft: 'rgba(124,58,237,0.14)' },
+    { name: 'amber', solid: '#b45309', soft: 'rgba(180,83,9,0.14)' },
+    { name: 'blue', solid: '#2563eb', soft: 'rgba(37,99,235,0.14)' },
+    { name: 'rose', solid: '#db2777', soft: 'rgba(219,39,119,0.14)' },
+  ],
+  dark: [
+    { name: 'teal', solid: '#2dd4bf', soft: 'rgba(45,212,191,0.18)' },
+    { name: 'purple', solid: '#a78bfa', soft: 'rgba(167,139,250,0.18)' },
+    { name: 'amber', solid: '#eab308', soft: 'rgba(234,179,8,0.18)' },
+    { name: 'blue', solid: '#60a5fa', soft: 'rgba(96,165,250,0.18)' },
+    { name: 'rose', solid: '#f472b6', soft: 'rgba(244,114,182,0.18)' },
+  ],
+} as const;
+
+export type SubjectTint =
+  | (typeof SUBJECT_TINT_PALETTE)['light'][number]
+  | (typeof SUBJECT_TINT_PALETTE)['dark'][number];
+
 /** Accent color overrides — only the colors that shift with the user's choice. */
 export interface AccentPreset {
   id: string;

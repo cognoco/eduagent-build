@@ -364,8 +364,104 @@ describe('streamSSEViaXHR', () => {
     }
 
     expect(caught).toBeInstanceOf(Error);
-    expect((caught as Error).message).toMatch(/500/);
+    // [BUG-955] 5xx now produces UpstreamError (not "API error 500:…") so callers
+    // can distinguish server faults from network drops by .name check.
+    expect((caught as Error).name).toBe('UpstreamError');
+    expect((caught as { status?: number }).status).toBe(500);
     // Crucial: the partial chunks must NOT have been yielded.
     expect(collected).toEqual([]);
+  });
+
+  // [BUG-955] classifyXhrError must produce typed errors for each HTTP error
+  // class so that session-types.ts can route to the correct user-facing message.
+
+  it('[BUG-955] throws UpstreamError (name=UpstreamError) for 5xx responses', async () => {
+    const xhr = installFakeXhr();
+    const { events } = streamSSEViaXHR('https://example.test/stream', {
+      method: 'POST',
+    });
+
+    xhr._emitError(500, JSON.stringify({ message: 'Internal server error' }));
+
+    let caught: unknown = null;
+    try {
+      for await (const _ of events) {
+        // drain
+      }
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as Error).name).toBe('UpstreamError');
+    expect((caught as { status?: number }).status).toBe(500);
+  });
+
+  it('[BUG-955] throws UpstreamError for 503 with no JSON body', async () => {
+    const xhr = installFakeXhr();
+    const { events } = streamSSEViaXHR('https://example.test/stream', {
+      method: 'POST',
+    });
+
+    xhr._emitError(503, 'Service Unavailable');
+
+    let caught: unknown = null;
+    try {
+      for await (const _ of events) {
+        // drain
+      }
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as Error).name).toBe('UpstreamError');
+    expect((caught as { status?: number }).status).toBe(503);
+  });
+
+  it('[BUG-955] throws an error with status 401 for session-expired mid-stream', async () => {
+    const xhr = installFakeXhr();
+    const { events } = streamSSEViaXHR('https://example.test/stream', {
+      method: 'POST',
+    });
+
+    xhr._emitError(
+      401,
+      JSON.stringify({ message: 'Session expired — please sign in again' })
+    );
+
+    let caught: unknown = null;
+    try {
+      for await (const _ of events) {
+        // drain
+      }
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as { status?: number }).status).toBe(401);
+  });
+
+  it('[BUG-955] throws NetworkError for onerror (status 0 / offline)', async () => {
+    const xhr = installFakeXhr();
+    const { events } = streamSSEViaXHR('https://example.test/stream', {
+      method: 'POST',
+    });
+
+    // Simulate onerror (no HTTP response received — CORS, offline, DNS)
+    xhr.onerror?.();
+
+    let caught: unknown = null;
+    try {
+      for await (const _ of events) {
+        // drain
+      }
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as Error).name).toBe('NetworkError');
   });
 });

@@ -15,7 +15,7 @@ export default [
   ...nx.configs['flat/typescript'],
   ...nx.configs['flat/javascript'],
   {
-    ignores: ['**/dist', '**/out-tsc', '**/coverage', '**/.nx', '**/.wrangler'],
+    ignores: ['**/dist', '**/out-tsc', '**/coverage', '**/.nx', '**/.wrangler', 'design_handoff_ui_improvements/**'],
   },
   // React/Expo config for mobile app (with deprecated rule filtered out)
   {
@@ -59,6 +59,13 @@ export default [
       '@typescript-eslint/no-non-null-assertion': 'off',
       // Test mocks and fixtures routinely use any.
       '@typescript-eslint/no-explicit-any': 'off',
+      // Re-enabled with allowShortCircuit/allowTernary for common test patterns.
+      // Bare function calls (screen.getByTestId etc.) are already exempt —
+      // the rule only flags non-call expressions with no side effects.
+      '@typescript-eslint/no-unused-expressions': ['error', {
+        allowShortCircuit: true,
+        allowTernary: true,
+      }],
     },
   },
   {

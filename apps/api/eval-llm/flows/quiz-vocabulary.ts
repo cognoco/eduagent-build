@@ -6,6 +6,7 @@ import type { Interest } from '../../src/services/quiz/config';
 import type { CefrLevel } from '@eduagent/schemas';
 import type { EvalProfile } from '../fixtures/profiles';
 import type { FlowDefinition, PromptMessages } from '../runner/types';
+import { callLlm } from '../runner/llm-bootstrap';
 
 // ---------------------------------------------------------------------------
 // Flow adapter — Quiz: Vocabulary
@@ -77,5 +78,18 @@ export const vocabularyFlow: FlowDefinition<VocabularyPromptParams> = {
         }.`,
       ],
     };
+  },
+
+  async runLive(
+    _input: VocabularyPromptParams,
+    messages: PromptMessages
+  ): Promise<string> {
+    return callLlm(
+      [
+        { role: 'system', content: messages.system },
+        { role: 'user', content: messages.user ?? 'Generate the quiz round.' },
+      ],
+      { flow: 'quiz-vocabulary', rung: 1 }
+    );
   },
 };

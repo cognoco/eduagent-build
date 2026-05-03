@@ -95,12 +95,14 @@ describe('QuizRoundDetailScreen — hint reveal', () => {
 
     fireEvent.press(screen.getByTestId('round-detail-question-0'));
 
-    expect(screen.getByTestId('round-detail-question-0-hints')).toBeTruthy();
+    screen.getByTestId('round-detail-question-0-hints');
     // After [BUG-932] fix the first clue also appears as the collapsed-row
     // prompt, so the same text now exists twice (once in the row prompt,
     // once in the expanded clues list). Both occurrences are intentional.
-    expect(screen.getAllByText('Born in Croatia in 1856.').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('He could speak eight languages.')).toBeTruthy();
+    expect(
+      screen.getAllByText('Born in Croatia in 1856.').length
+    ).toBeGreaterThanOrEqual(1);
+    screen.getByText('He could speak eight languages.');
   });
 
   it('marks clues beyond cluesUsed as "not needed"', () => {
@@ -115,7 +117,7 @@ describe('QuizRoundDetailScreen — hint reveal', () => {
     fireEvent.press(screen.getByTestId('round-detail-question-0'));
 
     // cluesUsed = 3 → indices 0,1,2 shown, 3 and 4 marked "not needed"
-    expect(screen.getByTestId('round-detail-question-0-clue-3')).toBeTruthy();
+    screen.getByTestId('round-detail-question-0-clue-3');
     expect(screen.getAllByText(/not needed/)).toHaveLength(2);
   });
 
@@ -131,7 +133,7 @@ describe('QuizRoundDetailScreen — hint reveal', () => {
 
     const card = screen.getByTestId('round-detail-question-0');
     fireEvent.press(card);
-    expect(screen.getByTestId('round-detail-question-0-hints')).toBeTruthy();
+    screen.getByTestId('round-detail-question-0-hints');
     fireEvent.press(card);
     expect(screen.queryByTestId('round-detail-question-0-hints')).toBeNull();
   });
@@ -154,7 +156,7 @@ describe('QuizRoundDetailScreen — hint reveal', () => {
       // Collapsed state: Q0 row shows first clue. The expanded clue list
       // is gated on tap, so before any press the clue appears exactly once
       // (in the row prompt) — no duplication possible.
-      expect(screen.getByText('Born in Croatia in 1856.')).toBeTruthy();
+      screen.getByText('Born in Croatia in 1856.');
       // The hints panel is NOT rendered in collapsed state — proves the
       // clue we're seeing is the row prompt, not the expanded list.
       expect(screen.queryByTestId('round-detail-question-0-hints')).toBeNull();
@@ -177,7 +179,7 @@ describe('QuizRoundDetailScreen — hint reveal', () => {
       render(<QuizRoundDetailScreen />);
 
       // Truncated form (60 chars + ellipsis) IS in the row prompt.
-      expect(screen.getByText(`${longClue.slice(0, 60)}…`)).toBeTruthy();
+      screen.getByText(`${longClue.slice(0, 60)}…`);
       // Full untruncated form is NOT visible in the collapsed view.
       expect(screen.queryByText(longClue)).toBeNull();
     });
@@ -201,7 +203,7 @@ describe('QuizRoundDetailScreen — hint reveal', () => {
       // ("Guess Who · 1/2"), so its text node won't match the exact string;
       // the only standalone "Guess Who" Text in the tree is the Q0 row
       // prompt fallback.
-      expect(screen.getByText('Guess Who')).toBeTruthy();
+      screen.getByText('Guess Who');
     });
   });
 });

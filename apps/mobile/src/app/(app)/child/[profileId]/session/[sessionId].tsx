@@ -12,6 +12,7 @@ import { useEffect, useState } from 'react';
 import { useChildSessionDetail } from '../../../../../hooks/use-dashboard';
 import { goBackOrReplace } from '../../../../../lib/navigation';
 import { EngagementChip } from '../../../../../components/parent/EngagementChip';
+import { MetricInfoDot } from '../../../../../components/parent/MetricInfoDot';
 let Clipboard: typeof import('expo-clipboard') | null = null;
 try {
   Clipboard = require('expo-clipboard');
@@ -197,7 +198,10 @@ export default function SessionDetailScreen() {
       >
         <View className="flex-row justify-between">
           <View>
-            <Text className="text-text-secondary text-xs">Duration</Text>
+            <View className="flex-row items-center gap-1">
+              <Text className="text-text-secondary text-xs">Duration</Text>
+              <MetricInfoDot metricKey="time-on-app" />
+            </View>
             <Text className="text-text-primary text-base font-medium">
               {duration || '—'}
             </Text>
@@ -215,7 +219,7 @@ export default function SessionDetailScreen() {
         <>
           {session.narrative ? (
             <View className="mx-4 mt-4 rounded-xl bg-surface p-4">
-              <Text className="text-text-secondary mb-2 text-xs font-medium uppercase">
+              <Text className="text-text-secondary mb-2 text-xs font-medium tracking-wide">
                 Session recap
               </Text>
               <Text className="text-text-primary text-base leading-relaxed">
@@ -226,7 +230,7 @@ export default function SessionDetailScreen() {
 
           {session.highlight ? (
             <View className="mx-4 mt-4 rounded-xl bg-surface p-4">
-              <Text className="text-text-secondary mb-2 text-xs font-medium uppercase">
+              <Text className="text-text-secondary mb-2 text-xs font-medium tracking-wide">
                 Highlight
               </Text>
               <Text className="text-text-primary text-base italic leading-relaxed">
@@ -237,7 +241,7 @@ export default function SessionDetailScreen() {
 
           {session.engagementSignal ? (
             <View className="mx-4 mt-4 rounded-xl bg-surface p-4">
-              <Text className="text-text-secondary mb-2 text-xs font-medium uppercase">
+              <Text className="text-text-secondary mb-2 text-xs font-medium tracking-wide">
                 Engagement
               </Text>
               <EngagementChip signal={session.engagementSignal} />
@@ -248,7 +252,7 @@ export default function SessionDetailScreen() {
             <View className="mx-4 mt-4 rounded-xl bg-surface p-4">
               <View className="flex-row items-start justify-between gap-3">
                 <View className="flex-1">
-                  <Text className="text-text-secondary mb-2 text-xs font-medium uppercase">
+                  <Text className="text-text-secondary mb-2 text-xs font-medium tracking-wide">
                     Try asking
                   </Text>
                   <Text className="text-text-primary text-base leading-relaxed">
@@ -305,7 +309,7 @@ export default function SessionDetailScreen() {
 
       {/* Summary */}
       <View className="mx-4 mt-4 rounded-xl bg-surface p-4">
-        <Text className="text-text-secondary mb-2 text-xs font-medium uppercase">
+        <Text className="text-text-secondary mb-2 text-xs font-medium tracking-wide">
           Session Summary
         </Text>
         {session.displaySummary ? (
@@ -331,7 +335,7 @@ export default function SessionDetailScreen() {
       {/* Homework details */}
       {session.homeworkSummary && (
         <View className="mx-4 mt-4 rounded-xl bg-surface p-4">
-          <Text className="text-text-secondary mb-2 text-xs font-medium uppercase">
+          <Text className="text-text-secondary mb-2 text-xs font-medium tracking-wide">
             Homework Help
           </Text>
           <Text className="text-text-primary text-base leading-relaxed">

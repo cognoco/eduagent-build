@@ -16,18 +16,6 @@ jest.mock('./retention', () => ({
   canRetestTopic: jest.fn().mockReturnValue(true),
 }));
 
-jest.mock('@eduagent/retention', () => ({
-  sm2: jest.fn().mockReturnValue({
-    card: {
-      easeFactor: 2.6,
-      interval: 6,
-      repetitions: 4,
-      lastReviewedAt: '2026-02-15T10:00:00.000Z',
-      nextReviewAt: '2026-02-21T10:00:00.000Z',
-    },
-  }),
-}));
-
 jest.mock('./adaptive-teaching', () => ({
   canExitNeedsDeepening: jest.fn(),
   checkNeedsDeepeningCapacity: jest
@@ -502,13 +490,13 @@ describe('processRecallTest', () => {
     expect(result.passed).toBe(false);
     expect(result.failureCount).toBe(3);
     expect(result.failureAction).toBe('redirect_to_library');
-    expect(result.remediation).toBeDefined();
+    expect(result.remediation).toEqual(expect.objectContaining({}));
     expect(result.remediation!.action).toBe('redirect_to_library');
     expect(result.remediation!.topicId).toBe(topicId);
     expect(result.remediation!.topicTitle).toBe('Topic 1');
     expect(result.remediation!.retentionStatus).toBe('weak');
     expect(result.remediation!.failureCount).toBe(3);
-    expect(result.remediation!.cooldownEndsAt).toBeDefined();
+    expect(typeof result.remediation!.cooldownEndsAt).toBe('string');
     expect(result.remediation!.options).toEqual([
       'review_and_retest',
       'relearn_topic',
@@ -583,7 +571,7 @@ describe('processRecallTest', () => {
       answer: 'I have no idea',
     });
 
-    expect(result.remediation).toBeDefined();
+    expect(result.remediation).toEqual(expect.objectContaining({}));
     expect(result.remediation!.topicId).toBe(topicId);
     expect(result.remediation!.topicTitle).toBe('Topic 1');
     expect(result.remediation!.action).toBe('redirect_to_library');
@@ -812,7 +800,7 @@ describe('processRecallTest', () => {
     });
 
     expect(result.cooldownActive).toBe(true);
-    expect(result.cooldownEndsAt).toBeDefined();
+    expect(typeof result.cooldownEndsAt).toBe('string');
     expect(result.passed).toBe(false);
     expect(result.xpChange).toBe('none');
   });
@@ -1603,7 +1591,7 @@ describe('ensureRetentionCard', () => {
 
     const result = await ensureRetentionCard(db, profileId, topicId);
 
-    expect(result).toBeDefined();
+    expect(result).toEqual(expect.objectContaining({}));
     expect(result.card.topicId).toBe(topicId);
     expect(result.isNew).toBe(true);
     expect(db.insert).toHaveBeenCalled();

@@ -121,7 +121,7 @@ describe('Integration: parking lot routes', () => {
     const saved = await db.query.parkingLotItems.findFirst({
       where: eq(parkingLotItems.id, body.item.id),
     });
-    expect(saved).toBeDefined();
+    expect(saved).not.toBeNull();
     expect(saved?.topicId).toBe(topicId);
   });
 

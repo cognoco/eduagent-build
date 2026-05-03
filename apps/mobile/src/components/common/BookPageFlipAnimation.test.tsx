@@ -4,7 +4,7 @@ import { BookPageFlipAnimation } from './BookPageFlipAnimation';
 describe('BookPageFlipAnimation', () => {
   it('renders without crashing', () => {
     const { getByTestId } = render(<BookPageFlipAnimation testID="book" />);
-    expect(getByTestId('book')).toBeTruthy();
+    getByTestId('book');
   });
 
   it('applies accessibility attributes', () => {
@@ -18,7 +18,7 @@ describe('BookPageFlipAnimation', () => {
     const { getByTestId } = render(
       <BookPageFlipAnimation testID="book" size={80} color="#3b82f6" />
     );
-    expect(getByTestId('book')).toBeTruthy();
+    getByTestId('book');
   });
 
   it('renders in reduced motion mode without crashing', () => {
@@ -27,7 +27,7 @@ describe('BookPageFlipAnimation', () => {
     reanimated.useReducedMotion = () => true;
 
     const { getByTestId } = render(<BookPageFlipAnimation testID="book" />);
-    expect(getByTestId('book')).toBeTruthy();
+    getByTestId('book');
 
     reanimated.useReducedMotion = original;
   });
@@ -70,7 +70,7 @@ describe('BookPageFlipAnimation', () => {
 
     // Should not throw; covers and pages are rendered but animated pages are hidden
     const { getByTestId } = render(<BookPageFlipAnimation testID="book" />);
-    expect(getByTestId('book')).toBeTruthy();
+    getByTestId('book');
 
     reanimated.useReducedMotion = original;
   });

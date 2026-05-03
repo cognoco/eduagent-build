@@ -1,13 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-// [CR-757] Use the module-scoped `router` singleton directly instead of
-// `useRouter()`. The hook returns the same singleton on every render, but
-// passing it through React's hook system makes eslint-react-hooks treat it
-// as a non-stable value that must be listed in every memo/callback dep
-// array — including `intentCards` below, which then re-runs on every
-// re-render despite the ref being stable. Skipping the hook removes the
-// false-positive dep without suppressing the lint rule.
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Profile } from '@eduagent/schemas';
@@ -18,6 +11,7 @@ import {
 } from '../../hooks/use-coaching-card';
 import {
   useLearningResumeTarget,
+  useOverallProgress,
   useReviewSummary,
 } from '../../hooks/use-progress';
 import { useSubjects } from '../../hooks/use-subjects';
@@ -32,11 +26,17 @@ import {
   readSessionRecoveryMarker,
   type SessionRecoveryMarker,
 } from '../../lib/session-recovery';
+import { FEATURE_FLAGS } from '../../lib/feature-flags';
+import { getSubjectTint } from '../../lib/subject-tints';
+import { useTheme } from '../../lib/theme';
 import { useThemeColors } from '../../lib/theme';
-import { IntentCard } from './IntentCard';
-import { EarlyAdopterCard } from './EarlyAdopterCard';
+import { CoachBand } from './CoachBand';
+import { SubjectCard } from './SubjectCard';
 
 const HOME_RETURN_PARAMS = { returnTo: LEARNER_HOME_RETURN_TO } as const;
+
+const DEFAULT_SUBJECT_ICON: React.ComponentProps<typeof Ionicons>['name'] =
+  'book-outline';
 
 export interface LearnerScreenProps {
   profiles: Profile[];
@@ -45,7 +45,6 @@ export interface LearnerScreenProps {
     profileId: string
   ) => Promise<{ success: boolean; error?: string }>;
   onBack?: () => void;
-  /** Injectable clock for deterministic testing of time-based greeting. */
   now?: Date;
 }
 
@@ -56,13 +55,13 @@ export function LearnerScreen({
   onBack,
   now,
 }: LearnerScreenProps): React.ReactElement {
-  // [CR-757] `router` is imported directly above as a module singleton — no
-  // hook call needed.
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
+  const { colorScheme } = useTheme();
   const { data: subjects, isLoading, isError, refetch } = useSubjects();
   const { data: resumeTarget } = useLearningResumeTarget();
   const { data: reviewSummary } = useReviewSummary();
+  const { data: overallProgress } = useOverallProgress();
   const { data: quizDiscovery } = useQuizDiscoveryCard();
   const markQuizDiscoverySurfaced = useMarkQuizDiscoverySurfaced();
   const [recoveryMarker, setRecoveryMarker] =
@@ -74,8 +73,14 @@ export function LearnerScreen({
     activeProfile && !activeProfile.isOwner && profiles.some((p) => p.isOwner)
   );
 
-  // [F-044] Loading timeout — show fallback after 15s so users aren't
-  // stuck on a bare spinner with no escape.
+  const coachBandDismissedRef = useRef(false);
+  const [, forceUpdate] = useState(0);
+
+  const dismissCoachBand = useCallback(() => {
+    coachBandDismissedRef.current = true;
+    forceUpdate((n) => n + 1);
+  }, []);
+
   const [loadingTimedOut, setLoadingTimedOut] = useState(false);
   useEffect(() => {
     if (!isLoading) {
@@ -106,8 +111,6 @@ export function LearnerScreen({
 
         setRecoveryMarker((current) => (current === null ? current : null));
         if (marker) {
-          // Stale marker — clear silently. The "Continue where you left off"
-          // card uses continueSuggestion (API-driven) and doesn't need this.
           void clearSessionRecoveryMarker(activeProfile?.id).catch((err) =>
             console.error('[LearnerScreen] stale marker cleanup failed:', err)
           );
@@ -130,10 +133,7 @@ export function LearnerScreen({
     setDismissedQuizDiscoveryId(null);
   }, [activeProfile?.id, quizDiscovery?.id]);
 
-  const { title, subtitle } = getGreeting(
-    activeProfile?.displayName ?? '',
-    now
-  );
+  const { subtitle } = getGreeting(activeProfile?.displayName ?? '', now);
 
   const markQuizDiscoveryHandled = useCallback(() => {
     if (!quizDiscovery) return;
@@ -141,110 +141,135 @@ export function LearnerScreen({
     markQuizDiscoverySurfaced.mutate(quizDiscovery.activityType);
   }, [markQuizDiscoverySurfaced, quizDiscovery]);
 
-  const intentCards = useMemo(() => {
-    const cards: Array<{
-      testID: string;
-      title: string;
-      subtitle?: string;
-      icon: React.ComponentProps<typeof Ionicons>['name'];
-      variant?: 'default' | 'highlight';
-      onPress?: () => void;
-      onDismiss?: () => void;
-    }> = [];
+  const subjectCards = useMemo(() => {
+    if (!subjects?.length) return [];
+    const progressBySubject = new Map(
+      (overallProgress?.subjects ?? []).map((p) => [p.subjectId, p])
+    );
+    return subjects
+      .filter((s) => s.status === 'active')
+      .map((s) => {
+        const progress = progressBySubject.get(s.id);
+        const tint = getSubjectTint(s.id, colorScheme);
+        const total = progress?.topicsTotal ?? 0;
+        const completed = progress?.topicsCompleted ?? 0;
 
-    if (!isParentProxy) {
-      if (recoveryMarker) {
-        cards.push({
-          testID: 'intent-continue',
-          title: 'Continue',
-          subtitle: `${recoveryMarker.subjectName ?? 'Session'} \u00b7 resume`,
-          icon: 'play-circle-outline',
-          variant: 'highlight',
-          onPress: () => {
-            void clearSessionRecoveryMarker(activeProfile?.id).catch((err) =>
-              console.error(
-                '[LearnerScreen] clearSessionRecoveryMarker failed:',
-                err
-              )
-            );
-            router.push({
-              pathname: '/(app)/session',
-              params: {
-                sessionId: recoveryMarker.sessionId,
-                ...(recoveryMarker.subjectId && {
-                  subjectId: recoveryMarker.subjectId,
-                }),
-                ...(recoveryMarker.subjectName && {
-                  subjectName: recoveryMarker.subjectName,
-                }),
-                ...(recoveryMarker.mode && { mode: recoveryMarker.mode }),
-                ...(recoveryMarker.topicId && {
-                  topicId: recoveryMarker.topicId,
-                }),
-                ...(recoveryMarker.topicName && {
-                  topicName: recoveryMarker.topicName,
-                }),
-                ...HOME_RETURN_PARAMS,
-              },
-            } as never);
-          },
-        });
-      } else if (resumeTarget) {
-        cards.push({
-          testID: 'intent-continue',
-          title: 'Continue',
-          subtitle: resumeTarget.topicTitle
-            ? `Pick up ${resumeTarget.topicTitle}`
-            : `Pick up ${resumeTarget.subjectName}`,
-          icon: 'play-circle-outline',
-          onPress: () =>
-            pushLearningResumeTarget(
-              router,
-              resumeTarget,
-              LEARNER_HOME_RETURN_TO
-            ),
-        });
-      } else if (
-        reviewSummary &&
-        reviewSummary.totalOverdue > 0 &&
-        reviewSummary.nextReviewTopic
-      ) {
-        cards.push({
-          testID: 'intent-continue',
-          title: 'Continue',
-          subtitle: `${reviewSummary.nextReviewTopic.subjectName} \u00b7 ${
-            reviewSummary.totalOverdue
-          } topic${reviewSummary.totalOverdue === 1 ? '' : 's'} to review`,
-          icon: 'play-circle-outline',
-          onPress: () =>
-            router.push({
-              pathname: '/(app)/topic/relearn',
-              params: {
-                topicId: reviewSummary.nextReviewTopic?.topicId,
-                subjectId: reviewSummary.nextReviewTopic?.subjectId,
-                topicName: reviewSummary.nextReviewTopic?.topicTitle,
-                ...HOME_RETURN_PARAMS,
-              },
-            } as never),
-        });
-      }
+        let hint = 'Open';
+        if (
+          resumeTarget?.subjectId === s.id &&
+          ['active_session', 'paused_session'].includes(resumeTarget.resumeKind)
+        ) {
+          hint = `Continue ${resumeTarget.topicTitle ?? s.name}`;
+        } else if (reviewSummary?.nextReviewTopic?.subjectId === s.id) {
+          hint = `Quiz: ${reviewSummary.nextReviewTopic.topicTitle}`;
+        } else if (completed > 0) {
+          hint = `Practice: ${s.name}`;
+        }
+
+        return {
+          subjectId: s.id,
+          name: s.name,
+          hint,
+          progress: total > 0 ? completed / total : 0,
+          tintSolid: tint.solid,
+          tintSoft: tint.soft,
+          icon: DEFAULT_SUBJECT_ICON,
+        };
+      });
+  }, [subjects, overallProgress, resumeTarget, reviewSummary, colorScheme]);
+
+  const coachBand = useMemo(() => {
+    if (isParentProxy) return null;
+
+    if (recoveryMarker) {
+      return {
+        headline: `Pick up where you stopped in ${
+          recoveryMarker.topicName ??
+          recoveryMarker.subjectName ??
+          'your session'
+        }.`,
+        topicHighlight: recoveryMarker.topicName ?? recoveryMarker.subjectName,
+        isQuizDriven: false,
+        quizActivityType: undefined as string | undefined,
+        onContinue: () => {
+          void clearSessionRecoveryMarker(activeProfile?.id).catch((err) =>
+            console.error(
+              '[LearnerScreen] clearSessionRecoveryMarker failed:',
+              err
+            )
+          );
+          router.push({
+            pathname: '/(app)/session',
+            params: {
+              sessionId: recoveryMarker.sessionId,
+              ...(recoveryMarker.subjectId && {
+                subjectId: recoveryMarker.subjectId,
+              }),
+              ...(recoveryMarker.subjectName && {
+                subjectName: recoveryMarker.subjectName,
+              }),
+              ...(recoveryMarker.mode && { mode: recoveryMarker.mode }),
+              ...(recoveryMarker.topicId && {
+                topicId: recoveryMarker.topicId,
+              }),
+              ...(recoveryMarker.topicName && {
+                topicName: recoveryMarker.topicName,
+              }),
+              ...HOME_RETURN_PARAMS,
+            },
+          } as never);
+        },
+      };
+    }
+
+    if (resumeTarget) {
+      return {
+        headline: `Pick up where you left off in ${
+          resumeTarget.topicTitle ?? resumeTarget.subjectName
+        }.`,
+        topicHighlight: resumeTarget.topicTitle ?? resumeTarget.subjectName,
+        isQuizDriven: false,
+        quizActivityType: undefined as string | undefined,
+        onContinue: () =>
+          pushLearningResumeTarget(
+            router,
+            resumeTarget,
+            LEARNER_HOME_RETURN_TO
+          ),
+      };
     }
 
     if (
-      !isParentProxy &&
-      quizDiscovery &&
-      dismissedQuizDiscoveryId !== quizDiscovery.id
+      reviewSummary &&
+      reviewSummary.totalOverdue > 0 &&
+      reviewSummary.nextReviewTopic
     ) {
-      cards.push({
-        testID: 'intent-quiz-discovery',
-        title: quizDiscovery.title,
-        subtitle: quizDiscovery.body,
-        icon: 'sparkles-outline',
-        variant: 'highlight',
-        onDismiss: () => {
-          markQuizDiscoveryHandled();
-        },
-        onPress: () => {
+      const topic = reviewSummary.nextReviewTopic;
+      return {
+        headline: `Revisit ${topic.topicTitle} — it's starting to fade.`,
+        topicHighlight: topic.topicTitle,
+        isQuizDriven: false,
+        quizActivityType: undefined as string | undefined,
+        onContinue: () =>
+          router.push({
+            pathname: '/(app)/topic/relearn',
+            params: {
+              topicId: topic.topicId,
+              subjectId: topic.subjectId,
+              topicName: topic.topicTitle,
+              ...HOME_RETURN_PARAMS,
+            },
+          } as never),
+      };
+    }
+
+    if (quizDiscovery && dismissedQuizDiscoveryId !== quizDiscovery.id) {
+      return {
+        headline: quizDiscovery.title,
+        topicHighlight: undefined as string | undefined,
+        isQuizDriven: true,
+        quizActivityType: quizDiscovery.activityType as string | undefined,
+        onContinue: () => {
           markQuizDiscoveryHandled();
           router.push({
             pathname: '/(app)/quiz',
@@ -254,71 +279,12 @@ export function LearnerScreen({
             },
           } as never);
         },
-      });
+      };
     }
 
-    cards.push({
-      testID: 'intent-learn',
-      title: 'Learn',
-      subtitle: 'Start a new subject or pick one',
-      icon: 'book-outline',
-      onPress: () =>
-        router.push({
-          pathname: '/create-subject',
-          params: HOME_RETURN_PARAMS,
-        } as never),
-    });
-
-    if (!isParentProxy) {
-      cards.push({
-        testID: 'intent-ask',
-        title: 'Ask',
-        subtitle: 'Get answers to any question',
-        icon: 'chatbubble-ellipses-outline',
-        onPress: () =>
-          router.push({
-            pathname: '/(app)/session',
-            params: { mode: 'freeform', ...HOME_RETURN_PARAMS },
-          } as never),
-      });
-      cards.push({
-        testID: 'intent-practice',
-        title: 'Practice',
-        subtitle: 'Games and reviews to sharpen what you know',
-        icon: 'game-controller-outline',
-        onPress: () =>
-          router.push({
-            pathname: '/(app)/practice',
-            params: HOME_RETURN_PARAMS,
-          } as never),
-      });
-      cards.push({
-        testID: 'intent-homework',
-        title: 'Homework',
-        subtitle: 'Snap a photo, get help',
-        icon: 'camera-outline',
-        onPress: () =>
-          router.push({
-            pathname: '/(app)/homework/camera',
-            params: HOME_RETURN_PARAMS,
-          } as never),
-      });
-    }
-
-    if (isParentProxy) {
-      cards.push({
-        testID: 'intent-proxy-placeholder',
-        title: `Sessions are private to ${
-          activeProfile?.displayName ?? 'this learner'
-        }`,
-        icon: 'lock-closed-outline',
-      });
-    }
-
-    return cards;
+    return null;
   }, [
     activeProfile?.id,
-    activeProfile?.displayName,
     dismissedQuizDiscoveryId,
     isParentProxy,
     markQuizDiscoveryHandled,
@@ -411,9 +377,10 @@ export function LearnerScreen({
     );
   }
 
+  const firstName = activeProfile?.displayName?.split(' ')[0] ?? 'there';
+
   return (
     <View className="flex-1 bg-background" testID="learner-screen">
-      {/* Header outside ScrollView so ProfileSwitcher dropdown isn't clipped */}
       <View
         className="flex-row items-center justify-between px-5"
         style={{
@@ -439,8 +406,10 @@ export function LearnerScreen({
             </Pressable>
           ) : null}
           <View className="flex-1">
-            <Text className="text-h2 font-bold text-text-primary">{title}</Text>
-            <Text className="text-body text-text-secondary mt-1">
+            <Text className="text-[22px] font-bold text-text-primary leading-tight">
+              Hey {firstName}!
+            </Text>
+            <Text className="text-[13px] text-text-secondary mt-0.5">
               {subtitle}
             </Text>
           </View>
@@ -454,19 +423,165 @@ export function LearnerScreen({
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{
-          paddingTop: 16,
-          paddingHorizontal: 20,
-          paddingBottom: insets.bottom + 24,
-        }}
-        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
+        showsVerticalScrollIndicator={false}
       >
-        <EarlyAdopterCard />
-        <View className="gap-4" testID="learner-intent-stack">
-          {intentCards.map((card) => (
-            <IntentCard key={card.testID} {...card} />
-          ))}
+        {FEATURE_FLAGS.COACH_BAND_ENABLED &&
+          coachBand &&
+          !coachBandDismissedRef.current && (
+            <CoachBand
+              headline={coachBand.headline}
+              topicHighlight={coachBand.topicHighlight}
+              onContinue={coachBand.onContinue}
+              onDismiss={dismissCoachBand}
+            />
+          )}
+
+        <View className="mt-1">
+          <Text className="text-[11px] font-bold uppercase tracking-wider text-text-tertiary px-5 mb-2.5">
+            YOUR SUBJECTS
+          </Text>
+          <ScrollView
+            testID="home-subject-carousel"
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
+          >
+            {subjectCards.map((card) => (
+              <SubjectCard
+                key={card.subjectId}
+                {...card}
+                testID={`home-subject-card-${card.subjectId}`}
+                onPress={() =>
+                  isParentProxy
+                    ? router.push({
+                        pathname: '/(app)/shelf/[subjectId]',
+                        params: { subjectId: card.subjectId },
+                      } as never)
+                    : router.push({
+                        pathname: '/(app)/session',
+                        params: {
+                          subjectId: card.subjectId,
+                          subjectName: card.name,
+                          mode: 'learning',
+                          ...HOME_RETURN_PARAMS,
+                        },
+                      } as never)
+                }
+              />
+            ))}
+            {!isParentProxy && (
+              <Pressable
+                testID="home-add-subject-tile"
+                onPress={() =>
+                  router.push({
+                    pathname: '/create-subject',
+                    params: HOME_RETURN_PARAMS,
+                  } as never)
+                }
+                className="rounded-2xl border border-dashed border-border items-center justify-center"
+                style={{
+                  width: subjectCards.length === 0 ? 280 : 96,
+                  height: 150,
+                  gap: 8,
+                }}
+              >
+                <Text className="text-[20px] text-text-tertiary opacity-70">
+                  ＋
+                </Text>
+                <Text className="text-xs font-bold text-text-tertiary">
+                  {subjectCards.length === 0
+                    ? 'Add your first subject'
+                    : 'New subject'}
+                </Text>
+              </Pressable>
+            )}
+          </ScrollView>
         </View>
+
+        {!isParentProxy && (
+          <Pressable
+            testID="home-ask-anything"
+            onPress={() =>
+              router.push({
+                pathname: '/(app)/session',
+                params: { mode: 'freeform', ...HOME_RETURN_PARAMS },
+              } as never)
+            }
+            className="mx-5 mt-3 mb-1.5 rounded-2xl bg-surface border border-border pl-4 pr-1.5 py-2.5 flex-row items-center"
+            style={{ gap: 8 }}
+          >
+            <Ionicons
+              name="chatbubble-ellipses-outline"
+              size={14}
+              color={colors.muted}
+            />
+            <Text className="flex-1 text-[13px] text-text-tertiary">
+              Ask anything…
+            </Text>
+            <View className="w-8 h-8 rounded-full bg-surface-elevated items-center justify-center">
+              <Ionicons name="mic-outline" size={14} color={colors.muted} />
+            </View>
+          </Pressable>
+        )}
+
+        {!isParentProxy && (
+          <View className="flex-row px-5 pt-1.5 pb-3" style={{ gap: 8 }}>
+            {(
+              [
+                {
+                  testID: 'home-action-study-new',
+                  icon: 'book-outline' as const,
+                  label: 'Study new',
+                  route: '/create-subject',
+                },
+                {
+                  testID: 'home-action-homework',
+                  icon: 'camera-outline' as const,
+                  label: 'Homework',
+                  route: '/(app)/homework/camera',
+                },
+                {
+                  testID: 'home-action-practice',
+                  icon: 'game-controller-outline' as const,
+                  label: 'Practice',
+                  route: '/(app)/practice',
+                },
+              ] as const
+            ).map((action) => (
+              <Pressable
+                key={action.testID}
+                testID={action.testID}
+                onPress={() =>
+                  router.push({
+                    pathname: action.route,
+                    params: HOME_RETURN_PARAMS,
+                  } as never)
+                }
+                className="flex-1 bg-surface border border-border rounded-[14px] py-3 items-center"
+                style={{ gap: 4 }}
+              >
+                <Ionicons
+                  name={action.icon}
+                  size={20}
+                  color={colors.textSecondary}
+                />
+                <Text className="text-[11px] font-bold text-text-secondary">
+                  {action.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+
+        {isParentProxy && (
+          <View testID="intent-proxy-placeholder" className="px-5 mt-4">
+            <Text className="text-body text-text-secondary text-center">
+              Sessions are private to{' '}
+              {activeProfile?.displayName ?? 'this learner'}
+            </Text>
+          </View>
+        )}
       </ScrollView>
     </View>
   );

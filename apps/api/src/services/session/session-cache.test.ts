@@ -147,7 +147,7 @@ describe('[BUG-667 / S-10] getOrLoadSessionSupplementary — concurrent fetch mu
       entry
     );
     expect(mockFetchPriorTopics).toHaveBeenCalledTimes(1);
-    expect(entry.supplementary).toBeDefined();
+    expect(entry.supplementary).toEqual(expect.objectContaining({}));
   });
 
   it('clears the in-flight slot on rejection so the next caller can retry', async () => {
@@ -180,7 +180,7 @@ describe('[BUG-667 / S-10] getOrLoadSessionSupplementary — concurrent fetch mu
         false,
         entry
       )
-    ).resolves.toBeDefined();
+    ).resolves.toEqual(expect.objectContaining({}));
     expect(mockFetchPriorTopics).toHaveBeenCalledTimes(2); // initial fail + retry
   });
 

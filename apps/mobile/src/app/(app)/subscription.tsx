@@ -1164,7 +1164,7 @@ export default function SubscriptionScreen() {
           contentContainerStyle={{ flexGrow: 1, paddingBottom: 32 }}
         >
           {/* Current plan */}
-          <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-4">
+          <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-4">
             Current plan
           </Text>
           <View
@@ -1262,7 +1262,7 @@ export default function SubscriptionScreen() {
           {/* Usage meter */}
           {usage && (
             <View className="mt-4">
-              <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2">
+              <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2">
                 Usage this month
               </Text>
               <View className="bg-surface rounded-card px-4 py-3.5">
@@ -1317,7 +1317,7 @@ export default function SubscriptionScreen() {
 
           {familySubscription && (
             <View className="mt-4" testID="family-pool-section">
-              <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2">
+              <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2">
                 Family pool
               </Text>
               <View className="bg-surface rounded-card px-4 py-3.5">
@@ -1350,7 +1350,7 @@ export default function SubscriptionScreen() {
                 offeringsYRef.current = e.nativeEvent.layout.y;
               }}
             >
-              <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
+              <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6">
                 Plans
               </Text>
               {availablePackages.map((pkg) => {
@@ -1396,7 +1396,7 @@ export default function SubscriptionScreen() {
                 offeringsYRef.current = e.nativeEvent.layout.y;
               }}
             >
-              <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
+              <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6">
                 Plans
               </Text>
               <View className="bg-surface rounded-card px-4 py-3.5 mb-3">
@@ -1520,7 +1520,7 @@ export default function SubscriptionScreen() {
           {/* Top-up */}
           {isPaidTier && (
             <View className="mt-6" testID="top-up-section">
-              <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2">
+              <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2">
                 Need more questions?
               </Text>
               <Pressable
@@ -1583,7 +1583,7 @@ export default function SubscriptionScreen() {
           {/* to cancel/manage in-app. */}
           {(isPaidTier || hasActiveSubscription) && (
             <View className="mt-6" testID="manage-section">
-              <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2">
+              <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2">
                 Manage
               </Text>
               {/* [BUG-916] Web has no native store deep link — RevenueCat IAP
@@ -1624,7 +1624,7 @@ export default function SubscriptionScreen() {
           )}
 
           <View className="mt-6" testID="byok-waitlist-section">
-            <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2">
+            <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2">
               Bring your own key
             </Text>
             <View className="bg-surface rounded-card px-4 py-3.5">

@@ -10,6 +10,23 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mockPush = jest.fn();
 const mockExportMutateAsync = jest.fn();
+const mockTrack = jest.fn();
+const mockOpenFeedback = jest.fn();
+const mockAccommodationMutate = jest.fn();
+let mockSubscription: { tier: string } | null = { tier: 'free' };
+let mockFamilySubscription: {
+  profileCount: number;
+  maxProfiles: number;
+} | null = null;
+let mockActiveProfile = {
+  id: 'profile-1',
+  displayName: 'Alex',
+  isOwner: true,
+};
+let mockProfiles = [mockActiveProfile];
+let mockLearnerProfile: { accommodationMode?: string } | null = {
+  accommodationMode: 'none',
+};
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
@@ -29,8 +46,8 @@ jest.mock('../../lib/theme', () => ({
 
 jest.mock('../../lib/profile', () => ({
   useProfile: () => ({
-    activeProfile: { id: 'profile-1', displayName: 'Alex', isOwner: true },
-    profiles: [{ id: 'profile-1', displayName: 'Alex', isOwner: true }],
+    activeProfile: mockActiveProfile,
+    profiles: mockProfiles,
   }),
 }));
 
@@ -48,8 +65,35 @@ jest.mock('../../hooks/use-account', () => ({
 }));
 
 jest.mock('../../hooks/use-subscription', () => ({
-  useSubscription: () => ({ data: { tier: 'free' } }),
-  useFamilySubscription: () => ({ data: null }),
+  useSubscription: () => ({ data: mockSubscription }),
+  useFamilySubscription: () => ({ data: mockFamilySubscription }),
+}));
+
+jest.mock('../../hooks/use-learner-profile', () => ({
+  useLearnerProfile: () => ({ data: mockLearnerProfile }),
+  useUpdateAccommodationMode: () => ({
+    mutate: mockAccommodationMutate,
+    isPending: false,
+  }),
+}));
+
+jest.mock('../../components/feedback/FeedbackProvider', () => ({
+  useFeedbackContext: () => ({ openFeedback: mockOpenFeedback }),
+}));
+
+jest.mock('../../lib/analytics', () => ({
+  track: (...args: unknown[]) => mockTrack(...args),
+}));
+
+jest.mock('@clerk/clerk-expo', () => ({
+  useAuth: () => ({ signOut: jest.fn() }),
+  useUser: () => ({
+    user: {
+      fullName: 'Alex',
+      firstName: 'Alex',
+      primaryEmailAddress: { emailAddress: 'alex@example.com' },
+    },
+  }),
 }));
 
 const mockNotifData = {
@@ -113,6 +157,16 @@ const MoreScreen = require('./more').default;
 describe('MoreScreen — Learning Mode', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSubscription = { tier: 'free' };
+    mockFamilySubscription = null;
+    mockActiveProfile = {
+      id: 'profile-1',
+      displayName: 'Alex',
+      isOwner: true,
+    };
+    mockProfiles = [mockActiveProfile];
+    mockLearnerProfile = { accommodationMode: 'none' };
+    mockIsParentProxy = false;
     mockExportMutateAsync.mockResolvedValue({
       account: {
         email: 'alex@example.com',
@@ -136,7 +190,7 @@ describe('MoreScreen — Learning Mode', () => {
     // BUG-909: Section header is prefixed with the active profile's display
     // name to make it unambiguous that the toggle applies to THAT profile,
     // not a child profile selected from elsewhere.
-    expect(screen.getByText("Alex's Learning Mode")).toBeTruthy();
+    screen.getByText("Alex's Learning Mode");
   });
 
   // BUG-909 break test: bare "Learning Mode" / "Learning Accommodation"
@@ -157,6 +211,71 @@ describe('MoreScreen — Learning Mode', () => {
     expect(screen.queryByText('Learning Accommodation')).toBeNull();
   });
 
+  it('does not render a child-preferences cross-link when there are no linked children', () => {
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    expect(screen.queryByTestId('learning-mode-child-link')).toBeNull();
+    expect(screen.queryByTestId('learning-mode-family-link')).toBeNull();
+  });
+
+  it('renders a direct child-preferences link when there is one linked child', () => {
+    mockProfiles = [
+      mockActiveProfile,
+      { id: 'child-1', displayName: 'Mia', isOwner: false },
+    ];
+
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    screen.getByTestId('learning-mode-child-link');
+    screen.getByText("To change Mia's preferences, open their profile →");
+  });
+
+  it('tracks and navigates to the child profile from the cross-link', () => {
+    mockProfiles = [
+      mockActiveProfile,
+      { id: 'child-1', displayName: 'Mia', isOwner: false },
+    ];
+
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    fireEvent.press(screen.getByTestId('learning-mode-child-link'));
+
+    expect(mockTrack).toHaveBeenCalledWith('child_progress_navigated', {
+      source: 'more_section',
+    });
+    expect(mockPush).toHaveBeenCalledWith('/(app)/child/child-1');
+  });
+
+  it('renders a Family cross-link when there are multiple linked children', () => {
+    mockProfiles = [
+      mockActiveProfile,
+      { id: 'child-1', displayName: 'Mia', isOwner: false },
+      { id: 'child-2', displayName: 'Leo', isOwner: false },
+    ];
+
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    screen.getByTestId('learning-mode-family-link');
+    screen.getByText("To change a child's preferences, open Family →");
+  });
+
+  it('tracks and navigates to Family from the multi-child cross-link', () => {
+    mockProfiles = [
+      mockActiveProfile,
+      { id: 'child-1', displayName: 'Mia', isOwner: false },
+      { id: 'child-2', displayName: 'Leo', isOwner: false },
+    ];
+
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    fireEvent.press(screen.getByTestId('learning-mode-family-link'));
+
+    expect(mockTrack).toHaveBeenCalledWith('child_progress_navigated', {
+      source: 'more_section',
+    });
+    expect(mockPush).toHaveBeenCalledWith('/(app)/dashboard');
+  });
+
   // BUG-909: When the profile is an owner with linked children, the
   // subtitle must direct them to a child profile to change a child's
   // settings. Otherwise it's a generic "applies to your own sessions".
@@ -171,25 +290,21 @@ describe('MoreScreen — Learning Mode', () => {
   it('renders both learning mode options', () => {
     render(<MoreScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('learning-mode-serious')).toBeTruthy();
-    expect(screen.getByTestId('learning-mode-casual')).toBeTruthy();
-    expect(screen.getByText('Challenge mode')).toBeTruthy();
-    expect(screen.getByText('Explorer')).toBeTruthy();
+    screen.getByTestId('learning-mode-serious');
+    screen.getByTestId('learning-mode-casual');
+    screen.getByText('Challenge mode');
+    screen.getByText('Explorer');
   });
 
   it('renders descriptions for both modes', () => {
     render(<MoreScreen />, { wrapper: createWrapper() });
 
-    expect(
-      screen.getByText(
-        'Push yourself further. Your mentor keeps you on track. You earn points after proving you remember, and recaps help lock it in.'
-      )
-    ).toBeTruthy();
-    expect(
-      screen.getByText(
-        'Learn at your own pace. Your mentor is relaxed and encouraging. You earn points right away and can skip recaps.'
-      )
-    ).toBeTruthy();
+    screen.getByText(
+      'Push yourself further. Your mentor keeps you on track. You earn points after proving you remember, and recaps help lock it in.'
+    );
+    screen.getByText(
+      'Learn at your own pace. Your mentor is relaxed and encouraging. You earn points right away and can skip recaps.'
+    );
   });
 
   it('shows Active label on current serious mode', () => {
@@ -311,20 +426,20 @@ describe('MoreScreen — Learning Mode', () => {
 
     expect(screen.queryByText('Appearance')).toBeNull();
     // BUG-909: Section labels are now possessive (per active profile).
-    expect(screen.getByText("Alex's Learning Mode")).toBeTruthy();
-    expect(screen.getByText("Alex's Learning Accommodation")).toBeTruthy();
-    expect(screen.getByText('Celebrations')).toBeTruthy();
-    expect(screen.getByText('Notifications')).toBeTruthy();
-    expect(screen.getByText('Account')).toBeTruthy();
-    expect(screen.getByText('Other')).toBeTruthy();
+    screen.getByText("Alex's Learning Mode");
+    screen.getByText("Alex's Learning Accommodation");
+    screen.getByText('Your celebrations');
+    screen.getByText('Notifications');
+    screen.getByText('Account');
+    screen.getByText('Other');
   });
 
   it('renders celebration level options', () => {
     render(<MoreScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('celebration-level-all')).toBeTruthy();
-    expect(screen.getByTestId('celebration-level-big-only')).toBeTruthy();
-    expect(screen.getByTestId('celebration-level-off')).toBeTruthy();
+    screen.getByTestId('celebration-level-all');
+    screen.getByTestId('celebration-level-big-only');
+    screen.getByTestId('celebration-level-off');
   });
 
   it('updates celebration level when selecting big milestones only', () => {
@@ -343,6 +458,14 @@ describe('MoreScreen — Account Actions', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockIsParentProxy = false;
+    mockSubscription = { tier: 'free' };
+    mockFamilySubscription = null;
+    mockActiveProfile = {
+      id: 'profile-1',
+      displayName: 'Alex',
+      isOwner: true,
+    };
+    mockProfiles = [mockActiveProfile];
     mockExportMutateAsync.mockResolvedValue({
       account: {
         email: 'alex@example.com',
@@ -425,6 +548,28 @@ describe('MoreScreen — Account Actions', () => {
   });
 });
 
+describe('MoreScreen — family actions', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSubscription = { tier: 'family' };
+    mockFamilySubscription = { profileCount: 1, maxProfiles: 4 };
+    mockActiveProfile = {
+      id: 'profile-1',
+      displayName: 'Alex',
+      isOwner: true,
+    };
+    mockProfiles = [mockActiveProfile];
+  });
+
+  it('navigates to create-profile with for=child when Add a child is pressed', () => {
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    fireEvent.press(screen.getByTestId('add-child-link'));
+
+    expect(mockPush).toHaveBeenCalledWith('/create-profile?for=child');
+  });
+});
+
 // [BUG-915] When the parent is impersonating a child profile, the More tab
 // must hide account-level destructive rows. The ProxyBanner at the top of the
 // (app) layout already provides the Switch-back escape, so the user is never
@@ -452,9 +597,9 @@ describe('MoreScreen — impersonation hides destructive actions (BUG-915)', () 
     mockIsParentProxy = false;
     render(<MoreScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByTestId('sign-out-button')).toBeTruthy();
-    expect(screen.getByTestId('more-row-delete-account')).toBeTruthy();
-    expect(screen.getByTestId('more-row-export')).toBeTruthy();
-    expect(screen.getByTestId('more-row-subscription')).toBeTruthy();
+    screen.getByTestId('sign-out-button');
+    screen.getByTestId('more-row-delete-account');
+    screen.getByTestId('more-row-export');
+    screen.getByTestId('more-row-subscription');
   });
 });

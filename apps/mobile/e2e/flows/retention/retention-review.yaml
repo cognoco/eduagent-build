@@ -35,11 +35,11 @@ tags:
 
 # 3. Intent card stack should be visible (replaced coaching card)
 - assertVisible:
-    id: "learner-intent-stack"
+    id: "home-subject-carousel"
 
 # 4. Tap intent-continue to start review (handles review-due topics)
 - tapOn:
-    id: "intent-continue"
+    id: "home-coach-band-continue"
 
 # 5. Wait for session screen (ChatShell)
 # BUG-40 fix: The app uses ChatShell for retention reviews, not a dedicated
@@ -52,7 +52,6 @@ tags:
 # 6. Verify the recall prompt is shown
 - assertVisible:
     text: "what you remember"
-    optional: true
 
 # 7. Enter answer
 - tapOn:

@@ -320,11 +320,11 @@ describe('retention routes', () => {
       expect(res.status).toBe(200);
 
       const body = await res.json();
-      expect(body.result).toBeDefined();
+      expect(body.result).toEqual(expect.objectContaining({}));
       expect(body.result.passed).toBe(true);
       expect(body.result.masteryScore).toBe(0.75);
       expect(body.result.xpChange).toBe('verified');
-      expect(body.result.nextReviewAt).toBeDefined();
+      expect(typeof body.result.nextReviewAt).toBe('string');
     });
 
     it('accepts dont_remember submissions without an answer body', async () => {
@@ -531,7 +531,7 @@ describe('retention routes', () => {
       expect(res.status).toBe(200);
 
       const body = await res.json();
-      expect(body.preference).toBeDefined();
+      expect(body.preference).toEqual(expect.objectContaining({}));
       expect(body.preference.method).toBe('visual_diagrams');
     });
 
@@ -573,7 +573,7 @@ describe('retention routes', () => {
       expect(res.status).toBe(200);
 
       const body = await res.json();
-      expect(body.preference).toBeDefined();
+      expect(body.preference).toEqual(expect.objectContaining({}));
       expect(body.preference.subjectId).toBe(SUBJECT_ID);
       expect(body.preference.method).toBe('visual_diagrams');
     });

@@ -250,7 +250,7 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
     const recoveredAfterWindowEmit = mockStep.sendEvent.mock.calls.find(
       ([name]: [string]) => name === 'emit-resolved-recovered-after-window'
     );
-    expect(recoveredAfterWindowEmit).toBeDefined();
+    expect(recoveredAfterWindowEmit).not.toBeUndefined();
     expect(recoveredAfterWindowEmit[1]).toMatchObject({
       name: 'app/session.filing_resolved',
       data: expect.objectContaining({
@@ -297,7 +297,7 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
       ([, payload]: [string, { data?: { resolution?: string } }]) =>
         payload?.data?.resolution === 'unrecoverable'
     );
-    expect(unrecoverableEmit).toBeDefined();
+    expect(unrecoverableEmit).not.toBeUndefined();
 
     // send-failure-push step MUST be invoked.
     const sendFailurePushCalls = mockStep.run.mock.calls.filter(
@@ -340,7 +340,7 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
     const recoveredAfterWindowEmit = mockStep.sendEvent.mock.calls.find(
       ([name]: [string]) => name === 'emit-resolved-recovered-after-window'
     );
-    expect(recoveredAfterWindowEmit).toBeDefined();
+    expect(recoveredAfterWindowEmit).not.toBeUndefined();
     expect(recoveredAfterWindowEmit[1]).toMatchObject({
       name: 'app/session.filing_resolved',
       data: expect.objectContaining({
@@ -615,6 +615,6 @@ describe('[H-2] filing-timed-out-observe — new step.run safety guards', () => 
     const pushCapture = mockCaptureException.mock.calls.find(
       ([err]: [Error]) => err === pushError
     );
-    expect(pushCapture).toBeDefined();
+    expect(pushCapture).not.toBeUndefined();
   });
 });

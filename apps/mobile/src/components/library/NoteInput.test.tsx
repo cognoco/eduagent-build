@@ -27,9 +27,9 @@ describe('NoteInput', () => {
     const { getByTestId, getByText } = render(
       <NoteInput onSave={jest.fn()} onCancel={jest.fn()} />
     );
-    expect(getByTestId('note-text-input')).toBeTruthy();
-    expect(getByText('Save')).toBeTruthy();
-    expect(getByText('Cancel')).toBeTruthy();
+    getByTestId('note-text-input');
+    getByText('Save');
+    getByText('Cancel');
   });
 
   it('calls onSave with text content', () => {
@@ -71,6 +71,6 @@ describe('NoteInput', () => {
       <NoteInput onSave={jest.fn()} onCancel={jest.fn()} />
     );
     fireEvent.changeText(getByTestId('note-text-input'), longText);
-    expect(getByText(/getting long/i)).toBeTruthy();
+    getByText(/getting long/i);
   });
 });

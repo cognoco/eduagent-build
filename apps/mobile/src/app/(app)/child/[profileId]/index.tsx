@@ -36,8 +36,12 @@ import {
   useChildLearnerProfile,
   useUpdateAccommodationMode,
 } from '../../../../hooks/use-learner-profile';
-import { ACCOMMODATION_OPTIONS } from '../../../../lib/accommodation-options';
+import {
+  ACCOMMODATION_GUIDE,
+  ACCOMMODATION_OPTIONS,
+} from '../../../../lib/accommodation-options';
 import { goBackOrReplace } from '../../../../lib/navigation';
+import { SamplePreview } from '../../../../components/parent/SamplePreview';
 
 function SubjectSkeleton(): React.ReactNode {
   return (
@@ -198,6 +202,7 @@ export default function ChildDetailScreen() {
 
   // [BUG-553] Styled in-app modal replaces window.confirm() on web
   const [withdrawConfirmVisible, setWithdrawConfirmVisible] = useState(false);
+  const [showAccommodationGuide, setShowAccommodationGuide] = useState(false);
 
   const handleWithdrawConsent = useCallback(() => {
     setWithdrawConfirmVisible(true);
@@ -235,6 +240,15 @@ export default function ChildDetailScreen() {
     },
     [profileId, learnerProfile?.accommodationMode, updateAccommodation]
   );
+
+  const showHowItsWorking = (() => {
+    const mode = learnerProfile?.accommodationMode;
+    const updatedAt = learnerProfile?.updatedAt;
+    if (!mode || mode === 'none' || !updatedAt) return false;
+    const daysSinceUpdate =
+      (Date.now() - new Date(updatedAt).getTime()) / (1000 * 60 * 60 * 24);
+    return daysSinceUpdate > 7;
+  })();
 
   if (!profileId) {
     return (
@@ -450,12 +464,29 @@ export default function ChildDetailScreen() {
 
         {history ? (
           <View className="mt-4">
-            <GrowthChart
-              title="Recent growth"
-              subtitle="Weekly changes in topics mastered and vocabulary"
-              data={buildGrowthData(history)}
-              emptyMessage="Progress becomes easier to spot after a few more sessions."
-            />
+            {buildGrowthData(history).length < 2 ? (
+              <SamplePreview unlockMessage="Progress becomes easier to spot after a few more sessions.">
+                <View className="bg-surface rounded-card p-4">
+                  <View className="bg-border rounded h-4 w-1/3 mb-4" />
+                  <View className="flex-row items-end gap-3 h-20">
+                    {[30, 55, 40, 70, 45, 65, 50, 80].map((height, i) => (
+                      <View
+                        key={i}
+                        className="flex-1 rounded-t-full bg-primary"
+                        style={{ height }}
+                      />
+                    ))}
+                  </View>
+                </View>
+              </SamplePreview>
+            ) : (
+              <GrowthChart
+                title="Recent growth"
+                subtitle="Weekly changes in topics mastered and vocabulary"
+                data={buildGrowthData(history)}
+                emptyMessage="Progress becomes easier to spot after a few more sessions."
+              />
+            )}
           </View>
         ) : null}
 
@@ -632,7 +663,9 @@ export default function ChildDetailScreen() {
         )}
 
         <Text className="text-h3 font-semibold text-text-primary mt-6 mb-2">
-          Mentor Memory
+          {child?.displayName
+            ? `${child.displayName}'s mentor memory`
+            : "Your child's mentor memory"}
         </Text>
         {/* [F-PV-08] Consent prompt lives on mentor-memory only; show CTA here */}
         {learnerProfile?.memoryConsentStatus === 'pending' && profileId ? (
@@ -678,13 +711,63 @@ export default function ChildDetailScreen() {
           </Text>
         </Pressable>
 
-        <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2 mt-6">
-          Learning Accommodation
+        <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6">
+          {child?.displayName
+            ? `${child.displayName}'s learning accommodation`
+            : "Your child's learning accommodation"}
         </Text>
         <Text className="text-body-sm text-text-secondary mb-2">
           Choose how the mentor adapts its teaching style. This takes effect on
           the next session.
         </Text>
+        <Pressable
+          onPress={() => setShowAccommodationGuide((v) => !v)}
+          className="flex-row items-center mb-3"
+          accessibilityRole="button"
+          accessibilityLabel="Not sure which to pick? Toggle decision guide"
+          testID="accommodation-guide-toggle"
+        >
+          <Ionicons
+            name={showAccommodationGuide ? 'chevron-up' : 'chevron-down'}
+            size={14}
+            color="#6b7280"
+          />
+          <Text className="text-body-sm text-text-secondary ms-1">
+            Not sure which to pick?
+          </Text>
+        </Pressable>
+        {showAccommodationGuide && (
+          <View
+            className="bg-surface rounded-card px-4 py-3 mb-3"
+            testID="accommodation-guide-content"
+          >
+            {ACCOMMODATION_GUIDE.map((row) => (
+              <View
+                key={row.recommendation}
+                className="flex-row items-center justify-between py-2"
+              >
+                <Text className="text-body-sm text-text-secondary flex-1 me-3">
+                  {row.condition}
+                </Text>
+                <Pressable
+                  onPress={() => {
+                    handleAccommodationChange(row.recommendation);
+                    setShowAccommodationGuide(false);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Pick ${row.recommendation}`}
+                  testID={`guide-pick-${row.recommendation}`}
+                >
+                  <Text className="text-primary text-body-sm font-semibold">
+                    {ACCOMMODATION_OPTIONS.find(
+                      (o) => o.mode === row.recommendation
+                    )?.title ?? row.recommendation}
+                  </Text>
+                </Pressable>
+              </View>
+            ))}
+          </View>
+        )}
         {ACCOMMODATION_OPTIONS.map((opt) => (
           <Pressable
             key={opt.mode}
@@ -719,6 +802,26 @@ export default function ChildDetailScreen() {
             </Text>
           </Pressable>
         ))}
+        <Text
+          className="text-caption text-text-secondary mt-1 mb-2"
+          testID="accommodation-try-it"
+        >
+          You can change this anytime. It takes effect on{' '}
+          {child?.displayName ?? "your child"}'s next session.
+        </Text>
+        {showHowItsWorking && (
+          <Pressable
+            className="flex-row items-center gap-2 self-start bg-surface rounded-full px-3 py-1.5 mb-4"
+            accessibilityRole="button"
+            accessibilityLabel="How it's working"
+            testID="accommodation-how-working"
+          >
+            <Ionicons name="analytics-outline" size={14} color="#6b7280" />
+            <Text className="text-caption text-text-secondary">
+              How it&apos;s working
+            </Text>
+          </Pressable>
+        )}
 
         {/* UX-DE-L11: surface consent-query errors */}
         {isConsentError && (

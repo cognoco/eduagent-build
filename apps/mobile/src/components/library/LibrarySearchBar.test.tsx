@@ -17,7 +17,7 @@ describe('LibrarySearchBar', () => {
         placeholder="Search shelves..."
       />
     );
-    expect(screen.getByTestId('library-search-input')).toBeTruthy();
+    screen.getByTestId('library-search-input');
     expect(screen.getByPlaceholderText('Search shelves...')).toBeTruthy();
   });
 
@@ -43,7 +43,7 @@ describe('LibrarySearchBar', () => {
         placeholder="Search..."
       />
     );
-    expect(screen.getByTestId('library-search-clear')).toBeTruthy();
+    screen.getByTestId('library-search-clear');
     fireEvent.press(screen.getByTestId('library-search-clear'));
     expect(onChangeText).toHaveBeenCalledWith('');
   });

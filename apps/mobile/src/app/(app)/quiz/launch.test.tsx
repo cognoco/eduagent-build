@@ -114,7 +114,7 @@ describe('QuizLaunchScreen', () => {
     render(<QuizLaunchScreen />);
 
     await waitFor(() => {
-      expect(screen.getByTestId('quiz-challenge-banner')).toBeTruthy();
+      screen.getByTestId('quiz-challenge-banner');
     });
 
     expect(mockReplace).not.toHaveBeenCalled();
@@ -162,9 +162,9 @@ describe('QuizLaunchScreen', () => {
         jest.advanceTimersByTime(30_000);
       });
 
-      expect(screen.getByTestId('quiz-launch-error-fallback')).toBeTruthy();
-      expect(screen.getByTestId('quiz-launch-retry')).toBeTruthy();
-      expect(screen.getByTestId('quiz-launch-back')).toBeTruthy();
+      screen.getByTestId('quiz-launch-error-fallback');
+      screen.getByTestId('quiz-launch-retry');
+      screen.getByTestId('quiz-launch-back');
     });
 
     it('clears the safety timeout when mutation leaves pending before 30s (cleanup)', () => {

@@ -25,13 +25,13 @@ describe('AnimatedSplash', () => {
   it('renders without crashing', () => {
     const onComplete = jest.fn();
     const { getByTestId } = render(<AnimatedSplash onComplete={onComplete} />);
-    expect(getByTestId('animated-splash')).toBeTruthy();
+    getByTestId('animated-splash');
   });
 
   it('renders splash-wordmark element', () => {
     const onComplete = jest.fn();
     const { getByTestId } = render(<AnimatedSplash onComplete={onComplete} />);
-    expect(getByTestId('splash-wordmark')).toBeTruthy();
+    getByTestId('splash-wordmark');
   });
 
   it('calls onComplete when reduced motion is enabled', () => {

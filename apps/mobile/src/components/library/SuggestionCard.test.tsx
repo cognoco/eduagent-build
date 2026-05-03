@@ -4,8 +4,8 @@ import { SuggestionCard } from './SuggestionCard';
 describe('SuggestionCard', () => {
   it('renders title and emoji', () => {
     render(<SuggestionCard title="Oceans" emoji="🌊" onPress={jest.fn()} />);
-    expect(screen.getByText('Oceans')).toBeTruthy();
-    expect(screen.getByText('🌊')).toBeTruthy();
+    screen.getByText('Oceans');
+    screen.getByText('🌊');
   });
 
   it('calls onPress when tapped', () => {
@@ -17,14 +17,14 @@ describe('SuggestionCard', () => {
 
   it('renders without emoji', () => {
     render(<SuggestionCard title="Mountains" onPress={jest.fn()} />);
-    expect(screen.getByText('Mountains')).toBeTruthy();
+    screen.getByText('Mountains');
   });
 
   it('renders with null emoji gracefully', () => {
     render(
       <SuggestionCard title="Volcanoes" emoji={null} onPress={jest.fn()} />
     );
-    expect(screen.getByText('Volcanoes')).toBeTruthy();
+    screen.getByText('Volcanoes');
   });
 
   it('renders description when provided', () => {
@@ -35,8 +35,8 @@ describe('SuggestionCard', () => {
         onPress={jest.fn()}
       />
     );
-    expect(screen.getByText('Rivers')).toBeTruthy();
-    expect(screen.getByText('Learn about major rivers')).toBeTruthy();
+    screen.getByText('Rivers');
+    screen.getByText('Learn about major rivers');
   });
 
   it('applies testID when provided', () => {
@@ -47,6 +47,6 @@ describe('SuggestionCard', () => {
         testID="suggestion-forests"
       />
     );
-    expect(screen.getByTestId('suggestion-forests')).toBeTruthy();
+    screen.getByTestId('suggestion-forests');
   });
 });

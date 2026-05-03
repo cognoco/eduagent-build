@@ -315,7 +315,7 @@ describe('Integration: POST /v1/retention/recall-test', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.result.passed).toBe(true);
-    expect(body.result.nextReviewAt).toBeDefined();
+    expect(typeof body.result.nextReviewAt).toBe('string');
     expect(body.result.failureCount).toBe(0);
   });
 
@@ -383,7 +383,9 @@ describe('Integration: POST /v1/retention/recall-test', () => {
     expect(body.result.passed).toBe(false);
     expect(body.result.failureCount).toBe(3);
     expect(body.result.failureAction).toBe('redirect_to_library');
-    expect(body.result.remediation).toBeDefined();
+    expect(body.result.remediation).toMatchObject({
+      topicTitle: 'Introduction to Calculus',
+    });
     expect(body.result.remediation.options).toContain('relearn_topic');
     expect(body.result.remediation.topicTitle).toBe('Introduction to Calculus');
   });
@@ -468,7 +470,7 @@ describe('Integration: POST /v1/retention/relearn', () => {
     expect(body.topicId).toBe(topicIds[0]);
     expect(body.method).toBe('same');
     expect(body.resetPerformed).toBe(true);
-    expect(body.sessionId).toBeDefined();
+    expect(typeof body.sessionId).toBe('string');
 
     // Verify the retention card was reset in the DB
     const db = createIntegrationDb();
@@ -476,7 +478,7 @@ describe('Integration: POST /v1/retention/relearn', () => {
       where: (rc, { and, eq }) =>
         and(eq(rc.profileId, profileId), eq(rc.topicId, topicIds[0]!)),
     });
-    expect(card).toBeDefined();
+    expect(card).not.toBeNull();
     expect(Number(card!.easeFactor)).toBe(2.5);
     expect(card!.intervalDays).toBe(1);
     expect(card!.repetitions).toBe(0);
