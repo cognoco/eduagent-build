@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { BookSuggestion } from '@eduagent/schemas';
 import { useBookSuggestions } from '../../../hooks/use-book-suggestions';
 import { useFiling } from '../../../hooks/use-filing';
+import { useStickyLoading } from '../../../hooks/use-sticky-loading';
 import { useSubjects } from '../../../hooks/use-subjects';
 import { SuggestionCard } from '../../../components/library/SuggestionCard';
 import { useThemeColors } from '../../../lib/theme';
@@ -43,6 +44,13 @@ export default function PickBookScreen(): React.ReactElement {
   const [showSkip, setShowSkip] = useState(false);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   const [loadingSlow, setLoadingSlow] = useState(false);
+
+  // Sticky-hold the loading view so the MagicPenAnimation is visible long
+  // enough to register even when suggestions resolve from cache.
+  const showSuggestionsLoading = useStickyLoading(
+    suggestionsQuery.isLoading,
+    800
+  );
 
   // BUG-361: Synchronous mutex — filing.isPending has React batching delay,
   // so an alert "Try again" callback and a "Go" button tap in the same frame
@@ -236,7 +244,7 @@ export default function PickBookScreen(): React.ReactElement {
   }
 
   // [BUG-539] Loading state with cycling messages and slow-loading hint
-  if (suggestionsQuery.isLoading) {
+  if (showSuggestionsLoading) {
     return (
       <View
         className="flex-1 bg-background items-center justify-center px-6"

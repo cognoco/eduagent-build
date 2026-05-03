@@ -9,6 +9,7 @@ import {
   ScrollView,
   Platform,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth, useClerk, useUser } from '@clerk/clerk-expo';
 import { useQueryClient } from '@tanstack/react-query';
@@ -100,6 +101,7 @@ function ProxyBanner({
 }): React.ReactElement {
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
+  const { t } = useTranslation();
 
   return (
     <View
@@ -121,18 +123,18 @@ function ProxyBanner({
           className="text-body-sm text-text-secondary flex-1"
           numberOfLines={1}
         >
-          Viewing {childName}&apos;s account
+          {t('tabs.proxyBanner.viewing', { name: childName })}
         </Text>
       </View>
       <Pressable
         onPress={onSwitchBack}
         hitSlop={8}
         accessibilityRole="button"
-        accessibilityLabel="Switch back to your account"
+        accessibilityLabel={t('tabs.proxyBanner.switchBackLabel')}
         testID="proxy-banner-switch-back"
       >
         <Text className="text-body-sm font-semibold text-primary">
-          Switch back
+          {t('tabs.proxyBanner.switchBack')}
         </Text>
       </Pressable>
     </View>
@@ -196,12 +198,13 @@ function canSwitchFromConsentGate(
 export function buildSwitchProfileConfirmation(params: {
   activeProfile: { id: string } | null;
   profiles: ReadonlyArray<{ id: string; displayName: string }>;
+  t: (key: string, options?: Record<string, string>) => string;
 }): {
   target: { id: string; displayName: string };
   title: string;
   message: string;
 } | null {
-  const { activeProfile, profiles } = params;
+  const { activeProfile, profiles, t } = params;
   if (!activeProfile) return null;
   const others = profiles.filter((p) => p.id !== activeProfile.id);
   if (others.length === 0) return null;
@@ -210,8 +213,10 @@ export function buildSwitchProfileConfirmation(params: {
   if (others.length === 1) {
     return {
       target,
-      title: `Switch to ${target.displayName}?`,
-      message: `You'll continue as ${target.displayName}.`,
+      title: t('tabs.switchProfile.title', { name: target.displayName }),
+      message: t('tabs.switchProfile.messageSingle', {
+        name: target.displayName,
+      }),
     };
   }
   const otherNames = others
@@ -220,11 +225,13 @@ export function buildSwitchProfileConfirmation(params: {
     .join(', ');
   return {
     target,
-    title: `Switch to ${target.displayName}?`,
+    title: t('tabs.switchProfile.title', { name: target.displayName }),
     message:
-      `You'll continue as ${target.displayName}.` +
-      `\n\nOther profiles on this account: ${otherNames}.` +
-      `\n\nTap Cancel and sign out if you want a different profile.`,
+      t('tabs.switchProfile.messageSingle', { name: target.displayName }) +
+      '\n\n' +
+      t('tabs.switchProfile.otherProfiles', { names: otherNames }) +
+      '\n\n' +
+      t('tabs.switchProfile.cancelHint'),
   };
 }
 
@@ -297,6 +304,7 @@ function PostApprovalLanding({
   onContinue: () => void;
 }): React.ReactElement {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
 
   return (
     <View
@@ -304,20 +312,23 @@ function PostApprovalLanding({
       style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
       testID="post-approval-landing"
     >
-      <Text className="text-4xl mb-6" accessibilityLabel="Celebration">
+      <Text
+        className="text-4xl mb-6"
+        accessibilityLabel={t('tabs.postApproval.celebrationLabel')}
+      >
         {'\u{1F389}'}
       </Text>
       <Text
         className="text-h1 font-bold text-text-primary mb-4 text-center"
         accessibilityRole="header"
       >
-        You're approved!
+        {t('tabs.postApproval.title')}
       </Text>
       <Text className="text-body text-text-secondary mb-2 text-center">
-        Your parent said yes — time to start learning.
+        {t('tabs.postApproval.parentApproved')}
       </Text>
       <Text className="text-body text-text-secondary mb-8 text-center">
-        Let's set up your first subject.
+        {t('tabs.postApproval.setupSubject')}
       </Text>
 
       <Pressable
@@ -325,10 +336,10 @@ function PostApprovalLanding({
         className="bg-primary rounded-button py-3.5 px-8 items-center w-full"
         testID="post-approval-continue"
         accessibilityRole="button"
-        accessibilityLabel="Let's Go"
+        accessibilityLabel={t('tabs.postApproval.letsGo')}
       >
         <Text className="text-body font-semibold text-text-inverse">
-          Let's Go
+          {t('tabs.postApproval.letsGo')}
         </Text>
       </Pressable>
     </View>
@@ -350,6 +361,7 @@ function PreviewSubjectBrowser({
 }): React.ReactElement {
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
+  const { t } = useTranslation();
 
   return (
     <View
@@ -361,18 +373,19 @@ function PreviewSubjectBrowser({
         <Pressable
           onPress={onDismiss}
           className="me-3 min-w-[44px] min-h-[44px] justify-center items-center"
-          accessibilityLabel="Back to waiting screen"
+          accessibilityLabel={t('tabs.previewSubjectBrowser.backLabel')}
           accessibilityRole="button"
         >
-          <Text className="text-primary text-body font-semibold">Back</Text>
+          <Text className="text-primary text-body font-semibold">
+            {t('common.back')}
+          </Text>
         </Pressable>
         <Text className="text-h2 font-bold text-text-primary">
-          Browse Subjects
+          {t('tabs.previewSubjectBrowser.title')}
         </Text>
       </View>
       <Text className="text-body-sm text-text-secondary px-5 mb-4">
-        Here's a preview of what you can learn. You'll unlock these once your
-        parent approves.
+        {t('tabs.previewSubjectBrowser.description')}
       </Text>
       <ScrollView
         className="flex-1 px-5"
@@ -410,6 +423,7 @@ function PreviewSampleCoaching({
   onDismiss: () => void;
 }): React.ReactElement {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
 
   return (
     <View
@@ -421,13 +435,15 @@ function PreviewSampleCoaching({
         <Pressable
           onPress={onDismiss}
           className="me-3 min-w-[44px] min-h-[44px] justify-center items-center"
-          accessibilityLabel="Back to waiting screen"
+          accessibilityLabel={t('tabs.previewSampleCoaching.backLabel')}
           accessibilityRole="button"
         >
-          <Text className="text-primary text-body font-semibold">Back</Text>
+          <Text className="text-primary text-body font-semibold">
+            {t('common.back')}
+          </Text>
         </Pressable>
         <Text className="text-h2 font-bold text-text-primary">
-          How It Works
+          {t('tabs.previewSampleCoaching.title')}
         </Text>
       </View>
       <ScrollView
@@ -436,54 +452,52 @@ function PreviewSampleCoaching({
       >
         <View className="bg-coaching-card rounded-card p-5 mt-4">
           <Text className="text-h3 font-semibold text-text-primary mb-2">
-            Ready for homework?
+            {t('tabs.previewSampleCoaching.homeworkCardTitle')}
           </Text>
           <Text className="text-body text-text-secondary mb-4">
-            Your mentor will know what you need each day — whether it's homework
-            help, practice, or a quick review.
+            {t('tabs.previewSampleCoaching.homeworkCardBody')}
           </Text>
           <View className="bg-surface rounded-button py-3 px-4 mb-2 items-center">
             <Text className="text-body font-semibold text-primary">
-              Homework help
+              {t('tabs.previewSampleCoaching.homeworkHelp')}
             </Text>
           </View>
           <View className="bg-surface rounded-button py-3 px-4 mb-2 items-center">
             <Text className="text-body font-semibold text-primary">
-              Practice for a test
+              {t('tabs.previewSampleCoaching.practiceTest')}
             </Text>
           </View>
         </View>
 
         <View className="bg-surface rounded-card p-4 mt-4">
           <Text className="text-body font-semibold text-text-primary mb-2">
-            How your mentor helps
+            {t('tabs.previewSampleCoaching.howMentorHelps')}
           </Text>
           <Text className="text-body-sm text-text-secondary mb-3">
-            Your AI mentor guides you through problems step by step — never
-            gives away the answer. You learn by thinking, not copying.
+            {t('tabs.previewSampleCoaching.howMentorHelpsBody')}
           </Text>
           <View className="flex-row items-start mb-2">
             <Text className="text-body me-2">{'\u{1F4F7}'}</Text>
             <Text className="text-body-sm text-text-secondary flex-1">
-              Snap a photo of your homework to get started
+              {t('tabs.previewSampleCoaching.snapPhoto')}
             </Text>
           </View>
           <View className="flex-row items-start mb-2">
             <Text className="text-body me-2">{'\u{1F9E0}'}</Text>
             <Text className="text-body-sm text-text-secondary flex-1">
-              Your mentor remembers what you've learned
+              {t('tabs.previewSampleCoaching.mentorRemembers')}
             </Text>
           </View>
           <View className="flex-row items-start">
             <Text className="text-body me-2">{'\u{1F4C8}'}</Text>
             <Text className="text-body-sm text-text-secondary flex-1">
-              Track your progress and retention over time
+              {t('tabs.previewSampleCoaching.trackProgress')}
             </Text>
           </View>
         </View>
 
         <Text className="text-caption text-text-muted text-center mt-6">
-          This is a preview. Full access unlocks after parent approval.
+          {t('tabs.previewSampleCoaching.previewDisclaimer')}
         </Text>
       </ScrollView>
     </View>
@@ -499,6 +513,7 @@ function CreateProfileGate(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { signOut } = useClerk();
+  const { t } = useTranslation();
   const isPushingRef = React.useRef(false);
 
   const handleSignOut = async () => {
@@ -507,7 +522,10 @@ function CreateProfileGate(): React.ReactElement {
       await signOut();
     } catch (err: unknown) {
       console.error('signOut failed:', err);
-      platformAlert('Sign Out Failed', 'Please try again or restart the app.');
+      platformAlert(
+        t('tabs.createProfile.signOutFailedTitle'),
+        t('tabs.createProfile.signOutFailedMessage')
+      );
     }
   };
 
@@ -528,10 +546,10 @@ function CreateProfileGate(): React.ReactElement {
       testID="create-profile-gate"
     >
       <Text className="text-h1 font-bold text-text-primary mb-3 text-center">
-        Welcome!
+        {t('tabs.createProfile.welcome')}
       </Text>
       <Text className="text-body text-text-secondary text-center mb-8">
-        Let's set up your profile so your mentor can get to know you.
+        {t('tabs.createProfile.setupProfile')}
       </Text>
       <Pressable
         onPress={handleGetStarted}
@@ -539,10 +557,10 @@ function CreateProfileGate(): React.ReactElement {
         style={{ minHeight: 48 }}
         testID="create-profile-cta"
         accessibilityRole="button"
-        accessibilityLabel="Get started"
+        accessibilityLabel={t('tabs.createProfile.getStarted')}
       >
         <Text className="text-body font-semibold text-text-inverse">
-          Get started
+          {t('tabs.createProfile.getStarted')}
         </Text>
       </Pressable>
       <Pressable
@@ -550,10 +568,10 @@ function CreateProfileGate(): React.ReactElement {
         className="mt-6 py-2"
         testID="create-profile-gate-signout"
         accessibilityRole="button"
-        accessibilityLabel="Sign out and use a different account"
+        accessibilityLabel={t('tabs.createProfile.signOutLabel')}
       >
         <Text className="text-caption text-text-muted text-center underline">
-          Sign out
+          {t('tabs.createProfile.signOut')}
         </Text>
       </Pressable>
     </View>
@@ -569,6 +587,7 @@ function ConsentWithdrawnGate(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const { signOut } = useClerk();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const [refreshing, setRefreshing] = React.useState(false);
 
   const handleSignOut = async () => {
@@ -577,7 +596,10 @@ function ConsentWithdrawnGate(): React.ReactElement {
       await signOut();
     } catch (err: unknown) {
       console.error('signOut failed:', err);
-      platformAlert('Sign Out Failed', 'Please try again or restart the app.');
+      platformAlert(
+        t('tabs.createProfile.signOutFailedTitle'),
+        t('tabs.createProfile.signOutFailedMessage')
+      );
     }
   };
 
@@ -625,13 +647,13 @@ function ConsentWithdrawnGate(): React.ReactElement {
         className="bg-primary rounded-button py-3.5 px-8 items-center mb-3 w-full"
         testID="withdrawn-refresh-status"
         accessibilityRole="button"
-        accessibilityLabel="Refresh status"
+        accessibilityLabel={t('tabs.consentWithdrawn.refreshStatus')}
       >
         {refreshing ? (
           <ActivityIndicator size="small" color="white" />
         ) : (
           <Text className="text-body font-semibold text-text-inverse">
-            Refresh status
+            {t('tabs.consentWithdrawn.refreshStatus')}
           </Text>
         )}
       </Pressable>
@@ -643,17 +665,18 @@ function ConsentWithdrawnGate(): React.ReactElement {
             const prompt = buildSwitchProfileConfirmation({
               activeProfile,
               profiles,
+              t,
             });
             if (!prompt) return;
             platformAlert(prompt.title, prompt.message, [
-              { text: 'Cancel', style: 'cancel' },
+              { text: t('common.cancel'), style: 'cancel' },
               {
-                text: 'Switch',
+                text: t('tabs.switchProfile.switchButton'),
                 onPress: () => {
                   void switchProfile(prompt.target.id).catch(() => {
                     platformAlert(
-                      'Could not switch profile',
-                      'Please try again.'
+                      t('tabs.switchProfile.errorTitle'),
+                      t('tabs.switchProfile.errorMessage')
                     );
                   });
                 },
@@ -663,10 +686,10 @@ function ConsentWithdrawnGate(): React.ReactElement {
           className="bg-surface rounded-button py-3.5 px-8 items-center mb-3 w-full"
           testID="withdrawn-switch-profile"
           accessibilityRole="button"
-          accessibilityLabel="Switch profile"
+          accessibilityLabel={t('tabs.consentGate.switchProfile')}
         >
           <Text className="text-body font-semibold text-text-secondary">
-            Switch profile
+            {t('tabs.consentGate.switchProfile')}
           </Text>
         </Pressable>
       )}
@@ -676,9 +699,11 @@ function ConsentWithdrawnGate(): React.ReactElement {
         className="py-3.5 px-8 items-center w-full"
         testID="withdrawn-sign-out"
         accessibilityRole="button"
-        accessibilityLabel="Sign out"
+        accessibilityLabel={t('tabs.consentGate.signOut')}
       >
-        <Text className="text-body font-semibold text-primary">Sign out</Text>
+        <Text className="text-body font-semibold text-primary">
+          {t('tabs.consentGate.signOut')}
+        </Text>
       </Pressable>
     </View>
   );
@@ -691,6 +716,7 @@ function ConsentPendingGate(): React.ReactElement {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { signOut } = useClerk();
+  const { t } = useTranslation();
 
   const handleSignOut = async () => {
     try {
@@ -698,7 +724,10 @@ function ConsentPendingGate(): React.ReactElement {
       await signOut();
     } catch (err: unknown) {
       console.error('signOut failed:', err);
-      platformAlert('Sign Out Failed', 'Please try again or restart the app.');
+      platformAlert(
+        t('tabs.createProfile.signOutFailedTitle'),
+        t('tabs.createProfile.signOutFailedMessage')
+      );
     }
   };
   const { profiles, activeProfile, switchProfile } = useProfile();
@@ -809,8 +838,8 @@ function ConsentPendingGate(): React.ReactElement {
             queryKey: ['consent-status'],
           });
           platformAlert(
-            'Link sent!',
-            `We sent a consent link to ${sentTo}. Check their inbox (and spam folder).`
+            t('tabs.consentPending.linkSentTitle'),
+            t('tabs.consentPending.linkSentMessage', { email: sentTo })
           );
         },
         onError: (err) => {
@@ -878,12 +907,13 @@ function ConsentPendingGate(): React.ReactElement {
               const prompt = buildSwitchProfileConfirmation({
                 activeProfile,
                 profiles,
+                t,
               });
               if (!prompt) return;
               platformAlert(prompt.title, prompt.message, [
-                { text: 'Cancel', style: 'cancel' },
+                { text: t('common.cancel'), style: 'cancel' },
                 {
-                  text: 'Switch',
+                  text: t('tabs.switchProfile.switchButton'),
                   onPress: () => {
                     void switchProfile(prompt.target.id).catch(() => {
                       platformAlert(
@@ -898,10 +928,10 @@ function ConsentPendingGate(): React.ReactElement {
             className="py-3.5 px-8 items-center mb-3 w-full"
             testID="consent-switch-profile"
             accessibilityRole="button"
-            accessibilityLabel="Switch profile"
+            accessibilityLabel={t('tabs.consentGate.switchProfile')}
           >
             <Text className="text-body font-semibold text-text-secondary">
-              Switch profile
+              {t('tabs.consentGate.switchProfile')}
             </Text>
           </Pressable>
         )}
@@ -911,9 +941,11 @@ function ConsentPendingGate(): React.ReactElement {
           className="py-3.5 px-8 items-center w-full"
           testID="consent-sign-out"
           accessibilityRole="button"
-          accessibilityLabel="Sign out"
+          accessibilityLabel={t('tabs.consentGate.signOut')}
         >
-          <Text className="text-body font-semibold text-primary">Sign out</Text>
+          <Text className="text-body font-semibold text-primary">
+            {t('tabs.consentGate.signOut')}
+          </Text>
         </Pressable>
       </ScrollView>
     );
@@ -951,19 +983,19 @@ function ConsentPendingGate(): React.ReactElement {
         className="bg-primary rounded-button py-3.5 px-8 items-center mb-3 w-full"
         testID="consent-check-again"
         accessibilityRole="button"
-        accessibilityLabel="Check again"
+        accessibilityLabel={t('tabs.consentPending.checkAgain')}
       >
         {checking ? (
           <ActivityIndicator color={colors.textInverse} />
         ) : (
           <Text className="text-body font-semibold text-text-inverse">
-            Check again
+            {t('tabs.consentPending.checkAgain')}
           </Text>
         )}
       </Pressable>
 
       <Text className="text-body-sm text-text-muted text-center mb-3">
-        We&apos;ll keep checking automatically while you wait.
+        {t('tabs.consentPending.autoChecking')}
       </Text>
 
       {parentEmail && consentData?.consentType && !changingEmail && (
@@ -973,13 +1005,13 @@ function ConsentPendingGate(): React.ReactElement {
           className="bg-surface rounded-button py-3.5 px-8 items-center mb-3 w-full"
           testID="consent-resend"
           accessibilityRole="button"
-          accessibilityLabel="Resend approval email"
+          accessibilityLabel={t('tabs.consentPending.resendApprovalEmailLabel')}
         >
           {resendMutation.isPending ? (
             <ActivityIndicator color={colors.accent} />
           ) : (
             <Text className="text-body font-semibold text-primary">
-              Resend email
+              {t('tabs.consentPending.resendEmail')}
             </Text>
           )}
         </Pressable>
@@ -991,7 +1023,7 @@ function ConsentPendingGate(): React.ReactElement {
           testID="consent-resend-success"
           accessibilityRole="alert"
         >
-          Email sent! Check the inbox (and spam folder).
+          {t('tabs.consentPending.emailSentFeedback')}
         </Text>
       )}
       {resendFeedback === 'error' && !changingEmail && (
@@ -1003,7 +1035,7 @@ function ConsentPendingGate(): React.ReactElement {
             className="text-danger text-body-sm"
             testID="consent-resend-error"
           >
-            {resendErrorMsg || 'Something went wrong. Please try again.'}
+            {resendErrorMsg || t('errors.generic')}
           </Text>
         </View>
       )}
@@ -1033,7 +1065,7 @@ function ConsentPendingGate(): React.ReactElement {
           </Text>
           <TextInput
             className="bg-background text-text-primary text-body rounded-input px-4 py-3 mb-2"
-            placeholder="parent@example.com"
+            placeholder={t('tabs.consentPending.parentEmailPlaceholder')}
             placeholderTextColor={colors.muted}
             value={newParentEmail}
             onChangeText={setNewParentEmail}
@@ -1093,9 +1125,11 @@ function ConsentPendingGate(): React.ReactElement {
             className="py-2 items-center"
             testID="consent-change-email-cancel"
             accessibilityRole="button"
-            accessibilityLabel="Cancel"
+            accessibilityLabel={t('common.cancel')}
           >
-            <Text className="text-body-sm text-text-secondary">Cancel</Text>
+            <Text className="text-body-sm text-text-secondary">
+              {t('common.cancel')}
+            </Text>
           </Pressable>
         </View>
       )}
@@ -1105,27 +1139,27 @@ function ConsentPendingGate(): React.ReactElement {
         <View className="flex-row items-center mb-3">
           <View className="flex-1 h-px bg-border" />
           <Text className="text-caption text-text-muted mx-3">
-            While you wait
+            {t('tabs.consentPending.whileYouWait')}
           </Text>
           <View className="flex-1 h-px bg-border" />
         </View>
         <Text className="text-body-sm text-text-secondary text-center mb-3">
-          Here's a preview of what you'll learn:
+          {t('tabs.consentPending.previewIntro')}
         </Text>
         <Pressable
           onPress={() => setPreviewMode('subjects')}
           className="bg-surface rounded-card px-4 py-3.5 mb-2 flex-row items-center"
           testID="preview-browse-subjects"
           accessibilityRole="button"
-          accessibilityLabel="Browse subjects preview"
+          accessibilityLabel={t('tabs.consentPending.browseSubjectsLabel')}
         >
           <Text className="text-body me-3">{'\u{1F4DA}'}</Text>
           <View className="flex-1">
             <Text className="text-body font-semibold text-text-primary">
-              Browse subjects
+              {t('tabs.consentPending.browseSubjects')}
             </Text>
             <Text className="text-caption text-text-secondary">
-              See what you can learn
+              {t('tabs.consentPending.browseSubjectsHint')}
             </Text>
           </View>
         </Pressable>
@@ -1134,15 +1168,15 @@ function ConsentPendingGate(): React.ReactElement {
           className="bg-surface rounded-card px-4 py-3.5 flex-row items-center"
           testID="preview-sample-coaching"
           accessibilityRole="button"
-          accessibilityLabel="Sample mentoring preview"
+          accessibilityLabel={t('tabs.consentPending.sampleMentoringLabel')}
         >
           <Text className="text-body me-3">{'\u{1F3AF}'}</Text>
           <View className="flex-1">
             <Text className="text-body font-semibold text-text-primary">
-              Sample mentoring
+              {t('tabs.consentPending.sampleMentoring')}
             </Text>
             <Text className="text-caption text-text-secondary">
-              See how your mentor works
+              {t('tabs.consentPending.sampleMentoringHint')}
             </Text>
           </View>
         </Pressable>
@@ -1155,17 +1189,18 @@ function ConsentPendingGate(): React.ReactElement {
             const prompt = buildSwitchProfileConfirmation({
               activeProfile,
               profiles,
+              t,
             });
             if (!prompt) return;
             platformAlert(prompt.title, prompt.message, [
-              { text: 'Cancel', style: 'cancel' },
+              { text: t('common.cancel'), style: 'cancel' },
               {
-                text: 'Switch',
+                text: t('tabs.switchProfile.switchButton'),
                 onPress: () => {
                   void switchProfile(prompt.target.id).catch(() => {
                     platformAlert(
-                      'Could not switch profile',
-                      'Please try again.'
+                      t('tabs.switchProfile.errorTitle'),
+                      t('tabs.switchProfile.errorMessage')
                     );
                   });
                 },
@@ -1202,6 +1237,7 @@ export default function AppLayout() {
   const colors = useThemeColors();
   const tokenVars = useTokenVars();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const router = useRouter();
   const pathname = usePathname();
   const currentAppPath = toInternalAppRedirectPath(pathname);
@@ -1347,10 +1383,10 @@ export default function AppLayout() {
         <View className="flex-1 bg-background">
           <ErrorFallback
             variant="centered"
-            title="Couldn't finish navigating"
-            message="Tap below to go home."
+            title={t('tabs.authRedirectTimeout.title')}
+            message={t('tabs.authRedirectTimeout.message')}
             primaryAction={{
-              label: 'Go Home',
+              label: t('common.goHome'),
               onPress: () => goBackOrReplace(router, '/(app)/home'),
               testID: 'auth-redirect-timeout-home',
             }}
@@ -1379,15 +1415,15 @@ export default function AppLayout() {
         <View className="flex-1 bg-background">
           <ErrorFallback
             variant="centered"
-            title="Loading your profile is taking too long"
-            message="Try again, or sign out and back in."
+            title={t('tabs.profileLoadTimeout.title')}
+            message={t('tabs.profileLoadTimeout.message')}
             primaryAction={{
-              label: 'Retry',
+              label: t('common.retry'),
               onPress: () => setProfileLoadTimedOut(false),
               testID: 'profile-loading-timeout-retry',
             }}
             secondaryAction={{
-              label: 'Sign out',
+              label: t('common.signOut'),
               onPress: () => {
                 clearTransitionState();
                 void clerkSignOut();
@@ -1532,9 +1568,9 @@ export default function AppLayout() {
           <Tabs.Screen
             name="home"
             options={{
-              title: 'Home',
+              title: t('tabs.home'),
               tabBarButtonTestID: 'tab-home',
-              tabBarAccessibilityLabel: 'Home Tab',
+              tabBarAccessibilityLabel: t('tabs.homeLabel'),
               // Lazy-load the Home tab so the initial mount only renders the
               // visible gate screens (consent, profile creation). The trade-off
               // is a brief spinner on the first Home tap, but it cuts ~200ms
@@ -1548,9 +1584,9 @@ export default function AppLayout() {
           <Tabs.Screen
             name="library"
             options={{
-              title: 'Library',
+              title: t('tabs.library'),
               tabBarButtonTestID: 'tab-library',
-              tabBarAccessibilityLabel: 'Library Tab',
+              tabBarAccessibilityLabel: t('tabs.libraryLabel'),
               tabBarIcon: ({ focused }) => (
                 <TabIcon name="Book" focused={focused} />
               ),
@@ -1559,9 +1595,9 @@ export default function AppLayout() {
           <Tabs.Screen
             name="progress"
             options={{
-              title: 'Progress',
+              title: t('tabs.progress'),
               tabBarButtonTestID: 'tab-progress',
-              tabBarAccessibilityLabel: 'Progress Tab',
+              tabBarAccessibilityLabel: t('tabs.progressLabel'),
               tabBarIcon: ({ focused }) => (
                 <TabIcon name="Progress" focused={focused} />
               ),
@@ -1570,9 +1606,9 @@ export default function AppLayout() {
           <Tabs.Screen
             name="more"
             options={{
-              title: 'More',
+              title: t('tabs.more'),
               tabBarButtonTestID: 'tab-more',
-              tabBarAccessibilityLabel: 'More Tab',
+              tabBarAccessibilityLabel: t('tabs.moreLabel'),
               tabBarIcon: ({ focused }) => (
                 <TabIcon name="More" focused={focused} />
               ),
@@ -1589,11 +1625,10 @@ export default function AppLayout() {
           >
             <View className="rounded-2xl bg-surface-elevated px-5 py-4 w-full shadow-lg">
               <Text className="text-body font-semibold text-text-primary mb-1">
-                Profile switched
+                {t('tabs.profileSwitchedToast.title')}
               </Text>
               <Text className="text-body-sm text-text-secondary">
-                One of your profiles is no longer available, so we've switched
-                you to your main profile.
+                {t('tabs.profileSwitchedToast.message')}
               </Text>
             </View>
           </Pressable>

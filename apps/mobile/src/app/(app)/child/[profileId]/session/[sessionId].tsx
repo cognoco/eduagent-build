@@ -9,6 +9,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useChildSessionDetail } from '../../../../../hooks/use-dashboard';
 import { goBackOrReplace } from '../../../../../lib/navigation';
 import { EngagementChip } from '../../../../../components/parent/EngagementChip';
@@ -36,6 +37,7 @@ function formatDuration(seconds: number | null): string {
 }
 
 export default function SessionDetailScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>(
@@ -90,14 +92,16 @@ export default function SessionDetailScreen() {
     return (
       <View className="flex-1 items-center justify-center bg-background px-6">
         <Text className="text-text-secondary mb-4 text-center">
-          Something went wrong loading this session.
+          {t('parentView.session.somethingWentWrong')}
         </Text>
         <Pressable
           testID="retry-session"
           onPress={() => refetch()}
           className="rounded-lg bg-primary px-6 py-3"
         >
-          <Text className="text-text-inverse font-medium">Retry</Text>
+          <Text className="text-text-inverse font-medium">
+            {t('common.retry')}
+          </Text>
         </Pressable>
         {/* [F-033] Secondary escape — UX resilience rule requires a Go Back
             action on every error state, not just Retry. */}
@@ -108,9 +112,11 @@ export default function SessionDetailScreen() {
           }
           className="mt-3 px-6 py-3"
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('common.goBack')}
         >
-          <Text className="text-text-secondary font-medium">Go Back</Text>
+          <Text className="text-text-secondary font-medium">
+            {t('common.goBack')}
+          </Text>
         </Pressable>
       </View>
     );
@@ -124,7 +130,7 @@ export default function SessionDetailScreen() {
       >
         <Ionicons name="document-text-outline" size={48} color="#888" />
         <Text className="text-text-secondary mt-4 text-center text-base">
-          This session is no longer available.
+          {t('parentView.session.sessionNoLongerAvailable')}
         </Text>
         <Pressable
           onPress={() =>
@@ -132,7 +138,9 @@ export default function SessionDetailScreen() {
           }
           className="mt-4 rounded-lg bg-primary px-6 py-3"
         >
-          <Text className="text-text-inverse font-medium">Go Back</Text>
+          <Text className="text-text-inverse font-medium">
+            {t('common.goBack')}
+          </Text>
         </Pressable>
       </View>
     );
@@ -178,7 +186,7 @@ export default function SessionDetailScreen() {
           }
           className="mb-4 flex-row items-center"
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('common.goBack')}
         >
           <Ionicons name="arrow-back" size={24} />
         </Pressable>
@@ -199,7 +207,9 @@ export default function SessionDetailScreen() {
         <View className="flex-row justify-between">
           <View>
             <View className="flex-row items-center gap-1">
-              <Text className="text-text-secondary text-xs">Duration</Text>
+              <Text className="text-text-secondary text-xs">
+                {t('parentView.session.duration')}
+              </Text>
               <MetricInfoDot metricKey="time-on-app" />
             </View>
             <Text className="text-text-primary text-base font-medium">
@@ -207,7 +217,9 @@ export default function SessionDetailScreen() {
             </Text>
           </View>
           <View>
-            <Text className="text-text-secondary text-xs">Type</Text>
+            <Text className="text-text-secondary text-xs">
+              {t('parentView.session.type')}
+            </Text>
             <Text className="text-text-primary text-base font-medium capitalize">
               {session.sessionType}
             </Text>
@@ -220,7 +232,7 @@ export default function SessionDetailScreen() {
           {session.narrative ? (
             <View className="mx-4 mt-4 rounded-xl bg-surface p-4">
               <Text className="text-text-secondary mb-2 text-xs font-medium tracking-wide">
-                Session recap
+                {t('parentView.session.sessionRecap')}
               </Text>
               <Text className="text-text-primary text-base leading-relaxed">
                 {session.narrative}
@@ -231,7 +243,7 @@ export default function SessionDetailScreen() {
           {session.highlight ? (
             <View className="mx-4 mt-4 rounded-xl bg-surface p-4">
               <Text className="text-text-secondary mb-2 text-xs font-medium tracking-wide">
-                Highlight
+                {t('parentView.session.highlight')}
               </Text>
               <Text className="text-text-primary text-base italic leading-relaxed">
                 {session.highlight}
@@ -242,7 +254,7 @@ export default function SessionDetailScreen() {
           {session.engagementSignal ? (
             <View className="mx-4 mt-4 rounded-xl bg-surface p-4">
               <Text className="text-text-secondary mb-2 text-xs font-medium tracking-wide">
-                Engagement
+                {t('parentView.session.engagement')}
               </Text>
               <EngagementChip signal={session.engagementSignal} />
             </View>
@@ -253,7 +265,7 @@ export default function SessionDetailScreen() {
               <View className="flex-row items-start justify-between gap-3">
                 <View className="flex-1">
                   <Text className="text-text-secondary mb-2 text-xs font-medium tracking-wide">
-                    Try asking
+                    {t('parentView.session.tryAsking')}
                   </Text>
                   <Text className="text-text-primary text-base leading-relaxed">
                     {session.conversationPrompt}
@@ -263,15 +275,17 @@ export default function SessionDetailScreen() {
                   onPress={() => void handleCopyPrompt()}
                   className="rounded-full bg-background px-3 py-2"
                   accessibilityRole="button"
-                  accessibilityLabel="Copy conversation prompt"
+                  accessibilityLabel={t(
+                    'parentView.session.copyConversationPrompt'
+                  )}
                   testID="copy-conversation-prompt"
                 >
                   <Text className="text-body-sm font-semibold text-primary">
                     {copyState === 'copied'
-                      ? 'Copied ✓'
+                      ? t('parentView.session.copied')
                       : copyState === 'failed'
-                      ? 'Copy failed'
-                      : 'Copy'}
+                      ? t('parentView.session.copyFailed')
+                      : t('parentView.session.copy')}
                   </Text>
                 </Pressable>
               </View>
@@ -284,14 +298,13 @@ export default function SessionDetailScreen() {
           testID="narrative-unavailable"
         >
           <Text className="text-text-primary text-base font-semibold">
-            No recap available
+            {t('parentView.session.noRecapAvailable')}
           </Text>
           <Text className="text-text-secondary mt-2 text-sm leading-relaxed">
             {/* [BUG-552] The recap may not exist because the session is still
                 being processed, was too short, or predates the recap feature.
                 Avoid "older session" — any session can lack a recap. */}
-            A recap for this session is not available. It may still be
-            generating, or the session may have been too short.
+            {t('parentView.session.noRecapBody')}
           </Text>
           <Pressable
             onPress={() =>
@@ -299,10 +312,12 @@ export default function SessionDetailScreen() {
             }
             className="mt-4 self-start rounded-lg bg-primary px-4 py-3"
             accessibilityRole="button"
-            accessibilityLabel="Go back"
+            accessibilityLabel={t('common.goBack')}
             testID="narrative-unavailable-back"
           >
-            <Text className="text-text-inverse font-medium">Go Back</Text>
+            <Text className="text-text-inverse font-medium">
+              {t('common.goBack')}
+            </Text>
           </Pressable>
         </View>
       )}
@@ -310,7 +325,7 @@ export default function SessionDetailScreen() {
       {/* Summary */}
       <View className="mx-4 mt-4 rounded-xl bg-surface p-4">
         <Text className="text-text-secondary mb-2 text-xs font-medium tracking-wide">
-          Session Summary
+          {t('parentView.session.sessionSummary')}
         </Text>
         {session.displaySummary ? (
           <Text className="text-text-primary text-base leading-relaxed">
@@ -325,9 +340,7 @@ export default function SessionDetailScreen() {
             className="text-text-secondary text-base leading-relaxed"
             testID="session-summary-empty-note"
           >
-            We don&apos;t have a written summary for this session — it may have
-            been a short browse or finished before the recap was generated. The
-            CTAs below let you re-open the topic or jump back to the profile.
+            {t('parentView.session.noSummaryBody')}
           </Text>
         )}
       </View>
@@ -336,7 +349,7 @@ export default function SessionDetailScreen() {
       {session.homeworkSummary && (
         <View className="mx-4 mt-4 rounded-xl bg-surface p-4">
           <Text className="text-text-secondary mb-2 text-xs font-medium tracking-wide">
-            Homework Help
+            {t('parentView.session.homeworkHelp')}
           </Text>
           <Text className="text-text-primary text-base leading-relaxed">
             {session.homeworkSummary.summary}
@@ -353,15 +366,19 @@ export default function SessionDetailScreen() {
             accessibilityRole="button"
             accessibilityLabel={
               session.topicTitle
-                ? `Open topic ${session.topicTitle}`
-                : 'Open this topic'
+                ? t('parentView.session.openTopicWithTitle', {
+                    title: session.topicTitle,
+                  })
+                : t('parentView.session.openThisTopic')
             }
             testID="session-detail-continue-topic"
           >
             <Text className="text-text-inverse font-medium">
               {session.topicTitle
-                ? `Open ${session.topicTitle}`
-                : 'Open this topic'}
+                ? t('parentView.session.openTopicWithTitle', {
+                    title: session.topicTitle,
+                  })
+                : t('parentView.session.openThisTopic')}
             </Text>
           </Pressable>
         ) : null}
@@ -371,11 +388,11 @@ export default function SessionDetailScreen() {
           }
           className="rounded-lg px-4 py-3 items-center min-h-[48px] justify-center"
           accessibilityRole="button"
-          accessibilityLabel="Back to child profile"
+          accessibilityLabel={t('parentView.session.backToChildProfile')}
           testID="session-detail-back-to-child"
         >
           <Text className="text-primary font-medium">
-            Back to child profile
+            {t('parentView.session.backToChildProfile')}
           </Text>
         </Pressable>
       </View>

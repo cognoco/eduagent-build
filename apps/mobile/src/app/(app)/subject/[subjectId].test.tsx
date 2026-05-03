@@ -2,6 +2,11 @@ import { render, screen, fireEvent } from '@testing-library/react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
+jest.mock(
+  'react-i18next',
+  () => require('../../../test-utils/mock-i18n').i18nMock
+);
+
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
 
@@ -97,13 +102,13 @@ describe('SubjectSettingsScreen', () => {
   it('renders the Analogy Preference section header', () => {
     render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
-    screen.getByText('Analogy Preference');
+    screen.getByText('subject.settings.analogyTitle');
   });
 
   it('renders the description text', () => {
     render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
-    screen.getByText(/Choose a domain for analogies/);
+    screen.getByText('subject.settings.analogyDescription');
   });
 
   it('renders the analogy domain picker', () => {
@@ -203,7 +208,7 @@ describe('SubjectSettingsScreen', () => {
 
       render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
-      expect(screen.queryByText('Analogy Preference')).toBeNull();
+      expect(screen.queryByText('subject.settings.analogyTitle')).toBeNull();
       expect(screen.queryByTestId('analogy-domain-picker')).toBeNull();
       expect(
         screen.getByTestId('subject-settings-language-empty')
@@ -217,7 +222,7 @@ describe('SubjectSettingsScreen', () => {
 
       render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
-      screen.getByText('Analogy Preference');
+      screen.getByText('subject.settings.analogyTitle');
       expect(
         screen.queryByTestId('subject-settings-language-empty')
       ).toBeNull();

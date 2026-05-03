@@ -12,6 +12,63 @@ const mockBack = jest.fn();
 const mockReplace = jest.fn();
 const mockCanGoBack = jest.fn();
 
+jest.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, opts?: Record<string, unknown>) => {
+      const strings: Record<
+        string,
+        string | ((o?: Record<string, unknown>) => string)
+      > = {
+        title: 'Delete account',
+        scheduledTitle: 'Your account is scheduled for deletion.',
+        scheduledBody: (o) =>
+          `All your data will be permanently removed on ${
+            o?.date ?? ''
+          }. You can cancel anytime before then.`,
+        scheduledAccountActive:
+          'Your account remains active until the grace period ends.',
+        keepAccount: 'I changed my mind — keep my account',
+        keepAccountLabel: 'I changed my mind — keep my account',
+        signOutNow: 'Sign out now',
+        signOutNowLabel: 'Sign out now',
+        signOutFailedTitle: 'Sign out failed',
+        signOutFailedMessage:
+          'Please close and reopen the app, then sign in again.',
+        closeWithoutCancellingLabel: 'Close without cancelling',
+        familyWarningTitle: 'If you have linked child profiles',
+        familyWarningBody:
+          'They will lose access to MentoMate. Their progress, learning history, and consent records are permanently deleted along with your account. The family link is not transferred.',
+        subscriptionWarningTitle: 'Cancel your subscription separately',
+        subscriptionWarningBodyPrefix:
+          'Your App Store or Play Store subscription is',
+        subscriptionWarningNot: 'not',
+        subscriptionWarningBodySuffix:
+          "automatically cancelled. Open your device's subscription settings before deleting your account, or you may continue to be billed.",
+        confirmPromptPrefix: 'Type',
+        confirmPromptSuffix: 'below to confirm.',
+        confirmInputLabel: (o) =>
+          `Type ${o?.phrase ?? ''} to confirm account deletion`,
+        permanentDelete: 'Permanently delete my account',
+        permanentDeleteLabel: 'Permanently delete my account',
+        warningBody1:
+          'This will permanently delete your account and all associated data, including profiles, learning progress, and consent records.',
+        warningBody2:
+          "You'll have a 7-day grace period to change your mind. After that, your data cannot be recovered.",
+        understandDelete: 'I understand, delete my account',
+        understandDeleteLabel: 'I understand, delete my account',
+        'common:close': 'Close',
+        'common:cancel': 'Cancel',
+        'common:goBack': 'Go Back',
+      };
+      const entry = strings[key];
+      if (entry === undefined) return key;
+      if (typeof entry === 'function') return entry(opts);
+      return entry;
+    },
+  }),
+  initReactI18next: { type: '3rdParty', init: jest.fn() },
+}));
+
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     back: mockBack,
@@ -221,9 +278,7 @@ describe('DeleteAccountScreen', () => {
       render(<DeleteAccountScreen />, { wrapper: Wrapper });
       fireEvent.press(screen.getByTestId('delete-account-confirm'));
 
-      expect(
-        screen.getByTestId('delete-account-family-warning')
-      ).toBeTruthy();
+      expect(screen.getByTestId('delete-account-family-warning')).toBeTruthy();
       screen.getByText(/linked child profiles/i);
       expect(
         screen.getByText(/permanently deleted along with your account/i)

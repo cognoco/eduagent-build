@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../../lib/theme';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
@@ -54,6 +55,7 @@ const CURRICULUM_POLL_INTERVAL_MS = 3_000;
 const CURRICULUM_POLL_TIMEOUT_MS = 90_000;
 
 export default function CurriculumScreen() {
+  const { t } = useTranslation();
   const {
     subjectId,
     subjectName,
@@ -189,16 +191,18 @@ export default function CurriculumScreen() {
   if (!subjectId) {
     return (
       <View className="flex-1 bg-background items-center justify-center px-5">
-        <Text className="text-text-secondary mb-4">No subject selected</Text>
+        <Text className="text-text-secondary mb-4">
+          {t('onboarding.common.noSubjectSelected')}
+        </Text>
         <Pressable
           onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
           className="bg-primary rounded-button px-6 py-3 items-center"
           accessibilityRole="button"
-          accessibilityLabel="Go home"
+          accessibilityLabel={t('common.goHome')}
           testID="curriculum-guard-home"
         >
           <Text className="text-text-inverse text-body font-semibold">
-            Go home
+            {t('common.goHome')}
           </Text>
         </Pressable>
       </View>
@@ -212,7 +216,10 @@ export default function CurriculumScreen() {
       setChallengeFeedback('');
       setShowChallengeModal(false);
     } catch (err: unknown) {
-      platformAlert('Curriculum update failed', formatApiError(err));
+      platformAlert(
+        t('onboarding.curriculumReview.updateFailedTitle'),
+        formatApiError(err)
+      );
     }
   };
 
@@ -250,7 +257,9 @@ export default function CurriculumScreen() {
       !addTopicDescription.trim() ||
       !Number.isFinite(estimatedMinutes)
     ) {
-      setAddTopicError('Add a title, description, and estimated minutes.');
+      setAddTopicError(
+        t('onboarding.curriculumReview.addTopicValidationError')
+      );
       return;
     }
 
@@ -319,7 +328,7 @@ export default function CurriculumScreen() {
             <Text className="text-primary text-h3">&larr;</Text>
           </Pressable>
           <Text className="text-h2 font-bold text-text-primary flex-1">
-            Your Curriculum
+            {t('onboarding.curriculumReview.title')}
           </Text>
           <Pressable
             onPress={() => setShowChallengeModal(true)}
@@ -327,7 +336,7 @@ export default function CurriculumScreen() {
             testID="challenge-button"
           >
             <Text className="text-body-sm text-primary font-semibold">
-              Suggest changes
+              {t('onboarding.curriculumReview.suggestChanges')}
             </Text>
           </Pressable>
         </View>
@@ -342,11 +351,10 @@ export default function CurriculumScreen() {
           testID="curriculum-loading-timeout"
         >
           <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
-            Still loading…
+            {t('onboarding.curriculumReview.loadingTimeout.title')}
           </Text>
           <Text className="text-body text-text-secondary text-center mb-6">
-            Loading your curriculum is taking longer than expected. Check your
-            connection and try again.
+            {t('onboarding.curriculumReview.loadingTimeout.body')}
           </Text>
           <Pressable
             onPress={() => {
@@ -356,10 +364,10 @@ export default function CurriculumScreen() {
             className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center mb-3 w-full"
             testID="curriculum-timeout-retry"
             accessibilityRole="button"
-            accessibilityLabel="Try again"
+            accessibilityLabel={t('common.tryAgain')}
           >
             <Text className="text-text-inverse text-body font-semibold">
-              Try again
+              {t('common.tryAgain')}
             </Text>
           </Pressable>
           <Pressable
@@ -367,10 +375,10 @@ export default function CurriculumScreen() {
             className="bg-surface rounded-button px-6 py-3 items-center min-h-[48px] justify-center w-full"
             testID="curriculum-timeout-home"
             accessibilityRole="button"
-            accessibilityLabel="Go home"
+            accessibilityLabel={t('common.goHome')}
           >
             <Text className="text-text-primary text-body font-semibold">
-              Go home
+              {t('common.goHome')}
             </Text>
           </Pressable>
         </View>
@@ -378,7 +386,7 @@ export default function CurriculumScreen() {
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" testID="curriculum-loading" />
           <Text className="text-text-secondary mt-2">
-            Loading curriculum...
+            {t('onboarding.curriculumReview.loadingCurriculum')}
           </Text>
         </View>
       ) : isError ? (
@@ -387,10 +395,10 @@ export default function CurriculumScreen() {
           testID="curriculum-error"
         >
           <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
-            Couldn't load curriculum
+            {t('onboarding.curriculumReview.loadError.title')}
           </Text>
           <Text className="text-body text-text-secondary text-center mb-6">
-            Check your connection and try again.
+            {t('onboarding.curriculumReview.loadError.body')}
           </Text>
           <Pressable
             onPress={() => void refetch()}
@@ -398,7 +406,7 @@ export default function CurriculumScreen() {
             testID="curriculum-error-retry"
           >
             <Text className="text-text-inverse text-body font-semibold">
-              Try again
+              {t('common.tryAgain')}
             </Text>
           </Pressable>
           <Pressable
@@ -407,7 +415,7 @@ export default function CurriculumScreen() {
             testID="curriculum-error-home"
           >
             <Text className="text-text-primary text-body font-semibold">
-              Go home
+              {t('common.goHome')}
             </Text>
           </Pressable>
         </View>
@@ -421,10 +429,10 @@ export default function CurriculumScreen() {
         >
           <ActivityIndicator size="large" className="mb-4" />
           <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
-            Building your curriculum…
+            {t('onboarding.curriculumReview.generating.title')}
           </Text>
           <Text className="text-body text-text-secondary text-center">
-            This usually takes about 10–20 seconds.
+            {t('onboarding.curriculumReview.generating.body')}
           </Text>
         </View>
       ) : !curriculum ? (
@@ -434,10 +442,10 @@ export default function CurriculumScreen() {
         >
           <ErrorFallback
             variant="card"
-            title="No curriculum yet"
-            message="Complete the assessment interview to generate your learning path."
+            title={t('onboarding.curriculumReview.noCurriculum.title')}
+            message={t('onboarding.curriculumReview.noCurriculum.message')}
             primaryAction={{
-              label: 'Retry',
+              label: t('common.retry'),
               testID: 'curriculum-empty-retry',
               onPress: () => {
                 setPollTimedOut(false);
@@ -445,7 +453,7 @@ export default function CurriculumScreen() {
               },
             }}
             secondaryAction={{
-              label: 'Go Home',
+              label: t('common.goHome'),
               testID: 'curriculum-empty-home',
               onPress: () => goBackOrReplace(router, '/(app)/home'),
             }}
@@ -457,7 +465,10 @@ export default function CurriculumScreen() {
           contentContainerStyle={{ paddingBottom: 100 }}
         >
           <Text className="text-body-sm text-text-secondary mb-4">
-            Version {curriculum.version} — {curriculum.topics.length} topics
+            {t('onboarding.curriculumReview.versionInfo', {
+              version: curriculum.version,
+              count: curriculum.topics.length,
+            })}
           </Text>
 
           {curriculum.topics.map((topic) => (
@@ -483,13 +494,16 @@ export default function CurriculumScreen() {
                     className="self-start mt-3"
                     testID={`explain-${topic.id}`}
                     accessibilityRole="button"
-                    accessibilityLabel={`Why is ${topic.title} in this order`}
+                    accessibilityLabel={t(
+                      'onboarding.curriculumReview.whyOrderLabel',
+                      { title: topic.title }
+                    )}
                     disabled={explainingTopicId === topic.id}
                   >
                     <Text className="text-body-sm font-semibold text-primary">
                       {explainingTopicId === topic.id
-                        ? 'Explaining...'
-                        : 'Why this order?'}
+                        ? t('onboarding.curriculumReview.explaining')
+                        : t('onboarding.curriculumReview.whyOrder')}
                     </Text>
                   </Pressable>
                   <View className="flex-row mt-2 items-center">
@@ -516,12 +530,12 @@ export default function CurriculumScreen() {
                   <Pressable
                     onPress={() =>
                       platformAlert(
-                        'Skip this topic?',
-                        'You can always bring it back later.',
+                        t('onboarding.curriculumReview.skipTopicTitle'),
+                        t('onboarding.curriculumReview.skipTopicBody'),
                         [
-                          { text: 'Cancel', style: 'cancel' },
+                          { text: t('common.cancel'), style: 'cancel' },
                           {
-                            text: 'Skip',
+                            text: t('onboarding.curriculumReview.skipAction'),
                             style: 'destructive',
                             // [UX-DE-M2] Surface skip errors — silent failure
                             // left the UI optimistically empty with no feedback.
@@ -529,7 +543,9 @@ export default function CurriculumScreen() {
                               skipTopic.mutate(topic.id, {
                                 onError: (err: unknown) =>
                                   platformAlert(
-                                    'Could not skip topic',
+                                    t(
+                                      'onboarding.curriculumReview.skipErrorTitle'
+                                    ),
                                     formatApiError(err)
                                   ),
                               }),
@@ -541,7 +557,7 @@ export default function CurriculumScreen() {
                     testID={`skip-${topic.id}`}
                   >
                     <Text className="text-caption text-text-secondary">
-                      Skip
+                      {t('onboarding.curriculumReview.skipAction')}
                     </Text>
                   </Pressable>
                 ) : (
@@ -551,18 +567,21 @@ export default function CurriculumScreen() {
                       unskipTopic.mutate(topic.id, {
                         onError: (err: unknown) =>
                           platformAlert(
-                            'Could not restore topic',
+                            t('onboarding.curriculumReview.restoreErrorTitle'),
                             formatApiError(err)
                           ),
                       })
                     }
                     className="bg-surface-elevated rounded-button px-3 py-1"
                     testID={`restore-${topic.id}`}
-                    accessibilityLabel={`Restore ${topic.title}`}
+                    accessibilityLabel={t(
+                      'onboarding.curriculumReview.restoreLabel',
+                      { title: topic.title }
+                    )}
                     accessibilityRole="button"
                   >
                     <Text className="text-caption font-medium text-primary">
-                      Restore
+                      {t('onboarding.curriculumReview.restore')}
                     </Text>
                   </Pressable>
                 )}
@@ -575,10 +594,10 @@ export default function CurriculumScreen() {
             className="bg-surface-elevated rounded-button py-3 px-4 items-center mb-4"
             testID="add-topic-button"
             accessibilityRole="button"
-            accessibilityLabel="Add topic"
+            accessibilityLabel={t('onboarding.curriculumReview.addTopic')}
           >
             <Text className="text-body font-semibold text-primary">
-              Add topic
+              {t('onboarding.curriculumReview.addTopic')}
             </Text>
           </Pressable>
         </ScrollView>
@@ -592,11 +611,10 @@ export default function CurriculumScreen() {
         >
           <View className="bg-surface rounded-card p-4 mb-3">
             <Text className="text-body font-semibold text-text-primary mb-2">
-              You skipped most of this curriculum
+              {t('onboarding.curriculumReview.placementCheck.mostSkipped')}
             </Text>
             <Text className="text-body-sm text-text-secondary">
-              Want a faster path? You can take a placement check, continue with
-              the remaining advanced topics, or switch to a different subject.
+              {t('onboarding.curriculumReview.placementCheck.hint')}
             </Text>
           </View>
           <Pressable
@@ -614,7 +632,7 @@ export default function CurriculumScreen() {
             testID="placement-check-button"
           >
             <Text className="text-text-inverse text-body font-semibold">
-              Take placement check
+              {t('onboarding.curriculumReview.placementCheck.takePlacement')}
             </Text>
           </Pressable>
           <Pressable
@@ -633,18 +651,20 @@ export default function CurriculumScreen() {
             testID="continue-advanced-button"
           >
             <Text className="text-body font-semibold text-primary">
-              Continue with advanced topics
+              {t('onboarding.curriculumReview.placementCheck.continueAdvanced')}
             </Text>
           </Pressable>
           <Pressable
             onPress={() => router.replace('/create-subject')}
             className="py-3 items-center"
             testID="choose-different-subject-button"
-            accessibilityLabel="Choose a different subject"
+            accessibilityLabel={t(
+              'onboarding.curriculumReview.placementCheck.chooseDifferent'
+            )}
             accessibilityRole="button"
           >
             <Text className="text-body text-primary font-semibold">
-              Choose a different subject
+              {t('onboarding.curriculumReview.placementCheck.chooseDifferent')}
             </Text>
           </Pressable>
         </View>
@@ -669,18 +689,20 @@ export default function CurriculumScreen() {
             testID="start-learning-button"
           >
             <Text className="text-text-inverse text-body font-semibold">
-              Start learning: {firstAvailableTopic.title}
+              {t('onboarding.curriculumReview.startLearning', {
+                title: firstAvailableTopic.title,
+              })}
             </Text>
           </Pressable>
           <Pressable
             onPress={() => router.replace('/(app)/home')}
             className="py-3 items-center mt-2"
             testID="go-home-button"
-            accessibilityLabel="Go to home screen"
+            accessibilityLabel={t('onboarding.curriculumReview.exploreFirst')}
             accessibilityRole="button"
           >
             <Text className="text-body text-primary font-semibold">
-              Explore first
+              {t('onboarding.curriculumReview.exploreFirst')}
             </Text>
           </Pressable>
         </View>
@@ -693,11 +715,11 @@ export default function CurriculumScreen() {
             onPress={() => router.replace('/(app)/home')}
             className="bg-primary rounded-button py-3.5 items-center"
             testID="continue-to-home-button"
-            accessibilityLabel="Continue to home"
+            accessibilityLabel={t('onboarding.curriculumReview.continueToHome')}
             accessibilityRole="button"
           >
             <Text className="text-text-inverse text-body font-semibold">
-              Continue to home
+              {t('onboarding.curriculumReview.continueToHome')}
             </Text>
           </Pressable>
         </View>
@@ -711,14 +733,16 @@ export default function CurriculumScreen() {
             style={{ paddingBottom: Math.max(insets.bottom, 24) }}
           >
             <Text className="text-h3 font-bold text-text-primary mb-3">
-              Change your topics
+              {t('onboarding.curriculumReview.challengeModal.title')}
             </Text>
             <Text className="text-body-sm text-text-secondary mb-4">
-              Tell us what you'd change and we'll regenerate your learning path.
+              {t('onboarding.curriculumReview.challengeModal.body')}
             </Text>
             <TextInput
               className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-4"
-              placeholder="e.g. I already know the basics, skip intro topics..."
+              placeholder={t(
+                'onboarding.curriculumReview.challengeModal.placeholder'
+              )}
               placeholderTextColor={colors.muted}
               value={challengeFeedback}
               onChangeText={setChallengeFeedback}
@@ -732,7 +756,9 @@ export default function CurriculumScreen() {
                 className="flex-1 rounded-button py-3 items-center bg-surface me-2"
                 testID="challenge-cancel"
               >
-                <Text className="text-body text-text-primary">Cancel</Text>
+                <Text className="text-body text-text-primary">
+                  {t('common.cancel')}
+                </Text>
               </Pressable>
               <Pressable
                 onPress={handleChallenge}
@@ -756,7 +782,7 @@ export default function CurriculumScreen() {
                         : 'text-text-secondary'
                     }`}
                   >
-                    Regenerate
+                    {t('onboarding.curriculumReview.challengeModal.regenerate')}
                   </Text>
                 )}
               </Pressable>
@@ -772,11 +798,10 @@ export default function CurriculumScreen() {
             style={{ paddingBottom: Math.max(insets.bottom, 24) }}
           >
             <Text className="text-h3 font-bold text-text-primary mb-3">
-              Add a topic
+              {t('onboarding.curriculumReview.addTopicModal.title')}
             </Text>
             <Text className="text-body-sm text-text-secondary mb-4">
-              Add something the generated curriculum missed. We'll suggest a
-              clean title first, then you can edit before saving.
+              {t('onboarding.curriculumReview.addTopicModal.body')}
             </Text>
 
             {addTopicError !== '' && (
@@ -791,11 +816,13 @@ export default function CurriculumScreen() {
             )}
 
             <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-              Topic
+              {t('onboarding.curriculumReview.addTopicModal.topicLabel')}
             </Text>
             <TextInput
               className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-4"
-              placeholder="e.g. Trigonometry, The French Revolution"
+              placeholder={t(
+                'onboarding.curriculumReview.addTopicModal.topicPlaceholder'
+              )}
               placeholderTextColor={colors.muted}
               value={addTopicTitle}
               onChangeText={(text) => {
@@ -808,11 +835,15 @@ export default function CurriculumScreen() {
             {addTopicPreviewReady && (
               <>
                 <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-                  Description
+                  {t(
+                    'onboarding.curriculumReview.addTopicModal.descriptionLabel'
+                  )}
                 </Text>
                 <TextInput
                   className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-4"
-                  placeholder="Short description"
+                  placeholder={t(
+                    'onboarding.curriculumReview.addTopicModal.descriptionPlaceholder'
+                  )}
                   placeholderTextColor={colors.muted}
                   value={addTopicDescription}
                   onChangeText={setAddTopicDescription}
@@ -821,11 +852,13 @@ export default function CurriculumScreen() {
                 />
 
                 <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-                  Estimated minutes
+                  {t('onboarding.curriculumReview.addTopicModal.minutesLabel')}
                 </Text>
                 <TextInput
                   className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-4"
-                  placeholder="30"
+                  placeholder={t(
+                    'onboarding.curriculumReview.addTopicModal.minutesPlaceholder'
+                  )}
                   placeholderTextColor={colors.muted}
                   value={addTopicMinutes}
                   onChangeText={setAddTopicMinutes}
@@ -844,7 +877,9 @@ export default function CurriculumScreen() {
                 className="flex-1 rounded-button py-3 items-center bg-surface me-2"
                 testID="add-topic-cancel"
               >
-                <Text className="text-body text-text-primary">Cancel</Text>
+                <Text className="text-body text-text-primary">
+                  {t('common.cancel')}
+                </Text>
               </Pressable>
               <Pressable
                 onPress={
@@ -870,7 +905,9 @@ export default function CurriculumScreen() {
                         : 'text-text-secondary'
                     }`}
                   >
-                    {addTopicPreviewReady ? 'Add topic' : 'Preview'}
+                    {addTopicPreviewReady
+                      ? t('onboarding.curriculumReview.addTopicModal.addTopic')
+                      : t('onboarding.curriculumReview.addTopicModal.preview')}
                   </Text>
                 )}
               </Pressable>
@@ -887,7 +924,7 @@ export default function CurriculumScreen() {
             testID="why-modal"
           >
             <Text className="text-h3 font-bold text-text-primary mb-2">
-              Why this order?
+              {t('onboarding.curriculumReview.whyOrder')}
             </Text>
             <Text className="text-body font-semibold text-text-primary mb-3">
               {whyTopicTitle}
@@ -901,10 +938,10 @@ export default function CurriculumScreen() {
               onPress={() => setShowWhyModal(false)}
               className="mt-5 rounded-button bg-primary py-3 items-center"
               accessibilityRole="button"
-              accessibilityLabel="Close explanation"
+              accessibilityLabel={t('common.close')}
             >
               <Text className="text-body font-semibold text-text-inverse">
-                Close
+                {t('common.close')}
               </Text>
             </Pressable>
           </View>

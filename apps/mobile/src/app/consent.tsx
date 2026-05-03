@@ -13,6 +13,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useUser } from '@clerk/clerk-expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReducedMotion } from 'react-native-reanimated';
+import { useTranslation } from 'react-i18next';
 import { useRequestConsent } from '../hooks/use-consent';
 import { useThemeColors } from '../lib/theme';
 import { Button } from '../components/common/Button';
@@ -39,6 +40,7 @@ export default function ConsentScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useThemeColors();
+  const { t } = useTranslation('consent');
   const { profileId } = useLocalSearchParams<{
     profileId: string;
   }>();
@@ -247,8 +249,7 @@ export default function ConsentScreen() {
                     accessibilityRole="alert"
                     accessibilityLiveRegion="assertive"
                   >
-                    This is your own email. Please enter a parent or
-                    guardian&apos;s email address.
+                    {t('sameEmailWarning')}
                   </Text>
                 )}
                 <Text className="text-body-sm text-text-secondary mb-6">
@@ -277,7 +278,7 @@ export default function ConsentScreen() {
                 <Button
                   variant="tertiary"
                   size="small"
-                  label="Go back"
+                  label={t('common:goBack')}
                   onPress={handleClose}
                   testID="consent-cancel"
                 />
@@ -334,8 +335,7 @@ export default function ConsentScreen() {
                     accessibilityRole="alert"
                     accessibilityLiveRegion="assertive"
                   >
-                    This is your own email. Please enter a parent or
-                    guardian&apos;s email address.
+                    {t('sameEmailWarning')}
                   </Text>
                 )}
                 <Text className="text-body-sm text-text-secondary mb-6">
@@ -355,7 +355,7 @@ export default function ConsentScreen() {
                 <Button
                   variant="tertiary"
                   size="small"
-                  label="Back to child"
+                  label={t('backToChild')}
                   onPress={() => transitionToPhase('child')}
                   testID="consent-back-to-child"
                 />
@@ -364,7 +364,7 @@ export default function ConsentScreen() {
                 <Button
                   variant="tertiary"
                   size="small"
-                  label="Go back"
+                  label={t('common:goBack')}
                   onPress={handleClose}
                   testID="consent-parent-cancel"
                 />
@@ -377,33 +377,24 @@ export default function ConsentScreen() {
               <Text className="text-h1 font-bold text-text-primary mb-4">
                 {deliveryState === 'sent'
                   ? copy.successMessage
-                  : "We couldn't confirm delivery yet"}
+                  : t('deliveryFailedTitle')}
               </Text>
               <Text className="text-body text-text-primary mb-2">
                 {deliveryState === 'sent' ? (
-                  <>
-                    Your parent will get an email at{' '}
-                    <Text className="font-semibold">{parentEmail}</Text>
-                    {'. '}
-                    We&apos;ll let you know as soon as they approve.
-                  </>
+                  <>{t('deliverySentBody', { email: parentEmail })}</>
                 ) : (
-                  <>
-                    We could not confirm that the consent email reached{' '}
-                    <Text className="font-semibold">{parentEmail}</Text>. Please
-                    double-check the address and try again.
-                  </>
+                  <>{t('deliveryFailedBody', { email: parentEmail })}</>
                 )}
               </Text>
               <Text className="text-body text-text-secondary mb-8">
-                {deliveryState !== 'sent'
-                  ? 'You can resend the request now or go back and enter a different email address.'
-                  : ''}
+                {deliveryState !== 'sent' ? t('deliveryFailedHint') : ''}
               </Text>
               <Button
                 variant="primary"
                 label={
-                  deliveryState === 'sent' ? copy.handBackButton : 'Go back'
+                  deliveryState === 'sent'
+                    ? copy.handBackButton
+                    : t('common:goBack')
                 }
                 onPress={() =>
                   deliveryState === 'sent'
@@ -425,7 +416,7 @@ export default function ConsentScreen() {
                 <Button
                   variant="tertiary"
                   size="small"
-                  label="Resend email"
+                  label={t('resendEmail')}
                   onPress={onResendEmail}
                   loading={resending}
                   testID="consent-resend-email"

@@ -1,10 +1,51 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createRoutedMockFetch,
   fetchCallsMatching,
 } from '../../../test-utils/mock-api-routes';
+
+// i18n mock — returns English values for quiz.index namespace so tests can
+// assert on the same English strings as before the migration.
+// Note: jest.mock factories are hoisted and must be self-contained.
+jest.mock('react-i18next', () => {
+  const TRANSLATIONS: Record<string, string> = {
+    'quiz.index.title': 'Quiz',
+    'quiz.index.backLabel': 'Go back',
+    'quiz.index.loadError': "Couldn't load quiz data.",
+    'quiz.index.tapToRetry': 'Tap to retry.',
+    'quiz.index.retryLabel': 'Retry loading quiz data',
+    'quiz.index.capitalsTitle': 'Capitals',
+    'quiz.index.capitalsDefaultSubtitle': 'Test yourself on world capitals',
+    'quiz.index.guessWhoTitle': 'Guess Who',
+    'quiz.index.guessWhoDefaultSubtitle': 'Name the famous person from clues',
+    'quiz.index.vocabLockedTitle': 'Vocabulary',
+    'quiz.index.vocabLockedSubtitle':
+      'Add a language subject to unlock vocabulary quizzes',
+    'quiz.index.bestScore': 'Best: {{score}}/{{total}} · Played: {{played}}',
+    'quiz.index.played': 'Played: {{played}}',
+    'quiz.index.vocabBasicsTitle': '{{language}} basics',
+    'quiz.index.vocabPersonalisedTitle': 'Vocabulary: {{language}}',
+    'quiz.index.vocabStarterSubtitle':
+      'Stock starter words — record {{threshold}} of your own to unlock personalised rounds',
+    'quiz.index.vocabPlayedSubtitleDefault': 'Practice new words and phrases',
+    'common.back': 'Back',
+  };
+  const t = (key: string, opts?: Record<string, unknown>) => {
+    const template = TRANSLATIONS[key] ?? key;
+    if (!opts) return template;
+    return template.replace(/\{\{(\w+)\}\}/g, (_: string, k: string) =>
+      String(opts[k] ?? `{{${k}}}`)
+    );
+  };
+  return { useTranslation: () => ({ t }) };
+});
 
 // [BUG-891] LanguageVocabCard calls useVocabulary(subjectId) so the menu
 // can switch the title to "<Lang> basics" when the learner has fewer than
@@ -16,7 +57,9 @@ import {
 // Default routes: empty stats, empty subjects, 5 vocab entries (personalised).
 // Order: most-specific first so /vocabulary matches before /subjects (both appear in
 // the vocabulary URL path /subjects/:id/vocabulary).
-const DEFAULT_VOCAB = Array.from({ length: 5 }).map((_, i) => ({ id: `v-${i}` }));
+const DEFAULT_VOCAB = Array.from({ length: 5 }).map((_, i) => ({
+  id: `v-${i}`,
+}));
 
 const mockFetch = createRoutedMockFetch({
   '/quiz/stats': [],
@@ -176,8 +219,18 @@ describe('QuizIndexScreen', () => {
 
     it('renders best-score subtitles when stats include bestScore', async () => {
       mockFetch.setRoute('/quiz/stats', [
-        { activityType: 'capitals', bestScore: 8, bestTotal: 10, roundsPlayed: 5 },
-        { activityType: 'guess_who', bestScore: 4, bestTotal: 5, roundsPlayed: 2 },
+        {
+          activityType: 'capitals',
+          bestScore: 8,
+          bestTotal: 10,
+          roundsPlayed: 5,
+        },
+        {
+          activityType: 'guess_who',
+          bestScore: 4,
+          bestTotal: 5,
+          roundsPlayed: 2,
+        },
       ]);
       render(<QuizIndexScreen />, { wrapper: Wrapper });
       await waitFor(() => {
@@ -196,9 +249,17 @@ describe('QuizIndexScreen', () => {
     it('shows per-language stats on the matching card only (BUG-926 fix)', async () => {
       mockFetch.setRoute('/quiz/stats', [
         // Italian stat row — only the Italian card should show this.
-        { activityType: 'vocabulary', languageCode: 'it', bestScore: 2, bestTotal: 6, roundsPlayed: 1 },
+        {
+          activityType: 'vocabulary',
+          languageCode: 'it',
+          bestScore: 2,
+          bestTotal: 6,
+          roundsPlayed: 1,
+        },
       ]);
-      mockFetch.setRoute('/subjects', { subjects: [ITALIAN_SUBJECT, SPANISH_SUBJECT] });
+      mockFetch.setRoute('/subjects', {
+        subjects: [ITALIAN_SUBJECT, SPANISH_SUBJECT],
+      });
 
       render(<QuizIndexScreen />, { wrapper: Wrapper });
 
@@ -217,9 +278,17 @@ describe('QuizIndexScreen', () => {
     it('shows neutral fallback on a language card with no matching stat row (BUG-926 fix)', async () => {
       mockFetch.setRoute('/quiz/stats', [
         // Only Spanish stats present.
-        { activityType: 'vocabulary', languageCode: 'es', bestScore: 5, bestTotal: 6, roundsPlayed: 3 },
+        {
+          activityType: 'vocabulary',
+          languageCode: 'es',
+          bestScore: 5,
+          bestTotal: 6,
+          roundsPlayed: 3,
+        },
       ]);
-      mockFetch.setRoute('/subjects', { subjects: [ITALIAN_SUBJECT, SPANISH_SUBJECT] });
+      mockFetch.setRoute('/subjects', {
+        subjects: [ITALIAN_SUBJECT, SPANISH_SUBJECT],
+      });
 
       render(<QuizIndexScreen />, { wrapper: Wrapper });
 
@@ -259,7 +328,9 @@ describe('QuizIndexScreen', () => {
       });
 
       it('keeps starter framing when vocab count is below the threshold', async () => {
-        mockFetch.setRoute('/vocabulary', { vocabulary: [{ id: 'v-1' }, { id: 'v-2' }] });
+        mockFetch.setRoute('/vocabulary', {
+          vocabulary: [{ id: 'v-1' }, { id: 'v-2' }],
+        });
         render(<QuizIndexScreen />, { wrapper: Wrapper });
         await waitFor(() => {
           screen.getByText('Italian basics');
@@ -268,7 +339,9 @@ describe('QuizIndexScreen', () => {
 
       it('switches to personalised framing once vocab >= threshold', async () => {
         mockFetch.setRoute('/vocabulary', {
-          vocabulary: Array.from({ length: 5 }).map((_, i) => ({ id: `v-${i}` })),
+          vocabulary: Array.from({ length: 5 }).map((_, i) => ({
+            id: `v-${i}`,
+          })),
         });
         render(<QuizIndexScreen />, { wrapper: Wrapper });
         await waitFor(() => {
@@ -285,7 +358,13 @@ describe('QuizIndexScreen', () => {
         // <Lang>" unconditionally, which is what made the bug reproducible
         // across empty subjects.
         // Simulate loading by making the vocabulary fetch never resolve.
-        mockFetch.setRoute('/vocabulary', () => new Promise(() => { /* never resolves */ }));
+        mockFetch.setRoute(
+          '/vocabulary',
+          () =>
+            new Promise(() => {
+              /* never resolves */
+            })
+        );
         render(<QuizIndexScreen />, { wrapper: Wrapper });
         // The card must appear immediately in starter framing — before vocab resolves.
         await waitFor(() => {
@@ -351,8 +430,12 @@ describe('QuizIndexScreen', () => {
       await waitFor(() => {
         const newCalls = mockFetch.mock.calls.length;
         // Both stats and subjects queries should have been refetched.
-        expect(fetchCallsMatching(mockFetch, '/quiz/stats').length).toBeGreaterThanOrEqual(2);
-        expect(fetchCallsMatching(mockFetch, '/subjects').length).toBeGreaterThanOrEqual(2);
+        expect(
+          fetchCallsMatching(mockFetch, '/quiz/stats').length
+        ).toBeGreaterThanOrEqual(2);
+        expect(
+          fetchCallsMatching(mockFetch, '/subjects').length
+        ).toBeGreaterThanOrEqual(2);
         expect(newCalls).toBeGreaterThan(callsBefore);
       });
     });

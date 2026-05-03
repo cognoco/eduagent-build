@@ -1,6 +1,7 @@
 import { View, Text, Pressable, ScrollView } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import {
   RetentionSignal,
   type RetentionStatus,
@@ -30,6 +31,7 @@ function TopicSkeleton(): React.ReactNode {
 }
 
 export default function SubjectTopicsScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const {
@@ -69,20 +71,20 @@ export default function SubjectTopicsScreen() {
         testID="child-subject-missing-params"
       >
         <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
-          Subject not found
+          {t('parentView.subjects.subjectNotFound')}
         </Text>
         <Text className="text-text-secondary text-body text-center mb-6">
-          Unable to load subject details. Please go back and try again.
+          {t('parentView.subjects.unableToLoadSubject')}
         </Text>
         <Pressable
           onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
           className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('common.goBack')}
           testID="child-subject-missing-params-back"
         >
           <Text className="text-body font-semibold text-text-inverse">
-            Go back
+            {t('common.back')}
           </Text>
         </Pressable>
       </View>
@@ -97,14 +99,14 @@ export default function SubjectTopicsScreen() {
         testID="child-subject-error"
       >
         <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
-          Could not load topics
+          {t('parentView.subjects.couldNotLoadTopics')}
         </Text>
         <Text className="text-body text-text-secondary text-center mb-6">
-          Something went wrong. Tap below to try again.
+          {t('parentView.subjects.somethingWentWrong')}
         </Text>
         <Button
           variant="primary"
-          label="Try again"
+          label={t('common.tryAgain')}
           onPress={() => refetch()}
           testID="retry-topics"
         />
@@ -112,10 +114,12 @@ export default function SubjectTopicsScreen() {
           onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
           className="mt-3 py-3 px-6 min-h-[44px] items-center justify-center"
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('common.goBack')}
           testID="child-subject-error-back"
         >
-          <Text className="text-body text-primary font-semibold">Go back</Text>
+          <Text className="text-body text-primary font-semibold">
+            {t('common.back')}
+          </Text>
         </Pressable>
       </View>
     );
@@ -127,7 +131,7 @@ export default function SubjectTopicsScreen() {
         <Pressable
           onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
           className="me-3 py-2 pe-2"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('common.goBack')}
           accessibilityRole="button"
           testID="back-button"
         >
@@ -176,7 +180,9 @@ export default function SubjectTopicsScreen() {
                 } as never)
               }
               className="bg-surface rounded-card p-4 mt-3"
-              accessibilityLabel={`View ${topic.title} details`}
+              accessibilityLabel={t('parentView.subjects.viewTopicDetails', {
+                title: topic.title,
+              })}
               accessibilityRole="button"
               testID={`topic-card-${topic.topicId}`}
             >
@@ -216,30 +222,30 @@ export default function SubjectTopicsScreen() {
           // Offer retry instead of misleading "No topics yet".
           <View className="py-8 items-center" testID="topics-load-unknown">
             <Text className="text-body text-text-secondary mb-3">
-              Topics could not be loaded. Tap to try again.
+              {t('parentView.subjects.topicsCouldNotLoad')}
             </Text>
             <Pressable
               onPress={() => refetch()}
               className="bg-primary rounded-button px-5 py-2.5 items-center"
               accessibilityRole="button"
-              accessibilityLabel="Retry loading topics"
+              accessibilityLabel={t('parentView.subjects.retryLoadingTopics')}
               testID="topics-retry-fallback"
             >
               <Text className="text-body font-semibold text-text-inverse">
-                Retry
+                {t('common.retry')}
               </Text>
             </Pressable>
           </View>
         ) : childIsNew ? (
           <View className="py-8 items-center" testID="topics-new-learner">
             <Text className="text-body text-text-secondary text-center">
-              Topics will appear here as your child explores this subject.
+              {t('parentView.subjects.topicsNewLearner')}
             </Text>
           </View>
         ) : (
           <View className="py-8 items-center" testID="topics-empty">
             <Text className="text-body text-text-secondary">
-              No topics yet — start a learning session to explore this subject.
+              {t('parentView.subjects.noTopicsYet')}
             </Text>
           </View>
         )}

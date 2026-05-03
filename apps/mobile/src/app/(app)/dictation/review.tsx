@@ -10,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../../lib/theme';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
@@ -17,6 +18,7 @@ import { useDictationData } from './_layout';
 import { useRecordDictationResult } from '../../../hooks/use-dictation-api';
 
 export default function DictationReviewScreen(): React.ReactElement {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
@@ -66,14 +68,14 @@ export default function DictationReviewScreen(): React.ReactElement {
       const message =
         err instanceof Error && err.message
           ? err.message
-          : 'We couldn\u2019t save your review result.';
-      platformAlert('Couldn\u2019t save result', message, [
+          : t('dictation.review.couldNotSaveResult');
+      platformAlert(t('dictation.review.couldNotSaveTitle'), message, [
         {
-          text: 'Retry',
+          text: t('common.retry'),
           onPress: () => void handleDone(),
         },
         {
-          text: 'Continue without saving',
+          text: t('dictation.review.continueWithoutSaving'),
           style: 'cancel',
           onPress: () => router.replace('/(app)/practice' as never),
         },
@@ -98,17 +100,17 @@ export default function DictationReviewScreen(): React.ReactElement {
           className="text-body text-text-primary mt-4 text-center"
           accessibilityRole="text"
         >
-          Review data not found.
+          {t('dictation.review.noDataFound')}
         </Text>
         <Pressable
           onPress={handleBack}
           className="mt-6 bg-primary rounded-xl py-3 px-8"
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('common.goBack')}
           testID="review-go-back"
         >
           <Text className="text-text-inverse font-semibold text-body">
-            Go back
+            {t('common.goBack')}
           </Text>
         </Pressable>
       </View>
@@ -133,14 +135,14 @@ export default function DictationReviewScreen(): React.ReactElement {
           accessibilityRole="header"
         >
           {isPerfect
-            ? 'Perfect!'
-            : `You fixed all ${mistakes.length} ${
-                mistakes.length === 1 ? 'mistake' : 'mistakes'
-              }!`}
+            ? t('dictation.review.perfect')
+            : t('dictation.review.fixedAll', { count: mistakes.length })}
         </Text>
         <Text className="text-body text-text-secondary mt-2 text-center">
-          {reviewResult.correctCount} of {reviewResult.totalSentences} sentences
-          correct
+          {t('dictation.review.scoreLabel', {
+            correct: reviewResult.correctCount,
+            total: reviewResult.totalSentences,
+          })}
         </Text>
 
         <Pressable
@@ -149,13 +151,13 @@ export default function DictationReviewScreen(): React.ReactElement {
           className="bg-primary rounded-xl py-4 px-8 mt-8"
           testID="review-done"
           accessibilityRole="button"
-          accessibilityLabel="Done"
+          accessibilityLabel={t('common.done')}
         >
           {recordResult.isPending ? (
             <ActivityIndicator size="small" color={colors.textInverse} />
           ) : (
             <Text className="text-text-inverse font-semibold text-body">
-              Done
+              {t('common.done')}
             </Text>
           )}
         </Pressable>
@@ -179,10 +181,13 @@ export default function DictationReviewScreen(): React.ReactElement {
         className="text-h3 font-bold text-text-primary mb-1"
         accessibilityRole="header"
       >
-        {mistakes.length} {mistakes.length === 1 ? 'mistake' : 'mistakes'} found
+        {t('dictation.review.mistakesFound', { count: mistakes.length })}
       </Text>
       <Text className="text-body-sm text-text-secondary mb-6">
-        Correction {completedCount + 1} of {mistakes.length}
+        {t('dictation.review.correctionProgress', {
+          current: completedCount + 1,
+          total: mistakes.length,
+        })}
       </Text>
 
       {/* Current mistake card */}
@@ -193,7 +198,7 @@ export default function DictationReviewScreen(): React.ReactElement {
         >
           {/* Original sentence */}
           <Text className="text-body-sm text-text-secondary mb-1">
-            Original
+            {t('dictation.review.original')}
           </Text>
           <Text className="text-body text-text-primary mb-3">
             {currentMistake.original}
@@ -203,7 +208,7 @@ export default function DictationReviewScreen(): React.ReactElement {
           {currentMistake.written ? (
             <>
               <Text className="text-body-sm text-text-secondary mb-1">
-                You wrote
+                {t('dictation.review.youWrote')}
               </Text>
               <Text className="text-body mb-3" style={{ color: colors.danger }}>
                 {currentMistake.written}
@@ -212,14 +217,16 @@ export default function DictationReviewScreen(): React.ReactElement {
           ) : null}
 
           {/* Error label */}
-          <Text className="text-body-sm text-text-secondary mb-1">Error</Text>
+          <Text className="text-body-sm text-text-secondary mb-1">
+            {t('dictation.review.error')}
+          </Text>
           <Text className="text-body-sm mb-3" style={{ color: colors.danger }}>
             {currentMistake.error}
           </Text>
 
           {/* Correction */}
           <Text className="text-body-sm text-text-secondary mb-1">
-            Correct version
+            {t('dictation.review.correctVersion')}
           </Text>
           <Text
             className="text-body font-semibold mb-3"
@@ -237,7 +244,7 @@ export default function DictationReviewScreen(): React.ReactElement {
 
       {/* Retype input */}
       <Text className="text-body-sm text-text-secondary mb-2">
-        Now type the correct sentence:
+        {t('dictation.review.nowTypeCorrect')}
       </Text>
       <TextInput
         className="bg-surface-elevated border border-border rounded-xl p-4 text-text-primary text-body min-h-[80px]"
@@ -247,9 +254,9 @@ export default function DictationReviewScreen(): React.ReactElement {
         textAlignVertical="top"
         autoCorrect={false}
         autoCapitalize="none"
-        placeholder="Type the correct sentence here…"
+        placeholder={t('dictation.review.typeCorrectedPlaceholder')}
         placeholderTextColor={colors.textSecondary}
-        accessibilityLabel="Type the corrected sentence"
+        accessibilityLabel={t('dictation.review.typeCorrectedLabel')}
         testID="review-correction-input"
       />
 
@@ -263,11 +270,15 @@ export default function DictationReviewScreen(): React.ReactElement {
         testID="review-submit-correction"
         accessibilityRole="button"
         accessibilityLabel={
-          currentMistakeIndex < mistakes.length - 1 ? 'Next' : 'Finish'
+          currentMistakeIndex < mistakes.length - 1
+            ? t('common.next')
+            : t('dictation.review.finish')
         }
       >
         <Text className="text-text-inverse font-semibold text-body">
-          {currentMistakeIndex < mistakes.length - 1 ? 'Next' : 'Finish'}
+          {currentMistakeIndex < mistakes.length - 1
+            ? t('common.next')
+            : t('dictation.review.finish')}
         </Text>
       </Pressable>
 
@@ -277,9 +288,11 @@ export default function DictationReviewScreen(): React.ReactElement {
         className="mt-4 py-3 items-center"
         testID="review-back"
         accessibilityRole="button"
-        accessibilityLabel="Go back"
+        accessibilityLabel={t('common.goBack')}
       >
-        <Text className="text-body-sm text-text-muted">Go back</Text>
+        <Text className="text-body-sm text-text-muted">
+          {t('common.goBack')}
+        </Text>
       </Pressable>
     </ScrollView>
   );

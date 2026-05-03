@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { View, Text, Pressable, ScrollView } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import type { HomeworkProblem } from '@eduagent/schemas';
 import type { Router } from 'expo-router';
 import type { useCreateSubject } from '../../hooks/use-subjects';
@@ -22,6 +23,7 @@ export function SessionToolAccessory({
   handleQuickChip,
   stage,
 }: SessionToolAccessoryProps) {
+  const { t } = useTranslation();
   if (stage !== 'teaching') return null;
 
   return (
@@ -34,8 +36,8 @@ export function SessionToolAccessory({
       >
         {(
           [
-            { id: 'switch_topic', label: 'Switch topic' },
-            { id: 'park', label: 'Park it' },
+            { id: 'switch_topic', label: t('session.accessories.switchTopic') },
+            { id: 'park', label: t('session.accessories.parkIt') },
           ] as Array<{ id: QuickChipId; label: string }>
         ).map((chip) => (
           <Pressable
@@ -94,6 +96,7 @@ export function SubjectResolutionAccessory({
   setPendingSubjectResolution,
   router,
 }: SubjectResolutionAccessoryProps) {
+  const { t } = useTranslation();
   if (!pendingSubjectResolution) return null;
 
   return (
@@ -105,7 +108,7 @@ export function SubjectResolutionAccessory({
       }}
     >
       <Text className="text-body-sm font-semibold text-text-primary">
-        Pick the subject
+        {t('session.accessories.pickSubject')}
       </Text>
       <Text className="text-body-sm text-text-secondary mt-1 mb-3">
         {pendingSubjectResolution.prompt}
@@ -155,7 +158,7 @@ export function SubjectResolutionAccessory({
             >
               <Text className="text-body-sm font-semibold text-primary">
                 {createSubject.isPending
-                  ? 'Adding...'
+                  ? t('session.accessories.adding')
                   : `+ ${pendingSubjectResolution.suggestedSubjectName}`}
               </Text>
             </Pressable>
@@ -180,7 +183,9 @@ export function SubjectResolutionAccessory({
               testID={`subject-resolution-resolve-${suggestion.name}`}
             >
               <Text className="text-body-sm font-semibold text-primary">
-                {createSubject.isPending ? 'Adding...' : `+ ${suggestion.name}`}
+                {createSubject.isPending
+                  ? t('session.accessories.adding')
+                  : `+ ${suggestion.name}`}
               </Text>
             </Pressable>
           ))}
@@ -198,14 +203,14 @@ export function SubjectResolutionAccessory({
             disabled={isStreaming || pendingClassification}
             className="rounded-full border border-border px-4 py-2"
             accessibilityRole="button"
-            accessibilityLabel="Create a new subject"
+            accessibilityLabel={t('session.accessories.createNewSubjectLabel')}
             accessibilityState={{
               disabled: isStreaming || pendingClassification,
             }}
             testID="subject-resolution-new"
           >
             <Text className="text-body-sm font-semibold text-primary">
-              + New subject
+              {t('session.accessories.newSubject')}
             </Text>
           </Pressable>
         </ScrollView>
@@ -224,11 +229,11 @@ export function SubjectResolutionAccessory({
           }}
           className="rounded-button bg-primary py-3 items-center min-h-[44px] justify-center"
           accessibilityRole="button"
-          accessibilityLabel="Create a new subject"
+          accessibilityLabel={t('session.accessories.createNewSubjectLabel')}
           testID="subject-resolution-create-new"
         >
           <Text className="text-body-sm font-semibold text-text-inverse">
-            Create a new subject
+            {t('session.accessories.createNewSubject')}
           </Text>
         </Pressable>
       )}
@@ -261,6 +266,7 @@ export function HomeworkModeChips({
   handleNextProblem,
   handleEndSession,
 }: HomeworkModeChipsProps) {
+  const { t } = useTranslation();
   const [problemExpanded, setProblemExpanded] = useState(true);
 
   if (effectiveMode !== 'homework') return null;
@@ -284,8 +290,10 @@ export function HomeworkModeChips({
                 className="text-body-sm font-semibold text-text-primary"
                 testID="homework-problem-progress"
               >
-                Problem {currentProblemIndex + 1} of{' '}
-                {homeworkProblemsState.length}
+                {t('session.accessories.problemProgress', {
+                  current: String(currentProblemIndex + 1),
+                  total: String(homeworkProblemsState.length),
+                })}
               </Text>
               <Text className="text-body-sm text-text-secondary">
                 {problemExpanded ? '▾' : '▸'}
@@ -309,10 +317,10 @@ export function HomeworkModeChips({
                   className="rounded-full bg-surface-elevated px-3 py-2"
                   testID="finish-homework-early-chip"
                   accessibilityRole="button"
-                  accessibilityLabel="Finish homework early"
+                  accessibilityLabel={t('session.accessories.finishEarlyLabel')}
                 >
                   <Text className="text-body-sm font-semibold text-text-secondary">
-                    I'm done
+                    {t('session.accessories.imDone')}
                   </Text>
                 </Pressable>
                 <Pressable
@@ -320,10 +328,10 @@ export function HomeworkModeChips({
                   className="rounded-full bg-primary/10 px-3 py-2"
                   testID="next-problem-chip"
                   accessibilityRole="button"
-                  accessibilityLabel="Move to the next homework problem"
+                  accessibilityLabel={t('session.accessories.nextProblemLabel')}
                 >
                   <Text className="text-body-sm font-semibold text-primary">
-                    Next problem
+                    {t('session.accessories.nextProblem')}
                   </Text>
                 </Pressable>
               </>
@@ -333,10 +341,12 @@ export function HomeworkModeChips({
                 className="rounded-full bg-success/15 px-3 py-2"
                 testID="finish-homework-chip"
                 accessibilityRole="button"
-                accessibilityLabel="Finish homework session"
+                accessibilityLabel={t(
+                  'session.accessories.finishHomeworkLabel'
+                )}
               >
                 <Text className="text-body-sm font-semibold text-success">
-                  Finish homework
+                  {t('session.accessories.finishHomework')}
                 </Text>
               </Pressable>
             )}
@@ -352,7 +362,7 @@ export function HomeworkModeChips({
             }`}
             testID="homework-mode-help-me"
             accessibilityRole="button"
-            accessibilityLabel="Walk me through it"
+            accessibilityLabel={t('session.accessories.walkMeThrough')}
             accessibilityState={{ selected: homeworkMode === 'help_me' }}
           >
             <Text
@@ -362,7 +372,7 @@ export function HomeworkModeChips({
                   : 'text-text-primary'
               }`}
             >
-              Walk me through it
+              {t('session.accessories.walkMeThrough')}
             </Text>
           </Pressable>
           <Pressable
@@ -374,7 +384,7 @@ export function HomeworkModeChips({
             }`}
             testID="homework-mode-check-answer"
             accessibilityRole="button"
-            accessibilityLabel="Check my answer"
+            accessibilityLabel={t('session.accessories.checkMyAnswer')}
             accessibilityState={{ selected: homeworkMode === 'check_answer' }}
           >
             <Text
@@ -384,7 +394,7 @@ export function HomeworkModeChips({
                   : 'text-text-primary'
               }`}
             >
-              Check my answer
+              {t('session.accessories.checkMyAnswer')}
             </Text>
           </Pressable>
         </View>
@@ -392,17 +402,17 @@ export function HomeworkModeChips({
         /* M6: Zero-problems fallback — add escape action so user isn't stuck */
         <View className="px-4 py-3" testID="homework-no-problems">
           <Text className="text-body-sm text-text-secondary text-center mb-2">
-            No problems loaded. Type your question directly in the chat.
+            {t('session.accessories.noProblemsLoaded')}
           </Text>
           <Pressable
             onPress={handleEndSession}
             className="rounded-button bg-surface-elevated py-2 items-center min-h-[44px] justify-center"
             accessibilityRole="button"
-            accessibilityLabel="End this session"
+            accessibilityLabel={t('session.accessories.endSessionLabel')}
             testID="homework-no-problems-end-btn"
           >
             <Text className="text-body-sm font-semibold text-text-secondary">
-              End session
+              {t('session.accessories.endSession')}
             </Text>
           </Pressable>
         </View>

@@ -1,5 +1,6 @@
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { DashboardData, Profile } from '@eduagent/schemas';
 import { ProfileSwitcher } from '../common';
@@ -7,9 +8,12 @@ import { useDashboard } from '../../hooks/use-dashboard';
 import { getGreeting } from '../../lib/greeting';
 import { IntentCard } from './IntentCard';
 
-function getChildHighlight(dashboard: DashboardData | undefined): string {
+function getChildHighlight(
+  dashboard: DashboardData | undefined,
+  t: (key: string, options?: Record<string, string>) => string
+): string {
   if (!dashboard || dashboard.children.length === 0) {
-    return "See how they're doing";
+    return t('home.parentGateway.seeHowTheyAreDoing');
   }
 
   const child = [...dashboard.children].sort(
@@ -17,17 +21,22 @@ function getChildHighlight(dashboard: DashboardData | undefined): string {
   )[0];
 
   if (!child) {
-    return "See how they're doing";
+    return t('home.parentGateway.seeHowTheyAreDoing');
   }
 
   if (child.totalTimeThisWeek > 0) {
     // [BUG-498] totalTimeThisWeek arrives from the API already in minutes
     // (dashboard.ts maps totalTimeThisWeekMinutes → totalTimeThisWeek).
     // The previous / 60 double-divided, under-reporting by 60×.
-    return `${child.displayName} practiced ${child.totalTimeThisWeek} min this week`;
+    return t('home.parentGateway.practicedThisWeek', {
+      name: child.displayName,
+      minutes: String(child.totalTimeThisWeek),
+    });
   }
 
-  return `${child.displayName} hasn't practiced this week`;
+  return t('home.parentGateway.notPracticedThisWeek', {
+    name: child.displayName,
+  });
 }
 
 export interface ParentGatewayProps {
@@ -49,6 +58,7 @@ export function ParentGateway({
   onLearn,
   now,
 }: ParentGatewayProps): React.ReactElement {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { data: dashboard, isError, refetch } = useDashboard();
@@ -96,25 +106,25 @@ export function ParentGateway({
             testID="parent-dashboard-error"
           >
             <Text className="text-body-sm text-danger font-semibold mb-1">
-              We couldn't load the dashboard
+              {t('home.parentGateway.dashboardError')}
             </Text>
             <Text className="text-caption text-text-secondary">
-              Tap to retry
+              {t('common.retry')}
             </Text>
           </Pressable>
         )}
 
         <View className="gap-4">
           <IntentCard
-            title="Check child's progress"
-            subtitle={getChildHighlight(dashboard)}
+            title={t('home.parentGateway.checkProgress')}
+            subtitle={getChildHighlight(dashboard, t)}
             onPress={() =>
               router.push('/(app)/dashboard?returnTo=home' as never)
             }
             testID="gateway-check-progress"
           />
           <IntentCard
-            title="Learn something"
+            title={t('home.parentGateway.learnSomething')}
             onPress={() =>
               onLearn ? onLearn() : router.push('/create-subject' as never)
             }

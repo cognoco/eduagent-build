@@ -1,6 +1,7 @@
 import { View, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../lib/theme';
 
 /**
@@ -10,6 +11,7 @@ import { useThemeColors } from '../../lib/theme';
 export function OfflineBanner(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
+  const { t } = useTranslation();
 
   return (
     <View
@@ -28,7 +30,7 @@ export function OfflineBanner(): React.ReactElement {
         className="text-caption font-semibold ms-2"
         style={{ color: colors.background }}
       >
-        No internet connection
+        {t('common.offlineBanner.noConnection')}
       </Text>
     </View>
   );

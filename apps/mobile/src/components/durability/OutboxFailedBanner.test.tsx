@@ -66,7 +66,7 @@ describe('OutboxFailedBanner', () => {
     screen.getByText('Some messages could not be sent');
     expect(
       screen.getByText(
-        'Copy them or send them to support so nothing gets lost.'
+        "Copy them or send them to support so your progress isn't lost."
       )
     ).toBeTruthy();
     screen.getByText('Hello world');

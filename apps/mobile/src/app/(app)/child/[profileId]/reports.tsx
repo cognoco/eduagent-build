@@ -7,6 +7,7 @@ import {
   useChildWeeklyReports,
 } from '../../../../hooks/use-progress';
 import { goBackOrReplace } from '../../../../lib/navigation';
+import { useTranslation } from 'react-i18next';
 
 /** Returns the formatted next report date and a human-friendly time context. */
 export function getNextReportInfo(now = new Date()): {
@@ -43,6 +44,7 @@ export function getNextReportInfo(now = new Date()): {
 }
 
 export default function ChildReportsScreen(): React.ReactElement {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { profileId: rawProfileId } = useLocalSearchParams<{
@@ -65,7 +67,7 @@ export default function ChildReportsScreen(): React.ReactElement {
     isError: weeklyError,
     refetch: weeklyRefetch,
   } = useChildWeeklyReports(profileId);
-  const childName = child?.displayName ?? 'Your child';
+  const childName = child?.displayName ?? t('parentView.index.yourChild');
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
@@ -85,7 +87,7 @@ export default function ChildReportsScreen(): React.ReactElement {
             }
             className="me-3 py-2 pe-2"
             accessibilityRole="button"
-            accessibilityLabel="Go back"
+            accessibilityLabel={t('common.goBack')}
             testID="child-reports-back"
           >
             <Text className="text-body font-semibold text-primary">
@@ -94,10 +96,10 @@ export default function ChildReportsScreen(): React.ReactElement {
           </Pressable>
           <View className="flex-1">
             <Text className="text-h2 font-bold text-text-primary">
-              Learning reports
+              {t('parentView.reports.title')}
             </Text>
             <Text className="text-body-sm text-text-secondary mt-0.5">
-              Weekly snapshots and monthly summaries of your child's progress.
+              {t('parentView.reports.subtitle')}
             </Text>
           </View>
         </View>
@@ -105,7 +107,7 @@ export default function ChildReportsScreen(): React.ReactElement {
         {weeklyLoading ? (
           <View className="bg-surface rounded-card p-4 mt-4">
             <Text className="text-body-sm text-text-secondary">
-              Loading weekly snapshots...
+              {t('parentView.reports.loadingWeeklySnapshots')}
             </Text>
           </View>
         ) : weeklyError ? (
@@ -114,20 +116,20 @@ export default function ChildReportsScreen(): React.ReactElement {
             testID="weekly-reports-error"
           >
             <Text className="text-body font-semibold text-text-primary">
-              Couldn't load weekly snapshots
+              {t('parentView.reports.couldNotLoadWeeklySnapshots')}
             </Text>
             <Text className="text-body-sm text-text-secondary mt-1">
-              Check your connection and try again.
+              {t('parentView.reports.checkConnectionRetry')}
             </Text>
             <Pressable
               onPress={() => void weeklyRefetch()}
               className="bg-primary rounded-button px-4 py-3 mt-3 items-center min-h-[48px] justify-center"
               accessibilityRole="button"
-              accessibilityLabel="Retry loading weekly snapshots"
+              accessibilityLabel={t('parentView.reports.retryWeeklySnapshots')}
               testID="weekly-reports-error-retry"
             >
               <Text className="text-body font-semibold text-text-inverse">
-                Try again
+                {t('common.tryAgain')}
               </Text>
             </Pressable>
           </View>
@@ -137,7 +139,7 @@ export default function ChildReportsScreen(): React.ReactElement {
               className="text-body font-semibold text-text-primary mb-2"
               testID="weekly-reports-heading"
             >
-              Weekly snapshots
+              {t('parentView.reports.weeklySnapshots')}
             </Text>
             {weeklyReports.map((report) => (
               <Pressable
@@ -152,7 +154,9 @@ export default function ChildReportsScreen(): React.ReactElement {
                   } as never)
                 }
                 accessibilityRole="button"
-                accessibilityLabel={`Week of ${new Date(
+                accessibilityLabel={`${t(
+                  'parentView.reports.weekOf'
+                )} ${new Date(
                   `${report.reportWeek}T00:00:00Z`
                 ).toLocaleDateString(undefined, {
                   month: 'short',
@@ -164,7 +168,7 @@ export default function ChildReportsScreen(): React.ReactElement {
                 <View className="flex-row items-start justify-between">
                   <View className="flex-1 me-3">
                     <Text className="text-body font-semibold text-text-primary">
-                      Week of{' '}
+                      {t('parentView.reports.weekOf')}{' '}
                       {new Date(
                         `${report.reportWeek}T00:00:00Z`
                       ).toLocaleDateString(undefined, {
@@ -182,7 +186,7 @@ export default function ChildReportsScreen(): React.ReactElement {
                   {!report.viewedAt ? (
                     <View className="bg-accent/15 rounded-full px-3 py-1">
                       <Text className="text-caption font-semibold text-accent">
-                        New
+                        {t('parentView.reports.newBadge')}
                       </Text>
                     </View>
                   ) : null}
@@ -196,23 +200,24 @@ export default function ChildReportsScreen(): React.ReactElement {
             testID="weekly-reports-empty"
           >
             <Text className="text-body font-semibold text-text-primary">
-              Weekly snapshots
+              {t('parentView.reports.weeklySnapshots')}
             </Text>
             <Text className="text-body-sm text-text-secondary mt-1">
-              Weekly snapshots are generated each week once {childName} starts
-              learning. Check back soon!
+              {t('parentView.reports.weeklySnapshotsEmpty', {
+                name: childName,
+              })}
             </Text>
           </View>
         )}
 
         <Text className="text-body font-semibold text-text-primary mt-4 mb-2">
-          Monthly reports
+          {t('parentView.reports.monthlyReports')}
         </Text>
 
         {isLoading ? (
           <View className="bg-surface rounded-card p-4 mt-4">
             <Text className="text-body-sm text-text-secondary">
-              Loading reports...
+              {t('parentView.reports.loadingReports')}
             </Text>
           </View>
         ) : isError ? (
@@ -225,21 +230,21 @@ export default function ChildReportsScreen(): React.ReactElement {
             testID="child-reports-error"
           >
             <Text className="text-h3 font-semibold text-text-primary">
-              We couldn't load the reports
+              {t('parentView.reports.couldNotLoadReports')}
             </Text>
             <Text className="text-body-sm text-text-secondary mt-2">
-              Check your connection and try again.
+              {t('parentView.reports.checkConnectionRetry')}
             </Text>
             <View className="flex-row gap-3 mt-4">
               <Pressable
                 onPress={() => void refetch()}
                 className="bg-primary rounded-button px-4 py-3 items-center flex-1 min-h-[48px] justify-center"
                 accessibilityRole="button"
-                accessibilityLabel="Retry loading reports"
+                accessibilityLabel={t('parentView.reports.retryReports')}
                 testID="child-reports-error-retry"
               >
                 <Text className="text-body font-semibold text-text-inverse">
-                  Try again
+                  {t('common.tryAgain')}
                 </Text>
               </Pressable>
               <Pressable
@@ -253,11 +258,11 @@ export default function ChildReportsScreen(): React.ReactElement {
                 }
                 className="bg-background rounded-button px-4 py-3 items-center flex-1 min-h-[48px] justify-center"
                 accessibilityRole="button"
-                accessibilityLabel="Go back"
+                accessibilityLabel={t('common.goBack')}
                 testID="child-reports-error-back"
               >
                 <Text className="text-body font-semibold text-text-primary">
-                  Go back
+                  {t('common.goBack')}
                 </Text>
               </Pressable>
             </View>
@@ -275,7 +280,9 @@ export default function ChildReportsScreen(): React.ReactElement {
               }}
               className="bg-surface rounded-card p-4 mt-4"
               accessibilityRole="button"
-              accessibilityLabel={`Open ${report.reportMonth} report`}
+              accessibilityLabel={t('parentView.reports.openReport', {
+                month: report.reportMonth,
+              })}
               testID={`report-card-${report.id}`}
             >
               <View className="flex-row items-start justify-between">
@@ -298,7 +305,7 @@ export default function ChildReportsScreen(): React.ReactElement {
                 {!report.viewedAt ? (
                   <View className="bg-accent/15 rounded-full px-3 py-1">
                     <Text className="text-caption font-semibold text-accent">
-                      New
+                      {t('parentView.reports.newBadge')}
                     </Text>
                   </View>
                 ) : null}
@@ -318,8 +325,14 @@ export default function ChildReportsScreen(): React.ReactElement {
                   testID="child-reports-empty-time-context"
                 >
                   {date
-                    ? `${childName}'s first report will arrive on ${date}.`
-                    : `${childName}'s first report ${timeContext}.`}
+                    ? t('parentView.reports.firstReportArriveOn', {
+                        name: childName,
+                        date,
+                      })
+                    : t('parentView.reports.firstReportTimeContext', {
+                        name: childName,
+                        timeContext,
+                      })}
                 </Text>
               );
             })()}
@@ -334,11 +347,13 @@ export default function ChildReportsScreen(): React.ReactElement {
               }
               className="bg-primary rounded-button px-5 py-3 mt-4 min-h-[48px] justify-center"
               accessibilityRole="button"
-              accessibilityLabel={`See ${childName}'s progress now`}
+              accessibilityLabel={t('parentView.reports.seeProgressNow', {
+                name: childName,
+              })}
               testID="child-reports-empty-progress"
             >
               <Text className="text-body font-semibold text-text-inverse text-center">
-                See {childName}'s progress now
+                {t('parentView.reports.seeProgressNow', { name: childName })}
               </Text>
             </Pressable>
           </View>

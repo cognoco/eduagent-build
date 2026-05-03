@@ -1,5 +1,16 @@
 import { render, screen, fireEvent } from '@testing-library/react-native';
 
+jest.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, opts?: Record<string, unknown>) => {
+      if (opts && typeof opts === 'object') {
+        return `${key}:${JSON.stringify(opts)}`;
+      }
+      return key;
+    },
+  }),
+}));
+
 // ---------------------------------------------------------------------------
 // Router + navigation
 // ---------------------------------------------------------------------------
@@ -128,8 +139,9 @@ jest.mock('../../../../components/parent/SamplePreview', () => ({
 // Module under test (required AFTER all mocks are set up)
 // ---------------------------------------------------------------------------
 
-const { default: ChildDetailScreen } =
-  require('./index') as { default: React.ComponentType };
+const { default: ChildDetailScreen } = require('./index') as {
+  default: React.ComponentType;
+};
 
 // ---------------------------------------------------------------------------
 // Default mock values
@@ -168,11 +180,21 @@ function setupDefaultMocks() {
   });
 
   mockUseChildLearnerProfile.mockReturnValue({
-    data: { accommodationMode: 'none', memoryConsentStatus: 'granted', updatedAt: null },
+    data: {
+      accommodationMode: 'none',
+      memoryConsentStatus: 'granted',
+      updatedAt: null,
+    },
   });
 
-  mockUseRevokeConsent.mockReturnValue({ mutateAsync: jest.fn(), isPending: false });
-  mockUseRestoreConsent.mockReturnValue({ mutateAsync: jest.fn(), isPending: false });
+  mockUseRevokeConsent.mockReturnValue({
+    mutateAsync: jest.fn(),
+    isPending: false,
+  });
+  mockUseRestoreConsent.mockReturnValue({
+    mutateAsync: jest.fn(),
+    isPending: false,
+  });
   mockUseUpdateAccommodationMode.mockReturnValue({
     mutate: jest.fn(),
     isPending: false,

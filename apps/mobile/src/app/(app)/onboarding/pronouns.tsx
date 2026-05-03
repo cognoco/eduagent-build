@@ -13,6 +13,7 @@ import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { PRONOUNS_PROMPT_MIN_AGE } from '@eduagent/schemas';
 import { OnboardingStepIndicator } from '../../../components/onboarding/OnboardingStepIndicator';
 import { useUpdatePronouns } from '../../../hooks/use-onboarding-dimensions';
@@ -30,6 +31,7 @@ const PRONOUNS_MAX_LENGTH = 32;
 type Choice = (typeof PRESETS)[number] | typeof OTHER_KEY | null;
 
 export default function PronounsScreen(): React.ReactElement {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
@@ -146,8 +148,8 @@ export default function PronounsScreen(): React.ReactElement {
         onSuccess: navigateForward,
         onError: () => {
           platformAlert(
-            'Could not save pronouns',
-            'Please check your connection and try again.'
+            t('onboarding.pronouns.saveErrorTitle'),
+            t('onboarding.pronouns.saveErrorMessage')
           );
         },
       }
@@ -169,7 +171,7 @@ export default function PronounsScreen(): React.ReactElement {
           onPress={handleBack}
           className="min-h-[44px] min-w-[44px] items-center justify-center self-start"
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('common.goBack')}
         >
           <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </Pressable>
@@ -183,11 +185,10 @@ export default function PronounsScreen(): React.ReactElement {
         contentContainerStyle={{ paddingBottom: 24 }}
       >
         <Text className="text-h2 font-bold text-text-primary mt-4 mb-2">
-          What pronouns should I use?
+          {t('onboarding.pronouns.title')}
         </Text>
         <Text className="text-body text-text-secondary mb-6">
-          Optional — only you see this. I&apos;ll use it when referring to you
-          in replies.
+          {t('onboarding.pronouns.subtitle')}
         </Text>
 
         <View className="gap-3">
@@ -238,7 +239,7 @@ export default function PronounsScreen(): React.ReactElement {
           >
             <View className="flex-row items-center">
               <Text className="flex-1 text-body font-semibold text-text-primary">
-                Something else
+                {t('onboarding.pronouns.somethingElse')}
               </Text>
               {choice === OTHER_KEY ? (
                 <Ionicons
@@ -254,7 +255,7 @@ export default function PronounsScreen(): React.ReactElement {
                 className="mt-3 bg-surface rounded-input px-3 py-2 text-body text-text-primary"
                 value={customPronouns}
                 onChangeText={setCustomPronouns}
-                placeholder="e.g. xe/xem"
+                placeholder={t('onboarding.pronouns.customPlaceholder')}
                 placeholderTextColor={colors.textSecondary}
                 maxLength={PRONOUNS_MAX_LENGTH}
                 autoFocus
@@ -283,7 +284,9 @@ export default function PronounsScreen(): React.ReactElement {
               canContinue ? 'text-text-inverse' : 'text-text-tertiary'
             }`}
           >
-            {updatePronouns.isPending ? 'Saving…' : 'Continue'}
+            {updatePronouns.isPending
+              ? t('onboarding.common.saving')
+              : t('common.continue')}
           </Text>
         </Pressable>
         <Pressable
@@ -292,7 +295,9 @@ export default function PronounsScreen(): React.ReactElement {
           onPress={handleSkip}
           disabled={updatePronouns.isPending}
         >
-          <Text className="text-body text-text-secondary">Skip</Text>
+          <Text className="text-body text-text-secondary">
+            {t('onboarding.common.skip')}
+          </Text>
         </Pressable>
       </View>
     </View>

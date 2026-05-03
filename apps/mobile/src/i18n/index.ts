@@ -5,22 +5,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FEATURE_FLAGS } from '../lib/feature-flags';
 
 import en from './locales/en.json';
-import nb from './locales/nb.json';
-import de from './locales/de.json';
-import es from './locales/es.json';
-import pt from './locales/pt.json';
-import pl from './locales/pl.json';
-import ja from './locales/ja.json';
 
-export const SUPPORTED_LANGUAGES = [
-  'en',
-  'nb',
-  'de',
-  'es',
-  'pt',
-  'pl',
-  'ja',
-] as const;
+// Locked to ['en'] until LLM translation lands. The 6 placeholder locale
+// JSONs (nb/de/es/pt/pl/ja) were byte-identical English clones — shipping
+// them would mislead users who pick their device language and see English.
+// `scripts/translate.ts` regenerates the missing files when run; once a
+// locale has real content, add it back here AND to the resources object
+// below in lockstep.
+export const SUPPORTED_LANGUAGES = ['en'] as const;
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 
 export const LANGUAGE_LABELS: Record<
@@ -28,12 +20,6 @@ export const LANGUAGE_LABELS: Record<
   { english: string; native: string }
 > = {
   en: { english: 'English', native: 'English' },
-  nb: { english: 'Norwegian Bokmål', native: 'Norsk bokmål' },
-  de: { english: 'German', native: 'Deutsch' },
-  es: { english: 'Spanish', native: 'Español' },
-  pt: { english: 'Portuguese', native: 'Português' },
-  pl: { english: 'Polish', native: 'Polski' },
-  ja: { english: 'Japanese', native: '日本語' },
 };
 
 const LANGUAGE_STORAGE_KEY = 'app-ui-language';
@@ -87,12 +73,6 @@ const initPromise = (async () => {
     fallbackLng: 'en',
     resources: {
       en: { translation: en },
-      nb: { translation: nb },
-      de: { translation: de },
-      es: { translation: es },
-      pt: { translation: pt },
-      pl: { translation: pl },
-      ja: { translation: ja },
     },
     interpolation: { escapeValue: false },
   });

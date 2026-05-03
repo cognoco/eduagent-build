@@ -4,6 +4,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { RoutedMockFetch } from '../../../../test-utils/mock-api-routes';
 import ShelfScreen from './index';
 
+jest.mock(
+  'react-i18next',
+  () => require('../../../../test-utils/mock-i18n').i18nMock
+);
+
 // ---------------------------------------------------------------------------
 // Fetch-boundary mock — mockFetch is assigned inside the jest.mock factory
 // so it is available before test code runs (bypasses hoisting issue).
@@ -12,7 +17,10 @@ import ShelfScreen from './index';
 let mockFetch: RoutedMockFetch;
 
 jest.mock('../../../../lib/api-client', () => {
-  const { createRoutedMockFetch, mockApiClientFactory } = require('../../../../test-utils/mock-api-routes');
+  const {
+    createRoutedMockFetch,
+    mockApiClientFactory,
+  } = require('../../../../test-utils/mock-api-routes');
   mockFetch = createRoutedMockFetch();
   return mockApiClientFactory(mockFetch);
 });
@@ -201,9 +209,7 @@ describe('ShelfScreen', () => {
       wrapper: TestWrapper,
     });
     getByTestId('shelf-missing-param');
-    expect(
-      getByText('Missing subject. Please go back and try again.')
-    ).toBeTruthy();
+    expect(getByText('library.shelf.missingParam')).toBeTruthy();
   });
 
   it('missing-param back button returns to library', () => {
@@ -229,7 +235,7 @@ describe('ShelfScreen', () => {
       wrapper: TestWrapper,
     });
     getByTestId('shelf-loading');
-    getByText('Loading this shelf...');
+    getByText('library.shelf.loading');
 
     // Resolve to prevent test teardown warnings
     resolveBooksResponse(
@@ -265,10 +271,9 @@ describe('ShelfScreen', () => {
   it('shows error state with retry and back buttons when booksQuery fails [BUG-82]', async () => {
     mockFetch.setRoute('/subjects/sub-1/books', () =>
       Promise.resolve(
-        new Response(
-          JSON.stringify({ message: 'Failed to load books' }),
-          { status: 500 }
-        )
+        new Response(JSON.stringify({ message: 'Failed to load books' }), {
+          status: 500,
+        })
       )
     );
 
@@ -288,10 +293,9 @@ describe('ShelfScreen', () => {
     mockFetch.setRoute('/subjects/sub-1/books', () => {
       callCount++;
       return Promise.resolve(
-        new Response(
-          JSON.stringify({ message: 'Network error' }),
-          { status: 500 }
-        )
+        new Response(JSON.stringify({ message: 'Network error' }), {
+          status: 500,
+        })
       );
     });
 
@@ -329,10 +333,9 @@ describe('ShelfScreen', () => {
   it('shows error state with retry and back buttons when subjectsQuery fails [BUG-82]', async () => {
     mockFetch.setRoute('/subjects', () =>
       Promise.resolve(
-        new Response(
-          JSON.stringify({ message: 'Subjects unavailable' }),
-          { status: 500 }
-        )
+        new Response(JSON.stringify({ message: 'Subjects unavailable' }), {
+          status: 500,
+        })
       )
     );
 
@@ -350,10 +353,9 @@ describe('ShelfScreen', () => {
     mockFetch.setRoute('/subjects', () => {
       callCount++;
       return Promise.resolve(
-        new Response(
-          JSON.stringify({ message: 'Subjects unavailable' }),
-          { status: 500 }
-        )
+        new Response(JSON.stringify({ message: 'Subjects unavailable' }), {
+          status: 500,
+        })
       );
     });
 
@@ -438,7 +440,7 @@ describe('ShelfScreen', () => {
     await waitFor(() => {
       getByTestId('shelf-empty');
     });
-    getByText('No books on this shelf yet.');
+    getByText('library.shelf.emptyTitle');
   });
 
   it('empty state back button returns to library', async () => {
@@ -480,7 +482,7 @@ describe('ShelfScreen', () => {
     await waitFor(() => {
       getByTestId('shelf-empty-pick-suggestion');
     });
-    getByText('Pick a book to start');
+    getByText('library.shelf.emptyPickTitle');
     // The conflicting "Check back soon" copy must not render.
     expect(queryByTestId('shelf-empty')).toBeNull();
   });
@@ -659,10 +661,9 @@ describe('ShelfScreen', () => {
     ]);
     mockFetch.setRoute('/filing', () =>
       Promise.resolve(
-        new Response(
-          JSON.stringify({ message: 'Filing failed' }),
-          { status: 500 }
-        )
+        new Response(JSON.stringify({ message: 'Filing failed' }), {
+          status: 500,
+        })
       )
     );
 

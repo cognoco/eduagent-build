@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
+import { useTranslation } from 'react-i18next';
 
 const SSO_TIMEOUT_MS = 10_000;
 
@@ -17,6 +18,7 @@ const SSO_TIMEOUT_MS = 10_000;
  */
 export default function SSOCallbackScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const [showFallback, setShowFallback] = useState(false);
 
   useEffect(() => {
@@ -30,20 +32,23 @@ export default function SSOCallbackScreen() {
 
   return (
     <View className="flex-1 bg-background items-center justify-center">
-      <ActivityIndicator size="large" accessibilityLabel="Finishing sign-in" />
+      <ActivityIndicator
+        size="large"
+        accessibilityLabel={t('auth.ssoCallback.loadingLabel')}
+      />
       <Text className="text-body text-text-secondary mt-4">
-        Finishing sign-in...
+        {t('auth.ssoCallback.finishing')}
       </Text>
       {showFallback && (
         <Pressable
           onPress={() => router.replace('/(auth)/sign-in')}
           className="mt-6 py-3 px-6"
-          accessibilityLabel="Back to sign in"
+          accessibilityLabel={t('auth.ssoCallback.backToSignIn')}
           accessibilityRole="button"
           testID="sso-fallback-back"
         >
           <Text className="text-primary text-body font-semibold">
-            Back to sign in
+            {t('auth.ssoCallback.backToSignIn')}
           </Text>
         </Pressable>
       )}

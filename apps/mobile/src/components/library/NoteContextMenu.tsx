@@ -5,6 +5,8 @@ interface NoteContextMenuProps {
   content: string;
   onEdit: (noteId: string, currentContent: string) => void;
   onDelete: (noteId: string) => void;
+  /** Optional i18n translate function — if omitted, falls back to key passthrough. */
+  t?: (key: string) => string;
 }
 
 export function showNoteContextMenu({
@@ -12,23 +14,28 @@ export function showNoteContextMenu({
   content,
   onEdit,
   onDelete,
+  t = (key) => key,
 }: NoteContextMenuProps) {
-  Alert.alert('Note', undefined, [
-    { text: 'Edit', onPress: () => onEdit(noteId, content) },
+  Alert.alert(t('library.noteMenu.title'), undefined, [
+    { text: t('common.edit'), onPress: () => onEdit(noteId, content) },
     {
-      text: 'Delete',
+      text: t('common.delete'),
       style: 'destructive',
       onPress: () => {
-        Alert.alert('Delete this note?', "This can't be undone.", [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Delete',
-            style: 'destructive',
-            onPress: () => onDelete(noteId),
-          },
-        ]);
+        Alert.alert(
+          t('library.noteMenu.deleteTitle'),
+          t('library.noteMenu.deleteMessage'),
+          [
+            { text: t('common.cancel'), style: 'cancel' },
+            {
+              text: t('common.delete'),
+              style: 'destructive',
+              onPress: () => onDelete(noteId),
+            },
+          ]
+        );
       },
     },
-    { text: 'Cancel', style: 'cancel' },
+    { text: t('common.cancel'), style: 'cancel' },
   ]);
 }

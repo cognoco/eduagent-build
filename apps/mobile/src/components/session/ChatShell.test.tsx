@@ -787,7 +787,7 @@ describe('ChatShell', () => {
 
       // Shows the manual-playback notice instead of auto-speaking
       screen.getByText(
-        'Screen reader is on, so voice mode keeps manual playback only.'
+        'Screen reader is on. Voice input is not available. Use text input below.'
       );
     });
 
@@ -901,7 +901,7 @@ describe('ChatShell', () => {
         // screenReaderEnabled on web, this assertion will fail.
         expect(
           screen.queryByText(
-            'Screen reader is on, so voice mode keeps manual playback only.'
+            'Screen reader is on. Voice input is not available. Use text input below.'
           )
         ).toBeNull();
       } finally {
@@ -938,7 +938,7 @@ describe('ChatShell', () => {
 
       // The manual-playback notice appears
       screen.getByText(
-        'Screen reader is on, so voice mode keeps manual playback only.'
+        'Screen reader is on. Voice input is not available. Use text input below.'
       );
     });
   });

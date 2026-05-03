@@ -4,6 +4,46 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react-native';
+// Translations table — mirrors what will be in en.json onboarding namespace once coordinator merges.
+// Keeps tests asserting on real English strings rather than i18n keys.
+const translations: Record<string, string> = {
+  'common.cancel': 'Cancel',
+  'common.save': 'Save',
+  'common.done': 'Done',
+  'common.continue': 'Continue',
+  'common.back': 'Back',
+  'common.close': 'Close',
+  'common.next': 'Next',
+  'common.retry': 'Retry',
+  'common.tryAgain': 'Try Again',
+  'common.goBack': 'Go Back',
+  'common.goHome': 'Go Home',
+  'onboarding.analogyPreference.title': 'How do you like things explained?',
+  'onboarding.analogyPreference.subtitle':
+    'Pick an analogy style (optional). You can always change this later in subject settings.',
+  'onboarding.analogyPreference.skipForNow': 'Skip for now',
+  'onboarding.analogyPreference.skipLabel': 'Skip analogy preference',
+  'onboarding.analogyPreference.saveErrorTitle': 'Could not save preference',
+  'onboarding.common.noSubjectSelected': 'No subject selected',
+  'onboarding.common.saving': 'Saving…',
+  'onboarding.common.skip': 'Skip',
+  'errors.generic': 'Something unexpected happened. Please try again.',
+};
+
+jest.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, opts?: Record<string, unknown>) => {
+      let val = translations[key] ?? key;
+      if (opts) {
+        Object.entries(opts).forEach(([k, v]) => {
+          val = val.replace(`{{${k}}}`, String(v));
+        });
+      }
+      return val;
+    },
+  }),
+  initReactI18next: { type: '3rdParty', init: () => undefined },
+}));
 
 const mockReplace = jest.fn();
 const mockGoBackOrReplace = jest.fn();

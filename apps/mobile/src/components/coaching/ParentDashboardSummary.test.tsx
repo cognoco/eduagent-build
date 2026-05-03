@@ -126,7 +126,7 @@ describe('ParentDashboardSummary', () => {
     );
 
     screen.getByTestId('retention-trend-badge');
-    screen.getByText(/Review health:/);
+    screen.getByText(/Review health/);
     screen.getByText(/Improving/);
   });
 

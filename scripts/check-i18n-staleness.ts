@@ -1,8 +1,19 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-const TARGET_LANGUAGES = ['nb', 'de', 'es', 'pt', 'pl', 'ja'] as const;
 const LOCALES_DIR = path.resolve(__dirname, '../apps/mobile/src/i18n/locales');
+
+// Dynamically discover target locales from the filesystem so this script
+// keeps working as locales are added/removed. Returns every `<code>.json`
+// in the locales dir except `en.json` (the source of truth).
+function discoverTargetLanguages(): string[] {
+  if (!fs.existsSync(LOCALES_DIR)) return [];
+  return fs
+    .readdirSync(LOCALES_DIR)
+    .filter((f) => f.endsWith('.json') && f !== 'en.json')
+    .map((f) => f.replace(/\.json$/, ''))
+    .sort();
+}
 
 type NestedStrings = { [k: string]: string | NestedStrings };
 
@@ -80,12 +91,16 @@ function main(): void {
   const source: NestedStrings = JSON.parse(fs.readFileSync(enPath, 'utf-8'));
   const targets: Record<string, NestedStrings> = {};
 
-  for (const lang of TARGET_LANGUAGES) {
+  const targetLanguages = discoverTargetLanguages();
+  if (targetLanguages.length === 0) {
+    console.log(
+      'No target locales present (en-only); staleness check is a no-op.'
+    );
+    return;
+  }
+
+  for (const lang of targetLanguages) {
     const targetPath = path.join(LOCALES_DIR, `${lang}.json`);
-    if (!fs.existsSync(targetPath)) {
-      console.error(`Missing translation file: ${targetPath}`);
-      process.exit(1);
-    }
     targets[lang] = JSON.parse(fs.readFileSync(targetPath, 'utf-8'));
   }
 

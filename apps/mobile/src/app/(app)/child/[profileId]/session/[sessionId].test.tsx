@@ -6,6 +6,17 @@ import {
 } from '@testing-library/react-native';
 import * as Clipboard from 'expo-clipboard';
 
+jest.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, opts?: Record<string, unknown>) => {
+      if (opts && typeof opts === 'object') {
+        return `${key}:${JSON.stringify(opts)}`;
+      }
+      return key;
+    },
+  }),
+}));
+
 const mockPush = jest.fn();
 jest.mock('expo-router', () => ({
   useRouter: () => ({
@@ -261,7 +272,7 @@ describe('SessionDetailScreen (summary-only)', () => {
 
     fireEvent.press(screen.getByTestId('copy-conversation-prompt'));
 
-    await waitFor(() => screen.getByText('Copied ✓'));
+    await waitFor(() => screen.getByText('parentView.session.copied'));
     expect(Clipboard.setStringAsync).toHaveBeenCalledWith(
       'Can you teach this back to me?'
     );

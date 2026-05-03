@@ -1,6 +1,7 @@
 import { View, Text, Pressable, ScrollView } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AnalogyDomainPicker } from '../../../components/common';
@@ -12,6 +13,7 @@ import type { AnalogyDomain } from '@eduagent/schemas';
 import { useCallback, useState } from 'react';
 
 export default function AnalogyPreferenceScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const colors = useThemeColors();
   const {
@@ -43,10 +45,8 @@ export default function AnalogyPreferenceScreen() {
         },
         onError: (err) => {
           platformAlert(
-            'Could not save preference',
-            err instanceof Error
-              ? err.message
-              : 'Something went wrong. Please try again.'
+            t('onboarding.analogyPreference.saveErrorTitle'),
+            err instanceof Error ? err.message : t('errors.generic')
           );
         },
       });
@@ -86,16 +86,18 @@ export default function AnalogyPreferenceScreen() {
   if (!subjectId) {
     return (
       <View className="flex-1 bg-background items-center justify-center px-5">
-        <Text className="text-text-secondary mb-4">No subject selected</Text>
+        <Text className="text-text-secondary mb-4">
+          {t('onboarding.common.noSubjectSelected')}
+        </Text>
         <Pressable
           onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
           className="bg-primary rounded-button px-6 py-3 items-center"
           accessibilityRole="button"
-          accessibilityLabel="Go home"
+          accessibilityLabel={t('common.goHome')}
           testID="analogy-guard-home"
         >
           <Text className="text-text-inverse text-body font-semibold">
-            Go home
+            {t('common.goHome')}
           </Text>
         </Pressable>
       </View>
@@ -109,7 +111,7 @@ export default function AnalogyPreferenceScreen() {
         <Pressable
           onPress={handleBack}
           className="mb-3 min-w-[44px] min-h-[44px] justify-center self-start"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('common.goBack')}
           accessibilityRole="button"
           testID="analogy-back-button"
         >
@@ -120,11 +122,10 @@ export default function AnalogyPreferenceScreen() {
           className="text-h2 font-bold text-text-primary"
           testID="analogy-preference-title"
         >
-          How do you like things explained?
+          {t('onboarding.analogyPreference.title')}
         </Text>
         <Text className="text-body text-text-secondary mt-2">
-          Pick an analogy style (optional). You can always change this later in
-          subject settings.
+          {t('onboarding.analogyPreference.subtitle')}
         </Text>
       </View>
 
@@ -151,11 +152,11 @@ export default function AnalogyPreferenceScreen() {
           disabled={isPending}
           className="bg-primary rounded-button py-3.5 items-center mb-2"
           testID="analogy-continue-button"
-          accessibilityLabel="Continue"
+          accessibilityLabel={t('common.continue')}
           accessibilityRole="button"
         >
           <Text className="text-text-inverse text-body font-semibold">
-            Continue
+            {t('common.continue')}
           </Text>
         </Pressable>
         <Pressable
@@ -163,11 +164,11 @@ export default function AnalogyPreferenceScreen() {
           disabled={isPending}
           className="py-3 items-center"
           testID="analogy-skip-button"
-          accessibilityLabel="Skip analogy preference"
+          accessibilityLabel={t('onboarding.analogyPreference.skipLabel')}
           accessibilityRole="button"
         >
           <Text className="text-body text-primary font-semibold">
-            Skip for now
+            {t('onboarding.analogyPreference.skipForNow')}
           </Text>
         </Pressable>
       </View>

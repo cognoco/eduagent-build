@@ -9,6 +9,109 @@ import {
   extractJsonBody,
 } from '../../../test-utils/mock-api-routes';
 
+// Mock react-i18next — t() is called with bare keys (namespace is passed to
+// useTranslation, not prefixed on each key). Return real English strings so
+// text-based assertions continue to pass.
+jest.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, opts?: Record<string, unknown>) => {
+      const strings: Record<
+        string,
+        string | ((o?: Record<string, unknown>) => string)
+      > = {
+        // homework namespace (bare keys)
+        permissionTitle: 'Camera Access Needed',
+        permissionPrompt:
+          "Snap a picture of your homework and I'll help you solve it step by step.",
+        permissionDenied:
+          'Camera access was denied. You can enable it in your device settings to photograph homework problems.',
+        openSettings: 'Open Settings',
+        openSettingsLabel: 'Open device settings',
+        allowCamera: 'Allow Camera',
+        allowCameraLabel: 'Allow camera access',
+        closeCameraLabel: 'Close camera',
+        galleryLabel: 'Choose homework from your photos',
+        takePhotoLabel: 'Take photo',
+        flashLabel: (o) => `Flash ${o?.state ?? ''}`,
+        flashOff: 'off',
+        flashOn: 'on',
+        centerHomework: 'Center your homework',
+        photoPreviewLabel: 'Homework image preview',
+        photoCaptured: 'Photo captured',
+        retake: 'Retake',
+        retakeLabel: 'Retake photo',
+        useThis: 'Use this',
+        useThisPhotoLabel: 'Use this photo',
+        cancelAndGoBackLabel: 'Cancel and go back',
+        cancelOcrLabel: 'Cancel OCR and retake',
+        readingHomework: (o) =>
+          o?.subject
+            ? `Reading your ${o.subject} homework...`
+            : 'Reading your homework...',
+        ocrTimeout:
+          'Reading the photo is taking too long. Check your connection and try again, or type the problem in.',
+        ocrDefaultError:
+          "We couldn't read that clearly. Try taking the photo again with better lighting.",
+        problemsFound: 'Here are the problems I found:',
+        addSkippedFragmentsLabel: 'Add skipped fragments back',
+        skippedFragments: (o) =>
+          `We skipped ${o?.count ?? 0} unclear fragment${
+            o?.count === 1 ? '' : 's'
+          }. Tap to add ${o?.count === 1 ? 'it' : 'them'} back.`,
+        problemNumber: (o) => `Problem ${o?.number ?? ''}`,
+        removeProblemLabel: (o) => `Remove problem ${o?.number ?? ''}`,
+        remove: 'Remove',
+        problemInputLabel: (o) => `Problem ${o?.number ?? ''}, editable`,
+        addProblem: 'Add another problem',
+        addProblemLabel: 'Add another problem card',
+        classifyFallbackPrompt:
+          "We couldn't automatically identify the subject. Would you like to select it manually or retake the photo?",
+        typeSubjectManually: 'Type subject manually',
+        typeSubjectManuallyLabel: 'Type subject manually',
+        classifyLoading: 'Figuring out the subject...',
+        looksLike: 'Looks like',
+        change: 'Change',
+        whichSubject: 'Which subject is this for?',
+        loadingSubjects: 'Loading your subjects...',
+        selectSubjectLabel: (o) => `Select ${o?.name ?? ''}`,
+        createNewSubject: 'Create New Subject',
+        createNewSubjectLabel: 'Create a new subject',
+        orTypeSubject: 'Or type a subject name:',
+        subjectInputPlaceholder: 'e.g. Biology, History...',
+        typeSubjectLabel: 'Type a subject name',
+        continueWithSubjectLabel: 'Continue with typed subject',
+        creatingSubject: 'Creating subject...',
+        startSessionLabel: 'Start session with this problem',
+        letsGo: "Let's go",
+        typeItOut: 'Want to type it out instead?',
+        manualInputPlaceholder: 'Type your problem here...',
+        typeManuallyLabel: 'Type your problem manually',
+        noSubjectsYet: "You don't have any subjects yet.",
+        createSubject: 'Create a subject',
+        continueWithProblemLabel: 'Continue with typed problem',
+        continueArrow: 'Continue →',
+        tryCameraAgain: 'Try camera again',
+        tryCameraAgainLabel: 'Try camera again',
+        tryReadingAgainLabel: 'Try reading again',
+        // common namespace keys (passed as 'common:key')
+        'common:goBack': 'Go Back',
+        'common:goHome': 'Go Home',
+        'common:cancel': 'Cancel',
+        'common:close': 'Close',
+        'common:continue': 'Continue',
+        'common:back': 'Back',
+        'common:tryAgain': 'Try Again',
+        'common:retry': 'Retry',
+      };
+      const entry = strings[key];
+      if (entry === undefined) return key;
+      if (typeof entry === 'function') return entry(opts);
+      return entry;
+    },
+  }),
+  initReactI18next: { type: '3rdParty', init: jest.fn() },
+}));
+
 // Mock expo-router
 jest.mock('expo-router', () => ({
   useRouter: jest.fn(),

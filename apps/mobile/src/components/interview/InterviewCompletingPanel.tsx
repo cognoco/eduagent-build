@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 type CompletingTier = 'initial' | 'almost' | 'soft-fallback';
 
@@ -9,6 +10,7 @@ type CompletingTier = 'initial' | 'almost' | 'soft-fallback';
  * user always knows what's happening and is never silently stuck.
  */
 export function InterviewCompletingPanel() {
+  const { t } = useTranslation();
   const [tier, setTier] = useState<CompletingTier>('initial');
 
   useEffect(() => {
@@ -22,10 +24,10 @@ export function InterviewCompletingPanel() {
 
   const message =
     tier === 'initial'
-      ? 'Building your learning path…'
+      ? t('interview.completing.initial')
       : tier === 'almost'
-      ? 'Almost there — this can take up to 30 seconds.'
-      : 'Still working — you can wait or come back later.';
+      ? t('interview.completing.almost')
+      : t('interview.completing.softFallback');
 
   return (
     <View

@@ -1,9 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import {
-  createRoutedMockFetch,
-} from '../../test-utils/mock-api-routes';
+import { createRoutedMockFetch } from '../../test-utils/mock-api-routes';
 
 // [BUG-815] Regression test: when a legacy profile row has `interests`
 // undefined or null, the Interests section renders the empty placeholder
@@ -61,7 +59,11 @@ jest.mock('../../lib/profile', () => ({
 // The route handler closes over `mockProfileData` by reference — update the
 // variable before each test to change what useLearnerProfile() returns.
 const mockFetch = createRoutedMockFetch({
-  'learner-profile/tell': () => ({ success: true, message: 'Saved', fieldsUpdated: [] }),
+  'learner-profile/tell': () => ({
+    success: true,
+    message: 'Saved',
+    fieldsUpdated: [],
+  }),
   'learner-profile': () => ({ profile: mockProfileData }),
 });
 
@@ -166,9 +168,9 @@ describe('MentorMemoryScreen — interests null guard', () => {
 // helper text below the accommodation badge must be hidden for owner profiles
 // (parents on their own account have no parent to attribute the setting to)
 // and shown for child profiles. Driven by `useActiveProfileRole() !== 'owner'`.
+// The text element carries testID="accommodation-set-by-parent" for stable
+// assertions that are independent of i18n key resolution state.
 describe('MentorMemoryScreen — accommodation helper copy is role-gated [BUG-918]', () => {
-  const SET_BY_PARENT = /Set by your parent in their settings\./;
-
   beforeEach(() => {
     jest.clearAllMocks();
     mockActiveRole = 'owner';
@@ -188,7 +190,7 @@ describe('MentorMemoryScreen — accommodation helper copy is role-gated [BUG-91
     render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
 
     await screen.findByTestId('accommodation-badge');
-    expect(screen.queryByText(SET_BY_PARENT)).toBeNull();
+    expect(screen.queryByTestId('accommodation-set-by-parent')).toBeNull();
   });
 
   it('shows "Set by your parent" for child profiles with accommodation badge visible', async () => {
@@ -196,7 +198,7 @@ describe('MentorMemoryScreen — accommodation helper copy is role-gated [BUG-91
     render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
 
     await screen.findByTestId('accommodation-badge');
-    await screen.findByText(SET_BY_PARENT);
+    await screen.findByTestId('accommodation-set-by-parent');
   });
 
   it('hides "Set by your parent" when accommodation badge is not shown', () => {
@@ -209,7 +211,7 @@ describe('MentorMemoryScreen — accommodation helper copy is role-gated [BUG-91
     render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
 
     expect(screen.queryByTestId('accommodation-badge')).toBeNull();
-    expect(screen.queryByText(SET_BY_PARENT)).toBeNull();
+    expect(screen.queryByTestId('accommodation-set-by-parent')).toBeNull();
   });
 });
 
@@ -222,21 +224,27 @@ describe('MentorMemoryScreen — catch blocks use formatApiError not generic cop
       memoryConsentStatus: 'granted',
     };
     // Reset the tell route to the default success response
-    mockFetch.setRoute(
-      'learner-profile/tell',
-      () => ({ success: true, message: 'Saved', fieldsUpdated: [] })
-    );
+    mockFetch.setRoute('learner-profile/tell', () => ({
+      success: true,
+      message: 'Saved',
+      fieldsUpdated: [],
+    }));
   });
 
   it('shows the server-specific error message from handleTellMentor, not "Please try again."', async () => {
     // Arrange: configure fetch to return a 403 with SUBJECT_INACTIVE for the
     // tell-mentor endpoint so assertOk throws and formatApiError maps it to
     // the friendly "paused" message.
-    mockFetch.setRoute('learner-profile/tell', () =>
-      new Response(
-        JSON.stringify({ message: 'subject is paused', code: 'SUBJECT_INACTIVE' }),
-        { status: 403, headers: { 'Content-Type': 'application/json' } }
-      )
+    mockFetch.setRoute(
+      'learner-profile/tell',
+      () =>
+        new Response(
+          JSON.stringify({
+            message: 'subject is paused',
+            code: 'SUBJECT_INACTIVE',
+          }),
+          { status: 403, headers: { 'Content-Type': 'application/json' } }
+        )
     );
 
     render(<MentorMemoryScreen />, { wrapper: makeWrapper() });

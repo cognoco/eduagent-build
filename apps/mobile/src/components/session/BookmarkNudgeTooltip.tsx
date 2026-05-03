@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import * as SecureStore from '../../lib/secure-storage';
 
 const KEY_PREFIX = 'bookmark-nudge-shown';
@@ -23,6 +24,7 @@ export function BookmarkNudgeTooltip({
   profileId,
   onBookmarkNow,
 }: BookmarkNudgeTooltipProps) {
+  const { t } = useTranslation();
   const [visible, setVisible] = useState(false);
   const checkedRef = useRef(false);
 
@@ -58,18 +60,18 @@ export function BookmarkNudgeTooltip({
       testID="bookmark-nudge-tooltip"
     >
       <Text className="text-body-sm text-text-primary">
-        Tap the bookmark icon to save explanations you want to revisit.
+        {t('session.bookmarkNudge.message')}
       </Text>
       <View className="flex-row gap-3 mt-2">
         <Pressable
           onPress={dismiss}
           className="self-start"
           accessibilityRole="button"
-          accessibilityLabel="Dismiss bookmark tip"
+          accessibilityLabel={t('session.bookmarkNudge.dismissLabel')}
           testID="bookmark-nudge-dismiss"
         >
           <Text className="text-body-sm font-semibold text-primary">
-            Got it
+            {t('session.bookmarkNudge.gotIt')}
           </Text>
         </Pressable>
         {/* L3: Secondary CTA so users can immediately try the feature */}
@@ -81,11 +83,11 @@ export function BookmarkNudgeTooltip({
             }}
             className="self-start"
             accessibilityRole="button"
-            accessibilityLabel="Bookmark the latest message now"
+            accessibilityLabel={t('session.bookmarkNudge.bookmarkNowLabel')}
             testID="bookmark-nudge-bookmark-now"
           >
             <Text className="text-body-sm font-semibold text-primary">
-              Bookmark now
+              {t('session.bookmarkNudge.bookmarkNow')}
             </Text>
           </Pressable>
         )}

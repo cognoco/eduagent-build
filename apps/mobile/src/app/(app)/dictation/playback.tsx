@@ -3,6 +3,7 @@ import { BackHandler, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { useDictationPlayback } from '../../../hooks/use-dictation-playback';
 import { useDictationPreferences } from '../../../hooks/use-dictation-preferences';
 import { goBackOrReplace } from '../../../lib/navigation';
@@ -11,13 +12,8 @@ import { useProfile } from '../../../lib/profile';
 import { useThemeColors } from '../../../lib/theme';
 import { useDictationData } from './_layout';
 
-const PACE_LABELS: Record<string, string> = {
-  slow: 'Slow',
-  normal: 'Normal',
-  fast: 'Fast',
-};
-
 export default function PlaybackScreen(): React.ReactElement {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
@@ -61,15 +57,19 @@ export default function PlaybackScreen(): React.ReactElement {
 
   // Back press confirmation — RF-09: progress is not auto-recorded, explicit user action only
   const handleExit = useCallback(() => {
-    platformAlert('Are you sure?', "Your dictation progress won't be saved.", [
-      { text: 'Keep going', style: 'cancel' },
-      {
-        text: 'Leave',
-        style: 'destructive',
-        onPress: () => router.replace('/(app)/practice' as never),
-      },
-    ]);
-  }, [router]);
+    platformAlert(
+      t('dictation.playback.exitTitle'),
+      t('dictation.playback.exitMessage'),
+      [
+        { text: t('dictation.playback.keepGoing'), style: 'cancel' },
+        {
+          text: t('dictation.playback.leave'),
+          style: 'destructive',
+          onPress: () => router.replace('/(app)/practice' as never),
+        },
+      ]
+    );
+  }, [router, t]);
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -90,17 +90,17 @@ export default function PlaybackScreen(): React.ReactElement {
         testID="dictation-playback-screen"
       >
         <Text className="text-body text-text-secondary text-center mb-6">
-          No dictation data found. Please go back and try again.
+          {t('dictation.playback.noDataMessage')}
         </Text>
         <Pressable
           onPress={() => goBackOrReplace(router, '/(app)/practice')}
           className="bg-primary rounded-xl py-4 px-8 items-center"
           testID="playback-go-back"
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('common.goBack')}
         >
           <Text className="text-text-inverse font-semibold text-body">
-            Go back
+            {t('common.goBack')}
           </Text>
         </Pressable>
       </View>
@@ -120,12 +120,16 @@ export default function PlaybackScreen(): React.ReactElement {
           className="px-3 py-2 rounded-lg bg-surface-elevated mr-2"
           testID="playback-pace"
           accessibilityRole="button"
-          accessibilityLabel={`Pace: ${
-            PACE_LABELS[prefs.pace] ?? prefs.pace
-          }. Tap to change.`}
+          accessibilityLabel={t('dictation.playback.paceLabel', {
+            pace: t(`dictation.playback.pace.${prefs.pace}`, {
+              defaultValue: prefs.pace,
+            }),
+          })}
         >
           <Text className="text-body-sm font-semibold text-text-primary">
-            {PACE_LABELS[prefs.pace] ?? prefs.pace}
+            {t(`dictation.playback.pace.${prefs.pace}`, {
+              defaultValue: prefs.pace,
+            })}
           </Text>
         </Pressable>
 
@@ -136,8 +140,8 @@ export default function PlaybackScreen(): React.ReactElement {
           accessibilityRole="button"
           accessibilityLabel={
             prefs.punctuationReadAloud
-              ? 'Punctuation read aloud. Tap to turn off.'
-              : 'Punctuation silent. Tap to turn on.'
+              ? t('dictation.playback.punctuationOn')
+              : t('dictation.playback.punctuationOff')
           }
         >
           <Ionicons
@@ -152,7 +156,7 @@ export default function PlaybackScreen(): React.ReactElement {
           className="px-3 py-2 rounded-lg bg-surface-elevated mr-2"
           testID="playback-skip"
           accessibilityRole="button"
-          accessibilityLabel="Skip to next sentence"
+          accessibilityLabel={t('dictation.playback.skipToNext')}
         >
           <Ionicons
             name="play-skip-forward"
@@ -182,16 +186,22 @@ export default function PlaybackScreen(): React.ReactElement {
           }
         }}
         accessibilityRole="button"
-        accessibilityLabel={isPaused ? 'Resume dictation' : 'Pause dictation'}
+        accessibilityLabel={
+          isPaused
+            ? t('dictation.playback.resumeDictation')
+            : t('dictation.playback.pauseDictation')
+        }
         testID="playback-tap-area"
       >
         {isCountdown ? (
-          <Text className="text-h1 font-bold text-text-primary">Ready...</Text>
+          <Text className="text-h1 font-bold text-text-primary">
+            {t('dictation.playback.ready')}
+          </Text>
         ) : isPaused ? (
           <View className="items-center">
             <Ionicons name="pause" size={48} color={colors.textSecondary} />
             <Text className="text-body text-text-secondary mt-4">
-              Tap to continue
+              {t('dictation.playback.tapToContinue')}
             </Text>
           </View>
         ) : (
@@ -206,11 +216,13 @@ export default function PlaybackScreen(): React.ReactElement {
           className="bg-surface-elevated rounded-xl py-4 items-center"
           testID="playback-repeat"
           accessibilityRole="button"
-          accessibilityLabel="Repeat last phrase"
+          accessibilityLabel={t('dictation.playback.repeatLastPhrase')}
         >
           <View className="flex-row items-center">
             <Ionicons name="refresh" size={20} color={colors.textPrimary} />
-            <Text className="text-body text-text-primary ml-2">Repeat</Text>
+            <Text className="text-body text-text-primary ml-2">
+              {t('dictation.playback.repeat')}
+            </Text>
           </View>
         </Pressable>
 
@@ -219,9 +231,11 @@ export default function PlaybackScreen(): React.ReactElement {
           className="py-3 items-center mt-2"
           testID="playback-exit"
           accessibilityRole="button"
-          accessibilityLabel="Exit dictation"
+          accessibilityLabel={t('dictation.playback.exitDictation')}
         >
-          <Text className="text-body-sm text-text-muted">Exit</Text>
+          <Text className="text-body-sm text-text-muted">
+            {t('dictation.playback.exit')}
+          </Text>
         </Pressable>
       </View>
     </View>

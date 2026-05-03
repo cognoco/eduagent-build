@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { Href } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { goBackOrReplace } from '../../lib/navigation';
 import { platformAlert } from '../../lib/platform-alert';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -34,17 +35,19 @@ function CardSkeleton(): React.ReactNode {
 }
 
 function DemoBanner(): React.ReactNode {
+  const { t } = useTranslation();
   return (
     <View
       className="bg-accent/10 border border-accent/30 rounded-card px-4 py-3 mt-2 mb-2"
       testID="demo-banner"
       accessibilityRole="header"
-      accessibilityLabel="Preview mode: this is sample data showing what your dashboard will look like once your child starts learning"
+      accessibilityLabel={t('dashboard.demoBannerLabel')}
     >
-      <Text className="text-body-sm font-semibold text-accent">Preview</Text>
+      <Text className="text-body-sm font-semibold text-accent">
+        {t('dashboard.demoPreviewLabel')}
+      </Text>
       <Text className="text-caption text-text-secondary mt-1">
-        This is sample data. Once your child starts learning, you will see their
-        real progress here.
+        {t('dashboard.demoPreviewMessage')}
       </Text>
     </View>
   );
@@ -101,6 +104,7 @@ function renderChildCards(
 }
 
 export default function DashboardScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { returnTo: rawReturnTo } = useLocalSearchParams<{
@@ -125,9 +129,9 @@ export default function DashboardScreen() {
   const handleDrillDown = (profileId: string): void => {
     if (isDemo) {
       platformAlert(
-        'Preview Mode',
-        "Link your child's account to see real data.",
-        [{ text: 'OK' }]
+        t('dashboard.demoAlertTitle'),
+        t('dashboard.demoAlertMessage'),
+        [{ text: t('common.done') }]
       );
       return;
     }
@@ -145,18 +149,16 @@ export default function DashboardScreen() {
           className="mb-2 self-start"
           hitSlop={12}
           testID="dashboard-back"
-          accessibilityLabel="Back"
+          accessibilityLabel={t('dashboard.backLabel')}
           accessibilityRole="button"
         >
-          <Text className="text-body text-accent">← Back</Text>
+          <Text className="text-body text-accent">← {t('common.back')}</Text>
         </Pressable>
         <Text className="text-h1 font-bold text-text-primary">
-          Child progress
+          {t('dashboard.title')}
         </Text>
         <Text className="text-body-sm text-text-secondary mt-1">
-          {isDemo
-            ? "Here's what your dashboard will look like"
-            : 'How your children are doing'}
+          {isDemo ? t('dashboard.demoDashboardHint') : t('dashboard.subtitle')}
         </Text>
       </View>
       <ScrollView
@@ -178,16 +180,16 @@ export default function DashboardScreen() {
         ) : isError ? (
           <View className="items-center justify-center py-12 px-4">
             <Text className="text-h3 font-semibold text-text-primary mb-2">
-              Couldn't load your dashboard
+              {t('dashboard.errorTitle')}
             </Text>
             <Text className="text-body text-text-secondary text-center mb-4">
-              Check your internet connection and try again.
+              {t('dashboard.errorMessage')}
             </Text>
             <Pressable
               onPress={() => refetch()}
               disabled={isRefetching}
               className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
-              accessibilityLabel="Retry loading dashboard"
+              accessibilityLabel={t('dashboard.retryLoadingLabel')}
               accessibilityRole="button"
               testID="dashboard-retry-button"
             >
@@ -199,7 +201,7 @@ export default function DashboardScreen() {
                 />
               ) : (
                 <Text className="text-text-inverse text-body font-semibold">
-                  Retry
+                  {t('common.retry')}
                 </Text>
               )}
             </Pressable>
@@ -208,22 +210,22 @@ export default function DashboardScreen() {
                 onPress={() => router.replace('/(app)/library' as never)}
                 className="bg-surface rounded-button px-5 py-3 min-h-[48px] items-center justify-center"
                 accessibilityRole="button"
-                accessibilityLabel="Open parent library"
+                accessibilityLabel={t('dashboard.libraryFallbackLabel')}
                 testID="dashboard-library-fallback"
               >
                 <Text className="text-body font-semibold text-text-primary">
-                  Library
+                  {t('dashboard.libraryButton')}
                 </Text>
               </Pressable>
               <Pressable
                 onPress={() => router.replace('/(app)/more' as never)}
                 className="bg-surface rounded-button px-5 py-3 min-h-[48px] items-center justify-center"
                 accessibilityRole="button"
-                accessibilityLabel="Open parent settings"
+                accessibilityLabel={t('dashboard.moreFallbackLabel')}
                 testID="dashboard-more-fallback"
               >
                 <Text className="text-body font-semibold text-text-primary">
-                  More
+                  {t('dashboard.moreButton')}
                 </Text>
               </Pressable>
             </View>
@@ -237,11 +239,11 @@ export default function DashboardScreen() {
                 onPress={() => router.push('/(app)/more' as never)}
                 className="bg-accent rounded-button mt-6 py-3 min-h-[48px] items-center justify-center"
                 accessibilityRole="button"
-                accessibilityLabel="Link your child's account to get started"
+                accessibilityLabel={t('dashboard.linkChildCtaLabel')}
                 testID="demo-link-child-cta"
               >
                 <Text className="text-body font-semibold text-white">
-                  Link your child's account
+                  {t('dashboard.linkChildCta')}
                 </Text>
               </Pressable>
             )}
@@ -249,28 +251,27 @@ export default function DashboardScreen() {
         ) : (
           <View className="py-8 items-center" testID="dashboard-empty">
             <Text className="text-body text-text-secondary text-center mb-6">
-              No children linked yet. Add a child profile to see their progress
-              here.
+              {t('dashboard.emptyMessage')}
             </Text>
             <Pressable
               onPress={() => router.push('/(app)/more' as never)}
               className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center mb-3"
               accessibilityRole="button"
-              accessibilityLabel="Add a child"
+              accessibilityLabel={t('dashboard.addChildLabel')}
               testID="dashboard-empty-add-child"
             >
               <Text className="text-body font-semibold text-text-inverse">
-                Add a child
+                {t('dashboard.addChild')}
               </Text>
             </Pressable>
             <Pressable
               onPress={() => goBackOrReplace(router, '/(app)/home')}
               accessibilityRole="button"
-              accessibilityLabel="Continue solo"
+              accessibilityLabel={t('dashboard.continueSoloLabel')}
               testID="dashboard-empty-solo"
             >
               <Text className="text-body text-primary font-semibold">
-                Continue solo
+                {t('dashboard.continueSolo')}
               </Text>
             </Pressable>
           </View>

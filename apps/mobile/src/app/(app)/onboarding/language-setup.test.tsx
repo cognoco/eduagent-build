@@ -5,6 +5,66 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 
+// Translations table — mirrors what will be in en.json onboarding namespace once coordinator merges.
+// Keeps tests asserting on real English strings rather than i18n keys.
+const translations: Record<string, string> = {
+  'common.cancel': 'Cancel',
+  'common.save': 'Save',
+  'common.done': 'Done',
+  'common.continue': 'Continue',
+  'common.back': 'Back',
+  'common.close': 'Close',
+  'common.next': 'Next',
+  'common.retry': 'Retry',
+  'common.tryAgain': 'Try Again',
+  'common.goBack': 'Go Back',
+  'common.goHome': 'Go Home',
+  'onboarding.languageSetup.title': 'Language setup',
+  'onboarding.languageSetup.subtitle':
+    "We'll switch this subject into a language-focused path with direct teaching, vocabulary tracking, and speaking practice.",
+  'onboarding.languageSetup.learningHint':
+    "Looks like you're learning {{language}}!",
+  'onboarding.languageSetup.approachHint':
+    "We'll use a language-focused approach built around vocabulary, fluency, input, and output practice.",
+  'onboarding.languageSetup.noSubjectSelected': 'No language subject selected',
+  'onboarding.languageSetup.nativeLanguageRequired':
+    'Please type your native language.',
+  'onboarding.languageSetup.nativeLanguageLabel': 'Your native language',
+  'onboarding.languageSetup.nativeLanguagePlaceholder': 'Type your language',
+  'onboarding.languageSetup.currentLevelLabel': 'Your current level',
+  'onboarding.languageSetup.startsAround': 'Starts around {{level}}',
+  'onboarding.languageSetup.levels.A1.label': 'Complete beginner',
+  'onboarding.languageSetup.levels.A1.description':
+    'Start from the foundations and build everyday basics.',
+  'onboarding.languageSetup.levels.A2.label': 'I know some basics',
+  'onboarding.languageSetup.levels.A2.description':
+    'You can handle simple situations and want to grow range.',
+  'onboarding.languageSetup.levels.B1.label': 'Conversational',
+  'onboarding.languageSetup.levels.B1.description':
+    'You can get by and want stronger fluency and precision.',
+  'onboarding.languageSetup.levels.B2.label': 'Advanced',
+  'onboarding.languageSetup.levels.B2.description':
+    'You want more nuance, confidence, and flexible expression.',
+  'onboarding.common.noSubjectSelected': 'No subject selected',
+  'onboarding.common.saving': 'Saving…',
+  'onboarding.common.skip': 'Skip',
+};
+
+jest.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, opts?: Record<string, unknown>) => {
+      let val = translations[key] ?? key;
+      if (opts) {
+        Object.entries(opts).forEach(([k, v]) => {
+          val = val.replace(`{{${k}}}`, String(v));
+        });
+      }
+      return val;
+    },
+  }),
+  initReactI18next: { type: '3rdParty', init: () => undefined },
+}));
+
 const mockReplace = jest.fn();
 const mockMutateAsync = jest.fn();
 const mockGoBackOrReplace = jest.fn();

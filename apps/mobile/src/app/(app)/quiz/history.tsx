@@ -1,6 +1,8 @@
 import { View, Text, Pressable, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
+import i18next from '../../../i18n';
 import { useRecentRounds } from '../../../hooks/use-quiz';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
@@ -17,8 +19,8 @@ function formatDateHeader(isoDate: string): string {
     (today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24)
   );
 
-  if (diffDays === 0) return 'Today';
-  if (diffDays === 1) return 'Yesterday';
+  if (diffDays === 0) return i18next.t('quiz.history.dateToday');
+  if (diffDays === 1) return i18next.t('quiz.history.dateYesterday');
 
   return d.toLocaleDateString(undefined, {
     month: 'long',
@@ -27,14 +29,8 @@ function formatDateHeader(isoDate: string): string {
   });
 }
 
-// [F-Q-05] Client-side label mapping so the UI never renders raw activity slugs.
-const ACTIVITY_LABELS: Record<string, string> = {
-  capitals: 'Capitals',
-  guess_who: 'Guess Who',
-  vocabulary: 'Vocabulary',
-};
-
 export default function QuizHistoryScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const colors = useThemeColors();
   // [BUG-933] On web, useSafeAreaInsets returns top:0 — useScreenTopInset
@@ -49,7 +45,9 @@ export default function QuizHistoryScreen() {
         testID="quiz-history-loading"
         className="flex-1 items-center justify-center"
       >
-        <Text className="text-on-surface-muted">Loading history...</Text>
+        <Text className="text-on-surface-muted">
+          {t('quiz.history.loadingText')}
+        </Text>
       </View>
     );
   }
@@ -59,15 +57,15 @@ export default function QuizHistoryScreen() {
     return (
       <ErrorFallback
         variant="centered"
-        title="Couldn't load history"
-        message="Check your connection and try again."
+        title={t('quiz.history.errorTitle')}
+        message={t('quiz.history.errorMessage')}
         primaryAction={{
-          label: 'Retry',
+          label: t('common.retry'),
           onPress: () => void refetch(),
           testID: 'quiz-history-retry',
         }}
         secondaryAction={{
-          label: 'Go Back',
+          label: t('common.goBack'),
           onPress: () => goBackOrReplace(router, '/(app)/quiz'),
           testID: 'quiz-history-go-back',
         }}
@@ -83,17 +81,19 @@ export default function QuizHistoryScreen() {
         className="flex-1 items-center justify-center p-6"
       >
         <Text className="text-on-surface text-lg font-semibold">
-          No rounds played yet
+          {t('quiz.history.emptyTitle')}
         </Text>
         <Text className="text-on-surface-muted mt-2 text-center">
-          Try a quiz to see your history here!
+          {t('quiz.history.emptyMessage')}
         </Text>
         <Pressable
           testID="quiz-history-try-quiz"
           className="bg-primary mt-4 rounded-xl px-6 py-3"
           onPress={() => router.push('/(app)/quiz')}
         >
-          <Text className="text-on-primary font-semibold">Try a Quiz</Text>
+          <Text className="text-on-primary font-semibold">
+            {t('quiz.history.tryQuiz')}
+          </Text>
         </Pressable>
       </View>
     );
@@ -123,12 +123,12 @@ export default function QuizHistoryScreen() {
           onPress={() => goBackOrReplace(router, '/(app)/practice')}
           className="min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('quiz.history.goBack')}
         >
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </Pressable>
         <Text className="text-on-surface ml-4 text-xl font-bold">
-          Quiz History
+          {t('quiz.history.title')}
         </Text>
       </View>
       <FlatList
@@ -140,8 +140,13 @@ export default function QuizHistoryScreen() {
               {formatDateHeader(section.date)}
             </Text>
             {section.items.map((round) => {
+              const activityLabelMap: Record<string, string> = {
+                capitals: t('quiz.history.activityLabels.capitals'),
+                guess_who: t('quiz.history.activityLabels.guessWho'),
+                vocabulary: t('quiz.history.activityLabels.vocabulary'),
+              };
               const baseLabel =
-                ACTIVITY_LABELS[round.activityType] ??
+                activityLabelMap[round.activityType] ??
                 round.activityType.replace(/_/g, ' ');
               // [BUG-930] Vocabulary rounds are otherwise indistinguishable
               // by language at a glance — quiz_rounds has no languageCode
@@ -163,14 +168,23 @@ export default function QuizHistoryScreen() {
                   className="bg-surface-elevated mx-4 mb-2 rounded-xl p-4"
                   onPress={() => router.push(`/(app)/quiz/${round.id}`)}
                   accessibilityRole="button"
-                  accessibilityLabel={`${label} round — ${round.theme} — ${round.score} out of ${round.total}. Open details.`}
+                  accessibilityLabel={t('quiz.history.rowLabel', {
+                    label,
+                    theme: round.theme,
+                    score: round.score,
+                    total: round.total,
+                  })}
                 >
                   <Text className="text-on-surface font-semibold">{label}</Text>
                   <Text className="text-on-surface-muted text-sm">
                     {round.theme}
                   </Text>
                   <Text className="text-on-surface mt-1">
-                    {round.score}/{round.total} · {round.xpEarned} XP
+                    {t('quiz.history.score', {
+                      score: round.score,
+                      total: round.total,
+                      xp: round.xpEarned,
+                    })}
                   </Text>
                 </Pressable>
               );

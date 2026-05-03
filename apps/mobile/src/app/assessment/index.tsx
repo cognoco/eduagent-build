@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { View, Text } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import {
   ChatShell,
   animateResponse,
@@ -15,11 +16,9 @@ import { goBackOrReplace } from '../../lib/navigation';
 import { Button } from '../../components/common/Button';
 import { ErrorFallback } from '../../components/common/ErrorFallback';
 
-const OPENING_MESSAGE =
-  "Let's see what you've picked up so far. I'll ask a few questions — just do your best, and I'll help fill in any gaps.";
-
 export default function AssessmentScreen() {
   const router = useRouter();
+  const { t } = useTranslation('assessment');
   const { subjectId, topicId } = useLocalSearchParams<{
     subjectId?: string;
     topicId?: string;
@@ -30,7 +29,7 @@ export default function AssessmentScreen() {
   const submitAnswer = useSubmitAnswer(assessmentId ?? '');
 
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: 'opening', role: 'assistant', content: OPENING_MESSAGE },
+    { id: 'opening', role: 'assistant', content: t('openingMessage') },
   ]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
@@ -67,9 +66,9 @@ export default function AssessmentScreen() {
               {
                 id: `assessment-done-${Date.now()}`,
                 role: 'assistant',
-                content: `You've got a solid grasp of most of this — ${Math.round(
-                  evaluation.masteryScore * 100
-                )}% mastery! The areas to revisit will show up in your Library.`,
+                content: t('passedMessage', {
+                  mastery: Math.round(evaluation.masteryScore * 100),
+                }),
               },
             ]);
           }
@@ -101,11 +100,11 @@ export default function AssessmentScreen() {
         }}
       >
         <Text className="text-text-primary text-body mb-4">
-          This assessment can't be started — missing required information.
+          {t('missingParams')}
         </Text>
         <Button
           variant="primary"
-          label="Go back"
+          label={t('common:goBack')}
           onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
           testID="assessment-go-back"
         />
@@ -115,7 +114,7 @@ export default function AssessmentScreen() {
 
   return (
     <ChatShell
-      title="Knowledge Check"
+      title={t('title')}
       messages={messages}
       onSend={handleSend}
       isStreaming={isStreaming}
@@ -123,10 +122,10 @@ export default function AssessmentScreen() {
         lastError ? (
           <ErrorFallback
             variant="card"
-            title="Something went wrong"
+            title={t('common:errorBoundary.title')}
             message={lastError}
             primaryAction={{
-              label: 'Try again',
+              label: t('common:tryAgain'),
               testID: 'assessment-error-retry',
               // [UX-DE-H3] Disable retry while streaming to prevent double-submit
               // on rapid taps during an in-flight answer check.
@@ -140,7 +139,7 @@ export default function AssessmentScreen() {
               },
             }}
             secondaryAction={{
-              label: 'Go Home',
+              label: t('common:goHome'),
               testID: 'assessment-error-home',
               onPress: () => goBackOrReplace(router, '/(app)/home' as const),
             }}

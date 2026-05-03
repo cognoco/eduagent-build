@@ -6,6 +6,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Markdown from 'react-native-markdown-display';
@@ -15,16 +16,22 @@ import { platformAlert } from '../../../lib/platform-alert';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useParentProxy } from '../../../hooks/use-parent-proxy';
 
-function formatRelativeDate(dateStr: string): string {
+function formatRelativeDate(
+  dateStr: string,
+  t: (key: string, opts?: Record<string, unknown>) => string
+): string {
   const date = new Date(dateStr);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-  if (diffDays <= 0) return 'Today';
-  if (diffDays === 1) return 'Yesterday';
-  if (diffDays < 7) return `${diffDays} days ago`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+  if (diffDays <= 0) return t('progress.saved.dateToday');
+  if (diffDays === 1) return t('progress.saved.dateYesterday');
+  if (diffDays < 7) return t('progress.saved.dateDaysAgo', { count: diffDays });
+  if (diffDays < 30)
+    return t('progress.saved.dateWeeksAgo', {
+      count: Math.floor(diffDays / 7),
+    });
 
   return date.toLocaleDateString();
 }
@@ -38,6 +45,7 @@ function BookmarkRow({
   onDelete: (bookmark: Bookmark) => void;
   isParentProxy: boolean;
 }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -45,7 +53,9 @@ function BookmarkRow({
       onPress={() => setExpanded((prev) => !prev)}
       className="bg-surface rounded-card p-4 mb-3"
       accessibilityRole="button"
-      accessibilityLabel={`Saved bookmark from ${bookmark.subjectName}`}
+      accessibilityLabel={t('progress.saved.bookmarkLabel', {
+        subject: bookmark.subjectName,
+      })}
       testID={`bookmark-row-${bookmark.id}`}
     >
       <View className="flex-row items-start justify-between">
@@ -55,7 +65,7 @@ function BookmarkRow({
             {bookmark.topicTitle ? ` · ${bookmark.topicTitle}` : ''}
           </Text>
           <Text className="text-caption text-text-tertiary mt-0.5">
-            {formatRelativeDate(bookmark.createdAt)}
+            {formatRelativeDate(bookmark.createdAt, t)}
           </Text>
         </View>
         {!isParentProxy && (
@@ -63,7 +73,7 @@ function BookmarkRow({
             onPress={() => onDelete(bookmark)}
             hitSlop={8}
             accessibilityRole="button"
-            accessibilityLabel="Remove bookmark"
+            accessibilityLabel={t('progress.saved.removeBookmark')}
             testID={`bookmark-delete-${bookmark.id}`}
           >
             <Ionicons
@@ -86,13 +96,16 @@ function BookmarkRow({
       </View>
 
       {!expanded && bookmark.content.length > 180 ? (
-        <Text className="text-body-sm text-primary mt-2">Tap to expand</Text>
+        <Text className="text-body-sm text-primary mt-2">
+          {t('progress.saved.tapToExpand')}
+        </Text>
       ) : null}
     </Pressable>
   );
 }
 
 export default function SavedBookmarksScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { isParentProxy } = useParentProxy();
   const bookmarksQuery = useBookmarks();
@@ -107,18 +120,18 @@ export default function SavedBookmarksScreen() {
   const handleDelete = useCallback(
     (bookmark: Bookmark) => {
       platformAlert(
-        'Remove bookmark?',
-        'This saved explanation will be removed.',
+        t('progress.saved.deleteTitle'),
+        t('progress.saved.deleteMessage'),
         [
-          { text: 'Cancel', style: 'cancel' },
+          { text: t('common.cancel'), style: 'cancel' },
           {
-            text: 'Remove',
+            text: t('progress.saved.deleteConfirm'),
             style: 'destructive',
             onPress: () => {
               void deleteBookmark.mutateAsync(bookmark.id).catch((error) => {
                 platformAlert(
-                  'Could not remove bookmark',
-                  error instanceof Error ? error.message : 'Please try again.'
+                  t('progress.saved.deleteErrorTitle'),
+                  error instanceof Error ? error.message : t('common.tryAgain')
                 );
               });
             },
@@ -135,13 +148,15 @@ export default function SavedBookmarksScreen() {
         <Pressable
           onPress={() => goBackOrReplace(router, '/(app)/progress' as const)}
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('common.goBack')}
           hitSlop={8}
           testID="saved-back"
         >
           <Ionicons name="arrow-back" size={24} className="text-text-primary" />
         </Pressable>
-        <Text className="text-h2 font-bold text-text-primary ml-3">Saved</Text>
+        <Text className="text-h2 font-bold text-text-primary ml-3">
+          {t('progress.saved.pageTitle')}
+        </Text>
       </View>
 
       <FlatList
@@ -187,22 +202,22 @@ export default function SavedBookmarksScreen() {
                 className="text-text-tertiary mb-4"
               />
               <Text className="text-body text-text-primary text-center mb-2">
-                Couldn&apos;t load your saved responses.
+                {t('progress.saved.errorLoad')}
               </Text>
               <Text className="text-body-sm text-text-secondary text-center mb-4">
                 {bookmarksQuery.error instanceof Error
                   ? bookmarksQuery.error.message
-                  : 'Please check your connection and try again.'}
+                  : t('progress.saved.errorNetwork')}
               </Text>
               <Pressable
                 onPress={() => void bookmarksQuery.refetch()}
                 className="bg-primary rounded-card px-5 py-3 mb-3"
                 accessibilityRole="button"
-                accessibilityLabel="Retry loading saved bookmarks"
+                accessibilityLabel={t('progress.saved.retryLabel')}
                 testID="saved-retry"
               >
                 <Text className="text-body font-semibold text-on-primary">
-                  Try again
+                  {t('common.tryAgain')}
                 </Text>
               </Pressable>
               <Pressable
@@ -210,10 +225,12 @@ export default function SavedBookmarksScreen() {
                   goBackOrReplace(router, '/(app)/progress' as const)
                 }
                 accessibilityRole="button"
-                accessibilityLabel="Go back"
+                accessibilityLabel={t('common.goBack')}
                 testID="saved-error-back"
               >
-                <Text className="text-body-sm text-primary">Go back</Text>
+                <Text className="text-body-sm text-primary">
+                  {t('common.goBack')}
+                </Text>
               </Pressable>
             </View>
           ) : (
@@ -224,10 +241,10 @@ export default function SavedBookmarksScreen() {
                 className="text-text-tertiary mb-4"
               />
               <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
-                Nothing saved yet
+                {t('progress.saved.emptyTitle')}
               </Text>
               <Text className="text-body text-text-secondary text-center mb-6">
-                Bookmark pages during sessions to find them here.
+                {t('progress.saved.emptySubtitle')}
               </Text>
               <Pressable
                 onPress={() =>
@@ -235,11 +252,11 @@ export default function SavedBookmarksScreen() {
                 }
                 className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
                 accessibilityRole="button"
-                accessibilityLabel="Go to Library"
+                accessibilityLabel={t('progress.saved.goToLibrary')}
                 testID="saved-empty-library-cta"
               >
                 <Text className="text-body font-semibold text-text-inverse">
-                  Go to Library
+                  {t('progress.saved.goToLibrary')}
                 </Text>
               </Pressable>
             </View>

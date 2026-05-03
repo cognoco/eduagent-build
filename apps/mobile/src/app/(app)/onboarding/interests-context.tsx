@@ -11,6 +11,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import type { InterestContext, InterestEntry } from '@eduagent/schemas';
 import { OnboardingStepIndicator } from '../../../components/onboarding/OnboardingStepIndicator';
 import { useUpdateInterestsContext } from '../../../hooks/use-onboarding-dimensions';
@@ -40,6 +41,7 @@ const CONTEXT_OPTIONS: Array<{
 ];
 
 export default function InterestsContextScreen(): React.ReactElement {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
@@ -138,8 +140,8 @@ export default function InterestsContextScreen(): React.ReactElement {
           onSuccess: navigateForward,
           onError: () => {
             platformAlert(
-              'Could not save',
-              'Please check your connection and try again.'
+              t('onboarding.interestsContext.saveErrorTitle'),
+              t('onboarding.interestsContext.saveErrorMessage')
             );
           },
         }
@@ -191,7 +193,7 @@ export default function InterestsContextScreen(): React.ReactElement {
           onPress={handleBack}
           className="min-h-[44px] min-w-[44px] items-center justify-center self-start"
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('common.goBack')}
         >
           <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </Pressable>
@@ -203,11 +205,10 @@ export default function InterestsContextScreen(): React.ReactElement {
         contentContainerStyle={{ paddingBottom: 24 }}
       >
         <Text className="text-h2 font-bold text-text-primary mt-4 mb-2">
-          Is each of these a school thing, a free-time thing, or both?
+          {t('onboarding.interestsContext.title')}
         </Text>
         <Text className="text-body text-text-secondary mb-6">
-          This helps me pick the right kind of examples. Skip to mark them all
-          as &ldquo;both&rdquo; — you can refine later in Settings.
+          {t('onboarding.interestsContext.subtitle')}
         </Text>
 
         <View className="gap-4">
@@ -247,14 +248,16 @@ export default function InterestsContextScreen(): React.ReactElement {
                             isSelected ? 'text-primary' : 'text-text-secondary'
                           }`}
                         >
-                          {opt.label}
+                          {t(
+                            `onboarding.interestsContext.contexts.${opt.value}.label`
+                          )}
                         </Text>
                       </Pressable>
                     );
                   })}
                 </View>
                 <Text className="text-body-sm text-text-tertiary mt-2">
-                  {CONTEXT_OPTIONS.find((o) => o.value === current)?.hint}
+                  {t(`onboarding.interestsContext.contexts.${current}.hint`)}
                 </Text>
               </View>
             );
@@ -271,7 +274,9 @@ export default function InterestsContextScreen(): React.ReactElement {
           accessibilityState={{ disabled: updateInterests.isPending }}
         >
           <Text className="text-text-inverse text-body font-semibold">
-            {updateInterests.isPending ? 'Saving…' : 'Continue'}
+            {updateInterests.isPending
+              ? t('onboarding.common.saving')
+              : t('common.continue')}
           </Text>
         </Pressable>
         <Pressable
@@ -280,7 +285,7 @@ export default function InterestsContextScreen(): React.ReactElement {
           onPress={handleSkip}
         >
           <Text className="text-body text-text-secondary">
-            Skip (mark all as both)
+            {t('onboarding.interestsContext.skipAll')}
           </Text>
         </Pressable>
       </View>

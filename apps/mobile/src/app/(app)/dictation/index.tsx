@@ -2,6 +2,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { IntentCard } from '../../../components/home/IntentCard';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useGenerateDictation } from '../../../hooks/use-dictation-api';
@@ -12,6 +13,7 @@ import { formatApiError } from '../../../lib/format-api-error';
 import { useState, useEffect, useRef } from 'react';
 
 export default function DictationChoiceScreen(): React.ReactElement {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
@@ -72,9 +74,12 @@ export default function DictationChoiceScreen(): React.ReactElement {
       if (generateCancelledRef.current) return;
       const message = formatApiError(err);
       setLastError(message);
-      platformAlert("Couldn't create a dictation right now", message, [
-        { text: 'Try again', onPress: () => void handleSurpriseMe() },
-        { text: 'Go back', style: 'cancel' },
+      platformAlert(t('dictation.index.errorTitle'), message, [
+        {
+          text: t('dictation.index.tryAgain'),
+          onPress: () => void handleSurpriseMe(),
+        },
+        { text: t('common.goBack'), style: 'cancel' },
       ]);
     }
   };
@@ -97,13 +102,13 @@ export default function DictationChoiceScreen(): React.ReactElement {
           }}
           className="mr-3 min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('common.goBack')}
           testID="dictation-choice-back"
         >
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </Pressable>
         <Text className="text-h2 font-bold text-text-primary flex-1">
-          Dictation
+          {t('dictation.index.title')}
         </Text>
       </View>
 
@@ -118,11 +123,11 @@ export default function DictationChoiceScreen(): React.ReactElement {
           <Pressable
             onPress={() => void handleSurpriseMe()}
             accessibilityRole="button"
-            accessibilityLabel="Retry dictation"
+            accessibilityLabel={t('dictation.index.retryDictation')}
             testID="dictation-error-retry"
           >
             <Text className="font-semibold text-primary text-body-sm">
-              Tap to retry
+              {t('dictation.index.tapToRetry')}
             </Text>
           </Pressable>
         </View>
@@ -139,7 +144,7 @@ export default function DictationChoiceScreen(): React.ReactElement {
                 className="text-body text-danger mb-2 text-center"
                 testID="dictation-timeout-error"
               >
-                That took too long — try again
+                {t('dictation.index.tookTooLong')}
               </Text>
               <Pressable
                 onPress={() => {
@@ -148,21 +153,21 @@ export default function DictationChoiceScreen(): React.ReactElement {
                 }}
                 className="mt-2 bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
                 accessibilityRole="button"
-                accessibilityLabel="Retry generating a dictation"
+                accessibilityLabel={t('dictation.index.retryGenerating')}
                 testID="dictation-timeout-retry"
               >
                 <Text className="text-text-inverse font-semibold text-body">
-                  Retry
+                  {t('common.retry')}
                 </Text>
               </Pressable>
             </>
           ) : (
             <>
               <Text className="text-body text-text-primary mb-2">
-                Picking a topic...
+                {t('dictation.index.pickingTopic')}
               </Text>
               <Text className="text-body-sm text-text-secondary">
-                This takes a few seconds
+                {t('dictation.index.takesAFewSeconds')}
               </Text>
             </>
           )}
@@ -173,27 +178,27 @@ export default function DictationChoiceScreen(): React.ReactElement {
             }}
             className="mt-4 py-2 px-4 min-h-[44px] items-center justify-center"
             accessibilityRole="button"
-            accessibilityLabel="Cancel generating a dictation"
+            accessibilityLabel={t('dictation.index.cancelGenerating')}
             testID="dictation-loading-cancel"
           >
             <Text className="text-body-sm font-semibold text-text-secondary">
-              Cancel
+              {t('common.cancel')}
             </Text>
           </Pressable>
         </View>
       ) : (
         <View className="gap-4">
           <IntentCard
-            title="I have a text"
-            subtitle="Type or paste your own text"
+            title={t('dictation.index.iHaveAText')}
+            subtitle={t('dictation.index.iHaveATextSubtitle')}
             onPress={() =>
               router.push('/(app)/dictation/text-preview' as never)
             }
             testID="dictation-homework"
           />
           <IntentCard
-            title="Surprise me"
-            subtitle="Practice with a new dictation"
+            title={t('dictation.index.surpriseMe')}
+            subtitle={t('dictation.index.surpriseMeSubtitle')}
             onPress={() => void handleSurpriseMe()}
             testID="dictation-surprise"
           />

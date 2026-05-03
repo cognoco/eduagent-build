@@ -3,6 +3,7 @@ import { View, Text, ScrollView, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import type {
   ClientQuizQuestion,
   ValidatedQuestionResult,
@@ -39,6 +40,7 @@ function formatActivityType(raw: string): string {
 }
 
 export default function QuizRoundDetailScreen() {
+  const { t } = useTranslation();
   const { roundId } = useLocalSearchParams<{ roundId: string }>();
   const router = useRouter();
   const colors = useThemeColors();
@@ -65,11 +67,11 @@ export default function QuizRoundDetailScreen() {
         isLoading={isLoading}
         testID="round-detail-loading"
         primaryAction={{
-          label: 'Try Again',
+          label: t('common.tryAgain'),
           onPress: () => void refetch(),
         }}
         secondaryAction={{
-          label: 'Go Back',
+          label: t('common.goBack'),
           onPress: () => goBackOrReplace(router, '/(app)/quiz'),
         }}
       />
@@ -82,13 +84,13 @@ export default function QuizRoundDetailScreen() {
         testID="round-detail-error"
         className="flex-1 items-center justify-center p-6"
       >
-        <Text className="text-on-surface">Could not load round details</Text>
+        <Text className="text-on-surface">{t('quiz.round.couldNotLoad')}</Text>
         <Pressable
           testID="round-detail-back"
           className="mt-4 min-h-[44px] min-w-[44px] items-center justify-center"
           onPress={() => goBackOrReplace(router, '/(app)/quiz/history')}
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('quiz.round.goBack')}
         >
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </Pressable>
@@ -110,7 +112,7 @@ export default function QuizRoundDetailScreen() {
           onPress={() => goBackOrReplace(router, '/(app)/quiz/history')}
           className="min-h-[44px] min-w-[44px] items-center justify-center self-start"
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('quiz.round.goBack')}
         >
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </Pressable>
@@ -140,20 +142,34 @@ export default function QuizRoundDetailScreen() {
             accessibilityState={hasHints ? { expanded: isExpanded } : undefined}
             accessibilityLabel={
               hasHints
-                ? `Q${i + 1}, ${result?.correct ? 'correct' : 'wrong'}, ${
-                    isExpanded ? 'tap to hide hints' : 'tap to see hints'
-                  }`
+                ? isExpanded
+                  ? t('quiz.round.expandedLabel', {
+                      num: i + 1,
+                      correctness: result?.correct
+                        ? t('quiz.round.correct')
+                        : t('quiz.round.wrong'),
+                    })
+                  : t('quiz.round.collapsedLabel', {
+                      num: i + 1,
+                      correctness: result?.correct
+                        ? t('quiz.round.correct')
+                        : t('quiz.round.wrong'),
+                    })
                 : undefined
             }
             className="bg-surface-elevated mx-4 mb-3 rounded-xl p-4"
           >
             <View className="flex-row items-center justify-between">
-              <Text className="text-on-surface font-semibold">Q{i + 1}</Text>
+              <Text className="text-on-surface font-semibold">
+                {t('quiz.round.questionLabel', { num: i + 1 })}
+              </Text>
               <View className="flex-row items-center gap-2">
                 <Text
                   className={result?.correct ? 'text-success' : 'text-error'}
                 >
-                  {result?.correct ? 'Correct' : 'Wrong'}
+                  {result?.correct
+                    ? t('quiz.round.correct')
+                    : t('quiz.round.wrong')}
                 </Text>
                 {hasHints && (
                   <Ionicons
@@ -167,11 +183,13 @@ export default function QuizRoundDetailScreen() {
             </View>
             {q.type === 'capitals' && (
               <Text className="text-on-surface mt-1">
-                Capital of {q.country}
+                {t('quiz.round.capitalQuestion', { country: q.country })}
               </Text>
             )}
             {q.type === 'vocabulary' && (
-              <Text className="text-on-surface mt-1">Translate: {q.term}</Text>
+              <Text className="text-on-surface mt-1">
+                {t('quiz.round.vocabularyQuestion', { term: q.term })}
+              </Text>
             )}
             {q.type === 'guess_who' && (
               // [BUG-932] Render the first clue (truncated) as the row prompt
@@ -183,7 +201,7 @@ export default function QuizRoundDetailScreen() {
               <Text className="text-on-surface mt-1" numberOfLines={1}>
                 {(() => {
                   const firstClue = q.clues?.[0];
-                  if (!firstClue) return 'Guess Who';
+                  if (!firstClue) return t('quiz.round.guessWhoFallback');
                   return firstClue.length > 60
                     ? `${firstClue.slice(0, 60)}…`
                     : firstClue;
@@ -192,12 +210,12 @@ export default function QuizRoundDetailScreen() {
             )}
             {result && (
               <Text className="text-on-surface-muted mt-1 text-sm">
-                Your answer: {result.answerGiven}
+                {t('quiz.round.yourAnswer', { answer: result.answerGiven })}
               </Text>
             )}
             {q.correctAnswer && (
               <Text className="text-success mt-1 text-sm">
-                Correct answer: {q.correctAnswer}
+                {t('quiz.round.correctAnswer', { answer: q.correctAnswer })}
               </Text>
             )}
             {isExpanded && hasHints && (
@@ -208,7 +226,7 @@ export default function QuizRoundDetailScreen() {
                 {q.type === 'guess_who' && (
                   <View className="mb-2">
                     <Text className="text-on-surface mb-2 text-sm font-semibold">
-                      Clues
+                      {t('quiz.round.cluesHeader')}
                     </Text>
                     {q.clues.map((clue, ci) => {
                       const wasShown =
@@ -237,7 +255,7 @@ export default function QuizRoundDetailScreen() {
                             }
                           >
                             {clue}
-                            {!wasShown && '  (not needed)'}
+                            {!wasShown && `  ${t('quiz.round.notNeeded')}`}
                           </Text>
                         </View>
                       );
@@ -247,7 +265,7 @@ export default function QuizRoundDetailScreen() {
                 {q.funFact && (
                   <View>
                     <Text className="text-on-surface mb-1 text-sm font-semibold">
-                      Did you know?
+                      {t('quiz.round.didYouKnow')}
                     </Text>
                     <Text className="text-on-surface-muted text-sm">
                       {q.funFact}

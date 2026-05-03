@@ -32,6 +32,7 @@ import {
   useDeleteNoteById,
 } from '../../../../../hooks/use-notes';
 import { useRetentionTopics } from '../../../../../hooks/use-retention';
+import { useStickyLoading } from '../../../../../hooks/use-sticky-loading';
 import { useCurriculum } from '../../../../../hooks/use-curriculum';
 import { useLearningResumeTarget } from '../../../../../hooks/use-progress';
 
@@ -218,6 +219,13 @@ export default function BookScreen() {
   );
 
   const needsGeneration = book !== null && !book.topicsGenerated;
+
+  // Keep the MagicPenAnimation visible long enough to register, even when
+  // generation completes faster than perception.
+  const showGenerating = useStickyLoading(
+    needsGeneration || generateMutation.isPending,
+    800
+  );
 
   useEffect(() => {
     if (!needsGeneration) return;
@@ -1020,7 +1028,7 @@ export default function BookScreen() {
   }
 
   // 3. Generation in progress
-  if (needsGeneration || generateMutation.isPending) {
+  if (showGenerating) {
     return (
       <View
         className="flex-1 bg-background items-center justify-center px-5"

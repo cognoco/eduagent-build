@@ -1,4 +1,5 @@
 import { View, Text, Pressable, ScrollView } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,6 +14,7 @@ import { classifyApiError } from '../../../lib/format-api-error';
 import { platformAlert } from '../../../lib/platform-alert';
 
 export default function SubjectSettingsScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { subjectId, subjectName } = useLocalSearchParams<{
@@ -38,7 +40,10 @@ export default function SubjectSettingsScreen() {
     // UX-DE-L9: surface mutation errors
     updateAnalogyDomain(domain, {
       onError: (err) =>
-        platformAlert('Could not update', classifyApiError(err).message),
+        platformAlert(
+          t('subject.settings.updateErrorTitle'),
+          classifyApiError(err).message
+        ),
     });
   };
 
@@ -46,10 +51,10 @@ export default function SubjectSettingsScreen() {
     return (
       <ErrorFallback
         variant="centered"
-        title="No subject selected"
-        message="We couldn't load this subject. Head home and try again."
+        title={t('subject.settings.missingTitle')}
+        message={t('subject.settings.missingMessage')}
         primaryAction={{
-          label: 'Go Home',
+          label: t('common.goHome'),
           onPress: () => goBackOrReplace(router, '/(app)/home'),
           testID: 'subject-missing-param',
         }}
@@ -70,7 +75,7 @@ export default function SubjectSettingsScreen() {
           }
           className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
           testID="subject-settings-back"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('common.goBack')}
           accessibilityRole="button"
         >
           <Text className="text-primary text-h3">&larr;</Text>
@@ -79,7 +84,7 @@ export default function SubjectSettingsScreen() {
           className="text-h2 font-bold text-text-primary flex-1"
           numberOfLines={1}
         >
-          {subjectName ?? 'Subject Settings'}
+          {subjectName ?? t('subject.settings.fallbackTitle')}
         </Text>
       </View>
 
@@ -93,9 +98,7 @@ export default function SubjectSettingsScreen() {
             testID="subject-settings-language-empty"
           >
             <Text className="text-body-sm text-text-secondary text-center">
-              No subject-specific settings yet for language subjects. Your
-              tutor adapts vocabulary, listening, and writing practice
-              automatically based on your CEFR level and progress.
+              {t('subject.settings.languageEmpty')}
             </Text>
           </View>
         ) : isSubjectsLoading && !activeSubject ? (
@@ -103,12 +106,10 @@ export default function SubjectSettingsScreen() {
         ) : (
           <View className="mt-2 mb-4">
             <Text className="text-h3 font-semibold text-text-primary mb-1">
-              Analogy Preference
+              {t('subject.settings.analogyTitle')}
             </Text>
             <Text className="text-body-sm text-text-secondary mb-3">
-              Choose a domain for analogies. The tutor will prefer analogies
-              from this world when explaining concepts, but won't force them
-              when a direct explanation is clearer.
+              {t('subject.settings.analogyDescription')}
             </Text>
             <AnalogyDomainPicker
               value={analogyDomain}

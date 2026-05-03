@@ -2,6 +2,19 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
+jest.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, opts?: Record<string, unknown>) => {
+      if (opts && typeof opts === 'object') {
+        // Return a deterministic interpolated string for assertions
+        return `${key}:${JSON.stringify(opts)}`;
+      }
+      return key;
+    },
+  }),
+  initReactI18next: { type: '3rdParty', init: jest.fn() },
+}));
+
 const mockPush = jest.fn();
 const mockUseSubjects = jest.fn();
 const mockUseOverallProgress = jest.fn();
@@ -380,7 +393,7 @@ describe('LibraryScreen', () => {
 
     // New library v3 design: empty state uses library-empty testID
     screen.getByTestId('library-empty');
-    screen.getByText('Your library is empty');
+    screen.getByText('library.empty.title');
   });
 
   it('renders shelf rows for each subject', () => {
@@ -563,7 +576,9 @@ describe('LibraryScreen', () => {
 
       const backdrop = screen.getByTestId('manage-subjects-backdrop');
       expect(backdrop.props.accessibilityRole).toBe('button');
-      expect(backdrop.props.accessibilityLabel).toBe('Close manage subjects');
+      expect(backdrop.props.accessibilityLabel).toBe(
+        'library.manage.closeAccessibilityLabel'
+      );
     });
   });
 
@@ -626,7 +641,8 @@ describe('LibraryScreen', () => {
 
       // 3 topics total (1 with bookId, 2 with null bookId) must all be counted.
       // Pre-fix this would render "1 subjects · 1 topics" (orphans dropped).
-      screen.getByText('1 subjects · 3 topics');
+      // With i18n mock: t('library.subtitle', {subjectCount:1, topicCount:3}) → key:JSON
+      screen.getByText('library.subtitle:{"subjectCount":1,"topicCount":3}');
     });
 
     it('omits the topic count segment entirely when there are no topics', () => {
@@ -643,7 +659,8 @@ describe('LibraryScreen', () => {
       render(<LibraryScreen />, { wrapper: TestWrapper });
 
       // Header should read just "1 subjects" with no trailing " · N topics".
-      screen.getByText('1 subjects');
+      // With i18n mock: t('library.subtitleNoTopics', {subjectCount:1}) → key:JSON
+      screen.getByText('library.subtitleNoTopics:{"subjectCount":1}');
     });
   });
 });
