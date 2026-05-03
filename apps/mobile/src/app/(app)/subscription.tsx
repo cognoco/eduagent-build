@@ -1163,6 +1163,32 @@ export default function SubscriptionScreen() {
           className="flex-1 px-5"
           contentContainerStyle={{ flexGrow: 1, paddingBottom: 32 }}
         >
+          {/* [BUG-966] Trial banner — surfaces "Trial active" headline with the
+              trial end date when the server reports status='trial'. The status
+              badge below also shifts to "Trial" so it does not falsely read
+              "Active" for a trialing user. */}
+          {status === 'trial' && (
+            <View
+              className="bg-primary-soft rounded-card px-4 py-3 mt-4"
+              testID="trial-banner"
+            >
+              <Text className="text-body font-semibold text-primary">
+                Trial active
+              </Text>
+              {subscription?.trialEndsAt && (
+                <Text className="text-caption text-text-secondary mt-0.5">
+                  {`Trial ends ${new Date(
+                    subscription.trialEndsAt
+                  ).toLocaleDateString(undefined, {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                  })}`}
+                </Text>
+              )}
+            </View>
+          )}
+
           {/* Current plan */}
           <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-4">
             Current plan
@@ -1183,6 +1209,8 @@ export default function SubscriptionScreen() {
                     ? 'Past due'
                     : status === 'expired'
                     ? 'Expired'
+                    : status === 'trial'
+                    ? 'Trial'
                     : 'Active'}
                 </Text>
               </View>

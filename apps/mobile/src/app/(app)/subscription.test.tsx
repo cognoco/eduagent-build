@@ -713,6 +713,98 @@ describe('SubscriptionScreen', () => {
     });
   });
 
+  // [BUG-966] When the server reports status='trial', the screen must surface
+  // a "Trial active" banner with the trial end date and shift the status badge
+  // away from "Active". Maestro flow billing/subscription-details.yaml asserts
+  // visible text "Trial active" — this unit test locks the contract so it
+  // cannot regress silently.
+  it('[BUG-966] renders Trial active banner with end date when status=trial', async () => {
+    mockFetch.setRoute(
+      '/subscription',
+      () =>
+        new Response(
+          JSON.stringify({
+            subscription: {
+              ...DEFAULT_SUBSCRIPTION,
+              tier: 'plus',
+              status: 'trial',
+              trialEndsAt: '2026-05-10T00:00:00.000Z',
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+    );
+    mockOfferings = makeMockOfferings([makeMockPackage()]);
+
+    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      screen.getByTestId('trial-banner');
+    });
+    screen.getByText('Trial active');
+    // Status badge must read "Trial", not "Active", when trialing.
+    screen.getByText('Trial');
+    expect(screen.queryByText('Active')).toBeNull();
+  });
+
+  // [BUG-966] Defensive: if trialEndsAt is null, the banner still renders
+  // its headline so the user knows they are on a trial. End-date copy is
+  // suppressed rather than rendered as "Invalid Date".
+  it('[BUG-966] renders Trial active banner without date when trialEndsAt is null', async () => {
+    mockFetch.setRoute(
+      '/subscription',
+      () =>
+        new Response(
+          JSON.stringify({
+            subscription: {
+              ...DEFAULT_SUBSCRIPTION,
+              tier: 'plus',
+              status: 'trial',
+              trialEndsAt: null,
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+    );
+    mockOfferings = makeMockOfferings([makeMockPackage()]);
+
+    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      screen.getByTestId('trial-banner');
+    });
+    screen.getByText('Trial active');
+    expect(screen.queryByText(/Trial ends/)).toBeNull();
+  });
+
+  // [BUG-966] Banner must not appear for non-trial statuses — guards against
+  // accidentally surfacing "Trial active" for active paying users.
+  it('[BUG-966] does not render Trial active banner when status=active', async () => {
+    mockFetch.setRoute(
+      '/subscription',
+      () =>
+        new Response(
+          JSON.stringify({
+            subscription: {
+              ...DEFAULT_SUBSCRIPTION,
+              tier: 'plus',
+              status: 'active',
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+    );
+    mockOfferings = makeMockOfferings([makeMockPackage()]);
+
+    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      screen.getByTestId('current-plan');
+    });
+    expect(screen.queryByTestId('trial-banner')).toBeNull();
+    expect(screen.queryByText('Trial active')).toBeNull();
+  });
+
   it('shows current plan info from subscription data', async () => {
     mockFetch.setRoute(
       '/subscription',
