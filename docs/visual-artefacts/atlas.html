@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mentomate Visual Onboarding Atlas</title>
+    <link rel="stylesheet" href="assets/atlas.css" />
+  </head>
+  <body>
+    <div id="atlas-app" class="atlas-app">
+      <header class="atlas-topbar" aria-label="Atlas controls">
+        <div class="atlas-brand">
+          <span class="eyebrow">Internal onboarding atlas</span>
+          <h1>Mentomate systems tour</h1>
+        </div>
+        <nav class="tour-controls" aria-label="Guided tour">
+          <button type="button" data-action="previous">Previous</button>
+          <button type="button" data-action="index">Index</button>
+          <button type="button" data-action="next">Next</button>
+          <button type="button" data-action="export">Export PNG</button>
+        </nav>
+      </header>
+
+      <main class="atlas-shell">
+        <aside id="index-panel" class="index-panel" aria-label="Atlas index"></aside>
+        <section id="board-stage" class="board-stage" aria-live="polite"></section>
+        <aside
+          id="node-drawer"
+          class="node-drawer"
+          aria-label="Selected node detail"
+          aria-live="polite"
+        ></aside>
+      </main>
+
+      <div id="atlas-toast" class="atlas-toast" role="status" aria-live="polite"></div>
+    </div>
+
+    <script src="data/atlas-data.js"></script>
+    <script src="assets/atlas.js"></script>
+  </body>
+</html>
