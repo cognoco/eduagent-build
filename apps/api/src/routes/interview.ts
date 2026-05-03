@@ -36,8 +36,11 @@ import { idempotencyPreflight } from '../middleware/idempotency';
 import { markPersisted } from '../services/idempotency-marker';
 import { notFound } from '../errors';
 import { captureException } from '../services/sentry';
+import { createLogger } from '../services/logger';
 import { appendOrphanInterviewTurn } from '../services/interview/append-orphan-interview-turn';
 import { inngest } from '../inngest/client';
+
+const logger = createLogger();
 
 type InterviewRouteEnv = {
   Bindings: {
@@ -229,11 +232,36 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
       return streamSSEUtf8(c, async (sseStream) => {
         let fullResponse = '';
 
-        for await (const chunk of stream) {
-          fullResponse += chunk;
-          await sseStream.writeSSE({
-            data: JSON.stringify({ type: 'chunk', content: chunk }),
+        try {
+          for await (const chunk of stream) {
+            fullResponse += chunk;
+            await sseStream.writeSSE({
+              data: JSON.stringify({ type: 'chunk', content: chunk }),
+            });
+          }
+        } catch (streamErr) {
+          logger.error('[interview/stream] LLM stream failed', {
+            draftId: draft.id,
+            error:
+              streamErr instanceof Error
+                ? streamErr.message
+                : String(streamErr),
           });
+          captureException(streamErr, {
+            profileId,
+            extra: { draftId: draft.id, phase: 'llm_stream' },
+          });
+          await sseStream.writeSSE({
+            data: JSON.stringify({
+              type: 'error',
+              message:
+                streamErr instanceof Error &&
+                streamErr.message.includes('safety filters')
+                  ? streamErr.message
+                  : 'Something went wrong while generating a reply. Please try again.',
+            }),
+          });
+          return;
         }
 
         try {

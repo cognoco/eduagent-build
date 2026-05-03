@@ -6,6 +6,8 @@ export interface SubjectCardProps {
   name: string;
   hint: string;
   progress: number;
+  topicsCompleted?: number;
+  topicsTotal?: number;
   tintSolid: string;
   tintSoft: string;
   icon: React.ComponentProps<typeof Ionicons>['name'];
@@ -17,6 +19,8 @@ export function SubjectCard({
   name,
   hint,
   progress,
+  topicsCompleted = 0,
+  topicsTotal = 0,
   tintSolid,
   tintSoft,
   icon,
@@ -45,7 +49,15 @@ export function SubjectCard({
           {hint}
         </Text>
       </View>
-      <View className="mt-auto">
+      <View className="mt-auto" style={{ gap: 6 }}>
+        {topicsTotal > 0 && (
+          <Text
+            testID={`${testID}-topics`}
+            className="text-[10px] font-semibold text-text-tertiary"
+          >
+            {topicsCompleted}/{topicsTotal} topics
+          </Text>
+        )}
         <View className="h-1 rounded-full bg-surface-elevated overflow-hidden flex-row">
           <View
             testID={`${testID}-progress`}

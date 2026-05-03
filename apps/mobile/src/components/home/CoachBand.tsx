@@ -1,45 +1,33 @@
 import { Pressable, View, Text } from 'react-native';
 import { useThemeColors } from '../../lib/theme';
 
+function getTimeAwareEyebrow(now: Date = new Date()): string {
+  const hour = now.getHours();
+  if (hour >= 5 && hour < 12) return 'THIS MORNING';
+  if (hour >= 12 && hour < 17) return 'THIS AFTERNOON';
+  return 'TONIGHT';
+}
+
 export interface CoachBandProps {
   headline: string | null;
-  topicHighlight?: string;
   eyebrow?: string;
   estimatedMinutes?: number;
   onContinue: () => void;
   onDismiss: () => void;
+  now?: Date;
 }
 
 export function CoachBand({
   headline,
-  topicHighlight,
-  eyebrow = 'TONIGHT',
+  eyebrow,
   estimatedMinutes,
   onContinue,
   onDismiss,
+  now,
 }: CoachBandProps) {
+  const resolvedEyebrow = eyebrow ?? getTimeAwareEyebrow(now);
   const colors = useThemeColors();
   if (!headline) return null;
-
-  const renderHeadline = () => {
-    if (!topicHighlight || !headline.includes(topicHighlight)) {
-      return (
-        <Text className="text-[17px] font-bold leading-snug text-text-primary">
-          {headline}
-        </Text>
-      );
-    }
-    const idx = headline.indexOf(topicHighlight);
-    const before = headline.slice(0, idx);
-    const after = headline.slice(idx + topicHighlight.length);
-    return (
-      <Text className="text-[17px] font-bold leading-snug text-text-primary">
-        {before}
-        <Text className="text-primary">{topicHighlight}</Text>
-        {after}
-      </Text>
-    );
-  };
 
   return (
     <View
@@ -53,9 +41,13 @@ export function CoachBand({
     >
       <Text className="text-[10px] font-bold uppercase tracking-wider text-primary">
         {'💡 '}
-        {eyebrow}
+        {resolvedEyebrow}
       </Text>
-      <View className="mt-1.5">{renderHeadline()}</View>
+      <View className="mt-1.5">
+        <Text className="text-[17px] font-bold leading-snug text-text-primary">
+          {headline}
+        </Text>
+      </View>
       <View className="flex-row items-center gap-2.5 mt-3">
         <Pressable
           testID="home-coach-band-continue"

@@ -327,11 +327,50 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         return streamSSEUtf8(c, async (sseStream) => {
           // [BUG-866] Track chunk count so we can detect zero-token streams.
           let chunkCount = 0;
-          for await (const chunk of stream) {
-            if (chunk.trim().length > 0) chunkCount++;
-            await sseStream.writeSSE({
-              data: JSON.stringify({ type: 'chunk', content: chunk }),
+          try {
+            for await (const chunk of stream) {
+              if (chunk.trim().length > 0) chunkCount++;
+              await sseStream.writeSSE({
+                data: JSON.stringify({ type: 'chunk', content: chunk }),
+              });
+            }
+          } catch (streamErr) {
+            logger.error('[sessions/stream] LLM stream failed', {
+              sessionId,
+              error:
+                streamErr instanceof Error
+                  ? streamErr.message
+                  : String(streamErr),
             });
+            captureException(streamErr, {
+              profileId,
+              extra: { sessionId, phase: 'llm_stream' },
+            });
+            if (subscriptionId) {
+              try {
+                await safeRefundQuota(db, subscriptionId, {
+                  route: 'sessions.stream.llm_error',
+                  profileId,
+                  sessionId,
+                });
+              } catch (refundErr) {
+                captureException(refundErr, {
+                  profileId,
+                  extra: { sessionId, route: 'sessions.stream.llm_error' },
+                });
+              }
+            }
+            await sseStream.writeSSE({
+              data: JSON.stringify({
+                type: 'error',
+                message:
+                  streamErr instanceof Error &&
+                  streamErr.message.includes('safety filters')
+                    ? streamErr.message
+                    : 'Something went wrong while generating a reply. Please try again.',
+              }),
+            });
+            return;
           }
 
           // [BUG-866] Structured metric on zero-token stream — "silent recovery

@@ -171,6 +171,8 @@ export function LearnerScreen({
           name: s.name,
           hint,
           progress: total > 0 ? completed / total : 0,
+          topicsCompleted: completed,
+          topicsTotal: total,
           tintSolid: tint.solid,
           tintSoft: tint.soft,
           icon: DEFAULT_SUBJECT_ICON,
@@ -188,7 +190,6 @@ export function LearnerScreen({
           recoveryMarker.subjectName ??
           'your session'
         }.`,
-        topicHighlight: recoveryMarker.topicName ?? recoveryMarker.subjectName,
         isQuizDriven: false,
         quizActivityType: undefined as string | undefined,
         onContinue: () => {
@@ -227,7 +228,6 @@ export function LearnerScreen({
         headline: `Pick up where you left off in ${
           resumeTarget.topicTitle ?? resumeTarget.subjectName
         }.`,
-        topicHighlight: resumeTarget.topicTitle ?? resumeTarget.subjectName,
         isQuizDriven: false,
         quizActivityType: undefined as string | undefined,
         onContinue: () =>
@@ -247,7 +247,6 @@ export function LearnerScreen({
       const topic = reviewSummary.nextReviewTopic;
       return {
         headline: `Revisit ${topic.topicTitle} — it's starting to fade.`,
-        topicHighlight: topic.topicTitle,
         isQuizDriven: false,
         quizActivityType: undefined as string | undefined,
         onContinue: () =>
@@ -266,7 +265,6 @@ export function LearnerScreen({
     if (quizDiscovery && dismissedQuizDiscoveryId !== quizDiscovery.id) {
       return {
         headline: quizDiscovery.title,
-        topicHighlight: undefined as string | undefined,
         isQuizDriven: true,
         quizActivityType: quizDiscovery.activityType as string | undefined,
         onContinue: () => {
@@ -431,72 +429,101 @@ export function LearnerScreen({
           !coachBandDismissedRef.current && (
             <CoachBand
               headline={coachBand.headline}
-              topicHighlight={coachBand.topicHighlight}
               onContinue={coachBand.onContinue}
               onDismiss={dismissCoachBand}
             />
           )}
 
         <View className="mt-1">
-          <Text className="text-[11px] font-bold uppercase tracking-wider text-text-tertiary px-5 mb-2.5">
-            YOUR SUBJECTS
-          </Text>
-          <ScrollView
-            testID="home-subject-carousel"
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
-          >
-            {subjectCards.map((card) => (
-              <SubjectCard
-                key={card.subjectId}
-                {...card}
-                testID={`home-subject-card-${card.subjectId}`}
-                onPress={() =>
-                  isParentProxy
-                    ? router.push({
-                        pathname: '/(app)/shelf/[subjectId]',
-                        params: { subjectId: card.subjectId },
-                      } as never)
-                    : router.push({
-                        pathname: '/(app)/session',
-                        params: {
-                          subjectId: card.subjectId,
-                          subjectName: card.name,
-                          mode: 'learning',
-                          ...HOME_RETURN_PARAMS,
-                        },
-                      } as never)
-                }
-              />
-            ))}
-            {!isParentProxy && (
-              <Pressable
-                testID="home-add-subject-tile"
-                onPress={() =>
-                  router.push({
-                    pathname: '/create-subject',
-                    params: HOME_RETURN_PARAMS,
-                  } as never)
-                }
-                className="rounded-2xl border border-dashed border-border items-center justify-center"
-                style={{
-                  width: subjectCards.length === 0 ? 280 : 96,
-                  height: 150,
-                  gap: 8,
-                }}
+          {subjectCards.length > 0 ? (
+            <>
+              <Text className="text-[11px] font-bold uppercase tracking-wider text-text-tertiary px-5 mb-2.5">
+                YOUR SUBJECTS
+              </Text>
+              <ScrollView
+                testID="home-subject-carousel"
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
               >
-                <Text className="text-[20px] text-text-tertiary opacity-70">
-                  ＋
+                {subjectCards.map((card) => (
+                  <SubjectCard
+                    key={card.subjectId}
+                    {...card}
+                    testID={`home-subject-card-${card.subjectId}`}
+                    onPress={() =>
+                      isParentProxy
+                        ? router.push({
+                            pathname: '/(app)/shelf/[subjectId]',
+                            params: { subjectId: card.subjectId },
+                          } as never)
+                        : router.push({
+                            pathname: '/(app)/session',
+                            params: {
+                              subjectId: card.subjectId,
+                              subjectName: card.name,
+                              mode: 'learning',
+                              ...HOME_RETURN_PARAMS,
+                            },
+                          } as never)
+                    }
+                  />
+                ))}
+                {!isParentProxy && (
+                  <Pressable
+                    testID="home-add-subject-tile"
+                    onPress={() =>
+                      router.push({
+                        pathname: '/create-subject',
+                        params: HOME_RETURN_PARAMS,
+                      } as never)
+                    }
+                    className="rounded-2xl border border-dashed border-border items-center justify-center"
+                    style={{ width: 96, height: 150, gap: 8 }}
+                  >
+                    <Text className="text-[20px] text-text-tertiary opacity-70">
+                      ＋
+                    </Text>
+                    <Text className="text-xs font-bold text-text-tertiary">
+                      New subject
+                    </Text>
+                  </Pressable>
+                )}
+              </ScrollView>
+            </>
+          ) : (
+            !isParentProxy && (
+              <View
+                testID="home-empty-subjects"
+                className="mx-5 rounded-2xl border border-dashed border-border items-center justify-center py-10"
+                style={{ gap: 12 }}
+              >
+                <Ionicons
+                  name="book-outline"
+                  size={32}
+                  color={colors.textSecondary}
+                  style={{ opacity: 0.6 }}
+                />
+                <Text className="text-sm text-text-secondary text-center px-6">
+                  Pick a subject to start learning
                 </Text>
-                <Text className="text-xs font-bold text-text-tertiary">
-                  {subjectCards.length === 0
-                    ? 'Add your first subject'
-                    : 'New subject'}
-                </Text>
-              </Pressable>
-            )}
-          </ScrollView>
+                <Pressable
+                  testID="home-add-first-subject"
+                  onPress={() =>
+                    router.push({
+                      pathname: '/create-subject',
+                      params: HOME_RETURN_PARAMS,
+                    } as never)
+                  }
+                  className="bg-primary rounded-xl px-5 py-2.5 mt-1"
+                >
+                  <Text className="text-sm font-bold text-text-inverse">
+                    Add a subject
+                  </Text>
+                </Pressable>
+              </View>
+            )
+          )}
         </View>
 
         {!isParentProxy && (

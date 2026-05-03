@@ -443,6 +443,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       let streamId: string | null = null;
       // [H6] SSE freeze watchdog — hoisted so finally can always clear it.
       let sseWatchdogTimerId: ReturnType<typeof setInterval> | null = null;
+      let doneCalled = false;
       try {
         const sessionSubjectId = options?.sessionSubjectId;
         const sessionSubjectName = options?.sessionSubjectName;
@@ -658,6 +659,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
             );
           },
           async (result) => {
+            doneCalled = true;
             const shouldConvertToReconnect =
               watchdogConverted || !!result.fallback || chunkCount === 0;
             const trackedExchange = shouldConvertToReconnect
@@ -870,14 +872,24 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
           clearInterval(sseWatchdogTimerId);
           sseWatchdogTimerId = null;
         }
-        // Safety net: ensure isStreaming is always cleared even if onDone was
-        // never called (e.g., server sent 'error' instead of 'done', or the
-        // stream closed without either event). React ignores no-op setState.
         setIsStreaming(false);
         if (streamId) {
           setMessages((prev) => {
             const msg = prev.find((m) => m.id === streamId);
-            if (msg?.streaming) {
+            if (!msg) return prev;
+            if (!doneCalled && msg.streaming && !msg.kind) {
+              return prev.map((m) =>
+                m.id === streamId
+                  ? {
+                      ...m,
+                      content: 'Connection lost — Try again',
+                      streaming: false,
+                      kind: 'reconnect_prompt' as const,
+                    }
+                  : m
+              );
+            }
+            if (msg.streaming) {
               return prev.map((m) =>
                 m.id === streamId ? { ...m, streaming: false } : m
               );
