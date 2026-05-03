@@ -12,7 +12,7 @@ jest.mock('expo-store-review', () => ({
 
 const secureStore: Record<string, string> = {};
 
-jest.mock('expo-secure-store', () => ({
+jest.mock('../lib/secure-storage', () => ({
   getItemAsync: jest.fn((key: string) =>
     Promise.resolve(secureStore[key] ?? null)
   ),
@@ -20,6 +20,8 @@ jest.mock('expo-secure-store', () => ({
     secureStore[key] = value;
     return Promise.resolve();
   }),
+  deleteItemAsync: jest.fn(),
+  sanitizeSecureStoreKey: (s: string) => s.replace(/[^a-zA-Z0-9._-]/g, '_'),
 }));
 
 const mockProfile = {
@@ -88,7 +90,7 @@ describe('useRatingPrompt', () => {
   });
 
   // [BREAK / BUG-680] computeAgeBracket(null) silently treats null birthYear
-  // as adult (year - null = year → 'adult'), so the previous code skipped
+  // as adult (year - null = year -> 'adult'), so the previous code skipped
   // the prompt for the wrong reason. The fix returns early on null birthYear
   // explicitly. We assert the prompt is NOT shown AND the recall count is
   // NOT incremented (the early return must happen before SecureStore writes).
@@ -103,7 +105,7 @@ describe('useRatingPrompt', () => {
     });
 
     expect(mockRequestReview).not.toHaveBeenCalled();
-    // Recall count must NOT have been bumped — guard fires before SecureStore.
+    // Recall count must NOT have been bumped -- guard fires before SecureStore.
     expect(secureStore['rating-recall-success-count-profile-1']).toBe('10');
     mockProfile.birthYear = originalBirthYear;
   });

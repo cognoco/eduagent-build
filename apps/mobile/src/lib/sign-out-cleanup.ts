@@ -31,8 +31,8 @@ import { sanitizeSecureStoreKey } from './secure-storage';
 export const PER_PROFILE_KEYS: ReadonlyArray<(profileId: string) => string> = [
   // EarlyAdopterCard.tsx — DISMISSED_KEY: `earlyAdopterDismissed_${profileId}`
   (id) => `earlyAdopterDismissed_${id}`,
-  // BookmarkNudgeTooltip.tsx — getBookmarkNudgeKey: `bookmark-nudge-shown:${profileId}`
-  (id) => `bookmark-nudge-shown:${id}`,
+  // BookmarkNudgeTooltip.tsx — getBookmarkNudgeKey: sanitized `bookmark-nudge-shown_${profileId}` (colon replaced by _)
+  (id) => sanitizeSecureStoreKey(`bookmark-nudge-shown:${id}`),
   // use-dictation-preferences.ts — getPaceKey + getPunctKey
   (id) => `dictation-pace-${id}`,
   (id) => `dictation-punctuation-${id}`,

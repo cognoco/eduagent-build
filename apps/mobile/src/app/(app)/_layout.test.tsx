@@ -121,10 +121,11 @@ jest.mock('../../lib/sentry', () => ({
   Sentry: { captureException: jest.fn(), addBreadcrumb: jest.fn() },
 }));
 
-jest.mock('expo-secure-store', () => ({
+jest.mock('../../lib/secure-storage', () => ({
   getItemAsync: jest.fn(),
   setItemAsync: jest.fn(),
   deleteItemAsync: jest.fn(),
+  sanitizeSecureStoreKey: (s: string) => s.replace(/[^a-zA-Z0-9._-]/g, '_'),
 }));
 
 jest.mock('../../components/feedback/FeedbackProvider', () => ({
@@ -169,7 +170,7 @@ describe('AppLayout', () => {
     (ExpoNotifications.requestPermissionsAsync as jest.Mock).mockResolvedValue({
       status: 'granted',
     });
-    const SecureStoreMock = require('expo-secure-store');
+    const SecureStoreMock = require('../../lib/secure-storage');
     (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
     (SecureStoreMock.setItemAsync as jest.Mock).mockResolvedValue(undefined);
     (SecureStoreMock.deleteItemAsync as jest.Mock).mockResolvedValue(undefined);
@@ -603,7 +604,7 @@ describe('AppLayout', () => {
       canAskAgain: true,
     });
 
-    const SecureStoreMock = require('expo-secure-store');
+    const SecureStoreMock = require('../../lib/secure-storage');
     (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
 
     renderLayout();
@@ -624,7 +625,7 @@ describe('AppLayout', () => {
       canAskAgain: true,
     });
 
-    const SecureStoreMock = require('expo-secure-store');
+    const SecureStoreMock = require('../../lib/secure-storage');
     (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
 
     renderLayout();
@@ -645,7 +646,7 @@ describe('AppLayout', () => {
       canAskAgain: true,
     });
 
-    const SecureStoreMock = require('expo-secure-store');
+    const SecureStoreMock = require('../../lib/secure-storage');
     (SecureStoreMock.getItemAsync as jest.Mock).mockImplementation(
       (key: string) => {
         if (key.startsWith('permissionSetupSeen_'))
@@ -672,7 +673,7 @@ describe('AppLayout', () => {
       canAskAgain: true,
     });
 
-    const SecureStoreMock = require('expo-secure-store');
+    const SecureStoreMock = require('../../lib/secure-storage');
     (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
     (SecureStoreMock.setItemAsync as jest.Mock).mockResolvedValue(undefined);
 
@@ -705,7 +706,7 @@ describe('AppLayout', () => {
       canAskAgain: true,
     });
 
-    const SecureStoreMock = require('expo-secure-store');
+    const SecureStoreMock = require('../../lib/secure-storage');
     (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
     (SecureStoreMock.setItemAsync as jest.Mock).mockResolvedValue(undefined);
 

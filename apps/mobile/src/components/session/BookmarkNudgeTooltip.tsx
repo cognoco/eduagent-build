@@ -2,11 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import * as SecureStore from '../../lib/secure-storage';
+import { sanitizeSecureStoreKey } from '../../lib/secure-storage';
 
 const KEY_PREFIX = 'bookmark-nudge-shown';
 
 function getBookmarkNudgeKey(profileId: string | undefined): string {
-  return profileId ? `${KEY_PREFIX}:${profileId}` : KEY_PREFIX;
+  return sanitizeSecureStoreKey(
+    profileId ? `${KEY_PREFIX}:${profileId}` : KEY_PREFIX
+  );
 }
 
 interface BookmarkNudgeTooltipProps {

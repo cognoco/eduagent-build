@@ -19,6 +19,7 @@ jest.mock('../../lib/secure-storage', () => ({
     delete secureStore[key];
     return Promise.resolve();
   }),
+  sanitizeSecureStoreKey: (s: string) => s.replace(/[^a-zA-Z0-9._-]/g, '_'),
 }));
 
 const { BookmarkNudgeTooltip } = require('./BookmarkNudgeTooltip');
@@ -71,7 +72,8 @@ describe('BookmarkNudgeTooltip', () => {
   });
 
   it('stays hidden when SecureStore already records a dismissal for the profile', async () => {
-    secureStore['bookmark-nudge-shown:p1'] = 'true';
+    // sanitizeSecureStoreKey replaces ':' with '_', so the stored key uses underscore
+    secureStore['bookmark-nudge-shown_p1'] = 'true';
 
     render(
       <BookmarkNudgeTooltip aiResponseCount={3} isFirstSession profileId="p1" />
@@ -94,7 +96,8 @@ describe('BookmarkNudgeTooltip', () => {
 
     expect(screen.queryByTestId('bookmark-nudge-tooltip')).toBeNull();
     await waitFor(() => {
-      expect(secureStore['bookmark-nudge-shown:p1']).toBe('true');
+      // sanitizeSecureStoreKey replaces ':' with '_'
+      expect(secureStore['bookmark-nudge-shown_p1']).toBe('true');
     });
   });
 

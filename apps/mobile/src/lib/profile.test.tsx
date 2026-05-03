@@ -1,8 +1,15 @@
 import { renderHook, waitFor, act } from '@testing-library/react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from './secure-storage';
 import { ProfileProvider, useProfile, type Profile } from './profile';
+
+jest.mock('./secure-storage', () => ({
+  getItemAsync: jest.fn(),
+  setItemAsync: jest.fn(),
+  deleteItemAsync: jest.fn(),
+  sanitizeSecureStoreKey: (s: string) => s.replace(/[^a-zA-Z0-9._-]/g, '_'),
+}));
 
 jest.mock('@clerk/clerk-expo', () => ({
   useAuth: () => ({ isSignedIn: true }),
