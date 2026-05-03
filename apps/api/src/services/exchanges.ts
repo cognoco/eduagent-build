@@ -38,7 +38,7 @@ const logger = createLogger();
 
 const SERVER_NOTE_RE = /<\/?server_note[^>]*>/gi;
 
-function sanitizeUserContent(content: string): string {
+export function sanitizeUserContent(content: string): string {
   return content.replace(SERVER_NOTE_RE, '');
 }
 

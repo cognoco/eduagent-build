@@ -165,7 +165,26 @@ describe('LearnerScreen', () => {
     });
   });
 
-  it('shows action grid and ask-anything when no subjects', async () => {
+  it('shows empty-subjects state, ask-anything, and actions when no subjects', async () => {
+    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      screen.getByTestId('home-empty-subjects');
+      screen.getByTestId('home-add-first-subject');
+      screen.getByTestId('home-ask-anything');
+      screen.getByTestId('home-action-study-new');
+      screen.getByTestId('home-action-homework');
+      screen.getByTestId('home-action-practice');
+      screen.getByText('Pick a subject to start learning');
+      expect(screen.queryByTestId('home-subject-carousel')).toBeNull();
+    });
+  });
+
+  it('shows action grid when subjects exist', async () => {
+    mockFetch.setRoute('/subjects', {
+      subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+    });
+
     render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
 
     await waitFor(() => {
@@ -197,6 +216,10 @@ describe('LearnerScreen', () => {
   });
 
   it('hides learner-only elements in parent proxy mode', async () => {
+    mockFetch.setRoute('/subjects', {
+      subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+    });
+
     render(
       <LearnerScreen
         {...defaultProps}
@@ -535,13 +558,13 @@ describe('LearnerScreen', () => {
     });
   });
 
-  it('shows add-subject tile as wide card when no subjects', async () => {
+  it('shows empty-state CTA when no subjects', async () => {
     render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
 
     await waitFor(() => {
-      const tile = screen.getByTestId('home-add-subject-tile');
-      expect(tile).toBeTruthy();
-      screen.getByText('Add your first subject');
+      screen.getByTestId('home-empty-subjects');
+      screen.getByTestId('home-add-first-subject');
+      screen.getByText('Add a subject');
     });
   });
 });

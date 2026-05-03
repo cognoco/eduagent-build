@@ -15,7 +15,6 @@ jest.mock('../../lib/theme', () => ({
 describe('CoachBand', () => {
   const baseProps: CoachBandProps = {
     headline: 'Pick up where you stopped in Linear equations.',
-    topicHighlight: 'Linear equations',
     eyebrow: 'TONIGHT',
     estimatedMinutes: 4,
     onContinue: jest.fn(),
@@ -29,7 +28,7 @@ describe('CoachBand', () => {
     expect(queryByTestId('home-coach-band')).toBeNull();
   });
 
-  it('renders the headline with topic highlighted', () => {
+  it('renders the headline', () => {
     const { getByTestId, getByText } = render(<CoachBand {...baseProps} />);
     expect(getByTestId('home-coach-band')).toBeTruthy();
     expect(getByText(/Linear equations/)).toBeTruthy();
@@ -53,9 +52,32 @@ describe('CoachBand', () => {
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 
-  it('renders eyebrow text', () => {
+  it('renders explicit eyebrow text', () => {
     const { getByText } = render(<CoachBand {...baseProps} />);
     expect(getByText(/TONIGHT/)).toBeTruthy();
+  });
+
+  it('renders time-aware eyebrow when none provided', () => {
+    const morning = new Date('2026-05-03T09:00:00');
+    const afternoon = new Date('2026-05-03T14:00:00');
+    const evening = new Date('2026-05-03T20:00:00');
+
+    const { unmount, getByText } = render(
+      <CoachBand {...baseProps} eyebrow={undefined} now={morning} />
+    );
+    expect(getByText(/THIS MORNING/)).toBeTruthy();
+    unmount();
+
+    const { unmount: u2, getByText: g2 } = render(
+      <CoachBand {...baseProps} eyebrow={undefined} now={afternoon} />
+    );
+    expect(g2(/THIS AFTERNOON/)).toBeTruthy();
+    u2();
+
+    const { getByText: g3 } = render(
+      <CoachBand {...baseProps} eyebrow={undefined} now={evening} />
+    );
+    expect(g3(/TONIGHT/)).toBeTruthy();
   });
 
   it('renders estimated minutes', () => {

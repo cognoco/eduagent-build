@@ -1,5 +1,6 @@
 import {
   buildSystemPrompt,
+  sanitizeUserContent,
   type ExchangeContext,
 } from '../../src/services/exchanges';
 import { resolveAgeBracket } from '../../src/services/exchange-prompts';
@@ -389,13 +390,19 @@ export const exchangesFlow: FlowDefinition<ExchangeScenarioInput> = {
     const priorTurns =
       lastUserIndex >= 0 ? history.slice(0, lastUserIndex) : history;
 
+    if (!messages.user) {
+      throw new Error(
+        `runLive: messages.user is undefined for scenario ${input.scenarioId} — buildPrompt must produce a user turn`
+      );
+    }
+
     const chatMessages: ChatMessage[] = [
       { role: 'system', content: messages.system },
       ...priorTurns.map((t) => ({
         role: t.role,
-        content: t.content,
+        content: t.role === 'user' ? sanitizeUserContent(t.content) : t.content,
       })),
-      { role: 'user' as const, content: messages.user ?? '' },
+      { role: 'user' as const, content: sanitizeUserContent(messages.user) },
     ];
 
     return runHarnessLlm(chatMessages, input.context.escalationRung, {
