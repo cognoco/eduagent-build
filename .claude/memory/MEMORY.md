@@ -112,6 +112,7 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 
 ## Development Process & Feedback
 
+- [feedback_audit_check_deleted_concepts.md](feedback_audit_check_deleted_concepts.md) — Before governance posture on rule violations, check if the concept was deleted by an epic. Literal grep misses aliases.
 - [feedback_spec_before_code.md](feedback_spec_before_code.md) — Spec before code. Use BMAD commands.
 - [feedback_spec_failure_modes.md](feedback_spec_failure_modes.md) — Every spec needs Failure Modes table.
 - [feedback_five_root_causes.md](feedback_five_root_causes.md) — 5 systemic root causes.
