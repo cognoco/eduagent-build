@@ -5,21 +5,12 @@
 - [project_implementation_phase.md](_archive/project_implementation_phase.md) — Epics 0-16 COMPLETE. LLM tuning phase COMPLETE (all 4 agents merged).
 - [project_session_lifecycle_decisions.md](project_session_lifecycle_decisions.md) — Wall-clock for users, active time internal. Adaptive silence. Hard caps removed.
 
-## Active Work (2026-04-30)
+## Active Work (2026-05-03)
 
-- Active branch: **`proc-optimization`**. Phase 3 LLM tuning COMPLETE (all 4 agents merged).
-- [project_llm_audit_2026_04_18.md](project_llm_audit_2026_04_18.md) — Three audit specs in docs/specs/: personalization, reliability/UX, response envelope. 9 prompt surfaces mapped.
-- [project_llm_marker_antipattern.md](project_llm_marker_antipattern.md) — 5 marker/JSON-in-text patterns. F1.2 hotfix shipped. Plan `docs/plans/2026-04-19-bucket-a-envelope-migration.md` (Bucket A).
-- [project_eval_llm_harness.md](project_eval_llm_harness.md) — `apps/api/eval-llm/` + `pnpm eval:llm`. All 9 flows wired (exchanges added in 002f5bad).
-- [project_eval_llm_signal_metrics.md](project_eval_llm_signal_metrics.md) — Layer 1 signal-distribution regression guard. `emitsEnvelope` flag + `--check-baseline`/`--update-baseline`. Restored 2026-04-21 after concurrent-edit loss.
-- [project_onboarding_new_dimensions.md](project_onboarding_new_dimensions.md) — conversationLanguage (mandatory), interestContext, pronouns. Spec `docs/specs/2026-04-19-onboarding-new-dimensions.md` (Bucket C).
-- [project_f8_memory_source_refs.md](project_f8_memory_source_refs.md) — Struggle/StrengthEntry provenance back-links. Spec `docs/specs/2026-04-19-memory-sources-f8.md` (Bucket C).
-- [project_parent_visibility_spec.md](project_parent_visibility_spec.md) — Two specs 2026-04-18: parent privacy/RLS + progress highlights. Pending implementation.
-- [project_ux_review_pass.md](project_ux_review_pass.md) — Home timeout nav, topic features, consent offline, progressive disclosure DONE. Hierarchy flattening under evaluation.
-- [project_summary_draft_backup_deferred.md](project_summary_draft_backup_deferred.md) — Local draft autosave shipped `DRAFT-BULLETPROOF-01` (2026-04-23). Server-side mirror deferred 2026-04-24 over volume concerns; design options already mapped.
-- [project_language_pedagogy.md](project_language_pedagogy.md) — four_strands pedagogy, vocabulary CRUD, CEFR levels.
-- [project_deploy_safety.md](project_deploy_safety.md) — deploy.yml uses drizzle-kit migrate (not push --force) for prod.
-- [project_eas_update_ota.md](project_eas_update_ota.md) — OTA IMPLEMENTED. JS-only changes deploy in ~5 min.
+- Active branch: **`consistency`**. Phase 3 LLM tuning COMPLETE (all 4 agents merged).
+- [project_f8_memory_source_refs.md](project_f8_memory_source_refs.md) — Struggle/StrengthEntry provenance back-links. Spec `docs/specs/2026-04-19-memory-sources-f8.md` (Bucket C). F8 prep landed in 413ece4f; full implementation status uncertain.
+- [project_parent_visibility_spec.md](project_parent_visibility_spec.md) — Two specs 2026-04-18: parent privacy/RLS + progress highlights. Partial-shipped in PR #121 (1e50b6ea); Phase 2 RLS for 11 tables + 5 pre-implementation gaps still open.
+- [project_ux_review_pass.md](project_ux_review_pass.md) — Library → Shelf → Book → Topic hierarchy flattening under evaluation. (Other items DONE.)
 
 ## Product Constraint — Strictly 11+
 
@@ -45,6 +36,8 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 
 ## Critical Architecture Decisions
 
+- [project_eval_llm_harness.md](project_eval_llm_harness.md) — `apps/api/eval-llm/` + `pnpm eval:llm`. All 9 LLM flows wired. Fixture-driven snapshot harness for prompt builders.
+- [project_eval_llm_signal_metrics.md](project_eval_llm_signal_metrics.md) — Layer 1 signal-distribution regression guard. `emitsEnvelope` flag + `--check-baseline`/`--update-baseline`.
 - [billing-payments.md](billing-payments.md) — Mobile IAP (RevenueCat), Stripe dormant for future web. Epic 9 COMPLETE.
 - [pricing_dual_cap.md](pricing_dual_cap.md) — Free: 10/day + 100/month. Plus: 700/month, no daily limit.
 - [market_language_pivot.md](market_language_pivot.md) — English UI only. Language TEACHING active (four_strands). GDPR-everywhere.
@@ -58,7 +51,7 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 - [feedback_parallel_agents.md](feedback_parallel_agents.md) — Parallel agents in same tree, no worktrees. Coordinator commits sequentially.
 - [feedback_fast_iteration.md](feedback_fast_iteration.md) — 60-min feedback loops unacceptable. CI gates, but optimize speed.
 - [feedback_fix_verification_rules.md](feedback_fix_verification_rules.md) — Changed ≠ verified. Break tests, finding IDs, no silent recovery.
-- [feedback_sweep_for_same_bug.md](feedback_sweep_for_same_bug.md) — After fixing a bug, sweep codebase for same pattern.
+- [feedback_sweep_for_same_bug.md](feedback_sweep_for_same_bug.md) — After fixing a bug, sweep codebase for same pattern. **Direct precursor of CLAUDE.md `Sweep when you fix` rule (added 2026-05-03).**
 - [feedback_just_do_it.md](feedback_just_do_it.md) — Clear action commands = execute immediately, don't gate on confirmations.
 - [feedback_autonomous_speccing.md](feedback_autonomous_speccing.md) — Decide small stuff yourself, only ask on genuinely big trade-offs.
 - [feedback_agents_commit_push.md](feedback_agents_commit_push.md) — Subagents never commit by default; coordinator commits via `/commit`. Exception: user-instructed one-off subagent commits are OK.
@@ -75,6 +68,7 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 - Windows username `ZuzanaKopečná` contains `č` — breaks native executables/JNI.
 - Emulator/ADB at `C:\Android\Sdk`, Doppler CLI at `C:\Tools\doppler\doppler.exe`.
 - [project_eas_build.md](project_eas_build.md) — EAS Build config, OTA operational, NX Cloud connected, Sentry upload disabled.
+- [project_eas_update_ota.md](project_eas_update_ota.md) — OTA IMPLEMENTED. JS-only changes deploy in ~5 min via expo-updates.
 - [project_fingerprint_pnpm_mismatch.md](project_fingerprint_pnpm_mismatch.md) — Fingerprint policy fails in pnpm monorepo. Using appVersion policy.
 - [project_ci_infrastructure.md](project_ci_infrastructure.md) — NX Cloud, path filters, E2E APK caching, Husky pre-commit.
 
@@ -87,6 +81,7 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 - [feedback_doppler_secrets.md](feedback_doppler_secrets.md) — All secrets via Doppler. EXPO_PUBLIC vars synced via `pnpm env:sync`.
 - [feedback_ota_env_vars.md](feedback_ota_env_vars.md) — Manual OTA must set target env vars explicitly.
 - [project_inngest_staging.md](project_inngest_staging.md) — Inngest sync URL is `/v1/inngest` (not `/inngest`). Staging synced 2026-04-17.
+- [project_deploy_safety.md](project_deploy_safety.md) — deploy.yml uses drizzle-kit migrate (not push --force) for prod.
 
 ## Store Publishing — BOTH BLOCKED (2026-03-27)
 
@@ -106,6 +101,7 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 
 ## Core Learning Philosophy
 
+- [project_language_pedagogy.md](project_language_pedagogy.md) — four_strands pedagogy mode (alongside socratic). Vocabulary CRUD, CEFR levels, language-progress routes.
 - [feedback_never_lock_topics.md](feedback_never_lock_topics.md) — NEVER lock/block topics. Prerequisites advisory.
 - [feedback_never_force_add_child.md](feedback_never_force_add_child.md) — Never force add-child. Solo/skip path always available for parent accounts.
 - [feedback_human_override_everywhere.md](feedback_human_override_everywhere.md) — Every AI-driven screen must allow human override.
