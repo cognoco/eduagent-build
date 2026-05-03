@@ -1,3 +1,5 @@
+import i18next from '../i18n';
+
 /**
  * Centralized error formatter for API and network errors.
  * Provides actionable, user-friendly messages based on error type.
@@ -74,13 +76,11 @@ function isForbiddenError(error: unknown): error is ForbiddenLike {
   );
 }
 
-const NETWORK_MESSAGE =
-  "Looks like you're offline or our servers can't be reached. Check your internet connection and try again.";
-
-const SERVER_MESSAGE =
-  'Something went wrong on our end. Please try again in a moment.';
-
-const DEFAULT_MESSAGE = 'Something unexpected happened. Please try again.';
+// Thunks resolve at call time so they reflect the active language, not
+// whatever language i18next had at module-load time.
+const NETWORK_MESSAGE = () => i18next.t('errors.networkError');
+const SERVER_MESSAGE = () => i18next.t('errors.serverError');
+const DEFAULT_MESSAGE = () => i18next.t('errors.generic');
 
 function isGenericServerMessage(message: string): boolean {
   const normalized = message.trim().toLowerCase().replace(/\.+$/, '');
@@ -101,49 +101,28 @@ function isGenericServerMessage(message: string): boolean {
  */
 const FRIENDLY_MESSAGE_MAP: Array<{
   pattern: RegExp;
-  message: string;
+  key: string;
 }> = [
   {
     pattern: /not configured for language learning/i,
-    message:
-      "This subject isn't set up for language learning. Try the standard learning path instead.",
+    key: 'friendlyErrors.notLanguageLearning',
   },
   {
     pattern: /subject.*(paused|archived|inactive)/i,
-    message:
-      'This subject is on pause right now. You can resume it from your subjects list.',
+    key: 'friendlyErrors.subjectPaused',
   },
   {
     pattern: /curriculum.*not.*found/i,
-    message:
-      "We haven't set up your learning path yet. Go back and start the interview first.",
+    key: 'friendlyErrors.curriculumNotFound',
   },
-  {
-    pattern: /topic.*not.*found/i,
-    message:
-      "That topic isn't available right now. Try picking a different one.",
-  },
-  {
-    pattern: /draft.*not.*found/i,
-    message: 'Your progress was lost. Please start again.',
-  },
-  {
-    pattern: /profile.*not.*found/i,
-    message:
-      'We had trouble loading your profile. Please sign out and back in.',
-  },
-  {
-    pattern: /session.*not.*found/i,
-    message: "That session isn't available anymore. Start a new one.",
-  },
-  {
-    pattern: /already.*completed/i,
-    message: "You've already finished this. Head back and pick something new.",
-  },
+  { pattern: /topic.*not.*found/i, key: 'friendlyErrors.topicNotFound' },
+  { pattern: /draft.*not.*found/i, key: 'friendlyErrors.draftNotFound' },
+  { pattern: /profile.*not.*found/i, key: 'friendlyErrors.profileNotFound' },
+  { pattern: /session.*not.*found/i, key: 'friendlyErrors.sessionNotFound' },
+  { pattern: /already.*completed/i, key: 'friendlyErrors.alreadyCompleted' },
   {
     pattern: /validation.*failed|invalid.*input|expected.*string/i,
-    message:
-      "Something didn't look right. Please check what you entered and try again.",
+    key: 'friendlyErrors.validationFailed',
   },
 ];
 
@@ -167,7 +146,7 @@ function isTechnicalMessage(msg: string): boolean {
 function friendlyMessage(raw: string): string | null {
   for (const entry of FRIENDLY_MESSAGE_MAP) {
     if (entry.pattern.test(raw)) {
-      return entry.message;
+      return i18next.t(entry.key);
     }
   }
   return null;
@@ -258,7 +237,11 @@ export function recoveryActions(
   }
 ): { primary?: RecoveryAction; secondary?: RecoveryAction } {
   const goHome = handlers.goHome
-    ? { label: 'Go Home', onPress: handlers.goHome, testID: 'recovery-go-home' }
+    ? {
+        label: i18next.t('recovery.goHome'),
+        onPress: handlers.goHome,
+        testID: 'recovery-go-home',
+      }
     : undefined;
 
   switch (classified.recovery) {
@@ -266,7 +249,7 @@ export function recoveryActions(
       return {
         primary: handlers.retry
           ? {
-              label: 'Try Again',
+              label: i18next.t('recovery.tryAgain'),
               onPress: handlers.retry,
               testID: 'recovery-retry',
             }
@@ -277,7 +260,7 @@ export function recoveryActions(
       return {
         primary: handlers.goBack
           ? {
-              label: 'Go Back',
+              label: i18next.t('recovery.goBack'),
               onPress: handlers.goBack,
               testID: 'recovery-go-back',
             }
@@ -288,7 +271,7 @@ export function recoveryActions(
       return {
         primary: handlers.signOut
           ? {
-              label: 'Sign Out',
+              label: i18next.t('recovery.signOut'),
               onPress: handlers.signOut,
               testID: 'recovery-sign-out',
             }
@@ -318,7 +301,11 @@ export function recoveryActions(
 export function classifyApiError(error: unknown): FormattedApiError {
   // 1. Typed NetworkError — thrown by customFetch on fetch rejection
   if (isNetworkError(error)) {
-    return { message: NETWORK_MESSAGE, category: 'network', recovery: 'retry' };
+    return {
+      message: NETWORK_MESSAGE(),
+      category: 'network',
+      recovery: 'retry',
+    };
   }
 
   // 1b. Legacy TypeError from native fetch (raw fetch calls outside customFetch)
@@ -326,7 +313,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
     const msg = error.message.toLowerCase();
     if (msg.includes('fetch') || msg.includes('network')) {
       return {
-        message: NETWORK_MESSAGE,
+        message: NETWORK_MESSAGE(),
         category: 'network',
         recovery: 'retry',
       };
@@ -356,8 +343,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
     return {
       category: 'server' as const,
       message:
-        friendlyMessage(error.message) ??
-        'Something went wrong on our end. Please try again.',
+        friendlyMessage(error.message) ?? i18next.t('errors.serverError'),
       recovery: 'retry' as const,
     };
   }
@@ -365,8 +351,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
   // Typed 404 — NotFoundError from api-client.ts
   if (isNotFoundError(error)) {
     return {
-      message:
-        friendlyMessage(error.message) ?? 'That page or item no longer exists.',
+      message: friendlyMessage(error.message) ?? i18next.t('errors.notFound'),
       category: 'not-found',
       recovery: 'go-back',
     };
@@ -376,8 +361,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
   if (isResourceGoneError(error)) {
     return {
       message:
-        friendlyMessage(error.message) ??
-        'This resource is no longer available.',
+        friendlyMessage(error.message) ?? i18next.t('errors.resourceGone'),
       category: 'not-found',
       recovery: 'go-back',
     };
@@ -387,8 +371,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
   if (isRateLimitedError(error)) {
     return {
       message:
-        friendlyMessage(error.message) ??
-        "You've hit the limit. Wait a moment and try again.",
+        friendlyMessage(error.message) ?? i18next.t('errors.rateLimited'),
       category: 'quota',
       recovery: 'retry',
     };
@@ -409,7 +392,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
     return {
       message: passThrough
         ? friendlyMessage(msg) ?? msg
-        : "That didn't work. Please check your input and try again.",
+        : i18next.t('errors.badRequest'),
       category: 'unknown',
       recovery: 'retry',
     };
@@ -438,7 +421,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
     return {
       message:
         friendlyMessage(error.message) ??
-        (error.message || 'You do not have permission to view this.'),
+        (error.message || i18next.t('errors.forbidden')),
       category: 'auth',
       recovery: 'sign-out',
     };
@@ -458,7 +441,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
     // 3. Typed error codes
     if (effectiveCode === 'EXCHANGE_LIMIT_EXCEEDED') {
       return {
-        message: 'Session limit reached. Start a new session to keep going.',
+        message: i18next.t('errors.sessionLimitReached'),
         category: 'quota',
         recovery: 'go-back',
       };
@@ -474,13 +457,17 @@ export function classifyApiError(error: unknown): FormattedApiError {
       effectiveCode === 'UPSTREAM_ERROR' ||
       effectiveCode === 'INTERNAL_ERROR'
     ) {
-      return { message: SERVER_MESSAGE, category: 'server', recovery: 'retry' };
+      return {
+        message: SERVER_MESSAGE(),
+        category: 'server',
+        recovery: 'retry',
+      };
     }
 
     // 3b. SSE timeout
     if (msgLower.includes('timed out while waiting for a reply')) {
       return {
-        message: 'That reply took too long. Tap reconnect to try again.',
+        message: i18next.t('errors.timedOut'),
         category: 'network',
         recovery: 'retry',
       };
@@ -495,7 +482,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
 
       if (code === 'EXCHANGE_LIMIT_EXCEEDED') {
         return {
-          message: 'Session limit reached. Start a new session to keep going.',
+          message: i18next.t('errors.sessionLimitReached'),
           category: 'quota',
           recovery: 'go-back',
         };
@@ -505,7 +492,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
         const userMsg =
           apiMessage && apiMessage.length < 200
             ? friendlyMessage(apiMessage) ?? apiMessage
-            : 'This subject is paused or archived. Resume it before starting a session.';
+            : i18next.t('friendlyErrors.subjectPaused');
         return { message: userMsg, category: 'not-found', recovery: 'go-back' };
       }
 
@@ -513,7 +500,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
         const userMsg =
           apiMessage && apiMessage.length < 200
             ? friendlyMessage(apiMessage) ?? apiMessage
-            : 'You do not have permission to view this.';
+            : i18next.t('errors.forbidden');
         return { message: userMsg, category: 'auth', recovery: 'sign-out' };
       }
 
@@ -521,7 +508,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
         const userMsg =
           apiMessage && apiMessage.length < 200
             ? friendlyMessage(apiMessage) ?? apiMessage
-            : 'That page or item no longer exists.';
+            : i18next.t('errors.notFound');
         return { message: userMsg, category: 'not-found', recovery: 'go-back' };
       }
 
@@ -529,7 +516,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
         const userMsg =
           apiMessage && apiMessage.length < 200
             ? friendlyMessage(apiMessage) ?? apiMessage
-            : "You've hit the limit. Wait a moment and try again.";
+            : i18next.t('errors.rateLimited');
         return { message: userMsg, category: 'quota', recovery: 'retry' };
       }
 
@@ -542,7 +529,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
         return {
           message: hasUsefulMsg
             ? friendlyMessage(apiMessage) ?? apiMessage
-            : SERVER_MESSAGE,
+            : SERVER_MESSAGE(),
           category: 'server',
           recovery: 'retry',
         };
@@ -557,7 +544,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
         };
       }
       return {
-        message: "That didn't work. Please check your input and try again.",
+        message: i18next.t('errors.badRequest'),
         category: 'unknown',
         recovery: 'retry',
       };
@@ -566,7 +553,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
     // 5. Network keyword heuristics on the raw message
     if (isNetworkRelated(msgLower)) {
       return {
-        message: NETWORK_MESSAGE,
+        message: NETWORK_MESSAGE(),
         category: 'network',
         recovery: 'retry',
       };
@@ -590,7 +577,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
   }
 
   // 7. Fallback for null / undefined / non-Error values
-  return { message: DEFAULT_MESSAGE, category: 'unknown', recovery: 'retry' };
+  return { message: DEFAULT_MESSAGE(), category: 'unknown', recovery: 'retry' };
 }
 
 /**

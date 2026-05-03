@@ -1087,6 +1087,7 @@ export default function SignInScreen() {
     <KeyboardAvoidingView
       className="flex-1 bg-background items-center"
       behavior="padding"
+      testID="sign-in-screen"
     >
       <ScrollView
         ref={scrollRef}
@@ -1103,6 +1104,7 @@ export default function SignInScreen() {
         }}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
+        testID="sign-in-scroll"
       >
         <View className="items-center mt-2 mb-1">
           <MentomateLogo size="sm" />

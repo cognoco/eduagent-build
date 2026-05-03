@@ -504,7 +504,7 @@ describe('LearnerScreen', () => {
     });
   });
 
-  it('navigates to session when subject card is tapped', async () => {
+  it('navigates to subject progress overview when subject card is tapped', async () => {
     mockFetch.setRoute('/subjects', {
       subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
     });
@@ -514,17 +514,12 @@ describe('LearnerScreen', () => {
     await waitFor(() => screen.getByTestId('home-subject-card-sub-1'));
     fireEvent.press(screen.getByTestId('home-subject-card-sub-1'));
     expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(app)/session',
-      params: {
-        subjectId: 'sub-1',
-        subjectName: 'Math',
-        mode: 'learning',
-        ...HOME_RETURN_PARAMS,
-      },
+      pathname: '/(app)/progress/[subjectId]',
+      params: { subjectId: 'sub-1' },
     });
   });
 
-  it('navigates to shelf when subject card is tapped in proxy mode', async () => {
+  it('navigates to subject progress overview when subject card is tapped in proxy mode', async () => {
     mockFetch.setRoute('/subjects', {
       subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
     });
@@ -548,7 +543,7 @@ describe('LearnerScreen', () => {
     await waitFor(() => screen.getByTestId('home-subject-card-sub-1'));
     fireEvent.press(screen.getByTestId('home-subject-card-sub-1'));
     expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(app)/shelf/[subjectId]',
+      pathname: '/(app)/progress/[subjectId]',
       params: { subjectId: 'sub-1' },
     });
   });

@@ -46,6 +46,16 @@ import { ACCOMMODATION_OPTIONS } from '../../lib/accommodation-options';
 import { formatApiError } from '../../lib/format-api-error';
 import { track } from '../../lib/analytics';
 import { FAMILY_HOME_PATH } from '../../lib/navigation';
+import { useTranslation } from 'react-i18next';
+import { FEATURE_FLAGS } from '../../lib/feature-flags';
+import i18next, {
+  SUPPORTED_LANGUAGES,
+  LANGUAGE_LABELS,
+  setStoredLanguage,
+  type SupportedLanguage,
+} from '../../i18n';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { useThemeColors } from '../../lib/theme';
 
 function SettingsRow({
   label,
@@ -84,20 +94,26 @@ function ToggleRow({
   value,
   onToggle,
   disabled,
+  testID,
 }: {
   label: string;
   value: boolean;
   onToggle: (v: boolean) => void;
   disabled?: boolean;
+  testID?: string;
 }) {
   return (
-    <View className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3 mb-2">
+    <View
+      className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3 mb-2"
+      testID={testID}
+    >
       <Text className="text-body text-text-primary">{label}</Text>
       <Switch
         value={value}
         onValueChange={onToggle}
         disabled={disabled}
         accessibilityLabel={label}
+        testID={testID ? `${testID}-switch` : undefined}
       />
     </View>
   );
@@ -182,6 +198,7 @@ function LearningModeOption({
 export default function MoreScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const themeColors = useThemeColors();
   const { signOut } = useAuth();
   const { user } = useUser();
   const { activeProfile, profiles } = useProfile();
@@ -219,6 +236,16 @@ export default function MoreScreen() {
   const { data: learnerProfile } = useLearnerProfile();
   const updateAccommodation = useUpdateAccommodationMode();
   const { openFeedback } = useFeedbackContext();
+  const { t } = useTranslation();
+
+  const [showLanguagePicker, setShowLanguagePicker] = useState(false);
+  const currentLanguage = i18next.language as SupportedLanguage;
+
+  const handleLanguageChange = useCallback(async (lang: SupportedLanguage) => {
+    await setStoredLanguage(lang);
+    await i18next.changeLanguage(lang);
+    setShowLanguagePicker(false);
+  }, []);
 
   const pushEnabled = notifPrefs?.pushEnabled ?? false;
   const weeklyDigest = notifPrefs?.weeklyProgressPush ?? false;
@@ -520,12 +547,16 @@ export default function MoreScreen() {
         {/* 3. What My Mentor Knows — shown after learning prefs, hidden for new learners */}
         {!hideMentorMemory ? (
           <>
-            <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6">
+            <Text
+              className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6"
+              testID="mentor-memory-section-header"
+            >
               What your mentor knows
             </Text>
             <SettingsRow
               label="View & manage"
               onPress={() => router.push('/(app)/mentor-memory')}
+              testID="mentor-memory-link"
             />
           </>
         ) : null}
@@ -565,7 +596,10 @@ export default function MoreScreen() {
         )}
 
         {/* 5. Celebrations */}
-        <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6">
+        <Text
+          className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6"
+          testID="celebrations-section-header"
+        >
           Your celebrations
         </Text>
         <LearningModeOption
@@ -618,7 +652,10 @@ export default function MoreScreen() {
         />
 
         {/* 6. Notifications */}
-        <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6">
+        <Text
+          className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6"
+          testID="notifications-section-header"
+        >
           Notifications
         </Text>
         <ToggleRow
@@ -626,12 +663,14 @@ export default function MoreScreen() {
           value={pushEnabled}
           onToggle={handleTogglePush}
           disabled={notifLoading || updateNotifications.isPending}
+          testID="push-notifications-toggle"
         />
         <ToggleRow
           label="Weekly progress digest"
           value={weeklyDigest}
           onToggle={handleToggleDigest}
           disabled={notifLoading || updateNotifications.isPending}
+          testID="weekly-digest-toggle"
         />
 
         {/* 7. Account — identity, language, subscription only */}
@@ -661,6 +700,49 @@ export default function MoreScreen() {
             })
           }
         />
+        {FEATURE_FLAGS.I18N_ENABLED && (
+          <SettingsRow
+            label={t('settings.appLanguage')}
+            value={LANGUAGE_LABELS[currentLanguage]?.native}
+            onPress={() => setShowLanguagePicker(true)}
+            testID="settings-app-language"
+          />
+        )}
+        {FEATURE_FLAGS.I18N_ENABLED && showLanguagePicker && (
+          <View className="mt-4">
+            <Text className="text-body-sm font-semibold text-text-secondary mb-2 uppercase tracking-wider">
+              {t('settings.appLanguage')}
+            </Text>
+            {SUPPORTED_LANGUAGES.map((lang) => (
+              <Pressable
+                key={lang}
+                onPress={() => handleLanguageChange(lang)}
+                className={`flex-row items-center justify-between p-4 rounded-xl mb-2 ${
+                  lang === currentLanguage
+                    ? 'bg-primary/10 border border-primary'
+                    : 'bg-surface'
+                }`}
+                testID={`language-option-${lang}`}
+              >
+                <View>
+                  <Text className="text-body font-medium text-text-primary">
+                    {LANGUAGE_LABELS[lang].native}
+                  </Text>
+                  <Text className="text-body-sm text-text-secondary">
+                    {LANGUAGE_LABELS[lang].english}
+                  </Text>
+                </View>
+                {lang === currentLanguage && (
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={24}
+                    color={themeColors.primary}
+                  />
+                )}
+              </Pressable>
+            ))}
+          </View>
+        )}
         {/* [BUG-915] Hide Subscription in impersonation — billing is the
             parent account's, not the child profile's. */}
         {!isImpersonating && (

@@ -14,6 +14,18 @@ import {
   ResourceGoneError,
   UpstreamError,
 } from './api-errors';
+import { ensureI18nReady } from '../i18n';
+
+// format-api-error.ts resolves messages via i18next.t(). The i18n module's
+// init() returns a promise; without awaiting it here, jest reports
+// "worker failed to exit gracefully" because the init promise is still
+// open when the test file finishes. The English copy asserted below is
+// stable across releases (en.json is the source of truth — see
+// CLAUDE.md "Tests must reflect reality"); when en.json strings change,
+// these assertions must be updated to match.
+beforeAll(async () => {
+  await ensureI18nReady();
+});
 const QUOTA_DETAILS = {
   tier: 'free' as const,
   reason: 'monthly' as const,

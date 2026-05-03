@@ -277,14 +277,18 @@ export default function LibraryScreen() {
   }, [enrichedBooks]);
 
   // ---- Total topic count for header subtitle ------------------------------
-  const totalTopicsAcrossBooks = useMemo(
-    () =>
-      Array.from(topicCountsByBookId.values()).reduce(
-        (sum, c) => sum + c.total,
-        0
-      ),
-    [topicCountsByBookId]
-  );
+  // [BUG-971] Count ALL retention topics (including those with null bookId,
+  // e.g. orphan topics or parking-lot entries) so the header subtitle matches
+  // the per-shelf totals served by progressQuery. topicCountsByBookId stays
+  // book-scoped on purpose — book rows must still exclude orphans.
+  const totalTopicsAcrossBooks = useMemo(() => {
+    let total = 0;
+    for (const ret of retentionDataBySubjectId.values()) {
+      if (!Array.isArray(ret.topics)) continue;
+      total += ret.topics.length;
+    }
+    return total;
+  }, [retentionDataBySubjectId]);
 
   // ---- Server-side search -------------------------------------------------
   const searchResult = useLibrarySearch(debouncedQuery);
@@ -439,7 +443,6 @@ export default function LibraryScreen() {
 
           return {
             bookId: b.book.id,
-            emoji: b.book.emoji ?? '📖',
             title: b.book.title,
             topicProgress,
             retentionStatus: bookRetention,
@@ -718,10 +721,6 @@ export default function LibraryScreen() {
             const topicsCompleted = progress?.topicsCompleted ?? 0;
             const topicProgress = `${topicsCompleted}/${topicsTotal}`;
 
-            // Derive shelf emoji from first book's emoji
-            const firstBookEmoji =
-              books.find((b) => b.book.emoji)?.book.emoji ?? '📚';
-
             const bookRows = buildBookRows(subject.id, debouncedQuery);
 
             return (
@@ -729,7 +728,6 @@ export default function LibraryScreen() {
                 key={subject.id}
                 subjectId={subject.id}
                 name={subject.name}
-                emoji={firstBookEmoji}
                 bookCount={bookCount}
                 topicProgress={topicProgress}
                 retentionStatus={retentionStatus}

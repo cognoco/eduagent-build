@@ -566,4 +566,84 @@ describe('LibraryScreen', () => {
       expect(backdrop.props.accessibilityLabel).toBe('Close manage subjects');
     });
   });
+
+  // -----------------------------------------------------------------------
+  // BUG-971: Header topic count must include null-bookId topics
+  // -----------------------------------------------------------------------
+  // Repro: topicCountsByBookId skips topics where bookId is null (orphan
+  // topics, parking-lot entries). totalTopicsAcrossBooks used to derive
+  // from topicCountsByBookId, so the header subtitle silently undercounted
+  // those topics — visibly drifting from per-shelf topic totals.
+  describe('Header topic count [BUG-971]', () => {
+    it('counts topics with null bookId in the header subtitle', () => {
+      mockUseSubjects.mockReturnValue({
+        data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+        isLoading: false,
+      });
+      mockUseOverallProgress.mockReturnValue({
+        data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
+        isLoading: false,
+      });
+      setLibraryRetention(testQueryClient, {
+        subjects: [
+          {
+            subjectId: 'sub-1',
+            topics: [
+              {
+                topicId: 't-1',
+                bookId: 'book-1',
+                easeFactor: 2.5,
+                repetitions: 0,
+                lastReviewedAt: null,
+                xpStatus: 'pending',
+                failureCount: 0,
+              },
+              {
+                topicId: 't-2',
+                bookId: null,
+                easeFactor: 2.5,
+                repetitions: 0,
+                lastReviewedAt: null,
+                xpStatus: 'pending',
+                failureCount: 0,
+              },
+              {
+                topicId: 't-3',
+                bookId: null,
+                easeFactor: 2.5,
+                repetitions: 0,
+                lastReviewedAt: null,
+                xpStatus: 'pending',
+                failureCount: 0,
+              },
+            ],
+            reviewDueCount: 0,
+          },
+        ],
+      });
+
+      render(<LibraryScreen />, { wrapper: TestWrapper });
+
+      // 3 topics total (1 with bookId, 2 with null bookId) must all be counted.
+      // Pre-fix this would render "1 subjects · 1 topics" (orphans dropped).
+      screen.getByText('1 subjects · 3 topics');
+    });
+
+    it('omits the topic count segment entirely when there are no topics', () => {
+      mockUseSubjects.mockReturnValue({
+        data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+        isLoading: false,
+      });
+      mockUseOverallProgress.mockReturnValue({
+        data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
+        isLoading: false,
+      });
+      setLibraryRetention(testQueryClient, { subjects: [] });
+
+      render(<LibraryScreen />, { wrapper: TestWrapper });
+
+      // Header should read just "1 subjects" with no trailing " · N topics".
+      screen.getByText('1 subjects');
+    });
+  });
 });

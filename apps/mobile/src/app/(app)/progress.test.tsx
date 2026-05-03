@@ -228,4 +228,42 @@ describe('ProgressScreen — progressive disclosure', () => {
     // No teaser and no empty state — just the loading/empty fallthrough
     expect(screen.queryByTestId('progress-new-learner-teaser')).toBeNull();
   });
+
+  // [BUG-968] When the user lands on the progress tab with at least one
+  // subject seeded, the progress index must render `journey-subject-<id>`
+  // testIDs for each subject so the Maestro nightly flow can scroll to the
+  // correct card. The flow waits up to 15s on `journey-subject-${SUBJECT_ID}`
+  // — a missing testID (e.g. dropped during a refactor or hidden behind a
+  // mid-totalSessions teaser) silently breaks the nightly run.
+  describe('journey-subject testIDs [BUG-968]', () => {
+    it('renders journey-subject-<id> for each subject in the full progress view', () => {
+      mockHooks({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
+          subjects: [fullSubject],
+        },
+      });
+      render(<ProgressScreen />);
+
+      screen.getByTestId('journey-subject-s1');
+    });
+
+    it('renders journey-subject-<id> for multiple subjects', () => {
+      const second = {
+        ...fullSubject,
+        subjectId: 's2',
+        subjectName: 'Science',
+      };
+      mockHooks({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 8, topicsMastered: 4 },
+          subjects: [fullSubject, second],
+        },
+      });
+      render(<ProgressScreen />);
+
+      screen.getByTestId('journey-subject-s1');
+      screen.getByTestId('journey-subject-s2');
+    });
+  });
 });

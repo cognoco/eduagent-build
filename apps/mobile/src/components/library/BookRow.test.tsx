@@ -24,7 +24,6 @@ jest.mock('../../lib/theme', () => ({
 
 const defaultProps = {
   bookId: 'book-42',
-  emoji: '📘',
   title: 'Algebra Basics',
   topicProgress: '5/8',
   retentionStatus: 'strong' as const,
@@ -47,9 +46,9 @@ describe('BookRow', () => {
     screen.getByText('5/8 topics');
   });
 
-  it('renders emoji', () => {
+  it('renders the tinted book icon tile', () => {
     render(<BookRow {...defaultProps} />);
-    screen.getByText('📘');
+    screen.getByTestId('book-row-icon-book-42');
   });
 
   it('calls onPress with bookId when pressed', () => {
@@ -62,24 +61,40 @@ describe('BookRow', () => {
     expect(onPress).toHaveBeenCalledWith('book-42');
   });
 
-  it('shows RetentionPill when retentionStatus is provided', () => {
+  it('renders Review pill when retentionStatus is weak', () => {
+    render(<BookRow {...defaultProps} retentionStatus="weak" />);
+    screen.getByTestId('book-row-review-book-42');
+    screen.getByText('Review');
+  });
+
+  it('renders Review pill when retentionStatus is forgotten', () => {
+    render(<BookRow {...defaultProps} retentionStatus="forgotten" />);
+    screen.getByTestId('book-row-review-book-42');
+  });
+
+  it('does not render Review pill when retentionStatus is strong', () => {
     render(<BookRow {...defaultProps} retentionStatus="strong" />);
-    // RetentionPill renders a dot in small size
-    expect(screen.getByTestId('retention-pill-dot')).toBeTruthy();
+    expect(screen.queryByTestId('book-row-review-book-42')).toBeNull();
+    expect(screen.queryByText('Review')).toBeNull();
+  });
+
+  it('does not render Review pill when retentionStatus is fading', () => {
+    render(<BookRow {...defaultProps} retentionStatus="fading" />);
+    expect(screen.queryByTestId('book-row-review-book-42')).toBeNull();
   });
 
   it('shows "not started" text when retentionStatus is null', () => {
     render(<BookRow {...defaultProps} retentionStatus={null} />);
     screen.getByText('not started');
-    expect(screen.queryByTestId('retention-pill-dot')).toBeNull();
+    expect(screen.queryByTestId('book-row-review-book-42')).toBeNull();
   });
 
-  it('shows notes emoji when hasNotes is true', () => {
+  it('shows notes indicator when hasNotes is true', () => {
     render(<BookRow {...defaultProps} hasNotes={true} />);
     screen.getByLabelText('Has notes');
   });
 
-  it('hides notes emoji when hasNotes is false', () => {
+  it('hides notes indicator when hasNotes is false', () => {
     render(<BookRow {...defaultProps} hasNotes={false} />);
     expect(screen.queryByLabelText('Has notes')).toBeNull();
   });

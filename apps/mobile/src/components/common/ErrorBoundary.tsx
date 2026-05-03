@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { ErrorFallback } from './ErrorFallback';
 import { Sentry } from '../../lib/sentry';
 
@@ -30,19 +31,20 @@ function ErrorFallbackView({
   onRetry: () => void;
   onGoHome: () => void;
 }): React.ReactElement {
+  const { t } = useTranslation();
   const router = useRouter();
   return (
     <ErrorFallback
       variant="centered"
-      title="Something went wrong"
-      message="An unexpected error occurred. You can try again or go back to the home screen."
+      title={t('errorBoundary.title')}
+      message={t('errorBoundary.message')}
       primaryAction={{
-        label: 'Try Again',
+        label: t('recovery.tryAgain'),
         onPress: onRetry,
         testID: 'error-boundary-retry',
       }}
       secondaryAction={{
-        label: 'Go Home',
+        label: t('recovery.goHome'),
         onPress: () => {
           // Reset the boundary BEFORE navigating — otherwise hasError stays
           // true and the fallback renders over whatever Home resolves to,

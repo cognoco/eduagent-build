@@ -925,8 +925,14 @@ export function ChatShell({
                 />
               </View>
             ) : (
+              // [BUG-965] When voice mode is OFF, this is the *enable-voice*
+              // affordance, not a record button. Long-press flips voice ON
+              // and starts recording. It must NOT share testID="voice-record-
+              // button" with the on-state mic — otherwise E2E `assertNotVisible:
+              // voice-record-button` fails when voice is off, and consumers
+              // can't distinguish the two states. Use a distinct testID.
               <Pressable
-                testID="voice-record-button"
+                testID="voice-enable-button"
                 onPress={handleVoicePress}
                 onLongPress={() => {
                   setIsVoiceEnabled(true);
@@ -936,7 +942,7 @@ export function ChatShell({
                   isStreaming || speechStatus === 'requesting_permission'
                 }
                 className="w-9 h-9 rounded-full bg-surface-elevated items-center justify-center me-2"
-                accessibilityLabel="Record voice message"
+                accessibilityLabel="Enable voice message"
                 accessibilityRole="button"
               >
                 <Ionicons

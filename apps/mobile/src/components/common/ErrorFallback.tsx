@@ -1,4 +1,5 @@
 import { Pressable, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 interface ErrorFallbackAction {
   label: string;
@@ -27,13 +28,16 @@ interface ErrorFallbackProps {
 }
 
 export function ErrorFallback({
-  title = 'Something went wrong',
-  message = 'An unexpected error occurred.',
+  title,
+  message,
   primaryAction,
   secondaryAction,
   variant = 'card',
   testID,
 }: ErrorFallbackProps): React.ReactElement {
+  const { t } = useTranslation();
+  const resolvedTitle = title ?? t('errorBoundary.title');
+  const resolvedMessage = message ?? t('errors.generic');
   const isCard = variant === 'card';
 
   return (
@@ -52,7 +56,7 @@ export function ErrorFallback({
             : 'text-h3 font-semibold text-text-primary text-center mb-2'
         }
       >
-        {title}
+        {resolvedTitle}
       </Text>
       <Text
         className={
@@ -61,7 +65,7 @@ export function ErrorFallback({
             : 'text-body text-text-secondary text-center mb-6'
         }
       >
-        {message}
+        {resolvedMessage}
       </Text>
       {(primaryAction || secondaryAction) && (
         <View className={isCard ? 'flex-row gap-3 mt-4' : 'flex-row gap-3'}>

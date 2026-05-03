@@ -1,14 +1,12 @@
 import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { RetentionStatus } from '@eduagent/schemas';
-import { useThemeColors } from '../../lib/theme';
-import { RetentionPill } from './RetentionPill';
+import { useSubjectTint, useThemeColors } from '../../lib/theme';
 import { BookRow, type BookRowData } from './BookRow';
 
 interface ShelfRowProps {
   subjectId: string;
   name: string;
-  emoji: string;
   bookCount: number;
   topicProgress: string; // "18/32"
   retentionStatus: RetentionStatus | null;
@@ -22,7 +20,6 @@ interface ShelfRowProps {
 export function ShelfRow({
   subjectId,
   name,
-  emoji,
   bookCount,
   topicProgress,
   retentionStatus,
@@ -33,10 +30,14 @@ export function ShelfRow({
   onBookPress,
 }: ShelfRowProps): React.ReactElement {
   const colors = useThemeColors();
+  const tint = useSubjectTint(subjectId);
 
   const subtitle = `${bookCount} ${
     bookCount === 1 ? 'book' : 'books'
   } · ${topicProgress} topics`;
+
+  const needsReview =
+    retentionStatus === 'weak' || retentionStatus === 'forgotten';
 
   return (
     <View style={{ opacity: isPaused ? 0.65 : 1 }}>
@@ -47,7 +48,9 @@ export function ShelfRow({
         accessibilityRole="button"
         accessibilityLabel={`${name} shelf, ${subtitle}${
           isPaused ? ', paused' : ''
-        }. Tap to ${expanded ? 'collapse' : 'expand'}.`}
+        }${needsReview ? ', review needed' : ''}. Tap to ${
+          expanded ? 'collapse' : 'expand'
+        }.`}
         style={{
           flexDirection: 'row',
           alignItems: 'center',
@@ -56,18 +59,19 @@ export function ShelfRow({
           gap: 12,
         }}
       >
-        {/* Emoji square */}
+        {/* Tinted icon tile — Ionicons "library" in subject's tint color */}
         <View
+          testID={`shelf-row-icon-${subjectId}`}
           style={{
             width: 40,
             height: 40,
-            borderRadius: 8,
-            backgroundColor: colors.surfaceElevated,
+            borderRadius: 12,
+            backgroundColor: tint.soft,
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <Text style={{ fontSize: 22 }}>{emoji}</Text>
+          <Ionicons name="library" size={22} color={tint.solid} />
         </View>
 
         {/* Name + subtitle */}
@@ -90,7 +94,7 @@ export function ShelfRow({
           </Text>
         </View>
 
-        {/* Right side: paused chip + retention + chevron */}
+        {/* Right side: paused chip + review pill + chevron */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           {isPaused ? (
             <View
@@ -114,8 +118,34 @@ export function ShelfRow({
             </View>
           ) : null}
 
-          {retentionStatus !== null ? (
-            <RetentionPill status={retentionStatus} size="small" />
+          {needsReview ? (
+            <View
+              testID={`shelf-row-review-${subjectId}`}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 3,
+                paddingHorizontal: 8,
+                paddingVertical: 2,
+                borderRadius: 10,
+                backgroundColor: colors.retentionWeak + '22',
+              }}
+            >
+              <Ionicons
+                name="alert-circle"
+                size={12}
+                color={colors.retentionWeak}
+              />
+              <Text
+                style={{
+                  fontSize: 11,
+                  fontWeight: '600',
+                  color: colors.retentionWeak,
+                }}
+              >
+                Review
+              </Text>
+            </View>
           ) : null}
 
           <Ionicons
@@ -146,6 +176,7 @@ export function ShelfRow({
               <BookRow
                 key={book.bookId}
                 {...book}
+                tint={tint}
                 onPress={(bookId) => onBookPress(subjectId, bookId)}
               />
             ))

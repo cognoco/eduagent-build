@@ -447,20 +447,10 @@ export function LearnerScreen({
                     {...card}
                     testID={`home-subject-card-${card.subjectId}`}
                     onPress={() =>
-                      isParentProxy
-                        ? router.push({
-                            pathname: '/(app)/shelf/[subjectId]',
-                            params: { subjectId: card.subjectId },
-                          } as never)
-                        : router.push({
-                            pathname: '/(app)/session',
-                            params: {
-                              subjectId: card.subjectId,
-                              subjectName: card.name,
-                              mode: 'learning',
-                              ...HOME_RETURN_PARAMS,
-                            },
-                          } as never)
+                      router.push({
+                        pathname: '/(app)/progress/[subjectId]',
+                        params: { subjectId: card.subjectId },
+                      } as never)
                     }
                   />
                 ))}

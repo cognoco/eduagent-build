@@ -1,4 +1,5 @@
 import '../../global.css';
+import { ensureI18nReady } from '../i18n';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Platform,
@@ -428,6 +429,21 @@ export default function RootLayout() {
     ...Ionicons.font,
   });
 
+  // i18n init pattern (b): folded into the existing fontsLoaded readiness
+  // gate. Native splash (preventAutoHideAsync) stays visible until both
+  // fonts and i18n resolve. Awaiting i18n eliminates flash-of-English for
+  // non-English users; ensureI18nReady() is local AsyncStorage so cost is ~ms.
+  const [i18nReady, setI18nReady] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    ensureI18nReady().then(() => {
+      if (!cancelled) setI18nReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Splash stays visible until BOTH conditions are met:
   //   1. The animated splash sequence has completed (or timed out)
   //   2. Clerk has finished initializing (app content is ready to render)
@@ -492,7 +508,7 @@ export default function RootLayout() {
   }, [clerkReady]);
 
   useEffect(() => {
-    if (fontsLoaded) {
+    if (fontsLoaded && i18nReady) {
       // Hide native splash — the AnimatedSplash component takes over
       SplashScreen.hideAsync();
       // [BUG-954] Fire-and-forget drift check — warns in console if the
@@ -503,9 +519,9 @@ export default function RootLayout() {
         );
       }
     }
-  }, [fontsLoaded]);
+  }, [fontsLoaded, i18nReady]);
 
-  if (!fontsLoaded) return null;
+  if (!fontsLoaded || !i18nReady) return null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

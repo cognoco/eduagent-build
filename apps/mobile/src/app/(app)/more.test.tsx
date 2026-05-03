@@ -434,6 +434,29 @@ describe('MoreScreen — Learning Mode', () => {
     screen.getByText('Other');
   });
 
+  // [BUG-960 / BUG-961 / BUG-962] These testIDs are load-bearing for the
+  // Maestro suites (more-tab-navigation, settings-toggles, learner-mentor-
+  // memory). E2E text-search regressed earlier because section headers were
+  // renamed (e.g. "Celebrations" → "Your celebrations"). Locking the testIDs
+  // here makes any future rename surface as a unit-test failure before E2E
+  // runs nightly.
+  it('exposes stable testIDs on section headers and toggle rows for E2E', () => {
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    // Section headers used by Maestro scrollUntilVisible.
+    screen.getByTestId('learning-mode-section-header');
+    screen.getByTestId('learning-accommodation-section-header');
+    screen.getByTestId('celebrations-section-header');
+    screen.getByTestId('notifications-section-header');
+
+    // Notification toggles tapped by the settings-toggles flow.
+    screen.getByTestId('push-notifications-toggle');
+    screen.getByTestId('weekly-digest-toggle');
+
+    // Sign-out button at bottom of scroll — must remain reachable.
+    screen.getByTestId('sign-out-button');
+  });
+
   it('renders celebration level options', () => {
     render(<MoreScreen />, { wrapper: createWrapper() });
 

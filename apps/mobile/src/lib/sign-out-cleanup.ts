@@ -58,6 +58,16 @@ export const PER_PROFILE_KEYS: ReadonlyArray<(profileId: string) => string> = [
   (id) => sanitizeSecureStoreKey(`accentPreset_${id}`),
 ];
 
+// AsyncStorage keys cleared at sign-out (account-scoped, not device-scoped).
+// Distinct from SecureStore GLOBAL_KEYS below. Each entry must include a
+// comment justifying why it is per-account vs. device-level.
+//
+// app-ui-language: device preference, preserved across sign-out
+// i18n-auto-suggest-dismissed: per-user, cleared on sign-out
+export const GLOBAL_ASYNCSTORAGE_KEYS: ReadonlyArray<string> = [
+  'i18n-auto-suggest-dismissed',
+];
+
 // Global keys that should reset when no one is signed in. Excludes onboarding
 // flags that legitimately survive sign-out cycles (e.g., a user who signs out
 // to switch accounts on the same device should not be prompted to re-onboard).
@@ -186,6 +196,11 @@ export async function clearProfileSecureStorageOnSignOut(
     outboxKeys.length > 0
       ? AsyncStorage.multiRemove(outboxKeys).catch(() => {
           // Per-key failure is non-fatal — same policy as SecureStore deletes above.
+        })
+      : Promise.resolve(),
+    GLOBAL_ASYNCSTORAGE_KEYS.length > 0
+      ? AsyncStorage.multiRemove([...GLOBAL_ASYNCSTORAGE_KEYS]).catch(() => {
+          // Per-key failure is non-fatal — same policy as outbox + SecureStore.
         })
       : Promise.resolve(),
   ]);

@@ -66,6 +66,16 @@ describe('SignUpScreen', () => {
     screen.getByText('or continue with email');
   });
 
+  // [BUG-959] sign-up-button sits below the fold on 1080x1920 once the
+  // logo + SSO + form fields stack up. The Maestro suite needs an
+  // always-above-fold container testID for screen-loaded waits.
+  it('exposes screen + scroll testIDs for Maestro screen-loaded waits', () => {
+    render(<SignUpScreen />);
+
+    screen.getByTestId('sign-up-screen');
+    screen.getByTestId('sign-up-scroll');
+  });
+
   it('renders OpenAI SSO when configured', () => {
     process.env.EXPO_PUBLIC_CLERK_OPENAI_SSO_KEY = 'openai';
 
