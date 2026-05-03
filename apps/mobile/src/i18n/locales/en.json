@@ -1,6 +1,7 @@
 {
   "common": {
     "cancel": "Cancel",
+    "ok": "OK",
     "save": "Save",
     "done": "Done",
     "loading": "Loading...",
@@ -71,7 +72,9 @@
   },
   "settings": {
     "appLanguage": "App Language",
-    "appLanguageDescription": "Change the language of the app interface"
+    "appLanguageDescription": "Change the language of the app interface",
+    "languageChangeFailedTitle": "Couldn't change language",
+    "languageChangeFailedMessage": "We couldn't switch the app language. Please try again."
   },
   "friendlyErrors": {
     "notLanguageLearning": "This subject isn't set up for language learning. Try the standard learning path instead.",
@@ -592,9 +595,11 @@
       "continueWithoutSaving": "Continue without saving",
       "noDataFound": "Review data not found.",
       "perfect": "Perfect!",
-      "fixedAll": "You fixed all {{count}} {{count, plural, one{mistake} other{mistakes}}}!",
+      "fixedAll_one": "You fixed all {{count}} mistake!",
+      "fixedAll_other": "You fixed all {{count}} mistakes!",
       "scoreLabel": "{{correct}} of {{total}} sentences correct",
-      "mistakesFound": "{{count}} {{count, plural, one{mistake} other{mistakes}}} found",
+      "mistakesFound_one": "{{count}} mistake found",
+      "mistakesFound_other": "{{count}} mistakes found",
       "correctionProgress": "Correction {{current}} of {{total}}",
       "original": "Original",
       "youWrote": "You wrote",
@@ -666,6 +671,24 @@
       "resume": "Resume",
       "restore": "Restore",
       "updateErrorTitle": "Could not update subject"
+    },
+    "row": {
+      "review": "Review",
+      "notStarted": "not started",
+      "paused": "Paused",
+      "hasNotes": "Has notes",
+      "bookTopics": "{{progress}} topics",
+      "shelfSubtitle_one": "{{count}} book · {{progress}} topics",
+      "shelfSubtitle_other": "{{count}} books · {{progress}} topics",
+      "shelfEmpty": "No books in this subject yet. Study a topic and it'll be filed here.",
+      "bookAccessibilityLabel": "{{title}}, {{progress}} topics{{retentionSuffix}}{{notesSuffix}}",
+      "bookRetentionSuffix": ", retention {{status}}",
+      "bookNotesSuffix": ", has notes",
+      "shelfAccessibilityLabel": "{{name}} shelf, {{subtitle}}{{pausedSuffix}}{{reviewSuffix}}. Tap to {{action}}.",
+      "shelfPausedSuffix": ", paused",
+      "shelfReviewSuffix": ", review needed",
+      "shelfActionExpand": "expand",
+      "shelfActionCollapse": "collapse"
     },
     "shelf": {
       "missingParam": "Missing subject. Please go back and try again.",
@@ -941,7 +964,9 @@
     "continueArrow": "Continue →",
     "tryCameraAgain": "Try camera again",
     "tryCameraAgainLabel": "Try camera again",
-    "tryReadingAgainLabel": "Try reading again"
+    "tryReadingAgainLabel": "Try reading again",
+    "classifyErrorTitle": "Could not identify the subject",
+    "classifyErrorMessage": "Please pick the subject this homework belongs to."
   },
   "progress": {
     "pageTitle": "My Learning Journey",
