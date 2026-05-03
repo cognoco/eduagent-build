@@ -91,4 +91,109 @@ export default [
       ],
     },
   },
+  // -------------------------------------------------------------------------
+  // Governance Rule 1 — drizzle-orm primitives must not be imported in API
+  // route files. Routes keep handlers inline for RPC inference but business
+  // logic and DB access belong in services/* via createScopedRepository.
+  // See CLAUDE.md > Non-Negotiable Engineering Rules.
+  // -------------------------------------------------------------------------
+  {
+    files: ['apps/api/src/routes/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'drizzle-orm',
+              message:
+                'Route files must not import drizzle-orm primitives. Move DB access to services/* and use createScopedRepository(profileId). See CLAUDE.md.',
+            },
+          ],
+          patterns: [
+            {
+              group: ['drizzle-orm/*'],
+              message:
+                'Route files must not import drizzle-orm primitives. Move DB access to services/* and use createScopedRepository(profileId). See CLAUDE.md.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  // -------------------------------------------------------------------------
+  // Governance Rule 3 — direct LLM provider SDK imports are restricted to
+  // the provider adapters under services/llm/providers/**. All other code
+  // must call services/llm/router.ts (or its barrel) so the router's
+  // retry/fallback/cost-metering logic stays the single chokepoint.
+  // See CLAUDE.md > Non-Negotiable Engineering Rules.
+  // -------------------------------------------------------------------------
+  {
+    files: ['apps/api/src/**/*.ts'],
+    ignores: ['apps/api/src/services/llm/providers/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@anthropic-ai/sdk',
+              message:
+                'Import the LLM router from services/llm instead. Direct SDK imports are only allowed in services/llm/providers/**.',
+            },
+            {
+              name: 'openai',
+              message:
+                'Import the LLM router from services/llm instead. Direct SDK imports are only allowed in services/llm/providers/**.',
+            },
+            {
+              name: '@google-ai/generativelanguage',
+              message:
+                'Import the LLM router from services/llm instead. Direct SDK imports are only allowed in services/llm/providers/**.',
+            },
+            {
+              name: '@google/generative-ai',
+              message:
+                'Import the LLM router from services/llm instead. Direct SDK imports are only allowed in services/llm/providers/**.',
+            },
+            {
+              name: '@google/genai',
+              message:
+                'Import the LLM router from services/llm instead. Direct SDK imports are only allowed in services/llm/providers/**.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  // -------------------------------------------------------------------------
+  // Governance Rule 4 — raw process.env reads are banned in API production
+  // code. Use the typed config object in apps/api/src/config.ts. The
+  // env-validation middleware and the test-only fallbacks in middleware/llm
+  // and inngest/helpers are explicitly allow-listed below.
+  // See CLAUDE.md > Repo-Specific Guardrails.
+  // -------------------------------------------------------------------------
+  {
+    files: ['apps/api/src/**/*.ts'],
+    ignores: [
+      'apps/api/src/config.ts',
+      'apps/api/src/middleware/env-validation.ts',
+      'apps/api/src/middleware/llm.ts',
+      'apps/api/src/inngest/helpers.ts',
+      'apps/api/src/**/*.test.ts',
+      'apps/api/src/**/*.spec.ts',
+      'apps/api/src/**/*.integration.test.ts',
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "MemberExpression[object.name='process'][property.name='env']",
+          message:
+            'Use the typed config object from apps/api/src/config.ts instead of raw process.env. See CLAUDE.md.',
+        },
+      ],
+    },
+  },
 ];

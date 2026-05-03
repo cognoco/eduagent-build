@@ -1,3 +1,18 @@
+// @inngest-admin: cross-profile
+//
+// This function is intentionally cross-profile. It is a one-shot ops sweep
+// that scans all learning sessions created in the last 14 days whose filing
+// status is stranded (completed/auto-closed but never filed), then dispatches
+// synthetic filing-timed-out events to recover them. Profile-scoping rules in
+// CLAUDE.md ("Reads must use createScopedRepository") do NOT apply here —
+// this is system-wide maintenance work running outside any single profile's
+// request context.
+//
+// If you add raw drizzle queries to this file, ensure they cannot leak
+// data between profiles in user-visible output (notifications,
+// recommendations). When in doubt, scope by profileId at the leaf even
+// when scanning broadly.
+
 import { and, asc, eq, gt, gte, inArray, isNull, or } from 'drizzle-orm';
 import { learningSessions } from '@eduagent/database';
 import { filingTimedOutEventSchema } from '@eduagent/schemas';

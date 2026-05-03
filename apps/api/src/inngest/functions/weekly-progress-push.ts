@@ -1,3 +1,22 @@
+// @inngest-admin: cross-profile
+//
+// This file is intentionally cross-profile. It contains two exports:
+//   - `weeklyProgressPushCron` (admin): cron entry that scans all parent
+//     profiles with weekly-push enabled whose local time is 09:00, then fans
+//     out per-parent generate events. Legitimately cross-profile.
+//   - `weeklyProgressPushGenerate` (per-parent fan-out): event handler driven
+//     by `app/weekly-progress-push.generate`; parentId comes from the event
+//     payload and all DB reads are scoped to that parent and their children.
+//
+// Profile-scoping rules in CLAUDE.md ("Reads must use createScopedRepository")
+// do NOT apply to `weeklyProgressPushCron` — this is system-wide work running
+// outside any single profile's request context.
+//
+// If you add raw drizzle queries to this file, ensure they cannot leak
+// data between profiles in user-visible output (notifications,
+// recommendations). When in doubt, scope by profileId at the leaf even
+// when scanning broadly.
+
 import { and, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import {

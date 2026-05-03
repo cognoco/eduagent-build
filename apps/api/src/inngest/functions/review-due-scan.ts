@@ -1,3 +1,16 @@
+// @inngest-admin: cross-profile
+//
+// This function is intentionally cross-profile. It scans all profiles with
+// overdue retention cards every 2 hours to fan out review-due notifications.
+// Profile-scoping rules in CLAUDE.md ("Reads must use createScopedRepository")
+// do NOT apply here — this is system-wide work running outside any single
+// profile's request context.
+//
+// If you add raw drizzle queries to this file, ensure they cannot leak
+// data between profiles in user-visible output (notifications,
+// recommendations). When in doubt, scope by profileId at the leaf even
+// when scanning broadly.
+
 // ---------------------------------------------------------------------------
 // Review Due Scan — Cron that finds profiles with overdue retention cards
 // and fans out per-profile events for independent notification delivery.

@@ -1,3 +1,16 @@
+// @inngest-admin: cross-profile
+//
+// This function is intentionally cross-profile. It scans all profiles with
+// active streaks whose local time is ~9 AM to fan out daily reminder notifications.
+// Profile-scoping rules in CLAUDE.md ("Reads must use createScopedRepository")
+// do NOT apply here — this is system-wide work running outside any single
+// profile's request context.
+//
+// If you add raw drizzle queries to this file, ensure they cannot leak
+// data between profiles in user-visible output (notifications,
+// recommendations). When in doubt, scope by profileId at the leaf even
+// when scanning broadly.
+
 // ---------------------------------------------------------------------------
 // Daily Reminder Scan — Hourly cron that finds profiles with active streaks
 // at their local ~9 AM, then fans out per-profile events for daily nudges.
