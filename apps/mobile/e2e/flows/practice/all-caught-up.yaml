@@ -1,0 +1,69 @@
+# Flow PRACTICE-04: All-caught-up empty state
+# Validates: when totalOverdue === 0 and nextUpcomingReviewAt is set,
+#            the practice hub shows review-empty-state and review-empty-browse
+#            navigates to the library.
+# Tags: nightly, practice
+#
+# Journey: UX Journey 3 (Practice & Reinforcement)
+# Prerequisite: Seeded learner with NO overdue cards but upcoming reviews
+#               (scenario: review-empty — retention cards all future-dated)
+#
+# testIDs verified against:
+#   - apps/mobile/src/components/home/LearnerScreen.tsx (home-action-practice)
+#   - apps/mobile/src/app/(app)/practice.tsx
+#       (practice-screen, practice-review, review-empty-state, review-empty-browse)
+appId: com.mentomate.app
+tags:
+  - nightly
+  - practice
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "review-empty"
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 15000
+
+# Navigate to Practice hub
+- scrollUntilVisible:
+    element:
+      id: "home-action-practice"
+    direction: DOWN
+    timeout: 5000
+
+- tapOn:
+    id: "home-action-practice"
+
+- extendedWaitUntil:
+    visible:
+      id: "practice-screen"
+    timeout: 10000
+
+- takeScreenshot: caught-up-01-practice-hub
+
+# The review-empty-state card appears directly below practice-review
+# when totalOverdue === 0 and reviewSummary is loaded
+- extendedWaitUntil:
+    visible:
+      id: "review-empty-state"
+    timeout: 8000
+
+- assertVisible:
+    id: "review-empty-state"
+
+- takeScreenshot: caught-up-02-empty-state
+
+# Tap "Browse your topics" deep-link — should navigate to library
+- tapOn:
+    id: "review-empty-browse"
+
+- extendedWaitUntil:
+    visible:
+      id: "shelves-list"
+    timeout: 10000
+
+- takeScreenshot: caught-up-03-library

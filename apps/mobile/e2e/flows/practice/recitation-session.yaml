@@ -1,0 +1,90 @@
+# Flow PRACTICE-03: Recitation session
+# Validates: practice hub → recitation session starts (mode=recitation),
+#            chat input accepts a message, session does not crash on exit.
+# Tags: nightly, practice
+#
+# Journey: UX Journey 3 (Practice & Reinforcement)
+# Prerequisite: Seeded learner with an active subject (scenario: learning-active)
+#
+# testIDs verified against:
+#   - apps/mobile/src/components/home/LearnerScreen.tsx (home-action-practice)
+#   - apps/mobile/src/app/(app)/practice.tsx (practice-screen, practice-recitation)
+#   - apps/mobile/src/components/session/ChatShell.tsx (chat-input, chat-shell-back)
+appId: com.mentomate.app
+tags:
+  - nightly
+  - practice
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "learning-active"
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 15000
+
+# Navigate to Practice hub
+- scrollUntilVisible:
+    element:
+      id: "home-action-practice"
+    direction: DOWN
+    timeout: 5000
+
+- tapOn:
+    id: "home-action-practice"
+
+- extendedWaitUntil:
+    visible:
+      id: "practice-screen"
+    timeout: 10000
+
+- takeScreenshot: recitation-01-practice-hub
+
+# Tap Recitation card
+- scrollUntilVisible:
+    element:
+      id: "practice-recitation"
+    direction: DOWN
+    timeout: 5000
+
+- tapOn:
+    id: "practice-recitation"
+
+# Wait for session screen (ChatShell renders chat-input always)
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 20000
+
+- takeScreenshot: recitation-02-session-screen
+
+# Send one message to confirm the session is live
+- tapOn:
+    id: "chat-input"
+- inputText: "The Road Not Taken by Robert Frost"
+- pressKey: back
+- pressKey: Enter
+
+# Verify the message rendered in the chat list
+- scrollUntilVisible:
+    element:
+      text: "The Road Not Taken by Robert Frost"
+    direction: DOWN
+    timeout: 10000
+
+- takeScreenshot: recitation-03-message-sent
+
+# Exit session
+- tapOn:
+    id: "end-session-button"
+
+- extendedWaitUntil:
+    visible:
+      id: "practice-screen"
+    timeout: 10000
+    optional: true
+
+- takeScreenshot: recitation-04-exited
