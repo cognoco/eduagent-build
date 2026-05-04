@@ -1,0 +1,90 @@
+location	specifier	category	basis	reason
+apps/mobile/src/hooks/use-account.test.ts:11	../lib/api-client	service-stub-with-business-logic	heuristic	mobile test mock replaces app-level hook or client logic
+apps/mobile/src/hooks/use-active-profile-role.test.ts:10	./use-parent-proxy	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/mobile/src/hooks/use-active-profile-role.test.ts:6	../lib/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/mobile/src/hooks/use-all-books.test.ts:12	../lib/api-client	service-stub-with-business-logic	heuristic	mobile test mock replaces app-level hook or client logic
+apps/mobile/src/hooks/use-all-books.test.ts:31	../lib/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/mobile/src/hooks/use-api-reachability.test.ts:5	../lib/api	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/mobile/src/hooks/use-assessments.test.ts:11	../lib/api-client	service-stub-with-business-logic	heuristic	mobile test mock replaces app-level hook or client logic
+apps/mobile/src/hooks/use-assessments.test.ts:18	../lib/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/mobile/src/hooks/use-books.test.ts:15	../lib/api-client	service-stub-with-business-logic	heuristic	mobile test mock replaces app-level hook or client logic
+apps/mobile/src/hooks/use-books.test.ts:34	../lib/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/mobile/src/hooks/use-classify-subject.test.ts:7	../lib/api-client	service-stub-with-business-logic	heuristic	mobile test mock replaces app-level hook or client logic
+apps/mobile/src/hooks/use-consent.test.ts:15	../lib/api-client	service-stub-with-business-logic	heuristic	mobile test mock replaces app-level hook or client logic
+apps/mobile/src/hooks/use-consent.test.ts:22	../lib/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/mobile/src/hooks/use-curriculum.test.ts:14	../lib/api-client	service-stub-with-business-logic	heuristic	mobile test mock replaces app-level hook or client logic
+apps/mobile/src/hooks/use-curriculum.test.ts:33	../lib/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/mobile/src/hooks/use-dashboard.test.ts:11	../lib/api-client	service-stub-with-business-logic	heuristic	mobile test mock replaces app-level hook or client logic
+apps/mobile/src/hooks/use-dashboard.test.ts:30	../lib/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/mobile/src/hooks/use-dictation-api.test.ts:22	../lib/assert-ok	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/mobile/src/hooks/use-dictation-api.test.ts:9	../lib/api-client	service-stub-with-business-logic	heuristic	mobile test mock replaces app-level hook or client logic
+apps/mobile/src/hooks/use-dictation-playback.test.ts:9	expo-speech	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/mobile/src/hooks/use-dictation-preferences.test.ts:5	../lib/secure-storage	service-stub-with-business-logic	heuristic	mobile test mock replaces app-level hook or client logic
+apps/mobile/src/hooks/use-homework-ocr.test.ts:10	@clerk/clerk-expo	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/mobile/src/hooks/use-homework-ocr.test.ts:16	../lib/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/mobile/src/hooks/use-homework-ocr.test.ts:22	../lib/api	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/mobile/src/hooks/use-homework-ocr.test.ts:26	../lib/analytics	service-stub-with-business-logic	heuristic	mobile test mock replaces app-level hook or client logic
+apps/mobile/src/hooks/use-homework-ocr.test.ts:39	@react-native-ml-kit/text-recognition	EXTERNAL	heuristic	bare-module mock defaults to an external dependency boundary
+apps/mobile/src/hooks/use-homework-ocr.test.ts:47	expo-image-manipulator	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/mobile/src/hooks/use-homework-ocr.test.ts:53	expo-file-system/legacy	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/mobile/src/hooks/use-interview.test.ts:11	../lib/api-client	service-stub-with-business-logic	heuristic	mobile test mock replaces app-level hook or client logic
+apps/mobile/src/hooks/use-interview.test.ts:36	@clerk/clerk-expo	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/mobile/src/hooks/use-interview.test.ts:40	../lib/api	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/mobile/src/hooks/use-interview.test.ts:44	../lib/sse	service-stub-with-business-logic	heuristic	mobile test mock replaces app-level hook or client logic
+apps/mobile/src/hooks/use-interview.test.ts:49	../lib/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/mobile/src/hooks/use-language-progress.test.ts:14	../lib/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/mobile/src/hooks/use-language-progress.test.ts:7	../lib/api-client	service-stub-with-business-logic	heuristic	mobile test mock replaces app-level hook or client logic
+apps/mobile/src/hooks/use-network-status.test.ts:9	@react-native-community/netinfo	EXTERNAL	heuristic	bare-module mock defaults to an external dependency boundary
+apps/mobile/src/hooks/use-notes.test.ts:16	../lib/api-client	service-stub-with-business-logic	heuristic	mobile test mock replaces app-level hook or client logic
+apps/mobile/src/hooks/use-notes.test.ts:35	../lib/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/mobile/src/hooks/use-parent-proxy.test.ts:11	../lib/api-client	service-stub-with-business-logic	heuristic	mobile test mock replaces app-level hook or client logic
+apps/mobile/src/hooks/use-parent-proxy.test.ts:15	../lib/secure-storage	service-stub-with-business-logic	heuristic	mobile test mock replaces app-level hook or client logic
+apps/mobile/src/hooks/use-parent-proxy.test.ts:7	../lib/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/mobile/src/hooks/use-profiles.test.ts:26	../lib/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/mobile/src/hooks/use-profiles.test.ts:29	@clerk/clerk-expo	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/mobile/src/hooks/use-profiles.test.ts:7	../lib/api-client	service-stub-with-business-logic	heuristic	mobile test mock replaces app-level hook or client logic
+apps/mobile/src/hooks/use-progress.test.ts:15	../lib/api-client	service-stub-with-business-logic	heuristic	mobile test mock replaces app-level hook or client logic
+apps/mobile/src/hooks/use-progress.test.ts:34	../lib/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/mobile/src/hooks/use-push-token-registration.test.ts:11	./use-settings	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/mobile/src/hooks/use-push-token-registration.test.ts:15	expo-constants	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/mobile/src/hooks/use-rating-prompt.test.ts:15	../lib/secure-storage	service-stub-with-business-logic	heuristic	mobile test mock replaces app-level hook or client logic
+apps/mobile/src/hooks/use-rating-prompt.test.ts:33	../lib/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/mobile/src/hooks/use-rating-prompt.test.ts:8	expo-store-review	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/mobile/src/hooks/use-resolve-subject.test.ts:7	../lib/api-client	service-stub-with-business-logic	heuristic	mobile test mock replaces app-level hook or client logic
+apps/mobile/src/hooks/use-retention.test.ts:13	../lib/api-client	service-stub-with-business-logic	heuristic	mobile test mock replaces app-level hook or client logic
+apps/mobile/src/hooks/use-retention.test.ts:20	../lib/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/mobile/src/hooks/use-revenuecat.test.ts:18	react-native-purchases	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/mobile/src/hooks/use-revenuecat.test.ts:81	@clerk/clerk-expo	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/mobile/src/hooks/use-revenuecat.test.ts:87	../lib/revenuecat	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/mobile/src/hooks/use-sessions.test.ts:20	@clerk/clerk-expo	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/mobile/src/hooks/use-sessions.test.ts:24	../lib/api-client	service-stub-with-business-logic	heuristic	mobile test mock replaces app-level hook or client logic
+apps/mobile/src/hooks/use-sessions.test.ts:49	../lib/api	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/mobile/src/hooks/use-sessions.test.ts:53	../lib/sse	service-stub-with-business-logic	heuristic	mobile test mock replaces app-level hook or client logic
+apps/mobile/src/hooks/use-sessions.test.ts:58	../lib/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/mobile/src/hooks/use-settings.test.ts:15	../lib/api-client	service-stub-with-business-logic	heuristic	mobile test mock replaces app-level hook or client logic
+apps/mobile/src/hooks/use-settings.test.ts:34	../lib/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/mobile/src/hooks/use-streaks.test.ts:26	../lib/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/mobile/src/hooks/use-streaks.test.ts:7	../lib/api-client	service-stub-with-business-logic	heuristic	mobile test mock replaces app-level hook or client logic
+apps/mobile/src/hooks/use-subjects.test.ts:26	../lib/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/mobile/src/hooks/use-subjects.test.ts:7	../lib/api-client	service-stub-with-business-logic	heuristic	mobile test mock replaces app-level hook or client logic
+apps/mobile/src/hooks/use-subscription.test.ts:19	@clerk/clerk-expo	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/mobile/src/hooks/use-subscription.test.ts:23	../lib/api-client	service-stub-with-business-logic	heuristic	mobile test mock replaces app-level hook or client logic
+apps/mobile/src/hooks/use-subscription.test.ts:35	../lib/api	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/mobile/src/hooks/use-subscription.test.ts:39	../lib/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/mobile/src/hooks/use-text-to-speech.test.ts:10	expo-speech	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/mobile/src/hooks/use-vocabulary.test.ts:11	../lib/api-client	service-stub-with-business-logic	heuristic	mobile test mock replaces app-level hook or client logic
+apps/mobile/src/hooks/use-vocabulary.test.ts:18	../lib/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/mobile/src/lib/api-client.test.tsx:25	@clerk/clerk-expo	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/mobile/src/lib/api-client.test.tsx:29	./api	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/mobile/src/lib/haptics.test.ts:16	react-native	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/mobile/src/lib/haptics.test.ts:4	expo-haptics	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/mobile/src/lib/profile.test.tsx:14	@clerk/clerk-expo	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/mobile/src/lib/profile.test.tsx:19	./api-client	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/mobile/src/lib/profile.test.tsx:7	./secure-storage	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/mobile/src/lib/revenuecat.test.ts:9	react-native-purchases	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/mobile/src/lib/sentry.test.ts:10	@sentry/react-native	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/mobile/src/lib/sign-out-cleanup.test.ts:13	./secure-storage	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/mobile/src/lib/summary-draft.test.ts:15	./sentry	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/mobile/src/lib/summary-draft.test.ts:9	./secure-storage	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/mobile/src/lib/theme.test.ts:9	nativewind	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/mobile/src/lib/use-screen-top-inset.test.ts:7	react-native-safe-area-context	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary

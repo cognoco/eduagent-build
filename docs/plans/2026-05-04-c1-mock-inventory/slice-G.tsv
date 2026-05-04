@@ -1,0 +1,7 @@
+location	specifier	category	basis	reason
+apps/api/src/inngest/functions/interview-persist-curriculum.integration.test.ts:22	../../services/llm	EXTERNAL	exact-override	partial llm mock replaces routeAndCall at the provider boundary
+apps/api/src/inngest/functions/interview-persist-curriculum.integration.test.ts:28	../../services/notifications	service-stub-with-business-logic	exact-override	full notifications barrel mock hides internal formatting and delivery behavior
+apps/api/src/inngest/functions/interview-persist-curriculum.integration.test.ts:33	../../services/sentry	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/inngest/functions/interview-persist-curriculum.integration.test.ts:37	../client	EXTERNAL	heuristic	mock targets the Inngest client wrapper boundary
+apps/api/src/services/quiz/vocabulary.integration.test.ts:1	../llm	service-stub-with-business-logic	exact-override	full llm barrel mock hides router and safety logic in an integration test
+apps/api/src/services/session-summary.integration.test.ts:17	./llm	EXTERNAL	exact-override	partial llm mock replaces only routeAndCall at the provider boundary

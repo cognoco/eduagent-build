@@ -1,10 +1,10 @@
 # C1 Mock Inventory — Phase 1: Categorize, Don't Refactor
 
-**Status:** Inventory only. No code changes in this phase.
-**Date:** 2026-05-04
+**Status:** Inventory summary with generated hand-off artifacts committed under `docs/plans/2026-05-04-c1-mock-inventory/`.
+**Date:** 2026-05-04 (last revised 2026-05-04 after adversarial review)
 **Branch:** `gov/h6-test-fixtures`
-**Owner:** TBD (Phase 2 epic)
-**Scope:** Every internal `jest.mock()` call site in the repo, classified to drive the C1 cleanup epic.
+**Owner:** TBD (Phase 2 epic). Trigger to assign: completion of the Hand-off checklist below.
+**Scope:** Every internal `jest.mock()` call site in the repo, classified to drive the C1 cleanup epic. Eight test surfaces are in scope: api/services, api/routes, api/middleware, api/inngest, mobile/app, mobile/components, mobile/hooks+lib, packages, eval-llm, **and `tests/integration/` (cross-package)**.
 
 ---
 
@@ -12,7 +12,13 @@
 
 The H-audit governance bundle flagged C1 (~260 internal `jest.mock()` of own services) as **CRITICAL** — but the original plan only addressed *new* violations via the GC1 lint rule. The 260 existing violations were punted to "a separate epic" with no triage. This document is the prerequisite to that epic: a classified, prioritized hit-list so the future refactor work can be scoped, sequenced, and parallelized.
 
-> Note: total `jest.mock()` occurrences in the repo are **946 across 264 test files** (verified via `rg "jest\.mock\(" -t ts -t tsx -c`). Of those, the majority are legitimate external-boundary mocks (Clerk SDK, Stripe SDK, Expo native modules, RevenueCat, Sentry, Inngest framework runtime, ML Kit, push providers). The "internal" subset that is the target of the C1 epic is the **~640 non-EXTERNAL rows** below.
+> Note: total `jest.mock()` occurrences at original snapshot (`ead82730`) were **946 across 264 test files**. Re-run on `a0ce9751` (2026-05-04) yields **971 across 264 files** (drift +25 from new tests added on `gov/h4-route-helper`; file count is unchanged). The "internal" subset that is the target of the C1 epic is the **~640 non-EXTERNAL rows** below; majority are legitimate external-boundary mocks (Clerk SDK, Stripe SDK, Expo native modules, RevenueCat, Sentry, Inngest framework runtime, ML Kit, push providers).
+>
+> **Regenerate the count before Phase 2 kickoff:**
+>
+> ```bash
+> git grep -c 'jest\.mock(' -- '*.test.ts' '*.test.tsx' | awk -F: '{s+=$NF} END {print "total:", s, "files:", NR}'
+> ```
 
 ---
 
@@ -27,12 +33,13 @@ Each `jest.mock()` site is bucketed into exactly one of:
 | **auth/middleware-bypass** | Mock of `middleware/jwt`, `middleware/auth`, `services/family-access`, `services/billing` (when used solely to satisfy metering middleware), or any guard that bypasses ownership/permission/quota checks. | **Medium-High** — these mocks routinely hide IDOR / authz regressions. Convert to a single shared test-auth helper that mints real-looking JWTs and runs real middleware. |
 | **service-stub-with-business-logic** | Mock of an internal service file where the factory contains conditional logic, multiple return paths, defines error classes inline, or stubs methods that have real business rules. | **HIGHEST** — these are the C1 critical cases. Bugs hide here. Replace with real implementation hitting real DB / Inngest test harness. |
 | **redundant-with-integration-test** | A parallel `*.integration.test.ts` exercises the same surface for real. The unit-test mock is therefore not buying coverage, only false confidence. | Medium — delete the unit-test mock or convert the file into a thin wrapper around the integration test. |
+| **rate-limit-bypass** | Mock of a rate-limit / throttle service (`settings.checkAndLogRateLimit`, similar) used to short-circuit an internal guard. Distinct from `auth/middleware-bypass` (which targets identity) and from quota-bypass (which targets billing). | Medium — replace with a real test-tier rate-limit configuration that allows the test traffic. |
 
 ---
 
 ## Headline counts
 
-Aggregated across all 7 inventory slices (api/services, api/routes, api/middleware, api/inngest, mobile/app, mobile/components, mobile/hooks+lib, integration tests, packages, eval-llm):
+Aggregated across all 8 inventory slices (api/services, api/routes, api/middleware, api/inngest, mobile/app, mobile/components, mobile/hooks+lib, packages, eval-llm, **`tests/integration/` cross-package**):
 
 | Category | Count | % of internal | Notes |
 |---|---:|---:|---|
@@ -40,7 +47,7 @@ Aggregated across all 7 inventory slices (api/services, api/routes, api/middlewa
 | `pure-data-stub` | **~470** | ~74% of internal | Largest bucket. Mostly `createDatabaseModuleMock`, `useProfile()` returning `{activeProfile}`, `lib/theme` returning flat color tokens, `react-i18next` key passthrough, `lib/api-client` with `mockApiClientFactory`. |
 | `auth/middleware-bypass` | **~36** | ~6% of internal | Concentrated in `apps/api/src/routes/*.test.ts` (every route file mocks `../middleware/jwt`). Two outliers: `services/family-access` (IDOR guard) in `dashboard.test.ts` + `learner-profile.test.ts`; `services/billing` mocked solely to satisfy metering middleware in dictation/interview/quiz routes. |
 | `service-stub-with-business-logic` | **~125** | ~20% of internal | C1 critical. Heavily concentrated in mobile screen tests (`api-client` factories, `use-settings`, `use-progress`, `use-curriculum`) and api/services with cross-service calls (`session-cache`, `retention-data`, `snapshot-aggregation`, `verification-completion`). |
-| `redundant-with-integration-test` | **0 confirmed** | — | No unit-test mock was clearly redundant given the existing integration suite. Some `*.integration.test.ts` files do still mock internal services — see "Integration-test violations" below. |
+| `redundant-with-integration-test` | **0 confirmed (not exhaustively assessed)** | — | This pass did not perform a paired-suite walk for every service that has both `*.test.ts` and `*.integration.test.ts` (e.g. consent, profile, dashboard, retention-data, settings, snapshot-aggregation, billing). The "0" reflects "nothing jumped out", not a verified result. Phase 2 should run a pair-walk before deleting anything in this category. |
 | **Internal subtotal (C1 target)** | **~631** | 100% | |
 | **Grand total `jest.mock()` sites** | **~941** | — | Matches the 946 grep count within rounding (5 sites in dual-counted files / regex edge cases). |
 
@@ -50,25 +57,44 @@ Aggregated across all 7 inventory slices (api/services, api/routes, api/middlewa
 
 ## ⚠️ Hit list 1 — Integration-test violations of CLAUDE.md
 
-CLAUDE.md states **"No internal mocks in integration tests."** Three integration files still violate this. Highest priority for the C1 epic because integration tests are the safety net the unit-test mocks claim to be redundant with — if the integration tests themselves mock internal services, the safety net is fictional.
+CLAUDE.md states **"No internal mocks in integration tests."** Four call sites across three files still violate this. Highest priority for the C1 epic because integration tests are the safety net the unit-test mocks claim to be redundant with — if the integration tests themselves mock internal services, the safety net is fictional.
 
 | File | Line | Mocked target | Why it's a violation |
 |---|---:|---|---|
 | `apps/api/src/services/quiz/vocabulary.integration.test.ts` | 1 | `../llm` (entire barrel, no `requireActual`) | Hides router / circuit-breaker / safety-preamble logic. The integration test name claims real-LLM coverage; the mock removes it. |
 | `apps/api/src/services/session-summary.integration.test.ts` | 17 | `./llm` (partial via `requireActual` but `routeAndCall` replaced) | Borderline: real router code is preserved, only the provider call is stubbed. Acceptable if `routeAndCall` is treated as a true external boundary, but conflicts with the "no internal mocks" rule as written. |
 | `apps/api/src/inngest/functions/interview-persist-curriculum.integration.test.ts` | 22 | `../../services/llm` (partial via `requireActual`) | Same shape as above — `routeAndCall` replaced, rest of router preserved. |
+| `apps/api/src/inngest/functions/interview-persist-curriculum.integration.test.ts` | 28 | `../../services/notifications` (full mock, no `requireActual`) | **Unambiguous internal-service stub** — the entire notifications barrel is replaced with `jest.fn()` factories. No external boundary justification. |
 
-**Recommendation:** Fix the rule or fix the tests. Either (a) define `routeAndCall` formally as the external-LLM boundary in the C1 acceptance criteria, in which case these become EXTERNAL, or (b) move LLM mocking up into a `services/llm/test-harness.ts` that the integration tests register through `registerProvider(...)`, deleting the `jest.mock(...)` calls entirely.
+> **Cross-package integration tests (`tests/integration/*.integration.test.ts`) — clean.** Re-scan of all 10 files using `jest.mock` shows every mock targets an external boundary: `apps/api/src/inngest/client` (Inngest SDK wrapper), `apps/api/src/services/stripe` (Stripe SDK wrapper), `apps/api/src/services/sentry` (Sentry SDK). No internal-service violations. The cross-package suite genuinely follows the "no internal mocks" rule today; this is the standard the api-local integration tests above need to meet.
+
+**Recommendation:** Fix the rule or fix the tests, with a verification gate:
+
+1. **Decision:** Either (a) define `routeAndCall` formally as the external-LLM boundary in the C1 acceptance criteria — in which case the `requireActual + routeAndCall stub` rows become EXTERNAL — or (b) converge on the existing `tests/integration/external-mocks.ts` + `fetch-interceptor.ts` pattern and delete the `jest.mock(...)` calls in favor of URL-pattern interception. **Do not introduce a third pattern** (e.g., a new `services/llm/test-harness.ts` registry) — the project already has two and the integration-layer interceptor is working. Lift it into `packages/test-utils/` if unit tests need access.
+2. **Required regardless of (a) or (b):** Delete or restructure the `notifications` mock at line 28 — it has no boundary justification under either resolution.
+3. **Verified by (per `feedback_fix_verification_rules`):**
+   - `test: vocabulary.integration.test.ts` after fix must fail when `routeAndCall` formalization is reverted (break test for the LLM-router contract).
+   - `test: interview-persist-curriculum.integration.test.ts` after fix must exercise the real `notifications.formatConsentRequestEmail` / `sendEmail` path against a seeded recipient row — assert the email payload, not just call counts.
 
 ---
 
-## ⚠️ Hit list 2 — `auth/middleware-bypass` (~36 sites)
+## ⚠️ Hit list 2 — Guard bypasses (~34 auth/billing + 1 rate-limit = ~35 sites)
 
-Concentrated, mechanical to fix. A single shared helper would replace all 30+ `jwt` mocks. Two outliers (`family-access`, `billing-as-metering`) genuinely hide authorization logic.
+Concentrated, mechanical to fix. A single shared helper would replace all 28 `jwt` mocks. Outliers (`family-access`, billing-as-metering, rate-limit) genuinely hide guard logic and need real services + seeded data.
+
+| Group | Category | Sites |
+|---|---|---:|
+| 2A — `middleware/jwt` | `auth/middleware-bypass` | 28 |
+| 2B — `family-access` (IDOR) | `auth/middleware-bypass` | 2 |
+| 2C — `services/billing` (metering) | `auth/middleware-bypass` | 3 |
+| 2D — `services/settings` (rate-limit) | `rate-limit-bypass` | 1 |
+| **Hit list 2 total** | | **34** |
+
+> Headline-table count of "~36 auth/middleware-bypass" includes 1 rate-limit site (now reclassified) plus a small inventory error bar. The reconciled total is **34**.
 
 ### Group 2A — `../middleware/jwt` mocks (28 sites)
 
-Every `apps/api/src/routes/*.test.ts` file mocks `../middleware/jwt` to bypass Clerk JWKS verification. Identical factory shape; mechanical to migrate.
+Every `apps/api/src/routes/*.test.ts` file mocks `../middleware/jwt` to bypass Clerk JWKS verification. Factory bodies are identical, but **the surrounding mock context is not uniform** — `sessions.test.ts` decorates the JWT mock with `inngest/hono` + `services/sentry` mocks for the SSE handlers, while `dictation.test.ts` does not. The shared fixture must compose with these per-route accessories.
 
 ```
 apps/api/src/routes/account.test.ts:5
@@ -94,7 +120,7 @@ apps/api/src/middleware/auth.test.ts:33
 apps/api/src/middleware/metering.test.ts:6
 ```
 
-**Recommendation:** Create `apps/api/test-utils/auth-fixture.ts` exporting `mintTestJWT(claims)` + a Hono middleware override `useTestAuth(app)`. Replace every `jest.mock('../middleware/jwt', ...)` with one import + one call. ~28 sites collapse to a shared fixture.
+**Recommendation:** Create `apps/api/src/test-utils/auth-fixture.ts` (alongside the existing `database-module.ts` helper) exporting `mintTestJWT(claims)` + a Hono middleware override `useTestAuth(app)`. Replace every `jest.mock('../middleware/jwt', ...)` with one import + one call. The 28 JWT lines collapse, but the surrounding `inngest/hono` + `services/sentry` decorations stay per-file until composed into a `setupRouteTest({ sse: true })` helper in a follow-up. **Effort caveat:** the "1–2 days" Wave 1 estimate (see Phase 2 sequencing) assumes the JWT collapse only; SSE/inngest decoration consolidation is a separate spike if pursued.
 
 ### Group 2B — IDOR / parent-access bypass (2 sites)
 
@@ -107,18 +133,27 @@ These mocks defeat real IDOR guards. They are the highest-risk auth bypasses in 
 
 **Recommendation:** These must use the real `family-access` service against a seeded DB. Adding break-tests (per `feedback_fix_verification_rules`) that revert the C5 `createScopedRepository` enforcement and watch them fail is the verification gate.
 
-### Group 2C — Quota/metering middleware-as-bypass (6 sites)
+### Group 2C — Quota/metering bypass (3 sites — `services/billing`)
 
 Tests mock `services/billing` not because they care about billing, but because the metering middleware *requires* a subscription record to exist. The mocks short-circuit the metering check.
 
 | File | Line | Mocked |
 |---|---:|---|
 | `apps/api/src/routes/dictation.test.ts` | 49 | `../services/billing` (seed quota for LLM-metered routes) |
-| `apps/api/src/routes/dictation.test.ts` | 83 | `../services/settings` (`checkAndLogRateLimit` bypass) |
 | `apps/api/src/routes/interview.test.ts` | 103 | `../services/billing` (seed quota) |
 | `apps/api/src/routes/quiz.test.ts` | 30 | `../services/billing` (seed quota) |
 
 **Recommendation:** Migrate to a real test-tier subscription seed (`createTestQuotaPool(profileId, { tier: 'free', remaining: 100 })`) used by an integration-style harness. The "mock billing to bypass metering" pattern is the most common silent metering-bug source.
+
+### Group 2D — Rate-limit bypass (1 site — `services/settings`)
+
+Distinct bug class from quota-bypass. The mock disables `checkAndLogRateLimit` so the test traffic doesn't trip the per-profile request throttle. Same risk profile as auth-bypass: the guard is silently turned off and the test never exercises it.
+
+| File | Line | Mocked |
+|---|---:|---|
+| `apps/api/src/routes/dictation.test.ts` | 83 | `../services/settings` (`checkAndLogRateLimit` returning `false`) |
+
+**Recommendation:** Configure a real test-tier rate-limit window that allows the test traffic (e.g., `RATE_LIMIT_DICTATION_REVIEW=1000/min` in test env) so the real middleware runs. Add a separate test that sends > limit and asserts the 429 response.
 
 ---
 
@@ -184,24 +219,32 @@ Route handlers that mock the service they delegate to with conditional logic in 
 
 ### 3D — `apps/mobile/src/app/*` screen tests (~50 sites — heaviest concentration)
 
-The mobile-app screen tests overwhelmingly use the `mockApiClientFactory` pattern in `lib/api-client` plus per-screen hook factories with conditional `mockReturnValue` per test. These are the bulk of the C1 violation count. **Strategy:** convert to MSW-style network-level mocking + `react-query` test wrapper that exercises real hook code paths.
+The mobile-app screen tests overwhelmingly use the `mockApiClientFactory` pattern in `lib/api-client` plus per-screen hook factories with conditional `mockReturnValue` per test. These are the bulk of the C1 violation count.
+
+> **Existing prior art — use it, don't replace it.** `apps/mobile/src/test-utils/mock-api-routes.ts` already exports `createRoutedMockFetch` (URL-pattern fetch interceptor with `setRoute(pattern, handler)` per test). It is adopted in 14 mobile screen tests today (`home.test.tsx`, `session/index.test.tsx`, `quiz/index.test.tsx`, `subscription.test.tsx`, `_layout.test.tsx`, `pick-book/[subjectId].test.tsx`, `homework/camera.test.tsx`, `mentor-memory.test.tsx`, `shelf/[subjectId]/index.test.tsx`, `topic/[topicId].test.tsx`, plus 4 more). `apps/mobile/src/test-utils/app-hook-test-utils.tsx` already provides `createQueryWrapper` (the React Query test wrapper).
+>
+> **Strategy:** Extend `createRoutedMockFetch` to cover the remaining ~36 screens, not introduce MSW. Adding MSW would mean: (a) installing a second mock pattern (`createRoutedMockFetch` is not going away mid-migration), and (b) tooling work to make MSW v2 cooperate with Expo / React Native + Hono RPC + jest. **MSW is not a project dependency today** — committing to it requires a separate spike with its own estimate.
+>
+> **Decision required before Wave 4 kicks off (see Hand-off checklist):** "Extend `createRoutedMockFetch`" vs "Adopt MSW" vs "Both — MSW for mobile screens, `createRoutedMockFetch` deprecated." Pick one. Don't ship two patterns.
 
 Selected highest-leverage targets (each used in 5+ files):
 
-| Mocked target | # of sites | Replacement |
+| Mocked target | # of sites | Replacement (default: extend `createRoutedMockFetch`) |
 |---|---:|---|
-| `lib/api-client` (`mockApiClientFactory` / direct hc()) | ~22 | MSW per-screen + real `hc()` client |
-| `hooks/use-progress` (per-test `mockReturnValue`) | 5 | Real hook + real api-client + MSW |
-| `hooks/use-settings` | 3 | Real hook + MSW |
-| `hooks/use-curriculum` | 1 | Real hook + MSW |
-| `hooks/use-sessions` (stream onChunk/onDone) | 2 | Real hook + MSW SSE |
+| `lib/api-client` (`mockApiClientFactory` / direct hc()) | ~22 | Real `hc()` client + `createRoutedMockFetch` |
+| `hooks/use-progress` (per-test `mockReturnValue`) | 5 | Real hook + real api-client + `createRoutedMockFetch` |
+| `hooks/use-settings` | 3 | Real hook + `createRoutedMockFetch` |
+| `hooks/use-curriculum` | 1 | Real hook + `createRoutedMockFetch` |
+| `hooks/use-sessions` (stream onChunk/onDone) | 2 | Real hook + SSE transport in routed fetch (extension required) |
 | `hooks/use-revenuecat` | 1 | Keep — wraps RevenueCat SDK (could be EXTERNAL) |
-| `hooks/use-interview` | 1 | Real hook + MSW SSE |
-| `hooks/use-homework-ocr` | 1 | Real hook + MSW |
-| `hooks/use-account` | 1 | Real hook + MSW |
+| `hooks/use-interview` | 1 | Real hook + SSE transport extension |
+| `hooks/use-homework-ocr` | 1 | Real hook + `createRoutedMockFetch` |
+| `hooks/use-account` | 1 | Real hook + `createRoutedMockFetch` |
 | `hooks/use-parent-proxy` | 1 | Real hook |
 | `hooks/use-milestone-tracker` | 1 | Real hook |
-| `lib/profile` (`useProfile` per-test conditionals) | 4 | Real ProfileContext provider in test wrapper |
+| `lib/profile` (`useProfile` per-test conditionals) | 4 | Real ProfileContext provider via `createQueryWrapper` extension |
+
+The two SSE-streaming hooks (`use-sessions`, `use-interview`) are the only rows that require a non-trivial extension — the current `createRoutedMockFetch` returns one-shot JSON; SSE needs a streaming `Response` body. Estimate this as a Wave 4 prerequisite spike.
 
 Full file-level list of mobile/app `service-stub-with-business-logic` sites (~50): see Appendix Slice D.
 
@@ -284,22 +327,40 @@ Listed only for completeness. Not part of the C1 cleanup target. Top recurring l
 
 The Phase 2 epic should **not** refactor 631 mocks one by one. Group the work:
 
-1. **Wave 1 (mechanical, 1–2 days):** Build shared `auth-fixture.ts` for the 28 `jwt` mocks → all 2A sites collapse to one import per file.
-2. **Wave 2 (high-risk, 3–5 days):** Fix the 2 IDOR `family-access` mocks (Hit list 2B) and the 4 metering-bypass `billing` mocks (Hit list 2C) by switching the affected route tests to real services + seeded test data. Add break-tests per `feedback_fix_verification_rules`.
+1. **Wave 1 (mechanical, 1–2 days):** Build shared `apps/api/src/test-utils/auth-fixture.ts` for the 28 `jwt` mocks → all 2A sites collapse to one import per file. SSE/inngest accessory consolidation deferred to a follow-up; this wave only collapses the JWT line.
+2. **Wave 2 (high-risk, 3–5 days):** Fix the 2 IDOR `family-access` mocks (Hit list 2B), the 3 metering-bypass `billing` mocks (Hit list 2C), and the 1 rate-limit-bypass `settings` mock (Hit list 2D) by switching the affected route tests to real services + seeded test data. Add break-tests per `feedback_fix_verification_rules`.
 3. **Wave 3 (correctness-critical, 5–10 days):** Address the 22 `apps/api/src/services/*` cross-service stubs in Hit list 3A. These are where bugs actually hide. Replace with real services hitting test DB.
-4. **Wave 4 (mobile, 5–10 days):** Build `mockApiServer` (MSW or similar) + `renderWithProviders` test wrapper, then migrate the 50+ mobile screen tests in Hit list 3D one feature area at a time.
-5. **Wave 5 (cleanup, ongoing):** As shared wrappers land, the ~470 `pure-data-stub` sites get deleted opportunistically in feature work.
-6. **Wave 6 (governance):** Resolve the 3 integration-test violations in Hit list 1 by formalizing `routeAndCall` as the LLM external boundary (or migrating to a `services/llm/test-harness.ts`), then turn GC1 from warn to error.
+4. **Wave 4 (mobile, 5–10 days + 1–2 day spike):** **Decide** between extending `createRoutedMockFetch` vs. adopting MSW (see Hit list 3D). Default assumption: extend the existing fetch interceptor. Add an SSE transport extension for `use-sessions` / `use-interview` (the only screens that need streaming responses). Migrate the ~36 remaining mobile screen tests one feature area at a time; the 14 already on `createRoutedMockFetch` need no migration. **Wave 4 estimate excludes a tooling spike if MSW is chosen instead** — that's a separate ~3–5 day item.
+5. **Wave 5 (cleanup, ongoing — does NOT gate Wave 6):** As shared wrappers land, the ~470 `pure-data-stub` sites get deleted opportunistically in feature work. No Phase 2 closure criterion depends on this completing.
+6. **Wave 6 (governance — runs in parallel after Wave 1–4 close):** Resolve the 4 integration-test violations in Hit list 1 by formalizing `routeAndCall` as the LLM external boundary **and** converging on the existing `tests/integration/external-mocks.ts` + `fetch-interceptor.ts` pattern (see Hit list 1 recommendation — do not introduce a third pattern). Then turn GC1 from warn to error. **Phase 2 closes when Wave 6 ships**, not when Wave 5 finishes.
 
-**Estimated Phase 2 effort:** 3–4 sprint-weeks for Waves 1–4. Wave 5 is months of opportunistic cleanup. Wave 6 is a half-day once the rest is unblocked.
+**Estimated Phase 2 effort:** 3–4 sprint-weeks for Waves 1–4 (assuming MSW is *not* adopted); +3–5 days if MSW is adopted. Wave 5 is months of opportunistic cleanup but is decoupled from closure. Wave 6 is a half-day once Waves 1–4 are done.
+
+### Phase 2 closure criterion
+
+Phase 2 is **done** when all of the following hold (not when Wave 5 reaches zero):
+
+- Hit list 1 (integration-test violations): all 4 sites resolved via either rule formalization or test conversion.
+- Hit list 2 (guard bypasses): 0 remaining `auth/middleware-bypass` and 0 `rate-limit-bypass` rows in a fresh inventory.
+- Hit list 3A (cross-service stubs in `apps/api/src/services/*`): 0 remaining.
+- GC1 lint rule: switched from `warn` to `error` and CI blocking.
+- Inventory regenerated and counts published; pure-data-stubs may remain.
 
 ---
 
 ## Appendix — Full inventory by area
 
-The complete TSV inventory (file:line, mocked target, category, notes) is captured in the `git log` of this commit. To regenerate or verify a slice, the original 7 inventory subagents can be re-run; their TSV outputs are reproducible from the test files alone.
+**Caveat:** Only Slice A is fully enumerated inline below. The generated per-slice TSVs now live in `docs/plans/2026-05-04-c1-mock-inventory/` (`slice-A.tsv` … `slice-J.tsv`) and are produced by `pnpm exec tsx scripts/generate-c1-mock-inventory.ts`. The narrative hit lists in this document remain the source of truth for prioritization; the TSVs are the reproducible hand-off artifact.
 
-For the convenience of the Phase 2 epic owner, the full per-row data is preserved in this section. If the reader prefers structured data, copy the rows below into a spreadsheet (Tab-separated, headers: `file`, `mocked`, `category`, `notes`).
+**Hand-off checklist — complete before Phase 2 kickoff:**
+
+- [x] Re-run inventory on the current Phase 2 planning snapshot and confirm counts are within ±5% of this document. Original snapshot: `ead82730`. Current artifact refresh: `a0ce9751` on branch `cleanup`. Raw grep still returns `971` line hits / `264` files; the generated artifact emits `969` actual `jest.mock()` call-site rows because two hits are comment text, not executable mocks.
+- [x] Commit a TSV per slice into `docs/plans/2026-05-04-c1-mock-inventory/` so the Phase 2 owner can scope work without re-doing the classification. Generated files: `slice-A.tsv` … `slice-J.tsv` plus `README.md`.
+- [x] Add Slice H — `tests/integration/` cross-package — even though current scan shows only EXTERNAL-boundary mocks there. The committed slice documents the specific Inngest/Stripe/Sentry adapter boundaries in use today.
+- [x] Add Slice I — `apps/api/eval-llm/` — and Slice J — `packages/` — so the inventory is complete for the current repo surface.
+- [x] Decide Wave 4 mobile direction: **extend `createRoutedMockFetch`**, do not introduce MSW as a second pattern mid-migration. Rationale: the project already has working routed-fetch test infrastructure and no MSW dependency today.
+- [x] Decide the Hit list 1 boundary rule: **formalize `routeAndCall` as the external LLM provider boundary** for partial `requireActual + routeAndCall` integration mocks, while still treating full-barrel mocks (for example `quiz/vocabulary.integration.test.ts`) and the `notifications` barrel mock as Phase 2 violations.
+- [ ] Assign Phase 2 epic owner. Trigger to assign: this checklist hits 100%.
 
 ### Slice A — `apps/api/src/services/*` (78 rows)
 
@@ -402,9 +463,15 @@ apps/api/src/routes/sessions.test.ts:352	../inngest/client	EXTERNAL	Inngest SDK 
 
 The remainder of Slice B (account, billing, books, coaching-card, consent, dashboard, dictation, feedback, filing, homework, inngest, interview, learner-profile, quiz, resend-webhook, retention, revenuecat-webhook, stripe-webhook, subjects, support, test-seed, topic-suggestions, book-suggestions, vocabulary) is captured in the Slice B subagent output. Patterns are uniform: `../middleware/jwt` → bypass, `@eduagent/database` → pure-data-stub, `../services/account`/`profile` → pure-data-stub fixtures, `../inngest/client` + `inngest/hono` → EXTERNAL, plus per-route service mock that is usually `pure-data-stub` (occasionally `service-stub-with-business-logic` per Hit list 3B).
 
-### Slices C–G
+### Slices C–J
 
-The full Slice C (middleware + inngest, ~148 rows), Slice D (mobile/app, ~330 rows), Slice E (mobile/components, ~85 rows), Slice F (mobile/hooks+lib, ~95 rows), and Slice G (integration, ~17 rows) inventories are preserved in the inventory commit's subagent transcript and reproducible by re-running the slice prompts. Their salient findings are summarized in Hit lists 1–4 above.
+Slice C (middleware + inngest), Slice D (mobile/app), Slice E (mobile/components), Slice F (mobile/hooks+lib), Slice G (`apps/api` local integration tests), Slice H (`tests/integration/` cross-package), Slice I (`apps/api/eval-llm`), and Slice J (`packages/`) are now committed as generated TSVs under `docs/plans/2026-05-04-c1-mock-inventory/`. Their salient findings are summarized in Hit lists 1–4 above; the TSVs exist so the Phase 2 owner can work from repo-state artifacts instead of reconstructing subagent transcripts.
+
+**Slices added by adversarial review (small, easy to enumerate now):**
+
+- **Slice H — `tests/integration/` cross-package** (generated): all current rows classify as EXTERNAL adapter-boundary mocks (`apps/api/src/inngest/client`, `services/stripe`, `services/sentry`).
+- **Slice I — `apps/api/eval-llm/`** (generated): current row classifies as EXTERNAL (`../runner/llm-client`, the eval harness LLM transport boundary).
+- **Slice J — `packages/`** (generated): current row classifies as `pure-data-stub` (`../utils/uuid` fixture stub in `packages/database/src/queries/embeddings.test.ts`).
 
 ---
 

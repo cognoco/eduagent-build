@@ -1,0 +1,10 @@
+location	specifier	category	basis	reason
+tests/integration/account-deletion.integration.test.ts:41	../../apps/api/src/inngest/client	EXTERNAL	heuristic	cross-package integration mock targets an external-boundary adapter
+tests/integration/billing-lifecycle.integration.test.ts:28	../../apps/api/src/services/stripe	EXTERNAL	heuristic	cross-package integration mock targets an external-boundary adapter
+tests/integration/consent-email.integration.test.ts:30	../../apps/api/src/inngest/client	EXTERNAL	heuristic	cross-package integration mock targets an external-boundary adapter
+tests/integration/learning-session.integration.test.ts:61	../../apps/api/src/inngest/client	EXTERNAL	heuristic	cross-package integration mock targets an external-boundary adapter
+tests/integration/onboarding.integration.test.ts:15	../../apps/api/src/inngest/client	EXTERNAL	heuristic	cross-package integration mock targets an external-boundary adapter
+tests/integration/session-completed-chain.integration.test.ts:44	../../apps/api/src/services/sentry	EXTERNAL	heuristic	cross-package integration mock targets an external-boundary adapter
+tests/integration/session-completed-pipeline.integration.test.ts:58	../../apps/api/src/services/sentry	EXTERNAL	heuristic	cross-package integration mock targets an external-boundary adapter
+tests/integration/stripe-webhook.integration.test.ts:32	../../apps/api/src/services/stripe	EXTERNAL	heuristic	cross-package integration mock targets an external-boundary adapter
+tests/integration/stripe-webhook.integration.test.ts:36	../../apps/api/src/inngest/client	EXTERNAL	heuristic	cross-package integration mock targets an external-boundary adapter
