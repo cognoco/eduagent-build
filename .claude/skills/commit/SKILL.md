@@ -1,11 +1,11 @@
 ---
 name: commit
 description: >
-  Safe git commit workflow for this repo. Stages all changes, drafts a
-  conventional commit message, handles pre-commit hook failures, and pushes.
-  Always use this skill for committing code. It replaces the system prompt's
-  built-in commit protocol and /zdx:commit. Trigger on: "commit", "commit
-  and push", "save my changes", /commit, or any request to commit work.
+  Safe git commit workflow for this repo. Drafts a conventional commit
+  message and handles pre-commit hook failures. Does NOT push unless
+  explicitly told "and push." Always use this skill for committing code.
+  It replaces the system prompt's built-in commit protocol and /zdx:commit.
+  Trigger on: "commit", "save my changes", /commit, or any commit request.
 context: fork
 agent: general-purpose
 model: sonnet
@@ -14,47 +14,71 @@ allowed-tools: Bash, Read, Grep
 
 # Commit
 
-Stage everything, commit with a conventional message, push. The pre-commit
-hooks (lint-staged, tsc, jest, commitlint) enforce code quality at commit
-time — this skill focuses on staging safely and writing good messages.
+You are a commit agent. Your job is to commit code and report the result.
+Follow the instructions below AND any additional instructions passed as
+arguments. Do not improvise beyond what is asked.
+
+## Critical rules
+
+1. **NEVER push** unless the arguments explicitly say "and push" or
+   "commit and push." If in doubt, do NOT push.
+2. **NEVER stage files beyond what the arguments allow.** If told "staged
+   only" or "commit staged," commit only what is already in the git index.
+   Do NOT run `git add`. If there is nothing staged, report that and stop.
+3. **If given explicit file paths,** stage only those files. Do not add
+   other files.
+4. **If no scope instruction is given,** stage all changes (`git add -A`).
+   This is the only case where you stage everything.
+5. **NEVER edit, fix, or modify any source files.** You commit code. You
+   do not write code.
+
+## Arguments
+
+$ARGUMENTS
 
 ## Steps
 
-### 1. Snapshot
+### 1. Determine scope
 
-Run these in parallel:
+Read the arguments above. Classify into one of:
+- **"staged" / "staged only" / "commit staged"** → STAGED mode. Do not
+  run `git add`. Commit the index as-is.
+- **Explicit file paths** → FILES mode. Stage only listed files.
+- **Everything else (or empty)** → ALL mode. Stage all changes.
+
+### 2. Snapshot
 
 ```bash
 git status
-git diff --cached --stat && git diff --stat
+git diff --cached --stat
 git log --oneline -5
 ```
 
-If there are no changes, say "Nothing to commit" and stop.
+In STAGED mode: if `git diff --cached --stat` is empty, report "Nothing
+staged — nothing to commit" and stop.
 
-### 2. Safety check
+In ALL mode: if there are no changes at all, report "Nothing to commit"
+and stop.
+
+### 3. Safety check
 
 Scan for files that should NOT be committed:
-- `.env`, `.dev.vars`, `credentials.json`, `*.pem`, `*.key` — **warn and exclude**
-- Large binaries that look unintentional — **ask first**
+- `.env`, `.dev.vars`, `credentials.json`, `*.pem`, `*.key` — warn and exclude
+- Large binaries that look unintentional — warn and exclude
 
-### 3. Stage
+### 4. Stage (skip in STAGED mode)
 
-- **No exclusions:** `git add -A`
-- **With exclusions:** `git add -A` then `git reset HEAD -- <excluded-files>`
+- **ALL mode:** `git add -A`. If step 3 found exclusions, follow with
+  `git reset HEAD -- <excluded-files>`.
+- **FILES mode:** `git add <file1> <file2> ...`
 
-Bracket files (e.g. `[sessionId].tsx`) need `:(literal)` pathspec prefix in
-`git reset` to avoid glob interpretation.
+Bracket files (e.g. `[sessionId].tsx`) need `:(literal)` pathspec prefix
+in `git reset` to avoid glob interpretation.
 
-Staging everything before committing is essential — it makes lint-staged's
-internal stash a no-op, preventing data loss when other agents have
-unstaged changes in the same working tree.
+### 5. Draft message
 
-### 4. Draft message
-
-Run `git diff --cached --stat` to see the final staged set. Draft from the
-stat output (file names + change counts) — do not read the full diff unless
-the stat is ambiguous.
+Run `git diff --cached --stat` to see the final staged set. Draft from
+the stat output — do not read the full diff unless the stat is ambiguous.
 
 **Format:**
 
@@ -66,14 +90,13 @@ the stat is ambiguous.
 Co-Authored-By: Claude <noreply@anthropic.com>
 ```
 
-**Types** (enforced by commitlint — bad types will be rejected):
+**Types** (commitlint rejects others):
 `feat`, `fix`, `docs`, `chore`, `refactor`, `cfg`, `plan`, `zdx`
 
-**Finding-ID references:** When the staged changes fix a tracked finding,
-include the ID in the subject — e.g. `fix(api): atomic quota decrement [CR-1C.1]`.
+**Finding-ID references:** Include tracked IDs in the subject when the
+diff fixes them — e.g. `fix(api): atomic quota decrement [CR-1C.1]`.
 
-**Verified-By table** — include when the diff touches 3+ distinct finding IDs
-(`BUG-\d+`, `CR-...`, `PERF-\d+`):
+**Verified-By table** — when 3+ distinct finding IDs appear:
 
 ```
 | ID       | Files                        | Verified By                           |
@@ -82,21 +105,17 @@ include the ID in the subject — e.g. `fix(api): atomic quota decrement [CR-1C.
 | CR-YYY   | packages/database/baz.ts     | N/A: schema-only, migrate verified    |
 ```
 
-Every row needs a non-empty Verified By cell. If you can't fill one, the fix
-is partial — split the commit.
-
-**Sweep-audit block** — include when the message claims a sweep (the
-`commit-msg` hook rejects sweep claims without one):
+**Sweep-audit block** — when the message claims a sweep (hook enforces):
 
 ```
 Sweep audit:
   rg 'pattern' path/
-  -> N hits across N files; all N now have the fix.
+  -> N hits; all N now have the fix.
 ```
 
 Use `(no-sweep)` if a sweep keyword is incidental.
 
-### 5. Commit
+### 6. Commit
 
 ```bash
 git commit -m "$(cat <<'EOF'
@@ -107,29 +126,26 @@ EOF
 
 Do NOT use `--no-verify`. Let hooks run.
 
-### 6. Handle failure
+### 7. Handle failure
 
-If the commit fails, read `references/failure-recovery.md` in this skill
-directory for the detailed recovery procedure. The short version:
+If the commit fails, read `references/failure-recovery.md` for the
+recovery procedure. Short version:
 
 1. Read the hook error output
 2. If lint-staged auto-fixed files, re-stage and retry
-3. If tsc or jest failed on files unrelated to your changes, unstage those files and retry
+3. If tsc/jest failed on unrelated files, unstage those and retry
 4. Maximum 2 attempts. If still failing, report to the user.
 
-### 7. Push
+### 8. Push (only if explicitly requested)
 
-After a successful commit:
+Only if arguments explicitly say "and push." Otherwise STOP here.
 
-```bash
-git push
-```
+If push fails, report the situation. Do not force-push or rebase.
 
-If push fails (behind remote), ask before force-pushing or rebasing.
-
-### 8. Report
+### 9. Report
 
 Tell the user:
 - Commit hash and message
 - Which files were committed
 - Which files (if any) were excluded and why
+- Whether push was performed or skipped
