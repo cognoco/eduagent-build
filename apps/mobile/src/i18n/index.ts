@@ -97,4 +97,4 @@ i18next.on('languageChanged', (lang) => {
   if (__DEV__) console.log(`[i18n] languageChanged → ${lang}`);
 });
 
-export default i18next;
+export { i18next };

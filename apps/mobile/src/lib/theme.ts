@@ -17,11 +17,9 @@ export interface ThemeContextValue {
 
 export const ThemeContext = createContext<ThemeContextValue>({
   colorScheme: 'light',
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
-  setColorScheme: () => {},
+  setColorScheme: () => undefined,
   accentPresetId: null,
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
-  setAccentPresetId: () => {},
+  setAccentPresetId: () => undefined,
 });
 
 export function useTheme(): ThemeContextValue {

@@ -1,4 +1,4 @@
-import i18next from '../i18n';
+import { i18next } from '../i18n';
 
 /**
  * Centralized error formatter for API and network errors.

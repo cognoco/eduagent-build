@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import i18next, { LANGUAGE_LABELS, type SupportedLanguage } from '../i18n';
+import { i18next, LANGUAGE_LABELS, type SupportedLanguage } from '../i18n';
 import { useProfile } from '../lib/profile';
 import { useUpdateConversationLanguage } from './use-onboarding-dimensions';
 import {

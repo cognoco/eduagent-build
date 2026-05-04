@@ -62,7 +62,7 @@ jest.mock('../../../i18n', () => {
       String(opts[k] ?? `{{${k}}}`)
     );
   };
-  return { __esModule: true, default: { t } };
+  return { __esModule: true, i18next: { t } };
 });
 
 const mockReplace = jest.fn();

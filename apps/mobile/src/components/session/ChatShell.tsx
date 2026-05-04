@@ -274,15 +274,9 @@ export function ChatShell({
 
   // BUG-349: Sync voice state when inputMode prop changes after mount
   // (useState only reads initial value once, so prop changes were ignored).
-  // Guard against the prev value to avoid an extra render on every mode toggle.
+  // React bails out on identical state, so no manual prev-value guard needed.
   useEffect(() => {
-    if (inputMode) {
-      const shouldBeVoice = inputMode === 'voice';
-      if (isVoiceEnabled !== shouldBeVoice) {
-        setIsVoiceEnabled(shouldBeVoice);
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (inputMode) setIsVoiceEnabled(inputMode === 'voice');
   }, [inputMode]);
 
   // STT hook

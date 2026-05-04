@@ -115,11 +115,11 @@ export default function CurriculumScreen() {
     return () => {
       if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
     };
-    // curriculum intentionally excluded — we only want to restart the timer
-    // when subjectId changes (new subject). Data arrival is handled by the
-    // early-return branch above.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subjectId]);
+    // Including `curriculum` is safe: when it transitions undefined → defined,
+    // the cleanup clears the timer, then the early-return branch above runs
+    // and skips re-arming. react-query's structural sharing keeps the reference
+    // stable across refetches with identical data, so no spurious re-runs.
+  }, [subjectId, curriculum]);
 
   const skipTopic = useSkipTopic(subjectId ?? '');
   const unskipTopic = useUnskipTopic(subjectId ?? '');

@@ -49,7 +49,8 @@ import { track } from '../../lib/analytics';
 import { FAMILY_HOME_PATH } from '../../lib/navigation';
 import { useTranslation } from 'react-i18next';
 import { FEATURE_FLAGS } from '../../lib/feature-flags';
-import i18next, {
+import {
+  i18next,
   SUPPORTED_LANGUAGES,
   LANGUAGE_LABELS,
   setStoredLanguage,

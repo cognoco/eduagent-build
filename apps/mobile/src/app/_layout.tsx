@@ -199,8 +199,7 @@ function ThemedApp() {
 
   // No-op setColorScheme — color scheme always follows system.
   // Kept in context interface to avoid breaking consumers.
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
-  const setColorScheme = useCallback((_cs: ColorScheme) => {}, []);
+  const setColorScheme = useCallback((_cs: ColorScheme): void => undefined, []);
 
   const themeValue = useMemo(
     () => ({
