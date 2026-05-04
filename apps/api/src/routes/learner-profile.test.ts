@@ -10,17 +10,9 @@
 // ---------------------------------------------------------------------------
 
 // Mock JWT module so auth middleware passes with a valid token.
-jest.mock('../middleware/jwt', () => ({
-  decodeJWTHeader: jest.fn().mockReturnValue({ alg: 'RS256', kid: 'test-kid' }),
-  fetchJWKS: jest.fn().mockResolvedValue({
-    keys: [{ kty: 'RSA', kid: 'test-kid', n: 'fake-n', e: 'AQAB' }],
-  }),
-  verifyJWT: jest.fn().mockResolvedValue({
-    sub: 'user_test',
-    email: 'test@example.com',
-    exp: Math.floor(Date.now() / 1000) + 3600,
-  }),
-}));
+jest.mock('../middleware/jwt', () =>
+  require('../test-utils/auth-fixture').createJwtModuleMock()
+);
 
 jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
@@ -36,7 +28,22 @@ jest.mock('../inngest/client', () => ({
 // Minimal database stub — middleware creates it per request.
 import { createDatabaseModuleMock } from '../test-utils/database-module';
 
-const mockDatabaseModule = createDatabaseModuleMock();
+const mockDatabaseModule = createDatabaseModuleMock({ includeActual: true });
+const mockFindFamilyLink = jest.fn().mockResolvedValue({
+  parentProfileId: '770e8400-e29b-41d4-a716-446655440000',
+  childProfileId: '770e8400-e29b-41d4-a716-446655440001',
+});
+const familyLinksQuery = {
+  findFirst: (...args: unknown[]) => mockFindFamilyLink(...args),
+  findMany: jest.fn().mockResolvedValue([]),
+};
+
+mockDatabaseModule.db.query = new Proxy(mockDatabaseModule.db.query, {
+  get(target, prop, receiver) {
+    if (prop === 'familyLinks') return familyLinksQuery;
+    return Reflect.get(target, prop, receiver);
+  },
+});
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
@@ -64,22 +71,6 @@ jest.mock('../services/profile', () => ({
       location: null,
       consentStatus: 'CONSENTED',
     })),
-}));
-
-// Family-access is the IDOR choke point. The route calls assertParentAccess
-// which throws ForbiddenError on denial; we drive that decision here.
-const mockHasParentAccess = jest.fn();
-jest.mock('../services/family-access', () => ({
-  hasParentAccess: (...args: unknown[]) => mockHasParentAccess(...args),
-  assertParentAccess: async (...args: unknown[]) => {
-    const allowed = await mockHasParentAccess(...args);
-    if (!allowed) {
-      const { ForbiddenError } = jest.requireActual('../errors') as {
-        ForbiddenError: new (msg?: string) => Error;
-      };
-      throw new ForbiddenError('You do not have access to this child profile.');
-    }
-  },
 }));
 
 // Learner-profile service mocks — record calls so assertions can verify
@@ -124,7 +115,10 @@ jest.mock('../services/learner-input', () => ({
 import { app } from '../index';
 import { BASE_AUTH_ENV } from '../test-utils/test-env';
 
-const TEST_ENV = { ...BASE_AUTH_ENV };
+const TEST_ENV = {
+  ...BASE_AUTH_ENV,
+  DATABASE_URL: 'postgresql://test:test@localhost/test',
+};
 
 const PARENT_PROFILE_ID = '770e8400-e29b-41d4-a716-446655440000';
 const OWN_CHILD_PROFILE_ID = '770e8400-e29b-41d4-a716-446655440001';
@@ -160,7 +154,10 @@ const MINIMAL_PROFILE = {
 describe('learner-profile routes', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockHasParentAccess.mockReset();
+    mockFindFamilyLink.mockResolvedValue({
+      parentProfileId: PARENT_PROFILE_ID,
+      childProfileId: OWN_CHILD_PROFILE_ID,
+    });
     mockGetOrCreateLearningProfile.mockResolvedValue(MINIMAL_PROFILE);
     mockDeleteAllMemory.mockResolvedValue(undefined);
     mockDeleteMemoryItem.mockResolvedValue(undefined);
@@ -179,7 +176,7 @@ describe('learner-profile routes', () => {
 
   describe('IDOR protection on /learner-profile/:profileId/* routes', () => {
     beforeEach(() => {
-      mockHasParentAccess.mockResolvedValue(false);
+      mockFindFamilyLink.mockResolvedValue(undefined);
     });
 
     it('returns 403 on GET /learner-profile/:profileId for another family', async () => {
@@ -191,11 +188,7 @@ describe('learner-profile routes', () => {
 
       expect(res.status).toBe(403);
       expect(mockGetOrCreateLearningProfile).not.toHaveBeenCalled();
-      expect(mockHasParentAccess).toHaveBeenCalledWith(
-        undefined,
-        PARENT_PROFILE_ID,
-        OTHER_FAMILY_CHILD_ID
-      );
+      expect(mockFindFamilyLink).toHaveBeenCalledTimes(1);
     });
 
     it('returns 403 on DELETE /learner-profile/:profileId/all for another family', async () => {
@@ -261,7 +254,10 @@ describe('learner-profile routes', () => {
 
   describe('parent with valid family link', () => {
     beforeEach(() => {
-      mockHasParentAccess.mockResolvedValue(true);
+      mockFindFamilyLink.mockResolvedValue({
+        parentProfileId: PARENT_PROFILE_ID,
+        childProfileId: OWN_CHILD_PROFILE_ID,
+      });
     });
 
     it('returns 200 and the child profile on GET /learner-profile/:profileId', async () => {
@@ -273,7 +269,7 @@ describe('learner-profile routes', () => {
 
       expect(res.status).toBe(200);
       expect(mockGetOrCreateLearningProfile).toHaveBeenCalledWith(
-        undefined,
+        expect.anything(),
         OWN_CHILD_PROFILE_ID
       );
       const body = (await res.json()) as { profile: { id: string } };
@@ -293,7 +289,7 @@ describe('learner-profile routes', () => {
 
       expect(res.status).toBe(200);
       expect(mockGrantMemoryConsent).toHaveBeenCalledWith(
-        undefined,
+        expect.anything(),
         OWN_CHILD_PROFILE_ID,
         undefined,
         'granted'
@@ -328,12 +324,12 @@ describe('learner-profile routes', () => {
 
       expect(res.status).toBe(200);
       expect(mockDeleteAllMemory).toHaveBeenCalledWith(
-        undefined,
+        expect.anything(),
         PARENT_PROFILE_ID,
         'test-account-id'
       );
       // Family-link check is not required for self-scoped routes.
-      expect(mockHasParentAccess).not.toHaveBeenCalled();
+      expect(mockFindFamilyLink).not.toHaveBeenCalled();
     });
 
     it('persists self-consent on POST /learner-profile/consent', async () => {
@@ -349,12 +345,12 @@ describe('learner-profile routes', () => {
 
       expect(res.status).toBe(200);
       expect(mockGrantMemoryConsent).toHaveBeenCalledWith(
-        undefined,
+        expect.anything(),
         PARENT_PROFILE_ID,
         'test-account-id',
         'granted'
       );
-      expect(mockHasParentAccess).not.toHaveBeenCalled();
+      expect(mockFindFamilyLink).not.toHaveBeenCalled();
     });
 
     it('calls toggleMemoryEnabled on PATCH /learner-profile/memory-enabled', async () => {
@@ -370,7 +366,7 @@ describe('learner-profile routes', () => {
 
       expect(res.status).toBe(200);
       expect(mockToggleMemoryEnabled).toHaveBeenCalledWith(
-        undefined,
+        expect.anything(),
         PARENT_PROFILE_ID,
         'test-account-id',
         false
@@ -394,7 +390,7 @@ describe('learner-profile routes', () => {
 
       expect(res.status).toBe(200);
       expect(mockDeleteMemoryItem).toHaveBeenCalledWith(
-        undefined,
+        expect.anything(),
         PARENT_PROFILE_ID,
         'test-account-id',
         'interests',
@@ -434,12 +430,12 @@ describe('learner-profile routes', () => {
 
       expect(res.status).toBe(200);
       expect(mockUpdateAccommodationMode).toHaveBeenCalledWith(
-        undefined,
+        expect.anything(),
         PARENT_PROFILE_ID,
         'test-account-id',
         'short-burst'
       );
-      expect(mockHasParentAccess).not.toHaveBeenCalled();
+      expect(mockFindFamilyLink).not.toHaveBeenCalled();
     });
 
     it('returns 400 when accommodationMode is not a valid enum value', async () => {
@@ -464,7 +460,10 @@ describe('learner-profile routes', () => {
 
   describe('PATCH /learner-profile/:profileId/accommodation-mode (parent)', () => {
     it('returns 200 and calls updateAccommodationMode for linked child', async () => {
-      mockHasParentAccess.mockResolvedValue(true);
+      mockFindFamilyLink.mockResolvedValue({
+        parentProfileId: PARENT_PROFILE_ID,
+        childProfileId: OWN_CHILD_PROFILE_ID,
+      });
 
       const res = await app.request(
         `/v1/learner-profile/${OWN_CHILD_PROFILE_ID}/accommodation-mode`,
@@ -478,7 +477,7 @@ describe('learner-profile routes', () => {
 
       expect(res.status).toBe(200);
       expect(mockUpdateAccommodationMode).toHaveBeenCalledWith(
-        undefined,
+        expect.anything(),
         OWN_CHILD_PROFILE_ID,
         undefined,
         'audio-first'
@@ -486,7 +485,7 @@ describe('learner-profile routes', () => {
     });
 
     it('returns 403 for non-linked child', async () => {
-      mockHasParentAccess.mockResolvedValue(false);
+      mockFindFamilyLink.mockResolvedValue(undefined);
 
       const res = await app.request(
         `/v1/learner-profile/${OTHER_FAMILY_CHILD_ID}/accommodation-mode`,

@@ -2,21 +2,18 @@
 // Mock JWT module so auth middleware passes with a valid token
 // ---------------------------------------------------------------------------
 
-jest.mock('../middleware/jwt', () => ({
-  decodeJWTHeader: jest.fn().mockReturnValue({ alg: 'RS256', kid: 'test-kid' }),
-  fetchJWKS: jest.fn().mockResolvedValue({
-    keys: [{ kty: 'RSA', kid: 'test-kid', n: 'fake-n', e: 'AQAB' }],
-  }),
-  verifyJWT: jest.fn().mockResolvedValue({
-    sub: 'user_test',
-    email: 'test@example.com',
-    exp: Math.floor(Date.now() / 1000) + 3600,
-  }),
-}));
+jest.mock('../middleware/jwt', () =>
+  require('../test-utils/auth-fixture').createJwtModuleMock()
+);
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
+import { createRouteMeteringFixture } from '../test-utils/route-metering-fixture';
 
-const mockDatabaseModule = createDatabaseModuleMock();
+const mockDatabaseModule = createDatabaseModuleMock({ includeActual: true });
+const meteringFixture = createRouteMeteringFixture(mockDatabaseModule.db, {
+  accountId: 'test-account-id',
+  profileId: 'test-profile-id',
+});
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
@@ -41,49 +38,6 @@ jest.mock('../services/profile', () => ({
   }),
 }));
 
-// [CRIT-1/IMP-7] Billing/metering mock — POST /v1/dictation/generate,
-// /prepare-homework, and /review are now LLM-metered, so the metering
-// middleware runs before our handler and needs these service boundaries
-// mocked. Values chosen so quota check always passes unless a specific
-// test overrides them.
-jest.mock('../services/billing', () => ({
-  getSubscriptionByAccountId: jest.fn().mockResolvedValue({
-    id: 'sub-1',
-    accountId: 'test-account-id',
-    tier: 'free',
-    status: 'ACTIVE',
-  }),
-  ensureFreeSubscription: jest.fn().mockResolvedValue({
-    id: 'sub-1',
-    accountId: 'test-account-id',
-    tier: 'free',
-    status: 'ACTIVE',
-  }),
-  getQuotaPool: jest.fn().mockResolvedValue({
-    id: 'qp-1',
-    subscriptionId: 'sub-1',
-    monthlyLimit: 500,
-    usedThisMonth: 10,
-    dailyLimit: null,
-    usedToday: 0,
-  }),
-  decrementQuota: jest.fn().mockResolvedValue({
-    success: true,
-    source: 'monthly',
-    remainingMonthly: 489,
-    remainingTopUp: 0,
-    remainingDaily: null,
-  }),
-  getTopUpCreditsRemaining: jest.fn().mockResolvedValue(0),
-  incrementQuota: jest.fn().mockResolvedValue(undefined),
-  createSubscription: jest.fn(),
-}));
-
-// [CR-4] Mock settings service for rate limiting on POST /dictation/review
-jest.mock('../services/settings', () => ({
-  checkAndLogRateLimit: jest.fn().mockResolvedValue(false),
-}));
-
 // Mock the dictation services — they are the internal boundary
 jest.mock('../services/dictation', () => ({
   prepareHomework: jest.fn(),
@@ -104,11 +58,6 @@ import {
   fetchGenerateContext,
 } from '../services/dictation';
 import {
-  ensureFreeSubscription,
-  getQuotaPool,
-  decrementQuota,
-} from '../services/billing';
-import {
   AUTH_HEADERS as BASE_AUTH_HEADERS,
   BASE_AUTH_ENV,
 } from '../test-utils/test-env';
@@ -128,6 +77,7 @@ const TODAY = new Date().toISOString().slice(0, 10);
 
 beforeEach(() => {
   jest.clearAllMocks();
+  meteringFixture.reset();
 });
 
 // ---------------------------------------------------------------------------
@@ -754,6 +704,25 @@ describe('POST /v1/dictation/review', () => {
 
     expect(res.status).toBe(401);
   });
+
+  it('returns 429 when the per-profile review limit is exhausted [CR-4]', async () => {
+    meteringFixture.setNotificationLogCount(10);
+
+    const res = await app.request(
+      '/v1/dictation/review',
+      {
+        method: 'POST',
+        headers: AUTH_HEADERS,
+        body: JSON.stringify(REVIEW_BODY),
+      },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(429);
+    const body = await res.json();
+    expect(body.code).toBe('RATE_LIMITED');
+    expect(reviewDictation).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -764,28 +733,9 @@ describe('POST /v1/dictation/review', () => {
 
 describe('Dictation LLM routes — quota exhaustion [IMP-7]', () => {
   beforeEach(() => {
-    // Override the billing mock so quota check fails (monthly exhausted)
-    (ensureFreeSubscription as jest.Mock).mockResolvedValue({
-      id: 'sub-1',
-      accountId: 'test-account-id',
-      tier: 'free',
-      status: 'ACTIVE',
-    });
-    (getQuotaPool as jest.Mock).mockResolvedValue({
-      id: 'qp-1',
-      subscriptionId: 'sub-1',
-      monthlyLimit: 50,
-      usedThisMonth: 50,
-      dailyLimit: null,
-      usedToday: 0,
-    });
-    (decrementQuota as jest.Mock).mockResolvedValue({
-      success: false,
-      source: 'monthly_exceeded',
-      remainingMonthly: 0,
-      remainingTopUp: 0,
-      remainingDaily: null,
-    });
+    // Seed the real billing service state so metering rejects before the route.
+    meteringFixture.state.monthlyLimit = 50;
+    meteringFixture.setQuotaUsage(50, 0);
   });
 
   it('POST /dictation/generate returns 402 QUOTA_EXCEEDED', async () => {

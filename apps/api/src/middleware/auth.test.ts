@@ -30,20 +30,11 @@ const sentryMock = require('../services/sentry') as {
 // Mock jwt.ts — avoids real Web Crypto / JWKS calls in unit tests
 // ---------------------------------------------------------------------------
 
-jest.mock('./jwt', () => ({
-  decodeJWTHeader: jest.fn().mockReturnValue({ alg: 'RS256', kid: 'test-kid' }),
-  fetchJWKS: jest.fn().mockResolvedValue({
-    keys: [{ kty: 'RSA', kid: 'test-kid', n: 'fake-n', e: 'AQAB' }],
-  }),
-  // Default: successful verification; individual tests override with
-  // mockResolvedValueOnce for specific payloads or mockRejectedValueOnce for
-  // failure scenarios. Using mockResolvedValue (persistent) ensures the mock
-  // always resolves even when clearAllMocks() clears the Once-queue between tests.
-  verifyJWT: jest.fn().mockResolvedValue({
-    sub: 'user_default',
-    exp: Math.floor(Date.now() / 1000) + 3600,
-  }),
-}));
+jest.mock('./jwt', () =>
+  require('../test-utils/auth-fixture').createJwtModuleMock({
+    payload: { sub: 'user_default', email: undefined },
+  })
+);
 
 const jwtMock = require('./jwt') as {
   verifyJWT: jest.Mock;
