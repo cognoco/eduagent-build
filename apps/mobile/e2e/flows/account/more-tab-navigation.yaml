@@ -15,7 +15,7 @@
 #     (standalone routes pushed from More, Back pops them)
 appId: com.mentomate.app
 tags:
-  - nightly
+  - pr-blocking
   - account
   - navigation
 ---
@@ -43,10 +43,24 @@ tags:
     timeout: 30000
 
 # ── Visual integrity: all section headings scrollable ──────────────────
-# More screen sections: Learning Mode, Learning Accommodation, Celebrations,
-# Notifications, Account, Other. Each must be reachable by scrolling.
+# More screen sections: Learning Mode, Learning Accommodation, Mentor Memory,
+# Family, Celebrations, Notifications, Account, Other. Each must be reachable.
 - assertVisible:
     id: "learning-mode-section-header"
+
+- scrollUntilVisible:
+    element:
+      id: "learning-accommodation-section-header"
+    direction: DOWN
+    timeout: 10000
+- assertVisible:
+    id: "accommodation-mode-none"
+- assertVisible:
+    id: "accommodation-mode-short-burst"
+- assertVisible:
+    id: "accommodation-mode-audio-first"
+- assertVisible:
+    id: "accommodation-mode-predictable"
 
 - scrollUntilVisible:
     element:
