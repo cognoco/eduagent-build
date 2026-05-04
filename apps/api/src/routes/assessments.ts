@@ -5,9 +5,8 @@ import {
   quickCheckResponseSchema,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
-import type { AuthUser } from '../middleware/auth';
-import { requireProfileId } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
+import { withProfile, type RouteEnv } from '../route-utils/route-context';
 import {
   evaluateAssessmentAnswer,
   createAssessment,
@@ -20,21 +19,11 @@ import { insertSessionXpEntry } from '../services/xp';
 import { getSession } from '../services/session';
 import { notFound } from '../errors';
 
-type AssessmentRouteEnv = {
-  Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
-  Variables: {
-    user: AuthUser;
-    db: Database;
-    profileId: string | undefined;
-  };
-};
-
-export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
+export const assessmentRoutes = new Hono<RouteEnv>()
   // Start a topic completion assessment
   .post('/subjects/:subjectId/topics/:topicId/assessments', async (c) => {
     assertNotProxyMode(c);
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
+    const { db, profileId } = withProfile(c);
     const subjectId = c.req.param('subjectId');
     const topicId = c.req.param('topicId');
 
@@ -65,8 +54,7 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
     '/assessments/:assessmentId/answer',
     zValidator('json', assessmentAnswerSchema),
     async (c) => {
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       const assessmentId = c.req.param('assessmentId');
       const { answer } = c.req.valid('json');
 
@@ -143,8 +131,7 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
 
   // Get assessment state
   .get('/assessments/:assessmentId', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
+    const { db, profileId } = withProfile(c);
     const assessmentId = c.req.param('assessmentId');
 
     const assessment = await getAssessment(db, profileId, assessmentId);
@@ -157,8 +144,7 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
     '/sessions/:sessionId/quick-check',
     zValidator('json', quickCheckResponseSchema),
     async (c) => {
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       const sessionId = c.req.param('sessionId');
       const { answer } = c.req.valid('json');
 
