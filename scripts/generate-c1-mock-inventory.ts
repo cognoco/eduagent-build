@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 type Category =
@@ -717,9 +717,7 @@ function main(): void {
 
   if (checkMode && staleFiles.length > 0) {
     const names = staleFiles
-      .map((entry) =>
-        entry.path.replace(`${repoRoot}\\`, '').replace(/\\/g, '/')
-      )
+      .map((entry) => relative(repoRoot, entry.path).replace(/\\/g, '/'))
       .join('\n');
     throw new Error(
       `C1 mock inventory artifacts are out of date. Regenerate them with:\n` +

@@ -1,23 +1,21 @@
-# Flow N9b: Topic Detail — Adaptive Buttons for In-Progress Topic (Story 4.14)
-# Validates: smart primary + expandable secondary actions show correct layout
-# for in_progress topics.
-# When completionStatus = in_progress:
-#   - Primary: "Continue learning" (primary-action-button)
-#   - Secondary section: "More ways to practice" -> "Recall Check"
+# Flow N9b: Topic Detail — Study CTA label for In-Progress Topic
+# Validates: deriveStudyCTA returns the in_progress label (not the not_started
+# or completed-strong labels) when the topic has sessions but no passed
+# assessment. Complements N9 which pins the not_started label.
 # Tags: nightly, retention
 #
 # Journey: UX Journey 2 (Retention management)
-# Epics: Story 4.14 (adaptive buttons)
+# Epics: StudyCTA derivation (PR #144)
 # Prerequisite: Seeded user with active session (scenario: learning-active)
 #
 # Seed note: learning-active creates a topic with 1 session (3 exchanges),
 # so computeCompletionStatus returns "in_progress" (sessionCount > 0, no
-# passed assessment). This triggers the in_progress button layout.
+# passed assessment). deriveStudyCTA falls through both conditional branches
+# and returns { label: "Review this topic", variant: 'primary' }.
 #
-# testID mapping (topic/[topicId].tsx — smart primary + expandable secondary):
-#   - primary-action-button     -> primary button for in_progress
-#   - more-ways-toggle          -> expands secondary actions
-#   - secondary-recall-check    -> recall check action
+# testID mapping (topic/[topicId].tsx):
+#   - retention-card    -> retention metrics card (optional for this seed)
+#   - study-cta         -> sticky study CTA button (single, label varies by state)
 appId: com.mentomate.app
 tags:
   - nightly
@@ -72,25 +70,23 @@ tags:
       text: "Progress"
     timeout: 10000
 
-# 8. Verify in_progress smart primary action
+# 8. Verify the study CTA renders the in_progress label.
+# learning-active seed -> sessions > 0, no passed assessment -> in_progress,
+# so deriveStudyCTA returns "Review this topic". Asserting the exact label
+# pins the derivation: a regression that returns "Start studying" (which
+# would re-treat in_progress as not_started) would fail this step.
 - assertVisible:
-    id: "primary-action-button"
+    id: "study-cta"
 - assertVisible:
-    text: "Continue learning"
+    text: "Review this topic"
 
-# 9. Verify the secondary section is available and exposes Recall Check
-- assertVisible:
-    id: "more-ways-toggle"
-- tapOn:
-    id: "more-ways-toggle"
-- assertVisible:
-    id: "secondary-recall-check"
-- assertVisible:
-    text: "Recall Check"
-
-# 10. Verify not_started primary label is not shown
+# 9. Negative assertion: the not_started label and the strong-retention
+# completed label must NOT appear. Catches regressions that fall back to
+# "Start studying" or that misclassify in_progress as completed+strong.
 - assertNotVisible:
-    text: "Start learning"
+    text: "Start studying"
+- assertNotVisible:
+    text: "Practice again"
 
-# 11. Screenshot of in_progress adaptive buttons
-- takeScreenshot: topic-detail-in-progress-adaptive-buttons
+# 10. Screenshot of in_progress study CTA
+- takeScreenshot: topic-detail-study-cta-in-progress

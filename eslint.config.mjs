@@ -290,10 +290,20 @@ export default [
     },
   },
   // -------------------------------------------------------------------------
-  // Governance Rule 4 — raw process.env reads are banned in API production
-  // code. Use the typed config object in apps/api/src/config.ts. The
-  // env-validation middleware and the test-only fallbacks in middleware/llm
-  // and inngest/helpers are explicitly allow-listed below.
+  // Governance Rule 4 + G4 (api default-export ban) — combined because flat
+  // config rules don't merge by key and both target apps/api/src/**.
+  //
+  // Rule 4: raw process.env reads are banned in API production code. Use the
+  //   typed config object in apps/api/src/config.ts. The env-validation
+  //   middleware and the test-only fallbacks in middleware/llm and
+  //   inngest/helpers are explicitly allow-listed below.
+  //
+  // G4 (api): default exports are reserved for the Worker entrypoint at
+  //   apps/api/src/index.ts (Cloudflare Workers require `export default`).
+  //   Anywhere else in the API source, named exports keep imports searchable
+  //   and prevent accidental rename drift — same rationale as the mobile G4
+  //   rule in apps/mobile/eslint.config.mjs.
+  //
   // See CLAUDE.md > Repo-Specific Guardrails.
   // -------------------------------------------------------------------------
   {
@@ -307,6 +317,28 @@ export default [
       'apps/api/src/**/*.spec.ts',
       'apps/api/src/**/*.integration.test.ts',
     ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "MemberExpression[object.name='process'][property.name='env']",
+          message:
+            'Use the typed config object from apps/api/src/config.ts instead of raw process.env. See CLAUDE.md.',
+        },
+        {
+          selector: 'ExportDefaultDeclaration',
+          message:
+            'Default exports are reserved for the Worker entrypoint (apps/api/src/index.ts). Use a named export elsewhere. See CLAUDE.md.',
+        },
+      ],
+    },
+  },
+  // G4 (api) — Worker entrypoint allow-list. index.ts must `export default`
+  // its fetch handler for Cloudflare Workers; keep the process.env ban
+  // active here but drop the ExportDefaultDeclaration selector.
+  {
+    files: ['apps/api/src/index.ts'],
     rules: {
       'no-restricted-syntax': [
         'error',
@@ -369,6 +401,11 @@ export default [
             "CallExpression[callee.property.name=/^(select|insert|update|delete)$/][callee.object.type='CallExpression'][callee.object.callee.object.name='c'][callee.object.callee.property.name='get'][callee.object.arguments.0.value='db']",
           message:
             "Route files must not call .select/.insert/.update/.delete directly on c.get('db'). Move the query into services/* and use createScopedRepository(profileId). See CLAUDE.md.",
+        },
+        {
+          selector: 'ExportDefaultDeclaration',
+          message:
+            'Default exports are reserved for the Worker entrypoint (apps/api/src/index.ts). Use a named export elsewhere. See CLAUDE.md.',
         },
       ],
     },
