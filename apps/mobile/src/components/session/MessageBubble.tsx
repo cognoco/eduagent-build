@@ -46,8 +46,7 @@ function ThinkingDot({ delay }: { delay: number }): React.ReactElement {
       -1,
       false
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [opacity]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
@@ -76,8 +75,7 @@ function PencilTapIcon(): React.ReactElement {
       -1,
       false
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reduceMotion]);
+  }, [reduceMotion, translateY]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: translateY.value }],
@@ -119,8 +117,7 @@ function BlinkingCursor(): React.ReactElement {
       -1,
       false
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [opacity]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,

@@ -1057,7 +1057,9 @@ describe('SessionSummaryScreen', () => {
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
       await waitFor(() => {
-        screen.getByDisplayValue('unfinished thought about autotrophs');
+        expect(
+          screen.getByTestId('summary-input').props.value
+        ).toBe('unfinished thought about autotrophs');
       });
     });
 
@@ -1195,7 +1197,9 @@ describe('SessionSummaryScreen', () => {
         screen.getByTestId('summary-resubmit-banner');
       });
       expect(screen.queryByTestId('summary-skipped-state')).toBeNull();
-      screen.getByDisplayValue('text I started last time but never submitted');
+      expect(
+        screen.getByTestId('summary-input').props.value
+      ).toBe('text I started last time but never submitted');
     });
 
     it('clears the stale draft when the session is already submitted server-side', async () => {

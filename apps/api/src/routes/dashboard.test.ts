@@ -2,21 +2,28 @@
 // Mock JWT module so auth middleware passes with a valid token
 // ---------------------------------------------------------------------------
 
-jest.mock('../middleware/jwt', () => ({
-  decodeJWTHeader: jest.fn().mockReturnValue({ alg: 'RS256', kid: 'test-kid' }),
-  fetchJWKS: jest.fn().mockResolvedValue({
-    keys: [{ kty: 'RSA', kid: 'test-kid', n: 'fake-n', e: 'AQAB' }],
-  }),
-  verifyJWT: jest.fn().mockResolvedValue({
-    sub: 'user_test',
-    email: 'test@example.com',
-    exp: Math.floor(Date.now() / 1000) + 3600,
-  }),
-}));
+jest.mock('../middleware/jwt', () =>
+  require('../test-utils/auth-fixture').createJwtModuleMock()
+);
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
 
-const mockDatabaseModule = createDatabaseModuleMock();
+const mockDatabaseModule = createDatabaseModuleMock({ includeActual: true });
+const mockFindFamilyLink = jest.fn().mockResolvedValue({
+  parentProfileId: 'test-profile-id',
+  childProfileId: '770e8400-e29b-41d4-a716-446655440000',
+});
+const familyLinksQuery = {
+  findFirst: (...args: unknown[]) => mockFindFamilyLink(...args),
+  findMany: jest.fn().mockResolvedValue([]),
+};
+
+mockDatabaseModule.db.query = new Proxy(mockDatabaseModule.db.query, {
+  get(target, prop, receiver) {
+    if (prop === 'familyLinks') return familyLinksQuery;
+    return Reflect.get(target, prop, receiver);
+  },
+});
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
@@ -53,17 +60,6 @@ jest.mock('../services/dashboard', () => ({
     mockGetChildSubjectTopics(...args),
 }));
 
-// [T-3 / BUG-744] Mock assertParentAccess so IDOR break tests can force 403.
-// The default mock succeeds (returns void). Individual break tests override it
-// to throw ForbiddenError — proving the route handles the error as 403.
-const mockAssertParentAccess = jest.fn().mockResolvedValue(undefined);
-
-jest.mock('../services/family-access', () => ({
-  ...jest.requireActual('../services/family-access'),
-  assertParentAccess: (...args: unknown[]) => mockAssertParentAccess(...args),
-  hasParentAccess: jest.fn().mockResolvedValue(true),
-}));
-
 const mockListWeeklyReports = jest.fn().mockResolvedValue([]);
 const mockGetWeeklyReport = jest.fn().mockResolvedValue(null);
 const mockMarkWeeklyReportViewed = jest.fn().mockResolvedValue(undefined);
@@ -87,8 +83,12 @@ import {
   AUTH_HEADERS as BASE_AUTH_HEADERS,
   BASE_AUTH_ENV,
 } from '../test-utils/test-env';
+import { extractDrizzleParamValues } from '../test-utils/drizzle-introspection';
 
-const TEST_ENV = { ...BASE_AUTH_ENV };
+const TEST_ENV = {
+  ...BASE_AUTH_ENV,
+  DATABASE_URL: 'postgresql://test:test@localhost/test',
+};
 
 const AUTH_HEADERS = {
   ...BASE_AUTH_HEADERS,
@@ -101,6 +101,10 @@ const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
 describe('dashboard routes', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockFindFamilyLink.mockResolvedValue({
+      parentProfileId: 'test-profile-id',
+      childProfileId: PROFILE_ID,
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -296,9 +300,8 @@ describe('dashboard routes', () => {
         TEST_ENV
       );
 
-      // First arg is db (undefined in test context since services are mocked)
       expect(mockListWeeklyReports).toHaveBeenCalledWith(
-        undefined,
+        expect.anything(),
         'test-profile-id',
         PROFILE_ID
       );
@@ -315,8 +318,29 @@ describe('dashboard routes', () => {
     it('returns 200 with weekly report data', async () => {
       mockGetWeeklyReport.mockResolvedValueOnce({
         id: REPORT_ID,
+        profileId: 'a0000001-0000-4000-a000-000000000001',
+        childProfileId: PROFILE_ID,
         reportWeek: '2026-04-14',
-        reportData: { childName: 'Test' },
+        reportData: {
+          childName: 'Test',
+          weekStart: '2026-04-14',
+          thisWeek: {
+            totalSessions: 3,
+            totalActiveMinutes: 45,
+            topicsMastered: 1,
+            topicsExplored: 2,
+            vocabularyTotal: 10,
+            streakBest: 3,
+          },
+          lastWeek: null,
+          headlineStat: {
+            label: 'Topics mastered',
+            value: 1,
+            comparison: 'in a first week',
+          },
+        },
+        viewedAt: null,
+        createdAt: '2026-04-21T00:00:00.000Z',
       });
 
       const res = await app.request(
@@ -359,9 +383,8 @@ describe('dashboard routes', () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.viewed).toBe(true);
-      // First arg is db (undefined in test context since services are mocked)
       expect(mockMarkWeeklyReportViewed).toHaveBeenCalledWith(
-        undefined,
+        expect.anything(),
         'test-profile-id',
         PROFILE_ID,
         REPORT_ID
@@ -390,16 +413,9 @@ describe('dashboard routes', () => {
   // -------------------------------------------------------------------------
 
   describe('[BUG-744] IDOR: assertParentAccess rejects mismatched parent/child', () => {
-    beforeEach(() => {
-      // Default: access granted. Override in individual break tests.
-      mockAssertParentAccess.mockResolvedValue(undefined);
-    });
-
     // [BREAK] memory endpoint calls assertParentAccess directly in the route
     it('[BREAK] GET /dashboard/children/:id/memory returns 403 for unlinked parent', async () => {
-      mockAssertParentAccess.mockRejectedValueOnce(
-        new ForbiddenError('You do not have access to this child profile.')
-      );
+      mockFindFamilyLink.mockResolvedValueOnce(undefined);
 
       const res = await app.request(
         `/v1/dashboard/children/${PROFILE_ID}/memory`,
@@ -408,7 +424,17 @@ describe('dashboard routes', () => {
       );
 
       expect(res.status).toBe(403);
-      expect(mockAssertParentAccess).toHaveBeenCalledTimes(1);
+      expect(mockFindFamilyLink).toHaveBeenCalledTimes(1);
+
+      // Pin the actual UUIDs the route asked the family-link table about. A
+      // future refactor that drops or swaps the parent/child equality clauses
+      // would still 403 (because the mock returns undefined) but would silently
+      // break the IDOR contract — this assertion catches that.
+      const params = extractDrizzleParamValues(
+        mockFindFamilyLink.mock.calls[0]?.[0]
+      );
+      expect(params).toContain('test-profile-id');
+      expect(params).toContain(PROFILE_ID);
     });
 
     it('GET /dashboard/children/:id/memory returns 200 for linked parent', async () => {
@@ -544,9 +570,7 @@ describe('dashboard routes', () => {
 
     for (const fixture of dashboardRouteFixtures) {
       it(`[BREAK / BUG-834] ${fixture.label} returns 403 when route-entry assertParentAccess rejects`, async () => {
-        mockAssertParentAccess.mockRejectedValueOnce(
-          new ForbiddenError('You do not have access to this child profile.')
-        );
+        mockFindFamilyLink.mockResolvedValueOnce(undefined);
 
         const res = await app.request(
           fixture.path,
@@ -566,9 +590,7 @@ describe('dashboard routes', () => {
     // tightest "defense-in-depth" assertion: the route-layer guard fires
     // before the service is even reached.
     it('[BREAK / BUG-834] route-entry guard short-circuits — service not called', async () => {
-      mockAssertParentAccess.mockRejectedValueOnce(
-        new ForbiddenError('You do not have access to this child profile.')
-      );
+      mockFindFamilyLink.mockResolvedValueOnce(undefined);
 
       const res = await app.request(
         `/v1/dashboard/children/${PROFILE_ID}`,

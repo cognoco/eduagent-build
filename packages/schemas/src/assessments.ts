@@ -130,6 +130,11 @@ export type AnalogyDomainUpdateInput = z.infer<
   typeof analogyDomainUpdateSchema
 >;
 
+export const analogyDomainResponseSchema = z.object({
+  analogyDomain: analogyDomainSchema.nullable(),
+});
+export type AnalogyDomainResponse = z.infer<typeof analogyDomainResponseSchema>;
+
 // EVALUATE assessment — hidden LLM output for Devil's Advocate challenges (FR128-133)
 
 export const evaluateAssessmentSchema = z.object({
@@ -257,3 +262,155 @@ export const evaluateFailureActionSchema = z.object({
   newDifficultyRung: z.number().int().min(1).max(4).optional(),
 });
 export type EvaluateFailureAction = z.infer<typeof evaluateFailureActionSchema>;
+
+// Route response envelopes — one schema per success c.json() call
+
+export const createAssessmentResponseSchema = z.object({
+  assessment: assessmentSchema,
+});
+export type CreateAssessmentResponse = z.infer<
+  typeof createAssessmentResponseSchema
+>;
+
+export const submitAssessmentAnswerResponseSchema = z.object({
+  evaluation: assessmentEvaluationSchema,
+});
+export type SubmitAssessmentAnswerResponse = z.infer<
+  typeof submitAssessmentAnswerResponseSchema
+>;
+
+export const getAssessmentResponseSchema = z.object({
+  assessment: assessmentRecordSchema,
+});
+export type GetAssessmentResponse = z.infer<typeof getAssessmentResponseSchema>;
+
+export const quickCheckFeedbackResponseSchema = z.object({
+  feedback: z.string(),
+  isCorrect: z.boolean(),
+});
+export type QuickCheckFeedbackResponse = z.infer<
+  typeof quickCheckFeedbackResponseSchema
+>;
+
+// ---------------------------------------------------------------------------
+// Retention route response envelopes
+// ---------------------------------------------------------------------------
+
+// RetentionCardResponse extended with topic metadata (Library Topics tab)
+const retentionCardWithMetaSchema = retentionCardSchema.extend({
+  topicTitle: z.string(),
+  bookId: z.string(),
+});
+
+/** GET /subjects/:subjectId/retention */
+export const subjectRetentionResponseSchema = z.object({
+  topics: z.array(retentionCardWithMetaSchema),
+  reviewDueCount: z.number().int(),
+});
+export type SubjectRetentionResponse = z.infer<
+  typeof subjectRetentionResponseSchema
+>;
+
+/** GET /library/retention */
+export const libraryRetentionResponseSchema = z.object({
+  subjects: z.array(
+    z.object({
+      subjectId: z.string().uuid(),
+      topics: z.array(retentionCardWithMetaSchema),
+      reviewDueCount: z.number().int(),
+    })
+  ),
+});
+export type LibraryRetentionResponse = z.infer<
+  typeof libraryRetentionResponseSchema
+>;
+
+/** GET /topics/:topicId/retention */
+export const topicRetentionResponseSchema = z.object({
+  card: retentionCardSchema.nullable(),
+});
+export type TopicRetentionResponse = z.infer<
+  typeof topicRetentionResponseSchema
+>;
+
+// Recall test result — RemediationSchema is embedded here to avoid circular imports
+const recallRemediationSchema = z.object({
+  action: z.literal('redirect_to_library'),
+  topicId: z.string().uuid(),
+  topicTitle: z.string(),
+  retentionStatus: z.string(),
+  failureCount: z.number().int(),
+  cooldownEndsAt: z.string().datetime(),
+  options: z.array(z.enum(['review_and_retest', 'relearn_topic'])),
+});
+
+export const recallTestResultSchema = z.object({
+  passed: z.boolean(),
+  masteryScore: z.number(),
+  xpChange: z.string(),
+  nextReviewAt: z.string().datetime(),
+  failureCount: z.number().int(),
+  hint: z.string().optional(),
+  failureAction: z.enum(['feedback_only', 'redirect_to_library']).optional(),
+  remediation: recallRemediationSchema.optional(),
+  cooldownActive: z.boolean().optional(),
+  cooldownEndsAt: z.string().datetime().optional(),
+});
+export type RecallTestResult = z.infer<typeof recallTestResultSchema>;
+
+/** POST /retention/recall-test */
+export const recallTestResponseSchema = z.object({
+  result: recallTestResultSchema,
+});
+export type RecallTestResponse = z.infer<typeof recallTestResponseSchema>;
+
+/** POST /retention/relearn */
+export const relearnResponseSchema = z.object({
+  message: z.string(),
+  topicId: z.string().uuid(),
+  method: z.string(),
+  preferredMethod: z.string().optional(),
+  sessionId: z.string().uuid().nullable(),
+  recap: z.string().nullable(),
+});
+export type RelearnResponse = z.infer<typeof relearnResponseSchema>;
+
+/** GET /subjects/:subjectId/needs-deepening */
+export const needsDeepeningResponseSchema = z.object({
+  topics: z.array(needsDeepeningSchema),
+  count: z.number().int(),
+});
+export type NeedsDeepeningResponse = z.infer<
+  typeof needsDeepeningResponseSchema
+>;
+
+// Teaching preference response shape (GET + PUT share the same envelope)
+export const teachingPreferenceResponseDataSchema = z.object({
+  subjectId: z.string().uuid(),
+  method: z.string(),
+  analogyDomain: z.string().nullable().optional(),
+  nativeLanguage: z.string().nullable().optional(),
+});
+
+/** GET /subjects/:subjectId/teaching-preference
+ *  PUT /subjects/:subjectId/teaching-preference */
+export const teachingPreferenceEndpointResponseSchema = z.object({
+  preference: teachingPreferenceResponseDataSchema.nullable(),
+});
+export type TeachingPreferenceEndpointResponse = z.infer<
+  typeof teachingPreferenceEndpointResponseSchema
+>;
+
+/** DELETE /subjects/:subjectId/teaching-preference */
+export const deleteTeachingPreferenceResponseSchema = z.object({
+  message: z.string(),
+});
+export type DeleteTeachingPreferenceResponse = z.infer<
+  typeof deleteTeachingPreferenceResponseSchema
+>;
+
+/** GET /retention/stability */
+export const stabilityResponseSchema = z.object({
+  topics: z.array(topicStabilitySchema),
+});
+export type StabilityResponse = z.infer<typeof stabilityResponseSchema>;

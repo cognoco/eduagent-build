@@ -1,5 +1,13 @@
 import { z } from 'zod';
-import { milestoneTypeSchema } from './snapshots';
+import {
+  milestoneTypeSchema,
+  knowledgeInventorySchema,
+  progressHistorySchema,
+  monthlyReportSummarySchema,
+  monthlyReportRecordSchema,
+  weeklyReportSummarySchema,
+  weeklyReportRecordSchema,
+} from './snapshots';
 
 export const learningModeSchema = z.enum(['serious', 'casual']);
 export type LearningMode = z.infer<typeof learningModeSchema>;
@@ -89,6 +97,74 @@ export const pushTokenRegisterSchema = z.object({
   token: z.string().min(1),
 });
 export type PushTokenRegisterInput = z.infer<typeof pushTokenRegisterSchema>;
+
+// ---------------------------------------------------------------------------
+// Route-level response schemas (settings routes)
+// ---------------------------------------------------------------------------
+
+// Response variant: server always populates the optional fields, so they are
+// required and the bounded range is loosened (the client should accept any
+// historical value the DB might still hold).
+export const notificationPrefsResponseSchema = notificationPrefsSchema.extend({
+  weeklyProgressPush: z.boolean(),
+  maxDailyPush: z.number().int(),
+});
+export type NotificationPrefsResponse = z.infer<
+  typeof notificationPrefsResponseSchema
+>;
+
+export const getNotificationsResponseSchema = z.object({
+  preferences: notificationPrefsResponseSchema,
+});
+export type GetNotificationsResponse = z.infer<
+  typeof getNotificationsResponseSchema
+>;
+
+export const getLearningModeResponseSchema = z.object({
+  mode: learningModeSchema,
+});
+export type GetLearningModeResponse = z.infer<
+  typeof getLearningModeResponseSchema
+>;
+
+export const getCelebrationLevelResponseSchema = z.object({
+  celebrationLevel: celebrationLevelSchema,
+});
+export type GetCelebrationLevelResponse = z.infer<
+  typeof getCelebrationLevelResponseSchema
+>;
+
+// GET /celebrations/pending
+export const pendingCelebrationsResponseSchema = z.object({
+  pendingCelebrations: z.array(pendingCelebrationSchema),
+});
+export type PendingCelebrationsResponse = z.infer<
+  typeof pendingCelebrationsResponseSchema
+>;
+
+// POST /celebrations/seen
+export const celebrationSeenResponseSchema = z.object({
+  ok: z.literal(true),
+});
+export type CelebrationSeenResponse = z.infer<
+  typeof celebrationSeenResponseSchema
+>;
+
+export const pushTokenRegisteredResponseSchema = z.object({
+  registered: z.boolean(),
+});
+export type PushTokenRegisteredResponse = z.infer<
+  typeof pushTokenRegisteredResponseSchema
+>;
+
+export const notifyParentSubscribeResponseSchema = z.object({
+  sent: z.boolean(),
+  rateLimited: z.boolean(),
+  reason: z.string().optional(),
+});
+export type NotifyParentSubscribeResponse = z.infer<
+  typeof notifyParentSubscribeResponseSchema
+>;
 
 export const subjectProgressSchema = z.object({
   subjectId: z.string().uuid(),
@@ -521,4 +597,231 @@ export const continueSuggestionResponseSchema = z.object({
 });
 export type ContinueSuggestionResponse = z.infer<
   typeof continueSuggestionResponseSchema
+>;
+
+// ---------------------------------------------------------------------------
+// Route-level response schemas (streaks routes)
+// ---------------------------------------------------------------------------
+
+export const streakEndpointResponseSchema = z.object({
+  streak: streakSchema,
+});
+export type StreakEndpointResponse = z.infer<
+  typeof streakEndpointResponseSchema
+>;
+
+export const xpSummaryEndpointResponseSchema = z.object({
+  xp: xpSummarySchema,
+});
+export type XpSummaryEndpointResponse = z.infer<
+  typeof xpSummaryEndpointResponseSchema
+>;
+
+// ---------------------------------------------------------------------------
+// Route-level response schemas (dashboard routes)
+// ---------------------------------------------------------------------------
+
+// GET /dashboard — already covered by dashboardDataSchema. Re-export as a
+// named response schema to follow the same naming convention as other routes.
+export const dashboardResponseSchema = dashboardDataSchema;
+export type DashboardResponse = z.infer<typeof dashboardResponseSchema>;
+
+// GET /dashboard/children/:profileId
+export const childDetailResponseSchema = z.object({
+  child: dashboardChildSchema.nullable(),
+});
+export type ChildDetailResponse = z.infer<typeof childDetailResponseSchema>;
+
+// GET /dashboard/children/:profileId/inventory
+export const childInventoryResponseSchema = z.object({
+  inventory: knowledgeInventorySchema,
+});
+export type ChildInventoryResponse = z.infer<
+  typeof childInventoryResponseSchema
+>;
+
+// GET /dashboard/children/:profileId/progress-history
+export const childProgressHistoryResponseSchema = z.object({
+  history: progressHistorySchema,
+});
+export type ChildProgressHistoryResponse = z.infer<
+  typeof childProgressHistoryResponseSchema
+>;
+
+// GET /dashboard/children/:profileId/subjects/:subjectId
+export const childSubjectTopicsResponseSchema = z.object({
+  topics: z.array(topicProgressSchema),
+});
+export type ChildSubjectTopicsResponse = z.infer<
+  typeof childSubjectTopicsResponseSchema
+>;
+
+// Child session schema — mirrors the ChildSession interface in services/dashboard.ts.
+// Uses inline enum values to avoid a circular import with sessions.ts
+// (which already imports from progress.ts).
+const homeworkSummaryInlineSchema = z.object({
+  problemCount: z.number().int().min(0),
+  practicedSkills: z.array(z.string()),
+  independentProblemCount: z.number().int().min(0),
+  guidedProblemCount: z.number().int().min(0),
+  summary: z.string().min(1),
+  displayTitle: z.string().min(1),
+});
+
+export const childSessionSchema = z.object({
+  sessionId: z.string().uuid(),
+  subjectId: z.string().uuid(),
+  subjectName: z.string().nullable(),
+  topicId: z.string().uuid().nullable(),
+  topicTitle: z.string().nullable(),
+  sessionType: z.enum(['learning', 'homework', 'interleaved']),
+  startedAt: z.string().datetime(),
+  endedAt: z.string().datetime().nullable(),
+  exchangeCount: z.number().int(),
+  escalationRung: z.number().int().min(1).max(5),
+  durationSeconds: z.number().int().nullable(),
+  wallClockSeconds: z.number().int().nullable(),
+  displayTitle: z.string(),
+  displaySummary: z.string().nullable(),
+  homeworkSummary: homeworkSummaryInlineSchema.nullable(),
+  highlight: z.string().nullable(),
+  narrative: z.string().nullable(),
+  conversationPrompt: z.string().nullable(),
+  engagementSignal: z
+    .enum(['curious', 'stuck', 'breezing', 'focused', 'scattered'])
+    .nullable(),
+});
+export type ChildSession = z.infer<typeof childSessionSchema>;
+
+// GET /dashboard/children/:profileId/sessions
+export const childSessionsResponseSchema = z.object({
+  sessions: z.array(childSessionSchema),
+});
+export type ChildSessionsResponse = z.infer<typeof childSessionsResponseSchema>;
+
+// GET /dashboard/children/:profileId/sessions/:sessionId
+export const childSessionDetailResponseSchema = z.object({
+  session: childSessionSchema,
+});
+export type ChildSessionDetailResponse = z.infer<
+  typeof childSessionDetailResponseSchema
+>;
+
+// Curated memory view schema — mirrors CuratedMemoryView interface in
+// services/curated-memory.ts.
+export const memoryCategoryKeySchema = z.enum([
+  'struggles',
+  'interests',
+  'strengths',
+  'communicationNotes',
+  'learningStyle',
+]);
+export type MemoryCategoryKey = z.infer<typeof memoryCategoryKeySchema>;
+
+export const curatedMemoryItemSchema = z.object({
+  category: memoryCategoryKeySchema,
+  value: z.string(),
+  statement: z.string(),
+});
+export type CuratedMemoryItem = z.infer<typeof curatedMemoryItemSchema>;
+
+export const memoryCategorySchema = z.object({
+  label: z.string(),
+  items: z.array(curatedMemoryItemSchema),
+});
+export type MemoryCategory = z.infer<typeof memoryCategorySchema>;
+
+export const parentTellItemSchema = z.object({
+  id: z.string(),
+  content: z.string(),
+  createdAt: z.string(),
+});
+export type ParentTellItem = z.infer<typeof parentTellItemSchema>;
+
+export const curatedMemoryViewSchema = z.object({
+  categories: z.array(memoryCategorySchema),
+  parentContributions: z.array(parentTellItemSchema),
+  settings: z.object({
+    memoryEnabled: z.boolean(),
+    collectionEnabled: z.boolean(),
+    injectionEnabled: z.boolean(),
+    accommodationMode: z.string().nullable(),
+  }),
+});
+export type CuratedMemoryView = z.infer<typeof curatedMemoryViewSchema>;
+
+// GET /dashboard/children/:profileId/memory
+export const childMemoryResponseSchema = z.object({
+  memory: curatedMemoryViewSchema,
+});
+export type ChildMemoryResponse = z.infer<typeof childMemoryResponseSchema>;
+
+// GET /dashboard/children/:profileId/reports
+export const childReportsResponseSchema = z.object({
+  reports: z.array(monthlyReportSummarySchema),
+});
+export type ChildReportsResponse = z.infer<typeof childReportsResponseSchema>;
+
+// GET /dashboard/children/:profileId/reports/:reportId
+export const childReportDetailResponseSchema = z.object({
+  report: monthlyReportRecordSchema,
+});
+export type ChildReportDetailResponse = z.infer<
+  typeof childReportDetailResponseSchema
+>;
+
+// POST /dashboard/children/:profileId/reports/:reportId/view
+// POST /dashboard/children/:profileId/weekly-reports/:reportId/view
+export const reportViewedResponseSchema = z.object({
+  viewed: z.literal(true),
+});
+export type ReportViewedResponse = z.infer<typeof reportViewedResponseSchema>;
+
+// GET /dashboard/children/:profileId/weekly-reports
+export const weeklyReportsResponseSchema = z.object({
+  reports: z.array(weeklyReportSummarySchema),
+});
+export type WeeklyReportsResponse = z.infer<typeof weeklyReportsResponseSchema>;
+
+// GET /dashboard/children/:profileId/weekly-reports/:reportId
+export const weeklyReportDetailResponseSchema = z.object({
+  report: weeklyReportRecordSchema,
+});
+export type WeeklyReportDetailResponse = z.infer<
+  typeof weeklyReportDetailResponseSchema
+>;
+
+// GET /dashboard/demo — demo children use non-UUID string profileIds
+// (e.g. 'demo-child-1'), so a separate looser schema is needed.
+const demoDashboardChildSchema = dashboardChildSchema.extend({
+  profileId: z.string(),
+});
+
+export const demoDashboardDataSchema = z.object({
+  children: z.array(demoDashboardChildSchema),
+  demoMode: z.literal(true),
+});
+export type DemoDashboardData = z.infer<typeof demoDashboardDataSchema>;
+
+// ---------------------------------------------------------------------------
+// Coaching Card endpoint response (GET /v1/coaching-card)
+// ---------------------------------------------------------------------------
+
+const coldStartActionSchema = z.object({
+  key: z.string(),
+  label: z.string(),
+  description: z.string(),
+});
+
+const coldStartFallbackSchema = z.object({
+  actions: z.array(coldStartActionSchema),
+});
+
+export const coachingCardEndpointResponseSchema = z.object({
+  coldStart: z.boolean(),
+  card: coachingCardSchema.nullable(),
+  fallback: coldStartFallbackSchema.nullable(),
+});
+export type CoachingCardEndpointResponse = z.infer<
+  typeof coachingCardEndpointResponseSchema
 >;

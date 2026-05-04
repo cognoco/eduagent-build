@@ -1,14 +1,6 @@
-jest.mock('../middleware/jwt', () => ({
-  decodeJWTHeader: jest.fn().mockReturnValue({ alg: 'RS256', kid: 'test-kid' }),
-  fetchJWKS: jest.fn().mockResolvedValue({
-    keys: [{ kty: 'RSA', kid: 'test-kid', n: 'fake-n', e: 'AQAB' }],
-  }),
-  verifyJWT: jest.fn().mockResolvedValue({
-    sub: 'user_test',
-    email: 'test@example.com',
-    exp: Math.floor(Date.now() / 1000) + 3600,
-  }),
-}));
+jest.mock('../middleware/jwt', () =>
+  require('../test-utils/auth-fixture').createJwtModuleMock()
+);
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
 
@@ -29,7 +21,7 @@ jest.mock('../services/account', () => ({
 jest.mock('../services/profile', () => ({
   findOwnerProfile: jest.fn().mockResolvedValue(null),
   getProfile: jest.fn().mockResolvedValue({
-    id: 'test-profile-id',
+    id: 'a0000000-0000-4000-a000-000000000001',
     birthYear: null,
     location: null,
     consentStatus: 'CONSENTED',
@@ -40,7 +32,7 @@ jest.mock('../services/vocabulary', () => ({
   listVocabulary: jest.fn().mockResolvedValue([
     {
       id: '770e8400-e29b-41d4-a716-446655440000',
-      profileId: 'test-profile-id',
+      profileId: 'a0000000-0000-4000-a000-000000000001',
       subjectId: '550e8400-e29b-41d4-a716-446655440000',
       term: 'hola',
       termNormalized: 'hola',
@@ -55,7 +47,7 @@ jest.mock('../services/vocabulary', () => ({
   ]),
   createVocabulary: jest.fn().mockResolvedValue({
     id: '770e8400-e29b-41d4-a716-446655440000',
-    profileId: 'test-profile-id',
+    profileId: 'a0000000-0000-4000-a000-000000000001',
     subjectId: '550e8400-e29b-41d4-a716-446655440000',
     term: 'buenos dias',
     termNormalized: 'buenos dias',
@@ -70,7 +62,7 @@ jest.mock('../services/vocabulary', () => ({
   reviewVocabulary: jest.fn().mockResolvedValue({
     vocabulary: {
       id: '770e8400-e29b-41d4-a716-446655440000',
-      profileId: 'test-profile-id',
+      profileId: 'a0000000-0000-4000-a000-000000000001',
       subjectId: '550e8400-e29b-41d4-a716-446655440000',
       term: 'hola',
       termNormalized: 'hola',
@@ -116,7 +108,7 @@ const TEST_ENV = { ...BASE_AUTH_ENV };
 
 const AUTH_HEADERS = {
   ...BASE_AUTH_HEADERS,
-  'X-Profile-Id': 'test-profile-id',
+  'X-Profile-Id': 'a0000000-0000-4000-a000-000000000001',
 };
 
 const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
@@ -372,7 +364,7 @@ describe('vocabulary routes', () => {
       const [, profileId, subjectId, vocabularyId] = (
         deleteVocabulary as jest.Mock
       ).mock.calls[0];
-      expect(profileId).toBe('test-profile-id');
+      expect(profileId).toBe('a0000000-0000-4000-a000-000000000001');
       expect(subjectId).toBe(SUBJECT_ID);
       expect(vocabularyId).toBe(VOCABULARY_ID);
     });

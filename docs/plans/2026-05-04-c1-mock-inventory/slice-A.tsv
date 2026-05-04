@@ -1,0 +1,78 @@
+location	specifier	category	basis	reason
+apps/api/src/services/account.test.ts:15	./billing	service-stub-with-business-logic	exact-override	mocks createSubscription from the internal billing service
+apps/api/src/services/account.test.ts:23	./trial	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/services/account.test.ts:28	./subscription	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/services/account.test.ts:44	../inngest/client	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/services/account.test.ts:49	./sentry	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/services/billing.test.ts:9	./sentry	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/services/book-generation.test.ts:1	./llm	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/services/bookmarks.test.ts:11	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/services/coaching-cards.test.ts:11	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/services/coaching-cards.test.ts:15	./sentry	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/services/consent.test.ts:5	./notifications	service-stub-with-business-logic	exact-override	mocks internal notifications rendering and delivery helpers
+apps/api/src/services/dictation/generate.test.ts:5	../llm	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/services/dictation/prepare-homework.test.ts:5	../llm	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/services/dictation/review.test.ts:5	../llm	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/services/embeddings.test.ts:21	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/services/evaluate-data.test.ts:14	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/services/evaluate-data.test.ts:16	./evaluate	service-stub-with-business-logic	exact-override	stubs evaluate decision logic and failure handling
+apps/api/src/services/homework-summary.test.ts:1	./llm	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/services/idempotency-assistant-state.test.ts:17	./sentry	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/services/idempotency-assistant-state.test.ts:21	./logger	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/services/idempotency-assistant-state.test.ts:29	../inngest/client	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/services/interleaved.test.ts:26	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/services/interview.test.ts:42	./curriculum	service-stub-with-business-logic	exact-override	stubs curriculum bootstrap logic with multiple internal branches
+apps/api/src/services/interview.test.ts:5	./llm	service-stub-with-business-logic	exact-override	partial llm mock carries conditional behavior beyond a boundary stub
+apps/api/src/services/interview.test.ts:71	../inngest/client	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/services/language-detect.test.ts:5	./llm	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/services/learner-input.test.ts:1	./llm	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/services/learner-input.test.ts:5	./learner-profile	service-stub-with-business-logic	exact-override	stubs learner-profile mutation logic
+apps/api/src/services/learner-profile.test.ts:19	./llm/router	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/services/llm/integration-mock-guard.test.ts:39	./llm	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/services/llm/integration-mock-guard.test.ts:40	../../services/llm/router	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/services/llm/integration-mock-guard.test.ts:41	@eduagent/llm-router	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/services/llm/integration-mock-guard.test.ts:42	@/services/llm	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/services/memory.test.ts:20	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/services/memory.test.ts:6	./embeddings	service-stub-with-business-logic	exact-override	stubs embedding generation logic behind an internal service
+apps/api/src/services/monthly-report.test.ts:5	./llm	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/services/monthly-report.test.ts:9	./sentry	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/services/notifications.test.ts:26	./settings	service-stub-with-business-logic	exact-override	stubs settings-driven notification behavior and counters
+apps/api/src/services/ocr.test.ts:5	./llm	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/services/overdue-topics.test.ts:10	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/services/parking-lot-data.test.ts:1	./parking-lot	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/services/profile.test.ts:5	./consent	service-stub-with-business-logic	exact-override	stubs consent state-machine logic
+apps/api/src/services/progress-helpers.test.ts:12	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/services/progress.test.ts:10	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/services/recall-bridge.test.ts:20	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/services/recall-bridge.test.ts:24	./llm	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/services/retention-data.test.ts:10	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/services/retention-data.test.ts:12	./retention	service-stub-with-business-logic	exact-override	stubs retention decision helpers with real business rules
+apps/api/src/services/retention-data.test.ts:19	./adaptive-teaching	service-stub-with-business-logic	exact-override	stubs adaptive-teaching capacity logic
+apps/api/src/services/retention-data.test.ts:26	./xp	service-stub-with-business-logic	exact-override	stubs XP ledger synchronization logic
+apps/api/src/services/retention-data.test.ts:30	./sentry	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/services/sentry.test.ts:17	@sentry/cloudflare	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/services/session/session-cache.test.ts:16	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/services/session/session-cache.test.ts:20	../prior-learning	service-stub-with-business-logic	exact-override	stubs prior-learning fetch and summarization logic
+apps/api/src/services/session/session-cache.test.ts:29	../retention-data	service-stub-with-business-logic	exact-override	stubs retention preference logic
+apps/api/src/services/session/session-cache.test.ts:35	../settings	service-stub-with-business-logic	exact-override	stubs settings-driven learning mode logic
+apps/api/src/services/session/session-cache.test.ts:40	../learner-profile	service-stub-with-business-logic	exact-override	stubs learner-profile context building logic
+apps/api/src/services/session/session-cache.test.ts:46	../subject	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/services/session/session-context-builders.test.ts:40	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/services/snapshot-aggregation.test.ts:13	./celebrations	service-stub-with-business-logic	exact-override	stubs celebration queueing logic
+apps/api/src/services/snapshot-aggregation.test.ts:17	./language-curriculum	service-stub-with-business-logic	exact-override	stubs language curriculum progress logic
+apps/api/src/services/snapshot-aggregation.test.ts:21	./sentry	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/services/snapshot-aggregation.test.ts:8	./milestone-detection	service-stub-with-business-logic	exact-override	stubs milestone detection logic
+apps/api/src/services/streaks.test.ts:10	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/services/stripe.test.ts:5	stripe	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/services/subject-classify.test.ts:13	./sentry	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/services/subject-classify.test.ts:5	./llm	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/services/subject-classify.test.ts:9	./subject	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/services/subject-resolve.test.ts:1	./llm	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/services/subject.test.ts:10	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/services/verification-completion.test.ts:14	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/services/verification-completion.test.ts:16	./evaluate	service-stub-with-business-logic	exact-override	stubs evaluate parsing and SM-2 mapping logic
+apps/api/src/services/verification-completion.test.ts:22	./teach-back	service-stub-with-business-logic	exact-override	stubs teach-back parsing and rubric mapping logic
+apps/api/src/services/vocabulary-extract.test.ts:5	./llm	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/services/vocabulary-extract.test.ts:9	./sentry	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/services/xp.test.ts:10	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/services/xp.test.ts:12	./settings	service-stub-with-business-logic	exact-override	stubs settings-derived XP mode rules

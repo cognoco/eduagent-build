@@ -3,6 +3,11 @@ import { zValidator } from '@hono/zod-validator';
 import {
   assessmentAnswerSchema,
   quickCheckResponseSchema,
+  createAssessmentResponseSchema,
+  submitAssessmentAnswerResponseSchema,
+  getAssessmentResponseSchema,
+  quickCheckFeedbackResponseSchema,
+  chatExchangeSchema,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
@@ -18,6 +23,9 @@ import { updateRetentionFromSession } from '../services/retention-data';
 import { insertSessionXpEntry } from '../services/xp';
 import { getSession } from '../services/session';
 import { notFound } from '../errors';
+import { createLogger } from '../services/logger';
+
+const logger = createLogger();
 
 export const assessmentRoutes = new Hono<RouteEnv>()
   // Start a topic completion assessment
@@ -35,7 +43,7 @@ export const assessmentRoutes = new Hono<RouteEnv>()
     );
 
     return c.json(
-      {
+      createAssessmentResponseSchema.parse({
         assessment: {
           id: assessment.id,
           topicId: assessment.topicId,
@@ -44,7 +52,7 @@ export const assessmentRoutes = new Hono<RouteEnv>()
           masteryScore: assessment.masteryScore,
           createdAt: assessment.createdAt,
         },
-      },
+      }),
       201
     );
   })
@@ -125,7 +133,7 @@ export const assessmentRoutes = new Hono<RouteEnv>()
         });
       }
 
-      return c.json({ evaluation });
+      return c.json(submitAssessmentAnswerResponseSchema.parse({ evaluation }));
     }
   )
 
@@ -136,7 +144,36 @@ export const assessmentRoutes = new Hono<RouteEnv>()
 
     const assessment = await getAssessment(db, profileId, assessmentId);
     if (!assessment) return notFound(c, 'Assessment not found');
-    return c.json({ assessment });
+
+    // exchangeHistory is jsonb in the DB and may carry rows written under an
+    // older schema (renamed roles, missing fields). A strict .parse() here
+    // would 500 on any drift; safeParse + per-entry filtering keeps the
+    // endpoint serving the rest of the assessment and surfaces drift via
+    // logs instead. Same pattern recommended in CLAUDE.md > Code Quality
+    // Guards (classify before formatting / fail-loud-but-don't-crash).
+    const parsed = getAssessmentResponseSchema.safeParse({ assessment });
+    if (parsed.success) {
+      return c.json(parsed.data);
+    }
+
+    const sanitizedHistory = Array.isArray(assessment.exchangeHistory)
+      ? assessment.exchangeHistory.filter(
+          (entry) => chatExchangeSchema.safeParse(entry).success
+        )
+      : [];
+    logger.warn(
+      '[assessments] response schema drift on get; sanitized exchangeHistory',
+      {
+        assessmentId,
+        droppedEntries:
+          (assessment.exchangeHistory?.length ?? 0) - sanitizedHistory.length,
+      }
+    );
+    return c.json(
+      getAssessmentResponseSchema.parse({
+        assessment: { ...assessment, exchangeHistory: sanitizedHistory },
+      })
+    );
   })
 
   // Submit quick check response during session
@@ -166,9 +203,11 @@ export const assessmentRoutes = new Hono<RouteEnv>()
         answer
       );
 
-      return c.json({
-        feedback: evaluation.feedback,
-        isCorrect: evaluation.passed,
-      });
+      return c.json(
+        quickCheckFeedbackResponseSchema.parse({
+          feedback: evaluation.feedback,
+          isCorrect: evaluation.passed,
+        })
+      );
     }
   );

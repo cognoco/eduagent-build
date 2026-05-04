@@ -1,0 +1,2 @@
+location	specifier	category	basis	reason
+apps/api/eval-llm/flows/exchanges.test.ts:3	../runner/llm-client	EXTERNAL	heuristic	eval harness mock replaces the runner LLM transport boundary

@@ -4,6 +4,10 @@ import type { Database } from '@eduagent/database';
 import {
   deleteMemoryItemSchema,
   grantMemoryConsentSchema,
+  learnerProfileExportTextResponseSchema,
+  learnerProfileGetResponseSchema,
+  learnerProfileSuccessResponseSchema,
+  parseLearnerInputResultSchema,
   tellMentorInputSchema,
   toggleMemoryCollectionSchema,
   toggleMemoryEnabledSchema,
@@ -44,16 +48,18 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
     const profile = await getOrCreateLearningProfile(db, profileId);
-    return c.json({ profile });
+    return c.json(learnerProfileGetResponseSchema.parse({ profile }));
   })
   .get('/learner-profile/export-text', async (c) => {
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
     const profile = await getOrCreateLearningProfile(db, profileId);
-    return c.json({
-      text: buildHumanReadableMemoryExport(profile),
-      profile,
-    });
+    return c.json(
+      learnerProfileExportTextResponseSchema.parse({
+        text: buildHumanReadableMemoryExport(profile),
+        profile,
+      })
+    );
   })
   .get('/learner-profile/:profileId/export-text', async (c) => {
     const db = c.get('db');
@@ -61,10 +67,12 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     const childProfileId = c.req.param('profileId');
     await assertParentAccess(db, parentProfileId, childProfileId);
     const profile = await getOrCreateLearningProfile(db, childProfileId);
-    return c.json({
-      text: buildHumanReadableMemoryExport(profile),
-      profile,
-    });
+    return c.json(
+      learnerProfileExportTextResponseSchema.parse({
+        text: buildHumanReadableMemoryExport(profile),
+        profile,
+      })
+    );
   })
   .get('/learner-profile/:profileId', async (c) => {
     const db = c.get('db');
@@ -72,7 +80,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
     const childProfileId = c.req.param('profileId');
     await assertParentAccess(db, parentProfileId, childProfileId);
     const profile = await getOrCreateLearningProfile(db, childProfileId);
-    return c.json({ profile });
+    return c.json(learnerProfileGetResponseSchema.parse({ profile }));
   })
   .delete(
     '/learner-profile/item',
@@ -91,7 +99,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
         input.suppress ?? false,
         input.subject
       );
-      return c.json({ success: true });
+      return c.json(
+        learnerProfileSuccessResponseSchema.parse({ success: true })
+      );
     }
   )
   .delete(
@@ -113,7 +123,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
         input.suppress ?? false,
         input.subject
       );
-      return c.json({ success: true });
+      return c.json(
+        learnerProfileSuccessResponseSchema.parse({ success: true })
+      );
     }
   )
   .delete('/learner-profile/all', async (c) => {
@@ -141,7 +153,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const accountId = c.get('account').id;
       const { memoryEnabled } = c.req.valid('json');
       await toggleMemoryEnabled(db, profileId, accountId, memoryEnabled);
-      return c.json({ success: true });
+      return c.json(
+        learnerProfileSuccessResponseSchema.parse({ success: true })
+      );
     }
   )
   .patch(
@@ -155,7 +169,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const { memoryEnabled } = c.req.valid('json');
       // accountId omitted: ownership verified via assertParentAccess (parent chain)
       await toggleMemoryEnabled(db, childProfileId, undefined, memoryEnabled);
-      return c.json({ success: true });
+      return c.json(
+        learnerProfileSuccessResponseSchema.parse({ success: true })
+      );
     }
   )
   .patch(
@@ -172,7 +188,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
         accountId,
         memoryCollectionEnabled
       );
-      return c.json({ success: true });
+      return c.json(
+        learnerProfileSuccessResponseSchema.parse({ success: true })
+      );
     }
   )
   .patch(
@@ -191,7 +209,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
         undefined,
         memoryCollectionEnabled
       );
-      return c.json({ success: true });
+      return c.json(
+        learnerProfileSuccessResponseSchema.parse({ success: true })
+      );
     }
   )
   .patch(
@@ -208,7 +228,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
         accountId,
         memoryInjectionEnabled
       );
-      return c.json({ success: true });
+      return c.json(
+        learnerProfileSuccessResponseSchema.parse({ success: true })
+      );
     }
   )
   .patch(
@@ -227,7 +249,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
         undefined,
         memoryInjectionEnabled
       );
-      return c.json({ success: true });
+      return c.json(
+        learnerProfileSuccessResponseSchema.parse({ success: true })
+      );
     }
   )
   .post(
@@ -239,7 +263,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const accountId = c.get('account').id;
       const { consent } = c.req.valid('json');
       await grantMemoryConsent(db, profileId, accountId, consent);
-      return c.json({ success: true });
+      return c.json(
+        learnerProfileSuccessResponseSchema.parse({ success: true })
+      );
     }
   )
   .post(
@@ -253,7 +279,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const { consent } = c.req.valid('json');
       // accountId omitted: ownership verified via assertParentAccess (parent chain)
       await grantMemoryConsent(db, childProfileId, undefined, consent);
-      return c.json({ success: true });
+      return c.json(
+        learnerProfileSuccessResponseSchema.parse({ success: true })
+      );
     }
   )
   .post(
@@ -264,7 +292,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const profileId = requireProfileId(c.get('profileId'));
       const { text } = c.req.valid('json');
       const result = await parseLearnerInput(db, profileId, text, 'learner');
-      return c.json(result);
+      return c.json(parseLearnerInputResultSchema.parse(result));
     }
   )
   .post(
@@ -282,7 +310,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
         text,
         'parent'
       );
-      return c.json(result);
+      return c.json(parseLearnerInputResultSchema.parse(result));
     }
   )
   .post(
@@ -294,7 +322,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const accountId = c.get('account').id;
       const { value } = c.req.valid('json');
       await unsuppressInference(db, profileId, accountId, value);
-      return c.json({ success: true });
+      return c.json(
+        learnerProfileSuccessResponseSchema.parse({ success: true })
+      );
     }
   )
   .post(
@@ -308,7 +338,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const { value } = c.req.valid('json');
       // accountId omitted: ownership verified via assertParentAccess (parent chain)
       await unsuppressInference(db, childProfileId, undefined, value);
-      return c.json({ success: true });
+      return c.json(
+        learnerProfileSuccessResponseSchema.parse({ success: true })
+      );
     }
   )
   .patch(
@@ -325,7 +357,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
         accountId,
         accommodationMode
       );
-      return c.json({ success: true });
+      return c.json(
+        learnerProfileSuccessResponseSchema.parse({ success: true })
+      );
     }
   )
   .patch(
@@ -344,6 +378,8 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
         undefined,
         accommodationMode
       );
-      return c.json({ success: true });
+      return c.json(
+        learnerProfileSuccessResponseSchema.parse({ success: true })
+      );
     }
   );

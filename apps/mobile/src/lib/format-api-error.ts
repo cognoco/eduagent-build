@@ -1,4 +1,4 @@
-import i18next from '../i18n';
+import { i18next } from '../i18n';
 
 /**
  * Centralized error formatter for API and network errors.
@@ -139,7 +139,15 @@ const FRIENDLY_MESSAGE_MAP: Array<{
 
 /**
  * [F-Q-01] Detects messages that are technical/internal and should never
- * reach a user — LLM provider errors, JSON fragments, stack traces, etc.
+ * reach a user — LLM provider errors, JSON fragments, stack traces, JS
+ * runtime errors (ReferenceError / TypeError shapes), etc.
+ *
+ * The runtime-error patterns prevent Hermes / V8 messages from leaking to
+ * the chat UI when an unhandled exception is caught and routed through
+ * `formatApiError`. A real example surfaced as a chat bubble showing
+ * `Property 'crypto' doesn't exist` (Hermes ReferenceError, BUG fixed by
+ * the expo-crypto migration) — that class of message must never reach a
+ * user even after the underlying bug is fixed.
  */
 function isTechnicalMessage(msg: string): boolean {
   return (
@@ -149,7 +157,35 @@ function isTechnicalMessage(msg: string): boolean {
     // JSON fragment or object literal in the message
     /\{"|\{\\"|^\[/.test(msg) ||
     // Stack trace indicators
-    /\bat\b.*\.(ts|js):\d+/i.test(msg)
+    /\bat\b.*\.(ts|js):\d+/i.test(msg) ||
+    // Hermes / V8 runtime-error shapes — never surfaced to users.
+    // Includes ASCII and curly quote variants (Hermes uses ASCII; the
+    // curly variants are belt-and-braces in case logging or i18n
+    // pipelines normalize quotes before reaching the formatter).
+    /Property\s+['"`‘’“”].+['"`‘’“”]\s+doesn[’']?t\s+exist/i.test(msg) ||
+    /\bis not (defined|a function|an object|iterable)\b/i.test(msg) ||
+    /Cannot read propert(y|ies) of (undefined|null)/i.test(msg) ||
+    /\bundefined is not an? (object|function)\b/i.test(msg) ||
+    /^(Reference|Type|Syntax|Range)Error:/i.test(msg)
+  );
+}
+
+/**
+ * Single gate for "is this short message safe to render as user-facing copy?"
+ * Used by both the typed-BadRequestError branch, the generic 4xx fallback, and
+ * the bare-error tail to keep the technical-message rejection consistent. If
+ * any branch skips this check, JS engine errors (`Property 'crypto' doesn't
+ * exist`) and stack-traced strings can leak into chat bubbles.
+ */
+function shouldPassThroughUserMessage(msg: string): boolean {
+  const looksLikeStack =
+    /\n\s+at /.test(msg) || /at [A-Z]\w*\./.test(msg) || /^at \S/.test(msg);
+  return (
+    msg.length > 0 &&
+    msg.length < 200 &&
+    !looksLikeStack &&
+    !msg.toLowerCase().includes('undefined') &&
+    !isTechnicalMessage(msg)
   );
 }
 
@@ -393,13 +429,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
   // user-facing message passthrough below), with a friendly override if matched.
   if (isBadRequestError(error)) {
     const msg = error.message;
-    const looksLikeStack =
-      /\n\s+at /.test(msg) || /at [A-Z]\w*\./.test(msg) || /^at \S/.test(msg);
-    const passThrough =
-      msg.length > 0 &&
-      msg.length < 200 &&
-      !looksLikeStack &&
-      !msg.toLowerCase().includes('undefined');
+    const passThrough = shouldPassThroughUserMessage(msg);
     return {
       message: passThrough
         ? friendlyMessage(msg) ?? msg
@@ -563,8 +593,10 @@ export function classifyApiError(error: unknown): FormattedApiError {
         };
       }
 
-      // 4xx client errors
-      if (apiMessage && apiMessage.length < 200) {
+      // 4xx client errors — same passthrough gate as the typed
+      // BadRequestError branch so technical / stack / runtime-error shapes
+      // never become chat bubbles.
+      if (apiMessage && shouldPassThroughUserMessage(apiMessage)) {
         return {
           message: friendlyMessage(apiMessage) ?? apiMessage,
           category: 'unknown',
@@ -587,15 +619,8 @@ export function classifyApiError(error: unknown): FormattedApiError {
       };
     }
 
-    // 6. Short, user-facing messages — pass through
-    const looksLikeStack =
-      /\n\s+at /.test(msg) || /at [A-Z]\w*\./.test(msg) || /^at \S/.test(msg);
-    if (
-      msg.length > 0 &&
-      msg.length < 200 &&
-      !looksLikeStack &&
-      !msgLower.includes('undefined')
-    ) {
+    // 6. Short, user-facing messages — pass through via the shared gate.
+    if (shouldPassThroughUserMessage(msg)) {
       return {
         message: friendlyMessage(msg) ?? msg,
         category: 'unknown',

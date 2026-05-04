@@ -1,7 +1,14 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
-import { ERROR_CODES, historyQuerySchema } from '@eduagent/schemas';
+import {
+  ERROR_CODES,
+  historyQuerySchema,
+  knowledgeInventorySchema,
+  progressHistorySchema,
+  milestonesResponseSchema,
+  refreshProgressResponseSchema,
+} from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
@@ -35,7 +42,7 @@ export const snapshotProgressRoutes = new Hono<SnapshotProgressRouteEnv>()
     const profileId = requireProfileId(c.get('profileId'));
 
     const inventory = await buildKnowledgeInventory(db, profileId);
-    return c.json(inventory);
+    return c.json(knowledgeInventorySchema.parse(inventory));
   })
   .get(
     '/progress/history',
@@ -46,7 +53,7 @@ export const snapshotProgressRoutes = new Hono<SnapshotProgressRouteEnv>()
       const query = c.req.valid('query');
 
       const history = await buildProgressHistory(db, profileId, query);
-      return c.json(history);
+      return c.json(progressHistorySchema.parse(history));
     }
   )
   .get(
@@ -62,7 +69,7 @@ export const snapshotProgressRoutes = new Hono<SnapshotProgressRouteEnv>()
         profileId,
         query.limit ?? 5
       );
-      return c.json({ milestones });
+      return c.json(milestonesResponseSchema.parse({ milestones }));
     }
   )
   .post('/progress/refresh', async (c) => {
@@ -87,5 +94,5 @@ export const snapshotProgressRoutes = new Hono<SnapshotProgressRouteEnv>()
 
     const snapshot = await refreshProgressSnapshot(db, profileId);
 
-    return c.json(snapshot);
+    return c.json(refreshProgressResponseSchema.parse(snapshot));
   });

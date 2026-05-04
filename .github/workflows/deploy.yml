@@ -217,12 +217,22 @@ jobs:
           echo "Deploying API to ${DEPLOY_ENV}"
           pnpm exec wrangler deploy --env "${DEPLOY_ENV}" --var "DEPLOY_SHA:${GITHUB_SHA:0:8}"
 
+      # When DOPPLER_TOKEN is missing the sync step silently skipped, leaving
+      # the Worker secrets stale — any value set in Doppler since the gap
+      # opened never reached production. The step now ALWAYS runs and emits a
+      # GitHub Actions warning when DOPPLER_TOKEN is absent, so deploys
+      # surface the broken integration rather than masking it. Add the
+      # repo/org secret `DOPPLER_TOKEN` (a Doppler service-account token
+      # scoped to the project) to restore automatic sync.
       - name: Sync secrets from Doppler to Worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
-        if: env.DOPPLER_TOKEN != ''
         run: |
+          if [ -z "${DOPPLER_TOKEN:-}" ]; then
+            echo "::warning title=Doppler→Worker sync skipped::DOPPLER_TOKEN is not set as a GitHub Actions secret. Worker secrets will NOT be synced from Doppler on this deploy. Run \`pnpm secrets:sync stg|prd\` locally to sync, or add DOPPLER_TOKEN to repo secrets to fix automatic sync."
+            exit 0
+          fi
           DEPLOY_ENV="${{ github.event_name == 'push' && 'staging' || inputs.api_environment }}"
           # Map wrangler env names to Doppler config short names
           case "$DEPLOY_ENV" in

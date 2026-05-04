@@ -33,6 +33,10 @@ import { tokens } from '../lib/design-tokens';
 // Reanimated's native module can fail to initialize, causing
 // createAnimatedComponent to throw. A module-level crash here kills the
 // entire root layout import chain — no error boundary can catch it.
+// Reanimated's createAnimatedComponent return type widens SVG props with
+// SharedValue<T> variants that aren't compatible with the bare-props type
+// the JSX call sites need. ComponentType<any> is the pragmatic shape that
+// accepts both the wrapped component and the plain-component fallback.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let AnimatedCircle: ComponentType<any>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

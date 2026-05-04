@@ -6,6 +6,13 @@ import {
   curriculumChallengeSchema,
   curriculumTopicAddSchema,
   curriculumAdaptRequestSchema,
+  curriculumTopicAddResponseSchema,
+  curriculumAdaptResponseSchema,
+  getCurriculumResponseSchema,
+  topicSkipResponseSchema,
+  topicUnskipResponseSchema,
+  challengeCurriculumResponseSchema,
+  explainTopicResponseSchema,
   ERROR_CODES,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
@@ -43,7 +50,7 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
     const profileId = requireProfileId(c.get('profileId'));
     const subjectId = c.req.param('subjectId');
     const curriculum = await getCurriculum(db, profileId, subjectId);
-    return c.json({ curriculum });
+    return c.json(getCurriculumResponseSchema.parse({ curriculum }));
   })
   // Skip a topic
   .post(
@@ -56,7 +63,9 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
       const { topicId } = c.req.valid('json');
       try {
         await skipTopic(db, profileId, subjectId, topicId);
-        return c.json({ message: 'Topic skipped', topicId });
+        return c.json(
+          topicSkipResponseSchema.parse({ message: 'Topic skipped', topicId })
+        );
       } catch (error) {
         if (error instanceof NotFoundError) {
           return notFound(c, error.message);
@@ -76,7 +85,12 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
       const { topicId } = c.req.valid('json');
       try {
         await unskipTopic(db, profileId, subjectId, topicId);
-        return c.json({ message: 'Topic restored', topicId });
+        return c.json(
+          topicUnskipResponseSchema.parse({
+            message: 'Topic restored',
+            topicId,
+          })
+        );
       } catch (error) {
         if (error instanceof NotFoundError) {
           return notFound(c, error.message);
@@ -105,7 +119,7 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
           subjectId,
           input
         );
-        return c.json(result);
+        return c.json(curriculumTopicAddResponseSchema.parse(result));
       } catch (error) {
         if (error instanceof NotFoundError) {
           return notFound(c, error.message);
@@ -129,7 +143,7 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
           subjectId,
           feedback
         );
-        return c.json({ curriculum });
+        return c.json(challengeCurriculumResponseSchema.parse({ curriculum }));
       } catch (error) {
         if (error instanceof NotFoundError) {
           return notFound(c, error.message);
@@ -155,7 +169,7 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
           subjectId,
           input
         );
-        return c.json(result);
+        return c.json(curriculumAdaptResponseSchema.parse(result));
       } catch (error) {
         if (error instanceof NotFoundError) {
           return notFound(c, error.message);
@@ -177,7 +191,7 @@ export const curriculumRoutes = new Hono<CurriculumRouteEnv>()
         subjectId,
         topicId
       );
-      return c.json({ explanation });
+      return c.json(explainTopicResponseSchema.parse({ explanation }));
     } catch (error) {
       if (error instanceof NotFoundError) {
         return notFound(c, error.message);

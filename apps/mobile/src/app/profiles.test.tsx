@@ -391,11 +391,14 @@ describe('ProfilesScreen', () => {
     render(<ProfilesScreen />);
 
     fireEvent.press(screen.getByTestId('profile-rename-owner-id'));
-    screen.getByTestId('rename-modal');
+    const modal = screen.getByTestId('rename-modal');
+    expect(modal.props.visible).toBe(true);
 
     fireEvent.press(screen.getByTestId('rename-cancel'));
 
-    // Modal should close — rename-input gone
-    expect(screen.queryByTestId('rename-input')).toBeNull();
+    // Cancelling calls setRenaming(null) → visible={false} on the Modal.
+    // On iOS, RN Modal keeps children mounted during the close animation so
+    // rename-input stays in the tree, but the Modal itself reports visible=false.
+    expect(screen.getByTestId('rename-modal').props.visible).toBe(false);
   });
 });

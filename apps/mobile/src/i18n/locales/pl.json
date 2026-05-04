@@ -66,7 +66,7 @@
   },
   "autoSuggest": {
     "title": "Czat w języku: {{language}}?",
-    "message": "Czy chcesz, aby Twój tutor rozmawiał z Tobą w języku: {{language}}?",
+    "message": "Czy chcesz, aby Twój mentor rozmawiał z Tobą w języku: {{language}}?",
     "accept": "Tak, przełącz",
     "dismiss": "Nie, dziękuję"
   },
@@ -163,7 +163,7 @@
       "sectionHeader": "Dostosowanie nauki dla {{name}}"
     },
     "mentorMemory": {
-      "sectionHeader": "Co wie Twój tutor",
+      "sectionHeader": "Co wie Twój mentor",
       "viewAndManage": "Wyświetl i zarządzaj"
     },
     "family": {
@@ -172,7 +172,7 @@
       "childCount_one": "{{count}} dziecko",
       "childCount_other": "{{count}} dzieci",
       "addChild": "Dodaj dziecko",
-      "addChildDescription": "Utwórz profil, aby Twoje dziecko mogło uczyć się z własnym tutorem",
+      "addChildDescription": "Utwórz profil, aby Twoje dziecko mogło uczyć się z własnym mentorem",
       "addChildAccessLabel": "Dodaj profil dziecka",
       "yourChild": "Twoje dziecko",
       "openFamilyPreferencesAccessLabel": "Otwórz preferencje rodziny",
@@ -200,7 +200,7 @@
     "account": {
       "sectionHeader": "Konto",
       "profile": "Profil",
-      "tutorLanguage": "Język tutora",
+      "mentorLanguage": "Język mentora",
       "subscription": "Subskrypcja",
       "signOut": "Wyloguj się",
       "couldNotSignOut": "Nie można było się wylogować"
@@ -228,7 +228,7 @@
       "tryAgainMoment": "Spróbuj ponownie za chwilę.",
       "couldNotSaveSetting": "Nie można zapisać ustawienia"
     },
-    "tutorLanguageLabels": {
+    "mentorLanguageLabels": {
       "en": "Angielski",
       "cs": "Czeski",
       "de": "Niemiecki",
@@ -242,9 +242,9 @@
   },
   "session": {
     "mentorMemory": {
-      "title": "Co wie mój tutor",
-      "subtitle": "Przeglądaj, edytuj lub dodawaj to, co pamięta Twój tutor.",
-      "loadError": "Nie mogliśmy teraz załadować pamięci Twojego tutora",
+      "title": "Co wie mój mentor",
+      "subtitle": "Przeglądaj, edytuj lub dodawaj to, co pamięta Twój mentor.",
+      "loadError": "Nie mogliśmy teraz załadować pamięci Twojego mentora",
       "loadTimeout": {
         "title": "Ładowanie trwa zbyt długo",
         "message": "Sprawdź połączenie i spróbuj ponownie."
@@ -259,32 +259,32 @@
         "disabled": "Zbieranie danych do pamięci jest wyłączone.",
         "pendingOwner": "Zbieranie danych do pamięci nie zostało jeszcze włączone.",
         "pendingChild": "Rodzic lub opiekun musi jeszcze włączyć zbieranie danych do pamięci.",
-        "useMemoryLabel": "Użyj tego, co wie tutor"
+        "useMemoryLabel": "Użyj tego, co wie mentor"
       },
       "consent": {
-        "title": "Włącz pamięć tutora",
-        "description": "Pozwól tutorowi zapamiętać, co jest dla Ciebie skuteczne — Twoje mocne strony, preferowane wyjaśnienia i tematy, które sprawiają Ci trudność."
+        "title": "Włącz pamięć mentora",
+        "description": "Pozwól mentorowi zapamiętać, co jest dla Ciebie skuteczne — Twoje mocne strony, preferowane wyjaśnienia i tematy, które sprawiają Ci trudność."
       },
       "accommodation": {
         "setByParent": "Ustawione przez rodzica w jego ustawieniach.",
         "shortBurst": {
-          "young": "Twój tutor używa specjalnego sposobu, by Cię uczyć!",
+          "young": "Twój mentor używa specjalnego sposobu, by Cię uczyć!",
           "mid": "Styl nauki: Krótkie serie — krótsze wyjaśnienia z dużą ilością pytań sprawdzających",
           "older": "Tryb dostosowania: Krótkie serie — zwięzłe wyjaśnienia, częste punkty kontrolne"
         },
         "audioFirst": {
-          "young": "Twój tutor używa specjalnego sposobu, by Cię uczyć!",
+          "young": "Twój mentor używa specjalnego sposobu, by Cię uczyć!",
           "mid": "Styl nauki: Najpierw audio — proste wyjaśnienia w stylu mówionym",
           "older": "Tryb dostosowania: Najpierw audio — język w stylu mówionym, wsparcie fonetyczne"
         },
         "predictable": {
-          "young": "Twój tutor używa specjalnego sposobu, by Cię uczyć!",
+          "young": "Twój mentor używa specjalnego sposobu, by Cię uczyć!",
           "mid": "Styl nauki: Przewidywalny — jasna struktura i sesje krok po kroku",
           "older": "Tryb dostosowania: Przewidywalny — ustrukturyzowane sesje, wyraźne przejścia"
         }
       },
       "sections": {
-        "tellMentor": "Powiedz swojemu tutorowi",
+        "tellMentor": "Powiedz swojemu mentorowi",
         "learningStyle": "Styl nauki",
         "interests": "Zainteresowania",
         "strengths": "Mocne strony",
@@ -294,17 +294,17 @@
         "privacy": "Prywatność"
       },
       "empty": {
-        "title": "Twój tutor Cię poznaje",
-        "message": "Podczas nauki Twój tutor dowie się o Twoich zainteresowaniach, mocnych stronach i o tym, jak lubisz się uczyć. Z czasem wszystko pojawi się tutaj."
+        "title": "Twój mentor Cię poznaje",
+        "message": "Podczas nauki Twój mentor dowie się o Twoich zainteresowaniach, mocnych stronach i o tym, jak lubisz się uczyć. Z czasem wszystko pojawi się tutaj."
       },
       "clearDialog": {
-        "title": "Wyczyścić pamięć tutora?",
-        "message": "To usunie wszystko, co tutor o Tobie zapamiętał i wyłączy pamięć, dopóki nie włączysz jej ponownie.",
+        "title": "Wyczyścić pamięć mentora?",
+        "message": "To usunie wszystko, co mentor o Tobie zapamiętał i wyłączy pamięć, dopóki nie włączysz jej ponownie.",
         "confirm": "Wyczyść"
       },
       "clearAll": {
-        "label": "Wyczyść całą pamięć tutora",
-        "accessibilityLabel": "Wyczyść pamięć tutora dla {{name}}",
+        "label": "Wyczyść całą pamięć mentora",
+        "accessibilityLabel": "Wyczyść pamięć mentora dla {{name}}",
         "defaultName": "tego profilu"
       },
       "errors": {
@@ -735,9 +735,9 @@
       "missingTitle": "Nie wybrano przedmiotu",
       "missingMessage": "Nie mogliśmy załadować tego przedmiotu. Wróć na stronę główną i spróbuj ponownie.",
       "updateErrorTitle": "Nie można zaktualizować",
-      "languageEmpty": "Brak jeszcze ustawień specyficznych dla przedmiotów językowych. Twój tutor automatycznie dostosowuje słownictwo, słuchanie i praktykę pisania na podstawie Twojego poziomu CEFR i postępów.",
+      "languageEmpty": "Brak jeszcze ustawień specyficznych dla przedmiotów językowych. Twój mentor automatycznie dostosowuje słownictwo, słuchanie i praktykę pisania na podstawie Twojego poziomu CEFR i postępów.",
       "analogyTitle": "Preferencje dotyczące analogii",
-      "analogyDescription": "Wybierz dziedzinę dla analogii. Tutor będzie preferował analogie z tego świata podczas wyjaśniania pojęć, ale nie będzie ich narzucał, gdy bezpośrednie wyjaśnienie będzie jaśniejsze."
+      "analogyDescription": "Wybierz dziedzinę dla analogii. Mentor będzie preferował analogie z tego świata podczas wyjaśniania pojęć, ale nie będzie ich narzucał, gdy bezpośrednie wyjaśnienie będzie jaśniejsze."
     },
     "title": "Nowy przedmiot",
     "prompt": "Czego chciałbyś(-abyś) się nauczyć? Wpisz dowolny przedmiot lub opisz, co Cię interesuje — my zajmiemy się resztą.",
@@ -841,14 +841,14 @@
       "title": "Polityka prywatności",
       "lastUpdated": "Ostatnia aktualizacja: marzec 2026",
       "s1Title": "1. Kim jesteśmy",
-      "s1Body": "MentoMate to platforma korepetycyjna oparta na sztucznej inteligencji, obsługiwana przez Zwizzly („my”, „nas”, „nasz”). Zobowiązujemy się do ochrony prywatności wszystkich naszych użytkowników, zwłaszcza dzieci w wieku 11–17 lat. Przetwarzamy dane osobowe zgodnie z Ogólnym Rozporządzeniem o Ochronie Danych UE (RODO).",
+      "s1Body": "MentoMate to platforma mentoringowa oparta na sztucznej inteligencji, obsługiwana przez Zwizzly („my”, „nas”, „nasz”). Zobowiązujemy się do ochrony prywatności wszystkich naszych użytkowników, zwłaszcza dzieci w wieku 11–17 lat. Przetwarzamy dane osobowe zgodnie z Ogólnym Rozporządzeniem o Ochronie Danych UE (RODO).",
       "s2Title": "2. Dane, które zbieramy",
       "s2Body1": "Dane konta: adres e-mail, nazwa wyświetlana i informacje profilowe podane podczas rejestracji.",
       "s2Body2": "Dane dotyczące nauki: przedmioty, odpowiedzi z wywiadu, postępy w programie nauczania, wymiany w sesjach, wyniki ocen, wyniki zapamiętywania i XP.",
       "s2Body3": "Dane urządzenia: tokeny powiadomień push, typ urządzenia i wersja aplikacji w celu dostarczania powiadomień i utrzymania jakości usług.",
       "s2Body4": "NIE zbieramy danych o lokalizacji, kontaktów, zdjęć (z wyjątkiem zdjęć prac domowych, które jawnie robisz) ani historii przeglądania.",
       "s3Title": "3. Jak wykorzystujemy Twoje dane",
-      "s3Body": "Do zapewniania spersonalizowanych korepetycji AI z wykorzystaniem dialogu sokratejskiego i powtórek w odstępach. Do generowania programów nauczania, wglądów w naukę i raportów o postępach. Do wysyłania przypomnień o powtórkach i powiadomień, na które wyraziłeś(-aś) zgodę. Do ulepszania naszych usług poprzez anonimowe, zagregowane analizy.",
+      "s3Body": "Do zapewniania spersonalizowanego mentoringu AI z wykorzystaniem dialogu sokratejskiego i powtórek w odstępach. Do generowania programów nauczania, wglądów w naukę i raportów o postępach. Do wysyłania przypomnień o powtórkach i powiadomień, na które wyraziłeś(-aś) zgodę. Do ulepszania naszych usług poprzez anonimowe, zagregowane analizy.",
       "s4Title": "4. Zgoda rodzicielska",
       "s4Body1": "Dla użytkowników poniżej 16 roku życia wymagamy weryfikowalnej zgody rodzicielskiej przed przetwarzaniem danych osobowych. Rodzic lub opiekun musi zatwierdzić konto dziecka za pośrednictwem poczty e-mail, zanim jakiekolwiek dane dotyczące nauki zostaną zebrane.",
       "s4Body2": "Rodzice mogą wycofać zgodę w dowolnym momencie z pulpitu rodzica. Po wycofaniu zgody dane dziecka wchodzą w 7-dniowy okres karencji, a następnie są trwale usuwane.",
@@ -873,13 +873,13 @@
       "s1Title": "1. Akceptacja warunków",
       "s1Body": "Tworząc konto lub korzystając z MentoMate, zgadzasz się na niniejszy Regulamin. Jeśli masz mniej niż 18 lat, Twój rodzic lub opiekun musi wyrazić zgodę w Twoim imieniu.",
       "s2Title": "2. Opis usługi",
-      "s2Body": "MentoMate to platforma korepetycyjna oparta na sztucznej inteligencji, która zapewnia spersonalizowaną naukę poprzez dialog sokratejski, powtórki w odstępach i adaptacyjne programy nauczania. Usługa jest przeznaczona dla uczniów w wieku 11-15 lat pod nadzorem rodzicielskim.",
+      "s2Body": "MentoMate to platforma mentoringowa oparta na sztucznej inteligencji, która zapewnia spersonalizowaną naukę poprzez dialog sokratejski, powtórki w odstępach i adaptacyjne programy nauczania. Usługa jest przeznaczona dla uczniów w wieku 11-15 lat pod nadzorem rodzicielskim.",
       "s3Title": "3. Obowiązki dotyczące konta",
       "s3Body": "Jesteś odpowiedzialny(-a) za zachowanie poufności swoich danych logowania. Musisz podać dokładne informacje podczas rejestracji. Nie wolno Ci udostępniać swojego konta innym ani tworzyć wielu kont.",
       "s4Title": "4. Dopuszczalne użytkowanie",
       "s4Body": "MentoMate służy wyłącznie do celów edukacyjnych. Zgadzasz się nie: używać usługi w żadnym celu niezgodnym z prawem; próbować omijać zabezpieczeń; przesyłać szkodliwych, obraźliwych lub nieodpowiednich treści; odtwarzać kodu źródłowego ani próbować wyodrębnić modeli AI lub algorytmów.",
       "s5Title": "5. Treści generowane przez AI",
-      "s5Body": "MentoMate wykorzystuje AI do generowania treści edukacyjnych. Chociaż dążymy do dokładności, odpowiedzi AI mogą czasami zawierać błędy. Usługa jest pomocą w nauce i nie zastępuje profesjonalnej edukacji, korepetycji ani porad akademickich.",
+      "s5Body": "MentoMate wykorzystuje AI do generowania treści edukacyjnych. Chociaż dążymy do dokładności, odpowiedzi AI mogą czasami zawierać błędy. Usługa jest pomocą w nauce i nie zastępuje profesjonalnej edukacji, mentoringu ani porad akademickich.",
       "s6Title": "6. Subskrypcje i płatności",
       "s6Body": "MentoMate oferuje darmowy poziom z ograniczonym dziennym i miesięcznym użytkowaniem. Płatne subskrypcje są dostępne za pośrednictwem Apple App Store lub Google Play Store. Warunki subskrypcji, ceny i anulowanie podlegają odpowiednim politykom sklepów z aplikacjami. Zwroty są obsługiwane przez sklep z aplikacjami, za pośrednictwem którego subskrybowałeś(-aś).",
       "s7Title": "7. Własność intelektualna",
@@ -1128,11 +1128,28 @@
       "saving": "Zapisywanie…",
       "skip": "Pomiń"
     },
-    "languagePicker": {
-      "title": "Jakiego języka się uczysz?",
-      "subtitle": "Ustawimy dla Ciebie ścieżkę nauki skoncentrowaną na języku.",
-      "otherHint": "Nie możesz znaleźć swojego języka? Wyszukaj lub przewiń w dół do „Inny”.",
-      "saving": "Zapisywanie…"
+    "mentorLanguagePicker": {
+      "title": "W jakim języku powinien mówić Twój mentor?",
+      "subtitle": "Twój mentor będzie używał tego języka do rozmów, zachęt i wyjaśnień. Możesz to później zmienić w sekcji Więcej.",
+      "otherLabel": "Inny",
+      "otherSublabel": "Powiedz nam, jaki język",
+      "saving": "Zapisywanie…",
+      "otherModal": {
+        "title": "Jaki język?",
+        "subtitle": "Przekażemy Twoją prośbę zespołowi i damy znać, gdy go dodamy.",
+        "placeholder": "np. norweski, mandaryński, arabski",
+        "submit": "Wyślij prośbę",
+        "cancel": "Anuluj",
+        "thanksTitle": "Dziękujemy!",
+        "thanksMessage": "Przekazaliśmy Twoją prośbę zespołowi.",
+        "thanksDone": "Gotowe"
+      },
+      "swapAppPrompt": {
+        "title": "Przełączyć też aplikację na {{language}}?",
+        "message": "Twój mentor będzie mówił {{language}}. Czy chcesz, aby reszta interfejsu aplikacji też była w {{language}}?",
+        "accept": "Tak, przełącz aplikację",
+        "decline": "Nie, zostaw jak jest"
+      }
     },
     "languageSetup": {
       "title": "Konfiguracja języka",
@@ -1328,14 +1345,14 @@
       "loadingChild": "Ładowanie danych dziecka...",
       "couldNotLoad": "Nie można załadować danych dziecka",
       "switchChild": "Zmień dziecko",
-      "openMentorMemory": "Otwórz pamięć tutora",
+      "openMentorMemory": "Otwórz pamięć mentora",
       "timeOnApp": "{{duration}} w aplikacji",
       "timeOnAppUnavailable": "Czas w aplikacji niedostępny",
       "childNotFound": "Nie znaleziono dziecka",
       "unableToLoadChild": "Nie mogliśmy załadować profilu tego dziecka.",
       "clearAlert": {
-        "title": "Wyczyścić pamięć tutora?",
-        "message": "Spowoduje to usunięcie wszystkich notatek, które tutor zapisał o {{name}}. Tej operacji nie można cofnąć.",
+        "title": "Wyczyścić pamięć mentora?",
+        "message": "Spowoduje to usunięcie wszystkich notatek, które mentor zapisał o {{name}}. Tej operacji nie można cofnąć.",
         "confirm": "Wyczyść pamięć"
       },
       "errorTitle": "Coś poszło nie tak",
@@ -1370,16 +1387,16 @@
       "refreshChildProfile": "Odśwież profil dziecka",
       "refresh": "Odśwież",
       "viewSessionFrom": "Zobacz sesję z",
-      "mentorMemoryTitle": "Co tutor wie o {{name}}",
-      "mentorMemoryTitleFallback": "Pamięć tutora",
-      "setUpMentorMemory": "Skonfiguruj pamięć tutora",
-      "chooseWhatMentorRemembers": "Wybierz, co tutor ma pamiętać",
-      "viewWhatMentorKnows": "Zobacz, co wie tutor",
-      "whatTheMentorKnows": "Co wie tutor",
+      "mentorMemoryTitle": "Co mentor wie o {{name}}",
+      "mentorMemoryTitleFallback": "Pamięć mentora",
+      "setUpMentorMemory": "Skonfiguruj pamięć mentora",
+      "chooseWhatMentorRemembers": "Wybierz, co mentor ma pamiętać",
+      "viewWhatMentorKnows": "Zobacz, co wie mentor",
+      "whatTheMentorKnows": "Co wie mentor",
       "reviewAndAdjustPrivacy": "Przejrzyj i dostosuj ustawienia prywatności",
       "learningAccommodationTitle": "Dostosowanie nauki dla {{name}}",
       "learningAccommodationTitleFallback": "Dostosowanie nauki",
-      "learningAccommodationDescription": "Dostosuj sposób, w jaki tutor uczy, aby pasował do potrzeb edukacyjnych Twojego dziecka",
+      "learningAccommodationDescription": "Dostosuj sposób, w jaki mentor uczy, aby pasował do potrzeb edukacyjnych Twojego dziecka",
       "toggleDecisionGuide": "Pokaż przewodnik decyzyjny",
       "notSureWhichToPick": "Nie wiesz, które wybrać?",
       "pickAccommodation": "Wybierz dostosowanie",
@@ -1406,38 +1423,38 @@
       "withdraw": "Wycofaj"
     },
     "mentorMemory": {
-      "title": "Pamięć tutora",
-      "subtitle": "Co tutor wie o {{name}}",
+      "title": "Pamięć mentora",
+      "subtitle": "Co mentor wie o {{name}}",
       "toggleCollection": "Przełącz zbieranie pamięci",
       "toggleInjection": "Przełącz wstrzykiwanie pamięci",
       "collectionOn": "Zbieranie włączone",
       "collectionOff": "Zbieranie wyłączone",
       "injectionOn": "Wstrzykiwanie włączone",
       "injectionOff": "Wstrzykiwanie wyłączone",
-      "collectionDescription": "Gdy włączone, tutor zapisuje obserwacje o {{name}} podczas sesji.",
-      "injectionDescription": "Gdy włączone, tutor używa zapisanych obserwacji do personalizacji sesji dla {{name}}.",
-      "tellTheMentor": "Powiedz tutorowi",
-      "tellTheMentorPlaceholder": "Dodaj notatkę dla tutora o {{name}}…",
+      "collectionDescription": "Gdy włączone, mentor zapisuje obserwacje o {{name}} podczas sesji.",
+      "injectionDescription": "Gdy włączone, mentor używa zapisanych obserwacji do personalizacji sesji dla {{name}}.",
+      "tellTheMentor": "Powiedz mentorowi",
+      "tellTheMentorPlaceholder": "Dodaj notatkę dla mentora o {{name}}…",
       "addNote": "Dodaj notatkę",
       "hiddenItems": "{{count}} ukrytych elementów",
       "showHidden": "Pokaż ukryte",
       "hideItem": "Ukryj to",
       "noMemoryYet": "Brak jeszcze pamięci",
-      "noMemoryDescription": "Tutor zacznie zapisywać obserwacje o {{name}} po kilku sesjach.",
+      "noMemoryDescription": "Mentorzacznie zapisywać obserwacje o {{name}} po kilku sesjach.",
       "privacyNote": "Pamięć jest prywatna i widoczna tylko dla Ciebie.",
       "correctionLabel": "Poprawka",
-      "correctionPlaceholder": "Co tutor powinien wiedzieć zamiast tego?",
+      "correctionPlaceholder": "Co mentor powinien wiedzieć zamiast tego?",
       "saveCorrection": "Zapisz poprawkę",
       "exportMemory": "Eksportuj pamięć",
-      "exportTitle": "Pamięć tutora {{name}}",
+      "exportTitle": "Pamięć mentora {{name}}",
       "clearMemory": "Wyczyść całą pamięć",
       "clearMemoryAlert": {
         "title": "Wyczyścić całą pamięć?",
-        "message": "Spowoduje to trwałe usunięcie całej pamięci tutora dla {{name}}.",
+        "message": "Spowoduje to trwałe usunięcie całej pamięci mentora dla {{name}}.",
         "confirm": "Wyczyść"
       },
       "loadingMemory": "Ładowanie pamięci…",
-      "couldNotLoad": "Nie można załadować pamięci tutora",
+      "couldNotLoad": "Nie można załadować pamięci mentora",
       "memoryCleared": "Pamięć wyczyszczona",
       "noteSaved": "Notatka zapisana",
       "correctionSaved": "Poprawka zapisana",
@@ -1446,10 +1463,10 @@
       "pleaseTryAgain": "Spróbuj ponownie",
       "couldNotRestoreItem": "Nie można przywrócić tego elementu",
       "clearMemoryTitle": "Wyczyścić całą pamięć?",
-      "clearMemoryBody": "Spowoduje to usunięcie wszystkiego, czego tutor nauczył się o Twoim dziecku. Tej operacji nie można cofnąć.",
+      "clearMemoryBody": "Spowoduje to usunięcie wszystkiego, czego mentor dowiedział się o Twoim dziecku. Tej operacji nie można cofnąć.",
       "clear": "Wyczyść",
       "couldNotClearMemory": "Nie można wyczyścić pamięci",
-      "savedMentorWillRemember": "Zapisano — tutor to zapamięta",
+      "savedMentorWillRemember": "Zapisano — mentor to zapamięta",
       "couldNotSaveThat": "Nie można tego zapisać",
       "couldNotUpdateMemory": "Nie można zaktualizować pamięci",
       "learner": "Uczeń",
@@ -1457,9 +1474,9 @@
       "couldNotExportMemory": "Nie można wyeksportować pamięci",
       "controls": "Sterowanie",
       "learnAboutChild": "Dowiedz się o dziecku",
-      "learnAboutChildDescription": "Pozwól tutorowi budować pamięć o mocnych i słabych stronach Twojego dziecka",
-      "useWhatMentorKnows": "Użyj tego, co wie tutor",
-      "useWhatMentorKnowsDescription": "Pozwól tutorowi personalizować sesje, używając tego, czego się nauczył",
+      "learnAboutChildDescription": "Pozwól mentorowi budować pamięć o mocnych i słabych stronach Twojego dziecka",
+      "useWhatMentorKnows": "Użyj tego, co wie mentor",
+      "useWhatMentorKnowsDescription": "Pozwól mentorowi personalizować sesje, używając tego, czego się dowiedział",
       "noObservationsYet": "Brak jeszcze obserwacji",
       "bringBack": "Przywróć",
       "privacy": "Prywatność",
@@ -1467,7 +1484,7 @@
       "clearAllMemory": "Wyczyść całą pamięć",
       "somethingElseIsWrong": "Coś innego jest nie tak",
       "whatSeemsWrong": "Co wydaje się nie tak?",
-      "whatSeemsWrongDescription": "Opisz poprawkę, a tutor weźmie ją pod uwagę",
+      "whatSeemsWrongDescription": "Opisz poprawkę, a mentor weźmie ją pod uwagę",
       "correctionNoted": "Poprawka odnotowana",
       "couldNotSaveCorrection": "Nie można zapisać poprawki",
       "submit": "Prześlij"
@@ -1640,7 +1657,7 @@
     "previewSubjectBrowser": {
       "backLabel": "Wstecz",
       "title": "Przeglądaj przedmioty",
-      "description": "Odkryj, czego możesz się nauczyć ze swoim tutorem"
+      "description": "Odkryj, czego możesz się nauczyć ze swoim mentorem"
     },
     "previewSampleCoaching": {
       "backLabel": "Wstecz",
@@ -1649,10 +1666,10 @@
       "homeworkCardBody": "Zrób zdjęcie swojej pracy domowej i przejdź przez nią krok po kroku",
       "homeworkHelp": "Pomoc w zadaniu domowym",
       "practiceTest": "Test próbny",
-      "howMentorHelps": "Jak pomaga Twój tutor",
-      "howMentorHelpsBody": "Twój tutor pamięta, co wiesz i dostosowuje się do Twojego tempa",
+      "howMentorHelps": "Jak pomaga Twój mentor",
+      "howMentorHelpsBody": "Twój mentor pamięta, co wiesz i dostosowuje się do Twojego tempa",
       "snapPhoto": "Zrób zdjęcie",
-      "mentorRemembers": "Tutor pamięta",
+      "mentorRemembers": "Mentor pamięta",
       "trackProgress": "Śledź postępy",
       "previewDisclaimer": "To jest podgląd — pełny dostęp odblokuje się po zatwierdzeniu przez rodzica"
     },
@@ -1688,7 +1705,7 @@
       "browseSubjectsHint": "Odkryj wszystko, czego możesz się nauczyć",
       "sampleMentoringLabel": "Wypróbuj przykładowe sesje mentorskie",
       "sampleMentoring": "Przykładowe sesje mentorskie",
-      "sampleMentoringHint": "Zobacz, jak Twój tutor będzie z Tobą pracował"
+      "sampleMentoringHint": "Zobacz, jak Twój mentor będzie z Tobą pracował"
     },
     "authRedirectTimeout": {
       "title": "Trwa to zbyt długo",
@@ -1853,7 +1870,7 @@
   "confirmInputLabel": "Wpisz {{phrase}}, aby potwierdzić usunięcie",
   "permanentDeleteLabel": "Trwale usuń moje konto",
   "permanentDelete": "Usuń moje konto",
-  "warningBody1": "Wszystkie Twoje dane dotyczące nauki, postępy i pamięć tutora zostaną trwale usunięte.",
+  "warningBody1": "Wszystkie Twoje dane dotyczące nauki, postępy i pamięć mentora zostaną trwale usunięte.",
   "warningBody2": "Tej operacji nie można cofnąć.",
   "understandDeleteLabel": "Rozumiem — usuń moje konto",
   "understandDelete": "Rozumiem",
@@ -1864,7 +1881,7 @@
     "s1Body": "EduAgent to platforma edukacyjna oparta na sztucznej inteligencji, przeznaczona dla uczniów w wieku 11 lat i starszych. Zobowiązujemy się do ochrony Twojej prywatności i starannego obchodzenia się z Twoimi danymi.",
     "s2Title": "Jakie dane zbieramy",
     "s2Body1": "Informacje o koncie: Twoje imię, adres e-mail i szczegóły profilu podane podczas rejestracji.",
-    "s2Body2": "Dane dotyczące nauki: transkrypcje sesji, studiowane tematy, wskaźniki postępów i notatki z pamięci tutora.",
+    "s2Body2": "Dane dotyczące nauki: transkrypcje sesji, studiowane tematy, wskaźniki postępów i notatki z pamięci mentora.",
     "s2Body3": "Dane o użytkowaniu: jak wchodzisz w interakcję z aplikacją, w tym używane funkcje i spędzony czas.",
     "s2Body4": "Dane urządzenia: typ urządzenia, system operacyjny i wersja aplikacji do celów diagnostycznych.",
     "s3Title": "Jak wykorzystujemy Twoje dane",

@@ -5,6 +5,16 @@ import {
   recallTestSubmitSchema,
   relearnTopicSchema,
   teachingPreferenceSchema,
+  libraryRetentionResponseSchema,
+  subjectRetentionResponseSchema,
+  topicRetentionResponseSchema,
+  recallTestResponseSchema,
+  relearnResponseSchema,
+  needsDeepeningResponseSchema,
+  teachingPreferenceEndpointResponseSchema,
+  deleteTeachingPreferenceResponseSchema,
+  stabilityResponseSchema,
+  evaluateEligibilitySchema,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
@@ -51,7 +61,7 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
     const result = await getAllSubjectsRetention(db, profileId);
-    return c.json(result);
+    return c.json(libraryRetentionResponseSchema.parse(result));
   })
 
   // Get retention status for all topics in subject
@@ -64,7 +74,7 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
       const { subjectId } = c.req.valid('param');
 
       const result = await getSubjectRetention(db, profileId, subjectId);
-      return c.json(result);
+      return c.json(subjectRetentionResponseSchema.parse(result));
     }
   )
 
@@ -78,7 +88,7 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
       const { topicId } = c.req.valid('param');
 
       const card = await getTopicRetention(db, profileId, topicId);
-      return c.json({ card });
+      return c.json(topicRetentionResponseSchema.parse({ card }));
     }
   )
 
@@ -93,7 +103,7 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
       const input = c.req.valid('json');
 
       const result = await processRecallTest(db, profileId, input);
-      return c.json({ result });
+      return c.json(recallTestResponseSchema.parse({ result }));
     }
   )
 
@@ -108,7 +118,7 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
       const input = c.req.valid('json');
 
       const result = await startRelearn(db, profileId, input);
-      return c.json(result);
+      return c.json(relearnResponseSchema.parse(result));
     }
   )
 
@@ -122,7 +132,7 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
       const { subjectId } = c.req.valid('param');
 
       const result = await getSubjectNeedsDeepening(db, profileId, subjectId);
-      return c.json(result);
+      return c.json(needsDeepeningResponseSchema.parse(result));
     }
   )
 
@@ -136,7 +146,9 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
       const { subjectId } = c.req.valid('param');
 
       const preference = await getTeachingPreference(db, profileId, subjectId);
-      return c.json({ preference });
+      return c.json(
+        teachingPreferenceEndpointResponseSchema.parse({ preference })
+      );
     }
   )
 
@@ -159,7 +171,9 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
           method,
           analogyDomain
         );
-        return c.json({ preference });
+        return c.json(
+          teachingPreferenceEndpointResponseSchema.parse({ preference })
+        );
       } catch (error) {
         if (error instanceof NotFoundError) {
           return notFound(c, error.message);
@@ -179,7 +193,11 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
       const { subjectId } = c.req.valid('param');
 
       await deleteTeachingPreference(db, profileId, subjectId);
-      return c.json({ message: 'Teaching preference reset' });
+      return c.json(
+        deleteTeachingPreferenceResponseSchema.parse({
+          message: 'Teaching preference reset',
+        })
+      );
     }
   )
 
@@ -196,7 +214,7 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
       const { subjectId } = c.req.valid('query');
 
       const topics = await getStableTopics(db, profileId, subjectId);
-      return c.json({ topics });
+      return c.json(stabilityResponseSchema.parse({ topics }));
     }
   )
 
@@ -214,6 +232,6 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
         profileId,
         topicId
       );
-      return c.json(eligibility);
+      return c.json(evaluateEligibilitySchema.parse(eligibility));
     }
   );

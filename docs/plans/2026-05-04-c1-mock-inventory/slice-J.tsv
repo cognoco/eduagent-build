@@ -1,0 +1,2 @@
+location	specifier	category	basis	reason
+packages/database/src/queries/embeddings.test.ts:8	../utils/uuid	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary

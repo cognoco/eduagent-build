@@ -34,6 +34,13 @@ export type NativeLanguageUpdateInput = z.infer<
   typeof nativeLanguageUpdateSchema
 >;
 
+export const nativeLanguageResponseSchema = z.object({
+  nativeLanguage: z.string().min(2).max(50).nullable(),
+});
+export type NativeLanguageResponse = z.infer<
+  typeof nativeLanguageResponseSchema
+>;
+
 export const vocabularySchema = z.object({
   id: z.string().uuid(),
   profileId: z.string().uuid(),
@@ -85,6 +92,43 @@ export const vocabularyRetentionCardSchema = z.object({
 });
 export type VocabularyRetentionCard = z.infer<
   typeof vocabularyRetentionCardSchema
+>;
+
+// ---------------------------------------------------------------------------
+// Route-level vocabulary response schemas
+// ---------------------------------------------------------------------------
+
+/** GET /subjects/:subjectId/vocabulary */
+export const vocabularyListResponseSchema = z.object({
+  vocabulary: z.array(vocabularySchema),
+});
+export type VocabularyListResponse = z.infer<
+  typeof vocabularyListResponseSchema
+>;
+
+/** POST /subjects/:subjectId/vocabulary */
+export const vocabularyCreateResponseSchema = z.object({
+  vocabulary: vocabularySchema,
+});
+export type VocabularyCreateResponse = z.infer<
+  typeof vocabularyCreateResponseSchema
+>;
+
+/** POST /subjects/:subjectId/vocabulary/:vocabularyId/review */
+export const vocabularyReviewResponseSchema = z.object({
+  vocabulary: vocabularySchema,
+  retention: vocabularyRetentionCardSchema,
+});
+export type VocabularyReviewResponse = z.infer<
+  typeof vocabularyReviewResponseSchema
+>;
+
+/** DELETE /subjects/:subjectId/vocabulary/:vocabularyId */
+export const vocabularyDeleteResponseSchema = z.object({
+  success: z.boolean(),
+});
+export type VocabularyDeleteResponse = z.infer<
+  typeof vocabularyDeleteResponseSchema
 >;
 
 export const languageMilestoneProgressSchema = z.object({

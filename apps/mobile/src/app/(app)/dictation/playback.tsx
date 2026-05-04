@@ -45,8 +45,7 @@ export default function PlaybackScreen(): React.ReactElement {
       hasStartedRef.current = true;
       playback.start();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data]);
+  }, [data, playback]);
 
   // Navigate to complete screen when done
   useEffect(() => {

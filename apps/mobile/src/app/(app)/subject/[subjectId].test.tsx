@@ -109,7 +109,7 @@ describe('SubjectSettingsScreen', () => {
     render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
     screen.getByText(
-      "Choose a domain for analogies. The tutor will prefer analogies from this world when explaining concepts, but won't force them when a direct explanation is clearer."
+      "Choose a domain for analogies. The mentor will prefer analogies from this world when explaining concepts, but won't force them when a direct explanation is clearer."
     );
   });
 

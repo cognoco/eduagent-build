@@ -2,8 +2,13 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import {
   prepareHomeworkInputSchema,
+  prepareHomeworkOutputSchema,
+  generateDictationOutputSchema,
   recordDictationResultInputSchema,
+  recordDictationResultResponseSchema,
   dictationReviewInputSchema,
+  dictationReviewResultSchema,
+  dictationStreakSchema,
   ERROR_CODES,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
@@ -96,7 +101,7 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
       requireProfileId(c.get('profileId'));
       const { text } = c.req.valid('json');
       const result = await prepareHomework(text);
-      return c.json(result, 200);
+      return c.json(prepareHomeworkOutputSchema.parse(result), 200);
     }
   )
 
@@ -117,7 +122,7 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
     );
     const result = await generateDictation(ctx);
 
-    return c.json(result, 200);
+    return c.json(generateDictationOutputSchema.parse(result), 200);
   })
 
   // -------------------------------------------------------------------------
@@ -154,7 +159,10 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
         reviewed: input.reviewed,
       });
 
-      return c.json({ result: row }, 201);
+      return c.json(
+        recordDictationResultResponseSchema.parse({ result: row }),
+        201
+      );
     }
   )
 
@@ -239,7 +247,7 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
         recentStruggles,
       });
 
-      return c.json(result, 200);
+      return c.json(dictationReviewResultSchema.parse(result), 200);
     }
   )
 
@@ -252,5 +260,5 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
     const db = c.get('db');
 
     const result = await getDictationStreak(db, profileId);
-    return c.json(result);
+    return c.json(dictationStreakSchema.parse(result));
   });

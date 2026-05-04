@@ -1,0 +1,155 @@
+location	specifier	category	basis	reason
+apps/api/src/inngest/functions/account-deletion.test.ts:12	../../services/deletion	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/account-deletion.test.ts:8	../helpers	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/ask-classification-observe.test.ts:12	../client	EXTERNAL	heuristic	mock targets the Inngest client wrapper boundary
+apps/api/src/inngest/functions/ask-silent-classify.test.ts:17	../../services/subject-classify	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/inngest/functions/ask-silent-classify.test.ts:21	../helpers	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/ask-silent-classify.test.ts:27	../client	EXTERNAL	heuristic	mock targets the Inngest client wrapper boundary
+apps/api/src/inngest/functions/billing-trial-subscription-failed.test.ts:13	../client	EXTERNAL	heuristic	mock targets the Inngest client wrapper boundary
+apps/api/src/inngest/functions/book-pre-generation.test.ts:39	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/inngest/functions/book-pre-generation.test.ts:54	../../services/book-generation	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/book-pre-generation.test.ts:66	../../services/curriculum	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/consent-reminders.test.ts:16	../helpers	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/consent-reminders.test.ts:31	../../services/consent	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/consent-reminders.test.ts:37	../../services/notifications	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/consent-reminders.test.ts:45	../../services/deletion	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/consent-revocation.test.ts:14	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/inngest/functions/consent-revocation.test.ts:17	../client	EXTERNAL	heuristic	mock targets the Inngest client wrapper boundary
+apps/api/src/inngest/functions/consent-revocation.test.ts:29	../../services/consent	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/consent-revocation.test.ts:34	../../services/deletion	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/consent-revocation.test.ts:39	../../services/notifications	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/consent-revocation.test.ts:45	../../services/settings	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/daily-reminder-send.test.ts:13	../../services/notifications	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/daily-reminder-send.test.ts:21	../../services/settings	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/daily-reminder-send.test.ts:27	../../services/sentry	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/inngest/functions/daily-reminder-send.test.ts:31	../client	EXTERNAL	heuristic	mock targets the Inngest client wrapper boundary
+apps/api/src/inngest/functions/daily-reminder-send.test.ts:9	../helpers	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/daily-snapshot.test.ts:36	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/inngest/functions/daily-snapshot.test.ts:40	../../services/snapshot-aggregation	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/daily-snapshot.test.ts:47	../../services/sentry	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/inngest/functions/daily-snapshot.test.ts:51	../helpers	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/exchange-empty-reply-fallback.test.ts:9	../client	EXTERNAL	heuristic	mock targets the Inngest client wrapper boundary
+apps/api/src/inngest/functions/feedback-delivery-failed.test.ts:25	../../services/notifications	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/feedback-delivery-failed.test.ts:29	../../services/sentry	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/inngest/functions/feedback-delivery-failed.test.ts:33	../../services/logger	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/inngest/functions/feedback-delivery-failed.test.ts:42	../helpers	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/feedback-delivery-failed.test.ts:48	../client	EXTERNAL	heuristic	mock targets the Inngest client wrapper boundary
+apps/api/src/inngest/functions/filing-completed-observe.test.ts:19	../helpers	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/filing-completed-observe.test.ts:23	../client	EXTERNAL	heuristic	mock targets the Inngest client wrapper boundary
+apps/api/src/inngest/functions/filing-completed-observe.test.ts:35	../../services/logger	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/inngest/functions/filing-stranded-backfill.test.ts:36	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/inngest/functions/filing-stranded-backfill.test.ts:38	../client	EXTERNAL	heuristic	mock targets the Inngest client wrapper boundary
+apps/api/src/inngest/functions/filing-stranded-backfill.test.ts:49	../helpers	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/filing-timed-out-observe.test.ts:18	../helpers	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/filing-timed-out-observe.test.ts:22	../client	EXTERNAL	heuristic	mock targets the Inngest client wrapper boundary
+apps/api/src/inngest/functions/filing-timed-out-observe.test.ts:35	../../services/sentry	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/inngest/functions/filing-timed-out-observe.test.ts:44	../../services/notifications	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/filing-timed-out-observe.test.ts:51	../../services/settings	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/filing-timed-out-observe.test.ts:56	../../services/logger	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/inngest/functions/freeform-filing.test.ts:105	../../services/llm	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/inngest/functions/freeform-filing.test.ts:56	@eduagent/database	service-stub-with-business-logic	exact-override	createScopedRepository mock carries inline session logic
+apps/api/src/inngest/functions/freeform-filing.test.ts:75	../../services/session	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/freeform-filing.test.ts:99	../../services/filing	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/interview-persist-curriculum.test.ts:10	../client	EXTERNAL	heuristic	mock targets the Inngest client wrapper boundary
+apps/api/src/inngest/functions/interview-persist-curriculum.test.ts:23	../../services/logger	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/inngest/functions/interview-persist-curriculum.test.ts:29	../../services/interview	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/interview-persist-curriculum.test.ts:36	../../services/notifications	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/interview-persist-curriculum.test.ts:6	../helpers	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/monthly-report-cron.test.ts:106	../../services/snapshot-aggregation	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/monthly-report-cron.test.ts:112	../../services/notifications	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/monthly-report-cron.test.ts:121	../../services/settings	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/monthly-report-cron.test.ts:128	../../services/sentry	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/inngest/functions/monthly-report-cron.test.ts:132	../helpers	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/monthly-report-cron.test.ts:70	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/inngest/functions/monthly-report-cron.test.ts:97	../../services/monthly-report	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/notification-suppressed-observe.test.ts:15	../../services/sentry	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/inngest/functions/notification-suppressed-observe.test.ts:21	../../services/logger	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/inngest/functions/notification-suppressed-observe.test.ts:30	../client	EXTERNAL	heuristic	mock targets the Inngest client wrapper boundary
+apps/api/src/inngest/functions/payment-failed-observe.test.ts:10	../client	EXTERNAL	heuristic	mock targets the Inngest client wrapper boundary
+apps/api/src/inngest/functions/post-session-suggestions.test.ts:12	../../services/llm	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/inngest/functions/post-session-suggestions.test.ts:16	../../services/llm/sanitize	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/inngest/functions/post-session-suggestions.test.ts:30	../helpers	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/post-session-suggestions.test.ts:34	../client	EXTERNAL	heuristic	mock targets the Inngest client wrapper boundary
+apps/api/src/inngest/functions/quota-reset.test.ts:51	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/inngest/functions/quota-reset.test.ts:53	../../services/subscription	service-stub-with-business-logic	exact-override	subscription config mock branches by tier
+apps/api/src/inngest/functions/recall-nudge-send.test.ts:10	../helpers	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/recall-nudge-send.test.ts:14	../../services/notifications	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/recall-nudge-send.test.ts:20	../../services/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/inngest/functions/recall-nudge-send.test.ts:25	../../services/settings	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/recall-nudge-send.test.ts:31	../../services/sentry	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/inngest/functions/recall-nudge-send.test.ts:35	../client	EXTERNAL	heuristic	mock targets the Inngest client wrapper boundary
+apps/api/src/inngest/functions/recall-nudge-send.test.ts:47	drizzle-orm	EXTERNAL	heuristic	bare-module mock defaults to an external dependency boundary
+apps/api/src/inngest/functions/recall-nudge-send.test.ts:52	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/inngest/functions/review-due-send.test.ts:13	../../services/notifications	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/review-due-send.test.ts:21	../../services/settings	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/review-due-send.test.ts:27	../../services/sentry	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/inngest/functions/review-due-send.test.ts:31	../client	EXTERNAL	heuristic	mock targets the Inngest client wrapper boundary
+apps/api/src/inngest/functions/review-due-send.test.ts:43	drizzle-orm	EXTERNAL	heuristic	bare-module mock defaults to an external dependency boundary
+apps/api/src/inngest/functions/review-due-send.test.ts:48	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/inngest/functions/review-due-send.test.ts:9	../helpers	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/session-completed.test.ts:101	../../services/embeddings	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/session-completed.test.ts:111	../../services/retention-data	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/session-completed.test.ts:120	../../services/language-curriculum	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/session-completed.test.ts:127	../../services/vocabulary-extract	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/session-completed.test.ts:134	../../services/vocabulary	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/session-completed.test.ts:141	../../services/summaries	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/session-completed.test.ts:161	../../services/coaching-cards	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/session-completed.test.ts:170	../../services/streaks	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/session-completed.test.ts:177	../../services/xp	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/session-completed.test.ts:186	../../services/homework-summary	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/session-completed.test.ts:195	../../services/settings	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/session-completed.test.ts:205	../../services/celebrations	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/session-completed.test.ts:212	../../services/verification-completion	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/session-completed.test.ts:221	../../services/snapshot-aggregation	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/session-completed.test.ts:233	../../services/session-highlights	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/session-completed.test.ts:242	../../services/sentry	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/inngest/functions/session-completed.test.ts:254	../../services/learner-profile	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/session-completed.test.ts:81	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/inngest/functions/session-stale-cleanup.test.ts:15	../../services/session	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/session-stale-cleanup.test.ts:19	../../services/quiz	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/session-stale-cleanup.test.ts:26	../helpers	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/session-stale-cleanup.test.ts:32	../client	EXTERNAL	heuristic	mock targets the Inngest client wrapper boundary
+apps/api/src/inngest/functions/subject-auto-archive.test.ts:13	../../services/subject	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/inngest/functions/subject-auto-archive.test.ts:9	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/inngest/functions/topup-expiry-reminder-send.test.ts:12	../client	EXTERNAL	heuristic	mock targets the Inngest client wrapper boundary
+apps/api/src/inngest/functions/topup-expiry-reminder.test.ts:28	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/inngest/functions/topup-expiry-reminder.test.ts:30	../client	EXTERNAL	heuristic	mock targets the Inngest client wrapper boundary
+apps/api/src/inngest/functions/topup-expiry-reminder.test.ts:44	../../services/billing	auth/middleware-bypass	heuristic	bypasses quota or metering checks through mocked billing state
+apps/api/src/inngest/functions/trial-expiry-failure-observe.test.ts:9	../client	EXTERNAL	heuristic	mock targets the Inngest client wrapper boundary
+apps/api/src/inngest/functions/trial-expiry.test.ts:16	../client	EXTERNAL	heuristic	mock targets the Inngest client wrapper boundary
+apps/api/src/inngest/functions/trial-expiry.test.ts:29	../../services/sentry	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/inngest/functions/trial-expiry.test.ts:33	../../services/subscription	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/trial-expiry.test.ts:47	../../services/billing	auth/middleware-bypass	heuristic	bypasses quota or metering checks through mocked billing state
+apps/api/src/inngest/functions/trial-expiry.test.ts:58	../../services/trial	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/trial-expiry.test.ts:76	../../services/notifications	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/trial-expiry.test.ts:85	../../services/settings	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/trial-expiry.test.ts:9	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/inngest/functions/trial-expiry.test.ts:91	../../services/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/inngest/functions/weekly-progress-push.test.ts:13	../../services/sentry	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/inngest/functions/weekly-progress-push.test.ts:16	../helpers	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/inngest/functions/weekly-progress-push.test.ts:26	../client	EXTERNAL	heuristic	mock targets the Inngest client wrapper boundary
+apps/api/src/middleware/account.test.ts:5	../services/account	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/middleware/auth.test.ts:10	../services/sentry	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/middleware/auth.test.ts:15	../services/logger	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/middleware/auth.test.ts:33	./jwt	auth/middleware-bypass	exact-override	bypasses JWT verification while testing auth middleware
+apps/api/src/middleware/database.test.ts:11	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/middleware/env-validation.test.ts:1	../config	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/middleware/idempotency.test.ts:1	../services/sentry	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/middleware/idempotency.test.ts:15	../services/idempotency-assistant-state	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/middleware/idempotency.test.ts:6	../services/logger	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/middleware/llm.test.ts:1	../services/llm	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/middleware/llm.test.ts:5	../services/llm/providers/gemini	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/middleware/llm.test.ts:9	../services/llm/providers/openai	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/middleware/metering.test.ts:108	../services/subject	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/middleware/metering.test.ts:122	../services/interview	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/middleware/metering.test.ts:159	../services/billing	auth/middleware-bypass	heuristic	bypasses quota or metering checks through mocked billing state
+apps/api/src/middleware/metering.test.ts:178	../services/kv	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/middleware/metering.test.ts:193	../services/logger	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/middleware/metering.test.ts:22	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/middleware/metering.test.ts:24	../services/account	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/middleware/metering.test.ts:35	../services/session	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/middleware/metering.test.ts:6	./jwt	auth/middleware-bypass	exact-override	bypasses JWT verification while testing metering middleware
+apps/api/src/middleware/metering.test.ts:87	../services/recall-bridge	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/middleware/metering.test.ts:94	../services/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/middleware/profile-scope.test.ts:16	../services/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/middleware/profile-scope.test.ts:3	../services/sentry	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary

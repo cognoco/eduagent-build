@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import type { Database } from '@eduagent/database';
+import { languageProgressSchema } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import { getCurrentLanguageProgress } from '../services/language-curriculum';
@@ -29,6 +30,6 @@ export const languageProgressRoutes = new Hono<LanguageProgressRouteEnv>().get(
       return notFound(c, 'Language progress not found');
     }
 
-    return c.json(progress);
+    return c.json(languageProgressSchema.parse(progress));
   }
 );

@@ -6,6 +6,7 @@ import {
   getUnpickedBookSuggestions,
   getAllBookSuggestions,
 } from '../services/suggestions';
+import { bookSuggestionsResponseSchema } from '@eduagent/schemas';
 
 type BookSuggestionsEnv = {
   Bindings: { DATABASE_URL: string };
@@ -27,7 +28,7 @@ export const bookSuggestionRoutes = new Hono<BookSuggestionsEnv>()
       profileId,
       subjectId
     );
-    return c.json(suggestions, 200);
+    return c.json(bookSuggestionsResponseSchema.parse(suggestions), 200);
   })
   .get('/subjects/:subjectId/book-suggestions/all', async (c) => {
     const profileId = requireProfileId(c.get('profileId'));
@@ -35,5 +36,5 @@ export const bookSuggestionRoutes = new Hono<BookSuggestionsEnv>()
     const subjectId = c.req.param('subjectId');
 
     const suggestions = await getAllBookSuggestions(db, profileId, subjectId);
-    return c.json(suggestions, 200);
+    return c.json(bookSuggestionsResponseSchema.parse(suggestions), 200);
   });

@@ -6,6 +6,7 @@ import { assertNotProxyMode } from '../middleware/proxy-guard';
 import {
   OCR_CONSTRAINTS,
   ocrResultSchema,
+  homeworkStartResponseSchema,
   ERROR_CODES,
 } from '@eduagent/schemas';
 import { validationError, apiError } from '../errors';
@@ -40,7 +41,7 @@ export const homeworkRoutes = new Hono<HomeworkRouteEnv>()
         sessionType: 'homework',
         inputMode: 'text',
       });
-      return c.json({ session }, 201);
+      return c.json(homeworkStartResponseSchema.parse({ session }), 201);
     } catch (err) {
       if (err instanceof SubjectInactiveError) {
         return apiError(c, 403, ERROR_CODES.SUBJECT_INACTIVE, err.message);

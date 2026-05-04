@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Crypto from 'expo-crypto';
 import { withLock } from './async-mutex';
 
 export type OutboxFlow = 'session' | 'interview';
@@ -105,12 +106,14 @@ export async function enqueue(input: EnqueueInput): Promise<OutboxEntry> {
     }
 
     const entry: OutboxEntry = {
-      // [I6] crypto.randomUUID() is the dedup key the server stores against
-      // sessionEvents.clientId / KV idempotency. Date.now()+Math.random has a
-      // realistic collision risk under burst-replay: ~36 bits of randomness in
-      // 8 base36 chars, and Math.random is not collision-safe across tabs/JS
+      // [I6] expo-crypto's randomUUID() is RFC4122 v4 — the dedup key the
+      // server stores against sessionEvents.clientId / KV idempotency. The
+      // global `crypto` is NOT defined in Hermes (RN engine), so use the
+      // expo-crypto polyfill. Date.now()+Math.random has a realistic
+      // collision risk under burst-replay: ~36 bits of randomness in 8
+      // base36 chars, and Math.random is not collision-safe across tabs/JS
       // contexts. RFC4122 v4 gives ~122 bits and zero collision risk.
-      id: input.id ?? crypto.randomUUID(),
+      id: input.id ?? Crypto.randomUUID(),
       flow: input.flow,
       surfaceKey: input.surfaceKey,
       content: input.content,

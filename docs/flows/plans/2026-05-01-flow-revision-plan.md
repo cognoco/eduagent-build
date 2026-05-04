@@ -1,10 +1,10 @@
 # Mobile App Flow Revision Plan — 2026-05-01
 
-Source inventory: [`mobile-app-flow-inventory.md`](../mobile-app-flow-inventory.md) (snapshot 2026-04-19, doc updated 2026-04-30).
+Source inventory: [`mobile-app-flow-inventory.md`](../mobile-app-flow-inventory.md) (snapshot 2026-05-04 — refreshed 2026-05-04 to cover library v3, home redesign, onboarding extras, session transcript, bookmarks, weekly report, dictation/quiz full E2E coverage, BUG-910 delete-account, BUG-966 trial UI, profile-as-lens, i18n, and a dozen new cross-cutting behaviours).
 
 ## Purpose
 
-Walk every flow in the inventory, log defects in the Notion Bug Tracker, and update the inventory document where descriptions have drifted. **Total scope: 154 numbered items across 13 sections + an open-ended discovery register for flows missing from the inventory.**
+Walk every flow in the inventory, log defects in the Notion Bug Tracker, and update the inventory document where descriptions have drifted. **Total scope: 184 numbered items across 13 sections + an open-ended discovery register for flows missing from the inventory** (154 in the original 2026-04-19 sweep + 30 added 2026-05-04 from the inventory refresh).
 
 ## Operating Instructions (read before starting any batch)
 
@@ -192,6 +192,8 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | AUTH-08 | OAuth sign in / sign up (Google, Apple, OpenAI) | 🚫 | Blocked | | ✅ 05-01 | Platform-conditional by design: Google=Android/web, Apple=iOS only. Inventory updated for drift. Cannot test OAuth in web preview. |
 | AUTH-09 | SSO callback completion + fallback | 🚫 | Blocked | | | Depends on OAuth sign-in (AUTH-08); cannot reach callback without OAuth flow |
 | HOME-05 | Empty first-user state | ✅ | Pass | | | Tested after ACCOUNT-01: learner home shows intent cards (Learn/Ask/Practice/Homework) with 0 subjects. No redirect to create-subject (Maestro flow outdated). |
+| AUTH-13 | Deep-link auth redirect preservation (BUG-530) | ⬜ | — | | | Added 2026-05-04. Repro: open `/(app)/quiz/history` in web preview while signed out; expect to be sent to sign-in then back to `/quiz/history` (5-min TTL via `pending-auth-redirect.ts`). Verify both web sessionStorage and native fallback. |
+| AUTH-14 | Sign-in transition spinner + stuck-state recovery | ⬜ | — | | | Added 2026-05-04. After successful `setActive()`, expect "Signing you in…" spinner; if redirect doesn't fire within `SESSION_TRANSITION_MS`, `ErrorFallback` with Try-again + Sign-up CTAs (testIDs `sign-in-transitioning`, `sign-in-transitioning-stuck`, `sign-in-stuck-retry`, `sign-in-stuck-signup`). To force the stuck path: throttle network or block `/me` after sign-in. |
 
 ---
 
@@ -211,6 +213,9 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | ACCOUNT-23 | Consent withdrawn gate | 🚫 | Blocked | | | Requires parent to withdraw consent; cannot simulate in web preview |
 | ACCOUNT-24 | Post-approval landing | 🚫 | Blocked | | | Requires parent to approve consent; cannot simulate in web preview |
 | ACCOUNT-26 | Regional consent variants (COPPA / GDPR / above threshold) | ⚠️ | Pass w/ issues | | | COPPA (age 12) tested and works. GDPR (age 14-15, Slot E) not tested — needs separate account. Above-threshold (18+) verified via Slot A. |
+| ACCOUNT-27 | Parent consent deny confirmation | ⬜ | — | | | Added 2026-05-04. Confirmation dialog gates the deny commit when parent declines from email link. Coverage: `e2e/flows/consent/consent-deny-confirmation.yaml`. Tester: trigger from email-link deny path (Slot D consent email). |
+| SUBJECT-16 | Conversation-language picker (mandatory, profile-wide) | ⬜ | — | | | Added 2026-05-04. First entry: `/(app)/onboarding/language-picker` after create-profile, before pronouns and interview. Verify mandatory selection, persistence to profile, and that re-entry from More (ACCOUNT-29) honours `returnTo=settings`. |
+| SUBJECT-17 | Pronouns picker (preset + free-text Other) | ⬜ | — | | | Added 2026-05-04. `/(app)/onboarding/pronouns`. Self-skip below `PRONOUNS_PROMPT_MIN_AGE` (13) — verify by creating a Slot D' profile with age 11 (should not see screen) and a Slot B-equivalent at age 14+ (should see screen). |
 
 ---
 
@@ -232,6 +237,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | SUBJECT-13 | Challenge curriculum (skip / add / explain ordering) | 🚫 | Blocked | | | "Suggest changes" button only available on curriculum-review screen during onboarding — would need a successful onboarding to test (currently blocked by SUBJECT-11). |
 | SUBJECT-14 | Placement / knowledge assessment | 🚫 | Blocked | | | Need to find the placement entry point — not part of standard 4-step interview flow |
 | SUBJECT-15 | Accommodation-mode onboarding (FR255) | ✅ | Pass | | | Step 3/4 "How do you learn best?" with 4 options (None / Short-Burst / Audio-First / Predictable) plus Continue/Skip. Skip → advanced to curriculum review. |
+| SUBJECT-18 | Interests-context picker (free-time / school / both) | ⬜ | — | | | Added 2026-05-04. Inserted by `interview.tsx` after the chat when LLM returns interests. Each interest classified as free-time / school / both (default both for untouched). Continue/skip → analogy-preference. Verify: at least one interest extracted, classification chips persist into mentor-memory. |
 
 ---
 
@@ -269,6 +275,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | SUBJECT-03 | Create subject from chat (classifier miss) | 🚫 | Blocked | | | Needs LLM chat response |
 | CC-01 | Conversation-stage chips + feedback gating | 🚫 | Blocked | | | Needs LLM chat response |
 | CC-02 | Greeting-aware subject classification | 🚫 | Blocked | | | Needs LLM chat response |
+| LEARN-23 | Read-only session transcript view (BUG-889) | ⬜ | — | | | Added 2026-05-04. From `/session-summary/[sessionId]` tap "View full transcript" → `session-transcript/[sessionId]` (`fullScreenModal`). Verify: scrolls full chat history, `isSystemPrompt` rows hidden, `stripEnvelopeJson` applied (BUG-941 — no raw `{"type":"message"…}` JSON visible), gated in parent-proxy mode (PARENT-05). |
 
 ---
 
@@ -285,6 +292,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | LEARN-11 | Manage subject status (active / paused / archived) | ✅ | Pass | [LEARN-11 P3](https://www.notion.so/3538bce91f7c810a846eea1521487111) | | Via Library "Manage" button — bottom sheet with Pause/Archive per subject. Web-only: nested button HTML error in console |
 | LEARN-12 | Topic detail | ✅ | Pass | | | Shows description, CEFR level, progress status, Start learning CTA |
 | ACCOUNT-18 | Subject analogy preference after setup | ⚠️ | Partial | | | Language subjects show "No subject-specific settings" + CEFR info. Analogy preference only for non-language — no non-language subject to test |
+| LEARN-25 | Library inline search (PR #144) | ⬜ | — | | | Added 2026-05-04. Type into `LibrarySearchBar`, expect 300 ms debounce + server-side `useLibrarySearch`. Matched shelves auto-expand to surface matched books / topics / notes. Verify empty-results state and that clearing the input restores the default shelf-collapsed view. |
 
 ---
 
@@ -315,6 +323,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | LEARN-20 | Milestones list | 🚫 | Blocked | | | Needs milestone unlocks from learning |
 | LEARN-21 | Cross-subject vocabulary browser | ✅ | Pass | | | Empty state: "Your vocabulary will grow here" + "Keep learning" subtitle + Go back CTA |
 | LEARN-22 | Per-subject vocabulary list (delete + CEFR/word badges) | 🚫 | Blocked | | | Needs vocabulary from learning sessions |
+| LEARN-24 | Saved bookmarks screen (`/(app)/progress/saved`) | ⬜ | — | | | Added 2026-05-04. Bookmarks created in chat (LEARN-04 long-press → Bookmark) appear here. Verify: subject name + topic title + relative date + truncated content with expand-on-tap; swipe / trash delete with confirm; parent-proxy mode disables delete button. Powered by `useBookmarks` infinite query. |
 
 ---
 
@@ -340,6 +349,9 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | QUIZ-09 | Quiz history (grouping + empty state) | ✅ | Pass | | | Empty state: "No rounds played yet" + "Try a Quiz" CTA |
 | QUIZ-10 | Quiz round detail (per-question review) | 🚫 | Blocked | | | Needs completed rounds |
 | CC-10 | Soft-fail side effects on completion | 🚫 | Blocked | | | Needs completed session |
+| QUIZ-11 | Malformed-round guard (BUG-812 / F-015) | ⬜ | — | | | Added 2026-05-04. When a `capitals`/`vocabulary` question's options dedupe to fewer than 2 unique values, expect actionable error screen (testIDs `quiz-play-malformed`, `quiz-play-malformed-back`) instead of a single-button dead-end. To force: seed a malformed round, or watch for it during quota-exhausted vocab quizzes where dedupe collapses options. |
+| QUIZ-12 | Wrong-answer dispute affordance (BUG-469 / BUG-927) | ⬜ | — | | | Added 2026-05-04. Answer wrong → "Not quite right?" link → swap to "Noted — we'll review this" (testIDs `quiz-dispute-button`, `quiz-dispute-noted`). Verify: dispute affordance NOT shown after a correct answer (BUG-927). |
+| QUIZ-13 | Answer-check failure inline warning (IMP-7 / BUG-799) | ⬜ | — | | | Added 2026-05-04. When `POST /quiz/rounds/:id/check` fails, expect non-blocking warning ("Answer check failed — result may be inaccurate") and the round continues assuming wrong (`answerCheckFailed` flag). Force by blocking the check endpoint mid-round. |
 
 ---
 
@@ -377,6 +389,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | HOMEWORK-05 | Gallery import | 🚫 | Blocked | | | Web preview lacks native gallery picker |
 | HOMEWORK-06 | Image pass-through to multimodal LLM | 🚫 | Blocked | | | Needs LLM + image |
 | SUBJECT-04 | Create subject from homework branch | 🚫 | Blocked | | | Needs homework session |
+| HOMEWORK-07 | Camera permission onboarding (two-state + Settings redirect) | ⬜ | — | | | Added 2026-05-04. First-request prompt vs permanently-denied/Settings-redirect (testIDs `grant-permission-button`, `open-settings-button`, `close-button`). Verify: deny → re-enter screen shows Settings CTA; tap Settings, grant on OS, return — permission auto-refreshes without app restart (commit 22c7c99c). Spec: `docs/plans/2026-04-22-permission-onboarding.md`. |
 
 ---
 
@@ -396,6 +409,8 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | ACCOUNT-15 | Self mentor memory | ✅ | Pass | | | Consent opt-in, user notes input, categorized sections (Learning Style/Interests/Strengths/Struggles/Communication), clear all, privacy controls |
 | AUTH-10 | Sign out | ✅ | Pass | | | Sign out button verified on More tab. Not executed to preserve session — button visible and functional. |
 | AUTH-11 | Session-expired forced sign-out | 🚫 | Blocked | | | Cannot simulate expired session from web preview |
+| ACCOUNT-28 | App language (UI locale) edit | ⬜ | — | | | Added 2026-05-04. More → Account → "App language" → bottom-sheet picker (testIDs `settings-app-language`, `language-picker-backdrop`, `language-picker-close`, `language-option-{lang}`). Verify: locale switch updates UI strings on subsequent screens (CC-11 — live-switch deferred), persists across reload, gated by `FEATURE_FLAGS.I18N_ENABLED`. Coverage: `e2e/flows/onboarding/settings-language-edit.yaml`. |
+| ACCOUNT-29 | Tutor language edit from More | ⬜ | — | | | Added 2026-05-04. More → Account → "Tutor language" (testID `more-row-tutorLanguage`) → `/(app)/onboarding/language-picker?returnTo=settings`; on save, returns to More. Verify: distinct from per-subject `native_language` (SUBJECT-08); changes profile-wide `conversationLanguage`; subsequent tutoring sessions reflect new tutor language. |
 
 ---
 
@@ -425,6 +440,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | ACCOUNT-25 | Parent consent management for a child | ✅ | Pass | | | Child detail drill-down shows "Withdraw Consent" button under "Timmy's Account" section. |
 | ACCOUNT-16 | Child mentor memory | ✅ | Pass | | | Child detail shows "Set up mentor memory" + "What the mentor knows" buttons with correct child-specific copy. |
 | ACCOUNT-17 | Child memory consent prompt | ✅ | Pass | | | "Choose what the mentor remembers about Timmy." prompt visible on child detail page. |
+| ACCOUNT-30 | Impersonated-child guard on More | ⬜ | — | | | Added 2026-05-04. Switch into the child profile (impersonation flow on Slot E). Verify on More: Sign out, Delete account, Export my data, Subscription rows are hidden when `useActiveProfileRole() === 'impersonated-child'`; visible again on owner profile. Unit-tested in `more.test.tsx`. |
 
 ---
 
@@ -451,6 +467,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | PARENT-12 | Child-subject detail retention badges (data-gated) | 🚫 | Blocked | | | "No subjects yet" — needs learning history |
 | CC-07 | Accommodation badge surfaces | ✅ | Pass | | | Child detail shows Learning Accommodation radios: None (Active), Short-Burst, Audio-First, Predictable. |
 | CC-08 | Parent-facing metric vocabulary canon | 🚫 | Blocked | | | Needs learning data for metrics to appear |
+| PARENT-13 | Child weekly report detail (push-driven) | ⬜ | — | | | Added 2026-05-04. Trigger weekly progress push on Slot E parent (or open `/(app)/child/[profileId]/weekly-report/[weeklyReportId]` directly with a seeded report). Verify hero + 3 metric cards (sessions, minutes, topics-mastered), `markViewed` fires on mount, retry on error (`child-weekly-report-error-retry`), back button (`child-weekly-report-back`). |
 
 ---
 
@@ -472,6 +489,8 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | BILLING-09 | Top-up question credits | ✅ | Pass | | | "Buy 500 credits" button with "One-time purchase. Credits expire in 12 months." |
 | BILLING-10 | BYOK waitlist | ✅ | Pass | | | "Bring Your Own Key" section with waitlist description and Join button |
 | CC-06 | Top-up purchase confidence (two-stage polling) | 🚫 | Blocked | | | Needs active purchase flow (store-dependent) |
+| BILLING-11 | Trial state UI (BUG-966) | ⬜ | — | | | Added 2026-05-04. Slot I (trialing). Verify: `trial-banner` card above Current Plan with "Trial active" headline + optional `subscription.trialEndsAt`; status badge reads "Trial" not "Active". Coverage: `e2e/flows/billing/subscription-details.yaml` already seeds `trial-active`. |
+| BILLING-12 | Pro / Family static tier comparison cards (BUG-917) | ⬜ | — | | | Added 2026-05-04. Pro or Family customer + RevenueCat offerings unavailable → PLANS block appends a read-only Family or Pro card (testIDs `static-tier-family`, `static-tier-pro`). Verify: no purchase action on these cards (preserves BUG-899 — no public upsell for store-unapproved SKUs). |
 
 ---
 
@@ -485,6 +504,14 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | CC-03 | Animation polish (icon, intent cards, celebrations) | 🚫 | Blocked | | | Needs native emulator — web preview doesn't run RN Animated/Reanimated |
 | CC-04 | `goBackOrReplace` on every back button | ⚠️ | Minor | BUG-948 | | Code sweep: 1 bare router.back() in TopicsTab.tsx:259 error fallback. All other back buttons use goBackOrReplace or explicit replace. |
 | CC-09 | Opaque web layout backgrounds | ✅ | Pass | | | Home, Library, Progress, More — all have opaque cream backgrounds, no transparency bleed |
+| CC-11 | i18n / `t()` cross-cutting string layer | ⬜ | — | | | Added 2026-05-04. Verify: error messages, dictation alerts, camera permission copy, sso-callback strings all use `t()` (no literal "common.ok" leaks); locales en, nb, de, es, pl, pt, ja bundled. Live-switch is intentionally deferred — confirm a fresh app start with a different locale flips strings end-to-end. |
+| CC-12 | FeedbackProvider + shake-to-feedback on gate screens | ⬜ | — | | | Added 2026-05-04. Trigger on consent-pending, paywall, and More screens via `use-shake-detector.ts`. Native only (web has no shake). Verify: feedback sheet opens, captures screen context, submits without crashing the gate screen. |
+| CC-13 | Streaming error classification + stream-fallback guard | ⬜ | — | | | Added 2026-05-04. Force a mid-stream SSE failure (e.g. block `/sessions/:id/stream` after first chunk). Expect typed-error UI via `classifyApiError` and the chat to remain interactive (no infinite "writing" animation). Verified by `sse.test.ts`. |
+| CC-14 | Envelope-strip render guard at chat-bubble boundary (BUG-941) | ⬜ | — | | | Added 2026-05-04. Verify in session and `session-transcript`: no raw `{"type":"message","content":"…"}` JSON renders as text in `MessageBubble`. Force by mocking an LLM response that leaks the envelope wrapper. |
+| CC-15 | RN Web stale-send block in ChatShell (BUG-886) | ⬜ | — | | | Added 2026-05-04. Web preview only. Rapidly double-tap Send on a chat input — second tap must be blocked (stale ref guard). Verified by `ChatShell.test.tsx`. |
+| CC-16 | HMR-safe error type guards (BUG-947) | ⬜ | — | | | Added 2026-05-04. Dev-mode only. Trigger Metro HMR on `api-errors.ts`, then reproduce a typed error (`ForbiddenError`, `QuotaExceededError`, etc.). Expect classification via `.name` + property shape, not `instanceof` (which breaks across HMR). |
+| CC-17 | Profile-as-lens navigation pattern | ⬜ | — | | | Added 2026-05-04. From parent home, drill into child detail and child topic; profile data must come from the navigation lens, not a screen-level re-fetch. Verify: switching the active profile mid-session updates all child-detail screens consistently; `(app)/_layout.tsx` is the authority. |
+| CC-18 | Stable FlatList refs (PERF-10) | ⬜ | — | | | Added 2026-05-04. Scroll the library, vocabulary, history, and bookmarks lists fast enough to trigger virtualisation. Verify: no flicker / no "row recycle" jank; hoisted `keyExtractor` / `renderItem` refs prevent rebuild churn. |
 
 ---
 
@@ -504,6 +531,9 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | QA-07 | Tab-bar leak regression | ✅ | Pass | | | Tab bar hidden on modal routes (create-subject, create-profile), visible on tab-group routes (subscription, shelf) |
 | QA-08 | Parent add-child regression | ✅ | Pass | | | Family plan (Slot E): child "Timmy" created successfully (201). Parent stays on own profile, sees confirmation alert, child appears in profile switcher and dashboard. |
 | QA-09 | Consent email URL regression | 🚫 | Blocked | | | Needs email deep-link — not testable on web preview |
+| QA-10 | Dictation full flow regression | ⬜ | — | | | Added 2026-05-04. Run `e2e/flows/dictation/dictation-full-flow.yaml` (Maestro / native emulator). Covers DICT-01..06 happy path including timeout / cancel branches. Photo-review (DICT-07..10) is NOT in this flow — track separately. |
+| QA-11 | Quiz full flow regression | ⬜ | — | | | Added 2026-05-04. Run `e2e/flows/quiz/quiz-full-flow.yaml`. Covers QUIZ-01..07 (index → launch → play → results, including Play Again with prefetched round). |
+| QA-12 | Consent deny-confirmation regression | ⬜ | — | | | Added 2026-05-04. Run `e2e/flows/consent/consent-deny-confirmation.yaml`. Covers ACCOUNT-27 (parent deny path with confirmation gate). |
 
 ---
 
@@ -534,40 +564,40 @@ Update this once a batch is complete to track overall progress.
 
 | Batch | Section | Items | Status | Notes |
 | --- | --- | --- | --- | --- |
-| 1  | Pre-auth & Auth          | 12 | ✅ | 8✅ 1⚠️ 3🚫 — AUTH-12 bug filed |
-| 2  | First Profile + Consent  |  9 | ✅ | 6✅ 1⚠️ 2🚫 — SUBJECT-08 verified 2026-05-02 |
-| 3  | Subject Onboarding       | 11 | ⚠️ | 8✅ 1❌ 2🚫 — SUBJECT-07 focused-book verified 2026-05-02 |
+| 1  | Pre-auth & Auth          | 14 | ⚠️ | 8✅ 1⚠️ 3🚫 2⬜ — +AUTH-13/14 added 2026-05-04 |
+| 2  | First Profile + Consent  | 11 | ⚠️ | 6✅ 1⚠️ 2🚫 2⬜ — +ACCOUNT-27, SUBJECT-16/17 added 2026-05-04 (3 new) |
+| 3  | Subject Onboarding       | 12 | ⚠️ | 8✅ 1❌ 2🚫 1⬜ — +SUBJECT-18 added 2026-05-04 |
 | 4  | Learner Home + Resume    |  6 | ✅ | 4✅ 1⚠️ 1🚫 |
-| 5  | Core Learning Sessions   | 11 | ⚠️ | 2❌ 1⚠️ 8🚫 — LEARN-01/02 still broken; LEARN-03 session UI verified |
-| 6  | Library, Books, Topics   |  6 | ✅ | 5✅ 1⚠️ |
+| 5  | Core Learning Sessions   | 12 | ⚠️ | 2❌ 1⚠️ 8🚫 1⬜ — +LEARN-23 added 2026-05-04 |
+| 6  | Library, Books, Topics   |  7 | ⚠️ | 5✅ 1⚠️ 1⬜ — +LEARN-25 added 2026-05-04 |
 | 7  | Retention & Recall       |  4 | 🚫 | 4🚫 — all need completed LLM sessions |
-| 8  | Progress / Vocab         |  6 | ⚠️ | 2✅ 4🚫 |
-| 9  | Practice Hub + Quiz      | 15 | ⚠️ | 8✅ 2⚠️ 5🚫 — QUIZ-04/06 pass, QUIZ-02/PRACTICE-03 partial, Guess Who round completed |
-| 10 | Dictation                | 10 | ⚠️ | 3✅ 7🚫 — DICT-03/04 verified, DICT-05 native dialog blocked |
-| 11 | Homework                 |  7 | 🚫 | 1✅ 6🚫 — camera/LLM blocked |
-| 12 | Account / Settings       |  9 | ✅ | 7✅ 1⚠️ 1🚫 — export bug filed |
+| 8  | Progress / Vocab         |  7 | ⚠️ | 2✅ 4🚫 1⬜ — +LEARN-24 added 2026-05-04 |
+| 9  | Practice Hub + Quiz      | 18 | ⚠️ | 8✅ 2⚠️ 5🚫 3⬜ — +QUIZ-11/12/13 added 2026-05-04 |
+| 10 | Dictation                | 10 | ⚠️ | 3✅ 7🚫 |
+| 11 | Homework                 |  8 | 🚫 | 1✅ 6🚫 1⬜ — +HOMEWORK-07 added 2026-05-04 |
+| 12 | Account / Settings       | 11 | ⚠️ | 7✅ 1⚠️ 1🚫 2⬜ — +ACCOUNT-28/29 added 2026-05-04 |
 | 13 | Account Deletion         |  2 | ⚠️ | 1✅ 1🚫 |
-| 14 | Parent Setup + Children  |  7 | ✅ | 7✅ — Family plan (Slot E) seeded, child Timmy created, all parent setup flows pass |
-| 15 | Parent Dashboard         | 16 | ⚠️ | 7✅ 9🚫 — dashboard/detail/accommodation pass, drill-downs blocked by no learning history |
-| 16 | Billing                  | 11 | ✅ | 7✅ 4🚫 — Family pool verified, store/child-paywall/quota blocked |
-| 17 | Cross-Cutting Final Pass |  3 | ⚠️ | 1✅ 1⚠️ 1🚫 — BUG-948 bare router.back() |
-| 18 | Regression Smoke         |  9 | ⚠️ | 4✅ 5🚫 — LLM/email blocked, parent add-child now passing |
-| **Total** | | **154** | | **79✅ 10⚠️ 3❌ 62🚫 0⬜ — 2026-05-02 pass 2: +8 verified (SUBJECT-07/08, PRACTICE-03, DICT-03/04, QUIZ-02/04/06), LEARN-03 UI confirmed; LEARN-01/02 still broken; Guess Who quiz fully playable |
+| 14 | Parent Setup + Children  |  8 | ⚠️ | 7✅ 1⬜ — +ACCOUNT-30 added 2026-05-04 |
+| 15 | Parent Dashboard         | 17 | ⚠️ | 7✅ 9🚫 1⬜ — +PARENT-13 added 2026-05-04 |
+| 16 | Billing                  | 13 | ⚠️ | 7✅ 4🚫 2⬜ — +BILLING-11/12 added 2026-05-04 |
+| 17 | Cross-Cutting Final Pass | 11 | ⚠️ | 1✅ 1⚠️ 1🚫 8⬜ — +CC-11..18 added 2026-05-04 |
+| 18 | Regression Smoke         | 12 | ⚠️ | 4✅ 5🚫 3⬜ — +QA-10/11/12 added 2026-05-04 |
+| **Total** | | **184** | | **79✅ 10⚠️ 3❌ 62🚫 30⬜ — 2026-05-04: 30 new flows added from inventory refresh (untested); 2026-05-02 pass 2: +8 verified (SUBJECT-07/08, PRACTICE-03, DICT-03/04, QUIZ-02/04/06), LEARN-03 UI confirmed; LEARN-01/02 still broken; Guess Who quiz fully playable |
 
 ### Coverage Audit
 
 Cross-check after Batch 18: every inventory ID must appear in exactly one batch table or in Discovered Flows.
 
-- AUTH-01..12 → Batches 1, 12 (sign out, expired)
-- ACCOUNT-01..26 → Batches 2, 4, 12, 13, 14
+- AUTH-01..14 → Batches 1, 12 (sign out, expired); AUTH-13/14 in Batch 1
+- ACCOUNT-01..30 → Batches 2, 4, 12, 13, 14; ACCOUNT-27 in Batch 2; ACCOUNT-28/29 in Batch 12; ACCOUNT-30 in Batch 14
 - HOME-01..08 → Batches 1, 4, 14, 15
-- SUBJECT-01..15 → Batches 3, 5, 11
-- LEARN-01..22 → Batches 5, 6, 7, 8
+- SUBJECT-01..18 → Batches 3, 5, 11; SUBJECT-16/17 in Batch 2; SUBJECT-18 in Batch 3
+- LEARN-01..25 → Batches 5, 6, 7, 8; LEARN-23 in Batch 5; LEARN-25 in Batch 6; LEARN-24 in Batch 8
 - PRACTICE-01..04 → Batch 9
-- QUIZ-01..10 → Batch 9
+- QUIZ-01..13 → Batch 9; QUIZ-11/12/13 in Batch 9
 - DICT-01..10 → Batch 10
-- HOMEWORK-01..06 → Batch 11
-- PARENT-01..12 → Batch 15
-- BILLING-01..10 → Batch 16
-- QA-01..09 → Batch 18
-- CC-01..10 → Batches 4 (CC-05), 5 (CC-01, CC-02), 9 (CC-10), 15 (CC-07, CC-08), 16 (CC-06), 17 (CC-03, CC-04, CC-09)
+- HOMEWORK-01..07 → Batch 11; HOMEWORK-07 in Batch 11
+- PARENT-01..13 → Batch 15; PARENT-13 in Batch 15
+- BILLING-01..12 → Batch 16; BILLING-11/12 in Batch 16
+- QA-01..12 → Batch 18; QA-10/11/12 in Batch 18
+- CC-01..18 → Batches 4 (CC-05), 5 (CC-01, CC-02), 9 (CC-10), 15 (CC-07, CC-08), 16 (CC-06), 17 (CC-03, CC-04, CC-09, CC-11, CC-12, CC-13, CC-14, CC-15, CC-16, CC-17, CC-18)

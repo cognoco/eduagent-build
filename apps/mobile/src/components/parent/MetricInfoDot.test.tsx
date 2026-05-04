@@ -20,7 +20,17 @@ describe('MetricInfoDot', () => {
     fireEvent.press(dot);
     expect(screen.getByTestId('metric-tooltip-understanding')).toBeTruthy();
     fireEvent.press(dot);
-    expect(screen.queryByTestId('metric-tooltip-understanding')).toBeNull();
+    // RN's iOS Modal keeps children mounted during the dismiss animation
+    // (waits for a 'modalDismissed' native event that never fires under
+    // jest), so queryByTestId(...).toBeNull() never goes null. Assert on
+    // the Modal host's `visible` prop instead — that's what the second
+    // press actually flips.
+    const tooltipModal = screen.UNSAFE_queryByProps({
+      visible: false,
+      animationType: 'fade',
+      transparent: true,
+    });
+    expect(tooltipModal).toBeTruthy();
   });
 
   it('renders nothing for unknown metricKey', () => {

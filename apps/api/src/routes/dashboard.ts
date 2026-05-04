@@ -1,7 +1,23 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import type { Database } from '@eduagent/database';
-import { historyQuerySchema } from '@eduagent/schemas';
+import {
+  historyQuerySchema,
+  dashboardResponseSchema,
+  childDetailResponseSchema,
+  childInventoryResponseSchema,
+  childProgressHistoryResponseSchema,
+  childSubjectTopicsResponseSchema,
+  childSessionsResponseSchema,
+  childSessionDetailResponseSchema,
+  childMemoryResponseSchema,
+  childReportsResponseSchema,
+  childReportDetailResponseSchema,
+  reportViewedResponseSchema,
+  weeklyReportsResponseSchema,
+  weeklyReportDetailResponseSchema,
+  demoDashboardDataSchema,
+} from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import {
@@ -42,7 +58,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const profileId = requireProfileId(c.get('profileId'));
 
     const children = await getChildrenForParent(db, profileId);
-    return c.json({ children, demoMode: false });
+    return c.json(dashboardResponseSchema.parse({ children, demoMode: false }));
   })
 
   // Get detailed child data
@@ -58,7 +74,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     await assertParentAccess(db, parentProfileId, childProfileId);
 
     const child = await getChildDetail(db, parentProfileId, childProfileId);
-    return c.json({ child });
+    return c.json(childDetailResponseSchema.parse({ child }));
   })
 
   .get('/dashboard/children/:profileId/inventory', async (c) => {
@@ -74,7 +90,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       parentProfileId,
       childProfileId
     );
-    return c.json({ inventory });
+    return c.json(childInventoryResponseSchema.parse({ inventory }));
   })
 
   .get(
@@ -95,7 +111,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
         childProfileId,
         query
       );
-      return c.json({ history });
+      return c.json(childProgressHistoryResponseSchema.parse({ history }));
     }
   )
 
@@ -115,7 +131,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       childProfileId,
       subjectId
     );
-    return c.json({ topics });
+    return c.json(childSubjectTopicsResponseSchema.parse({ topics }));
   })
 
   // List child's sessions
@@ -132,7 +148,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       parentProfileId,
       childProfileId
     );
-    return c.json({ sessions });
+    return c.json(childSessionsResponseSchema.parse({ sessions }));
   })
 
   // Single session detail (summary only, no transcript)
@@ -156,7 +172,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     if (!session) {
       return notFound(c, 'Session not found');
     }
-    return c.json({ session });
+    return c.json(childSessionDetailResponseSchema.parse({ session }));
   })
 
   // Curated memory view for parent
@@ -170,22 +186,24 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
     if (!profile) {
       // [F-PV-09] No profile = no consent. Both flags off.
-      return c.json({
-        memory: {
-          categories: [],
-          parentContributions: [],
-          settings: {
-            memoryEnabled: true,
-            collectionEnabled: false,
-            injectionEnabled: false,
-            accommodationMode: null,
+      return c.json(
+        childMemoryResponseSchema.parse({
+          memory: {
+            categories: [],
+            parentContributions: [],
+            settings: {
+              memoryEnabled: true,
+              collectionEnabled: false,
+              injectionEnabled: false,
+              accommodationMode: null,
+            },
           },
-        },
-      });
+        })
+      );
     }
 
     const memory = buildCuratedMemoryView(profile);
-    return c.json({ memory });
+    return c.json(childMemoryResponseSchema.parse({ memory }));
   })
 
   .get('/dashboard/children/:profileId/reports', async (c) => {
@@ -197,7 +215,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     await assertParentAccess(db, parentProfileId, childProfileId);
 
     const reports = await getChildReports(db, parentProfileId, childProfileId);
-    return c.json({ reports });
+    return c.json(childReportsResponseSchema.parse({ reports }));
   })
 
   .get('/dashboard/children/:profileId/reports/:reportId', async (c) => {
@@ -218,7 +236,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     if (!report) {
       return notFound(c, 'Report not found');
     }
-    return c.json({ report });
+    return c.json(childReportDetailResponseSchema.parse({ report }));
   })
 
   .post('/dashboard/children/:profileId/reports/:reportId/view', async (c) => {
@@ -231,7 +249,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     await assertParentAccess(db, parentProfileId, childProfileId);
 
     await markChildReportViewed(db, parentProfileId, childProfileId, reportId);
-    return c.json({ viewed: true });
+    return c.json(reportViewedResponseSchema.parse({ viewed: true }));
   })
 
   // [BUG-524] Weekly reports
@@ -248,7 +266,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       parentProfileId,
       childProfileId
     );
-    return c.json({ reports });
+    return c.json(weeklyReportsResponseSchema.parse({ reports }));
   })
 
   .get('/dashboard/children/:profileId/weekly-reports/:reportId', async (c) => {
@@ -269,7 +287,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     if (!report) {
       return notFound(c, 'Report not found');
     }
-    return c.json({ report });
+    return c.json(weeklyReportDetailResponseSchema.parse({ report }));
   })
 
   .post(
@@ -289,61 +307,63 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
         childProfileId,
         reportId
       );
-      return c.json({ viewed: true });
+      return c.json(reportViewedResponseSchema.parse({ viewed: true }));
     }
   )
 
   // Get demo mode fixture data
   .get('/dashboard/demo', async (c) => {
-    return c.json({
-      demoMode: true,
-      children: [
-        {
-          profileId: 'demo-child-1',
-          displayName: 'Alex',
-          // [BUG-876] Subject names must match the `subjects[]` array below
-          // exactly so the dashboard summary, the subjects list, the library,
-          // the shelf, and progress all read as the same canonical word.
-          summary:
-            'Alex: Mathematics \u2014 5 problems, 3 guided. Science fading. 4 sessions this week (\u2191 from 2 last week).',
-          sessionsThisWeek: 4,
-          sessionsLastWeek: 2,
-          totalTimeThisWeek: 180,
-          totalTimeLastWeek: 90,
-          exchangesThisWeek: 0,
-          exchangesLastWeek: 0,
-          trend: 'up',
-          subjects: [
-            { name: 'Mathematics', retentionStatus: 'strong' },
-            { name: 'Science', retentionStatus: 'fading' },
-          ],
-          guidedVsImmediateRatio: 0.6,
-          retentionTrend: 'stable',
-          totalSessions: 12,
-          currentStreak: 3,
-          longestStreak: 7,
-          totalXp: 450,
-        },
-        {
-          profileId: 'demo-child-2',
-          displayName: 'Sam',
-          summary:
-            'Sam: English \u2014 steady progress. 3 sessions this week (\u2192 same as last week).',
-          sessionsThisWeek: 3,
-          sessionsLastWeek: 3,
-          totalTimeThisWeek: 120,
-          totalTimeLastWeek: 115,
-          exchangesThisWeek: 0,
-          exchangesLastWeek: 0,
-          trend: 'stable',
-          subjects: [{ name: 'English', retentionStatus: 'strong' }],
-          guidedVsImmediateRatio: 0.3,
-          retentionTrend: 'improving',
-          totalSessions: 8,
-          currentStreak: 1,
-          longestStreak: 5,
-          totalXp: 280,
-        },
-      ],
-    });
+    return c.json(
+      demoDashboardDataSchema.parse({
+        demoMode: true,
+        children: [
+          {
+            profileId: 'demo-child-1',
+            displayName: 'Alex',
+            // [BUG-876] Subject names must match the `subjects[]` array below
+            // exactly so the dashboard summary, the subjects list, the library,
+            // the shelf, and progress all read as the same canonical word.
+            summary:
+              'Alex: Mathematics \u2014 5 problems, 3 guided. Science fading. 4 sessions this week (\u2191 from 2 last week).',
+            sessionsThisWeek: 4,
+            sessionsLastWeek: 2,
+            totalTimeThisWeek: 180,
+            totalTimeLastWeek: 90,
+            exchangesThisWeek: 0,
+            exchangesLastWeek: 0,
+            trend: 'up',
+            subjects: [
+              { name: 'Mathematics', retentionStatus: 'strong' },
+              { name: 'Science', retentionStatus: 'fading' },
+            ],
+            guidedVsImmediateRatio: 0.6,
+            retentionTrend: 'stable',
+            totalSessions: 12,
+            currentStreak: 3,
+            longestStreak: 7,
+            totalXp: 450,
+          },
+          {
+            profileId: 'demo-child-2',
+            displayName: 'Sam',
+            summary:
+              'Sam: English \u2014 steady progress. 3 sessions this week (\u2192 same as last week).',
+            sessionsThisWeek: 3,
+            sessionsLastWeek: 3,
+            totalTimeThisWeek: 120,
+            totalTimeLastWeek: 115,
+            exchangesThisWeek: 0,
+            exchangesLastWeek: 0,
+            trend: 'stable',
+            subjects: [{ name: 'English', retentionStatus: 'strong' }],
+            guidedVsImmediateRatio: 0.3,
+            retentionTrend: 'improving',
+            totalSessions: 8,
+            currentStreak: 1,
+            longestStreak: 5,
+            totalXp: 280,
+          },
+        ],
+      })
+    );
   });

@@ -1,11 +1,24 @@
 # Learning Path Flows — End-User Perspective
 
-Complete trace of every learning path in EduAgent, from the learner's first tap to post-session recording. Last updated 2026-04-18.
+Complete trace of every learning path in EduAgent, from the learner's first tap to post-session recording. Last updated 2026-05-04.
 
 > **What changed since 2026-04-14**
-> - The five tutoring-session paths below are unchanged in shape; only their **entry points** moved. The intermediate `/(app)/learn-new` screen was deleted in the home IA simplification (commit 55ddcbdb). Learners now tap an IntentCard directly on `/(app)/home` to start any path.
-> - **Three new "practice" paths** (Quiz, Dictation, Recitation) ship out of the home Practice card. They are not full tutoring sessions — they are bounded activities with their own scoring loops. Recitation is a session mode; Quiz and Dictation are standalone flows with their own context state.
+> - The five tutoring-session paths below are unchanged in shape; only their **entry points** moved. The intermediate `/(app)/learn-new` screen was deleted in the home IA simplification (commit 55ddcbdb). Learners now tap a quick action or the Ask Anything bar directly on `/(app)/home` to start any path.
+> - **Three new "practice" paths** (Quiz, Dictation, Recitation) ship out of the Practice quick action. They are not full tutoring sessions — they are bounded activities with their own scoring loops. Recitation is a session mode; Quiz and Dictation are standalone flows with their own context state.
 > - The homework path now optionally passes the captured image straight to a multimodal LLM (vision) instead of OCR-only — the same image-pass-through pipeline powers dictation photo-review.
+
+> **What changed since 2026-04-18 (the `improvements` branch, snapshot 2026-05-04)**
+> - **Home redesign (commit 435a7b89).** The four-IntentCard pattern is gone. Home now shows a subject-tint carousel (`home-subject-carousel`), an Ask Anything bar (`home-ask-anything`), a quick-action row (`home-action-study-new`, `home-action-homework`, `home-action-practice`), an add-subject tile, and an empty-subjects branch (`home-empty-subjects` / `home-add-first-subject`). Entry points in every path below are updated to match.
+> - **Library v3 (PR #144, commit 1dd00262).** The shelves/books/topics tab architecture is gone. Library is a single-pane topic-first view with expandable subject shelves, inline book cards, server-side debounced search (`LibrarySearchBar` + `useLibrarySearch`), and retention pills. Guided learning and relearn paths now start from this single-pane view.
+> - **Quiz history + round detail (PR #121).** Completed rounds remain discoverable after the results screen is dismissed via `/(app)/quiz/history` and `/(app)/quiz/[roundId]`.
+> - **Bookmarks within sessions (commit 6e0ffb58).** Learners can bookmark AI messages mid-session; saved messages live at `/(app)/progress/saved`. A first-time `BookmarkNudgeTooltip` appears after a few AI responses. Parent-proxy mode disables delete.
+> - **Session transcript for parents (commit 53524c6d, BUG-889).** New read-only `/(app)/session-transcript/[sessionId]` route reachable from the session-summary "View full transcript" link. Bubbles are rendered through `stripEnvelopeJson` (BUG-941).
+> - **Onboarding extras Bucket C — `conversationLanguage` (mandatory), `pronouns`, `interestsContext`.** These dimensions are now passed into every session prompt; see Cross-Cutting Dimensions.
+> - **i18n cross-cutting layer.** UI strings (errors, dictation alerts, camera permission copy, sso-callback) are rendered via `t()` in en/nb/de/es/pl/pt/ja. App-language is now editable from More.
+> - **Profile-as-lens phase 1.** Profile-scoped screens receive the active profile as a navigation lens; impersonated-child sessions hide destructive actions in More.
+> - **Parent Narrative Phase 1 (commit 68a2288c).** "Understanding" replaces Mastery on the parent dashboard, plus a session-recap block and gated retention badges. See "What Parents See".
+> - **Weekly progress push.** New push-driven `/(app)/child/[profileId]/weekly-report/[weeklyReportId]` route marks the report viewed on mount.
+> - **Quiz robustness fixes.** BUG-929 / CR-PR129-M4 resets `answerState` / `selectedAnswer` / `freeTextAnswer` / `guessWhoCluesUsed` and the per-question timer in the same React batch on advance. BUG-892 replaces the web `window.confirm` quit with an in-app Modal. BUG-941 envelope-strip is applied at the chat-bubble render boundary across all sessions and the new transcript view.
 
 ---
 
@@ -13,19 +26,19 @@ Complete trace of every learning path in EduAgent, from the learner's first tap 
 
 | Path | Entry Point (current IA) | Session Type (DB) | UI Mode | Summary |
 |---|---|---|---|---|
-| **Freeform Chat** | Home "Ask" intent card | `learning` | `freeform` | Open-ended — no subject or topic chosen upfront |
-| **Guided Learning** | Topic detail or book | `learning` | `freeform` (scoped) | Focused on a specific topic within a subject |
-| **Homework Help** | Home "Homework" intent card | `homework` | `homework` | Photo or typed math/science problem |
+| **Freeform Chat** | Home Ask Anything bar (`home-ask-anything`) | `learning` | `freeform` | Open-ended — no subject or topic chosen upfront |
+| **Guided Learning** | Library v3 single pane → topic detail (or subject carousel on home) | `learning` | `freeform` (scoped) | Focused on a specific topic within a subject |
+| **Homework Help** | Home Homework quick action (`home-action-homework`) | `homework` | `homework` | Photo or typed math/science problem |
 | **Practice / Review** | Topic detail | `learning` | `practice` | Timed review of a previously studied topic |
-| **Retention Relearn** | Library / retention alerts / Practice hub "Review topics" | `learning` | `relearn` | Re-study a fading or forgotten topic |
-| **Recitation** | Practice hub "Recite" card | `learning` | `recitation` | Recite a poem or text from memory; AI listens and prompts |
+| **Retention Relearn** | Library v3 retention pills / recall-test failure / Practice hub "Review topics" | `learning` | `relearn` | Re-study a fading or forgotten topic |
+| **Recitation** | Home Practice quick action (`home-action-practice`) → Practice hub "Recite" | `learning` | `recitation` | Recite a poem or text from memory; AI listens and prompts |
 
 ## Overview: Practice Activity Paths (non-session)
 
 | Path | Entry Point | Backend | Summary |
 |---|---|---|---|
-| **Quiz** | Practice hub "Quiz" card | `POST /quiz/rounds` (generate), `POST /quiz/rounds/:id/check` (per answer), `POST /quiz/rounds/:id/complete` (submit) | Three activity types — Capitals, Vocabulary (per language subject), Guess Who. Server-validated answers with mid-round prefetch for instant Play Again. |
-| **Dictation** | Practice hub "Dictation" card | `POST /dictation/generate` (LLM topic), `POST /dictation/prepare-homework` (sentence split), `POST /dictation/review` (multimodal photo review), `POST /dictation/results` (record) | TTS dictation with paced playback; optional photo review of handwriting; sentence-level remediation. |
+| **Quiz** | Home Practice quick action → Practice hub "Quiz" | `POST /quiz/rounds` (generate), `POST /quiz/rounds/:id/check` (per answer), `POST /quiz/rounds/:id/complete` (submit) | Three activity types — Capitals, Vocabulary (per language subject), Guess Who. Server-validated answers with mid-round prefetch for instant Play Again. Past rounds discoverable via `/(app)/quiz/history` and `/(app)/quiz/[roundId]`. |
+| **Dictation** | Home Practice quick action → Practice hub "Dictation" | `POST /dictation/generate` (LLM topic), `POST /dictation/prepare-homework` (sentence split), `POST /dictation/review` (multimodal photo review), `POST /dictation/results` (record) | TTS dictation with paced playback; optional photo review of handwriting; sentence-level remediation. |
 
 Additionally, two **verification overlays** can activate within any tutoring session:
 - **Devil's Advocate** (`evaluate`) — AI presents a flawed explanation; learner finds the error
@@ -42,7 +55,7 @@ Learners who are curious about something but don't want to navigate subjects or 
 
 ```
 Home Screen (LearnerScreen)
-  └─ Tap "Ask" intent card           ← was: tap "Start learning" → "Just ask anything"
+  └─ Tap Ask Anything bar (`home-ask-anything`)   ← was: "Ask" intent card; before that, "Start learning" → "Just ask anything"
       └─ Session Screen (mode=freeform, no subject, no topic)
                   │
                   ├─ Opening: "What's on your mind? I'm ready when you are."
@@ -105,10 +118,10 @@ Learners following a curriculum — they've picked a subject, a book, and a spec
 ### Flow
 
 ```
-Library
-  └─ Tap a shelf (subject)
-      └─ Tap a book
-          └─ Tap a topic
+Library v3 (single-pane topic-first view)
+  └─ Expand a subject shelf (or land on it via the home subject carousel)
+      └─ Tap a book card (inline)
+          └─ Tap a topic row (retention pill visible)
               └─ Topic Detail Screen
                   ├─ Shows: topic title, description, completion status, retention status
                   │
@@ -156,9 +169,9 @@ Learners with homework problems — typically math or science. Can photograph th
 
 ```
 Home Screen (LearnerScreen)
-  └─ Tap "Homework" intent card     ← directly from home now (no /learn-new step)
+  └─ Tap Homework quick action (`home-action-homework`)   ← was: "Homework" intent card; no /learn-new step
       └─ Camera Screen
-          ├─ Camera permission check
+          ├─ Camera permission check (two sub-states: first-request vs permanently-denied/Settings-redirect; auto-refreshes on app resume)
           ├─ Take photo of homework problem
           │   └─ Preview + OCR processing
           │       ├─ OCR succeeds → extracted text shown for review
@@ -252,7 +265,7 @@ Learners whose retention on a topic has decayed — triggered from the library's
 ### Flow
 
 ```
-Library (Topics tab shows retention badges: strong/fading/weak/forgotten)
+Library v3 (single pane — retention pills shown inline on each topic row)
   └─ Tap a fading or weak topic
       └─ Topic Detail Screen (shows retention status)
           └─ Tap "Start Learning" or navigate from recall failure
@@ -292,7 +305,7 @@ Learners memorising something verbatim — a poem, lines for a play, a multiplic
 
 ```
 Home Screen
-  └─ Tap "Practice" intent card
+  └─ Tap Practice quick action (`home-action-practice`)
       └─ Practice Hub (/(app)/practice)
           └─ Tap "Recite"
               └─ Session Screen (mode=recitation)
@@ -323,7 +336,7 @@ Learners who want low-friction practice — three to ten questions, instant feed
 
 ```
 Home Screen
-  └─ Tap "Practice" intent card
+  └─ Tap Practice quick action (`home-action-practice`)
       └─ Practice Hub (/(app)/practice)
           └─ Tap "Quiz"
               └─ Quiz Index (/(app)/quiz)
@@ -362,7 +375,11 @@ Home Screen
                                   │   POST /quiz/rounds (next round generated server-side)
                                   │   so "Play Again" on the results screen feels instant
                                   │
-                                  ├─ Mid-round quit: close icon top-left → goBackOrReplace('/(app)/quiz')
+                                  ├─ Mid-round quit: close icon top-left → in-app Modal confirms quit (BUG-892 replaced web `window.confirm`) → goBackOrReplace('/(app)/quiz')
+
+                                  ├─ Advance: BUG-929 / CR-PR129-M4 resets `answerState`, `selectedAnswer`,
+                                  │   `freeTextAnswer`, `guessWhoCluesUsed`, and the per-question timer
+                                  │   in the same React batch (no flash of stale state)
                                   │
                                   ├─ After last question: POST /quiz/rounds/:id/complete
                                   │   On error: inline retry card with Retry / Exit (no silent recovery)
@@ -382,6 +399,10 @@ Home Screen
                                       │   └─ Else → replace to /launch (fresh generate)
                                       │
                                       └─ Done → goBackOrReplace('/(app)/practice')
+
+After dismissal, the round remains discoverable:
+  └─ /(app)/quiz/history (list of past rounds)
+      └─ /(app)/quiz/[roundId] (per-round detail; Guess Who rows show first clue truncated as the prompt — BUG-932)
 ```
 
 ### What gets recorded
@@ -412,7 +433,7 @@ Learners practising spelling and writing in a target language — primary use ca
 
 ```
 Home Screen
-  └─ Tap "Practice" intent card
+  └─ Tap Practice quick action (`home-action-practice`)
       └─ Practice Hub
           └─ Tap "Dictation"
               └─ Dictation Choice (/(app)/dictation)
@@ -490,6 +511,25 @@ Home Screen
 - **Photo review depends on multimodal LLM** — same image-pass-through pipeline that powers the homework vision feature. If the feature flag is off the "Check my writing" button is hidden.
 - **Mid-dictation exit is an explicit user choice** — hardware back triggers a destructive-style Alert ("Your dictation progress won't be saved") with Keep going / Leave.
 - **No silent recovery on result save failure** — both `complete.tsx` and `review.tsx` surface the typed error message and offer Retry / Continue without saving (per CLAUDE.md "silent recovery without escalation is banned").
+
+---
+
+## Bookmarks (Within Any Tutoring Session)
+
+Learners can save AI messages mid-session. After a few AI responses, a one-time `BookmarkNudgeTooltip` appears (gated per profile via `bookmark-nudge-shown` SecureStore key) and offers an inline "Bookmark now" CTA that bookmarks the latest AI message.
+
+```
+During any tutoring session...
+  └─ Long-press / tap-bookmark on an AI message bubble
+      └─ POST /bookmarks → toast confirmation
+          │
+          └─ Bookmark visible later at /(app)/progress/saved
+              ├─ Infinite list (`useBookmarks`)
+              ├─ Swipe-to-delete (`useDeleteBookmark`)
+              └─ Parent-proxy mode hides delete (read-only)
+```
+
+Bookmarks do not change session pedagogy or recording — they are a per-message side index for the learner.
 
 ---
 
@@ -608,6 +648,14 @@ These settings apply across all paths and modify the AI's behavior:
 | **Learning mode** | `serious` / `casual` | Per profile | Academic rigor vs. relaxed pacing |
 | **Input mode** | `text` / `voice` | Per session | Full responses vs. ≤50-word spoken-style responses |
 | **Celebration level** | `all` / `milestones` / `none` | Per profile | Controls which celebrations appear |
+| **Conversation language** | BCP-47 (mandatory at onboarding) | Per profile | Language the AI tutor speaks/writes in. Distinct from per-subject native language and from the app UI locale |
+| **Pronouns** | free-form / declined below `PRONOUNS_PROMPT_MIN_AGE` | Per profile | Used in AI-generated prose to address the learner correctly |
+| **Interests context** | free-form snippet, inserted by interview when LLM returns interests | Per profile | Seeds analogies and examples in tutoring prompts |
+| **App UI locale** | en / nb / de / es / pl / pt / ja | Per profile | Translates UI strings (errors, dictation alerts, camera permission, sso-callback) via `t()`. Editable inline from More |
+| **Active profile lens** | owner / impersonated-child | Per navigation | Profile-as-lens phase 1: destructive actions in More are hidden when `useActiveProfileRole() === 'impersonated-child'` |
+
+Cross-cutting render guard:
+- **Envelope-strip at chat-bubble boundary (BUG-941).** Every AI message bubble in every tutoring path — and the read-only session transcript view — passes through `stripEnvelopeJson` so any leaked envelope JSON or `[MARKER]` token is hidden from the learner and the parent.
 
 ---
 
@@ -618,10 +666,13 @@ Parents don't use learning paths directly. They see the **outputs** of the recor
 | Surface | Data Source |
 |---|---|
 | Dashboard activity feed | `learning_sessions` + `session_events` |
-| Session transcript | `session_events` (user_message + ai_response) |
+| Session recap block (Parent Narrative Phase 1, commit 68a2288c) | `learning_sessions.metadata` summary fields, surfaced as a recap card on parent dashboard |
+| Read-only session transcript (`/(app)/session-transcript/[sessionId]`, BUG-889) | `session_events` (user_message + ai_response), bubbles run through `stripEnvelopeJson` |
 | Homework summary | `learning_sessions.metadata.homeworkSummary` |
 | Subject progress | `progress_snapshots` |
-| Retention status per topic | `retention_cards` |
+| Understanding card (replaced "Mastery" in Parent Narrative Phase 1) | Aggregated from `progress_snapshots` + `learning_profiles`; retention badges gated until enough signal |
+| Retention status per topic | `retention_cards` (gated visibility per Parent Narrative Phase 1) |
 | Learner strengths/struggles | `learning_profiles` (consent-gated) |
+| Weekly progress report (`/(app)/child/[profileId]/weekly-report/[weeklyReportId]`) | Push-driven; route marks the report viewed on mount |
 | Monthly reports | Aggregated from all tables above |
 | Mentor memory | `learning_profiles` interests, strengths, communication notes |

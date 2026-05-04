@@ -2,17 +2,9 @@
 // Mock JWT module so auth middleware passes with a valid token
 // ---------------------------------------------------------------------------
 
-jest.mock('../middleware/jwt', () => ({
-  decodeJWTHeader: jest.fn().mockReturnValue({ alg: 'RS256', kid: 'test-kid' }),
-  fetchJWKS: jest.fn().mockResolvedValue({
-    keys: [{ kty: 'RSA', kid: 'test-kid', n: 'fake-n', e: 'AQAB' }],
-  }),
-  verifyJWT: jest.fn().mockResolvedValue({
-    sub: 'user_test',
-    email: 'test@example.com',
-    exp: Math.floor(Date.now() / 1000) + 3600,
-  }),
-}));
+jest.mock('../middleware/jwt', () =>
+  require('../test-utils/auth-fixture').createJwtModuleMock()
+);
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
 
@@ -72,15 +64,15 @@ describe('coaching card routes', () => {
       (getCoachingCardForProfile as jest.Mock).mockResolvedValue({
         coldStart: false,
         card: {
-          id: 'card-1',
-          profileId: 'test-account-id',
+          id: 'a0000001-0000-4000-a000-000000000001',
+          profileId: 'a0000000-0000-4000-a000-000000000000',
           type: 'challenge',
           title: 'Ready?',
           body: 'Take the next step.',
           priority: 3,
           expiresAt: '2026-02-16T10:00:00.000Z',
           createdAt: '2026-02-15T10:00:00.000Z',
-          topicId: 'topic-1',
+          topicId: 'a0000002-0000-4000-a000-000000000002',
           difficulty: 'easy',
           xpReward: 10,
         },

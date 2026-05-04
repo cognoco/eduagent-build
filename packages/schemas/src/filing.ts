@@ -118,3 +118,10 @@ export const filingResultSchema = z.object({
   fallback: z.boolean().optional(),
 });
 export type FilingResult = z.infer<typeof filingResultSchema>;
+
+// --- Filing retry queue response (API → mobile) ---
+
+export const filingQueuedResponseSchema = z.object({
+  queued: z.literal(true),
+});
+export type FilingQueuedResponse = z.infer<typeof filingQueuedResponseSchema>;

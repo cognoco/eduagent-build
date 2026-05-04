@@ -1,17 +1,3 @@
-// ---------------------------------------------------------------------------
-// Mock notifications module — sendEmail is called by requestConsent
-// ---------------------------------------------------------------------------
-
-jest.mock('./notifications', () => ({
-  sendEmail: jest.fn().mockResolvedValue({ sent: true }),
-  formatConsentRequestEmail: jest.fn().mockReturnValue({
-    to: 'parent@example.com',
-    subject: 'Test',
-    body: 'Test',
-    type: 'consent_request',
-  }),
-}));
-
 import type { Database } from '@eduagent/database';
 import {
   checkConsentRequired,
@@ -23,12 +9,27 @@ import {
   EmailDeliveryError,
 } from './consent';
 
-const { sendEmail: mockSendEmail } = jest.requireMock('./notifications') as {
-  sendEmail: jest.Mock;
-};
-
 const NOW = new Date('2025-01-15T10:00:00.000Z');
 const CURRENT_YEAR = new Date().getFullYear();
+const EMAIL_OPTIONS = { resendApiKey: 'test-resend-api-key' };
+const originalFetch = global.fetch;
+const fetchMock = jest.fn() as jest.MockedFunction<typeof fetch>;
+
+function createFetchResponse({
+  ok = true,
+  status = 200,
+  json = { id: 'email-1' },
+}: {
+  ok?: boolean;
+  status?: number;
+  json?: unknown;
+} = {}): Response {
+  return {
+    ok,
+    status,
+    json: async () => json,
+  } as Response;
+}
 
 function mockConsentRow(
   overrides?: Partial<{
@@ -119,6 +120,16 @@ function createMockDb({
   } as unknown as Database;
 }
 
+beforeEach(() => {
+  fetchMock.mockReset();
+  fetchMock.mockResolvedValue(createFetchResponse());
+  global.fetch = fetchMock;
+});
+
+afterAll(() => {
+  global.fetch = originalFetch;
+});
+
 // ---------------------------------------------------------------------------
 // checkConsentRequired
 // ---------------------------------------------------------------------------
@@ -176,7 +187,8 @@ describe('requestConsent', () => {
         parentEmail: 'parent@example.com',
         consentType: 'GDPR',
       },
-      'https://test.example.com'
+      'https://test.example.com',
+      EMAIL_OPTIONS
     );
 
     expect(result.consentState.status).toBe('PARENTAL_CONSENT_REQUESTED');
@@ -201,7 +213,8 @@ describe('requestConsent', () => {
         parentEmail: 'parent@example.com',
         consentType: 'GDPR',
       },
-      'https://test.example.com'
+      'https://test.example.com',
+      EMAIL_OPTIONS
     );
 
     const insertCall = (db.insert as jest.Mock).mock.results[0].value;
@@ -213,7 +226,6 @@ describe('requestConsent', () => {
   });
 
   it('returns emailDelivered false when API key is missing (no_api_key)', async () => {
-    mockSendEmail.mockResolvedValueOnce({ sent: false, reason: 'no_api_key' });
     const row = mockConsentRow();
     const db = createMockDb({ insertReturning: [row] });
 
@@ -228,15 +240,15 @@ describe('requestConsent', () => {
     );
 
     expect(result.emailDelivered).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
     // Counter should NOT be rolled back for missing config
     expect(db.update).not.toHaveBeenCalled();
   });
 
   it('throws EmailDeliveryError and rolls back counter when email delivery fails', async () => {
-    mockSendEmail.mockResolvedValueOnce({
-      sent: false,
-      reason: 'delivery_failed',
-    });
+    fetchMock.mockResolvedValueOnce(
+      createFetchResponse({ ok: false, status: 503 })
+    );
     const row = mockConsentRow();
     const db = createMockDb({ insertReturning: [row] });
 
@@ -248,7 +260,8 @@ describe('requestConsent', () => {
           parentEmail: 'parent@example.com',
           consentType: 'GDPR',
         },
-        'https://test.example.com'
+        'https://test.example.com',
+        EMAIL_OPTIONS
       )
     ).rejects.toThrow(EmailDeliveryError);
 
@@ -257,12 +270,7 @@ describe('requestConsent', () => {
   });
 
   // BUG-240: Consent email link must use the API origin, never APP_URL
-  it('passes tokenUrl starting with the provided appUrl to formatConsentRequestEmail [BUG-240]', async () => {
-    const { formatConsentRequestEmail: mockFormat } = jest.requireMock(
-      './notifications'
-    ) as { formatConsentRequestEmail: jest.Mock };
-    mockFormat.mockClear();
-
+  it('uses the provided API origin in the sent consent email body [BUG-240]', async () => {
     const row = mockConsentRow();
     const db = createMockDb({ insertReturning: [row] });
     await requestConsent(
@@ -272,23 +280,20 @@ describe('requestConsent', () => {
         parentEmail: 'parent@example.com',
         consentType: 'GDPR',
       },
-      'https://api.mentomate.com'
+      'https://api.mentomate.com',
+      EMAIL_OPTIONS
     );
 
-    expect(mockFormat).toHaveBeenCalledTimes(1);
-    const tokenUrl = mockFormat.mock.calls[0][3] as string;
-    expect(tokenUrl).toMatch(
-      /^https:\/\/api\.mentomate\.com\/v1\/consent-page\?token=/
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [, init] = fetchMock.mock.calls[0];
+    const emailRequestBody = JSON.parse(String(init?.body)) as { text: string };
+    expect(emailRequestBody.text).toContain(
+      'https://api.mentomate.com/v1/consent-page?token='
     );
   });
 
   // BUG-240 break test: the tokenUrl must NEVER contain www.mentomate.com or app.mentomate.com
-  it('never produces a consent link pointing to APP_URL domains [BUG-240]', async () => {
-    const { formatConsentRequestEmail: mockFormat } = jest.requireMock(
-      './notifications'
-    ) as { formatConsentRequestEmail: jest.Mock };
-    mockFormat.mockClear();
-
+  it('never sends a consent link pointing to APP_URL domains [BUG-240]', async () => {
     const row = mockConsentRow();
     const db = createMockDb({ insertReturning: [row] });
     await requestConsent(
@@ -298,12 +303,14 @@ describe('requestConsent', () => {
         parentEmail: 'parent@example.com',
         consentType: 'GDPR',
       },
-      'https://api.mentomate.com'
+      'https://api.mentomate.com',
+      EMAIL_OPTIONS
     );
 
-    const tokenUrl = mockFormat.mock.calls[0][3] as string;
-    expect(tokenUrl).not.toContain('app.mentomate.com');
-    expect(tokenUrl).not.toContain('www.mentomate.com');
+    const [, init] = fetchMock.mock.calls[0];
+    const emailRequestBody = JSON.parse(String(init?.body)) as { text: string };
+    expect(emailRequestBody.text).not.toContain('app.mentomate.com');
+    expect(emailRequestBody.text).not.toContain('www.mentomate.com');
   });
 
   it('returns consent state with correct consent type for COPPA (backward compat)', async () => {
@@ -316,7 +323,8 @@ describe('requestConsent', () => {
         parentEmail: 'parent@example.com',
         consentType: 'COPPA',
       },
-      'https://test.example.com'
+      'https://test.example.com',
+      EMAIL_OPTIONS
     );
 
     expect(result.consentState.consentType).toBe('COPPA');

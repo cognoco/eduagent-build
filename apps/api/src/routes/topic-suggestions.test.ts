@@ -2,17 +2,9 @@
 // Mock JWT module so auth middleware passes with a valid token
 // ---------------------------------------------------------------------------
 
-jest.mock('../middleware/jwt', () => ({
-  decodeJWTHeader: jest.fn().mockReturnValue({ alg: 'RS256', kid: 'test-kid' }),
-  fetchJWKS: jest.fn().mockResolvedValue({
-    keys: [{ kty: 'RSA', kid: 'test-kid', n: 'fake-n', e: 'AQAB' }],
-  }),
-  verifyJWT: jest.fn().mockResolvedValue({
-    sub: 'user_test',
-    email: 'test@example.com',
-    exp: Math.floor(Date.now() / 1000) + 3600,
-  }),
-}));
+jest.mock('../middleware/jwt', () =>
+  require('../test-utils/auth-fixture').createJwtModuleMock()
+);
 
 // ---------------------------------------------------------------------------
 // Mock database module — middleware creates a stub db per request
@@ -80,8 +72,10 @@ jest.mock('../services/suggestions', () => ({
   getUnusedTopicSuggestions: jest.fn().mockResolvedValue([
     {
       id: TEST_TOPIC_ID,
+      bookId: 'a0000000-0000-4000-a000-000000000401',
       title: 'Suggested Topic',
-      description: 'A suggested topic for study',
+      createdAt: '2024-01-01T00:00:00.000Z',
+      usedAt: null,
     },
   ]),
 }));

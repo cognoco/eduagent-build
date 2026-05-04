@@ -57,6 +57,37 @@ export default [
     plugins: { gov: govPlugin },
     rules: {
       'gov/no-internal-jest-mock': 'warn',
+      // ---------------------------------------------------------------------
+      // Governance Rule G7 — ban silently-skipped tests. Direct .skip() calls
+      // and xit/xdescribe/xtest aliases let dead tests accumulate in the
+      // suite while staying invisible. Conditional skips like
+      // `(hasDb ? describe : describe.skip)('integration', ...)` remain
+      // allowed: the call's callee is a ConditionalExpression, not a
+      // MemberExpression, so it does not match these selectors.
+      // .todo() is also banned; create a tracked ticket instead.
+      // See docs/plans/2026-05-03-governance-audit.md.
+      // ---------------------------------------------------------------------
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "CallExpression[callee.type='MemberExpression'][callee.object.name=/^(it|test|describe)$/][callee.property.name='skip']",
+          message:
+            'Do not commit .skip() tests. Either fix the test, delete it with a clear reason, or use a conditional callee like `(hasDb ? describe : describe.skip)(...)` for env-gated suites.',
+        },
+        {
+          selector:
+            "CallExpression[callee.type='MemberExpression'][callee.object.name='it'][callee.property.name='todo']",
+          message:
+            'Do not commit it.todo(). Open a tracked ticket for the missing test instead.',
+        },
+        {
+          selector:
+            "CallExpression[callee.type='Identifier'][callee.name=/^x(it|describe|test)$/]",
+          message:
+            'Do not commit xit/xdescribe/xtest. Either fix the test, delete it, or use a conditional callee like `(hasDb ? describe : describe.skip)(...)` for env-gated suites.',
+        },
+      ],
     },
   },
   // React/Expo config for mobile app (with deprecated rule filtered out)
@@ -259,10 +290,20 @@ export default [
     },
   },
   // -------------------------------------------------------------------------
-  // Governance Rule 4 — raw process.env reads are banned in API production
-  // code. Use the typed config object in apps/api/src/config.ts. The
-  // env-validation middleware and the test-only fallbacks in middleware/llm
-  // and inngest/helpers are explicitly allow-listed below.
+  // Governance Rule 4 + G4 (api default-export ban) — combined because flat
+  // config rules don't merge by key and both target apps/api/src/**.
+  //
+  // Rule 4: raw process.env reads are banned in API production code. Use the
+  //   typed config object in apps/api/src/config.ts. The env-validation
+  //   middleware and the test-only fallbacks in middleware/llm and
+  //   inngest/helpers are explicitly allow-listed below.
+  //
+  // G4 (api): default exports are reserved for the Worker entrypoint at
+  //   apps/api/src/index.ts (Cloudflare Workers require `export default`).
+  //   Anywhere else in the API source, named exports keep imports searchable
+  //   and prevent accidental rename drift — same rationale as the mobile G4
+  //   rule in apps/mobile/eslint.config.mjs.
+  //
   // See CLAUDE.md > Repo-Specific Guardrails.
   // -------------------------------------------------------------------------
   {
@@ -276,6 +317,28 @@ export default [
       'apps/api/src/**/*.spec.ts',
       'apps/api/src/**/*.integration.test.ts',
     ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "MemberExpression[object.name='process'][property.name='env']",
+          message:
+            'Use the typed config object from apps/api/src/config.ts instead of raw process.env. See CLAUDE.md.',
+        },
+        {
+          selector: 'ExportDefaultDeclaration',
+          message:
+            'Default exports are reserved for the Worker entrypoint (apps/api/src/index.ts). Use a named export elsewhere. See CLAUDE.md.',
+        },
+      ],
+    },
+  },
+  // G4 (api) — Worker entrypoint allow-list. index.ts must `export default`
+  // its fetch handler for Cloudflare Workers; keep the process.env ban
+  // active here but drop the ExportDefaultDeclaration selector.
+  {
+    files: ['apps/api/src/index.ts'],
     rules: {
       'no-restricted-syntax': [
         'error',
@@ -338,6 +401,11 @@ export default [
             "CallExpression[callee.property.name=/^(select|insert|update|delete)$/][callee.object.type='CallExpression'][callee.object.callee.object.name='c'][callee.object.callee.property.name='get'][callee.object.arguments.0.value='db']",
           message:
             "Route files must not call .select/.insert/.update/.delete directly on c.get('db'). Move the query into services/* and use createScopedRepository(profileId). See CLAUDE.md.",
+        },
+        {
+          selector: 'ExportDefaultDeclaration',
+          message:
+            'Default exports are reserved for the Worker entrypoint (apps/api/src/index.ts). Use a named export elsewhere. See CLAUDE.md.',
         },
       ],
     },

@@ -1,6 +1,11 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
-import { parkingLotAddSchema, ERROR_CODES } from '@eduagent/schemas';
+import {
+  parkingLotAddSchema,
+  parkingLotItemsResponseSchema,
+  parkingLotAddResponseSchema,
+  ERROR_CODES,
+} from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
@@ -30,7 +35,7 @@ export const parkingLotRoutes = new Hono<ParkingLotRouteEnv>()
     const sessionId = c.req.param('sessionId');
 
     const result = await getParkingLotItems(db, profileId, sessionId);
-    return c.json(result);
+    return c.json(parkingLotItemsResponseSchema.parse(result));
   })
 
   // Get parked questions linked to a topic for topic review
@@ -40,7 +45,7 @@ export const parkingLotRoutes = new Hono<ParkingLotRouteEnv>()
     const topicId = c.req.param('topicId');
 
     const result = await getParkingLotItemsForTopic(db, profileId, topicId);
-    return c.json(result);
+    return c.json(parkingLotItemsResponseSchema.parse(result));
   })
 
   // Park a question for later
@@ -74,6 +79,6 @@ export const parkingLotRoutes = new Hono<ParkingLotRouteEnv>()
         );
       }
 
-      return c.json({ item }, 201);
+      return c.json(parkingLotAddResponseSchema.parse({ item }), 201);
     }
   );

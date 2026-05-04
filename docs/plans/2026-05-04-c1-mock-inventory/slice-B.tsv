@@ -1,0 +1,161 @@
+location	specifier	category	basis	reason
+apps/api/src/routes/account.test.ts:17	inngest/hono	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/account.test.ts:21	../inngest/client	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/account.test.ts:28	../services/sentry	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/account.test.ts:5	../middleware/jwt	auth/middleware-bypass	heuristic	bypasses auth or ownership middleware in test coverage
+apps/api/src/routes/account.test.ts:52	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/account.test.ts:58	../services/account	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/account.test.ts:68	../services/deletion	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/routes/account.test.ts:78	../services/export	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/routes/billing.test.ts:107	../services/stripe	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/billing.test.ts:36	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/billing.test.ts:38	../services/account	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/billing.test.ts:5	../middleware/jwt	auth/middleware-bypass	heuristic	bypasses auth or ownership middleware in test coverage
+apps/api/src/routes/billing.test.ts:65	../services/billing	auth/middleware-bypass	heuristic	bypasses quota or metering checks through mocked billing state
+apps/api/src/routes/billing.test.ts:92	../services/kv	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/routes/book-suggestions.test.ts:102	../services/llm	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/book-suggestions.test.ts:114	../services/sentry	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/book-suggestions.test.ts:34	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/book-suggestions.test.ts:40	../services/account	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/book-suggestions.test.ts:5	../middleware/jwt	auth/middleware-bypass	heuristic	bypasses auth or ownership middleware in test coverage
+apps/api/src/routes/book-suggestions.test.ts:54	../services/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/book-suggestions.test.ts:79	../services/suggestions	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/routes/books.test.ts:113	inngest/hono	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/books.test.ts:117	../inngest/client	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/books.test.ts:25	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/books.test.ts:31	../services/account	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/books.test.ts:41	../services/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/books.test.ts:5	../middleware/jwt	auth/middleware-bypass	heuristic	bypasses auth or ownership middleware in test coverage
+apps/api/src/routes/books.test.ts:89	../services/curriculum	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/routes/books.test.ts:98	../services/book-generation	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/routes/coaching-card.test.ts:21	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/coaching-card.test.ts:23	../services/account	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/coaching-card.test.ts:33	../services/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/coaching-card.test.ts:43	../services/coaching-cards	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/routes/coaching-card.test.ts:5	../middleware/jwt	auth/middleware-bypass	heuristic	bypasses auth or ownership middleware in test coverage
+apps/api/src/routes/consent.test.ts:100	../services/consent	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/routes/consent.test.ts:18	../services/sentry	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/consent.test.ts:22	../services/notifications	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/routes/consent.test.ts:41	../middleware/jwt	auth/middleware-bypass	exact-override	bypasses Clerk JWT verification in route tests
+apps/api/src/routes/consent.test.ts:5	inngest/hono	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/consent.test.ts:61	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/consent.test.ts:67	../services/account	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/consent.test.ts:77	../services/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/consent.test.ts:9	../inngest/client	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/dashboard.test.ts:21	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/dashboard.test.ts:23	../services/account	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/dashboard.test.ts:33	../services/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/dashboard.test.ts:47	../services/dashboard	service-stub-with-business-logic	exact-override	mixes real and fake dashboard service behavior
+apps/api/src/routes/dashboard.test.ts:5	../middleware/jwt	auth/middleware-bypass	exact-override	bypasses Clerk JWT verification in route tests
+apps/api/src/routes/dashboard.test.ts:61	../services/family-access	auth/middleware-bypass	exact-override	bypasses parent-access enforcement via family-access
+apps/api/src/routes/dashboard.test.ts:74	../services/weekly-report	service-stub-with-business-logic	exact-override	stubs weekly-report service behavior
+apps/api/src/routes/dictation.test.ts:21	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/dictation.test.ts:23	../services/account	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/dictation.test.ts:33	../services/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/dictation.test.ts:49	../services/billing	auth/middleware-bypass	exact-override	bypasses metering via mocked billing service
+apps/api/src/routes/dictation.test.ts:5	../middleware/jwt	auth/middleware-bypass	heuristic	bypasses auth or ownership middleware in test coverage
+apps/api/src/routes/dictation.test.ts:83	../services/settings	rate-limit-bypass	exact-override	disables checkAndLogRateLimit in route coverage
+apps/api/src/routes/dictation.test.ts:88	../services/dictation	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/routes/feedback.test.ts:5	inngest/hono	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/feedback.test.ts:9	../inngest/client	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/filing.test.ts:108	../services/suggestions	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/routes/filing.test.ts:117	../services/session	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/routes/filing.test.ts:126	../services/llm	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/filing.test.ts:138	../services/sentry	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/filing.test.ts:146	../inngest/client	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/filing.test.ts:155	inngest/hono	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/filing.test.ts:38	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/filing.test.ts:44	../services/account	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/filing.test.ts:5	../middleware/jwt	auth/middleware-bypass	heuristic	bypasses auth or ownership middleware in test coverage
+apps/api/src/routes/filing.test.ts:58	../services/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/filing.test.ts:83	../services/filing	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/routes/homework.test.ts:17	inngest/hono	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/homework.test.ts:21	../inngest/client	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/homework.test.ts:28	../services/sentry	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/homework.test.ts:37	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/homework.test.ts:39	../services/account	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/homework.test.ts:49	../services/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/homework.test.ts:5	../middleware/jwt	auth/middleware-bypass	heuristic	bypasses auth or ownership middleware in test coverage
+apps/api/src/routes/homework.test.ts:61	../services/session	service-stub-with-business-logic	exact-override	defines SubjectInactiveError inline while stubbing session logic
+apps/api/src/routes/homework.test.ts:80	../services/ocr	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/inngest.test.ts:10	inngest/hono	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/inngest.test.ts:5	../inngest	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/routes/interview.test.ts:103	../services/billing	auth/middleware-bypass	exact-override	bypasses metering via mocked billing service
+apps/api/src/routes/interview.test.ts:134	../services/subject	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/interview.test.ts:152	../services/interview	service-stub-with-business-logic	exact-override	partial interview service mock hides real branching
+apps/api/src/routes/interview.test.ts:20	../middleware/jwt	auth/middleware-bypass	exact-override	bypasses Clerk JWT verification in route tests
+apps/api/src/routes/interview.test.ts:44	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/interview.test.ts:5	inngest/hono	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/interview.test.ts:50	../services/account	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/interview.test.ts:64	../services/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/interview.test.ts:9	../inngest/client	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/learner-profile.test.ts:116	../services/learner-input	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/routes/learner-profile.test.ts:13	../middleware/jwt	auth/middleware-bypass	exact-override	bypasses Clerk JWT verification in route tests
+apps/api/src/routes/learner-profile.test.ts:25	inngest/hono	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/learner-profile.test.ts:29	../inngest/client	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/learner-profile.test.ts:41	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/learner-profile.test.ts:43	../services/account	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/learner-profile.test.ts:57	../services/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/learner-profile.test.ts:72	../services/family-access	auth/middleware-bypass	exact-override	bypasses family-access ownership checks
+apps/api/src/routes/learner-profile.test.ts:98	../services/learner-profile	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/routes/quiz.test.ts:1	../middleware/jwt	auth/middleware-bypass	exact-override	bypasses Clerk JWT verification in route tests
+apps/api/src/routes/quiz.test.ts:24	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/quiz.test.ts:30	../services/billing	auth/middleware-bypass	exact-override	bypasses metering via mocked billing service
+apps/api/src/routes/quiz.test.ts:63	../services/account	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/quiz.test.ts:73	../services/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/quiz.test.ts:84	../services/streaks	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/routes/quiz.test.ts:90	../services/llm	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/resend-webhook.test.ts:11	../services/logger	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/resend-webhook.test.ts:5	../inngest/client	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/retention.test.ts:21	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/retention.test.ts:23	../services/account	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/retention.test.ts:33	../services/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/retention.test.ts:43	../services/retention-data	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/routes/retention.test.ts:5	../middleware/jwt	auth/middleware-bypass	heuristic	bypasses auth or ownership middleware in test coverage
+apps/api/src/routes/revenuecat-webhook.test.ts:35	../services/account	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/revenuecat-webhook.test.ts:39	../services/subscription	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/routes/revenuecat-webhook.test.ts:5	../services/kv	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/routes/revenuecat-webhook.test.ts:51	../services/trial	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/routes/revenuecat-webhook.test.ts:55	../inngest/client	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/revenuecat-webhook.test.ts:63	../services/sentry	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/revenuecat-webhook.test.ts:9	../services/billing	auth/middleware-bypass	heuristic	bypasses quota or metering checks through mocked billing state
+apps/api/src/routes/sessions.test.ts:130	../services/session	service-stub-with-business-logic	exact-override	defines SubjectInactiveError inline and replaces many session methods
+apps/api/src/routes/sessions.test.ts:20	../services/sentry	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/sessions.test.ts:32	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/sessions.test.ts:327	../services/interleaved	service-stub-with-business-logic	exact-override	partial interleaved service mock hides internal branching
+apps/api/src/routes/sessions.test.ts:340	../services/recall-bridge	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/routes/sessions.test.ts:346	inngest/hono	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/sessions.test.ts:352	../inngest/client	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/sessions.test.ts:38	../services/account	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/sessions.test.ts:5	../middleware/jwt	auth/middleware-bypass	exact-override	bypasses Clerk JWT verification in route tests
+apps/api/src/routes/sessions.test.ts:52	../services/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/sessions.test.ts:98	../services/billing	auth/middleware-bypass	heuristic	bypasses quota or metering checks through mocked billing state
+apps/api/src/routes/stripe-webhook.test.ts:13	../services/billing	auth/middleware-bypass	heuristic	bypasses quota or metering checks through mocked billing state
+apps/api/src/routes/stripe-webhook.test.ts:22	../services/subscription	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/routes/stripe-webhook.test.ts:46	../inngest/client	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/stripe-webhook.test.ts:5	../services/stripe	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/stripe-webhook.test.ts:52	../services/sentry	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/stripe-webhook.test.ts:9	../services/kv	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/routes/subjects.test.ts:25	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/subjects.test.ts:31	../services/account	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/subjects.test.ts:41	../services/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/subjects.test.ts:5	../middleware/jwt	auth/middleware-bypass	heuristic	bypasses auth or ownership middleware in test coverage
+apps/api/src/routes/subjects.test.ts:51	../services/subject-resolve	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/subjects.test.ts:59	../services/subject-classify	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/subjects.test.ts:67	../services/sentry	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/subjects.test.ts:72	../services/subject	service-stub-with-business-logic	exact-override	defines SubjectNotLanguageLearningError inline and overrides behavior
+apps/api/src/routes/support.test.ts:1	../services/support/spillover	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/routes/test-seed.test.ts:13	../services/llm	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/test-seed.test.ts:19	../services/test-seed	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/routes/topic-suggestions.test.ts:105	../services/sentry	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/topic-suggestions.test.ts:34	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/topic-suggestions.test.ts:40	../services/account	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/topic-suggestions.test.ts:5	../middleware/jwt	auth/middleware-bypass	heuristic	bypasses auth or ownership middleware in test coverage
+apps/api/src/routes/topic-suggestions.test.ts:54	../services/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/topic-suggestions.test.ts:79	../services/suggestions	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden
+apps/api/src/routes/topic-suggestions.test.ts:93	../services/llm	EXTERNAL	heuristic	mock targets an external SDK or adapter boundary
+apps/api/src/routes/vocabulary.test.ts:1	../middleware/jwt	auth/middleware-bypass	heuristic	bypasses auth or ownership middleware in test coverage
+apps/api/src/routes/vocabulary.test.ts:17	@eduagent/database	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/vocabulary.test.ts:19	../services/account	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/vocabulary.test.ts:29	../services/profile	pure-data-stub	heuristic	mock returns fixtures or constants without crossing a real boundary
+apps/api/src/routes/vocabulary.test.ts:39	../services/vocabulary	pure-data-stub	heuristic	relative mock defaults to an internal fixture stub unless overridden

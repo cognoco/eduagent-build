@@ -98,6 +98,56 @@ export default [
       ],
     },
   },
+  // -------------------------------------------------------------------------
+  // Governance Rule G4 (mobile) — default exports are reserved for Expo Router
+  // page components under apps/mobile/src/app/**. Anywhere else, named exports
+  // make imports searchable and prevent accidental rename drift. `.d.ts` files
+  // are excluded because Metro's `*.svg` ambient module declaration requires
+  // `export default content` to model `import Logo from './logo.svg'`.
+  // See CLAUDE.md > Repo-Specific Guardrails.
+  // -------------------------------------------------------------------------
+  {
+    files: ['src/**/*.ts', 'src/**/*.tsx'],
+    ignores: [
+      'src/app/**/*.ts',
+      'src/app/**/*.tsx',
+      'src/**/*.d.ts',
+      'src/**/*.test.ts',
+      'src/**/*.test.tsx',
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'ExportDefaultDeclaration',
+          message:
+            'Default exports are only for Expo Router page components under src/app/. Use a named export instead. See CLAUDE.md.',
+        },
+      ],
+    },
+  },
+  // -------------------------------------------------------------------------
+  // The global `crypto` does NOT exist in Hermes (React Native engine).
+  // `crypto.randomUUID()` / `crypto.getRandomValues()` throw
+  // `ReferenceError: Property 'crypto' doesn't exist` at runtime, but unit
+  // tests pass under jsdom/Node where `crypto` IS a global — so this slips
+  // through CI. Use `expo-crypto`'s `Crypto.randomUUID()` instead.
+  // Regression for the bug introduced by PR #130 (commit 8672bdcd).
+  // -------------------------------------------------------------------------
+  {
+    files: ['src/**/*.ts', 'src/**/*.tsx'],
+    ignores: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    rules: {
+      'no-restricted-globals': [
+        'error',
+        {
+          name: 'crypto',
+          message:
+            "The global `crypto` is not defined in Hermes (React Native). Import expo-crypto: `import * as Crypto from 'expo-crypto'` and use `Crypto.randomUUID()`.",
+        },
+      ],
+    },
+  },
   {
     ignores: ['.expo', 'web-build', 'cache', 'dist', '**/out-tsc'],
   },

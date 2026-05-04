@@ -1,19 +1,12 @@
-﻿jest.mock('../middleware/jwt', () => ({
-  decodeJWTHeader: jest.fn().mockReturnValue({ alg: 'RS256', kid: 'test-kid' }),
-  fetchJWKS: jest.fn().mockResolvedValue({
-    keys: [{ kty: 'RSA', kid: 'test-kid', n: 'fake-n', e: 'AQAB' }],
-  }),
-  verifyJWT: jest.fn().mockResolvedValue({
-    sub: 'user_test',
-    email: 'test@example.com',
-    exp: Math.floor(Date.now() / 1000) + 3600,
-  }),
-}));
+jest.mock('../middleware/jwt', () =>
+  require('../test-utils/auth-fixture').createJwtModuleMock()
+);
 
 import {
   createDatabaseModuleMock,
   createTransactionalMockDb,
 } from '../test-utils/database-module';
+import { createRouteMeteringFixture } from '../test-utils/route-metering-fixture';
 
 const mockDb = createTransactionalMockDb();
 const mockDatabaseModule = createDatabaseModuleMock({
@@ -22,43 +15,6 @@ const mockDatabaseModule = createDatabaseModuleMock({
 });
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
-
-// Billing/metering mock — POST /v1/quiz/rounds + /prefetch are now
-// LLM-metered, so the metering middleware runs before our handler and needs
-// these service boundaries mocked. Values chosen so quota check always
-// passes unless a specific test overrides them.
-jest.mock('../services/billing', () => ({
-  getSubscriptionByAccountId: jest.fn().mockResolvedValue({
-    id: 'sub-1',
-    accountId: 'test-account-id',
-    tier: 'free',
-    status: 'ACTIVE',
-  }),
-  ensureFreeSubscription: jest.fn().mockResolvedValue({
-    id: 'sub-1',
-    accountId: 'test-account-id',
-    tier: 'free',
-    status: 'ACTIVE',
-  }),
-  getQuotaPool: jest.fn().mockResolvedValue({
-    id: 'qp-1',
-    subscriptionId: 'sub-1',
-    monthlyLimit: 500,
-    usedThisMonth: 10,
-    dailyLimit: null,
-    usedToday: 0,
-  }),
-  decrementQuota: jest.fn().mockResolvedValue({
-    success: true,
-    source: 'monthly',
-    remainingMonthly: 489,
-    remainingTopUp: 0,
-    remainingDaily: null,
-  }),
-  getTopUpCreditsRemaining: jest.fn().mockResolvedValue(0),
-  incrementQuota: jest.fn().mockResolvedValue(undefined),
-  createSubscription: jest.fn(),
-}));
 
 jest.mock('../services/account', () => ({
   findOrCreateAccount: jest.fn().mockResolvedValue({
@@ -165,6 +121,8 @@ const AUTH_HEADERS = {
   'X-Profile-Id': 'test-profile-id',
 };
 
+let meteringFixture: ReturnType<typeof createRouteMeteringFixture>;
+
 function setInsertReturning(id = '01933b3c-0000-7000-8000-000000000999') {
   const returning = jest.fn().mockResolvedValue([{ id }]);
   const values = jest.fn().mockReturnValue({ returning });
@@ -185,7 +143,7 @@ function setUpdateReturning(rows: Array<{ id: string }> = [{ id: 'round-1' }]) {
 }
 
 const ACTIVE_ROUND = {
-  id: 'round-1',
+  id: 'a0000000-0000-4000-a000-000000000001',
   profileId: 'test-profile-id',
   activityType: 'capitals',
   theme: 'Central European Capitals',
@@ -218,7 +176,7 @@ const ACTIVE_ROUND = {
 // getRoundByIdOrThrow returns after completeQuizRound has persisted.
 const COMPLETED_ROUND = {
   ...ACTIVE_ROUND,
-  id: 'round-completed',
+  id: 'a0000000-0000-4000-a000-000000000002',
   status: 'completed' as const,
   score: 1,
   xpEarned: 15,
@@ -262,6 +220,10 @@ beforeEach(() => {
   (mockDb as any).transaction = jest
     .fn()
     .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(mockDb));
+  meteringFixture = createRouteMeteringFixture(mockDb, {
+    accountId: 'test-account-id',
+    profileId: 'test-profile-id',
+  });
 });
 
 describe('Quiz routes', () => {
@@ -335,6 +297,26 @@ describe('Quiz routes', () => {
       );
 
       expect(res.status).toBe(400);
+    });
+
+    it('returns 402 when seeded quota is exhausted [Phase 2C]', async () => {
+      meteringFixture.state.monthlyLimit = 25;
+      meteringFixture.setQuotaUsage(25, 0);
+
+      const res = await app.request(
+        '/v1/quiz/rounds',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ activityType: 'capitals' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(402);
+      const body = await res.json();
+      expect(body.code).toBe('QUOTA_EXCEEDED');
+      expect(routeAndCall).not.toHaveBeenCalled();
     });
 
     it('generates a vocabulary round with a valid language subject', async () => {
@@ -517,6 +499,9 @@ describe('Quiz routes', () => {
   describe('POST /v1/quiz/rounds (guess_who)', () => {
     it('generates a guess_who round with topic titles', async () => {
       // Mock the select().from().innerJoin()... chain used by getGuessWhoRoundContext
+      const { topUpCredits } = jest.requireActual(
+        '@eduagent/database'
+      ) as typeof import('@eduagent/database');
       const chainResult = [
         { title: 'Albert Einstein' },
         { title: 'Marie Curie' },
@@ -529,7 +514,14 @@ describe('Quiz routes', () => {
       const innerJoinFn1 = jest
         .fn()
         .mockReturnValue({ innerJoin: innerJoinFn2 });
-      const fromFn = jest.fn().mockReturnValue({ innerJoin: innerJoinFn1 });
+      const fromFn = jest.fn().mockImplementation((table: unknown) => {
+        if (table === topUpCredits) {
+          return {
+            where: jest.fn().mockResolvedValue([{ total: 0 }]),
+          };
+        }
+        return { innerJoin: innerJoinFn1 };
+      });
       (mockDb as any).select = jest.fn().mockReturnValue({ from: fromFn });
 
       (routeAndCall as jest.Mock).mockResolvedValueOnce({
@@ -639,7 +631,7 @@ describe('Quiz routes', () => {
 
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(body.id).toBe('round-1');
+      expect(body.id).toBe('a0000000-0000-4000-a000-000000000001');
     });
 
     it('returns correctAnswer + acceptedAliases + celebrationTier for completed rounds [F-032]', async () => {
@@ -872,6 +864,10 @@ describe('Quiz routes', () => {
         .fn()
         .mockResolvedValue(ACTIVE_ROUND);
       setUpdateReturning([]);
+      meteringFixture = createRouteMeteringFixture(mockDb, {
+        accountId: 'test-account-id',
+        profileId: 'test-profile-id',
+      });
 
       const res = await app.request(
         '/v1/quiz/rounds/round-1/complete',
@@ -900,7 +896,7 @@ describe('Quiz routes', () => {
     it('returns completed rounds', async () => {
       (mockDb as any).query.quizRounds.findMany = jest.fn().mockResolvedValue([
         {
-          id: 'round-1',
+          id: 'a0000000-0000-4000-a000-000000000010',
           activityType: 'capitals',
           theme: 'Central European Capitals',
           score: 7,

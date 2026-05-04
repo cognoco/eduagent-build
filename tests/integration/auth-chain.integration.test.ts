@@ -35,10 +35,32 @@ describe('Integration: Auth chain — public paths', () => {
     expect(res.status).toBe(200);
   });
 
-  it('POST /v1/inngest returns non-401 without token', async () => {
-    // Inngest serve handler may return 4xx/5xx for invalid payload, but not 401
+  it('POST /v1/inngest is not blocked by the auth middleware', async () => {
+    // The auth middleware skips /v1/inngest (PUBLIC_PATHS) — verify by
+    // confirming no `UNAUTHORIZED` envelope from middleware/auth.ts. Inngest's
+    // own serve handler may return 401 for a missing signing key (3.x default),
+    // 4xx for invalid payload, or 5xx — that's fine; what we're guarding here
+    // is that auth middleware doesn't intercept this path before Inngest sees
+    // it. Anything other than the middleware's UNAUTHORIZED body satisfies the
+    // intent of the original assertion.
     const res = await app.request('/v1/inngest', { method: 'POST' }, TEST_ENV);
-    expect(res.status).not.toBe(401);
+    if (res.status === 401) {
+      // Read the body once and parse manually (single-use stream rule).
+      const text = await res.text();
+      let parsed: unknown = null;
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        // Inngest serve returns plain text bodies — not the middleware's JSON
+        // envelope. That's a pass for this assertion.
+        return;
+      }
+      const code =
+        parsed && typeof parsed === 'object' && 'code' in parsed
+          ? (parsed as { code: unknown }).code
+          : undefined;
+      expect(code).not.toBe('UNAUTHORIZED');
+    }
   });
 
   it('/v1/auth/* paths skip authentication', async () => {

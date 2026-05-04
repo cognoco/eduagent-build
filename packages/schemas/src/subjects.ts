@@ -5,6 +5,14 @@ import {
   pedagogyModeSchema,
 } from './language.ts';
 
+// neon-serverless returns raw Date objects; neon-http returns ISO strings.
+// Accept either so response schemas don't break when a service forgets to map.
+// See `project_drizzle_date_objects.md` memory entry.
+const isoDateField = z.union([
+  z.string().datetime(),
+  z.date().transform((d) => d.toISOString()),
+]);
+
 // Enums
 
 export const subjectStatusSchema = z.enum(['active', 'paused', 'archived']);
@@ -49,8 +57,8 @@ export const subjectSchema = z.object({
   status: subjectStatusSchema,
   pedagogyMode: pedagogyModeSchema,
   languageCode: languageCodeSchema.nullable().optional(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+  createdAt: isoDateField,
+  updatedAt: isoDateField,
 });
 export type Subject = z.infer<typeof subjectSchema>;
 
@@ -122,7 +130,7 @@ export const curriculumSchema = z.object({
   subjectId: z.string().uuid(),
   version: z.number().int(),
   topics: z.array(curriculumTopicSchema),
-  generatedAt: z.string().datetime(),
+  generatedAt: isoDateField,
 });
 export type Curriculum = z.infer<typeof curriculumSchema>;
 
@@ -145,8 +153,8 @@ export const curriculumBookSchema = z.object({
   status: bookProgressStatusSchema.optional(),
   topicCount: z.number().int().optional(),
   completedTopicCount: z.number().int().optional(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+  createdAt: isoDateField,
+  updatedAt: isoDateField,
 });
 export type CurriculumBook = z.infer<typeof curriculumBookSchema>;
 
@@ -353,6 +361,32 @@ export const subjectClassifyResultSchema = z.object({
 });
 export type SubjectClassifyResult = z.infer<typeof subjectClassifyResultSchema>;
 
+// --- Route response schemas ---
+
+export const subjectResponseSchema = z.object({
+  subject: subjectSchema,
+});
+export type SubjectResponse = z.infer<typeof subjectResponseSchema>;
+
+export const subjectListResponseSchema = z.object({
+  subjects: z.array(subjectSchema),
+});
+export type SubjectListResponse = z.infer<typeof subjectListResponseSchema>;
+
+export const createSubjectWithStructureResponseSchema = z.object({
+  subject: subjectSchema,
+  structureType: subjectStructureTypeSchema,
+  bookId: z.string().uuid().optional(),
+  bookTitle: z.string().optional(),
+  bookCount: z.number().int().optional(),
+  topicCount: z.number().int().optional(),
+  suggestionCount: z.number().int().optional(),
+  classificationFailed: z.boolean().optional(),
+});
+export type CreateSubjectWithStructureResponse = z.infer<
+  typeof createSubjectWithStructureResponseSchema
+>;
+
 // --- Book & Topic Suggestions (Conversation-First Flow) ---
 
 export const bookSuggestionSchema = z.object({
@@ -361,16 +395,105 @@ export const bookSuggestionSchema = z.object({
   title: z.string(),
   emoji: z.string().nullable(),
   description: z.string().nullable(),
-  createdAt: z.string().datetime(),
-  pickedAt: z.string().datetime().nullable(),
+  createdAt: isoDateField,
+  pickedAt: z.union([isoDateField, z.null()]),
 });
 export type BookSuggestion = z.infer<typeof bookSuggestionSchema>;
+
+export const bookSuggestionsResponseSchema = z.array(bookSuggestionSchema);
+export type BookSuggestionsResponse = z.infer<
+  typeof bookSuggestionsResponseSchema
+>;
 
 export const topicSuggestionSchema = z.object({
   id: z.string().uuid(),
   bookId: z.string().uuid(),
   title: z.string(),
-  createdAt: z.string().datetime(),
-  usedAt: z.string().datetime().nullable(),
+  createdAt: isoDateField,
+  usedAt: z.union([isoDateField, z.null()]),
 });
 export type TopicSuggestion = z.infer<typeof topicSuggestionSchema>;
+
+export const topicSuggestionsResponseSchema = z.array(topicSuggestionSchema);
+export type TopicSuggestionsResponse = z.infer<
+  typeof topicSuggestionsResponseSchema
+>;
+
+// --- Curriculum route response schemas ---
+
+export const getCurriculumResponseSchema = z.object({
+  curriculum: curriculumSchema.nullable(),
+});
+export type GetCurriculumResponse = z.infer<typeof getCurriculumResponseSchema>;
+
+export const topicSkipResponseSchema = z.object({
+  message: z.string(),
+  topicId: z.string().uuid(),
+});
+export type TopicSkipResponse = z.infer<typeof topicSkipResponseSchema>;
+
+export const topicUnskipResponseSchema = z.object({
+  message: z.string(),
+  topicId: z.string().uuid(),
+});
+export type TopicUnskipResponse = z.infer<typeof topicUnskipResponseSchema>;
+
+export const challengeCurriculumResponseSchema = z.object({
+  curriculum: curriculumSchema,
+});
+export type ChallengeCurriculumResponse = z.infer<
+  typeof challengeCurriculumResponseSchema
+>;
+
+export const explainTopicResponseSchema = z.object({
+  explanation: z.string(),
+});
+export type ExplainTopicResponse = z.infer<typeof explainTopicResponseSchema>;
+
+// --- Book route response schemas ---
+
+/** GET /library/books — all books grouped by subject */
+export const getAllProfileBooksResponseSchema = z.object({
+  subjects: z.array(
+    z.object({
+      subjectId: z.string().uuid(),
+      subjectName: z.string(),
+      books: z.array(curriculumBookSchema),
+    })
+  ),
+});
+export type GetAllProfileBooksResponse = z.infer<
+  typeof getAllProfileBooksResponseSchema
+>;
+
+/** GET /subjects/:subjectId/books */
+export const getBooksResponseSchema = z.object({
+  books: z.array(curriculumBookSchema),
+});
+export type GetBooksResponse = z.infer<typeof getBooksResponseSchema>;
+
+/** GET /subjects/:subjectId/books/:bookId/sessions — one session entry */
+export const bookSessionSchema = z.object({
+  id: z.string().uuid(),
+  topicId: z.string().uuid().nullable(),
+  topicTitle: z.string(),
+  chapter: z.string().nullable(),
+  createdAt: isoDateField,
+});
+export type BookSession = z.infer<typeof bookSessionSchema>;
+
+/** GET /subjects/:subjectId/books/:bookId/sessions */
+export const getBookSessionsResponseSchema = z.object({
+  sessions: z.array(bookSessionSchema),
+});
+export type GetBookSessionsResponse = z.infer<
+  typeof getBookSessionsResponseSchema
+>;
+
+/** PATCH /subjects/:subjectId/books/:bookId/topics/:topicId/move */
+export const moveTopicResponseSchema = z.object({
+  moved: z.literal(true),
+  topicId: z.string().uuid(),
+  targetBookId: z.string().uuid(),
+});
+export type MoveTopicResponse = z.infer<typeof moveTopicResponseSchema>;

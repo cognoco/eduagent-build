@@ -17,17 +17,9 @@ jest.mock('../inngest/client', () => ({
 // Mock JWT module so auth middleware passes with a valid token
 // ---------------------------------------------------------------------------
 
-jest.mock('../middleware/jwt', () => ({
-  decodeJWTHeader: jest.fn().mockReturnValue({ alg: 'RS256', kid: 'test-kid' }),
-  fetchJWKS: jest.fn().mockResolvedValue({
-    keys: [{ kty: 'RSA', kid: 'test-kid', n: 'fake-n', e: 'AQAB' }],
-  }),
-  verifyJWT: jest.fn().mockResolvedValue({
-    sub: 'user_test',
-    email: 'test@example.com',
-    exp: Math.floor(Date.now() / 1000) + 3600,
-  }),
-}));
+jest.mock('../middleware/jwt', () =>
+  require('../test-utils/auth-fixture').createJwtModuleMock()
+);
 
 // ---------------------------------------------------------------------------
 // Mock database module — middleware creates a stub db per request
@@ -78,51 +70,6 @@ jest.mock('../services/profile', () => ({
     consentStatus: 'CONSENTED',
   }),
   getProfileDisplayName: jest.fn().mockResolvedValue('Test User'),
-}));
-
-// ---------------------------------------------------------------------------
-// Mock billing service — metering middleware needs these for quota checks
-// ---------------------------------------------------------------------------
-
-const mockSubscription = {
-  id: 'sub-1',
-  accountId: 'test-account-id',
-  tier: 'free',
-  status: 'active',
-  stripeCustomerId: null,
-  stripeSubscriptionId: null,
-  trialEndsAt: null,
-  currentPeriodEnd: null,
-  currentPeriodStart: null,
-  cancelledAt: null,
-  lastStripeEventTimestamp: null,
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-};
-
-jest.mock('../services/billing', () => ({
-  getSubscriptionByAccountId: jest.fn().mockResolvedValue(mockSubscription),
-  ensureFreeSubscription: jest.fn().mockResolvedValue(mockSubscription),
-  getQuotaPool: jest.fn().mockResolvedValue({
-    id: 'qp-1',
-    subscriptionId: 'sub-1',
-    monthlyLimit: 100,
-    usedThisMonth: 0,
-    dailyLimit: 10,
-    usedToday: 0,
-    cycleResetAt: new Date().toISOString(),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }),
-  decrementQuota: jest.fn().mockResolvedValue({
-    success: true,
-    source: 'monthly',
-    remainingMonthly: 99,
-    remainingTopUp: 0,
-    remainingDaily: 9,
-  }),
-  getTopUpCreditsRemaining: jest.fn().mockResolvedValue(0),
-  createSubscription: jest.fn(),
 }));
 
 // ---------------------------------------------------------------------------

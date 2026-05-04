@@ -3,6 +3,10 @@ import { zValidator } from '@hono/zod-validator';
 import {
   vocabularyCreateSchema,
   vocabularyReviewSchema,
+  vocabularyListResponseSchema,
+  vocabularyCreateResponseSchema,
+  vocabularyReviewResponseSchema,
+  vocabularyDeleteResponseSchema,
   ERROR_CODES,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
@@ -40,7 +44,7 @@ export const vocabularyRoutes = new Hono<VocabularyRouteEnv>()
         profileId,
         c.req.param('subjectId')
       );
-      return c.json({ vocabulary });
+      return c.json(vocabularyListResponseSchema.parse({ vocabulary }));
     } catch (err) {
       // [FIX-API-6] Use typed instanceof check instead of string-matching message
       if (err instanceof SubjectNotFoundError) {
@@ -62,7 +66,10 @@ export const vocabularyRoutes = new Hono<VocabularyRouteEnv>()
           c.req.param('subjectId'),
           c.req.valid('json')
         );
-        return c.json({ vocabulary }, 201);
+        return c.json(
+          vocabularyCreateResponseSchema.parse({ vocabulary }),
+          201
+        );
       } catch (err) {
         // [FIX-API-6] Use typed instanceof check instead of string-matching message
         if (err instanceof SubjectNotFoundError) {
@@ -86,7 +93,7 @@ export const vocabularyRoutes = new Hono<VocabularyRouteEnv>()
           c.req.valid('json'),
           c.req.param('subjectId')
         );
-        return c.json(result);
+        return c.json(vocabularyReviewResponseSchema.parse(result));
       } catch (err) {
         // [FIX-API-6] Use typed instanceof check instead of string-matching message
         if (err instanceof VocabularyNotFoundError) {
@@ -115,5 +122,5 @@ export const vocabularyRoutes = new Hono<VocabularyRouteEnv>()
     if (!deleted) {
       return notFound(c, 'Vocabulary item not found');
     }
-    return c.json({ success: true });
+    return c.json(vocabularyDeleteResponseSchema.parse({ success: true }));
   });

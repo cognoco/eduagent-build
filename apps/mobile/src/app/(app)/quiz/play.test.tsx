@@ -965,8 +965,13 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
     fireEvent.press(screen.getByTestId('quiz-play-quit'));
     fireEvent.press(screen.getByTestId('quiz-quit-cancel'));
 
-    // After dismiss the modal hides (children unmount).
-    expect(screen.queryByTestId('quiz-quit-confirm')).toBeNull();
+    // Cancelling calls setQuitConfirmVisible(false). On iOS, RN Modal keeps
+    // children mounted during the close animation so quiz-quit-confirm stays
+    // in the tree, but the Modal host reports visible=false. Verify via the
+    // backdrop's ancestor (RCTModalHostView) or UNSAFE_queryByProps.
+    expect(
+      screen.UNSAFE_queryByProps({ visible: false, animationType: 'fade', transparent: true })
+    ).not.toBeNull();
     expect(mockGoBackOrReplace).not.toHaveBeenCalled();
   });
 

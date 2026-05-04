@@ -2,17 +2,9 @@
 // Mock JWT module so auth middleware passes with a valid token
 // ---------------------------------------------------------------------------
 
-jest.mock('../middleware/jwt', () => ({
-  decodeJWTHeader: jest.fn().mockReturnValue({ alg: 'RS256', kid: 'test-kid' }),
-  fetchJWKS: jest.fn().mockResolvedValue({
-    keys: [{ kty: 'RSA', kid: 'test-kid', n: 'fake-n', e: 'AQAB' }],
-  }),
-  verifyJWT: jest.fn().mockResolvedValue({
-    sub: 'user_test',
-    email: 'test@example.com',
-    exp: Math.floor(Date.now() / 1000) + 3600,
-  }),
-}));
+jest.mock('../middleware/jwt', () =>
+  require('../test-utils/auth-fixture').createJwtModuleMock()
+);
 
 jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
@@ -122,10 +114,12 @@ describe('homework routes', () => {
     it('returns 201 with homework session', async () => {
       const now = new Date().toISOString();
       mockStartSession.mockResolvedValue({
-        id: 'session-001',
+        id: 'a0000000-0000-4000-a000-000000000001',
         subjectId: SUBJECT_ID,
         topicId: null,
         sessionType: 'homework',
+        inputMode: 'text',
+        verificationType: null,
         status: 'active',
         escalationRung: 1,
         exchangeCount: 0,
@@ -133,6 +127,10 @@ describe('homework routes', () => {
         lastActivityAt: now,
         endedAt: null,
         durationSeconds: null,
+        wallClockSeconds: null,
+        filedAt: null,
+        filingStatus: null,
+        filingRetryCount: 0,
       });
 
       const res = await app.request(
@@ -157,18 +155,25 @@ describe('homework routes', () => {
     });
 
     it('calls startSession with homework sessionType', async () => {
+      const now = new Date().toISOString();
       mockStartSession.mockResolvedValue({
-        id: 'session-001',
+        id: 'a0000000-0000-4000-a000-000000000001',
         subjectId: SUBJECT_ID,
         topicId: null,
         sessionType: 'homework',
+        inputMode: 'text',
+        verificationType: null,
         status: 'active',
         escalationRung: 1,
         exchangeCount: 0,
-        startedAt: new Date().toISOString(),
-        lastActivityAt: new Date().toISOString(),
+        startedAt: now,
+        lastActivityAt: now,
         endedAt: null,
         durationSeconds: null,
+        wallClockSeconds: null,
+        filedAt: null,
+        filingStatus: null,
+        filingRetryCount: 0,
       });
 
       await app.request(

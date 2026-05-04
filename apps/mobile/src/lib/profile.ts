@@ -98,8 +98,7 @@ export const ProfileContext = createContext<ProfileContextValue>({
   switchProfile: async () => ({ success: true }),
   isLoading: true,
   profileWasRemoved: false,
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
-  acknowledgeProfileRemoval: () => {},
+  acknowledgeProfileRemoval: () => undefined,
 });
 
 export function useProfile(): ProfileContextValue {

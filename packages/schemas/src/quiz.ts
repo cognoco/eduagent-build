@@ -295,3 +295,80 @@ export const markSurfacedInputSchema = z.object({
   activityType: quizActivityTypeSchema,
 });
 export type MarkSurfacedInput = z.infer<typeof markSurfacedInputSchema>;
+
+// ─── Route response schemas ───────────────────────────────────────────────
+// These validate the outbound JSON from quiz route handlers.
+
+/** POST /quiz/rounds/prefetch — only exposes the round id. */
+export const prefetchRoundResponseSchema = z.object({
+  id: z.string().uuid(),
+});
+export type PrefetchRoundResponse = z.infer<typeof prefetchRoundResponseSchema>;
+
+/**
+ * GET /quiz/rounds/recent — extends recentRoundSchema with the human-readable
+ * activityLabel added by the route layer.
+ */
+export const recentRoundListItemSchema = recentRoundSchema.extend({
+  activityLabel: z.string(),
+});
+export type RecentRoundListItem = z.infer<typeof recentRoundListItemSchema>;
+
+/**
+ * GET /quiz/rounds/:id (active) — client-safe question list plus activityLabel.
+ * Extends quizRoundResponseSchema which already contains id, activityType,
+ * theme, questions, total, and optional difficultyBump.
+ */
+export const activeRoundDetailResponseSchema = quizRoundResponseSchema.extend({
+  activityLabel: z.string(),
+});
+export type ActiveRoundDetailResponse = z.infer<
+  typeof activeRoundDetailResponseSchema
+>;
+
+/**
+ * Questions in a completed round: client-safe base fields plus the answer
+ * context that is safe to reveal after grading (correctAnswer + acceptedAliases).
+ * acceptedAliases is undefined for guess_who questions.
+ */
+export const completedRoundQuestionSchema = z.intersection(
+  clientQuizQuestionSchema,
+  z.object({
+    correctAnswer: z.string(),
+    acceptedAliases: z.array(z.string()).optional(),
+  })
+);
+export type CompletedRoundQuestion = z.infer<
+  typeof completedRoundQuestionSchema
+>;
+
+/**
+ * GET /quiz/rounds/:id (completed) — extends the shared base with grading
+ * context (score, results, celebrationTier) and overrides `questions` with the
+ * post-grading shape that reveals correct answers.
+ */
+export const completedRoundDetailResponseSchema = quizRoundResponseSchema
+  .omit({ difficultyBump: true, questions: true })
+  .extend({
+    activityLabel: z.string(),
+    status: quizRoundStatusSchema,
+    score: z.number().int().nonnegative().nullable(),
+    xpEarned: z.number().int().nonnegative().nullable(),
+    celebrationTier: z.enum(['perfect', 'great', 'nice']),
+    completedAt: z.string().optional(),
+    questions: z.array(completedRoundQuestionSchema),
+    results: z.unknown(),
+  });
+export type CompletedRoundDetailResponse = z.infer<
+  typeof completedRoundDetailResponseSchema
+>;
+
+/** POST /quiz/missed-items/mark-surfaced */
+export const markSurfacedResponseSchema = z.object({
+  markedCount: z.number().int().nonnegative(),
+});
+export type MarkSurfacedResponse = z.infer<typeof markSurfacedResponseSchema>;
+
+/** GET /quiz/stats — array of per-activity round stats. */
+export const quizStatsListResponseSchema = z.array(quizStatsSchema);
+export type QuizStatsListResponse = z.infer<typeof quizStatsListResponseSchema>;

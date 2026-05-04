@@ -4,6 +4,9 @@ import {
   profileCreateSchema,
   profileUpdateSchema,
   profileSwitchSchema,
+  profileResponseSchema,
+  profileListResponseSchema,
+  profileSwitchResponseSchema,
   ERROR_CODES,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
@@ -35,7 +38,7 @@ export const profileRoutes = new Hono<ProfileEnv>()
     const db = c.get('db');
     const account = c.get('account');
     const profiles = await listProfiles(db, account.id);
-    return c.json({ profiles });
+    return c.json(profileListResponseSchema.parse({ profiles }));
   })
   .post('/profiles', zValidator('json', profileCreateSchema), async (c) => {
     const db = c.get('db');
@@ -45,7 +48,7 @@ export const profileRoutes = new Hono<ProfileEnv>()
     try {
       const profile = await createProfileWithLimitCheck(db, account.id, input);
 
-      return c.json({ profile }, 201);
+      return c.json(profileResponseSchema.parse({ profile }), 201);
     } catch (err) {
       if (err instanceof ProfileLimitError) {
         // [FIX-API-7] 402 Payment Required is the correct status for a quota gate
@@ -69,7 +72,7 @@ export const profileRoutes = new Hono<ProfileEnv>()
     const account = c.get('account');
     const profile = await getProfile(db, c.req.param('id'), account.id);
     if (!profile) return notFound(c, 'Profile not found');
-    return c.json({ profile });
+    return c.json(profileResponseSchema.parse({ profile }));
   })
   .patch(
     '/profiles/:id',
@@ -85,7 +88,7 @@ export const profileRoutes = new Hono<ProfileEnv>()
         input
       );
       if (!profile) return notFound(c, 'Profile not found');
-      return c.json({ profile });
+      return c.json(profileResponseSchema.parse({ profile }));
     }
   )
   .post(
@@ -98,6 +101,11 @@ export const profileRoutes = new Hono<ProfileEnv>()
       const result = await switchProfile(db, profileId, account.id);
       if (!result)
         return forbidden(c, 'Profile does not belong to this account');
-      return c.json({ message: 'Profile switched', profileId });
+      return c.json(
+        profileSwitchResponseSchema.parse({
+          message: 'Profile switched',
+          profileId,
+        })
+      );
     }
   );

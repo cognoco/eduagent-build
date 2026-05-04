@@ -65,6 +65,15 @@ jest.mock('expo/src/winter/ImportMetaRegistry', () => ({
   },
 }));
 
+// expo/src/winter/runtime.native.ts installs `__ExpoImportMetaRegistry` as a
+// lazy global getter that, when accessed, calls `require('./ImportMetaRegistry')`
+// — under jest 30 that deferred require trips the "outside test scope" guard
+// because it fires after module-eval completes. Stubbing the runtime module
+// short-circuits the lazy install entirely. The two paths cover both
+// jest-expo platform resolutions (./runtime and ./runtime.native).
+jest.mock('expo/src/winter/runtime.native', () => ({}), { virtual: true });
+jest.mock('expo/src/winter/runtime', () => ({}), { virtual: true });
+
 jest.mock('react-native-reanimated', () => {
   const { View, Text } = require('react-native');
   const chainable = { delay: () => chainable, duration: () => chainable };
@@ -229,6 +238,21 @@ jest.mock('expo-clipboard', () => ({
   setStringAsync: jest.fn().mockResolvedValue(undefined),
 }));
 
+// expo-haptics throws "method not available on ios" when invoked under jest
+// because there's no native binding. Stub the impact / notification / select
+// surfaces and the enum constants the project consumes via lib/haptics.ts.
+jest.mock('expo-haptics', () => ({
+  impactAsync: jest.fn().mockResolvedValue(undefined),
+  notificationAsync: jest.fn().mockResolvedValue(undefined),
+  selectionAsync: jest.fn().mockResolvedValue(undefined),
+  ImpactFeedbackStyle: { Light: 'light', Medium: 'medium', Heavy: 'heavy' },
+  NotificationFeedbackType: {
+    Success: 'success',
+    Warning: 'warning',
+    Error: 'error',
+  },
+}));
+
 jest.mock('expo-notifications', () => ({
   getPermissionsAsync: jest
     .fn()
@@ -248,6 +272,21 @@ jest.mock('expo-secure-store', () => ({
   setItemAsync: jest.fn().mockResolvedValue(undefined),
   deleteItemAsync: jest.fn().mockResolvedValue(undefined),
 }));
+
+// expo-crypto loads a native module on import; mock to Node's randomUUID so
+// the outbox dedup-id path works under jest. The runtime app uses
+// expo-crypto's Hermes-safe implementation; this mock just keeps test parity.
+jest.mock('expo-crypto', () => {
+  const nodeCrypto = require('crypto');
+  return {
+    randomUUID: () => nodeCrypto.randomUUID(),
+    getRandomBytesAsync: async (size: number) =>
+      new Uint8Array(nodeCrypto.randomBytes(size)),
+    digestStringAsync: async (_alg: string, data: string) =>
+      nodeCrypto.createHash('sha256').update(data).digest('hex'),
+    CryptoDigestAlgorithm: { SHA256: 'SHA-256' },
+  };
+});
 
 jest.mock('@react-native-async-storage/async-storage', () => {
   const store = new Map<string, string>();
@@ -284,3 +323,10 @@ const { notifyManager } = require('@tanstack/react-query');
 notifyManager.setScheduler((cb: () => void) => {
   cb();
 });
+
+// Note: TextInput native component stubs (AndroidTextInputNativeComponent,
+// RCTSingelineTextInputNativeComponent, RCTMultilineTextInputNativeComponent)
+// are handled via moduleNameMapper in jest.config.cjs → jest.text-input-native-mock.js.
+// They cannot live here as jest.mock() factories because the react-native-css-interop
+// Babel plugin rewrites React.createElement → _ReactNativeCSSInterop.createInteropElement
+// at file scope, making that variable an out-of-scope reference inside hoisted factories.

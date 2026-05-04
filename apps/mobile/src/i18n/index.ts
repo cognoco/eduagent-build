@@ -5,14 +5,25 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FEATURE_FLAGS } from '../lib/feature-flags';
 
 import en from './locales/en.json';
+import de from './locales/de.json';
+import es from './locales/es.json';
+import ja from './locales/ja.json';
+import nb from './locales/nb.json';
+import pl from './locales/pl.json';
+import pt from './locales/pt.json';
 
-// Locked to ['en'] until LLM translation lands. The 6 placeholder locale
-// JSONs (nb/de/es/pt/pl/ja) were byte-identical English clones — shipping
-// them would mislead users who pick their device language and see English.
-// `scripts/translate.ts` regenerates the missing files when run; once a
-// locale has real content, add it back here AND to the resources object
-// below in lockstep.
-export const SUPPORTED_LANGUAGES = ['en'] as const;
+// 7 launch locales — translations generated via scripts/translate.ts and
+// human-reviewed for nb/de. Adding a locale requires updating this array,
+// LANGUAGE_LABELS, and the resources object below in lockstep.
+export const SUPPORTED_LANGUAGES = [
+  'en',
+  'de',
+  'es',
+  'ja',
+  'nb',
+  'pl',
+  'pt',
+] as const;
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 
 export const LANGUAGE_LABELS: Record<
@@ -20,6 +31,12 @@ export const LANGUAGE_LABELS: Record<
   { english: string; native: string }
 > = {
   en: { english: 'English', native: 'English' },
+  de: { english: 'German', native: 'Deutsch' },
+  es: { english: 'Spanish', native: 'Español' },
+  ja: { english: 'Japanese', native: '日本語' },
+  nb: { english: 'Norwegian', native: 'Norsk' },
+  pl: { english: 'Polish', native: 'Polski' },
+  pt: { english: 'Portuguese', native: 'Português' },
 };
 
 const LANGUAGE_STORAGE_KEY = 'app-ui-language';
@@ -78,6 +95,12 @@ const initPromise = (async () => {
     fallbackLng: 'en',
     resources: {
       en: { translation: en },
+      de: { translation: de },
+      es: { translation: es },
+      ja: { translation: ja },
+      nb: { translation: nb },
+      pl: { translation: pl },
+      pt: { translation: pt },
     },
     interpolation: { escapeValue: false },
   });
@@ -97,4 +120,4 @@ i18next.on('languageChanged', (lang) => {
   if (__DEV__) console.log(`[i18n] languageChanged → ${lang}`);
 });
 
-export default i18next;
+export { i18next };

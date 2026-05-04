@@ -264,3 +264,23 @@ export const weeklyReportSummarySchema = z.object({
   headlineStat: monthlyReportHeadlineSchema,
 });
 export type WeeklyReportSummary = z.infer<typeof weeklyReportSummarySchema>;
+
+// ---------------------------------------------------------------------------
+// Snapshot-progress route response envelopes
+// ---------------------------------------------------------------------------
+
+/** GET /progress/milestones */
+export const milestonesResponseSchema = z.object({
+  milestones: z.array(milestoneRecordSchema),
+});
+export type MilestonesResponse = z.infer<typeof milestonesResponseSchema>;
+
+/** POST /progress/refresh — mirrors RefreshSnapshotResult in snapshot-aggregation service */
+export const refreshProgressResponseSchema = z.object({
+  snapshotDate: z.string(),
+  metrics: progressMetricsSchema,
+  milestones: z.array(milestoneRecordSchema),
+});
+export type RefreshProgressResponse = z.infer<
+  typeof refreshProgressResponseSchema
+>;

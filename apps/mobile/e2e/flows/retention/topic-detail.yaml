@@ -1,27 +1,22 @@
-# Flow N9: Topic Detail — Retention Metrics and Adaptive Actions
+# Flow N9: Topic Detail — Retention Metrics and Study CTA
 # Validates: user can navigate to topic detail screen from Library,
-# view retention metrics (mastery, memory strength, interval), and see
-# adaptive action buttons based on completionStatus (Story 4.14).
+# view retention metrics, and see the StudyCTA whose label is derived from
+# completionStatus + retentionStatus (deriveStudyCTA in topic/[topicId].tsx).
 # Tags: nightly, retention
 #
 # Journey: UX Journey 2 (Retention management)
-# Epics: Epic 3 (FR43, FR48), Story 4.14 (adaptive buttons)
+# Epics: Epic 3 (FR43, FR48); StudyCTA derivation (PR #144)
 # Prerequisite: Seeded user with due retention cards (scenario: retention-due)
 #
 # Seed note: retention-due creates topics with retention cards but no sessions
 # or assessments, so computeCompletionStatus returns "not_started".
-# This means the adaptive buttons show: primary "Start Learning" only.
+# deriveStudyCTA('not_started', _) -> { label: "Start studying", variant: 'primary' }.
 #
-# testID mapping (topic/[topicId].tsx — smart primary + expandable secondary):
-#   - topic-detail-back         -> back button
+# testID mapping (topic/[topicId].tsx):
+#   - topic-detail-scroll       -> scroll container
 #   - topic-detail-loading      -> loading state
 #   - topic-detail-empty        -> empty/not-found state
-#   - retention-card            -> retention metrics card
-#   - primary-action-button     -> smart primary action
-#   - more-ways-toggle          -> expandable secondary action section
-#   - secondary-recall-check    -> recall check action
-#   - secondary-challenge       -> challenge yourself action
-#   - secondary-teach-back      -> teach it back action
+#   - study-cta                 -> sticky study CTA button (single, label varies by state)
 #
 # testID mapping (library/index.tsx):
 #   - subject-filter-tabs     -> subject filter strip
@@ -104,20 +99,26 @@ tags:
 - assertVisible:
     text: "Progress"
 
-# 13. Verify smart primary action for not_started topic
-# retention-due seed has no sessions/assessments -> completionStatus = not_started
-# not_started shows only the primary "Start learning" button
+# 13. Verify the study CTA renders the not_started label.
+# retention-due seed has no sessions/assessments -> completionStatus = not_started,
+# so deriveStudyCTA returns label "Start studying". Asserting the exact label
+# pins the derivation: a regression that returns "Review this topic" or any
+# other label for not_started would fail this step.
 - assertVisible:
-    id: "primary-action-button"
+    id: "study-cta"
 - assertVisible:
-    text: "Start learning"
+    text: "Start studying"
 
-# 14. Verify secondary actions stay hidden for not_started topic
+# 14. Negative assertion: the in_progress / completed labels must NOT appear
+# for a not_started topic. If deriveStudyCTA accidentally falls through to
+# the default branch ("Review this topic"), this catches it.
 - assertNotVisible:
-    id: "more-ways-toggle"
+    text: "Review this topic"
+- assertNotVisible:
+    text: "Practice again"
 
-# 15. Screenshot of topic detail with adaptive buttons
-- takeScreenshot: topic-detail-adaptive-buttons
+# 15. Screenshot of topic detail with study CTA
+- takeScreenshot: topic-detail-study-cta-not-started
 
 # 16. Screenshot of full topic detail with retention metrics
 - takeScreenshot: topic-detail-retention

@@ -2,7 +2,15 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import type { Database } from '@eduagent/database';
-import { bookTopicGenerateInputSchema, ERROR_CODES } from '@eduagent/schemas';
+import {
+  bookTopicGenerateInputSchema,
+  bookWithTopicsSchema,
+  getAllProfileBooksResponseSchema,
+  getBooksResponseSchema,
+  getBookSessionsResponseSchema,
+  moveTopicResponseSchema,
+  ERROR_CODES,
+} from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import { notFound, NotFoundError, apiError } from '../errors';
@@ -46,7 +54,7 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
     const result = await getAllProfileBooks(db, profileId);
-    return c.json(result);
+    return c.json(getAllProfileBooksResponseSchema.parse(result));
   })
   .get(
     '/subjects/:subjectId/books',
@@ -58,7 +66,7 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
 
       try {
         const books = await getBooks(db, profileId, subjectId);
-        return c.json({ books });
+        return c.json(getBooksResponseSchema.parse({ books }));
       } catch (error) {
         if (error instanceof NotFoundError) {
           return notFound(c, error.message);
@@ -80,7 +88,7 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
         if (!book) {
           return notFound(c, 'Book not found');
         }
-        return c.json(book);
+        return c.json(bookWithTopicsSchema.parse(book));
       } catch (error) {
         if (error instanceof NotFoundError) {
           return notFound(c, error.message);
@@ -120,7 +128,7 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
           if (!existing) {
             return notFound(c, 'Book not found');
           }
-          return c.json(existing);
+          return c.json(bookWithTopicsSchema.parse(existing));
         }
 
         const learnerAge = await getProfileAge(db, profileId);
@@ -161,7 +169,7 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
             });
           });
 
-        return c.json(persisted);
+        return c.json(bookWithTopicsSchema.parse(persisted));
       } catch (error) {
         if (error instanceof NotFoundError) {
           return notFound(c, error.message);
@@ -179,7 +187,7 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
       const { bookId } = c.req.valid('param');
 
       const sessions = await getBookSessions(db, profileId, bookId);
-      return c.json({ sessions });
+      return c.json(getBookSessionsResponseSchema.parse({ sessions }));
     }
   )
   // Move a topic from its current book to a different book within the same shelf.
@@ -221,7 +229,9 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
           topicId,
           targetBookId
         );
-        return c.json({ moved: true, topicId, targetBookId });
+        return c.json(
+          moveTopicResponseSchema.parse({ moved: true, topicId, targetBookId })
+        );
       } catch (error) {
         if (error instanceof NotFoundError) {
           return notFound(c, error.message);

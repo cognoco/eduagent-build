@@ -1,6 +1,10 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
-import { celebrationSeenSchema } from '@eduagent/schemas';
+import {
+  celebrationSeenSchema,
+  pendingCelebrationsResponseSchema,
+  celebrationSeenResponseSchema,
+} from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
@@ -28,17 +32,23 @@ export const celebrationRoutes = new Hono<CelebrationRouteEnv>()
     const celebrations = await getPendingCelebrations(db, profileId, viewer);
 
     if (viewer === 'parent') {
-      return c.json({ pendingCelebrations: celebrations });
+      return c.json(
+        pendingCelebrationsResponseSchema.parse({
+          pendingCelebrations: celebrations,
+        })
+      );
     }
 
     const celebrationLevel = await getCelebrationLevel(db, profileId);
 
-    return c.json({
-      pendingCelebrations: filterCelebrationsByLevel(
-        celebrations,
-        celebrationLevel
-      ),
-    });
+    return c.json(
+      pendingCelebrationsResponseSchema.parse({
+        pendingCelebrations: filterCelebrationsByLevel(
+          celebrations,
+          celebrationLevel
+        ),
+      })
+    );
   })
   .post(
     '/celebrations/seen',
@@ -49,6 +59,6 @@ export const celebrationRoutes = new Hono<CelebrationRouteEnv>()
       const body = c.req.valid('json');
 
       await markCelebrationsSeen(db, profileId, body.viewer);
-      return c.json({ ok: true });
+      return c.json(celebrationSeenResponseSchema.parse({ ok: true }));
     }
   );
