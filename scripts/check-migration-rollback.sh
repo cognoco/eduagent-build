@@ -139,7 +139,7 @@ if [[ -f "$JOURNAL" ]]; then
       echo "✗ Latest drizzle journal entry (idx $padded) is missing a meta/${padded}_*.json snapshot."
       echo ""
       echo "A missing latest snapshot silently breaks 'drizzle-kit generate' on"
-      echo "the next schema change. Regenerate with 'pnpm run db:generate' or"
+      echo "the next schema change. Regenerate with 'pnpm run db:generate:dev' or"
       echo "hand-author from the previous snapshot."
       exit 1
     fi
