@@ -1,5 +1,9 @@
 import { createElement, type ReactNode } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  QueryClient,
+  QueryClientProvider,
+  type QueryClientConfig,
+} from '@tanstack/react-query';
 import {
   ProfileContext,
   type Profile,
@@ -7,6 +11,34 @@ import {
 } from '../lib/profile';
 
 process.env.EXPO_PUBLIC_API_URL ??= 'http://localhost:8787';
+
+// QueryClient-only wrapper for hook tests that already mock `../lib/profile`.
+export function createQueryWrapper(
+  options: { queryClientOptions?: QueryClientConfig } = {}
+) {
+  const userOpts = options.queryClientOptions ?? {};
+  const queryClient = new QueryClient({
+    ...userOpts,
+    defaultOptions: {
+      ...userOpts.defaultOptions,
+      queries: {
+        retry: false,
+        gcTime: 0,
+        ...userOpts.defaultOptions?.queries,
+      },
+    },
+  });
+
+  function Wrapper({ children }: { children: ReactNode }) {
+    return createElement(
+      QueryClientProvider,
+      { client: queryClient },
+      children
+    );
+  }
+
+  return { queryClient, wrapper: Wrapper };
+}
 
 export function createTestProfile(overrides: Partial<Profile> = {}): Profile {
   return {
