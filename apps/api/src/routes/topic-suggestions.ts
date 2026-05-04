@@ -3,6 +3,7 @@ import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import { getUnusedTopicSuggestions } from '../services/suggestions';
+import { topicSuggestionsResponseSchema } from '@eduagent/schemas';
 
 type TopicSuggestionsEnv = {
   Bindings: { DATABASE_URL: string };
@@ -27,6 +28,6 @@ export const topicSuggestionRoutes = new Hono<TopicSuggestionsEnv>().get(
       bookId,
       subjectId
     );
-    return c.json(suggestions, 200);
+    return c.json(topicSuggestionsResponseSchema.parse(suggestions), 200);
   }
 );

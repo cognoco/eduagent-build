@@ -72,8 +72,10 @@ jest.mock('../services/suggestions', () => ({
   getUnusedTopicSuggestions: jest.fn().mockResolvedValue([
     {
       id: TEST_TOPIC_ID,
+      bookId: 'a0000000-0000-4000-a000-000000000401',
       title: 'Suggested Topic',
-      description: 'A suggested topic for study',
+      createdAt: '2024-01-01T00:00:00.000Z',
+      usedAt: null,
     },
   ]),
 }));

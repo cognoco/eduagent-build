@@ -6,6 +6,7 @@ import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import { recordOutboxSpillover } from '../services/support/spillover';
 import { createLogger } from '../services/logger';
+import { outboxSpilloverResultSchema } from '@eduagent/schemas';
 
 const logger = createLogger();
 
@@ -54,6 +55,6 @@ export const supportRoutes = new Hono<SupportRouteEnv>().post(
       written: result.written,
     });
 
-    return c.json(result);
+    return c.json(outboxSpilloverResultSchema.parse(result));
   }
 );

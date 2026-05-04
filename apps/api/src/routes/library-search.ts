@@ -1,6 +1,9 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
-import { librarySearchQuerySchema } from '@eduagent/schemas';
+import {
+  librarySearchQuerySchema,
+  librarySearchResultSchema,
+} from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
@@ -20,6 +23,6 @@ export const librarySearchRoutes = new Hono<SearchRouteEnv>().get(
     const { q } = c.req.valid('query');
 
     const results = await searchLibrary(db, profileId, q);
-    return c.json(results);
+    return c.json(librarySearchResultSchema.parse(results));
   }
 );

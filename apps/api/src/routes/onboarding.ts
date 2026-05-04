@@ -15,6 +15,7 @@ import {
   onboardingLanguagePatchSchema,
   onboardingPronounsPatchSchema,
   onboardingInterestsContextPatchSchema,
+  onboardingSuccessResponseSchema,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
@@ -62,7 +63,7 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
         }
         throw err;
       }
-      return c.json({ success: true });
+      return c.json(onboardingSuccessResponseSchema.parse({ success: true }));
     }
   )
   .patch(
@@ -88,7 +89,7 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
         }
         throw err;
       }
-      return c.json({ success: true });
+      return c.json(onboardingSuccessResponseSchema.parse({ success: true }));
     }
   )
   // ---- Pronouns -----------------------------------------------------------
@@ -108,7 +109,7 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
         }
         throw err;
       }
-      return c.json({ success: true });
+      return c.json(onboardingSuccessResponseSchema.parse({ success: true }));
     }
   )
   .patch(
@@ -129,7 +130,7 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
         }
         throw err;
       }
-      return c.json({ success: true });
+      return c.json(onboardingSuccessResponseSchema.parse({ success: true }));
     }
   )
   // ---- Interest context ---------------------------------------------------
@@ -149,7 +150,7 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
         }
         throw err;
       }
-      return c.json({ success: true });
+      return c.json(onboardingSuccessResponseSchema.parse({ success: true }));
     }
   )
   .patch(
@@ -170,6 +171,6 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
         }
         throw err;
       }
-      return c.json({ success: true });
+      return c.json(onboardingSuccessResponseSchema.parse({ success: true }));
     }
   );

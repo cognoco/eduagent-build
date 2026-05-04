@@ -2,7 +2,11 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import type { Database } from '@eduagent/database';
-import { filingRequestSchema } from '@eduagent/schemas';
+import {
+  filingRequestSchema,
+  filingResultSchema,
+  filingQueuedResponseSchema,
+} from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import {
@@ -51,7 +55,7 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
         name: 'app/filing.retry',
         data: { sessionId, sessionMode, profileId },
       });
-      return c.json({ queued: true });
+      return c.json(filingQueuedResponseSchema.parse({ queued: true }));
     }
   )
   .post('/filing', zValidator('json', filingRequestSchema), async (c) => {
@@ -247,5 +251,10 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
         });
       });
 
-    return c.json(usedFallback ? { ...result, fallback: true } : result, 200);
+    return c.json(
+      filingResultSchema.parse(
+        usedFallback ? { ...result, fallback: true } : result
+      ),
+      200
+    );
   });

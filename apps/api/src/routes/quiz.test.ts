@@ -143,7 +143,7 @@ function setUpdateReturning(rows: Array<{ id: string }> = [{ id: 'round-1' }]) {
 }
 
 const ACTIVE_ROUND = {
-  id: 'round-1',
+  id: 'a0000000-0000-4000-a000-000000000001',
   profileId: 'test-profile-id',
   activityType: 'capitals',
   theme: 'Central European Capitals',
@@ -176,7 +176,7 @@ const ACTIVE_ROUND = {
 // getRoundByIdOrThrow returns after completeQuizRound has persisted.
 const COMPLETED_ROUND = {
   ...ACTIVE_ROUND,
-  id: 'round-completed',
+  id: 'a0000000-0000-4000-a000-000000000002',
   status: 'completed' as const,
   score: 1,
   xpEarned: 15,
@@ -631,7 +631,7 @@ describe('Quiz routes', () => {
 
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(body.id).toBe('round-1');
+      expect(body.id).toBe('a0000000-0000-4000-a000-000000000001');
     });
 
     it('returns correctAnswer + acceptedAliases + celebrationTier for completed rounds [F-032]', async () => {
@@ -896,7 +896,7 @@ describe('Quiz routes', () => {
     it('returns completed rounds', async () => {
       (mockDb as any).query.quizRounds.findMany = jest.fn().mockResolvedValue([
         {
-          id: 'round-1',
+          id: 'a0000000-0000-4000-a000-000000000010',
           activityType: 'capitals',
           theme: 'Central European Capitals',
           score: 7,

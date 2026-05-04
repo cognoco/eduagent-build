@@ -1,5 +1,11 @@
 /// <reference types="jest" />
 
+// Internal mock to be replaced by real-DB integration tests under the C1
+// mock-inventory plan (docs/plans/c1-mock-inventory). When touching: extend
+// in-memory state rather than stubbing additional services, and surface
+// contract drift loudly (see fallback branches below) instead of silently
+// returning empty rows.
+
 type BillingTier = 'free' | 'plus' | 'family' | 'pro';
 type BillingStatus = 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired';
 
@@ -232,8 +238,16 @@ export function createRouteMeteringFixture(
                 return rows;
               }
 
-              rows = [quotaPoolAccessor.findFirst()];
-              return rows;
+              // Contract drift: production decrement helper passed a setValues
+              // shape we don't recognise (neither monthly+daily nor daily-only).
+              // Throw loudly so the test fails fast instead of papering over
+              // a divergence between this fixture and the real helper.
+              throw new Error(
+                `route-metering-fixture: unrecognised quotaPools update shape — keys=[${Object.keys(
+                  setValues
+                ).join(', ')}]. ` +
+                  'Either extend the fixture to handle this case or update the production helper.'
+              );
             };
 
             return {

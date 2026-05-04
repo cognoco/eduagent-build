@@ -44,6 +44,7 @@ jest.mock('../services/subject-resolve', () => ({
   resolveSubjectName: jest.fn().mockResolvedValue({
     status: 'corrected',
     resolvedName: 'Physics',
+    suggestions: [],
     displayMessage: 'Did you mean **Physics**?',
   }),
 }));
@@ -69,9 +70,9 @@ jest.mock('../services/subject', () => ({
     }
   },
   listSubjects: jest.fn().mockResolvedValue([]),
-  createSubject: jest.fn().mockImplementation((_db, profileId, input) => ({
-    id: 'test-subject-id',
-    profileId,
+  createSubject: jest.fn().mockImplementation((_db, _profileId, input) => ({
+    id: 'a0000000-0000-4000-a000-000000000001',
+    profileId: 'a0000000-0000-4000-a000-000000000002',
     name: input.name,
     rawInput: input.rawInput ?? null,
     status: 'active',
@@ -80,10 +81,10 @@ jest.mock('../services/subject', () => ({
   })),
   createSubjectWithStructure: jest
     .fn()
-    .mockImplementation((_db, profileId, input) => ({
+    .mockImplementation((_db, _profileId, input) => ({
       subject: {
-        id: 'test-subject-id',
-        profileId,
+        id: 'a0000000-0000-4000-a000-000000000001',
+        profileId: 'a0000000-0000-4000-a000-000000000002',
         name: input.name,
         rawInput: input.rawInput ?? null,
         status: 'active',
@@ -95,8 +96,8 @@ jest.mock('../services/subject', () => ({
       structureType: 'narrow',
     })),
   configureLanguageSubject: jest.fn().mockResolvedValue({
-    id: 'test-subject-id',
-    profileId: 'test-profile-id',
+    id: 'a0000000-0000-4000-a000-000000000001',
+    profileId: 'a0000000-0000-4000-a000-000000000002',
     name: 'Spanish',
     rawInput: 'Learn Spanish',
     status: 'active',
@@ -106,8 +107,8 @@ jest.mock('../services/subject', () => ({
     updatedAt: new Date().toISOString(),
   }),
   getSubject: jest.fn().mockResolvedValue({
-    id: 'test-subject-id',
-    profileId: 'test-account-id',
+    id: 'a0000000-0000-4000-a000-000000000001',
+    profileId: 'a0000000-0000-4000-a000-000000000002',
     name: 'Mathematics',
     rawInput: null,
     status: 'active',
@@ -117,8 +118,8 @@ jest.mock('../services/subject', () => ({
     updatedAt: new Date().toISOString(),
   }),
   updateSubject: jest.fn().mockResolvedValue({
-    id: 'test-subject-id',
-    profileId: 'test-account-id',
+    id: 'a0000000-0000-4000-a000-000000000001',
+    profileId: 'a0000000-0000-4000-a000-000000000002',
     name: 'Updated Subject',
     rawInput: null,
     status: 'active',
@@ -367,10 +368,10 @@ describe('subject routes', () => {
         Record<string, jest.Mock>
       >('../services/subject');
       createSubjectWithStructure.mockImplementationOnce(
-        (_db: unknown, profileId: string, input: { name: string }) => ({
+        (_db: unknown, _profileId: string, input: { name: string }) => ({
           subject: {
-            id: 'test-subject-id',
-            profileId,
+            id: 'a0000000-0000-4000-a000-000000000001',
+            profileId: 'a0000000-0000-4000-a000-000000000002',
             name: input.name,
             rawInput: null,
             status: 'active',

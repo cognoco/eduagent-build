@@ -319,8 +319,8 @@ describe('POST /v1/dictation/generate', () => {
 describe('POST /v1/dictation/result', () => {
   it('returns 201 when result is recorded successfully', async () => {
     (recordDictationResult as jest.Mock).mockResolvedValueOnce({
-      id: 'result-uuid-001',
-      profileId: 'test-profile-id',
+      id: 'a0000000-0000-4000-a000-000000000001',
+      profileId: 'a0000000-0000-4000-a000-000000000002',
       date: TODAY,
       sentenceCount: 5,
       mistakeCount: 2,

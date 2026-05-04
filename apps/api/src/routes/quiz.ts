@@ -2,9 +2,18 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import {
   completeRoundInputSchema,
+  completeRoundResponseSchema,
   generateRoundInputSchema,
   markSurfacedInputSchema,
+  markSurfacedResponseSchema,
+  prefetchRoundResponseSchema,
   questionCheckInputSchema,
+  questionCheckResponseSchema,
+  quizRoundResponseSchema,
+  quizStatsListResponseSchema,
+  recentRoundListItemSchema,
+  activeRoundDetailResponseSchema,
+  completedRoundDetailResponseSchema,
   type ClientQuizQuestion,
   type CefrLevel,
   type GenerateRoundInput,
@@ -240,7 +249,7 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
       if ('error' in result) return result.error;
 
       return c.json(
-        {
+        quizRoundResponseSchema.parse({
           id: result.round.id,
           activityType: result.input.activityType,
           theme: result.round.theme,
@@ -249,7 +258,7 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
           ),
           total: result.round.total,
           difficultyBump: result.round.difficultyBump,
-        },
+        }),
         200
       );
     }
@@ -270,7 +279,10 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
       const result = await generateRoundFromInput(c, input);
       if ('error' in result) return result.error;
 
-      return c.json({ id: result.round.id }, 200);
+      return c.json(
+        prefetchRoundResponseSchema.parse({ id: result.round.id }),
+        200
+      );
     }
   )
   .get('/quiz/rounds/recent', async (c) => {
@@ -280,17 +292,19 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
     const rounds = await listRecentCompletedRounds(db, profileId, 10);
 
     return c.json(
-      rounds.map((round) => ({
-        id: round.id,
-        activityType: round.activityType,
-        activityLabel: formatActivityLabel(round.activityType),
-        theme: round.theme,
-        score: round.score ?? 0,
-        total: round.total,
-        xpEarned: round.xpEarned ?? 0,
-        completedAt:
-          round.completedAt?.toISOString() ?? round.createdAt.toISOString(),
-      })),
+      rounds.map((round) =>
+        recentRoundListItemSchema.parse({
+          id: round.id,
+          activityType: round.activityType,
+          activityLabel: formatActivityLabel(round.activityType),
+          theme: round.theme,
+          score: round.score ?? 0,
+          total: round.total,
+          xpEarned: round.xpEarned ?? 0,
+          completedAt:
+            round.completedAt?.toISOString() ?? round.createdAt.toISOString(),
+        })
+      ),
       200
     );
   })
@@ -311,7 +325,7 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
       // plus a celebrationTier and human-readable activityLabel. Distractors
       // remain stripped — the round is over, there's no reason to leak them.
       return c.json(
-        {
+        completedRoundDetailResponseSchema.parse({
           id: round.id,
           activityType: round.activityType,
           activityLabel: formatActivityLabel(round.activityType),
@@ -340,20 +354,20 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
             };
           }),
           results: round.results,
-        },
+        }),
         200
       );
     }
 
     return c.json(
-      {
+      activeRoundDetailResponseSchema.parse({
         id: round.id,
         activityType: round.activityType,
         activityLabel: formatActivityLabel(round.activityType),
         theme: round.theme,
         questions: toClientSafeQuestions(questions),
         total: round.total,
-      },
+      }),
       200
     );
   })
@@ -378,10 +392,10 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
       // [F-Q-02/F-Q-07] Reveal correctAnswer only on wrong submissions so the
       // client can highlight the right option and show the person's name.
       return c.json(
-        {
+        questionCheckResponseSchema.parse({
           correct: result.correct,
           ...(result.correct ? {} : { correctAnswer: result.correctAnswer }),
-        },
+        }),
         200
       );
     }
@@ -415,7 +429,7 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
         });
       });
 
-      return c.json(result, 200);
+      return c.json(completeRoundResponseSchema.parse(result), 200);
     }
   )
   // [BUG-833] zValidator middleware replaces manual c.req.json() + safeParse.
@@ -440,7 +454,7 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
         activityType
       );
 
-      return c.json({ markedCount }, 200);
+      return c.json(markSurfacedResponseSchema.parse({ markedCount }), 200);
     }
   )
   .get('/quiz/stats', async (c) => {
@@ -448,5 +462,5 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
     const db = c.get('db');
 
     const stats = await computeRoundStats(db, profileId);
-    return c.json(stats, 200);
+    return c.json(quizStatsListResponseSchema.parse(stats), 200);
   });

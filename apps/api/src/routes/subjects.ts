@@ -7,6 +7,11 @@ import {
   subjectClassifyInputSchema,
   languageSetupSchema,
   ERROR_CODES,
+  subjectResolveResultSchema,
+  subjectClassifyResultSchema,
+  subjectListResponseSchema,
+  subjectResponseSchema,
+  createSubjectWithStructureResponseSchema,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
@@ -46,7 +51,7 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
     async (c) => {
       const { rawInput } = c.req.valid('json');
       const result = await resolveSubjectName(rawInput);
-      return c.json(result);
+      return c.json(subjectResolveResultSchema.parse(result));
     }
   )
   .post(
@@ -57,7 +62,7 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const result = await classifySubject(db, profileId, text);
-      return c.json(result);
+      return c.json(subjectClassifyResultSchema.parse(result));
     }
   )
   .get('/subjects', async (c) => {
@@ -65,7 +70,7 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
     const profileId = requireProfileId(c.get('profileId'));
     const includeInactive = c.req.query('includeInactive') === 'true';
     const subjects = await listSubjects(db, profileId, { includeInactive });
-    return c.json({ subjects });
+    return c.json(subjectListResponseSchema.parse({ subjects }));
   })
   .post('/subjects', zValidator('json', subjectCreateSchema), async (c) => {
     const db = c.get('db');
@@ -76,7 +81,7 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
     // others to Sentry. The old try/catch was masking quota and LLM errors
     // as generic 500s, making them invisible in Sentry.
     const result = await createSubjectWithStructure(db, profileId, input);
-    return c.json(result, 201);
+    return c.json(createSubjectWithStructureResponseSchema.parse(result), 201);
   })
   .put(
     '/subjects/:id/language-setup',
@@ -91,7 +96,7 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
           c.req.param('id'),
           c.req.valid('json')
         );
-        return c.json({ subject });
+        return c.json(subjectResponseSchema.parse({ subject }));
       } catch (err) {
         // [FIX-API-6] Use typed instanceof check instead of string-matching message
         if (err instanceof SubjectNotFoundError) {
@@ -110,7 +115,7 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
     const profileId = requireProfileId(c.get('profileId'));
     const subject = await getSubject(db, profileId, c.req.param('id'));
     if (!subject) return notFound(c, 'Subject not found');
-    return c.json({ subject });
+    return c.json(subjectResponseSchema.parse({ subject }));
   })
   .patch(
     '/subjects/:id',
@@ -126,6 +131,6 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
         input
       );
       if (!subject) return notFound(c, 'Subject not found');
-      return c.json({ subject });
+      return c.json(subjectResponseSchema.parse({ subject }));
     }
   );

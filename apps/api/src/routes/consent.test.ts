@@ -589,7 +589,7 @@ describe('consent routes', () => {
       mockGetState.mockResolvedValueOnce({
         status: 'PARENTAL_CONSENT_REQUESTED',
         parentEmail: 'sensitive.parent.email@example.com',
-        consentType: 'PARENTAL',
+        consentType: 'GDPR',
       });
 
       const res = await app.request(

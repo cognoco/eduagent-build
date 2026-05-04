@@ -93,8 +93,11 @@ describe('retention routes', () => {
             intervalDays: 7,
             repetitions: 3,
             nextReviewAt: '2026-02-22T10:00:00.000Z',
+            lastReviewedAt: null,
             xpStatus: 'pending',
             failureCount: 0,
+            topicTitle: 'Limits',
+            bookId: '',
           },
         ],
         reviewDueCount: 0,
@@ -239,6 +242,7 @@ describe('retention routes', () => {
         intervalDays: 7,
         repetitions: 3,
         nextReviewAt: '2026-02-22T10:00:00.000Z',
+        lastReviewedAt: null,
         xpStatus: 'pending',
         failureCount: 0,
       });
@@ -293,6 +297,7 @@ describe('retention routes', () => {
         masteryScore: 0.75,
         xpChange: 'verified',
         nextReviewAt: '2026-02-22T10:00:00.000Z',
+        failureCount: 0,
       });
 
       const res = await app.request(
@@ -410,6 +415,8 @@ describe('retention routes', () => {
         message: 'Relearn started',
         topicId: TOPIC_ID,
         method: 'different',
+        sessionId: null,
+        recap: null,
       });
 
       const res = await app.request(
@@ -739,7 +746,7 @@ describe('retention routes', () => {
   describe('GET /v1/retention/stability', () => {
     it('returns 200 and forwards parsed UUID to service', async () => {
       (getStableTopics as jest.Mock).mockResolvedValue([
-        { topicId: TOPIC_ID, status: 'stable' },
+        { topicId: TOPIC_ID, isStable: true, consecutiveSuccesses: 5 },
       ]);
 
       const res = await app.request(

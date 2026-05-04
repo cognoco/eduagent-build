@@ -32,7 +32,7 @@ const sentryMock = require('../services/sentry') as {
 
 jest.mock('./jwt', () =>
   require('../test-utils/auth-fixture').createJwtModuleMock({
-    payload: { sub: 'user_default', email: undefined },
+    payload: { sub: 'user_default' },
   })
 );
 

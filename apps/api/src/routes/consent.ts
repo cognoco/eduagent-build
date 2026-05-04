@@ -3,6 +3,11 @@ import { zValidator } from '@hono/zod-validator';
 import {
   consentRequestSchema,
   consentResponseSchema,
+  consentRequestResultSchema,
+  consentRespondResultSchema,
+  myConsentStatusSchema,
+  childConsentStatusSchema,
+  consentActionResultSchema,
   ERROR_CODES,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
@@ -201,11 +206,11 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       }
 
       return c.json(
-        {
+        consentRequestResultSchema.parse({
           message: 'Consent request sent to parent',
           consentType: input.consentType,
           emailStatus: result.emailDelivered ? 'sent' : 'failed',
-        },
+        }),
         201
       );
     }
@@ -242,9 +247,11 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
 
       try {
         await processConsentResponse(db, input.token, input.approved);
-        return c.json({
-          message: input.approved ? 'Consent granted' : 'Consent denied',
-        });
+        return c.json(
+          consentRespondResultSchema.parse({
+            message: input.approved ? 'Consent granted' : 'Consent denied',
+          })
+        );
       } catch (error) {
         if (error instanceof ConsentTokenNotFoundError) {
           return notFound(c, error.message);
@@ -264,24 +271,28 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
     // returns null values when no profile is resolved.
     const profileId = c.get('profileId');
     if (!profileId) {
-      return c.json({
-        consentStatus: null,
-        parentEmail: null,
-        consentType: null,
-      });
+      return c.json(
+        myConsentStatusSchema.parse({
+          consentStatus: null,
+          parentEmail: null,
+          consentType: null,
+        })
+      );
     }
     const db = c.get('db');
     const state = await getProfileConsentState(db, profileId);
-    return c.json({
-      consentStatus: state?.status ?? null,
-      // [BUG-625 / A-10] parentEmail is third-party PII (the parent's address,
-      // not the requesting profile's). The mobile reminder banner needs *some*
-      // identifier to confirm "consent request sent to <X>", but returning the
-      // full address lets a child session enumerate the parent's email.
-      // Mask to "p***@example.com" — preserves verification UX, reduces leak.
-      parentEmail: maskEmail(state?.parentEmail ?? null),
-      consentType: state?.consentType ?? null,
-    });
+    return c.json(
+      myConsentStatusSchema.parse({
+        consentStatus: state?.status ?? null,
+        // [BUG-625 / A-10] parentEmail is third-party PII (the parent's address,
+        // not the requesting profile's). The mobile reminder banner needs *some*
+        // identifier to confirm "consent request sent to <X>", but returning the
+        // full address lets a child session enumerate the parent's email.
+        // Mask to "p***@example.com" — preserves verification UX, reduces leak.
+        parentEmail: maskEmail(state?.parentEmail ?? null),
+        consentType: state?.consentType ?? null,
+      })
+    );
   })
 
   // Get consent status for a child (parent view, includes respondedAt for countdown)
@@ -297,17 +308,21 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
         parentProfileId
       );
       if (!state) {
-        return c.json({
-          consentStatus: null,
-          respondedAt: null,
-          consentType: null,
-        });
+        return c.json(
+          childConsentStatusSchema.parse({
+            consentStatus: null,
+            respondedAt: null,
+            consentType: null,
+          })
+        );
       }
-      return c.json({
-        consentStatus: state.status,
-        respondedAt: state.respondedAt,
-        consentType: state.consentType,
-      });
+      return c.json(
+        childConsentStatusSchema.parse({
+          consentStatus: state.status,
+          respondedAt: state.respondedAt,
+          consentType: state.consentType,
+        })
+      );
     } catch (error) {
       if (error instanceof ConsentNotAuthorizedError) {
         return forbidden(c, error.message);
@@ -351,11 +366,13 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
         });
       }
 
-      return c.json({
-        message:
-          'Consent revoked. Data will be deleted after 7-day grace period.',
-        consentStatus: state.status,
-      });
+      return c.json(
+        consentActionResultSchema.parse({
+          message:
+            'Consent revoked. Data will be deleted after 7-day grace period.',
+          consentStatus: state.status,
+        })
+      );
     } catch (error) {
       if (error instanceof ConsentNotAuthorizedError) {
         return forbidden(c, error.message);
@@ -375,10 +392,12 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
 
     try {
       const state = await restoreConsent(db, childProfileId, parentProfileId);
-      return c.json({
-        message: 'Consent restored. Deletion cancelled.',
-        consentStatus: state.status,
-      });
+      return c.json(
+        consentActionResultSchema.parse({
+          message: 'Consent restored. Deletion cancelled.',
+          consentStatus: state.status,
+        })
+      );
     } catch (error) {
       if (error instanceof ConsentNotAuthorizedError) {
         return forbidden(c, error.message);

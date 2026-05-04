@@ -114,6 +114,7 @@ jest.mock('../services/learner-input', () => ({
 
 import { app } from '../index';
 import { BASE_AUTH_ENV } from '../test-utils/test-env';
+import { extractDrizzleParamValues } from '../test-utils/drizzle-introspection';
 
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
@@ -131,7 +132,7 @@ const PARENT_HEADERS = {
 };
 
 const MINIMAL_PROFILE = {
-  id: 'learning-profile-id',
+  id: 'a0000000-0000-4000-a000-000000000001',
   profileId: OWN_CHILD_PROFILE_ID,
   learningStyle: null,
   interests: [],
@@ -189,6 +190,16 @@ describe('learner-profile routes', () => {
       expect(res.status).toBe(403);
       expect(mockGetOrCreateLearningProfile).not.toHaveBeenCalled();
       expect(mockFindFamilyLink).toHaveBeenCalledTimes(1);
+
+      // Pin the actual UUIDs the route asked the family-link table about. A
+      // future refactor that drops or swaps the parent/child equality clauses
+      // would still 403 (because the mock returns undefined) but would silently
+      // break the IDOR contract — this assertion catches that.
+      const params = extractDrizzleParamValues(
+        mockFindFamilyLink.mock.calls[0]?.[0]
+      );
+      expect(params).toContain(PARENT_PROFILE_ID);
+      expect(params).toContain(OTHER_FAMILY_CHILD_ID);
     });
 
     it('returns 403 on DELETE /learner-profile/:profileId/all for another family', async () => {

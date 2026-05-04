@@ -83,6 +83,7 @@ import {
   AUTH_HEADERS as BASE_AUTH_HEADERS,
   BASE_AUTH_ENV,
 } from '../test-utils/test-env';
+import { extractDrizzleParamValues } from '../test-utils/drizzle-introspection';
 
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
@@ -317,8 +318,29 @@ describe('dashboard routes', () => {
     it('returns 200 with weekly report data', async () => {
       mockGetWeeklyReport.mockResolvedValueOnce({
         id: REPORT_ID,
+        profileId: 'a0000001-0000-4000-a000-000000000001',
+        childProfileId: PROFILE_ID,
         reportWeek: '2026-04-14',
-        reportData: { childName: 'Test' },
+        reportData: {
+          childName: 'Test',
+          weekStart: '2026-04-14',
+          thisWeek: {
+            totalSessions: 3,
+            totalActiveMinutes: 45,
+            topicsMastered: 1,
+            topicsExplored: 2,
+            vocabularyTotal: 10,
+            streakBest: 3,
+          },
+          lastWeek: null,
+          headlineStat: {
+            label: 'Topics mastered',
+            value: 1,
+            comparison: 'in a first week',
+          },
+        },
+        viewedAt: null,
+        createdAt: '2026-04-21T00:00:00.000Z',
       });
 
       const res = await app.request(
@@ -403,6 +425,16 @@ describe('dashboard routes', () => {
 
       expect(res.status).toBe(403);
       expect(mockFindFamilyLink).toHaveBeenCalledTimes(1);
+
+      // Pin the actual UUIDs the route asked the family-link table about. A
+      // future refactor that drops or swaps the parent/child equality clauses
+      // would still 403 (because the mock returns undefined) but would silently
+      // break the IDOR contract — this assertion catches that.
+      const params = extractDrizzleParamValues(
+        mockFindFamilyLink.mock.calls[0]?.[0]
+      );
+      expect(params).toContain('test-profile-id');
+      expect(params).toContain(PROFILE_ID);
     });
 
     it('GET /dashboard/children/:id/memory returns 200 for linked parent', async () => {

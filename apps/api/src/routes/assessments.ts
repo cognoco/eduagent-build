@@ -3,6 +3,10 @@ import { zValidator } from '@hono/zod-validator';
 import {
   assessmentAnswerSchema,
   quickCheckResponseSchema,
+  createAssessmentResponseSchema,
+  submitAssessmentAnswerResponseSchema,
+  getAssessmentResponseSchema,
+  quickCheckFeedbackResponseSchema,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
@@ -35,7 +39,7 @@ export const assessmentRoutes = new Hono<RouteEnv>()
     );
 
     return c.json(
-      {
+      createAssessmentResponseSchema.parse({
         assessment: {
           id: assessment.id,
           topicId: assessment.topicId,
@@ -44,7 +48,7 @@ export const assessmentRoutes = new Hono<RouteEnv>()
           masteryScore: assessment.masteryScore,
           createdAt: assessment.createdAt,
         },
-      },
+      }),
       201
     );
   })
@@ -125,7 +129,7 @@ export const assessmentRoutes = new Hono<RouteEnv>()
         });
       }
 
-      return c.json({ evaluation });
+      return c.json(submitAssessmentAnswerResponseSchema.parse({ evaluation }));
     }
   )
 
@@ -136,7 +140,7 @@ export const assessmentRoutes = new Hono<RouteEnv>()
 
     const assessment = await getAssessment(db, profileId, assessmentId);
     if (!assessment) return notFound(c, 'Assessment not found');
-    return c.json({ assessment });
+    return c.json(getAssessmentResponseSchema.parse({ assessment }));
   })
 
   // Submit quick check response during session
@@ -166,9 +170,11 @@ export const assessmentRoutes = new Hono<RouteEnv>()
         answer
       );
 
-      return c.json({
-        feedback: evaluation.feedback,
-        isCorrect: evaluation.passed,
-      });
+      return c.json(
+        quickCheckFeedbackResponseSchema.parse({
+          feedback: evaluation.feedback,
+          isCorrect: evaluation.passed,
+        })
+      );
     }
   );

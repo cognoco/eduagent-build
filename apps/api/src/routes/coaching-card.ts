@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import type { Database } from '@eduagent/database';
+import { coachingCardEndpointResponseSchema } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import { getCoachingCardForProfile } from '../services/coaching-cards';
@@ -20,5 +21,5 @@ export const coachingCardRoutes = new Hono<CoachingCardRouteEnv>()
     const profileId = requireProfileId(c.get('profileId'));
 
     const result = await getCoachingCardForProfile(db, profileId);
-    return c.json(result);
+    return c.json(coachingCardEndpointResponseSchema.parse(result));
   });

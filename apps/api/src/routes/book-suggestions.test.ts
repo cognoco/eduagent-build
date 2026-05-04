@@ -72,17 +72,23 @@ jest.mock('../services/suggestions', () => ({
   getUnpickedBookSuggestions: jest.fn().mockResolvedValue([
     {
       id: TEST_BOOK_ID,
+      subjectId: 'a0000000-0000-4000-a000-000000000201',
       title: 'Suggested Book',
       emoji: '📖',
       description: 'A suggested book',
+      createdAt: '2024-01-01T00:00:00.000Z',
+      pickedAt: null,
     },
   ]),
   getAllBookSuggestions: jest.fn().mockResolvedValue([
     {
       id: TEST_BOOK_ID,
+      subjectId: 'a0000000-0000-4000-a000-000000000201',
       title: 'Suggested Book',
       emoji: '📖',
       description: 'A suggested book',
+      createdAt: '2024-01-01T00:00:00.000Z',
+      pickedAt: null,
     },
   ]),
 }));

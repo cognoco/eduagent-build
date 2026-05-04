@@ -8,6 +8,13 @@ import {
   analogyDomainUpdateSchema,
   celebrationLevelUpdateSchema,
   nativeLanguageUpdateSchema,
+  getNotificationsResponseSchema,
+  getLearningModeResponseSchema,
+  getCelebrationLevelResponseSchema,
+  pushTokenRegisteredResponseSchema,
+  notifyParentSubscribeResponseSchema,
+  analogyDomainResponseSchema,
+  nativeLanguageResponseSchema,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
@@ -57,7 +64,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
     const preferences = await getNotificationPrefs(db, profileId);
-    return c.json({ preferences });
+    return c.json(getNotificationsResponseSchema.parse({ preferences }));
   })
 
   // Update notification preferences
@@ -75,7 +82,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
         accountId,
         body
       );
-      return c.json({ preferences });
+      return c.json(getNotificationsResponseSchema.parse({ preferences }));
     }
   )
 
@@ -84,7 +91,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
     const result = await getLearningMode(db, profileId);
-    return c.json({ mode: result.mode });
+    return c.json(getLearningModeResponseSchema.parse({ mode: result.mode }));
   })
 
   // Update learning mode
@@ -102,7 +109,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
         accountId,
         body.mode
       );
-      return c.json({ mode: result.mode });
+      return c.json(getLearningModeResponseSchema.parse({ mode: result.mode }));
     }
   )
 
@@ -110,7 +117,9 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
     const celebrationLevel = await getCelebrationLevel(db, profileId);
-    return c.json({ celebrationLevel });
+    return c.json(
+      getCelebrationLevelResponseSchema.parse({ celebrationLevel })
+    );
   })
 
   .put(
@@ -127,7 +136,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
         accountId,
         body.celebrationLevel
       );
-      return c.json(result);
+      return c.json(getCelebrationLevelResponseSchema.parse(result));
     }
   )
 
@@ -141,7 +150,9 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
       const accountId = c.get('account').id;
       const body = c.req.valid('json');
       await registerPushToken(db, profileId, accountId, body.token);
-      return c.json({ registered: true });
+      return c.json(
+        pushTokenRegisteredResponseSchema.parse({ registered: true })
+      );
     }
   )
 
@@ -165,7 +176,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
       },
       apiOrigin
     );
-    return c.json(result);
+    return c.json(notifyParentSubscribeResponseSchema.parse(result));
   })
 
   // Get analogy domain preference for a subject (FR134-137)
@@ -177,7 +188,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
       const profileId = requireProfileId(c.get('profileId'));
       const { subjectId } = c.req.valid('param');
       const analogyDomain = await getAnalogyDomain(db, profileId, subjectId);
-      return c.json({ analogyDomain });
+      return c.json(analogyDomainResponseSchema.parse({ analogyDomain }));
     }
   )
 
@@ -199,7 +210,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
           subjectId,
           body.analogyDomain
         );
-        return c.json({ analogyDomain });
+        return c.json(analogyDomainResponseSchema.parse({ analogyDomain }));
       } catch (error) {
         if (error instanceof NotFoundError) {
           return notFound(c, error.message);
@@ -216,7 +227,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
       const profileId = requireProfileId(c.get('profileId'));
       const { subjectId } = c.req.valid('param');
       const nativeLanguage = await getNativeLanguage(db, profileId, subjectId);
-      return c.json({ nativeLanguage });
+      return c.json(nativeLanguageResponseSchema.parse({ nativeLanguage }));
     }
   )
   .put(
@@ -236,7 +247,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
           subjectId,
           body.nativeLanguage
         );
-        return c.json({ nativeLanguage });
+        return c.json(nativeLanguageResponseSchema.parse({ nativeLanguage }));
       } catch (error) {
         if (error instanceof NotFoundError) {
           return notFound(c, error.message);
