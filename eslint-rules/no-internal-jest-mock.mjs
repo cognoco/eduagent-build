@@ -36,23 +36,28 @@ const rule = {
   },
 
   create(context) {
+    function check(node) {
+      const arg = node.arguments[0];
+      if (!arg || arg.type !== 'Literal' || typeof arg.value !== 'string') {
+        return;
+      }
+      const specifier = arg.value;
+      if (specifier.startsWith('./') || specifier.startsWith('../')) {
+        context.report({
+          node: arg,
+          messageId: 'internalMock',
+          data: { specifier },
+        });
+      }
+    }
+
     return {
-      "CallExpression[callee.object.name='jest'][callee.property.name='mock']"(
-        node
-      ) {
-        const arg = node.arguments[0];
-        if (!arg || arg.type !== 'Literal' || typeof arg.value !== 'string') {
-          return;
-        }
-        const specifier = arg.value;
-        if (specifier.startsWith('./') || specifier.startsWith('../')) {
-          context.report({
-            node: arg,
-            messageId: 'internalMock',
-            data: { specifier },
-          });
-        }
-      },
+      // Cover both jest.mock (hoisted) and jest.doMock (non-hoisted). Without
+      // doMock the rule has a trivial bypass — see #148 review feedback.
+      "CallExpression[callee.object.name='jest'][callee.property.name='mock']":
+        check,
+      "CallExpression[callee.object.name='jest'][callee.property.name='doMock']":
+        check,
     };
   },
 };

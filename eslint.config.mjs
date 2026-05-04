@@ -12,26 +12,30 @@ const reactConfigFiltered = nx.configs['flat/react'].map((config) => {
 });
 
 // Local plugin for project-wide rules (mobile has its own additions in
-// apps/mobile/eslint.config.mjs).
+// apps/mobile/eslint.config.mjs). `meta.name` lets ESLint v9 surface a
+// stable namespace in --print-config / --debug output.
 const govPlugin = {
+  meta: { name: 'gov' },
   rules: {
     'no-internal-jest-mock': noInternalJestMock,
   },
 };
 
 export default [
+  ...nx.configs['flat/base'],
+  ...nx.configs['flat/typescript'],
+  ...nx.configs['flat/javascript'],
   // G6 — fail the build on stale `eslint-disable` directives. Without this
   // setting they accumulate silently as code is refactored, hiding the fact
   // that the suppression is no longer needed (and sometimes hiding real
-  // violations the rule would otherwise catch).
+  // violations the rule would otherwise catch). Positioned AFTER the nx
+  // config spreads so a future nx preset that sets reportUnusedDisableDirectives
+  // does not silently override our 'error' value (last-match-wins).
   {
     linterOptions: {
       reportUnusedDisableDirectives: 'error',
     },
   },
-  ...nx.configs['flat/base'],
-  ...nx.configs['flat/typescript'],
-  ...nx.configs['flat/javascript'],
   {
     ignores: ['**/dist', '**/out-tsc', '**/coverage', '**/.nx', '**/.wrangler', 'design_handoff_ui_improvements/**'],
   },
