@@ -84,7 +84,9 @@ Changed code is not fixed code. Every fix must be verified, not just applied. Th
 - **Silent recovery without escalation is banned.** Any `catch` block or fallback path in billing, auth, or webhook code that silently recovers must also emit a structured metric or Inngest event. `console.warn` alone is never sufficient — if you can't query how many times the fallback fired in the last 24 hours, the "recovery" is invisible.
 - **Sweep when you fix.** When you fix a drift that has 3+ sibling locations, either (a) sweep all current sites in the same PR with a forward-only guard test, or (b) document a deferred sweep with a tracked ID, owner, and target date. Never silently fix one of N.
 
-Commit-specific rules (finding-ID references, Verified-By tables, sweep-audit blocks) live in `/commit`.
+- **Fix tables must include a "Verified By" column** with one of: `test: file.test.ts:"test name"`, `manual: description`, or `N/A: reason`. An empty cell means the fix is PARTIAL, not DONE. This applies to commit messages (see `/commit`), PR descriptions, and fix documentation.
+
+Commit-specific formatting rules (finding-ID references, Verified-By table format, sweep-audit blocks) live in `/commit`.
 
 ## Code Quality Guards
 

@@ -75,6 +75,8 @@ If dangerous files are already staged (even in STAGED mode), unstage them:
 - **ALL mode:** `git add -A`. If step 3 found exclusions, follow with
   `git reset HEAD -- <excluded-files>`.
 - **FILES mode:** `git add <file1> <file2> ...`
+  If step 3 found exclusions among the listed files, follow with
+  `git reset HEAD -- <excluded-files>` immediately after.
 
 Bracket files (e.g. `[sessionId].tsx`) need `:(literal)` pathspec prefix
 in `git reset` to avoid glob interpretation.
