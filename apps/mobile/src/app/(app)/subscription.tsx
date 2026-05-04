@@ -1187,7 +1187,10 @@ export default function SubscriptionScreen() {
                 {t('subscription.trial.active')}
               </Text>
               {subscription?.trialEndsAt && (
-                <Text className="text-caption text-text-secondary mt-0.5">
+                <Text
+                  className="text-caption text-text-secondary mt-0.5"
+                  testID="trial-banner-ends-at"
+                >
                   {t('subscription.trial.endsAt', {
                     date: new Date(subscription.trialEndsAt).toLocaleDateString(
                       undefined,
