@@ -98,6 +98,8 @@ export type SeedScenario =
   | 'parent-subject-no-retention'
   | 'subscription-family-active'
   | 'subscription-pro-active'
+  | 'purchase-pending'
+  | 'purchase-confirmed'
   | 'quota-exceeded'
   | 'forbidden'
   | 'quiz-malformed-round'
@@ -2665,6 +2667,139 @@ async function seedSubscriptionProActive(
 }
 
 // ---------------------------------------------------------------------------
+// Scenario: purchase-pending
+// Free-tier user who has initiated a RevenueCat purchase but the server-side
+// webhook has not yet confirmed the upgrade. DB state is still free/active.
+// In the emulator the RevenueCat offerings section is absent (no Play Store),
+// so the subscription screen shows the static no-offerings fallback with the
+// Upgrade button — representing the pre-confirmation state machine step.
+// ---------------------------------------------------------------------------
+
+async function seedPurchasePending(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const freeTier = getTierConfig('free');
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Purchase Pending User',
+    birthYear: LEARNER_BIRTH_YEAR,
+    isOwner: true,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: 'parent-seed@example.com',
+    respondedAt: new Date(),
+  });
+
+  const subscriptionId = generateUUIDv7();
+  await db.insert(subscriptions).values({
+    id: subscriptionId,
+    accountId,
+    tier: 'free',
+    status: 'active',
+    currentPeriodStart: new Date(),
+    currentPeriodEnd: futureDate(30),
+  });
+
+  await db.insert(quotaPools).values({
+    id: generateUUIDv7(),
+    subscriptionId,
+    monthlyLimit: freeTier.monthlyQuota,
+    usedThisMonth: 3,
+    dailyLimit: freeTier.dailyLimit,
+    usedToday: 1,
+    cycleResetAt: futureDate(30),
+  });
+
+  const { subjectId } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'History'
+  );
+
+  return {
+    scenario: 'purchase-pending',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: { subscriptionId, subjectId },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Scenario: purchase-confirmed
+// Free-tier user whose upgrade webhook has been processed — now on Plus tier,
+// status=active. Represents the post-confirmation state machine step.
+// The subscription screen shows: current plan "Plus", static tier comparison
+// with plus highlighted, manage-billing section, and top-up section visible.
+// ---------------------------------------------------------------------------
+
+async function seedPurchaseConfirmed(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const plusTier = getTierConfig('plus');
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Confirmed Subscriber',
+    birthYear: LEARNER_BIRTH_YEAR,
+    isOwner: true,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: 'parent-seed@example.com',
+    respondedAt: new Date(),
+  });
+
+  const subscriptionId = generateUUIDv7();
+  await db.insert(subscriptions).values({
+    id: subscriptionId,
+    accountId,
+    tier: 'plus',
+    status: 'active',
+    currentPeriodStart: new Date(),
+    currentPeriodEnd: futureDate(30),
+  });
+
+  await db.insert(quotaPools).values({
+    id: generateUUIDv7(),
+    subscriptionId,
+    monthlyLimit: plusTier.monthlyQuota,
+    usedThisMonth: 10,
+    cycleResetAt: futureDate(30),
+  });
+
+  const { subjectId } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'Science'
+  );
+
+  return {
+    scenario: 'purchase-confirmed',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: { subscriptionId, subjectId },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Scenario: quota-exceeded
 // User whose monthly quota is fully exhausted (distinct from daily-limit-reached
 // which caps only the daily allowance). Quiz launch will return
@@ -3334,6 +3469,8 @@ const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   'parent-subject-no-retention': seedParentSubjectNoRetention,
   'subscription-family-active': seedSubscriptionFamilyActive,
   'subscription-pro-active': seedSubscriptionProActive,
+  'purchase-pending': seedPurchasePending,
+  'purchase-confirmed': seedPurchaseConfirmed,
   'quota-exceeded': seedQuotaExceeded,
   forbidden: seedForbidden,
   'quiz-malformed-round': seedQuizMalformedRound,

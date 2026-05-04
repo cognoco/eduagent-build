@@ -58,7 +58,7 @@ function createMockDb(): Database {
 // ---------------------------------------------------------------------------
 
 describe('VALID_SCENARIOS', () => {
-  it('contains all 41 expected scenarios', () => {
+  it('contains all 43 expected scenarios', () => {
     expect(VALID_SCENARIOS).toEqual([
       'onboarding-complete',
       'onboarding-no-subject',
@@ -94,6 +94,8 @@ describe('VALID_SCENARIOS', () => {
       'parent-subject-no-retention',
       'subscription-family-active',
       'subscription-pro-active',
+      'purchase-pending',
+      'purchase-confirmed',
       'quota-exceeded',
       'forbidden',
       'quiz-malformed-round',
@@ -273,6 +275,14 @@ describe('new Stage-0 scenarios return required IDs', () => {
     },
     {
       scenario: 'subscription-pro-active',
+      requiredIds: ['subscriptionId', 'subjectId'],
+    },
+    {
+      scenario: 'purchase-pending',
+      requiredIds: ['subscriptionId', 'subjectId'],
+    },
+    {
+      scenario: 'purchase-confirmed',
       requiredIds: ['subscriptionId', 'subjectId'],
     },
     {
