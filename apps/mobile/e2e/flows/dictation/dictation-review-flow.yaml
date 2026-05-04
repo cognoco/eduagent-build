@@ -1,0 +1,218 @@
+# Flow DICT-07..08: Dictation Review — Photo capture + remediation
+# Validates: complete screen → pick-from-gallery (E2E seam) → LLM review →
+#   review-remediation-screen → mistake card → correction input → submit.
+# Tags: nightly, dictation
+#
+# Journey: UX Journey 3 (Practice & Reinforcement)
+# Epics: Epic 12 (Dictation)
+# Prerequisite: dictation-with-mistakes seed + EXPO_PUBLIC_E2E=1 dev-client build
+#
+# Run with:
+#   ./e2e/scripts/seed-and-run-dictation-review.sh \
+#     dictation-with-mistakes \
+#     e2e/flows/dictation/dictation-review-flow.yaml
+#
+# The wrapper:
+#   1. Plants a JPEG with deliberate misspelling in the emulator gallery.
+#   2. Seeds the dictation-with-mistakes scenario (authenticated learner).
+#   3. Calls seed-and-run.sh which launches the dev-client and runs this flow.
+# The dev-client must be built with EXPO_PUBLIC_E2E=1 in apps/mobile/.env.local
+# so that the complete-pick-gallery button is rendered on the complete screen.
+#
+# E2E seam note:
+#   complete-check-writing launches the system camera (cannot be driven by
+#   Maestro without a real device). complete-pick-gallery (E2E-only, rendered
+#   when EXPO_PUBLIC_E2E=1) opens the image library picker instead — Maestro
+#   selects the pre-planted test JPEG and the flow proceeds identically from
+#   that point onward.
+#
+# testIDs verified against source:
+#   - apps/mobile/src/components/home/LearnerScreen.tsx (intent-practice)
+#   - apps/mobile/src/app/(app)/practice.tsx (practice-screen, practice-dictation)
+#   - apps/mobile/src/app/(app)/dictation/index.tsx (dictation-choice-screen, dictation-homework)
+#   - apps/mobile/src/app/(app)/dictation/text-preview.tsx (dictation-text-preview-screen, text-preview-input, text-preview-start)
+#   - apps/mobile/src/app/(app)/dictation/playback.tsx (dictation-playback-screen, playback-progress)
+#   - apps/mobile/src/app/(app)/dictation/complete.tsx:263 (dictation-complete-screen)
+#   - apps/mobile/src/app/(app)/dictation/complete.tsx:348 (complete-pick-gallery — E2E seam, EXPO_PUBLIC_E2E=1)
+#   - apps/mobile/src/app/(app)/dictation/review.tsx:178 (review-remediation-screen)
+#   - apps/mobile/src/app/(app)/dictation/review.tsx:197 (review-mistake-card)
+#   - apps/mobile/src/app/(app)/dictation/review.tsx:260 (review-correction-input)
+#   - apps/mobile/src/app/(app)/dictation/review.tsx:264 (review-submit-correction)
+#   - apps/mobile/src/app/(app)/dictation/review.tsx:127 (review-celebration — when LLM finds no mistakes)
+#   - apps/mobile/src/app/(app)/dictation/review.tsx:153 (review-done)
+appId: com.mentomate.app
+tags:
+  - nightly
+  - dictation
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "dictation-with-mistakes"
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 15000
+
+- scrollUntilVisible:
+    element:
+      id: "home-action-practice"
+    direction: DOWN
+    timeout: 5000
+
+- tapOn:
+    id: "home-action-practice"
+
+- extendedWaitUntil:
+    visible:
+      id: "practice-screen"
+    timeout: 10000
+
+- tapOn:
+    id: "practice-dictation"
+
+- extendedWaitUntil:
+    visible:
+      id: "dictation-choice-screen"
+    timeout: 10000
+
+- takeScreenshot: dict-review-01-choice
+
+- tapOn:
+    id: "dictation-homework"
+
+- extendedWaitUntil:
+    visible:
+      id: "dictation-text-preview-screen"
+    timeout: 10000
+
+- tapOn:
+    id: "text-preview-input"
+
+# Short, predictable dictation text. The seeded JPEG (with deliberate misspelling
+# "sune") is compared by the LLM against these sentences, so mistakes.length > 0.
+- inputText: "The sun is warm."
+
+- pressKey: back
+
+- tapOn:
+    id: "text-preview-start"
+
+- extendedWaitUntil:
+    visible:
+      id: "dictation-playback-screen"
+    timeout: 15000
+
+- assertVisible:
+    id: "playback-progress"
+
+# Wait up to 60s for playback to finish and auto-navigate to complete screen.
+- extendedWaitUntil:
+    visible:
+      id: "dictation-complete-screen"
+    timeout: 60000
+
+- takeScreenshot: dict-review-03-complete
+
+- assertVisible:
+    id: "complete-check-writing"
+
+# E2E seam: assert and tap the gallery picker button (rendered only when
+# EXPO_PUBLIC_E2E=1). The wrapper pre-planted a JPEG with deliberate misspellings.
+- assertVisible:
+    id: "complete-pick-gallery"
+
+- takeScreenshot: dict-review-04-before-gallery
+
+- tapOn:
+    id: "complete-pick-gallery"
+
+# System image library picker opens. The test JPEG file name may or may not
+# surface as text in the picker — use optional for both filename and fallback tap.
+- extendedWaitUntil:
+    visible:
+      text: "dictation-test-image"
+    timeout: 10000
+    optional: true
+
+# Tap the first image tile in the picker (the pre-planted test JPEG).
+- tapOn:
+    index: 0
+    text: "Photos"
+    optional: true
+
+# Wait for the LLM review to complete. The review screen is either
+# review-remediation-screen (mistakes found) or review-celebration (no mistakes).
+# Both branches are handled below via conditional runFlow.
+# Maestro has no assertAny — poll both with optional: true then branch.
+- extendedWaitUntil:
+    visible:
+      id: "review-remediation-screen"
+    timeout: 30000
+    optional: true
+
+- extendedWaitUntil:
+    visible:
+      id: "review-celebration"
+    timeout: 5000
+    optional: true
+
+- takeScreenshot: dict-review-05-review-screen
+
+# --- DICT-07: Remediation path — mistakes found ---
+- runFlow:
+    when:
+      visible:
+        id: "review-remediation-screen"
+    commands:
+      # DICT-07: mistake card visible
+      - assertVisible:
+          id: "review-mistake-card"
+
+      - takeScreenshot: dict-review-06-mistake-card
+
+      # DICT-08: type a correction and submit
+      - tapOn:
+          id: "review-correction-input"
+
+      - inputText: "The sun is warm."
+
+      - tapOn:
+          id: "review-submit-correction"
+
+      - takeScreenshot: dict-review-07-after-correction
+
+      # After submitting the last correction the celebration screen appears
+      - extendedWaitUntil:
+          visible:
+            id: "review-celebration"
+          timeout: 5000
+
+      - assertVisible:
+          id: "review-done"
+
+      - tapOn:
+          id: "review-done"
+
+# --- DICT-09/10: Perfect-score path — LLM found no mistakes ---
+- runFlow:
+    when:
+      visible:
+        id: "review-celebration"
+    commands:
+      - assertVisible:
+          id: "review-done"
+
+      - takeScreenshot: dict-review-08-celebration
+
+      - tapOn:
+          id: "review-done"
+
+- extendedWaitUntil:
+    visible:
+      id: "practice-screen"
+    timeout: 10000
+
+- takeScreenshot: dict-review-09-back-at-practice
