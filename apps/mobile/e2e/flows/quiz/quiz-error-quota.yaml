@@ -1,0 +1,126 @@
+# Flow QUIZ-08a: Quiz Launch — Quota Exceeded Error
+# Validates: when a user has exhausted their monthly quota, launching a quiz
+# round from the quiz index shows the error panel with Go Back but NO Retry.
+# Tags: nightly, quiz
+#
+# Journey: UX Journey 3 (Practice & Reinforcement) — Error paths
+# Epics: Epic 13 (Quiz Activities), Epic 5 (Quota Metering)
+# Prerequisite: Seeded user whose monthly quota is fully exhausted
+#               (scenario: quota-exceeded)
+#
+# Error classification:
+#   API returns 429/QUOTA_EXCEEDED → assertOk throws ApiResponseError{ code: 'QUOTA_EXCEEDED' }
+#   launch.tsx checks: errorCode === 'QUOTA_EXCEEDED' → isUnretryable = true
+#   → primaryAction is undefined (Retry suppressed)
+#   → secondaryAction renders quiz-launch-back
+#   Per CLAUDE.md: YAML asserts rendered fallback UI by testID, NOT formatted error string.
+#
+# testIDs verified against:
+#   - apps/mobile/src/app/(app)/quiz/launch.tsx:250  (quiz-launch-error)
+#   - apps/mobile/src/app/(app)/quiz/launch.tsx:219  (quiz-launch-error-fallback)
+#   - apps/mobile/src/app/(app)/quiz/launch.tsx:270  (quiz-launch-back)
+#   - apps/mobile/src/app/(app)/quiz/launch.tsx:263  (quiz-launch-retry — must be ABSENT)
+#   - apps/mobile/src/app/(app)/quiz/index.tsx:179   (quiz-index-screen)
+#   - apps/mobile/src/app/(app)/quiz/index.tsx:241   (quiz-capitals)
+#   - apps/mobile/src/components/home/LearnerScreen.tsx (learner-screen)
+#   - apps/mobile/src/app/(app)/practice.tsx          (practice-screen, practice-quiz)
+appId: com.mentomate.app
+tags:
+  - nightly
+  - quiz
+---
+# 1. Seed & sign in (quota-exceeded scenario)
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "quota-exceeded"
+      API_URL: ${API_URL}
+
+# 2. Wait for learner home screen
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 30000
+
+- takeScreenshot: quiz-quota-01-home
+
+# 3. Navigate to Practice tab
+- scrollUntilVisible:
+    element:
+      id: "home-action-practice"
+    direction: DOWN
+    timeout: 5000
+
+- tapOn:
+    id: "home-action-practice"
+
+- extendedWaitUntil:
+    visible:
+      id: "practice-screen"
+    timeout: 10000
+
+# 4. Navigate to Quiz from Practice
+# [BUG-967] practice-quiz sits below the fold on 5.8" devices — scroll first.
+- scrollUntilVisible:
+    element:
+      id: "practice-quiz"
+    direction: DOWN
+    timeout: 5000
+
+- tapOn:
+    id: "practice-quiz"
+
+- extendedWaitUntil:
+    visible:
+      id: "quiz-index-screen"
+    timeout: 10000
+
+- takeScreenshot: quiz-quota-02-index
+
+# 5. Tap Capitals to trigger round generation (which will be blocked by quota)
+- assertVisible:
+    id: "quiz-capitals"
+
+- tapOn:
+    id: "quiz-capitals"
+
+# 6. Wait for the loading spinner to appear then transition to error
+# launch.tsx: generateRound mutation fires → API returns QUOTA_EXCEEDED → isError = true
+- extendedWaitUntil:
+    visible:
+      id: "quiz-launch-loading"
+    timeout: 10000
+    optional: true
+
+# 7. Wait for error panel — quota-exceeded causes isUnretryable = true
+- extendedWaitUntil:
+    visible:
+      id: "quiz-launch-error"
+    timeout: 15000
+
+- takeScreenshot: quiz-quota-03-error-panel
+
+# 8. Assert the error fallback container is present
+- assertVisible:
+    id: "quiz-launch-error-fallback"
+
+# 9. Assert Go Back button is visible (secondary action always present)
+- assertVisible:
+    id: "quiz-launch-back"
+
+# 10. Assert Retry button is NOT present (suppressed for QUOTA_EXCEEDED)
+- assertNotVisible:
+    id: "quiz-launch-retry"
+
+- takeScreenshot: quiz-quota-04-retry-suppressed
+
+# 11. Tap Go Back → should return to quiz index
+- tapOn:
+    id: "quiz-launch-back"
+
+- extendedWaitUntil:
+    visible:
+      id: "quiz-index-screen"
+    timeout: 10000
+
+- takeScreenshot: quiz-quota-05-returned-to-index
