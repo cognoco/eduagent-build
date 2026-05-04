@@ -1,0 +1,31 @@
+# BLOCKED: Top-up Flow [BILLING-09]
+#
+# Step 0 scope check result: DEFERRED — top-up requires a live RevenueCat
+# consumable purchase. The handleTopUp handler in subscription.tsx:
+#   1. Looks up offerings.all['top_up'] from RevenueCat SDK.
+#   2. Calls purchase.mutateAsync(topUpPkg) — a live store IAP call.
+#   3. Polls the API until usage.topUpCreditsRemaining > baseCredits.
+#
+# In the emulator (no Play Store entitlement), offerings are always empty,
+# so the handler shows "Not available" alert immediately — there is no
+# seeded-state path through the purchase flow. A server-side credit-grant
+# endpoint does NOT exist; the only credit path is through RevenueCat webhook.
+#
+# Prerequisite to unblock: sandbox automation harness with RevenueCat
+# test-mode consumable IAP support. Track as separate followup.
+#
+# testID evidence:
+#   top-up-section  — subscription.tsx:1567
+#   top-up-button   — subscription.tsx:1577
+#   top-up-spinner  — subscription.tsx:1584
+#
+# Tags: weekly, billing
+appId: com.mentomate.app
+tags:
+  - weekly
+  - billing
+---
+# Placeholder — blocked pending sandbox harness (see header comment).
+# launchApp is required by Maestro to satisfy the "commands section" rule;
+# the flow intentionally stops here and makes no assertions.
+- launchApp
