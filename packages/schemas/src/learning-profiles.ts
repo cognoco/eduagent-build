@@ -132,6 +132,57 @@ export const learningProfileSchema = z.object({
 });
 export type LearningProfile = z.infer<typeof learningProfileSchema>;
 
+// Accepts ISO string or Date (from Drizzle DB rows) and normalises to string.
+const _lpDateField = z.union([
+  z.string().datetime(),
+  z.date().transform((d) => d.toISOString()),
+]);
+
+// Response-facing schema: tolerates Drizzle Date objects on timestamp columns.
+export const learningProfileResponseSchema = learningProfileSchema.extend({
+  consentPromptDismissedAt: z
+    .union([_lpDateField, z.null()])
+    .nullable()
+    .optional(),
+  createdAt: _lpDateField,
+  updatedAt: _lpDateField,
+});
+export type LearningProfileResponse = z.infer<
+  typeof learningProfileResponseSchema
+>;
+
+// Route response envelopes
+export const learnerProfileGetResponseSchema = z.object({
+  profile: learningProfileResponseSchema,
+});
+export type LearnerProfileGetResponse = z.infer<
+  typeof learnerProfileGetResponseSchema
+>;
+
+export const learnerProfileExportTextResponseSchema = z.object({
+  text: z.string(),
+  profile: learningProfileResponseSchema,
+});
+export type LearnerProfileExportTextResponse = z.infer<
+  typeof learnerProfileExportTextResponseSchema
+>;
+
+export const parseLearnerInputResultSchema = z.object({
+  success: z.boolean(),
+  message: z.string(),
+  fieldsUpdated: z.array(z.string()),
+});
+export type ParseLearnerInputResult = z.infer<
+  typeof parseLearnerInputResultSchema
+>;
+
+export const learnerProfileSuccessResponseSchema = z.object({
+  success: z.literal(true),
+});
+export type LearnerProfileSuccessResponse = z.infer<
+  typeof learnerProfileSuccessResponseSchema
+>;
+
 export const sessionAnalysisOutputSchema = z.object({
   explanationEffectiveness: z
     .object({

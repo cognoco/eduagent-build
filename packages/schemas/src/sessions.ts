@@ -419,6 +419,19 @@ export const parkingLotItemSchema = z.object({
 });
 export type ParkingLotItem = z.infer<typeof parkingLotItemSchema>;
 
+export const parkingLotItemsResponseSchema = z.object({
+  items: z.array(parkingLotItemSchema),
+  count: z.number().int().nonnegative(),
+});
+export type ParkingLotItemsResponse = z.infer<
+  typeof parkingLotItemsResponseSchema
+>;
+
+export const parkingLotAddResponseSchema = z.object({
+  item: parkingLotItemSchema,
+});
+export type ParkingLotAddResponse = z.infer<typeof parkingLotAddResponseSchema>;
+
 // Homework OCR schemas
 
 export const ocrRegionSchema = z.object({
@@ -473,3 +486,17 @@ export const recallBridgeResultSchema = z.object({
   topicTitle: z.string(),
 });
 export type RecallBridgeResult = z.infer<typeof recallBridgeResultSchema>;
+
+// Homework start response — POST /subjects/:subjectId/homework → 201
+
+export const homeworkStartResponseSchema = z.object({
+  session: learningSessionSchema,
+});
+export type HomeworkStartResponse = z.infer<typeof homeworkStartResponseSchema>;
+
+// Outbox spillover result — POST /support/outbox-spillover → 200
+
+export const outboxSpilloverResultSchema = z.object({
+  written: z.number().int().nonnegative(),
+});
+export type OutboxSpilloverResult = z.infer<typeof outboxSpilloverResultSchema>;

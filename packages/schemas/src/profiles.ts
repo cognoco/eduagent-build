@@ -107,6 +107,37 @@ export const profileSchema = z.object({
 
 export type Profile = z.infer<typeof profileSchema>;
 
+// ---------------------------------------------------------------------------
+// Route response envelope schemas
+// Used in routes/profiles.ts to validate outgoing JSON bodies.
+// ---------------------------------------------------------------------------
+
+export const profileResponseSchema = z.object({
+  profile: profileSchema,
+});
+export type ProfileResponse = z.infer<typeof profileResponseSchema>;
+
+export const profileListResponseSchema = z.object({
+  profiles: z.array(profileSchema),
+});
+export type ProfileListResponse = z.infer<typeof profileListResponseSchema>;
+
+export const profileSwitchResponseSchema = z.object({
+  message: z.string(),
+  profileId: z.string().uuid(),
+});
+export type ProfileSwitchResponse = z.infer<typeof profileSwitchResponseSchema>;
+
+// BKT-C.1 / BKT-C.2 — response schema for the onboarding single-field PATCH
+// endpoints (language, pronouns, interests/context). All six variants return
+// the same shape: { success: true }.
+export const onboardingSuccessResponseSchema = z.object({
+  success: z.literal(true),
+});
+export type OnboardingSuccessResponse = z.infer<
+  typeof onboardingSuccessResponseSchema
+>;
+
 /**
  * Number of completed sessions before a learner is no longer considered "new".
  * When session count is below this, the dashboard shows a "getting started"

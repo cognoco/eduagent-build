@@ -103,3 +103,20 @@ export const dictationResultSchema = z.object({
   reviewed: z.boolean(),
 });
 export type DictationResult = z.infer<typeof dictationResultSchema>;
+
+// --- record dictation result response ---
+
+export const recordDictationResultResponseSchema = z.object({
+  result: dictationResultSchema,
+});
+export type RecordDictationResultResponse = z.infer<
+  typeof recordDictationResultResponseSchema
+>;
+
+// --- dictation streak response ---
+
+export const dictationStreakSchema = z.object({
+  streak: z.number().int().nonnegative(),
+  lastDate: z.string().date().nullable(),
+});
+export type DictationStreak = z.infer<typeof dictationStreakSchema>;

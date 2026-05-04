@@ -14,5 +14,6 @@ export type FeedbackSubmission = z.infer<typeof feedbackSubmissionSchema>;
 
 export const feedbackResponseSchema = z.object({
   success: z.boolean(),
+  queued: z.boolean(),
 });
 export type FeedbackResponse = z.infer<typeof feedbackResponseSchema>;
