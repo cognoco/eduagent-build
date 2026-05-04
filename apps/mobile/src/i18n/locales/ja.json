@@ -66,7 +66,7 @@
   },
   "autoSuggest": {
     "title": "{{language}}でチャットしますか？",
-    "message": "チューターに{{language}}で話してもらいますか？",
+    "message": "メンターに{{language}}で話してもらいますか？",
     "accept": "はい、切り替える",
     "dismiss": "いいえ"
   },
@@ -163,7 +163,7 @@
       "sectionHeader": "{{name}}さんの学習サポート"
     },
     "mentorMemory": {
-      "sectionHeader": "チューターが知っていること",
+      "sectionHeader": "メンターが知っていること",
       "viewAndManage": "表示と管理"
     },
     "family": {
@@ -200,7 +200,7 @@
     "account": {
       "sectionHeader": "アカウント",
       "profile": "プロフィール",
-      "tutorLanguage": "チューターの言語",
+      "mentorLanguage": "メンターの言語",
       "subscription": "サブスクリプション",
       "signOut": "サインアウト",
       "couldNotSignOut": "サインアウトできませんでした"
@@ -228,7 +228,7 @@
       "tryAgainMoment": "しばらくしてからもう一度お試しください。",
       "couldNotSaveSetting": "設定を保存できませんでした"
     },
-    "tutorLanguageLabels": {
+    "mentorLanguageLabels": {
       "en": "英語",
       "cs": "チェコ語",
       "de": "ドイツ語",
@@ -242,9 +242,9 @@
   },
   "session": {
     "mentorMemory": {
-      "title": "私のチューターが知っていること",
-      "subtitle": "チューターが記憶している内容を確認、編集、追加します。",
-      "loadError": "現在、チューターの記憶を読み込めませんでした",
+      "title": "私のメンターが知っていること",
+      "subtitle": "メンターが記憶している内容を確認、編集、追加します。",
+      "loadError": "現在、メンターの記憶を読み込めませんでした",
       "loadTimeout": {
         "title": "読み込みに時間がかかりすぎています",
         "message": "接続を確認して、もう一度お試しください。"
@@ -259,32 +259,32 @@
         "disabled": "記憶の収集はオフになっています。",
         "pendingOwner": "記憶の収集はまだ有効になっていません。",
         "pendingChild": "保護者が記憶の収集を有効にする必要があります。",
-        "useMemoryLabel": "チューターが知っていることを使う"
+        "useMemoryLabel": "メンターが知っていることを使う"
       },
       "consent": {
-        "title": "チューターの記憶を有効にする",
-        "description": "チューターに、あなたにとって効果的なこと（得意なこと、好みの説明、苦手なトピック）を記憶させましょう。"
+        "title": "メンターの記憶を有効にする",
+        "description": "メンターに、あなたにとって効果的なこと（得意なこと、好みの説明、苦手なトピック）を記憶させましょう。"
       },
       "accommodation": {
         "setByParent": "保護者が設定で設定しました。",
         "shortBurst": {
-          "young": "チューターは特別な方法で教えてくれるよ！",
+          "young": "メンターは特別な方法で教えてくれるよ！",
           "mid": "学習スタイル：ショートバースト — 短い説明と多くの確認",
           "older": "学習サポートモード：ショートバースト — 簡潔な説明、頻繁なチェックポイント"
         },
         "audioFirst": {
-          "young": "チューターは特別な方法で教えてくれるよ！",
+          "young": "メンターは特別な方法で教えてくれるよ！",
           "mid": "学習スタイル：音声優先 — シンプルな話し言葉での説明",
           "older": "学習サポートモード：音声優先 — 話し言葉、音声サポート"
         },
         "predictable": {
-          "young": "チューターは特別な方法で教えてくれるよ！",
+          "young": "メンターは特別な方法で教えてくれるよ！",
           "mid": "学習スタイル：予測可能 — 明確な構成と段階的なセッション",
           "older": "学習サポートモード：予測可能 — 構成化されたセッション、明確な移行"
         }
       },
       "sections": {
-        "tellMentor": "チューターに伝える",
+        "tellMentor": "メンターに伝える",
         "learningStyle": "学習スタイル",
         "interests": "興味",
         "strengths": "得意なこと",
@@ -294,17 +294,17 @@
         "privacy": "プライバシー"
       },
       "empty": {
-        "title": "チューターはあなたのことを学んでいます",
-        "message": "学習を進めるにつれて、チューターはあなたの興味、得意なこと、学習の好みを学びます。すべては時間とともにここに表示されます。"
+        "title": "メンターはあなたのことを知ろうとしています",
+        "message": "学習を進めるにつれて、メンターはあなたの興味、得意なこと、学習の好みを把握していきます。すべては時間とともにここに表示されます。"
       },
       "clearDialog": {
-        "title": "チューターの記憶を消去しますか？",
-        "message": "これにより、チューターがあなたについて記憶したすべてが削除され、再度有効にするまで記憶機能がオフになります。",
+        "title": "メンターの記憶を消去しますか？",
+        "message": "これにより、メンターがあなたについて記憶したすべてが削除され、再度有効にするまで記憶機能がオフになります。",
         "confirm": "消去"
       },
       "clearAll": {
-        "label": "すべてのチューターの記憶を消去",
-        "accessibilityLabel": "{{name}}さんのチューターの記憶を消去",
+        "label": "すべてのメンターの記憶を消去",
+        "accessibilityLabel": "{{name}}さんのメンターの記憶を消去",
         "defaultName": "このプロフィール"
       },
       "errors": {
@@ -735,9 +735,9 @@
       "missingTitle": "科目が選択されていません",
       "missingMessage": "この科目を読み込めませんでした。ホームに戻って、もう一度お試しください。",
       "updateErrorTitle": "更新できませんでした",
-      "languageEmpty": "言語科目にはまだ科目固有の設定がありません。チューターは、CEFRレベルと進捗に基づいて、語彙、リスニング、ライティングの練習を自動的に調整します。",
+      "languageEmpty": "言語科目にはまだ科目固有の設定がありません。メンターは、CEFRレベルと進捗に基づいて、語彙、リスニング、ライティングの練習を自動的に調整します。",
       "analogyTitle": "アナロジーの好み",
-      "analogyDescription": "アナロジーの分野を選択してください。チューターは概念を説明する際にこの分野のアナロジーを優先しますが、直接的な説明の方が明確な場合は強制しません。"
+      "analogyDescription": "アナロジーの分野を選択してください。メンターは概念を説明する際にこの分野のアナロジーを優先しますが、直接的な説明の方が明確な場合は強制しません。"
     },
     "title": "新しい科目",
     "prompt": "何を学びたいですか？科目名を入力するか、興味のあることを説明してください — 残りは私たちが考えます。",
@@ -841,14 +841,14 @@
       "title": "プライバシーポリシー",
       "lastUpdated": "最終更新日：2026年3月",
       "s1Title": "1. 当社について",
-      "s1Body": "MentoMateは、Zwizzly（以下「当社」）が運営するAI搭載のチュータープラットフォームです。当社は、すべてのユーザー、特に11歳から17歳のお子様のプライバシー保護に努めています。当社は、EU一般データ保護規則（GDPR）に従って個人データを処理します。",
+      "s1Body": "MentoMateは、Zwizzly（以下「当社」）が運営するAI搭載のメンタープラットフォームです。当社は、すべてのユーザー、特に11歳から17歳のお子様のプライバシー保護に努めています。当社は、EU一般データ保護規則（GDPR）に従って個人データを処理します。",
       "s2Title": "2. 収集するデータ",
       "s2Body1": "アカウントデータ：登録時に提供されるメールアドレス、表示名、プロフィール情報。",
       "s2Body2": "学習データ：科目、インタビューの回答、カリキュラムの進捗、セッションのやり取り、評価結果、定着度スコア、XP。",
       "s2Body3": "デバイスデータ：プッシュ通知トークン、デバイスタイプ、アプリのバージョン（通知の配信とサービス品質の維持のため）。",
       "s2Body4": "当社は、位置情報、連絡先、写真（明示的に撮影した宿題の画像を除く）、閲覧履歴は収集しません。",
       "s3Title": "3. データの使用方法",
-      "s3Body": "ソクラテス式対話と間隔反復を使用して、パーソナライズされたAIチューターを提供するため。カリキュラム、学習の洞察、進捗レポートを生成するため。オプトインした復習リマインダーや通知を送信するため。匿名化・集計された分析を通じてサービスを改善するため。",
+      "s3Body": "ソクラテス式対話と間隔反復を使用して、パーソナライズされたAIメンターを提供するため。カリキュラム、学習の洞察、進捗レポートを生成するため。オプトインした復習リマインダーや通知を送信するため。匿名化・集計された分析を通じてサービスを改善するため。",
       "s4Title": "4. 保護者の同意",
       "s4Body1": "16歳未満のユーザーについては、個人データを処理する前に検証可能な保護者の同意が必要です。保護者は、学習データが収集される前に、メールでお子様のアカウントを承認する必要があります。",
       "s4Body2": "保護者は、保護者用ダッシュボードからいつでも同意を撤回できます。撤回後、お子様のデータは7日間の猶予期間を経て、完全に削除されます。",
@@ -873,13 +873,13 @@
       "s1Title": "1. 規約への同意",
       "s1Body": "MentoMateのアカウントを作成または使用することにより、これらの利用規約に同意したものとみなされます。18歳未満の場合は、保護者があなたに代わって同意する必要があります。",
       "s2Title": "2. サービスの説明",
-      "s2Body": "MentoMateは、ソクラテス式対話、間隔反復、適応型カリキュラムを通じてパーソナライズされた学習を提供するAI搭載のチュータープラットフォームです。このサービスは、保護者の監督のもと、11歳から15歳の生徒向けに設計されています。",
+      "s2Body": "MentoMateは、ソクラテス式対話、間隔反復、適応型カリキュラムを通じてパーソナライズされた学習を提供するAI搭載のメンタープラットフォームです。このサービスは、保護者の監督のもと、11歳から15歳の生徒向けに設計されています。",
       "s3Title": "3. アカウントの責任",
       "s3Body": "アカウントの認証情報の機密性を維持する責任はあなたにあります。登録時には正確な情報を提供する必要があります。アカウントを他人と共有したり、複数のアカウントを作成したりしてはなりません。",
       "s4Title": "4. 許容される使用",
       "s4Body": "MentoMateは教育目的のみに使用されます。あなたは、違法な目的でサービスを使用しないこと、安全機能を回避しようとしないこと、有害、虐待的、または不適切なコンテンツを送信しないこと、リバースエンジニアリングやAIモデルまたはアルゴリズムの抽出を試みないことに同意します。",
       "s5Title": "5. AI生成コンテンツ",
-      "s5Body": "MentoMateはAIを使用して教育コンテンツを生成します。正確性を期すよう努めていますが、AIの応答には時折誤りが含まれる場合があります。このサービスは学習補助であり、専門的な教育、チューター、学術的アドバイスに代わるものではありません。",
+      "s5Body": "MentoMateはAIを使用して教育コンテンツを生成します。正確性を期すよう努めていますが、AIの応答には時折誤りが含まれる場合があります。このサービスは学習補助であり、専門的な教育、メンター、学術的アドバイスに代わるものではありません。",
       "s6Title": "6. サブスクリプションと支払い",
       "s6Body": "MentoMateは、日次および月次の使用制限がある無料プランを提供しています。有料サブスクリプションは、Apple App StoreまたはGoogle Play Storeを通じて利用できます。サブスクリプションの条件、価格、キャンセルは、各アプリストアのポリシーに準拠します。返金は、購読したアプリストアを通じて処理されます。",
       "s7Title": "7. 知的財産",
@@ -1128,11 +1128,28 @@
       "saving": "保存中…",
       "skip": "スキップ"
     },
-    "languagePicker": {
-      "title": "どの言語を学んでいますか？",
-      "subtitle": "言語に特化した学習パスを設定します。",
-      "otherHint": "言語が見つかりませんか？検索するか、「その他」までスクロールしてください。",
-      "saving": "保存中…"
+    "mentorLanguagePicker": {
+      "title": "メンターには何語で話してほしいですか？",
+      "subtitle": "メンターはこの言語でチャットや励まし、説明に使います。後で「その他」から変更できます。",
+      "otherLabel": "その他",
+      "otherSublabel": "希望の言語を教えてください",
+      "saving": "保存中…",
+      "otherModal": {
+        "title": "どの言語ですか？",
+        "subtitle": "リクエストをチームに伝え、追加したらお知らせします。",
+        "placeholder": "例：ノルウェー語、中国語、アラビア語",
+        "submit": "リクエストを送信",
+        "cancel": "キャンセル",
+        "thanksTitle": "ありがとうございます！",
+        "thanksMessage": "リクエストをチームに伝えました。",
+        "thanksDone": "完了"
+      },
+      "swapAppPrompt": {
+        "title": "アプリも{{language}}に切り替えますか？",
+        "message": "メンターは{{language}}で話します。アプリのインターフェースも{{language}}にしますか？",
+        "accept": "はい、切り替える",
+        "decline": "いいえ、このまま"
+      }
     },
     "languageSetup": {
       "title": "言語設定",
@@ -1328,14 +1345,14 @@
       "loadingChild": "お子様のデータを読み込み中...",
       "couldNotLoad": "お子様のデータを読み込めませんでした",
       "switchChild": "お子様を切り替え",
-      "openMentorMemory": "チューターの記憶を開く",
+      "openMentorMemory": "メンターの記憶を開く",
       "timeOnApp": "アプリ利用時間 {{duration}}",
       "timeOnAppUnavailable": "アプリ利用時間 不明",
       "childNotFound": "お子様が見つかりません",
       "unableToLoadChild": "このお子様のプロフィールを読み込めませんでした。",
       "clearAlert": {
-        "title": "チューターの記憶を消去しますか？",
-        "message": "これにより、チューターが{{name}}さんについて保存したすべてのメモが削除されます。この操作は元に戻せません。",
+        "title": "メンターの記憶を消去しますか？",
+        "message": "これにより、メンターが{{name}}さんについて保存したすべてのメモが削除されます。この操作は元に戻せません。",
         "confirm": "記憶を消去"
       },
       "errorTitle": "問題が発生しました",
@@ -1370,16 +1387,16 @@
       "refreshChildProfile": "お子様のプロフィールを更新",
       "refresh": "更新",
       "viewSessionFrom": "からのセッションを表示",
-      "mentorMemoryTitle": "{{name}}についてチューターが知っていること",
-      "mentorMemoryTitleFallback": "チューターの記憶",
-      "setUpMentorMemory": "チューターの記憶を設定",
-      "chooseWhatMentorRemembers": "チューターが記憶することを選択",
-      "viewWhatMentorKnows": "チューターが知っていることを表示",
-      "whatTheMentorKnows": "チューターが知っていること",
+      "mentorMemoryTitle": "{{name}}についてメンターが知っていること",
+      "mentorMemoryTitleFallback": "メンターの記憶",
+      "setUpMentorMemory": "メンターの記憶を設定",
+      "chooseWhatMentorRemembers": "メンターが記憶することを選択",
+      "viewWhatMentorKnows": "メンターが知っていることを表示",
+      "whatTheMentorKnows": "メンターが知っていること",
       "reviewAndAdjustPrivacy": "プライバシー設定を確認・調整",
       "learningAccommodationTitle": "{{name}}さんのための学習サポート",
       "learningAccommodationTitleFallback": "学習サポート",
-      "learningAccommodationDescription": "お子様の学習ニーズに合わせてチューターの教え方を調整します",
+      "learningAccommodationDescription": "お子様の学習ニーズに合わせてメンターの関わり方を調整します",
       "toggleDecisionGuide": "決定ガイドを表示",
       "notSureWhichToPick": "どれを選べばいいかわからない？",
       "pickAccommodation": "サポートを選択",
@@ -1406,38 +1423,38 @@
       "withdraw": "撤回"
     },
     "mentorMemory": {
-      "title": "チューターの記憶",
-      "subtitle": "{{name}}についてチューターが知っていること",
+      "title": "メンターの記憶",
+      "subtitle": "{{name}}についてメンターが知っていること",
       "toggleCollection": "記憶の収集を切り替え",
       "toggleInjection": "記憶の注入を切り替え",
       "collectionOn": "収集オン",
       "collectionOff": "収集オフ",
       "injectionOn": "注入オン",
       "injectionOff": "注入オフ",
-      "collectionDescription": "オンの場合、チューターはセッション中に{{name}}さんに関する観察を保存します。",
-      "injectionDescription": "オンの場合、チューターは保存された観察を使用して{{name}}さんのセッションをパーソナライズします。",
-      "tellTheMentor": "チューターに伝える",
-      "tellTheMentorPlaceholder": "{{name}}さんについてチューターへのメモを追加…",
+      "collectionDescription": "オンの場合、メンターはセッション中に{{name}}さんに関する観察を保存します。",
+      "injectionDescription": "オンの場合、メンターは保存された観察を使用して{{name}}さんのセッションをパーソナライズします。",
+      "tellTheMentor": "メンターに伝える",
+      "tellTheMentorPlaceholder": "{{name}}さんについてメンターへのメモを追加…",
       "addNote": "メモを追加",
       "hiddenItems": "{{count}}個の非表示項目",
       "showHidden": "非表示を表示",
       "hideItem": "これを非表示",
       "noMemoryYet": "まだ記憶がありません",
-      "noMemoryDescription": "チューターは数セッション後に{{name}}さんに関する観察の保存を開始します。",
+      "noMemoryDescription": "メンターは数セッション後に{{name}}さんに関する観察の保存を開始します。",
       "privacyNote": "記憶はプライベートであり、あなたにのみ表示されます。",
       "correctionLabel": "訂正",
-      "correctionPlaceholder": "代わりにチューターは何を知るべきですか？",
+      "correctionPlaceholder": "代わりにメンターは何を知るべきですか？",
       "saveCorrection": "訂正を保存",
       "exportMemory": "記憶をエクスポート",
-      "exportTitle": "{{name}}さんのチューターの記憶",
+      "exportTitle": "{{name}}さんのメンターの記憶",
       "clearMemory": "すべての記憶を消去",
       "clearMemoryAlert": {
         "title": "すべての記憶を消去しますか？",
-        "message": "これにより、{{name}}さんのすべてのチューターの記憶が完全に削除されます。",
+        "message": "これにより、{{name}}さんのすべてのメンターの記憶が完全に削除されます。",
         "confirm": "消去"
       },
       "loadingMemory": "記憶を読み込み中…",
-      "couldNotLoad": "チューターの記憶を読み込めませんでした",
+      "couldNotLoad": "メンターの記憶を読み込めませんでした",
       "memoryCleared": "記憶が消去されました",
       "noteSaved": "メモが保存されました",
       "correctionSaved": "訂正が保存されました",
@@ -1446,10 +1463,10 @@
       "pleaseTryAgain": "もう一度お試しください",
       "couldNotRestoreItem": "この項目を復元できませんでした",
       "clearMemoryTitle": "すべての記憶を消去しますか？",
-      "clearMemoryBody": "これにより、チューターがお子様について学んだすべてが削除されます。この操作は元に戻せません。",
+      "clearMemoryBody": "これにより、メンターがお子様について把握したすべてが削除されます。この操作は元に戻せません。",
       "clear": "消去",
       "couldNotClearMemory": "記憶を消去できませんでした",
-      "savedMentorWillRemember": "保存しました — チューターはこれを記憶します",
+      "savedMentorWillRemember": "保存しました — メンターはこれを記憶します",
       "couldNotSaveThat": "それを保存できませんでした",
       "couldNotUpdateMemory": "記憶を更新できませんでした",
       "learner": "学習者",
@@ -1457,9 +1474,9 @@
       "couldNotExportMemory": "記憶をエクスポートできませんでした",
       "controls": "コントロール",
       "learnAboutChild": "お子様について学ぶ",
-      "learnAboutChildDescription": "チューターがお子様の長所と短所の記憶を構築できるようにします",
-      "useWhatMentorKnows": "チューターが知っていることを使う",
-      "useWhatMentorKnowsDescription": "チューターが学んだことを使ってセッションをパーソナライズさせます",
+      "learnAboutChildDescription": "メンターがお子様の長所と短所の記憶を構築できるようにします",
+      "useWhatMentorKnows": "メンターが知っていることを使う",
+      "useWhatMentorKnowsDescription": "メンターが把握したことを使ってセッションをパーソナライズさせます",
       "noObservationsYet": "まだ観察がありません",
       "bringBack": "元に戻す",
       "privacy": "プライバシー",
@@ -1467,7 +1484,7 @@
       "clearAllMemory": "すべての記憶を消去",
       "somethingElseIsWrong": "他に何か問題があります",
       "whatSeemsWrong": "何が問題だと思われますか？",
-      "whatSeemsWrongDescription": "訂正内容を説明してください。チューターがそれを考慮します",
+      "whatSeemsWrongDescription": "訂正内容を説明してください。メンターがそれを考慮します",
       "correctionNoted": "訂正を記録しました",
       "couldNotSaveCorrection": "訂正を保存できませんでした",
       "submit": "送信"
@@ -1640,7 +1657,7 @@
     "previewSubjectBrowser": {
       "backLabel": "戻る",
       "title": "科目を閲覧",
-      "description": "チューターと学べることを探検しましょう"
+      "description": "メンターと学べることを探検しましょう"
     },
     "previewSampleCoaching": {
       "backLabel": "戻る",
@@ -1649,10 +1666,10 @@
       "homeworkCardBody": "宿題の写真を撮って、一歩ずつガイドしてもらいましょう",
       "homeworkHelp": "宿題のヘルプ",
       "practiceTest": "練習テスト",
-      "howMentorHelps": "チューターの助け方",
-      "howMentorHelpsBody": "チューターはあなたが知っていることを記憶し、あなたのペースに合わせます",
+      "howMentorHelps": "メンターのサポート方法",
+      "howMentorHelpsBody": "メンターはあなたが知っていることを記憶し、あなたのペースに合わせます",
       "snapPhoto": "写真を撮る",
-      "mentorRemembers": "チューターが記憶",
+      "mentorRemembers": "メンターが記憶",
       "trackProgress": "進捗を追跡",
       "previewDisclaimer": "これはプレビューです — 保護者が承認するとフルアクセスがアンロックされます"
     },
@@ -1688,7 +1705,7 @@
       "browseSubjectsHint": "学べるすべてを探検",
       "sampleMentoringLabel": "サンプルのメンタリングを試す",
       "sampleMentoring": "サンプルのメンタリング",
-      "sampleMentoringHint": "チューターがどのようにあなたと協力するかを見る"
+      "sampleMentoringHint": "メンターがどのようにあなたと協力するかを見る"
     },
     "authRedirectTimeout": {
       "title": "時間がかかりすぎています",
@@ -1853,7 +1870,7 @@
   "confirmInputLabel": "削除を確認するには{{phrase}}と入力してください",
   "permanentDeleteLabel": "アカウントを完全に削除する",
   "permanentDelete": "アカウントを削除",
-  "warningBody1": "すべての学習データ、進捗、チューターの記憶が完全に削除されます。",
+  "warningBody1": "すべての学習データ、進捗、メンターの記憶が完全に削除されます。",
   "warningBody2": "この操作は元に戻せません。",
   "understandDeleteLabel": "理解しました — アカウントを削除します",
   "understandDelete": "理解しました",
@@ -1864,7 +1881,7 @@
     "s1Body": "EduAgentは、11歳以上の学習者向けに設計されたAI搭載の学習プラットフォームです。当社は、あなたのプライバシーを保護し、データを慎重に取り扱うことに尽力しています。",
     "s2Title": "収集するデータ",
     "s2Body1": "アカウント情報：サインアップ時に提供される名前、メールアドレス、プロフィール詳細。",
-    "s2Body2": "学習データ：セッションの記録、学習したトピック、進捗指標、チューターの記憶メモ。",
+    "s2Body2": "学習データ：セッションの記録、学習したトピック、進捗指標、メンターの記憶メモ。",
     "s2Body3": "利用データ：使用した機能や費やした時間など、アプリとのやり取りの方法。",
     "s2Body4": "デバイスデータ：診断目的のためのデバイスタイプ、オペレーティングシステム、アプリのバージョン。",
     "s3Title": "データの使用方法",

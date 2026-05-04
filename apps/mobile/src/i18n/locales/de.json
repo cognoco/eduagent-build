@@ -66,7 +66,7 @@
   },
   "autoSuggest": {
     "title": "Auf {{language}} chatten?",
-    "message": "Möchtest du, dass dein Tutor mit dir auf {{language}} spricht?",
+    "message": "Möchtest du, dass dein Mentor mit dir auf {{language}} spricht?",
     "accept": "Ja, wechseln",
     "dismiss": "Nein, danke"
   },
@@ -163,7 +163,7 @@
       "sectionHeader": "{{name}}s Lernanpassung"
     },
     "mentorMemory": {
-      "sectionHeader": "Was dein Tutor weiß",
+      "sectionHeader": "Was dein Mentor weiß",
       "viewAndManage": "Ansehen & verwalten"
     },
     "family": {
@@ -172,7 +172,7 @@
       "childCount_one": "{{count}} Kind",
       "childCount_other": "{{count}} Kinder",
       "addChild": "Kind hinzufügen",
-      "addChildDescription": "Erstelle ein Profil, damit dein Kind mit seinem eigenen Tutor lernen kann",
+      "addChildDescription": "Erstelle ein Profil, damit dein Kind mit seinem eigenen Mentor lernen kann",
       "addChildAccessLabel": "Kinderprofil hinzufügen",
       "yourChild": "dein Kind",
       "openFamilyPreferencesAccessLabel": "Familieneinstellungen öffnen",
@@ -200,7 +200,7 @@
     "account": {
       "sectionHeader": "Konto",
       "profile": "Profil",
-      "tutorLanguage": "Tutor-Sprache",
+      "mentorLanguage": "Mentor-Sprache",
       "subscription": "Abonnement",
       "signOut": "Abmelden",
       "couldNotSignOut": "Abmeldung fehlgeschlagen"
@@ -228,7 +228,7 @@
       "tryAgainMoment": "Bitte versuche es in einem Moment erneut.",
       "couldNotSaveSetting": "Einstellung konnte nicht gespeichert werden"
     },
-    "tutorLanguageLabels": {
+    "mentorLanguageLabels": {
       "en": "Englisch",
       "cs": "Tschechisch",
       "de": "Deutsch",
@@ -242,9 +242,9 @@
   },
   "session": {
     "mentorMemory": {
-      "title": "Was mein Tutor weiß",
-      "subtitle": "Überprüfe, bearbeite oder füge hinzu, was dein Tutor sich merkt.",
-      "loadError": "Wir konnten dein Tutor-Gedächtnis gerade nicht laden",
+      "title": "Was mein Mentor weiß",
+      "subtitle": "Überprüfe, bearbeite oder füge hinzu, was dein Mentor sich merkt.",
+      "loadError": "Wir konnten dein Mentor-Gedächtnis gerade nicht laden",
       "loadTimeout": {
         "title": "Laden dauert zu lange",
         "message": "Überprüfe deine Verbindung und versuche es erneut."
@@ -259,32 +259,32 @@
         "disabled": "Gedächtniserfassung ist ausgeschaltet.",
         "pendingOwner": "Gedächtniserfassung wurde noch nicht aktiviert.",
         "pendingChild": "Ein Elternteil oder Erziehungsberechtigter muss die Gedächtniserfassung noch aktivieren.",
-        "useMemoryLabel": "Nutzen, was der Tutor weiß"
+        "useMemoryLabel": "Nutzen, was der Mentor weiß"
       },
       "consent": {
-        "title": "Tutor-Gedächtnis aktivieren",
-        "description": "Lass den Tutor sich merken, was für dich funktioniert – deine Stärken, bevorzugte Erklärungen und Themen, die du knifflig findest."
+        "title": "Mentor-Gedächtnis aktivieren",
+        "description": "Lass den Mentor sich merken, was für dich funktioniert – deine Stärken, bevorzugte Erklärungen und Themen, die du knifflig findest."
       },
       "accommodation": {
         "setByParent": "Von deinen Eltern in ihren Einstellungen festgelegt.",
         "shortBurst": {
-          "young": "Dein Tutor verwendet eine besondere Art, um dir etwas beizubringen!",
+          "young": "Dein Mentor verwendet eine besondere Art, um dir etwas beizubringen!",
           "mid": "Lernstil: Kurze Einheiten – kürzere Erklärungen mit vielen Zwischenfragen",
           "older": "Anpassungsmodus: Kurze Einheiten – prägnante Erklärungen, häufige Kontrollpunkte"
         },
         "audioFirst": {
-          "young": "Dein Tutor verwendet eine besondere Art, um dir etwas beizubringen!",
+          "young": "Dein Mentor verwendet eine besondere Art, um dir etwas beizubringen!",
           "mid": "Lernstil: Audio zuerst – einfache, gesprochene Erklärungen",
           "older": "Anpassungsmodus: Audio zuerst – gesprochene Sprache, phonetische Unterstützung"
         },
         "predictable": {
-          "young": "Dein Tutor verwendet eine besondere Art, um dir etwas beizubringen!",
+          "young": "Dein Mentor verwendet eine besondere Art, um dir etwas beizubringen!",
           "mid": "Lernstil: Vorhersehbar – klare Struktur und schrittweise Sitzungen",
           "older": "Anpassungsmodus: Vorhersehbar – strukturierte Sitzungen, explizite Übergänge"
         }
       },
       "sections": {
-        "tellMentor": "Sag es deinem Tutor",
+        "tellMentor": "Sag es deinem Mentor",
         "learningStyle": "Lernstil",
         "interests": "Interessen",
         "strengths": "Stärken",
@@ -294,17 +294,17 @@
         "privacy": "Datenschutz"
       },
       "empty": {
-        "title": "Dein Tutor lernt dich kennen",
-        "message": "Während du lernst, wird dein Tutor deine Interessen, Stärken und deine bevorzugte Lernweise kennenlernen. Alles wird hier mit der Zeit erscheinen."
+        "title": "Dein Mentor lernt dich kennen",
+        "message": "Während du lernst, wird dein Mentor deine Interessen, Stärken und deine bevorzugte Lernweise kennenlernen. Alles wird hier mit der Zeit erscheinen."
       },
       "clearDialog": {
-        "title": "Tutor-Gedächtnis löschen?",
-        "message": "Dies entfernt alles, was der Tutor sich über dich gemerkt hat, und schaltet das Gedächtnis aus, bis du es wieder aktivierst.",
+        "title": "Mentor-Gedächtnis löschen?",
+        "message": "Dies entfernt alles, was der Mentor sich über dich gemerkt hat, und schaltet das Gedächtnis aus, bis du es wieder aktivierst.",
         "confirm": "Löschen"
       },
       "clearAll": {
-        "label": "Gesamtes Tutor-Gedächtnis löschen",
-        "accessibilityLabel": "Tutor-Gedächtnis für {{name}} löschen",
+        "label": "Gesamtes Mentor-Gedächtnis löschen",
+        "accessibilityLabel": "Mentor-Gedächtnis für {{name}} löschen",
         "defaultName": "dieses Profil"
       },
       "errors": {
@@ -735,9 +735,9 @@
       "missingTitle": "Kein Fach ausgewählt",
       "missingMessage": "Wir konnten dieses Fach nicht laden. Gehe zur Startseite und versuche es erneut.",
       "updateErrorTitle": "Konnte nicht aktualisiert werden",
-      "languageEmpty": "Noch keine fachspezifischen Einstellungen für Sprachfächer. Dein Tutor passt Vokabular, Hör- und Schreibübungen automatisch basierend auf deinem GER-Niveau und Fortschritt an.",
+      "languageEmpty": "Noch keine fachspezifischen Einstellungen für Sprachfächer. Dein Mentor passt Vokabular, Hör- und Schreibübungen automatisch basierend auf deinem GER-Niveau und Fortschritt an.",
       "analogyTitle": "Analogie-Präferenz",
-      "analogyDescription": "Wähle einen Bereich für Analogien. Der Tutor wird Analogien aus dieser Welt bevorzugen, wenn er Konzepte erklärt, aber sie nicht erzwingen, wenn eine direkte Erklärung klarer ist."
+      "analogyDescription": "Wähle einen Bereich für Analogien. Der Mentor wird Analogien aus dieser Welt bevorzugen, wenn er Konzepte erklärt, aber sie nicht erzwingen, wenn eine direkte Erklärung klarer ist."
     },
     "title": "Neues Fach",
     "prompt": "Was möchtest du lernen? Gib ein beliebiges Fach ein oder beschreibe, was dich interessiert – wir kümmern uns um den Rest.",
@@ -841,14 +841,14 @@
       "title": "Datenschutzrichtlinie",
       "lastUpdated": "Letzte Aktualisierung: März 2026",
       "s1Title": "1. Wer wir sind",
-      "s1Body": "MentoMate ist eine KI-gestützte Tutor-Plattform, die von Zwizzly („wir“, „uns“, „unser“) betrieben wird. Wir verpflichten uns, die Privatsphäre all unserer Nutzer, insbesondere von Kindern im Alter von 11–17 Jahren, zu schützen. Wir verarbeiten personenbezogene Daten gemäß der EU-Datenschutz-Grundverordnung (DSGVO).",
+      "s1Body": "MentoMate ist eine KI-gestützte Mentoring-Plattform, die von Zwizzly (\"wir\", \"uns\", \"unser\") betrieben wird. Wir verpflichten uns, die Privatsphäre all unserer Nutzer, insbesondere von Kindern im Alter von 11–17 Jahren, zu schützen. Wir verarbeiten personenbezogene Daten gemäß der EU-Datenschutz-Grundverordnung (DSGVO).",
       "s2Title": "2. Daten, die wir erheben",
       "s2Body1": "Kontodaten: E-Mail-Adresse, Anzeigename und Profilinformationen, die du bei der Registrierung angibst.",
       "s2Body2": "Lerndaten: Fächer, Interview-Antworten, Lehrplanfortschritt, Sitzungsaustausch, Bewertungsergebnisse, Behaltenswerte und XP.",
       "s2Body3": "Gerätedaten: Push-Benachrichtigungs-Token, Gerätetyp und App-Version zur Zustellung von Benachrichtigungen und zur Aufrechterhaltung der Servicequalität.",
       "s2Body4": "Wir erheben KEINE Standortdaten, Kontakte, Fotos (außer Hausaufgabenbilder, die du explizit aufnimmst) oder den Browserverlauf.",
       "s3Title": "3. Wie wir deine Daten verwenden",
-      "s3Body": "Um personalisiertes KI-Tutoring mit sokratischem Dialog und räumlicher Wiederholung bereitzustellen. Um Lehrpläne, Lernerkenntnisse und Fortschrittsberichte zu erstellen. Um Wiederholungserinnerungen und Benachrichtigungen zu senden, die du abonniert hast. Um unseren Service durch anonymisierte, aggregierte Analysen zu verbessern.",
+      "s3Body": "Um personalisiertes KI-Mentoring mit sokratischem Dialog und räumlicher Wiederholung bereitzustellen. Um Lehrpläne, Lernerkenntnisse und Fortschrittsberichte zu erstellen. Um Wiederholungserinnerungen und Benachrichtigungen zu senden, die du abonniert hast. Um unseren Service durch anonymisierte, aggregierte Analysen zu verbessern.",
       "s4Title": "4. Elterliche Zustimmung",
       "s4Body1": "Für Nutzer unter 16 Jahren benötigen wir eine nachweisbare elterliche Zustimmung, bevor wir personenbezogene Daten verarbeiten. Ein Elternteil oder Erziehungsberechtigter muss das Konto des Kindes per E-Mail genehmigen, bevor Lerndaten erhoben werden.",
       "s4Body2": "Eltern können die Zustimmung jederzeit über das Eltern-Dashboard widerrufen. Nach dem Widerruf treten die Daten des Kindes in eine 7-tägige Frist ein und werden dann endgültig gelöscht.",
@@ -873,13 +873,13 @@
       "s1Title": "1. Annahme der Bedingungen",
       "s1Body": "Durch die Erstellung eines Kontos oder die Nutzung von MentoMate stimmst du diesen Nutzungsbedingungen zu. Wenn du unter 18 Jahre alt bist, muss ein Elternteil oder Erziehungsberechtigter in deinem Namen zustimmen.",
       "s2Title": "2. Beschreibung des Dienstes",
-      "s2Body": "MentoMate ist eine KI-gestützte Tutor-Plattform, die personalisiertes Lernen durch sokratischen Dialog, räumliche Wiederholung und adaptive Lehrpläne bietet. Der Dienst ist für Schüler im Alter von 11-15 Jahren mit elterlicher Aufsicht konzipiert.",
+      "s2Body": "MentoMate ist eine KI-gestützte Mentoring-Plattform, die personalisiertes Lernen durch sokratischen Dialog, räumliche Wiederholung und adaptive Lehrpläne bietet. Der Dienst ist für Schüler im Alter von 11-15 Jahren mit elterlicher Aufsicht konzipiert.",
       "s3Title": "3. Kontoverantwortung",
       "s3Body": "Du bist für die Geheimhaltung deiner Kontodaten verantwortlich. Du musst bei der Registrierung genaue Informationen angeben. Du darfst dein Konto nicht mit anderen teilen oder mehrere Konten erstellen.",
       "s4Title": "4. Akzeptable Nutzung",
       "s4Body": "MentoMate ist nur für Bildungszwecke bestimmt. Du stimmst zu, den Dienst nicht für rechtswidrige Zwecke zu nutzen, Sicherheitsfunktionen zu umgehen, schädliche, missbräuchliche oder unangemessene Inhalte einzureichen oder die KI-Modelle oder Algorithmen zurückzuentwickeln oder zu extrahieren.",
       "s5Title": "5. KI-generierte Inhalte",
-      "s5Body": "MentoMate verwendet KI, um Bildungsinhalte zu generieren. Obwohl wir uns um Genauigkeit bemühen, können KI-Antworten gelegentlich Fehler enthalten. Der Dienst ist eine Lernhilfe und ersetzt keine professionelle Bildung, Nachhilfe oder akademische Beratung.",
+      "s5Body": "MentoMate verwendet KI, um Bildungsinhalte zu generieren. Obwohl wir uns um Genauigkeit bemühen, können KI-Antworten gelegentlich Fehler enthalten. Der Dienst ist eine Lernhilfe und ersetzt keine professionelle Bildung, kein professionelles Mentoring oder akademische Beratung.",
       "s6Title": "6. Abonnements & Zahlungen",
       "s6Body": "MentoMate bietet eine kostenlose Stufe mit begrenzter täglicher und monatlicher Nutzung. Bezahlte Abonnements sind über den Apple App Store oder Google Play Store erhältlich. Abonnementbedingungen, Preise und Kündigungen unterliegen den jeweiligen App-Store-Richtlinien. Rückerstattungen werden vom App Store abgewickelt, über den du abonniert hast.",
       "s7Title": "7. Geistiges Eigentum",
@@ -1128,11 +1128,28 @@
       "saving": "Wird gespeichert...",
       "skip": "Überspringen"
     },
-    "languagePicker": {
-      "title": "Welche Sprache lernst du?",
-      "subtitle": "Wir richten einen sprachfokussierten Lernpfad für dich ein.",
-      "otherHint": "Findest du deine Sprache nicht? Suche oder scrolle nach unten zu 'Andere'.",
-      "saving": "Wird gespeichert..."
+    "mentorLanguagePicker": {
+      "title": "Welche Sprache soll dein Mentor sprechen?",
+      "subtitle": "Dein Mentor verwendet diese Sprache für Gespräche, Ermutigung und Erklärungen. Du kannst sie später unter Mehr ändern.",
+      "otherLabel": "Andere",
+      "otherSublabel": "Sag uns, welche Sprache",
+      "saving": "Wird gespeichert...",
+      "otherModal": {
+        "title": "Welche Sprache?",
+        "subtitle": "Wir leiten deine Anfrage an das Team weiter und sagen dir Bescheid, wenn wir sie hinzufügen.",
+        "placeholder": "z. B. Norwegisch, Mandarin, Arabisch",
+        "submit": "Anfrage senden",
+        "cancel": "Abbrechen",
+        "thanksTitle": "Danke!",
+        "thanksMessage": "Wir haben deine Anfrage an das Team weitergeleitet.",
+        "thanksDone": "Fertig"
+      },
+      "swapAppPrompt": {
+        "title": "App auch auf {{language}} umstellen?",
+        "message": "Dein Mentor spricht {{language}}. Möchtest du auch die Benutzeroberfläche der App auf {{language}}?",
+        "accept": "Ja, App umstellen",
+        "decline": "Nein, so lassen"
+      }
     },
     "languageSetup": {
       "title": "Spracheinrichtung",
@@ -1328,14 +1345,14 @@
       "loadingChild": "Kinderdaten werden geladen...",
       "couldNotLoad": "Kinderdaten konnten nicht geladen werden",
       "switchChild": "Kind wechseln",
-      "openMentorMemory": "Tutor-Gedächtnis öffnen",
+      "openMentorMemory": "Mentor-Gedächtnis öffnen",
       "timeOnApp": "{{duration}} in der App",
       "timeOnAppUnavailable": "Zeit in der App nicht verfügbar",
       "childNotFound": "Kind nicht gefunden",
       "unableToLoadChild": "Wir konnten das Profil dieses Kindes nicht laden.",
       "clearAlert": {
-        "title": "Tutor-Gedächtnis löschen?",
-        "message": "Dies entfernt alle Notizen, die der Tutor über {{name}} gespeichert hat. Dies kann nicht rückgängig gemacht werden.",
+        "title": "Mentor-Gedächtnis löschen?",
+        "message": "Dies entfernt alle Notizen, die der Mentor über {{name}} gespeichert hat. Dies kann nicht rückgängig gemacht werden.",
         "confirm": "Gedächtnis löschen"
       },
       "errorTitle": "Etwas ist schiefgelaufen",
@@ -1370,16 +1387,16 @@
       "refreshChildProfile": "Kinderprofil aktualisieren",
       "refresh": "Aktualisieren",
       "viewSessionFrom": "Sitzung ansehen von",
-      "mentorMemoryTitle": "Was der Tutor über {{name}} weiß",
-      "mentorMemoryTitleFallback": "Tutor-Gedächtnis",
-      "setUpMentorMemory": "Tutor-Gedächtnis einrichten",
-      "chooseWhatMentorRemembers": "Wähle, was der Tutor sich merkt",
-      "viewWhatMentorKnows": "Ansehen, was der Tutor weiß",
-      "whatTheMentorKnows": "Was der Tutor weiß",
+      "mentorMemoryTitle": "Was der Mentor über {{name}} weiß",
+      "mentorMemoryTitleFallback": "Mentor-Gedächtnis",
+      "setUpMentorMemory": "Mentor-Gedächtnis einrichten",
+      "chooseWhatMentorRemembers": "Wähle, was der Mentor sich merkt",
+      "viewWhatMentorKnows": "Ansehen, was der Mentor weiß",
+      "whatTheMentorKnows": "Was der Mentor weiß",
       "reviewAndAdjustPrivacy": "Datenschutzeinstellungen überprüfen und anpassen",
       "learningAccommodationTitle": "Lernanpassung für {{name}}",
       "learningAccommodationTitleFallback": "Lernanpassung",
-      "learningAccommodationDescription": "Passe an, wie der Tutor unterrichtet, um den Lernbedürfnissen deines Kindes gerecht zu werden",
+      "learningAccommodationDescription": "Passe an, wie der Mentor begleitet, um den Lernbedürfnissen deines Kindes gerecht zu werden",
       "toggleDecisionGuide": "Entscheidungshilfe anzeigen",
       "notSureWhichToPick": "Nicht sicher, was du wählen sollst?",
       "pickAccommodation": "Eine Anpassung wählen",
@@ -1406,38 +1423,38 @@
       "withdraw": "Widerrufen"
     },
     "mentorMemory": {
-      "title": "Tutor-Gedächtnis",
-      "subtitle": "Was der Tutor über {{name}} weiß",
+      "title": "Mentor-Gedächtnis",
+      "subtitle": "Was der Mentor über {{name}} weiß",
       "toggleCollection": "Gedächtniserfassung umschalten",
       "toggleInjection": "Gedächtnisverwendung umschalten",
       "collectionOn": "Erfassung an",
       "collectionOff": "Erfassung aus",
       "injectionOn": "Verwendung an",
       "injectionOff": "Verwendung aus",
-      "collectionDescription": "Wenn eingeschaltet, speichert der Tutor Beobachtungen über {{name}} während der Sitzungen.",
-      "injectionDescription": "Wenn eingeschaltet, verwendet der Tutor gespeicherte Beobachtungen, um Sitzungen für {{name}} zu personalisieren.",
-      "tellTheMentor": "Sag es dem Tutor",
-      "tellTheMentorPlaceholder": "Füge eine Notiz für den Tutor über {{name}} hinzu...",
+      "collectionDescription": "Wenn eingeschaltet, speichert der Mentor Beobachtungen über {{name}} während der Sitzungen.",
+      "injectionDescription": "Wenn eingeschaltet, verwendet der Mentor gespeicherte Beobachtungen, um Sitzungen für {{name}} zu personalisieren.",
+      "tellTheMentor": "Sag es dem Mentor",
+      "tellTheMentorPlaceholder": "Füge eine Notiz für den Mentor über {{name}} hinzu...",
       "addNote": "Notiz hinzufügen",
       "hiddenItems": "{{count}} versteckte Elemente",
       "showHidden": "Versteckte anzeigen",
       "hideItem": "Dies ausblenden",
       "noMemoryYet": "Noch kein Gedächtnis",
-      "noMemoryDescription": "Der Tutor wird nach einigen Sitzungen anfangen, Beobachtungen über {{name}} zu speichern.",
+      "noMemoryDescription": "Der Mentor wird nach einigen Sitzungen anfangen, Beobachtungen über {{name}} zu speichern.",
       "privacyNote": "Das Gedächtnis ist privat und nur für dich sichtbar.",
       "correctionLabel": "Korrektur",
-      "correctionPlaceholder": "Was sollte der Tutor stattdessen wissen?",
+      "correctionPlaceholder": "Was sollte der Mentor stattdessen wissen?",
       "saveCorrection": "Korrektur speichern",
       "exportMemory": "Gedächtnis exportieren",
-      "exportTitle": "{{name}}s Tutor-Gedächtnis",
+      "exportTitle": "{{name}}s Mentor-Gedächtnis",
       "clearMemory": "Gesamtes Gedächtnis löschen",
       "clearMemoryAlert": {
         "title": "Gesamtes Gedächtnis löschen?",
-        "message": "Dies löscht das gesamte Tutor-Gedächtnis für {{name}} endgültig.",
+        "message": "Dies löscht das gesamte Mentor-Gedächtnis für {{name}} endgültig.",
         "confirm": "Löschen"
       },
       "loadingMemory": "Gedächtnis wird geladen...",
-      "couldNotLoad": "Tutor-Gedächtnis konnte nicht geladen werden",
+      "couldNotLoad": "Mentor-Gedächtnis konnte nicht geladen werden",
       "memoryCleared": "Gedächtnis gelöscht",
       "noteSaved": "Notiz gespeichert",
       "correctionSaved": "Korrektur gespeichert",
@@ -1446,10 +1463,10 @@
       "pleaseTryAgain": "Bitte versuche es erneut",
       "couldNotRestoreItem": "Dieses Element konnte nicht wiederhergestellt werden",
       "clearMemoryTitle": "Gesamtes Gedächtnis löschen?",
-      "clearMemoryBody": "Dies entfernt alles, was der Tutor über dein Kind gelernt hat. Dies kann nicht rückgängig gemacht werden.",
+      "clearMemoryBody": "Dies entfernt alles, was der Mentor über dein Kind gesammelt hat. Dies kann nicht rückgängig gemacht werden.",
       "clear": "Löschen",
       "couldNotClearMemory": "Gedächtnis konnte nicht gelöscht werden",
-      "savedMentorWillRemember": "Gespeichert – der Tutor wird sich daran erinnern",
+      "savedMentorWillRemember": "Gespeichert – der Mentor wird sich daran erinnern",
       "couldNotSaveThat": "Das konnte nicht gespeichert werden",
       "couldNotUpdateMemory": "Gedächtnis konnte nicht aktualisiert werden",
       "learner": "Lernender",
@@ -1457,9 +1474,9 @@
       "couldNotExportMemory": "Gedächtnis konnte nicht exportiert werden",
       "controls": "Steuerung",
       "learnAboutChild": "Über das Kind lernen",
-      "learnAboutChildDescription": "Erlaube dem Tutor, ein Gedächtnis über die Stärken und Schwächen deines Kindes aufzubauen",
-      "useWhatMentorKnows": "Nutzen, was der Tutor weiß",
-      "useWhatMentorKnowsDescription": "Lass den Tutor Sitzungen personalisieren, indem er nutzt, was er gelernt hat",
+      "learnAboutChildDescription": "Erlaube dem Mentor, ein Gedächtnis über die Stärken und Schwächen deines Kindes aufzubauen",
+      "useWhatMentorKnows": "Nutzen, was der Mentor weiß",
+      "useWhatMentorKnowsDescription": "Lass den Mentor Sitzungen personalisieren, indem er nutzt, was er über dein Kind weiß",
       "noObservationsYet": "Noch keine Beobachtungen",
       "bringBack": "Zurückholen",
       "privacy": "Datenschutz",
@@ -1467,7 +1484,7 @@
       "clearAllMemory": "Gesamtes Gedächtnis löschen",
       "somethingElseIsWrong": "Etwas anderes stimmt nicht",
       "whatSeemsWrong": "Was scheint falsch zu sein?",
-      "whatSeemsWrongDescription": "Beschreibe die Korrektur und der Tutor wird sie berücksichtigen",
+      "whatSeemsWrongDescription": "Beschreibe die Korrektur und der Mentor wird sie berücksichtigen",
       "correctionNoted": "Korrektur vermerkt",
       "couldNotSaveCorrection": "Korrektur konnte nicht gespeichert werden",
       "submit": "Senden"
@@ -1640,7 +1657,7 @@
     "previewSubjectBrowser": {
       "backLabel": "Zurück",
       "title": "Fächer durchsuchen",
-      "description": "Entdecke, was du mit deinem Tutor lernen kannst"
+      "description": "Entdecke, was du mit deinem Mentor lernen kannst"
     },
     "previewSampleCoaching": {
       "backLabel": "Zurück",
@@ -1649,10 +1666,10 @@
       "homeworkCardBody": "Mach ein Foto von deinen Hausaufgaben und lass dich Schritt für Schritt durchführen",
       "homeworkHelp": "Hausaufgabenhilfe",
       "practiceTest": "Übungstest",
-      "howMentorHelps": "Wie dein Tutor hilft",
-      "howMentorHelpsBody": "Dein Tutor merkt sich, was du weißt, und passt sich deinem Tempo an",
+      "howMentorHelps": "Wie dein Mentor hilft",
+      "howMentorHelpsBody": "Dein Mentor merkt sich, was du weißt, und passt sich deinem Tempo an",
       "snapPhoto": "Foto machen",
-      "mentorRemembers": "Tutor merkt sich",
+      "mentorRemembers": "Mentor merkt sich",
       "trackProgress": "Fortschritt verfolgen",
       "previewDisclaimer": "Dies ist eine Vorschau – voller Zugriff wird freigeschaltet, sobald deine Eltern zustimmen"
     },
@@ -1688,7 +1705,7 @@
       "browseSubjectsHint": "Entdecke alles, was du lernen kannst",
       "sampleMentoringLabel": "Beispiel-Betreuung ausprobieren",
       "sampleMentoring": "Beispiel-Betreuung",
-      "sampleMentoringHint": "Sieh, wie dein Tutor mit dir arbeiten wird"
+      "sampleMentoringHint": "Sieh, wie dein Mentor mit dir arbeiten wird"
     },
     "authRedirectTimeout": {
       "title": "Dauert zu lange",
@@ -1853,7 +1870,7 @@
   "confirmInputLabel": "Gib {{phrase}} ein, um die Löschung zu bestätigen",
   "permanentDeleteLabel": "Mein Konto endgültig löschen",
   "permanentDelete": "Mein Konto löschen",
-  "warningBody1": "Alle deine Lerndaten, Fortschritte und das Tutor-Gedächtnis werden endgültig gelöscht.",
+  "warningBody1": "Alle deine Lerndaten, Fortschritte und das Mentor-Gedächtnis werden endgültig gelöscht.",
   "warningBody2": "Dies kann nicht rückgängig gemacht werden.",
   "understandDeleteLabel": "Ich verstehe – mein Konto löschen",
   "understandDelete": "Ich verstehe",
@@ -1864,7 +1881,7 @@
     "s1Body": "EduAgent ist eine KI-gestützte Lernplattform für Lernende ab 11 Jahren. Wir verpflichten uns, deine Privatsphäre zu schützen und deine Daten sorgfältig zu behandeln.",
     "s2Title": "Welche Daten wir erheben",
     "s2Body1": "Kontoinformationen: dein Name, deine E-Mail-Adresse und Profildetails, die du bei der Anmeldung angibst.",
-    "s2Body2": "Lerndaten: Sitzungsprotokolle, studierte Themen, Fortschrittsmetriken und Notizen des Tutor-Gedächtnisses.",
+    "s2Body2": "Lerndaten: Sitzungsprotokolle, studierte Themen, Fortschrittsmetriken und Notizen des Mentor-Gedächtnisses.",
     "s2Body3": "Nutzungsdaten: wie du mit der App interagierst, einschließlich genutzter Funktionen und verbrachter Zeit.",
     "s2Body4": "Gerätedaten: Gerätetyp, Betriebssystem und App-Version für diagnostische Zwecke.",
     "s3Title": "Wie wir deine Daten verwenden",

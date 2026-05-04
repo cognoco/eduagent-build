@@ -66,7 +66,7 @@
   },
   "autoSuggest": {
     "title": "Czat w języku: {{language}}?",
-    "message": "Czy chcesz, aby Twój tutor rozmawiał z Tobą w języku: {{language}}?",
+    "message": "Czy chcesz, aby Twój mentor rozmawiał z Tobą w języku: {{language}}?",
     "accept": "Tak, przełącz",
     "dismiss": "Nie, dziękuję"
   },
@@ -200,7 +200,7 @@
     "account": {
       "sectionHeader": "Konto",
       "profile": "Profil",
-      "tutorLanguage": "Język tutora",
+      "mentorLanguage": "Język mentora",
       "subscription": "Subskrypcja",
       "signOut": "Wyloguj się",
       "couldNotSignOut": "Nie można było się wylogować"
@@ -228,7 +228,7 @@
       "tryAgainMoment": "Spróbuj ponownie za chwilę.",
       "couldNotSaveSetting": "Nie można zapisać ustawienia"
     },
-    "tutorLanguageLabels": {
+    "mentorLanguageLabels": {
       "en": "Angielski",
       "cs": "Czeski",
       "de": "Niemiecki",
@@ -1128,11 +1128,28 @@
       "saving": "Zapisywanie…",
       "skip": "Pomiń"
     },
-    "languagePicker": {
-      "title": "Jakiego języka się uczysz?",
-      "subtitle": "Ustawimy dla Ciebie ścieżkę nauki skoncentrowaną na języku.",
-      "otherHint": "Nie możesz znaleźć swojego języka? Wyszukaj lub przewiń w dół do „Inny”.",
-      "saving": "Zapisywanie…"
+    "mentorLanguagePicker": {
+      "title": "W jakim języku powinien mówić Twój mentor?",
+      "subtitle": "Twój mentor będzie używał tego języka do rozmów, zachęt i wyjaśnień. Możesz to później zmienić w sekcji Więcej.",
+      "otherLabel": "Inny",
+      "otherSublabel": "Powiedz nam, jaki język",
+      "saving": "Zapisywanie…",
+      "otherModal": {
+        "title": "Jaki język?",
+        "subtitle": "Przekażemy Twoją prośbę zespołowi i damy znać, gdy go dodamy.",
+        "placeholder": "np. norweski, mandaryński, arabski",
+        "submit": "Wyślij prośbę",
+        "cancel": "Anuluj",
+        "thanksTitle": "Dziękujemy!",
+        "thanksMessage": "Przekazaliśmy Twoją prośbę zespołowi.",
+        "thanksDone": "Gotowe"
+      },
+      "swapAppPrompt": {
+        "title": "Przełączyć też aplikację na {{language}}?",
+        "message": "Twój mentor będzie mówił {{language}}. Czy chcesz, aby reszta interfejsu aplikacji też była w {{language}}?",
+        "accept": "Tak, przełącz aplikację",
+        "decline": "Nie, zostaw jak jest"
+      }
     },
     "languageSetup": {
       "title": "Konfiguracja języka",

@@ -66,7 +66,7 @@
   },
   "autoSuggest": {
     "title": "Chatte på {{language}}?",
-    "message": "Vil du at veilederen din skal snakke med deg på {{language}}?",
+    "message": "Vil du at mentoren din skal snakke med deg på {{language}}?",
     "accept": "Ja, bytt",
     "dismiss": "Nei takk"
   },
@@ -152,18 +152,18 @@
       "familyPreferencesLink": "For å endre et barns preferanser, åpne Familie →",
       "casual": {
         "title": "Utforsker",
-        "description": "Lær i ditt eget tempo. Veilederen din er avslappet og oppmuntrende. Du tjener poeng med en gang og kan hoppe over repetisjoner."
+        "description": "Lær i ditt eget tempo. Mentoren din er avslappet og oppmuntrende. Du tjener poeng med en gang og kan hoppe over repetisjoner."
       },
       "serious": {
         "title": "Utfordringsmodus",
-        "description": "Utfordre deg selv mer. Veilederen din holder deg på sporet. Du tjener poeng etter å ha bevist at du husker, og repetisjoner hjelper med å feste kunnskapen."
+        "description": "Utfordre deg selv mer. Mentoren din holder deg på sporet. Du tjener poeng etter å ha bevist at du husker, og repetisjoner hjelper med å feste kunnskapen."
       }
     },
     "accommodation": {
       "sectionHeader": "{{name}}s læringstilpasning"
     },
     "mentorMemory": {
-      "sectionHeader": "Hva veilederen din vet",
+      "sectionHeader": "Hva mentoren din vet",
       "viewAndManage": "Se og administrer"
     },
     "family": {
@@ -172,7 +172,7 @@
       "childCount_one": "{{count}} barn",
       "childCount_other": "{{count}} barn",
       "addChild": "Legg til et barn",
-      "addChildDescription": "Opprett en profil slik at barnet ditt kan lære med sin egen veileder",
+      "addChildDescription": "Opprett en profil slik at barnet ditt kan lære med sin egen mentor",
       "addChildAccessLabel": "Legg til en barneprofil",
       "yourChild": "ditt barn",
       "openFamilyPreferencesAccessLabel": "Åpne familieinnstillinger",
@@ -200,7 +200,7 @@
     "account": {
       "sectionHeader": "Konto",
       "profile": "Profil",
-      "tutorLanguage": "Veilederspråk",
+      "mentorLanguage": "Mentorspråk",
       "subscription": "Abonnement",
       "signOut": "Logg ut",
       "couldNotSignOut": "Kunne ikke logge ut"
@@ -228,7 +228,7 @@
       "tryAgainMoment": "Prøv igjen om et øyeblikk.",
       "couldNotSaveSetting": "Kunne ikke lagre innstilling"
     },
-    "tutorLanguageLabels": {
+    "mentorLanguageLabels": {
       "en": "Engelsk",
       "cs": "Tsjekkisk",
       "de": "Tysk",
@@ -242,9 +242,9 @@
   },
   "session": {
     "mentorMemory": {
-      "title": "Hva veilederen min vet",
-      "subtitle": "Gjennomgå, rediger eller legg til hva veilederen din husker.",
-      "loadError": "Vi kunne ikke laste veilederens minne akkurat nå",
+      "title": "Hva mentoren min vet",
+      "subtitle": "Gjennomgå, rediger eller legg til hva mentoren din husker.",
+      "loadError": "Vi kunne ikke laste mentorens minne akkurat nå",
       "loadTimeout": {
         "title": "Lasting tar for lang tid",
         "message": "Sjekk tilkoblingen din og prøv igjen."
@@ -259,32 +259,32 @@
         "disabled": "Minneinnsamling er slått av.",
         "pendingOwner": "Minneinnsamling er ikke aktivert ennå.",
         "pendingChild": "En forelder eller verge må fortsatt aktivere minneinnsamling.",
-        "useMemoryLabel": "Bruk det veilederen vet"
+        "useMemoryLabel": "Bruk det mentoren vet"
       },
       "consent": {
-        "title": "Aktiver veilederens minne",
-        "description": "La veilederen huske hva som fungerer for deg – dine styrker, foretrukne forklaringer og emner du synes er vanskelige."
+        "title": "Aktiver mentorens minne",
+        "description": "La mentoren huske hva som fungerer for deg – dine styrker, foretrukne forklaringer og emner du synes er vanskelige."
       },
       "accommodation": {
         "setByParent": "Satt av din forelder i deres innstillinger.",
         "shortBurst": {
-          "young": "Veilederen din bruker en spesiell måte å lære deg på!",
+          "young": "Mentoren din bruker en spesiell måte å lære deg på!",
           "mid": "Læringsstil: Korte økter – kortere forklaringer med mange innsjekkinger",
           "older": "Tilpasningsmodus: Korte økter – konsise forklaringer, hyppige sjekkpunkter"
         },
         "audioFirst": {
-          "young": "Veilederen din bruker en spesiell måte å lære deg på!",
+          "young": "Mentoren din bruker en spesiell måte å lære deg på!",
           "mid": "Læringsstil: Lyd først – enkle, muntlige forklaringer",
           "older": "Tilpasningsmodus: Lyd først – muntlig språk, fonetisk støtte"
         },
         "predictable": {
-          "young": "Veilederen din bruker en spesiell måte å lære deg på!",
+          "young": "Mentoren din bruker en spesiell måte å lære deg på!",
           "mid": "Læringsstil: Forutsigbar – klar struktur og trinnvise økter",
           "older": "Tilpasningsmodus: Forutsigbar – strukturerte økter, tydelige overganger"
         }
       },
       "sections": {
-        "tellMentor": "Fortell veilederen din",
+        "tellMentor": "Fortell mentoren din",
         "learningStyle": "Læringsstil",
         "interests": "Interesser",
         "strengths": "Styrker",
@@ -294,17 +294,17 @@
         "privacy": "Personvern"
       },
       "empty": {
-        "title": "Veilederen din blir kjent med deg",
-        "message": "Mens du studerer, vil veilederen din lære om dine interesser, styrker og hvordan du liker å lære. Alt vil dukke opp her over tid."
+        "title": "Mentoren din blir kjent med deg",
+        "message": "Mens du studerer, vil mentoren din bli kjent med dine interesser, styrker og hvordan du liker å lære. Alt vil dukke opp her over tid."
       },
       "clearDialog": {
-        "title": "Tømme veilederens minne?",
-        "message": "Dette fjerner alt veilederen har husket om deg og slår av minnet til du aktiverer det igjen.",
+        "title": "Tømme mentorens minne?",
+        "message": "Dette fjerner alt mentoren har husket om deg og slår av minnet til du aktiverer det igjen.",
         "confirm": "Tøm"
       },
       "clearAll": {
-        "label": "Tøm alt veilederens minne",
-        "accessibilityLabel": "Tøm veilederens minne for {{name}}",
+        "label": "Tøm alt mentorens minne",
+        "accessibilityLabel": "Tøm mentorens minne for {{name}}",
         "defaultName": "denne profilen"
       },
       "errors": {
@@ -735,9 +735,9 @@
       "missingTitle": "Ingen emne valgt",
       "missingMessage": "Vi kunne ikke laste dette emnet. Gå hjem og prøv igjen.",
       "updateErrorTitle": "Kunne ikke oppdatere",
-      "languageEmpty": "Ingen emnespesifikke innstillinger for språkfag ennå. Veilederen din tilpasser vokabular, lytte- og skriveøvelser automatisk basert på ditt CEFR-nivå og fremgang.",
+      "languageEmpty": "Ingen emnespesifikke innstillinger for språkfag ennå. Mentoren din tilpasser vokabular, lytte- og skriveøvelser automatisk basert på ditt CEFR-nivå og fremgang.",
       "analogyTitle": "Analogipreferanse",
-      "analogyDescription": "Velg et domene for analogier. Veilederen vil foretrekke analogier fra denne verdenen når den forklarer konsepter, men vil ikke tvinge dem frem når en direkte forklaring er tydeligere."
+      "analogyDescription": "Velg et domene for analogier. Mentoren vil foretrekke analogier fra denne verdenen når den forklarer konsepter, men vil ikke tvinge dem frem når en direkte forklaring er tydeligere."
     },
     "title": "Nytt emne",
     "prompt": "Hva vil du lære? Skriv inn et hvilket som helst emne eller beskriv hva som interesserer deg – vi ordner resten.",
@@ -1128,15 +1128,32 @@
       "saving": "Lagrer ...",
       "skip": "Hopp over"
     },
-    "languagePicker": {
-      "title": "Hvilket språk lærer du?",
-      "subtitle": "Vi vil sette opp en språkfokusert læringssti for deg.",
-      "otherHint": "Finner du ikke språket ditt? Søk eller rull ned for 'Annet'.",
-      "saving": "Lagrer ..."
+    "mentorLanguagePicker": {
+      "title": "Hvilket språk skal mentoren din snakke?",
+      "subtitle": "Mentoren din bruker dette språket for chat, oppmuntring og forklaringer. Du kan endre det senere under Mer.",
+      "otherLabel": "Annet",
+      "otherSublabel": "Fortell oss hvilket språk",
+      "saving": "Lagrer ...",
+      "otherModal": {
+        "title": "Hvilket språk?",
+        "subtitle": "Vi sender forespørselen din til teamet og gir deg beskjed når vi legger den til.",
+        "placeholder": "f.eks. Norsk, Mandarin, Arabisk",
+        "submit": "Send forespørsel",
+        "cancel": "Avbryt",
+        "thanksTitle": "Takk!",
+        "thanksMessage": "Vi har sendt forespørselen din til teamet.",
+        "thanksDone": "Ferdig"
+      },
+      "swapAppPrompt": {
+        "title": "Bytt appen til {{language}} også?",
+        "message": "Mentoren din snakker {{language}}. Vil du også ha resten av app-grensesnittet på {{language}}?",
+        "accept": "Ja, bytt appen",
+        "decline": "Nei, behold som det er"
+      }
     },
     "languageSetup": {
       "title": "Språkoppsett",
-      "subtitle": "Vi vil bytte dette emnet til en språkfokusert sti med direkte undervisning, vokabularsporing og taleøvelser.",
+      "subtitle": "Vi vil bytte dette emnet til en språkfokusert sti med direkte mentoring, vokabularsporing og taleøvelser.",
       "learningHint": "Ser ut som du lærer {{language}}!",
       "approachHint": "Vi vil bruke en språkfokusert tilnærming bygget rundt vokabular, flyt, input og output-øvelser.",
       "noSubjectSelected": "Ingen språkfag valgt",
@@ -1328,14 +1345,14 @@
       "loadingChild": "Laster barnedata ...",
       "couldNotLoad": "Kunne ikke laste barnedata",
       "switchChild": "Bytt barn",
-      "openMentorMemory": "Åpne veilederens minne",
+      "openMentorMemory": "Åpne mentorens minne",
       "timeOnApp": "{{duration}} på appen",
       "timeOnAppUnavailable": "Tid på appen utilgjengelig",
       "childNotFound": "Barn ikke funnet",
       "unableToLoadChild": "Vi kunne ikke laste dette barnets profil.",
       "clearAlert": {
-        "title": "Tømme veilederens minne?",
-        "message": "Dette vil fjerne alle notater veilederen har lagret om {{name}}. Dette kan ikke angres.",
+        "title": "Tømme mentorens minne?",
+        "message": "Dette vil fjerne alle notater mentoren har lagret om {{name}}. Dette kan ikke angres.",
         "confirm": "Tøm minne"
       },
       "errorTitle": "Noe gikk galt",
@@ -1370,16 +1387,16 @@
       "refreshChildProfile": "Oppdater barneprofil",
       "refresh": "Oppdater",
       "viewSessionFrom": "Se økt fra",
-      "mentorMemoryTitle": "Hva veilederen vet om {{name}}",
-      "mentorMemoryTitleFallback": "Veilederens minne",
-      "setUpMentorMemory": "Sett opp veilederens minne",
-      "chooseWhatMentorRemembers": "Velg hva veilederen husker",
-      "viewWhatMentorKnows": "Se hva veilederen vet",
-      "whatTheMentorKnows": "Hva veilederen vet",
+      "mentorMemoryTitle": "Hva mentoren vet om {{name}}",
+      "mentorMemoryTitleFallback": "Mentorens minne",
+      "setUpMentorMemory": "Sett opp mentorens minne",
+      "chooseWhatMentorRemembers": "Velg hva mentoren husker",
+      "viewWhatMentorKnows": "Se hva mentoren vet",
+      "whatTheMentorKnows": "Hva mentoren vet",
       "reviewAndAdjustPrivacy": "Gjennomgå og juster personverninnstillinger",
       "learningAccommodationTitle": "Læringstilpasning for {{name}}",
       "learningAccommodationTitleFallback": "Læringstilpasning",
-      "learningAccommodationDescription": "Juster hvordan veilederen underviser for å passe barnets læringsbehov",
+      "learningAccommodationDescription": "Juster hvordan mentoren underviser for å passe barnets læringsbehov",
       "toggleDecisionGuide": "Vis beslutningsguide",
       "notSureWhichToPick": "Ikke sikker på hvilken du skal velge?",
       "pickAccommodation": "Velg en tilpasning",
@@ -1406,38 +1423,38 @@
       "withdraw": "Trekk tilbake"
     },
     "mentorMemory": {
-      "title": "Veilederens minne",
-      "subtitle": "Hva veilederen vet om {{name}}",
+      "title": "Mentorens minne",
+      "subtitle": "Hva mentoren vet om {{name}}",
       "toggleCollection": "Slå av/på minneinnsamling",
       "toggleInjection": "Slå av/på minnebruk",
       "collectionOn": "Innsamling på",
       "collectionOff": "Innsamling av",
       "injectionOn": "Bruk på",
       "injectionOff": "Bruk av",
-      "collectionDescription": "Når på, lagrer veilederen observasjoner om {{name}} under økter.",
-      "injectionDescription": "Når på, bruker veilederen lagrede observasjoner for å tilpasse økter for {{name}}.",
-      "tellTheMentor": "Fortell veilederen",
-      "tellTheMentorPlaceholder": "Legg til et notat for veilederen om {{name}} ...",
+      "collectionDescription": "Når på, lagrer mentoren observasjoner om {{name}} under økter.",
+      "injectionDescription": "Når på, bruker mentoren lagrede observasjoner for å tilpasse økter for {{name}}.",
+      "tellTheMentor": "Fortell mentoren",
+      "tellTheMentorPlaceholder": "Legg til et notat for mentoren om {{name}} ...",
       "addNote": "Legg til notat",
       "hiddenItems": "{{count}} skjulte elementer",
       "showHidden": "Vis skjulte",
       "hideItem": "Skjul dette",
       "noMemoryYet": "Ingen minne ennå",
-      "noMemoryDescription": "Veilederen vil begynne å lagre observasjoner om {{name}} etter noen økter.",
+      "noMemoryDescription": "Mentoren vil begynne å lagre observasjoner om {{name}} etter noen økter.",
       "privacyNote": "Minnet er privat og kun synlig for deg.",
       "correctionLabel": "Korreksjon",
-      "correctionPlaceholder": "Hva bør veilederen vite i stedet?",
+      "correctionPlaceholder": "Hva bør mentoren vite i stedet?",
       "saveCorrection": "Lagre korreksjon",
       "exportMemory": "Eksporter minne",
-      "exportTitle": "{{name}}s veileder-minne",
+      "exportTitle": "{{name}}s mentor-minne",
       "clearMemory": "Tøm alt minne",
       "clearMemoryAlert": {
         "title": "Tømme alt minne?",
-        "message": "Dette vil permanent slette alt veileder-minne for {{name}}.",
+        "message": "Dette vil permanent slette alt mentor-minne for {{name}}.",
         "confirm": "Tøm"
       },
       "loadingMemory": "Laster minne ...",
-      "couldNotLoad": "Kunne ikke laste veilederens minne",
+      "couldNotLoad": "Kunne ikke laste mentorens minne",
       "memoryCleared": "Minne tømt",
       "noteSaved": "Notat lagret",
       "correctionSaved": "Korreksjon lagret",
@@ -1446,10 +1463,10 @@
       "pleaseTryAgain": "Prøv igjen",
       "couldNotRestoreItem": "Kunne ikke gjenopprette dette elementet",
       "clearMemoryTitle": "Tømme alt minne?",
-      "clearMemoryBody": "Dette vil fjerne alt veilederen har lært om barnet ditt. Dette kan ikke angres.",
+      "clearMemoryBody": "Dette vil fjerne alt mentoren har lært om barnet ditt. Dette kan ikke angres.",
       "clear": "Tøm",
       "couldNotClearMemory": "Kunne ikke tømme minnet",
-      "savedMentorWillRemember": "Lagret – veilederen vil huske dette",
+      "savedMentorWillRemember": "Lagret – mentoren vil huske dette",
       "couldNotSaveThat": "Kunne ikke lagre det",
       "couldNotUpdateMemory": "Kunne ikke oppdatere minnet",
       "learner": "Elev",
@@ -1457,9 +1474,9 @@
       "couldNotExportMemory": "Kunne ikke eksportere minne",
       "controls": "Kontroller",
       "learnAboutChild": "Lær om barnet",
-      "learnAboutChildDescription": "Tillat veilederen å bygge et minne om barnets styrker og utfordringer",
-      "useWhatMentorKnows": "Bruk det veilederen vet",
-      "useWhatMentorKnowsDescription": "La veilederen tilpasse økter ved hjelp av det den har lært",
+      "learnAboutChildDescription": "Tillat mentoren å bygge et minne om barnets styrker og utfordringer",
+      "useWhatMentorKnows": "Bruk det mentoren vet",
+      "useWhatMentorKnowsDescription": "La mentoren tilpasse økter ved hjelp av det den har lært",
       "noObservationsYet": "Ingen observasjoner ennå",
       "bringBack": "Hent tilbake",
       "privacy": "Personvern",
@@ -1467,7 +1484,7 @@
       "clearAllMemory": "Tøm alt minne",
       "somethingElseIsWrong": "Noe annet er galt",
       "whatSeemsWrong": "Hva virker galt?",
-      "whatSeemsWrongDescription": "Beskriv korreksjonen, og veilederen vil ta den i betraktning",
+      "whatSeemsWrongDescription": "Beskriv korreksjonen, og mentoren vil ta den i betraktning",
       "correctionNoted": "Korreksjon notert",
       "couldNotSaveCorrection": "Kunne ikke lagre korreksjon",
       "submit": "Send inn"
@@ -1640,7 +1657,7 @@
     "previewSubjectBrowser": {
       "backLabel": "Tilbake",
       "title": "Bla gjennom emner",
-      "description": "Utforsk hva du kan lære med veilederen din"
+      "description": "Utforsk hva du kan lære med mentoren din"
     },
     "previewSampleCoaching": {
       "backLabel": "Tilbake",
@@ -1649,10 +1666,10 @@
       "homeworkCardBody": "Ta et bilde av leksene dine og få veiledning trinn for trinn",
       "homeworkHelp": "Leksehjelp",
       "practiceTest": "Øvingstest",
-      "howMentorHelps": "Hvordan veilederen din hjelper",
-      "howMentorHelpsBody": "Veilederen din husker hva du kan og tilpasser seg tempoet ditt",
+      "howMentorHelps": "Hvordan mentoren din hjelper",
+      "howMentorHelpsBody": "Mentoren din husker hva du kan og tilpasser seg tempoet ditt",
       "snapPhoto": "Ta et bilde",
-      "mentorRemembers": "Veilederen husker",
+      "mentorRemembers": "Mentoren husker",
       "trackProgress": "Spor fremgang",
       "previewDisclaimer": "Dette er en forhåndsvisning – full tilgang låses opp når din forelder godkjenner"
     },
@@ -1688,7 +1705,7 @@
       "browseSubjectsHint": "Utforsk alt du kan lære",
       "sampleMentoringLabel": "Prøv eksempel-veiledning",
       "sampleMentoring": "Eksempel-veiledning",
-      "sampleMentoringHint": "Se hvordan veilederen din vil jobbe med deg"
+      "sampleMentoringHint": "Se hvordan mentoren din vil jobbe med deg"
     },
     "authRedirectTimeout": {
       "title": "Tar for lang tid",
@@ -1853,7 +1870,7 @@
   "confirmInputLabel": "Skriv {{phrase}} for å bekrefte sletting",
   "permanentDeleteLabel": "Slett kontoen min permanent",
   "permanentDelete": "Slett kontoen min",
-  "warningBody1": "Alle dine læringsdata, fremgang og veileder-minne vil bli permanent slettet.",
+  "warningBody1": "Alle dine læringsdata, fremgang og mentor-minne vil bli permanent slettet.",
   "warningBody2": "Dette kan ikke angres.",
   "understandDeleteLabel": "Jeg forstår – slett kontoen min",
   "understandDelete": "Jeg forstår",
@@ -1864,7 +1881,7 @@
     "s1Body": "EduAgent er en AI-drevet læringsplattform designet for elever fra 11 år og oppover. Vi er forpliktet til å beskytte personvernet ditt og håndtere dataene dine med omhu.",
     "s2Title": "Hvilke data vi samler inn",
     "s2Body1": "Kontoinformasjon: ditt navn, e-postadresse og profildetaljer du oppgir når du registrerer deg.",
-    "s2Body2": "Læringsdata: økttranskripsjoner, studerte temaer, fremgangsmetrikker og notater i veilederens minne.",
+    "s2Body2": "Læringsdata: økttranskripsjoner, studerte temaer, fremgangsmetrikker og notater i mentorens minne.",
     "s2Body3": "Bruksdata: hvordan du samhandler med appen, inkludert brukte funksjoner og tid brukt.",
     "s2Body4": "Enhetsdata: enhetstype, operativsystem og appversjon for diagnostiske formål.",
     "s3Title": "Hvordan vi bruker dataene dine",
