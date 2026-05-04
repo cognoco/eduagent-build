@@ -213,5 +213,23 @@ describe('eslint governance rules — self-test', () => {
         ).toBeGreaterThan(0);
       });
     }
+
+    // Negative case: prove the selector is anchored to c.get('db') and
+    // doesn't widen to c.get(<anything>).select(). Without this, a future
+    // refactor that drops the 'db' literal check could broaden the rule
+    // (e.g. flagging c.get('user').select(...) on a non-DB object) without
+    // any selftest failing.
+    it("does NOT flag c.get('user').select() — rule is anchored to c.get('db')", () => {
+      const result = lint(
+        routePath,
+        `export const handler = (c: any) => c.get('user').select();\n`
+      );
+      expect(
+        messageHits(
+          result,
+          'Route files must not call .select/.insert/.update/.delete'
+        ).length
+      ).toBe(0);
+    });
   });
 });

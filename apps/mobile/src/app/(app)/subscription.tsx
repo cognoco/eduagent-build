@@ -734,7 +734,10 @@ export default function SubscriptionScreen() {
 
     if (confirmed) {
       await refetchUsage();
-      platformAlert('Restored', 'Your subscription has been restored.');
+      platformAlert(
+        t('subscription.alerts.restoredTitle'),
+        t('subscription.alerts.restoredBody')
+      );
     } else {
       platformAlert(
         'No subscriptions found',
@@ -844,11 +847,14 @@ export default function SubscriptionScreen() {
       await Promise.all([refetchSub(), refetchUsage()]);
 
       if (confirmed) {
-        platformAlert('Success', 'Your subscription is now active!');
+        platformAlert(
+          t('subscription.alerts.successTitle'),
+          t('subscription.alerts.successBody')
+        );
       } else {
         platformAlert(
-          'Purchase confirmed',
-          'Your subscription is being activated. It usually appears within a minute — pull down to refresh.',
+          t('subscription.alerts.purchaseConfirmedTitle'),
+          t('subscription.alerts.purchaseConfirmedBody'),
           [{ text: t('common.ok') }]
         );
       }
@@ -1021,7 +1027,10 @@ export default function SubscriptionScreen() {
     setTopUpPolling(false);
 
     if (confirmed) {
-      platformAlert('Top-up', '500 additional credits have been added!');
+      platformAlert(
+        t('subscription.alerts.topUpTitle'),
+        t('subscription.alerts.topUpBody')
+      );
     } else {
       platformAlert(
         'Purchase confirmed',

@@ -1922,6 +1922,16 @@
     },
     "statusBadge": {
       "trial": "Prueba"
+    },
+    "alerts": {
+      "restoredTitle": "Restored",
+      "restoredBody": "Your subscription has been restored.",
+      "successTitle": "Success",
+      "successBody": "Your subscription is now active!",
+      "purchaseConfirmedTitle": "Purchase confirmed",
+      "purchaseConfirmedBody": "Your subscription is being activated. It usually appears within a minute — pull down to refresh.",
+      "topUpTitle": "Top-up",
+      "topUpBody": "500 additional credits have been added!"
     }
   }
 }
