@@ -22,9 +22,15 @@ tags:
 - assertVisible:
     id: "learner-screen"
 
-# 3. Intent card stack should be present on home screen
-- assertVisible:
-    id: "home-subject-carousel"
+# 3. Intent card stack should be present on home screen.
+# [BUG-989] Use extendedWaitUntil so a slow first-render of useSubjects (e.g.
+# fresh sign-in + cold-start cache) doesn't surface as a flaky test. Kept
+# optional because the seed scenario could land on a parent gateway that
+# doesn't carry the carousel testID.
+- extendedWaitUntil:
+    visible:
+      id: "home-subject-carousel"
+    timeout: 10000
     optional: true
 
 # REMOVED (Rule 3): "Your coach has a plan" assertion dropped — this heading
@@ -66,9 +72,14 @@ tags:
       id: "learner-screen"
     timeout: 10000
 
-# 12. Intent card stack still visible after round-trip (replaced "Your subjects" heading)
-- assertVisible:
-    id: "home-subject-carousel"
+# 12. Intent card stack still visible after round-trip (replaced "Your subjects" heading).
+# [BUG-989] Use extendedWaitUntil because returning to the Home tab can briefly
+# render the loading state while React Query revalidates `subjects`, so a bare
+# assertVisible races the carousel mount.
+- extendedWaitUntil:
+    visible:
+      id: "home-subject-carousel"
+    timeout: 10000
 
 # 13. Screenshot
 - takeScreenshot: view-curriculum-03-back-home

@@ -27,7 +27,7 @@ tags:
     id: "language-picker-cancel"
 
 - assertVisible:
-    id: "language-picker-other-hint"
+    id: "language-option-other"
 
 - takeScreenshot: 01-language-picker
 

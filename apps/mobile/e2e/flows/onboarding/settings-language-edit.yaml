@@ -1,7 +1,7 @@
-# Tutor language edit via Settings
+# Mentor language edit via Settings
 # Tags: nightly, onboarding
 # Seed: language-subject-active
-# Covers: More -> Tutor language -> picker -> save -> return
+# Covers: More -> Mentor language -> picker -> save -> return
 # Usage: ./scripts/seed-and-run.sh language-subject-active flows/onboarding/settings-language-edit.yaml
 appId: com.mentomate.app
 tags:
@@ -25,11 +25,11 @@ tags:
 
 - scrollUntilVisible:
     element:
-      text: "Tutor language"
+      text: "Mentor language"
     direction: DOWN
     timeout: 10000
 
-- tapOn: "Tutor language"
+- tapOn: "Mentor language"
 
 - extendedWaitUntil:
     visible:
@@ -40,7 +40,7 @@ tags:
     id: "language-picker-cancel"
 
 - assertVisible:
-    id: "language-picker-other-hint"
+    id: "language-option-other"
 
 - takeScreenshot: 01-settings-language-picker
 
