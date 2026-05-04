@@ -1,14 +1,14 @@
-# Flow N8: Delete Account — Deletion UI + Grace Period + Cancellation
-# Validates: user can navigate to delete account screen, see confirmation UI,
-# and cancel to keep their account. Does NOT actually delete the account.
-# Tags: nightly, account, gdpr
+# Flow N8: Delete Account — Deletion UI + typed-confirmation stage + Cancellation
+# Validates: initial warning screen, typed-confirmation stage (wrong phrase stays,
+# correct phrase accepted), and cancel via back-to-warning. Does NOT schedule deletion.
+# Tags: pr-blocking, account, gdpr
 #
 # Journey: UX Journey 5 (Account Management)
 # Epics: Epic 5 (FR101-FR105)
 # Prerequisite: Seeded user with onboarding complete (scenario: onboarding-complete)
 appId: com.mentomate.app
 tags:
-  - nightly
+  - pr-blocking
   - account
   - gdpr
 ---
@@ -74,25 +74,62 @@ tags:
 - assertVisible:
     id: "delete-account-close"
 
-# 13. Screenshot of the delete account confirmation screen
-- takeScreenshot: delete-account-confirmation
+# 13. Screenshot of the initial warning screen
+- takeScreenshot: delete-account-initial
 
-# 14. Tap cancel to go back without deleting
+# 14. Tap the initial confirm to advance to the typed-confirmation stage
+- tapOn:
+    id: "delete-account-confirm"
+
+# 15. Confirming stage assertions
+- extendedWaitUntil:
+    visible:
+      id: "delete-account-confirming"
+    timeout: 10000
+- assertVisible:
+    id: "delete-account-confirm-input"
+- assertVisible:
+    id: "delete-account-confirm-final"
+
+# 16. Type the wrong phrase — confirm-final button must remain disabled (no advance)
+- tapOn:
+    id: "delete-account-confirm-input"
+- inputText: "delete"
+- assertVisible:
+    id: "delete-account-confirm-final"
+- takeScreenshot: delete-account-typed-wrong
+
+# 17. Clear and type the correct phrase — button becomes enabled
+- eraseText: 6
+- inputText: "DELETE"
+- takeScreenshot: delete-account-typed-correct
+
+# 18. Cancel out via back-to-warning so we don't actually schedule deletion
+- tapOn:
+    id: "delete-account-back-to-warning"
+
+# 19. Verify we're back on the initial warning screen
+- extendedWaitUntil:
+    visible:
+      id: "delete-account-confirm"
+    timeout: 10000
+- assertVisible:
+    id: "delete-account-cancel"
+
+# 20. Cancel to return to More
 - tapOn:
     id: "delete-account-cancel"
 
-# 15. Verify we're back on the More screen
+# 21. Verify we're back on the More screen — sign-out button confirms intact account
 - extendedWaitUntil:
     visible:
       text: "More"
     timeout: 10000
-
-# 16. Verify account is intact — sign-out button visible (scroll needed; More tab is long)
 - scrollUntilVisible:
     element:
       id: "sign-out-button"
     direction: DOWN
     timeout: 10000
 
-# 17. Final screenshot — back to normal state
+# 22. Final screenshot — back to normal state
 - takeScreenshot: delete-account-cancelled
