@@ -192,6 +192,80 @@ describe('validateTranslation', () => {
       expect.objectContaining({ type: 'glossary_violation', key: 'x.y' })
     );
   });
+
+  // Short ASCII glossary stems (e.g. brand acronym 'XP') must match on word
+  // boundaries, not substring. Pre-fix: glossaryStem('XP') → 'xp' and
+  // 'expert'.includes('xp') === true, so any translation containing 'expert'
+  // (or 'experience', 'expand') would falsely satisfy the lock. The brand
+  // acronym preservation was effectively a no-op.
+  it('[REGRESSION] rejects short-ASCII glossary stem matched as substring of unrelated word', () => {
+    const src = { x: { y: 'You earned XP today' } };
+    // Translation drops 'XP' entirely but happens to contain 'expert', which
+    // .includes('xp') used to satisfy. Word-boundary match must reject this.
+    const tgt = { x: { y: 'Heute hast du Expertenpunkte verdient' } };
+    const glossary = { XP: { de: 'XP' } };
+    const result = validateTranslation(src, tgt, 'de', glossary);
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContainEqual(
+      expect.objectContaining({ type: 'glossary_violation', key: 'x.y' })
+    );
+  });
+
+  it('[REGRESSION] still accepts short-ASCII glossary stem present as a standalone word', () => {
+    const src = { x: { y: 'You earned XP today' } };
+    const tgt = { x: { y: 'Heute hast du XP verdient' } };
+    const glossary = { XP: { de: 'XP' } };
+    const result = validateTranslation(src, tgt, 'de', glossary);
+    expect(result.valid).toBe(true);
+  });
+
+  // Type drift: LLM returns a nested object where source has a string. After
+  // flattening the target produces `common.save.label` while source has
+  // `common.save`, so the validator reports both an extra_key and a missing_key.
+  // Catches the "LLM hallucinated extra structure" failure mode.
+  it('rejects type-drift where target deepens a leaf string into an object', () => {
+    const src = { common: { save: 'Save action', cancel: 'Cancel button' } };
+    const tgt = {
+      common: {
+        save: { label: 'Speichern' }, // type drift: object where string expected
+        cancel: 'Abbrechen',
+      },
+    };
+    const result = validateTranslation(src, tgt, 'de');
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContainEqual(
+      expect.objectContaining({ type: 'missing_key', key: 'common.save' })
+    );
+    expect(result.errors).toContainEqual(
+      expect.objectContaining({ type: 'extra_key', key: 'common.save.label' })
+    );
+  });
+
+  // Hallucinated interpolation variable: target adds {{var}} not in source.
+  // Today the validator does not flag this (only missing variables fail), but
+  // it surfaces as an extra_key check against any sister key — the test
+  // documents current behaviour so a future tightening is intentional.
+  it('does not raise missing_variable when target adds an unrelated {{var}}', () => {
+    const src = {
+      common: { save: 'Save action', cancel: 'Cancel button' },
+      errors: { generic: 'Something went wrong. {{action}} to retry.' },
+    };
+    const tgt = {
+      common: {
+        save: 'Speichern {{hallucinated}}', // extra var; no source var to miss
+        cancel: 'Abbrechen',
+      },
+      errors: { generic: 'Fehler. {{action}}.' },
+    };
+    const result = validateTranslation(src, tgt, 'de');
+    // Source has no variables on common.save, so no missing_variable fires.
+    expect(
+      result.errors.filter((e) => e.type === 'missing_variable')
+    ).toHaveLength(0);
+    // Documented gap: extra variables in target are currently silent. If you
+    // tighten validateTranslation to flag them, replace this assertion with
+    // toContainEqual({ type: 'extra_variable', key: 'common.save', variable: '{{hallucinated}}' }).
+  });
 });
 
 describe('computeChangedKeys', () => {

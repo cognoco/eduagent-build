@@ -105,11 +105,12 @@ export const reviewDueSend = inngest.createFunction(
     });
 
     // CLAUDE.md "Silent recovery without escalation is banned": the
-    // dedup_check_failed path swallows a DB error and returns skipped, so
-    // Sentry is the only signal that the recovery fired. Emit a structured
-    // app/notification.suppressed event so the volume is queryable in 24h
-    // dashboards. step.sendEvent makes the dispatch durable and idempotent
-    // under Inngest retries.
+    // dedup_check_failed path swallows a DB error and returns skipped.
+    // captureException above feeds Sentry exception counts; this
+    // app/notification.suppressed event is consumed by
+    // notification-suppressed-observe which emits a structured
+    // [notification-suppressed] log line, making the volume queryable via
+    // Cloudflare Workers Logpush in addition to Sentry.
     if (result.status === 'skipped' && result.reason === 'dedup_check_failed') {
       await step.sendEvent('notify-notification-suppressed', {
         name: 'app/notification.suppressed',

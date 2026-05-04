@@ -3,6 +3,17 @@ import * as path from 'node:path';
 
 const LOCALES_DIR = path.resolve(__dirname, '../apps/mobile/src/i18n/locales');
 
+// Languages the project commits to shipping. Must mirror
+// `TARGET_LANGUAGES` in scripts/translate.ts. Listed explicitly here so
+// CI hard-fails if any of these locale files are absent — earlier the
+// script discovered locales from the filesystem only, which meant a CI
+// checkout that somehow lacked the expected files would silently pass
+// with "All translation files are up to date" (vacuously true: no
+// targets to check). That made the staleness check effectively
+// dependent on what was on the runner's disk rather than on the
+// project's stated locale set.
+const EXPECTED_TARGET_LANGUAGES = ['nb', 'de', 'es', 'pt', 'pl', 'ja'] as const;
+
 // Dynamically discover target locales from the filesystem so this script
 // keeps working as locales are added/removed. Returns every `<code>.json`
 // in the locales dir except `en.json` (the source of truth).
@@ -13,6 +24,24 @@ function discoverTargetLanguages(): string[] {
     .filter((f) => f.endsWith('.json') && f !== 'en.json')
     .map((f) => f.replace(/\.json$/, ''))
     .sort();
+}
+
+// Throws (via process.exit(1)) if any of the EXPECTED_TARGET_LANGUAGES
+// locale files are missing on disk. Returns the verified discovered set.
+//
+// Why this guard exists: a CI lane (or contributor) running this script
+// against a tree where one or more expected locale JSONs are absent would
+// otherwise see "All translation files are up to date" — vacuously true,
+// because the missing locales aren't checked against. Hard-failing here
+// turns "silently skip" into "fail loudly", which is what the staleness
+// check is supposed to do.
+export function assertExpectedLocalesPresent(
+  discovered: string[],
+  expected: readonly string[] = EXPECTED_TARGET_LANGUAGES
+): { ok: true } | { ok: false; missing: string[] } {
+  const discoveredSet = new Set(discovered);
+  const missing = expected.filter((lang) => !discoveredSet.has(lang));
+  return missing.length === 0 ? { ok: true } : { ok: false, missing };
 }
 
 type NestedStrings = { [k: string]: string | NestedStrings };
@@ -104,6 +133,23 @@ function main(): void {
   const targets: Record<string, NestedStrings> = {};
 
   const targetLanguages = discoverTargetLanguages();
+
+  // Hard-fail if any of the expected target locales are missing from disk.
+  // Without this guard the script's "discover from filesystem" approach
+  // silently skips missing locales and reports green when there is nothing
+  // to check.
+  const presence = assertExpectedLocalesPresent(targetLanguages);
+  if (!presence.ok) {
+    console.error(
+      `Missing expected locale files in ${LOCALES_DIR}:\n` +
+        presence.missing.map((l) => `  - ${l}.json`).join('\n') +
+        '\n\nExpected target languages are pinned in scripts/check-i18n-staleness.ts ' +
+        '(must mirror scripts/translate.ts → TARGET_LANGUAGES).\n' +
+        'Run `pnpm translate` and commit the result.'
+    );
+    process.exit(1);
+  }
+
   if (targetLanguages.length === 0) {
     console.log(
       'No target locales present (en-only); staleness check is a no-op.'

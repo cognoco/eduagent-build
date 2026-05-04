@@ -50,6 +50,9 @@ async function insertNoteWithCap(
     // return it instead of inserting a duplicate. submitSummary can be
     // retried (mobile network timeout, double-tap) and without this check the
     // 50-note cap would be the only backstop — poor UX.
+    // Filter by topicId as well: callers today validate session.topicId === topicId
+    // upstream, but the function signature accepts arbitrary topicId so a future
+    // caller mismatching the pair must not get a note bound to the wrong topic.
     if (values.sessionId) {
       const [existingForSession] = await tx
         .select({
@@ -64,7 +67,8 @@ async function insertNoteWithCap(
         .where(
           and(
             eq(topicNotes.profileId, values.profileId),
-            eq(topicNotes.sessionId, values.sessionId)
+            eq(topicNotes.sessionId, values.sessionId),
+            eq(topicNotes.topicId, values.topicId)
           )
         )
         .limit(1);

@@ -11,11 +11,13 @@ on:
       - main
     paths:
       - 'docs/plans/**.md'
+      - 'apps/api/drizzle/**'
       - 'scripts/check-migration-rollback.sh'
       - '.github/workflows/docs-checks.yml'
   pull_request:
     paths:
       - 'docs/plans/**.md'
+      - 'apps/api/drizzle/**'
       - 'scripts/check-migration-rollback.sh'
       - '.github/workflows/docs-checks.yml'
 
@@ -34,7 +36,10 @@ jobs:
 
       # Per CLAUDE.md → "Schema And Deploy Safety": destructive migration plans
       # (DROP COLUMN/TABLE/TYPE in fenced SQL) must include a '## Rollback'
-      # section spelling out (a) whether rollback is possible, (b) what data
-      # is lost, (c) the recovery procedure.
+      # section. The script also scans apps/api/drizzle/*.sql for destructive
+      # statements and verifies each ships with a <name>.rollback.md, so a
+      # migration-only PR without a plan doc is no longer unenforced — the
+      # apps/api/drizzle/** path filter above triggers the workflow on
+      # SQL-only changes.
       - name: Migration rollback-section check
         run: bash scripts/check-migration-rollback.sh

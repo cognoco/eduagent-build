@@ -161,6 +161,11 @@ export default [
               message:
                 'Import the LLM router from services/llm instead. Direct SDK imports are only allowed in services/llm/providers/**.',
             },
+            {
+              name: '@google-cloud/vertexai',
+              message:
+                'Import the LLM router from services/llm instead. Direct SDK imports are only allowed in services/llm/providers/**.',
+            },
           ],
         },
       ],
@@ -192,6 +197,48 @@ export default [
             "MemberExpression[object.name='process'][property.name='env']",
           message:
             'Use the typed config object from apps/api/src/config.ts instead of raw process.env. See CLAUDE.md.',
+        },
+      ],
+    },
+  },
+  // -------------------------------------------------------------------------
+  // Governance Rule 5 — route files must not call .select/.insert/.update/
+  // .delete directly on the typed-context db handle (`c.get('db')`).
+  // Companion to Rule 1 (no drizzle-orm imports in routes): without this
+  // rule, a route could still write `c.get('db').select().from(table)` and
+  // satisfy the import-only check. Move the query into services/* and use
+  // createScopedRepository(profileId).
+  // See CLAUDE.md > Non-Negotiable Engineering Rules ("Reads must use
+  // createScopedRepository(profileId)"; "Route files must not import ORM
+  // primitives, schema tables, or createScopedRepository").
+  //
+  // Positioned AFTER Rule 4 so the routes-files override of
+  // no-restricted-syntax wins for routes. Both selectors are included so
+  // Rule 4 (raw process.env ban) still applies to routes too — flat config
+  // re-specifying the same rule replaces the prior value, so we re-list the
+  // process.env selector here.
+  // -------------------------------------------------------------------------
+  {
+    files: ['apps/api/src/routes/**/*.ts'],
+    ignores: [
+      'apps/api/src/routes/**/*.test.ts',
+      'apps/api/src/routes/**/*.spec.ts',
+      'apps/api/src/routes/**/*.integration.test.ts',
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "MemberExpression[object.name='process'][property.name='env']",
+          message:
+            'Use the typed config object from apps/api/src/config.ts instead of raw process.env. See CLAUDE.md.',
+        },
+        {
+          selector:
+            "CallExpression[callee.property.name=/^(select|insert|update|delete)$/][callee.object.type='CallExpression'][callee.object.callee.object.name='c'][callee.object.callee.property.name='get'][callee.object.arguments.0.value='db']",
+          message:
+            "Route files must not call .select/.insert/.update/.delete directly on c.get('db'). Move the query into services/* and use createScopedRepository(profileId). See CLAUDE.md.",
         },
       ],
     },

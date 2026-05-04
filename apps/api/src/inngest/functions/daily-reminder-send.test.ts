@@ -256,7 +256,7 @@ describe('[BUG-976] daily-reminder-send getRecentNotificationCount DB failure â€
     const dbError = new Error('connection timeout');
     mockGetRecentNotificationCount.mockRejectedValueOnce(dbError);
 
-    const { result } = await executeHandler({
+    const { result, mockStep } = await executeHandler({
       profileId: 'p-err',
       streakDays: 5,
     });
@@ -276,6 +276,20 @@ describe('[BUG-976] daily-reminder-send getRecentNotificationCount DB failure â€
       reason: 'dedup_check_failed',
       profileId: 'p-err',
     });
+    // CLAUDE.md "Silent recovery without escalation is banned": the
+    // dedup_check_failed path must dispatch a structured event so the
+    // suppression is queryable in 24h dashboards. Sentry alone is not enough.
+    expect(mockStep.sendEvent).toHaveBeenCalledWith(
+      'notify-notification-suppressed',
+      expect.objectContaining({
+        name: 'app/notification.suppressed',
+        data: expect.objectContaining({
+          profileId: 'p-err',
+          notificationType: 'daily_reminder',
+          reason: 'dedup_check_failed',
+        }),
+      })
+    );
   });
 
   it('does NOT call captureException on the happy path', async () => {
@@ -285,9 +299,14 @@ describe('[BUG-976] daily-reminder-send getRecentNotificationCount DB failure â€
       ticketId: 'ticket-ok',
     });
 
-    await executeHandler({ profileId: 'p-ok', streakDays: 1 });
+    const { mockStep } = await executeHandler({
+      profileId: 'p-ok',
+      streakDays: 1,
+    });
 
     expect(mockCaptureException).not.toHaveBeenCalled();
     expect(mockSendPushNotification).toHaveBeenCalled();
+    // Happy path must not emit the suppression escalation event.
+    expect(mockStep.sendEvent).not.toHaveBeenCalled();
   });
 });

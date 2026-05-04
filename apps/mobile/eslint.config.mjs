@@ -41,6 +41,12 @@ export default [
   // Promoted from 'warn' to 'error' on 2026-05-03; the 13 known violations
   // in session/index.tsx + _layout.tsx were migrated to design tokens
   // (incl. new dangerSoft token) in the same PR.
+  //
+  // Ignored files are render assets (SVG <Stop> fills, Reanimated worklet
+  // colors, brand logo gradients) where NativeWind classes do not apply —
+  // SVG attributes and worklet shared values require literal hex strings.
+  // BookPageFlipAnimation, BrandCelebration, AnimatedSplash, MentomateLogo
+  // all fit this exception.
   // See CLAUDE.md > Non-Negotiable Engineering Rules.
   {
     files: ['src/**/*.ts', 'src/**/*.tsx'],

@@ -1,4 +1,7 @@
-import { checkStaleness } from './check-i18n-staleness';
+import {
+  checkStaleness,
+  assertExpectedLocalesPresent,
+} from './check-i18n-staleness';
 
 describe('checkStaleness', () => {
   const source = {
@@ -86,5 +89,55 @@ describe('checkStaleness', () => {
     const langs = result.errors.map((e) => e.lang);
     expect(langs).toContain('de');
     expect(langs).toContain('es');
+  });
+});
+
+describe('assertExpectedLocalesPresent', () => {
+  // Pre-fix: the staleness check discovered locales from fs.readdirSync only,
+  // so a tree missing some expected JSONs reported green vacuously. The guard
+  // must hard-fail so CI cannot silently skip languages the project commits to.
+  it('returns ok when discovered set covers expected set', () => {
+    const result = assertExpectedLocalesPresent(
+      ['nb', 'de', 'es', 'pt', 'pl', 'ja'],
+      ['nb', 'de', 'es', 'pt', 'pl', 'ja']
+    );
+    expect(result).toEqual({ ok: true });
+  });
+
+  it('returns ok when discovered set is a strict superset of expected', () => {
+    const result = assertExpectedLocalesPresent(
+      ['nb', 'de', 'es', 'pt', 'pl', 'ja', 'fr'], // extra locale on disk
+      ['nb', 'de', 'es', 'pt', 'pl', 'ja']
+    );
+    expect(result).toEqual({ ok: true });
+  });
+
+  it('returns missing list when some expected locales are absent on disk', () => {
+    const result = assertExpectedLocalesPresent(
+      ['nb', 'de'], // pt, pl, es, ja are absent
+      ['nb', 'de', 'es', 'pt', 'pl', 'ja']
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.missing.sort()).toEqual(['es', 'ja', 'pl', 'pt']);
+    }
+  });
+
+  it('returns all missing when discovered set is empty', () => {
+    const result = assertExpectedLocalesPresent(
+      [],
+      ['nb', 'de', 'es', 'pt', 'pl', 'ja']
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.missing.sort()).toEqual(
+        ['de', 'es', 'ja', 'nb', 'pl', 'pt'].sort()
+      );
+    }
+  });
+
+  it('returns ok when expected set is empty (vacuous)', () => {
+    const result = assertExpectedLocalesPresent([], []);
+    expect(result).toEqual({ ok: true });
   });
 });
