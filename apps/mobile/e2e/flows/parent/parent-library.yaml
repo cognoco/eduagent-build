@@ -53,9 +53,9 @@ tags:
       text: "Library"
     timeout: 10000
 
-# 7. Check if Shelves tab is visible (default active tab in the new 3-tab Library)
+# 7. Check if shelves list is visible (Library v3: library-tab-shelves removed in PR #144)
 - assertVisible:
-    id: "library-tab-shelves"
+    id: "shelves-list"
     optional: true
 
 # 8. Check for loading state (may have already resolved)

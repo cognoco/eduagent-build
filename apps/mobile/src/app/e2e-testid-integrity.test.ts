@@ -42,23 +42,10 @@ const KNOWN_DRIFT = new Set([
   'library-scroll',
   'library-screen',
   'library-tab',
-  // Library v3 redesign removed tabs and old topic screen elements — Maestro flows need updating
-  'library-tab-shelves',
-  'library-tab-books',
-  'retention-card',
-  'secondary-recall-check',
-  'primary-action-button',
-  'more-ways-toggle',
   'home-screen',
   'learn-new-screen',
   'interview-screen',
   'shelf-book-list',
-  // Relearn flow redesign WIP — testIDs temporarily removed during screen refactor
-  'relearn-different-method',
-  'relearn-same-method',
-  'relearn-back-to-choice',
-  // Streak display
-  'streak-badge',
   // Session summary
   'summary-score',
   'summary-topics',

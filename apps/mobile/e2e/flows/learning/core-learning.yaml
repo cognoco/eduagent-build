@@ -39,9 +39,9 @@ tags:
     id: "tab-library"
 - extendedWaitUntil:
     visible:
-      id: "library-tab-shelves"
+      id: "shelves-list"
     timeout: 5000
-    # library-tab-shelves is the default Shelves tab in the new 3-tab Library
+    # shelves-list is the Library v3 single-pane shelf list (library-tab-shelves removed in PR #144)
     optional: true
 
 # Tap More tab → verify it navigates
