@@ -4724,7 +4724,7 @@ So that I understand why my child is studying "Biology — Entomology" when they
 **Then** no subtitle is shown (no mapping to display)
 
 **Implementation notes:**
-- **Schema:** Add `rawInput: text('raw_input')` (nullable) to `subjects` table in `packages/database/src/schema/subjects.ts`. Run `pnpm run db:generate` for migration.
+- **Schema:** Add `rawInput: text('raw_input')` (nullable) to `subjects` table in `packages/database/src/schema/subjects.ts`. Run `pnpm run db:generate:dev` for migration.
 - **Schemas package:** Add optional `rawInput` field to `subjectCreateSchema` in `@eduagent/schemas`. Add `rawInput` to subject response schema.
 - **API route:** `POST /v1/subjects` accepts optional `rawInput` field. Subject service passes it to insert.
 - **Mobile create-subject:** Pass `rawInput` to `createSubject.mutateAsync()` when the resolved name differs from the original input. For direct matches, omit it.

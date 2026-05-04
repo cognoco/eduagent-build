@@ -310,7 +310,7 @@ ALTER TABLE family_links ENABLE ROW LEVEL SECURITY;
 
 #### 1.2 — Generate Drizzle migration metadata — ✅ DONE (verify `apps/api/drizzle/meta/*.json` snapshots show `isRLSEnabled: true` for all 26 tables)
 
-Run `pnpm run db:generate` to produce the corresponding snapshot JSON. Verify the snapshots now show `isRLSEnabled: true` for all 26 tables.
+Run `pnpm run db:generate:dev` to produce the corresponding snapshot JSON. Verify the snapshots now show `isRLSEnabled: true` for all 26 tables.
 
 #### 1.3 — Deploy to dev, then staging — ✅ DONE (presumed; **action item:** re-run `SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public'` against staging + prod and paste the result here)
 

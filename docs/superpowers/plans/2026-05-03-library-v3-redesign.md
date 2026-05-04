@@ -75,7 +75,7 @@
 
 **Files:**
 - Modify: `packages/database/src/schema/notes.ts`
-- Create: migration SQL (via `pnpm run db:generate`)
+- Create: migration SQL (via `pnpm run db:generate:dev`)
 
 - [ ] **Step 1: Verify baseline**
 
@@ -132,7 +132,7 @@ Key changes: `sessionId` nullable FK added with `onDelete: 'set null'`, trigram 
 - [ ] **Step 3: Generate the migration**
 
 ```bash
-pnpm run db:generate
+pnpm run db:generate:dev
 ```
 
 Expected migration:
@@ -2723,7 +2723,7 @@ In `packages/database/src/schema/notes.ts`, replace the constraint table arg:
 - [ ] **Step 7: Generate and apply the Phase 2 migration**
 
 ```bash
-pnpm run db:generate
+pnpm run db:generate:dev
 pnpm run db:push:dev
 ```
 
