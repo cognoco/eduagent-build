@@ -94,6 +94,18 @@ export function createRouteMeteringFixture(
   const state = buildDefaultState(options);
   const defaults = buildDefaultState(options);
 
+  const buildQuotaPoolRow = () => ({
+    id: state.quotaPoolId,
+    subscriptionId: state.subscriptionId,
+    monthlyLimit: state.monthlyLimit,
+    usedThisMonth: state.usedThisMonth,
+    dailyLimit: state.dailyLimit,
+    usedToday: state.usedToday,
+    cycleResetAt: new Date('2026-06-01T00:00:00.000Z'),
+    createdAt: new Date('2026-05-01T00:00:00.000Z'),
+    updatedAt: new Date('2026-05-01T00:00:00.000Z'),
+  });
+
   const subscriptionAccessor = {
     findFirst: jest.fn(async () => ({
       id: state.subscriptionId,
@@ -113,17 +125,7 @@ export function createRouteMeteringFixture(
   };
 
   const quotaPoolAccessor = {
-    findFirst: jest.fn(async () => ({
-      id: state.quotaPoolId,
-      subscriptionId: state.subscriptionId,
-      monthlyLimit: state.monthlyLimit,
-      usedThisMonth: state.usedThisMonth,
-      dailyLimit: state.dailyLimit,
-      usedToday: state.usedToday,
-      cycleResetAt: new Date('2026-06-01T00:00:00.000Z'),
-      createdAt: new Date('2026-05-01T00:00:00.000Z'),
-      updatedAt: new Date('2026-05-01T00:00:00.000Z'),
-    })),
+    findFirst: jest.fn(async () => buildQuotaPoolRow()),
   };
 
   const topUpCreditsAccessor = {
@@ -200,7 +202,12 @@ export function createRouteMeteringFixture(
           .fn()
           .mockImplementation((setValues: Record<string, unknown>) => {
             let applied = false;
-            let rows: unknown[] = [];
+            // Rows are plain values (never thenables) — the prior implementation
+            // returned `[quotaPoolAccessor.findFirst()]` (a Promise) and relied
+            // on Promise.all to flatten it. That made the contract implicit and
+            // brittle. Build the row synchronously here so callers get
+            // unwrapped data on the first await.
+            let rows: ReturnType<typeof buildQuotaPoolRow>[] = [];
 
             const apply = () => {
               if (applied) return rows;
@@ -219,7 +226,7 @@ export function createRouteMeteringFixture(
 
                 state.usedThisMonth += 1;
                 state.usedToday += 1;
-                rows = [quotaPoolAccessor.findFirst()];
+                rows = [buildQuotaPoolRow()];
                 return rows;
               }
 
@@ -234,7 +241,7 @@ export function createRouteMeteringFixture(
                 }
 
                 state.usedToday += 1;
-                rows = [quotaPoolAccessor.findFirst()];
+                rows = [buildQuotaPoolRow()];
                 return rows;
               }
 
@@ -254,9 +261,7 @@ export function createRouteMeteringFixture(
               where: jest.fn().mockImplementation(() => {
                 apply();
                 return {
-                  returning: jest
-                    .fn()
-                    .mockImplementation(async () => Promise.all(apply())),
+                  returning: jest.fn().mockImplementation(async () => apply()),
                 };
               }),
             };

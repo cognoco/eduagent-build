@@ -5,6 +5,14 @@ import {
   pedagogyModeSchema,
 } from './language.ts';
 
+// neon-serverless returns raw Date objects; neon-http returns ISO strings.
+// Accept either so response schemas don't break when a service forgets to map.
+// See `project_drizzle_date_objects.md` memory entry.
+const isoDateField = z.union([
+  z.string().datetime(),
+  z.date().transform((d) => d.toISOString()),
+]);
+
 // Enums
 
 export const subjectStatusSchema = z.enum(['active', 'paused', 'archived']);
@@ -49,8 +57,8 @@ export const subjectSchema = z.object({
   status: subjectStatusSchema,
   pedagogyMode: pedagogyModeSchema,
   languageCode: languageCodeSchema.nullable().optional(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+  createdAt: isoDateField,
+  updatedAt: isoDateField,
 });
 export type Subject = z.infer<typeof subjectSchema>;
 
@@ -122,7 +130,7 @@ export const curriculumSchema = z.object({
   subjectId: z.string().uuid(),
   version: z.number().int(),
   topics: z.array(curriculumTopicSchema),
-  generatedAt: z.string().datetime(),
+  generatedAt: isoDateField,
 });
 export type Curriculum = z.infer<typeof curriculumSchema>;
 
@@ -145,8 +153,8 @@ export const curriculumBookSchema = z.object({
   status: bookProgressStatusSchema.optional(),
   topicCount: z.number().int().optional(),
   completedTopicCount: z.number().int().optional(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+  createdAt: isoDateField,
+  updatedAt: isoDateField,
 });
 export type CurriculumBook = z.infer<typeof curriculumBookSchema>;
 
@@ -381,11 +389,6 @@ export type CreateSubjectWithStructureResponse = z.infer<
 
 // --- Book & Topic Suggestions (Conversation-First Flow) ---
 
-const isoDateField = z.union([
-  z.string().datetime(),
-  z.date().transform((d) => d.toISOString()),
-]);
-
 export const bookSuggestionSchema = z.object({
   id: z.string().uuid(),
   subjectId: z.string().uuid(),
@@ -475,7 +478,7 @@ export const bookSessionSchema = z.object({
   topicId: z.string().uuid().nullable(),
   topicTitle: z.string(),
   chapter: z.string().nullable(),
-  createdAt: z.string().datetime(),
+  createdAt: isoDateField,
 });
 export type BookSession = z.infer<typeof bookSessionSchema>;
 

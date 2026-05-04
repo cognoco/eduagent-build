@@ -59,17 +59,22 @@ export function __resetConsentRespondRateLimit(): void {
 function isConsentRespondRateLimited(ipKey: string): boolean {
   const now = Date.now();
   const cutoff = now - CONSENT_RESPOND_RATE_LIMIT_WINDOW_MS;
-  const timestamps = (consentRespondTimestamps.get(ipKey) ?? []).filter(
-    (t) => t > cutoff
-  );
-  if (timestamps.length === 0 && consentRespondTimestamps.has(ipKey)) {
+  const existing = consentRespondTimestamps.get(ipKey);
+  const timestamps = (existing ?? []).filter((t) => t > cutoff);
+  if (timestamps.length === 0 && existing !== undefined) {
     consentRespondTimestamps.delete(ipKey);
   }
-  if (consentRespondTimestamps.size >= CONSENT_RESPOND_MAP_MAX_ENTRIES) {
-    // FIFO eviction (Maps preserve insertion order; `keys().next()` returns
-    // the first-inserted key). This is NOT LRU — we don't re-insert on access
-    // — but for an abuse-prevention rate limiter the difference is harmless:
-    // a victim of eviction has been quiet long enough to age past the head.
+  // Only evict when admitting a NEW key would push us past the cap. A
+  // returning IP that's already tracked updates in place, so it never
+  // punishes an unrelated quiet user. FIFO order (Map insertion order) is
+  // fine for abuse prevention — eviction targets keys quiet long enough to
+  // age past the head.
+  const isNewKey =
+    !consentRespondTimestamps.has(ipKey) && timestamps.length === 0;
+  if (
+    isNewKey &&
+    consentRespondTimestamps.size >= CONSENT_RESPOND_MAP_MAX_ENTRIES
+  ) {
     const oldest = consentRespondTimestamps.keys().next().value;
     if (oldest !== undefined) consentRespondTimestamps.delete(oldest);
   }
