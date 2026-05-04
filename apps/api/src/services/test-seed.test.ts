@@ -43,9 +43,11 @@ function createMockDb(): Database {
           id: 'mock-topic-id',
           curriculumId: 'mock-curriculum-id',
         }),
-        findMany: jest.fn().mockResolvedValue([
-          { id: 'mock-topic-id', curriculumId: 'mock-curriculum-id' },
-        ]),
+        findMany: jest
+          .fn()
+          .mockResolvedValue([
+            { id: 'mock-topic-id', curriculumId: 'mock-curriculum-id' },
+          ]),
       },
     },
   } as unknown as Database;
@@ -56,7 +58,7 @@ function createMockDb(): Database {
 // ---------------------------------------------------------------------------
 
 describe('VALID_SCENARIOS', () => {
-  it('contains all 38 expected scenarios', () => {
+  it('contains all 41 expected scenarios', () => {
     expect(VALID_SCENARIOS).toEqual([
       'onboarding-complete',
       'onboarding-no-subject',
@@ -97,6 +99,9 @@ describe('VALID_SCENARIOS', () => {
       'quiz-malformed-round',
       'quiz-deterministic-wrong-answer',
       'quiz-answer-check-fails',
+      'review-empty',
+      'dictation-with-mistakes',
+      'dictation-perfect-score',
     ]);
   });
 
@@ -289,6 +294,14 @@ describe('new Stage-0 scenarios return required IDs', () => {
     {
       scenario: 'quiz-answer-check-fails',
       requiredIds: ['subjectId', 'roundId'],
+    },
+    {
+      scenario: 'dictation-with-mistakes',
+      requiredIds: ['subjectId'],
+    },
+    {
+      scenario: 'dictation-perfect-score',
+      requiredIds: ['subjectId'],
     },
   ];
 

@@ -102,7 +102,10 @@ export type SeedScenario =
   | 'forbidden'
   | 'quiz-malformed-round'
   | 'quiz-deterministic-wrong-answer'
-  | 'quiz-answer-check-fails';
+  | 'quiz-answer-check-fails'
+  | 'dictation-with-mistakes'
+  | 'dictation-perfect-score'
+  | 'review-empty';
 
 /** Environment bindings needed by the seed service */
 export interface SeedEnv {
@@ -392,7 +395,12 @@ async function createSubjectWithCurriculum(
   name: string,
   status: 'active' | 'paused' | 'archived' = 'active',
   topicCount = 3
-): Promise<{ subjectId: string; curriculumId: string; topicIds: string[] }> {
+): Promise<{
+  subjectId: string;
+  curriculumId: string;
+  bookId: string;
+  topicIds: string[];
+}> {
   const subjectId = generateUUIDv7();
   await db.insert(subjects).values({
     id: subjectId,
@@ -436,7 +444,7 @@ async function createSubjectWithCurriculum(
   await db.insert(curriculumTopics).values(topicValues);
 
   const topicIds = topicValues.map((t) => t.id);
-  return { subjectId, curriculumId, topicIds };
+  return { subjectId, curriculumId, bookId, topicIds };
 }
 
 // ---------------------------------------------------------------------------
@@ -566,7 +574,7 @@ async function seedLearningActive(
     birthYear: LEARNER_BIRTH_YEAR,
   });
 
-  const { subjectId, topicIds } = await createSubjectWithCurriculum(
+  const { subjectId, bookId, topicIds } = await createSubjectWithCurriculum(
     db,
     profileId,
     'World History'
@@ -616,7 +624,7 @@ async function seedLearningActive(
     profileId,
     email,
     password,
-    ids: { subjectId, sessionId, topicId: firstTopicId },
+    ids: { subjectId, bookId, sessionId, topicId: firstTopicId },
   };
 }
 
@@ -1943,14 +1951,15 @@ async function seedSessionWithTranscript(
     respondedAt: new Date(),
   });
 
-  const { subjectId, topicIds } = await createSubjectWithCurriculum(
+  const { subjectId, bookId, topicIds } = await createSubjectWithCurriculum(
     db,
     profileId,
     'Mathematics'
   );
 
   const topicId = topicIds[0];
-  if (!topicId) throw new Error('createSubjectWithCurriculum returned no topics');
+  if (!topicId)
+    throw new Error('createSubjectWithCurriculum returned no topics');
 
   const sessionId = generateUUIDv7();
   const startedAt = pastDate(1);
@@ -1980,12 +1989,62 @@ async function seedSessionWithTranscript(
     eventType: 'user_message' | 'ai_response';
     content: string;
   }> = [
-    { id: generateUUIDv7(), sessionId, profileId, subjectId, topicId, eventType: 'user_message', content: 'What is the Pythagorean theorem?' },
-    { id: generateUUIDv7(), sessionId, profileId, subjectId, topicId, eventType: 'ai_response', content: 'The Pythagorean theorem states that in a right triangle, a² + b² = c².' },
-    { id: generateUUIDv7(), sessionId, profileId, subjectId, topicId, eventType: 'user_message', content: 'Can you give me an example?' },
-    { id: generateUUIDv7(), sessionId, profileId, subjectId, topicId, eventType: 'ai_response', content: 'Sure! If a = 3 and b = 4, then c = 5 because 9 + 16 = 25.' },
-    { id: generateUUIDv7(), sessionId, profileId, subjectId, topicId, eventType: 'user_message', content: 'How do I find the hypotenuse?' },
-    { id: generateUUIDv7(), sessionId, profileId, subjectId, topicId, eventType: 'ai_response', content: 'Square both legs, add them together, then take the square root.' },
+    {
+      id: generateUUIDv7(),
+      sessionId,
+      profileId,
+      subjectId,
+      topicId,
+      eventType: 'user_message',
+      content: 'What is the Pythagorean theorem?',
+    },
+    {
+      id: generateUUIDv7(),
+      sessionId,
+      profileId,
+      subjectId,
+      topicId,
+      eventType: 'ai_response',
+      content:
+        'The Pythagorean theorem states that in a right triangle, a² + b² = c².',
+    },
+    {
+      id: generateUUIDv7(),
+      sessionId,
+      profileId,
+      subjectId,
+      topicId,
+      eventType: 'user_message',
+      content: 'Can you give me an example?',
+    },
+    {
+      id: generateUUIDv7(),
+      sessionId,
+      profileId,
+      subjectId,
+      topicId,
+      eventType: 'ai_response',
+      content: 'Sure! If a = 3 and b = 4, then c = 5 because 9 + 16 = 25.',
+    },
+    {
+      id: generateUUIDv7(),
+      sessionId,
+      profileId,
+      subjectId,
+      topicId,
+      eventType: 'user_message',
+      content: 'How do I find the hypotenuse?',
+    },
+    {
+      id: generateUUIDv7(),
+      sessionId,
+      profileId,
+      subjectId,
+      topicId,
+      eventType: 'ai_response',
+      content:
+        'Square both legs, add them together, then take the square root.',
+    },
   ];
 
   await db.insert(sessionEvents).values(eventValues);
@@ -2011,7 +2070,7 @@ async function seedSessionWithTranscript(
     profileId,
     email,
     password,
-    ids: { subjectId, sessionId, topicId },
+    ids: { subjectId, bookId, sessionId, topicId },
   };
 }
 
@@ -2057,14 +2116,15 @@ async function seedParentProxy(
     respondedAt: new Date(),
   });
 
-  const { subjectId, topicIds } = await createSubjectWithCurriculum(
+  const { subjectId, bookId, topicIds } = await createSubjectWithCurriculum(
     db,
     childProfileId,
     'Science'
   );
 
   const topicId = topicIds[0];
-  if (!topicId) throw new Error('createSubjectWithCurriculum returned no topics');
+  if (!topicId)
+    throw new Error('createSubjectWithCurriculum returned no topics');
 
   const sessionId = generateUUIDv7();
   const startedAt = pastDate(1);
@@ -2101,7 +2161,8 @@ async function seedParentProxy(
       subjectId,
       topicId,
       eventType: 'ai_response' as const,
-      content: 'Plants use sunlight, water, and CO₂ to produce glucose and oxygen.',
+      content:
+        'Plants use sunlight, water, and CO₂ to produce glucose and oxygen.',
     },
     {
       id: generateUUIDv7(),
@@ -2119,7 +2180,8 @@ async function seedParentProxy(
       subjectId,
       topicId,
       eventType: 'ai_response' as const,
-      content: 'Chlorophyll absorbs red and blue light but reflects green, making leaves appear green.',
+      content:
+        'Chlorophyll absorbs red and blue light but reflects green, making leaves appear green.',
     },
   ];
 
@@ -2146,7 +2208,14 @@ async function seedParentProxy(
     profileId: parentProfileId,
     email,
     password,
-    ids: { parentProfileId, childProfileId, subjectId, sessionId, topicId },
+    ids: {
+      parentProfileId,
+      childProfileId,
+      subjectId,
+      bookId,
+      sessionId,
+      topicId,
+    },
   };
 }
 
@@ -2176,14 +2245,15 @@ async function seedWithBookmarks(
     respondedAt: new Date(),
   });
 
-  const { subjectId, topicIds } = await createSubjectWithCurriculum(
+  const { subjectId, bookId, topicIds } = await createSubjectWithCurriculum(
     db,
     profileId,
     'History'
   );
 
   const topicId = topicIds[0];
-  if (!topicId) throw new Error('createSubjectWithCurriculum returned no topics');
+  if (!topicId)
+    throw new Error('createSubjectWithCurriculum returned no topics');
 
   const sessionId = generateUUIDv7();
   await db.insert(learningSessions).values({
@@ -2210,7 +2280,8 @@ async function seedWithBookmarks(
       eventId: event1Id,
       subjectId,
       topicId,
-      content: 'The Roman Republic was founded in 509 BC after the overthrow of the monarchy.',
+      content:
+        'The Roman Republic was founded in 509 BC after the overthrow of the monarchy.',
     },
     {
       id: generateUUIDv7(),
@@ -2219,7 +2290,8 @@ async function seedWithBookmarks(
       eventId: event2Id,
       subjectId,
       topicId,
-      content: 'Julius Caesar crossed the Rubicon river in 49 BC, triggering the civil war.',
+      content:
+        'Julius Caesar crossed the Rubicon river in 49 BC, triggering the civil war.',
     },
   ]);
 
@@ -2229,7 +2301,7 @@ async function seedWithBookmarks(
     profileId,
     email,
     password,
-    ids: { subjectId, sessionId, bookmarkId, topicId },
+    ids: { subjectId, bookId, sessionId, bookmarkId, topicId },
   };
 }
 
@@ -2321,9 +2393,7 @@ async function seedParentSessionWithRecap(
   const existingSessionId = base.ids.sessionId;
 
   if (!childProfileId || !subjectId || !existingSessionId) {
-    throw new Error(
-      'parent-with-children seed did not return expected IDs'
-    );
+    throw new Error('parent-with-children seed did not return expected IDs');
   }
 
   // Add a backfilled recap summary to the session created in seedParentWithChildren
@@ -2336,7 +2406,8 @@ async function seedParentSessionWithRecap(
     highlight: 'Recognised the pattern for isolating the variable.',
     narrative:
       'The learner approached algebra methodically and self-corrected on the second equation without prompting.',
-    conversationPrompt: 'Can you spot any connection between this and the last topic?',
+    conversationPrompt:
+      'Can you spot any connection between this and the last topic?',
     engagementSignal: 'engaged',
     status: 'accepted',
   });
@@ -2369,9 +2440,7 @@ async function seedParentSessionRecapEmpty(
   const existingSessionId = base.ids.sessionId;
 
   if (!childProfileId || !subjectId || !existingSessionId) {
-    throw new Error(
-      'parent-with-children seed did not return expected IDs'
-    );
+    throw new Error('parent-with-children seed did not return expected IDs');
   }
 
   // Insert a summary with all nullable recap fields left null
@@ -2652,7 +2721,8 @@ async function seedQuotaExceeded(
   );
 
   const topicId = topicIds[0];
-  if (!topicId) throw new Error('createSubjectWithCurriculum returned no topics');
+  if (!topicId)
+    throw new Error('createSubjectWithCurriculum returned no topics');
 
   return {
     scenario: 'quota-exceeded',
@@ -3079,6 +3149,153 @@ async function seedDailyLimitReached(
 }
 
 // ---------------------------------------------------------------------------
+// review-empty — All caught up (totalOverdue === 0, nextUpcomingReviewAt set)
+// ---------------------------------------------------------------------------
+
+async function seedReviewEmpty(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Caught Up Learner',
+    birthYear: LEARNER_BIRTH_YEAR,
+  });
+
+  const { subjectId, topicIds } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'Environmental Science'
+  );
+
+  // All cards scheduled for the future — totalOverdue === 0.
+  // nextUpcomingReviewAt will be populated (7 days from now), which
+  // causes practice.tsx to render the "All caught up" branch including
+  // review-empty-state and review-empty-browse.
+  const cardValues = topicIds.map((topicId) => ({
+    id: generateUUIDv7(),
+    profileId,
+    topicId,
+    easeFactor: 2.5,
+    intervalDays: 7,
+    repetitions: 3,
+    failureCount: 0,
+    consecutiveSuccesses: 3,
+    xpStatus: 'verified' as const,
+    nextReviewAt: futureDate(7),
+    lastReviewedAt: new Date(),
+  }));
+
+  await db.insert(retentionCards).values(cardValues);
+
+  const firstTopicId = topicIds[0];
+  if (!firstTopicId)
+    throw new Error('createSubjectWithCurriculum returned no topics');
+  return {
+    scenario: 'review-empty',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: { subjectId, topicId: firstTopicId },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Scenario: dictation-with-mistakes
+// Active learner for the dictation review flow (DICT-07..08).
+// The reviewResult is produced at E2E runtime by the LLM analysing a seeded
+// gallery image — the seed only provides the authenticated user context.
+// The E2E wrapper (seed-and-run-dictation-review.sh) pre-pushes a JPEG with
+// deliberate spelling errors to the emulator gallery so the LLM consistently
+// returns a non-empty mistakes array.
+// ---------------------------------------------------------------------------
+
+async function seedDictationWithMistakes(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Dictation Learner',
+    birthYear: LEARNER_BIRTH_YEAR,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: 'parent-seed@example.com',
+    respondedAt: new Date(),
+  });
+
+  const { subjectId } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'English'
+  );
+
+  return {
+    scenario: 'dictation-with-mistakes',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: { subjectId },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Scenario: dictation-perfect-score
+// Active learner for the dictation perfect-score review flow (DICT-09..10).
+// Same profile shape as dictation-with-mistakes. The wrapper pushes a JPEG
+// of neatly written, correctly spelled text so the LLM returns
+// mistakes.length === 0 and the review-celebration screen renders.
+// ---------------------------------------------------------------------------
+
+async function seedDictationPerfectScore(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Dictation Learner',
+    birthYear: LEARNER_BIRTH_YEAR,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: 'parent-seed@example.com',
+    respondedAt: new Date(),
+  });
+
+  const { subjectId } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'English'
+  );
+
+  return {
+    scenario: 'dictation-perfect-score',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: { subjectId },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -3118,10 +3335,13 @@ const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   'subscription-family-active': seedSubscriptionFamilyActive,
   'subscription-pro-active': seedSubscriptionProActive,
   'quota-exceeded': seedQuotaExceeded,
-  'forbidden': seedForbidden,
+  forbidden: seedForbidden,
   'quiz-malformed-round': seedQuizMalformedRound,
   'quiz-deterministic-wrong-answer': seedQuizDeterministicWrongAnswer,
   'quiz-answer-check-fails': seedQuizAnswerCheckFails,
+  'review-empty': seedReviewEmpty,
+  'dictation-with-mistakes': seedDictationWithMistakes,
+  'dictation-perfect-score': seedDictationPerfectScore,
 };
 
 export const VALID_SCENARIOS = Object.keys(SCENARIO_MAP) as SeedScenario[];
