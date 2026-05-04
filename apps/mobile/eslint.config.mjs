@@ -98,6 +98,34 @@ export default [
       ],
     },
   },
+  // -------------------------------------------------------------------------
+  // Governance Rule G4 (mobile) — default exports are reserved for Expo Router
+  // page components under apps/mobile/src/app/**. Anywhere else, named exports
+  // make imports searchable and prevent accidental rename drift. `.d.ts` files
+  // are excluded because Metro's `*.svg` ambient module declaration requires
+  // `export default content` to model `import Logo from './logo.svg'`.
+  // See CLAUDE.md > Repo-Specific Guardrails.
+  // -------------------------------------------------------------------------
+  {
+    files: ['src/**/*.ts', 'src/**/*.tsx'],
+    ignores: [
+      'src/app/**/*.ts',
+      'src/app/**/*.tsx',
+      'src/**/*.d.ts',
+      'src/**/*.test.ts',
+      'src/**/*.test.tsx',
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'ExportDefaultDeclaration',
+          message:
+            'Default exports are only for Expo Router page components under src/app/. Use a named export instead. See CLAUDE.md.',
+        },
+      ],
+    },
+  },
   {
     ignores: ['.expo', 'web-build', 'cache', 'dist', '**/out-tsc'],
   },

@@ -57,6 +57,37 @@ export default [
     plugins: { gov: govPlugin },
     rules: {
       'gov/no-internal-jest-mock': 'warn',
+      // ---------------------------------------------------------------------
+      // Governance Rule G7 — ban silently-skipped tests. Direct .skip() calls
+      // and xit/xdescribe/xtest aliases let dead tests accumulate in the
+      // suite while staying invisible. Conditional skips like
+      // `(hasDb ? describe : describe.skip)('integration', ...)` remain
+      // allowed: the call's callee is a ConditionalExpression, not a
+      // MemberExpression, so it does not match these selectors.
+      // .todo() is also banned; create a tracked ticket instead.
+      // See docs/plans/2026-05-03-governance-audit.md.
+      // ---------------------------------------------------------------------
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "CallExpression[callee.type='MemberExpression'][callee.object.name=/^(it|test|describe)$/][callee.property.name='skip']",
+          message:
+            'Do not commit .skip() tests. Either fix the test, delete it with a clear reason, or use a conditional callee like `(hasDb ? describe : describe.skip)(...)` for env-gated suites.',
+        },
+        {
+          selector:
+            "CallExpression[callee.type='MemberExpression'][callee.object.name='it'][callee.property.name='todo']",
+          message:
+            'Do not commit it.todo(). Open a tracked ticket for the missing test instead.',
+        },
+        {
+          selector:
+            "CallExpression[callee.type='Identifier'][callee.name=/^x(it|describe|test)$/]",
+          message:
+            'Do not commit xit/xdescribe/xtest. Either fix the test, delete it, or use a conditional callee like `(hasDb ? describe : describe.skip)(...)` for env-gated suites.',
+        },
+      ],
     },
   },
   // React/Expo config for mobile app (with deprecated rule filtered out)
