@@ -5,6 +5,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +21,7 @@ import { ErrorFallback } from '../../../components/common/ErrorFallback';
 import type { Vocabulary } from '@eduagent/schemas';
 
 function TypeBadge({ type }: { type: 'word' | 'chunk' }) {
+  const { t } = useTranslation();
   return (
     <View
       className={
@@ -29,7 +31,9 @@ function TypeBadge({ type }: { type: 'word' | 'chunk' }) {
       }
     >
       <Text className="text-caption text-text-secondary">
-        {type === 'word' ? 'word' : 'phrase'}
+        {type === 'word'
+          ? t('vocabulary.typeWord')
+          : t('vocabulary.typePhrase')}
       </Text>
     </View>
   );
@@ -57,6 +61,7 @@ function VocabularyRow({
   isDeleting: boolean;
   colors: ReturnType<typeof useThemeColors>;
 }) {
+  const { t } = useTranslation();
   return (
     <View
       className="bg-surface rounded-card px-4 py-3 mb-2 flex-row items-center"
@@ -88,7 +93,9 @@ function VocabularyRow({
         disabled={isDeleting}
         className="p-2 min-w-[44px] min-h-[44px] items-center justify-center"
         accessibilityRole="button"
-        accessibilityLabel={`Delete ${item.term}`}
+        accessibilityLabel={t('vocabulary.deleteAccessibilityLabel', {
+          term: item.term,
+        })}
         testID={`vocab-delete-${item.id}`}
       >
         {isDeleting ? (
@@ -102,6 +109,7 @@ function VocabularyRow({
 }
 
 export default function VocabularyListScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
@@ -111,29 +119,34 @@ export default function VocabularyListScreen() {
   const subjectsQuery = useSubjects();
 
   const subjectName =
-    subjectsQuery.data?.find((s) => s.id === subjectId)?.name ?? 'Vocabulary';
+    subjectsQuery.data?.find((s) => s.id === subjectId)?.name ??
+    t('vocabulary.fallbackTitle');
 
   const handleDelete = (vocabularyId: string) => {
-    platformAlert('Delete word', 'Remove this word from your vocabulary?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => {
-          deleteVocabulary.mutate(vocabularyId, {
-            onError: (err) => {
-              platformAlert(
-                'Could not delete',
-                err instanceof Error
-                  ? err.message
-                  : 'Something went wrong. Try again.',
-                [{ text: 'OK' }]
-              );
-            },
-          });
+    platformAlert(
+      t('vocabulary.deleteDialog.title'),
+      t('vocabulary.deleteDialog.message'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('common.delete'),
+          style: 'destructive',
+          onPress: () => {
+            deleteVocabulary.mutate(vocabularyId, {
+              onError: (err) => {
+                platformAlert(
+                  t('vocabulary.deleteDialog.errorTitle'),
+                  err instanceof Error
+                    ? err.message
+                    : t('vocabulary.deleteDialog.errorFallback'),
+                  [{ text: t('common.ok') }]
+                );
+              },
+            });
+          },
         },
-      },
-    ]);
+      ]
+    );
   };
 
   // UX-DE-M10: better contextual parent for deep-link entry
@@ -154,15 +167,15 @@ export default function VocabularyListScreen() {
       >
         <ErrorFallback
           variant="centered"
-          title="No subject selected"
-          message="Open this screen from a subject's detail page. Browse your Library to pick a subject and view its vocabulary."
+          title={t('vocabulary.noSubject.title')}
+          message={t('vocabulary.noSubject.message')}
           primaryAction={{
-            label: 'Open Library',
+            label: t('vocabulary.noSubject.openLibrary'),
             onPress: () => router.replace('/(app)/library' as const),
             testID: 'vocabulary-empty-library',
           }}
           secondaryAction={{
-            label: 'Back to progress',
+            label: t('vocabulary.noSubject.backToProgress'),
             onPress: () => router.replace('/(app)/progress' as never),
             testID: 'vocabulary-empty-back',
           }}
@@ -179,7 +192,7 @@ export default function VocabularyListScreen() {
           onPress={goBack}
           className="me-3 py-2 pe-2"
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('common.goBack')}
           testID="vocabulary-back"
         >
           <Text className="text-body font-semibold text-primary">
@@ -190,7 +203,9 @@ export default function VocabularyListScreen() {
           <Text className="text-h2 font-bold text-text-primary">
             {subjectName}
           </Text>
-          <Text className="text-body-sm text-text-secondary">Vocabulary</Text>
+          <Text className="text-body-sm text-text-secondary">
+            {t('vocabulary.screenSubtitle')}
+          </Text>
         </View>
       </View>
 
@@ -201,48 +216,48 @@ export default function VocabularyListScreen() {
       ) : vocabularyQuery.isError ? (
         <View className="flex-1 items-center justify-center px-6">
           <Text className="text-body text-text-secondary text-center mb-4">
-            Could not load vocabulary. Check your connection and try again.
+            {t('vocabulary.loadError')}
           </Text>
           <Pressable
             onPress={() => void vocabularyQuery.refetch()}
             className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center mb-3"
             accessibilityRole="button"
-            accessibilityLabel="Retry"
+            accessibilityLabel={t('common.retry')}
             testID="vocabulary-retry"
           >
             <Text className="text-body font-semibold text-text-inverse">
-              Retry
+              {t('common.retry')}
             </Text>
           </Pressable>
           <Pressable
             onPress={goBack}
             className="bg-surface rounded-button px-6 py-3 min-h-[48px] items-center justify-center border border-border"
             accessibilityRole="button"
-            accessibilityLabel="Go back"
+            accessibilityLabel={t('common.goBack')}
             testID="vocabulary-error-back"
           >
             <Text className="text-body font-semibold text-text-primary">
-              Go back
+              {t('common.back')}
             </Text>
           </Pressable>
         </View>
       ) : !vocabularyQuery.data?.length ? (
         <View className="flex-1 items-center justify-center px-6">
           <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
-            No vocabulary yet
+            {t('vocabulary.empty.title')}
           </Text>
           <Text className="text-body text-text-secondary text-center mb-6">
-            Complete a language session to start building your word list.
+            {t('vocabulary.empty.message')}
           </Text>
           <Pressable
             onPress={goBack}
             className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
             accessibilityRole="button"
-            accessibilityLabel="Go back"
+            accessibilityLabel={t('common.goBack')}
             testID="vocabulary-empty-back"
           >
             <Text className="text-body font-semibold text-text-inverse">
-              Go back
+              {t('common.back')}
             </Text>
           </Pressable>
         </View>

@@ -7,11 +7,20 @@ tags:
   - auth
 ---
 # ── Navigate to sign-up ─────────────────────────────────────────────
+# [BUG-959] sign-in-button can be below fold on 1080x1920; sign-up-link sits
+# even further down. Wait on the screen container, then scroll the link
+# into view before tapping.
 
 - extendedWaitUntil:
     visible:
-      id: "sign-in-button"
+      id: "sign-in-screen"
     timeout: 10000
+
+- scrollUntilVisible:
+    element:
+      id: "sign-up-link"
+    direction: DOWN
+    timeout: 5000
 
 - tapOn:
     id: "sign-up-link"
@@ -44,7 +53,13 @@ tags:
 # Password requirements hint
 - assertVisible: "At least 8 characters"
 
-# Submit button
+# Submit button — scroll to it so its visibility is verified, not assumed.
+- scrollUntilVisible:
+    element:
+      id: "sign-up-button"
+    direction: DOWN
+    timeout: 5000
+
 - assertVisible:
     id: "sign-up-button"
 
@@ -83,5 +98,5 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: "sign-in-button"
+      id: "sign-in-screen"
     timeout: 10000

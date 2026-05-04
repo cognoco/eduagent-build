@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { useProfile, isGuardianProfile } from '../lib/profile';
 import { goBackOrReplace } from '../lib/navigation';
 import {
@@ -25,6 +26,7 @@ import { formatApiError } from '../lib/format-api-error';
 export default function ProfilesScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { t } = useTranslation();
   const { profiles, activeProfile, switchProfile, isLoading } = useProfile();
   const { data: subscription } = useSubscription();
   const { data: familyData } = useFamilySubscription(
@@ -127,9 +129,9 @@ export default function ProfilesScreen() {
                 text: 'View plans',
                 onPress: () => router.push('/(app)/subscription'),
               },
-              { text: 'OK', style: 'cancel' },
+              { text: t('common.ok'), style: 'cancel' },
             ]
-          : [{ text: 'OK' }]
+          : [{ text: t('common.ok') }]
       );
       return;
     }

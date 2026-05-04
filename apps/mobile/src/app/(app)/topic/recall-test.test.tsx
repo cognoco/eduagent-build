@@ -7,6 +7,15 @@ import {
 import React from 'react';
 import { Alert } from 'react-native';
 
+jest.mock(
+  'react-i18next',
+  () => require('../../../test-utils/mock-i18n').i18nMock
+);
+
+jest.mock('expo-localization', () => ({
+  getLocales: () => [{ languageTag: 'en' }],
+}));
+
 const mockPush = jest.fn();
 const mockRecallMutate = jest.fn();
 let queuedRecallResults: Array<Record<string, unknown>> = [];

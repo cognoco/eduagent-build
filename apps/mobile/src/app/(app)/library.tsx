@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { platformAlert } from '../../lib/platform-alert';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -94,6 +95,7 @@ function SubjectStatusPill({
 }: {
   status: Subject['status'];
 }): React.ReactElement | null {
+  const { t } = useTranslation();
   if (status === 'active') return null;
   return (
     <View
@@ -110,7 +112,9 @@ function SubjectStatusPill({
             : 'text-caption font-medium text-text-secondary'
         }
       >
-        {status === 'paused' ? 'Paused' : 'Archived'}
+        {status === 'paused'
+          ? t('library.statusPaused')
+          : t('library.statusArchived')}
       </Text>
     </View>
   );
@@ -121,6 +125,7 @@ function SubjectStatusPill({
 // ---------------------------------------------------------------------------
 
 export default function LibraryScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const themeColors = useThemeColors();
@@ -277,14 +282,18 @@ export default function LibraryScreen() {
   }, [enrichedBooks]);
 
   // ---- Total topic count for header subtitle ------------------------------
-  const totalTopicsAcrossBooks = useMemo(
-    () =>
-      Array.from(topicCountsByBookId.values()).reduce(
-        (sum, c) => sum + c.total,
-        0
-      ),
-    [topicCountsByBookId]
-  );
+  // [BUG-971] Count ALL retention topics (including those with null bookId,
+  // e.g. orphan topics or parking-lot entries) so the header subtitle matches
+  // the per-shelf totals served by progressQuery. topicCountsByBookId stays
+  // book-scoped on purpose — book rows must still exclude orphans.
+  const totalTopicsAcrossBooks = useMemo(() => {
+    let total = 0;
+    for (const ret of retentionDataBySubjectId.values()) {
+      if (!Array.isArray(ret.topics)) continue;
+      total += ret.topics.length;
+    }
+    return total;
+  }, [retentionDataBySubjectId]);
 
   // ---- Server-side search -------------------------------------------------
   const searchResult = useLibrarySearch(debouncedQuery);
@@ -358,6 +367,10 @@ export default function LibraryScreen() {
   const handleBookPress = useCallback(
     (subjectId: string, bookId: string) => {
       navigatingToChild.current = true;
+      // Two-push pattern (CLAUDE.md cross-tab rule): unstable_settings only
+      // seeds one level deep, so we push the parent shelf first then the
+      // book child to ensure router.back() from the book screen lands on
+      // the shelf, not the Tabs root.
       router.push({
         pathname: '/(app)/shelf/[subjectId]',
         params: { subjectId },
@@ -385,7 +398,7 @@ export default function LibraryScreen() {
     try {
       await updateSubject.mutateAsync({ subjectId: subject.id, status });
     } catch (err: unknown) {
-      platformAlert('Could not update subject', formatApiError(err));
+      platformAlert(t('library.manage.updateErrorTitle'), formatApiError(err));
     } finally {
       setPendingSubjectId(null);
     }
@@ -439,7 +452,6 @@ export default function LibraryScreen() {
 
           return {
             bookId: b.book.id,
-            emoji: b.book.emoji ?? '📖',
             title: b.book.title,
             topicProgress,
             retentionStatus: bookRetention,
@@ -545,10 +557,10 @@ export default function LibraryScreen() {
         return (
           <ErrorFallback
             variant="centered"
-            title="Library is taking too long to load"
-            message="Check your connection and try again."
+            title={t('library.loadTimeout.title')}
+            message={t('library.loadTimeout.message')}
             primaryAction={{
-              label: 'Retry',
+              label: t('common.retry'),
               onPress: () => {
                 void subjectsQuery.refetch();
                 void progressQuery.refetch();
@@ -556,7 +568,7 @@ export default function LibraryScreen() {
               testID: 'library-load-timeout-retry',
             }}
             secondaryAction={{
-              label: 'Go Home',
+              label: t('common.goHome'),
               onPress: () => goBackOrReplace(router, '/(app)/home'),
               testID: 'library-load-timeout-home',
             }}
@@ -577,7 +589,7 @@ export default function LibraryScreen() {
           <Text className="text-body text-text-secondary text-center mb-4">
             {libraryLoadError
               ? formatApiError(libraryLoadError)
-              : 'Unable to load your library. Please try again.'}
+              : t('library.loadError.message')}
           </Text>
           <Pressable
             onPress={handleRetry}
@@ -585,7 +597,7 @@ export default function LibraryScreen() {
             testID="library-retry-button"
           >
             <Text className="text-text-inverse text-body font-semibold">
-              Retry
+              {t('common.retry')}
             </Text>
           </Pressable>
           <Pressable
@@ -594,7 +606,7 @@ export default function LibraryScreen() {
             testID="library-home-button"
           >
             <Text className="text-text-primary text-body font-semibold">
-              Go Home
+              {t('common.goHome')}
             </Text>
           </Pressable>
         </View>
@@ -609,10 +621,10 @@ export default function LibraryScreen() {
         >
           <BookPageFlipAnimation size={100} color={themeColors.accent} />
           <Text className="text-h3 font-semibold text-text-primary mt-4 text-center">
-            Your library is empty
+            {t('library.empty.title')}
           </Text>
           <Text className="text-body-sm text-text-secondary mt-2 text-center">
-            Start a study session and your subjects will appear here.
+            {t('library.empty.message')}
           </Text>
           <Pressable
             onPress={() => router.replace('/(app)')}
@@ -620,7 +632,7 @@ export default function LibraryScreen() {
             testID="library-empty-go-home"
           >
             <Text className="text-text-inverse text-body font-semibold">
-              Go to Home
+              {t('library.empty.goHome')}
             </Text>
           </Pressable>
         </View>
@@ -648,11 +660,10 @@ export default function LibraryScreen() {
                 </View>
                 <View className="flex-1">
                   <Text className="text-body font-semibold text-text-primary">
-                    You&apos;ve covered everything here!
+                    {t('library.curriculumComplete.title')}
                   </Text>
                   <Text className="text-body-sm text-text-secondary mt-2">
-                    Add a fresh subject when you want something new, or keep
-                    revisiting these topics.
+                    {t('library.curriculumComplete.message')}
                   </Text>
                 </View>
               </View>
@@ -667,7 +678,7 @@ export default function LibraryScreen() {
                 testID="library-add-subject"
               >
                 <Text className="text-text-inverse text-body font-semibold">
-                  Add another subject
+                  {t('library.curriculumComplete.addSubject')}
                 </Text>
               </Pressable>
             </View>
@@ -681,7 +692,7 @@ export default function LibraryScreen() {
           >
             <ActivityIndicator size="small" />
             <Text className="text-body-sm text-text-secondary ms-2">
-              Searching…
+              {t('library.search.searching')}
             </Text>
           </View>
         )}
@@ -692,7 +703,7 @@ export default function LibraryScreen() {
           !searchResult.isLoading && (
             <View className="items-center py-10" testID="library-search-empty">
               <Text className="text-body text-text-secondary text-center">
-                No results for &quot;{debouncedQuery}&quot;
+                {t('library.search.noResults', { query: debouncedQuery })}
               </Text>
               <Pressable
                 onPress={() => handleSearchChange('')}
@@ -700,7 +711,7 @@ export default function LibraryScreen() {
                 testID="library-search-clear-results"
               >
                 <Text className="text-body-sm font-semibold text-text-primary">
-                  Clear search
+                  {t('library.search.clear')}
                 </Text>
               </Pressable>
             </View>
@@ -718,10 +729,6 @@ export default function LibraryScreen() {
             const topicsCompleted = progress?.topicsCompleted ?? 0;
             const topicProgress = `${topicsCompleted}/${topicsTotal}`;
 
-            // Derive shelf emoji from first book's emoji
-            const firstBookEmoji =
-              books.find((b) => b.book.emoji)?.book.emoji ?? '📚';
-
             const bookRows = buildBookRows(subject.id, debouncedQuery);
 
             return (
@@ -729,7 +736,6 @@ export default function LibraryScreen() {
                 key={subject.id}
                 subjectId={subject.id}
                 name={subject.name}
-                emoji={firstBookEmoji}
                 bookCount={bookCount}
                 topicProgress={topicProgress}
                 retentionStatus={retentionStatus}
@@ -757,21 +763,27 @@ export default function LibraryScreen() {
       >
         <View className="flex-row items-center flex-1 me-3">
           <View className="flex-1">
-            <Text className="text-h1 font-bold text-text-primary">Library</Text>
+            <Text className="text-h1 font-bold text-text-primary">
+              {t('library.title')}
+            </Text>
             <Text className="text-body-sm text-text-secondary mt-1">
               {isGuardian
-                ? `Your personal library · ${
-                    subjectsQuery.data?.length ?? 0
-                  } subjects${
-                    totalTopicsAcrossBooks > 0
-                      ? ` · ${totalTopicsAcrossBooks} topics`
-                      : ''
-                  }`
-                : `${subjectsQuery.data?.length ?? 0} subjects${
-                    totalTopicsAcrossBooks > 0
-                      ? ` · ${totalTopicsAcrossBooks} topics`
-                      : ''
-                  }`}
+                ? totalTopicsAcrossBooks > 0
+                  ? t('library.subtitleGuardian', {
+                      subjectCount: subjectsQuery.data?.length ?? 0,
+                      topicCount: totalTopicsAcrossBooks,
+                    })
+                  : t('library.subtitleGuardianNoTopics', {
+                      subjectCount: subjectsQuery.data?.length ?? 0,
+                    })
+                : totalTopicsAcrossBooks > 0
+                ? t('library.subtitle', {
+                    subjectCount: subjectsQuery.data?.length ?? 0,
+                    topicCount: totalTopicsAcrossBooks,
+                  })
+                : t('library.subtitleNoTopics', {
+                    subjectCount: subjectsQuery.data?.length ?? 0,
+                  })}
             </Text>
           </View>
         </View>
@@ -782,11 +794,11 @@ export default function LibraryScreen() {
             className="rounded-full bg-surface-elevated px-4 py-2"
             style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
             accessibilityRole="button"
-            accessibilityLabel="Manage subjects"
+            accessibilityLabel={t('library.manage.accessibilityLabel')}
             testID="manage-subjects-button"
           >
             <Text className="text-body-sm font-semibold text-primary">
-              Manage
+              {t('library.manage.button')}
             </Text>
           </Pressable>
         )}
@@ -797,7 +809,7 @@ export default function LibraryScreen() {
         <LibrarySearchBar
           value={searchQuery}
           onChangeText={handleSearchChange}
-          placeholder="Search books, topics, notes…"
+          placeholder={t('library.search.placeholder')}
         />
       </View>
 
@@ -822,7 +834,7 @@ export default function LibraryScreen() {
           className="flex-1 bg-black/40 justify-end"
           onPress={() => setShowManageSubjects(false)}
           accessibilityRole="button"
-          accessibilityLabel="Close manage subjects"
+          accessibilityLabel={t('library.manage.closeAccessibilityLabel')}
           testID="manage-subjects-backdrop"
         >
           <Pressable
@@ -839,11 +851,10 @@ export default function LibraryScreen() {
               <View className="w-10 h-1 rounded-full bg-text-secondary/30" />
             </View>
             <Text className="text-h3 font-semibold text-text-primary mb-2">
-              Manage subjects
+              {t('library.manage.title')}
             </Text>
             <Text className="text-body-sm text-text-secondary mb-4">
-              Pause a subject to hide it from active learning, or archive it
-              until you restore it.
+              {t('library.manage.description')}
             </Text>
 
             <ScrollView style={{ maxHeight: 360 }}>
@@ -872,7 +883,9 @@ export default function LibraryScreen() {
                             testID={`pause-subject-${subject.id}`}
                           >
                             <Text className="text-body-sm font-semibold text-text-primary">
-                              {isPending ? 'Saving...' : 'Pause'}
+                              {isPending
+                                ? t('library.manage.saving')
+                                : t('library.manage.pause')}
                             </Text>
                           </Pressable>
                           <Pressable
@@ -887,7 +900,7 @@ export default function LibraryScreen() {
                             testID={`archive-subject-${subject.id}`}
                           >
                             <Text className="text-body-sm font-semibold text-text-primary">
-                              Archive
+                              {t('library.manage.archive')}
                             </Text>
                           </Pressable>
                         </>
@@ -902,7 +915,9 @@ export default function LibraryScreen() {
                             testID={`resume-subject-${subject.id}`}
                           >
                             <Text className="text-body-sm font-semibold text-text-inverse">
-                              {isPending ? 'Saving...' : 'Resume'}
+                              {isPending
+                                ? t('library.manage.saving')
+                                : t('library.manage.resume')}
                             </Text>
                           </Pressable>
                           <Pressable
@@ -917,7 +932,7 @@ export default function LibraryScreen() {
                             testID={`archive-subject-${subject.id}`}
                           >
                             <Text className="text-body-sm font-semibold text-text-primary">
-                              Archive
+                              {t('library.manage.archive')}
                             </Text>
                           </Pressable>
                         </>
@@ -931,7 +946,9 @@ export default function LibraryScreen() {
                           testID={`restore-subject-${subject.id}`}
                         >
                           <Text className="text-body-sm font-semibold text-text-inverse">
-                            {isPending ? 'Saving...' : 'Restore'}
+                            {isPending
+                              ? t('library.manage.saving')
+                              : t('library.manage.restore')}
                           </Text>
                         </Pressable>
                       )}
@@ -945,11 +962,11 @@ export default function LibraryScreen() {
               onPress={() => setShowManageSubjects(false)}
               className="items-center py-3"
               accessibilityRole="button"
-              accessibilityLabel="Close manage subjects"
+              accessibilityLabel={t('library.manage.closeAccessibilityLabel')}
               testID="manage-subjects-close"
             >
               <Text className="text-body font-semibold text-text-secondary">
-                Close
+                {t('common.close')}
               </Text>
             </Pressable>
           </Pressable>

@@ -32,14 +32,14 @@ describe('typed error classes [BUG-644]', () => {
     expect(err.message).toContain('Profile');
   });
 
-  it('ForbiddenError exposes a stable .code marker and optional .apiCode', () => {
+  it('ForbiddenError exposes a stable .errorCode marker and optional .apiCode', () => {
     const generic = new ForbiddenError();
     expect(generic).toBeInstanceOf(ForbiddenError);
-    expect(generic.code).toBe('FORBIDDEN');
+    expect(generic.errorCode).toBe('FORBIDDEN');
     expect(generic.apiCode).toBeUndefined();
 
     const specific = new ForbiddenError('Subject inactive', 'SUBJECT_INACTIVE');
-    expect(specific.code).toBe('FORBIDDEN');
+    expect(specific.errorCode).toBe('FORBIDDEN');
     expect(specific.apiCode).toBe('SUBJECT_INACTIVE');
     expect(specific.message).toBe('Subject inactive');
   });

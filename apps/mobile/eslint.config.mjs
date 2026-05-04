@@ -36,8 +36,18 @@ export default [
       'local/require-mutate-error-handling': 'warn',
     },
   },
-  // Ban hardcoded hex colors in non-token source files.
+  // Governance Rule 5 — ban hardcoded hex colors in non-token source files.
   // Forces use of NativeWind theme classes or design-tokens instead.
+  // Promoted from 'warn' to 'error' on 2026-05-03; the 13 known violations
+  // in session/index.tsx + _layout.tsx were migrated to design tokens
+  // (incl. new dangerSoft token) in the same PR.
+  //
+  // Ignored files are render assets (SVG <Stop> fills, Reanimated worklet
+  // colors, brand logo gradients) where NativeWind classes do not apply —
+  // SVG attributes and worklet shared values require literal hex strings.
+  // BookPageFlipAnimation, BrandCelebration, AnimatedSplash, MentomateLogo
+  // all fit this exception.
+  // See CLAUDE.md > Non-Negotiable Engineering Rules.
   {
     files: ['src/**/*.ts', 'src/**/*.tsx'],
     ignores: [
@@ -46,15 +56,44 @@ export default [
       'src/**/*.test.tsx',
       'src/components/AnimatedSplash.tsx',
       'src/components/common/BrandCelebration.tsx',
+      'src/components/common/BookPageFlipAnimation.tsx',
       'src/components/MentomateLogo.tsx',
     ],
     rules: {
       'no-restricted-syntax': [
-        'warn',
+        'error',
         {
           selector: 'Property > Literal[value=/^#[0-9a-fA-F]{3,8}$/]',
           message:
             'Avoid hardcoded hex color values. Use NativeWind theme classes (bg-surface, text-primary) or design tokens from design-tokens.ts instead.',
+        },
+      ],
+    },
+  },
+  // Governance Rule 2 — ban direct expo-secure-store imports outside the
+  // wrapper. The wrapper at lib/secure-storage handles web fallback and
+  // key sanitization; bypassing it crashes iOS Keychain on invalid chars.
+  // Test files are excluded so jest.mock('expo-secure-store') still works
+  // for the wrapper's own unit tests.
+  // See CLAUDE.md > Repo-Specific Guardrails.
+  {
+    files: ['src/**/*.ts', 'src/**/*.tsx'],
+    ignores: [
+      'src/lib/secure-storage.ts',
+      'src/**/*.test.ts',
+      'src/**/*.test.tsx',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'expo-secure-store',
+              message:
+                'Import from lib/secure-storage instead of expo-secure-store directly. The wrapper handles web fallback and key sanitization.',
+            },
+          ],
         },
       ],
     },

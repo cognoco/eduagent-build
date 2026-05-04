@@ -18,8 +18,10 @@ export const conversationLanguageSchema = z.enum([
 ]);
 export type ConversationLanguage = z.infer<typeof conversationLanguageSchema>;
 
-// BKT-C.1 — optional, learner-owned free text. Max 32 chars enforced here,
-// not at the DB layer. Stored as-is (no LLM validation).
+// BKT-C.1 — optional, learner-owned free text. Max 32 chars enforced as
+// defence-in-depth: this Zod check at the API/RPC boundary AND a CHECK
+// constraint at the DB layer (migration 0052_fixed_hex). Stored as-is
+// (no LLM validation).
 export const pronounsSchema = z.string().min(1).max(32);
 export type Pronouns = z.infer<typeof pronounsSchema>;
 

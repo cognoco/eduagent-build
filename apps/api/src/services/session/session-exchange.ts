@@ -467,7 +467,7 @@ export async function prepareExchangeContext(
     !isInterleaved &&
     session.sessionType === 'learning'
   ) {
-    const ease = Number(retentionCard.easeFactor);
+    const ease = retentionCard.easeFactor;
     const reps = retentionCard.repetitions;
     if (shouldTriggerEvaluate(ease, reps)) {
       verificationType = 'evaluate';
@@ -659,7 +659,7 @@ export async function prepareExchangeContext(
   if (retentionCard) {
     const retState: RetentionState = {
       topicId: retentionCard.topicId,
-      easeFactor: Number(retentionCard.easeFactor),
+      easeFactor: retentionCard.easeFactor,
       intervalDays: retentionCard.intervalDays,
       repetitions: retentionCard.repetitions,
       failureCount: retentionCard.failureCount,
@@ -933,9 +933,7 @@ export async function prepareExchangeContext(
     retentionStatus: retentionStatusValue
       ? {
           status: retentionStatusValue,
-          easeFactor: retentionCard
-            ? Number(retentionCard.easeFactor)
-            : undefined,
+          easeFactor: retentionCard ? retentionCard.easeFactor : undefined,
           daysSinceLastReview,
         }
       : undefined,
@@ -1038,12 +1036,26 @@ export async function persistExchangeResult(
   // SessionExchangeLimitError but its events stayed in the DB as orphans
   // (visible as ghost turns in subsequent exchangeHistory loads).
   //
-  // Why reorder instead of wrap in a transaction: the production driver is
-  // neon-http (packages/database/src/client.ts), which does NOT support
-  // multi-statement transactions — db.transaction silently degrades to
-  // sequential statements with only a console.warn. A transaction wrap
-  // would NOT roll back orphan events in production. Reordering makes the
-  // guarantee independent of transaction support.
+  // Why reorder instead of wrap in a transaction:
+  //
+  // [BUG-981 / CCR-PR126-M-5] The production driver was migrated from
+  // neon-http to neon-serverless (Phase 0.0 of the RLS preparatory plan,
+  // see packages/database/src/client.ts), so interactive transactions over
+  // WebSocket are now supported. The earlier comment on this block claimed
+  // db.transaction "silently degrades to sequential statements" — that
+  // claim is no longer true and was removed.
+  //
+  // The reorder is kept for two reasons that *do* still hold:
+  //   1. The hot path makes only two writes (UPDATE + 1–2 INSERTs); on the
+  //      contention loser branch we want to avoid the cost of opening a tx
+  //      just to roll back. The targeted DELETE rollback below is cheaper.
+  //   2. We are mid-migration on RLS plumbing; until createScopedRepository
+  //      is fully RLS-aware everywhere, mixing tx wrapping with repo writes
+  //      requires extra ceremony we'd rather defer.
+  //
+  // If those constraints lift, this block is a candidate for replacement
+  // with a single db.transaction(async (tx) => { ... }) block — the driver
+  // now supports it correctly.
   //
   // Trade-off: if the post-UPDATE INSERTs fail (e.g., connection drop)
   // we get a counter increment without events. This is rare and recoverable

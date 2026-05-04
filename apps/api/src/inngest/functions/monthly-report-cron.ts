@@ -1,3 +1,22 @@
+// @inngest-admin: cross-profile
+//
+// This file is intentionally cross-profile. It contains two exports:
+//   - `monthlyReportCron` (admin): cron entry that scans all parent/child
+//     family links with active snapshots for the prior month, then fans out
+//     per-pair generate events. Legitimately cross-profile.
+//   - `monthlyReportGenerate` (per-pair fan-out): event handler driven by
+//     `app/monthly-report.generate`; parentId and childId come from the event
+//     payload and all DB reads are scoped to those two profiles only.
+//
+// Profile-scoping rules in CLAUDE.md ("Reads must use createScopedRepository")
+// do NOT apply to `monthlyReportCron` — this is system-wide work running
+// outside any single profile's request context.
+//
+// If you add raw drizzle queries to this file, ensure they cannot leak
+// data between profiles in user-visible output (notifications,
+// recommendations). When in doubt, scope by profileId at the leaf even
+// when scanning broadly.
+
 import { and, eq, gte, inArray, lte } from 'drizzle-orm';
 import {
   monthlyReports,

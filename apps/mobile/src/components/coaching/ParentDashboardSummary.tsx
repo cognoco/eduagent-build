@@ -1,6 +1,7 @@
 import { type ReactNode } from 'react';
 import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { BaseCoachingCard } from './BaseCoachingCard';
 import { RetentionSignal, type RetentionStatus } from '../progress';
 import { useThemeColors } from '../../lib/theme';
@@ -54,21 +55,21 @@ const TREND_LABELS: Record<'up' | 'down' | 'stable', string> = {
 
 const RETENTION_TREND_CONFIG: Record<
   'improving' | 'declining' | 'stable',
-  { arrow: string; label: string; className: string }
+  { arrow: string; labelKey: string; className: string }
 > = {
   improving: {
     arrow: '\u2191',
-    label: 'Improving',
+    labelKey: 'coaching.parentDashboard.retentionTrend.improving',
     className: 'text-retention-strong',
   },
   declining: {
     arrow: '\u2193',
-    label: 'Declining',
+    labelKey: 'coaching.parentDashboard.retentionTrend.declining',
     className: 'text-retention-weak',
   },
   stable: {
     arrow: '\u2192',
-    label: 'Stable',
+    labelKey: 'coaching.parentDashboard.retentionTrend.stable',
     className: 'text-text-secondary',
   },
 };
@@ -78,26 +79,26 @@ const AGGREGATE_SIGNAL_CONFIG: Record<
   {
     icon: keyof typeof Ionicons.glyphMap;
     colorKey: 'retentionStrong' | 'retentionFading' | 'retentionWeak';
-    label: string;
+    labelKey: string;
     textColor: string;
   }
 > = {
   'on-track': {
     icon: 'leaf',
     colorKey: 'retentionStrong',
-    label: 'On Track',
+    labelKey: 'coaching.parentDashboard.signal.onTrack',
     textColor: 'text-retention-strong',
   },
   'needs-attention': {
     icon: 'flame',
     colorKey: 'retentionFading',
-    label: 'Needs Attention',
+    labelKey: 'coaching.parentDashboard.signal.needsAttention',
     textColor: 'text-retention-fading',
   },
   'falling-behind': {
     icon: 'sparkles',
     colorKey: 'retentionWeak',
-    label: 'Falling Behind',
+    labelKey: 'coaching.parentDashboard.signal.fallingBehind',
     textColor: 'text-retention-weak',
   },
 };
@@ -148,6 +149,7 @@ export function ParentDashboardSummary({
   isLoading,
 }: ParentDashboardSummaryProps): ReactNode {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const aggregateSignal = deriveAggregateSignal(subjects);
   const showFullSignals = !isNewLearner(totalSessions);
   const remaining = sessionsUntilFullProgress(totalSessions);
@@ -167,7 +169,9 @@ export function ParentDashboardSummary({
           <View
             className="flex-row items-center mt-1"
             testID="aggregate-signal"
-            accessibilityLabel={`Overall status: ${AGGREGATE_SIGNAL_CONFIG[aggregateSignal].label}`}
+            accessibilityLabel={`Overall status: ${t(
+              AGGREGATE_SIGNAL_CONFIG[aggregateSignal].labelKey
+            )}`}
           >
             <Ionicons
               name={AGGREGATE_SIGNAL_CONFIG[aggregateSignal].icon}
@@ -178,7 +182,7 @@ export function ParentDashboardSummary({
             <Text
               className={`text-body-sm font-semibold ${AGGREGATE_SIGNAL_CONFIG[aggregateSignal].textColor}`}
             >
-              {AGGREGATE_SIGNAL_CONFIG[aggregateSignal].label}
+              {t(AGGREGATE_SIGNAL_CONFIG[aggregateSignal].labelKey)}
             </Text>
           </View>
         ) : (
@@ -186,7 +190,7 @@ export function ParentDashboardSummary({
             className="text-caption text-text-secondary mt-1"
             testID="aggregate-signal-empty"
           >
-            No data yet
+            {t('coaching.parentDashboard.noDataYet')}
           </Text>
         )
       ) : null}
@@ -206,13 +210,13 @@ export function ParentDashboardSummary({
             accessibilityLabel={`Review health: ${retentionTrend}`}
           >
             <Text className="text-caption text-text-secondary">
-              Review health:{' '}
+              {t('coaching.parentDashboard.reviewHealth')}{' '}
             </Text>
             <Text
               className={`text-caption font-semibold ${RETENTION_TREND_CONFIG[retentionTrend].className}`}
             >
               {RETENTION_TREND_CONFIG[retentionTrend].arrow}{' '}
-              {RETENTION_TREND_CONFIG[retentionTrend].label}
+              {t(RETENTION_TREND_CONFIG[retentionTrend].labelKey)}
             </Text>
           </View>
         ) : (
@@ -220,7 +224,7 @@ export function ParentDashboardSummary({
             className="text-caption text-text-secondary mt-1.5"
             testID="retention-trend-empty"
           >
-            No data yet
+            {t('coaching.parentDashboard.noDataYet')}
           </Text>
         )
       ) : null}
@@ -302,7 +306,7 @@ export function ParentDashboardSummary({
     <BaseCoachingCard
       headline={childName}
       subtext={summary}
-      primaryLabel="View details"
+      primaryLabel={t('coaching.parentDashboard.viewDetails')}
       onPrimary={onDrillDown}
       metadata={metadata}
       isLoading={isLoading}

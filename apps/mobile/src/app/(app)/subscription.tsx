@@ -22,6 +22,7 @@ import type {
 } from 'react-native-purchases';
 import { PURCHASES_ERROR_CODE, PACKAGE_TYPE } from 'react-native-purchases';
 import { useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../lib/theme';
 import { goBackOrReplace } from '../../lib/navigation';
 import { useProfile } from '../../lib/profile';
@@ -589,6 +590,7 @@ export default function SubscriptionScreen() {
   const colors = useThemeColors();
   const { activeProfile } = useProfile();
   const client = useApiClient();
+  const { t } = useTranslation();
 
   const queryClient = useQueryClient();
 
@@ -744,7 +746,7 @@ export default function SubscriptionScreen() {
               void refetchSub();
             },
           },
-          { text: 'OK', style: 'cancel' },
+          { text: t('common.ok'), style: 'cancel' },
         ]
       );
     }
@@ -847,7 +849,7 @@ export default function SubscriptionScreen() {
         platformAlert(
           'Purchase confirmed',
           'Your subscription is being activated. It usually appears within a minute — pull down to refresh.',
-          [{ text: 'OK' }]
+          [{ text: t('common.ok') }]
         );
       }
     },
@@ -887,7 +889,7 @@ export default function SubscriptionScreen() {
               });
             },
           },
-          { text: 'OK', style: 'cancel' },
+          { text: t('common.ok'), style: 'cancel' },
         ]
       );
     }
@@ -913,7 +915,7 @@ export default function SubscriptionScreen() {
               void refetchOfferings();
             },
           },
-          { text: 'OK', style: 'cancel' },
+          { text: t('common.ok'), style: 'cancel' },
         ]
       );
       return;
@@ -939,7 +941,7 @@ export default function SubscriptionScreen() {
               void refetchOfferings();
             },
           },
-          { text: 'OK', style: 'cancel' },
+          { text: t('common.ok'), style: 'cancel' },
         ]
       );
       return;
@@ -1024,7 +1026,7 @@ export default function SubscriptionScreen() {
       platformAlert(
         'Purchase confirmed',
         'Your 500 credits are being added. They usually appear within a minute \u2014 pull down to refresh your usage.',
-        [{ text: 'OK' }]
+        [{ text: t('common.ok') }]
       );
     }
   }, [
@@ -1163,6 +1165,35 @@ export default function SubscriptionScreen() {
           className="flex-1 px-5"
           contentContainerStyle={{ flexGrow: 1, paddingBottom: 32 }}
         >
+          {/* [BUG-966] Trial banner — surfaces "Trial active" headline with the
+              trial end date when the server reports status='trial'. The status
+              badge below also shifts to "Trial" so it does not falsely read
+              "Active" for a trialing user. */}
+          {status === 'trial' && (
+            <View
+              className="bg-primary-soft rounded-card px-4 py-3 mt-4"
+              testID="trial-banner"
+            >
+              <Text className="text-body font-semibold text-primary">
+                {t('subscription.trial.active')}
+              </Text>
+              {subscription?.trialEndsAt && (
+                <Text className="text-caption text-text-secondary mt-0.5">
+                  {t('subscription.trial.endsAt', {
+                    date: new Date(subscription.trialEndsAt).toLocaleDateString(
+                      undefined,
+                      {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                      }
+                    ),
+                  })}
+                </Text>
+              )}
+            </View>
+          )}
+
           {/* Current plan */}
           <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-4">
             Current plan
@@ -1183,6 +1214,8 @@ export default function SubscriptionScreen() {
                     ? 'Past due'
                     : status === 'expired'
                     ? 'Expired'
+                    : status === 'trial'
+                    ? t('subscription.statusBadge.trial')
                     : 'Active'}
                 </Text>
               </View>

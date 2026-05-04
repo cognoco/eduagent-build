@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
+import i18next from '../../../i18n';
 import type { QuizRoundResponse } from '@eduagent/schemas';
 import { ErrorFallback } from '../../../components/common/ErrorFallback';
 import { useGenerateRound } from '../../../hooks/use-quiz';
@@ -24,27 +26,29 @@ export function friendlyErrorMessage(
 ): string {
   switch (code) {
     case 'UPSTREAM_ERROR':
-      return 'Something went wrong creating your quiz. Try again!';
+      return i18next.t('quiz.launch.friendlyErrors.upstreamError');
     case 'TIMEOUT':
-      return 'The quiz took too long to create. Try again!';
+      return i18next.t('quiz.launch.friendlyErrors.timeout');
     case 'RATE_LIMITED':
-      return 'Too many requests — wait a moment and try again.';
+      return i18next.t('quiz.launch.friendlyErrors.rateLimited');
     case 'VALIDATION_ERROR':
-      return 'Something went wrong. Please try a different activity.';
+      return i18next.t('quiz.launch.friendlyErrors.validationError');
     default:
       return fallback.length > 60
-        ? 'Something went wrong. Try again!'
+        ? i18next.t('quiz.launch.friendlyErrors.genericShort')
         : fallback;
   }
 }
 
-const LOADING_MESSAGES = [
-  'Shuffling questions...',
-  'Picking a theme...',
-  'Almost ready...',
-];
+// Keys are resolved at render time via t() in the component.
+const LOADING_MESSAGE_KEYS = [
+  'quiz.launch.loadingShuffling',
+  'quiz.launch.loadingPicking',
+  'quiz.launch.loadingAlmost',
+] as const;
 
 export default function QuizLaunchScreen(): React.ReactElement {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
@@ -108,7 +112,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
   useEffect(() => {
     const interval = setInterval(() => {
       setLoadingMessageIndex(
-        (current) => (current + 1) % LOADING_MESSAGES.length
+        (current) => (current + 1) % LOADING_MESSAGE_KEYS.length
       );
     }, 1500);
 
@@ -160,24 +164,24 @@ export default function QuizLaunchScreen(): React.ReactElement {
           className="w-full rounded-card border border-primary bg-primary-soft p-6"
           accessible
           accessibilityRole="alert"
-          accessibilityLabel="Challenge round. This round is harder than usual."
+          accessibilityLabel={t('quiz.launch.challengeLabel')}
           testID="quiz-challenge-banner"
         >
           <Text className="text-center text-h3 font-bold text-text-primary">
-            Challenge round
+            {t('quiz.launch.challengeTitle')}
           </Text>
           <Text className="mt-3 text-center text-body text-text-secondary">
-            You&apos;re on a streak. This one is harder.
+            {t('quiz.launch.challengeBody')}
           </Text>
           <Pressable
             onPress={() => enterPlay(challengeRound)}
             className="mt-5 min-h-[48px] items-center justify-center rounded-button bg-primary px-6 py-3"
             accessibilityRole="button"
-            accessibilityLabel="Start challenge round"
+            accessibilityLabel={t('quiz.launch.challengeStartLabel')}
             testID="quiz-challenge-start"
           >
             <Text className="text-body font-semibold text-text-inverse">
-              Start
+              {t('quiz.launch.challengeStart')}
             </Text>
           </Pressable>
         </View>
@@ -197,10 +201,10 @@ export default function QuizLaunchScreen(): React.ReactElement {
       >
         <ErrorFallback
           variant="centered"
-          title="Quiz is taking too long"
-          message="Generating the round took longer than expected. Check your connection and try again."
+          title={t('quiz.launch.hardTimeoutTitle')}
+          message={t('quiz.launch.hardTimeoutMessage')}
           primaryAction={{
-            label: 'Retry',
+            label: t('common.retry'),
             onPress: () => {
               setHardTimedOut(false);
               startRound();
@@ -208,7 +212,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
             testID: 'quiz-launch-retry',
           }}
           secondaryAction={{
-            label: 'Go Back',
+            label: t('common.goBack'),
             onPress: () => goBackOrReplace(router, '/(app)/quiz'),
             testID: 'quiz-launch-back',
           }}
@@ -240,7 +244,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
     const rawMessage =
       generateRound.error instanceof Error && generateRound.error.message
         ? generateRound.error.message
-        : 'Try again, or head back and pick a different activity.';
+        : t('quiz.launch.errorFallback');
     const errorMessage = friendlyErrorMessage(errorCode, rawMessage);
 
     return (
@@ -251,19 +255,19 @@ export default function QuizLaunchScreen(): React.ReactElement {
       >
         <ErrorFallback
           variant="centered"
-          title="Couldn't create a round"
+          title={t('quiz.launch.errorTitle')}
           message={errorMessage}
           primaryAction={
             isUnretryable
               ? undefined
               : {
-                  label: 'Retry',
+                  label: t('common.retry'),
                   onPress: startRound,
                   testID: 'quiz-launch-retry',
                 }
           }
           secondaryAction={{
-            label: 'Go Back',
+            label: t('common.goBack'),
             onPress: () => goBackOrReplace(router, '/(app)/quiz'),
             testID: 'quiz-launch-back',
           }}
@@ -284,15 +288,16 @@ export default function QuizLaunchScreen(): React.ReactElement {
     >
       <ActivityIndicator size="large" color={colors.primary} />
       <Text className="mt-4 text-body text-text-secondary">
-        {LOADING_MESSAGES[loadingMessageIndex]}
+        {t(
+          LOADING_MESSAGE_KEYS[loadingMessageIndex] ?? LOADING_MESSAGE_KEYS[0]
+        )}
       </Text>
       {timedOut ? (
         <Text
           className="mt-2 text-center text-body-sm text-text-secondary"
           testID="quiz-launch-timed-out"
         >
-          This is taking longer than usual — tap Cancel if you&apos;d rather try
-          again later.
+          {t('quiz.launch.timedOutHint')}
         </Text>
       ) : null}
       <Pressable
@@ -300,10 +305,10 @@ export default function QuizLaunchScreen(): React.ReactElement {
         className="mt-10 min-h-[44px] items-center justify-center rounded-button px-6 py-3"
         testID="quiz-launch-cancel"
         accessibilityRole="button"
-        accessibilityLabel="Cancel"
+        accessibilityLabel={t('quiz.launch.cancelLabel')}
       >
         <Text className="text-body-sm font-semibold text-text-secondary">
-          Cancel
+          {t('quiz.launch.cancelLabel')}
         </Text>
       </Pressable>
     </View>

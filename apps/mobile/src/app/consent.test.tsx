@@ -12,6 +12,8 @@ const mockBack = jest.fn();
 const mockReplace = jest.fn();
 const mockCanGoBack = jest.fn();
 
+jest.mock('react-i18next', () => require('../test-utils/mock-i18n').i18nMock);
+
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     back: mockBack,

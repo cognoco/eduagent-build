@@ -64,9 +64,10 @@ export const profiles = pgTable(
     // rows backfill to English without a behavioral change. CHECK enforces the
     // supported language list at the DB layer.
     conversationLanguage: text('conversation_language').notNull().default('en'),
-    // BKT-C.1 — optional, learner-owned free text up to 32 chars (enforced in
-    // Zod). No SQL length check: the field is nullable and the schema boundary
-    // is where we enforce formatting.
+    // BKT-C.1 — optional, learner-owned free text up to 32 chars. The Zod
+    // schema is the primary boundary; the DB CHECK below (BUG-978) is the
+    // last-resort guard for paths that bypass the API (raw SQL, seed scripts,
+    // admin patches).
     pronouns: text('pronouns'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
@@ -84,6 +85,13 @@ export const profiles = pgTable(
     check(
       'profiles_conversation_language_check',
       sql`${table.conversationLanguage} IN ('en','cs','es','fr','de','it','pt','pl')`
+    ),
+    // [BUG-978 / CCR-PR123-DB-1] DB-layer enforcement of the 32-char pronouns
+    // cap. The Zod validator is primary; this CHECK closes the gap for any
+    // path that bypasses the API layer (raw SQL, seed scripts, admin tools).
+    check(
+      'profiles_pronouns_length_check',
+      sql`${table.pronouns} IS NULL OR char_length(${table.pronouns}) <= 32`
     ),
   ]
 );

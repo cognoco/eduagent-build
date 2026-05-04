@@ -66,7 +66,7 @@ function mapRetentionCardRow(
 ): RetentionCardResponse {
   return {
     topicId: row.topicId,
-    easeFactor: Number(row.easeFactor),
+    easeFactor: row.easeFactor,
     intervalDays: row.intervalDays,
     repetitions: row.repetitions,
     nextReviewAt: row.nextReviewAt?.toISOString() ?? null,
@@ -82,7 +82,7 @@ function rowToRetentionState(
 ): RetentionState {
   return {
     topicId: row.topicId,
-    easeFactor: Number(row.easeFactor),
+    easeFactor: row.easeFactor,
     intervalDays: row.intervalDays,
     repetitions: row.repetitions,
     failureCount: row.failureCount,
@@ -1179,7 +1179,7 @@ export async function updateRetentionFromSession(
   const result = sm2({
     quality,
     card: {
-      easeFactor: Number(card.easeFactor),
+      easeFactor: card.easeFactor,
       interval: card.intervalDays,
       repetitions: card.repetitions,
       lastReviewedAt:

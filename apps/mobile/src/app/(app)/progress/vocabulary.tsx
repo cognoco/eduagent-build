@@ -1,4 +1,5 @@
 import { ScrollView, Text, View, Pressable } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ErrorFallback } from '../../../components/common';
@@ -25,6 +26,7 @@ function SubjectVocabSection({
 }: {
   subject: SubjectInventory;
 }): React.ReactElement {
+  const { t } = useTranslation();
   const router = useRouter();
   const cefrEntries = sortCefrEntries(
     Object.entries(subject.vocabulary.byCefrLevel)
@@ -36,7 +38,9 @@ function SubjectVocabSection({
         router.push(`/(app)/vocabulary/${subject.subjectId}` as never)
       }
       accessibilityRole="button"
-      accessibilityLabel={`View ${subject.subjectName} vocabulary`}
+      accessibilityLabel={t('progress.vocabulary.viewSubjectLabel', {
+        subject: subject.subjectName,
+      })}
       testID={`vocab-subject-${subject.subjectId}`}
       className="bg-surface rounded-card p-4 mt-4"
     >
@@ -45,14 +49,18 @@ function SubjectVocabSection({
           {subject.subjectName}
         </Text>
         <Text className="text-body-sm text-primary font-semibold">
-          View all →
+          {t('progress.vocabulary.viewAllLink')}
         </Text>
       </View>
       <Text className="text-body-sm text-text-secondary mt-1">
-        {subject.vocabulary.total} words — {subject.vocabulary.mastered}{' '}
-        mastered
+        {t('progress.vocabulary.wordsSummary', {
+          total: subject.vocabulary.total,
+          mastered: subject.vocabulary.mastered,
+        })}
         {subject.vocabulary.learning > 0
-          ? `, ${subject.vocabulary.learning} learning`
+          ? t('progress.vocabulary.learningAppend', {
+              count: subject.vocabulary.learning,
+            })
           : ''}
       </Text>
       {cefrEntries.length > 0 ? (
@@ -61,7 +69,7 @@ function SubjectVocabSection({
             <View key={level} className="flex-row items-center justify-between">
               <Text className="text-body-sm text-text-primary">{level}</Text>
               <Text className="text-body-sm text-text-secondary">
-                {count} words
+                {t('progress.subject.wordCount', { count })}
               </Text>
             </View>
           ))}
@@ -83,6 +91,7 @@ function SkeletonRow(): React.ReactElement {
 }
 
 export default function VocabularyBrowserScreen(): React.ReactElement {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const {
@@ -107,10 +116,12 @@ export default function VocabularyBrowserScreen(): React.ReactElement {
   const hasLanguageSubject = existingLanguageSubjects.length > 0;
   const emptyMessage =
     existingLanguageSubjects.length === 1
-      ? `Practice ${existingLanguageSubjects[0]} to start building your word list.`
+      ? t('progress.vocabulary.emptyMessageOne', {
+          subject: existingLanguageSubjects[0],
+        })
       : existingLanguageSubjects.length > 1
-      ? 'Practice a language subject to start building your word list.'
-      : 'Start a language subject and the words you learn will appear here.';
+      ? t('progress.vocabulary.emptyMessageMany')
+      : t('progress.vocabulary.emptyMessageNone');
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
@@ -119,7 +130,7 @@ export default function VocabularyBrowserScreen(): React.ReactElement {
           onPress={() => goBackOrReplace(router, '/(app)/progress' as const)}
           className="me-3 py-2 pe-2"
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('common.goBack')}
           testID="vocab-browser-back"
         >
           <Text className="text-primary text-body font-semibold">
@@ -128,11 +139,11 @@ export default function VocabularyBrowserScreen(): React.ReactElement {
         </Pressable>
         <View className="flex-1">
           <Text className="text-h2 font-bold text-text-primary">
-            Your Vocabulary
+            {t('progress.vocabulary.pageTitle')}
           </Text>
           {!isLoading && !isError && totalVocab > 0 ? (
             <Text className="text-body-sm text-text-secondary mt-0.5">
-              {totalVocab} words across all subjects
+              {t('progress.vocabulary.totalWords', { count: totalVocab })}
             </Text>
           ) : null}
         </View>
@@ -150,15 +161,15 @@ export default function VocabularyBrowserScreen(): React.ReactElement {
         ) : isError ? (
           <View testID="vocab-browser-error">
             <ErrorFallback
-              title="We couldn't load your vocabulary"
-              message="Check your connection and try again."
+              title={t('progress.vocabulary.errorTitle')}
+              message={t('progress.vocabulary.errorMessage')}
               primaryAction={{
-                label: 'Try again',
+                label: t('common.tryAgain'),
                 onPress: () => void refetch(),
                 testID: 'vocab-browser-retry',
               }}
               secondaryAction={{
-                label: 'Go back',
+                label: t('common.goBack'),
                 onPress: () =>
                   goBackOrReplace(router, '/(app)/progress' as const),
                 testID: 'vocab-browser-go-back',
@@ -172,16 +183,18 @@ export default function VocabularyBrowserScreen(): React.ReactElement {
             testID="vocab-browser-no-language"
           >
             <Text className="text-text-secondary text-center text-base">
-              Vocabulary tracking is available for language subjects.
+              {t('progress.vocabulary.noLanguageMessage')}
             </Text>
             <Pressable
               onPress={() => router.replace('/(app)/progress' as never)}
               className="mt-4 rounded-lg bg-primary px-6 py-3"
               accessibilityRole="button"
-              accessibilityLabel="Go back"
+              accessibilityLabel={t('common.goBack')}
               testID="vocab-browser-no-language-back"
             >
-              <Text className="text-text-inverse font-medium">Go Back</Text>
+              <Text className="text-text-inverse font-medium">
+                {t('common.goBack')}
+              </Text>
             </Pressable>
           </View>
         ) : isEmpty && newLearner ? (
@@ -190,20 +203,20 @@ export default function VocabularyBrowserScreen(): React.ReactElement {
             testID="vocab-browser-new-learner"
           >
             <Text className="text-h3 font-semibold text-text-primary text-center">
-              Your vocabulary will grow here
+              {t('progress.vocabulary.newLearnerTitle')}
             </Text>
             <Text className="text-body-sm text-text-secondary text-center mt-2">
-              Keep learning and the words you discover will appear here.
+              {t('progress.vocabulary.newLearnerSubtitle')}
             </Text>
             <Pressable
               onPress={() => router.replace('/(app)/progress' as never)}
               className="bg-background rounded-button px-5 py-3 mt-4"
               accessibilityRole="button"
-              accessibilityLabel="Go back"
+              accessibilityLabel={t('common.goBack')}
               testID="vocab-browser-new-learner-back"
             >
               <Text className="text-body font-semibold text-text-primary">
-                Go back
+                {t('common.goBack')}
               </Text>
             </Pressable>
           </View>
@@ -213,7 +226,7 @@ export default function VocabularyBrowserScreen(): React.ReactElement {
             testID="vocab-browser-empty"
           >
             <Text className="text-h3 font-semibold text-text-primary text-center">
-              No vocabulary yet
+              {t('progress.vocabulary.emptyTitle')}
             </Text>
             <Text className="text-body-sm text-text-secondary text-center mt-2">
               {emptyMessage}
@@ -222,11 +235,11 @@ export default function VocabularyBrowserScreen(): React.ReactElement {
               onPress={() => router.replace('/(app)/progress' as never)}
               className="bg-background rounded-button px-5 py-3 mt-4"
               accessibilityRole="button"
-              accessibilityLabel="Go back to Journey"
+              accessibilityLabel={t('progress.vocabulary.emptyBackLabel')}
               testID="vocab-browser-empty-back"
             >
               <Text className="text-body font-semibold text-text-primary">
-                Go back
+                {t('common.goBack')}
               </Text>
             </Pressable>
           </View>

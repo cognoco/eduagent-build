@@ -42,7 +42,11 @@ tags:
 - assertVisible:
     id: "voice-toggle"
 
-# 6. Voice defaults OFF for learning session — no mic button
+# 6. Voice defaults OFF for learning session — only the compact "enable
+#    voice" pill button is shown, NOT the full record button. [BUG-965]
+#    The two states must be distinguishable so this assertion can be exact.
+- assertVisible:
+    id: "voice-enable-button"
 - assertNotVisible:
     id: "voice-record-button"
 
@@ -117,11 +121,14 @@ tags:
 - tapOn:
     id: "voice-toggle"
 
-# 20. Mic button gone
+# 20. Record button gone, compact enable-voice button takes its place
 - extendedWaitUntil:
     notVisible:
       id: "voice-record-button"
     timeout: 3000
+
+- assertVisible:
+    id: "voice-enable-button"
 
 # 21. Playback bar gone
 - assertNotVisible:

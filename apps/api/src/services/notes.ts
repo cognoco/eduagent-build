@@ -46,6 +46,35 @@ async function insertNoteWithCap(
       sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`
     );
 
+    // Idempotency for retries: if a note for this sessionId already exists,
+    // return it instead of inserting a duplicate. submitSummary can be
+    // retried (mobile network timeout, double-tap) and without this check the
+    // 50-note cap would be the only backstop — poor UX.
+    // Filter by topicId as well: callers today validate session.topicId === topicId
+    // upstream, but the function signature accepts arbitrary topicId so a future
+    // caller mismatching the pair must not get a note bound to the wrong topic.
+    if (values.sessionId) {
+      const [existingForSession] = await tx
+        .select({
+          id: topicNotes.id,
+          topicId: topicNotes.topicId,
+          sessionId: topicNotes.sessionId,
+          content: topicNotes.content,
+          createdAt: topicNotes.createdAt,
+          updatedAt: topicNotes.updatedAt,
+        })
+        .from(topicNotes)
+        .where(
+          and(
+            eq(topicNotes.profileId, values.profileId),
+            eq(topicNotes.sessionId, values.sessionId),
+            eq(topicNotes.topicId, values.topicId)
+          )
+        )
+        .limit(1);
+      if (existingForSession) return existingForSession;
+    }
+
     const [countRow] = await tx
       .select({ count: sql<number>`count(*)` })
       .from(topicNotes)
@@ -281,8 +310,11 @@ export async function getTopicIdsWithNotes(
   db: Database,
   profileId: string
 ): Promise<string[]> {
+  // Migration 0048 dropped the (topic_id, profile_id) unique constraint to
+  // allow multi-note per topic, so the same topicId can now appear multiple
+  // times. Use selectDistinct to avoid bloating the response.
   const rows = await db
-    .select({ topicId: topicNotes.topicId })
+    .selectDistinct({ topicId: topicNotes.topicId })
     .from(topicNotes)
     .where(eq(topicNotes.profileId, profileId));
 

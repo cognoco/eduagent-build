@@ -10,6 +10,7 @@ import {
   useChildReportDetail,
   useMarkChildReportViewed,
 } from '../../../../../hooks/use-progress';
+import { useTranslation } from 'react-i18next';
 
 function MetricCard({
   label,
@@ -31,6 +32,7 @@ function MetricCard({
 }
 
 export default function ChildReportDetailScreen(): React.ReactElement {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { profileId, reportId } = useLocalSearchParams<{
@@ -86,7 +88,7 @@ export default function ChildReportDetailScreen(): React.ReactElement {
             onPress={() => goBackOrReplace(router, reportsHref)}
             className="me-3 py-2 pe-2"
             accessibilityRole="button"
-            accessibilityLabel="Go back"
+            accessibilityLabel={t('common.goBack')}
             testID="child-report-back"
           >
             <Text className="text-body font-semibold text-primary">
@@ -95,10 +97,10 @@ export default function ChildReportDetailScreen(): React.ReactElement {
           </Pressable>
           <View className="flex-1">
             <Text className="text-h2 font-bold text-text-primary">
-              {report?.reportData.month ?? 'Monthly report'}
+              {report?.reportData.month ?? t('parentView.report.monthlyReport')}
             </Text>
             <Text className="text-body-sm text-text-secondary mt-0.5">
-              Progress you can see and share.
+              {t('parentView.report.subtitle')}
             </Text>
           </View>
         </View>
@@ -106,7 +108,7 @@ export default function ChildReportDetailScreen(): React.ReactElement {
         {isLoading ? (
           <View className="bg-surface rounded-card p-4 mt-4">
             <Text className="text-body-sm text-text-secondary">
-              Loading report...
+              {t('parentView.report.loadingReport')}
             </Text>
           </View>
         ) : isError ? (
@@ -115,12 +117,12 @@ export default function ChildReportDetailScreen(): React.ReactElement {
             variant="card"
             message={classifyApiError(error).message}
             primaryAction={{
-              label: 'Try Again',
+              label: t('common.tryAgain'),
               onPress: () => void refetch(),
               testID: 'child-report-error-retry',
             }}
             secondaryAction={{
-              label: 'Back to reports',
+              label: t('parentView.report.backToReports'),
               onPress: () => goBackOrReplace(router, reportsHref),
               testID: 'child-report-error-back',
             }}
@@ -146,12 +148,12 @@ export default function ChildReportDetailScreen(): React.ReactElement {
 
             <View className="flex-row gap-3 mt-4">
               <MetricCard
-                label="Sessions"
+                label={t('parentView.report.sessions')}
                 value={String(report.reportData.thisMonth.totalSessions)}
                 testID="child-report-metric-sessions"
               />
               <MetricCard
-                label="Time on app"
+                label={t('parentView.report.timeOnApp')}
                 value={String(report.reportData.thisMonth.totalActiveMinutes)}
                 testID="child-report-metric-minutes"
               />
@@ -159,7 +161,7 @@ export default function ChildReportDetailScreen(): React.ReactElement {
 
             <View className="flex-row gap-3 mt-3">
               <MetricCard
-                label="Topics mastered"
+                label={t('parentView.report.topicsMastered')}
                 value={String(report.reportData.thisMonth.topicsMastered)}
                 testID="child-report-metric-topics"
               />
@@ -167,7 +169,7 @@ export default function ChildReportDetailScreen(): React.ReactElement {
                   vocabularyTotal — it's cumulative, not per-month delta.
                   "Words learned" was misleading; use "Total words". */}
               <MetricCard
-                label="Total words"
+                label={t('parentView.report.totalWords')}
                 value={String(report.reportData.thisMonth.vocabularyTotal)}
                 testID="child-report-metric-vocabulary"
               />
@@ -179,7 +181,7 @@ export default function ChildReportDetailScreen(): React.ReactElement {
                 testID="child-report-highlights"
               >
                 <Text className="text-h3 font-semibold text-text-primary">
-                  Highlights
+                  {t('parentView.report.highlights')}
                 </Text>
                 <View className="mt-3 gap-2">
                   {report.reportData.highlights.map((highlight) => (
@@ -200,7 +202,7 @@ export default function ChildReportDetailScreen(): React.ReactElement {
                 testID="child-report-next-steps"
               >
                 <Text className="text-h3 font-semibold text-text-primary">
-                  What's next
+                  {t('parentView.report.whatsNext')}
                 </Text>
                 <View className="mt-3 gap-2">
                   {report.reportData.nextSteps.map((step) => (
@@ -220,7 +222,7 @@ export default function ChildReportDetailScreen(): React.ReactElement {
               testID="child-report-subjects"
             >
               <Text className="text-h3 font-semibold text-text-primary">
-                Subject breakdown
+                {t('parentView.report.subjectBreakdown')}
               </Text>
               <View className="mt-3 gap-3">
                 {report.reportData.subjects.map((subject) => (
@@ -232,9 +234,11 @@ export default function ChildReportDetailScreen(): React.ReactElement {
                       {subject.subjectName}
                     </Text>
                     <Text className="text-body-sm text-text-secondary mt-1">
-                      {subject.topicsMastered} topics mastered •{' '}
-                      {subject.vocabularyTotal} words known •{' '}
-                      {subject.activeMinutes} min on app
+                      {t('parentView.report.subjectStats', {
+                        topicsMastered: subject.topicsMastered,
+                        vocabularyTotal: subject.vocabularyTotal,
+                        activeMinutes: subject.activeMinutes,
+                      })}
                     </Text>
                   </View>
                 ))}
@@ -250,21 +254,20 @@ export default function ChildReportDetailScreen(): React.ReactElement {
             testID="child-report-gone"
           >
             <Text className="text-h3 font-semibold text-text-primary">
-              This report is no longer available
+              {t('parentView.report.reportGoneTitle')}
             </Text>
             <Text className="text-body-sm text-text-secondary mt-2">
-              It may have been archived or removed. All your other reports are
-              still safe.
+              {t('parentView.report.reportGoneBody')}
             </Text>
             <Pressable
               onPress={() => goBackOrReplace(router, reportsHref)}
               className="bg-primary rounded-button px-4 py-3 items-center mt-4 min-h-[48px] justify-center"
               accessibilityRole="button"
-              accessibilityLabel="Back to reports"
+              accessibilityLabel={t('parentView.report.backToReports')}
               testID="child-report-gone-back"
             >
               <Text className="text-body font-semibold text-text-inverse">
-                Back to reports
+                {t('parentView.report.backToReports')}
               </Text>
             </Pressable>
           </View>

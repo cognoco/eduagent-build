@@ -6,6 +6,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { platformAlert } from '../../../lib/platform-alert';
 import { classifyApiError } from '../../../lib/format-api-error';
 import { useRouter } from 'expo-router';
@@ -34,11 +35,14 @@ import {
 import { useApiClient } from '../../../lib/api-client';
 import { pushLearningResumeTarget } from '../../../lib/navigation';
 
-function heroCopy(input: {
-  topicsMastered: number;
-  vocabularyTotal: number;
-  totalSessions: number;
-}): {
+function heroCopy(
+  input: {
+    topicsMastered: number;
+    vocabularyTotal: number;
+    totalSessions: number;
+  },
+  t: (key: string, opts?: Record<string, unknown>) => string
+): {
   title: string;
   subtitle: string;
 } {
@@ -47,40 +51,44 @@ function heroCopy(input: {
   // [F-043] User has sessions but nothing mastered yet — show encouragement
   if (topicsMastered === 0 && vocabularyTotal === 0 && totalSessions > 0) {
     return {
-      title: `${totalSessions} session${
-        totalSessions === 1 ? '' : 's'
-      } completed`,
-      subtitle: 'Topics mastered and vocabulary will appear as you progress.',
+      title: t('progress.hero.sessionsCompleted', { count: totalSessions }),
+      subtitle: t('progress.hero.sessionsCompletedSubtitle'),
     };
   }
 
   if (vocabularyTotal > 0 && topicsMastered === 0) {
     return vocabularyTotal < 20
       ? {
-          title: "You're building your language",
-          subtitle: `${vocabularyTotal} words and counting.`,
+          title: t('progress.hero.buildingLanguage'),
+          subtitle: t('progress.hero.buildingLanguageSubtitle', {
+            count: vocabularyTotal,
+          }),
         }
       : {
-          title: `You know ${vocabularyTotal} words`,
-          subtitle: 'That knowledge is yours now.',
+          title: t('progress.hero.knowWords', { count: vocabularyTotal }),
+          subtitle: t('progress.hero.knowWordsSubtitle'),
         };
   }
 
   if (topicsMastered > 0 && vocabularyTotal === 0) {
     return topicsMastered < 20
       ? {
-          title: "You're building your knowledge",
-          subtitle: `${topicsMastered} topics and counting.`,
+          title: t('progress.hero.buildingKnowledge'),
+          subtitle: t('progress.hero.buildingKnowledgeSubtitle', {
+            count: topicsMastered,
+          }),
         }
       : {
-          title: `You've mastered ${topicsMastered} topics`,
-          subtitle: 'Your progress keeps stacking up.',
+          title: t('progress.hero.masteredTopics', { count: topicsMastered }),
+          subtitle: t('progress.hero.masteredTopicsSubtitle'),
         };
   }
 
   return {
-    title: `You've mastered ${topicsMastered} topics`,
-    subtitle: `And you know ${vocabularyTotal} words across your subjects.`,
+    title: t('progress.hero.masteredTopics', { count: topicsMastered }),
+    subtitle: t('progress.hero.masteredTopicsAndWords', {
+      words: vocabularyTotal,
+    }),
   };
 }
 
@@ -123,15 +131,18 @@ function buildGrowthData(
 
 const MILESTONE_THRESHOLDS = [1, 3, 5, 10, 25, 50, 100];
 
-export function getNextMilestoneLabel(totalSessions: number): string {
-  const next = MILESTONE_THRESHOLDS.find((t) => t > totalSessions);
+export function getNextMilestoneLabel(
+  totalSessions: number,
+  t: (key: string, opts?: Record<string, unknown>) => string
+): string {
+  const next = MILESTONE_THRESHOLDS.find(
+    (threshold) => threshold > totalSessions
+  );
   if (next === undefined) {
-    return "You've reached all session milestones. Keep exploring!";
+    return t('progress.milestones.allReached');
   }
   const remaining = next - totalSessions;
-  return `Complete ${remaining} more ${
-    remaining === 1 ? 'session' : 'sessions'
-  } to reach your next milestone.`;
+  return t('progress.milestones.nextMilestone', { count: remaining });
 }
 
 function LoadingBlock(): React.ReactElement {
@@ -152,6 +163,7 @@ function LoadingBlock(): React.ReactElement {
 }
 
 export default function ProgressScreen(): React.ReactElement {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const apiClient = useApiClient();
@@ -162,11 +174,14 @@ export default function ProgressScreen(): React.ReactElement {
   const refreshSnapshot = useRefreshProgressSnapshot();
 
   const inventory = inventoryQuery.data;
-  const hero = heroCopy({
-    topicsMastered: inventory?.global.topicsMastered ?? 0,
-    vocabularyTotal: inventory?.global.vocabularyTotal ?? 0,
-    totalSessions: inventory?.global.totalSessions ?? 0,
-  });
+  const hero = heroCopy(
+    {
+      topicsMastered: inventory?.global.topicsMastered ?? 0,
+      vocabularyTotal: inventory?.global.vocabularyTotal ?? 0,
+      totalSessions: inventory?.global.totalSessions ?? 0,
+    },
+    t
+  );
 
   const growthData = useMemo(
     () => buildGrowthData(historyQuery.data),
@@ -182,10 +197,8 @@ export default function ProgressScreen(): React.ReactElement {
       // *manual* refresh action that fails needs direct user feedback or
       // the user thinks the gesture was ignored.
       const message =
-        err instanceof Error
-          ? err.message
-          : "We couldn't refresh your progress right now.";
-      platformAlert('Refresh failed', message);
+        err instanceof Error ? err.message : t('progress.refreshFailed');
+      platformAlert(t('progress.refreshFailedTitle'), message);
     }
 
     await Promise.all([
@@ -258,29 +271,29 @@ export default function ProgressScreen(): React.ReactElement {
         }
       >
         <Text className="text-h1 font-bold text-text-primary mt-4">
-          My Learning Journey
+          {t('progress.pageTitle')}
         </Text>
         <Text className="text-body-sm text-text-secondary mt-1 mb-4">
-          Progress that reflects what you actually know.
+          {t('progress.pageSubtitle')}
         </Text>
 
         {isLoading ? (
           <LoadingBlock />
         ) : isError ? (
           <ErrorFallback
-            title="We couldn't load your progress"
+            title={t('progress.error.loadTitle')}
             message={
               inventoryQuery.error?.message?.includes('API error')
-                ? 'Something went wrong on our end. Pull down or tap below to retry.'
-                : 'Check your connection and try again. Your data is safe.'
+                ? t('progress.error.loadMessageServer')
+                : t('progress.error.loadMessageNetwork')
             }
             primaryAction={{
-              label: 'Try again',
+              label: t('common.tryAgain'),
               onPress: () => void inventoryQuery.refetch(),
               testID: 'progress-error-retry',
             }}
             secondaryAction={{
-              label: 'Go home',
+              label: t('progress.error.goHome'),
               onPress: () => router.push('/(app)/home' as never),
               testID: 'progress-error-home',
             }}
@@ -289,20 +302,20 @@ export default function ProgressScreen(): React.ReactElement {
         ) : isEmpty ? (
           <View className="bg-coaching-card rounded-card p-5">
             <Text className="text-h3 font-semibold text-text-primary">
-              Start your first session
+              {t('progress.empty.title')}
             </Text>
             <Text className="text-body text-text-secondary mt-2">
-              Start your first session to see your progress here
+              {t('progress.empty.subtitle')}
             </Text>
             <Pressable
               onPress={handleGlobalResume}
               className="bg-primary rounded-button px-4 py-3 mt-4 items-center"
               accessibilityRole="button"
-              accessibilityLabel="Start learning"
+              accessibilityLabel={t('progress.startLearning')}
               testID="progress-start-learning"
             >
               <Text className="text-body font-semibold text-text-inverse">
-                Start learning
+                {t('progress.startLearning')}
               </Text>
             </Pressable>
           </View>
@@ -312,26 +325,22 @@ export default function ProgressScreen(): React.ReactElement {
             testID="progress-new-learner-teaser"
           >
             <Text className="text-h3 font-semibold text-text-primary">
-              {`You've completed ${
-                inventory?.global.totalSessions ?? 0
-              } session${
-                (inventory?.global.totalSessions ?? 0) === 1 ? '' : 's'
-              }. Keep going!`}
+              {t('progress.newLearner.title', {
+                count: inventory?.global.totalSessions ?? 0,
+              })}
             </Text>
             <Text className="text-body text-text-secondary mt-2">
-              Complete {remaining} more{' '}
-              {remaining === 1 ? 'session' : 'sessions'} to see your full
-              learning journey!
+              {t('progress.newLearner.subtitle', { count: remaining })}
             </Text>
             <Pressable
               onPress={handleGlobalResume}
               className="bg-primary rounded-button px-4 py-3 mt-4 items-center"
               accessibilityRole="button"
-              accessibilityLabel="Start learning"
+              accessibilityLabel={t('progress.startLearning')}
               testID="progress-new-learner-start"
             >
               <Text className="text-body font-semibold text-text-inverse">
-                Start learning
+                {t('progress.startLearning')}
               </Text>
             </Pressable>
           </View>
@@ -348,7 +357,9 @@ export default function ProgressScreen(): React.ReactElement {
                 <View className="flex-row flex-wrap gap-2 mt-4">
                   <View className="bg-background rounded-full px-3 py-1.5">
                     <Text className="text-caption font-semibold text-text-primary">
-                      {inventory.global.totalSessions} sessions
+                      {t('progress.stats.sessions', {
+                        count: inventory.global.totalSessions,
+                      })}
                     </Text>
                   </View>
                   <View className="bg-background rounded-full px-3 py-1.5">
@@ -366,7 +377,9 @@ export default function ProgressScreen(): React.ReactElement {
                     className="bg-background rounded-full px-3 py-1.5"
                   >
                     <Text className="text-caption font-semibold text-text-primary">
-                      {inventory.global.currentStreak}-day streak
+                      {t('progress.stats.streak', {
+                        count: inventory.global.currentStreak,
+                      })}
                     </Text>
                   </View>
                   {/* [F-012] Show vocabulary pill for language subjects only.
@@ -381,15 +394,19 @@ export default function ProgressScreen(): React.ReactElement {
                       accessibilityRole="button"
                       accessibilityLabel={
                         inventory.global.vocabularyTotal > 0
-                          ? `View ${inventory.global.vocabularyTotal} vocabulary words`
-                          : 'View vocabulary'
+                          ? t('progress.stats.viewVocabCount', {
+                              count: inventory.global.vocabularyTotal,
+                            })
+                          : t('progress.stats.viewVocab')
                       }
                       testID="progress-vocab-stat"
                     >
                       <Text className="text-caption font-semibold text-primary">
                         {inventory.global.vocabularyTotal > 0
-                          ? `${inventory.global.vocabularyTotal} words →`
-                          : 'Vocabulary →'}
+                          ? t('progress.stats.wordsLink', {
+                              count: inventory.global.vocabularyTotal,
+                            })
+                          : t('progress.stats.vocabularyLink')}
                       </Text>
                     </Pressable>
                   ) : null}
@@ -398,7 +415,7 @@ export default function ProgressScreen(): React.ReactElement {
             </View>
 
             <Text className="text-h3 font-semibold text-text-primary mt-6 mb-2">
-              Your subjects
+              {t('progress.yourSubjects')}
             </Text>
             {inventory?.subjects
               .filter((s) => !!s.subjectId)
@@ -424,29 +441,27 @@ export default function ProgressScreen(): React.ReactElement {
 
             <View className="mt-6">
               <GrowthChart
-                title="Your growth"
-                subtitle="Weekly changes in topics mastered and vocabulary"
+                title={t('progress.growth.title')}
+                subtitle={t('progress.growth.subtitle')}
                 data={growthData}
                 emptyMessage={
                   // [F-043] Distinguish brand-new users from users who have
                   // sessions but no mastery data yet (mastery takes repeat exposures).
                   // When totalSessions >= 3, hint that topic mastery unlocks the chart.
                   (inventory?.global.totalSessions ?? 0) >= 3
-                    ? "You're building a foundation. Growth will become visible once you master your first topic."
+                    ? t('progress.growth.emptyFoundation')
                     : (inventory?.global.totalSessions ?? 0) > 0
-                    ? `You've put in ${
-                        inventory?.global.totalSessions ?? 0
-                      } session${
-                        (inventory?.global.totalSessions ?? 0) === 1 ? '' : 's'
-                      }. Keep going — mastery shows up after repeat exposures.`
-                    : 'You just started. Keep going and your growth will appear here.'
+                    ? t('progress.growth.emptyInProgress', {
+                        count: inventory?.global.totalSessions ?? 0,
+                      })
+                    : t('progress.growth.emptyJustStarted')
                 }
               />
             </View>
 
             <View className="flex-row items-center justify-between mt-6 mb-2">
               <Text className="text-h3 font-semibold text-text-primary">
-                Recent milestones
+                {t('progress.milestones.recentTitle')}
               </Text>
               {/* [F-012] Always show "See all" when the query has resolved —
                   previously gated on `length >= 5`, which hid the screen
@@ -458,11 +473,11 @@ export default function ProgressScreen(): React.ReactElement {
                     router.push('/(app)/progress/milestones' as never)
                   }
                   accessibilityRole="button"
-                  accessibilityLabel="See all milestones"
+                  accessibilityLabel={t('progress.milestones.seeAll')}
                   testID="progress-milestones-see-all"
                 >
                   <Text className="text-body-sm text-primary font-medium">
-                    See all →
+                    {t('progress.milestones.seeAllLink')}
                   </Text>
                 </Pressable>
               ) : null}
@@ -473,7 +488,7 @@ export default function ProgressScreen(): React.ReactElement {
                 variant="card"
                 message={classifyApiError(milestonesQuery.error).message}
                 primaryAction={{
-                  label: 'Try Again',
+                  label: t('common.tryAgain'),
                   onPress: () => void milestonesQuery.refetch(),
                   testID: 'progress-milestones-error-retry',
                 }}
@@ -488,7 +503,8 @@ export default function ProgressScreen(): React.ReactElement {
             ) : (
               <SamplePreview
                 unlockMessage={getNextMilestoneLabel(
-                  inventory?.global.totalSessions ?? 0
+                  inventory?.global.totalSessions ?? 0,
+                  t
                 )}
               >
                 <View className="bg-surface rounded-card p-4 gap-3">
@@ -512,13 +528,13 @@ export default function ProgressScreen(): React.ReactElement {
               onPress={() => router.push('/(app)/progress/saved' as never)}
               className="bg-surface rounded-card p-4 mt-6 flex-row items-center justify-between"
               accessibilityRole="button"
-              accessibilityLabel="View saved explanations"
+              accessibilityLabel={t('progress.saved.viewLabel')}
               testID="progress-saved-link"
             >
               <View className="flex-row items-center gap-3">
                 <Ionicons name="bookmark" size={20} className="text-primary" />
                 <Text className="text-body font-medium text-text-primary">
-                  Saved
+                  {t('progress.saved.title')}
                 </Text>
               </View>
               <Ionicons
@@ -532,11 +548,11 @@ export default function ProgressScreen(): React.ReactElement {
               onPress={handleGlobalResume}
               className="bg-primary rounded-button px-4 py-3 mt-6 items-center"
               accessibilityRole="button"
-              accessibilityLabel="Keep learning"
+              accessibilityLabel={t('progress.keepLearning')}
               testID="progress-keep-learning"
             >
               <Text className="text-body font-semibold text-text-inverse">
-                Keep learning
+                {t('progress.keepLearning')}
               </Text>
             </Pressable>
           </>

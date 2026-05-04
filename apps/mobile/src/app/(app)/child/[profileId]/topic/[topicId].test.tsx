@@ -1,5 +1,16 @@
 import { render, screen } from '@testing-library/react-native';
 
+jest.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, opts?: Record<string, unknown>) => {
+      if (opts && typeof opts === 'object') {
+        return `${key}:${JSON.stringify(opts)}`;
+      }
+      return key;
+    },
+  }),
+}));
+
 const mockUseLocalSearchParams = jest.fn();
 const mockUseChildSessions = jest.fn();
 
@@ -43,9 +54,9 @@ describe('TopicDetailScreen', () => {
     render(<TopicDetailScreen />);
 
     screen.getByTestId('topic-understanding-card');
-    screen.getByText('Understanding');
+    screen.getByText('parentView.topic.understanding');
     screen.getByText('Getting comfortable');
-    screen.getByText('Review status');
+    screen.getByText('parentView.topic.reviewStatus');
     screen.getByText('A few things to refresh');
   });
 

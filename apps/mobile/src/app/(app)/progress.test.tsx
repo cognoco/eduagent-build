@@ -9,6 +9,75 @@ import {
 } from '../../hooks/use-progress';
 import ProgressScreen from './progress/index';
 
+jest.mock('react-i18next', () => ({
+  initReactI18next: { type: '3rdParty', init: jest.fn() },
+  useTranslation: () => ({
+    t: (key: string, opts?: Record<string, unknown>) => {
+      // Hero copy translations
+      if (key === 'progress.hero.sessionsCompleted') {
+        const count = opts?.count as number;
+        return `${count} session${count === 1 ? '' : 's'} completed`;
+      }
+      if (key === 'progress.hero.sessionsCompletedSubtitle')
+        return 'Topics mastered and vocabulary will appear as you progress.';
+      if (key === 'progress.hero.buildingLanguage')
+        return "You're building your language";
+      if (key === 'progress.hero.buildingLanguageSubtitle')
+        return `${opts?.count ?? ''} words and counting.`;
+      if (key === 'progress.hero.knowWords')
+        return `You know ${opts?.count ?? ''} words`;
+      if (key === 'progress.hero.knowWordsSubtitle')
+        return 'That knowledge is yours now.';
+      if (key === 'progress.hero.buildingKnowledge')
+        return "You're building your knowledge";
+      if (key === 'progress.hero.buildingKnowledgeSubtitle')
+        return `${opts?.count ?? ''} topics and counting.`;
+      if (key === 'progress.hero.masteredTopics')
+        return `You've mastered ${opts?.count ?? ''} topics`;
+      if (key === 'progress.hero.masteredTopicsSubtitle')
+        return 'Your progress keeps stacking up.';
+      if (key === 'progress.hero.masteredTopicsAndWords')
+        return `And you know ${opts?.words ?? ''} words across your subjects.`;
+      // New learner
+      if (key === 'progress.newLearner.title') {
+        const count = opts?.count as number;
+        return `You've completed ${count} session${
+          count === 1 ? '' : 's'
+        }. Keep going!`;
+      }
+      if (key === 'progress.newLearner.subtitle') {
+        const count = opts?.count as number;
+        return `Complete ${count} more ${
+          count === 1 ? 'session' : 'sessions'
+        } to see your full learning journey!`;
+      }
+      // Milestone next label
+      if (key === 'progress.milestones.allReached')
+        return "You've reached all session milestones. Keep exploring!";
+      if (key === 'progress.milestones.nextMilestone') {
+        const count = opts?.count as number;
+        return `Complete ${count} more ${
+          count === 1 ? 'session' : 'sessions'
+        } to reach your next milestone.`;
+      }
+      // Stats
+      if (key === 'progress.stats.sessions') {
+        const count = opts?.count as number;
+        return `${count} sessions`;
+      }
+      if (key === 'progress.stats.streak') {
+        const count = opts?.count as number;
+        return `${count}-day streak`;
+      }
+      // Common fallbacks
+      if (key === 'common.tryAgain') return 'Try again';
+      if (key === 'common.goBack') return 'Go Back';
+      if (key === 'common.goHome') return 'Go Home';
+      return key;
+    },
+  }),
+}));
+
 jest.mock('../../hooks/use-progress');
 jest.mock('../../lib/api-client', () => ({
   useApiClient: () => ({}),
@@ -227,5 +296,43 @@ describe('ProgressScreen — progressive disclosure', () => {
 
     // No teaser and no empty state — just the loading/empty fallthrough
     expect(screen.queryByTestId('progress-new-learner-teaser')).toBeNull();
+  });
+
+  // [BUG-968] When the user lands on the progress tab with at least one
+  // subject seeded, the progress index must render `journey-subject-<id>`
+  // testIDs for each subject so the Maestro nightly flow can scroll to the
+  // correct card. The flow waits up to 15s on `journey-subject-${SUBJECT_ID}`
+  // — a missing testID (e.g. dropped during a refactor or hidden behind a
+  // mid-totalSessions teaser) silently breaks the nightly run.
+  describe('journey-subject testIDs [BUG-968]', () => {
+    it('renders journey-subject-<id> for each subject in the full progress view', () => {
+      mockHooks({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
+          subjects: [fullSubject],
+        },
+      });
+      render(<ProgressScreen />);
+
+      screen.getByTestId('journey-subject-s1');
+    });
+
+    it('renders journey-subject-<id> for multiple subjects', () => {
+      const second = {
+        ...fullSubject,
+        subjectId: 's2',
+        subjectName: 'Science',
+      };
+      mockHooks({
+        inventory: {
+          global: { ...baseGlobal, totalSessions: 8, topicsMastered: 4 },
+          subjects: [fullSubject, second],
+        },
+      });
+      render(<ProgressScreen />);
+
+      screen.getByTestId('journey-subject-s1');
+      screen.getByTestId('journey-subject-s2');
+    });
   });
 });

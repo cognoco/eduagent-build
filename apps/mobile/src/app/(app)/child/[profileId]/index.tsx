@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { platformAlert } from '../../../../lib/platform-alert';
 import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { AccommodationMode } from '@eduagent/schemas';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfile } from '../../../../lib/profile';
@@ -59,9 +60,14 @@ function formatDuration(seconds: number | null): string {
   return `${mins} min`;
 }
 
-function formatTimeOnApp(seconds: number | null): string {
+function formatTimeOnApp(
+  seconds: number | null,
+  t: (key: string, opts?: Record<string, unknown>) => string
+): string {
   const duration = formatDuration(seconds);
-  return duration === '--' ? 'Time on app unavailable' : `${duration} on app`;
+  return duration === '--'
+    ? t('parentView.index.timeOnAppUnavailable')
+    : t('parentView.index.timeOnApp', { duration });
 }
 
 function formatSessionDate(iso: string): string {
@@ -128,6 +134,7 @@ function getGracePeriodDaysRemaining(respondedAt: string | null): number {
 }
 
 export default function ChildDetailScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { profiles } = useProfile();
@@ -213,7 +220,10 @@ export default function ChildDetailScreen() {
     try {
       await revokeConsent.mutateAsync();
     } catch {
-      platformAlert('Error', 'Could not withdraw consent. Please try again.');
+      platformAlert(
+        t('parentView.index.errorTitle'),
+        t('parentView.index.couldNotWithdrawConsent')
+      );
     }
   }, [revokeConsent]);
 
@@ -221,7 +231,10 @@ export default function ChildDetailScreen() {
     try {
       await restoreConsent.mutateAsync();
     } catch {
-      platformAlert('Error', 'Could not cancel deletion. Please try again.');
+      platformAlert(
+        t('parentView.index.errorTitle'),
+        t('parentView.index.couldNotCancelDeletion')
+      );
     }
   }, [restoreConsent]);
 
@@ -233,7 +246,10 @@ export default function ChildDetailScreen() {
         { childProfileId: profileId, accommodationMode: mode },
         {
           onError: () => {
-            platformAlert('Could not save setting', 'Please try again.');
+            platformAlert(
+              t('parentView.index.couldNotSaveSetting'),
+              t('parentView.index.pleaseTryAgain')
+            );
           },
         }
       );
@@ -258,20 +274,20 @@ export default function ChildDetailScreen() {
         testID="child-profile-no-id"
       >
         <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
-          Profile not found
+          {t('parentView.index.profileNotFound')}
         </Text>
         <Text className="text-body text-text-secondary text-center mb-6">
-          Unable to load child details.
+          {t('parentView.index.unableToLoadChildDetails')}
         </Text>
         <Pressable
           onPress={() => router.replace('/(app)/home' as never)}
           className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
           accessibilityRole="button"
-          accessibilityLabel="Go home"
+          accessibilityLabel={t('common.goHome')}
           testID="child-profile-no-id-go-home"
         >
           <Text className="text-body font-semibold text-text-inverse">
-            Go Home
+            {t('common.goHome')}
           </Text>
         </Pressable>
       </View>
@@ -286,22 +302,21 @@ export default function ChildDetailScreen() {
         testID="child-profile-unavailable"
       >
         <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
-          Profile no longer available
+          {t('parentView.index.profileNoLongerAvailable')}
         </Text>
         <Text className="text-body text-text-secondary text-center mb-6">
-          This child profile may have been removed or you may no longer have
-          access to it.
+          {t('parentView.index.profileRemovedOrNoAccess')}
         </Text>
         {isError && (
           <Pressable
             onPress={() => void refetch()}
             className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center mb-3"
             accessibilityRole="button"
-            accessibilityLabel="Try again"
+            accessibilityLabel={t('common.tryAgain')}
             testID="child-profile-retry"
           >
             <Text className="text-body font-semibold text-text-inverse">
-              Try again
+              {t('common.tryAgain')}
             </Text>
           </Pressable>
         )}
@@ -309,11 +324,11 @@ export default function ChildDetailScreen() {
           onPress={() => router.replace('/(app)/dashboard' as never)}
           className="bg-surface rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
           accessibilityRole="button"
-          accessibilityLabel="Back to parent dashboard"
+          accessibilityLabel={t('parentView.index.backToDashboard')}
           testID="child-profile-back"
         >
           <Text className="text-body font-semibold text-text-primary">
-            Back to dashboard
+            {t('parentView.index.backToDashboard')}
           </Text>
         </Pressable>
       </View>
@@ -328,7 +343,7 @@ export default function ChildDetailScreen() {
         style={{ paddingTop: insets.top }}
       >
         <Text className="text-body text-text-secondary text-center mb-4">
-          You don&apos;t have access to this profile.
+          {t('parentView.index.noAccessToProfile')}
         </Text>
         <Pressable
           onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
@@ -336,7 +351,7 @@ export default function ChildDetailScreen() {
           accessibilityRole="button"
         >
           <Text className="text-text-inverse text-body font-semibold">
-            Go back
+            {t('common.back')}
           </Text>
         </Pressable>
       </View>
@@ -349,7 +364,7 @@ export default function ChildDetailScreen() {
         <Pressable
           onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
           className="me-3 py-2 pe-2"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('common.goBack')}
           accessibilityRole="button"
           testID="back-button"
         >
@@ -359,7 +374,7 @@ export default function ChildDetailScreen() {
         </Pressable>
         <View className="flex-1">
           <Text className="text-h2 font-bold text-text-primary">
-            {child?.displayName ?? 'Loading...'}
+            {child?.displayName ?? t('common.loading')}
           </Text>
           {child && (
             <Text className="text-body-sm text-text-secondary mt-0.5">
@@ -379,7 +394,9 @@ export default function ChildDetailScreen() {
             <View className="flex-row items-center gap-1">
               <Ionicons name="flame-outline" size={16} color="#f97316" />
               <Text className="text-text-secondary text-sm">
-                {child.currentStreak}-day streak
+                {t('parentView.index.dayStreak', {
+                  count: child.currentStreak,
+                })}
               </Text>
             </View>
           )}
@@ -403,19 +420,25 @@ export default function ChildDetailScreen() {
         {child?.progress ? (
           <View className="bg-coaching-card rounded-card p-4 mt-4">
             <Text className="text-h3 font-semibold text-text-primary">
-              Visible progress
+              {t('parentView.index.visibleProgress')}
             </Text>
             <Text className="text-body-sm text-text-secondary mt-1">
-              {child.progress.topicsMastered} topics mastered
+              {t('parentView.index.topicsMastered', {
+                count: child.progress.topicsMastered,
+              })}
               {child.progress.vocabularyTotal > 0
-                ? ` • ${child.progress.vocabularyTotal} words known`
+                ? ` • ${t('parentView.index.wordsKnown', {
+                    count: child.progress.vocabularyTotal,
+                  })}`
                 : ''}
             </Text>
             <View className="flex-row flex-wrap gap-2 mt-3">
               {child.progress.weeklyDeltaTopicsMastered != null ? (
                 <View className="bg-background rounded-full px-3 py-1.5">
                   <Text className="text-caption font-semibold text-text-primary">
-                    +{child.progress.weeklyDeltaTopicsMastered} topics this week
+                    {t('parentView.index.topicsThisWeek', {
+                      count: child.progress.weeklyDeltaTopicsMastered,
+                    })}
                   </Text>
                 </View>
               ) : null}
@@ -423,7 +446,9 @@ export default function ChildDetailScreen() {
               child.progress.vocabularyTotal > 0 ? (
                 <View className="bg-background rounded-full px-3 py-1.5">
                   <Text className="text-caption font-semibold text-text-primary">
-                    +{child.progress.weeklyDeltaVocabularyTotal} words
+                    {t('parentView.index.wordsThisWeek', {
+                      count: child.progress.weeklyDeltaVocabularyTotal,
+                    })}
                   </Text>
                 </View>
               ) : null}
@@ -447,17 +472,17 @@ export default function ChildDetailScreen() {
               } as never);
             }}
             accessibilityRole="button"
-            accessibilityLabel="Open monthly reports"
+            accessibilityLabel={t('parentView.index.openMonthlyReports')}
             testID="child-reports-link"
           >
             <Text className="text-body font-semibold text-text-primary">
-              Monthly reports
+              {t('parentView.index.monthlyReports')}
               {reports && reports.length > 0 ? ` (${reports.length})` : ''}
             </Text>
             <Text className="text-body-sm text-text-secondary mt-1">
               {reports && reports.length > 0
-                ? 'A monthly summary of learning activity.'
-                : 'Your first report will appear after the first month of activity.'}
+                ? t('parentView.index.monthlyReportsSummary')
+                : t('parentView.index.firstReportSoon')}
             </Text>
           </Pressable>
         </View>
@@ -465,7 +490,9 @@ export default function ChildDetailScreen() {
         {history ? (
           <View className="mt-4">
             {buildGrowthData(history).length < 2 ? (
-              <SamplePreview unlockMessage="Progress becomes easier to spot after a few more sessions.">
+              <SamplePreview
+                unlockMessage={t('parentView.index.progressUnlockMessage')}
+              >
                 <View className="bg-surface rounded-card p-4">
                   <View className="bg-border rounded h-4 w-1/3 mb-4" />
                   <View className="flex-row items-end gap-3 h-20">
@@ -481,10 +508,10 @@ export default function ChildDetailScreen() {
               </SamplePreview>
             ) : (
               <GrowthChart
-                title="Recent growth"
-                subtitle="Weekly changes in topics mastered and vocabulary"
+                title={t('parentView.index.recentGrowth')}
+                subtitle={t('parentView.index.recentGrowthSubtitle')}
                 data={buildGrowthData(history)}
-                emptyMessage="Progress becomes easier to spot after a few more sessions."
+                emptyMessage={t('parentView.index.progressUnlockMessage')}
               />
             )}
           </View>
@@ -500,7 +527,7 @@ export default function ChildDetailScreen() {
           visibleSubjects.length > 0 ? (
             <>
               <Text className="text-h3 font-semibold text-text-primary mt-4 mb-2">
-                Subjects
+                {t('parentView.index.subjects')}
               </Text>
               {visibleSubjects.map((subject) => (
                 <View key={subject.subjectId} className="mt-3">
@@ -516,14 +543,14 @@ export default function ChildDetailScreen() {
           ) : (
             <View className="py-8 items-center">
               <Text className="text-body text-text-secondary">
-                No subjects yet
+                {t('parentView.index.noSubjectsYet')}
               </Text>
             </View>
           )
         ) : child?.subjects && child.subjects.length > 0 ? (
           <>
             <Text className="text-h3 font-semibold text-text-primary mt-4 mb-2">
-              Subjects
+              {t('parentView.index.subjects')}
             </Text>
             {child.subjects.map((subject) => (
               <Pressable
@@ -543,7 +570,9 @@ export default function ChildDetailScreen() {
                 className={`bg-surface rounded-card p-4 mt-3 flex-row items-center justify-between${
                   !subject.subjectId ? ' opacity-50' : ''
                 }`}
-                accessibilityLabel={`View ${subject.name} details`}
+                accessibilityLabel={t('parentView.index.viewSubjectDetails', {
+                  name: subject.name,
+                })}
                 accessibilityRole="button"
                 testID={`subject-card-${subject.name}`}
               >
@@ -556,7 +585,9 @@ export default function ChildDetailScreen() {
                       className="text-caption text-text-secondary mt-0.5"
                       testID={`subject-raw-input-${subject.name}`}
                     >
-                      Your child searched for &ldquo;{subject.rawInput}&rdquo;
+                      {t('parentView.index.childSearchedFor', {
+                        term: subject.rawInput,
+                      })}
                     </Text>
                   )}
                 </View>
@@ -570,14 +601,14 @@ export default function ChildDetailScreen() {
         ) : (
           <View className="py-8 items-center">
             <Text className="text-body text-text-secondary">
-              No subjects yet
+              {t('parentView.index.noSubjectsYet')}
             </Text>
           </View>
         )}
 
         {/* Recent Sessions */}
         <Text className="text-h3 font-semibold text-text-primary mt-6 mb-2">
-          Recent Sessions
+          {t('parentView.index.recentSessions')}
         </Text>
         {sessionsLoading ? (
           <>
@@ -587,17 +618,17 @@ export default function ChildDetailScreen() {
         ) : sessionsError ? (
           <View className="py-4 items-center">
             <Text className="text-body text-text-secondary text-center mb-3">
-              We couldn't load recent sessions right now.
+              {t('parentView.index.couldNotLoadSessions')}
             </Text>
             <Pressable
               onPress={() => void refetchSessions()}
               className="bg-surface rounded-button px-5 py-3 min-h-[48px] items-center justify-center"
               accessibilityRole="button"
-              accessibilityLabel="Refresh child profile"
+              accessibilityLabel={t('parentView.index.refreshChildProfile')}
               testID="child-profile-refresh"
             >
               <Text className="text-body font-semibold text-text-primary">
-                Refresh
+                {t('parentView.index.refresh')}
               </Text>
             </Pressable>
           </View>
@@ -616,9 +647,9 @@ export default function ChildDetailScreen() {
                 } as never);
               }}
               className="bg-surface rounded-card p-4 mt-3"
-              accessibilityLabel={`View session from ${formatSessionDate(
-                session.startedAt
-              )}`}
+              accessibilityLabel={t('parentView.index.viewSessionFrom', {
+                date: formatSessionDate(session.startedAt),
+              })}
               accessibilityRole="button"
               testID={`session-card-${session.sessionId}`}
             >
@@ -648,7 +679,8 @@ export default function ChildDetailScreen() {
               )}
               <Text className="text-caption text-text-secondary">
                 {formatTimeOnApp(
-                  session.wallClockSeconds ?? session.durationSeconds
+                  session.wallClockSeconds ?? session.durationSeconds,
+                  t
                 )}
               </Text>
             </Pressable>
@@ -656,16 +688,19 @@ export default function ChildDetailScreen() {
         ) : (
           <View className="mx-4 mt-4 rounded-xl bg-surface p-6">
             <Text className="text-text-secondary text-center text-base">
-              No sessions yet. When {child?.displayName ?? 'your child'} starts
-              learning, you'll see what they work on here.
+              {t('parentView.index.noSessionsYet', {
+                name: child?.displayName ?? t('parentView.index.yourChild'),
+              })}
             </Text>
           </View>
         )}
 
         <Text className="text-h3 font-semibold text-text-primary mt-6 mb-2">
           {child?.displayName
-            ? `${child.displayName}'s mentor memory`
-            : "Your child's mentor memory"}
+            ? t('parentView.index.mentorMemoryTitle', {
+                name: child.displayName,
+              })
+            : t('parentView.index.mentorMemoryTitleFallback')}
         </Text>
         {/* [F-PV-08] Consent prompt lives on mentor-memory only; show CTA here */}
         {learnerProfile?.memoryConsentStatus === 'pending' && profileId ? (
@@ -678,15 +713,16 @@ export default function ChildDetailScreen() {
             }
             className="bg-primary/10 rounded-card p-4 mb-3"
             accessibilityRole="button"
-            accessibilityLabel="Set up mentor memory"
+            accessibilityLabel={t('parentView.index.setUpMentorMemory')}
             testID="memory-consent-cta"
           >
             <Text className="text-body font-semibold text-primary">
-              Set up mentor memory
+              {t('parentView.index.setUpMentorMemory')}
             </Text>
             <Text className="text-body-sm text-text-secondary mt-1">
-              Choose what the mentor remembers about{' '}
-              {child?.displayName ?? 'your child'}.
+              {t('parentView.index.chooseWhatMentorRemembers', {
+                name: child?.displayName ?? t('parentView.index.yourChild'),
+              })}
             </Text>
           </Pressable>
         ) : null}
@@ -700,31 +736,32 @@ export default function ChildDetailScreen() {
           }}
           className="bg-surface rounded-card p-4 mt-1"
           accessibilityRole="button"
-          accessibilityLabel="View what the mentor knows"
+          accessibilityLabel={t('parentView.index.viewWhatMentorKnows')}
           testID="mentor-memory-link"
         >
           <Text className="text-body font-medium text-text-primary">
-            What the mentor knows
+            {t('parentView.index.whatTheMentorKnows')}
           </Text>
           <Text className="text-body-sm text-text-secondary mt-1">
-            Review what has been remembered and adjust privacy controls.
+            {t('parentView.index.reviewAndAdjustPrivacy')}
           </Text>
         </Pressable>
 
         <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6">
           {child?.displayName
-            ? `${child.displayName}'s learning accommodation`
-            : "Your child's learning accommodation"}
+            ? t('parentView.index.learningAccommodationTitle', {
+                name: child.displayName,
+              })
+            : t('parentView.index.learningAccommodationTitleFallback')}
         </Text>
         <Text className="text-body-sm text-text-secondary mb-2">
-          Choose how the mentor adapts its teaching style. This takes effect on
-          the next session.
+          {t('parentView.index.learningAccommodationDescription')}
         </Text>
         <Pressable
           onPress={() => setShowAccommodationGuide((v) => !v)}
           className="flex-row items-center mb-3"
           accessibilityRole="button"
-          accessibilityLabel="Not sure which to pick? Toggle decision guide"
+          accessibilityLabel={t('parentView.index.toggleDecisionGuide')}
           testID="accommodation-guide-toggle"
         >
           <Ionicons
@@ -733,7 +770,7 @@ export default function ChildDetailScreen() {
             color="#6b7280"
           />
           <Text className="text-body-sm text-text-secondary ms-1">
-            Not sure which to pick?
+            {t('parentView.index.notSureWhichToPick')}
           </Text>
         </Pressable>
         {showAccommodationGuide && (
@@ -755,7 +792,9 @@ export default function ChildDetailScreen() {
                     setShowAccommodationGuide(false);
                   }}
                   accessibilityRole="button"
-                  accessibilityLabel={`Pick ${row.recommendation}`}
+                  accessibilityLabel={t('parentView.index.pickAccommodation', {
+                    mode: row.recommendation,
+                  })}
                   testID={`guide-pick-${row.recommendation}`}
                 >
                   <Text className="text-primary text-body-sm font-semibold">
@@ -793,7 +832,7 @@ export default function ChildDetailScreen() {
               </Text>
               {(learnerProfile?.accommodationMode ?? 'none') === opt.mode && (
                 <Text className="text-primary text-body font-semibold">
-                  Active
+                  {t('parentView.index.active')}
                 </Text>
               )}
             </View>
@@ -806,19 +845,20 @@ export default function ChildDetailScreen() {
           className="text-caption text-text-secondary mt-1 mb-2"
           testID="accommodation-try-it"
         >
-          You can change this anytime. It takes effect on{' '}
-          {child?.displayName ?? "your child"}'s next session.
+          {t('parentView.index.accommodationTryIt', {
+            name: child?.displayName ?? t('parentView.index.yourChild'),
+          })}
         </Text>
         {showHowItsWorking && (
           <Pressable
             className="flex-row items-center gap-2 self-start bg-surface rounded-full px-3 py-1.5 mb-4"
             accessibilityRole="button"
-            accessibilityLabel="How it's working"
+            accessibilityLabel={t('parentView.index.howItsWorking')}
             testID="accommodation-how-working"
           >
             <Ionicons name="analytics-outline" size={14} color="#6b7280" />
             <Text className="text-caption text-text-secondary">
-              How it&apos;s working
+              {t('parentView.index.howItsWorking')}
             </Text>
           </Pressable>
         )}
@@ -827,17 +867,17 @@ export default function ChildDetailScreen() {
         {isConsentError && (
           <View className="mt-8 mb-4 bg-surface rounded-card px-4 py-3.5">
             <Text className="text-body text-text-secondary mb-2">
-              Consent settings couldn't be loaded
+              {t('parentView.index.consentSettingsCouldNotLoad')}
             </Text>
             <Pressable
               onPress={() => void refetchConsent()}
               className="self-start"
               accessibilityRole="button"
-              accessibilityLabel="Retry loading consent settings"
+              accessibilityLabel={t('parentView.index.retryConsentSettings')}
               testID="consent-retry"
             >
               <Text className="text-body text-primary font-semibold">
-                Retry
+                {t('common.retry')}
               </Text>
             </Pressable>
           </View>
@@ -848,8 +888,10 @@ export default function ChildDetailScreen() {
           <View className="mt-8 mb-4" testID="consent-section">
             <Text className="text-h3 font-semibold text-text-primary mb-2">
               {child?.displayName
-                ? `${child.displayName}'s Account`
-                : 'Account'}
+                ? t('parentView.index.accountTitle', {
+                    name: child.displayName,
+                  })
+                : t('parentView.index.accountTitleFallback')}
             </Text>
 
             {isWithdrawn ? (
@@ -858,28 +900,28 @@ export default function ChildDetailScreen() {
                 testID="grace-period-banner"
               >
                 <Text className="text-body font-semibold text-danger mb-1">
-                  Deletion pending
+                  {t('parentView.index.deletionPending')}
                 </Text>
                 <Text className="text-body-sm text-text-secondary mb-3">
                   {daysRemaining > 0
-                    ? `Account and all learning data will be deleted in ${daysRemaining} ${
-                        daysRemaining === 1 ? 'day' : 'days'
-                      }.`
-                    : 'Deletion is being processed.'}
+                    ? t('parentView.index.deletionCountdown', {
+                        count: daysRemaining,
+                      })
+                    : t('parentView.index.deletionProcessing')}
                 </Text>
                 {daysRemaining > 0 && (
                   <Pressable
                     onPress={handleCancelDeletion}
                     disabled={restoreConsent.isPending}
                     className="bg-primary rounded-lg py-3 items-center"
-                    accessibilityLabel="Cancel deletion"
+                    accessibilityLabel={t('parentView.index.cancelDeletion')}
                     accessibilityRole="button"
                     testID="cancel-deletion-button"
                   >
                     <Text className="text-body font-semibold text-on-primary">
                       {restoreConsent.isPending
-                        ? 'Cancelling...'
-                        : 'Cancel Deletion'}
+                        ? t('parentView.index.cancelling')
+                        : t('parentView.index.cancelDeletion')}
                     </Text>
                   </Pressable>
                 )}
@@ -887,12 +929,14 @@ export default function ChildDetailScreen() {
                   <Pressable
                     onPress={() => void refetch()}
                     className="bg-surface rounded-lg py-3 items-center"
-                    accessibilityLabel="Refresh deletion status"
+                    accessibilityLabel={t(
+                      'parentView.index.refreshDeletionStatus'
+                    )}
                     accessibilityRole="button"
                     testID="refresh-grace-period-button"
                   >
                     <Text className="text-body font-semibold text-text-primary">
-                      Refresh status
+                      {t('parentView.index.refreshStatus')}
                     </Text>
                   </Pressable>
                 )}
@@ -902,14 +946,14 @@ export default function ChildDetailScreen() {
                 onPress={handleWithdrawConsent}
                 disabled={revokeConsent.isPending}
                 className="border border-danger rounded-lg py-3 items-center"
-                accessibilityLabel="Withdraw consent"
+                accessibilityLabel={t('parentView.index.withdrawConsent')}
                 accessibilityRole="button"
                 testID="withdraw-consent-button"
               >
                 <Text className="text-body font-semibold text-danger">
                   {revokeConsent.isPending
-                    ? 'Withdrawing...'
-                    : 'Withdraw Consent'}
+                    ? t('parentView.index.withdrawing')
+                    : t('parentView.index.withdrawConsent')}
                 </Text>
               </Pressable>
             ) : null}
@@ -930,41 +974,45 @@ export default function ChildDetailScreen() {
           className="flex-1 bg-black/40 justify-center items-center px-6"
           onPress={() => setWithdrawConfirmVisible(false)}
           accessibilityRole="button"
-          accessibilityLabel="Dismiss"
+          accessibilityLabel={t('common.close')}
         >
           <Pressable
             className="bg-background rounded-2xl w-full max-w-sm p-6"
             onPress={(e) => e.stopPropagation()}
           >
             <Text className="text-h3 font-bold text-text-primary text-center">
-              Withdraw consent for {child?.displayName ?? 'this child'}?
+              {t('parentView.index.withdrawConsentConfirmTitle', {
+                name: child?.displayName ?? t('parentView.index.thisChild'),
+              })}
             </Text>
             <Text className="text-body-sm text-text-secondary text-center mt-3 leading-relaxed">
-              {child?.displayName ?? 'This child'}'s account and all learning
-              data will be deleted after a 7-day grace period.{'\n\n'}You can
-              reverse this within 7 days.
+              {t('parentView.index.withdrawConsentBody', {
+                name: child?.displayName ?? t('parentView.index.thisChild'),
+              })}
             </Text>
             <View className="mt-5 gap-3">
               <Pressable
                 onPress={() => void handleConfirmWithdraw()}
                 className="bg-danger rounded-button py-3 items-center min-h-[48px] justify-center"
                 accessibilityRole="button"
-                accessibilityLabel="Confirm withdraw consent"
+                accessibilityLabel={t(
+                  'parentView.index.confirmWithdrawConsent'
+                )}
                 testID="withdraw-consent-confirm"
               >
                 <Text className="text-body font-semibold text-text-inverse">
-                  Withdraw
+                  {t('parentView.index.withdraw')}
                 </Text>
               </Pressable>
               <Pressable
                 onPress={() => setWithdrawConfirmVisible(false)}
                 className="bg-surface rounded-button py-3 items-center min-h-[48px] justify-center"
                 accessibilityRole="button"
-                accessibilityLabel="Cancel"
+                accessibilityLabel={t('common.cancel')}
                 testID="withdraw-consent-cancel"
               >
                 <Text className="text-body font-semibold text-text-primary">
-                  Cancel
+                  {t('common.cancel')}
                 </Text>
               </Pressable>
             </View>

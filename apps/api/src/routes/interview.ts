@@ -4,7 +4,6 @@ import { zValidator } from '@hono/zod-validator';
 import {
   ERROR_CODES,
   interviewMessageSchema,
-  interviewReadyToPersistEventSchema,
   type InterviewResult,
   extractedInterviewSignalsSchema,
   streamFallbackFrameSchema,
@@ -27,6 +26,7 @@ import {
   updateDraft,
   buildDraftResumeSummary,
   claimDraftForPersisting,
+  dispatchInterviewPersist,
 } from '../services/interview';
 import {
   appendInterviewAssistantExchange,
@@ -128,17 +128,12 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
         const claimed = await claimDraftForPersisting(db, profileId, draft.id);
 
         if (claimed.length > 0) {
-          await inngest.send({
-            id: `persist-${draft.id}`,
-            name: 'app/interview.ready_to_persist',
-            data: interviewReadyToPersistEventSchema.parse({
-              version: 1,
-              draftId: draft.id,
-              profileId,
-              subjectId,
-              subjectName: subject.name,
-              bookId,
-            }),
+          await dispatchInterviewPersist({
+            draftId: draft.id,
+            profileId,
+            subjectId,
+            subjectName: subject.name,
+            bookId,
           });
         }
       } else {
@@ -319,17 +314,12 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
               );
 
               if (claimed.length > 0) {
-                await inngest.send({
-                  id: `persist-${draft.id}`,
-                  name: 'app/interview.ready_to_persist',
-                  data: interviewReadyToPersistEventSchema.parse({
-                    version: 1,
-                    draftId: draft.id,
-                    profileId,
-                    subjectId,
-                    subjectName: subject.name,
-                    bookId,
-                  }),
+                await dispatchInterviewPersist({
+                  draftId: draft.id,
+                  profileId,
+                  subjectId,
+                  subjectName: subject.name,
+                  bookId,
                 });
               }
             } catch (cause) {
@@ -450,17 +440,12 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
     const claimed = await claimDraftForPersisting(db, profileId, draft.id);
 
     if (claimed.length > 0) {
-      await inngest.send({
-        id: `persist-${draft.id}`,
-        name: 'app/interview.ready_to_persist',
-        data: interviewReadyToPersistEventSchema.parse({
-          version: 1,
-          draftId: draft.id,
-          profileId,
-          subjectId,
-          subjectName: subject.name,
-          bookId,
-        }),
+      await dispatchInterviewPersist({
+        draftId: draft.id,
+        profileId,
+        subjectId,
+        subjectName: subject.name,
+        bookId,
       });
     }
 
@@ -537,18 +522,16 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
       return c.json({ error: 'not-failed', status: draft.status }, 409);
     }
 
-    await inngest.send({
-      id: `persist-${draft.id}-retry-${Date.now()}`,
-      name: 'app/interview.ready_to_persist',
-      data: interviewReadyToPersistEventSchema.parse({
-        version: 1,
+    await dispatchInterviewPersist(
+      {
         draftId: draft.id,
         profileId,
         subjectId,
         subjectName: subject.name,
         bookId,
-      }),
-    });
+      },
+      { isRetry: true }
+    );
 
     return c.json({ status: 'completing' });
   });

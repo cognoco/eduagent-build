@@ -1,3 +1,5 @@
+import i18next from '../i18n';
+
 /**
  * Centralized error formatter for API and network errors.
  * Provides actionable, user-friendly messages based on error type.
@@ -67,20 +69,29 @@ function isQuotaExceededError(error: unknown): error is QuotaExceededLike {
   );
 }
 
-type ForbiddenLike = Error & { code: string; apiCode?: string };
+type ForbiddenLike = Error & { errorCode: string; apiCode?: string };
 function isForbiddenError(error: unknown): error is ForbiddenLike {
   return (
-    error instanceof Error && error.name === 'ForbiddenError' && 'code' in error
+    error instanceof Error &&
+    error.name === 'ForbiddenError' &&
+    'errorCode' in error
   );
 }
 
-const NETWORK_MESSAGE =
-  "Looks like you're offline or our servers can't be reached. Check your internet connection and try again.";
-
-const SERVER_MESSAGE =
-  'Something went wrong on our end. Please try again in a moment.';
-
-const DEFAULT_MESSAGE = 'Something unexpected happened. Please try again.';
+// Thunks resolve at call time so they reflect the active language, not
+// whatever language i18next had at module-load time.
+//
+// [I18N-LIVE-SWITCH TODO] These — and every t(...) call inside classifyApiError
+// below — translate at *classify time*, which today equals render time because
+// classification happens in a render path. Once live language switching lands
+// (FEATURE_FLAGS.I18N_ENABLED true with mid-session changeLanguage), the
+// classified string can be cached in component state across a language switch
+// and end up out-of-date. When wiring live switch, change the FormattedApiError
+// shape to carry a translation *key* (or token + interpolation values) instead
+// of a pre-translated string, and translate in the consuming component.
+const NETWORK_MESSAGE = () => i18next.t('errors.networkError');
+const SERVER_MESSAGE = () => i18next.t('errors.serverError');
+const DEFAULT_MESSAGE = () => i18next.t('errors.generic');
 
 function isGenericServerMessage(message: string): boolean {
   const normalized = message.trim().toLowerCase().replace(/\.+$/, '');
@@ -101,49 +112,28 @@ function isGenericServerMessage(message: string): boolean {
  */
 const FRIENDLY_MESSAGE_MAP: Array<{
   pattern: RegExp;
-  message: string;
+  key: string;
 }> = [
   {
     pattern: /not configured for language learning/i,
-    message:
-      "This subject isn't set up for language learning. Try the standard learning path instead.",
+    key: 'friendlyErrors.notLanguageLearning',
   },
   {
     pattern: /subject.*(paused|archived|inactive)/i,
-    message:
-      'This subject is on pause right now. You can resume it from your subjects list.',
+    key: 'friendlyErrors.subjectPaused',
   },
   {
     pattern: /curriculum.*not.*found/i,
-    message:
-      "We haven't set up your learning path yet. Go back and start the interview first.",
+    key: 'friendlyErrors.curriculumNotFound',
   },
-  {
-    pattern: /topic.*not.*found/i,
-    message:
-      "That topic isn't available right now. Try picking a different one.",
-  },
-  {
-    pattern: /draft.*not.*found/i,
-    message: 'Your progress was lost. Please start again.',
-  },
-  {
-    pattern: /profile.*not.*found/i,
-    message:
-      'We had trouble loading your profile. Please sign out and back in.',
-  },
-  {
-    pattern: /session.*not.*found/i,
-    message: "That session isn't available anymore. Start a new one.",
-  },
-  {
-    pattern: /already.*completed/i,
-    message: "You've already finished this. Head back and pick something new.",
-  },
+  { pattern: /topic.*not.*found/i, key: 'friendlyErrors.topicNotFound' },
+  { pattern: /draft.*not.*found/i, key: 'friendlyErrors.draftNotFound' },
+  { pattern: /profile.*not.*found/i, key: 'friendlyErrors.profileNotFound' },
+  { pattern: /session.*not.*found/i, key: 'friendlyErrors.sessionNotFound' },
+  { pattern: /already.*completed/i, key: 'friendlyErrors.alreadyCompleted' },
   {
     pattern: /validation.*failed|invalid.*input|expected.*string/i,
-    message:
-      "Something didn't look right. Please check what you entered and try again.",
+    key: 'friendlyErrors.validationFailed',
   },
 ];
 
@@ -167,7 +157,7 @@ function isTechnicalMessage(msg: string): boolean {
 function friendlyMessage(raw: string): string | null {
   for (const entry of FRIENDLY_MESSAGE_MAP) {
     if (entry.pattern.test(raw)) {
-      return entry.message;
+      return i18next.t(entry.key);
     }
   }
   return null;
@@ -258,7 +248,11 @@ export function recoveryActions(
   }
 ): { primary?: RecoveryAction; secondary?: RecoveryAction } {
   const goHome = handlers.goHome
-    ? { label: 'Go Home', onPress: handlers.goHome, testID: 'recovery-go-home' }
+    ? {
+        label: i18next.t('recovery.goHome'),
+        onPress: handlers.goHome,
+        testID: 'recovery-go-home',
+      }
     : undefined;
 
   switch (classified.recovery) {
@@ -266,7 +260,7 @@ export function recoveryActions(
       return {
         primary: handlers.retry
           ? {
-              label: 'Try Again',
+              label: i18next.t('recovery.tryAgain'),
               onPress: handlers.retry,
               testID: 'recovery-retry',
             }
@@ -277,7 +271,7 @@ export function recoveryActions(
       return {
         primary: handlers.goBack
           ? {
-              label: 'Go Back',
+              label: i18next.t('recovery.goBack'),
               onPress: handlers.goBack,
               testID: 'recovery-go-back',
             }
@@ -288,7 +282,7 @@ export function recoveryActions(
       return {
         primary: handlers.signOut
           ? {
-              label: 'Sign Out',
+              label: i18next.t('recovery.signOut'),
               onPress: handlers.signOut,
               testID: 'recovery-sign-out',
             }
@@ -318,7 +312,11 @@ export function recoveryActions(
 export function classifyApiError(error: unknown): FormattedApiError {
   // 1. Typed NetworkError — thrown by customFetch on fetch rejection
   if (isNetworkError(error)) {
-    return { message: NETWORK_MESSAGE, category: 'network', recovery: 'retry' };
+    return {
+      message: NETWORK_MESSAGE(),
+      category: 'network',
+      recovery: 'retry',
+    };
   }
 
   // 1b. Legacy TypeError from native fetch (raw fetch calls outside customFetch)
@@ -326,7 +324,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
     const msg = error.message.toLowerCase();
     if (msg.includes('fetch') || msg.includes('network')) {
       return {
-        message: NETWORK_MESSAGE,
+        message: NETWORK_MESSAGE(),
         category: 'network',
         recovery: 'retry',
       };
@@ -356,8 +354,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
     return {
       category: 'server' as const,
       message:
-        friendlyMessage(error.message) ??
-        'Something went wrong on our end. Please try again.',
+        friendlyMessage(error.message) ?? i18next.t('errors.serverError'),
       recovery: 'retry' as const,
     };
   }
@@ -365,8 +362,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
   // Typed 404 — NotFoundError from api-client.ts
   if (isNotFoundError(error)) {
     return {
-      message:
-        friendlyMessage(error.message) ?? 'That page or item no longer exists.',
+      message: friendlyMessage(error.message) ?? i18next.t('errors.notFound'),
       category: 'not-found',
       recovery: 'go-back',
     };
@@ -376,8 +372,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
   if (isResourceGoneError(error)) {
     return {
       message:
-        friendlyMessage(error.message) ??
-        'This resource is no longer available.',
+        friendlyMessage(error.message) ?? i18next.t('errors.resourceGone'),
       category: 'not-found',
       recovery: 'go-back',
     };
@@ -387,8 +382,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
   if (isRateLimitedError(error)) {
     return {
       message:
-        friendlyMessage(error.message) ??
-        "You've hit the limit. Wait a moment and try again.",
+        friendlyMessage(error.message) ?? i18next.t('errors.rateLimited'),
       category: 'quota',
       recovery: 'retry',
     };
@@ -409,7 +403,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
     return {
       message: passThrough
         ? friendlyMessage(msg) ?? msg
-        : "That didn't work. Please check your input and try again.",
+        : i18next.t('errors.badRequest'),
       category: 'unknown',
       recovery: 'retry',
     };
@@ -424,7 +418,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
 
   // Typed 403 — ForbiddenError from api-client.ts
   if (isForbiddenError(error)) {
-    const effectiveCode = error.apiCode ?? error.code;
+    const effectiveCode = error.apiCode ?? error.errorCode;
     if (
       effectiveCode === 'SUBJECT_INACTIVE' ||
       effectiveCode === 'SUBJECT_PAUSED'
@@ -435,10 +429,20 @@ export function classifyApiError(error: unknown): FormattedApiError {
         recovery: 'go-back',
       };
     }
+    // Proxy-mode rejection (parent acting on a child profile that can't perform
+    // a write op) is a 403 but must NOT trigger sign-out — the user just needs
+    // to switch back to their owner profile or skip the action.
+    if (effectiveCode === 'PROXY_MODE') {
+      return {
+        message: friendlyMessage(error.message) ?? error.message,
+        category: 'auth',
+        recovery: 'go-back',
+      };
+    }
     return {
       message:
         friendlyMessage(error.message) ??
-        (error.message || 'You do not have permission to view this.'),
+        (error.message || i18next.t('errors.forbidden')),
       category: 'auth',
       recovery: 'sign-out',
     };
@@ -450,15 +454,22 @@ export function classifyApiError(error: unknown): FormattedApiError {
     const apiErrorLike = error as Error & {
       status?: number;
       code?: string;
+      errorCode?: string;
       apiCode?: string;
     };
 
-    const effectiveCode = apiErrorLike.apiCode ?? apiErrorLike.code;
+    // Read errorCode (typed-error field, e.g. ForbiddenError) before falling
+    // back to the legacy `code` duck-type — HMR can break the `instanceof`
+    // branch above and drop a typed error into this generic path; without
+    // errorCode here the EXCHANGE_LIMIT_EXCEEDED / PROXY_MODE classifications
+    // would silently miss.
+    const effectiveCode =
+      apiErrorLike.apiCode ?? apiErrorLike.errorCode ?? apiErrorLike.code;
 
     // 3. Typed error codes
     if (effectiveCode === 'EXCHANGE_LIMIT_EXCEEDED') {
       return {
-        message: 'Session limit reached. Start a new session to keep going.',
+        message: i18next.t('errors.sessionLimitReached'),
         category: 'quota',
         recovery: 'go-back',
       };
@@ -474,13 +485,17 @@ export function classifyApiError(error: unknown): FormattedApiError {
       effectiveCode === 'UPSTREAM_ERROR' ||
       effectiveCode === 'INTERNAL_ERROR'
     ) {
-      return { message: SERVER_MESSAGE, category: 'server', recovery: 'retry' };
+      return {
+        message: SERVER_MESSAGE(),
+        category: 'server',
+        recovery: 'retry',
+      };
     }
 
     // 3b. SSE timeout
     if (msgLower.includes('timed out while waiting for a reply')) {
       return {
-        message: 'That reply took too long. Tap reconnect to try again.',
+        message: i18next.t('errors.timedOut'),
         category: 'network',
         recovery: 'retry',
       };
@@ -495,7 +510,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
 
       if (code === 'EXCHANGE_LIMIT_EXCEEDED') {
         return {
-          message: 'Session limit reached. Start a new session to keep going.',
+          message: i18next.t('errors.sessionLimitReached'),
           category: 'quota',
           recovery: 'go-back',
         };
@@ -505,7 +520,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
         const userMsg =
           apiMessage && apiMessage.length < 200
             ? friendlyMessage(apiMessage) ?? apiMessage
-            : 'This subject is paused or archived. Resume it before starting a session.';
+            : i18next.t('friendlyErrors.subjectPaused');
         return { message: userMsg, category: 'not-found', recovery: 'go-back' };
       }
 
@@ -513,7 +528,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
         const userMsg =
           apiMessage && apiMessage.length < 200
             ? friendlyMessage(apiMessage) ?? apiMessage
-            : 'You do not have permission to view this.';
+            : i18next.t('errors.forbidden');
         return { message: userMsg, category: 'auth', recovery: 'sign-out' };
       }
 
@@ -521,7 +536,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
         const userMsg =
           apiMessage && apiMessage.length < 200
             ? friendlyMessage(apiMessage) ?? apiMessage
-            : 'That page or item no longer exists.';
+            : i18next.t('errors.notFound');
         return { message: userMsg, category: 'not-found', recovery: 'go-back' };
       }
 
@@ -529,7 +544,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
         const userMsg =
           apiMessage && apiMessage.length < 200
             ? friendlyMessage(apiMessage) ?? apiMessage
-            : "You've hit the limit. Wait a moment and try again.";
+            : i18next.t('errors.rateLimited');
         return { message: userMsg, category: 'quota', recovery: 'retry' };
       }
 
@@ -542,7 +557,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
         return {
           message: hasUsefulMsg
             ? friendlyMessage(apiMessage) ?? apiMessage
-            : SERVER_MESSAGE,
+            : SERVER_MESSAGE(),
           category: 'server',
           recovery: 'retry',
         };
@@ -557,7 +572,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
         };
       }
       return {
-        message: "That didn't work. Please check your input and try again.",
+        message: i18next.t('errors.badRequest'),
         category: 'unknown',
         recovery: 'retry',
       };
@@ -566,7 +581,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
     // 5. Network keyword heuristics on the raw message
     if (isNetworkRelated(msgLower)) {
       return {
-        message: NETWORK_MESSAGE,
+        message: NETWORK_MESSAGE(),
         category: 'network',
         recovery: 'retry',
       };
@@ -590,7 +605,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
   }
 
   // 7. Fallback for null / undefined / non-Error values
-  return { message: DEFAULT_MESSAGE, category: 'unknown', recovery: 'retry' };
+  return { message: DEFAULT_MESSAGE(), category: 'unknown', recovery: 'retry' };
 }
 
 /**

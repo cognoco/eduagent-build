@@ -1,5 +1,16 @@
 import { render, screen, fireEvent } from '@testing-library/react-native';
 
+jest.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, opts?: Record<string, unknown>) => {
+      if (opts && typeof opts === 'object') {
+        return `${key}:${JSON.stringify(opts)}`;
+      }
+      return key;
+    },
+  }),
+}));
+
 const mockReplace = jest.fn();
 const mockPush = jest.fn();
 const mockBack = jest.fn();
@@ -186,7 +197,7 @@ describe('ChildWeeklyReportDetailScreen', () => {
     render(<ChildWeeklyReportDetailScreen />);
 
     screen.getByTestId('child-weekly-report-empty-note');
-    screen.getByText(/Send Emma a nudge/);
+    screen.getByText('parentView.weeklyReport.sendNudge:{"name":"Emma"}');
   });
 
   // BUG-903 (b): "Open child" CTA navigates to /(app)/child/[id].

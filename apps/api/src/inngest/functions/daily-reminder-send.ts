@@ -10,6 +10,7 @@ import {
   sendPushNotification,
 } from '../../services/notifications';
 import { getRecentNotificationCount } from '../../services/settings';
+import { captureException } from '../../services/sentry';
 
 export const dailyReminderSend = inngest.createFunction(
   {
@@ -32,12 +33,30 @@ export const dailyReminderSend = inngest.createFunction(
       // guard and push the same recipient again. The notification-log check
       // is belt-and-suspenders, consistent with all other cron-driven push
       // paths in this codebase.
-      const recentCount = await getRecentNotificationCount(
-        db,
-        profileId,
-        'daily_reminder',
-        24
-      );
+      // [BUG-976 / CCR-PR129-M-3] Fail closed on DB error: skip this cycle
+      // rather than throwing uncaught (which would cause Inngest to retry
+      // indefinitely and block the notification pipeline). captureException
+      // makes the failure queryable in Sentry so we can measure transient
+      // DB hiccup frequency. Mirrors the recall-nudge-send pattern.
+      let recentCount: number;
+      try {
+        recentCount = await getRecentNotificationCount(
+          db,
+          profileId,
+          'daily_reminder',
+          24
+        );
+      } catch (err) {
+        captureException(err, {
+          profileId,
+          extra: { context: 'daily-reminder-send:getRecentNotificationCount' },
+        });
+        return {
+          status: 'skipped' as const,
+          reason: 'dedup_check_failed',
+          profileId,
+        };
+      }
       if (recentCount > 0) {
         return { status: 'skipped' as const, reason: 'dedup_24h', profileId };
       }
@@ -65,6 +84,25 @@ export const dailyReminderSend = inngest.createFunction(
         profileId,
       };
     });
+
+    // CLAUDE.md "Silent recovery without escalation is banned": the
+    // dedup_check_failed path swallows a DB error and returns skipped.
+    // captureException above feeds Sentry exception counts; this
+    // app/notification.suppressed event is consumed by
+    // notification-suppressed-observe which emits a structured
+    // [notification-suppressed] log line, making the volume queryable via
+    // Cloudflare Workers Logpush in addition to Sentry.
+    if (result.status === 'skipped' && result.reason === 'dedup_check_failed') {
+      await step.sendEvent('notify-notification-suppressed', {
+        name: 'app/notification.suppressed',
+        data: {
+          profileId,
+          notificationType: 'daily_reminder',
+          reason: result.reason,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    }
 
     return result;
   }

@@ -54,6 +54,23 @@ describe('ForgotPasswordScreen', () => {
     screen.getByTestId('back-to-sign-in');
   });
 
+  // [BUG-963] Pressing the "Back to sign in" link from forgot-password must
+  // hand control back to the sign-in stack via goBackOrReplace, not synthesize
+  // a 1-deep stack via router.push('/sign-in') (which leaves Maestro on the
+  // sign-in screen scrolled to top with sign-in-button below the fold and no
+  // way back to the previous tab). The press goes through router.back() when
+  // canGoBack is true, falling back to router.replace otherwise.
+  it('[BUG-963] back-to-sign-in press routes through router.back when possible', () => {
+    render(<ForgotPasswordScreen />);
+
+    fireEvent.press(screen.getByTestId('back-to-sign-in'));
+
+    // canGoBack is true in this test setup, so router.back() runs and
+    // router.replace must NOT be invoked (replace would discard history).
+    expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
   it('calls signIn.create with reset_password_email_code strategy', async () => {
     mockCreate.mockResolvedValue({});
 

@@ -1,4 +1,5 @@
 import { View, Text } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import type { WarningLevel } from '../../hooks/use-subscription';
 
 interface UsageMeterProps {
@@ -15,6 +16,7 @@ const BAR_COLORS: Record<WarningLevel, string> = {
 };
 
 export function UsageMeter({ used, limit, warningLevel }: UsageMeterProps) {
+  const { t } = useTranslation();
   const percentage = limit > 0 ? Math.min((used / limit) * 100, 100) : 0;
   const barColor = BAR_COLORS[warningLevel];
   const clampedUsed = Math.min(used, limit);
@@ -23,7 +25,10 @@ export function UsageMeter({ used, limit, warningLevel }: UsageMeterProps) {
     <View>
       <View className="flex-row items-center justify-between mb-1.5">
         <Text className="text-caption text-text-secondary">
-          {used} / {limit} questions used
+          {t('common.usageMeter.questionsUsed', {
+            used: String(used),
+            limit: String(limit),
+          })}
         </Text>
         <Text className="text-caption font-semibold text-text-primary">
           {Math.round(percentage)}%

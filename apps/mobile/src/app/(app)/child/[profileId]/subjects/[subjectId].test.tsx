@@ -1,5 +1,16 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
+jest.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, opts?: Record<string, unknown>) => {
+      if (opts && typeof opts === 'object') {
+        return `${key}:${JSON.stringify(opts)}`;
+      }
+      return key;
+    },
+  }),
+}));
+
 const mockPush = jest.fn();
 const mockUseLocalSearchParams = jest.fn();
 const mockUseChildSubjectTopics = jest.fn();

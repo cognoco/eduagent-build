@@ -1,0 +1,71 @@
+# [BUG-979 / CCR-PR123-M-3] Nightly cleanup of orphaned Playwright seed
+# accounts in the staging DB.
+#
+# The e2e-web workflow uses cancel-in-progress to short-circuit superseded
+# runs. Playwright's globalTeardown (apps/mobile/e2e-web/helpers/global-teardown.ts)
+# is the primary cleanup path; the per-job "Reset seeded staging accounts"
+# step in e2e-web.yml is the secondary path. This workflow is the tertiary
+# safety net for the rare hard-kill case where neither runs.
+#
+# It calls POST /v1/__test/reset with no prefix filter, which the API
+# scopes to clerk_seed_* accounts only (see apps/api/src/routes/test-seed.ts).
+# Production data is never touched.
+
+name: E2E Web Cleanup
+
+on:
+  schedule:
+    # 03:17 UTC daily — off-peak for staging, after the typical CI day in
+    # both EU and US timezones. The odd minute reduces chance of contention
+    # with other scheduled cron jobs.
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run — log the call that would be made without executing it'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+permissions:
+  contents: read
+
+jobs:
+  reset:
+    name: Reset orphaned seed accounts
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Reset seeded staging accounts
+        env:
+          API_URL: ${{ vars.E2E_API_URL || 'https://api-stg.mentomate.com' }}
+          TEST_SEED_SECRET: ${{ secrets.TEST_SEED_SECRET }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+        run: |
+          if [ -z "${TEST_SEED_SECRET}" ]; then
+            echo "::error::TEST_SEED_SECRET is not configured"
+            exit 1
+          fi
+          echo "Reset endpoint: ${API_URL}/v1/__test/reset"
+          if [ "${DRY_RUN}" = "true" ]; then
+            echo "::notice::DRY RUN — would POST to ${API_URL}/v1/__test/reset (skipped)"
+            exit 0
+          fi
+          # No prefix filter → clears all seed-created accounts older than the
+          # API's safety window. The endpoint guards against deleting non-seed
+          # data via account-naming conventions enforced server-side.
+          #
+          # Graceful degrade on transient failures: this is a *tertiary*
+          # safety net (Playwright globalTeardown + per-job reset run first),
+          # so a single 03:17 UTC hiccup against staging should warn, not
+          # produce nightly red. Mirrors the sibling step in e2e-web.yml:88.
+          # The next nightly run will sweep what this one missed.
+          response=$(curl --fail-with-body --silent --show-error \
+            -X POST \
+            -H "X-Test-Secret: ${TEST_SEED_SECRET}" \
+            "${API_URL}/v1/__test/reset") \
+            || { echo "::warning::seed reset returned non-2xx; next nightly run will sweep"; exit 0; }
+          echo "Response: ${response}"

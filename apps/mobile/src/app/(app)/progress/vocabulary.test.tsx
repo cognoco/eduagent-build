@@ -2,6 +2,50 @@ import { render, screen } from '@testing-library/react-native';
 import { useProgressInventory } from '../../../hooks/use-progress';
 import VocabularyBrowserScreen from './vocabulary';
 
+jest.mock('react-i18next', () => ({
+  initReactI18next: { type: '3rdParty', init: jest.fn() },
+  useTranslation: () => ({
+    t: (key: string, opts?: Record<string, unknown>) => {
+      const map: Record<string, string> = {
+        'progress.vocabulary.pageTitle': 'Your Vocabulary',
+        'progress.vocabulary.totalWords': `${
+          opts?.count ?? ''
+        } words across all subjects`,
+        'progress.vocabulary.errorTitle': "We couldn't load your vocabulary",
+        'progress.vocabulary.errorMessage':
+          'Check your connection and try again.',
+        'progress.vocabulary.noLanguageMessage':
+          'Vocabulary tracking is available for language subjects.',
+        'progress.vocabulary.newLearnerTitle': 'Your vocabulary will grow here',
+        'progress.vocabulary.newLearnerSubtitle':
+          'Keep learning and the words you discover will appear here.',
+        'progress.vocabulary.emptyTitle': 'No vocabulary yet',
+        'progress.vocabulary.emptyBackLabel': 'Go back to Journey',
+        'progress.vocabulary.emptyMessageOne': `Practice ${
+          opts?.subject ?? ''
+        } to start building your word list.`,
+        'progress.vocabulary.emptyMessageMany':
+          'Practice a language subject to start building your word list.',
+        'progress.vocabulary.emptyMessageNone':
+          'Start a language subject and the words you learn will appear here.',
+        'progress.vocabulary.viewSubjectLabel': `View ${
+          opts?.subject ?? ''
+        } vocabulary`,
+        'progress.vocabulary.viewAllLink': 'View all →',
+        'progress.vocabulary.wordsSummary': `${opts?.total ?? ''} words — ${
+          opts?.mastered ?? ''
+        } mastered`,
+        'progress.vocabulary.learningAppend': `, ${opts?.count ?? ''} learning`,
+        'progress.subject.wordCount': `${opts?.count ?? ''} words`,
+        'common.tryAgain': 'Try again',
+        'common.goBack': 'Go back',
+      };
+      if (key in map) return map[key]!;
+      return key;
+    },
+  }),
+}));
+
 jest.mock('../../../hooks/use-progress');
 jest.mock('expo-router', () => ({
   useRouter: () => ({ back: jest.fn(), push: jest.fn(), replace: jest.fn() }),

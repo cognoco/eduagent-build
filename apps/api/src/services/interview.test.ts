@@ -62,6 +62,18 @@ jest.mock('./curriculum', () => ({
   ensureDefaultBook: jest.fn().mockResolvedValue('book-1'),
 }));
 
+// ---------------------------------------------------------------------------
+// Mock Inngest client — dispatchInterviewPersist publishes an event;
+// other functions in this module use it for fire-and-forget observability
+// (emitInterviewFallbackEvent), which is silent on failure anyway.
+// ---------------------------------------------------------------------------
+
+jest.mock('../inngest/client', () => ({
+  inngest: {
+    send: jest.fn().mockResolvedValue(undefined),
+  },
+}));
+
 import type { Database } from '@eduagent/database';
 import {
   processInterviewExchange,
@@ -72,7 +84,9 @@ import {
   updateDraft,
   persistCurriculum,
   buildDraftResumeSummary,
+  dispatchInterviewPersist,
 } from './interview';
+import { inngest } from '../inngest/client';
 import type { InterviewContext, OnboardingDraft } from '@eduagent/schemas';
 import { routeAndCall, routeAndStream } from './llm';
 import { generateCurriculum } from './curriculum';
@@ -1411,5 +1425,95 @@ describe('interpretInterviewResponse schema-failure fallback [BUG-934][BUG-935]'
     });
 
     expect(result.response).toBe('plain text, no json at all');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// dispatchInterviewPersist — single source of truth for the
+// app/interview.ready_to_persist event. The four route call sites previously
+// inlined this dispatch and the retry path drifted to a different
+// idempotency-key shape. These tests lock the contract.
+// ---------------------------------------------------------------------------
+
+describe('dispatchInterviewPersist', () => {
+  const VALID_PAYLOAD = {
+    draftId: '00000000-0000-4000-8000-000000000001',
+    profileId: '00000000-0000-4000-8000-000000000002',
+    subjectId: '550e8400-e29b-41d4-a716-446655440000',
+    subjectName: 'Algebra',
+  };
+
+  it('uses persist-<draftId> as idempotency key for non-retry dispatch', async () => {
+    await dispatchInterviewPersist(VALID_PAYLOAD);
+
+    expect(inngest.send).toHaveBeenCalledTimes(1);
+    expect(inngest.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: `persist-${VALID_PAYLOAD.draftId}`,
+        name: 'app/interview.ready_to_persist',
+      })
+    );
+  });
+
+  it('uses persist-<draftId>-retry-<uuid> as idempotency key for retry dispatch', async () => {
+    await dispatchInterviewPersist(VALID_PAYLOAD, { isRetry: true });
+
+    expect(inngest.send).toHaveBeenCalledTimes(1);
+    const call = (inngest.send as jest.Mock).mock.calls[0][0];
+    expect(call.name).toBe('app/interview.ready_to_persist');
+    // Retry suffix is a v4 UUID (8-4-4-4-12 hex), not a timestamp — two
+    // retries firing in the same millisecond would otherwise collide and
+    // Inngest would silently dedup the second send.
+    expect(call.id).toMatch(
+      new RegExp(
+        `^persist-${VALID_PAYLOAD.draftId}-retry-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`
+      )
+    );
+  });
+
+  it('non-retry and retry produce different idempotency keys for the same draft', async () => {
+    await dispatchInterviewPersist(VALID_PAYLOAD);
+    await dispatchInterviewPersist(VALID_PAYLOAD, { isRetry: true });
+
+    const calls = (inngest.send as jest.Mock).mock.calls;
+    expect(calls).toHaveLength(2);
+    expect(calls[0][0].id).toBe(`persist-${VALID_PAYLOAD.draftId}`);
+    expect(calls[1][0].id).not.toBe(calls[0][0].id);
+    expect(calls[1][0].id).toMatch(/-retry-[0-9a-f-]{36}$/);
+  });
+
+  it('[BREAK] two retries for the same draft produce distinct idempotency keys', async () => {
+    // Pre-fix: the suffix was Date.now(); two retries inside the same
+    // millisecond produced identical keys and Inngest dedup'd silently.
+    // Post-fix: each retry gets a fresh UUID, so the keys cannot collide
+    // even when the calls fire back-to-back synchronously.
+    await dispatchInterviewPersist(VALID_PAYLOAD, { isRetry: true });
+    await dispatchInterviewPersist(VALID_PAYLOAD, { isRetry: true });
+
+    const calls = (inngest.send as jest.Mock).mock.calls;
+    expect(calls).toHaveLength(2);
+    expect(calls[0][0].id).not.toBe(calls[1][0].id);
+  });
+
+  it('sends the parsed event payload in data, omitting bookId when not provided', async () => {
+    await dispatchInterviewPersist(VALID_PAYLOAD);
+
+    const call = (inngest.send as jest.Mock).mock.calls[0][0];
+    expect(call.data).toEqual({
+      version: 1,
+      draftId: VALID_PAYLOAD.draftId,
+      profileId: VALID_PAYLOAD.profileId,
+      subjectId: VALID_PAYLOAD.subjectId,
+      subjectName: VALID_PAYLOAD.subjectName,
+    });
+    expect(call.data).not.toHaveProperty('bookId');
+  });
+
+  it('includes bookId in data when provided', async () => {
+    const bookId = '550e8400-e29b-41d4-a716-446655440099';
+    await dispatchInterviewPersist({ ...VALID_PAYLOAD, bookId });
+
+    const call = (inngest.send as jest.Mock).mock.calls[0][0];
+    expect(call.data.bookId).toBe(bookId);
   });
 });

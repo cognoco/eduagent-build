@@ -1,0 +1,45 @@
+name: Docs Checks
+
+# Lightweight checks that run on plan/spec doc changes. Separate from ci.yml
+# because ci.yml has `paths-ignore: docs/**` (we don't want full lint/test/
+# typecheck on doc-only changes), so doc-only PRs would otherwise skip
+# enforcement entirely.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/plans/**.md'
+      - 'apps/api/drizzle/**'
+      - 'scripts/check-migration-rollback.sh'
+      - '.github/workflows/docs-checks.yml'
+  pull_request:
+    paths:
+      - 'docs/plans/**.md'
+      - 'apps/api/drizzle/**'
+      - 'scripts/check-migration-rollback.sh'
+      - '.github/workflows/docs-checks.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-checks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  rollback-section:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Per CLAUDE.md → "Schema And Deploy Safety": destructive migration plans
+      # (DROP COLUMN/TABLE/TYPE in fenced SQL) must include a '## Rollback'
+      # section. The script also scans apps/api/drizzle/*.sql for destructive
+      # statements and verifies each ships with a <name>.rollback.md, so a
+      # migration-only PR without a plan doc is no longer unenforced — the
+      # apps/api/drizzle/** path filter above triggers the workflow on
+      # SQL-only changes.
+      - name: Migration rollback-section check
+        run: bash scripts/check-migration-rollback.sh

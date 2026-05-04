@@ -23,9 +23,16 @@ let createSubjectErrorMessage = '';
 // Placeholder — replaced before each test by beforeEach (see describe block).
 // createRoutedMockFetch requires an initial entry so the map has the right key order.
 const mockFetch = createRoutedMockFetch({
-  '/subjects/resolve': { status: 'direct_match', resolvedName: '', suggestions: [], displayMessage: '' },
+  '/subjects/resolve': {
+    status: 'direct_match',
+    resolvedName: '',
+    suggestions: [],
+    displayMessage: '',
+  },
   '/subjects': { subjects: [] },
 });
+
+jest.mock('react-i18next', () => require('../test-utils/mock-i18n').i18nMock);
 
 jest.mock('../lib/api-client', () =>
   require('../test-utils/mock-api-routes').mockApiClientFactory(mockFetch)
@@ -125,7 +132,11 @@ function defaultSubjectsHandler(url: string, init?: RequestInit): unknown {
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
-    return createSubjectResponse ?? { subject: { id: 'subject-default', name: 'Subject' } };
+    return (
+      createSubjectResponse ?? {
+        subject: { id: 'subject-default', name: 'Subject' },
+      }
+    );
   }
   // GET — return list
   if (subjectsListIsError) {
@@ -135,7 +146,12 @@ function defaultSubjectsHandler(url: string, init?: RequestInit): unknown {
 }
 
 // Default handler for /subjects/resolve.
-const defaultResolveHandler = { status: 'direct_match', resolvedName: '', suggestions: [], displayMessage: '' };
+const defaultResolveHandler = {
+  status: 'direct_match',
+  resolvedName: '',
+  suggestions: [],
+  displayMessage: '',
+};
 
 describe('CreateSubjectScreen', () => {
   let Wrapper: React.ComponentType<{ children: React.ReactNode }>;
@@ -262,10 +278,13 @@ describe('CreateSubjectScreen', () => {
 
     await waitFor(() => {
       const createCalls = fetchCallsMatching(mockFetch, '/subjects').filter(
-        (c: { url: string; init?: RequestInit }) => c.init?.method === 'POST' && !c.url.includes('/resolve')
+        (c: { url: string; init?: RequestInit }) =>
+          c.init?.method === 'POST' && !c.url.includes('/resolve')
       );
       expect(createCalls.length).toBeGreaterThanOrEqual(1);
-      const body = extractJsonBody<{ name: string; rawInput: string }>(createCalls[0]?.init);
+      const body = extractJsonBody<{ name: string; rawInput: string }>(
+        createCalls[0]?.init
+      );
       expect(body?.name).toBe('leaf cutter ants');
       expect(body?.rawInput).toBe('leaf cutter ants');
     });
@@ -351,10 +370,16 @@ describe('CreateSubjectScreen', () => {
 
     await waitFor(() => {
       const createCalls = fetchCallsMatching(mockFetch, '/subjects').filter(
-        (c: { url: string; init?: RequestInit }) => c.init?.method === 'POST' && !c.url.includes('/resolve')
+        (c: { url: string; init?: RequestInit }) =>
+          c.init?.method === 'POST' && !c.url.includes('/resolve')
       );
       expect(createCalls.length).toBeGreaterThanOrEqual(1);
-      const body = extractJsonBody<{ name: string; rawInput: string; focus: string; focusDescription: string }>(createCalls[0]?.init);
+      const body = extractJsonBody<{
+        name: string;
+        rawInput: string;
+        focus: string;
+        focusDescription: string;
+      }>(createCalls[0]?.init);
       expect(body).toMatchObject({
         name: 'World History',
         rawInput: 'Easter',
@@ -419,10 +444,16 @@ describe('CreateSubjectScreen', () => {
     await waitFor(() => {
       // When the suggestion has an explicit focus, use that instead of deriving
       const createCalls = fetchCallsMatching(mockFetch, '/subjects').filter(
-        (c: { url: string; init?: RequestInit }) => c.init?.method === 'POST' && !c.url.includes('/resolve')
+        (c: { url: string; init?: RequestInit }) =>
+          c.init?.method === 'POST' && !c.url.includes('/resolve')
       );
       expect(createCalls.length).toBeGreaterThanOrEqual(1);
-      const body = extractJsonBody<{ name: string; rawInput: string; focus: string; focusDescription: string }>(createCalls[0]?.init);
+      const body = extractJsonBody<{
+        name: string;
+        rawInput: string;
+        focus: string;
+        focusDescription: string;
+      }>(createCalls[0]?.init);
       expect(body).toMatchObject({
         name: 'World History',
         rawInput: 'Easter',
@@ -471,10 +502,16 @@ describe('CreateSubjectScreen', () => {
     await waitFor(() => {
       // Should split "Biology — Botany" → subjectName "Botany", focus "tea"
       const createCalls = fetchCallsMatching(mockFetch, '/subjects').filter(
-        (c: { url: string; init?: RequestInit }) => c.init?.method === 'POST' && !c.url.includes('/resolve')
+        (c: { url: string; init?: RequestInit }) =>
+          c.init?.method === 'POST' && !c.url.includes('/resolve')
       );
       expect(createCalls.length).toBeGreaterThanOrEqual(1);
-      const body = extractJsonBody<{ name: string; rawInput: string; focus: string; focusDescription: string }>(createCalls[0]?.init);
+      const body = extractJsonBody<{
+        name: string;
+        rawInput: string;
+        focus: string;
+        focusDescription: string;
+      }>(createCalls[0]?.init);
       expect(body).toMatchObject({
         name: 'Botany',
         rawInput: 'tea',
@@ -564,7 +601,8 @@ describe('CreateSubjectScreen', () => {
       displayMessage: 'Math works.',
     });
     createSubjectShouldError = true;
-    createSubjectErrorMessage = 'You have reached the subject limit for your plan';
+    createSubjectErrorMessage =
+      'You have reached the subject limit for your plan';
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
     fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Math');
@@ -610,7 +648,8 @@ describe('CreateSubjectScreen', () => {
       displayMessage: 'Math works.',
     });
     createSubjectShouldError = true;
-    createSubjectErrorMessage = 'You have reached the subject limit for your plan';
+    createSubjectErrorMessage =
+      'You have reached the subject limit for your plan';
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
@@ -639,7 +678,8 @@ describe('CreateSubjectScreen', () => {
       displayMessage: 'Math works.',
     });
     createSubjectShouldError = true;
-    createSubjectErrorMessage = 'You have reached the subject limit for your plan';
+    createSubjectErrorMessage =
+      'You have reached the subject limit for your plan';
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
@@ -855,7 +895,8 @@ describe('CreateSubjectScreen', () => {
     // Wait for resolve to finish (before create fires)
     await waitFor(() => {
       const createCalls = fetchCallsMatching(mockFetch, '/subjects').filter(
-        (c: { url: string; init?: RequestInit }) => c.init?.method === 'POST' && !c.url.includes('/resolve')
+        (c: { url: string; init?: RequestInit }) =>
+          c.init?.method === 'POST' && !c.url.includes('/resolve')
       );
       expect(createCalls.length).toBeGreaterThanOrEqual(1);
     });
@@ -888,12 +929,14 @@ describe('CreateSubjectScreen', () => {
       resolveResolve = r;
     });
 
-    mockFetch.setRoute('/subjects/resolve', () => pendingResolve.then(() => ({
-      status: 'direct_match',
-      resolvedName: 'Science',
-      suggestions: [],
-      displayMessage: 'Science it is.',
-    })));
+    mockFetch.setRoute('/subjects/resolve', () =>
+      pendingResolve.then(() => ({
+        status: 'direct_match',
+        resolvedName: 'Science',
+        suggestions: [],
+        displayMessage: 'Science it is.',
+      }))
+    );
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
@@ -911,7 +954,8 @@ describe('CreateSubjectScreen', () => {
 
     // createSubject must NOT have been called — cancelled before it ran
     const createCalls = fetchCallsMatching(mockFetch, '/subjects').filter(
-      (c: { url: string; init?: RequestInit }) => c.init?.method === 'POST' && !c.url.includes('/resolve')
+      (c: { url: string; init?: RequestInit }) =>
+        c.init?.method === 'POST' && !c.url.includes('/resolve')
     );
     expect(createCalls.length).toBe(0);
     // No post-cancel navigation from the mutation result
@@ -941,11 +985,16 @@ describe('CreateSubjectScreen', () => {
       screen.getByTestId('subjects-load-error-retry');
     });
 
-    const subjectCallsBefore = fetchCallsMatching(mockFetch, '/subjects').length;
+    const subjectCallsBefore = fetchCallsMatching(
+      mockFetch,
+      '/subjects'
+    ).length;
     fireEvent.press(screen.getByTestId('subjects-load-error-retry'));
 
     await waitFor(() => {
-      expect(fetchCallsMatching(mockFetch, '/subjects').length).toBeGreaterThan(subjectCallsBefore);
+      expect(fetchCallsMatching(mockFetch, '/subjects').length).toBeGreaterThan(
+        subjectCallsBefore
+      );
     });
   });
 });
@@ -974,7 +1023,9 @@ describe('CreateSubjectScreen — keyboard avoiding behavior', () => {
       });
       return function W({ children }: { children: React.ReactNode }) {
         return (
-          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+          <QueryClientProvider client={queryClient}>
+            {children}
+          </QueryClientProvider>
         );
       };
     })();

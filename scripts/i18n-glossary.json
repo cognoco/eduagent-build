@@ -1,0 +1,62 @@
+{
+  "_meta": {
+    "description": "Locked translations for domain-specific terms. The LLM translation prompt includes these as constraints.",
+    "format": "term → { langCode: translation }"
+  },
+  "XP": {
+    "nb": "XP",
+    "de": "XP",
+    "es": "XP",
+    "pt": "XP",
+    "pl": "XP",
+    "ja": "XP"
+  },
+  "streak": {
+    "nb": "streak",
+    "de": "Streak",
+    "es": "racha",
+    "pt": "sequência",
+    "pl": "seria",
+    "ja": "ストリーク"
+  },
+  "session": {
+    "nb": "økt",
+    "de": "Sitzung",
+    "es": "sesión",
+    "pt": "sessão",
+    "pl": "sesja",
+    "ja": "セッション"
+  },
+  "tutor": {
+    "nb": "veileder",
+    "de": "Tutor",
+    "es": "tutor",
+    "pt": "tutor",
+    "pl": "tutor",
+    "ja": "チューター"
+  },
+  "quiz": {
+    "nb": "quiz",
+    "de": "Quiz",
+    "es": "quiz",
+    "pt": "quiz",
+    "pl": "quiz",
+    "ja": "クイズ"
+  },
+  "dictation": {
+    "nb": "diktat",
+    "de": "Diktat",
+    "es": "dictado",
+    "pt": "ditado",
+    "pl": "dyktando",
+    "ja": "ディクテーション"
+  },
+  "library": {
+    "nb": "bibliotek",
+    "de": "Bibliothek",
+    "es": "biblioteca",
+    "pt": "biblioteca",
+    "pl": "biblioteka",
+    "ja": "ライブラリ"
+  }
+}

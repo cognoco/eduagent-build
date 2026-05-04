@@ -28,5 +28,9 @@ export function useLibrarySearch(
       }
     },
     enabled: !!activeProfile && trimmed.length >= 1,
+    // The consumer debounces the input string before passing it in, but a
+    // user retyping the same query within a few seconds shouldn't refire 4
+    // ILIKE queries on the server.
+    staleTime: 5_000,
   });
 }

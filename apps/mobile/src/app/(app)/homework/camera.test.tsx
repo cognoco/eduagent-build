@@ -9,6 +9,11 @@ import {
   extractJsonBody,
 } from '../../../test-utils/mock-api-routes';
 
+jest.mock(
+  'react-i18next',
+  () => require('../../../test-utils/mock-i18n').i18nMock
+);
+
 // Mock expo-router
 jest.mock('expo-router', () => ({
   useRouter: jest.fn(),

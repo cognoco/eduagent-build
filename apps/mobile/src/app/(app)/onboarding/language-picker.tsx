@@ -13,6 +13,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import type { ConversationLanguage } from '@eduagent/schemas';
 import { OnboardingStepIndicator } from '../../../components/onboarding/OnboardingStepIndicator';
 import { useUpdateConversationLanguage } from '../../../hooks/use-onboarding-dimensions';
@@ -41,6 +42,7 @@ const LANGUAGE_OPTIONS: Array<{
 ];
 
 export default function LanguagePickerScreen(): React.ReactElement {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
@@ -126,7 +128,7 @@ export default function LanguagePickerScreen(): React.ReactElement {
           onPress={handleBack}
           className="min-h-[44px] min-w-[44px] items-center justify-center self-start"
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('common.goBack')}
         >
           <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </Pressable>
@@ -140,11 +142,10 @@ export default function LanguagePickerScreen(): React.ReactElement {
         contentContainerStyle={{ paddingBottom: 24 }}
       >
         <Text className="text-h2 font-bold text-text-primary mt-4 mb-2">
-          Which language should your tutor speak?
+          {t('onboarding.languagePicker.title')}
         </Text>
         <Text className="text-body text-text-secondary mb-6">
-          You can still switch mid-conversation — the tutor follows your lead.
-          This only sets the default.
+          {t('onboarding.languagePicker.subtitle')}
         </Text>
 
         <View className="gap-3">
@@ -191,8 +192,7 @@ export default function LanguagePickerScreen(): React.ReactElement {
           className="text-body-sm text-text-secondary mt-4 text-center"
           testID="language-picker-other-hint"
         >
-          Don't see your language? Pick the closest one for now — your tutor can
-          switch languages mid-conversation if you ask.
+          {t('onboarding.languagePicker.otherHint')}
         </Text>
       </ScrollView>
 
@@ -210,7 +210,9 @@ export default function LanguagePickerScreen(): React.ReactElement {
           accessibilityState={{ disabled: updateLanguage.isPending }}
         >
           <Text className="text-text-inverse text-body font-semibold">
-            {updateLanguage.isPending ? 'Saving…' : 'Continue'}
+            {updateLanguage.isPending
+              ? t('onboarding.common.saving')
+              : t('common.continue')}
           </Text>
         </Pressable>
         {returnTo === 'settings' && (
@@ -220,7 +222,9 @@ export default function LanguagePickerScreen(): React.ReactElement {
             onPress={handleBack}
             accessibilityRole="button"
           >
-            <Text className="text-primary text-body font-semibold">Cancel</Text>
+            <Text className="text-primary text-body font-semibold">
+              {t('common.cancel')}
+            </Text>
           </Pressable>
         )}
       </View>

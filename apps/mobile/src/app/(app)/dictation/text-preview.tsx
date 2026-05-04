@@ -3,6 +3,7 @@ import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
 import { usePrepareHomework } from '../../../hooks/use-dictation-api';
@@ -10,6 +11,7 @@ import { useThemeColors } from '../../../lib/theme';
 import { useDictationData } from './_layout';
 
 export default function TextPreviewScreen(): React.ReactElement {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
@@ -43,7 +45,10 @@ export default function TextPreviewScreen(): React.ReactElement {
 
   const handleStartDictation = async () => {
     if (!text.trim()) {
-      platformAlert('No text', 'Please enter or photograph some text first.');
+      platformAlert(
+        t('dictation.textPreview.noTextTitle'),
+        t('dictation.textPreview.noTextMessage')
+      );
       return;
     }
 
@@ -70,11 +75,14 @@ export default function TextPreviewScreen(): React.ReactElement {
       if (prepareCancelledRef.current) return;
       console.warn('[dictation] homework preparation failed:', err);
       platformAlert(
-        'Something went wrong',
-        'Could not prepare your dictation. Try again?',
+        t('dictation.textPreview.prepareErrorTitle'),
+        t('dictation.textPreview.prepareErrorMessage'),
         [
-          { text: 'Try again', onPress: () => void handleStartDictation() },
-          { text: 'Go back', style: 'cancel' },
+          {
+            text: t('dictation.textPreview.tryAgain'),
+            onPress: () => void handleStartDictation(),
+          },
+          { text: t('common.goBack'), style: 'cancel' },
         ]
       );
     }
@@ -98,20 +106,20 @@ export default function TextPreviewScreen(): React.ReactElement {
           }}
           className="mr-3 min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('common.goBack')}
           testID="text-preview-back"
         >
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </Pressable>
         <Text className="text-h2 font-bold text-text-primary flex-1">
-          Check the text
+          {t('dictation.textPreview.title')}
         </Text>
       </View>
 
       <Text className="text-body-sm text-text-secondary mb-3">
         {ocrText
-          ? 'Edit any mistakes from the photo, then start your dictation.'
-          : 'Review your text, then start your dictation.'}
+          ? t('dictation.textPreview.subtitleFromPhoto')
+          : t('dictation.textPreview.subtitleManual')}
       </Text>
 
       <TextInput
@@ -122,9 +130,9 @@ export default function TextPreviewScreen(): React.ReactElement {
         textAlignVertical="top"
         autoCorrect={false}
         placeholderTextColor={colors.textSecondary}
-        placeholder="Type or paste your text here..."
+        placeholder={t('dictation.textPreview.inputPlaceholder')}
         testID="text-preview-input"
-        accessibilityLabel="Dictation text"
+        accessibilityLabel={t('dictation.textPreview.inputLabel')}
       />
 
       <Pressable
@@ -138,11 +146,15 @@ export default function TextPreviewScreen(): React.ReactElement {
         testID="text-preview-start"
         accessibilityRole="button"
         accessibilityLabel={
-          prepareMutation.isPending ? 'Preparing dictation' : 'Start dictation'
+          prepareMutation.isPending
+            ? t('dictation.textPreview.preparingDictation')
+            : t('dictation.textPreview.startDictation')
         }
       >
         <Text className="text-text-inverse font-semibold text-body">
-          {prepareMutation.isPending ? 'Preparing...' : 'Start dictation'}
+          {prepareMutation.isPending
+            ? t('dictation.textPreview.preparing')
+            : t('dictation.textPreview.startDictation')}
         </Text>
       </Pressable>
 
@@ -153,7 +165,7 @@ export default function TextPreviewScreen(): React.ReactElement {
               className="text-body-sm text-danger text-center mt-3"
               testID="text-preview-timeout-hint"
             >
-              This is taking longer than usual — you can cancel and try again.
+              {t('dictation.textPreview.takingLonger')}
             </Text>
           )}
           <Pressable
@@ -164,11 +176,11 @@ export default function TextPreviewScreen(): React.ReactElement {
             }}
             className="mt-3 py-2 px-4 min-h-[44px] items-center justify-center self-center"
             accessibilityRole="button"
-            accessibilityLabel="Cancel preparing dictation"
+            accessibilityLabel={t('dictation.textPreview.cancelPreparing')}
             testID="text-preview-cancel"
           >
             <Text className="text-body-sm font-semibold text-text-secondary">
-              Cancel
+              {t('common.cancel')}
             </Text>
           </Pressable>
         </>

@@ -3,6 +3,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import type { AccommodationMode } from '@eduagent/schemas';
 import { OnboardingStepIndicator } from '../../../components/onboarding/OnboardingStepIndicator';
 import { useUpdateAccommodationMode } from '../../../hooks/use-learner-profile';
@@ -14,6 +15,7 @@ import { useThemeColors } from '../../../lib/theme';
 import { ErrorFallback } from '../../../components/common/ErrorFallback';
 
 export default function AccommodationsScreen(): React.ReactElement {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
@@ -88,7 +90,7 @@ export default function AccommodationsScreen(): React.ReactElement {
         onError: (err) => {
           // UX-DE-M12: preserve server message via classifyApiError
           platformAlert(
-            'Could not save setting',
+            t('onboarding.accommodations.saveErrorTitle'),
             classifyApiError(err).message
           );
         },
@@ -110,15 +112,15 @@ export default function AccommodationsScreen(): React.ReactElement {
       >
         <ErrorFallback
           variant="centered"
-          title="No subject selected"
-          message="Open this screen from a subject's detail page. Browse your Library to pick a subject and continue setup from there."
+          title={t('onboarding.accommodations.noSubjectTitle')}
+          message={t('onboarding.accommodations.noSubjectMessage')}
           primaryAction={{
-            label: 'Open Library',
+            label: t('onboarding.accommodations.openLibrary'),
             onPress: () => router.replace('/(app)/library' as const),
             testID: 'accommodation-empty-library',
           }}
           secondaryAction={{
-            label: 'Go back',
+            label: t('common.goBack'),
             onPress: () => goBackOrReplace(router, '/(app)/home' as const),
             testID: 'accommodation-empty-back',
           }}
@@ -139,7 +141,7 @@ export default function AccommodationsScreen(): React.ReactElement {
           onPress={handleBack}
           className="min-h-[44px] min-w-[44px] items-center justify-center self-start"
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('common.goBack')}
         >
           <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </Pressable>
@@ -151,11 +153,10 @@ export default function AccommodationsScreen(): React.ReactElement {
         contentContainerStyle={{ paddingBottom: 24 }}
       >
         <Text className="text-h2 font-bold text-text-primary mt-4 mb-2">
-          How do you learn best?
+          {t('onboarding.accommodations.title')}
         </Text>
         <Text className="text-body text-text-secondary mb-6">
-          Some learners do best with shorter explanations, audio-first help, or
-          very predictable steps. Pick what fits, or skip for now.
+          {t('onboarding.accommodations.subtitle')}
         </Text>
 
         <View className="gap-3">
@@ -206,7 +207,7 @@ export default function AccommodationsScreen(): React.ReactElement {
           disabled={updateAccommodation.isPending}
         >
           <Text className="text-text-inverse text-body font-semibold">
-            Continue
+            {t('common.continue')}
           </Text>
         </Pressable>
         <Pressable
@@ -214,7 +215,9 @@ export default function AccommodationsScreen(): React.ReactElement {
           className="py-2 items-center"
           onPress={navigateToCurriculum}
         >
-          <Text className="text-body text-text-secondary">Skip</Text>
+          <Text className="text-body text-text-secondary">
+            {t('onboarding.common.skip')}
+          </Text>
         </Pressable>
       </View>
     </View>

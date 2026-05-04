@@ -45,6 +45,11 @@ const sessionBookmarksQuerySchema = z.object({
 
 export const bookmarkRoutes = new Hono<BookmarkRouteEnv>()
   .post('/bookmarks', zValidator('json', createBookmarkSchema), async (c) => {
+    // [BUG-973 / CCR-PR126-C-2] Block writes from proxy sessions. DELETE
+    // already enforces this; POST creates a bookmark on the resolved profile,
+    // which is just as much a write a parent acting on a child must not be
+    // permitted to make.
+    assertNotProxyMode(c);
     const bookmark = await createBookmark(
       c.get('db'),
       requireProfileId(c.get('profileId')),

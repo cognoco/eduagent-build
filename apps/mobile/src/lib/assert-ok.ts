@@ -2,6 +2,19 @@
  * Asserts that an API response is successful (2xx status).
  * Extracts the server's error message when available.
  * Throws an Error that TanStack Query will catch and surface as query/mutation error.
+ *
+ * [BUG-982 / CCR-PR127-M-9] Returns the response narrowed to the success
+ * branch (`Extract<T, { ok: true }>`). TypeScript forbids `asserts` predicates
+ * on async functions, so we encode the same narrowing via the return value.
+ * `Extract` distributes over the response union (Hono RPC `ClientResponse`
+ * has `ok: true` only on success-status members) and drops error-status
+ * members at the type level. Callers can therefore do
+ *   `const okRes = await assertOk(res); return await okRes.json();`
+ * and TypeScript will infer the success-body type without an `as` cast.
+ *
+ * Existing callsites that still pattern as `await assertOk(res); ...res.json()`
+ * continue to work — the return value is simply discarded and `res` keeps its
+ * original union type. New code should prefer the narrowed return.
  */
 export interface ApiResponseError extends Error {
   status: number;
@@ -10,8 +23,12 @@ export interface ApiResponseError extends Error {
   bodyText?: string;
 }
 
-export async function assertOk(res: Response): Promise<void> {
-  if (res.ok) return;
+type AssertedOk<T> = T extends { ok: false } ? never : T;
+
+export async function assertOk<T extends Response>(
+  res: T
+): Promise<AssertedOk<T>> {
+  if (res.ok) return res as AssertedOk<T>;
 
   let message = `Request failed (${res.status})`;
   let code: string | undefined;

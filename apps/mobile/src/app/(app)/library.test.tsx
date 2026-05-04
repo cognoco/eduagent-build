@@ -2,6 +2,16 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
+// Use the shared mock-i18n util so assertions reference the rendered English
+// copy from en.json (what users actually see), not bare keys. A bare-key mock
+// would only prove t() was called — not that the translation pipeline is
+// wired correctly or that {{interpolation}} tokens resolve. See
+// apps/mobile/src/test-utils/mock-i18n.ts for the lookup behaviour.
+jest.mock(
+  'react-i18next',
+  () => require('../../test-utils/mock-i18n').i18nMock
+);
+
 const mockPush = jest.fn();
 const mockUseSubjects = jest.fn();
 const mockUseOverallProgress = jest.fn();
@@ -438,8 +448,9 @@ describe('LibraryScreen', () => {
 
   it('navigates to book screen when a book row inside an expanded shelf is pressed', () => {
     // Library v3: books are accessed by expanding a shelf row, not via a
-    // separate Books tab. Tapping a book inside the expanded shelf triggers
-    // the cross-tab nav pattern (parent route pushed first).
+    // separate Books tab. Single deep push: shelf/[subjectId]/_layout exports
+    // unstable_settings.initialRouteName = 'index', which seeds the stack so
+    // router.back() from the book screen returns to the shelf index.
     mockUseSubjects.mockReturnValue({
       data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
       isLoading: false,
@@ -480,7 +491,11 @@ describe('LibraryScreen', () => {
     // The ShelfRow mock renders book-row-book-1 when expanded=true.
     fireEvent.press(screen.getByTestId('book-row-book-1'));
 
-    // [CLAUDE.md cross-tab nav] Parent shelf pushed first, then book
+    // [CLAUDE.md cross-tab nav] Two-push pattern: parent shelf first,
+    // then book child. unstable_settings only seeds one level deep, so
+    // explicit ancestor push keeps router.back() landing on the shelf
+    // index rather than the Tabs root.
+    expect(mockPush).toHaveBeenCalledTimes(2);
     expect(mockPush).toHaveBeenNthCalledWith(1, {
       pathname: '/(app)/shelf/[subjectId]',
       params: { subjectId: 'sub-1' },
@@ -489,7 +504,6 @@ describe('LibraryScreen', () => {
       pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
       params: { subjectId: 'sub-1', bookId: 'book-1' },
     });
-    expect(mockPush).toHaveBeenCalledTimes(2);
   });
 
   // -----------------------------------------------------------------------
@@ -566,6 +580,86 @@ describe('LibraryScreen', () => {
       const backdrop = screen.getByTestId('manage-subjects-backdrop');
       expect(backdrop.props.accessibilityRole).toBe('button');
       expect(backdrop.props.accessibilityLabel).toBe('Close manage subjects');
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // BUG-971: Header topic count must include null-bookId topics
+  // -----------------------------------------------------------------------
+  // Repro: topicCountsByBookId skips topics where bookId is null (orphan
+  // topics, parking-lot entries). totalTopicsAcrossBooks used to derive
+  // from topicCountsByBookId, so the header subtitle silently undercounted
+  // those topics — visibly drifting from per-shelf topic totals.
+  describe('Header topic count [BUG-971]', () => {
+    it('counts topics with null bookId in the header subtitle', () => {
+      mockUseSubjects.mockReturnValue({
+        data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+        isLoading: false,
+      });
+      mockUseOverallProgress.mockReturnValue({
+        data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
+        isLoading: false,
+      });
+      setLibraryRetention(testQueryClient, {
+        subjects: [
+          {
+            subjectId: 'sub-1',
+            topics: [
+              {
+                topicId: 't-1',
+                bookId: 'book-1',
+                easeFactor: 2.5,
+                repetitions: 0,
+                lastReviewedAt: null,
+                xpStatus: 'pending',
+                failureCount: 0,
+              },
+              {
+                topicId: 't-2',
+                bookId: null,
+                easeFactor: 2.5,
+                repetitions: 0,
+                lastReviewedAt: null,
+                xpStatus: 'pending',
+                failureCount: 0,
+              },
+              {
+                topicId: 't-3',
+                bookId: null,
+                easeFactor: 2.5,
+                repetitions: 0,
+                lastReviewedAt: null,
+                xpStatus: 'pending',
+                failureCount: 0,
+              },
+            ],
+            reviewDueCount: 0,
+          },
+        ],
+      });
+
+      render(<LibraryScreen />, { wrapper: TestWrapper });
+
+      // 3 topics total (1 with bookId, 2 with null bookId) must all be counted.
+      // Pre-fix this would render "1 subjects · 1 topics" (orphans dropped).
+      screen.getByText('1 subjects · 3 topics');
+    });
+
+    it('omits the topic count segment entirely when there are no topics', () => {
+      mockUseSubjects.mockReturnValue({
+        data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+        isLoading: false,
+      });
+      mockUseOverallProgress.mockReturnValue({
+        data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
+        isLoading: false,
+      });
+      setLibraryRetention(testQueryClient, { subjects: [] });
+
+      render(<LibraryScreen />, { wrapper: TestWrapper });
+
+      // Header should read just "1 subjects" with no trailing " · N topics".
+      screen.getByText('1 subjects');
     });
   });
 });

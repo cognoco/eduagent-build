@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, Pressable } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import type { FluencyDrillEvent } from '../../lib/sse';
 
 function formatCountdown(seconds: number): string {
@@ -27,6 +28,7 @@ export function FluencyDrillStrip({
   onDismissScore,
   onSkipDrill,
 }: FluencyDrillStripProps) {
+  const { t } = useTranslation();
   const [remaining, setRemaining] = useState(drill.durationSeconds ?? 60);
   const startRef = useRef(Date.now());
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -74,17 +76,19 @@ export function FluencyDrillStrip({
             {correct}/{total}
           </Text>
           <Text className="text-caption text-text-secondary">
-            {pct}% correct
+            {t('session.fluencyDrill.percentCorrect', { pct: String(pct) })}
           </Text>
         </View>
         <Pressable
           onPress={handleDismiss}
           hitSlop={8}
           accessibilityRole="button"
-          accessibilityLabel="Dismiss drill score"
+          accessibilityLabel={t('session.fluencyDrill.dismissLabel')}
           testID="fluency-drill-dismiss"
         >
-          <Text className="text-caption text-text-tertiary">Dismiss</Text>
+          <Text className="text-caption text-text-tertiary">
+            {t('session.fluencyDrill.dismiss')}
+          </Text>
         </Pressable>
       </View>
     );
@@ -106,7 +110,7 @@ export function FluencyDrillStrip({
     >
       <View className="flex-row items-center gap-2">
         <Text className="text-caption font-semibold text-primary">
-          Fluency drill
+          {t('session.fluencyDrill.title')}
         </Text>
       </View>
       <View className="flex-row items-center gap-3">
@@ -123,10 +127,12 @@ export function FluencyDrillStrip({
             onPress={onSkipDrill}
             hitSlop={8}
             accessibilityRole="button"
-            accessibilityLabel="Skip drill"
+            accessibilityLabel={t('session.fluencyDrill.skipLabel')}
             testID="fluency-drill-skip"
           >
-            <Text className="text-caption text-text-tertiary">Skip</Text>
+            <Text className="text-caption text-text-tertiary">
+              {t('session.fluencyDrill.skip')}
+            </Text>
           </Pressable>
         )}
       </View>

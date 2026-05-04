@@ -5,6 +5,7 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 import { OutboxFailedBanner } from './OutboxFailedBanner';
+import { ensureI18nReady } from '../../i18n';
 import {
   listPermanentlyFailed,
   deletePermanentlyFailed,
@@ -41,6 +42,13 @@ const ENTRY = {
   status: 'permanently-failed' as const,
 };
 
+// Pin the i18n init so this suite cannot regress to rendering raw keys if
+// test-setup.ts ordering ever changes. Matches the pattern in
+// format-api-error.test.ts.
+beforeAll(async () => {
+  await ensureI18nReady();
+});
+
 beforeEach(() => jest.clearAllMocks());
 
 describe('OutboxFailedBanner', () => {
@@ -66,7 +74,7 @@ describe('OutboxFailedBanner', () => {
     screen.getByText('Some messages could not be sent');
     expect(
       screen.getByText(
-        'Copy them or send them to support so nothing gets lost.'
+        "Copy them or send them to support so your progress isn't lost."
       )
     ).toBeTruthy();
     screen.getByText('Hello world');

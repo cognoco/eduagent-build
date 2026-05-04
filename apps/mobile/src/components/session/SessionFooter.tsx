@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { QuestionCounter, LibraryPrompt } from '../session';
 import { NoteInput } from '../library/NoteInput';
 import type { useFiling } from '../../hooks/use-filing';
@@ -61,6 +62,7 @@ export function SessionFooter({
   showQuestionCount,
   showBookLink,
 }: SessionFooterProps) {
+  const { t } = useTranslation();
   return (
     <>
       {showFilingPrompt && !filingDismissed ? (
@@ -77,21 +79,20 @@ export function SessionFooter({
       {sessionExpired ? (
         <View className="bg-surface rounded-card p-4 mt-2 mb-4">
           <Text className="text-body font-semibold text-text-primary mb-2">
-            Session expired
+            {t('session.expired.title')}
           </Text>
           <Text className="text-body-sm text-text-secondary mb-3">
-            This session is no longer available. Start a new one from home or
-            your library.
+            {t('session.expired.message')}
           </Text>
           <Pressable
             onPress={() => router.replace('/(app)/home' as never)}
             className="bg-primary rounded-button py-3 items-center"
             testID="session-expired-go-home"
             accessibilityRole="button"
-            accessibilityLabel="Go home"
+            accessibilityLabel={t('common.goHome')}
           >
             <Text className="text-text-inverse text-body font-semibold">
-              Go Home
+              {t('common.goHome')}
             </Text>
           </Pressable>
         </View>
@@ -102,7 +103,7 @@ export function SessionFooter({
           onPress={() => setShowNoteInput(true)}
           testID="session-note-prompt"
           accessibilityRole="button"
-          accessibilityLabel="Write a note"
+          accessibilityLabel={t('session.notePrompt.writeNote')}
         >
           <Ionicons
             name="document-text-outline"
@@ -110,7 +111,7 @@ export function SessionFooter({
             color={colors.primary}
           />
           <Text className="text-body text-primary font-semibold ml-2">
-            Write a note
+            {t('session.notePrompt.writeNote')}
           </Text>
         </Pressable>
       ) : null}
@@ -120,8 +121,8 @@ export function SessionFooter({
             onSave={(content) => {
               if (!topicId) {
                 platformAlert(
-                  'Cannot save note',
-                  'No topic selected for this session.'
+                  t('session.notePrompt.cannotSaveTitle'),
+                  t('session.notePrompt.cannotSaveMessage')
                 );
                 return;
               }
@@ -138,7 +139,7 @@ export function SessionFooter({
                   },
                   onError: (error) => {
                     platformAlert(
-                      "Couldn't save your note",
+                      t('session.notePrompt.saveFailedTitle'),
                       formatApiError(error)
                     );
                   },
@@ -176,18 +177,21 @@ function StandardFilingPrompt({
     filedBookId?: string
   ) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <View
       className="px-4 py-6 bg-surface-elevated rounded-t-2xl"
       testID="filing-prompt"
     >
       <Text className="text-lg font-semibold text-text-primary mb-2">
-        Add to your library?
+        {t('session.filingPrompt.title')}
       </Text>
       <Text className="text-body-sm text-text-secondary mb-4">
         {filingTopicHint
-          ? `You explored "${filingTopicHint}". Keep it in your library?`
-          : 'We can organize what you learned into your library.'}
+          ? t('session.filingPrompt.descriptionWithTopic', {
+              topic: filingTopicHint,
+            })
+          : t('session.filingPrompt.description')}
       </Text>
       <View className="flex-row gap-3">
         <Pressable
@@ -201,11 +205,11 @@ function StandardFilingPrompt({
               navigateToSessionSummary(result.shelfId, result.bookId);
             } catch {
               platformAlert(
-                "Couldn't add to library",
-                'Your session is still saved.',
+                t('session.filingPrompt.addFailedTitle'),
+                t('session.filingPrompt.addFailedMessage'),
                 [
                   {
-                    text: 'OK',
+                    text: t('common.done'),
                     onPress: () => {
                       setFilingDismissed(true);
                       navigateToSessionSummary();
@@ -220,13 +224,17 @@ function StandardFilingPrompt({
           testID="filing-prompt-accept"
           accessibilityRole="button"
           accessibilityLabel={
-            filing.isPending ? 'Adding to library' : 'Yes, add to library'
+            filing.isPending
+              ? t('session.filingPrompt.adding')
+              : t('session.filingPrompt.yesAddLabel')
           }
         >
           {filing.isPending ? (
             <ActivityIndicator color="white" />
           ) : (
-            <Text className="text-text-inverse font-semibold">Yes, add it</Text>
+            <Text className="text-text-inverse font-semibold">
+              {t('session.filingPrompt.yesAdd')}
+            </Text>
           )}
         </Pressable>
         <Pressable
@@ -238,9 +246,11 @@ function StandardFilingPrompt({
           className="px-4 py-3 min-h-[44px] justify-center"
           testID="filing-prompt-dismiss"
           accessibilityRole="button"
-          accessibilityLabel="No thanks, skip"
+          accessibilityLabel={t('session.filingPrompt.noThanksLabel')}
         >
-          <Text className="text-text-secondary">No thanks</Text>
+          <Text className="text-text-secondary">
+            {t('session.filingPrompt.noThanks')}
+          </Text>
         </Pressable>
       </View>
     </View>

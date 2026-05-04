@@ -83,6 +83,20 @@ describe('SignInScreen', () => {
     screen.getByTestId('sign-in-button');
   });
 
+  // [BUG-959] sign-in-button + sign-up-link sit below the fold on 1080x1920
+  // (~5.8" devices) once logo + Google SSO + form fields stack up. The
+  // ScrollView is fine — it's the E2E test's screen-loaded signal that
+  // breaks, because Maestro waits on sign-in-button which is below-fold.
+  // Lock the always-above-fold container testIDs so any future rename
+  // surfaces here before the Maestro suite breaks nightly.
+  it('exposes screen + scroll testIDs for Maestro screen-loaded waits', async () => {
+    render(<SignInScreen />);
+    await act(async () => undefined);
+
+    screen.getByTestId('sign-in-screen');
+    screen.getByTestId('sign-in-scroll');
+  });
+
   it('renders Apple SSO button on iOS (Google hidden)', async () => {
     render(<SignInScreen />);
     await act(async () => undefined);

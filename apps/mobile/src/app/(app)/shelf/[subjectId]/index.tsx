@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,6 +20,7 @@ import {
 import { useThemeColors } from '../../../../lib/theme';
 
 export default function ShelfScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const themeColors = useThemeColors();
@@ -116,7 +118,7 @@ export default function ShelfScreen() {
         testID="shelf-missing-param"
       >
         <Text className="text-body text-text-secondary text-center mb-4">
-          Missing subject. Please go back and try again.
+          {t('library.shelf.missingParam')}
         </Text>
         <Pressable
           onPress={handleBack}
@@ -124,7 +126,7 @@ export default function ShelfScreen() {
           testID="shelf-missing-param-back"
         >
           <Text className="text-text-primary text-body font-semibold">
-            Go back
+            {t('common.back')}
           </Text>
         </Pressable>
       </View>
@@ -182,15 +184,17 @@ export default function ShelfScreen() {
       >
         <BookPageFlipAnimation size={140} color={themeColors.accent} />
         <Text className="text-body-sm text-text-secondary mt-3">
-          Loading this shelf...
+          {t('library.shelf.loading')}
         </Text>
         <Pressable
           onPress={handleBack}
           className="mt-6 px-5 py-3"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('common.back')}
           testID="shelf-loading-back"
         >
-          <Text className="text-body text-primary font-semibold">Go back</Text>
+          <Text className="text-body text-primary font-semibold">
+            {t('common.back')}
+          </Text>
         </Pressable>
       </View>
     );
@@ -216,7 +220,7 @@ export default function ShelfScreen() {
       >
         <ErrorFallback
           variant="centered"
-          title="Couldn't load this shelf"
+          title={t('library.shelf.errorTitle')}
           message={errorMessage}
           primaryAction={actions.primary}
           secondaryAction={actions.secondary}
@@ -236,7 +240,7 @@ export default function ShelfScreen() {
         <Pressable
           onPress={handleBack}
           className="p-2 -ms-2 me-2"
-          accessibilityLabel="Back"
+          accessibilityLabel={t('common.back')}
           testID="shelf-back"
         >
           <Ionicons name="arrow-back" size={24} color={themeColors.accent} />
@@ -247,10 +251,10 @@ export default function ShelfScreen() {
             className="text-h1 font-bold text-text-primary"
             numberOfLines={1}
           >
-            {subject?.name ?? 'Shelf'}
+            {subject?.name ?? t('library.shelf.fallbackTitle')}
           </Text>
           <Text className="text-body-sm text-text-secondary mt-1">
-            {books.length} {books.length === 1 ? 'book' : 'books'}
+            {t('library.shelf.bookCount', { count: books.length })}
           </Text>
           {showProgress && (
             <View className="mt-2">
@@ -258,7 +262,10 @@ export default function ShelfScreen() {
                 className="text-caption text-text-secondary mb-1"
                 testID="shelf-progress-label"
               >
-                {completedTopics}/{totalTopics} topics
+                {t('library.shelf.topicProgress', {
+                  completed: completedTopics,
+                  total: totalTopics,
+                })}
               </Text>
               <View className="h-1.5 bg-surface-elevated rounded-full overflow-hidden">
                 <View
@@ -283,7 +290,7 @@ export default function ShelfScreen() {
             } as never)
           }
           className="p-2 -me-2"
-          accessibilityLabel="Subject settings"
+          accessibilityLabel={t('library.shelf.settingsAccessibilityLabel')}
           testID="shelf-settings"
         >
           <Ionicons
@@ -298,7 +305,7 @@ export default function ShelfScreen() {
       {bookSuggestions.length > 0 && (
         <View className="px-4 mb-4">
           <Text className="text-sm font-semibold text-text-muted mb-3">
-            Study next
+            {t('library.shelf.studyNext')}
           </Text>
           <View className="flex-row gap-3">
             {bookSuggestions.slice(0, 2).map((suggestion) => (
@@ -327,9 +334,11 @@ export default function ShelfScreen() {
           className="mx-4 mb-4 border border-dashed border-border rounded-xl py-3 items-center"
           testID="shelf-browse-all-suggestions"
           accessibilityRole="button"
-          accessibilityLabel="Browse all suggestions"
+          accessibilityLabel={t('library.shelf.browseAll')}
         >
-          <Text className="text-text-muted">Browse all suggestions</Text>
+          <Text className="text-text-muted">
+            {t('library.shelf.browseAll')}
+          </Text>
         </Pressable>
       )}
 
@@ -366,10 +375,10 @@ export default function ShelfScreen() {
               testID="shelf-empty-pick-suggestion"
             >
               <Text className="text-body font-semibold text-text-primary text-center mb-2">
-                Pick a book to start
+                {t('library.shelf.emptyPickTitle')}
               </Text>
               <Text className="text-body-sm text-text-secondary text-center">
-                Tap one of the &ldquo;Study next&rdquo; cards above to begin.
+                {t('library.shelf.emptyPickMessage')}
               </Text>
             </View>
           ) : (
@@ -378,10 +387,10 @@ export default function ShelfScreen() {
               testID="shelf-empty"
             >
               <Text className="text-body font-semibold text-text-primary text-center mb-2">
-                No books on this shelf yet.
+                {t('library.shelf.emptyTitle')}
               </Text>
               <Text className="text-body-sm text-text-secondary text-center mb-5">
-                Your curriculum is still being built. Check back soon.
+                {t('library.shelf.emptyMessage')}
               </Text>
               <Pressable
                 onPress={handleBack}
@@ -389,7 +398,7 @@ export default function ShelfScreen() {
                 testID="shelf-empty-back"
               >
                 <Text className="text-text-primary text-body font-semibold">
-                  Go back
+                  {t('common.back')}
                 </Text>
               </Pressable>
             </View>
@@ -405,7 +414,7 @@ export default function ShelfScreen() {
         >
           <BookPageFlipAnimation size={140} color={themeColors.accent} />
           <Text className="text-body-sm text-text-secondary mt-3">
-            Organizing your library...
+            {t('library.shelf.organizing')}
           </Text>
           {showSkip && (
             <Pressable
@@ -421,10 +430,10 @@ export default function ShelfScreen() {
               }}
               className="mt-6 bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
               testID="shelf-filing-skip"
-              accessibilityLabel="Skip and start learning anyway"
+              accessibilityLabel={t('library.shelf.skipAccessibilityLabel')}
             >
               <Text className="text-body font-semibold text-text-primary">
-                Skip — start learning anyway
+                {t('library.shelf.skip')}
               </Text>
             </Pressable>
           )}
@@ -439,16 +448,16 @@ export default function ShelfScreen() {
         >
           <ErrorFallback
             variant="centered"
-            title="Couldn't add that book"
+            title={t('library.shelf.filingErrorTitle')}
             message={filingError.message}
             primaryAction={{
-              label: 'Try Again',
+              label: t('common.tryAgain'),
               onPress: () =>
                 void handlePickBookSuggestion(filingError.suggestion),
               testID: 'shelf-filing-error-retry',
             }}
             secondaryAction={{
-              label: 'Go Back',
+              label: t('common.goBack'),
               onPress: handleBack,
               testID: 'shelf-filing-error-back',
             }}

@@ -1,10 +1,15 @@
 import { renderHook, act } from '@testing-library/react-native';
-import * as ExpoSecureStore from 'expo-secure-store';
+import * as SecureStore from '../lib/secure-storage';
 import { useDictationPreferences } from './use-dictation-preferences';
 
-jest.mock('expo-secure-store');
-const mockGet = jest.mocked(ExpoSecureStore.getItemAsync);
-const mockSet = jest.mocked(ExpoSecureStore.setItemAsync);
+jest.mock('../lib/secure-storage', () => ({
+  getItemAsync: jest.fn(),
+  setItemAsync: jest.fn(),
+  deleteItemAsync: jest.fn(),
+  sanitizeSecureStoreKey: (s: string) => s.replace(/[^a-zA-Z0-9._-]/g, '_'),
+}));
+const mockGet = jest.mocked(SecureStore.getItemAsync);
+const mockSet = jest.mocked(SecureStore.setItemAsync);
 
 describe('useDictationPreferences', () => {
   beforeEach(() => {
@@ -13,9 +18,7 @@ describe('useDictationPreferences', () => {
   });
 
   it('returns default pace "slow" when nothing stored', async () => {
-    const { result } = renderHook(() =>
-      useDictationPreferences('profile-123')
-    );
+    const { result } = renderHook(() => useDictationPreferences('profile-123'));
 
     await act(() => Promise.resolve());
 
@@ -23,9 +26,7 @@ describe('useDictationPreferences', () => {
   });
 
   it('returns default punctuationReadAloud true when nothing stored', async () => {
-    const { result } = renderHook(() =>
-      useDictationPreferences('profile-123')
-    );
+    const { result } = renderHook(() => useDictationPreferences('profile-123'));
 
     await act(() => Promise.resolve());
 
@@ -39,9 +40,7 @@ describe('useDictationPreferences', () => {
       return null;
     });
 
-    const { result } = renderHook(() =>
-      useDictationPreferences('profile-123')
-    );
+    const { result } = renderHook(() => useDictationPreferences('profile-123'));
 
     await act(() => Promise.resolve());
 
@@ -52,9 +51,7 @@ describe('useDictationPreferences', () => {
   it('setPace writes to SecureStore and updates state', async () => {
     mockSet.mockResolvedValue();
 
-    const { result } = renderHook(() =>
-      useDictationPreferences('profile-123')
-    );
+    const { result } = renderHook(() => useDictationPreferences('profile-123'));
 
     await act(() => Promise.resolve());
     await act(async () => {
@@ -71,9 +68,7 @@ describe('useDictationPreferences', () => {
   it('togglePunctuation flips state and writes to SecureStore', async () => {
     mockSet.mockResolvedValue();
 
-    const { result } = renderHook(() =>
-      useDictationPreferences('profile-123')
-    );
+    const { result } = renderHook(() => useDictationPreferences('profile-123'));
 
     await act(() => Promise.resolve());
 
@@ -93,9 +88,7 @@ describe('useDictationPreferences', () => {
   it('cyclePace follows slow → normal → fast → slow cycle', async () => {
     mockSet.mockResolvedValue();
 
-    const { result } = renderHook(() =>
-      useDictationPreferences('profile-123')
-    );
+    const { result } = renderHook(() => useDictationPreferences('profile-123'));
 
     await act(() => Promise.resolve());
 
@@ -121,9 +114,7 @@ describe('useDictationPreferences', () => {
   it('does not write to SecureStore when profileId is undefined', async () => {
     mockSet.mockResolvedValue();
 
-    const { result } = renderHook(() =>
-      useDictationPreferences(undefined)
-    );
+    const { result } = renderHook(() => useDictationPreferences(undefined));
 
     await act(() => Promise.resolve());
     await act(async () => {

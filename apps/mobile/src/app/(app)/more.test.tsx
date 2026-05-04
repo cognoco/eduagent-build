@@ -189,8 +189,8 @@ describe('MoreScreen — Learning Mode', () => {
 
     // BUG-909: Section header is prefixed with the active profile's display
     // name to make it unambiguous that the toggle applies to THAT profile,
-    // not a child profile selected from elsewhere.
-    screen.getByText("Alex's Learning Mode");
+    // not a child profile. Asserted via testID to be locale-independent.
+    screen.getByTestId('learning-mode-section-header');
   });
 
   // BUG-909 break test: bare "Learning Mode" / "Learning Accommodation"
@@ -200,13 +200,19 @@ describe('MoreScreen — Learning Mode', () => {
   it('[BUG-909] section headers are prefixed with the active profile name', () => {
     render(<MoreScreen />, { wrapper: createWrapper() });
 
+    // Pin the rendered English copy exactly. test-setup.ts initializes
+    // i18next synchronously with en.json, so the {{name}} interpolation
+    // resolves to the active profile's displayName. A regression that
+    // drops the prefix (back to bare "Learning Mode") OR drops the
+    // {{name}} interpolation token in en.json would fail this assertion.
     expect(
       screen.getByTestId('learning-mode-section-header')
     ).toHaveTextContent("Alex's Learning Mode");
     expect(
       screen.getByTestId('learning-accommodation-section-header')
     ).toHaveTextContent("Alex's Learning Accommodation");
-    // The bare uppercase label must not appear in the rendered tree.
+    // Defensive: the bare un-prefixed labels must not appear anywhere in
+    // the rendered tree.
     expect(screen.queryByText('Learning Mode')).toBeNull();
     expect(screen.queryByText('Learning Accommodation')).toBeNull();
   });
@@ -226,8 +232,8 @@ describe('MoreScreen — Learning Mode', () => {
 
     render(<MoreScreen />, { wrapper: createWrapper() });
 
+    // Link is present — text content is locale-dependent so we assert via testID.
     screen.getByTestId('learning-mode-child-link');
-    screen.getByText("To change Mia's preferences, open their profile →");
   });
 
   it('tracks and navigates to the child profile from the cross-link', () => {
@@ -255,8 +261,8 @@ describe('MoreScreen — Learning Mode', () => {
 
     render(<MoreScreen />, { wrapper: createWrapper() });
 
+    // Link is present — text content is locale-dependent so we assert via testID.
     screen.getByTestId('learning-mode-family-link');
-    screen.getByText("To change a child's preferences, open Family →");
   });
 
   it('tracks and navigates to Family from the multi-child cross-link', () => {
@@ -282,7 +288,13 @@ describe('MoreScreen — Learning Mode', () => {
   it('[BUG-909] subtitle clarifies scope when owner has linked children', () => {
     render(<MoreScreen />, { wrapper: createWrapper() });
 
-    // Default mock: isOwner=true, no linked children -> generic copy.
+    // Default mock: isOwner=true, no linked children -> the generic subtitle
+    // ("Applies to your own learning sessions.") is rendered for BOTH the
+    // Learning Mode and Learning Accommodation sections. Asserting on the
+    // rendered English copy locks the contract: a regression that drops the
+    // subtitle, swaps to the with-children variant, or returns a blank
+    // string would fail this test. test-setup.ts initializes i18next
+    // synchronously with en.json so {{interpolation}} resolves at render.
     const generic = screen.queryAllByText(/Applies to your own learning/i);
     expect(generic.length).toBeGreaterThanOrEqual(2);
   });
@@ -290,6 +302,11 @@ describe('MoreScreen — Learning Mode', () => {
   it('renders both learning mode options', () => {
     render(<MoreScreen />, { wrapper: createWrapper() });
 
+    // Pin testIDs AND the rendered English titles. Real i18n is active
+    // (test-setup.ts synchronously initializes i18next with en.json), so the
+    // titles must resolve to the en.json values. getByText matches per text
+    // node, so 'Challenge mode' / 'Explorer' are found even though the card
+    // also contains the "Active" badge and the description below.
     screen.getByTestId('learning-mode-serious');
     screen.getByTestId('learning-mode-casual');
     screen.getByText('Challenge mode');
@@ -299,6 +316,9 @@ describe('MoreScreen — Learning Mode', () => {
   it('renders descriptions for both modes', () => {
     render(<MoreScreen />, { wrapper: createWrapper() });
 
+    // Assert rendered English description copy (real i18n is active in this
+    // file; see test-setup.ts). A regression that drops the description, mis-
+    // routes the t() key, or breaks JSON-key wiring fails here.
     screen.getByText(
       'Push yourself further. Your mentor keeps you on track. You earn points after proving you remember, and recaps help lock it in.'
     );
@@ -312,21 +332,11 @@ describe('MoreScreen — Learning Mode', () => {
 
     render(<MoreScreen />, { wrapper: createWrapper() });
 
-    // The Appearance section also has "Active" for the active persona.
-    // We check that the serious mode option specifically contains "Active".
+    // The serious mode card is rendered and selected.
     const seriousOption = screen.getByTestId('learning-mode-serious');
-    const activeTexts = screen.getAllByText('Active');
-
-    // At least one "Active" text must be within the serious option
-    const hasActiveInSerious = activeTexts.some((textEl) => {
-      let node = textEl.parent;
-      while (node) {
-        if (node === seriousOption) return true;
-        node = node.parent;
-      }
-      return false;
-    });
-    expect(hasActiveInSerious).toBe(true);
+    expect(seriousOption).toBeTruthy();
+    // The selected state is communicated via accessibilityState on the Pressable.
+    expect(seriousOption.props.accessibilityState?.selected).toBe(true);
   });
 
   it('shows Active label on current casual mode', () => {
@@ -335,17 +345,8 @@ describe('MoreScreen — Learning Mode', () => {
     render(<MoreScreen />, { wrapper: createWrapper() });
 
     const casualOption = screen.getByTestId('learning-mode-casual');
-    const activeTexts = screen.getAllByText('Active');
-
-    const hasActiveInCasual = activeTexts.some((textEl) => {
-      let node = textEl.parent;
-      while (node) {
-        if (node === casualOption) return true;
-        node = node.parent;
-      }
-      return false;
-    });
-    expect(hasActiveInCasual).toBe(true);
+    expect(casualOption).toBeTruthy();
+    expect(casualOption.props.accessibilityState?.selected).toBe(true);
   });
 
   it('calls updateLearningMode when switching to casual', () => {
@@ -426,12 +427,34 @@ describe('MoreScreen — Learning Mode', () => {
 
     expect(screen.queryByText('Appearance')).toBeNull();
     // BUG-909: Section labels are now possessive (per active profile).
-    screen.getByText("Alex's Learning Mode");
-    screen.getByText("Alex's Learning Accommodation");
-    screen.getByText('Your celebrations');
-    screen.getByText('Notifications');
-    screen.getByText('Account');
-    screen.getByText('Other');
+    // Asserted via testID to remain locale-independent.
+    screen.getByTestId('learning-mode-section-header');
+    screen.getByTestId('learning-accommodation-section-header');
+    screen.getByTestId('celebrations-section-header');
+    screen.getByTestId('notifications-section-header');
+  });
+
+  // [BUG-960 / BUG-961 / BUG-962] These testIDs are load-bearing for the
+  // Maestro suites (more-tab-navigation, settings-toggles, learner-mentor-
+  // memory). E2E text-search regressed earlier because section headers were
+  // renamed (e.g. "Celebrations" → "Your celebrations"). Locking the testIDs
+  // here makes any future rename surface as a unit-test failure before E2E
+  // runs nightly.
+  it('exposes stable testIDs on section headers and toggle rows for E2E', () => {
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    // Section headers used by Maestro scrollUntilVisible.
+    screen.getByTestId('learning-mode-section-header');
+    screen.getByTestId('learning-accommodation-section-header');
+    screen.getByTestId('celebrations-section-header');
+    screen.getByTestId('notifications-section-header');
+
+    // Notification toggles tapped by the settings-toggles flow.
+    screen.getByTestId('push-notifications-toggle');
+    screen.getByTestId('weekly-digest-toggle');
+
+    // Sign-out button at bottom of scroll — must remain reachable.
+    screen.getByTestId('sign-out-button');
   });
 
   it('renders celebration level options', () => {
@@ -484,12 +507,16 @@ describe('MoreScreen — Account Actions', () => {
 
     render(<MoreScreen />, { wrapper: createWrapper() });
 
-    fireEvent.press(screen.getByText('Export my data'));
+    fireEvent.press(screen.getByTestId('more-row-export'));
 
     await waitFor(() => {
       expect(mockExportMutateAsync).toHaveBeenCalledTimes(1);
       expect(shareSpy).toHaveBeenCalledWith(
         expect.objectContaining({
+          // Pin the rendered share-sheet title — verifies that
+          // t('more.export.shareTitle') resolves to the en.json copy. A bare
+          // toHaveBeenCalledTimes / message-only check would let the title
+          // regress to a key like "more.export.shareTitle" silently.
           title: 'MentoMate account data export',
           message: expect.stringContaining('"email": "alex@example.com"'),
         })
@@ -505,7 +532,7 @@ describe('MoreScreen — Account Actions', () => {
 
     render(<MoreScreen />, { wrapper: createWrapper() });
 
-    fireEvent.press(screen.getByText('Export my data'));
+    fireEvent.press(screen.getByTestId('more-row-export'));
 
     await waitFor(() => {
       expect(mockExportMutateAsync).toHaveBeenCalledTimes(1);
@@ -520,7 +547,7 @@ describe('MoreScreen — Account Actions', () => {
 
     render(<MoreScreen />, { wrapper: createWrapper() });
 
-    fireEvent.press(screen.getByText('Help & Support'));
+    fireEvent.press(screen.getByTestId('more-row-help'));
 
     await waitFor(() => {
       expect(openUrlSpy).toHaveBeenCalledWith(
@@ -535,9 +562,13 @@ describe('MoreScreen — Account Actions', () => {
 
     render(<MoreScreen />, { wrapper: createWrapper() });
 
-    fireEvent.press(screen.getByText('Help & Support'));
+    fireEvent.press(screen.getByTestId('more-row-help'));
 
     await waitFor(() => {
+      // Pin the rendered title and message — verifies the i18n keys resolve
+      // to the en.json copy. A toHaveBeenCalledTimes-only check would let
+      // a regression to bare keys ("more.help.contactSupportTitle") or a
+      // dropped support email pass silently.
       expect(alertSpy).toHaveBeenCalledWith(
         'Contact support',
         'Email support@mentomate.app for help with your account.',
@@ -587,10 +618,6 @@ describe('MoreScreen — impersonation hides destructive actions (BUG-915)', () 
     expect(screen.queryByTestId('more-row-delete-account')).toBeNull();
     expect(screen.queryByTestId('more-row-export')).toBeNull();
     expect(screen.queryByTestId('more-row-subscription')).toBeNull();
-    // Sanity: text-level checks make the assertion visible without testIDs.
-    expect(screen.queryByText('Sign out')).toBeNull();
-    expect(screen.queryByText('Delete account')).toBeNull();
-    expect(screen.queryByText('Export my data')).toBeNull();
   });
 
   it('shows Sign out, Delete account, Export my data, and Subscription on the parent account', () => {

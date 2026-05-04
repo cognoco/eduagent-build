@@ -1,4 +1,5 @@
 import { ScrollView, Text, View, Pressable } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ErrorFallback } from '../../../components/common';
@@ -19,6 +20,7 @@ function SkeletonRow(): React.ReactElement {
 }
 
 export default function MilestonesListScreen(): React.ReactElement {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const {
@@ -38,7 +40,7 @@ export default function MilestonesListScreen(): React.ReactElement {
           onPress={() => goBackOrReplace(router, '/(app)/progress' as const)}
           className="me-3 py-2 pe-2"
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('common.goBack')}
           testID="milestones-back"
         >
           <Text className="text-primary text-body font-semibold">
@@ -47,12 +49,11 @@ export default function MilestonesListScreen(): React.ReactElement {
         </Pressable>
         <View className="flex-1">
           <Text className="text-h2 font-bold text-text-primary">
-            Your Milestones
+            {t('progress.milestones.pageTitle')}
           </Text>
           {!isLoading && !isError && milestoneCount > 0 ? (
             <Text className="text-body-sm text-text-secondary mt-0.5">
-              {milestoneCount} milestone
-              {milestoneCount !== 1 ? 's' : ''} earned
+              {t('progress.milestones.earned', { count: milestoneCount })}
             </Text>
           ) : null}
         </View>
@@ -71,15 +72,15 @@ export default function MilestonesListScreen(): React.ReactElement {
         ) : isError ? (
           <View testID="milestones-error">
             <ErrorFallback
-              title="We couldn't load your milestones"
-              message="Check your connection and try again."
+              title={t('progress.milestones.errorTitle')}
+              message={t('progress.milestones.errorMessage')}
               primaryAction={{
-                label: 'Try again',
+                label: t('common.tryAgain'),
                 onPress: () => void refetch(),
                 testID: 'milestones-retry',
               }}
               secondaryAction={{
-                label: 'Go back',
+                label: t('common.goBack'),
                 onPress: () =>
                   goBackOrReplace(router, '/(app)/progress' as const),
                 testID: 'milestones-go-back',
@@ -94,10 +95,10 @@ export default function MilestonesListScreen(): React.ReactElement {
           >
             <Text className="text-2xl mb-3">🎯</Text>
             <Text className="text-h3 font-semibold text-text-primary text-center">
-              No milestones yet
+              {t('progress.milestones.emptyTitle')}
             </Text>
             <Text className="text-body-sm text-text-secondary text-center mt-2">
-              Complete sessions and master topics to earn your first milestone.
+              {t('progress.milestones.emptySubtitle')}
             </Text>
             <Pressable
               onPress={() =>
@@ -105,11 +106,11 @@ export default function MilestonesListScreen(): React.ReactElement {
               }
               className="bg-background rounded-button px-5 py-3 mt-4"
               accessibilityRole="button"
-              accessibilityLabel="Go back to Journey"
+              accessibilityLabel={t('progress.milestones.emptyBackLabel')}
               testID="milestones-empty-back"
             >
               <Text className="text-body font-semibold text-text-primary">
-                Go back
+                {t('common.goBack')}
               </Text>
             </Pressable>
           </View>

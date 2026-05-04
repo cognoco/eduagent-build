@@ -28,18 +28,21 @@ tags:
 
 - tapOn: "More Tab"
 
+# Use the always-above-fold section header as the screen-loaded signal —
+# sign-out-button lives at the bottom of the scroll and isn't visible on load.
 - extendedWaitUntil:
     visible:
-      id: "sign-out-button"
+      id: "learning-mode-section-header"
     timeout: 10000
 
 - scrollUntilVisible:
     element:
-      text: "What My Mentor Knows"
+      id: "mentor-memory-link"
     direction: DOWN
     timeout: 10000
 
-- tapOn: "What My Mentor Knows"
+- tapOn:
+    id: "mentor-memory-link"
 
 - extendedWaitUntil:
     visible:
@@ -74,5 +77,11 @@ tags:
 
 - extendedWaitUntil:
     visible:
+      id: "learning-mode-section-header"
+    timeout: 10000
+
+- scrollUntilVisible:
+    element:
       id: "sign-out-button"
+    direction: DOWN
     timeout: 10000

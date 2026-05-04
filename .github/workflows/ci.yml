@@ -116,6 +116,37 @@ jobs:
           find . -name '*.tsbuildinfo' -not -path '*/node_modules/*' -delete
           rm -rf apps/mobile/dist apps/api/dist
 
+      # ---- Fast-fail checks (run before the multi-minute nx run-many) ------
+      # These are seconds-fast structural guards — keep them before the big
+      # build so a missing i18n key, marker-token regression, or broken
+      # script-level test fails the run early instead of after lint+test+
+      # typecheck+build has already burned several minutes.
+
+      # Fail fast on missing/typo'd t('key') calls — i18next renders unknown
+      # keys as the literal key string at runtime, which typecheck and most
+      # tests don't catch.
+      - name: i18n orphan-key check
+        run: pnpm exec tsx scripts/check-i18n-orphan-keys.ts
+
+      # Fail fast on stale translation files — Husky only runs check:i18n when
+      # en.json is staged in the same commit, so a PR that touches en.json
+      # across multiple commits (or omits it from staging) can let locale
+      # drift land. CI is the backstop.
+      - name: i18n staleness check
+        run: pnpm run check:i18n
+
+      # Forbid [MARKER] tokens in LLM prompt builders. State-machine signals
+      # must use the structured `signals` envelope (services/llm/envelope.ts),
+      # not free-text marker tokens. See CLAUDE.md → "LLM Response Envelope".
+      - name: Prompt marker-token check
+        run: bash scripts/check-prompt-markers.sh
+
+      # Structural-regression guards under scripts/ (BUG-979 / BUG-974). Nx
+      # does not pick these up — they live outside any project — so we run
+      # them directly through ts-jest via scripts/jest.config.cjs.
+      - name: scripts/* tests
+        run: pnpm exec jest --config scripts/jest.config.cjs --no-coverage
+
       # Prepend any command with "nx-cloud record --" to record its logs to Nx Cloud
       # - run: pnpm exec nx-cloud record -- echo Hello World
       # When you enable task distribution, run the e2e-ci task instead of e2e

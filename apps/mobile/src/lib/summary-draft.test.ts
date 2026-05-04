@@ -1,4 +1,4 @@
-import * as ExpoSecureStore from 'expo-secure-store';
+import * as SecureStore from './secure-storage';
 import {
   writeSummaryDraft,
   readSummaryDraft,
@@ -6,7 +6,12 @@ import {
   DRAFT_TTL_MS,
 } from './summary-draft';
 
-jest.mock('expo-secure-store');
+jest.mock('./secure-storage', () => ({
+  getItemAsync: jest.fn(),
+  setItemAsync: jest.fn(),
+  deleteItemAsync: jest.fn(),
+  sanitizeSecureStoreKey: (s: string) => s.replace(/[^a-zA-Z0-9._-]/g, '_'),
+}));
 jest.mock('./sentry', () => ({
   Sentry: {
     captureException: jest.fn(),
@@ -14,9 +19,9 @@ jest.mock('./sentry', () => ({
   },
 }));
 
-const mockGet = jest.mocked(ExpoSecureStore.getItemAsync);
-const mockSet = jest.mocked(ExpoSecureStore.setItemAsync);
-const mockDelete = jest.mocked(ExpoSecureStore.deleteItemAsync);
+const mockGet = jest.mocked(SecureStore.getItemAsync);
+const mockSet = jest.mocked(SecureStore.setItemAsync);
+const mockDelete = jest.mocked(SecureStore.deleteItemAsync);
 
 const PROFILE = 'profile-123';
 const SESSION = 'session-abc';

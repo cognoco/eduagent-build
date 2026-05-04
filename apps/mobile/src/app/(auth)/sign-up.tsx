@@ -408,6 +408,7 @@ export default function SignUpScreen() {
     <KeyboardAvoidingView
       className="flex-1 bg-background items-center"
       behavior="padding"
+      testID="sign-up-screen"
     >
       <ScrollView
         ref={scrollRef}
@@ -424,6 +425,7 @@ export default function SignUpScreen() {
         }}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
+        testID="sign-up-scroll"
       >
         {/* Brand logo at top of screen */}
         <View className="items-center mt-4 mb-4">

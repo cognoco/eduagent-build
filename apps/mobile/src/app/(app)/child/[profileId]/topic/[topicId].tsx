@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { useChildSessions } from '../../../../../hooks/use-dashboard';
 import { goBackOrReplace } from '../../../../../lib/navigation';
 import {
@@ -17,12 +18,12 @@ import {
 import { useThemeColors } from '../../../../../lib/theme';
 import { MetricInfoDot } from '../../../../../components/parent/MetricInfoDot';
 
-const COMPLETION_LABELS: Record<string, string> = {
-  not_started: 'Not started',
-  in_progress: 'Started',
-  completed: 'Completed',
-  verified: 'Verified',
-  stable: 'Stable',
+const COMPLETION_STATUS_KEYS: Record<string, string> = {
+  not_started: 'parentView.topic.completionStatus.notStarted',
+  in_progress: 'parentView.topic.completionStatus.inProgress',
+  completed: 'parentView.topic.completionStatus.completed',
+  verified: 'parentView.topic.completionStatus.verified',
+  stable: 'parentView.topic.completionStatus.stable',
 };
 
 function formatSessionDate(iso: string): string {
@@ -42,12 +43,18 @@ function formatDuration(seconds: number | null): string {
   return `${mins} min`;
 }
 
-function formatTimeOnApp(seconds: number | null): string {
+function formatTimeOnApp(
+  seconds: number | null,
+  t: (key: string, opts?: Record<string, unknown>) => string
+): string {
   const duration = formatDuration(seconds);
-  return duration === '--' ? 'Time on app unavailable' : `${duration} on app`;
+  return duration === '--'
+    ? t('parentView.topic.timeOnAppUnavailable')
+    : t('parentView.topic.timeOnApp', { duration });
 }
 
 export default function TopicDetailScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
@@ -112,7 +119,7 @@ export default function TopicDetailScreen() {
         <Pressable
           onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
           className="me-3 py-2 pe-2"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('common.goBack')}
           accessibilityRole="button"
           testID="back-button"
         >
@@ -122,7 +129,7 @@ export default function TopicDetailScreen() {
         </Pressable>
         <View className="flex-1">
           <Text className="text-h2 font-bold text-text-primary">
-            {title ?? 'Topic'}
+            {title ?? t('parentView.topic.topic')}
           </Text>
           {subjectName || subjectId ? (
             <Text className="text-body-sm text-text-secondary mt-0.5">
@@ -143,12 +150,15 @@ export default function TopicDetailScreen() {
             testID="topic-status-card"
           >
             <Text className="text-body-sm font-medium text-text-secondary mb-1">
-              Status
+              {t('parentView.topic.status')}
             </Text>
             <Text className="text-body font-semibold text-text-primary">
-              {COMPLETION_LABELS[completionStatus ?? ''] ??
-                completionStatus ??
-                'Unknown'}
+              {(() => {
+                const statusKey =
+                  COMPLETION_STATUS_KEYS[completionStatus ?? ''];
+                if (statusKey) return t(statusKey);
+                return completionStatus ?? t('parentView.topic.statusUnknown');
+              })()}
             </Text>
           </View>
 
@@ -161,7 +171,7 @@ export default function TopicDetailScreen() {
               <View className="flex-row items-center justify-between mb-2">
                 <View className="flex-row items-center gap-1">
                   <Text className="text-body-sm font-medium text-text-secondary">
-                    Understanding
+                    {t('parentView.topic.understanding')}
                   </Text>
                   <MetricInfoDot metricKey="understanding" />
                 </View>
@@ -202,7 +212,7 @@ export default function TopicDetailScreen() {
               >
                 <View className="flex-row items-center gap-1 mb-2">
                   <Text className="text-body-sm font-medium text-text-secondary">
-                    Review status
+                    {t('parentView.topic.reviewStatus')}
                   </Text>
                   <MetricInfoDot metricKey="review-status" />
                 </View>
@@ -227,7 +237,7 @@ export default function TopicDetailScreen() {
 
         {/* Session History */}
         <Text className="text-h3 font-semibold text-text-primary mt-6 mb-2">
-          Session History
+          {t('parentView.topic.sessionHistory')}
         </Text>
         {sessionsLoading ? (
           <View className="py-4 items-center" testID="sessions-loading">
@@ -247,9 +257,9 @@ export default function TopicDetailScreen() {
                 } as never)
               }
               className="bg-surface rounded-card p-4 mt-2"
-              accessibilityLabel={`View session from ${formatSessionDate(
-                session.startedAt
-              )}`}
+              accessibilityLabel={t('parentView.topic.viewSessionFrom', {
+                date: formatSessionDate(session.startedAt),
+              })}
               accessibilityRole="button"
               testID={`session-card-${session.sessionId}`}
             >
@@ -263,7 +273,8 @@ export default function TopicDetailScreen() {
               </View>
               <Text className="text-caption text-text-secondary">
                 {formatTimeOnApp(
-                  session.wallClockSeconds ?? session.durationSeconds
+                  session.wallClockSeconds ?? session.durationSeconds,
+                  t
                 )}
               </Text>
             </Pressable>
@@ -271,7 +282,7 @@ export default function TopicDetailScreen() {
         ) : (
           <View className="py-4 items-center" testID="no-topic-sessions">
             <Text className="text-body text-text-secondary">
-              No sessions for this topic yet
+              {t('parentView.topic.noSessionsYet')}
             </Text>
           </View>
         )}

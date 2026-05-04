@@ -2,6 +2,87 @@ import { render, screen, fireEvent } from '@testing-library/react-native';
 
 import ProgressSubjectScreen from './[subjectId]';
 
+jest.mock('react-i18next', () => ({
+  initReactI18next: { type: '3rdParty', init: jest.fn() },
+  useTranslation: () => ({
+    t: (key: string, opts?: Record<string, unknown>) => {
+      // Minimal translation table for progress.subject assertions in this suite.
+      const map: Record<string, string> = {
+        'progress.subject.noSubjectTitle': 'No subject selected',
+        'progress.subject.noSubjectSubtitle':
+          'Pick a subject from your progress page to see details.',
+        'progress.subject.backToProgress': 'Back to progress',
+        'progress.subject.loadingTooLong': 'Loading is taking too long',
+        'progress.subject.checkConnection':
+          'Check your connection and try again.',
+        'progress.subject.errorTitle': "We couldn't load this subject",
+        'progress.subject.errorMessageServer':
+          'Something went wrong on our end. Tap below to retry.',
+        'progress.subject.errorMessageNetwork':
+          'Check your connection and try again.',
+        'progress.subject.fallbackTitle': 'Subject progress',
+        'progress.subject.topicsMastered': `${opts?.mastered ?? ''}/${
+          opts?.total ?? ''
+        } planned topics mastered`,
+        'progress.subject.noTopicsPlanned': 'No topics planned yet',
+        'progress.subject.topicsExplored': `${opts?.count ?? ''} ${
+          (opts?.count ?? 0) === 1 ? 'topic' : 'topics'
+        } explored`,
+        'progress.subject.wordsTracked': `${
+          opts?.count ?? ''
+        } words tracked in this subject`,
+        'progress.subject.sessionsCompleted': `${opts?.count ?? ''} ${
+          (opts?.count ?? 0) === 1 ? 'session' : 'sessions'
+        } completed`,
+        'progress.subject.statStarted': 'Started',
+        'progress.subject.statNotStarted': 'Not started',
+        'progress.subject.statTimeSpent': 'Time spent',
+        'progress.subject.statSessions': 'Sessions',
+        'progress.subject.vocabularyTitle': 'Vocabulary',
+        'progress.subject.vocabularyBreakdown': `${
+          opts?.mastered ?? ''
+        } mastered • ${opts?.learning ?? ''} learning • ${opts?.new ?? ''} new`,
+        'progress.subject.wordCount': `${opts?.count ?? ''} words`,
+        'progress.subject.viewAllVocab': 'View all vocabulary',
+        'progress.subject.viewAllVocabLink': 'View all vocabulary →',
+        'progress.subject.languageMilestone': 'Language milestone',
+        'progress.subject.milestoneLoadError': 'Could not load milestone data.',
+        'progress.subject.retryMilestone': 'Retry loading milestone',
+        'progress.subject.wordsProgress': `${opts?.mastered ?? ''}/${
+          opts?.target ?? ''
+        } words`,
+        'progress.subject.phrasesProgress': `${opts?.mastered ?? ''}/${
+          opts?.target ?? ''
+        } phrases`,
+        'progress.subject.upNext': `Up next: ${opts?.level ?? ''} — ${
+          opts?.title ?? ''
+        }`,
+        'progress.subject.milestoneNoData':
+          'Complete a session to start tracking your milestone progress.',
+        'progress.subject.retentionTitle': 'Current retention',
+        'progress.subject.retentionLoadError':
+          "We couldn't load retention data right now.",
+        'progress.subject.retryRetention': 'Retry loading retention',
+        'progress.subject.retentionStrong': 'Knowledge feels stable right now.',
+        'progress.subject.retentionFading':
+          'A light review would help keep this fresh.',
+        'progress.subject.retentionWeak':
+          'This subject would benefit from some extra attention.',
+        'progress.subject.openShelf': 'Open shelf',
+        'progress.subject.goneTitle': 'This subject is no longer available',
+        'progress.subject.goneSubtitle':
+          'It may have been removed or merged into another subject.',
+        'progress.keepLearning': 'Keep learning',
+        'common.retry': 'Retry',
+        'common.tryAgain': 'Try Again',
+        'common.goBack': 'Go back',
+      };
+      if (key in map) return map[key]!;
+      return key;
+    },
+  }),
+}));
+
 const mockReplace = jest.fn();
 const mockPush = jest.fn();
 const mockGoBackOrReplace = jest.fn();

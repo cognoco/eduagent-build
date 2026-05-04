@@ -1,5 +1,6 @@
 import type { InputMode } from '@eduagent/schemas';
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   AccessibilityInfo,
   AppState,
@@ -24,6 +25,7 @@ import { VoiceRecordButton, VoiceTranscriptPreview } from './VoiceRecordButton';
 import { VoiceToggle } from './VoiceToggle';
 import { VoicePlaybackBar } from './VoicePlaybackBar';
 import { useSpeechRecognition } from '../../hooks/use-speech-recognition';
+import { useStickyLoading } from '../../hooks/use-sticky-loading';
 import { useTextToSpeech } from '../../hooks/use-text-to-speech';
 import { useThemeColors } from '../../lib/theme';
 import { goBackOrReplace } from '../../lib/navigation';
@@ -149,7 +151,7 @@ export function animateResponse(
 
 export function ChatShell({
   title,
-  subtitle = "I'm here to help",
+  subtitle,
   headerBelow,
   messages,
   onSend,
@@ -160,7 +162,7 @@ export function ChatShell({
   footer,
   inputAccessory,
   onDraftChange,
-  placeholder = 'Type a message...',
+  placeholder,
   renderMessageActions,
   verificationType,
   initialVoiceEnabled,
@@ -177,6 +179,10 @@ export function ChatShell({
   pedagogicalState,
   memoryHint,
 }: ChatShellProps) {
+  const { t } = useTranslation();
+  const resolvedSubtitle = subtitle ?? t('session.chatShell.defaultSubtitle');
+  const resolvedPlaceholder =
+    placeholder ?? t('session.chatShell.defaultPlaceholder');
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
@@ -195,6 +201,11 @@ export function ChatShell({
   const [input, setInput] = useState('');
   const [screenReaderEnabled, setScreenReaderEnabled] = useState(false);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+
+  // Hold the desk-lamp "thinking" indicator long enough to perceive even
+  // when streaming is fast. The streamed reply renders alongside it for a
+  // beat — that's intentional and cheaper than a flicker.
+  const showThinking = useStickyLoading(isStreaming, 800);
 
   // [PERF-10 safeguard] FlatList virtualisation only kicks in when its
   // `data`, `renderItem`, and `keyExtractor` keep stable references across
@@ -234,7 +245,7 @@ export function ChatShell({
             >
               <Ionicons name="camera-outline" size={32} color={colors.muted} />
               <Text className="text-body-sm text-text-secondary mt-1">
-                Image no longer available
+                {t('session.chatShell.imageUnavailable')}
               </Text>
             </View>
           </View>
@@ -647,8 +658,10 @@ export function ChatShell({
                   {pedagogicalState.exchangesMax} exchanges
                 </Text>
               </View>
-            ) : subtitle ? (
-              <Text className="text-xs text-text-secondary">{subtitle}</Text>
+            ) : resolvedSubtitle ? (
+              <Text className="text-xs text-text-secondary">
+                {resolvedSubtitle}
+              </Text>
             ) : null}
           </View>
           {headerRightContent}
@@ -701,13 +714,13 @@ export function ChatShell({
             testID="chat-empty-state"
           >
             <Text className="text-body text-text-secondary text-center">
-              Your conversation will appear here.
+              {t('session.chatShell.emptyState')}
             </Text>
           </View>
         }
         ListFooterComponent={
           <>
-            {isStreaming && (
+            {showThinking && (
               <View
                 className="items-center py-4"
                 testID="thinking-bulb-animation"
@@ -752,13 +765,13 @@ export function ChatShell({
           testID="voice-listening-indicator"
         >
           <Text className="text-caption text-text-secondary mb-1">
-            Listening…
+            {t('session.chatShell.listening')}
           </Text>
           {transcript.trim() ? (
             <Text className="text-body text-text-primary">{transcript}</Text>
           ) : (
             <Text className="text-body text-text-tertiary">
-              Speak now — tap the mic again to stop
+              {t('session.chatShell.speakNow')}
             </Text>
           )}
         </View>
@@ -768,7 +781,7 @@ export function ChatShell({
       {isVoiceEnabled && speechStatus === 'processing' && (
         <View className="mx-4 mb-1" testID="voice-processing-indicator">
           <Text className="text-caption text-text-secondary">
-            Processing...
+            {t('session.chatShell.processing')}
           </Text>
         </View>
       )}
@@ -815,7 +828,7 @@ export function ChatShell({
           accessibilityRole="alert"
         >
           <Text className="text-body-sm text-text-secondary text-center">
-            {disabledReason ?? 'Input is currently unavailable'}
+            {disabledReason ?? t('session.chatShell.inputUnavailable')}
           </Text>
         </View>
       ) : (
@@ -835,7 +848,7 @@ export function ChatShell({
                   }
                   accessibilityRole="button"
                   accessibilityState={{ selected: !isVoiceEnabled }}
-                  accessibilityLabel="Switch to text mode"
+                  accessibilityLabel={t('session.chatShell.switchToTextMode')}
                   testID="input-mode-text"
                 >
                   <Text
@@ -845,7 +858,7 @@ export function ChatShell({
                         : 'text-body-sm font-semibold text-text-secondary'
                     }
                   >
-                    Text mode
+                    {t('session.chatShell.textMode')}
                   </Text>
                 </Pressable>
                 <Pressable
@@ -857,7 +870,7 @@ export function ChatShell({
                   }
                   accessibilityRole="button"
                   accessibilityState={{ selected: isVoiceEnabled }}
-                  accessibilityLabel="Switch to voice mode"
+                  accessibilityLabel={t('session.chatShell.switchToVoiceMode')}
                   testID="input-mode-voice"
                 >
                   <Text
@@ -867,13 +880,13 @@ export function ChatShell({
                         : 'text-body-sm font-semibold text-text-secondary'
                     }
                   >
-                    Voice mode
+                    {t('session.chatShell.voiceMode')}
                   </Text>
                 </Pressable>
               </View>
               {screenReaderEnabled && isVoiceEnabled ? (
                 <Text className="text-caption text-text-secondary mt-2">
-                  Screen reader is on, so voice mode keeps manual playback only.
+                  {t('session.chatShell.screenReaderVoiceNote')}
                 </Text>
               ) : null}
             </View>
@@ -894,7 +907,7 @@ export function ChatShell({
           >
             <TextInput
               className="flex-1 bg-background rounded-input px-4 py-3 text-body text-text-primary me-2"
-              placeholder={placeholder}
+              placeholder={resolvedPlaceholder}
               placeholderTextColor={colors.muted}
               value={input}
               onChangeText={(text) => {
@@ -925,8 +938,14 @@ export function ChatShell({
                 />
               </View>
             ) : (
+              // [BUG-965] When voice mode is OFF, this is the *enable-voice*
+              // affordance, not a record button. Long-press flips voice ON
+              // and starts recording. It must NOT share testID="voice-record-
+              // button" with the on-state mic — otherwise E2E `assertNotVisible:
+              // voice-record-button` fails when voice is off, and consumers
+              // can't distinguish the two states. Use a distinct testID.
               <Pressable
-                testID="voice-record-button"
+                testID="voice-enable-button"
                 onPress={handleVoicePress}
                 onLongPress={() => {
                   setIsVoiceEnabled(true);
@@ -936,7 +955,7 @@ export function ChatShell({
                   isStreaming || speechStatus === 'requesting_permission'
                 }
                 className="w-9 h-9 rounded-full bg-surface-elevated items-center justify-center me-2"
-                accessibilityLabel="Record voice message"
+                accessibilityLabel="Enable voice message"
                 accessibilityRole="button"
               >
                 <Ionicons

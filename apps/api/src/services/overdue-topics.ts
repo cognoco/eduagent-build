@@ -1,4 +1,4 @@
-import { lt, inArray } from 'drizzle-orm';
+import { and, eq, inArray, lt, sql } from 'drizzle-orm';
 import {
   createScopedRepository,
   curricula,
@@ -32,8 +32,24 @@ export async function getOverdueTopicsGrouped(
     return { totalOverdue: 0, subjects: [] };
   }
 
+  // Real total may exceed the 500-card display cap. Run a separate count so
+  // the UI can show "500+" or the true backlog without loading all rows.
+  const [countRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(retentionCards)
+    .where(
+      and(
+        eq(retentionCards.profileId, profileId),
+        lt(retentionCards.nextReviewAt, now)
+      )
+    );
+  const totalOverdue = countRow?.count ?? overdueCards.length;
+
   const topicIds = [...new Set(overdueCards.map((c) => c.topicId))];
 
+  // Scoping: join through subjects.profileId so cross-profile topics with the
+  // same id (impossible today, but defends against RLS misconfiguration or
+  // future schema changes) are filtered out at the DB level.
   const topicsRows = await db
     .select({
       id: curriculumTopics.id,
@@ -41,7 +57,14 @@ export async function getOverdueTopicsGrouped(
       curriculumId: curriculumTopics.curriculumId,
     })
     .from(curriculumTopics)
-    .where(inArray(curriculumTopics.id, topicIds));
+    .innerJoin(curricula, eq(curriculumTopics.curriculumId, curricula.id))
+    .innerJoin(subjects, eq(curricula.subjectId, subjects.id))
+    .where(
+      and(
+        inArray(curriculumTopics.id, topicIds),
+        eq(subjects.profileId, profileId)
+      )
+    );
   const topicMap = new Map(topicsRows.map((t) => [t.id, t]));
 
   const curriculumIds = [...new Set(topicsRows.map((t) => t.curriculumId))];
@@ -50,7 +73,13 @@ export async function getOverdueTopicsGrouped(
       ? await db
           .select({ id: curricula.id, subjectId: curricula.subjectId })
           .from(curricula)
-          .where(inArray(curricula.id, curriculumIds))
+          .innerJoin(subjects, eq(curricula.subjectId, subjects.id))
+          .where(
+            and(
+              inArray(curricula.id, curriculumIds),
+              eq(subjects.profileId, profileId)
+            )
+          )
       : [];
   const curriculumMap = new Map(curriculaRows.map((c) => [c.id, c]));
 
@@ -109,7 +138,7 @@ export async function getOverdueTopicsGrouped(
     });
 
   return {
-    totalOverdue: overdueCards.length,
+    totalOverdue,
     subjects: groupedSubjects,
   };
 }

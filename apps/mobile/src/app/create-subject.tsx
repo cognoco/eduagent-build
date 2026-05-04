@@ -11,6 +11,7 @@ import {
   Pressable,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useCreateSubject, useSubjects } from '../hooks/use-subjects';
@@ -55,6 +56,7 @@ type ResolveState =
 export default function CreateSubjectScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { t } = useTranslation();
   const { returnTo, chatTopic } = useLocalSearchParams<{
     returnTo?: string;
     chatTopic?: string;
@@ -93,7 +95,7 @@ export default function CreateSubjectScreen() {
       resolveTimeoutRef.current = setTimeout(() => {
         setResolveTimedOut(true);
         setResolveState({ phase: 'idle' });
-        setError('Check took too long — try again');
+        setError(t('subject.resolveTookTooLong'));
       }, 30_000);
       return () => {
         if (resolveTimeoutRef.current) clearTimeout(resolveTimeoutRef.current);
@@ -255,9 +257,7 @@ export default function CreateSubjectScreen() {
         // [BUG-692] Don't show error if user already navigated away.
         if (cancelledRef.current) return;
         // Don't fall through to create on network error
-        setError(
-          'Could not check if this subject exists. Please check your connection and try again.'
-        );
+        setError(t('subject.resolveNetworkError'));
         setResolveState({ phase: 'idle' });
         return;
       }
@@ -267,7 +267,7 @@ export default function CreateSubjectScreen() {
 
   const onSubmit = useCallback(async () => {
     if (!name.trim()) {
-      setError('Please enter a subject name');
+      setError(t('subject.enterSubjectNameError'));
       return;
     }
     if (!canSubmit) return;
@@ -447,12 +447,12 @@ export default function CreateSubjectScreen() {
       >
         <View className="flex-row items-center justify-between mb-8">
           <Text className="text-h1 font-bold text-text-primary">
-            New subject
+            {t('subject.title')}
           </Text>
           <Button
             variant="tertiary"
             size="small"
-            label="Cancel"
+            label={t('common.cancel')}
             onPress={handleCancel}
             testID="create-subject-cancel"
           />
@@ -480,11 +480,11 @@ export default function CreateSubjectScreen() {
                 }}
                 className="mt-2 self-start"
                 accessibilityRole="button"
-                accessibilityLabel="Retry checking subject name"
+                accessibilityLabel={t('subject.retryCheckLabel')}
                 testID="resolve-timeout-retry"
               >
                 <Text className="text-body-sm font-semibold text-primary">
-                  Retry
+                  {t('common.retry')}
                 </Text>
               </Pressable>
             )}
@@ -495,12 +495,14 @@ export default function CreateSubjectScreen() {
                 className="mt-2 bg-surface rounded-button py-2.5 px-4 items-center"
                 accessibilityRole="button"
                 accessibilityLabel={
-                  returnTo === 'chat' ? 'Go back' : 'Manage your subjects'
+                  returnTo === 'chat'
+                    ? t('common.goBack')
+                    : t('subject.manageSubjects')
                 }
                 testID="manage-subjects-button"
               >
                 <Text className="text-body-sm font-semibold text-primary">
-                  Manage your subjects
+                  {t('subject.manageSubjects')}
                 </Text>
               </Pressable>
             )}
@@ -508,17 +510,16 @@ export default function CreateSubjectScreen() {
         )}
 
         <Text className="text-body text-text-secondary mb-4">
-          What would you like to learn? Enter any subject or describe what
-          interests you — we'll figure out the rest.
+          {t('subject.prompt')}
         </Text>
 
         <View onLayout={onFieldLayout('name')}>
           <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-            Subject name
+            {t('subject.nameLabel')}
           </Text>
           <TextInput
             className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-4"
-            placeholder="e.g. Calculus, World History, 'learn about ants'..."
+            placeholder={t('subject.namePlaceholder')}
             placeholderTextColor={colors.muted}
             value={name}
             onChangeText={onNameChange}
@@ -539,12 +540,14 @@ export default function CreateSubjectScreen() {
               onPress={() => void refetchSubjects()}
               className="mb-3 self-start"
               accessibilityRole="button"
-              accessibilityLabel="Retry loading your subjects"
+              accessibilityLabel={t('subject.retryLoadSubjectsLabel')}
               testID="subjects-load-error-retry"
             >
               <Text className="text-body-sm text-danger">
-                Couldn&apos;t load your subjects.{' '}
-                <Text className="font-semibold text-primary">Tap to retry</Text>
+                {t('subject.subjectsLoadError')}{' '}
+                <Text className="font-semibold text-primary">
+                  {t('subject.tapToRetry')}
+                </Text>
               </Text>
             </Pressable>
           )}
@@ -556,7 +559,7 @@ export default function CreateSubjectScreen() {
             <View
               className="gap-3 mt-4 mb-4"
               testID="subject-options"
-              accessibilityLabel="Suggested subjects"
+              accessibilityLabel={t('subject.suggestedSubjectsLabel')}
             >
               {(existingSubjects ?? []).map((subject) => (
                 <Pressable
@@ -573,12 +576,14 @@ export default function CreateSubjectScreen() {
                   }
                   className="rounded-card bg-surface-elevated px-4 py-3 flex-row items-center"
                   accessibilityRole="button"
-                  accessibilityLabel={`Continue ${subject.name}`}
+                  accessibilityLabel={t('subject.continueSubjectLabel', {
+                    name: subject.name,
+                  })}
                   testID={`subject-continue-${subject.id}`}
                 >
                   <View className="flex-1">
                     <Text className="text-body font-semibold text-text-primary">
-                      Continue {subject.name}
+                      {t('subject.continueSubject', { name: subject.name })}
                     </Text>
                   </View>
                   <Ionicons
@@ -594,12 +599,14 @@ export default function CreateSubjectScreen() {
                   onPress={() => void onChipPress(chip)}
                   className="rounded-card bg-surface-elevated px-4 py-3 flex-row items-center"
                   accessibilityRole="button"
-                  accessibilityLabel={`Start ${chip}`}
+                  accessibilityLabel={t('subject.startSubjectLabel', {
+                    name: chip,
+                  })}
                   testID={`subject-start-${chip.toLowerCase()}`}
                 >
                   <View className="flex-1">
                     <Text className="text-body font-semibold text-text-primary">
-                      Start {chip}
+                      {t('subject.startSubject', { name: chip })}
                     </Text>
                   </View>
                   <Ionicons
@@ -618,8 +625,7 @@ export default function CreateSubjectScreen() {
             className="text-body-sm text-text-secondary mb-4"
             testID="not-sure-hint"
           >
-            Not sure? Just describe what interests you — like "I want to
-            understand how plants grow"
+            {t('subject.notSureHint')}
           </Text>
         )}
 
@@ -635,7 +641,7 @@ export default function CreateSubjectScreen() {
               style={{ marginRight: 8 }}
             />
             <Text className="text-body-sm text-text-secondary">
-              Checking subject name...
+              {t('subject.checkingName')}
             </Text>
           </View>
         )}
@@ -691,24 +697,24 @@ export default function CreateSubjectScreen() {
               className="bg-surface rounded-card px-4 py-3 mt-2 border border-border min-h-[52px] justify-center"
               testID="subject-something-else"
               accessibilityRole="button"
-              accessibilityLabel="Something else"
+              accessibilityLabel={t('subject.somethingElse')}
             >
               <Text className="text-body font-semibold text-text-primary">
-                Something else
+                {t('subject.somethingElse')}
               </Text>
               <Text className="text-body-sm text-text-secondary mt-0.5">
-                Be as specific as you like.
+                {t('subject.somethingElseHint')}
               </Text>
             </Pressable>
 
             {showClarifyInput && (
               <View className="mt-3" testID="subject-clarify-card">
                 <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-                  What exactly do you want to learn?
+                  {t('subject.clarifyLabel')}
                 </Text>
                 <TextInput
                   className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-3"
-                  placeholder="e.g. ant colonies, Roman roads, solving fractions..."
+                  placeholder={t('subject.clarifyPlaceholder')}
                   placeholderTextColor={colors.muted}
                   value={clarificationInput}
                   onChangeText={setClarificationInput}
@@ -717,7 +723,7 @@ export default function CreateSubjectScreen() {
                 />
                 <Button
                   variant="primary"
-                  label="Check this instead"
+                  label={t('subject.checkThisInstead')}
                   onPress={onClarifySubmit}
                   disabled={!clarificationInput.trim() || isBusy}
                   loading={isBusy}
@@ -732,10 +738,12 @@ export default function CreateSubjectScreen() {
                 className="mt-3 py-3 min-h-[44px] items-center justify-center"
                 testID="subject-use-my-words"
                 accessibilityRole="button"
-                accessibilityLabel={`Just use ${exactWords} as my subject`}
+                accessibilityLabel={t('subject.useMyWordsLabel', {
+                  words: exactWords,
+                })}
               >
                 <Text className="text-body-sm font-semibold text-primary">
-                  Just use "{exactWords}" as my subject
+                  {t('subject.useMyWords', { words: exactWords })}
                 </Text>
               </Pressable>
             )}
@@ -752,12 +760,12 @@ export default function CreateSubjectScreen() {
               testID="subject-suggestion-message"
             >
               {stripBold(resolveState.result.displayMessage ?? '') ||
-                "I couldn't match that cleanly, but we can still use your exact words."}
+                t('subject.noMatchFallback')}
             </Text>
             {exactWords !== '' && (
               <Button
                 variant="primary"
-                label={`Just use "${exactWords}"`}
+                label={t('subject.justUse', { words: exactWords })}
                 onPress={onUseMyWords}
                 disabled={isBusy}
                 loading={isBusy}
@@ -769,10 +777,10 @@ export default function CreateSubjectScreen() {
               className="py-3 items-center mt-2"
               testID="subject-no-match-edit"
               accessibilityRole="button"
-              accessibilityLabel="Edit subject name"
+              accessibilityLabel={t('subject.editSubjectNameLabel')}
             >
               <Text className="text-body-sm font-semibold text-primary">
-                Edit instead
+                {t('subject.editInstead')}
               </Text>
             </Pressable>
           </View>
@@ -807,10 +815,10 @@ export default function CreateSubjectScreen() {
                   className="flex-1 bg-primary rounded-button py-3 items-center min-h-[44px] justify-center"
                   testID="subject-suggestion-accept"
                   accessibilityRole="button"
-                  accessibilityLabel="Accept suggestion"
+                  accessibilityLabel={t('subject.acceptSuggestionLabel')}
                 >
                   <Text className="text-text-inverse font-semibold text-body-sm">
-                    Accept
+                    {t('subject.accept')}
                   </Text>
                 </Pressable>
                 <Pressable
@@ -818,10 +826,10 @@ export default function CreateSubjectScreen() {
                   className="flex-1 bg-surface rounded-button py-3 items-center min-h-[44px] justify-center border border-border"
                   testID="subject-suggestion-edit"
                   accessibilityRole="button"
-                  accessibilityLabel="Edit suggestion"
+                  accessibilityLabel={t('subject.editSuggestionLabel')}
                 >
                   <Text className="text-text-primary font-semibold text-body-sm">
-                    Edit
+                    {t('common.edit')}
                   </Text>
                 </Pressable>
               </View>
@@ -833,7 +841,7 @@ export default function CreateSubjectScreen() {
           <>
             <Button
               variant="primary"
-              label="Start Learning"
+              label={t('subject.startLearning')}
               onPress={onSubmit}
               disabled={!canSubmit}
               loading={isBusy}
@@ -845,7 +853,7 @@ export default function CreateSubjectScreen() {
                 className="text-body-sm text-text-secondary text-center mt-2"
                 testID="create-subject-validation-hint"
               >
-                Enter a subject name to get started
+                {t('subject.validationHint')}
               </Text>
             )}
           </>

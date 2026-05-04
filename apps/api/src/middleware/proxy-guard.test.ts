@@ -102,6 +102,44 @@ describe('assertNotProxyMode — server-derived proxy mode [BUG-718]', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// [BREAK / BUG-975 / CCR-PR126-H-1] Fail-closed when profileMeta is absent.
+//
+// Pre-fix, if profileScopeMiddleware did not run (or auto-resolve failed
+// silently), profileMeta was undefined and the server-derived check was
+// skipped — leaving only the client-controlled X-Proxy-Mode header guarding
+// writes. Post-fix, missing profileMeta is itself a 403 because ownership
+// cannot be verified server-side.
+// ---------------------------------------------------------------------------
+
+describe('assertNotProxyMode — fail-closed when profileMeta is absent [BUG-975]', () => {
+  function createAppNoMeta() {
+    const app = new Hono();
+    app.post('/test', (c) => {
+      assertNotProxyMode(c);
+      return c.json({ ok: true });
+    });
+    return app;
+  }
+
+  it('[BREAK] throws 403 when profileMeta is undefined and X-Proxy-Mode header is absent', async () => {
+    const app = createAppNoMeta();
+    const res = await app.request('/test', { method: 'POST' });
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.message).toBe('Not available in proxy mode');
+  });
+
+  it('[BREAK] throws 403 when profileMeta is undefined even when X-Proxy-Mode: false is sent', async () => {
+    const app = createAppNoMeta();
+    const res = await app.request('/test', {
+      method: 'POST',
+      headers: { 'X-Proxy-Mode': 'false' },
+    });
+    expect(res.status).toBe(403);
+  });
+});
+
 describe('assertNotProxyMode - real route integration', () => {
   it('returns 403 from bookmarks DELETE when X-Proxy-Mode: true, without touching the DB', async () => {
     const app = new Hono();
@@ -151,6 +189,58 @@ describe('assertNotProxyMode - real route integration', () => {
         method: 'DELETE',
       }
     );
+
+    expect(res.status).toBe(403);
+    expect(dbCalled).not.toHaveBeenCalled();
+  });
+
+  // [BREAK / BUG-973 / CCR-PR126-C-2] POST /bookmarks must reject proxy
+  // sessions just like DELETE. A non-owner profile injected via profileMeta
+  // (the production code path — set by profileScopeMiddleware after verifying
+  // X-Profile-Id) must be blocked from creating bookmarks even when the
+  // X-Proxy-Mode header is omitted, and the DB must never be touched.
+  it('[BREAK] returns 403 from bookmarks POST when profileMeta.isOwner=false and header is absent', async () => {
+    const app = new Hono();
+    const dbCalled = jest.fn();
+
+    app.use('*', async (c, next) => {
+      c.set('db' as never, new Proxy({}, { get: () => dbCalled }));
+      c.set('profileId' as never, 'profile-test');
+      c.set('profileMeta' as never, { isOwner: false });
+      await next();
+    });
+    app.route('/', bookmarkRoutes);
+
+    const res = await app.request('/bookmarks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventId: '00000000-0000-4000-8000-000000000000' }),
+    });
+
+    expect(res.status).toBe(403);
+    expect(dbCalled).not.toHaveBeenCalled();
+  });
+
+  it('[BREAK] returns 403 from bookmarks POST when X-Proxy-Mode: true, without touching the DB', async () => {
+    const app = new Hono();
+    const dbCalled = jest.fn();
+
+    app.use('*', async (c, next) => {
+      c.set('db' as never, new Proxy({}, { get: () => dbCalled }));
+      c.set('profileId' as never, 'profile-test');
+      c.set('profileMeta' as never, { isOwner: true });
+      await next();
+    });
+    app.route('/', bookmarkRoutes);
+
+    const res = await app.request('/bookmarks', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Proxy-Mode': 'true',
+      },
+      body: JSON.stringify({ eventId: '00000000-0000-4000-8000-000000000000' }),
+    });
 
     expect(res.status).toBe(403);
     expect(dbCalled).not.toHaveBeenCalled();

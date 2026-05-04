@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { platformAlert } from '../../../../lib/platform-alert';
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MemoryConsentPrompt } from '../../../../components/memory-consent-prompt';
@@ -39,6 +40,7 @@ import { goBackOrReplace } from '../../../../lib/navigation';
 import { useApiClient } from '../../../../lib/api-client';
 
 export default function ChildMentorMemoryScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const client = useApiClient();
@@ -76,7 +78,10 @@ export default function ChildMentorMemoryScreen() {
       try {
         await deleteItem.mutateAsync(args);
       } catch {
-        platformAlert('Could not delete item', 'Please try again.');
+        platformAlert(
+          t('parentView.mentorMemory.couldNotDeleteItem'),
+          t('parentView.mentorMemory.pleaseTryAgain')
+        );
       }
     },
     [deleteItem]
@@ -87,7 +92,10 @@ export default function ChildMentorMemoryScreen() {
       try {
         await unsuppress.mutateAsync(args);
       } catch {
-        platformAlert('Could not restore item', 'Please try again.');
+        platformAlert(
+          t('parentView.mentorMemory.couldNotRestoreItem'),
+          t('parentView.mentorMemory.pleaseTryAgain')
+        );
       }
     },
     [unsuppress]
@@ -96,18 +104,21 @@ export default function ChildMentorMemoryScreen() {
   const handleDeleteAll = useCallback(() => {
     if (!childProfileId) return;
     platformAlert(
-      'Clear mentor memory?',
-      'This removes the saved learner-memory data for this child and turns it off.',
+      t('parentView.mentorMemory.clearMemoryTitle'),
+      t('parentView.mentorMemory.clearMemoryBody'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Clear',
+          text: t('parentView.mentorMemory.clear'),
           style: 'destructive',
           onPress: async () => {
             try {
               await deleteAll.mutateAsync({ childProfileId });
             } catch {
-              platformAlert('Could not clear memory', 'Please try again.');
+              platformAlert(
+                t('parentView.mentorMemory.couldNotClearMemory'),
+                t('parentView.mentorMemory.pleaseTryAgain')
+              );
             }
           },
         },
@@ -126,10 +137,13 @@ export default function ChildMentorMemoryScreen() {
       });
       setDraft('');
       setConfirmationToast(
-        result.message || 'Saved — the mentor will remember this.'
+        result.message || t('parentView.mentorMemory.savedMentorWillRemember')
       );
     } catch {
-      platformAlert('Could not save that', 'Please try again.');
+      platformAlert(
+        t('parentView.mentorMemory.couldNotSaveThat'),
+        t('parentView.mentorMemory.pleaseTryAgain')
+      );
     }
   }, [childProfileId, draft, tellMentor]);
 
@@ -143,11 +157,14 @@ export default function ChildMentorMemoryScreen() {
             memoryCollectionEnabled: value,
           });
         } catch {
-          platformAlert('Could not update memory', 'Please try again.');
+          platformAlert(
+            t('parentView.mentorMemory.couldNotUpdateMemory'),
+            t('parentView.mentorMemory.pleaseTryAgain')
+          );
         }
       })();
     },
-    [childProfileId, toggleCollection]
+    [childProfileId, toggleCollection, t]
   );
 
   const handleToggleInjection = useCallback(
@@ -160,11 +177,14 @@ export default function ChildMentorMemoryScreen() {
             memoryInjectionEnabled: value,
           });
         } catch {
-          platformAlert('Could not update memory', 'Please try again.');
+          platformAlert(
+            t('parentView.mentorMemory.couldNotUpdateMemory'),
+            t('parentView.mentorMemory.pleaseTryAgain')
+          );
         }
       })();
     },
-    [childProfileId, toggleInjection]
+    [childProfileId, toggleInjection, t]
   );
 
   const handleExport = useCallback(() => {
@@ -197,13 +217,17 @@ export default function ChildMentorMemoryScreen() {
           const url = URL.createObjectURL(blob);
           const a = doc.createElement('a');
           a.href = url;
-          a.download = `${child?.displayName ?? 'learner'}-memory-summary.txt`;
+          a.download = `${
+            child?.displayName ?? t('parentView.mentorMemory.learner')
+          }-memory-summary.txt`;
           a.click();
           URL.revokeObjectURL(url);
         } else {
           const result = await Share.share({
             message: data.text,
-            title: `${child?.displayName ?? 'Learner'} memory summary`,
+            title: t('parentView.mentorMemory.memorySummaryTitle', {
+              name: child?.displayName ?? t('parentView.mentorMemory.learner'),
+            }),
           });
           // [UX-DE-L5] iOS returns dismissedAction when the user cancels the
           // share sheet — treat it as a no-op, not a success or error.
@@ -212,10 +236,13 @@ export default function ChildMentorMemoryScreen() {
           }
         }
       } catch {
-        platformAlert('Could not export memory', 'Please try again.');
+        platformAlert(
+          t('parentView.mentorMemory.couldNotExportMemory'),
+          t('parentView.mentorMemory.pleaseTryAgain')
+        );
       }
     })();
-  }, [child?.displayName, childProfileId, client]);
+  }, [child?.displayName, childProfileId, client, t]);
 
   // BUG-382: Client-side IDOR guard — only allow access to profiles owned by this account
   if (
@@ -229,7 +256,7 @@ export default function ChildMentorMemoryScreen() {
         style={{ paddingTop: insets.top }}
       >
         <Text className="text-body text-text-secondary text-center mb-4">
-          You don&apos;t have access to this profile.
+          {t('parentView.index.noAccessToProfile')}
         </Text>
         <Pressable
           onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
@@ -237,7 +264,7 @@ export default function ChildMentorMemoryScreen() {
           accessibilityRole="button"
         >
           <Text className="text-text-inverse text-body font-semibold">
-            Go back
+            {t('common.back')}
           </Text>
         </Pressable>
       </View>
@@ -251,7 +278,7 @@ export default function ChildMentorMemoryScreen() {
           onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
           className="me-3 py-2 pe-2"
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('common.goBack')}
         >
           <Text className="text-primary text-body font-semibold">
             {'\u2190'}
@@ -259,10 +286,10 @@ export default function ChildMentorMemoryScreen() {
         </Pressable>
         <View className="flex-1">
           <Text className="text-h2 font-bold text-text-primary">
-            What the mentor knows
+            {t('parentView.mentorMemory.title')}
           </Text>
           <Text className="text-body-sm text-text-secondary mt-0.5">
-            Review, edit, and guide what the mentor remembers.
+            {t('parentView.mentorMemory.subtitle')}
           </Text>
         </View>
       </View>
@@ -310,15 +337,15 @@ export default function ChildMentorMemoryScreen() {
           </View>
         ) : null}
 
-        <MemorySection title="Controls">
+        <MemorySection title={t('parentView.mentorMemory.controls')}>
           <View className="bg-surface rounded-card p-4">
             <View className="flex-row items-center justify-between">
               <View className="flex-1 pe-4">
                 <Text className="text-body text-text-primary">
-                  Learn about this child
+                  {t('parentView.mentorMemory.learnAboutChild')}
                 </Text>
                 <Text className="text-body-sm text-text-secondary mt-1">
-                  Save new signals from future sessions and direct notes.
+                  {t('parentView.mentorMemory.learnAboutChildDescription')}
                 </Text>
               </View>
               <Switch
@@ -330,10 +357,10 @@ export default function ChildMentorMemoryScreen() {
             <View className="flex-row items-center justify-between mt-4">
               <View className="flex-1 pe-4">
                 <Text className="text-body text-text-primary">
-                  Use what the mentor knows
+                  {t('parentView.mentorMemory.useWhatMentorKnows')}
                 </Text>
                 <Text className="text-body-sm text-text-secondary mt-1">
-                  Let future sessions use saved context naturally.
+                  {t('parentView.mentorMemory.useWhatMentorKnowsDescription')}
                 </Text>
               </View>
               <Switch
@@ -345,7 +372,7 @@ export default function ChildMentorMemoryScreen() {
           </View>
         </MemorySection>
 
-        <MemorySection title="Tell the Mentor">
+        <MemorySection title={t('parentView.mentorMemory.tellTheMentor')}>
           <TellMentorInput
             audience="parent"
             childName={child?.displayName}
@@ -380,48 +407,50 @@ export default function ChildMentorMemoryScreen() {
         {memory && memory.categories.length === 0 && (
           <View className="bg-surface rounded-card p-6 mt-4">
             <Text className="text-text-secondary text-center text-base">
-              No learning observations yet. As{' '}
-              {child?.displayName ?? 'your child'} uses the app, the mentor will
-              learn about their preferences and pace.
+              {t('parentView.mentorMemory.noObservationsYet', {
+                name: child?.displayName ?? t('parentView.index.yourChild'),
+              })}
             </Text>
           </View>
         )}
 
         {(profile?.suppressedInferences ?? []).length > 0 ? (
           <CollapsibleMemorySection
-            title="Hidden Items"
+            title={t('parentView.mentorMemory.hiddenItems')}
             defaultExpanded={false}
           >
             {profile?.suppressedInferences.map((value) => (
               <MemoryRow
                 key={value}
                 label={value}
-                actionLabel="Bring back"
+                actionLabel={t('parentView.mentorMemory.bringBack')}
                 onRemove={() => void safeUnsuppress({ childProfileId, value })}
               />
             ))}
           </CollapsibleMemorySection>
         ) : null}
 
-        <MemorySection title="Privacy">
+        <MemorySection title={t('parentView.mentorMemory.privacy')}>
           <Pressable
             onPress={handleExport}
             className="bg-surface rounded-card px-4 py-3 mb-2"
             accessibilityRole="button"
-            accessibilityLabel="Export mentor memory summary"
+            accessibilityLabel={t(
+              'parentView.mentorMemory.exportMemorySummary'
+            )}
           >
             <Text className="text-body font-semibold text-text-primary">
-              Export mentor memory summary
+              {t('parentView.mentorMemory.exportMemorySummary')}
             </Text>
           </Pressable>
           <Pressable
             onPress={handleDeleteAll}
             className="bg-surface rounded-card px-4 py-3"
             accessibilityRole="button"
-            accessibilityLabel="Clear all mentor memory for this child"
+            accessibilityLabel={t('parentView.mentorMemory.clearAllMemory')}
           >
             <Text className="text-body font-semibold text-danger">
-              Clear all mentor memory
+              {t('parentView.mentorMemory.clearAllMemory')}
             </Text>
           </Pressable>
         </MemorySection>
@@ -434,16 +463,16 @@ export default function ChildMentorMemoryScreen() {
             className="bg-surface rounded-card px-4 py-3 mt-4"
           >
             <Text className="text-text-secondary text-center text-sm">
-              Something else is wrong?
+              {t('parentView.mentorMemory.somethingElseIsWrong')}
             </Text>
           </Pressable>
         ) : (
           <View className="bg-surface rounded-card p-4 mt-4">
             <Text className="text-body font-medium text-text-primary mb-2">
-              What seems wrong?
+              {t('parentView.mentorMemory.whatSeemsWrong')}
             </Text>
             <Text className="text-body-sm text-text-secondary mb-3">
-              Describe what the mentor got wrong. We&apos;ll review your note.
+              {t('parentView.mentorMemory.whatSeemsWrongDescription')}
             </Text>
             <TextInput
               testID="correction-input"
@@ -451,7 +480,7 @@ export default function ChildMentorMemoryScreen() {
               onChangeText={setCorrectionText}
               multiline
               numberOfLines={3}
-              placeholder="e.g. She doesn't actually struggle with fractions anymore"
+              placeholder={t('parentView.mentorMemory.correctionPlaceholder')}
               className="border-border mb-3 rounded-lg border p-3 text-text-primary"
             />
             <View className="flex-row gap-2">
@@ -463,7 +492,7 @@ export default function ChildMentorMemoryScreen() {
                 className="flex-1 rounded-lg border border-border p-3"
               >
                 <Text className="text-text-secondary text-center text-sm">
-                  Cancel
+                  {t('common.cancel')}
                 </Text>
               </Pressable>
               <Pressable
@@ -482,12 +511,13 @@ export default function ChildMentorMemoryScreen() {
                       setCorrectionOpen(false);
                       setCorrectionText('');
                       setConfirmationToast(
-                        result.message || 'Correction noted — thank you.'
+                        result.message ||
+                          t('parentView.mentorMemory.correctionNoted')
                       );
                     } catch {
                       platformAlert(
-                        'Could not save correction',
-                        'Please try again.'
+                        t('parentView.mentorMemory.couldNotSaveCorrection'),
+                        t('parentView.mentorMemory.pleaseTryAgain')
                       );
                     }
                   })()
@@ -495,7 +525,7 @@ export default function ChildMentorMemoryScreen() {
                 className="flex-1 rounded-lg bg-primary p-3 disabled:opacity-50"
               >
                 <Text className="text-text-inverse text-center text-sm font-medium">
-                  Submit
+                  {t('parentView.mentorMemory.submit')}
                 </Text>
               </Pressable>
             </View>

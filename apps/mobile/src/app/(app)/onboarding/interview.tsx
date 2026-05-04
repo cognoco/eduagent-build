@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import {
   ChatShell,
   LivingBook,
@@ -33,6 +34,7 @@ const OPENING_MESSAGE =
   "Hi! I'm your learning mate. Before we build your learning path — what do you already know about this subject? Even a rough sense is helpful.";
 
 export default function InterviewScreen() {
+  const { t } = useTranslation();
   const {
     subjectId,
     subjectName,
@@ -400,7 +402,10 @@ export default function InterviewScreen() {
       setStreamError(null);
       seededDraftRef.current = true;
     } catch (err: unknown) {
-      platformAlert('Could not restart interview', formatApiError(err));
+      platformAlert(
+        t('onboarding.interview.restartErrorTitle'),
+        formatApiError(err)
+      );
     }
   }, [abortStream, openingMessage]);
 
@@ -433,7 +438,10 @@ export default function InterviewScreen() {
     } catch (err: unknown) {
       // BUG-692-FOLLOWUP: Don't surface error alert if user already navigated away.
       if (skipCancelledRef.current) return;
-      platformAlert('Could not skip ahead', formatApiError(err));
+      platformAlert(
+        t('onboarding.interview.skipErrorTitle'),
+        formatApiError(err)
+      );
     }
   }, [
     interviewComplete,
@@ -672,7 +680,7 @@ export default function InterviewScreen() {
     return (
       <View className="flex-1 bg-background items-center justify-center px-5">
         <Text className="text-body text-text-secondary text-center mb-4">
-          Missing subject information. Please go back and try again.
+          {t('onboarding.interview.missingSubject')}
         </Text>
         <Pressable
           onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
@@ -681,7 +689,7 @@ export default function InterviewScreen() {
           accessibilityRole="button"
         >
           <Text className="text-text-primary text-body font-semibold">
-            Go back
+            {t('common.goBack')}
           </Text>
         </Pressable>
       </View>
@@ -745,10 +753,10 @@ export default function InterviewScreen() {
               className="px-3 py-2"
               testID="end-session-button"
               accessibilityRole="button"
-              accessibilityLabel="End session"
+              accessibilityLabel={t('common.done')}
             >
               <Text className="text-body-sm text-primary font-medium">
-                Done
+                {t('common.done')}
               </Text>
             </Pressable>
           ) : (
@@ -769,7 +777,7 @@ export default function InterviewScreen() {
               {sessionCreationStuck ? (
                 <View className="items-center gap-2">
                   <Text className="text-body-sm text-danger text-center mb-2">
-                    This is taking longer than expected.
+                    {t('onboarding.interview.sessionCreationStuck')}
                   </Text>
                   <Pressable
                     onPress={() => {
@@ -780,10 +788,10 @@ export default function InterviewScreen() {
                     className="bg-primary rounded-button px-6 py-3 min-h-[44px] items-center justify-center w-full"
                     testID="session-creating-retry"
                     accessibilityRole="button"
-                    accessibilityLabel="Try again"
+                    accessibilityLabel={t('common.tryAgain')}
                   >
                     <Text className="text-body font-semibold text-text-inverse">
-                      Try Again
+                      {t('common.tryAgain')}
                     </Text>
                   </Pressable>
                   <Pressable
@@ -793,10 +801,10 @@ export default function InterviewScreen() {
                     className="bg-surface-elevated rounded-button px-6 py-3 min-h-[44px] items-center justify-center w-full"
                     testID="session-creating-go-back"
                     accessibilityRole="button"
-                    accessibilityLabel="Go back to home"
+                    accessibilityLabel={t('common.goBack')}
                   >
                     <Text className="text-body font-semibold text-text-primary">
-                      Go Back
+                      {t('common.goBack')}
                     </Text>
                   </Pressable>
                 </View>
@@ -804,7 +812,7 @@ export default function InterviewScreen() {
                 <>
                   <ActivityIndicator size="small" />
                   <Text className="text-body-sm text-text-secondary mt-2">
-                    Setting things up…
+                    {t('onboarding.interview.settingUp')}
                   </Text>
                 </>
               )}
@@ -812,21 +820,20 @@ export default function InterviewScreen() {
           ) : interviewComplete ? (
             <View className="bg-coaching-card rounded-card p-4 mt-2 mb-4">
               <Text className="text-body font-semibold text-text-primary mb-2">
-                Ready to start learning!
+                {t('onboarding.interview.completionTitle')}
               </Text>
               <Text className="text-body-sm text-text-secondary mb-3">
-                I've built your first learning path. Review it, make any quick
-                changes you want, and start learning.
+                {t('onboarding.interview.completionBody')}
               </Text>
               <Pressable
                 onPress={goToNextStep}
                 className="bg-primary rounded-button py-3 items-center"
                 testID="view-curriculum-button"
-                accessibilityLabel="Start learning"
+                accessibilityLabel={t('onboarding.interview.startLearning')}
                 accessibilityRole="button"
               >
                 <Text className="text-text-inverse text-body font-semibold">
-                  Let's Go
+                  {t('onboarding.interview.letsGo')}
                 </Text>
               </Pressable>
             </View>
@@ -836,7 +843,7 @@ export default function InterviewScreen() {
               testID="interview-stream-error"
             >
               <Text className="text-body font-semibold text-text-primary mb-2">
-                We hit a problem
+                {t('onboarding.interview.streamErrorTitle')}
               </Text>
               <Text className="text-body-sm text-text-secondary mb-3">
                 {streamError}
@@ -858,11 +865,11 @@ export default function InterviewScreen() {
                 }}
                 className="bg-primary rounded-button py-3 items-center"
                 testID="interview-try-again-button"
-                accessibilityLabel="Try the interview again"
+                accessibilityLabel={t('onboarding.interview.tryAgainLabel')}
                 accessibilityRole="button"
               >
                 <Text className="text-text-inverse text-body font-semibold">
-                  Try Again
+                  {t('common.tryAgain')}
                 </Text>
               </Pressable>
             </View>
@@ -875,8 +882,7 @@ export default function InterviewScreen() {
               {forceCompleteTimedOut ? (
                 <View testID="force-complete-timeout-error">
                   <Text className="text-body-sm text-danger text-center mb-2">
-                    Setting up your curriculum is taking too long. Check your
-                    connection and try again.
+                    {t('onboarding.interview.forceCompleteTimeout')}
                   </Text>
                   <Pressable
                     onPress={() =>
@@ -885,10 +891,10 @@ export default function InterviewScreen() {
                     className="py-2.5 items-center rounded-button bg-surface-elevated"
                     testID="force-complete-timeout-go-back"
                     accessibilityRole="button"
-                    accessibilityLabel="Go back to home"
+                    accessibilityLabel={t('common.goBack')}
                   >
                     <Text className="text-body-sm text-primary font-medium">
-                      Go Back
+                      {t('common.goBack')}
                     </Text>
                   </Pressable>
                 </View>
@@ -913,10 +919,10 @@ export default function InterviewScreen() {
                     }
                   >
                     {forceComplete.isPending
-                      ? 'Setting up your curriculum...'
+                      ? t('onboarding.interview.settingUpCurriculum')
                       : exchangeCount >= 3
-                      ? "Continue — I'm ready to start learning"
-                      : "I'm ready to start learning"}
+                      ? t('onboarding.interview.skipButtonProminent')
+                      : t('onboarding.interview.skipButton')}
                   </Text>
                 </Pressable>
               )}
@@ -924,21 +930,20 @@ export default function InterviewScreen() {
           ) : restartRequired ? (
             <View className="bg-coaching-card rounded-card p-4 mt-2 mb-4">
               <Text className="text-body font-semibold text-text-primary mb-2">
-                Interview expired
+                {t('onboarding.interview.expiredTitle')}
               </Text>
               <Text className="text-body-sm text-text-secondary mb-3">
-                After 7 days away, we start fresh so your curriculum still
-                matches where you are now.
+                {t('onboarding.interview.expiredBody')}
               </Text>
               <Pressable
                 onPress={handleRestartInterview}
                 className="bg-primary rounded-button py-3 items-center"
                 testID="restart-interview-button"
-                accessibilityLabel="Restart interview"
+                accessibilityLabel={t('onboarding.interview.restartButton')}
                 accessibilityRole="button"
               >
                 <Text className="text-text-inverse text-body font-semibold">
-                  Restart Interview
+                  {t('onboarding.interview.restartButton')}
                 </Text>
               </Pressable>
             </View>

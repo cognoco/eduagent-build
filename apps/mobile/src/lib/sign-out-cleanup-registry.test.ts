@@ -175,7 +175,12 @@ function isCoveredByPerProfileShape(rawArg: string): boolean {
     const helperMap: Array<[RegExp, (sampleId: string) => string]> = [
       [/^getPaceKey\([^)]*\)$/, (s) => `dictation-pace-${s}`],
       [/^getPunctKey\([^)]*\)$/, (s) => `dictation-punctuation-${s}`],
-      [/^getBookmarkNudgeKey\([^)]*\)$/, (s) => `bookmark-nudge-shown:${s}`],
+      [
+        /^getBookmarkNudgeKey\([^)]*\)$/,
+        (s) =>
+          // Mirror the sanitization of `bookmark-nudge-shown:${id}` -- colon is replaced by _.
+          `bookmark-nudge-shown:${s}`.replace(/[^a-zA-Z0-9._-]/g, '_'),
+      ],
       [
         /^getRecoveryKey\([^)]*\)$/,
         (s) =>

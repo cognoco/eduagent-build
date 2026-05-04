@@ -68,7 +68,7 @@ describe('FilingFailedBanner', () => {
 
     fireEvent.press(screen.getByTestId('filing-retry-button'));
 
-    await screen.findByText('Retry already in progress.');
+    await screen.findByText('A retry is already in progress.');
     expect(mockMutateAsync).toHaveBeenCalledWith({ sessionId: 'session-1' });
   });
 
@@ -82,7 +82,7 @@ describe('FilingFailedBanner', () => {
     fireEvent.press(screen.getByTestId('filing-retry-button'));
 
     expect(
-      await screen.findByText('Retry limit reached for this session.')
+      await screen.findByText('Retry limit reached. Please try again later.')
     ).toBeTruthy();
   });
 

@@ -3,6 +3,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { IntentCard } from '../../../components/home/IntentCard';
 import { useQuizStats } from '../../../hooks/use-quiz';
 import { useSubjects } from '../../../hooks/use-subjects';
@@ -35,6 +36,7 @@ function LanguageVocabCard({
   playedSubtitle,
   onSelect,
 }: LanguageVocabCardProps): React.ReactElement {
+  const { t } = useTranslation();
   const vocabulary = useVocabulary(subjectId);
   const vocabCount = vocabulary.data?.length ?? 0;
   // While the count is loading, default to "starter" labelling — the
@@ -45,16 +47,18 @@ function LanguageVocabCard({
     isLoadingVocab || vocabCount < PERSONAL_VOCAB_QUIZ_THRESHOLD;
 
   const title = usingStarterWords
-    ? `${displayLanguage} basics`
-    : `Vocabulary: ${displayLanguage}`;
+    ? t('quiz.index.vocabBasicsTitle', { language: displayLanguage })
+    : t('quiz.index.vocabPersonalisedTitle', { language: displayLanguage });
 
   // [BUG-891] When the learner has < threshold recorded words the round
   // pulls from a stock seed list, not their own vocabulary. Say so — the
   // previous "Practice new words and phrases" subtitle implied
   // personalisation that wasn't happening for fresh language subjects.
   const subtitle = usingStarterWords
-    ? `Stock starter words — record ${PERSONAL_VOCAB_QUIZ_THRESHOLD} of your own to unlock personalised rounds`
-    : playedSubtitle ?? 'Practice new words and phrases';
+    ? t('quiz.index.vocabStarterSubtitle', {
+        threshold: PERSONAL_VOCAB_QUIZ_THRESHOLD,
+      })
+    : playedSubtitle ?? t('quiz.index.vocabPlayedSubtitleDefault');
 
   return (
     <IntentCard
@@ -83,6 +87,7 @@ function getLanguageDisplayName(
 }
 
 export default function QuizIndexScreen(): React.ReactElement {
+  const { t } = useTranslation();
   const router = useRouter();
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const insets = useSafeAreaInsets();
@@ -119,10 +124,14 @@ export default function QuizIndexScreen(): React.ReactElement {
     capitalsStats &&
     capitalsStats.bestScore != null &&
     capitalsStats.bestTotal != null
-      ? `Best: ${capitalsStats.bestScore}/${capitalsStats.bestTotal} · Played: ${capitalsStats.roundsPlayed}`
+      ? t('quiz.index.bestScore', {
+          score: capitalsStats.bestScore,
+          total: capitalsStats.bestTotal,
+          played: capitalsStats.roundsPlayed,
+        })
       : capitalsStats
-      ? `Played: ${capitalsStats.roundsPlayed}`
-      : 'Test yourself on world capitals';
+      ? t('quiz.index.played', { played: capitalsStats.roundsPlayed })
+      : t('quiz.index.capitalsDefaultSubtitle');
 
   const guessWhoStats = stats?.find(
     (stat) => stat.activityType === 'guess_who'
@@ -131,10 +140,14 @@ export default function QuizIndexScreen(): React.ReactElement {
     guessWhoStats &&
     guessWhoStats.bestScore != null &&
     guessWhoStats.bestTotal != null
-      ? `Best: ${guessWhoStats.bestScore}/${guessWhoStats.bestTotal} · Played: ${guessWhoStats.roundsPlayed}`
+      ? t('quiz.index.bestScore', {
+          score: guessWhoStats.bestScore,
+          total: guessWhoStats.bestTotal,
+          played: guessWhoStats.roundsPlayed,
+        })
       : guessWhoStats
-      ? `Played: ${guessWhoStats.roundsPlayed}`
-      : 'Name the famous person from clues';
+      ? t('quiz.index.played', { played: guessWhoStats.roundsPlayed })
+      : t('quiz.index.guessWhoDefaultSubtitle');
 
   const handleSelectVocabulary = (subjectId: string, languageName: string) => {
     setActivityType('vocabulary');
@@ -169,12 +182,14 @@ export default function QuizIndexScreen(): React.ReactElement {
           onPress={handleBack}
           className="mr-3 min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('quiz.index.backLabel')}
           testID="quiz-back"
         >
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </Pressable>
-        <Text className="flex-1 text-h2 font-bold text-text-primary">Quiz</Text>
+        <Text className="flex-1 text-h2 font-bold text-text-primary">
+          {t('quiz.index.title')}
+        </Text>
       </View>
 
       {hasLoadError ? (
@@ -186,30 +201,32 @@ export default function QuizIndexScreen(): React.ReactElement {
             }}
             className="rounded-card bg-surface p-4"
             accessibilityRole="button"
-            accessibilityLabel="Retry loading quiz data"
+            accessibilityLabel={t('quiz.index.retryLabel')}
             testID="quiz-load-retry"
           >
             <Text className="text-body-sm text-text-secondary">
-              Couldn&apos;t load quiz data.{' '}
-              <Text className="font-semibold text-primary">Tap to retry.</Text>
+              {t('quiz.index.loadError')}{' '}
+              <Text className="font-semibold text-primary">
+                {t('quiz.index.tapToRetry')}
+              </Text>
             </Text>
           </Pressable>
           <Pressable
             onPress={handleBack}
             className="min-h-[44px] items-center justify-center rounded-button bg-surface-elevated px-4 py-3"
             accessibilityRole="button"
-            accessibilityLabel="Go back"
+            accessibilityLabel={t('quiz.index.backLabel')}
             testID="quiz-error-back"
           >
             <Text className="text-body-sm font-semibold text-text-primary">
-              Go back
+              {t('common.back')}
             </Text>
           </Pressable>
         </View>
       ) : (
         <View className="gap-4">
           <IntentCard
-            title="Capitals"
+            title={t('quiz.index.capitalsTitle')}
             subtitle={capitalsSubtitle}
             onPress={() => {
               setActivityType('capitals');
@@ -241,9 +258,13 @@ export default function QuizIndexScreen(): React.ReactElement {
                   langStat &&
                   langStat.bestScore != null &&
                   langStat.bestTotal != null
-                    ? `Best: ${langStat.bestScore}/${langStat.bestTotal} · Played: ${langStat.roundsPlayed}`
+                    ? t('quiz.index.bestScore', {
+                        score: langStat.bestScore,
+                        total: langStat.bestTotal,
+                        played: langStat.roundsPlayed,
+                      })
                     : langStat
-                    ? `Played: ${langStat.roundsPlayed}`
+                    ? t('quiz.index.played', { played: langStat.roundsPlayed })
                     : null
                 }
                 onSelect={() =>
@@ -253,7 +274,7 @@ export default function QuizIndexScreen(): React.ReactElement {
             );
           })}
           <IntentCard
-            title="Guess Who"
+            title={t('quiz.index.guessWhoTitle')}
             subtitle={guessWhoSubtitle}
             onPress={() => {
               setActivityType('guess_who');
@@ -273,8 +294,8 @@ export default function QuizIndexScreen(): React.ReactElement {
           {languageSubjects.length === 0 && (
             <View className="opacity-60">
               <IntentCard
-                title="Vocabulary"
-                subtitle="Add a language subject to unlock vocabulary quizzes"
+                title={t('quiz.index.vocabLockedTitle')}
+                subtitle={t('quiz.index.vocabLockedSubtitle')}
                 onPress={() => router.push('/(app)/library' as never)}
                 testID="quiz-vocab-locked"
               />

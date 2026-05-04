@@ -1,3 +1,22 @@
+// @inngest-admin: cross-profile
+//
+// This file is intentionally cross-profile. It contains two exports:
+//   - `dailySnapshotCron` (admin): cron entry that scans all profiles active
+//     in the last 90 days at 03:00 UTC, then fans out per-profile snapshot
+//     refresh events. Legitimately cross-profile.
+//   - `dailySnapshotRefresh` (per-profile fan-out): event handler driven by
+//     `app/progress.snapshot.refresh`; profileId comes from the event payload
+//     and all DB reads/writes are scoped to that single profile only.
+//
+// Profile-scoping rules in CLAUDE.md ("Reads must use createScopedRepository")
+// do NOT apply to `dailySnapshotCron` — this is system-wide work running
+// outside any single profile's request context.
+//
+// If you add raw drizzle queries to this file, ensure they cannot leak
+// data between profiles in user-visible output (notifications,
+// recommendations). When in doubt, scope by profileId at the leaf even
+// when scanning broadly.
+
 import { eq, gte } from 'drizzle-orm';
 import { learningSessions, profiles } from '@eduagent/database';
 import { inngest } from '../client';

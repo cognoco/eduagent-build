@@ -1,4 +1,5 @@
 import '../../global.css';
+import { ensureI18nReady } from '../i18n';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Platform,
@@ -30,6 +31,7 @@ import {
 } from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-expo';
 import { ThemeContext, useThemeColors, useTokenVars } from '../lib/theme';
+import { tokens } from '../lib/design-tokens';
 import type { ColorScheme } from '../lib/design-tokens';
 import { ProfileProvider, useProfile } from '../lib/profile';
 import {
@@ -362,7 +364,7 @@ function ClerkGate({
           <Text
             style={{
               fontSize: 14,
-              color: '#888',
+              color: tokens.light.colors.muted,
               textAlign: 'center',
               marginBottom: 24,
             }}
@@ -377,7 +379,7 @@ function ClerkGate({
               )
             }
             style={{
-              backgroundColor: '#0d9488',
+              backgroundColor: tokens.light.colors.primary,
               borderRadius: 12,
               paddingVertical: 14,
               paddingHorizontal: 32,
@@ -385,7 +387,13 @@ function ClerkGate({
             accessibilityRole="button"
             accessibilityLabel="Try again"
           >
-            <Text style={{ color: '#fff', fontWeight: '600', fontSize: 16 }}>
+            <Text
+              style={{
+                color: tokens.light.colors.textInverse,
+                fontWeight: '600',
+                fontSize: 16,
+              }}
+            >
               Try again
             </Text>
           </Pressable>
@@ -427,6 +435,28 @@ export default function RootLayout() {
     AtkinsonHyperlegible_700Bold,
     ...Ionicons.font,
   });
+
+  // i18n init pattern (b): folded into the existing fontsLoaded readiness
+  // gate. Native splash (preventAutoHideAsync) stays visible until both
+  // fonts and i18n resolve. Awaiting i18n eliminates flash-of-English for
+  // non-English users; ensureI18nReady() is local AsyncStorage so cost is ~ms.
+  const [i18nReady, setI18nReady] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    ensureI18nReady()
+      .then(() => {
+        if (!cancelled) setI18nReady(true);
+      })
+      .catch(() => {
+        // AsyncStorage corruption (or any other init failure) must not soft-lock
+        // the splash. Fall through to render with whatever i18n state we have —
+        // i18next falls back to English if init never completed.
+        if (!cancelled) setI18nReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Splash stays visible until BOTH conditions are met:
   //   1. The animated splash sequence has completed (or timed out)
@@ -492,7 +522,7 @@ export default function RootLayout() {
   }, [clerkReady]);
 
   useEffect(() => {
-    if (fontsLoaded) {
+    if (fontsLoaded && i18nReady) {
       // Hide native splash — the AnimatedSplash component takes over
       SplashScreen.hideAsync();
       // [BUG-954] Fire-and-forget drift check — warns in console if the
@@ -503,9 +533,9 @@ export default function RootLayout() {
         );
       }
     }
-  }, [fontsLoaded]);
+  }, [fontsLoaded, i18nReady]);
 
-  if (!fontsLoaded) return null;
+  if (!fontsLoaded || !i18nReady) return null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

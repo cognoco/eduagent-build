@@ -10,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import type { CefrLevel } from '@eduagent/schemas';
 import { OnboardingStepIndicator } from '../../../components/onboarding/OnboardingStepIndicator';
 import { useConfigureLanguageSubject } from '../../../hooks/use-subjects';
@@ -67,6 +68,7 @@ const LEVEL_OPTIONS: Array<{
 ];
 
 export default function LanguageSetup() {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const {
@@ -124,7 +126,7 @@ export default function LanguageSetup() {
   const handleContinue = async () => {
     if (!subjectId) return;
     if (nativeLanguage === 'other' && customLanguage.trim().length < 2) {
-      setError('Please type your native language.');
+      setError(t('onboarding.languageSetup.nativeLanguageRequired'));
       return;
     }
     setError('');
@@ -162,17 +164,17 @@ export default function LanguageSetup() {
     return (
       <View className="flex-1 bg-background items-center justify-center px-5">
         <Text className="text-text-secondary mb-4">
-          No language subject selected
+          {t('onboarding.languageSetup.noSubjectSelected')}
         </Text>
         <Pressable
           onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
           className="bg-primary rounded-button px-6 py-3 items-center"
           accessibilityRole="button"
-          accessibilityLabel="Go home"
+          accessibilityLabel={t('common.goHome')}
           testID="language-setup-guard-home"
         >
           <Text className="text-text-inverse text-body font-semibold">
-            Go home
+            {t('common.goHome')}
           </Text>
         </Pressable>
       </View>
@@ -189,7 +191,7 @@ export default function LanguageSetup() {
         <Pressable
           onPress={handleBack}
           className="mb-3 min-w-[44px] min-h-[44px] justify-center self-start"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('common.goBack')}
           accessibilityRole="button"
           testID="language-setup-back"
         >
@@ -198,20 +200,20 @@ export default function LanguageSetup() {
         <OnboardingStepIndicator step={step} totalSteps={totalSteps} />
 
         <Text className="text-h2 font-bold text-text-primary">
-          Language setup
+          {t('onboarding.languageSetup.title')}
         </Text>
         <Text className="text-body text-text-secondary mt-2 mb-5">
-          We&apos;ll switch this subject into a language-focused path with
-          direct teaching, vocabulary tracking, and speaking practice.
+          {t('onboarding.languageSetup.subtitle')}
         </Text>
 
         <View className="bg-primary/10 rounded-card p-4 mb-6">
           <Text className="text-body font-semibold text-text-primary">
-            Looks like you&apos;re learning {safeLanguageName}!
+            {t('onboarding.languageSetup.learningHint', {
+              language: safeLanguageName,
+            })}
           </Text>
           <Text className="text-body-sm text-text-secondary mt-2">
-            We&apos;ll use a language-focused approach built around vocabulary,
-            fluency, input, and output practice.
+            {t('onboarding.languageSetup.approachHint')}
           </Text>
         </View>
 
@@ -223,22 +225,22 @@ export default function LanguageSetup() {
                 onPress={() => void handleContinue()}
                 className="bg-primary rounded-button px-4 py-2.5 items-center flex-1 min-h-[44px] justify-center"
                 accessibilityRole="button"
-                accessibilityLabel="Try again"
+                accessibilityLabel={t('common.tryAgain')}
                 testID="language-setup-error-retry"
               >
                 <Text className="text-text-inverse text-body-sm font-semibold">
-                  Try again
+                  {t('common.tryAgain')}
                 </Text>
               </Pressable>
               <Pressable
                 onPress={() => goBackOrReplace(router, '/(app)/home')}
                 className="bg-surface rounded-button px-4 py-2.5 items-center flex-1 min-h-[44px] justify-center"
                 accessibilityRole="button"
-                accessibilityLabel="Cancel"
+                accessibilityLabel={t('common.cancel')}
                 testID="language-setup-error-cancel"
               >
                 <Text className="text-text-primary text-body-sm font-semibold">
-                  Cancel
+                  {t('common.cancel')}
                 </Text>
               </Pressable>
             </View>
@@ -246,7 +248,7 @@ export default function LanguageSetup() {
         )}
 
         <Text className="text-body font-semibold text-text-primary mb-3">
-          Your native language
+          {t('onboarding.languageSetup.nativeLanguageLabel')}
         </Text>
         <View className="gap-2 mb-6">
           {NATIVE_LANGUAGE_OPTIONS.map((option) => {
@@ -272,7 +274,9 @@ export default function LanguageSetup() {
                   <TextInput
                     value={customLanguage}
                     onChangeText={setCustomLanguage}
-                    placeholder="Type your language"
+                    placeholder={t(
+                      'onboarding.languageSetup.nativeLanguagePlaceholder'
+                    )}
                     placeholderTextColor={colors.textSecondary}
                     className="rounded-card border border-primary bg-surface px-4 py-3 text-body text-text-primary"
                     autoFocus
@@ -285,7 +289,7 @@ export default function LanguageSetup() {
         </View>
 
         <Text className="text-body font-semibold text-text-primary mb-3">
-          Your current level
+          {t('onboarding.languageSetup.currentLevelLabel')}
         </Text>
         <View className="gap-3">
           {LEVEL_OPTIONS.map((option) => {
@@ -304,13 +308,17 @@ export default function LanguageSetup() {
                 testID={option.testId}
               >
                 <Text className="text-body font-semibold text-text-primary">
-                  {option.label}
+                  {t(`onboarding.languageSetup.levels.${option.level}.label`)}
                 </Text>
                 <Text className="text-caption text-text-secondary mt-1">
-                  Starts around {option.level}
+                  {t('onboarding.languageSetup.startsAround', {
+                    level: option.level,
+                  })}
                 </Text>
                 <Text className="text-body-sm text-text-secondary mt-2">
-                  {option.description}
+                  {t(
+                    `onboarding.languageSetup.levels.${option.level}.description`
+                  )}
                 </Text>
               </Pressable>
             );
@@ -327,7 +335,7 @@ export default function LanguageSetup() {
             <ActivityIndicator color={colors.textInverse} />
           ) : (
             <Text className="text-text-inverse text-body font-semibold">
-              Continue
+              {t('common.continue')}
             </Text>
           )}
         </Pressable>

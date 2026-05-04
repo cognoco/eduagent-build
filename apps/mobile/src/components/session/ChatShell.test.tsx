@@ -163,9 +163,13 @@ describe('ChatShell', () => {
     screen.getByTestId('input-mode-toggle');
   });
 
-  it('renders mic button in the input row when not in voice mode', () => {
+  it('renders the compact enable-voice button in the input row when not in voice mode', () => {
     renderChatShell();
-    screen.getByTestId('voice-record-button');
+    // [BUG-965] Voice-OFF state shows the long-press-to-enable button, NOT
+    // the recording button. Distinct testIDs let E2E flows assert each
+    // state's presence/absence without ambiguity.
+    screen.getByTestId('voice-enable-button');
+    expect(screen.queryByTestId('voice-record-button')).toBeNull();
   });
 
   it('uses the explicit fallback route when backBehavior is replace', () => {
@@ -250,28 +254,35 @@ describe('ChatShell', () => {
       expect(toggle.props.accessibilityState.checked).toBe(true);
     });
 
-    it('shows compact mic button in input row when voice is OFF (standard session)', () => {
+    it('shows enable-voice button (NOT record button) when voice is OFF (standard session)', () => {
       renderChatShell({ verificationType: undefined });
 
-      screen.getByTestId('voice-record-button');
+      // [BUG-965] Distinct testIDs per state — see ChatShell.tsx voice
+      // input branch.
+      screen.getByTestId('voice-enable-button');
+      expect(screen.queryByTestId('voice-record-button')).toBeNull();
     });
 
-    it('shows voice record button when voice is ON (teach_back)', () => {
+    it('shows voice record button (NOT enable button) when voice is ON (teach_back)', () => {
       renderChatShell({ verificationType: 'teach_back' });
 
       screen.getByTestId('voice-record-button');
+      expect(screen.queryByTestId('voice-enable-button')).toBeNull();
     });
 
-    it('shows mic button after toggling voice ON in standard session', () => {
+    it('flips from enable-voice button to record button after toggling voice ON', () => {
       renderChatShell({ verificationType: undefined });
 
-      // Mic button always present (compact mic-in-pill)
-      screen.getByTestId('voice-record-button');
+      // OFF → enable-voice button only
+      screen.getByTestId('voice-enable-button');
+      expect(screen.queryByTestId('voice-record-button')).toBeNull();
 
-      // Toggle voice ON — mic button stays visible (full VoiceRecordButton)
+      // Flip voice ON
       fireEvent.press(screen.getByTestId('voice-toggle'));
 
+      // ON → record button only
       screen.getByTestId('voice-record-button');
+      expect(screen.queryByTestId('voice-enable-button')).toBeNull();
     });
 
     it('shows playback bar when voice is enabled', () => {
@@ -620,6 +631,38 @@ describe('ChatShell', () => {
     expect(screen.queryByTestId('send-button')).toBeNull();
   });
 
+  // [BUG-970 / BUG-969] The Maestro nightly flows for assessment and homework
+  // wait up to 10–15s on `chat-input`. ChatShell hides the input row when
+  // inputDisabled flips on (during interview→session handoff or while the
+  // homework camera is closing back to chat) — so the visibility of
+  // `chat-input` *must* track inputDisabled exactly. Both directions are
+  // locked in here so any future refactor that desyncs the testID from the
+  // disabled state surfaces in CI before the nightly flow goes red.
+  it('[BUG-970 / BUG-969] chat-input testID is rendered when input is enabled', () => {
+    renderChatShell({ inputDisabled: false });
+
+    screen.getByTestId('chat-input');
+    screen.getByTestId('send-button');
+  });
+
+  it('[BUG-970 / BUG-969] chat-input testID re-appears when inputDisabled flips back to false', () => {
+    const { rerender } = renderChatShell({ inputDisabled: true });
+    expect(screen.queryByTestId('chat-input')).toBeNull();
+
+    rerender(
+      <ChatShell
+        title="Session"
+        messages={DEFAULT_MESSAGES}
+        onSend={jest.fn()}
+        isStreaming={false}
+        inputDisabled={false}
+      />
+    );
+
+    screen.getByTestId('chat-input');
+    screen.getByTestId('send-button');
+  });
+
   it('hides voice record button when inputDisabled even for teach_back', () => {
     renderChatShell({ inputDisabled: true, verificationType: 'teach_back' });
 
@@ -744,7 +787,7 @@ describe('ChatShell', () => {
 
       // Shows the manual-playback notice instead of auto-speaking
       screen.getByText(
-        'Screen reader is on, so voice mode keeps manual playback only.'
+        'Screen reader is on. Voice input is not available. Use text input below.'
       );
     });
 
@@ -858,7 +901,7 @@ describe('ChatShell', () => {
         // screenReaderEnabled on web, this assertion will fail.
         expect(
           screen.queryByText(
-            'Screen reader is on, so voice mode keeps manual playback only.'
+            'Screen reader is on. Voice input is not available. Use text input below.'
           )
         ).toBeNull();
       } finally {
@@ -895,7 +938,7 @@ describe('ChatShell', () => {
 
       // The manual-playback notice appears
       screen.getByText(
-        'Screen reader is on, so voice mode keeps manual playback only.'
+        'Screen reader is on. Voice input is not available. Use text input below.'
       );
     });
   });

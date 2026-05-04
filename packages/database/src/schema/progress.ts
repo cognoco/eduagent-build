@@ -7,6 +7,7 @@ import {
   timestamp,
   pgEnum,
   index,
+  uniqueIndex,
   jsonb,
 } from 'drizzle-orm/pg-core';
 import { profiles } from './profiles';
@@ -76,6 +77,16 @@ export const xpLedger = pgTable(
   (table) => [
     index('xp_ledger_profile_id_idx').on(table.profileId),
     index('xp_ledger_topic_id_idx').on(table.topicId),
+    // Enforce one XP entry per (profile, topic) at the DB level. Application
+    // logic in insertSessionXpEntry already dedupes via findFirst, but two
+    // concurrent session closes could both pass the check and insert. With
+    // this unique constraint in place, insertSessionXpEntry uses
+    // onConflictDoNothing to make the check+insert atomic. Without it,
+    // applyReflectionMultiplier would non-deterministically pick a row.
+    uniqueIndex('xp_ledger_profile_topic_unique').on(
+      table.profileId,
+      table.topicId
+    ),
   ]
 );
 

@@ -1,14 +1,13 @@
 import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import type { RetentionStatus } from '@eduagent/schemas';
-import { useThemeColors } from '../../lib/theme';
-import { RetentionPill } from './RetentionPill';
+import { useSubjectTint, useThemeColors } from '../../lib/theme';
 import { BookRow, type BookRowData } from './BookRow';
 
 interface ShelfRowProps {
   subjectId: string;
   name: string;
-  emoji: string;
   bookCount: number;
   topicProgress: string; // "18/32"
   retentionStatus: RetentionStatus | null;
@@ -22,7 +21,6 @@ interface ShelfRowProps {
 export function ShelfRow({
   subjectId,
   name,
-  emoji,
   bookCount,
   topicProgress,
   retentionStatus,
@@ -32,11 +30,20 @@ export function ShelfRow({
   onToggle,
   onBookPress,
 }: ShelfRowProps): React.ReactElement {
+  const { t } = useTranslation();
   const colors = useThemeColors();
+  const tint = useSubjectTint(subjectId);
 
-  const subtitle = `${bookCount} ${
-    bookCount === 1 ? 'book' : 'books'
-  } · ${topicProgress} topics`;
+  // i18next pluralization picks shelfSubtitle_one vs shelfSubtitle_other based
+  // on count, so the singular/plural form moves with the locale's plural rules
+  // (e.g. Polish/Russian use multiple plural buckets — a hardcoded pair is wrong).
+  const subtitle = t('library.row.shelfSubtitle', {
+    count: bookCount,
+    progress: topicProgress,
+  });
+
+  const needsReview =
+    retentionStatus === 'weak' || retentionStatus === 'forgotten';
 
   return (
     <View style={{ opacity: isPaused ? 0.65 : 1 }}>
@@ -45,9 +52,15 @@ export function ShelfRow({
         testID={`shelf-row-header-${subjectId}`}
         onPress={() => onToggle(subjectId)}
         accessibilityRole="button"
-        accessibilityLabel={`${name} shelf, ${subtitle}${
-          isPaused ? ', paused' : ''
-        }. Tap to ${expanded ? 'collapse' : 'expand'}.`}
+        accessibilityLabel={t('library.row.shelfAccessibilityLabel', {
+          name,
+          subtitle,
+          pausedSuffix: isPaused ? t('library.row.shelfPausedSuffix') : '',
+          reviewSuffix: needsReview ? t('library.row.shelfReviewSuffix') : '',
+          action: expanded
+            ? t('library.row.shelfActionCollapse')
+            : t('library.row.shelfActionExpand'),
+        })}
         style={{
           flexDirection: 'row',
           alignItems: 'center',
@@ -56,18 +69,19 @@ export function ShelfRow({
           gap: 12,
         }}
       >
-        {/* Emoji square */}
+        {/* Tinted icon tile — Ionicons "library" in subject's tint color */}
         <View
+          testID={`shelf-row-icon-${subjectId}`}
           style={{
             width: 40,
             height: 40,
-            borderRadius: 8,
-            backgroundColor: colors.surfaceElevated,
+            borderRadius: 12,
+            backgroundColor: tint.soft,
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <Text style={{ fontSize: 22 }}>{emoji}</Text>
+          <Ionicons name="library" size={22} color={tint.solid} />
         </View>
 
         {/* Name + subtitle */}
@@ -90,7 +104,7 @@ export function ShelfRow({
           </Text>
         </View>
 
-        {/* Right side: paused chip + retention + chevron */}
+        {/* Right side: paused chip + review pill + chevron */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           {isPaused ? (
             <View
@@ -109,13 +123,39 @@ export function ShelfRow({
                   color: colors.warning,
                 }}
               >
-                Paused
+                {t('library.row.paused')}
               </Text>
             </View>
           ) : null}
 
-          {retentionStatus !== null ? (
-            <RetentionPill status={retentionStatus} size="small" />
+          {needsReview ? (
+            <View
+              testID={`shelf-row-review-${subjectId}`}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 3,
+                paddingHorizontal: 8,
+                paddingVertical: 2,
+                borderRadius: 10,
+                backgroundColor: colors.retentionWeak + '22',
+              }}
+            >
+              <Ionicons
+                name="alert-circle"
+                size={12}
+                color={colors.retentionWeak}
+              />
+              <Text
+                style={{
+                  fontSize: 11,
+                  fontWeight: '600',
+                  color: colors.retentionWeak,
+                }}
+              >
+                {t('library.row.review')}
+              </Text>
+            </View>
           ) : null}
 
           <Ionicons
@@ -137,8 +177,7 @@ export function ShelfRow({
               testID={`shelf-empty-${subjectId}`}
             >
               <Text style={{ fontSize: 13, color: colors.textSecondary }}>
-                No books in this subject yet. Study a topic and it&apos;ll be
-                filed here.
+                {t('library.row.shelfEmpty')}
               </Text>
             </View>
           ) : (
@@ -146,6 +185,7 @@ export function ShelfRow({
               <BookRow
                 key={book.bookId}
                 {...book}
+                tint={tint}
                 onPress={(bookId) => onBookPress(subjectId, bookId)}
               />
             ))

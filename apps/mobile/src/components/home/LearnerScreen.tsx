@@ -446,22 +446,17 @@ export function LearnerScreen({
                     key={card.subjectId}
                     {...card}
                     testID={`home-subject-card-${card.subjectId}`}
-                    onPress={() =>
-                      isParentProxy
-                        ? router.push({
-                            pathname: '/(app)/shelf/[subjectId]',
-                            params: { subjectId: card.subjectId },
-                          } as never)
-                        : router.push({
-                            pathname: '/(app)/session',
-                            params: {
-                              subjectId: card.subjectId,
-                              subjectName: card.name,
-                              mode: 'learning',
-                              ...HOME_RETURN_PARAMS,
-                            },
-                          } as never)
-                    }
+                    onPress={() => {
+                      // Two-push pattern (CLAUDE.md cross-tab rule):
+                      // unstable_settings only seeds one level deep, so push
+                      // the progress index first then the subject child to
+                      // keep router.back() landing on the progress tab root.
+                      router.push('/(app)/progress' as never);
+                      router.push({
+                        pathname: '/(app)/progress/[subjectId]',
+                        params: { subjectId: card.subjectId },
+                      } as never);
+                    }}
                   />
                 ))}
                 {!isParentProxy && (

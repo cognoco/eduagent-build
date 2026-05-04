@@ -1,6 +1,38 @@
 import { render, screen, fireEvent } from '@testing-library/react-native';
-
 import QuizRoundDetailScreen from './[roundId]';
+
+// i18n mock — returns English values for quiz.round namespace so tests can
+// assert on the same English strings as before the migration.
+// Note: jest.mock factories are hoisted and must be self-contained.
+jest.mock('react-i18next', () => {
+  const TRANSLATIONS: Record<string, string> = {
+    'quiz.round.goBack': 'Go back',
+    'quiz.round.couldNotLoad': 'Could not load round details',
+    'quiz.round.correct': 'Correct',
+    'quiz.round.wrong': 'Wrong',
+    'quiz.round.capitalQuestion': 'Capital of {{country}}',
+    'quiz.round.vocabularyQuestion': 'Translate: {{term}}',
+    'quiz.round.guessWhoFallback': 'Guess Who',
+    'quiz.round.yourAnswer': 'Your answer: {{answer}}',
+    'quiz.round.correctAnswer': 'Correct answer: {{answer}}',
+    'quiz.round.notNeeded': '(not needed)',
+    'quiz.round.cluesHeader': 'Clues',
+    'quiz.round.didYouKnow': 'Did you know?',
+    'quiz.round.expandedLabel': 'Q{{num}}, {{correctness}}, tap to hide hints',
+    'quiz.round.collapsedLabel': 'Q{{num}}, {{correctness}}, tap to see hints',
+    'quiz.round.questionLabel': 'Q{{num}}',
+    'common.tryAgain': 'Try Again',
+    'common.goBack': 'Go Back',
+  };
+  const t = (key: string, opts?: Record<string, unknown>) => {
+    const template = TRANSLATIONS[key] ?? key;
+    if (!opts) return template;
+    return template.replace(/\{\{(\w+)\}\}/g, (_: string, k: string) =>
+      String(opts[k] ?? `{{${k}}}`)
+    );
+  };
+  return { useTranslation: () => ({ t }) };
+});
 
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ roundId: 'round-1' }),

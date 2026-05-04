@@ -33,6 +33,17 @@ if [ -n "$PROMPT_CHANGED" ]; then
   fi
 fi
 
+# i18n staleness guard: when en.json is staged, every locale must already match
+# its key/variable shape. Without this the staleness check exists but never
+# runs in CI/husky, so missing-key drift ships silently. Skip when only
+# non-en locale files are staged (translator output committing back).
+I18N_EN_CHANGED=$(git diff --cached --name-only --diff-filter=d \
+  | grep -E '^apps/mobile/src/i18n/locales/en\.json$' || true)
+if [ -n "$I18N_EN_CHANGED" ]; then
+  echo "pre-commit: running check:i18n (en.json changed)..."
+  pnpm exec tsx scripts/check-i18n-staleness.ts || exit 1
+fi
+
 # Full project-reference type-check (incremental via composite tsconfig).
 # Emits .d.ts to dist/ (gitignored) + .tsbuildinfo (gitignored) for incremental caching.
 # Skip if no .ts/.tsx files are staged — docs/config-only commits need no tsc.

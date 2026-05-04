@@ -6,6 +6,65 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 
+// i18n mock — returns English values for the quiz.launch namespace so tests
+// can assert on the same English strings as before the migration.
+// Note: jest.mock factories are hoisted and must be self-contained.
+jest.mock('react-i18next', () => {
+  const TRANSLATIONS: Record<string, string> = {
+    'quiz.launch.loadingShuffling': 'Shuffling questions...',
+    'quiz.launch.loadingPicking': 'Picking a theme...',
+    'quiz.launch.loadingAlmost': 'Almost ready...',
+    'quiz.launch.challengeTitle': 'Challenge round',
+    'quiz.launch.challengeBody': "You're on a streak. This one is harder.",
+    'quiz.launch.challengeStart': 'Start',
+    'quiz.launch.challengeLabel':
+      'Challenge round. This round is harder than usual.',
+    'quiz.launch.challengeStartLabel': 'Start challenge round',
+    'quiz.launch.hardTimeoutTitle': 'Quiz is taking too long',
+    'quiz.launch.hardTimeoutMessage':
+      'Generating the round took longer than expected. Check your connection and try again.',
+    'quiz.launch.errorTitle': "Couldn't create a round",
+    'quiz.launch.errorFallback':
+      'Try again, or head back and pick a different activity.',
+    'quiz.launch.timedOutHint':
+      "This is taking longer than usual — tap Cancel if you'd rather try again later.",
+    'quiz.launch.cancelLabel': 'Cancel',
+    'common.retry': 'Retry',
+    'common.goBack': 'Go Back',
+  };
+  const t = (key: string, opts?: Record<string, unknown>) => {
+    const template = TRANSLATIONS[key] ?? key;
+    if (!opts) return template;
+    return template.replace(/\{\{(\w+)\}\}/g, (_: string, k: string) =>
+      String(opts[k] ?? `{{${k}}}`)
+    );
+  };
+  return { useTranslation: () => ({ t }) };
+});
+
+jest.mock('../../../i18n', () => {
+  const TRANSLATIONS: Record<string, string> = {
+    'quiz.launch.friendlyErrors.upstreamError':
+      'Something went wrong creating your quiz. Try again!',
+    'quiz.launch.friendlyErrors.timeout':
+      'The quiz took too long to create. Try again!',
+    'quiz.launch.friendlyErrors.rateLimited':
+      'Too many requests — wait a moment and try again.',
+    'quiz.launch.friendlyErrors.validationError':
+      'Something went wrong. Please try a different activity.',
+    'quiz.launch.friendlyErrors.genericShort':
+      'Something went wrong. Try again!',
+  };
+  const t = (key: string, opts?: Record<string, unknown>) => {
+    const template = TRANSLATIONS[key] ?? key;
+    if (!opts) return template;
+    return template.replace(/\{\{(\w+)\}\}/g, (_: string, k: string) =>
+      String(opts[k] ?? `{{${k}}}`)
+    );
+  };
+  return { __esModule: true, default: { t } };
+});
+
 const mockReplace = jest.fn();
 const mockSetRound = jest.fn();
 const mockMutate = jest.fn();

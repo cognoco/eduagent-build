@@ -34,6 +34,14 @@ export function pushLearningResumeTarget(
   target: LearningResumeTarget,
   returnTo?: string
 ): void {
+  // [BUG-977 / CCR-PR126-M-2] Replace the previous `as never` cast (which
+  // silenced the typed Href system entirely) with `as Href`. The Expo Router
+  // generator types each route's params as required regardless of which
+  // are optional in practice — and our params are all string-or-undefined,
+  // so the structural shape can't be expressed without casting at all.
+  // `as Href` keeps the pathname checked against the route table (a typo or
+  // route rename will fail at compile time) while accepting the dynamic
+  // params shape; `as never` allowed any pathname through.
   router.push({
     pathname: '/(app)/session',
     params: {
@@ -48,5 +56,5 @@ export function pushLearningResumeTarget(
         : {}),
       ...(returnTo ? { returnTo } : {}),
     },
-  } as never);
+  } as Href);
 }

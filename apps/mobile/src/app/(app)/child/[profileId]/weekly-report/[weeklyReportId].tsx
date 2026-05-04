@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import * as Sentry from '@sentry/react-native';
 import { goBackOrReplace } from '../../../../../lib/navigation';
 import { classifyApiError } from '../../../../../lib/format-api-error';
@@ -77,6 +78,7 @@ function isEmptyWeeklyReport(reportData: {
 }
 
 export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { profileId, weeklyReportId } = useLocalSearchParams<{
@@ -138,7 +140,7 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
             }
             className="me-3 py-2 pe-2"
             accessibilityRole="button"
-            accessibilityLabel="Go back"
+            accessibilityLabel={t('common.goBack')}
             testID="child-weekly-report-back"
           >
             <Text className="text-body font-semibold text-primary">
@@ -149,10 +151,10 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
             <Text className="text-h2 font-bold text-text-primary">
               {report
                 ? formatWeeklyReportRange(report.reportData.weekStart)
-                : 'Weekly report'}
+                : t('parentView.weeklyReport.weeklyReport')}
             </Text>
             <Text className="text-body-sm text-text-secondary mt-0.5">
-              A snapshot of this week&apos;s learning.
+              {t('parentView.weeklyReport.subtitle')}
             </Text>
           </View>
         </View>
@@ -160,7 +162,7 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
         {isLoading ? (
           <View className="bg-surface rounded-card p-4 mt-4">
             <Text className="text-body-sm text-text-secondary">
-              Loading report...
+              {t('parentView.weeklyReport.loadingReport')}
             </Text>
           </View>
         ) : isError ? (
@@ -169,12 +171,12 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
             variant="card"
             message={classifyApiError(error).message}
             primaryAction={{
-              label: 'Try Again',
+              label: t('common.tryAgain'),
               onPress: () => void refetch(),
               testID: 'child-weekly-report-error-retry',
             }}
             secondaryAction={{
-              label: 'Back to reports',
+              label: t('parentView.weeklyReport.backToReports'),
               onPress: () => goBackOrReplace(router, reportsHref),
               testID: 'child-weekly-report-error-back',
             }}
@@ -200,12 +202,12 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
 
             <View className="flex-row gap-3 mt-4">
               <MetricCard
-                label="Sessions this week"
+                label={t('parentView.weeklyReport.sessionsThisWeek')}
                 value={String(report.reportData.thisWeek.totalSessions)}
                 testID="child-weekly-report-metric-sessions"
               />
               <MetricCard
-                label="Time on app"
+                label={t('parentView.weeklyReport.timeOnApp')}
                 value={String(report.reportData.thisWeek.totalActiveMinutes)}
                 testID="child-weekly-report-metric-minutes"
               />
@@ -213,14 +215,14 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
 
             <View className="flex-row gap-3 mt-3">
               <MetricCard
-                label="Topics mastered"
+                label={t('parentView.weeklyReport.topicsMastered')}
                 value={String(report.reportData.thisWeek.topicsMastered)}
                 testID="child-weekly-report-metric-topics"
               />
               {/* [SUGG-1] vocabularyTotal is cumulative (absolute snapshot),
                   not a weekly delta — label reflects that. */}
               <MetricCard
-                label="Total words known"
+                label={t('parentView.weeklyReport.totalWordsKnown')}
                 value={String(report.reportData.thisWeek.vocabularyTotal)}
                 testID="child-weekly-report-metric-vocabulary"
               />
@@ -234,8 +236,9 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
                 testID="child-weekly-report-empty-note"
               >
                 <Text className="text-body-sm text-text-secondary">
-                  No activity this week — quiet weeks happen. A short nudge
-                  often helps {report.reportData.childName} get going again.
+                  {t('parentView.weeklyReport.noActivityNote', {
+                    name: report.reportData.childName,
+                  })}
                 </Text>
               </View>
             )}
@@ -251,24 +254,35 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
                 }}
                 className="bg-primary rounded-button px-4 py-3 items-center min-h-[48px] justify-center"
                 accessibilityRole="button"
-                accessibilityLabel={`Open ${report.reportData.childName}'s profile`}
+                accessibilityLabel={t(
+                  'parentView.weeklyReport.openChildProfile',
+                  {
+                    name: report.reportData.childName,
+                  }
+                )}
                 testID="child-weekly-report-open-child"
               >
                 <Text className="text-body font-semibold text-text-inverse">
                   {isEmptyWeeklyReport(report.reportData)
-                    ? `Send ${report.reportData.childName} a nudge`
-                    : `Open ${report.reportData.childName}'s profile`}
+                    ? t('parentView.weeklyReport.sendNudge', {
+                        name: report.reportData.childName,
+                      })
+                    : t('parentView.weeklyReport.openChildProfile', {
+                        name: report.reportData.childName,
+                      })}
                 </Text>
               </Pressable>
               <Pressable
                 onPress={() => goBackOrReplace(router, reportsHref)}
                 className="rounded-button px-4 py-3 items-center min-h-[48px] justify-center mt-2"
                 accessibilityRole="button"
-                accessibilityLabel="Back to all reports"
+                accessibilityLabel={t(
+                  'parentView.weeklyReport.backToAllReports'
+                )}
                 testID="child-weekly-report-back-to-reports"
               >
                 <Text className="text-body font-semibold text-primary">
-                  Back to all reports
+                  {t('parentView.weeklyReport.backToAllReports')}
                 </Text>
               </Pressable>
             </View>
@@ -281,21 +295,20 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
             testID="child-weekly-report-gone"
           >
             <Text className="text-h3 font-semibold text-text-primary">
-              This report is no longer available
+              {t('parentView.weeklyReport.reportGoneTitle')}
             </Text>
             <Text className="text-body-sm text-text-secondary mt-2">
-              It may have been archived or removed. All your other reports are
-              still safe.
+              {t('parentView.weeklyReport.reportGoneBody')}
             </Text>
             <Pressable
               onPress={() => goBackOrReplace(router, reportsHref)}
               className="bg-primary rounded-button px-4 py-3 items-center mt-4 min-h-[48px] justify-center"
               accessibilityRole="button"
-              accessibilityLabel="Back to reports"
+              accessibilityLabel={t('parentView.weeklyReport.backToReports')}
               testID="child-weekly-report-gone-back"
             >
               <Text className="text-body font-semibold text-text-inverse">
-                Back to reports
+                {t('parentView.weeklyReport.backToReports')}
               </Text>
             </Pressable>
           </View>

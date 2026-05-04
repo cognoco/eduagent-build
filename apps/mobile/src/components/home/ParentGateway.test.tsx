@@ -149,7 +149,7 @@ describe('ParentGateway', () => {
 
     screen.getByTestId('parent-dashboard-error');
     screen.getByText("We couldn't load the dashboard");
-    screen.getByText('Tap to retry');
+    screen.getByText('Retry');
 
     fireEvent.press(screen.getByTestId('parent-dashboard-error'));
     expect(mockRefetch).toHaveBeenCalledTimes(1);

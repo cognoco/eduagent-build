@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import {
   CONFLICT_ERROR_NAME,
   RATE_LIMITED_ERROR_NAME,
@@ -17,6 +18,7 @@ interface SessionLike {
 }
 
 export function FilingFailedBanner({ session }: { session: SessionLike }) {
+  const { t } = useTranslation();
   const [hidden, setHidden] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const retry = useRetryFiling();
@@ -52,11 +54,11 @@ export function FilingFailedBanner({ session }: { session: SessionLike }) {
       await retry.mutateAsync({ sessionId: session.id });
     } catch (err) {
       if (err instanceof Error && err.name === CONFLICT_ERROR_NAME) {
-        setMessage('Retry already in progress.');
+        setMessage(t('session.filingFailed.retryInProgress'));
       } else if (err instanceof Error && err.name === RATE_LIMITED_ERROR_NAME) {
-        setMessage('Retry limit reached for this session.');
+        setMessage(t('session.filingFailed.retryLimitReached'));
       } else {
-        setMessage('Could not start retry. Please try again in a moment.');
+        setMessage(t('session.filingFailed.couldNotStartRetry'));
         Sentry.captureException(err);
       }
     }
@@ -73,7 +75,7 @@ export function FilingFailedBanner({ session }: { session: SessionLike }) {
         <View className="flex-row items-center">
           <ActivityIndicator />
           <Text className="text-body text-text-primary ms-3">
-            Retrying topic placement...
+            {t('session.filingFailed.retrying')}
           </Text>
         </View>
       ) : null}
@@ -81,11 +83,10 @@ export function FilingFailedBanner({ session }: { session: SessionLike }) {
       {session.filingStatus === 'filing_failed' ? (
         <View>
           <Text className="text-body font-semibold text-text-primary">
-            Topic placement needs attention
+            {t('session.filingFailed.needsAttention')}
           </Text>
           <Text className="text-body text-text-secondary mt-1">
-            Your overall progress is saved. We just need to sort this session
-            into the right topic.
+            {t('session.filingFailed.progressSaved')}
           </Text>
           {message ? (
             <Text className="text-caption text-danger mt-2">{message}</Text>
@@ -96,11 +97,11 @@ export function FilingFailedBanner({ session }: { session: SessionLike }) {
             }}
             disabled={retryDisabled}
             accessibilityRole="button"
-            accessibilityLabel="Retry topic placement for this session"
+            accessibilityLabel={t('session.filingFailed.retryLabel')}
             accessibilityState={{ disabled: retryDisabled }}
             accessibilityHint={
               session.filingRetryCount >= MAX_RETRIES
-                ? 'Retry limit reached for this session.'
+                ? t('session.filingFailed.retryLimitReached')
                 : undefined
             }
             className={`rounded-button py-3 px-4 items-center mt-3 ${
@@ -113,7 +114,9 @@ export function FilingFailedBanner({ session }: { session: SessionLike }) {
                 retryDisabled ? 'text-text-secondary' : 'text-text-inverse'
               }`}
             >
-              {retry.isPending ? 'Retrying...' : 'Try again'}
+              {retry.isPending
+                ? t('session.filingFailed.retryingButton')
+                : t('session.filingFailed.tryAgain')}
             </Text>
           </Pressable>
         </View>
@@ -121,7 +124,7 @@ export function FilingFailedBanner({ session }: { session: SessionLike }) {
 
       {session.filingStatus === 'filing_recovered' ? (
         <Text className="text-body text-text-primary">
-          Topic placement recovered.
+          {t('session.filingFailed.recovered')}
         </Text>
       ) : null}
     </View>

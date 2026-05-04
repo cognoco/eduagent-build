@@ -1,5 +1,6 @@
 import React from 'react';
 import { Platform, Pressable, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import * as Clipboard from 'expo-clipboard';
 import {
   deletePermanentlyFailed,
@@ -19,6 +20,7 @@ export function OutboxFailedBanner({
   flow,
   onEscalate,
 }: OutboxFailedBannerProps): React.ReactElement | null {
+  const { t } = useTranslation();
   const [entries, setEntries] = React.useState<OutboxEntry[]>([]);
 
   const refresh = React.useCallback(async () => {
@@ -41,10 +43,10 @@ export function OutboxFailedBanner({
       className="mx-4 mb-3 rounded-card bg-warning/15 px-4 py-3"
     >
       <Text className="text-body font-semibold text-text-primary">
-        Some messages could not be sent
+        {t('session.outboxFailed.title')}
       </Text>
       <Text className="mt-1 text-body-sm text-text-secondary">
-        Copy them or send them to support so nothing gets lost.
+        {t('session.outboxFailed.description')}
       </Text>
       {entries.map((entry) => (
         <View key={entry.id} className="mt-3 rounded-card bg-surface px-3 py-2">
@@ -61,7 +63,7 @@ export function OutboxFailedBanner({
             }}
           >
             <Text className="text-body-sm font-semibold text-text-secondary">
-              Copy message
+              {t('session.outboxFailed.copyMessage')}
             </Text>
           </Pressable>
         </View>
@@ -75,7 +77,7 @@ export function OutboxFailedBanner({
           testID="outbox-escalate-button"
         >
           <Text className="text-body-sm font-semibold text-text-inverse">
-            Send to support
+            {t('session.outboxFailed.sendToSupport')}
           </Text>
         </Pressable>
       ) : null}

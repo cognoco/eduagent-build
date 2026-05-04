@@ -523,6 +523,52 @@ describe('useSessionStreaming', () => {
       expect(opts.trackExchange).not.toHaveBeenCalled();
     });
 
+    // [BUG-957 / LEARN-02] Corner case: streamMessage resolves *without* ever
+    // invoking onChunk or onComplete. The XHR closed cleanly (HTTP 200) but
+    // the server emitted no SSE events at all (e.g. proxy buffering, mid-flight
+    // worker termination, or an empty SSE stream that ends before any frame is
+    // flushed). Without the finally-block fixup in use-session-streaming.ts
+    // (lines ~875-898), the streaming bubble would stay forever — the writing
+    // animation never stops because setIsStreaming stays true and the message
+    // bubble keeps `streaming: true`. This break test guards that fixup.
+    it('[BUG-957] converts a silent stream completion (no chunks, no onComplete) into a reconnect prompt', async () => {
+      const opts = makeOpts({
+        // Resolve immediately with no events — simulates a 200 response that
+        // closed before any SSE frame was emitted.
+        streamMessage: jest.fn(async () => {
+          /* no-op: no onChunk, no onComplete */
+        }),
+      });
+      const { result } = renderHook(() => useSessionStreaming(opts as any));
+
+      await act(async () => {
+        await result.current.continueWithMessage('Hello?');
+      });
+
+      const finalMessages = applyMessageUpdates(
+        (opts.setMessages as jest.Mock).mock.calls,
+        []
+      );
+
+      // The streaming bubble must be converted into a reconnect prompt with
+      // a clear recovery affordance — no message may remain in `streaming: true`.
+      expect(finalMessages).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            role: 'assistant',
+            kind: 'reconnect_prompt',
+            content: 'Connection lost — Try again',
+            streaming: false,
+          }),
+        ])
+      );
+      // No ghost streaming bubble must be left over.
+      const stillStreaming = finalMessages.filter(
+        (m: { streaming?: boolean }) => m.streaming === true
+      );
+      expect(stillStreaming).toHaveLength(0);
+    });
+
     it('does not overwrite watchdog reconnect prompts during finalization', async () => {
       jest.useFakeTimers();
 

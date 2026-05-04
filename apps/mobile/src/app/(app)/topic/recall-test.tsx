@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { View, Text, Pressable } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
   ChatShell,
@@ -34,6 +35,7 @@ function deriveStatus(retentionStatus?: string): RetentionStatus {
 }
 
 export default function RecallTestScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { topicId, subjectId, topicName } = useLocalSearchParams<{
     topicId: string;
@@ -110,7 +112,7 @@ export default function RecallTestScreen() {
           onError: (err: Error) => {
             // UX-DE-L8: error is not an AI reply
             platformAlert(
-              'Something went wrong',
+              t('topic.recallTest.errorTitle'),
               classifyApiError(err).message
             );
           },
@@ -184,7 +186,10 @@ export default function RecallTestScreen() {
         onError: (err: Error) => {
           setDontRememberCount((prev) => Math.max(prev - 1, 0));
           // UX-DE-L8: error is not an AI reply
-          platformAlert('Something went wrong', classifyApiError(err).message);
+          platformAlert(
+            t('topic.recallTest.errorTitle'),
+            classifyApiError(err).message
+          );
         },
       }
     );
@@ -194,10 +199,10 @@ export default function RecallTestScreen() {
     return (
       <ErrorFallback
         variant="centered"
-        title="Topic not found"
-        message="We couldn't load this topic. Head to the library to pick one."
+        title={t('topic.recallTest.missingTitle')}
+        message={t('topic.recallTest.missingMessage')}
         primaryAction={{
-          label: 'Go to Library',
+          label: t('topic.recallTest.goToLibrary'),
           onPress: () => goBackOrReplace(router, '/(app)/library'),
           testID: 'recall-test-missing-topic',
         }}
@@ -218,17 +223,17 @@ export default function RecallTestScreen() {
   ) : inputDisabled ? (
     <View className="mt-4 items-center px-4">
       <Text className="text-body-sm text-text-secondary text-center mb-3">
-        Head back to your Library whenever you're ready.
+        {t('topic.recallTest.successPrompt')}
       </Text>
       <Pressable
         onPress={() => goBackOrReplace(router, '/(app)/library')}
         className="bg-primary rounded-button px-6 py-3 items-center"
         accessibilityRole="button"
-        accessibilityLabel="Go to Library"
+        accessibilityLabel={t('topic.recallTest.goToLibrary')}
         testID="recall-test-success-go-library"
       >
         <Text className="text-body font-semibold text-text-inverse">
-          Go to Library
+          {t('topic.recallTest.goToLibrary')}
         </Text>
       </Pressable>
     </View>
@@ -242,11 +247,15 @@ export default function RecallTestScreen() {
         testID="recall-dont-remember-button"
         accessibilityRole="button"
         accessibilityLabel={
-          dontRememberCount > 0 ? 'Still stuck' : "I don't remember"
+          dontRememberCount > 0
+            ? t('topic.recallTest.stillStuck')
+            : t('topic.recallTest.dontRemember')
         }
       >
         <Text className="text-body-sm font-medium text-text-primary">
-          {dontRememberCount > 0 ? 'Still stuck' : "I don't remember"}
+          {dontRememberCount > 0
+            ? t('topic.recallTest.stillStuck')
+            : t('topic.recallTest.dontRemember')}
         </Text>
       </Pressable>
     </View>
@@ -255,15 +264,15 @@ export default function RecallTestScreen() {
   return (
     <View testID="recall-test-screen" style={{ flex: 1 }}>
       <ChatShell
-        title="Recall Check"
-        subtitle="Test your memory"
+        title={t('topic.recallTest.title')}
+        subtitle={t('topic.recallTest.subtitle')}
         messages={messages}
         onSend={handleSend}
         isStreaming={isStreaming}
         inputDisabled={inputDisabled}
         footer={footer}
         inputAccessory={inputAccessory}
-        placeholder="Explain what you remember..."
+        placeholder={t('topic.recallTest.inputPlaceholder')}
         messagesTestID="recall-messages"
         backFallback="/(app)/library"
       />

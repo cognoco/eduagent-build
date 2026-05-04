@@ -12,6 +12,8 @@ const mockBack = jest.fn();
 const mockReplace = jest.fn();
 const mockCanGoBack = jest.fn();
 
+jest.mock('react-i18next', () => require('../test-utils/mock-i18n').i18nMock);
+
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     back: mockBack,
@@ -221,9 +223,7 @@ describe('DeleteAccountScreen', () => {
       render(<DeleteAccountScreen />, { wrapper: Wrapper });
       fireEvent.press(screen.getByTestId('delete-account-confirm'));
 
-      expect(
-        screen.getByTestId('delete-account-family-warning')
-      ).toBeTruthy();
+      expect(screen.getByTestId('delete-account-family-warning')).toBeTruthy();
       screen.getByText(/linked child profiles/i);
       expect(
         screen.getByText(/permanently deleted along with your account/i)

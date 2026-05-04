@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { ErrorFallback } from './ErrorFallback';
 
 interface TimeoutLoaderAction {
@@ -33,12 +34,15 @@ interface TimeoutLoaderProps {
 export function TimeoutLoader({
   isLoading,
   timeoutMs = 15_000,
-  title = 'Taking longer than expected',
-  message = 'Check your connection and try again.',
+  title,
+  message,
   primaryAction,
   secondaryAction,
   testID,
 }: TimeoutLoaderProps) {
+  const { t } = useTranslation();
+  const resolvedTitle = title ?? t('common.timeoutLoader.title');
+  const resolvedMessage = message ?? t('common.timeoutLoader.message');
   const [timedOut, setTimedOut] = useState(false);
 
   useEffect(() => {
@@ -56,8 +60,8 @@ export function TimeoutLoader({
     return (
       <ErrorFallback
         variant="centered"
-        title={title}
-        message={message}
+        title={resolvedTitle}
+        message={resolvedMessage}
         primaryAction={primaryAction}
         secondaryAction={secondaryAction}
       />

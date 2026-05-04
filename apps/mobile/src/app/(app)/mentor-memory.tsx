@@ -6,6 +6,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { platformAlert } from '../../lib/platform-alert';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Redirect, useRouter } from 'expo-router';
@@ -38,6 +39,7 @@ import { useParentProxy } from '../../hooks/use-parent-proxy';
 import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
 
 export default function MentorMemoryScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { activeProfile } = useProfile();
@@ -59,8 +61,8 @@ export default function MentorMemoryScreen() {
       setLoadTimedOut(false);
       return;
     }
-    const t = setTimeout(() => setLoadTimedOut(true), 15_000);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setLoadTimedOut(true), 15_000);
+    return () => clearTimeout(timer);
   }, [isLoading]);
 
   const learningStyleRows = useMemo(
@@ -90,22 +92,19 @@ export default function MentorMemoryScreen() {
       { young: string; mid: string; older: string }
     > = {
       'short-burst': {
-        young: 'Your mentor uses a special way to teach you!',
-        mid: 'Learning style: Short-Burst — shorter explanations with lots of check-ins',
-        older:
-          'Accommodation mode: Short-Burst — concise explanations, frequent checkpoints',
+        young: t('session.mentorMemory.accommodation.shortBurst.young'),
+        mid: t('session.mentorMemory.accommodation.shortBurst.mid'),
+        older: t('session.mentorMemory.accommodation.shortBurst.older'),
       },
       'audio-first': {
-        young: 'Your mentor uses a special way to teach you!',
-        mid: 'Learning style: Audio-First — simple, spoken-style explanations',
-        older:
-          'Accommodation mode: Audio-First — spoken-style language, phonetic support',
+        young: t('session.mentorMemory.accommodation.audioFirst.young'),
+        mid: t('session.mentorMemory.accommodation.audioFirst.mid'),
+        older: t('session.mentorMemory.accommodation.audioFirst.older'),
       },
       predictable: {
-        young: 'Your mentor uses a special way to teach you!',
-        mid: 'Learning style: Predictable — clear structure and step-by-step sessions',
-        older:
-          'Accommodation mode: Predictable — structured sessions, explicit transitions',
+        young: t('session.mentorMemory.accommodation.predictable.young'),
+        mid: t('session.mentorMemory.accommodation.predictable.mid'),
+        older: t('session.mentorMemory.accommodation.predictable.older'),
       },
     };
     const labels = modeLabels[accommodationMode];
@@ -114,22 +113,25 @@ export default function MentorMemoryScreen() {
     if (persona === 'teen') return labels.young;
     if (persona === 'learner') return labels.mid;
     return labels.older;
-  }, [accommodationMode, activeProfile?.birthYear]);
+  }, [accommodationMode, activeProfile?.birthYear, t]);
 
   const handleDeleteAll = useCallback(() => {
     platformAlert(
-      'Clear mentor memory?',
-      'This removes everything the mentor has remembered about you and turns memory off until you enable it again.',
+      t('session.mentorMemory.clearDialog.title'),
+      t('session.mentorMemory.clearDialog.message'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Clear',
+          text: t('session.mentorMemory.clearDialog.confirm'),
           style: 'destructive',
           onPress: async () => {
             try {
               await deleteAll.mutateAsync({});
             } catch (err) {
-              platformAlert('Could not clear memory', formatApiError(err));
+              platformAlert(
+                t('session.mentorMemory.errors.clearFailed'),
+                formatApiError(err)
+              );
               Sentry.captureException(err, {
                 tags: { surface: 'mentor-memory', action: 'delete_all' },
               });
@@ -138,7 +140,7 @@ export default function MentorMemoryScreen() {
         },
       ]
     );
-  }, [deleteAll]);
+  }, [deleteAll, t]);
 
   const handleTellMentor = useCallback(async () => {
     const text = draft.trim();
@@ -147,12 +149,15 @@ export default function MentorMemoryScreen() {
       await tellMentor.mutateAsync({ text });
       setDraft('');
     } catch (err) {
-      platformAlert('Could not save that', formatApiError(err));
+      platformAlert(
+        t('session.mentorMemory.errors.saveFailed'),
+        formatApiError(err)
+      );
       Sentry.captureException(err, {
         tags: { surface: 'mentor-memory', action: 'tell_mentor' },
       });
     }
-  }, [draft, tellMentor]);
+  }, [draft, tellMentor, t]);
 
   const handleToggleInjection = useCallback(
     (value: boolean) => {
@@ -162,14 +167,17 @@ export default function MentorMemoryScreen() {
             memoryInjectionEnabled: value,
           });
         } catch (err) {
-          platformAlert('Could not update memory', formatApiError(err));
+          platformAlert(
+            t('session.mentorMemory.errors.updateFailed'),
+            formatApiError(err)
+          );
           Sentry.captureException(err, {
             tags: { surface: 'mentor-memory', action: 'toggle_injection' },
           });
         }
       })();
     },
-    [toggleInjection]
+    [toggleInjection, t]
   );
 
   const consentStatus = profile?.memoryConsentStatus ?? 'pending';
@@ -185,15 +193,15 @@ export default function MentorMemoryScreen() {
         >
           <ErrorFallback
             variant="centered"
-            title="Loading is taking too long"
-            message="Check your connection and try again."
+            title={t('session.mentorMemory.loadTimeout.title')}
+            message={t('session.mentorMemory.loadTimeout.message')}
             primaryAction={{
-              label: 'Retry',
+              label: t('common.retry'),
               onPress: () => void refetch(),
               testID: 'mentor-memory-load-timeout-retry',
             }}
             secondaryAction={{
-              label: 'Go Back',
+              label: t('common.goBack'),
               onPress: () => goBackOrReplace(router, '/(app)/more'),
               testID: 'mentor-memory-load-timeout-back',
             }}
@@ -220,7 +228,7 @@ export default function MentorMemoryScreen() {
         style={{ paddingTop: insets.top }}
       >
         <Text className="text-body text-text-primary text-center px-6">
-          We couldn't load your mentor memory right now
+          {t('session.mentorMemory.loadError')}
         </Text>
         <Pressable
           testID="mentor-memory-retry"
@@ -228,7 +236,9 @@ export default function MentorMemoryScreen() {
           className="mt-4 px-6 py-3 bg-primary rounded-card"
           accessibilityRole="button"
         >
-          <Text className="text-body font-semibold text-white">Retry</Text>
+          <Text className="text-body font-semibold text-white">
+            {t('common.retry')}
+          </Text>
         </Pressable>
         <Pressable
           testID="mentor-memory-go-back"
@@ -236,7 +246,7 @@ export default function MentorMemoryScreen() {
           className="mt-3 px-6 py-3"
           accessibilityRole="button"
         >
-          <Text className="text-body text-primary">Go Back</Text>
+          <Text className="text-body text-primary">{t('common.goBack')}</Text>
         </Pressable>
       </View>
     );
@@ -249,7 +259,7 @@ export default function MentorMemoryScreen() {
           onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
           className="me-3 py-2 pe-2"
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('common.goBack')}
         >
           <Text className="text-primary text-body font-semibold">
             {'\u2190'}
@@ -257,10 +267,10 @@ export default function MentorMemoryScreen() {
         </Pressable>
         <View className="flex-1">
           <Text className="text-h2 font-bold text-text-primary">
-            What My Mentor Knows
+            {t('session.mentorMemory.title')}
           </Text>
           <Text className="text-body-sm text-text-secondary mt-0.5">
-            Review, edit, or add what your mentor remembers.
+            {t('session.mentorMemory.subtitle')}
           </Text>
         </View>
       </View>
@@ -271,34 +281,36 @@ export default function MentorMemoryScreen() {
       >
         <View className="bg-surface rounded-card p-4 mt-4">
           <Text className="text-body font-semibold text-text-primary">
-            Memory status
+            {t('session.mentorMemory.status.heading')}
           </Text>
           <Text
             className="text-body-sm text-text-secondary mt-1"
             testID="memory-status-text"
           >
             {consentStatus === 'granted'
-              ? 'Memory collection is enabled.'
+              ? t('session.mentorMemory.status.enabled')
               : consentStatus === 'declined'
-              ? 'Memory collection is turned off.'
+              ? t('session.mentorMemory.status.disabled')
               : // BUG-[NOTION-3468bce9]: role-aware pending copy.
               // Adult/owner accounts (isOwner === true) control their own
               // consent — don't tell them a guardian must act. Child
               // profiles under a family link (isOwner === false) DO need
               // a parent/guardian to enable memory collection.
               activeProfile?.isOwner
-              ? "Memory collection hasn't been enabled yet."
-              : 'A parent or guardian still needs to enable memory collection.'}
+              ? t('session.mentorMemory.status.pendingOwner')
+              : t('session.mentorMemory.status.pendingChild')}
           </Text>
           <View className="flex-row items-center justify-between mt-4">
             <Text className="text-body text-text-primary">
-              Use what the mentor knows
+              {t('session.mentorMemory.status.useMemoryLabel')}
             </Text>
             <Switch
               value={profile?.memoryInjectionEnabled ?? false}
               onValueChange={handleToggleInjection}
               disabled={isLoading || toggleInjection.isPending}
-              accessibilityLabel="Use what the mentor knows"
+              accessibilityLabel={t(
+                'session.mentorMemory.status.useMemoryLabel'
+              )}
             />
           </View>
         </View>
@@ -306,8 +318,8 @@ export default function MentorMemoryScreen() {
         {consentStatus === 'pending' && activeProfile?.isOwner && (
           <View className="mt-3">
             <MemoryConsentPrompt
-              title="Enable mentor memory"
-              description="Let the mentor remember what works for you — your strengths, preferred explanations, and topics you find tricky."
+              title={t('session.mentorMemory.consent.title')}
+              description={t('session.mentorMemory.consent.description')}
               isPending={grantConsent.isPending}
               onGrant={() =>
                 void (async () => {
@@ -315,7 +327,7 @@ export default function MentorMemoryScreen() {
                     await grantConsent.mutateAsync({ consent: 'granted' });
                   } catch (err) {
                     platformAlert(
-                      'Could not enable memory',
+                      t('session.mentorMemory.errors.enableFailed'),
                       formatApiError(err)
                     );
                     Sentry.captureException(err, {
@@ -333,7 +345,7 @@ export default function MentorMemoryScreen() {
                     await grantConsent.mutateAsync({ consent: 'declined' });
                   } catch (err) {
                     platformAlert(
-                      'Could not update memory',
+                      t('session.mentorMemory.errors.updateFailed'),
                       formatApiError(err)
                     );
                     Sentry.captureException(err, {
@@ -363,14 +375,17 @@ export default function MentorMemoryScreen() {
                 attribute it to. The phrase only fits non-owner profiles
                 (child user, or parent in proxy mode). */}
             {role !== 'owner' ? (
-              <Text className="text-caption text-text-secondary mt-1">
-                Set by your parent in their settings.
+              <Text
+                testID="accommodation-set-by-parent"
+                className="text-caption text-text-secondary mt-1"
+              >
+                {t('session.mentorMemory.accommodation.setByParent')}
               </Text>
             ) : null}
           </View>
         ) : null}
 
-        <MemorySection title="Tell Your Mentor">
+        <MemorySection title={t('session.mentorMemory.sections.tellMentor')}>
           <TellMentorInput
             birthYear={activeProfile?.birthYear}
             value={draft}
@@ -386,17 +401,15 @@ export default function MentorMemoryScreen() {
             testID="mentor-memory-all-empty"
           >
             <Text className="text-body font-semibold text-text-primary text-center">
-              Your mentor is getting to know you
+              {t('session.mentorMemory.empty.title')}
             </Text>
             <Text className="text-body-sm text-text-secondary text-center mt-2">
-              As you study, your mentor will learn about your interests,
-              strengths, and how you like to learn. Everything will appear here
-              over time.
+              {t('session.mentorMemory.empty.message')}
             </Text>
           </View>
         ) : null}
 
-        <MemorySection title="Learning Style">
+        <MemorySection title={t('session.mentorMemory.sections.learningStyle')}>
           {learningStyleRows.length > 0 ? (
             learningStyleRows.map((row) => (
               <MemoryRow
@@ -411,7 +424,10 @@ export default function MentorMemoryScreen() {
                       suppress: true,
                     });
                   } catch (err) {
-                    platformAlert('Could not delete item', formatApiError(err));
+                    platformAlert(
+                      t('session.mentorMemory.errors.deleteFailed'),
+                      formatApiError(err)
+                    );
                     Sentry.captureException(err, {
                       tags: {
                         surface: 'mentor-memory',
@@ -423,11 +439,11 @@ export default function MentorMemoryScreen() {
               />
             ))
           ) : (
-            <MemoryRow label="Nothing saved yet." />
+            <MemoryRow label={t('session.mentorMemory.nothingSaved')} />
           )}
         </MemorySection>
 
-        <MemorySection title="Interests">
+        <MemorySection title={t('session.mentorMemory.sections.interests')}>
           {(profile?.interests ?? []).length > 0 ? (
             // [BUG-815] Use the same `?? []` guard inside the map call so
             // the lookup is safe even when profile is undefined or interests
@@ -442,7 +458,9 @@ export default function MentorMemoryScreen() {
               // [BUG-471] Surface timestamp if available
               const ts = profile?.interestTimestamps?.[label];
               const detail = ts
-                ? `Noticed ${formatRelativeDate(ts)}`
+                ? t('session.mentorMemory.noticed', {
+                    date: formatRelativeDate(ts),
+                  })
                 : undefined;
               return (
                 <MemoryRow
@@ -458,7 +476,7 @@ export default function MentorMemoryScreen() {
                       });
                     } catch (err) {
                       platformAlert(
-                        'Could not delete item',
+                        t('session.mentorMemory.errors.deleteFailed'),
                         formatApiError(err)
                       );
                       Sentry.captureException(err, {
@@ -473,11 +491,11 @@ export default function MentorMemoryScreen() {
               );
             })
           ) : (
-            <MemoryRow label="Nothing saved yet." />
+            <MemoryRow label={t('session.mentorMemory.nothingSaved')} />
           )}
         </MemorySection>
 
-        <MemorySection title="Strengths">
+        <MemorySection title={t('session.mentorMemory.sections.strengths')}>
           {(profile?.strengths ?? []).length > 0 ? (
             profile?.strengths.map((entry) => (
               <MemoryRow
@@ -492,7 +510,10 @@ export default function MentorMemoryScreen() {
                       suppress: true,
                     });
                   } catch (err) {
-                    platformAlert('Could not delete item', formatApiError(err));
+                    platformAlert(
+                      t('session.mentorMemory.errors.deleteFailed'),
+                      formatApiError(err)
+                    );
                     Sentry.captureException(err, {
                       tags: {
                         surface: 'mentor-memory',
@@ -504,12 +525,12 @@ export default function MentorMemoryScreen() {
               />
             ))
           ) : (
-            <MemoryRow label="Nothing saved yet." />
+            <MemoryRow label={t('session.mentorMemory.nothingSaved')} />
           )}
         </MemorySection>
 
         <CollapsibleMemorySection
-          title="Things You're Improving At"
+          title={t('session.mentorMemory.sections.struggles')}
           defaultExpanded={false}
         >
           {(profile?.struggles ?? []).length > 0 ? (
@@ -523,7 +544,9 @@ export default function MentorMemoryScreen() {
                   }`}
                   detail={
                     entry.lastSeen
-                      ? `Last seen ${formatRelativeDate(entry.lastSeen)}`
+                      ? t('session.mentorMemory.lastSeen', {
+                          date: formatRelativeDate(entry.lastSeen),
+                        })
                       : undefined
                   }
                   source={entry.source}
@@ -539,7 +562,7 @@ export default function MentorMemoryScreen() {
                       });
                     } catch (err) {
                       platformAlert(
-                        'Could not delete item',
+                        t('session.mentorMemory.errors.deleteFailed'),
                         formatApiError(err)
                       );
                       Sentry.captureException(err, {
@@ -554,11 +577,13 @@ export default function MentorMemoryScreen() {
               );
             })
           ) : (
-            <MemoryRow label="Nothing saved yet." />
+            <MemoryRow label={t('session.mentorMemory.nothingSaved')} />
           )}
         </CollapsibleMemorySection>
 
-        <MemorySection title="Communication Notes">
+        <MemorySection
+          title={t('session.mentorMemory.sections.communicationNotes')}
+        >
           {(profile?.communicationNotes ?? []).length > 0 ? (
             profile?.communicationNotes.map((note) => (
               <MemoryRow
@@ -572,7 +597,10 @@ export default function MentorMemoryScreen() {
                       suppress: true,
                     });
                   } catch (err) {
-                    platformAlert('Could not delete item', formatApiError(err));
+                    platformAlert(
+                      t('session.mentorMemory.errors.deleteFailed'),
+                      formatApiError(err)
+                    );
                     Sentry.captureException(err, {
                       tags: {
                         surface: 'mentor-memory',
@@ -584,26 +612,26 @@ export default function MentorMemoryScreen() {
               />
             ))
           ) : (
-            <MemoryRow label="Nothing saved yet." />
+            <MemoryRow label={t('session.mentorMemory.nothingSaved')} />
           )}
         </MemorySection>
 
         {(profile?.suppressedInferences ?? []).length > 0 ? (
           <CollapsibleMemorySection
-            title="Hidden Items"
+            title={t('session.mentorMemory.sections.hiddenItems')}
             defaultExpanded={false}
           >
             {profile?.suppressedInferences.map((value) => (
               <MemoryRow
                 key={value}
                 label={value}
-                actionLabel="Bring back"
+                actionLabel={t('session.mentorMemory.bringBack')}
                 onRemove={async () => {
                   try {
                     await unsuppress.mutateAsync({ value });
                   } catch (err) {
                     platformAlert(
-                      'Could not restore item',
+                      t('session.mentorMemory.errors.restoreFailed'),
                       formatApiError(err)
                     );
                     Sentry.captureException(err, {
@@ -619,17 +647,22 @@ export default function MentorMemoryScreen() {
           </CollapsibleMemorySection>
         ) : null}
 
-        <MemorySection title="Privacy">
+        <MemorySection title={t('session.mentorMemory.sections.privacy')}>
           <Pressable
             onPress={handleDeleteAll}
             className="bg-surface rounded-card px-4 py-3"
             accessibilityRole="button"
-            accessibilityLabel={`Clear mentor memory for ${
-              activeProfile?.displayName ?? 'this profile'
-            }`}
+            accessibilityLabel={t(
+              'session.mentorMemory.clearAll.accessibilityLabel',
+              {
+                name:
+                  activeProfile?.displayName ??
+                  t('session.mentorMemory.clearAll.defaultName'),
+              }
+            )}
           >
             <Text className="text-body font-semibold text-danger">
-              Clear all mentor memory
+              {t('session.mentorMemory.clearAll.label')}
             </Text>
           </Pressable>
         </MemorySection>

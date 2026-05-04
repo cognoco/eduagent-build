@@ -5,6 +5,11 @@ const mockBack = jest.fn();
 const mockCanGoBack = jest.fn(() => false);
 let mockSearchParams: Record<string, string | undefined> = {};
 
+jest.mock(
+  'react-i18next',
+  () => require('../../test-utils/mock-i18n').i18nMock
+);
+
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     push: jest.fn(),

@@ -864,7 +864,7 @@ describe('SessionScreen homework flow', () => {
 
     const header = testScreen.getByTestId('session-topic-header');
     within(header).getByText(/Continents/);
-    within(header).getByText(/Current topic/);
+    within(header).getByText(/Topic:/);
 
     fireEvent.press(testScreen.getByTestId('session-topic-header-change'));
     await flushAsyncWork();

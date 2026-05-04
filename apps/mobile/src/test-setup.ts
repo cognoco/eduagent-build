@@ -1,3 +1,23 @@
+// Initialize i18next synchronously with the real English catalog so every
+// test renders the same English strings the app would. Tests that need
+// different behavior (e.g., assertion on raw key) can still jest.mock
+// react-i18next per-file. Without this, components using useTranslation()
+// receive the raw key as text because the i18n module's async IIFE init in
+// apps/mobile/src/i18n/index.ts hasn't resolved by the time the test renders.
+import i18nextInstance from 'i18next';
+import { initReactI18next as i18nInitPlugin } from 'react-i18next';
+import enCatalogForTests from './i18n/locales/en.json';
+
+if (!i18nextInstance.isInitialized) {
+  void i18nextInstance.use(i18nInitPlugin).init({
+    lng: 'en',
+    fallbackLng: 'en',
+    resources: { en: { translation: enCatalogForTests } },
+    interpolation: { escapeValue: false },
+    react: { useSuspense: false },
+  });
+}
+
 // @sentry/react-native loads native module config at import time, which fails
 // in Jest with "Config file contains no configuration data". Mock globally.
 jest.mock('@sentry/react-native', () => ({

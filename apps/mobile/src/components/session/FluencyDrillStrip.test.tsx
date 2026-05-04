@@ -48,7 +48,7 @@ describe('FluencyDrillStrip', () => {
 
     screen.getByTestId('fluency-drill-score');
     screen.getByText('7/10');
-    screen.getByText(/70% correct/);
+    screen.getByText('70% correct');
   });
 
   it('dismiss press invokes onDismissScore', () => {

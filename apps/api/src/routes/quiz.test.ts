@@ -290,7 +290,9 @@ describe('Quiz routes', () => {
       expect(body.questions[0].acceptedAliases).toBeUndefined();
     });
 
-    it('returns 400 without a profile id header', async () => {
+    // BUG-975: Missing X-Profile-Id — proxy-guard fails closed (no profileMeta)
+    // before requireProfileId runs, so the response is 403 not 400.
+    it('returns 403 without a profile id header [BUG-975]', async () => {
       const res = await app.request(
         '/v1/quiz/rounds',
         {
@@ -304,7 +306,7 @@ describe('Quiz routes', () => {
         TEST_ENV
       );
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(403);
     });
 
     it('returns 400 for an invalid activity type', async () => {

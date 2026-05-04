@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import type { CurriculumTopic, RetentionStatus } from '@eduagent/schemas';
 import * as Sentry from '@sentry/react-native';
@@ -32,6 +33,7 @@ import {
   useDeleteNoteById,
 } from '../../../../../hooks/use-notes';
 import { useRetentionTopics } from '../../../../../hooks/use-retention';
+import { useStickyLoading } from '../../../../../hooks/use-sticky-loading';
 import { useCurriculum } from '../../../../../hooks/use-curriculum';
 import { useLearningResumeTarget } from '../../../../../hooks/use-progress';
 
@@ -147,6 +149,7 @@ export default function BookScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const themeColors = useThemeColors();
+  const { t } = useTranslation();
   const params = useLocalSearchParams<{
     subjectId: string;
     bookId: string;
@@ -219,6 +222,13 @@ export default function BookScreen() {
 
   const needsGeneration = book !== null && !book.topicsGenerated;
 
+  // Keep the MagicPenAnimation visible long enough to register, even when
+  // generation completes faster than perception.
+  const showGenerating = useStickyLoading(
+    needsGeneration || generateMutation.isPending,
+    800
+  );
+
   useEffect(() => {
     if (!needsGeneration) return;
     if (alreadyPending.current) return;
@@ -248,7 +258,7 @@ export default function BookScreen() {
         alreadyPending.current = false;
         // BUG-81: Show user-visible error feedback on initial generation failure
         platformAlert("Couldn't build this book", formatApiError(error), [
-          { text: 'OK' },
+          { text: t('common.ok') },
         ]);
       },
     });
@@ -1020,7 +1030,7 @@ export default function BookScreen() {
   }
 
   // 3. Generation in progress
-  if (needsGeneration || generateMutation.isPending) {
+  if (showGenerating) {
     return (
       <View
         className="flex-1 bg-background items-center justify-center px-5"

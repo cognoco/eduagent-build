@@ -62,3 +62,13 @@ export const orphanPersistFailedEventSchema = z.object({
 export type OrphanPersistFailedEvent = z.infer<
   typeof orphanPersistFailedEventSchema
 >;
+
+export const appNotificationSuppressedEventSchema = z.object({
+  profileId: z.string().uuid(),
+  notificationType: z.enum(['daily_reminder', 'review_reminder']),
+  reason: z.string(),
+  timestamp: z.string().datetime(),
+});
+export type AppNotificationSuppressedEvent = z.infer<
+  typeof appNotificationSuppressedEventSchema
+>;

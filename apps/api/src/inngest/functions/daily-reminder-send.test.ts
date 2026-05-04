@@ -23,6 +23,11 @@ jest.mock('../../services/settings', () => ({
     mockGetRecentNotificationCount(...args),
 }));
 
+const mockCaptureException = jest.fn();
+jest.mock('../../services/sentry', () => ({
+  captureException: (...args: unknown[]) => mockCaptureException(...args),
+}));
+
 jest.mock('../client', () => ({
   inngest: {
     createFunction: jest.fn((_config, _trigger, handler) => ({
@@ -226,5 +231,82 @@ describe('[BUG-699-FOLLOWUP] daily-reminder-send 24h push dedup', () => {
       profileId: 'p-1',
       ticketId: 'ticket-002',
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [BUG-976 / CCR-PR129-M-3] getRecentNotificationCount DB failure — fail closed
+//
+// Pre-fix the call had no try/catch; a DB blip would propagate uncaught,
+// causing Inngest to retry the function indefinitely and block the
+// notification pipeline. Post-fix the failure is captured to Sentry and the
+// function returns skipped:dedup_check_failed so retries are bounded.
+// ---------------------------------------------------------------------------
+
+describe('[BUG-976] daily-reminder-send getRecentNotificationCount DB failure — fail closed', () => {
+  const mockDb = { query: {} };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetStepDatabase.mockReturnValue(mockDb);
+    mockFormatDailyReminderBody.mockReturnValue('Keep your streak going!');
+  });
+
+  it('[BREAK] calls captureException and returns skipped:dedup_check_failed when getRecentNotificationCount throws', async () => {
+    const dbError = new Error('connection timeout');
+    mockGetRecentNotificationCount.mockRejectedValueOnce(dbError);
+
+    const { result, mockStep } = await executeHandler({
+      profileId: 'p-err',
+      streakDays: 5,
+    });
+
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      dbError,
+      expect.objectContaining({
+        profileId: 'p-err',
+        extra: expect.objectContaining({
+          context: 'daily-reminder-send:getRecentNotificationCount',
+        }),
+      })
+    );
+    expect(mockSendPushNotification).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      status: 'skipped',
+      reason: 'dedup_check_failed',
+      profileId: 'p-err',
+    });
+    // CLAUDE.md "Silent recovery without escalation is banned": the
+    // dedup_check_failed path must dispatch a structured event so the
+    // suppression is queryable in 24h dashboards. Sentry alone is not enough.
+    expect(mockStep.sendEvent).toHaveBeenCalledWith(
+      'notify-notification-suppressed',
+      expect.objectContaining({
+        name: 'app/notification.suppressed',
+        data: expect.objectContaining({
+          profileId: 'p-err',
+          notificationType: 'daily_reminder',
+          reason: 'dedup_check_failed',
+        }),
+      })
+    );
+  });
+
+  it('does NOT call captureException on the happy path', async () => {
+    mockGetRecentNotificationCount.mockResolvedValueOnce(0);
+    mockSendPushNotification.mockResolvedValueOnce({
+      sent: true,
+      ticketId: 'ticket-ok',
+    });
+
+    const { mockStep } = await executeHandler({
+      profileId: 'p-ok',
+      streakDays: 1,
+    });
+
+    expect(mockCaptureException).not.toHaveBeenCalled();
+    expect(mockSendPushNotification).toHaveBeenCalled();
+    // Happy path must not emit the suppression escalation event.
+    expect(mockStep.sendEvent).not.toHaveBeenCalled();
   });
 });

@@ -55,6 +55,7 @@ import {
 import { feedbackDeliveryFailed } from './functions/feedback-delivery-failed';
 import { orphanPersistFailed } from './functions/orphan-persist-failed';
 import { interviewPersistCurriculum } from './functions/interview-persist-curriculum';
+import { notificationSuppressedObserve } from './functions/notification-suppressed-observe';
 
 export {
   inngest,
@@ -98,6 +99,7 @@ export {
   askSilentClassifyOnFailure,
   orphanPersistFailed,
   interviewPersistCurriculum,
+  notificationSuppressedObserve,
 };
 
 // All Inngest functions to register with the serve handler
@@ -143,4 +145,5 @@ export const functions = [
   askSilentClassifyOnFailure,
   orphanPersistFailed,
   interviewPersistCurriculum,
+  notificationSuppressedObserve,
 ];

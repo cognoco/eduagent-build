@@ -50,7 +50,8 @@ describe('clearProfileSecureStorageOnSignOut [BUG-723 / SEC-7]', () => {
       expect(calledWith).toEqual(
         expect.arrayContaining([
           `earlyAdopterDismissed_${id}`,
-          `bookmark-nudge-shown:${id}`,
+          // sanitizeSecureStoreKey replaces colon with _ in bookmark key
+          `bookmark-nudge-shown_${id}`,
           `dictation-pace-${id}`,
           `dictation-punctuation-${id}`,
           `rating-recall-success-count-${id}`,

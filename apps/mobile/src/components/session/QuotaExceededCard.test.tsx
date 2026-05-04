@@ -29,7 +29,7 @@ describe('QuotaExceededCard', () => {
     render(<QuotaExceededCard details={ownerDetails} isOwner={true} />);
 
     screen.getByTestId('quota-exceeded-card');
-    screen.getByText(/used 100 of 100/i);
+    screen.getByText("You've used 100 of 100 questions this month.");
     screen.getByTestId('quota-upgrade-btn');
   });
 
@@ -43,7 +43,7 @@ describe('QuotaExceededCard', () => {
     render(<QuotaExceededCard details={ownerDetails} isOwner={false} />);
 
     screen.getByTestId('quota-exceeded-card');
-    screen.getByText(/ask your parent/i);
+    screen.getByText('Ask parent');
     expect(screen.queryByTestId('quota-upgrade-btn')).toBeNull();
   });
 
@@ -51,8 +51,8 @@ describe('QuotaExceededCard', () => {
     const dailyDetails = { ...ownerDetails, reason: 'daily' as const };
     render(<QuotaExceededCard details={dailyDetails} isOwner={true} />);
 
-    screen.getByText(/today's limit/i);
-    screen.getByText(/used 10 of 10/i);
+    screen.getByText('Daily limit reached');
+    screen.getByText("You've used 10 of 10 questions today.");
   });
 
   // H5: Child variant must have a navigation escape
@@ -60,7 +60,7 @@ describe('QuotaExceededCard', () => {
     render(<QuotaExceededCard details={ownerDetails} isOwner={false} />);
 
     screen.getByTestId('quota-go-home-btn');
-    screen.getByText(/go home/i);
+    screen.getByText('Go Home');
   });
 
   it('child view: Go home button navigates to home screen [H5]', () => {

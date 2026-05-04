@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import type {
   useParkingLot,
   useAddParkingLotItem,
@@ -38,6 +39,7 @@ export function ParkingLotModal({
   addParkingLotItem,
   insetsBottom,
 }: ParkingLotModalProps) {
+  const { t } = useTranslation();
   return (
     <Modal
       visible={visible}
@@ -57,22 +59,21 @@ export function ParkingLotModal({
             <View className="w-10 h-1 rounded-full bg-text-secondary/30" />
           </View>
           <Text className="text-h3 font-semibold text-text-primary mb-2">
-            Parking lot
+            {t('session.parkingLot.title')}
           </Text>
           <Text className="text-body-sm text-text-secondary mb-4">
-            Save side questions for later so you can stay focused on this
-            session.
+            {t('session.parkingLot.description')}
           </Text>
 
           <TextInput
             value={parkingLotDraft}
             onChangeText={setParkingLotDraft}
-            placeholder="What do you want to come back to later?"
+            placeholder={t('session.parkingLot.placeholder')}
             className="bg-surface rounded-input px-4 py-3 text-body text-text-primary"
             multiline
             testID="parking-lot-input"
-            accessibilityLabel="Parking lot note"
-            accessibilityHint="Type a question or idea you want to come back to later"
+            accessibilityLabel={t('session.parkingLot.inputLabel')}
+            accessibilityHint={t('session.parkingLot.inputHint')}
           />
 
           <Pressable
@@ -95,7 +96,7 @@ export function ParkingLotModal({
                     : 'text-body font-semibold text-text-secondary'
                 }
               >
-                Save question
+                {t('session.parkingLot.saveButton')}
               </Text>
             )}
           </Pressable>
@@ -112,7 +113,7 @@ export function ParkingLotModal({
                   {item.question}
                 </Text>
                 <Text className="text-caption text-text-secondary mt-1">
-                  Saved for later
+                  {t('session.parkingLot.savedForLater')}
                 </Text>
               </View>
             ))}
@@ -122,7 +123,7 @@ export function ParkingLotModal({
               </View>
             ) : parkingLot.data?.length ? null : (
               <Text className="text-body-sm text-text-secondary mt-3">
-                Nothing parked yet.
+                {t('session.parkingLot.emptyState')}
               </Text>
             )}
           </ScrollView>
@@ -130,11 +131,11 @@ export function ParkingLotModal({
           <Pressable
             onPress={onClose}
             accessibilityRole="button"
-            accessibilityLabel="Close"
+            accessibilityLabel={t('common.close')}
             className="items-center justify-center min-h-[44px] py-3 mt-3"
           >
             <Text className="text-body font-semibold text-text-secondary">
-              Close
+              {t('common.close')}
             </Text>
           </Pressable>
         </View>
@@ -174,6 +175,7 @@ export function TopicSwitcherModal({
   insetsBottom,
   isSwitching = false,
 }: TopicSwitcherModalProps) {
+  const { t } = useTranslation();
   return (
     <Modal
       visible={visible}
@@ -190,11 +192,10 @@ export function TopicSwitcherModal({
             <View className="w-10 h-1 rounded-full bg-text-secondary/30" />
           </View>
           <Text className="text-h3 font-semibold text-text-primary mb-2">
-            Switch topic
+            {t('session.topicSwitcher.title')}
           </Text>
           <Text className="text-body-sm text-text-secondary mb-4">
-            Start a new learning thread in another topic without losing this
-            conversation.
+            {t('session.topicSwitcher.description')}
           </Text>
 
           <ScrollView
@@ -216,7 +217,10 @@ export function TopicSwitcherModal({
                   }
                   testID={`switch-subject-${subject.id}`}
                   accessibilityRole="button"
-                  accessibilityLabel={`Filter by subject ${subject.name}`}
+                  accessibilityLabel={t(
+                    'session.topicSwitcher.filterBySubjectLabel',
+                    { name: subject.name }
+                  )}
                   accessibilityState={{ selected: isSelected }}
                 >
                   <Text
@@ -276,11 +280,11 @@ export function TopicSwitcherModal({
           <Pressable
             onPress={onClose}
             accessibilityRole="button"
-            accessibilityLabel="Close"
+            accessibilityLabel={t('common.close')}
             className="items-center justify-center min-h-[44px] py-3 mt-3"
           >
             <Text className="text-body font-semibold text-text-secondary">
-              Close
+              {t('common.close')}
             </Text>
           </Pressable>
         </View>

@@ -2,6 +2,11 @@ import { render, screen, fireEvent } from '@testing-library/react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
+jest.mock(
+  'react-i18next',
+  () => require('../../../test-utils/mock-i18n').i18nMock
+);
+
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
 
@@ -103,7 +108,9 @@ describe('SubjectSettingsScreen', () => {
   it('renders the description text', () => {
     render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
-    screen.getByText(/Choose a domain for analogies/);
+    screen.getByText(
+      "Choose a domain for analogies. The tutor will prefer analogies from this world when explaining concepts, but won't force them when a direct explanation is clearer."
+    );
   });
 
   it('renders the analogy domain picker', () => {

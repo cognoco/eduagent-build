@@ -190,7 +190,7 @@ export function errorHasCode(error: unknown, code: string): boolean {
       return true;
     }
     // [BUG-100] ForbiddenError preserves the server's error code in .apiCode
-    // (e.g. 'SUBJECT_INACTIVE') while .code stays 'FORBIDDEN' for HTTP-level typing.
+    // (e.g. 'SUBJECT_INACTIVE'). The HTTP-level FORBIDDEN marker lives on .errorCode.
     if (
       'apiCode' in error &&
       (error as { apiCode?: unknown }).apiCode === code

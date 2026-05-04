@@ -16,11 +16,12 @@ export function useRetryFiling() {
       const res = await client.sessions[':sessionId']['retry-filing'].$post({
         param: { sessionId },
       });
-      await assertOk(res);
-      // assertOk throws on non-2xx but is typed `Promise<void>`, not an
-      // `asserts` predicate, so TS cannot narrow the RPC response union here.
-      // The cast pins the success-shape and matches the function return type.
-      return (await res.json()) as { session: LearningSession };
+      // [BUG-982] assertOk now returns the response narrowed to the success
+      // branch (T & { ok: true }). The cast pins the success-body shape:
+      // Hono RPC ClientResponse has multiple success-status members, so the
+      // union still resolves to a wider type than the function signature.
+      const okRes = await assertOk(res);
+      return (await okRes.json()) as { session: LearningSession };
     },
     onSuccess: (_data, { sessionId }) => {
       void queryClient.invalidateQueries({ queryKey: ['session', sessionId] });

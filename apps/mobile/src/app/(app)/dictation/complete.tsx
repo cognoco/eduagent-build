@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { platformAlert } from '../../../lib/platform-alert';
@@ -19,6 +20,7 @@ import {
 // "Check my writing" records with reviewed=true + mistakeCount on the review screen.
 
 export default function DictationCompleteScreen(): React.ReactElement {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
@@ -88,21 +90,20 @@ export default function DictationCompleteScreen(): React.ReactElement {
           className="text-h3 font-semibold text-text-primary mt-4 text-center"
           accessibilityRole="header"
         >
-          No dictation to finish
+          {t('dictation.complete.noSessionTitle')}
         </Text>
         <Text className="text-body text-text-secondary mt-2 text-center">
-          Start a dictation first — your completion screen will appear here when
-          you&apos;ve finished one.
+          {t('dictation.complete.noSessionMessage')}
         </Text>
         <Pressable
           onPress={() => router.replace('/(app)/dictation' as never)}
           className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center mt-6"
           accessibilityRole="button"
-          accessibilityLabel="Start a dictation"
+          accessibilityLabel={t('dictation.complete.startDictation')}
           testID="dictation-complete-missing-start"
         >
           <Text className="text-body font-semibold text-text-inverse">
-            Start a dictation
+            {t('dictation.complete.startDictation')}
           </Text>
         </Pressable>
       </View>
@@ -132,9 +133,9 @@ export default function DictationCompleteScreen(): React.ReactElement {
       assetMimeType = asset?.mimeType;
     } catch {
       platformAlert(
-        'Camera error',
-        'Could not open camera. Please try again.',
-        [{ text: 'OK' }]
+        t('dictation.complete.cameraErrorTitle'),
+        t('dictation.complete.cameraErrorMessage'),
+        [{ text: t('common.ok') }]
       );
       return;
     }
@@ -163,9 +164,9 @@ export default function DictationCompleteScreen(): React.ReactElement {
       }
     } catch {
       platformAlert(
-        'Photo error',
-        'Could not read the photo. Please try again.',
-        [{ text: 'OK' }]
+        t('dictation.complete.photoErrorTitle'),
+        t('dictation.complete.photoErrorMessage'),
+        [{ text: t('common.ok') }]
       );
       return;
     }
@@ -194,15 +195,14 @@ export default function DictationCompleteScreen(): React.ReactElement {
     } catch (err) {
       // [BUG-692] Don't pop an alert if the user already navigated away.
       if (reviewCancelledRef.current) return;
-      const message =
-        err instanceof Error ? err.message : 'Something went wrong.';
-      platformAlert('Review failed', message, [
+      const message = err instanceof Error ? err.message : t('errors.generic');
+      platformAlert(t('dictation.complete.reviewFailedTitle'), message, [
         {
-          text: 'Try again',
+          text: t('dictation.complete.tryAgain'),
           onPress: () => void handleCheckWriting(),
         },
         {
-          text: 'Skip',
+          text: t('dictation.complete.skip'),
           style: 'cancel',
           onPress: () => {
             reviewCancelledRef.current = true;
@@ -238,14 +238,14 @@ export default function DictationCompleteScreen(): React.ReactElement {
       const message =
         err instanceof Error && err.message
           ? err.message
-          : 'We couldn\u2019t save your dictation result.';
-      platformAlert('Couldn\u2019t save your result', message, [
+          : t('dictation.complete.couldNotSaveDictation');
+      platformAlert(t('dictation.complete.couldNotSaveTitle'), message, [
         {
-          text: 'Retry',
+          text: t('common.retry'),
           onPress: () => void handleDone(),
         },
         {
-          text: 'Continue without saving',
+          text: t('dictation.complete.continueWithoutSaving'),
           style: 'cancel',
           onPress: () => router.replace('/(app)/practice' as never),
         },
@@ -270,7 +270,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
                 className="text-body text-danger text-center mb-4"
                 testID="review-timeout-error"
               >
-                That took too long — try again
+                {t('dictation.complete.tookTooLong')}
               </Text>
               <Pressable
                 onPress={() => {
@@ -280,11 +280,13 @@ export default function DictationCompleteScreen(): React.ReactElement {
                 }}
                 className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center mb-3"
                 accessibilityRole="button"
-                accessibilityLabel="Retry checking writing"
+                accessibilityLabel={t(
+                  'dictation.complete.retryCheckingWriting'
+                )}
                 testID="review-timeout-retry"
               >
                 <Text className="text-text-inverse font-semibold text-body">
-                  Try again
+                  {t('common.tryAgain')}
                 </Text>
               </Pressable>
             </>
@@ -292,7 +294,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
             <>
               <ActivityIndicator size="large" color={colors.primary} />
               <Text className="text-body text-text-secondary mt-4 text-center">
-                Checking your writing…
+                {t('dictation.complete.checkingWriting')}
               </Text>
             </>
           )}
@@ -305,11 +307,11 @@ export default function DictationCompleteScreen(): React.ReactElement {
             }}
             className="mt-4 py-2 px-4 min-h-[44px] items-center justify-center"
             accessibilityRole="button"
-            accessibilityLabel="Cancel checking writing and go back"
+            accessibilityLabel={t('dictation.complete.cancelCheckingWriting')}
             testID="review-cancel"
           >
             <Text className="text-body-sm font-semibold text-text-secondary">
-              Cancel
+              {t('common.cancel')}
             </Text>
           </Pressable>
         </>
@@ -320,10 +322,10 @@ export default function DictationCompleteScreen(): React.ReactElement {
             className="text-h2 font-bold text-text-primary mt-4 text-center"
             accessibilityRole="header"
           >
-            Well done!
+            {t('dictation.complete.wellDone')}
           </Text>
           <Text className="text-body text-text-secondary mt-2 text-center">
-            Want to check your work?
+            {t('dictation.complete.wantToCheck')}
           </Text>
 
           <View className="w-full gap-3 mt-8">
@@ -332,12 +334,12 @@ export default function DictationCompleteScreen(): React.ReactElement {
               className="bg-primary rounded-xl py-4 items-center"
               testID="complete-check-writing"
               accessibilityRole="button"
-              accessibilityLabel="Check my writing"
+              accessibilityLabel={t('dictation.complete.checkMyWriting')}
             >
               <View className="flex-row items-center">
                 <Ionicons name="camera" size={20} color={colors.textInverse} />
                 <Text className="text-text-inverse font-semibold text-body ml-2">
-                  Check my writing
+                  {t('dictation.complete.checkMyWriting')}
                 </Text>
               </View>
             </Pressable>
@@ -348,13 +350,13 @@ export default function DictationCompleteScreen(): React.ReactElement {
               className="rounded-xl py-4 items-center bg-surface-elevated"
               testID="complete-done"
               accessibilityRole="button"
-              accessibilityLabel="I'm done"
+              accessibilityLabel={t('dictation.complete.imDone')}
             >
               {recordResult.isPending ? (
                 <ActivityIndicator size="small" color={colors.primary} />
               ) : (
                 <Text className="font-semibold text-body text-text-primary">
-                  I'm done
+                  {t('dictation.complete.imDone')}
                 </Text>
               )}
             </Pressable>
@@ -364,10 +366,10 @@ export default function DictationCompleteScreen(): React.ReactElement {
               className="py-3 items-center"
               testID="complete-try-again"
               accessibilityRole="button"
-              accessibilityLabel="Try another dictation"
+              accessibilityLabel={t('dictation.complete.tryAnotherDictation')}
             >
               <Text className="text-body-sm text-text-muted">
-                Try another dictation
+                {t('dictation.complete.tryAnotherDictation')}
               </Text>
             </Pressable>
           </View>

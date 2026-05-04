@@ -1417,6 +1417,67 @@ describe('session routes', () => {
       );
     });
 
+    // [BUG-950] Freeform/guided chat used to surface a generic 500
+    // ("streamExchange threw") whenever the LLM failed *before* any chunk
+    // had been streamed. session-exchange wraps that failure as
+    // `LlmStreamError(cause)`, and the global onError handler in
+    // apps/api/src/index.ts unwraps it so typed providers (UpstreamLlmError →
+    // 502, anything else → 503 LLM_UNAVAILABLE) get classified correctly
+    // instead of falling through to the bare 500.
+    it('[BUG-950] LlmStreamError wrapping UpstreamLlmError surfaces as 502', async () => {
+      const { LlmStreamError, UpstreamLlmError } =
+        jest.requireActual('@eduagent/schemas');
+      (streamMessage as jest.Mock).mockRejectedValueOnce(
+        new LlmStreamError(
+          'streamExchange threw',
+          new UpstreamLlmError('Anthropic 503 — upstream LLM unavailable')
+        )
+      );
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'Hello' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(502);
+      const body = await res.json();
+      expect(body).toMatchObject({ code: 'UPSTREAM_ERROR' });
+      // Quota refund still fires — user must not be charged for a no-op.
+      expect(mockIncrementQuota).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-1'
+      );
+    });
+
+    it('[BUG-950] LlmStreamError wrapping a generic Error surfaces as 503 LLM_UNAVAILABLE', async () => {
+      const { LlmStreamError } = jest.requireActual('@eduagent/schemas');
+      (streamMessage as jest.Mock).mockRejectedValueOnce(
+        new LlmStreamError(
+          'streamExchange threw',
+          new Error('envelope parse rejected before first chunk')
+        )
+      );
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'Hello' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(503);
+      const body = await res.json();
+      expect(body).toMatchObject({ code: 'LLM_UNAVAILABLE' });
+    });
+
     // [BUG-666 / S-7] When the SSE stream is abandoned mid-flight — i.e.
     // streamMessage returned but onComplete (which drains rawResponsePromise,
     // parses the envelope, and persists the user_message + ai_response in a

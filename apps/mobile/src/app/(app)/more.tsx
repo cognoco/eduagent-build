@@ -7,6 +7,7 @@ import {
   Switch,
   Linking,
   Share,
+  Modal,
 } from 'react-native';
 import { useState, useCallback } from 'react';
 import { platformAlert } from '../../lib/platform-alert';
@@ -46,6 +47,16 @@ import { ACCOMMODATION_OPTIONS } from '../../lib/accommodation-options';
 import { formatApiError } from '../../lib/format-api-error';
 import { track } from '../../lib/analytics';
 import { FAMILY_HOME_PATH } from '../../lib/navigation';
+import { useTranslation } from 'react-i18next';
+import { FEATURE_FLAGS } from '../../lib/feature-flags';
+import i18next, {
+  SUPPORTED_LANGUAGES,
+  LANGUAGE_LABELS,
+  setStoredLanguage,
+  type SupportedLanguage,
+} from '../../i18n';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { useThemeColors } from '../../lib/theme';
 
 function SettingsRow({
   label,
@@ -84,20 +95,26 @@ function ToggleRow({
   value,
   onToggle,
   disabled,
+  testID,
 }: {
   label: string;
   value: boolean;
   onToggle: (v: boolean) => void;
   disabled?: boolean;
+  testID?: string;
 }) {
   return (
-    <View className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3 mb-2">
+    <View
+      className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3 mb-2"
+      testID={testID}
+    >
       <Text className="text-body text-text-primary">{label}</Text>
       <Switch
         value={value}
         onValueChange={onToggle}
         disabled={disabled}
         accessibilityLabel={label}
+        testID={testID ? `${testID}-switch` : undefined}
       />
     </View>
   );
@@ -107,35 +124,16 @@ function ToggleRow({
 // inline (rather than imported from onboarding/language-picker.tsx) to avoid
 // Expo Router treating a shared helper under app/(app)/ as a route. The source
 // of truth for the allowed codes is packages/schemas/src/profiles.ts.
-const TUTOR_LANGUAGE_LABELS: Record<ConversationLanguage, string> = {
-  en: 'English',
-  cs: 'Czech',
-  de: 'German',
-  es: 'Spanish',
-  fr: 'French',
-  it: 'Italian',
-  pl: 'Polish',
-  pt: 'Portuguese',
+const TUTOR_LANGUAGE_KEYS: Record<ConversationLanguage, string> = {
+  en: 'more.tutorLanguageLabels.en',
+  cs: 'more.tutorLanguageLabels.cs',
+  de: 'more.tutorLanguageLabels.de',
+  es: 'more.tutorLanguageLabels.es',
+  fr: 'more.tutorLanguageLabels.fr',
+  it: 'more.tutorLanguageLabels.it',
+  pl: 'more.tutorLanguageLabels.pl',
+  pt: 'more.tutorLanguageLabels.pt',
 };
-
-const LEARNING_MODE_OPTIONS: {
-  mode: LearningMode;
-  title: string;
-  description: string;
-}[] = [
-  {
-    mode: 'casual',
-    title: 'Explorer',
-    description:
-      'Learn at your own pace. Your mentor is relaxed and encouraging. You earn points right away and can skip recaps.',
-  },
-  {
-    mode: 'serious',
-    title: 'Challenge mode',
-    description:
-      'Push yourself further. Your mentor keeps you on track. You earn points after proving you remember, and recaps help lock it in.',
-  },
-];
 
 function LearningModeOption({
   title,
@@ -152,6 +150,7 @@ function LearningModeOption({
   onPress: () => void;
   testID?: string;
 }) {
+  const { t } = useTranslation();
   return (
     <Pressable
       onPress={onPress}
@@ -169,7 +168,9 @@ function LearningModeOption({
           {title}
         </Text>
         {selected && (
-          <Text className="text-primary text-body font-semibold">Active</Text>
+          <Text className="text-primary text-body font-semibold">
+            {t('more.active')}
+          </Text>
         )}
       </View>
       <Text className="text-body-sm text-text-secondary mt-1">
@@ -182,6 +183,7 @@ function LearningModeOption({
 export default function MoreScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const themeColors = useThemeColors();
   const { signOut } = useAuth();
   const { user } = useUser();
   const { activeProfile, profiles } = useProfile();
@@ -219,6 +221,46 @@ export default function MoreScreen() {
   const { data: learnerProfile } = useLearnerProfile();
   const updateAccommodation = useUpdateAccommodationMode();
   const { openFeedback } = useFeedbackContext();
+  const { t } = useTranslation();
+
+  const [showLanguagePicker, setShowLanguagePicker] = useState(false);
+  const currentLanguage = i18next.language as SupportedLanguage;
+
+  const handleLanguageChange = useCallback(
+    async (lang: SupportedLanguage) => {
+      try {
+        await setStoredLanguage(lang);
+        await i18next.changeLanguage(lang);
+        setShowLanguagePicker(false);
+      } catch (err) {
+        console.warn('[more] language change failed:', err);
+        platformAlert(
+          t('settings.languageChangeFailedTitle'),
+          t('settings.languageChangeFailedMessage'),
+          [{ text: t('common.ok') }]
+        );
+      }
+    },
+    [t]
+  );
+
+  // LEARNING_MODE_OPTIONS defined inside component to access t()
+  const LEARNING_MODE_OPTIONS: {
+    mode: LearningMode;
+    title: string;
+    description: string;
+  }[] = [
+    {
+      mode: 'casual',
+      title: t('more.learningMode.casual.title'),
+      description: t('more.learningMode.casual.description'),
+    },
+    {
+      mode: 'serious',
+      title: t('more.learningMode.serious.title'),
+      description: t('more.learningMode.serious.description'),
+    },
+  ];
 
   const pushEnabled = notifPrefs?.pushEnabled ?? false;
   const weeklyDigest = notifPrefs?.weeklyProgressPush ?? false;
@@ -235,14 +277,14 @@ export default function MoreScreen() {
         {
           onError: () => {
             platformAlert(
-              'Could not update notification settings',
-              'Please try again.'
+              t('more.notifications.updateErrorTitle'),
+              t('more.errors.tryAgain')
             );
           },
         }
       );
     },
-    [updateNotifications, notifPrefs]
+    [updateNotifications, notifPrefs, t]
   );
 
   const handleToggleDigest = useCallback(
@@ -257,14 +299,14 @@ export default function MoreScreen() {
         {
           onError: () => {
             platformAlert(
-              'Could not update notification settings',
-              'Please try again.'
+              t('more.notifications.updateErrorTitle'),
+              t('more.errors.tryAgain')
             );
           },
         }
       );
     },
-    [updateNotifications, notifPrefs]
+    [updateNotifications, notifPrefs, t]
   );
 
   const handleSelectMode = useCallback(
@@ -277,12 +319,15 @@ export default function MoreScreen() {
       if (mode !== learningMode) {
         updateLearningMode.mutate(mode, {
           onError: () => {
-            platformAlert('Could not save setting', 'Please try again.');
+            platformAlert(
+              t('more.errors.couldNotSaveSetting'),
+              t('more.errors.tryAgain')
+            );
           },
         });
       }
     },
-    [learningMode, updateLearningMode]
+    [learningMode, updateLearningMode, t]
   );
 
   const handleSelectAccommodation = useCallback(
@@ -292,12 +337,15 @@ export default function MoreScreen() {
         { accommodationMode: mode },
         {
           onError: () => {
-            platformAlert('Could not save setting', 'Please try again.');
+            platformAlert(
+              t('more.errors.couldNotSaveSetting'),
+              t('more.errors.tryAgain')
+            );
           },
         }
       );
     },
-    [learnerProfile?.accommodationMode, updateAccommodation]
+    [learnerProfile?.accommodationMode, updateAccommodation, t]
   );
 
   const handleExport = useCallback(async () => {
@@ -330,7 +378,7 @@ export default function MoreScreen() {
         URL.revokeObjectURL(url);
       } else {
         const result = await Share.share({
-          title: 'MentoMate account data export',
+          title: t('more.export.shareTitle'),
           message: jsonString,
         });
         // [UX-DE-L4] iOS returns dismissedAction when the user cancels the
@@ -340,9 +388,9 @@ export default function MoreScreen() {
         }
       }
     } catch (err: unknown) {
-      platformAlert('Export failed', formatApiError(err));
+      platformAlert(t('more.export.errorTitle'), formatApiError(err));
     }
-  }, [exportData]);
+  }, [exportData, t]);
 
   const handleHelp = useCallback(async () => {
     try {
@@ -351,11 +399,11 @@ export default function MoreScreen() {
       );
     } catch {
       platformAlert(
-        'Contact support',
-        'Email support@mentomate.app for help with your account.'
+        t('more.help.contactSupportTitle'),
+        t('more.help.contactSupportMessage')
       );
     }
-  }, []);
+  }, [t]);
 
   const handleAddChild = useCallback(() => {
     if (!subscription) {
@@ -366,14 +414,14 @@ export default function MoreScreen() {
     // Whitelist: only family/pro may add children. Blocks free and plus.
     if (tier !== 'family' && tier !== 'pro') {
       platformAlert(
-        'Upgrade required',
-        'Adding child profiles requires a Family or Pro subscription.',
+        t('more.family.upgradeRequiredTitle'),
+        t('more.family.upgradeRequiredMessage'),
         [
           {
-            text: 'View plans',
+            text: t('more.family.viewPlans'),
             onPress: () => router.push('/(app)/subscription'),
           },
-          { text: 'Cancel', style: 'cancel' },
+          { text: t('common.cancel'), style: 'cancel' },
         ]
       );
       return;
@@ -381,25 +429,26 @@ export default function MoreScreen() {
 
     if (familyData && familyData.profileCount >= familyData.maxProfiles) {
       platformAlert(
-        'Profile limit reached',
-        `Your ${tier === 'pro' ? 'Pro' : 'Family'} plan supports up to ${
-          familyData.maxProfiles
-        } profiles.`,
+        t('more.family.profileLimitTitle'),
+        t('more.family.profileLimitMessage', {
+          plan: tier === 'pro' ? 'Pro' : 'Family',
+          max: familyData.maxProfiles,
+        }),
         tier === 'family'
           ? [
               {
-                text: 'View plans',
+                text: t('more.family.viewPlans'),
                 onPress: () => router.push('/(app)/subscription'),
               },
-              { text: 'OK', style: 'cancel' },
+              { text: t('common.cancel'), style: 'cancel' },
             ]
-          : [{ text: 'OK' }]
+          : [{ text: t('common.ok') }]
       );
       return;
     }
 
     router.push('/create-profile?for=child');
-  }, [subscription, familyData, router]);
+  }, [subscription, familyData, router, t]);
 
   const handleChildProgressNavigation = useCallback(
     (href: string) => {
@@ -423,7 +472,9 @@ export default function MoreScreen() {
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="px-5 pt-4 pb-2">
-        <Text className="text-h1 font-bold text-text-primary">More</Text>
+        <Text className="text-h1 font-bold text-text-primary">
+          {t('more.screenTitle')}
+        </Text>
       </View>
       <ScrollView
         className="flex-1 px-5"
@@ -439,12 +490,12 @@ export default function MoreScreen() {
           className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-1 mt-4"
           testID="learning-mode-section-header"
         >
-          {`${displayName}'s Learning Mode`}
+          {t('more.learningMode.sectionHeader', { name: displayName })}
         </Text>
         <Text className="text-caption text-text-secondary mb-2">
           {activeProfile?.isOwner && linkedChildren.length > 0
-            ? "Applies to your own sessions. To change a child's, open their profile from the dashboard."
-            : 'Applies to your own learning sessions.'}
+            ? t('more.learningMode.subtitleWithChildren')
+            : t('more.learningMode.subtitle')}
         </Text>
         {activeProfile?.isOwner && linkedChildren.length === 1 ? (
           <Pressable
@@ -455,14 +506,20 @@ export default function MoreScreen() {
             }
             className="self-start mb-3"
             accessibilityRole="button"
-            accessibilityLabel={`Open ${
-              linkedChildren[0]?.displayName ?? 'your child'
-            }'s profile preferences`}
+            accessibilityLabel={t(
+              'more.learningMode.childPreferencesAccessLabel',
+              {
+                name:
+                  linkedChildren[0]?.displayName ?? t('more.family.yourChild'),
+              }
+            )}
             testID="learning-mode-child-link"
           >
             <Text className="text-caption font-semibold text-primary">
-              To change {linkedChildren[0]?.displayName ?? 'your child'}
-              {"'s"} preferences, open their profile →
+              {t('more.learningMode.childPreferencesLink', {
+                name:
+                  linkedChildren[0]?.displayName ?? t('more.family.yourChild'),
+              })}
             </Text>
           </Pressable>
         ) : null}
@@ -471,11 +528,13 @@ export default function MoreScreen() {
             onPress={() => handleChildProgressNavigation(FAMILY_HOME_PATH)}
             className="self-start mb-3"
             accessibilityRole="button"
-            accessibilityLabel="Open family preferences"
+            accessibilityLabel={t(
+              'more.family.openFamilyPreferencesAccessLabel'
+            )}
             testID="learning-mode-family-link"
           >
             <Text className="text-caption font-semibold text-primary">
-              To change a child&apos;s preferences, open Family →
+              {t('more.learningMode.familyPreferencesLink')}
             </Text>
           </Pressable>
         ) : null}
@@ -496,12 +555,12 @@ export default function MoreScreen() {
           className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-1 mt-6"
           testID="learning-accommodation-section-header"
         >
-          {`${displayName}'s Learning Accommodation`}
+          {t('more.accommodation.sectionHeader', { name: displayName })}
         </Text>
         <Text className="text-caption text-text-secondary mb-2">
           {activeProfile?.isOwner && linkedChildren.length > 0
-            ? "Applies to your own sessions. To change a child's, open their profile from the dashboard."
-            : 'Applies to your own learning sessions.'}
+            ? t('more.learningMode.subtitleWithChildren')
+            : t('more.learningMode.subtitle')}
         </Text>
         {ACCOMMODATION_OPTIONS.map((opt) => (
           <LearningModeOption
@@ -520,12 +579,16 @@ export default function MoreScreen() {
         {/* 3. What My Mentor Knows — shown after learning prefs, hidden for new learners */}
         {!hideMentorMemory ? (
           <>
-            <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6">
-              What your mentor knows
+            <Text
+              className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6"
+              testID="mentor-memory-section-header"
+            >
+              {t('more.mentorMemory.sectionHeader')}
             </Text>
             <SettingsRow
-              label="View & manage"
+              label={t('more.mentorMemory.viewAndManage')}
               onPress={() => router.push('/(app)/mentor-memory')}
+              testID="mentor-memory-link"
             />
           </>
         ) : null}
@@ -534,14 +597,14 @@ export default function MoreScreen() {
         {activeProfile?.isOwner && (
           <>
             <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6">
-              Family
+              {t('more.family.sectionHeader')}
             </Text>
             {linkedChildren.length > 0 && (
               <SettingsRow
-                label="Child progress"
-                value={`${linkedChildren.length} ${
-                  linkedChildren.length === 1 ? 'child' : 'children'
-                }`}
+                label={t('more.family.childProgress')}
+                value={t('more.family.childCount', {
+                  count: linkedChildren.length,
+                })}
                 onPress={() =>
                   router.push('/(app)/dashboard?returnTo=more' as never)
                 }
@@ -550,34 +613,40 @@ export default function MoreScreen() {
             <Pressable
               onPress={handleAddChild}
               className="bg-surface rounded-card px-4 py-3.5 mb-2"
-              accessibilityLabel="Add a child profile"
+              accessibilityLabel={t('more.family.addChildAccessLabel')}
               accessibilityRole="button"
               testID="add-child-link"
             >
               <Text className="text-body font-semibold text-text-primary">
-                Add a child
+                {t('more.family.addChild')}
               </Text>
               <Text className="text-body-sm text-text-secondary mt-1">
-                Create a profile so your child can learn with their own mentor
+                {t('more.family.addChildDescription')}
               </Text>
             </Pressable>
           </>
         )}
 
         {/* 5. Celebrations */}
-        <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6">
-          Your celebrations
+        <Text
+          className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6"
+          testID="celebrations-section-header"
+        >
+          {t('more.celebrations.sectionHeader')}
         </Text>
         <LearningModeOption
-          title="All celebrations"
-          description="Show every milestone, including quick wins"
+          title={t('more.celebrations.allTitle')}
+          description={t('more.celebrations.allDescription')}
           selected={celebrationLevel === 'all'}
           disabled={celebrationLoading || updateCelebrationLevel.isPending}
           onPress={() => {
             if (celebrationLevel !== 'all') {
               updateCelebrationLevel.mutate('all', {
                 onError: () => {
-                  platformAlert('Could not save setting', 'Please try again.');
+                  platformAlert(
+                    t('more.errors.couldNotSaveSetting'),
+                    t('more.errors.tryAgain')
+                  );
                 },
               });
             }
@@ -585,15 +654,18 @@ export default function MoreScreen() {
           testID="celebration-level-all"
         />
         <LearningModeOption
-          title="Big milestones only"
-          description="Keep Comet and Orion's Belt, skip the smaller pops"
+          title={t('more.celebrations.bigOnlyTitle')}
+          description={t('more.celebrations.bigOnlyDescription')}
           selected={celebrationLevel === 'big_only'}
           disabled={celebrationLoading || updateCelebrationLevel.isPending}
           onPress={() => {
             if (celebrationLevel !== 'big_only') {
               updateCelebrationLevel.mutate('big_only', {
                 onError: () => {
-                  platformAlert('Could not save setting', 'Please try again.');
+                  platformAlert(
+                    t('more.errors.couldNotSaveSetting'),
+                    t('more.errors.tryAgain')
+                  );
                 },
               });
             }
@@ -601,15 +673,18 @@ export default function MoreScreen() {
           testID="celebration-level-big-only"
         />
         <LearningModeOption
-          title="Off"
-          description="Track milestones quietly without animations"
+          title={t('more.celebrations.offTitle')}
+          description={t('more.celebrations.offDescription')}
           selected={celebrationLevel === 'off'}
           disabled={celebrationLoading || updateCelebrationLevel.isPending}
           onPress={() => {
             if (celebrationLevel !== 'off') {
               updateCelebrationLevel.mutate('off', {
                 onError: () => {
-                  platformAlert('Could not save setting', 'Please try again.');
+                  platformAlert(
+                    t('more.errors.couldNotSaveSetting'),
+                    t('more.errors.tryAgain')
+                  );
                 },
               });
             }
@@ -618,28 +693,33 @@ export default function MoreScreen() {
         />
 
         {/* 6. Notifications */}
-        <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6">
-          Notifications
+        <Text
+          className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6"
+          testID="notifications-section-header"
+        >
+          {t('more.notifications.sectionHeader')}
         </Text>
         <ToggleRow
-          label="Push notifications"
+          label={t('more.notifications.pushTitle')}
           value={pushEnabled}
           onToggle={handleTogglePush}
           disabled={notifLoading || updateNotifications.isPending}
+          testID="push-notifications-toggle"
         />
         <ToggleRow
-          label="Weekly progress digest"
+          label={t('more.notifications.weeklyDigestTitle')}
           value={weeklyDigest}
           onToggle={handleToggleDigest}
           disabled={notifLoading || updateNotifications.isPending}
+          testID="weekly-digest-toggle"
         />
 
         {/* 7. Account — identity, language, subscription only */}
         <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6">
-          Account
+          {t('more.account.sectionHeader')}
         </Text>
         <SettingsRow
-          label="Profile"
+          label={t('more.account.profile')}
           value={displayName}
           onPress={() => router.push('/profiles')}
         />
@@ -648,10 +728,10 @@ export default function MoreScreen() {
         {/* interview onboarding uses, with returnTo=settings so the picker's */}
         {/* onSave returns here instead of forward-routing into language-setup. */}
         <SettingsRow
-          label="Tutor language"
+          label={t('more.account.tutorLanguage')}
           value={
             activeProfile?.conversationLanguage
-              ? TUTOR_LANGUAGE_LABELS[activeProfile.conversationLanguage]
+              ? t(TUTOR_LANGUAGE_KEYS[activeProfile.conversationLanguage])
               : undefined
           }
           onPress={() =>
@@ -661,11 +741,96 @@ export default function MoreScreen() {
             })
           }
         />
+        {FEATURE_FLAGS.I18N_ENABLED && (
+          <SettingsRow
+            label={t('settings.appLanguage')}
+            value={LANGUAGE_LABELS[currentLanguage]?.native}
+            onPress={() => setShowLanguagePicker(true)}
+            testID="settings-app-language"
+          />
+        )}
+        {FEATURE_FLAGS.I18N_ENABLED && (
+          <Modal
+            visible={showLanguagePicker}
+            animationType="slide"
+            transparent
+            onRequestClose={() => setShowLanguagePicker(false)}
+          >
+            {/* Bottom-sheet picker — rendered outside the outer ScrollView so
+                row taps don't race the parent scroll on Android (the inline
+                Pressable list inside ScrollView pattern routinely lost taps).
+                Pressable backdrop dismisses on tap-outside. */}
+            <Pressable
+              className="flex-1 bg-black/50 justify-end"
+              onPress={() => setShowLanguagePicker(false)}
+              accessibilityLabel={t('common.close')}
+              testID="language-picker-backdrop"
+            >
+              <Pressable
+                onPress={(e) => e.stopPropagation()}
+                className="bg-background rounded-t-3xl px-5 pt-4 pb-8"
+                style={{ maxHeight: '85%' }}
+              >
+                <View className="items-center mb-3">
+                  <View className="w-12 h-1 bg-text-secondary/30 rounded-full" />
+                </View>
+                <View className="flex-row items-center justify-between mb-3">
+                  <Text className="text-h3 font-semibold text-text-primary">
+                    {t('settings.appLanguage')}
+                  </Text>
+                  <Pressable
+                    onPress={() => setShowLanguagePicker(false)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('common.close')}
+                    testID="language-picker-close"
+                    hitSlop={12}
+                  >
+                    <Ionicons
+                      name="close"
+                      size={24}
+                      color={themeColors.textSecondary}
+                    />
+                  </Pressable>
+                </View>
+                <ScrollView showsVerticalScrollIndicator={false}>
+                  {SUPPORTED_LANGUAGES.map((lang) => (
+                    <Pressable
+                      key={lang}
+                      onPress={() => void handleLanguageChange(lang)}
+                      className={`flex-row items-center justify-between p-4 rounded-xl mb-2 ${
+                        lang === currentLanguage
+                          ? 'bg-primary/10 border border-primary'
+                          : 'bg-surface'
+                      }`}
+                      testID={`language-option-${lang}`}
+                    >
+                      <View>
+                        <Text className="text-body font-medium text-text-primary">
+                          {LANGUAGE_LABELS[lang].native}
+                        </Text>
+                        <Text className="text-body-sm text-text-secondary">
+                          {LANGUAGE_LABELS[lang].english}
+                        </Text>
+                      </View>
+                      {lang === currentLanguage && (
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={24}
+                          color={themeColors.primary}
+                        />
+                      )}
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </Pressable>
+            </Pressable>
+          </Modal>
+        )}
         {/* [BUG-915] Hide Subscription in impersonation — billing is the
             parent account's, not the child profile's. */}
         {!isImpersonating && (
           <SettingsRow
-            label="Subscription"
+            label={t('more.account.subscription')}
             value={
               subscription
                 ? `${subscription.tier
@@ -680,31 +845,42 @@ export default function MoreScreen() {
 
         {/* 8. Other — support, legal, data management */}
         <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6">
-          Other
+          {t('more.other.sectionHeader')}
         </Text>
-        <SettingsRow label="Help & Support" onPress={() => void handleHelp()} />
-        <SettingsRow label="Report a Problem" onPress={openFeedback} />
         <SettingsRow
-          label="Privacy Policy"
+          label={t('more.other.helpAndSupport')}
+          onPress={() => void handleHelp()}
+          testID="more-row-help"
+        />
+        <SettingsRow
+          label={t('more.other.reportAProblem')}
+          onPress={openFeedback}
+        />
+        <SettingsRow
+          label={t('more.other.privacyPolicy')}
           onPress={() => router.push('/privacy')}
         />
         <SettingsRow
-          label="Terms of Service"
+          label={t('more.other.termsOfService')}
           onPress={() => router.push('/terms')}
         />
         {/* [BUG-915] Hide Export my data and Delete account in impersonation —
             both operate on the parent's underlying account. */}
         {!isImpersonating && (
           <SettingsRow
-            label="Export my data"
+            label={t('more.other.exportMyData')}
             onPress={exportData.isPending ? undefined : handleExport}
-            value={exportData.isPending ? 'Preparing export...' : undefined}
+            value={
+              exportData.isPending
+                ? t('more.export.preparingExport')
+                : undefined
+            }
             testID="more-row-export"
           />
         )}
         {!isImpersonating && (
           <SettingsRow
-            label="Delete account"
+            label={t('more.other.deleteAccount')}
             onPress={() => router.push('/delete-account')}
             testID="more-row-delete-account"
           />
@@ -751,8 +927,8 @@ export default function MoreScreen() {
                 await signOut();
               } catch {
                 platformAlert(
-                  'Could not sign out',
-                  'Please try again in a moment.'
+                  t('more.account.couldNotSignOut'),
+                  t('more.errors.tryAgainMoment')
                 );
                 setIsSigningOut(false);
               }
@@ -764,18 +940,18 @@ export default function MoreScreen() {
             }
             style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
             testID="sign-out-button"
-            accessibilityLabel="Sign out"
+            accessibilityLabel={t('more.account.signOut')}
             accessibilityRole="button"
           >
             <Text className="text-body font-semibold text-danger">
-              Sign out
+              {t('more.account.signOut')}
             </Text>
           </Pressable>
         )}
 
         <View className="mt-8 items-center">
           <Text className="text-caption text-text-secondary">
-            MentoMate v1.0.0
+            {t('more.appVersion')}
           </Text>
         </View>
       </ScrollView>

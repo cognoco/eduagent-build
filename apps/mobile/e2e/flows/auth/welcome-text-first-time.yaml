@@ -24,15 +24,19 @@ tags:
 # After clearState, SecureStore has no `hasSignedInBefore` key.
 # The sign-in screen MUST show first-time copy, not returning-user copy.
 
-# 2. Verify first-time heading is shown
-- assertVisible: "Welcome to MentoMate"
+# 2. Verify first-time heading is shown (id-based — copy-stable + i18n-stable)
+- assertVisible:
+    id: "sign-in-welcome-first-time"
 
 # 3. Verify first-time subtitle is shown
-- assertVisible: "Sign in to start learning"
+- assertVisible:
+    id: "sign-in-subtitle-first-time"
 
 # 4. Negative assertions: returning-user text must NOT appear
-- assertNotVisible: "Welcome back"
-- assertNotVisible: "Sign in to continue learning"
+- assertNotVisible:
+    id: "sign-in-welcome-returning"
+- assertNotVisible:
+    id: "sign-in-subtitle-returning"
 
 # 5. Verify the rest of the sign-in screen is intact (form fields, SSO, links)
 - assertVisible:
@@ -41,6 +45,14 @@ tags:
     id: "sign-in-email"
 - assertVisible:
     id: "sign-in-password"
+
+# [BUG-959] Sign in button + Sign up link sit below the fold on 1080x1920.
+- scrollUntilVisible:
+    element:
+      id: "sign-in-button"
+    direction: DOWN
+    timeout: 5000
+
 - assertVisible:
     id: "sign-in-button"
 - assertVisible: "Sign up"

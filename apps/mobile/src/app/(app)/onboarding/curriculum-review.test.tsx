@@ -7,6 +7,104 @@ import {
 } from '@testing-library/react-native';
 import React from 'react';
 
+// Translations table — mirrors what will be in en.json onboarding namespace once coordinator merges.
+// Keeps tests asserting on real English strings rather than i18n keys.
+const translations: Record<string, string> = {
+  'common.cancel': 'Cancel',
+  'common.save': 'Save',
+  'common.done': 'Done',
+  'common.continue': 'Continue',
+  'common.back': 'Back',
+  'common.close': 'Close',
+  'common.next': 'Next',
+  'common.retry': 'Retry',
+  'common.tryAgain': 'Try Again',
+  'common.goBack': 'Go Back',
+  'common.goHome': 'Go Home',
+  'onboarding.common.noSubjectSelected': 'No subject selected',
+  'onboarding.common.saving': 'Saving…',
+  'onboarding.common.skip': 'Skip',
+  'onboarding.curriculumReview.title': 'Your Curriculum',
+  'onboarding.curriculumReview.suggestChanges': 'Suggest changes',
+  'onboarding.curriculumReview.loadingTimeout.title': 'Still loading…',
+  'onboarding.curriculumReview.loadingTimeout.body':
+    'Loading your curriculum is taking longer than expected. Check your connection and try again.',
+  'onboarding.curriculumReview.loadingCurriculum': 'Loading curriculum...',
+  'onboarding.curriculumReview.loadError.title': "Couldn't load curriculum",
+  'onboarding.curriculumReview.loadError.body':
+    'Check your connection and try again.',
+  'onboarding.curriculumReview.generating.title': 'Building your curriculum…',
+  'onboarding.curriculumReview.generating.body':
+    'This usually takes about 10–20 seconds.',
+  'onboarding.curriculumReview.noCurriculum.title': 'No curriculum yet',
+  'onboarding.curriculumReview.noCurriculum.message':
+    'Complete the assessment interview to generate your learning path.',
+  'onboarding.curriculumReview.versionInfo':
+    'Version {{version}} — {{count}} topics',
+  'onboarding.curriculumReview.whyOrderLabel': 'Why is {{title}} in this order',
+  'onboarding.curriculumReview.whyOrder': 'Why this order?',
+  'onboarding.curriculumReview.explaining': 'Explaining...',
+  'onboarding.curriculumReview.skipTopicTitle': 'Skip this topic?',
+  'onboarding.curriculumReview.skipTopicBody':
+    'You can always bring it back later.',
+  'onboarding.curriculumReview.skipAction': 'Skip',
+  'onboarding.curriculumReview.skipErrorTitle': 'Could not skip topic',
+  'onboarding.curriculumReview.restoreErrorTitle': 'Could not restore topic',
+  'onboarding.curriculumReview.restoreLabel': 'Restore {{title}}',
+  'onboarding.curriculumReview.restore': 'Restore',
+  'onboarding.curriculumReview.addTopic': 'Add topic',
+  'onboarding.curriculumReview.placementCheck.mostSkipped':
+    'You skipped most of this curriculum',
+  'onboarding.curriculumReview.placementCheck.hint':
+    'Want a faster path? You can take a placement check, continue with the remaining advanced topics, or switch to a different subject.',
+  'onboarding.curriculumReview.placementCheck.takePlacement':
+    'Take placement check',
+  'onboarding.curriculumReview.placementCheck.continueAdvanced':
+    'Continue with advanced topics',
+  'onboarding.curriculumReview.placementCheck.chooseDifferent':
+    'Choose a different subject',
+  'onboarding.curriculumReview.startLearning': 'Start learning: {{title}}',
+  'onboarding.curriculumReview.exploreFirst': 'Explore first',
+  'onboarding.curriculumReview.continueToHome': 'Continue to home',
+  'onboarding.curriculumReview.challengeModal.title': 'Change your topics',
+  'onboarding.curriculumReview.challengeModal.body':
+    "Tell us what you'd change and we'll regenerate your learning path.",
+  'onboarding.curriculumReview.challengeModal.placeholder':
+    'e.g. I already know the basics, skip intro topics...',
+  'onboarding.curriculumReview.challengeModal.regenerate': 'Regenerate',
+  'onboarding.curriculumReview.addTopicModal.title': 'Add a topic',
+  'onboarding.curriculumReview.addTopicModal.body':
+    "Add something the generated curriculum missed. We'll suggest a clean title first, then you can edit before saving.",
+  'onboarding.curriculumReview.addTopicModal.topicLabel': 'Topic',
+  'onboarding.curriculumReview.addTopicModal.topicPlaceholder':
+    'e.g. Trigonometry, The French Revolution',
+  'onboarding.curriculumReview.addTopicModal.descriptionLabel': 'Description',
+  'onboarding.curriculumReview.addTopicModal.descriptionPlaceholder':
+    'Short description',
+  'onboarding.curriculumReview.addTopicModal.minutesLabel': 'Estimated minutes',
+  'onboarding.curriculumReview.addTopicModal.minutesPlaceholder': '30',
+  'onboarding.curriculumReview.addTopicModal.addTopic': 'Add topic',
+  'onboarding.curriculumReview.addTopicModal.preview': 'Preview',
+  'onboarding.curriculumReview.addTopicValidationError':
+    'Add a title, description, and estimated minutes.',
+  'onboarding.curriculumReview.updateFailedTitle': 'Curriculum update failed',
+};
+
+jest.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, opts?: Record<string, unknown>) => {
+      let val = translations[key] ?? key;
+      if (opts) {
+        Object.entries(opts).forEach(([k, v]) => {
+          val = val.replace(`{{${k}}}`, String(v));
+        });
+      }
+      return val;
+    },
+  }),
+  initReactI18next: { type: '3rdParty', init: () => undefined },
+}));
+
 const mockBack = jest.fn();
 const mockPush = jest.fn();
 const mockReplace = jest.fn();

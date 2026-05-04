@@ -1,5 +1,6 @@
 import { Pressable, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import type { QuotaExceededDetails } from '../../lib/api-client';
 
 export interface QuotaExceededCardProps {
@@ -16,9 +17,9 @@ export function QuotaExceededCard({
   isOwner,
 }: QuotaExceededCardProps): React.ReactElement {
   const router = useRouter();
+  const { t } = useTranslation();
 
   const isDailyLimit = details.reason === 'daily';
-  const limitLabel = isDailyLimit ? "today's limit" : "this month's limit";
 
   return (
     <View
@@ -27,29 +28,34 @@ export function QuotaExceededCard({
       accessibilityRole="alert"
     >
       <Text className="text-body font-semibold text-text-primary mb-1">
-        {isDailyLimit ? 'Daily limit reached' : 'Monthly limit reached'}
+        {isDailyLimit
+          ? t('session.quota.dailyLimitReached')
+          : t('session.quota.monthlyLimitReached')}
       </Text>
 
       {isOwner ? (
         <>
           <Text className="text-body-sm text-text-secondary mb-3">
             {isDailyLimit
-              ? `You've reached today's limit. Used ${details.usedToday} of ${
-                  details.dailyLimit ?? 0
-                } — resets at midnight.`
-              : `Used ${details.usedThisMonth} of ${details.monthlyLimit} this month.`}{' '}
-            Upgrade for more learning time.
+              ? t('session.quota.ownerDailyMessage', {
+                  used: String(details.usedToday),
+                  limit: String(details.dailyLimit ?? 0),
+                })
+              : t('session.quota.ownerMonthlyMessage', {
+                  used: String(details.usedThisMonth),
+                  limit: String(details.monthlyLimit),
+                })}
           </Text>
 
           <Pressable
             onPress={() => router.push('/(app)/subscription' as never)}
             className="bg-primary rounded-button py-3 items-center min-h-[44px] justify-center mb-2"
             accessibilityRole="button"
-            accessibilityLabel="Upgrade plan"
+            accessibilityLabel={t('session.quota.upgradePlan')}
             testID="quota-upgrade-btn"
           >
             <Text className="text-body-sm font-semibold text-text-inverse">
-              Upgrade plan
+              {t('session.quota.upgradePlan')}
             </Text>
           </Pressable>
 
@@ -58,11 +64,13 @@ export function QuotaExceededCard({
               onPress={() => router.push('/(app)/subscription' as never)}
               className="bg-surface-elevated rounded-button py-3 items-center min-h-[44px] justify-center"
               accessibilityRole="button"
-              accessibilityLabel="Top up credits"
+              accessibilityLabel={t('session.quota.topUpCredits')}
               testID="quota-topup-btn"
             >
               <Text className="text-body-sm font-semibold text-text-secondary">
-                Top up credits ({details.topUpCreditsRemaining} remaining)
+                {t('session.quota.topUpCreditsWithCount', {
+                  count: String(details.topUpCreditsRemaining),
+                })}
               </Text>
             </Pressable>
           )}
@@ -70,8 +78,9 @@ export function QuotaExceededCard({
       ) : (
         <>
           <Text className="text-body-sm text-text-secondary mb-3">
-            You've reached {limitLabel} for learning sessions. Ask your parent
-            for more learning time so you can keep going.
+            {isDailyLimit
+              ? t('session.quota.childDailyMessage')
+              : t('session.quota.childMonthlyMessage')}
           </Text>
 
           <View
@@ -79,7 +88,7 @@ export function QuotaExceededCard({
             testID="quota-ask-parent"
           >
             <Text className="text-body-sm text-text-secondary">
-              Let your parent know you need more learning time
+              {t('session.quota.askParent')}
             </Text>
           </View>
 
@@ -88,11 +97,11 @@ export function QuotaExceededCard({
             onPress={() => router.push('/(app)/home' as never)}
             className="bg-surface-elevated rounded-button py-3 items-center min-h-[44px] justify-center"
             accessibilityRole="button"
-            accessibilityLabel="Go to home screen"
+            accessibilityLabel={t('common.goHome')}
             testID="quota-go-home-btn"
           >
             <Text className="text-body-sm font-semibold text-text-secondary">
-              Go home
+              {t('common.goHome')}
             </Text>
           </Pressable>
         </>

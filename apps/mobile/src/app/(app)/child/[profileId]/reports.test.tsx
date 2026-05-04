@@ -1,5 +1,16 @@
 import { render, screen, fireEvent } from '@testing-library/react-native';
 
+jest.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, opts?: Record<string, unknown>) => {
+      if (opts && typeof opts === 'object') {
+        return `${key}:${JSON.stringify(opts)}`;
+      }
+      return key;
+    },
+  }),
+}));
+
 const mockReplace = jest.fn();
 const mockPush = jest.fn();
 const mockGoBackOrReplace = jest.fn();
@@ -64,7 +75,7 @@ describe('ChildReportsScreen', () => {
       render(<ChildReportsScreen />);
 
       screen.getByTestId('child-reports-empty');
-      screen.getByText(/Emma's first report/);
+      screen.getByTestId('child-reports-empty-time-context');
       expect(screen.queryByText('Your first report is on its way')).toBeNull();
     });
 
@@ -73,7 +84,7 @@ describe('ChildReportsScreen', () => {
 
       const button = screen.getByTestId('child-reports-empty-progress');
       expect(button).toBeTruthy();
-      screen.getByText("See Emma's progress now");
+      screen.getByText('parentView.reports.seeProgressNow:{"name":"Emma"}');
 
       fireEvent.press(button);
       expect(mockGoBackOrReplace).toHaveBeenCalledWith(
@@ -118,7 +129,9 @@ describe('ChildReportsScreen', () => {
 
       render(<ChildReportsScreen />);
 
-      screen.getByText("See Your child's progress now");
+      screen.getByText(
+        'parentView.reports.seeProgressNow:{"name":"parentView.index.yourChild"}'
+      );
     });
   });
 
@@ -133,7 +146,7 @@ describe('ChildReportsScreen', () => {
 
       render(<ChildReportsScreen />);
 
-      screen.getByText('Loading reports...');
+      screen.getByText('parentView.reports.loadingReports');
     });
   });
 
@@ -150,7 +163,7 @@ describe('ChildReportsScreen', () => {
       render(<ChildReportsScreen />);
 
       screen.getByTestId('child-reports-error');
-      screen.getByText("We couldn't load the reports");
+      screen.getByText('parentView.reports.couldNotLoadReports');
 
       fireEvent.press(screen.getByTestId('child-reports-error-retry'));
       expect(refetch).toHaveBeenCalled();
@@ -187,7 +200,7 @@ describe('ChildReportsScreen', () => {
       render(<ChildReportsScreen />);
 
       screen.getByTestId('report-card-report-001');
-      screen.getByText('New');
+      screen.getByText('parentView.reports.newBadge');
       screen.getByText('Sessions: 12');
     });
 
@@ -265,7 +278,7 @@ describe('ChildReportsScreen', () => {
 
       render(<ChildReportsScreen />);
       screen.getByTestId('report-card-report-002');
-      expect(screen.queryByText('New')).toBeNull();
+      expect(screen.queryByText('parentView.reports.newBadge')).toBeNull();
     });
   });
 

@@ -28,12 +28,14 @@ import {
 } from './curriculum';
 import { getProfileAge } from './profile';
 import type { LLMTier } from './subscription';
-import type {
-  InterviewContext,
-  InterviewResult,
-  OnboardingDraft,
-  ExchangeEntry,
-  DraftStatus,
+import {
+  interviewReadyToPersistEventSchema,
+  type InterviewReadyToPersistEvent,
+  type InterviewContext,
+  type InterviewResult,
+  type OnboardingDraft,
+  type ExchangeEntry,
+  type DraftStatus,
 } from '@eduagent/schemas';
 import {
   INTERVIEW_SYSTEM_PROMPT,
@@ -814,6 +816,47 @@ export async function claimDraftForPersisting(
       )
     )
     .returning({ id: onboardingDrafts.id });
+}
+
+// ---------------------------------------------------------------------------
+// Inngest dispatch helper — single authoritative source for the
+// 'app/interview.ready_to_persist' event and its idempotency-key format.
+// All four call sites in routes/interview.ts must use this function so the
+// key construction cannot drift independently.
+// ---------------------------------------------------------------------------
+
+export async function dispatchInterviewPersist(
+  payload: {
+    draftId: string;
+    profileId: string;
+    subjectId: string;
+    subjectName: string;
+    bookId?: string | null | undefined;
+  },
+  options: { isRetry?: boolean } = {}
+): Promise<void> {
+  // Retry path uses a fresh UUID, not Date.now(): two retries firing in the
+  // same millisecond would otherwise produce identical idempotency keys and
+  // Inngest would silently dedup the second send.
+  const idempotencyId = options.isRetry
+    ? `persist-${payload.draftId}-retry-${crypto.randomUUID()}`
+    : `persist-${payload.draftId}`;
+
+  const data: InterviewReadyToPersistEvent =
+    interviewReadyToPersistEventSchema.parse({
+      version: 1,
+      draftId: payload.draftId,
+      profileId: payload.profileId,
+      subjectId: payload.subjectId,
+      subjectName: payload.subjectName,
+      ...(payload.bookId != null ? { bookId: payload.bookId } : {}),
+    });
+
+  await inngest.send({
+    id: idempotencyId,
+    name: 'app/interview.ready_to_persist',
+    data,
+  });
 }
 
 // ---------------------------------------------------------------------------

@@ -25,6 +25,7 @@ export type UpgradeOption = QuotaExceededDetails['upgradeOptions'][number];
 
 export class QuotaExceededError extends Error {
   readonly code = 'QUOTA_EXCEEDED' as const;
+  readonly errorCode = 'QUOTA_EXCEEDED' as const;
   readonly details: QuotaExceededDetails;
 
   constructor(message: string, details: QuotaExceededDetails) {
@@ -47,6 +48,7 @@ export {
  * been permanently removed. Callers should navigate away rather than retry.
  */
 export class ResourceGoneError extends Error {
+  readonly errorCode = 'RESOURCE_GONE' as const;
   readonly code: string | undefined;
   readonly details: unknown;
 
@@ -68,6 +70,7 @@ export class ResourceGoneError extends Error {
  * Distinguishes network-layer failures from API-layer errors.
  */
 export class NetworkError extends Error {
+  readonly errorCode = 'NETWORK_ERROR' as const;
   override readonly cause: unknown;
 
   constructor(
@@ -87,6 +90,7 @@ export class NetworkError extends Error {
  * parsing raw JSON from Error.message.
  */
 export class UpstreamError extends Error {
+  readonly errorCode = 'UPSTREAM_ERROR' as const;
   readonly code: string;
   readonly status: number;
 

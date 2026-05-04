@@ -6,6 +6,7 @@
     "rootDir": "src",
     "jsx": "react-jsx",
     "noUnusedLocals": true,
+    "resolveJsonModule": true,
     "tsBuildInfoFile": "dist/tsconfig.app.tsbuildinfo"
   },
   "files": ["../../node_modules/@nx/expo/typings/svg.d.ts"],
@@ -35,6 +36,7 @@
     "**/*.tsx",
     "**/*.js",
     "**/*.jsx",
+    "src/**/*.json",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
   ],

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { View, ActivityIndicator, Text, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { ParentGateway, LearnerScreen } from '../../components/home';
 import { useCelebration } from '../../hooks/use-celebration';
 import {
@@ -24,6 +25,7 @@ function hasLinkedChildren(
 }
 
 export default function HomeScreen(): React.ReactElement {
+  const { t } = useTranslation();
   const router = useRouter();
   const { view } = useLocalSearchParams<{ view?: string }>();
   const { profiles, activeProfile, switchProfile, isLoading } = useProfile();
@@ -92,40 +94,39 @@ export default function HomeScreen(): React.ReactElement {
         testID="home-loading-timeout"
       >
         <Text className="text-body text-text-secondary text-center mb-4">
-          Taking longer than expected. Please check your connection and try
-          again.
+          {t('home.loadingTimeoutMessage')}
         </Text>
         <Pressable
           onPress={() => setLoadingTimedOut(false)}
           className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
           accessibilityRole="button"
-          accessibilityLabel="Retry loading"
+          accessibilityLabel={t('home.retryLoadingLabel')}
           testID="home-loading-retry"
         >
           <Text className="text-text-inverse text-body font-semibold">
-            Retry
+            {t('common.retry')}
           </Text>
         </Pressable>
         <Pressable
           onPress={() => router.replace('/(app)/library' as never)}
           className="mt-3 px-6 py-3 min-h-[48px] items-center justify-center"
           accessibilityRole="button"
-          accessibilityLabel="Go to Library"
+          accessibilityLabel={t('home.goToLibraryLabel')}
           testID="timeout-library-button"
         >
           <Text className="text-primary text-body font-medium">
-            Go to Library
+            {t('home.goToLibrary')}
           </Text>
         </Pressable>
         <Pressable
           onPress={() => router.replace('/(app)/more' as never)}
           className="px-6 py-3 min-h-[48px] items-center justify-center"
           accessibilityRole="button"
-          accessibilityLabel="More options"
+          accessibilityLabel={t('home.moreOptionsLabel')}
           testID="timeout-more-button"
         >
           <Text className="text-primary text-body font-medium">
-            More options
+            {t('home.moreOptions')}
           </Text>
         </Pressable>
       </View>
