@@ -194,24 +194,24 @@ describe('eslint governance rules — self-test', () => {
       'apps/api/src/routes/__selftest_g5.ts'
     );
 
-    it('flags `c.get("db").select()` inside a route', () => {
-      const result = lint(
-        routePath,
-        `export const handler = (c: any) => c.get('db').select();\n`
-      );
-      expect(
-        messageHits(result, 'Route files must not call .select').length
-      ).toBeGreaterThan(0);
-    });
-
-    it('flags `c.get("db").insert()` inside a route', () => {
-      const result = lint(
-        routePath,
-        `export const handler = (c: any) => c.get('db').insert();\n`
-      );
-      expect(
-        messageHits(result, 'Route files must not call .select').length
-      ).toBeGreaterThan(0);
-    });
+    // The G5 rule emits a single shared message
+    // ("Route files must not call .select/.insert/.update/.delete…") for all
+    // four operations. To prove each operation independently trips the rule,
+    // every test below lints a source containing ONLY that one call — so a
+    // non-zero hit count is necessarily attributable to the named operation.
+    for (const op of ['select', 'insert', 'update', 'delete'] as const) {
+      it(`flags \`c.get("db").${op}()\` inside a route`, () => {
+        const result = lint(
+          routePath,
+          `export const handler = (c: any) => c.get('db').${op}();\n`
+        );
+        expect(
+          messageHits(
+            result,
+            'Route files must not call .select/.insert/.update/.delete'
+          ).length
+        ).toBeGreaterThan(0);
+      });
+    }
   });
 });
