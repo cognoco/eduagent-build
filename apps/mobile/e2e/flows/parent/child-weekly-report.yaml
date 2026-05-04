@@ -1,0 +1,98 @@
+# Flow PARENT-13: Child Weekly Report Detail
+# Validates: parent navigates from child detail → reports → weekly report detail,
+#             sees hero card and all three metric cards, then returns to reports list.
+# Tags: nightly, parent
+# Seed: parent-with-weekly-report
+# Usage: ./e2e/scripts/seed-and-run.sh parent-with-weekly-report e2e/flows/parent/child-weekly-report.yaml
+#
+# testIDs verified against:
+#   apps/mobile/src/app/(app)/child/[profileId]/reports.tsx
+#     weekly-report-card-${report.id}  (line 148)
+#     child-reports-back               (line 91)
+#   apps/mobile/src/app/(app)/child/[profileId]/weekly-report/[weeklyReportId].tsx
+#     child-weekly-report-back         (line 144)
+#     child-weekly-report-hero         (line 189)
+#     child-weekly-report-metric-sessions (line 207)
+#     child-weekly-report-metric-minutes  (line 212)
+#     child-weekly-report-metric-topics   (line 220)
+appId: com.mentomate.app
+tags:
+  - nightly
+  - parent
+---
+# 1. Seed & sign in (parent-with-weekly-report seeds a parent account with
+#    a linked child who has at least one weekly report snapshot)
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "parent-with-weekly-report"
+
+# 2. Wait for parent dashboard
+- extendedWaitUntil:
+    visible:
+      id: "dashboard-scroll"
+    timeout: 15000
+
+# 3. Tap primary action on the seeded child card to open child detail
+- tapOn:
+    id: "dashboard-child-${CHILD_PROFILE_ID}-primary"
+
+# 4. Wait for child detail scroll view
+- extendedWaitUntil:
+    visible:
+      id: "child-detail-scroll"
+    timeout: 10000
+
+# 5. Scroll down to reveal the reports link (it may be below the fold)
+- scrollUntilVisible:
+    element:
+      id: "child-reports-link"
+    direction: DOWN
+    timeout: 10000
+
+# 6. Tap the reports link
+- tapOn:
+    id: "child-reports-link"
+
+# 7. Wait for the reports screen back button (screen-level indicator)
+- extendedWaitUntil:
+    visible:
+      id: "child-reports-back"
+    timeout: 10000
+
+- takeScreenshot: 01-reports-list
+
+# 8. Tap the seeded weekly report card
+#    weekly-report-card-${WEEKLY_REPORT_ID} is injected by seed-and-run.sh
+- tapOn:
+    id: "weekly-report-card-${WEEKLY_REPORT_ID}"
+
+# 9. Wait for the weekly report detail hero card
+- extendedWaitUntil:
+    visible:
+      id: "child-weekly-report-hero"
+    timeout: 10000
+
+# 10. Assert metric cards
+- assertVisible:
+    id: "child-weekly-report-metric-sessions"
+
+- assertVisible:
+    id: "child-weekly-report-metric-minutes"
+
+- assertVisible:
+    id: "child-weekly-report-metric-topics"
+
+- takeScreenshot: 02-weekly-report-detail
+
+# 11. Navigate back to reports list via the back button
+- tapOn:
+    id: "child-weekly-report-back"
+
+# 12. Confirm we are back on the reports list
+- extendedWaitUntil:
+    visible:
+      id: "child-reports-back"
+    timeout: 10000
+
+- takeScreenshot: 03-back-to-reports
