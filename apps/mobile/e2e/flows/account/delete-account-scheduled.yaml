@@ -1,0 +1,96 @@
+# Flow N8b: Delete Account — Scheduled Stage Smoke
+# Validates: scheduled-deletion stage UI: keep-account CTA, sign-out CTA, recovery flow.
+# Taps keep-account and verifies return to More with sign-out-button visible.
+# Tags: pr-blocking, account
+#
+# Journey: UX Journey 5 (Account Management)
+# Epics: Epic 5 (FR101-FR105)
+# Prerequisite: Account with deletionScheduledAt set (scenario: account-deletion-scheduled)
+#
+# testIDs verified against:
+#   - apps/mobile/src/app/delete-account.tsx (delete-account-scheduled, delete-account-keep,
+#     delete-account-sign-out)
+#   - apps/mobile/src/app/(app)/more.tsx (sign-out-button)
+appId: com.mentomate.app
+tags:
+  - pr-blocking
+  - account
+---
+# 1. Seed & sign in with deletion-scheduled account
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "account-deletion-scheduled"
+      API_URL: ${API_URL}
+
+# 2. Verify home screen loaded (deletion-scheduled account still has access during grace period)
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 15000
+
+# 3. Navigate to More tab
+- tapOn:
+    text: "More"
+
+# 4. Wait for More screen to load
+- extendedWaitUntil:
+    visible:
+      text: "More"
+    timeout: 10000
+
+# 5. Scroll to find Delete account row
+- scrollUntilVisible:
+    element:
+      text: "Delete account"
+    direction: DOWN
+    timeout: 15000
+
+# 6. Tap Delete account
+- tapOn:
+    text: "Delete account"
+
+# 7. Wait for delete account screen to open
+- extendedWaitUntil:
+    visible:
+      text: "Delete account"
+    timeout: 10000
+
+# 8. The account-deletion-scheduled seed pre-sets deletionScheduledAt, so the screen
+#    boots directly into the 'scheduled' stage (no button-tap needed to advance).
+- extendedWaitUntil:
+    visible:
+      id: "delete-account-scheduled"
+    timeout: 10000
+
+# 9. Verify keep-account CTA is visible
+- assertVisible:
+    id: "delete-account-keep"
+
+# 10. Verify sign-out CTA is visible
+- assertVisible:
+    id: "delete-account-sign-out"
+
+# 11. Screenshot: scheduled stage with both CTAs
+- takeScreenshot: delete-account-scheduled-stage
+
+# 12. Tap keep-account to cancel the scheduled deletion and return to More
+- tapOn:
+    id: "delete-account-keep"
+
+# 13. Verify we returned to the More screen (mutation succeeded, router.back() fired)
+- extendedWaitUntil:
+    visible:
+      text: "More"
+    timeout: 15000
+
+# 14. Verify sign-out-button is visible — confirms the account is intact and
+#     the user is still authenticated with a live session
+- scrollUntilVisible:
+    element:
+      id: "sign-out-button"
+    direction: DOWN
+    timeout: 10000
+
+# 15. Final screenshot — More screen with intact account
+- takeScreenshot: delete-account-scheduled-kept
