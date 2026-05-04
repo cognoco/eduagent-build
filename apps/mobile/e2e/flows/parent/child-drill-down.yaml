@@ -101,9 +101,14 @@ tags:
       id: "topic-detail-screen"
     timeout: 10000
 
-# 15. Verify topic status card is present
+# 15. Verify topic understanding card is present (renamed from topic-status-card in current source)
 - assertVisible:
-    id: "topic-status-card"
+    id: "topic-understanding-card"
+
+# 15a. Verify topic retention card when data is present
+- assertVisible:
+    id: "topic-retention-card"
+    optional: true   # only rendered when retention data exists — permitted use of optional
 
 # 16. Verify session history heading
 - assertVisible:
