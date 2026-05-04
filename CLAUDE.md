@@ -16,19 +16,21 @@
 2. Use `docs/project_context.md` for repo-specific implementation rules.
 3. Use `docs/architecture.md` when the change touches routing, data access, background jobs, or deployment.
 
+## Git Commits
+
+Always use `/commit` for all commits in this repo. Never use `/zdx:commit`, `/my:commit-old`, or the system prompt's built-in commit protocol. `/commit` is the single source of truth for staging, message format, hook handling, and push.
+
 ## Non-Negotiable Engineering Rules
 
 - `@eduagent/schemas` is the shared contract. Do not redefine API-facing types locally.
-- Hono route files keep handlers inline for RPC inference, but business logic belongs in `services/`.
-- Route files must not import ORM primitives, schema tables, or `createScopedRepository`.
+- Business logic belongs in `services/`, not in route handlers. Route/service boundaries are lint-enforced (eslint G1 and G5 in `eslint.config.mjs`).
 - Reads must use `createScopedRepository(profileId)`.
 - Writes must include explicit `profileId` protection or verify ownership through the parent chain before updating child records.
 - Shared mobile components stay persona-unaware. Use semantic tokens and CSS variables, not persona checks or hardcoded hex colors.
 - Durable async work goes through Inngest. Do not fire-and-forget background work from route handlers.
-- LLM calls go through `services/llm/router.ts` (or its barrel), not direct provider SDK calls.
 - LLM responses that drive state-machine decisions (close interview, hold escalation, trigger UI widget) must use the structured response envelope (`llmResponseEnvelopeSchema` from `@eduagent/schemas`). Parse with `parseEnvelope()` from `services/llm/envelope.ts`. Never embed `[MARKER]` tokens or JSON blobs in free-text replies. Every envelope signal must have a server-side hard cap (e.g., `MAX_INTERVIEW_EXCHANGES = 4`) so the flow terminates even if the LLM never emits the signal. See `docs/architecture.md` → "LLM Response Envelope" for the full contract.
-- When changing LLM prompts, run the eval harness (`pnpm eval:llm`) to snapshot before/after across the 5 fixture profiles. Use `pnpm eval:llm --live` (Tier 2) to validate real LLM responses against `expectedResponseSchema` when set. Harness code: `apps/api/eval-llm/`.
-- Subagents (agents spawned via the Agent tool) must NEVER run `git add`, `git commit`, or `git push`. Only the coordinator (main conversation) commits. Subagents write code, run tests, and report which files they changed — the coordinator commits their work sequentially using `/commit`.
+- When changing LLM prompts (`apps/api/src/services/**/*-prompts.ts` or `apps/api/src/services/llm/*.ts`), run the eval harness (`pnpm eval:llm`) to snapshot before/after, and `pnpm eval:llm --live` (Tier 2) to validate real LLM responses against `expectedResponseSchema`. The pre-commit hook only checks that snapshot files are staged — it does NOT run the harness. Harness code: `apps/api/eval-llm/`.
+- Subagents must NEVER run `git add`, `git commit`, or `git push` — except the `/commit` skill, which runs as an authorized `context: fork` subagent. All other subagents write code, run tests, and report which files they changed. The coordinator commits their work using `/commit`.
 
 ## Known Exceptions to Engineering Rules
 
@@ -48,23 +50,19 @@ These deviations from the rules above exist in the codebase as of 2026-05-01. Th
 
 ## Required Validation
 
-Run the smallest useful verification first, then the project-level checks for the touched area.
+Unit tests, lint, typecheck, and formatting are enforced by pre-commit hooks (lint-staged, `tsc --build`, `scripts/pre-commit-tests.sh`). You don't need to re-run them manually before committing — but verify locally while iterating. Focus on what the hooks do NOT cover:
 
-- Targeted tests: `pnpm exec jest --findRelatedTests <changed-files> --no-coverage`
-- API lint/typecheck: `pnpm exec nx run api:lint` and `pnpm exec nx run api:typecheck`
-- Mobile lint/typecheck: `pnpm exec nx lint mobile` and `cd apps/mobile && pnpm exec tsc --noEmit`
-- Run integration tests when changing DB behavior, auth/profile scoping, Inngest flows, or cross-package contracts.
-
-Do not call work complete if related tests, lint, typecheck, or required migrations are still failing.
+- Run integration tests when changing DB behavior, auth/profile scoping, Inngest flows, or cross-package contracts. The pre-commit hook intentionally skips `.integration.test.` files.
+- Do not call work complete if related tests, lint, typecheck, or required migrations are still failing.
 - No suppression, no shortcuts — always address the root of the error. Never use `eslint-disable` or suppress warnings to make lint pass. Fix the actual code or improve the lint rule to handle the pattern correctly.
 
 ## Repo-Specific Guardrails
 
 - Default exports are only for Expo Router page components.
 - Tests are co-located with source files. Do not create `__tests__/` folders.
-- Package imports go through the package barrel (`@eduagent/schemas`, `@eduagent/database`, etc.).
+- Package imports go through the package barrel — enforced by `@nx/enforce-module-boundaries`.
 - SecureStore keys must use Expo-safe characters only: letters, numbers, `.`, `-`, `_`.
-- In API code, use the typed config object instead of raw `process.env` reads.
+- In API code, use the typed config object instead of raw `process.env` reads (eslint G4 enforces this; the violation message points back here).
 - Cross-tab / cross-stack `router.push` calls must push the full ancestor chain, not just the leaf. A direct push to `shelf/[subjectId]/book/[bookId]` from another tab synthesizes a 1-deep stack containing only the leaf, so `router.back()` falls through to the Tabs first-route (Home). Either push the parent first then the child, or rely on `unstable_settings.initialRouteName` in the nested layout — but the rule of thumb is to push the chain. `unstable_settings` only seeds one level, so it does not protect future deeper paths (e.g. `shelf/[subjectId]/book/[bookId]/chapter/[chapterId]`).
 - Any new nested Expo Router layout that contains both an `index` screen and a deeper dynamic child must export `unstable_settings = { initialRouteName: 'index' }` as a safety net for cross-stack deep pushes.
 
@@ -78,14 +76,17 @@ These rules prevent dead-end states where users get stuck with no actionable esc
 - **Spec failure modes before coding.** Every feature spec / story must include a Failure Modes table with columns: State, Trigger, User sees, Recovery. If the Recovery column can't be filled, the design isn't complete.
 - **End-to-end feature tracing.** For every event handler, cron function, or background job, verify something actually dispatches the event or schedules the cron in production code. Wired-but-untriggered code is worse than dead code — it creates false confidence.
 
-## Fix Verification Rules
+## Fix Development Rules
 
 Changed code is not fixed code. Every fix must be verified, not just applied. These rules apply to all bug fixes, security patches, and review-finding resolutions.
 
 - **Security fixes require a "break test."** Every fix tagged CRITICAL or HIGH in a security or data-integrity context must include at least one negative-path test that attempts the exact attack being prevented (unauthorized access, missing auth, invalid input). Use the red-green regression pattern (see `superpowers:verification-before-completion` → "Regression tests"): write the test, watch it pass, revert the fix, watch it fail, restore.
 - **Silent recovery without escalation is banned.** Any `catch` block or fallback path in billing, auth, or webhook code that silently recovers must also emit a structured metric or Inngest event. `console.warn` alone is never sufficient — if you can't query how many times the fallback fired in the last 24 hours, the "recovery" is invisible.
-- **Fix tables must include a "Verified By" column** with one of: `test: file.test.ts:"test name"`, `manual: description`, or `N/A: reason`. An empty cell means the fix is PARTIAL, not DONE.
-- **Fix commits must reference the finding ID** — e.g. `fix(api): atomic quota decrement [CR-1C.1]`. This makes `git log --grep="CR-1C"` useful and links code changes to the discovery that motivated them.
+- **Sweep when you fix.** When you fix a drift that has 3+ sibling locations, either (a) sweep all current sites in the same PR with a forward-only guard test, or (b) document a deferred sweep with a tracked ID, owner, and target date. Never silently fix one of N.
+
+- **Fix tables must include a "Verified By" column** with one of: `test: file.test.ts:"test name"`, `manual: description`, or `N/A: reason`. An empty cell means the fix is PARTIAL, not DONE. This applies to commit messages (see `/commit`), PR descriptions, and fix documentation.
+
+Commit-specific formatting rules (finding-ID references, Verified-By table format, sweep-audit blocks) live in `/commit`.
 
 ## Code Quality Guards
 
@@ -95,7 +96,6 @@ These rules catch bugs that survive type-checking and only surface at runtime. L
 - **Response bodies are single-use.** Never call both `.json()` and `.text()` on the same `fetch` Response — the body stream is consumed on first read. If you need both JSON parsing with a text fallback, read `.text()` once and `JSON.parse` it manually. Applies to `assertOk`-style helpers, error-extraction middleware, and SSE error handlers.
 - **Classify errors before formatting.** When code branches on error *type* (reconnectable vs. fatal, quota vs. network) and also formats errors for display, classify the **raw** error object first, then format for the user. Never string-match on the output of `formatApiError` — the formatter strips status codes, error codes, and keywords classifiers depend on.
 - **Clean up all artifacts when removing a feature.** Grep the entire project for all references: types, imports, constants, SecureStore keys, commented-out JSX, fallback branches. Orphaned types create false confidence, unreachable fallback branches inflate coverage, leaked storage keys waste device storage forever.
-- **Verify JSX handler references exist.** Every `onPress`, `onSubmit`, or event handler referenced in JSX must be defined or imported in the component scope. A missing handler is a **runtime crash** (`ReferenceError`), not a lint warning. After adding any `Pressable`/`Button`, search the file for the handler name before committing.
 
 ## Secrets Management
 
