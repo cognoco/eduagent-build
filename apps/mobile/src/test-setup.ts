@@ -308,3 +308,10 @@ const { notifyManager } = require('@tanstack/react-query');
 notifyManager.setScheduler((cb: () => void) => {
   cb();
 });
+
+// Note: TextInput native component stubs (AndroidTextInputNativeComponent,
+// RCTSingelineTextInputNativeComponent, RCTMultilineTextInputNativeComponent)
+// are handled via moduleNameMapper in jest.config.cjs → jest.text-input-native-mock.js.
+// They cannot live here as jest.mock() factories because the react-native-css-interop
+// Babel plugin rewrites React.createElement → _ReactNativeCSSInterop.createInteropElement
+// at file scope, making that variable an out-of-scope reference inside hoisted factories.
