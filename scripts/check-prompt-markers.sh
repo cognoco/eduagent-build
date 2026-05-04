@@ -8,7 +8,10 @@
 # we migrated away from. New uses regress that migration.
 #
 # Scope:
-#   - All apps/api/src/services/**/*-prompts.ts files.
+#   - All apps/api/src/services/**/*.ts files (excluding *.test.ts).
+#     Restricting to *-prompts.ts misses the case where a developer inlines
+#     a marker token directly in a service file (where the actual call sites
+#     live) — that workaround would silently bypass this check.
 #
 # Allowed bracket-tokens (SSE sentinels, not LLM directives):
 #   [DONE] [OK]
@@ -36,7 +39,7 @@ TOKEN_RE='\[[A-Z][A-Z0-9_]{2,}\]'
 # SSE sentinels — strip these out before re-checking the line for any remaining marker.
 ALLOWLIST_RE='\[(DONE|OK)\]'
 # Lines that are *describing a forbidden marker* rather than emitting one.
-NEGATION_RE="(do not|don't|never use|avoid|instead of|markers like|not \[|no \[)"
+NEGATION_RE="(do not|don't|never use|avoid|instead of|markers like|not \[|no \[|pre-migration|legacy|historical|was derived from|used to be|after the (envelope )?migration|before the (envelope )?migration|free-text marker|previous marker|the marker)"
 
 found=0
 findings=""
@@ -61,7 +64,7 @@ while IFS= read -r -d '' f; do
     findings+="${f#$ROOT/}:$lineno:$line"$'\n'
     found=$((found + 1))
   done < <(grep -nE "$TOKEN_RE" "$f" || true)
-done < <(find "$SEARCH_DIR" -name '*-prompts.ts' -type f -print0)
+done < <(find "$SEARCH_DIR" -type f -name '*.ts' -not -name '*.test.ts' -not -name '*.spec.ts' -print0)
 
 if [[ $found -gt 0 ]]; then
   printf '%s' "$findings"

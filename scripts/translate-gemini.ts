@@ -371,11 +371,13 @@ async function main(): Promise<void> {
         }
       }
 
+      const tmpPath = `${targetPath}.tmp`;
       fs.writeFileSync(
-        targetPath,
+        tmpPath,
         JSON.stringify(translated, null, 2) + '\n',
         'utf-8'
       );
+      fs.renameSync(tmpPath, targetPath);
       console.log(`[${lang}] Written to ${targetPath}`);
       succeeded.push(lang);
     } catch (err) {

@@ -114,6 +114,28 @@ function glossaryStem(expected: string): string {
   return normalised.slice(0, Math.max(4, normalised.length - 2));
 }
 
+// Decide whether the diacritic-stripped target text contains the expected
+// glossary term.
+//
+// Long stems (≥4 chars) and any stem with non-ASCII characters use substring
+// matching: (a) inflected forms share the leading 4-letter prefix with the
+// nominative-singular, and (b) non-space scripts (Japanese, Korean, Cyrillic
+// without spaces, etc.) have no reliable \b word boundary.
+//
+// Short ASCII stems (≤3 chars) use word-boundary regex matching instead.
+// Substring is unsafe here because it lets unrelated words containing the
+// letters slip through: glossaryStem('XP') → 'xp' and 'expert', 'experience',
+// 'expand' all .includes('xp'). The brand-acronym lock would be a no-op.
+// Word boundaries are safe because the term is by construction Latin script.
+function glossaryMatches(targetNormalised: string, expected: string): boolean {
+  const stem = glossaryStem(expected);
+  const isShortAscii = stem.length <= 3 && /^[a-z0-9]+$/.test(stem);
+  if (isShortAscii) {
+    return new RegExp(`\\b${escapeRegex(stem)}\\b`, 'i').test(targetNormalised);
+  }
+  return targetNormalised.includes(stem);
+}
+
 export function computeChangedKeys(
   current: NestedStrings,
   previous: NestedStrings | null
@@ -160,22 +182,18 @@ export function validateTranslation(
 
   for (const [term, translations] of glossaryEntries) {
     const expected = translations[lang];
-    const stem = glossaryStem(expected);
     const sourceWordRe = new RegExp(`\\b${escapeRegex(term)}\\b`, 'i');
     for (const key of Object.keys(sourceFlat)) {
       if (!sourceWordRe.test(sourceFlat[key])) continue;
       if (!(key in translatedFlat)) continue;
-      // Stem match on diacritic-stripped target. Substring (not word-boundary)
-      // because Japanese and other non-space scripts have no reliable \b. The
-      // stem accepts inflected forms (Polish sesja → sesji/sesję/sesją;
-      // Spanish sesión → sesiones; Portuguese sessão → sessões). False
-      // positives (validator passes a translation that lacks the term but
-      // happens to share a 4-letter prefix) are preferred to false negatives,
-      // which block correct translations.
+      // Stem match on diacritic-stripped target. Long stems use substring
+      // because non-space scripts have no reliable \b; short ASCII stems
+      // (≤3 chars, e.g. brand acronym 'XP') use word-boundary regex to
+      // avoid matching unrelated words. See glossaryMatches() for details.
       const targetNormalised = stripDiacritics(
         translatedFlat[key]
       ).toLowerCase();
-      if (!targetNormalised.includes(stem)) {
+      if (!glossaryMatches(targetNormalised, expected)) {
         errors.push({
           type: 'glossary_violation',
           key,
@@ -294,7 +312,7 @@ async function translateWithRetry(
     try {
       const response = await client.messages.create({
         model: TRANSLATE_MODEL,
-        max_tokens: 8192,
+        max_tokens: 65536,
         system: [
           {
             type: 'text',
