@@ -28,8 +28,6 @@ export class NotFoundError extends Error {
 
 export class ForbiddenError extends Error {
   readonly errorCode = 'FORBIDDEN' as const;
-  /** Generic 403 marker — stable for code-side detection regardless of message. */
-  readonly code = 'FORBIDDEN' as const;
   /** Server-side application code (e.g. SUBJECT_INACTIVE) when distinct from the generic FORBIDDEN code. */
   readonly apiCode: string | undefined;
 

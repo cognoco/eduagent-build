@@ -150,7 +150,7 @@ describe('ForbiddenError re-export', () => {
   it('is instanceof ForbiddenError from @eduagent/schemas', () => {
     const err = new ForbiddenError('Access denied', 'SUBJECT_INACTIVE');
     expect(err).toBeInstanceOf(ForbiddenError);
-    expect(err.code).toBe('FORBIDDEN');
+    expect(err.errorCode).toBe('FORBIDDEN');
     expect(err.apiCode).toBe('SUBJECT_INACTIVE');
   });
 });

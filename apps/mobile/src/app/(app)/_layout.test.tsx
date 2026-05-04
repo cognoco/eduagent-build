@@ -776,12 +776,12 @@ describe('[BUG-776] buildSwitchProfileConfirmation', () => {
     });
     expect(result).not.toBeNull();
     expect(result.target.id).toBe('kid1');
-    // The key contains the interpolated name; the test verifies the name appears in the output
-    expect(result.title).toContain('Alex');
-    expect(result.message).toContain('Alex');
-    // Single-sibling case: NO "other profiles" hint — it would be confusing
-    // when there are no others.
-    expect(result.message).not.toContain('Sam');
+    // testT renders `${key} ${interpolated values}` so an exact-match assertion
+    // pins both the i18n key chosen and the values fed into it. A weaker
+    // toContain('Alex') would pass even if the wrong key were used, or extra
+    // siblings leaked in.
+    expect(result.title).toBe('tabs.switchProfile.title Alex');
+    expect(result.message).toBe('tabs.switchProfile.messageSingle Alex');
   });
 
   it('lists the other siblings when more than one alternative exists', () => {
@@ -799,12 +799,14 @@ describe('[BUG-776] buildSwitchProfileConfirmation', () => {
     // Picks the first non-current (deterministic) but the user can now SEE
     // who they're being switched to and cancel if it's wrong.
     expect(result.target.id).toBe('kid1');
-    expect(result.title).toContain('Alex');
-    // Message must enumerate the other siblings so a parent with 3 kids
-    // can tell whether they're about to land on the right one.
-    expect(result.message).toContain('Sam');
-    expect(result.message).toContain('Jordan');
-    // And give them an off-ramp hint (cancelHint key contains "cancel" in the key name).
-    expect(result.message).toContain('tabs.switchProfile.cancelHint');
+    expect(result.title).toBe('tabs.switchProfile.title Alex');
+    // Exact-match: pins the message structure (target name, others list,
+    // cancel hint), the order, and the separator. A weakened toContain would
+    // pass even if the wrong sibling were named or the cancel hint dropped.
+    expect(result.message).toBe(
+      'tabs.switchProfile.messageSingle Alex\n\n' +
+        'tabs.switchProfile.otherProfiles Sam, Jordan\n\n' +
+        'tabs.switchProfile.cancelHint'
+    );
   });
 });

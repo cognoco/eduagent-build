@@ -1109,14 +1109,32 @@ export default function SignInScreen() {
         <View className="items-center mt-2 mb-1">
           <MentomateLogo size="sm" />
         </View>
-        <Text className="text-h2 font-bold text-text-primary mb-1 text-center">
+        <Text
+          className="text-h2 font-bold text-text-primary mb-1 text-center"
+          testID={
+            isReturningUser === null
+              ? 'sign-in-welcome-loading'
+              : isReturningUser
+              ? 'sign-in-welcome-returning'
+              : 'sign-in-welcome-first-time'
+          }
+        >
           {isReturningUser === null
             ? 'Welcome'
             : isReturningUser
             ? 'Welcome back'
             : 'Welcome to MentoMate'}
         </Text>
-        <Text className="text-body-sm text-text-secondary mb-2 text-center">
+        <Text
+          className="text-body-sm text-text-secondary mb-2 text-center"
+          testID={
+            isReturningUser === null
+              ? 'sign-in-subtitle-loading'
+              : isReturningUser
+              ? 'sign-in-subtitle-returning'
+              : 'sign-in-subtitle-first-time'
+          }
+        >
           {isReturningUser === null
             ? 'Sign in to get started'
             : isReturningUser

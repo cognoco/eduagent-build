@@ -47,10 +47,17 @@ export function useConversationLanguageSuggest(): {
 
   useEffect(() => {
     if (!FEATURE_FLAGS.I18N_ENABLED) return;
-    AsyncStorage.getItem(DISMISS_KEY).then((val) => {
-      setDismissed(val === 'true');
-      setChecked(true);
-    });
+    AsyncStorage.getItem(DISMISS_KEY)
+      .then((val) => {
+        setDismissed(val === 'true');
+        setChecked(true);
+      })
+      .catch(() => {
+        // AsyncStorage rejection must not permanently silence the hook.
+        // Treat the read failure as "not dismissed" so the suggestion can
+        // still render once and the user can act on it.
+        setChecked(true);
+      });
   }, []);
 
   const uiLanguage = i18next.language;

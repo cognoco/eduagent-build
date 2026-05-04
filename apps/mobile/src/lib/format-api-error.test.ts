@@ -278,7 +278,7 @@ describe('classifyApiError', () => {
   it('[BUG-947] classifies ForbiddenError-shaped error when instanceof fails (HMR)', () => {
     const err = Object.assign(new Error('No permission'), {
       name: 'ForbiddenError',
-      code: 'FORBIDDEN',
+      errorCode: 'FORBIDDEN',
       apiCode: undefined,
     });
     const result = classifyApiError(err);

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import type { RetentionStatus } from '@eduagent/schemas';
 import type { SubjectTint } from '../../lib/design-tokens';
 import { useThemeColors } from '../../lib/theme';
@@ -27,6 +28,7 @@ export function BookRow({
   tint,
   onPress,
 }: BookRowProps): React.ReactElement {
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const resolvedTint = useMemo<SubjectTint>(
     () =>
@@ -46,9 +48,14 @@ export function BookRow({
       testID={`book-row-${bookId}`}
       onPress={() => onPress(bookId)}
       accessibilityRole="button"
-      accessibilityLabel={`${title}, ${topicProgress} topics${
-        retentionStatus ? `, retention ${retentionStatus}` : ''
-      }${hasNotes ? ', has notes' : ''}`}
+      accessibilityLabel={t('library.row.bookAccessibilityLabel', {
+        title,
+        progress: topicProgress,
+        retentionSuffix: retentionStatus
+          ? t('library.row.bookRetentionSuffix', { status: retentionStatus })
+          : '',
+        notesSuffix: hasNotes ? t('library.row.bookNotesSuffix') : '',
+      })}
       style={{
         flexDirection: 'row',
         alignItems: 'center',
@@ -84,7 +91,7 @@ export function BookRow({
           style={{ fontSize: 12, color: colors.textSecondary, marginTop: 1 }}
           numberOfLines={1}
         >
-          {topicProgress} topics
+          {t('library.row.bookTopics', { progress: topicProgress })}
         </Text>
       </View>
 
@@ -115,14 +122,16 @@ export function BookRow({
                 color: colors.retentionWeak,
               }}
             >
-              Review
+              {t('library.row.review')}
             </Text>
           </View>
         ) : retentionStatus === null ? (
-          <Text style={{ fontSize: 11, color: colors.muted }}>not started</Text>
+          <Text style={{ fontSize: 11, color: colors.muted }}>
+            {t('library.row.notStarted')}
+          </Text>
         ) : null}
         {hasNotes ? (
-          <View accessibilityLabel="Has notes">
+          <View accessibilityLabel={t('library.row.hasNotes')}>
             <Ionicons
               name="document-text-outline"
               size={14}

@@ -15,6 +15,7 @@ export interface ThemeTokens {
     success: string;
     warning: string;
     danger: string;
+    dangerSoft: string;
     info: string;
     border: string;
     muted: string;
@@ -59,6 +60,7 @@ export const tokens: Record<ColorScheme, ThemeTokens> = {
       success: '#15803d',
       warning: '#a16207',
       danger: '#dc2626',
+      dangerSoft: '#fee2e2',
       info: '#38bdf8',
       border: '#e8e0d4',
       muted: '#a3a3a3',
@@ -88,6 +90,7 @@ export const tokens: Record<ColorScheme, ThemeTokens> = {
       success: '#22c55e',
       warning: '#eab308',
       danger: '#ef4444',
+      dangerSoft: 'rgba(239, 68, 68, 0.15)',
       info: '#38bdf8',
       border: '#2a2a54',
       muted: '#94a3b8',
@@ -269,6 +272,7 @@ export function tokensToCssVars(t: ThemeTokens): Record<`--${string}`, string> {
     '--color-success': t.colors.success,
     '--color-warning': t.colors.warning,
     '--color-danger': t.colors.danger,
+    '--color-danger-soft': t.colors.dangerSoft,
     '--color-info': t.colors.info,
     '--color-border': t.colors.border,
     '--color-muted': t.colors.muted,

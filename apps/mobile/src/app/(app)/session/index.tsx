@@ -74,6 +74,7 @@ import {
   type QuotaExceededDetails,
 } from '../../../lib/api-client';
 import { useThemeColors } from '../../../lib/theme';
+import { tokens } from '../../../lib/design-tokens';
 import { useCreateNote } from '../../../hooks/use-notes';
 import { getVoiceLocaleForLanguage } from '../../../lib/language-locales';
 import { useProfile } from '../../../lib/profile';
@@ -157,7 +158,7 @@ class SessionErrorBoundary extends Component<
     if (this.state.hasError) {
       return (
         <ScrollView
-          style={{ flex: 1, backgroundColor: '#faf5ef' }}
+          style={{ flex: 1, backgroundColor: tokens.light.colors.background }}
           contentContainerStyle={{
             padding: 24,
             paddingTop: 60,
@@ -167,7 +168,7 @@ class SessionErrorBoundary extends Component<
             style={{
               fontSize: 20,
               fontWeight: 'bold',
-              color: '#b91c1c',
+              color: tokens.light.colors.danger,
               marginBottom: 12,
             }}
           >
@@ -176,7 +177,7 @@ class SessionErrorBoundary extends Component<
           <Text
             style={{
               fontSize: 15,
-              color: '#1a1a1a',
+              color: tokens.light.colors.textPrimary,
               marginBottom: 16,
               fontWeight: '600',
             }}
@@ -188,7 +189,7 @@ class SessionErrorBoundary extends Component<
               <Text
                 style={{
                   fontSize: 11,
-                  color: '#444',
+                  color: tokens.light.colors.textSecondary,
                   fontFamily: 'monospace',
                   marginBottom: 16,
                 }}
@@ -199,7 +200,7 @@ class SessionErrorBoundary extends Component<
               {this.state.componentStack && (
                 <View
                   style={{
-                    backgroundColor: '#fee2e2',
+                    backgroundColor: tokens.light.colors.dangerSoft,
                     borderRadius: 8,
                     padding: 12,
                     marginBottom: 16,
@@ -208,7 +209,7 @@ class SessionErrorBoundary extends Component<
                   <Text
                     style={{
                       fontSize: 10,
-                      color: '#333',
+                      color: tokens.light.colors.textPrimary,
                       fontFamily: 'monospace',
                     }}
                     selectable
@@ -228,14 +229,20 @@ class SessionErrorBoundary extends Component<
               })
             }
             style={{
-              backgroundColor: '#0d9488',
+              backgroundColor: tokens.light.colors.primary,
               borderRadius: 12,
               paddingVertical: 14,
               alignItems: 'center',
               marginBottom: 12,
             }}
           >
-            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>
+            <Text
+              style={{
+                color: tokens.light.colors.textInverse,
+                fontSize: 16,
+                fontWeight: '600',
+              }}
+            >
               Try Again
             </Text>
           </Pressable>
@@ -253,7 +260,7 @@ class SessionErrorBoundary extends Component<
               router.replace('/(app)/home' as never);
             }}
             style={{
-              backgroundColor: '#e5e7eb',
+              backgroundColor: tokens.light.colors.border,
               borderRadius: 12,
               paddingVertical: 14,
               alignItems: 'center',
@@ -262,7 +269,13 @@ class SessionErrorBoundary extends Component<
             accessibilityRole="button"
             accessibilityLabel="Go Home"
           >
-            <Text style={{ color: '#374151', fontSize: 16, fontWeight: '600' }}>
+            <Text
+              style={{
+                color: tokens.light.colors.textSecondary,
+                fontSize: 16,
+                fontWeight: '600',
+              }}
+            >
               Go Home
             </Text>
           </Pressable>

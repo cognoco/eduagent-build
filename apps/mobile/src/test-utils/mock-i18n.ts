@@ -30,6 +30,15 @@ function interpolate(template: string, opts?: Record<string, unknown>): string {
 }
 
 export function translate(key: string, opts?: Record<string, unknown>): string {
+  // i18next pluralization: when `count` is supplied, real i18next picks
+  // `key_one` for count===1 and `key_other` otherwise (English plural rules).
+  // Mirror that here so tests that hit a pluralized key (`library.row.shelfSubtitle`)
+  // resolve to the right form.
+  if (opts && 'count' in opts && typeof opts.count === 'number') {
+    const suffix = opts.count === 1 ? '_one' : '_other';
+    const pluralValue = lookup(en as Nested, `${key}${suffix}`);
+    if (pluralValue !== undefined) return interpolate(pluralValue, opts);
+  }
   const value = lookup(en as Nested, key);
   if (value === undefined) return key;
   return interpolate(value, opts);

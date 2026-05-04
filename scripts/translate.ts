@@ -90,6 +90,30 @@ function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+// Strip diacritics (NFD decomposition + remove combining marks). Lets the
+// glossary check accept "sesion" as equivalent to "sesión" and "sessao" as
+// equivalent to "sessão", which matters because Portuguese/Spanish plurals
+// often shift accents (sessão → sessões).
+function stripDiacritics(s: string): string {
+  // Combining diacritical marks block: U+0300..U+036F.
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+// Compute a stem from a glossary term to allow inflected forms to satisfy
+// the check. Polish, Czech, Russian etc. heavily inflect nouns by case
+// (sesja → sesji/sesję/sesją/sesjach), and Spanish/Portuguese pluralise
+// (sesión → sesiones, sessão → sessões). A bare substring check on the
+// nominative-singular form rejects all of these as glossary violations.
+//
+// Stem length: max(4, term.length - 2). Forms shorter than 4 chars are
+// matched exactly. The stem is computed on the diacritic-stripped form so
+// "sesion" matches "sesión".
+function glossaryStem(expected: string): string {
+  const normalised = stripDiacritics(expected).toLowerCase();
+  if (normalised.length < 4) return normalised;
+  return normalised.slice(0, Math.max(4, normalised.length - 2));
+}
+
 export function computeChangedKeys(
   current: NestedStrings,
   previous: NestedStrings | null
@@ -136,20 +160,26 @@ export function validateTranslation(
 
   for (const [term, translations] of glossaryEntries) {
     const expected = translations[lang];
-    const expectedLower = expected.toLowerCase();
+    const stem = glossaryStem(expected);
     const sourceWordRe = new RegExp(`\\b${escapeRegex(term)}\\b`, 'i');
     for (const key of Object.keys(sourceFlat)) {
       if (!sourceWordRe.test(sourceFlat[key])) continue;
       if (!(key in translatedFlat)) continue;
-      // Case-insensitive containment: handles sentence-initial capitalization
-      // and inflected forms via substring. Word-boundary matching is NOT used
-      // on the target — Japanese and other non-space-delimited scripts have
-      // no reliable \b semantics.
-      if (!translatedFlat[key].toLowerCase().includes(expectedLower)) {
+      // Stem match on diacritic-stripped target. Substring (not word-boundary)
+      // because Japanese and other non-space scripts have no reliable \b. The
+      // stem accepts inflected forms (Polish sesja → sesji/sesję/sesją;
+      // Spanish sesión → sesiones; Portuguese sessão → sessões). False
+      // positives (validator passes a translation that lacks the term but
+      // happens to share a 4-letter prefix) are preferred to false negatives,
+      // which block correct translations.
+      const targetNormalised = stripDiacritics(
+        translatedFlat[key]
+      ).toLowerCase();
+      if (!targetNormalised.includes(stem)) {
         errors.push({
           type: 'glossary_violation',
           key,
-          detail: `source contains "${term}" but translation is missing locked term "${expected}"`,
+          detail: `source contains "${term}" but translation is missing locked term "${expected}" (or any stem-matching inflection)`,
         });
       }
     }
@@ -171,9 +201,23 @@ export function validateTranslation(
 
     const sourceLen = sourceFlat[key].length;
     const translatedLen = translatedFlat[key].length;
-    if (sourceLen > 0) {
+    // Sub-6-char source strings ("OK", "Done", "Save", "Edit") get false-flagged
+    // by ratio caps even with the absolute floor below — "OK" → "D'accord"
+    // (2 → 8 chars = 400%) reads as a fail despite being correct French.
+    // Skip the length check entirely for tiny source strings; the absolute
+    // floor still guards 6–10 char strings where ratios start to be useful.
+    if (sourceLen > 0 && sourceLen >= 6) {
+      // For 6–10 char source strings (button labels like "Cancel", "Submit"),
+      // ratio-based caps still misfire — Norwegian "Hopp over" (9 chars) for
+      // English "Skip" (4 chars) would read as 225%. Use an absolute floor
+      // (sourceLen + 12) for sources <= 10 chars.
+      const absoluteFloor = sourceLen <= 10 ? sourceLen + 12 : 0;
       const ratio = translatedLen / sourceLen;
-      if (ratio > LENGTH_FAIL_RATIO) {
+      const overFail =
+        ratio > LENGTH_FAIL_RATIO && translatedLen > absoluteFloor;
+      const overWarn =
+        ratio > LENGTH_WARN_RATIO && translatedLen > absoluteFloor;
+      if (overFail) {
         errors.push({
           type: 'length_exceeded',
           key,
@@ -181,7 +225,7 @@ export function validateTranslation(
             ratio * 100
           )}% of source (${sourceLen}). Max: ${LENGTH_FAIL_RATIO * 100}%`,
         });
-      } else if (ratio > LENGTH_WARN_RATIO) {
+      } else if (overWarn) {
         warnings.push({
           type: 'length_warning',
           key,
@@ -220,12 +264,19 @@ function buildSystemPrompt(
 RULES:
 - Translate JSON values only, never modify keys
 - Preserve all {{interpolation}} markers exactly as they appear
-- Keep translations concise — mobile UI has limited space. Aim for ≤130% of the English character length
 - Use age-appropriate language (11+ audience)
 - Return ONLY valid JSON — no markdown fences, no commentary
 - Maintain the exact JSON structure (nested objects with same keys)
+- Preserve plural-suffixed keys exactly (e.g. _one, _other, _zero) — translate the value but keep both keys
 
-GLOSSARY — use these translations for domain-specific terms:
+LENGTH BUDGET (HARD CONSTRAINTS — translations breaking these will be rejected):
+- Source ≤ 12 chars (button labels like "Try Again", "Tap to retry", "Go home"):
+  target MUST be ≤ source_length + 12 chars. If the natural translation is too long, choose a SHORTER imperative form. Example: "Tap to retry" (12) → German "Erneut tippen" (13), NOT "Tippen Sie zum erneuten Versuchen" (33).
+- Source 13–30 chars (titles, short messages): target ≤ 1.7× source length.
+- Source > 30 chars: target ≤ 1.5× source length.
+- For all UI labels: prefer the shortest natural phrasing. Drop politeness particles ("bitte", "por favor"), articles, and pronouns when the meaning is clear.
+
+GLOSSARY — use these translations for domain-specific terms (inflected forms are accepted):
 ${glossaryEntries || '(no glossary entries for this language)'}
 
 Target language: ${lang}`;
@@ -476,11 +527,17 @@ async function main(): Promise<void> {
         }
       }
 
+      // Atomic write: render to a sibling .tmp file then rename. A crash or
+      // process kill mid-`writeFileSync` would otherwise leave a half-written
+      // JSON file that breaks every subsequent run (and would be silently
+      // committed if the killed run was inside a husky hook).
+      const tmpPath = `${targetPath}.tmp`;
       fs.writeFileSync(
-        targetPath,
+        tmpPath,
         JSON.stringify(translated, null, 2) + '\n',
         'utf-8'
       );
+      fs.renameSync(tmpPath, targetPath);
       console.log(`[${lang}] Written to ${targetPath}`);
       succeeded.push(lang);
     } catch (err) {

@@ -35,7 +35,7 @@ export default function PrivacyPolicyScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useThemeColors();
-  const { t } = useTranslation('legal');
+  const { t } = useTranslation();
   const handleBack = () => {
     goBackOrReplace(router, '/(app)/more');
   };
@@ -45,7 +45,7 @@ export default function PrivacyPolicyScreen() {
       <View className="flex-row items-center px-5 pt-4 pb-2">
         <Pressable
           onPress={handleBack}
-          accessibilityLabel={t('common:goBack')}
+          accessibilityLabel={t('common.goBack')}
           accessibilityRole="button"
           className="mr-3 w-10 h-10 items-center justify-center rounded-full bg-surface"
           testID="back-button"
@@ -53,7 +53,7 @@ export default function PrivacyPolicyScreen() {
           <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
         </Pressable>
         <Text className="text-h2 font-bold text-text-primary">
-          {t('privacy.title')}
+          {t('legal.privacy.title')}
         </Text>
       </View>
       <ScrollView
@@ -61,53 +61,53 @@ export default function PrivacyPolicyScreen() {
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
       >
         <Text className="text-caption text-text-secondary mb-4">
-          {t('privacy.lastUpdated')}
+          {t('legal.privacy.lastUpdated')}
         </Text>
 
-        <Section title={t('privacy.s1Title')}>
-          <Paragraph>{t('privacy.s1Body')}</Paragraph>
+        <Section title={t('legal.privacy.s1Title')}>
+          <Paragraph>{t('legal.privacy.s1Body')}</Paragraph>
         </Section>
 
-        <Section title={t('privacy.s2Title')}>
-          <Paragraph>{t('privacy.s2Body1')}</Paragraph>
-          <Paragraph>{t('privacy.s2Body2')}</Paragraph>
-          <Paragraph>{t('privacy.s2Body3')}</Paragraph>
-          <Paragraph>{t('privacy.s2Body4')}</Paragraph>
+        <Section title={t('legal.privacy.s2Title')}>
+          <Paragraph>{t('legal.privacy.s2Body1')}</Paragraph>
+          <Paragraph>{t('legal.privacy.s2Body2')}</Paragraph>
+          <Paragraph>{t('legal.privacy.s2Body3')}</Paragraph>
+          <Paragraph>{t('legal.privacy.s2Body4')}</Paragraph>
         </Section>
 
-        <Section title={t('privacy.s3Title')}>
-          <Paragraph>{t('privacy.s3Body')}</Paragraph>
+        <Section title={t('legal.privacy.s3Title')}>
+          <Paragraph>{t('legal.privacy.s3Body')}</Paragraph>
         </Section>
 
-        <Section title={t('privacy.s4Title')}>
-          <Paragraph>{t('privacy.s4Body1')}</Paragraph>
-          <Paragraph>{t('privacy.s4Body2')}</Paragraph>
+        <Section title={t('legal.privacy.s4Title')}>
+          <Paragraph>{t('legal.privacy.s4Body1')}</Paragraph>
+          <Paragraph>{t('legal.privacy.s4Body2')}</Paragraph>
         </Section>
 
-        <Section title={t('privacy.s5Title')}>
-          <Paragraph>{t('privacy.s5Body')}</Paragraph>
+        <Section title={t('legal.privacy.s5Title')}>
+          <Paragraph>{t('legal.privacy.s5Body')}</Paragraph>
         </Section>
 
-        <Section title={t('privacy.s6Title')}>
-          <Paragraph>{t('privacy.s6Body1')}</Paragraph>
-          <Paragraph>{t('privacy.s6Body2')}</Paragraph>
+        <Section title={t('legal.privacy.s6Title')}>
+          <Paragraph>{t('legal.privacy.s6Body1')}</Paragraph>
+          <Paragraph>{t('legal.privacy.s6Body2')}</Paragraph>
         </Section>
 
-        <Section title={t('privacy.s7Title')}>
-          <Paragraph>{t('privacy.s7Body')}</Paragraph>
+        <Section title={t('legal.privacy.s7Title')}>
+          <Paragraph>{t('legal.privacy.s7Body')}</Paragraph>
         </Section>
 
-        <Section title={t('privacy.s8Title')}>
-          <Paragraph>{t('privacy.s8Body1')}</Paragraph>
-          <Paragraph>{t('privacy.s8Body2')}</Paragraph>
+        <Section title={t('legal.privacy.s8Title')}>
+          <Paragraph>{t('legal.privacy.s8Body1')}</Paragraph>
+          <Paragraph>{t('legal.privacy.s8Body2')}</Paragraph>
         </Section>
 
-        <Section title={t('privacy.s9Title')}>
-          <Paragraph>{t('privacy.s9Body')}</Paragraph>
+        <Section title={t('legal.privacy.s9Title')}>
+          <Paragraph>{t('legal.privacy.s9Body')}</Paragraph>
         </Section>
 
-        <Section title={t('privacy.s10Title')}>
-          <Paragraph>{t('privacy.s10Body')}</Paragraph>
+        <Section title={t('legal.privacy.s10Title')}>
+          <Paragraph>{t('legal.privacy.s10Body')}</Paragraph>
         </Section>
       </ScrollView>
     </View>

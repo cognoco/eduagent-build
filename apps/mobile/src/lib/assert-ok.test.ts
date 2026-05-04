@@ -20,6 +20,26 @@ describe('assertOk', () => {
     expect(okRes.ok).toBe(true);
   });
 
+  it('returns a 204 No Content response untouched without reading the body', async () => {
+    const res = new Response(null, { status: 204 });
+    const okRes = await assertOk(res);
+    expect(okRes).toBe(res);
+    expect(okRes.status).toBe(204);
+    // Body must remain readable by the caller — assertOk must not consume it.
+    expect(okRes.bodyUsed).toBe(false);
+  });
+
+  it('returns a 201 Created response with empty body untouched', async () => {
+    const res = new Response('', {
+      status: 201,
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const okRes = await assertOk(res);
+    expect(okRes).toBe(res);
+    expect(okRes.status).toBe(201);
+    expect(okRes.bodyUsed).toBe(false);
+  });
+
   it('throws an ApiResponseError on a 4xx with structured body', async () => {
     const res = makeResponse(400, {
       code: 'INVALID_INPUT',

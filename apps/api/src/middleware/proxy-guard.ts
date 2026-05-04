@@ -3,6 +3,15 @@ import { HTTPException } from 'hono/http-exception';
 import type { ProfileScopeEnv } from './profile-scope';
 
 const PROXY_MODE_MESSAGE = 'Not available in proxy mode';
+const PROXY_MODE_CODE = 'PROXY_MODE';
+
+// Body shape: include a stable `code` so the mobile classifier can distinguish
+// proxy-mode rejection from a generic 403 and avoid mapping it to "sign out".
+// The classifier reads parsed.error?.code ?? parsed?.code (api-client.ts).
+const proxyModeBody = {
+  code: PROXY_MODE_CODE,
+  message: PROXY_MODE_MESSAGE,
+};
 
 /**
  * [SEC-2 / BUG-718] Server-derived proxy-mode guard for write endpoints.
@@ -41,7 +50,7 @@ export function assertNotProxyMode(
   if (!profileMeta) {
     throw new HTTPException(403, {
       message: PROXY_MODE_MESSAGE,
-      res: c.json({ message: PROXY_MODE_MESSAGE }, 403),
+      res: c.json(proxyModeBody, 403),
     });
   }
 
@@ -49,7 +58,7 @@ export function assertNotProxyMode(
   if (profileMeta.isOwner === false) {
     throw new HTTPException(403, {
       message: PROXY_MODE_MESSAGE,
-      res: c.json({ message: PROXY_MODE_MESSAGE }, 403),
+      res: c.json(proxyModeBody, 403),
     });
   }
 
@@ -59,7 +68,7 @@ export function assertNotProxyMode(
   if (c.req.header('X-Proxy-Mode') === 'true') {
     throw new HTTPException(403, {
       message: PROXY_MODE_MESSAGE,
-      res: c.json({ message: PROXY_MODE_MESSAGE }, 403),
+      res: c.json(proxyModeBody, 403),
     });
   }
 }

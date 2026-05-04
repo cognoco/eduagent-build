@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 const mockReplace = jest.fn();
 
@@ -61,5 +61,51 @@ describe('SSOCallbackScreen', () => {
     render(<SSOCallbackScreen />);
 
     expect(WebBrowser.maybeCompleteAuthSession).toHaveBeenCalledTimes(1);
+  });
+
+  describe('10s timeout fallback', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('does not show fallback before 10s', () => {
+      render(<SSOCallbackScreen />);
+
+      expect(screen.queryByTestId('sso-fallback-back')).toBeNull();
+
+      act(() => {
+        jest.advanceTimersByTime(9_999);
+      });
+
+      expect(screen.queryByTestId('sso-fallback-back')).toBeNull();
+    });
+
+    it('reveals "Back to sign in" after 10s with no callback completion', () => {
+      render(<SSOCallbackScreen />);
+
+      act(() => {
+        jest.advanceTimersByTime(10_000);
+      });
+
+      expect(screen.getByTestId('sso-fallback-back')).toBeTruthy();
+      expect(screen.getByText('Back to sign in')).toBeTruthy();
+    });
+
+    it('routes back to /(auth)/sign-in when fallback button is pressed', () => {
+      render(<SSOCallbackScreen />);
+
+      act(() => {
+        jest.advanceTimersByTime(10_000);
+      });
+
+      fireEvent.press(screen.getByTestId('sso-fallback-back'));
+
+      expect(mockReplace).toHaveBeenCalledTimes(1);
+      expect(mockReplace).toHaveBeenCalledWith('/(auth)/sign-in');
+    });
   });
 });

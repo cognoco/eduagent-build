@@ -6,6 +6,7 @@ on:
       - main
       - develop
       - improvements
+      - language-add
   workflow_dispatch:
 
 concurrency:

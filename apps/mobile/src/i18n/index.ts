@@ -36,6 +36,11 @@ export async function setStoredLanguage(
 
 export async function clearStoredLanguage(): Promise<void> {
   await AsyncStorage.removeItem(LANGUAGE_STORAGE_KEY);
+  // Without changeLanguage(), i18next keeps using whatever locale was active
+  // before the reset, so the UI doesn't actually revert until the next app
+  // start. Force the in-memory locale back to English so settings reset has
+  // an immediate visible effect.
+  await i18next.changeLanguage('en');
 }
 
 function getDeviceLanguage(): string {

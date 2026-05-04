@@ -7,6 +7,7 @@ import {
   Switch,
   Linking,
   Share,
+  Modal,
 } from 'react-native';
 import { useState, useCallback } from 'react';
 import { platformAlert } from '../../lib/platform-alert';
@@ -225,11 +226,23 @@ export default function MoreScreen() {
   const [showLanguagePicker, setShowLanguagePicker] = useState(false);
   const currentLanguage = i18next.language as SupportedLanguage;
 
-  const handleLanguageChange = useCallback(async (lang: SupportedLanguage) => {
-    await setStoredLanguage(lang);
-    await i18next.changeLanguage(lang);
-    setShowLanguagePicker(false);
-  }, []);
+  const handleLanguageChange = useCallback(
+    async (lang: SupportedLanguage) => {
+      try {
+        await setStoredLanguage(lang);
+        await i18next.changeLanguage(lang);
+        setShowLanguagePicker(false);
+      } catch (err) {
+        console.warn('[more] language change failed:', err);
+        platformAlert(
+          t('settings.languageChangeFailedTitle'),
+          t('settings.languageChangeFailedMessage'),
+          [{ text: t('common.ok') }]
+        );
+      }
+    },
+    [t]
+  );
 
   // LEARNING_MODE_OPTIONS defined inside component to access t()
   const LEARNING_MODE_OPTIONS: {
@@ -429,7 +442,7 @@ export default function MoreScreen() {
               },
               { text: t('common.cancel'), style: 'cancel' },
             ]
-          : [{ text: t('common.cancel') }]
+          : [{ text: t('common.ok') }]
       );
       return;
     }
@@ -736,40 +749,82 @@ export default function MoreScreen() {
             testID="settings-app-language"
           />
         )}
-        {FEATURE_FLAGS.I18N_ENABLED && showLanguagePicker && (
-          <View className="mt-4">
-            <Text className="text-body-sm font-semibold text-text-secondary mb-2">
-              {t('settings.appLanguage')}
-            </Text>
-            {SUPPORTED_LANGUAGES.map((lang) => (
+        {FEATURE_FLAGS.I18N_ENABLED && (
+          <Modal
+            visible={showLanguagePicker}
+            animationType="slide"
+            transparent
+            onRequestClose={() => setShowLanguagePicker(false)}
+          >
+            {/* Bottom-sheet picker — rendered outside the outer ScrollView so
+                row taps don't race the parent scroll on Android (the inline
+                Pressable list inside ScrollView pattern routinely lost taps).
+                Pressable backdrop dismisses on tap-outside. */}
+            <Pressable
+              className="flex-1 bg-black/50 justify-end"
+              onPress={() => setShowLanguagePicker(false)}
+              accessibilityLabel={t('common.close')}
+              testID="language-picker-backdrop"
+            >
               <Pressable
-                key={lang}
-                onPress={() => handleLanguageChange(lang)}
-                className={`flex-row items-center justify-between p-4 rounded-xl mb-2 ${
-                  lang === currentLanguage
-                    ? 'bg-primary/10 border border-primary'
-                    : 'bg-surface'
-                }`}
-                testID={`language-option-${lang}`}
+                onPress={(e) => e.stopPropagation()}
+                className="bg-background rounded-t-3xl px-5 pt-4 pb-8"
+                style={{ maxHeight: '85%' }}
               >
-                <View>
-                  <Text className="text-body font-medium text-text-primary">
-                    {LANGUAGE_LABELS[lang].native}
-                  </Text>
-                  <Text className="text-body-sm text-text-secondary">
-                    {LANGUAGE_LABELS[lang].english}
-                  </Text>
+                <View className="items-center mb-3">
+                  <View className="w-12 h-1 bg-text-secondary/30 rounded-full" />
                 </View>
-                {lang === currentLanguage && (
-                  <Ionicons
-                    name="checkmark-circle"
-                    size={24}
-                    color={themeColors.primary}
-                  />
-                )}
+                <View className="flex-row items-center justify-between mb-3">
+                  <Text className="text-h3 font-semibold text-text-primary">
+                    {t('settings.appLanguage')}
+                  </Text>
+                  <Pressable
+                    onPress={() => setShowLanguagePicker(false)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('common.close')}
+                    testID="language-picker-close"
+                    hitSlop={12}
+                  >
+                    <Ionicons
+                      name="close"
+                      size={24}
+                      color={themeColors.textSecondary}
+                    />
+                  </Pressable>
+                </View>
+                <ScrollView showsVerticalScrollIndicator={false}>
+                  {SUPPORTED_LANGUAGES.map((lang) => (
+                    <Pressable
+                      key={lang}
+                      onPress={() => void handleLanguageChange(lang)}
+                      className={`flex-row items-center justify-between p-4 rounded-xl mb-2 ${
+                        lang === currentLanguage
+                          ? 'bg-primary/10 border border-primary'
+                          : 'bg-surface'
+                      }`}
+                      testID={`language-option-${lang}`}
+                    >
+                      <View>
+                        <Text className="text-body font-medium text-text-primary">
+                          {LANGUAGE_LABELS[lang].native}
+                        </Text>
+                        <Text className="text-body-sm text-text-secondary">
+                          {LANGUAGE_LABELS[lang].english}
+                        </Text>
+                      </View>
+                      {lang === currentLanguage && (
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={24}
+                          color={themeColors.primary}
+                        />
+                      )}
+                    </Pressable>
+                  ))}
+                </ScrollView>
               </Pressable>
-            ))}
-          </View>
+            </Pressable>
+          </Modal>
         )}
         {/* [BUG-915] Hide Subscription in impersonation — billing is the
             parent account's, not the child profile's. */}

@@ -69,15 +69,26 @@ function isQuotaExceededError(error: unknown): error is QuotaExceededLike {
   );
 }
 
-type ForbiddenLike = Error & { code: string; apiCode?: string };
+type ForbiddenLike = Error & { errorCode: string; apiCode?: string };
 function isForbiddenError(error: unknown): error is ForbiddenLike {
   return (
-    error instanceof Error && error.name === 'ForbiddenError' && 'code' in error
+    error instanceof Error &&
+    error.name === 'ForbiddenError' &&
+    'errorCode' in error
   );
 }
 
 // Thunks resolve at call time so they reflect the active language, not
 // whatever language i18next had at module-load time.
+//
+// [I18N-LIVE-SWITCH TODO] These — and every t(...) call inside classifyApiError
+// below — translate at *classify time*, which today equals render time because
+// classification happens in a render path. Once live language switching lands
+// (FEATURE_FLAGS.I18N_ENABLED true with mid-session changeLanguage), the
+// classified string can be cached in component state across a language switch
+// and end up out-of-date. When wiring live switch, change the FormattedApiError
+// shape to carry a translation *key* (or token + interpolation values) instead
+// of a pre-translated string, and translate in the consuming component.
 const NETWORK_MESSAGE = () => i18next.t('errors.networkError');
 const SERVER_MESSAGE = () => i18next.t('errors.serverError');
 const DEFAULT_MESSAGE = () => i18next.t('errors.generic');
@@ -407,7 +418,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
 
   // Typed 403 — ForbiddenError from api-client.ts
   if (isForbiddenError(error)) {
-    const effectiveCode = error.apiCode ?? error.code;
+    const effectiveCode = error.apiCode ?? error.errorCode;
     if (
       effectiveCode === 'SUBJECT_INACTIVE' ||
       effectiveCode === 'SUBJECT_PAUSED'
@@ -415,6 +426,16 @@ export function classifyApiError(error: unknown): FormattedApiError {
       return {
         message: friendlyMessage(error.message) ?? error.message,
         category: 'not-found',
+        recovery: 'go-back',
+      };
+    }
+    // Proxy-mode rejection (parent acting on a child profile that can't perform
+    // a write op) is a 403 but must NOT trigger sign-out — the user just needs
+    // to switch back to their owner profile or skip the action.
+    if (effectiveCode === 'PROXY_MODE') {
+      return {
+        message: friendlyMessage(error.message) ?? error.message,
+        category: 'auth',
         recovery: 'go-back',
       };
     }

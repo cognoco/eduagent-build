@@ -30,6 +30,11 @@ export const topicNotes = pgTable(
   },
   (t) => [
     index('topic_notes_topic_profile_idx').on(t.topicId, t.profileId),
+    // Idempotency lookup in services/notes.ts insertNoteWithCap scans
+    // (profileId, sessionId) on retry. Without this index the query is a
+    // sequential scan within profile scope — fine while the per-topic note
+    // cap is 50, but degrades as the cap rises or note volume grows.
+    index('topic_notes_session_id_idx').on(t.sessionId),
     index('topic_notes_content_trgm_idx').using(
       'gin',
       sql`${t.content} gin_trgm_ops`

@@ -19,7 +19,7 @@ type NestedStrings = { [k: string]: string | NestedStrings };
 
 interface StalenessError {
   lang: string;
-  type: 'missing_key' | 'orphaned_key' | 'missing_variable';
+  type: 'missing_key' | 'orphaned_key' | 'missing_variable' | 'extra_variable';
   key: string;
   variable?: string;
 }
@@ -64,9 +64,21 @@ export function checkStaleness(
 
       const sourceVars = extractVariables(sourceFlat[key]);
       const targetVars = extractVariables(targetFlat[key]);
+      // Forward: source variables that the translation dropped.
       for (const v of sourceVars) {
         if (!targetVars.includes(v)) {
           errors.push({ lang, type: 'missing_variable', key, variable: v });
+        }
+      }
+      // Reverse: variables the translator hallucinated that don't exist in
+      // the source. translate.ts validates this on write, but check:i18n is
+      // the runtime contract used by Husky and CI — without the reverse
+      // check, a hand-edited or upstream-mangled translation can ship a
+      // {{name}} the runtime never interpolates and renders the literal
+      // `{{name}}` to users.
+      for (const v of targetVars) {
+        if (!sourceVars.includes(v)) {
+          errors.push({ lang, type: 'extra_variable', key, variable: v });
         }
       }
     }
@@ -123,6 +135,11 @@ function main(): void {
       case 'missing_variable':
         console.error(
           `  [${err.lang}] Missing variable ${err.variable} in: ${err.key}`
+        );
+        break;
+      case 'extra_variable':
+        console.error(
+          `  [${err.lang}] Extra variable ${err.variable} not in source: ${err.key}`
         );
         break;
     }

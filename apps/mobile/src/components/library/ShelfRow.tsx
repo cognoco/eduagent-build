@@ -1,5 +1,6 @@
 import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import type { RetentionStatus } from '@eduagent/schemas';
 import { useSubjectTint, useThemeColors } from '../../lib/theme';
 import { BookRow, type BookRowData } from './BookRow';
@@ -29,12 +30,17 @@ export function ShelfRow({
   onToggle,
   onBookPress,
 }: ShelfRowProps): React.ReactElement {
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const tint = useSubjectTint(subjectId);
 
-  const subtitle = `${bookCount} ${
-    bookCount === 1 ? 'book' : 'books'
-  } · ${topicProgress} topics`;
+  // i18next pluralization picks shelfSubtitle_one vs shelfSubtitle_other based
+  // on count, so the singular/plural form moves with the locale's plural rules
+  // (e.g. Polish/Russian use multiple plural buckets — a hardcoded pair is wrong).
+  const subtitle = t('library.row.shelfSubtitle', {
+    count: bookCount,
+    progress: topicProgress,
+  });
 
   const needsReview =
     retentionStatus === 'weak' || retentionStatus === 'forgotten';
@@ -46,11 +52,15 @@ export function ShelfRow({
         testID={`shelf-row-header-${subjectId}`}
         onPress={() => onToggle(subjectId)}
         accessibilityRole="button"
-        accessibilityLabel={`${name} shelf, ${subtitle}${
-          isPaused ? ', paused' : ''
-        }${needsReview ? ', review needed' : ''}. Tap to ${
-          expanded ? 'collapse' : 'expand'
-        }.`}
+        accessibilityLabel={t('library.row.shelfAccessibilityLabel', {
+          name,
+          subtitle,
+          pausedSuffix: isPaused ? t('library.row.shelfPausedSuffix') : '',
+          reviewSuffix: needsReview ? t('library.row.shelfReviewSuffix') : '',
+          action: expanded
+            ? t('library.row.shelfActionCollapse')
+            : t('library.row.shelfActionExpand'),
+        })}
         style={{
           flexDirection: 'row',
           alignItems: 'center',
@@ -113,7 +123,7 @@ export function ShelfRow({
                   color: colors.warning,
                 }}
               >
-                Paused
+                {t('library.row.paused')}
               </Text>
             </View>
           ) : null}
@@ -143,7 +153,7 @@ export function ShelfRow({
                   color: colors.retentionWeak,
                 }}
               >
-                Review
+                {t('library.row.review')}
               </Text>
             </View>
           ) : null}
@@ -167,8 +177,7 @@ export function ShelfRow({
               testID={`shelf-empty-${subjectId}`}
             >
               <Text style={{ fontSize: 13, color: colors.textSecondary }}>
-                No books in this subject yet. Study a topic and it&apos;ll be
-                filed here.
+                {t('library.row.shelfEmpty')}
               </Text>
             </View>
           ) : (

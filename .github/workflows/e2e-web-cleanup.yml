@@ -20,6 +20,15 @@ on:
     # with other scheduled cron jobs.
     - cron: '17 3 * * *'
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run — log the call that would be made without executing it'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
 
 permissions:
   contents: read
@@ -34,12 +43,17 @@ jobs:
         env:
           API_URL: ${{ vars.E2E_API_URL || 'https://api-stg.mentomate.com' }}
           TEST_SEED_SECRET: ${{ secrets.TEST_SEED_SECRET }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
         run: |
           if [ -z "${TEST_SEED_SECRET}" ]; then
             echo "::error::TEST_SEED_SECRET is not configured"
             exit 1
           fi
           echo "Reset endpoint: ${API_URL}/v1/__test/reset"
+          if [ "${DRY_RUN}" = "true" ]; then
+            echo "::notice::DRY RUN — would POST to ${API_URL}/v1/__test/reset (skipped)"
+            exit 0
+          fi
           # No prefix filter → clears all seed-created accounts older than the
           # API's safety window. The endpoint guards against deleting non-seed
           # data via account-naming conventions enforced server-side.

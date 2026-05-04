@@ -459,6 +459,35 @@ export default function CurriculumScreen() {
             }}
           />
         </View>
+      ) : curriculum.topics.length === 0 ? (
+        // [UX-DEAD-END] Curriculum exists but has zero topics — without an
+        // explicit empty state the user lands on a blank list with no path
+        // forward. Honor "every AI-driven screen allows human override" by
+        // surfacing the same Add-topic / Challenge / Home affordances that
+        // the populated screen offers, plus a Retry that re-fetches.
+        <View
+          className="flex-1 items-center justify-center px-8"
+          testID="curriculum-empty-topics"
+        >
+          <ErrorFallback
+            variant="card"
+            title={t('onboarding.curriculumReview.noCurriculum.title')}
+            message={t('onboarding.curriculumReview.noCurriculum.message')}
+            primaryAction={{
+              label: t('common.retry'),
+              testID: 'curriculum-empty-topics-retry',
+              onPress: () => {
+                setPollTimedOut(false);
+                void refetch();
+              },
+            }}
+            secondaryAction={{
+              label: t('common.goHome'),
+              testID: 'curriculum-empty-topics-home',
+              onPress: () => goBackOrReplace(router, '/(app)/home'),
+            }}
+          />
+        </View>
       ) : (
         <ScrollView
           className="flex-1 px-5"
