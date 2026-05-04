@@ -5,12 +5,10 @@
 - [project_implementation_phase.md](_archive/project_implementation_phase.md) — Epics 0-16 COMPLETE. LLM tuning phase COMPLETE (all 4 agents merged).
 - [project_session_lifecycle_decisions.md](project_session_lifecycle_decisions.md) — Wall-clock for users, active time internal. Adaptive silence. Hard caps removed.
 
-## Active Work (2026-05-03)
+## Active Work (2026-05-04)
 
-- Active branch: **`consistency`**. Phase 3 LLM tuning COMPLETE (all 4 agents merged).
-- [project_f8_memory_source_refs.md](project_f8_memory_source_refs.md) — Struggle/StrengthEntry provenance back-links. Spec `docs/specs/2026-04-19-memory-sources-f8.md` (Bucket C). F8 prep landed in 413ece4f; full implementation status uncertain.
-- [project_parent_visibility_spec.md](project_parent_visibility_spec.md) — Two specs 2026-04-18: parent privacy/RLS + progress highlights. Partial-shipped in PR #121 (1e50b6ea); Phase 2 RLS for 11 tables + 5 pre-implementation gaps still open.
-- [project_ux_review_pass.md](project_ux_review_pass.md) — Library → Shelf → Book → Topic hierarchy flattening under evaluation. (Other items DONE.)
+- Active branch: **`consistency`**. Stage 2 decision burndown COMPLETE (13/13). Stage 3 execution next.
+- Consistency cleanup plan: `docs/audit/cleanup-plan.md` (single source of truth).
 
 ## Product Constraint — Strictly 11+
 
@@ -19,7 +17,6 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 ## Known Issues
 
 - [project_nx_expo_plugin_bug.md](project_nx_expo_plugin_bug.md) — @nx/expo/plugin stack overflow on Windows. Run Jest/eslint directly.
-- [project_open_bugs.md](project_open_bugs.md) — No P0/P1. BUG-359/397/311/237 fixed 2026-04-15. EP15-C2/C3 CLOSED 2026-04-19.
 - [project_known_bug_patterns.md](project_known_bug_patterns.md) — Systemic patterns: silent fallbacks + React state timing gaps.
 - [project_schema_drift_pattern.md](project_schema_drift_pattern.md) — push→migrate transition silently skips columns. Fix dev: `db:push:dev`.
 - [project_dev_schema_drift_trap.md](project_dev_schema_drift_trap.md) — `mentomate-api-dev` "column does not exist" → `db:push:dev` + `db:generate`. Neon "staging" ≠ dev Worker's DB.
@@ -31,8 +28,7 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 
 ## Pre-Launch Action Items
 
-- [project_prod_approval_gate.md](project_prod_approval_gate.md) — GitHub Environment protection rules missing for production.
-- [project_deploy_config_open.md](project_deploy_config_open.md) — Production deploy targeting unverified (user-flagged 2026-03-28).
+- GitHub Environment protection rules + deploy targeting — tracked in Notion (archived from memory 2026-05-04).
 
 ## Critical Architecture Decisions
 
@@ -92,7 +88,7 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 ## Brand & UX Decisions
 
 - [project_brand_dark_first.md](project_brand_dark_first.md) — Teal primary + lavender secondary. No accent picker. Dark default.
-- [project_multiple_coaching_cards.md](project_multiple_coaching_cards.md) — Coaching cards REMOVED. Intent cards in place.
+- Coaching cards REMOVED, intent cards in place (archived from memory 2026-05-04).
 
 ## Persona Architecture (Epic 12 — COMPLETE, ThemeContext cleaned 2026-04-15)
 
@@ -147,7 +143,7 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 - [reference_notion_workspace.md](reference_notion_workspace.md) — Notion MCP often unavailable; use REST API via `doppler.exe`. Bug Tracker DB: `b8ce802f...`.
 - [project_expo_web_preview.md](project_expo_web_preview.md) — `.claude/launch.json` `mobile` target. Cold bundle ~18s. Auth-walled past sign-in.
 - [nativewind-windows.md](nativewind-windows.md) — pnpm patchedDependencies + metro forceWriteFileSystem.
-- [project_template_repo.md](project_template_repo.md) — Reusable SaaS mobile template extraction plan.
+- Template repo extraction plan — tracked in Notion (archived from memory 2026-05-04).
 - [feedback_notion_rest_for_queries.md](feedback_notion_rest_for_queries.md) — Always REST API for exhaustive Notion queries.
 - [feedback_notion_resolution_recording.md](feedback_notion_resolution_recording.md) — Record resolution on Done items. Never reopen.
 - [feedback_e2e_runbook.md](feedback_e2e_runbook.md) — Read `docs/E2Edocs/e2e-runbook.md` BEFORE any E2E/emulator/Maestro debugging. 2,358 lines of vault docs replaced with verified short runbook on 2026-04-30.
