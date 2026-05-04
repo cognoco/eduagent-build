@@ -95,6 +95,18 @@ async function translateWithRetry(
   lang: string
 ): Promise<string> {
   let lastError: Error | null = null;
+  // SECURITY NOTE: Gemini's documented auth pattern is `?key=<API_KEY>` in the
+  // URL — there is no header-based equivalent for generateContent. This means
+  // the key WILL surface in any layer that logs URLs (shell history of the
+  // operator running this script, HTTP-level proxy/ALB access logs, network
+  // traces, error reports that include request URL, etc.). To contain blast
+  // radius:
+  //   1. Use a dedicated GEMINI_API_KEY scoped to translation only — no
+  //      production data, no other Google Cloud APIs.
+  //   2. Rotate the key after each translation run, or set a short-lived
+  //      service-account binding.
+  //   3. Never run this script against a CI environment that ships request
+  //      logs to a shared sink.
   const url = `${GEMINI_BASE}/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(
     apiKey
   )}`;

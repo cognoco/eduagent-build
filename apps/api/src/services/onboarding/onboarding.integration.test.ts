@@ -17,7 +17,7 @@ import {
   learningProfiles,
   createDatabase,
 } from '@eduagent/database';
-import { loadDatabaseEnv } from '@eduagent/test-utils';
+import { loadDatabaseEnv, TEST_NONEXISTENT_ID } from '@eduagent/test-utils';
 import { resolve } from 'path';
 import {
   updateConversationLanguage,
@@ -249,10 +249,8 @@ describe('updateInterestsContext (integration)', () => {
   it('throws for a completely nonexistent profileId', async () => {
     const { account } = await seedAccountAndProfile(0);
     const db = createIntegrationDb();
-    const fakeProfileId = '00000000-0000-0000-0000-000000000099';
-
     await expect(
-      updateInterestsContext(db, fakeProfileId, account.id, [
+      updateInterestsContext(db, TEST_NONEXISTENT_ID, account.id, [
         { label: 'Music', context: 'both' as const },
       ])
     ).rejects.toThrow(OnboardingNotFoundError);

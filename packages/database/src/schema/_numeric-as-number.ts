@@ -23,14 +23,21 @@ import { customType } from 'drizzle-orm/pg-core';
  * Throw with the column name and the offending value so Sentry captures it
  * and the operator can identify the row.
  */
+// Parameter is widened to `string | null | undefined` (rather than `string`,
+// which would match drizzle's `fromDriver` signature) so the runtime guards
+// below are type-coherent and honestly document the defensive contract.
+// Today's columns are notNull(), but a postgres driver can theoretically emit
+// null despite the column metadata (driver bug, schema drift, hand-crafted
+// row), and a future nullable numeric column would route through here too —
+// without the widened type, a refactor that "tightens" the param to `string`
+// could silently delete the guard. See callsite: customType.fromDriver below.
 export function parseNumericFromDriver(
-  value: string,
+  value: string | null | undefined,
   columnName: string
 ): number {
   // Reject null/undefined explicitly. Number(null) === 0 and Number.isFinite(0)
   // is true, so without this guard a null driver value would silently coerce
-  // to 0 and pass validation. Today's columns are notNull(), but a future
-  // nullable numeric column would corrupt data invisibly through this helper.
+  // to 0 and pass validation, corrupting SRS scheduling math invisibly.
   if (value === null || value === undefined) {
     throw new Error(
       `numericAsNumber: received ${value === null ? 'null' : 'undefined'} ` +

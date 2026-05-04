@@ -262,6 +262,18 @@ export default [
   // Rule 4 (raw process.env ban) still applies to routes too — flat config
   // re-specifying the same rule replaces the prior value, so we re-list the
   // process.env selector here.
+  //
+  // KNOWN GAP: the selector below catches `c.get('db').select()` directly on
+  // the call chain but does NOT catch the destructured / aliased forms:
+  //   const { db } = c.var; db.select().from(table);
+  //   const db = c.get('db'); db.select().from(table);
+  // These bypasses are covered by Rule 1 (no drizzle-orm imports in routes)
+  // — without `eq`, `and`, `from`, etc. there's no way to actually express a
+  // useful query, so the import ban is the primary backstop. The shared
+  // schema barrel is also banned in routes, so even raw `db.select()` calls
+  // need a table reference that has to come through services. Keep both
+  // rules in place; widening this selector to AST-walk through aliases is
+  // brittle and Rule 1 already pays for the coverage.
   // -------------------------------------------------------------------------
   {
     files: ['apps/api/src/routes/**/*.ts'],

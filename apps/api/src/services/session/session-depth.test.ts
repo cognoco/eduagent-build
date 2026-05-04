@@ -1,4 +1,6 @@
 import type { SessionTranscript } from '@eduagent/schemas';
+import { TEST_SESSION_ID, TEST_SUBJECT_ID } from '@eduagent/test-utils';
+
 import {
   registerProvider,
   _clearProviders,
@@ -14,8 +16,8 @@ function makeTranscript(
   const startedAt = new Date('2026-04-19T10:00:00.000Z').toISOString();
   return {
     session: {
-      sessionId: '00000000-0000-0000-0000-000000000001',
-      subjectId: '00000000-0000-0000-0000-000000000002',
+      sessionId: TEST_SESSION_ID,
+      subjectId: TEST_SUBJECT_ID,
       topicId: null,
       sessionType: 'learning',
       inputMode: 'text',

@@ -1,10 +1,11 @@
 import { render, screen, fireEvent, act } from '@testing-library/react-native';
 import { ProfileSwitcher } from './ProfileSwitcher';
 import type { Profile } from '@eduagent/schemas';
+import { TEST_ACCOUNT_ID, TEST_PROFILE_ID } from '@eduagent/test-utils';
 
 const makeProfile = (overrides: Partial<Profile> = {}): Profile => ({
-  id: '00000000-0000-0000-0000-000000000001',
-  accountId: '00000000-0000-0000-0000-000000000099',
+  id: TEST_PROFILE_ID,
+  accountId: TEST_ACCOUNT_ID,
   displayName: 'Alex',
   avatarUrl: null,
   birthYear: 2010,

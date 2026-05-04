@@ -34,6 +34,8 @@ jest.mock('../client', () => ({
 }));
 
 // Import AFTER mocks
+import { TEST_PROFILE_ID, TEST_SESSION_ID } from '@eduagent/test-utils';
+
 import { askSilentClassify } from './ask-silent-classify';
 
 async function executeHandler(eventData: unknown) {
@@ -162,8 +164,8 @@ describe('ask-silent-classify Inngest function', () => {
       });
 
       await executeHandler({
-        sessionId: '00000000-0000-0000-0000-000000000001',
-        profileId: '00000000-0000-0000-0000-000000000002',
+        sessionId: TEST_SESSION_ID,
+        profileId: TEST_PROFILE_ID,
         classifyInput: 'photosynthesis basics',
         exchangeCount: 1,
       });

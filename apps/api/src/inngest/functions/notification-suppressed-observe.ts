@@ -17,6 +17,7 @@
 import { appNotificationSuppressedEventSchema } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
+import { captureException } from '../../services/sentry';
 
 const logger = createLogger();
 
@@ -30,14 +31,27 @@ export const notificationSuppressedObserve = inngest.createFunction(
     const parsed = appNotificationSuppressedEventSchema.safeParse(event.data);
 
     if (!parsed.success) {
+      // CLAUDE.md "Silent recovery without escalation is banned": a malformed
+      // payload here means an upstream producer drifted from the schema, or a
+      // bad actor / replay injected garbage. Returning success would mark the
+      // run completed and disappear the signal. Instead: capture to Sentry and
+      // throw so Inngest retries → eventually dead-letters, where the volume
+      // is queryable.
+      const err = new Error(
+        '[notification-suppressed] invalid event payload — schema drift or bad event'
+      );
       logger.error('[notification-suppressed] invalid event payload', {
         issues: parsed.error.issues,
         rawData: event.data,
       });
-      return {
-        observed: false,
-        reason: 'invalid_payload',
-      };
+      captureException(err, {
+        extra: {
+          context: 'notification-suppressed-observe:invalid_payload',
+          issues: parsed.error.issues,
+          rawData: event.data,
+        },
+      });
+      throw err;
     }
 
     const data = parsed.data;

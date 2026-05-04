@@ -642,7 +642,10 @@ describe('LibraryScreen', () => {
 
       // 3 topics total (1 with bookId, 2 with null bookId) must all be counted.
       // Pre-fix this would render "1 subjects · 1 topics" (orphans dropped).
-      screen.getByText('1 subjects · 3 topics');
+      // Match on the topic-count segment only — the subject-count segment's
+      // grammar ("1 subject" vs "1 subjects") may shift if proper i18next
+      // pluralization lands later, and that change is unrelated to BUG-971.
+      expect(screen.getByText(/· 3 topics\b/)).toBeTruthy();
     });
 
     it('omits the topic count segment entirely when there are no topics', () => {
