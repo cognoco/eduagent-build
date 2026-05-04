@@ -121,19 +121,19 @@ function ToggleRow({
   );
 }
 
-// BKT-C.1 — Settings display names for the 8 supported tutor languages. Kept
+// BKT-C.1 — Settings display names for the 8 supported mentor languages. Kept
 // inline (rather than imported from onboarding/language-picker.tsx) to avoid
 // Expo Router treating a shared helper under app/(app)/ as a route. The source
 // of truth for the allowed codes is packages/schemas/src/profiles.ts.
-const TUTOR_LANGUAGE_KEYS: Record<ConversationLanguage, string> = {
-  en: 'more.tutorLanguageLabels.en',
-  cs: 'more.tutorLanguageLabels.cs',
-  de: 'more.tutorLanguageLabels.de',
-  es: 'more.tutorLanguageLabels.es',
-  fr: 'more.tutorLanguageLabels.fr',
-  it: 'more.tutorLanguageLabels.it',
-  pl: 'more.tutorLanguageLabels.pl',
-  pt: 'more.tutorLanguageLabels.pt',
+const MENTOR_LANGUAGE_KEYS: Record<ConversationLanguage, string> = {
+  en: 'more.mentorLanguageLabels.en',
+  cs: 'more.mentorLanguageLabels.cs',
+  de: 'more.mentorLanguageLabels.de',
+  es: 'more.mentorLanguageLabels.es',
+  fr: 'more.mentorLanguageLabels.fr',
+  it: 'more.mentorLanguageLabels.it',
+  pl: 'more.mentorLanguageLabels.pl',
+  pt: 'more.mentorLanguageLabels.pt',
 };
 
 function LearningModeOption({
@@ -725,14 +725,14 @@ export default function MoreScreen() {
           onPress={() => router.push('/profiles')}
         />
         <AccountSecurity visible={activeProfile?.isOwner ?? false} />
-        {/* BKT-C.1 — Tutor language edit path. Launches the same picker the */}
+        {/* BKT-C.1 — Mentor language edit path. Launches the same picker the */}
         {/* interview onboarding uses, with returnTo=settings so the picker's */}
         {/* onSave returns here instead of forward-routing into language-setup. */}
         <SettingsRow
-          label={t('more.account.tutorLanguage')}
+          label={t('more.account.mentorLanguage')}
           value={
             activeProfile?.conversationLanguage
-              ? t(TUTOR_LANGUAGE_KEYS[activeProfile.conversationLanguage])
+              ? t(MENTOR_LANGUAGE_KEYS[activeProfile.conversationLanguage])
               : undefined
           }
           onPress={() =>

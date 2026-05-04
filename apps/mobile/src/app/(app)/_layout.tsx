@@ -35,7 +35,7 @@ import {
 } from '../../lib/pending-auth-redirect';
 import { platformAlert } from '../../lib/platform-alert';
 import { FeedbackProvider } from '../../components/feedback/FeedbackProvider';
-import { ErrorFallback } from '../../components/common';
+import { ErrorFallback, GateContent } from '../../components/common';
 import { goBackOrReplace } from '../../lib/navigation';
 import { useSubjects } from '../../hooks/use-subjects';
 import { usePermissionSetup } from '../../hooks/use-permission-setup';
@@ -545,35 +545,37 @@ function CreateProfileGate(): React.ReactElement {
       style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
       testID="create-profile-gate"
     >
-      <Text className="text-h1 font-bold text-text-primary mb-3 text-center">
-        {t('tabs.createProfile.welcome')}
-      </Text>
-      <Text className="text-body text-text-secondary text-center mb-8">
-        {t('tabs.createProfile.setupProfile')}
-      </Text>
-      <Pressable
-        onPress={handleGetStarted}
-        className="bg-primary rounded-button py-3.5 px-8 items-center w-full"
-        style={{ minHeight: 48 }}
-        testID="create-profile-cta"
-        accessibilityRole="button"
-        accessibilityLabel={t('tabs.createProfile.getStarted')}
-      >
-        <Text className="text-body font-semibold text-text-inverse">
-          {t('tabs.createProfile.getStarted')}
+      <GateContent>
+        <Text className="text-h1 font-bold text-text-primary mb-3 text-center">
+          {t('tabs.createProfile.welcome')}
         </Text>
-      </Pressable>
-      <Pressable
-        onPress={() => void handleSignOut()}
-        className="mt-6 py-2"
-        testID="create-profile-gate-signout"
-        accessibilityRole="button"
-        accessibilityLabel={t('tabs.createProfile.signOutLabel')}
-      >
-        <Text className="text-caption text-text-muted text-center underline">
-          {t('tabs.createProfile.signOut')}
+        <Text className="text-body text-text-secondary text-center mb-8">
+          {t('tabs.createProfile.setupProfile')}
         </Text>
-      </Pressable>
+        <Pressable
+          onPress={handleGetStarted}
+          className="bg-primary rounded-button py-3.5 px-8 items-center w-full"
+          style={{ minHeight: 48 }}
+          testID="create-profile-cta"
+          accessibilityRole="button"
+          accessibilityLabel={t('tabs.createProfile.getStarted')}
+        >
+          <Text className="text-body font-semibold text-text-inverse">
+            {t('tabs.createProfile.getStarted')}
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => void handleSignOut()}
+          className="mt-6 py-2 items-center"
+          testID="create-profile-gate-signout"
+          accessibilityRole="button"
+          accessibilityLabel={t('tabs.createProfile.signOutLabel')}
+        >
+          <Text className="text-caption text-text-muted text-center underline">
+            {t('tabs.createProfile.signOut')}
+          </Text>
+        </Pressable>
+      </GateContent>
     </View>
   );
 }
@@ -624,87 +626,89 @@ function ConsentWithdrawnGate(): React.ReactElement {
       style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
       testID="consent-withdrawn-gate"
     >
-      <Text
-        className="text-h1 font-bold text-text-primary mb-4 text-center"
-        accessibilityRole="header"
-      >
-        {copy.title}
-      </Text>
-      <Text className="text-body text-text-secondary mb-2 text-center">
-        {copy.message}
-      </Text>
-      <Text className="text-body text-text-secondary mb-2 text-center">
-        {copy.details}
-      </Text>
-      <Text className="text-body-sm text-text-muted mb-8 text-center">
-        {copy.help}
-      </Text>
-
-      {/* BUG-114: Refresh button so child can re-check if consent was restored */}
-      <Pressable
-        onPress={() => void handleRefresh()}
-        disabled={refreshing}
-        className="bg-primary rounded-button py-3.5 px-8 items-center mb-3 w-full"
-        testID="withdrawn-refresh-status"
-        accessibilityRole="button"
-        accessibilityLabel={t('tabs.consentWithdrawn.refreshStatus')}
-      >
-        {refreshing ? (
-          <ActivityIndicator size="small" color="white" />
-        ) : (
-          <Text className="text-body font-semibold text-text-inverse">
-            {t('tabs.consentWithdrawn.refreshStatus')}
-          </Text>
-        )}
-      </Pressable>
-
-      {canSwitchFromConsentGate(activeProfile, profiles) && (
-        <Pressable
-          onPress={() => {
-            // [BUG-776] Confirm destination by name before switching.
-            const prompt = buildSwitchProfileConfirmation({
-              activeProfile,
-              profiles,
-              t,
-            });
-            if (!prompt) return;
-            platformAlert(prompt.title, prompt.message, [
-              { text: t('common.cancel'), style: 'cancel' },
-              {
-                text: t('tabs.switchProfile.switchButton'),
-                onPress: () => {
-                  void switchProfile(prompt.target.id).catch(() => {
-                    platformAlert(
-                      t('tabs.switchProfile.errorTitle'),
-                      t('tabs.switchProfile.errorMessage')
-                    );
-                  });
-                },
-              },
-            ]);
-          }}
-          className="bg-surface rounded-button py-3.5 px-8 items-center mb-3 w-full"
-          testID="withdrawn-switch-profile"
-          accessibilityRole="button"
-          accessibilityLabel={t('tabs.consentGate.switchProfile')}
+      <GateContent>
+        <Text
+          className="text-h1 font-bold text-text-primary mb-4 text-center"
+          accessibilityRole="header"
         >
-          <Text className="text-body font-semibold text-text-secondary">
-            {t('tabs.consentGate.switchProfile')}
+          {copy.title}
+        </Text>
+        <Text className="text-body text-text-secondary mb-2 text-center">
+          {copy.message}
+        </Text>
+        <Text className="text-body text-text-secondary mb-2 text-center">
+          {copy.details}
+        </Text>
+        <Text className="text-body-sm text-text-muted mb-8 text-center">
+          {copy.help}
+        </Text>
+
+        {/* BUG-114: Refresh button so child can re-check if consent was restored */}
+        <Pressable
+          onPress={() => void handleRefresh()}
+          disabled={refreshing}
+          className="bg-primary rounded-button py-3.5 px-8 items-center mb-3 w-full"
+          testID="withdrawn-refresh-status"
+          accessibilityRole="button"
+          accessibilityLabel={t('tabs.consentWithdrawn.refreshStatus')}
+        >
+          {refreshing ? (
+            <ActivityIndicator size="small" color="white" />
+          ) : (
+            <Text className="text-body font-semibold text-text-inverse">
+              {t('tabs.consentWithdrawn.refreshStatus')}
+            </Text>
+          )}
+        </Pressable>
+
+        {canSwitchFromConsentGate(activeProfile, profiles) && (
+          <Pressable
+            onPress={() => {
+              // [BUG-776] Confirm destination by name before switching.
+              const prompt = buildSwitchProfileConfirmation({
+                activeProfile,
+                profiles,
+                t,
+              });
+              if (!prompt) return;
+              platformAlert(prompt.title, prompt.message, [
+                { text: t('common.cancel'), style: 'cancel' },
+                {
+                  text: t('tabs.switchProfile.switchButton'),
+                  onPress: () => {
+                    void switchProfile(prompt.target.id).catch(() => {
+                      platformAlert(
+                        t('tabs.switchProfile.errorTitle'),
+                        t('tabs.switchProfile.errorMessage')
+                      );
+                    });
+                  },
+                },
+              ]);
+            }}
+            className="bg-surface rounded-button py-3.5 px-8 items-center mb-3 w-full"
+            testID="withdrawn-switch-profile"
+            accessibilityRole="button"
+            accessibilityLabel={t('tabs.consentGate.switchProfile')}
+          >
+            <Text className="text-body font-semibold text-text-secondary">
+              {t('tabs.consentGate.switchProfile')}
+            </Text>
+          </Pressable>
+        )}
+
+        <Pressable
+          onPress={() => void handleSignOut()}
+          className="py-3.5 px-8 items-center w-full"
+          testID="withdrawn-sign-out"
+          accessibilityRole="button"
+          accessibilityLabel={t('tabs.consentGate.signOut')}
+        >
+          <Text className="text-body font-semibold text-primary">
+            {t('tabs.consentGate.signOut')}
           </Text>
         </Pressable>
-      )}
-
-      <Pressable
-        onPress={() => void handleSignOut()}
-        className="py-3.5 px-8 items-center w-full"
-        testID="withdrawn-sign-out"
-        accessibilityRole="button"
-        accessibilityLabel={t('tabs.consentGate.signOut')}
-      >
-        <Text className="text-body font-semibold text-primary">
-          {t('tabs.consentGate.signOut')}
-        </Text>
-      </Pressable>
+      </GateContent>
     </View>
   );
 }
@@ -872,81 +876,83 @@ function ConsentPendingGate(): React.ReactElement {
         }}
         testID="consent-pending-gate"
       >
-        <Text className="text-h1 font-bold text-text-primary mb-4 text-center">
-          {copy.noEmailSentTitle}
-        </Text>
-        <Text className="text-body text-text-secondary mb-2 text-center">
-          {copy.noEmailSentDescription}
-        </Text>
-        <Text className="text-body text-text-secondary mb-8 text-center">
-          {copy.noEmailSentSubtext}
-        </Text>
-
-        <Pressable
-          onPress={() => {
-            if (!activeProfile) return;
-            router.push({
-              pathname: '/consent',
-              params: { profileId: activeProfile.id },
-            });
-          }}
-          className="bg-primary rounded-button py-3.5 px-8 items-center mb-3 w-full"
-          testID="consent-send-to-parent"
-          accessibilityRole="button"
-          accessibilityLabel={copy.sendToParentButton}
-        >
-          <Text className="text-body font-semibold text-text-inverse">
-            {copy.sendToParentButton}
+        <GateContent>
+          <Text className="text-h1 font-bold text-text-primary mb-4 text-center">
+            {copy.noEmailSentTitle}
           </Text>
-        </Pressable>
+          <Text className="text-body text-text-secondary mb-2 text-center">
+            {copy.noEmailSentDescription}
+          </Text>
+          <Text className="text-body text-text-secondary mb-8 text-center">
+            {copy.noEmailSentSubtext}
+          </Text>
 
-        {canSwitchFromConsentGate(activeProfile, profiles) && (
           <Pressable
             onPress={() => {
-              // [BUG-776] Confirm destination by name before switching.
-              const prompt = buildSwitchProfileConfirmation({
-                activeProfile,
-                profiles,
-                t,
+              if (!activeProfile) return;
+              router.push({
+                pathname: '/consent',
+                params: { profileId: activeProfile.id },
               });
-              if (!prompt) return;
-              platformAlert(prompt.title, prompt.message, [
-                { text: t('common.cancel'), style: 'cancel' },
-                {
-                  text: t('tabs.switchProfile.switchButton'),
-                  onPress: () => {
-                    void switchProfile(prompt.target.id).catch(() => {
-                      platformAlert(
-                        'Could not switch profile',
-                        'Please try again.'
-                      );
-                    });
-                  },
-                },
-              ]);
             }}
-            className="py-3.5 px-8 items-center mb-3 w-full"
-            testID="consent-switch-profile"
+            className="bg-primary rounded-button py-3.5 px-8 items-center mb-3 w-full"
+            testID="consent-send-to-parent"
             accessibilityRole="button"
-            accessibilityLabel={t('tabs.consentGate.switchProfile')}
+            accessibilityLabel={copy.sendToParentButton}
           >
-            <Text className="text-body font-semibold text-text-secondary">
-              {t('tabs.consentGate.switchProfile')}
+            <Text className="text-body font-semibold text-text-inverse">
+              {copy.sendToParentButton}
             </Text>
           </Pressable>
-        )}
 
-        <Pressable
-          onPress={() => void handleSignOut()}
-          className="py-3.5 px-8 items-center w-full"
-          testID="consent-sign-out"
-          accessibilityRole="button"
-          accessibilityLabel={t('tabs.consentGate.signOut')}
-        >
-          <Text className="text-body font-semibold text-primary">
-            {t('tabs.consentGate.signOut')}
-          </Text>
-        </Pressable>
+          {canSwitchFromConsentGate(activeProfile, profiles) && (
+            <Pressable
+              onPress={() => {
+                // [BUG-776] Confirm destination by name before switching.
+                const prompt = buildSwitchProfileConfirmation({
+                  activeProfile,
+                  profiles,
+                  t,
+                });
+                if (!prompt) return;
+                platformAlert(prompt.title, prompt.message, [
+                  { text: t('common.cancel'), style: 'cancel' },
+                  {
+                    text: t('tabs.switchProfile.switchButton'),
+                    onPress: () => {
+                      void switchProfile(prompt.target.id).catch(() => {
+                        platformAlert(
+                          'Could not switch profile',
+                          'Please try again.'
+                        );
+                      });
+                    },
+                  },
+                ]);
+              }}
+              className="py-3.5 px-8 items-center mb-3 w-full"
+              testID="consent-switch-profile"
+              accessibilityRole="button"
+              accessibilityLabel={t('tabs.consentGate.switchProfile')}
+            >
+              <Text className="text-body font-semibold text-text-secondary">
+                {t('tabs.consentGate.switchProfile')}
+              </Text>
+            </Pressable>
+          )}
+
+          <Pressable
+            onPress={() => void handleSignOut()}
+            className="py-3.5 px-8 items-center w-full"
+            testID="consent-sign-out"
+            accessibilityRole="button"
+            accessibilityLabel={t('tabs.consentGate.signOut')}
+          >
+            <Text className="text-body font-semibold text-primary">
+              {t('tabs.consentGate.signOut')}
+            </Text>
+          </Pressable>
+        </GateContent>
       </ScrollView>
     );
   }
@@ -965,268 +971,272 @@ function ConsentPendingGate(): React.ReactElement {
       }}
       testID="consent-pending-gate"
     >
-      <Text className="text-h1 font-bold text-text-primary mb-4 text-center">
-        {copy.title}
-      </Text>
-      <Text className="text-body text-text-secondary mb-2 text-center">
-        {parentEmail
-          ? copy.descriptionWithEmail(parentEmail)
-          : copy.descriptionWithoutEmail}
-      </Text>
-      <Text className="text-body text-text-secondary mb-8 text-center">
-        {copy.subtext}
-      </Text>
-
-      <Pressable
-        onPress={onCheckAgain}
-        disabled={checking}
-        className="bg-primary rounded-button py-3.5 px-8 items-center mb-3 w-full"
-        testID="consent-check-again"
-        accessibilityRole="button"
-        accessibilityLabel={t('tabs.consentPending.checkAgain')}
-      >
-        {checking ? (
-          <ActivityIndicator color={colors.textInverse} />
-        ) : (
-          <Text className="text-body font-semibold text-text-inverse">
-            {t('tabs.consentPending.checkAgain')}
-          </Text>
-        )}
-      </Pressable>
-
-      <Text className="text-body-sm text-text-muted text-center mb-3">
-        {t('tabs.consentPending.autoChecking')}
-      </Text>
-
-      {parentEmail && consentData?.consentType && !changingEmail && (
-        <Pressable
-          onPress={onResend}
-          disabled={resendMutation.isPending}
-          className="bg-surface rounded-button py-3.5 px-8 items-center mb-3 w-full"
-          testID="consent-resend"
-          accessibilityRole="button"
-          accessibilityLabel={t('tabs.consentPending.resendApprovalEmailLabel')}
-        >
-          {resendMutation.isPending ? (
-            <ActivityIndicator color={colors.accent} />
-          ) : (
-            <Text className="text-body font-semibold text-primary">
-              {t('tabs.consentPending.resendEmail')}
-            </Text>
-          )}
-        </Pressable>
-      )}
-
-      {resendFeedback === 'sent' && !changingEmail && (
-        <Text
-          className="text-body-sm text-primary text-center mb-3"
-          testID="consent-resend-success"
-          accessibilityRole="alert"
-        >
-          {t('tabs.consentPending.emailSentFeedback')}
+      <GateContent>
+        <Text className="text-h1 font-bold text-text-primary mb-4 text-center">
+          {copy.title}
         </Text>
-      )}
-      {resendFeedback === 'error' && !changingEmail && (
-        <View
-          className="bg-danger/10 rounded-card px-4 py-3 mb-3 w-full"
-          accessibilityRole="alert"
-        >
-          <Text
-            className="text-danger text-body-sm"
-            testID="consent-resend-error"
-          >
-            {resendErrorMsg || t('errors.generic')}
-          </Text>
-        </View>
-      )}
+        <Text className="text-body text-text-secondary mb-2 text-center">
+          {parentEmail
+            ? copy.descriptionWithEmail(parentEmail)
+            : copy.descriptionWithoutEmail}
+        </Text>
+        <Text className="text-body text-text-secondary mb-8 text-center">
+          {copy.subtext}
+        </Text>
 
-      {consentData?.consentType && !changingEmail && (
         <Pressable
-          onPress={() => {
-            setChangingEmail(true);
-            setResendFeedback(null);
-            setChangeEmailError('');
-          }}
-          className="py-3.5 px-8 items-center mb-3 w-full"
-          testID="consent-change-email"
+          onPress={onCheckAgain}
+          disabled={checking}
+          className="bg-primary rounded-button py-3.5 px-8 items-center mb-3 w-full"
+          testID="consent-check-again"
           accessibilityRole="button"
-          accessibilityLabel={copy.changeEmailButton}
+          accessibilityLabel={t('tabs.consentPending.checkAgain')}
         >
-          <Text className="text-body font-semibold text-primary">
-            {copy.changeEmailButton}
-          </Text>
-        </Pressable>
-      )}
-
-      {changingEmail && (
-        <View className="bg-surface rounded-card px-4 py-4 mb-3 w-full">
-          <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-            {copy.changeEmailLabel}
-          </Text>
-          <TextInput
-            className="bg-background text-text-primary text-body rounded-input px-4 py-3 mb-2"
-            placeholder={t('tabs.consentPending.parentEmailPlaceholder')}
-            placeholderTextColor={colors.muted}
-            value={newParentEmail}
-            onChangeText={setNewParentEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoComplete="email"
-            autoFocus
-            editable={!resendMutation.isPending}
-            testID="consent-new-email-input"
-          />
-          {isSameAsChild && (
-            <Text
-              className="text-danger text-body-sm mb-1"
-              accessibilityRole="alert"
-              accessibilityLiveRegion="assertive"
-              testID="consent-change-same-email-warning"
-            >
-              {copy.sameEmailWarning}
+          {checking ? (
+            <ActivityIndicator color={colors.textInverse} />
+          ) : (
+            <Text className="text-body font-semibold text-text-inverse">
+              {t('tabs.consentPending.checkAgain')}
             </Text>
           )}
-          {changeEmailError !== '' && (
-            <View
-              className="bg-danger/10 rounded-card px-4 py-3 mb-2"
-              accessibilityRole="alert"
-            >
-              <Text
-                className="text-danger text-body-sm"
-                testID="consent-change-email-error"
-              >
-                {changeEmailError}
-              </Text>
-            </View>
-          )}
+        </Pressable>
+
+        <Text className="text-body-sm text-text-muted text-center mb-3">
+          {t('tabs.consentPending.autoChecking')}
+        </Text>
+
+        {parentEmail && consentData?.consentType && !changingEmail && (
           <Pressable
-            onPress={onSubmitNewEmail}
-            disabled={!canSubmitNewEmail}
-            className={`rounded-button py-3.5 items-center mb-2 ${
-              canSubmitNewEmail ? 'bg-primary' : 'bg-primary/40'
-            }`}
-            testID="consent-change-email-submit"
+            onPress={onResend}
+            disabled={resendMutation.isPending}
+            className="bg-surface rounded-button py-3.5 px-8 items-center mb-3 w-full"
+            testID="consent-resend"
             accessibilityRole="button"
-            accessibilityLabel={copy.changeEmailSubmit}
+            accessibilityLabel={t(
+              'tabs.consentPending.resendApprovalEmailLabel'
+            )}
           >
             {resendMutation.isPending ? (
-              <ActivityIndicator color={colors.textInverse} />
+              <ActivityIndicator color={colors.accent} />
             ) : (
-              <Text className="text-body font-semibold text-text-inverse">
-                {copy.changeEmailSubmit}
+              <Text className="text-body font-semibold text-primary">
+                {t('tabs.consentPending.resendEmail')}
               </Text>
             )}
           </Pressable>
+        )}
+
+        {resendFeedback === 'sent' && !changingEmail && (
+          <Text
+            className="text-body-sm text-primary text-center mb-3"
+            testID="consent-resend-success"
+            accessibilityRole="alert"
+          >
+            {t('tabs.consentPending.emailSentFeedback')}
+          </Text>
+        )}
+        {resendFeedback === 'error' && !changingEmail && (
+          <View
+            className="bg-danger/10 rounded-card px-4 py-3 mb-3 w-full"
+            accessibilityRole="alert"
+          >
+            <Text
+              className="text-danger text-body-sm"
+              testID="consent-resend-error"
+            >
+              {resendErrorMsg || t('errors.generic')}
+            </Text>
+          </View>
+        )}
+
+        {consentData?.consentType && !changingEmail && (
           <Pressable
             onPress={() => {
-              setChangingEmail(false);
-              setNewParentEmail('');
+              setChangingEmail(true);
+              setResendFeedback(null);
+              setChangeEmailError('');
             }}
-            className="py-2 items-center"
-            testID="consent-change-email-cancel"
+            className="py-3.5 px-8 items-center mb-3 w-full"
+            testID="consent-change-email"
             accessibilityRole="button"
-            accessibilityLabel={t('common.cancel')}
+            accessibilityLabel={copy.changeEmailButton}
           >
-            <Text className="text-body-sm text-text-secondary">
-              {t('common.cancel')}
+            <Text className="text-body font-semibold text-primary">
+              {copy.changeEmailButton}
             </Text>
           </Pressable>
-        </View>
-      )}
+        )}
 
-      {/* Preview section */}
-      <View className="w-full mt-6 mb-4">
-        <View className="flex-row items-center mb-3">
-          <View className="flex-1 h-px bg-border" />
-          <Text className="text-caption text-text-muted mx-3">
-            {t('tabs.consentPending.whileYouWait')}
+        {changingEmail && (
+          <View className="bg-surface rounded-card px-4 py-4 mb-3 w-full">
+            <Text className="text-body-sm font-semibold text-text-secondary mb-1">
+              {copy.changeEmailLabel}
+            </Text>
+            <TextInput
+              className="bg-background text-text-primary text-body rounded-input px-4 py-3 mb-2"
+              placeholder={t('tabs.consentPending.parentEmailPlaceholder')}
+              placeholderTextColor={colors.muted}
+              value={newParentEmail}
+              onChangeText={setNewParentEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoComplete="email"
+              autoFocus
+              editable={!resendMutation.isPending}
+              testID="consent-new-email-input"
+            />
+            {isSameAsChild && (
+              <Text
+                className="text-danger text-body-sm mb-1"
+                accessibilityRole="alert"
+                accessibilityLiveRegion="assertive"
+                testID="consent-change-same-email-warning"
+              >
+                {copy.sameEmailWarning}
+              </Text>
+            )}
+            {changeEmailError !== '' && (
+              <View
+                className="bg-danger/10 rounded-card px-4 py-3 mb-2"
+                accessibilityRole="alert"
+              >
+                <Text
+                  className="text-danger text-body-sm"
+                  testID="consent-change-email-error"
+                >
+                  {changeEmailError}
+                </Text>
+              </View>
+            )}
+            <Pressable
+              onPress={onSubmitNewEmail}
+              disabled={!canSubmitNewEmail}
+              className={`rounded-button py-3.5 items-center mb-2 ${
+                canSubmitNewEmail ? 'bg-primary' : 'bg-primary/40'
+              }`}
+              testID="consent-change-email-submit"
+              accessibilityRole="button"
+              accessibilityLabel={copy.changeEmailSubmit}
+            >
+              {resendMutation.isPending ? (
+                <ActivityIndicator color={colors.textInverse} />
+              ) : (
+                <Text className="text-body font-semibold text-text-inverse">
+                  {copy.changeEmailSubmit}
+                </Text>
+              )}
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                setChangingEmail(false);
+                setNewParentEmail('');
+              }}
+              className="py-2 items-center"
+              testID="consent-change-email-cancel"
+              accessibilityRole="button"
+              accessibilityLabel={t('common.cancel')}
+            >
+              <Text className="text-body-sm text-text-secondary">
+                {t('common.cancel')}
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
+        {/* Preview section */}
+        <View className="w-full mt-6 mb-4">
+          <View className="flex-row items-center mb-3">
+            <View className="flex-1 h-px bg-border" />
+            <Text className="text-caption text-text-muted mx-3">
+              {t('tabs.consentPending.whileYouWait')}
+            </Text>
+            <View className="flex-1 h-px bg-border" />
+          </View>
+          <Text className="text-body-sm text-text-secondary text-center mb-3">
+            {t('tabs.consentPending.previewIntro')}
           </Text>
-          <View className="flex-1 h-px bg-border" />
+          <Pressable
+            onPress={() => setPreviewMode('subjects')}
+            className="bg-surface rounded-card px-4 py-3.5 mb-2 flex-row items-center"
+            testID="preview-browse-subjects"
+            accessibilityRole="button"
+            accessibilityLabel={t('tabs.consentPending.browseSubjectsLabel')}
+          >
+            <Text className="text-body me-3">{'\u{1F4DA}'}</Text>
+            <View className="flex-1">
+              <Text className="text-body font-semibold text-text-primary">
+                {t('tabs.consentPending.browseSubjects')}
+              </Text>
+              <Text className="text-caption text-text-secondary">
+                {t('tabs.consentPending.browseSubjectsHint')}
+              </Text>
+            </View>
+          </Pressable>
+          <Pressable
+            onPress={() => setPreviewMode('coaching')}
+            className="bg-surface rounded-card px-4 py-3.5 flex-row items-center"
+            testID="preview-sample-coaching"
+            accessibilityRole="button"
+            accessibilityLabel={t('tabs.consentPending.sampleMentoringLabel')}
+          >
+            <Text className="text-body me-3">{'\u{1F3AF}'}</Text>
+            <View className="flex-1">
+              <Text className="text-body font-semibold text-text-primary">
+                {t('tabs.consentPending.sampleMentoring')}
+              </Text>
+              <Text className="text-caption text-text-secondary">
+                {t('tabs.consentPending.sampleMentoringHint')}
+              </Text>
+            </View>
+          </Pressable>
         </View>
-        <Text className="text-body-sm text-text-secondary text-center mb-3">
-          {t('tabs.consentPending.previewIntro')}
-        </Text>
-        <Pressable
-          onPress={() => setPreviewMode('subjects')}
-          className="bg-surface rounded-card px-4 py-3.5 mb-2 flex-row items-center"
-          testID="preview-browse-subjects"
-          accessibilityRole="button"
-          accessibilityLabel={t('tabs.consentPending.browseSubjectsLabel')}
-        >
-          <Text className="text-body me-3">{'\u{1F4DA}'}</Text>
-          <View className="flex-1">
-            <Text className="text-body font-semibold text-text-primary">
-              {t('tabs.consentPending.browseSubjects')}
-            </Text>
-            <Text className="text-caption text-text-secondary">
-              {t('tabs.consentPending.browseSubjectsHint')}
-            </Text>
-          </View>
-        </Pressable>
-        <Pressable
-          onPress={() => setPreviewMode('coaching')}
-          className="bg-surface rounded-card px-4 py-3.5 flex-row items-center"
-          testID="preview-sample-coaching"
-          accessibilityRole="button"
-          accessibilityLabel={t('tabs.consentPending.sampleMentoringLabel')}
-        >
-          <Text className="text-body me-3">{'\u{1F3AF}'}</Text>
-          <View className="flex-1">
-            <Text className="text-body font-semibold text-text-primary">
-              {t('tabs.consentPending.sampleMentoring')}
-            </Text>
-            <Text className="text-caption text-text-secondary">
-              {t('tabs.consentPending.sampleMentoringHint')}
-            </Text>
-          </View>
-        </Pressable>
-      </View>
 
-      {canSwitchFromConsentGate(activeProfile, profiles) && (
-        <Pressable
-          onPress={() => {
-            // [BUG-776] Confirm destination by name before switching.
-            const prompt = buildSwitchProfileConfirmation({
-              activeProfile,
-              profiles,
-              t,
-            });
-            if (!prompt) return;
-            platformAlert(prompt.title, prompt.message, [
-              { text: t('common.cancel'), style: 'cancel' },
-              {
-                text: t('tabs.switchProfile.switchButton'),
-                onPress: () => {
-                  void switchProfile(prompt.target.id).catch(() => {
-                    platformAlert(
-                      t('tabs.switchProfile.errorTitle'),
-                      t('tabs.switchProfile.errorMessage')
-                    );
-                  });
+        {canSwitchFromConsentGate(activeProfile, profiles) && (
+          <Pressable
+            onPress={() => {
+              // [BUG-776] Confirm destination by name before switching.
+              const prompt = buildSwitchProfileConfirmation({
+                activeProfile,
+                profiles,
+                t,
+              });
+              if (!prompt) return;
+              platformAlert(prompt.title, prompt.message, [
+                { text: t('common.cancel'), style: 'cancel' },
+                {
+                  text: t('tabs.switchProfile.switchButton'),
+                  onPress: () => {
+                    void switchProfile(prompt.target.id).catch(() => {
+                      platformAlert(
+                        t('tabs.switchProfile.errorTitle'),
+                        t('tabs.switchProfile.errorMessage')
+                      );
+                    });
+                  },
                 },
-              },
-            ]);
-          }}
-          className="py-3.5 px-8 items-center mb-3 w-full"
-          testID="consent-switch-profile"
-          accessibilityRole="button"
-          accessibilityLabel="Switch profile"
-        >
-          <Text className="text-body font-semibold text-text-secondary">
-            Switch profile
-          </Text>
-        </Pressable>
-      )}
+              ]);
+            }}
+            className="py-3.5 px-8 items-center mb-3 w-full"
+            testID="consent-switch-profile"
+            accessibilityRole="button"
+            accessibilityLabel="Switch profile"
+          >
+            <Text className="text-body font-semibold text-text-secondary">
+              Switch profile
+            </Text>
+          </Pressable>
+        )}
 
-      <Pressable
-        onPress={() => void handleSignOut()}
-        className="py-3.5 px-8 items-center w-full"
-        testID="consent-sign-out"
-        accessibilityRole="button"
-        accessibilityLabel="Sign out"
-      >
-        <Text className="text-body font-semibold text-primary">Sign out</Text>
-      </Pressable>
+        <Pressable
+          onPress={() => void handleSignOut()}
+          className="py-3.5 px-8 items-center w-full"
+          testID="consent-sign-out"
+          accessibilityRole="button"
+          accessibilityLabel="Sign out"
+        >
+          <Text className="text-body font-semibold text-primary">Sign out</Text>
+        </Pressable>
+      </GateContent>
     </ScrollView>
   );
 }

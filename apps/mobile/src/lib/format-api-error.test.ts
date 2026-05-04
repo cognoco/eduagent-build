@@ -625,3 +625,54 @@ describe('recoveryActions', () => {
     expect(result.primary).toBeUndefined();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Regression — runtime-error leak guard
+//
+// A Hermes ReferenceError ("Property 'crypto' doesn't exist") was caught
+// in the streaming pipeline and rendered as the assistant's reply because
+// classifyApiError step 6 returned err.message verbatim for any short,
+// non-stack message. The fix has two layers: kill the global `crypto`
+// usage that threw the error AND make the formatter refuse to surface
+// JS-engine error shapes even if a future bug throws another one.
+// ---------------------------------------------------------------------------
+describe('classifyApiError — runtime-error leak guard', () => {
+  const RUNTIME_ERROR_MESSAGES = [
+    "Property 'crypto' doesn't exist",
+    "Property 'foo' doesn't exist",
+    'crypto is not defined',
+    'someFn is not a function',
+    'Cannot read property of undefined',
+    'Cannot read properties of null',
+    'undefined is not an object',
+    'undefined is not a function',
+    'ReferenceError: x is not defined',
+    'TypeError: cannot read foo',
+  ];
+
+  it.each(RUNTIME_ERROR_MESSAGES)(
+    'never surfaces runtime-error message %p as user-facing text',
+    (raw) => {
+      const formatted = formatApiError(new Error(raw));
+      expect(formatted).not.toBe(raw);
+      expect(formatted.toLowerCase()).not.toContain('crypto');
+      expect(formatted.toLowerCase()).not.toContain('referenceerror');
+      expect(formatted.toLowerCase()).not.toContain('typeerror');
+    }
+  );
+
+  it('still passes through short user-friendly messages', () => {
+    const formatted = formatApiError(
+      new Error('Profile name must be 1 to 80 characters.')
+    );
+    expect(formatted).toBe('Profile name must be 1 to 80 characters.');
+  });
+
+  it('classifies a Hermes-style ReferenceError as unknown/retry', () => {
+    const result = classifyApiError(
+      new Error("Property 'crypto' doesn't exist")
+    );
+    expect(result.category).toBe('unknown');
+    expect(result.recovery).toBe('retry');
+  });
+});

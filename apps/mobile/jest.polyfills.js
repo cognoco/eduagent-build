@@ -34,6 +34,21 @@ Object.defineProperty(global, '__ExpoImportMetaRegistry', {
   enumerable: false,
 });
 
+// Same pattern for `structuredClone`: expo's installGlobal would otherwise
+// replace Node's native `structuredClone` with a lazy getter that requires
+// `@ungap/structured-clone` long after module-eval, tripping the same
+// jest-30 "outside test scope" guard. Pre-claim it as non-configurable so
+// installGlobal early-returns and Node's native polyfill stays in place.
+if (typeof globalThis.structuredClone === 'function') {
+  const native = globalThis.structuredClone;
+  Object.defineProperty(global, 'structuredClone', {
+    value: native,
+    configurable: false,
+    writable: true,
+    enumerable: false,
+  });
+}
+
 if (typeof global.__fbBatchedBridgeConfig === 'undefined') {
   global.__fbBatchedBridgeConfig = {
     remoteModuleConfig: [],
@@ -135,6 +150,12 @@ if (typeof global.__turboModuleProxy === 'undefined') {
     }
     if (name === 'I18nManager') {
       return { getConstants: () => i18nManagerConstants };
+    }
+    if (name === 'SourceCode') {
+      // RN's getDevServer.js calls NativeSourceCode.getConstants().scriptURL
+      // and immediately .match()s it; an undefined value throws at module
+      // require-time of expo's async-require/messageSocket.native.
+      return { getConstants: () => ({ scriptURL: 'http://localhost/' }) };
     }
     return genericStub;
   };

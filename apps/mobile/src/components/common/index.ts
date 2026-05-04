@@ -7,6 +7,7 @@ export * from './celebrations';
 export { CheckmarkPopAnimation } from './CheckmarkPopAnimation';
 export { ErrorBoundary } from './ErrorBoundary';
 export { ErrorFallback } from './ErrorFallback';
+export { GateContent, GATE_WEB_MAX_WIDTH } from './GateContent';
 export { OfflineBanner } from './OfflineBanner';
 export { PasswordInput } from './PasswordInput';
 export { DeskLampAnimation } from './DeskLampAnimation';

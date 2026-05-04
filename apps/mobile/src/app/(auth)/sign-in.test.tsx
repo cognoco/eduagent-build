@@ -6,7 +6,7 @@ import {
   act,
 } from '@testing-library/react-native';
 import { useSignIn, useSSO } from '@clerk/clerk-expo';
-import { Platform } from 'react-native';
+import { KeyboardAvoidingView, Platform } from 'react-native';
 import * as Linking from 'expo-linking';
 
 const mockReplace = jest.fn();
@@ -95,6 +95,20 @@ describe('SignInScreen', () => {
 
     screen.getByTestId('sign-in-screen');
     screen.getByTestId('sign-in-scroll');
+  });
+
+  // [BUG-988] testID on KeyboardAvoidingView is not emitted as Android
+  // resource-id, so Maestro can't find the screen on Android dev-client.
+  // Lock the testID to a plain View child of KAV to keep resource-id wiring.
+  it('places sign-in-screen testID on a View, not on KeyboardAvoidingView', async () => {
+    const { UNSAFE_getAllByType } = render(<SignInScreen />);
+    await act(async () => undefined);
+
+    const kavs = UNSAFE_getAllByType(KeyboardAvoidingView);
+    expect(kavs.length).toBeGreaterThan(0);
+    for (const kav of kavs) {
+      expect(kav.props.testID).not.toBe('sign-in-screen');
+    }
   });
 
   it('renders Apple SSO button on iOS (Google hidden)', async () => {

@@ -65,6 +65,15 @@ jest.mock('expo/src/winter/ImportMetaRegistry', () => ({
   },
 }));
 
+// expo/src/winter/runtime.native.ts installs `__ExpoImportMetaRegistry` as a
+// lazy global getter that, when accessed, calls `require('./ImportMetaRegistry')`
+// — under jest 30 that deferred require trips the "outside test scope" guard
+// because it fires after module-eval completes. Stubbing the runtime module
+// short-circuits the lazy install entirely. The two paths cover both
+// jest-expo platform resolutions (./runtime and ./runtime.native).
+jest.mock('expo/src/winter/runtime.native', () => ({}), { virtual: true });
+jest.mock('expo/src/winter/runtime', () => ({}), { virtual: true });
+
 jest.mock('react-native-reanimated', () => {
   const { View, Text } = require('react-native');
   const chainable = { delay: () => chainable, duration: () => chainable };

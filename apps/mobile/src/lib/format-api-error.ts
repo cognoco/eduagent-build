@@ -139,7 +139,15 @@ const FRIENDLY_MESSAGE_MAP: Array<{
 
 /**
  * [F-Q-01] Detects messages that are technical/internal and should never
- * reach a user — LLM provider errors, JSON fragments, stack traces, etc.
+ * reach a user — LLM provider errors, JSON fragments, stack traces, JS
+ * runtime errors (ReferenceError / TypeError shapes), etc.
+ *
+ * The runtime-error patterns prevent Hermes / V8 messages from leaking to
+ * the chat UI when an unhandled exception is caught and routed through
+ * `formatApiError`. A real example surfaced as a chat bubble showing
+ * `Property 'crypto' doesn't exist` (Hermes ReferenceError, BUG fixed by
+ * the expo-crypto migration) — that class of message must never reach a
+ * user even after the underlying bug is fixed.
  */
 function isTechnicalMessage(msg: string): boolean {
   return (
@@ -149,7 +157,16 @@ function isTechnicalMessage(msg: string): boolean {
     // JSON fragment or object literal in the message
     /\{"|\{\\"|^\[/.test(msg) ||
     // Stack trace indicators
-    /\bat\b.*\.(ts|js):\d+/i.test(msg)
+    /\bat\b.*\.(ts|js):\d+/i.test(msg) ||
+    // Hermes / V8 runtime-error shapes — never surfaced to users.
+    // Includes ASCII and curly quote variants (Hermes uses ASCII; the
+    // curly variants are belt-and-braces in case logging or i18n
+    // pipelines normalize quotes before reaching the formatter).
+    /Property\s+['"`‘’“”].+['"`‘’“”]\s+doesn[’']?t\s+exist/i.test(msg) ||
+    /\bis not (defined|a function|an object|iterable)\b/i.test(msg) ||
+    /Cannot read propert(y|ies) of (undefined|null)/i.test(msg) ||
+    /\bundefined is not an? (object|function)\b/i.test(msg) ||
+    /^(Reference|Type|Syntax|Range)Error:/i.test(msg)
   );
 }
 
@@ -587,14 +604,17 @@ export function classifyApiError(error: unknown): FormattedApiError {
       };
     }
 
-    // 6. Short, user-facing messages — pass through
+    // 6. Short, user-facing messages — pass through. Reject technical
+    // messages (LLM/JSON/stack/runtime-error shapes) so JS engine errors
+    // like `Property 'crypto' doesn't exist` never become chat bubbles.
     const looksLikeStack =
       /\n\s+at /.test(msg) || /at [A-Z]\w*\./.test(msg) || /^at \S/.test(msg);
     if (
       msg.length > 0 &&
       msg.length < 200 &&
       !looksLikeStack &&
-      !msgLower.includes('undefined')
+      !msgLower.includes('undefined') &&
+      !isTechnicalMessage(msg)
     ) {
       return {
         message: friendlyMessage(msg) ?? msg,
