@@ -126,6 +126,28 @@ export default [
       ],
     },
   },
+  // -------------------------------------------------------------------------
+  // The global `crypto` does NOT exist in Hermes (React Native engine).
+  // `crypto.randomUUID()` / `crypto.getRandomValues()` throw
+  // `ReferenceError: Property 'crypto' doesn't exist` at runtime, but unit
+  // tests pass under jsdom/Node where `crypto` IS a global — so this slips
+  // through CI. Use `expo-crypto`'s `Crypto.randomUUID()` instead.
+  // Regression for the bug introduced by PR #130 (commit 8672bdcd).
+  // -------------------------------------------------------------------------
+  {
+    files: ['src/**/*.ts', 'src/**/*.tsx'],
+    ignores: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    rules: {
+      'no-restricted-globals': [
+        'error',
+        {
+          name: 'crypto',
+          message:
+            "The global `crypto` is not defined in Hermes (React Native). Import expo-crypto: `import * as Crypto from 'expo-crypto'` and use `Crypto.randomUUID()`.",
+        },
+      ],
+    },
+  },
   {
     ignores: ['.expo', 'web-build', 'cache', 'dist', '**/out-tsc'],
   },
