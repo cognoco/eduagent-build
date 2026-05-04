@@ -249,7 +249,7 @@ describe('updateInterestsContext (integration)', () => {
   it('throws for a completely nonexistent profileId', async () => {
     const { account } = await seedAccountAndProfile(0);
     const db = createIntegrationDb();
-    const fakeProfileId = '00000000-0000-0000-0000-000000000099';
+    const fakeProfileId = '00000000-0000-4000-8000-000000000099';
 
     await expect(
       updateInterestsContext(db, fakeProfileId, account.id, [

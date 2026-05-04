@@ -18,6 +18,8 @@ jest.mock('../middleware/jwt', () => ({
 // Mock database module — middleware creates a stub db per request
 // ---------------------------------------------------------------------------
 
+import { TEST_TOPIC_ID } from '@eduagent/test-utils';
+
 import {
   createDatabaseModuleMock,
   createTransactionalMockDb,
@@ -77,7 +79,7 @@ jest.mock('../services/profile', () => ({
 jest.mock('../services/suggestions', () => ({
   getUnusedTopicSuggestions: jest.fn().mockResolvedValue([
     {
-      id: '00000000-0000-0000-0000-000000000001',
+      id: TEST_TOPIC_ID,
       title: 'Suggested Topic',
       description: 'A suggested topic for study',
     },

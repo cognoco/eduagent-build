@@ -27,6 +27,7 @@
   "devDependencies": {
     "@clerk/types": "^4.40.0",
     "@cloudflare/workers-types": "^4.0.0",
+    "@eduagent/test-utils": "workspace:*",
     "@inngest/test": "0.1.9",
     "wrangler": "^4.0.0"
   }

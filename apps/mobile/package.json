@@ -62,6 +62,7 @@
   },
   "devDependencies": {
     "@eduagent/api": "workspace:*",
+    "@eduagent/test-utils": "workspace:*",
     "@expo/config-plugins": "54.0.4",
     "@expo/metro-config": "~54.0.11",
     "@testing-library/react-native": "^13.2.2",

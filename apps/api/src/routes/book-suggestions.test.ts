@@ -18,6 +18,8 @@ jest.mock('../middleware/jwt', () => ({
 // Mock database module — middleware creates a stub db per request
 // ---------------------------------------------------------------------------
 
+import { TEST_BOOK_ID } from '@eduagent/test-utils';
+
 import {
   createDatabaseModuleMock,
   createTransactionalMockDb,
@@ -77,7 +79,7 @@ jest.mock('../services/profile', () => ({
 jest.mock('../services/suggestions', () => ({
   getUnpickedBookSuggestions: jest.fn().mockResolvedValue([
     {
-      id: '00000000-0000-0000-0000-000000000001',
+      id: TEST_BOOK_ID,
       title: 'Suggested Book',
       emoji: '📖',
       description: 'A suggested book',
@@ -85,7 +87,7 @@ jest.mock('../services/suggestions', () => ({
   ]),
   getAllBookSuggestions: jest.fn().mockResolvedValue([
     {
-      id: '00000000-0000-0000-0000-000000000001',
+      id: TEST_BOOK_ID,
       title: 'Suggested Book',
       emoji: '📖',
       description: 'A suggested book',

@@ -19,6 +19,12 @@ jest.mock('../middleware/jwt', () => ({
 // ---------------------------------------------------------------------------
 
 import {
+  TEST_BOOK_ID,
+  TEST_SHELF_ID,
+  TEST_TOPIC_ID,
+} from '@eduagent/test-utils';
+
+import {
   createDatabaseModuleMock,
   createTransactionalMockDb,
 } from '../test-utils/database-module';
@@ -84,12 +90,12 @@ jest.mock('../services/filing', () => ({
     topic: { title: 'Newton Laws', description: 'Laws of motion' },
   }),
   resolveFilingResult: jest.fn().mockResolvedValue({
-    shelfId: '00000000-0000-0000-0000-000000000001',
+    shelfId: TEST_SHELF_ID,
     shelfName: 'Science',
-    bookId: '00000000-0000-0000-0000-000000000002',
+    bookId: TEST_BOOK_ID,
     bookName: 'Physics',
     chapter: 'Mechanics',
-    topicId: '00000000-0000-0000-0000-000000000003',
+    topicId: TEST_TOPIC_ID,
     topicTitle: 'Newton Laws',
     isNew: { shelf: true, book: true, chapter: true },
   }),

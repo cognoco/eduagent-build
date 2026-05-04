@@ -1,3 +1,5 @@
+import { TEST_PROFILE_ID } from '@eduagent/test-utils';
+
 import { createScopedRepository } from './repository.js';
 import { subjects } from './schema/index.js';
 
@@ -44,7 +46,7 @@ function createRecordingChain(result: unknown[]) {
 }
 
 describe('createScopedRepository → curriculumTopics', () => {
-  const profileId = '00000000-0000-0000-0000-000000000001';
+  const profileId = TEST_PROFILE_ID;
 
   describe('findById', () => {
     it('returns the topic when the scoped chain resolves a row', async () => {
