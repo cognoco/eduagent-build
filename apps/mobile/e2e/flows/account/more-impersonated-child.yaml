@@ -1,0 +1,106 @@
+# ACCOUNT-30: Impersonated-child More guard [BUG-915]
+#
+# Signs in as a parent, switches to a child profile via the Profiles screen,
+# then navigates to the More tab and asserts that account-level destructive
+# actions are hidden while the child is active:
+#   - sign-out-button         → hidden (would sign out the parent's whole session)
+#   - more-row-delete-account → hidden (operates on parent's account)
+#   - more-row-export         → hidden (operates on parent's account)
+#   - more-row-subscription   → hidden (billing is the parent's, not the child's)
+#
+# Seed: parent-with-children — parent "Test Parent" + child "Test Teen".
+#   CHILD_PROFILE_ID and CHILD_NAME ("Test Teen") are exported by the seed.
+#
+# testIDs verified against:
+#   - apps/mobile/src/app/(app)/more.tsx
+#       sign-out-button (line 944), more-row-delete-account (line 887),
+#       more-row-export (line 879), more-row-subscription (line 843)
+#       — all rendered only when !isImpersonating
+#   - apps/mobile/e2e/flows/_setup/switch-to-child.yaml
+#       (profiles-screen, learner-screen after switch)
+#
+# Usage: ./e2e/scripts/seed-and-run.sh parent-with-children e2e/flows/account/more-impersonated-child.yaml
+appId: com.mentomate.app
+tags:
+  - nightly
+  - account
+---
+# 1. Seed & sign in as parent
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "parent-with-children"
+      API_URL: ${API_URL}
+
+# 2. Wait for parent dashboard
+- extendedWaitUntil:
+    visible:
+      id: "dashboard-scroll"
+    timeout: 15000
+
+# 3. Switch to child profile ("Test Teen")
+- runFlow:
+    file: ../_setup/switch-to-child.yaml
+    env:
+      CHILD_NAME: "Test Teen"
+
+# 4. Now on learner home as impersonated child — navigate to More tab
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 15000
+
+- tapOn:
+    text: "More"
+
+# 5. Wait for More screen to load
+- extendedWaitUntil:
+    visible:
+      id: "learning-mode-section-header"
+    timeout: 15000
+
+- takeScreenshot: 01-more-as-impersonated-child
+
+# 6. Scroll through all sections confirming the guard items are absent
+
+# Sign-out button must not be visible at any scroll position
+- assertNotVisible:
+    id: "sign-out-button"
+
+# Subscription row must not be visible
+- assertNotVisible:
+    id: "more-row-subscription"
+
+# Export and Delete rows appear in the "Other" section — scroll down to check
+- scrollUntilVisible:
+    element:
+      id: "learning-accommodation-section-header"
+    direction: DOWN
+    timeout: 10000
+
+- scrollUntilVisible:
+    element:
+      id: "notifications-section-header"
+    direction: DOWN
+    timeout: 10000
+
+- scrollUntilVisible:
+    element:
+      id: "more-row-help"
+    direction: DOWN
+    timeout: 10000
+
+- takeScreenshot: 02-more-other-section-impersonated
+
+# Export and Delete rows must not be rendered
+- assertNotVisible:
+    id: "more-row-export"
+
+- assertNotVisible:
+    id: "more-row-delete-account"
+
+# Sign-out must still not be visible after scrolling to the bottom
+- assertNotVisible:
+    id: "sign-out-button"
+
+- takeScreenshot: 03-account-actions-hidden
