@@ -27,6 +27,16 @@ export function parseNumericFromDriver(
   value: string,
   columnName: string
 ): number {
+  // Reject null/undefined explicitly. Number(null) === 0 and Number.isFinite(0)
+  // is true, so without this guard a null driver value would silently coerce
+  // to 0 and pass validation. Today's columns are notNull(), but a future
+  // nullable numeric column would corrupt data invisibly through this helper.
+  if (value === null || value === undefined) {
+    throw new Error(
+      `numericAsNumber: received ${value === null ? 'null' : 'undefined'} ` +
+        `for column "${columnName}" — expected numeric string`
+    );
+  }
   const result = Number(value);
   if (!Number.isFinite(result)) {
     throw new Error(

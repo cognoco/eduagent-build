@@ -1455,14 +1455,19 @@ describe('dispatchInterviewPersist', () => {
     );
   });
 
-  it('uses persist-<draftId>-retry-<timestamp> as idempotency key for retry dispatch', async () => {
+  it('uses persist-<draftId>-retry-<uuid> as idempotency key for retry dispatch', async () => {
     await dispatchInterviewPersist(VALID_PAYLOAD, { isRetry: true });
 
     expect(inngest.send).toHaveBeenCalledTimes(1);
     const call = (inngest.send as jest.Mock).mock.calls[0][0];
     expect(call.name).toBe('app/interview.ready_to_persist');
+    // Retry suffix is a v4 UUID (8-4-4-4-12 hex), not a timestamp — two
+    // retries firing in the same millisecond would otherwise collide and
+    // Inngest would silently dedup the second send.
     expect(call.id).toMatch(
-      new RegExp(`^persist-${VALID_PAYLOAD.draftId}-retry-\\d+$`)
+      new RegExp(
+        `^persist-${VALID_PAYLOAD.draftId}-retry-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`
+      )
     );
   });
 
@@ -1474,7 +1479,20 @@ describe('dispatchInterviewPersist', () => {
     expect(calls).toHaveLength(2);
     expect(calls[0][0].id).toBe(`persist-${VALID_PAYLOAD.draftId}`);
     expect(calls[1][0].id).not.toBe(calls[0][0].id);
-    expect(calls[1][0].id).toMatch(/-retry-\d+$/);
+    expect(calls[1][0].id).toMatch(/-retry-[0-9a-f-]{36}$/);
+  });
+
+  it('[BREAK] two retries for the same draft produce distinct idempotency keys', async () => {
+    // Pre-fix: the suffix was Date.now(); two retries inside the same
+    // millisecond produced identical keys and Inngest dedup'd silently.
+    // Post-fix: each retry gets a fresh UUID, so the keys cannot collide
+    // even when the calls fire back-to-back synchronously.
+    await dispatchInterviewPersist(VALID_PAYLOAD, { isRetry: true });
+    await dispatchInterviewPersist(VALID_PAYLOAD, { isRetry: true });
+
+    const calls = (inngest.send as jest.Mock).mock.calls;
+    expect(calls).toHaveLength(2);
+    expect(calls[0][0].id).not.toBe(calls[1][0].id);
   });
 
   it('sends the parsed event payload in data, omitting bookId when not provided', async () => {

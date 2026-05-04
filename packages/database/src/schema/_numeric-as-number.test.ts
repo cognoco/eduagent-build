@@ -101,6 +101,22 @@ describe('parseNumericFromDriver — NaN guard [BUG-980]', () => {
     );
   });
 
+  it('[BREAK] throws on null instead of silently coercing to 0', () => {
+    // Number(null) === 0 and Number.isFinite(0) === true, so without an
+    // explicit null guard a null driver value would silently round to 0 and
+    // pass validation. Today's columns are notNull(), but a future nullable
+    // numeric column would corrupt data invisibly through this helper.
+    expect(() =>
+      parseNumericFromDriver(null as unknown as string, 'mastery_score')
+    ).toThrow(/null.*for column "mastery_score"/);
+  });
+
+  it('[BREAK] throws on undefined for the same reason', () => {
+    expect(() =>
+      parseNumericFromDriver(undefined as unknown as string, 'ease_factor')
+    ).toThrow(/undefined.*for column "ease_factor"/);
+  });
+
   it('[BREAK] error message includes the column name for triage', () => {
     try {
       parseNumericFromDriver('xyz', 'ease_factor');

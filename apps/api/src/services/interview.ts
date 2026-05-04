@@ -835,8 +835,11 @@ export async function dispatchInterviewPersist(
   },
   options: { isRetry?: boolean } = {}
 ): Promise<void> {
+  // Retry path uses a fresh UUID, not Date.now(): two retries firing in the
+  // same millisecond would otherwise produce identical idempotency keys and
+  // Inngest would silently dedup the second send.
   const idempotencyId = options.isRetry
-    ? `persist-${payload.draftId}-retry-${Date.now()}`
+    ? `persist-${payload.draftId}-retry-${crypto.randomUUID()}`
     : `persist-${payload.draftId}`;
 
   const data: InterviewReadyToPersistEvent =

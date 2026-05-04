@@ -2,18 +2,15 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-jest.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string, opts?: Record<string, unknown>) => {
-      if (opts && typeof opts === 'object') {
-        // Return a deterministic interpolated string for assertions
-        return `${key}:${JSON.stringify(opts)}`;
-      }
-      return key;
-    },
-  }),
-  initReactI18next: { type: '3rdParty', init: jest.fn() },
-}));
+// Use the shared mock-i18n util so assertions reference the rendered English
+// copy from en.json (what users actually see), not bare keys. A bare-key mock
+// would only prove t() was called — not that the translation pipeline is
+// wired correctly or that {{interpolation}} tokens resolve. See
+// apps/mobile/src/test-utils/mock-i18n.ts for the lookup behaviour.
+jest.mock(
+  'react-i18next',
+  () => require('../../test-utils/mock-i18n').i18nMock
+);
 
 const mockPush = jest.fn();
 const mockUseSubjects = jest.fn();
@@ -393,7 +390,7 @@ describe('LibraryScreen', () => {
 
     // New library v3 design: empty state uses library-empty testID
     screen.getByTestId('library-empty');
-    screen.getByText('library.empty.title');
+    screen.getByText('Your library is empty');
   });
 
   it('renders shelf rows for each subject', () => {
@@ -582,9 +579,7 @@ describe('LibraryScreen', () => {
 
       const backdrop = screen.getByTestId('manage-subjects-backdrop');
       expect(backdrop.props.accessibilityRole).toBe('button');
-      expect(backdrop.props.accessibilityLabel).toBe(
-        'library.manage.closeAccessibilityLabel'
-      );
+      expect(backdrop.props.accessibilityLabel).toBe('Close manage subjects');
     });
   });
 
@@ -647,8 +642,7 @@ describe('LibraryScreen', () => {
 
       // 3 topics total (1 with bookId, 2 with null bookId) must all be counted.
       // Pre-fix this would render "1 subjects · 1 topics" (orphans dropped).
-      // With i18n mock: t('library.subtitle', {subjectCount:1, topicCount:3}) → key:JSON
-      screen.getByText('library.subtitle:{"subjectCount":1,"topicCount":3}');
+      screen.getByText('1 subjects · 3 topics');
     });
 
     it('omits the topic count segment entirely when there are no topics', () => {
@@ -665,8 +659,7 @@ describe('LibraryScreen', () => {
       render(<LibraryScreen />, { wrapper: TestWrapper });
 
       // Header should read just "1 subjects" with no trailing " · N topics".
-      // With i18n mock: t('library.subtitleNoTopics', {subjectCount:1}) → key:JSON
-      screen.getByText('library.subtitleNoTopics:{"subjectCount":1}');
+      screen.getByText('1 subjects');
     });
   });
 });

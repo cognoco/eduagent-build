@@ -200,12 +200,19 @@ describe('MoreScreen — Learning Mode', () => {
   it('[BUG-909] section headers are prefixed with the active profile name', () => {
     render(<MoreScreen />, { wrapper: createWrapper() });
 
-    // Section headers exist and are rendered (contain translated text, not the bare English labels).
-    expect(screen.getByTestId('learning-mode-section-header')).toBeTruthy();
+    // Pin the rendered English copy exactly. test-setup.ts initializes
+    // i18next synchronously with en.json, so the {{name}} interpolation
+    // resolves to the active profile's displayName. A regression that
+    // drops the prefix (back to bare "Learning Mode") OR drops the
+    // {{name}} interpolation token in en.json would fail this assertion.
+    expect(
+      screen.getByTestId('learning-mode-section-header')
+    ).toHaveTextContent("Alex's Learning Mode");
     expect(
       screen.getByTestId('learning-accommodation-section-header')
-    ).toBeTruthy();
-    // The bare uppercase label must not appear in the rendered tree.
+    ).toHaveTextContent("Alex's Learning Accommodation");
+    // Defensive: the bare un-prefixed labels must not appear anywhere in
+    // the rendered tree.
     expect(screen.queryByText('Learning Mode')).toBeNull();
     expect(screen.queryByText('Learning Accommodation')).toBeNull();
   });

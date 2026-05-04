@@ -454,10 +454,17 @@ export function classifyApiError(error: unknown): FormattedApiError {
     const apiErrorLike = error as Error & {
       status?: number;
       code?: string;
+      errorCode?: string;
       apiCode?: string;
     };
 
-    const effectiveCode = apiErrorLike.apiCode ?? apiErrorLike.code;
+    // Read errorCode (typed-error field, e.g. ForbiddenError) before falling
+    // back to the legacy `code` duck-type — HMR can break the `instanceof`
+    // branch above and drop a typed error into this generic path; without
+    // errorCode here the EXCHANGE_LIMIT_EXCEEDED / PROXY_MODE classifications
+    // would silently miss.
+    const effectiveCode =
+      apiErrorLike.apiCode ?? apiErrorLike.errorCode ?? apiErrorLike.code;
 
     // 3. Typed error codes
     if (effectiveCode === 'EXCHANGE_LIMIT_EXCEEDED') {
