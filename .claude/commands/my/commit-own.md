@@ -15,13 +15,15 @@ conversation. Use your conversation history — you know what you touched.
 If you are unsure which files are yours, run `git status` and compare
 against your memory of what you worked on. When in doubt, ask the user.
 
-### 2. Stage only those files
+### 2. Reset the index, then stage only those files
 
 ```bash
+git reset HEAD
 git add <file1> <file2> ...
 ```
 
-Do NOT run `git add -A`. Do NOT stage files you did not touch.
+The `git reset HEAD` clears any pre-existing staged files so only your
+session's changes end up in the commit. Do NOT run `git add -A`.
 
 Bracket files (e.g. `[sessionId].tsx`) need `:(literal)` pathspec:
 ```bash
@@ -32,7 +34,7 @@ git add ':(literal)apps/mobile/src/app/session/[sessionId].tsx'
 
 After staging, invoke the `commit` skill with the argument "staged only":
 
-```
+```text
 Skill(skill: "commit", args: "staged only")
 ```
 

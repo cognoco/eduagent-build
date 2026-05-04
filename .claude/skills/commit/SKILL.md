@@ -62,9 +62,13 @@ and stop.
 
 ### 3. Safety check
 
-Scan for files that should NOT be committed:
+Scan the staged set (and pending files in ALL/FILES mode) for files that
+should NOT be committed:
 - `.env`, `.dev.vars`, `credentials.json`, `*.pem`, `*.key` — warn and exclude
 - Large binaries that look unintentional — warn and exclude
+
+If dangerous files are already staged (even in STAGED mode), unstage them:
+`git reset HEAD -- <dangerous-file>`. Safety check applies in ALL modes.
 
 ### 4. Stage (skip in STAGED mode)
 
@@ -82,7 +86,7 @@ the stat output — do not read the full diff unless the stat is ambiguous.
 
 **Format:**
 
-```
+```text
 <type>(<scope>): <summary>   (max 72 chars)
 
 - bullet points summarizing what changed and why (2-4 lines)
@@ -98,7 +102,7 @@ diff fixes them — e.g. `fix(api): atomic quota decrement [CR-1C.1]`.
 
 **Verified-By table** — when 3+ distinct finding IDs appear:
 
-```
+```text
 | ID       | Files                        | Verified By                           |
 |----------|------------------------------|---------------------------------------|
 | BUG-XXX  | apps/api/foo.ts, foo.test.ts | test: foo.test.ts:"break test name"   |
@@ -107,7 +111,7 @@ diff fixes them — e.g. `fix(api): atomic quota decrement [CR-1C.1]`.
 
 **Sweep-audit block** — when the message claims a sweep (hook enforces):
 
-```
+```text
 Sweep audit:
   rg 'pattern' path/
   -> N hits; all N now have the fix.

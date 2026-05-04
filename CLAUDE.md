@@ -30,7 +30,7 @@ Always use `/commit` for all commits in this repo. Never use `/zdx:commit`, `/my
 - Durable async work goes through Inngest. Do not fire-and-forget background work from route handlers.
 - LLM responses that drive state-machine decisions (close interview, hold escalation, trigger UI widget) must use the structured response envelope (`llmResponseEnvelopeSchema` from `@eduagent/schemas`). Parse with `parseEnvelope()` from `services/llm/envelope.ts`. Never embed `[MARKER]` tokens or JSON blobs in free-text replies. Every envelope signal must have a server-side hard cap (e.g., `MAX_INTERVIEW_EXCHANGES = 4`) so the flow terminates even if the LLM never emits the signal. See `docs/architecture.md` → "LLM Response Envelope" for the full contract.
 - When changing LLM prompts (`apps/api/src/services/**/*-prompts.ts` or `apps/api/src/services/llm/*.ts`), run the eval harness (`pnpm eval:llm`) to snapshot before/after, and `pnpm eval:llm --live` (Tier 2) to validate real LLM responses against `expectedResponseSchema`. The pre-commit hook only checks that snapshot files are staged — it does NOT run the harness. Harness code: `apps/api/eval-llm/`.
-- Subagents (agents spawned via the Agent tool) must NEVER run `git add`, `git commit`, or `git push`. Only the coordinator (main conversation) commits. Subagents write code, run tests, and report which files they changed — the coordinator commits their work using `/commit`.
+- Subagents must NEVER run `git add`, `git commit`, or `git push` — except the `/commit` skill, which runs as an authorized `context: fork` subagent. All other subagents write code, run tests, and report which files they changed. The coordinator commits their work using `/commit`.
 
 ## Known Exceptions to Engineering Rules
 

@@ -13,7 +13,7 @@ is lost. Follow this procedure.
   If the failing file IS staged but unrelated to your changes, unstage it
   with `git reset HEAD -- <file>`.
 - **Test failures (jest)**: Parse the failing test file paths. Find their
-  source files (strip `.test.ts`). If unrelated to your changes, unstage
+  source files (strip `.test.ts` / `.test.tsx`). If unrelated to your changes, unstage
   both source and test files.
 - **NX boundary errors**: Run `pnpm exec nx reset`, re-stage, and retry.
 
@@ -41,14 +41,15 @@ Always use `--keep-index -u` (not just `--keep-index`) when stashing during
 a partial commit. Without `-u`, untracked files stay in the working tree and
 lint-staged's stash/pop can destroy them.
 
-After commit succeeds, run `git stash pop`. If the output says "stash entry
-is kept," the apply was incomplete — verify with
+If you created a stash in the steps above, run `git stash pop` after the
+commit succeeds. If no stash was created, skip this. If the output says
+"stash entry is kept," the apply was incomplete — verify with
 `git stash show --stat 'stash@{0}'` before dropping.
 
 ## Expo Router bracket files
 
 Files with `[` or `]` in the name (e.g., `[sessionId].tsx`) need the
 `:(literal)` pathspec prefix in `git reset` and `git stash push`:
-```
+```bash
 git reset HEAD -- ':(literal)apps/mobile/src/app/session/[sessionId].tsx'
 ```
