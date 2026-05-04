@@ -42,7 +42,7 @@ let queryClient: QueryClient;
 function createWrapper() {
   const w = createQueryWrapper();
   queryClient = w.queryClient;
-  return w.Wrapper;
+  return w.wrapper;
 }
 
 describe('useNotificationSettings', () => {

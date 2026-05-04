@@ -12,23 +12,22 @@ import {
 
 process.env.EXPO_PUBLIC_API_URL ??= 'http://localhost:8787';
 
-/**
- * Lightweight QueryClient-only wrapper for hook tests that mock
- * `../lib/profile` directly (the dominant pattern across `hooks/*.test.ts`).
- *
- * Unlike `createHookWrapper`, this does NOT pull in `ProfileContext` —
- * that import would resolve to the test's `jest.mock('../lib/profile')`
- * shim and provide an undefined Provider. Use this helper when the
- * test already mocks the profile module.
- */
+// QueryClient-only wrapper for hook tests that already mock `../lib/profile`.
 export function createQueryWrapper(
   options: { queryClientOptions?: QueryClientConfig } = {}
 ) {
-  const queryClient = new QueryClient(
-    options.queryClientOptions ?? {
-      defaultOptions: { queries: { retry: false, gcTime: 0 } },
-    }
-  );
+  const userOpts = options.queryClientOptions ?? {};
+  const queryClient = new QueryClient({
+    ...userOpts,
+    defaultOptions: {
+      ...userOpts.defaultOptions,
+      queries: {
+        retry: false,
+        gcTime: 0,
+        ...userOpts.defaultOptions?.queries,
+      },
+    },
+  });
 
   function Wrapper({ children }: { children: ReactNode }) {
     return createElement(
@@ -38,7 +37,7 @@ export function createQueryWrapper(
     );
   }
 
-  return { queryClient, Wrapper };
+  return { queryClient, wrapper: Wrapper };
 }
 
 export function createTestProfile(overrides: Partial<Profile> = {}): Profile {
