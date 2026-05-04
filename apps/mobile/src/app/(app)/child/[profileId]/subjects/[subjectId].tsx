@@ -193,11 +193,13 @@ export default function SubjectTopicsScreen() {
                 {topic.retentionStatus &&
                 topic.totalSessions >= 1 &&
                 topic.completionStatus !== 'not_started' ? (
-                  <RetentionSignal
-                    status={topic.retentionStatus as RetentionStatus}
-                    compact
-                    parentFacing
-                  />
+                  <View testID="subject-retention-badge">
+                    <RetentionSignal
+                      status={topic.retentionStatus as RetentionStatus}
+                      compact
+                      parentFacing
+                    />
+                  </View>
                 ) : null}
               </View>
               <Text className="text-caption text-text-secondary mb-2">

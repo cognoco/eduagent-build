@@ -230,7 +230,10 @@ export default function SessionDetailScreen() {
       {hasRecap ? (
         <>
           {session.narrative ? (
-            <View className="mx-4 mt-4 rounded-xl bg-surface p-4">
+            <View
+              testID="session-recap-narrative"
+              className="mx-4 mt-4 rounded-xl bg-surface p-4"
+            >
               <Text className="text-text-secondary mb-2 text-xs font-medium tracking-wide">
                 {t('parentView.session.sessionRecap')}
               </Text>
@@ -241,7 +244,10 @@ export default function SessionDetailScreen() {
           ) : null}
 
           {session.highlight ? (
-            <View className="mx-4 mt-4 rounded-xl bg-surface p-4">
+            <View
+              testID="session-recap-highlight"
+              className="mx-4 mt-4 rounded-xl bg-surface p-4"
+            >
               <Text className="text-text-secondary mb-2 text-xs font-medium tracking-wide">
                 {t('parentView.session.highlight')}
               </Text>
@@ -261,7 +267,10 @@ export default function SessionDetailScreen() {
           ) : null}
 
           {session.conversationPrompt ? (
-            <View className="mx-4 mt-4 rounded-xl bg-surface p-4">
+            <View
+              testID="session-recap-conversation-prompt"
+              className="mx-4 mt-4 rounded-xl bg-surface p-4"
+            >
               <View className="flex-row items-start justify-between gap-3">
                 <View className="flex-1">
                   <Text className="text-text-secondary mb-2 text-xs font-medium tracking-wide">
@@ -278,7 +287,7 @@ export default function SessionDetailScreen() {
                   accessibilityLabel={t(
                     'parentView.session.copyConversationPrompt'
                   )}
-                  testID="copy-conversation-prompt"
+                  testID="session-recap-copy-prompt"
                 >
                   <Text className="text-body-sm font-semibold text-primary">
                     {copyState === 'copied'
@@ -289,6 +298,17 @@ export default function SessionDetailScreen() {
                   </Text>
                 </Pressable>
               </View>
+              {copyState === 'copied' ? (
+                <View
+                  testID="session-recap-copy-prompt-toast"
+                  className="mt-2 self-start rounded-full bg-primary/10 px-3 py-1"
+                  accessibilityRole="text"
+                >
+                  <Text className="text-caption font-semibold text-primary">
+                    {t('parentView.session.copied')}
+                  </Text>
+                </View>
+              ) : null}
             </View>
           ) : null}
         </>
