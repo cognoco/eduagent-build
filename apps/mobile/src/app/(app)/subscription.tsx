@@ -22,6 +22,7 @@ import type {
 } from 'react-native-purchases';
 import { PURCHASES_ERROR_CODE, PACKAGE_TYPE } from 'react-native-purchases';
 import { useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../lib/theme';
 import { goBackOrReplace } from '../../lib/navigation';
 import { useProfile } from '../../lib/profile';
@@ -589,6 +590,7 @@ export default function SubscriptionScreen() {
   const colors = useThemeColors();
   const { activeProfile } = useProfile();
   const client = useApiClient();
+  const { t } = useTranslation();
 
   const queryClient = useQueryClient();
 
@@ -744,7 +746,7 @@ export default function SubscriptionScreen() {
               void refetchSub();
             },
           },
-          { text: 'OK', style: 'cancel' },
+          { text: t('common.ok'), style: 'cancel' },
         ]
       );
     }
@@ -847,7 +849,7 @@ export default function SubscriptionScreen() {
         platformAlert(
           'Purchase confirmed',
           'Your subscription is being activated. It usually appears within a minute — pull down to refresh.',
-          [{ text: 'OK' }]
+          [{ text: t('common.ok') }]
         );
       }
     },
@@ -887,7 +889,7 @@ export default function SubscriptionScreen() {
               });
             },
           },
-          { text: 'OK', style: 'cancel' },
+          { text: t('common.ok'), style: 'cancel' },
         ]
       );
     }
@@ -913,7 +915,7 @@ export default function SubscriptionScreen() {
               void refetchOfferings();
             },
           },
-          { text: 'OK', style: 'cancel' },
+          { text: t('common.ok'), style: 'cancel' },
         ]
       );
       return;
@@ -939,7 +941,7 @@ export default function SubscriptionScreen() {
               void refetchOfferings();
             },
           },
-          { text: 'OK', style: 'cancel' },
+          { text: t('common.ok'), style: 'cancel' },
         ]
       );
       return;
@@ -1024,7 +1026,7 @@ export default function SubscriptionScreen() {
       platformAlert(
         'Purchase confirmed',
         'Your 500 credits are being added. They usually appear within a minute \u2014 pull down to refresh your usage.',
-        [{ text: 'OK' }]
+        [{ text: t('common.ok') }]
       );
     }
   }, [
@@ -1173,17 +1175,20 @@ export default function SubscriptionScreen() {
               testID="trial-banner"
             >
               <Text className="text-body font-semibold text-primary">
-                Trial active
+                {t('subscription.trial.active')}
               </Text>
               {subscription?.trialEndsAt && (
                 <Text className="text-caption text-text-secondary mt-0.5">
-                  {`Trial ends ${new Date(
-                    subscription.trialEndsAt
-                  ).toLocaleDateString(undefined, {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                  })}`}
+                  {t('subscription.trial.endsAt', {
+                    date: new Date(subscription.trialEndsAt).toLocaleDateString(
+                      undefined,
+                      {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                      }
+                    ),
+                  })}
                 </Text>
               )}
             </View>
@@ -1210,7 +1215,7 @@ export default function SubscriptionScreen() {
                     : status === 'expired'
                     ? 'Expired'
                     : status === 'trial'
-                    ? 'Trial'
+                    ? t('subscription.statusBadge.trial')
                     : 'Active'}
                 </Text>
               </View>

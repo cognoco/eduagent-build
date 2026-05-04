@@ -16,6 +16,11 @@ import { loadDatabaseEnv } from '@eduagent/test-utils';
 
 loadDatabaseEnv(resolve(__dirname, '../..'));
 
+// Integration tests do real Neon HTTP roundtrips; the eslint governance
+// selftest spawns 13 ESLint subprocesses (~4.5 s each). Both blow past Jest's
+// 5 s default under concurrent load. 30 s leaves headroom without hiding hangs.
+jest.setTimeout(30_000);
+
 function isNeonUrl(url: string): boolean {
   try {
     return new URL(url).hostname.endsWith('.neon.tech');

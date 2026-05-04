@@ -40,7 +40,7 @@ function mapVocabularyRetentionCard(
 ): VocabularyRetentionCard {
   return {
     vocabularyId: row.vocabularyId,
-    easeFactor: Number(row.easeFactor),
+    easeFactor: row.easeFactor,
     intervalDays: row.intervalDays,
     repetitions: row.repetitions,
     lastReviewedAt: row.lastReviewedAt?.toISOString() ?? null,
@@ -279,7 +279,7 @@ export async function reviewVocabulary(
     const result = sm2({
       quality: input.quality,
       card: {
-        easeFactor: Number(card.easeFactor),
+        easeFactor: card.easeFactor,
         interval: Math.max(1, card.intervalDays),
         repetitions: card.repetitions,
         lastReviewedAt: card.lastReviewedAt?.toISOString() ?? now,

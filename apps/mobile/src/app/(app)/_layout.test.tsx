@@ -547,7 +547,11 @@ describe('AppLayout', () => {
     renderLayout();
 
     screen.getByTestId('proxy-banner');
-    screen.getByText(/Viewing as/);
+    // Exact match — a regression that breaks the {{name}} interpolation
+    // ("Viewing as " with an empty/literal name) would slip past the broader
+    // /Viewing as/ regex. test-setup.ts initializes i18next synchronously
+    // with en.json so {{name}} resolves at render.
+    screen.getByText('Viewing as Alex');
 
     fireEvent.press(screen.getByTestId('proxy-banner-switch-back'));
 

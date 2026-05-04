@@ -14,6 +14,7 @@
 // escalation is banned".
 // ---------------------------------------------------------------------------
 
+import { appNotificationSuppressedEventSchema } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
 
@@ -26,24 +27,32 @@ export const notificationSuppressedObserve = inngest.createFunction(
   },
   { event: 'app/notification.suppressed' },
   async ({ event }) => {
-    const data = event.data as {
-      profileId?: string;
-      notificationType?: string;
-      reason?: string;
-      timestamp?: string;
-    };
+    const parsed = appNotificationSuppressedEventSchema.safeParse(event.data);
+
+    if (!parsed.success) {
+      logger.error('[notification-suppressed] invalid event payload', {
+        issues: parsed.error.issues,
+        rawData: event.data,
+      });
+      return {
+        observed: false,
+        reason: 'invalid_payload',
+      };
+    }
+
+    const data = parsed.data;
 
     logger.warn('[notification-suppressed]', {
-      profileId: data.profileId ?? null,
-      notificationType: data.notificationType ?? 'unknown',
-      reason: data.reason ?? 'unknown',
-      timestamp: data.timestamp ?? new Date().toISOString(),
+      profileId: data.profileId,
+      notificationType: data.notificationType,
+      reason: data.reason,
+      timestamp: data.timestamp,
     });
 
     return {
       observed: true,
-      notificationType: data.notificationType ?? 'unknown',
-      reason: data.reason ?? 'unknown',
+      notificationType: data.notificationType,
+      reason: data.reason,
     };
   }
 );

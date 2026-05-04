@@ -37,6 +37,16 @@ export function parseNumericFromDriver(
         `for column "${columnName}" — expected numeric string`
     );
   }
+  // Same trap class as null: Number('') === 0 and Number(' \t\n') === 0, both
+  // pass isFinite. Postgres numeric columns won't emit empty/whitespace today,
+  // but a hand-crafted INSERT, a driver bug, or a future ETL path could —
+  // and the silent coerce-to-zero would corrupt SRS scheduling math invisibly.
+  if (typeof value === 'string' && value.trim() === '') {
+    throw new Error(
+      `numericAsNumber: received empty/whitespace string for column ` +
+        `"${columnName}" — expected numeric string`
+    );
+  }
   const result = Number(value);
   if (!Number.isFinite(result)) {
     throw new Error(

@@ -467,7 +467,7 @@ export async function prepareExchangeContext(
     !isInterleaved &&
     session.sessionType === 'learning'
   ) {
-    const ease = Number(retentionCard.easeFactor);
+    const ease = retentionCard.easeFactor;
     const reps = retentionCard.repetitions;
     if (shouldTriggerEvaluate(ease, reps)) {
       verificationType = 'evaluate';
@@ -659,7 +659,7 @@ export async function prepareExchangeContext(
   if (retentionCard) {
     const retState: RetentionState = {
       topicId: retentionCard.topicId,
-      easeFactor: Number(retentionCard.easeFactor),
+      easeFactor: retentionCard.easeFactor,
       intervalDays: retentionCard.intervalDays,
       repetitions: retentionCard.repetitions,
       failureCount: retentionCard.failureCount,
@@ -933,9 +933,7 @@ export async function prepareExchangeContext(
     retentionStatus: retentionStatusValue
       ? {
           status: retentionStatusValue,
-          easeFactor: retentionCard
-            ? Number(retentionCard.easeFactor)
-            : undefined,
+          easeFactor: retentionCard ? retentionCard.easeFactor : undefined,
           daysSinceLastReview,
         }
       : undefined,

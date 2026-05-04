@@ -76,6 +76,31 @@ describe('checkStaleness', () => {
     );
   });
 
+  // A hand-edited or upstream-mangled translation can introduce a {{var}} not
+  // present in the source. i18next will not interpolate it (no value supplied),
+  // so the literal `{{var}}` renders to users. translate.ts validates this on
+  // write; checkStaleness is the runtime contract used by Husky/CI.
+  it('fails when target has an extra interpolation variable not in source', () => {
+    const targets = {
+      de: {
+        common: { save: 'Speichern', cancel: 'Abbrechen' },
+        errors: {
+          generic: 'Fehler. {{action}} bei {{name}} zum Wiederholen.',
+        },
+      },
+    };
+    const result = checkStaleness(source, targets);
+    expect(result.pass).toBe(false);
+    expect(result.errors).toContainEqual(
+      expect.objectContaining({
+        lang: 'de',
+        type: 'extra_variable',
+        key: 'errors.generic',
+        variable: '{{name}}',
+      })
+    );
+  });
+
   it('reports errors from multiple languages', () => {
     const targets = {
       de: {

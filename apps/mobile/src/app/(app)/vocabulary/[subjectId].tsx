@@ -139,7 +139,7 @@ export default function VocabularyListScreen() {
                   err instanceof Error
                     ? err.message
                     : t('vocabulary.deleteDialog.errorFallback'),
-                  [{ text: 'OK' }]
+                  [{ text: t('common.ok') }]
                 );
               },
             });

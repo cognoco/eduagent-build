@@ -1914,5 +1914,14 @@
     "s11Body": "Diese Bedingungen unterliegen den Gesetzen von Norwegen. Alle Streitigkeiten werden vor den Gerichten von Norwegen beigelegt.",
     "s12Title": "Kontaktiere uns",
     "s12Body": "Wenn du Fragen zu diesen Bedingungen hast, kontaktiere uns unter legal@eduagent.app."
+  },
+  "subscription": {
+    "trial": {
+      "active": "Testphase aktiv",
+      "endsAt": "Testphase endet am {{date}}"
+    },
+    "statusBadge": {
+      "trial": "Test"
+    }
   }
 }

@@ -117,6 +117,18 @@ describe('parseNumericFromDriver — NaN guard [BUG-980]', () => {
     ).toThrow(/undefined.*for column "ease_factor"/);
   });
 
+  it('[BREAK] throws on empty / whitespace strings instead of coercing to 0', () => {
+    // Number('') === 0 and Number(' \t\n') === 0 — both pass isFinite, so
+    // without the explicit whitespace guard a malformed driver value would
+    // silently round to 0 and corrupt SRS scheduling math the same way the
+    // null case did. Pin the boundary so a future refactor can't regress it.
+    for (const blank of ['', ' ', '\t', '\n', '   \t\n']) {
+      expect(() => parseNumericFromDriver(blank, 'mastery_score')).toThrow(
+        /empty\/whitespace string for column "mastery_score"/
+      );
+    }
+  });
+
   it('[BREAK] error message includes the column name for triage', () => {
     try {
       parseNumericFromDriver('xyz', 'ease_factor');

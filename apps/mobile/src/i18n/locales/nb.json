@@ -1914,5 +1914,14 @@
     "s11Body": "Disse vilkårene styres av lovene i Norge. Eventuelle tvister skal løses i domstolene i Norge.",
     "s12Title": "Kontakt oss",
     "s12Body": "Hvis du har spørsmål om disse vilkårene, kontakt oss på legal@eduagent.app."
+  },
+  "subscription": {
+    "trial": {
+      "active": "Prøveperiode aktiv",
+      "endsAt": "Prøveperioden slutter {{date}}"
+    },
+    "statusBadge": {
+      "trial": "Prøve"
+    }
   }
 }

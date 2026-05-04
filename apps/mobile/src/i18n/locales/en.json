@@ -1914,5 +1914,14 @@
     "s11Body": "These terms are governed by the laws of Norway. Any disputes shall be resolved in the courts of Norway.",
     "s12Title": "Contact us",
     "s12Body": "If you have questions about these terms, contact us at legal@eduagent.app."
+  },
+  "subscription": {
+    "trial": {
+      "active": "Trial active",
+      "endsAt": "Trial ends {{date}}"
+    },
+    "statusBadge": {
+      "trial": "Trial"
+    }
   }
 }

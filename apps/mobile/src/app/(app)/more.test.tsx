@@ -288,28 +288,43 @@ describe('MoreScreen — Learning Mode', () => {
   it('[BUG-909] subtitle clarifies scope when owner has linked children', () => {
     render(<MoreScreen />, { wrapper: createWrapper() });
 
-    // Default mock: isOwner=true, no linked children -> generic subtitle copy is rendered.
-    // Both the learning mode and accommodation sections render a subtitle text.
-    // We verify the subtitles are present (locale-independent check via section headers).
-    expect(screen.getByTestId('learning-mode-section-header')).toBeTruthy();
-    expect(
-      screen.getByTestId('learning-accommodation-section-header')
-    ).toBeTruthy();
+    // Default mock: isOwner=true, no linked children -> the generic subtitle
+    // ("Applies to your own learning sessions.") is rendered for BOTH the
+    // Learning Mode and Learning Accommodation sections. Asserting on the
+    // rendered English copy locks the contract: a regression that drops the
+    // subtitle, swaps to the with-children variant, or returns a blank
+    // string would fail this test. test-setup.ts initializes i18next
+    // synchronously with en.json so {{interpolation}} resolves at render.
+    const generic = screen.queryAllByText(/Applies to your own learning/i);
+    expect(generic.length).toBeGreaterThanOrEqual(2);
   });
 
   it('renders both learning mode options', () => {
     render(<MoreScreen />, { wrapper: createWrapper() });
 
+    // Pin testIDs AND the rendered English titles. Real i18n is active
+    // (test-setup.ts synchronously initializes i18next with en.json), so the
+    // titles must resolve to the en.json values. getByText matches per text
+    // node, so 'Challenge mode' / 'Explorer' are found even though the card
+    // also contains the "Active" badge and the description below.
     screen.getByTestId('learning-mode-serious');
     screen.getByTestId('learning-mode-casual');
+    screen.getByText('Challenge mode');
+    screen.getByText('Explorer');
   });
 
   it('renders descriptions for both modes', () => {
     render(<MoreScreen />, { wrapper: createWrapper() });
 
-    // Both learning mode option cards are present (descriptions are locale-dependent).
-    screen.getByTestId('learning-mode-serious');
-    screen.getByTestId('learning-mode-casual');
+    // Assert rendered English description copy (real i18n is active in this
+    // file; see test-setup.ts). A regression that drops the description, mis-
+    // routes the t() key, or breaks JSON-key wiring fails here.
+    screen.getByText(
+      'Push yourself further. Your mentor keeps you on track. You earn points after proving you remember, and recaps help lock it in.'
+    );
+    screen.getByText(
+      'Learn at your own pace. Your mentor is relaxed and encouraging. You earn points right away and can skip recaps.'
+    );
   });
 
   it('shows Active label on current serious mode', () => {
@@ -498,6 +513,11 @@ describe('MoreScreen — Account Actions', () => {
       expect(mockExportMutateAsync).toHaveBeenCalledTimes(1);
       expect(shareSpy).toHaveBeenCalledWith(
         expect.objectContaining({
+          // Pin the rendered share-sheet title — verifies that
+          // t('more.export.shareTitle') resolves to the en.json copy. A bare
+          // toHaveBeenCalledTimes / message-only check would let the title
+          // regress to a key like "more.export.shareTitle" silently.
+          title: 'MentoMate account data export',
           message: expect.stringContaining('"email": "alex@example.com"'),
         })
       );
@@ -545,7 +565,16 @@ describe('MoreScreen — Account Actions', () => {
     fireEvent.press(screen.getByTestId('more-row-help'));
 
     await waitFor(() => {
-      expect(alertSpy).toHaveBeenCalledTimes(1);
+      // Pin the rendered title and message — verifies the i18n keys resolve
+      // to the en.json copy. A toHaveBeenCalledTimes-only check would let
+      // a regression to bare keys ("more.help.contactSupportTitle") or a
+      // dropped support email pass silently.
+      expect(alertSpy).toHaveBeenCalledWith(
+        'Contact support',
+        'Email support@mentomate.app for help with your account.',
+        undefined,
+        undefined
+      );
     });
   });
 });

@@ -30,6 +30,13 @@ jest.mock('../../lib/platform-alert', () => ({
     mockPlatformAlert(...(args as Parameters<typeof Alert.alert>)),
 }));
 
+// Resolves t('common.ok') → 'OK' (from en.json) so existing assertions on the
+// rendered button label keep matching after the alert sweep.
+jest.mock(
+  'react-i18next',
+  () => require('../../test-utils/mock-i18n').i18nMock
+);
+
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     back: mockBack,

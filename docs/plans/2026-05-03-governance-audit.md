@@ -61,6 +61,7 @@ Apply in `eslint.config.mjs` (root) and `apps/mobile/eslint.config.mjs` as appro
 - **GC2** — Flag string-literal SecureStore keys containing chars outside `[a-zA-Z0-9._-]`. Catches C4 and future drift.
 - **GC3** — Flag `#[0-9a-fA-F]{3,6}` literals in `apps/mobile/src/components/**` JSX/TSX (currently only `AnimatedSplash` violates; rule is preventive).
 - **GC4** — Flag `router.push(` calls with two `[param]` segments and no intermediate push.
+- **GC5** — Enforce the `// @inngest-admin: cross-profile` tag on every Inngest function that bypasses `createScopedRepository`. Tag is currently documentation-only (7 functions: `daily-snapshot`, `daily-reminder-scan`, `filing-stranded-backfill`, `monthly-report-cron`, `recall-nudge`, `review-due-scan`, `weekly-progress-push`). Future cross-profile admin work should add the tag; a custom rule can grep for `db.select(...)` / raw `eq(...profileId...)` in `apps/api/src/inngest/functions/**` and require either a `createScopedRepository` call or the `@inngest-admin` tag in the file header.
 
 ### Claude Code drift-catcher hooks
 

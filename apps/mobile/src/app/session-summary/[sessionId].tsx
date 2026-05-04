@@ -12,6 +12,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../lib/theme';
 import { useProfile, personaFromBirthYear } from '../../lib/profile';
 import { useParentProxy } from '../../hooks/use-parent-proxy';
@@ -79,6 +80,7 @@ export default function SessionSummaryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
+  const { t } = useTranslation();
 
   const [summaryText, setSummaryText] = useState('');
   const [aiFeedback, setAiFeedback] = useState<string | null>(null);
@@ -686,7 +688,7 @@ export default function SessionSummaryScreen() {
           'Reflecting helps you remember. Give it a try next time?',
           [
             {
-              text: 'OK',
+              text: t('common.ok'),
               onPress: () => {
                 void (async () => {
                   await maybePromptForRecall();

@@ -19,8 +19,19 @@
 //   - Only literal-string keys are checked. Template literals and dynamic
 //     keys are skipped.
 //   - Scans line-by-line, so multi-line `t(\n  'key'\n)` calls are NOT
-//     matched. The codebase currently has none; if that changes, swap
-//     this for an AST walk (ts-morph) rather than a multi-line regex.
+//     matched. The codebase currently has none, but this is a real
+//     regression risk as the codebase grows: a developer wrapping a long
+//     key onto a new line silently disables this checker for that call.
+//     A multi-line regex would not solve it cleanly (string boundaries,
+//     comments, JSX text, escapes).
+//
+//     TODO(i18n-orphan-ts-morph): swap this scanner for a ts-morph AST
+//     walk that resolves any `t(...)` CallExpression and reads the first
+//     argument as a string literal (or NoSubstitutionTemplateLiteral),
+//     ignoring TemplateExpression / Identifier args. That removes the
+//     line-boundary assumption entirely. Until that lands, do not
+//     reformat multi-line `t()` calls into a state this checker cannot
+//     see — keep the literal key on the same line as the `t(`.
 //   - i18next pluralization suffixes (_one, _other, _zero, _two, _few,
 //     _many) are accepted: if `key_other` exists, `key` is considered
 //     present.

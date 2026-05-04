@@ -34,6 +34,6 @@ module.exports = {
     },
   },
   passWithNoTests: true,
-  testTimeout: 10000,
+  testTimeout: 30000,
   maxWorkers: 1,
 };

@@ -1914,5 +1914,14 @@
     "s11Body": "Estes termos são regidos pelas leis da Noruega. Quaisquer disputas serão resolvidas nos tribunais da Noruega.",
     "s12Title": "Contate-nos",
     "s12Body": "Se você tiver dúvidas sobre estes termos, entre em contato conosco em legal@eduagent.app."
+  },
+  "subscription": {
+    "trial": {
+      "active": "Avaliação ativa",
+      "endsAt": "Avaliação termina em {{date}}"
+    },
+    "statusBadge": {
+      "trial": "Avaliação"
+    }
   }
 }

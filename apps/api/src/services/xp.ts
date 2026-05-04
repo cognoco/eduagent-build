@@ -117,12 +117,11 @@ export async function insertSessionXpEntry(
   // closes for the same topic would both see existing=null but only one
   // can land thanks to the (profile_id, topic_id) unique index added in
   // migration 0051.
-  const mastery = Number(assessment.masteryScore);
   const depth = (assessment.verificationDepth ?? 'recall') as
     | 'recall'
     | 'explain'
     | 'transfer';
-  const amount = calculateTopicXp(mastery, depth);
+  const amount = calculateTopicXp(assessment.masteryScore, depth);
 
   await db
     .insert(xpLedger)

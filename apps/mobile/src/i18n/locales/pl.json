@@ -1914,5 +1914,14 @@
     "s11Body": "Niniejsze warunki podlegają prawu Norwegii. Wszelkie spory będą rozstrzygane w sądach Norwegii.",
     "s12Title": "Kontakt",
     "s12Body": "Jeśli masz pytania dotyczące tych warunków, skontaktuj się z nami pod adresem legal@eduagent.app."
+  },
+  "subscription": {
+    "trial": {
+      "active": "Okres próbny aktywny",
+      "endsAt": "Okres próbny kończy się {{date}}"
+    },
+    "statusBadge": {
+      "trial": "Próbny"
+    }
   }
 }

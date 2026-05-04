@@ -24,6 +24,8 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
+jest.mock('react-i18next', () => require('../test-utils/mock-i18n').i18nMock);
+
 const mockSwitchProfile = jest.fn().mockResolvedValue(undefined);
 
 const ownerProfile: Profile = {

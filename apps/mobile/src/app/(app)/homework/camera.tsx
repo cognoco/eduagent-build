@@ -611,7 +611,7 @@ export default function CameraScreen(): React.ReactNode {
       platformAlert(
         'Could not identify the subject',
         'Please pick the subject this homework belongs to.',
-        [{ text: 'OK' }]
+        [{ text: t('common.ok') }]
       );
       setShowSubjectPicker(true);
     }

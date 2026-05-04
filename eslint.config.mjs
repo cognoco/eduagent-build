@@ -92,45 +92,34 @@ export default [
     },
   },
   // -------------------------------------------------------------------------
-  // Governance Rule 1 — drizzle-orm primitives must not be imported in API
-  // route files. Routes keep handlers inline for RPC inference but business
-  // logic and DB access belong in services/* via createScopedRepository.
+  // Governance Rule 1 + Rule 3 (combined config for routes and services).
+  //
+  // Flat-config rules do not merge by key — when two configs both set
+  // `no-restricted-imports` and both match a file, only the LAST config's
+  // value applies. Routes are matched by both the route-specific G1 glob
+  // and the broader G3 glob, so we MUST emit both rule lists in the same
+  // config block targeting the narrower glob, otherwise G3 silently
+  // overrides G1 and the drizzle-orm restriction becomes a no-op for
+  // routes. The selftest in apps/api/src/eslint-governance.selftest.test.ts
+  // catches that regression.
+  //
+  // G1 — drizzle-orm primitives must not be imported in API route files.
+  //      Routes keep handlers inline for RPC inference but business logic
+  //      and DB access belong in services/* via createScopedRepository.
+  // G3 — direct LLM provider SDK imports are restricted to the provider
+  //      adapters under services/llm/providers/**. All other code must call
+  //      services/llm/router.ts (or its barrel) so the router's
+  //      retry/fallback/cost-metering logic stays the single chokepoint.
   // See CLAUDE.md > Non-Negotiable Engineering Rules.
   // -------------------------------------------------------------------------
-  {
-    files: ['apps/api/src/routes/**/*.ts'],
-    rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          paths: [
-            {
-              name: 'drizzle-orm',
-              message:
-                'Route files must not import drizzle-orm primitives. Move DB access to services/* and use createScopedRepository(profileId). See CLAUDE.md.',
-            },
-          ],
-          patterns: [
-            {
-              group: ['drizzle-orm/*'],
-              message:
-                'Route files must not import drizzle-orm primitives. Move DB access to services/* and use createScopedRepository(profileId). See CLAUDE.md.',
-            },
-          ],
-        },
-      ],
-    },
-  },
-  // -------------------------------------------------------------------------
-  // Governance Rule 3 — direct LLM provider SDK imports are restricted to
-  // the provider adapters under services/llm/providers/**. All other code
-  // must call services/llm/router.ts (or its barrel) so the router's
-  // retry/fallback/cost-metering logic stays the single chokepoint.
-  // See CLAUDE.md > Non-Negotiable Engineering Rules.
-  // -------------------------------------------------------------------------
+  // First, the broad G3 rule for everything under apps/api/src (except
+  // provider adapters). Routes get their own override below.
   {
     files: ['apps/api/src/**/*.ts'],
-    ignores: ['apps/api/src/services/llm/providers/**/*.ts'],
+    ignores: [
+      'apps/api/src/services/llm/providers/**/*.ts',
+      'apps/api/src/routes/**/*.ts',
+    ],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -165,6 +154,62 @@ export default [
               name: '@google-cloud/vertexai',
               message:
                 'Import the LLM router from services/llm instead. Direct SDK imports are only allowed in services/llm/providers/**.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  // Routes-only override: combine G1 (drizzle-orm) + G3 (LLM SDKs) so neither
+  // is dropped by last-match-wins semantics.
+  {
+    files: ['apps/api/src/routes/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'drizzle-orm',
+              message:
+                'Route files must not import drizzle-orm primitives. Move DB access to services/* and use createScopedRepository(profileId). See CLAUDE.md.',
+            },
+            {
+              name: '@anthropic-ai/sdk',
+              message:
+                'Import the LLM router from services/llm instead. Direct SDK imports are only allowed in services/llm/providers/**.',
+            },
+            {
+              name: 'openai',
+              message:
+                'Import the LLM router from services/llm instead. Direct SDK imports are only allowed in services/llm/providers/**.',
+            },
+            {
+              name: '@google-ai/generativelanguage',
+              message:
+                'Import the LLM router from services/llm instead. Direct SDK imports are only allowed in services/llm/providers/**.',
+            },
+            {
+              name: '@google/generative-ai',
+              message:
+                'Import the LLM router from services/llm instead. Direct SDK imports are only allowed in services/llm/providers/**.',
+            },
+            {
+              name: '@google/genai',
+              message:
+                'Import the LLM router from services/llm instead. Direct SDK imports are only allowed in services/llm/providers/**.',
+            },
+            {
+              name: '@google-cloud/vertexai',
+              message:
+                'Import the LLM router from services/llm instead. Direct SDK imports are only allowed in services/llm/providers/**.',
+            },
+          ],
+          patterns: [
+            {
+              group: ['drizzle-orm/*'],
+              message:
+                'Route files must not import drizzle-orm primitives. Move DB access to services/* and use createScopedRepository(profileId). See CLAUDE.md.',
             },
           ],
         },
