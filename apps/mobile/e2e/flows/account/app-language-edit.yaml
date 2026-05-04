@@ -1,0 +1,118 @@
+# Flow: App Language Edit — Bottom-Sheet Picker [ACCOUNT-28]
+# Validates: user can open the language picker bottom sheet from the More
+# screen, select a language (nb), verify the locale change via the sign-out
+# button label ("Logg ut"), then reset back to English ("Log out").
+#
+# PREREQUISITE FLAG: This flow requires FEATURE_FLAGS.I18N_ENABLED = true
+# and SUPPORTED_LANGUAGES to include 'nb'. Currently both are disabled in
+# production (I18N_ENABLED: false, SUPPORTED_LANGUAGES: ['en'] only).
+# Enable the flag in src/lib/feature-flags.ts and expand SUPPORTED_LANGUAGES
+# in src/i18n/index.ts before running this flow.
+#
+# Tags: nightly, account
+#
+# Journey: UX Journey 5 (Account Management)
+# Epics: Epic 5 (FR101-FR105)
+# Prerequisite: Seeded user with onboarding complete (scenario: onboarding-complete)
+appId: com.mentomate.app
+tags:
+  - nightly
+  - account
+---
+# 1. Seed & sign in
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "onboarding-complete"
+      API_URL: ${API_URL}
+
+# 2. Verify home screen loaded
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 15000
+
+# 3. Navigate to More tab
+- tapOn:
+    text: "More"
+
+# 4. Wait for More screen — Learning Mode section is always above the fold
+- extendedWaitUntil:
+    visible:
+      id: "learning-mode-casual"
+    timeout: 10000
+
+# 5. Scroll down to Account section (language picker row is below the fold)
+- scrollUntilVisible:
+    element:
+      id: "settings-app-language"
+    direction: DOWN
+    timeout: 15000
+
+# 6. Tap the App Language settings row to open the bottom sheet
+- tapOn:
+    id: "settings-app-language"
+
+# 7. Verify the picker bottom sheet appeared
+- extendedWaitUntil:
+    visible:
+      id: "language-picker-backdrop"
+    timeout: 10000
+
+- takeScreenshot: language-picker-open
+
+# 8. Tap the Norwegian (nb) language option
+- tapOn:
+    id: "language-option-nb"
+
+# 9. Bottom sheet should close after selection
+- assertNotVisible:
+    id: "language-picker-backdrop"
+
+- takeScreenshot: language-changed-nb
+
+# 10. Verify locale changed: sign-out button should read "Logg ut" (Norwegian)
+- scrollUntilVisible:
+    element:
+      id: "sign-out-button"
+    direction: DOWN
+    timeout: 10000
+
+- assertVisible:
+    text: "Logg ut"
+
+- takeScreenshot: sign-out-label-norwegian
+
+# 11. Reset back to English — reopen the picker
+- scrollUntilVisible:
+    element:
+      id: "settings-app-language"
+    direction: UP
+    timeout: 10000
+
+- tapOn:
+    id: "settings-app-language"
+
+- extendedWaitUntil:
+    visible:
+      id: "language-picker-backdrop"
+    timeout: 10000
+
+# 12. Select English (en) to restore default
+- tapOn:
+    id: "language-option-en"
+
+- assertNotVisible:
+    id: "language-picker-backdrop"
+
+# 13. Verify locale reset: sign-out button should read "Log out" (English)
+- scrollUntilVisible:
+    element:
+      id: "sign-out-button"
+    direction: DOWN
+    timeout: 10000
+
+- assertVisible:
+    text: "Log out"
+
+- takeScreenshot: language-reset-english
