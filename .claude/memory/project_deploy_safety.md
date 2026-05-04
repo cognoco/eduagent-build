@@ -12,4 +12,4 @@ type: project
 - Production/staging deploys now run committed SQL migrations via `drizzle-kit migrate`
 - Dev environments still use `drizzle-kit push` (the `db:push` script in packages/database)
 - CI quality gate (ci.yml) still uses `db:push` for test postgres — this is correct (disposable DB)
-- When adding schema changes: `pnpm run db:generate` to create migration SQL, commit it
+- When adding schema changes: `pnpm run db:generate:dev` to create migration SQL, commit it

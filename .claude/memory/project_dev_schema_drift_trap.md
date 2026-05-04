@@ -1,6 +1,6 @@
 ---
 name: Dev environment schema drift — investigation trap
-description: When mentomate-api-dev throws "column X does not exist", the fix is db:push:dev + db:generate. Do NOT send the user to check Doppler configs or run Neon diagnostic queries — that loop wasted a full session.
+description: When mentomate-api-dev throws "column X does not exist", the fix is db:push:dev + db:generate:dev. Do NOT send the user to check Doppler configs or run Neon diagnostic queries — that loop wasted a full session.
 type: project
 originSessionId: 4a47e2eb-7781-4413-bf1b-5117ee66f0bf
 ---
@@ -25,7 +25,7 @@ Running diagnostic queries on the Neon "staging" branch will show clean results 
 **Do this, in order:**
 
 1. `pnpm run db:push:dev` — syncs current Drizzle schema to the dev Neon branch (script wraps drizzle-kit push with `.env.development.local`, which holds the dev Doppler config)
-2. `pnpm run db:generate` — checks if drift needs a committed migration (commit if it produces a file)
+2. `pnpm run db:generate:dev` — checks if drift needs a committed migration (commit if it produces a file)
 3. Restart the dev server / reload the mobile preview
 
 **Do NOT:**
@@ -35,11 +35,11 @@ Running diagnostic queries on the Neon "staging" branch will show clean results 
 
 ## Why db:push:dev Works
 
-`db:push:dev` pushes the current Drizzle TypeScript schema directly to whatever Neon branch Doppler's `dev` config points to. It bypasses the migration system, so it's fast but leaves no migration trail. Always follow with `db:generate` to capture any committed diff.
+`db:push:dev` pushes the current Drizzle TypeScript schema directly to whatever Neon branch Doppler's `dev` config points to. It bypasses the migration system, so it's fast but leaves no migration trail. Always follow with `db:generate:dev` to capture any committed diff.
 
 ## Follow-Up Still Open (as of 2026-04-17)
 
-- Run `db:generate` to check if the push created uncommitted drift
+- Run `db:generate:dev` to check if the push created uncommitted drift
 - Enable Cloudflare Workers Observability on `mentomate-api-dev` (currently disabled — had to diagnose blind)
 - Record the blank-screen-on-500 UX bug in Notion (separate from DB issue)
 
