@@ -1,12 +1,13 @@
-# Mentor language edit via Settings
-# Tags: nightly, onboarding
+# Flow ACCOUNT-29: Tutor Language Edit from More
+# Validates: More -> Mentor language -> language picker -> save -> return to More
+# Covers ACCOUNT-29 (tutor/mentor language). ACCOUNT-28 (app UI locale) is a separate test.
+# Tags: nightly, account
 # Seed: language-subject-active
-# Covers: More -> Mentor language -> picker -> save -> return
-# Usage: ./scripts/seed-and-run.sh language-subject-active flows/onboarding/settings-language-edit.yaml
+# Usage: ./scripts/seed-and-run.sh language-subject-active flows/account/tutor-language-edit.yaml
 appId: com.mentomate.app
 tags:
   - nightly
-  - onboarding
+  - account
 ---
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
