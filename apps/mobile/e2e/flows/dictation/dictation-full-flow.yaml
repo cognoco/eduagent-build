@@ -98,8 +98,12 @@ tags:
     commands:
       - tapOn:
           id: "playback-exit"
+      - extendedWaitUntil:
+          visible:
+            id: "dictation-exit-confirm"
+          timeout: 5000
       - tapOn:
-          text: "Leave"
+          id: "dictation-exit-confirm"
 
 - runFlow:
     when:
