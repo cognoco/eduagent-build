@@ -1,0 +1,77 @@
+# Flow LEARN-24 (Step 1): Saved bookmarks — list, expand on tap, delete with confirm.
+# Validates: progress tab -> saved link -> bookmarks list -> bookmark-row visible ->
+#            tap to expand -> tap trash -> native alert confirm -> bookmark removed.
+# Tags: nightly, learning
+#
+# Prerequisite: with-bookmarks seed (learner + 2 bookmarks in History subject).
+# Env vars: BOOKMARK_ID, SUBJECT_ID, SESSION_ID
+#
+# testIDs verified against:
+#   - apps/mobile/src/app/(app)/_layout.tsx (tab-progress)
+#   - apps/mobile/src/app/(app)/progress/index.tsx (progress-saved-link)
+#   - apps/mobile/src/app/(app)/progress/saved.tsx
+#       (saved-bookmarks-list, bookmark-row-${BOOKMARK_ID}, bookmark-delete-${BOOKMARK_ID})
+#   Delete confirm is a native platformAlert — tap by text "Remove" (i18n key: deleteConfirm).
+appId: com.mentomate.app
+tags:
+  - nightly
+  - learning
+---
+# 1. Seed & sign in
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "with-bookmarks"
+      API_URL: ${API_URL}
+
+# 2. Wait for learner home
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 15000
+
+# 3. Navigate to Progress tab
+- tapOn:
+    id: "tab-progress"
+
+- extendedWaitUntil:
+    visible:
+      id: "progress-saved-link"
+    timeout: 10000
+
+- takeScreenshot: bookmarks-01-progress-screen
+
+# 4. Navigate to saved bookmarks
+- tapOn:
+    id: "progress-saved-link"
+
+- extendedWaitUntil:
+    visible:
+      id: "saved-bookmarks-list"
+    timeout: 10000
+
+- takeScreenshot: bookmarks-02-list-loaded
+
+# 5. Verify the seeded bookmark row is present
+- assertVisible:
+    id: "bookmark-row-${BOOKMARK_ID}"
+
+# 6. Tap the row to expand it
+- tapOn:
+    id: "bookmark-row-${BOOKMARK_ID}"
+
+- takeScreenshot: bookmarks-03-expanded
+
+# 7. Tap the delete button (trash icon) on the seeded bookmark
+- tapOn:
+    id: "bookmark-delete-${BOOKMARK_ID}"
+
+# 8. Confirm deletion in the native alert — text matches i18n key progress.saved.deleteConfirm = "Remove"
+- tapOn:
+    text: "Remove"
+
+# 9. Verify the deleted bookmark is no longer visible
+- assertNotVisible:
+    id: "bookmark-row-${BOOKMARK_ID}"
+
+- takeScreenshot: bookmarks-04-after-delete
