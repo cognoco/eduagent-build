@@ -1,6 +1,6 @@
 import { renderHook, act } from '@testing-library/react-native';
-import React from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient } from '@tanstack/react-query';
+import { createQueryWrapper } from '../test-utils/app-hook-test-utils';
 import { useClassifySubject } from './use-classify-subject';
 
 const mockFetch = jest.fn();
@@ -14,16 +14,9 @@ jest.mock('../lib/api-client', () => ({
 let queryClient: QueryClient;
 
 function createWrapper() {
-  queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
-  });
-  return function Wrapper({ children }: { children: React.ReactNode }) {
-    return React.createElement(
-      QueryClientProvider,
-      { client: queryClient },
-      children
-    );
-  };
+  const w = createQueryWrapper();
+  queryClient = w.queryClient;
+  return w.Wrapper;
 }
 
 describe('useClassifySubject', () => {

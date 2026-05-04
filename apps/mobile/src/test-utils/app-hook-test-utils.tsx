@@ -1,5 +1,9 @@
 import { createElement, type ReactNode } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  QueryClient,
+  QueryClientProvider,
+  type QueryClientConfig,
+} from '@tanstack/react-query';
 import {
   ProfileContext,
   type Profile,
@@ -7,6 +11,35 @@ import {
 } from '../lib/profile';
 
 process.env.EXPO_PUBLIC_API_URL ??= 'http://localhost:8787';
+
+/**
+ * Lightweight QueryClient-only wrapper for hook tests that mock
+ * `../lib/profile` directly (the dominant pattern across `hooks/*.test.ts`).
+ *
+ * Unlike `createHookWrapper`, this does NOT pull in `ProfileContext` —
+ * that import would resolve to the test's `jest.mock('../lib/profile')`
+ * shim and provide an undefined Provider. Use this helper when the
+ * test already mocks the profile module.
+ */
+export function createQueryWrapper(
+  options: { queryClientOptions?: QueryClientConfig } = {}
+) {
+  const queryClient = new QueryClient(
+    options.queryClientOptions ?? {
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    }
+  );
+
+  function Wrapper({ children }: { children: ReactNode }) {
+    return createElement(
+      QueryClientProvider,
+      { client: queryClient },
+      children
+    );
+  }
+
+  return { queryClient, Wrapper };
+}
 
 export function createTestProfile(overrides: Partial<Profile> = {}): Profile {
   return {
