@@ -1,0 +1,40 @@
+# Flow A-MFA-4: Sign-in MFA — Backup code branch
+#
+# BLOCKED: Same infrastructure gap as sign-in-mfa-email-code.yaml.
+# Backup codes are generated at TOTP enrollment time. The test harness would
+# need to: (a) seed a TOTP-enrolled user, (b) capture the backup codes at
+# enrollment, and (c) export one as ${BACKUP_CODE} for use in this flow.
+# Neither the seeder nor the seed-and-run wrapper supports this today.
+#
+# Unlike TOTP, backup codes are static (one-time use), so they CAN be passed as
+# a Maestro env var once available. The `keyboardType` for backup_code is
+# `default` (not `number-pad`) — the flow would `inputText ${BACKUP_CODE}` then
+# assert sign-in succeeds.
+#
+# Unblock path:
+#   1. Add "mfa-backup-code" seed scenario to test-seed.ts that:
+#      - Enrolls TOTP on the Clerk user.
+#      - Captures the backup codes from Clerk's response.
+#      - Returns one backup code in the seed response as `backupCode`.
+#   2. Export as ${BACKUP_CODE} from seed-and-run.sh.
+#   3. Remove this BLOCKED comment and implement the flow below.
+#
+# testIDs (confirmed in apps/mobile/src/app/(auth)/sign-in.tsx):
+#   sign-in-verify-code  line 1030  (placeholder: "Enter backup code")
+#   sign-in-verify-button line 1041
+#   sign-in-back-from-verify line 1078
+#   (sign-in-resend-code NOT rendered for backup_code — line 1058-1070)
+#
+# Seed scenario needed: "mfa-backup-code" (does not yet exist)
+# Run command: ./e2e/scripts/seed-and-run.sh --no-seed e2e/flows/auth/sign-in-mfa-backup-code.yaml
+
+# BLOCKED: implement after mfa-backup-code seed scenario is wired.
+appId: com.mentomate.app
+tags:
+  - weekly
+  - auth
+---
+# Placeholder: flow body will be written once infrastructure is unblocked.
+- launchApp:
+    appId: "com.mentomate.app"
+    stopApp: false

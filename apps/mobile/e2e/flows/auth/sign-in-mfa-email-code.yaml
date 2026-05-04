@@ -1,0 +1,40 @@
+# Flow A-MFA-1: Sign-in MFA — Email code branch
+#
+# BLOCKED: CLERK_TESTING_TOKEN is currently a placeholder (see CLAUDE.md).
+# MFA branches require a Clerk test user with email-code 2FA enrolled.
+# Seeding a user with MFA via Clerk Admin API would work, but the seeder
+# (apps/api/src/services/test-seed.ts) does not yet enroll TOTP/phone/email-2FA
+# on created users. Without a real MFA-enrolled user, sign-in never reaches
+# the pendingVerification step and this flow would assert against an invisible
+# element, making it flaky/always-failing theatre.
+#
+# Unblock path:
+#   1. Add a new seed scenario "mfa-email-code" to test-seed.ts that enrolls
+#      email-code 2FA on the Clerk user.
+#   2. Wire CLERK_TESTING_TOKEN in Doppler to provide the pre-issued auth token
+#      so Clerk does not rate-limit or block E2E sign-ins.
+#   3. Remove this BLOCKED comment and implement Step 1 below.
+#
+# testIDs (confirmed in apps/mobile/src/app/(auth)/sign-in.tsx):
+#   sign-in-email       line 1252
+#   sign-in-password    line 1270
+#   sign-in-button      line 1293
+#   sign-in-verify-code line 1030
+#   sign-in-verify-button line 1041
+#   sign-in-resend-code line 1067
+#   sign-in-back-from-verify line 1078
+#
+# Seed scenario needed: "mfa-email-code" (does not yet exist in test-seed.ts)
+# Run command: ./e2e/scripts/seed-and-run.sh --no-seed e2e/flows/auth/sign-in-mfa-email-code.yaml
+
+# BLOCKED: implement after mfa-email-code seed scenario + CLERK_TESTING_TOKEN are wired.
+appId: com.mentomate.app
+tags:
+  - weekly
+  - auth
+---
+# Placeholder: flow body will be written once infrastructure is unblocked.
+# The launchApp below is a no-op stub required by Maestro's parser.
+- launchApp:
+    appId: "com.mentomate.app"
+    stopApp: false

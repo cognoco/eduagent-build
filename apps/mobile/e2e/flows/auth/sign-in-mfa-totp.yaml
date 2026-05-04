@@ -1,0 +1,37 @@
+# Flow A-MFA-2: Sign-in MFA — TOTP (authenticator app) branch
+#
+# BLOCKED: Same infrastructure gap as sign-in-mfa-email-code.yaml.
+# TOTP enrollment requires calling Clerk's Admin API to set up TOTP on a test
+# user — the seeder does not yet support this. Additionally, TOTP codes rotate
+# every 30 seconds (RFC 6238); a Maestro flow cannot generate them without
+# `runScript` (unreliable on Maestro 2.2.0 per CLAUDE.md). This branch needs
+# either (a) a pre-generated static test code from Clerk's testing-token
+# mechanism, or (b) a seed-and-run wrapper that generates and exports the TOTP
+# code before launching Maestro.
+#
+# Unblock path:
+#   1. Add "mfa-totp" seed scenario to test-seed.ts with TOTP enrolled and the
+#      TOTP secret exported as a seed response field (${TOTP_SECRET}).
+#   2. Add a seed-and-run-mfa-totp.sh wrapper that uses `oathtool` (or Node
+#      `otplib`) to generate the current TOTP code and exports it as ${TOTP_CODE}.
+#   3. Remove this BLOCKED comment and implement the flow below.
+#
+# testIDs (confirmed in apps/mobile/src/app/(auth)/sign-in.tsx):
+#   sign-in-verify-code   line 1030
+#   sign-in-verify-button line 1041
+#   sign-in-back-from-verify line 1078
+#   (sign-in-resend-code NOT rendered for totp strategy — line 1058-1070)
+#
+# Seed scenario needed: "mfa-totp" (does not yet exist)
+# Run command: ./e2e/scripts/seed-and-run-mfa-totp.sh mfa-totp e2e/flows/auth/sign-in-mfa-totp.yaml
+
+# BLOCKED: implement after mfa-totp seed scenario + wrapper script are wired.
+appId: com.mentomate.app
+tags:
+  - weekly
+  - auth
+---
+# Placeholder: flow body will be written once infrastructure is unblocked.
+- launchApp:
+    appId: "com.mentomate.app"
+    stopApp: false
