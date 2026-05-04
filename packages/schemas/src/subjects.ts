@@ -389,6 +389,11 @@ export type CreateSubjectWithStructureResponse = z.infer<
 
 // --- Book & Topic Suggestions (Conversation-First Flow) ---
 
+const isoDateField = z.union([
+  z.string().datetime(),
+  z.date().transform((d) => d.toISOString()),
+]);
+
 export const bookSuggestionSchema = z.object({
   id: z.string().uuid(),
   subjectId: z.string().uuid(),
