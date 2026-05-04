@@ -41,7 +41,7 @@ type FlashMode = 'off' | 'on' | 'auto';
 
 export default function CameraScreen(): React.ReactNode {
   const router = useRouter();
-  const { t } = useTranslation('homework');
+  const { t } = useTranslation();
   const { subjectId, subjectName, returnTo } = useLocalSearchParams<{
     subjectId?: string;
     subjectName?: string;
@@ -158,7 +158,7 @@ export default function CameraScreen(): React.ReactNode {
       ocr.cancel();
       dispatch({
         type: 'OCR_ERROR',
-        message: t('ocrTimeout'),
+        message: t('homework.ocrTimeout'),
       });
     }, OCR_UI_TIMEOUT_MS);
     return () => clearTimeout(timeoutId);
@@ -687,21 +687,23 @@ export default function CameraScreen(): React.ReactNode {
         style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
       >
         <Text className="text-h2 font-bold text-text-primary text-center mb-3">
-          {t('permissionTitle')}
+          {t('homework.permissionTitle')}
         </Text>
         <Text className="text-body text-text-secondary text-center mb-8">
-          {denied ? t('permissionDenied') : t('permissionPrompt')}
+          {denied
+            ? t('homework.permissionDenied')
+            : t('homework.permissionPrompt')}
         </Text>
         {denied ? (
           <Pressable
             testID="open-settings-button"
             onPress={() => Linking.openSettings()}
             className="bg-primary rounded-button py-4 px-8 min-h-[48px] items-center justify-center"
-            accessibilityLabel={t('openSettingsLabel')}
+            accessibilityLabel={t('homework.openSettingsLabel')}
             accessibilityRole="button"
           >
             <Text className="text-text-inverse text-body font-semibold">
-              {t('openSettings')}
+              {t('homework.openSettings')}
             </Text>
           </Pressable>
         ) : (
@@ -709,11 +711,11 @@ export default function CameraScreen(): React.ReactNode {
             testID="grant-permission-button"
             onPress={requestPermission}
             className="bg-primary rounded-button py-4 px-8 min-h-[48px] items-center justify-center"
-            accessibilityLabel={t('allowCameraLabel')}
+            accessibilityLabel={t('homework.allowCameraLabel')}
             accessibilityRole="button"
           >
             <Text className="text-text-inverse text-body font-semibold">
-              {t('allowCamera')}
+              {t('homework.allowCamera')}
             </Text>
           </Pressable>
         )}
@@ -721,11 +723,11 @@ export default function CameraScreen(): React.ReactNode {
           testID="close-button"
           onPress={handleClose}
           className="mt-4 py-3 px-6 min-h-[48px] items-center justify-center"
-          accessibilityLabel={t('common:goBack')}
+          accessibilityLabel={t('common.goBack')}
           accessibilityRole="button"
         >
           <Text className="text-body text-text-secondary">
-            {t('common:goBack')}
+            {t('common.goBack')}
           </Text>
         </Pressable>
       </View>
@@ -749,7 +751,7 @@ export default function CameraScreen(): React.ReactNode {
             onPress={handleClose}
             className="absolute top-0 left-4 w-14 h-14 items-center justify-center rounded-full bg-black/60 border border-white/30"
             style={{ marginTop: insets.top + 8 }}
-            accessibilityLabel={t('closeCameraLabel')}
+            accessibilityLabel={t('homework.closeCameraLabel')}
             accessibilityRole="button"
           >
             <Ionicons name="close" size={28} color="white" />
@@ -762,7 +764,7 @@ export default function CameraScreen(): React.ReactNode {
           >
             <View className="w-full aspect-[4/3] border-2 border-dashed border-primary/60 rounded-card items-center justify-center">
               <Text className="text-white/70 text-body-sm text-center">
-                {t('centerHomework')}
+                {t('homework.centerHomework')}
               </Text>
             </View>
           </View>
@@ -776,7 +778,7 @@ export default function CameraScreen(): React.ReactNode {
               testID="gallery-button"
               onPress={() => void handlePickFromGallery()}
               className="absolute left-8 w-12 h-12 items-center justify-center rounded-full bg-black/40"
-              accessibilityLabel={t('galleryLabel')}
+              accessibilityLabel={t('homework.galleryLabel')}
               accessibilityRole="button"
             >
               <Ionicons name="images-outline" size={22} color="white" />
@@ -786,7 +788,7 @@ export default function CameraScreen(): React.ReactNode {
               testID="capture-button"
               onPress={handleCapture}
               className="w-16 h-16 rounded-full bg-primary items-center justify-center"
-              accessibilityLabel={t('takePhotoLabel')}
+              accessibilityLabel={t('homework.takePhotoLabel')}
               accessibilityRole="button"
             >
               <View className="w-14 h-14 rounded-full border-2 border-white/80" />
@@ -796,8 +798,11 @@ export default function CameraScreen(): React.ReactNode {
               testID="flash-toggle"
               onPress={toggleFlash}
               className="absolute right-8 w-12 h-12 items-center justify-center rounded-full bg-black/40"
-              accessibilityLabel={t('flashLabel', {
-                state: flash === 'off' ? t('flashOff') : t('flashOn'),
+              accessibilityLabel={t('homework.flashLabel', {
+                state:
+                  flash === 'off'
+                    ? t('homework.flashOff')
+                    : t('homework.flashOn'),
               })}
               accessibilityRole="button"
             >
@@ -827,12 +832,12 @@ export default function CameraScreen(): React.ReactNode {
               className="w-full aspect-[4/3] rounded-card"
               resizeMode="contain"
               testID="photo-preview"
-              accessibilityLabel={t('photoPreviewLabel')}
+              accessibilityLabel={t('homework.photoPreviewLabel')}
             />
           ) : (
             <View className="w-full aspect-[4/3] bg-surface rounded-card items-center justify-center">
               <Text className="text-body text-text-secondary">
-                {t('photoCaptured')}
+                {t('homework.photoCaptured')}
               </Text>
             </View>
           )}
@@ -842,22 +847,22 @@ export default function CameraScreen(): React.ReactNode {
             testID="retake-button"
             onPress={handleRetake}
             className="flex-1 bg-surface rounded-button py-4 min-h-[48px] items-center justify-center"
-            accessibilityLabel={t('retakeLabel')}
+            accessibilityLabel={t('homework.retakeLabel')}
             accessibilityRole="button"
           >
             <Text className="text-body font-semibold text-text-primary">
-              {t('retake')}
+              {t('homework.retake')}
             </Text>
           </Pressable>
           <Pressable
             testID="camera-use-this-button"
             onPress={handleConfirmPhoto}
             className="flex-1 bg-accent rounded-button py-4 min-h-[48px] items-center justify-center border border-accent"
-            accessibilityLabel={t('useThisPhotoLabel')}
+            accessibilityLabel={t('homework.useThisPhotoLabel')}
             accessibilityRole="button"
           >
             <Text className="text-body font-bold text-white">
-              {t('useThis')}
+              {t('homework.useThis')}
             </Text>
           </Pressable>
         </View>
@@ -865,11 +870,11 @@ export default function CameraScreen(): React.ReactNode {
           testID="preview-cancel"
           onPress={handleClose}
           className="py-3 px-6 min-h-[44px] items-center justify-center self-center mb-2"
-          accessibilityLabel={t('cancelAndGoBackLabel')}
+          accessibilityLabel={t('homework.cancelAndGoBackLabel')}
           accessibilityRole="button"
         >
           <Text className="text-body text-text-secondary">
-            {t('common:cancel')}
+            {t('common.cancel')}
           </Text>
         </Pressable>
       </View>
@@ -891,7 +896,7 @@ export default function CameraScreen(): React.ReactNode {
             <View className="h-4 bg-surface-elevated rounded-full w-3/5" />
           </View>
           <Text className="text-body text-text-secondary text-center mt-6">
-            {t('readingHomework', { subject: subjectName ?? '' })}
+            {t('homework.readingHomework', { subject: subjectName ?? '' })}
           </Text>
           <Pressable
             onPress={() => {
@@ -899,12 +904,12 @@ export default function CameraScreen(): React.ReactNode {
               dispatch({ type: 'RETAKE' });
             }}
             className="mt-6 py-3 px-6 min-h-[44px] items-center justify-center self-center"
-            accessibilityLabel={t('cancelOcrLabel')}
+            accessibilityLabel={t('homework.cancelOcrLabel')}
             accessibilityRole="button"
             testID="camera-cancel-ocr"
           >
             <Text className="text-body font-semibold text-text-secondary">
-              {t('common:cancel')}
+              {t('common.cancel')}
             </Text>
           </Pressable>
         </View>
@@ -927,12 +932,12 @@ export default function CameraScreen(): React.ReactNode {
           testID="camera-back-button"
           onPress={handleRetake}
           className="self-start flex-row items-center min-h-[48px] mt-2 px-2"
-          accessibilityLabel={t('retakeLabel')}
+          accessibilityLabel={t('homework.retakeLabel')}
           accessibilityRole="button"
         >
           <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
           <Text className="text-body font-semibold text-text-primary ml-1">
-            {t('common:back')}
+            {t('common.back')}
           </Text>
         </Pressable>
 
@@ -949,7 +954,7 @@ export default function CameraScreen(): React.ReactNode {
         )}
 
         <Text className="text-body text-text-secondary mt-4 mb-3">
-          {t('problemsFound')}
+          {t('homework.problemsFound')}
         </Text>
 
         {droppedProblems.length > 0 && (
@@ -957,11 +962,13 @@ export default function CameraScreen(): React.ReactNode {
             testID="dropped-fragments-chip"
             onPress={handleRestoreDroppedProblems}
             className="mb-3 rounded-button bg-surface px-4 py-3"
-            accessibilityLabel={t('addSkippedFragmentsLabel')}
+            accessibilityLabel={t('homework.addSkippedFragmentsLabel')}
             accessibilityRole="button"
           >
             <Text className="text-body-sm font-medium text-text-primary">
-              {t('skippedFragments', { count: droppedProblems.length })}
+              {t('homework.skippedFragments', {
+                count: droppedProblems.length,
+              })}
             </Text>
           </Pressable>
         )}
@@ -975,19 +982,19 @@ export default function CameraScreen(): React.ReactNode {
             >
               <View className="flex-row items-center justify-between mb-3">
                 <Text className="text-body font-semibold text-text-primary">
-                  {t('problemNumber', { number: index + 1 })}
+                  {t('homework.problemNumber', { number: index + 1 })}
                 </Text>
                 {draftProblems.length > 1 && (
                   <Pressable
                     onPress={() => handleRemoveProblem(problem.id)}
                     testID={`remove-problem-${index}`}
-                    accessibilityLabel={t('removeProblemLabel', {
+                    accessibilityLabel={t('homework.removeProblemLabel', {
                       number: index + 1,
                     })}
                     accessibilityRole="button"
                   >
                     <Text className="text-body-sm text-danger">
-                      {t('remove')}
+                      {t('homework.remove')}
                     </Text>
                   </Pressable>
                 )}
@@ -1004,9 +1011,9 @@ export default function CameraScreen(): React.ReactNode {
                 multiline
                 className="bg-background rounded-card p-4 text-body text-text-primary min-h-[120px]"
                 textAlignVertical="top"
-                placeholder={t('problemNumber', { number: index + 1 })}
+                placeholder={t('homework.problemNumber', { number: index + 1 })}
                 placeholderTextColor={colors.muted}
-                accessibilityLabel={t('problemInputLabel', {
+                accessibilityLabel={t('homework.problemInputLabel', {
                   number: index + 1,
                 })}
               />
@@ -1018,11 +1025,11 @@ export default function CameraScreen(): React.ReactNode {
           testID="add-problem-button"
           onPress={handleAddProblem}
           className="mt-3 self-start bg-surface-elevated rounded-button px-4 py-3 min-h-[48px] justify-center"
-          accessibilityLabel={t('addProblemLabel')}
+          accessibilityLabel={t('homework.addProblemLabel')}
           accessibilityRole="button"
         >
           <Text className="text-body-sm font-semibold text-text-primary">
-            {t('addProblem')}
+            {t('homework.addProblem')}
           </Text>
         </Pressable>
 
@@ -1037,28 +1044,28 @@ export default function CameraScreen(): React.ReactNode {
               testID="classify-fallback"
             >
               <Text className="text-body-sm text-text-secondary mb-3">
-                {t('classifyFallbackPrompt')}
+                {t('homework.classifyFallbackPrompt')}
               </Text>
               <Pressable
                 onPress={() => setShowSubjectPicker(true)}
                 className="bg-primary rounded-button py-3 mb-2 min-h-[48px] items-center justify-center"
-                accessibilityLabel={t('typeSubjectManuallyLabel')}
+                accessibilityLabel={t('homework.typeSubjectManuallyLabel')}
                 accessibilityRole="button"
                 testID="classify-fallback-type-subject"
               >
                 <Text className="text-body font-semibold text-text-inverse">
-                  {t('typeSubjectManually')}
+                  {t('homework.typeSubjectManually')}
                 </Text>
               </Pressable>
               <Pressable
                 onPress={handleRetake}
                 className="bg-surface-elevated rounded-button py-3 min-h-[48px] items-center justify-center"
-                accessibilityLabel={t('retakeLabel')}
+                accessibilityLabel={t('homework.retakeLabel')}
                 accessibilityRole="button"
                 testID="classify-fallback-retake"
               >
                 <Text className="text-body font-semibold text-text-primary">
-                  {t('retake')}
+                  {t('homework.retake')}
                 </Text>
               </Pressable>
             </View>
@@ -1071,7 +1078,7 @@ export default function CameraScreen(): React.ReactNode {
               className="text-body-sm text-text-secondary mt-3"
               testID="classify-loading"
             >
-              {t('classifyLoading')}
+              {t('homework.classifyLoading')}
             </Text>
             {/* BUG-388: Always show Retake during classification so user
                 isn't stuck if detection hangs or takes too long */}
@@ -1079,11 +1086,11 @@ export default function CameraScreen(): React.ReactNode {
               testID="classify-pending-retake"
               onPress={handleRetake}
               className="bg-surface rounded-button py-3 mt-4 min-h-[48px] items-center justify-center"
-              accessibilityLabel={t('retakeLabel')}
+              accessibilityLabel={t('homework.retakeLabel')}
               accessibilityRole="button"
             >
               <Text className="text-body font-semibold text-text-primary">
-                {t('retake')}
+                {t('homework.retake')}
               </Text>
             </Pressable>
           </View>
@@ -1096,7 +1103,7 @@ export default function CameraScreen(): React.ReactNode {
             testID="auto-detected-subject"
           >
             <Text className="text-sm text-text-secondary">
-              {t('looksLike')}{' '}
+              {t('homework.looksLike')}{' '}
               <Text className="font-medium text-text-primary">
                 {autoDetectedSubject.subjectName}
               </Text>
@@ -1106,7 +1113,7 @@ export default function CameraScreen(): React.ReactNode {
               testID="change-subject-link"
             >
               <Text className="text-sm text-primary underline">
-                {t('change')}
+                {t('homework.change')}
               </Text>
             </Pressable>
           </View>
@@ -1116,7 +1123,7 @@ export default function CameraScreen(): React.ReactNode {
         {needsSubjectPick && showSubjectPicker && (
           <View className="mt-6" testID="subject-picker">
             <Text className="text-body font-semibold text-text-primary mb-3">
-              {t('whichSubject')}
+              {t('homework.whichSubject')}
             </Text>
             {/* [BUG-690] In the error/no-candidate phase the picker can render
                 empty rows of subjects while useSubjects() is still loading.
@@ -1128,7 +1135,7 @@ export default function CameraScreen(): React.ReactNode {
               >
                 <ActivityIndicator size="small" color={colors.primary} />
                 <Text className="text-body-sm text-text-secondary">
-                  {t('loadingSubjects')}
+                  {t('homework.loadingSubjects')}
                 </Text>
               </View>
             ) : null}
@@ -1151,7 +1158,7 @@ export default function CameraScreen(): React.ReactNode {
                       ? 'bg-primary/10 border border-primary/30'
                       : 'bg-surface-elevated'
                   }`}
-                  accessibilityLabel={t('selectSubjectLabel', {
+                  accessibilityLabel={t('homework.selectSubjectLabel', {
                     name: candidate.subjectName,
                   })}
                   accessibilityRole="button"
@@ -1175,7 +1182,9 @@ export default function CameraScreen(): React.ReactNode {
                   key={s.id}
                   onPress={() => handlePickSubject(s.id, s.name)}
                   className="bg-surface-elevated rounded-button py-3 px-4 mb-2 min-h-[48px] justify-center"
-                  accessibilityLabel={t('selectSubjectLabel', { name: s.name })}
+                  accessibilityLabel={t('homework.selectSubjectLabel', {
+                    name: s.name,
+                  })}
                   accessibilityRole="button"
                   testID={`subject-pick-${s.id}`}
                 >
@@ -1185,27 +1194,27 @@ export default function CameraScreen(): React.ReactNode {
             <Pressable
               onPress={() => router.push('/create-subject')}
               className="bg-surface rounded-button py-3 px-4 mb-2 min-h-[48px] justify-center"
-              accessibilityLabel={t('createNewSubjectLabel')}
+              accessibilityLabel={t('homework.createNewSubjectLabel')}
               accessibilityRole="button"
               testID="camera-create-subject"
             >
               <Text className="text-body font-semibold text-primary">
-                {t('createNewSubject')}
+                {t('homework.createNewSubject')}
               </Text>
             </Pressable>
 
             {/* Manual subject entry — lets user type a subject name */}
             <Text className="text-body-sm text-text-secondary mt-4 mb-2">
-              {t('orTypeSubject')}
+              {t('homework.orTypeSubject')}
             </Text>
             <TextInput
               testID="camera-subject-input"
               value={manualSubjectName}
               onChangeText={setManualSubjectName}
-              placeholder={t('subjectInputPlaceholder')}
+              placeholder={t('homework.subjectInputPlaceholder')}
               placeholderTextColor={colors.muted}
               className="bg-surface rounded-button px-4 py-3 text-body text-text-primary min-h-[48px] mb-3 border border-border"
-              accessibilityLabel={t('typeSubjectLabel')}
+              accessibilityLabel={t('homework.typeSubjectLabel')}
               autoCapitalize="words"
             />
             <Pressable
@@ -1217,7 +1226,7 @@ export default function CameraScreen(): React.ReactNode {
                   ? 'bg-accent'
                   : 'bg-surface-elevated'
               }`}
-              accessibilityLabel={t('continueWithSubjectLabel')}
+              accessibilityLabel={t('homework.continueWithSubjectLabel')}
               accessibilityRole="button"
             >
               <Text
@@ -1228,8 +1237,8 @@ export default function CameraScreen(): React.ReactNode {
                 }`}
               >
                 {createSubject.isPending
-                  ? t('creatingSubject')
-                  : t('common:continue')}
+                  ? t('homework.creatingSubject')
+                  : t('common.continue')}
               </Text>
             </Pressable>
 
@@ -1237,11 +1246,11 @@ export default function CameraScreen(): React.ReactNode {
               testID="retake-button"
               onPress={handleRetake}
               className="bg-surface rounded-button py-4 mt-2 min-h-[48px] items-center justify-center"
-              accessibilityLabel={t('retakeLabel')}
+              accessibilityLabel={t('homework.retakeLabel')}
               accessibilityRole="button"
             >
               <Text className="text-body font-semibold text-text-primary">
-                {t('retake')}
+                {t('homework.retake')}
               </Text>
             </Pressable>
           </View>
@@ -1257,22 +1266,22 @@ export default function CameraScreen(): React.ReactNode {
                 testID="retake-button"
                 onPress={handleRetake}
                 className="flex-1 bg-surface rounded-button py-4 min-h-[48px] items-center justify-center"
-                accessibilityLabel={t('retakeLabel')}
+                accessibilityLabel={t('homework.retakeLabel')}
                 accessibilityRole="button"
               >
                 <Text className="text-body font-semibold text-text-primary">
-                  {t('retake')}
+                  {t('homework.retake')}
                 </Text>
               </Pressable>
               <Pressable
                 testID="confirm-button"
                 onPress={handleConfirmResult}
                 className="flex-1 bg-primary rounded-button py-4 min-h-[48px] items-center justify-center"
-                accessibilityLabel={t('startSessionLabel')}
+                accessibilityLabel={t('homework.startSessionLabel')}
                 accessibilityRole="button"
               >
                 <Text className="text-body font-semibold text-text-inverse">
-                  {t('letsGo')}
+                  {t('homework.letsGo')}
                 </Text>
               </Pressable>
             </View>
@@ -1285,22 +1294,22 @@ export default function CameraScreen(): React.ReactNode {
               testID="retake-button"
               onPress={handleRetake}
               className="flex-1 bg-surface rounded-button py-4 min-h-[48px] items-center justify-center"
-              accessibilityLabel={t('retakeLabel')}
+              accessibilityLabel={t('homework.retakeLabel')}
               accessibilityRole="button"
             >
               <Text className="text-body font-semibold text-text-primary">
-                {t('retake')}
+                {t('homework.retake')}
               </Text>
             </Pressable>
             <Pressable
               testID="confirm-button"
               onPress={handleConfirmResult}
               className="flex-1 bg-primary rounded-button py-4 min-h-[48px] items-center justify-center"
-              accessibilityLabel={t('startSessionLabel')}
+              accessibilityLabel={t('homework.startSessionLabel')}
               accessibilityRole="button"
             >
               <Text className="text-body font-semibold text-text-inverse">
-                {t('letsGo')}
+                {t('homework.letsGo')}
               </Text>
             </Pressable>
           </View>
@@ -1312,7 +1321,7 @@ export default function CameraScreen(): React.ReactNode {
   // ---- Error phase ----
   if (state.phase === 'error') {
     const showManualFallback = ocr.failCount >= 1;
-    const errorMessage = state.errorMessage ?? t('ocrDefaultError');
+    const errorMessage = state.errorMessage ?? t('homework.ocrDefaultError');
 
     return (
       <View
@@ -1323,7 +1332,7 @@ export default function CameraScreen(): React.ReactNode {
           testID="close-button"
           onPress={handleClose}
           className="self-start w-12 h-12 items-center justify-center mt-2"
-          accessibilityLabel={t('common:close')}
+          accessibilityLabel={t('common.close')}
           accessibilityRole="button"
         >
           <Text className="text-h3 font-bold text-text-primary">X</Text>
@@ -1337,24 +1346,24 @@ export default function CameraScreen(): React.ReactNode {
           {showManualFallback ? (
             <View className="mt-6">
               <Text className="text-body text-text-secondary text-center mb-4">
-                {t('typeItOut')}
+                {t('homework.typeItOut')}
               </Text>
               <TextInput
                 testID="manual-input"
                 value={manualText}
                 onChangeText={setManualText}
                 multiline
-                placeholder={t('manualInputPlaceholder')}
+                placeholder={t('homework.manualInputPlaceholder')}
                 placeholderTextColor={colors.muted}
                 className="bg-surface rounded-card p-4 text-body text-text-primary min-h-[120px] mb-4"
                 textAlignVertical="top"
-                accessibilityLabel={t('typeManuallyLabel')}
+                accessibilityLabel={t('homework.typeManuallyLabel')}
               />
               <View className="gap-3">
                 {!subjectId && manualText.trim() && showSubjectPicker ? (
                   <>
                     <Text className="text-body font-semibold text-text-primary mt-2 mb-1">
-                      {t('whichSubject')}
+                      {t('homework.whichSubject')}
                     </Text>
                     {subjectsLoading ? (
                       <View
@@ -1366,7 +1375,7 @@ export default function CameraScreen(): React.ReactNode {
                           color={colors.primary}
                         />
                         <Text className="text-body-sm text-text-secondary">
-                          {t('loadingSubjects')}
+                          {t('homework.loadingSubjects')}
                         </Text>
                       </View>
                     ) : !subjects || subjects.length === 0 ? (
@@ -1375,17 +1384,19 @@ export default function CameraScreen(): React.ReactNode {
                         testID="manual-subject-picker-empty"
                       >
                         <Text className="text-body-sm text-text-secondary mb-3">
-                          {t('noSubjectsYet')}
+                          {t('homework.noSubjectsYet')}
                         </Text>
                         <Pressable
                           testID="manual-subject-picker-create"
                           onPress={() => router.push('/create-subject')}
                           className="bg-primary rounded-button py-3 px-4 min-h-[48px] items-center justify-center"
-                          accessibilityLabel={t('createNewSubjectLabel')}
+                          accessibilityLabel={t(
+                            'homework.createNewSubjectLabel'
+                          )}
                           accessibilityRole="button"
                         >
                           <Text className="text-body font-semibold text-text-inverse">
-                            {t('createSubject')}
+                            {t('homework.createSubject')}
                           </Text>
                         </Pressable>
                       </View>
@@ -1395,7 +1406,7 @@ export default function CameraScreen(): React.ReactNode {
                           key={s.id}
                           onPress={() => handleManualPickSubject(s.id, s.name)}
                           className="bg-surface-elevated rounded-button py-3 px-4 min-h-[48px] justify-center"
-                          accessibilityLabel={t('selectSubjectLabel', {
+                          accessibilityLabel={t('homework.selectSubjectLabel', {
                             name: s.name,
                           })}
                           accessibilityRole="button"
@@ -1418,7 +1429,7 @@ export default function CameraScreen(): React.ReactNode {
                         ? 'bg-primary'
                         : 'bg-surface'
                     }`}
-                    accessibilityLabel={t('continueWithProblemLabel')}
+                    accessibilityLabel={t('homework.continueWithProblemLabel')}
                     accessibilityRole="button"
                   >
                     <Text
@@ -1429,8 +1440,8 @@ export default function CameraScreen(): React.ReactNode {
                       }`}
                     >
                       {classifyMutation.isPending
-                        ? t('classifyLoading')
-                        : t('continueArrow')}
+                        ? t('homework.classifyLoading')
+                        : t('homework.continueArrow')}
                     </Text>
                   </Pressable>
                 )}
@@ -1438,11 +1449,11 @@ export default function CameraScreen(): React.ReactNode {
                   testID="try-camera-again-button"
                   onPress={handleRetake}
                   className="bg-surface rounded-button py-4 min-h-[48px] items-center justify-center"
-                  accessibilityLabel={t('tryCameraAgainLabel')}
+                  accessibilityLabel={t('homework.tryCameraAgainLabel')}
                   accessibilityRole="button"
                 >
                   <Text className="text-body font-semibold text-text-primary">
-                    {t('tryCameraAgain')}
+                    {t('homework.tryCameraAgain')}
                   </Text>
                 </Pressable>
               </View>
@@ -1454,22 +1465,22 @@ export default function CameraScreen(): React.ReactNode {
                   testID="retake-button"
                   onPress={handleRetake}
                   className="flex-1 bg-surface rounded-button py-4 min-h-[48px] items-center justify-center"
-                  accessibilityLabel={t('retakeLabel')}
+                  accessibilityLabel={t('homework.retakeLabel')}
                   accessibilityRole="button"
                 >
                   <Text className="text-body font-semibold text-text-primary">
-                    {t('retake')}
+                    {t('homework.retake')}
                   </Text>
                 </Pressable>
                 <Pressable
                   testID="retry-button"
                   onPress={handleRetryOcr}
                   className="flex-1 bg-primary rounded-button py-4 min-h-[48px] items-center justify-center"
-                  accessibilityLabel={t('tryReadingAgainLabel')}
+                  accessibilityLabel={t('homework.tryReadingAgainLabel')}
                   accessibilityRole="button"
                 >
                   <Text className="text-body font-semibold text-text-inverse">
-                    {t('common:tryAgain')}
+                    {t('common.tryAgain')}
                   </Text>
                 </Pressable>
               </View>
@@ -1478,11 +1489,11 @@ export default function CameraScreen(): React.ReactNode {
                 testID="go-home-button"
                 onPress={handleClose}
                 className="mt-3 py-3 min-h-[48px] items-center justify-center"
-                accessibilityLabel={t('common:goHome')}
+                accessibilityLabel={t('common.goHome')}
                 accessibilityRole="button"
               >
                 <Text className="text-body-sm font-semibold text-text-secondary">
-                  {t('common:goHome')}
+                  {t('common.goHome')}
                 </Text>
               </Pressable>
             </>
