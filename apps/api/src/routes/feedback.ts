@@ -1,6 +1,10 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
-import { feedbackSubmissionSchema, ERROR_CODES } from '@eduagent/schemas';
+import {
+  feedbackSubmissionSchema,
+  feedbackResponseSchema,
+  ERROR_CODES,
+} from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import type { Database } from '@eduagent/database';
 import { sendEmail } from '../services/notifications';
@@ -118,9 +122,13 @@ export const feedbackRoutes = new Hono<FeedbackRouteEnv>().post(
         name: 'app/feedback.delivery_failed',
         data: { profileId, category: body.category },
       });
-      return c.json({ success: true, queued: true });
+      return c.json(
+        feedbackResponseSchema.parse({ success: true, queued: true })
+      );
     }
 
-    return c.json({ success: true, queued: false });
+    return c.json(
+      feedbackResponseSchema.parse({ success: true, queued: false })
+    );
   }
 );
