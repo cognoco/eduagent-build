@@ -1,4 +1,5 @@
 import nx from '@nx/eslint-plugin';
+import noInternalJestMock from './eslint-rules/no-internal-jest-mock.mjs';
 
 // Filter out jsx-a11y/accessible-emoji rule from react config
 // (deprecated in eslint-plugin-jsx-a11y v6.6.0, removed in later versions)
@@ -10,12 +11,53 @@ const reactConfigFiltered = nx.configs['flat/react'].map((config) => {
   return config;
 });
 
+// Local plugin for project-wide rules (mobile has its own additions in
+// apps/mobile/eslint.config.mjs). `meta.name` lets ESLint v9 surface a
+// stable namespace in --print-config / --debug output.
+const govPlugin = {
+  meta: { name: 'gov' },
+  rules: {
+    'no-internal-jest-mock': noInternalJestMock,
+  },
+};
+
 export default [
   ...nx.configs['flat/base'],
   ...nx.configs['flat/typescript'],
   ...nx.configs['flat/javascript'],
+  // G6 — fail the build on stale `eslint-disable` directives. Without this
+  // setting they accumulate silently as code is refactored, hiding the fact
+  // that the suppression is no longer needed (and sometimes hiding real
+  // violations the rule would otherwise catch). Positioned AFTER the nx
+  // config spreads so a future nx preset that sets reportUnusedDisableDirectives
+  // does not silently override our 'error' value (last-match-wins).
+  {
+    linterOptions: {
+      reportUnusedDisableDirectives: 'error',
+    },
+  },
   {
     ignores: ['**/dist', '**/out-tsc', '**/coverage', '**/.nx', '**/.wrangler', 'design_handoff_ui_improvements/**'],
+  },
+  // -------------------------------------------------------------------------
+  // GC1 — warn on jest.mock() of internal (relative-path) modules. Internal
+  // mocks hide real bugs; mocks should be reserved for external boundaries
+  // (Stripe, Clerk JWKS, third-party SDKs, push providers, time). At `warn`
+  // severity for now: ~260 legacy violations exist and are tracked toward
+  // a separate cleanup epic; this rule's job is to stop NEW violations.
+  // See CLAUDE.md > Code Quality Guards.
+  // -------------------------------------------------------------------------
+  {
+    files: [
+      '**/*.test.ts',
+      '**/*.test.tsx',
+      '**/*.spec.ts',
+      '**/*.spec.tsx',
+    ],
+    plugins: { gov: govPlugin },
+    rules: {
+      'gov/no-internal-jest-mock': 'warn',
+    },
   },
   // React/Expo config for mobile app (with deprecated rule filtered out)
   {
