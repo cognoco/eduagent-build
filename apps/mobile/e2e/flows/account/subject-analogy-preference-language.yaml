@@ -1,0 +1,92 @@
+# ACCOUNT-18 / BUG-939: Subject analogy preference — language subject hides picker
+#
+# Navigates to subject settings for a language subject (Spanish, pedagogyMode
+# 'four_strands') and asserts the analogy picker is hidden — replaced by the
+# subject-settings-language-empty placeholder — because four-strands pedagogy
+# does not use domain analogies.
+#
+# Seed: language-subject-active — builds on language-learner which creates a
+#   Spanish subject with pedagogyMode 'four_strands'.
+#
+# testIDs verified against:
+#   - apps/mobile/src/app/(app)/shelf/[subjectId]/index.tsx  (shelf-settings)
+#   - apps/mobile/src/app/(app)/subject/[subjectId].tsx
+#       (subject-settings-back, subject-settings-language-empty [must appear])
+#   - apps/mobile/src/components/common/AnalogyDomainPicker.tsx
+#       (analogy-domain-picker [must NOT appear])
+#
+# Usage: ./e2e/scripts/seed-and-run.sh language-subject-active e2e/flows/account/subject-analogy-preference-language.yaml
+appId: com.mentomate.app
+tags:
+  - nightly
+  - account
+---
+# 1. Seed & sign in
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "language-subject-active"
+      API_URL: ${API_URL}
+
+# 2. Wait for learner home
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 15000
+
+# 3. Navigate to Library tab
+- tapOn:
+    id: "tab-library"
+
+- extendedWaitUntil:
+    visible:
+      id: "shelves-list"
+    timeout: 10000
+
+# 4. Tap the shelf row header to navigate to the shelf screen
+- scrollUntilVisible:
+    element:
+      id: "shelf-row-header-${SUBJECT_ID}"
+    direction: DOWN
+    timeout: 10000
+
+- tapOn:
+    id: "shelf-row-header-${SUBJECT_ID}"
+
+- extendedWaitUntil:
+    visible:
+      id: "shelf-screen"
+    timeout: 10000
+
+- takeScreenshot: 01-language-shelf-screen
+
+# 5. Tap the settings gear
+- tapOn:
+    id: "shelf-settings"
+
+# 6. Wait for subject settings screen
+- extendedWaitUntil:
+    visible:
+      id: "subject-settings-back"
+    timeout: 10000
+
+- takeScreenshot: 02-language-subject-settings
+
+# 7. BUG-939: For a language subject the analogy picker must be hidden
+- assertNotVisible:
+    id: "analogy-domain-picker"
+
+# 8. The language-empty placeholder must be visible instead
+- assertVisible:
+    id: "subject-settings-language-empty"
+
+- takeScreenshot: 03-language-empty-placeholder
+
+# 9. Back button must still be reachable (no dead-end — UX-DE-L9)
+- tapOn:
+    id: "subject-settings-back"
+
+- extendedWaitUntil:
+    visible:
+      id: "shelf-screen"
+    timeout: 10000
