@@ -1,0 +1,84 @@
+# Flow PARENT-11 (empty): Child Session Recap — Empty Arm (pre-backfill session)
+# Validates: parent navigates into a session that has NO recap data.
+#             The "narrative-unavailable" block renders; session-recap-narrative is NOT present.
+#             session-metadata is still visible (duration/type always render).
+# Tags: nightly, parent
+# Seed: parent-session-recap-empty
+# Usage: ./e2e/scripts/seed-and-run.sh parent-session-recap-empty e2e/flows/parent/child-session-recap-empty.yaml
+#
+# testIDs verified against:
+#   apps/mobile/src/app/(app)/child/[profileId]/session/[sessionId].tsx
+#     session-metadata         (line 204) — always rendered
+#     narrative-unavailable    (line 297) — rendered when hasRecap=false
+#     narrative-unavailable-back (line 315) — back CTA inside empty-recap block
+appId: com.mentomate.app
+tags:
+  - nightly
+  - parent
+---
+# 1. Seed & sign in (parent-session-recap-empty seeds a parent with a child who
+#    has a session with no narrative/highlight/engagementSignal/conversationPrompt)
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "parent-session-recap-empty"
+
+# 2. Wait for parent dashboard
+- extendedWaitUntil:
+    visible:
+      id: "dashboard-scroll"
+    timeout: 15000
+
+# 3. Tap primary action on the seeded child card
+- tapOn:
+    id: "dashboard-child-${CHILD_PROFILE_ID}-primary"
+
+# 4. Wait for child detail scroll view
+- extendedWaitUntil:
+    visible:
+      id: "child-detail-scroll"
+    timeout: 10000
+
+# 5. Scroll until the session card is visible
+- scrollUntilVisible:
+    element:
+      id: "session-card-${SESSION_ID}"
+    direction: DOWN
+    timeout: 10000
+
+# 6. Tap the seeded session card
+- tapOn:
+    id: "session-card-${SESSION_ID}"
+
+# 7. Wait for session detail metadata card
+- extendedWaitUntil:
+    visible:
+      id: "session-metadata"
+    timeout: 10000
+
+- takeScreenshot: 01-session-detail-empty-recap
+
+# 8. Metadata is always rendered — confirm duration/type block
+- assertVisible:
+    id: "session-metadata"
+
+# 9. The "no recap available" block must be visible
+- assertVisible:
+    id: "narrative-unavailable"
+
+# 10. The populated recap container must NOT be visible
+- assertNotVisible:
+    id: "session-recap-narrative"
+
+- takeScreenshot: 02-empty-recap-confirmed
+
+# 11. Navigate back via the CTA inside the empty-recap block
+- tapOn:
+    id: "narrative-unavailable-back"
+
+- extendedWaitUntil:
+    visible:
+      id: "child-detail-scroll"
+    timeout: 10000
+
+- takeScreenshot: 03-back-to-child
