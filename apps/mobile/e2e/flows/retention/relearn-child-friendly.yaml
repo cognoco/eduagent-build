@@ -1,7 +1,7 @@
 # Flow N10b: Relearn Child-Friendly Copy — Learner Persona Labels
 # Validates: when signed in as a learner persona (child), the relearn screen
-# shows child-friendly labels ("Try Something New", "Show Me Pictures", etc.)
-# instead of the default labels ("Different Method", "Visual Diagrams", etc.).
+# shows child-friendly method labels ("Show Me Pictures", "Walk Me Through It", etc.)
+# instead of the default labels ("Visual Diagrams", "Step-by-Step", etc.).
 # Tags: nightly, retention
 #
 # Journey: UX Journey 2 (Recall failure path — remediation)
@@ -10,15 +10,21 @@
 #               (scenario: failed-recall-3x). The learner persona is the default
 #               persona for a child profile.
 #
+# testID mapping (topic/[topicId].tsx):
+#   - topic-detail-scroll         -> scrollable content container
+#   - study-cta                   -> sticky study CTA button
+#
 # testID mapping (topic/relearn.tsx):
 #   - relearn-back                -> back button
-#   - relearn-different-method    -> choice: try different method
-#   - relearn-same-method         -> choice: continue same method
-#   - relearn-method-visual_diagrams    -> method picker option
-#   - relearn-method-step_by_step      -> method picker option
-#   - relearn-method-real_world_examples -> method picker option
-#   - relearn-method-practice_problems  -> method picker option
-#   - relearn-back-to-choice     -> back from method picker to choice phase
+#   - relearn-topics-phase        -> topic selection phase (ScrollView)
+#   - relearn-method-phase        -> method selection phase (ScrollView)
+#   - relearn-method-visual_diagrams    -> method picker option (child label: "Show Me Pictures")
+#   - relearn-method-step_by_step      -> method picker option (child label: "Walk Me Through It")
+#   - relearn-method-real_world_examples -> method picker option (child label: "Show Me How It Works")
+#   - relearn-method-practice_problems  -> method picker option (child label: "Let Me Try It")
+#
+# NOTE: relearn-different-method, relearn-same-method, relearn-back-to-choice removed.
+# The new design goes directly to topics phase → method phase (no choice screen).
 appId: com.mentomate.app
 tags:
   - nightly
@@ -61,18 +67,16 @@ tags:
 # 7. Wait for topic detail screen
 - extendedWaitUntil:
     visible:
-      id: "retention-card"
+      id: "topic-detail-scroll"
     timeout: 10000
 
-# 8. Verify the smart primary action resolves to Relearn
+# 8. Verify the study CTA is present
 - assertVisible:
-    id: "primary-action-button"
-- assertVisible:
-    text: "Relearn"
+    id: "study-cta"
 
-# 9. Tap the primary relearn action
+# 9. Tap the study CTA (routes to relearn session for needs-deepening topic)
 - tapOn:
-    id: "primary-action-button"
+    id: "study-cta"
 
 # 10. Verify relearn screen loads
 - extendedWaitUntil:
@@ -80,31 +84,39 @@ tags:
       text: "Relearn Topic"
     timeout: 10000
 
-# 11. Verify child-friendly phase 1 copy (learner persona).
-#     "Try Something New" replaces "Different Method" for learner.
+# 11. Wait for topics phase or method phase to render.
+#     When entering from topic detail with a specific topicId/subjectId,
+#     relearn opens at method phase (directEntry=true).
 - extendedWaitUntil:
     visible:
-      id: "relearn-different-method"
+      id: "relearn-method-phase"
+    timeout: 10000
+    optional: true
+
+- extendedWaitUntil:
+    visible:
+      id: "relearn-topics-phase"
     timeout: 5000
+    optional: true
 
-- assertVisible:
-    text: "Try Something New"
-- assertVisible:
-    text: "Same Method"
+# 12. If in topics phase, tap first topic to advance to method phase
+- tapOn:
+    text: "Chemistry Topic 1"
+    optional: true
 
-# 12. Screenshot of child-friendly choice phase
+# 13. Wait for method phase
+- extendedWaitUntil:
+    visible:
+      id: "relearn-method-phase"
+    timeout: 10000
+
+# 14. Screenshot of method picker (child-friendly phase)
 - takeScreenshot: relearn-child-friendly-choice
 
-# 13. Tap "Try Something New" to enter method picker
-- tapOn:
-    id: "relearn-different-method"
-
-# 14. Verify child-friendly method labels are visible
-- extendedWaitUntil:
-    visible:
-      id: "relearn-method-visual_diagrams"
-    timeout: 5000
-
+# 15. Verify child-friendly method labels are visible (learner persona).
+#     Learner persona uses TEACHING_METHODS_LEARNER copy.
+- assertVisible:
+    id: "relearn-method-visual_diagrams"
 - assertVisible:
     text: "Show Me Pictures"
 - assertVisible:
@@ -114,12 +126,5 @@ tags:
 - assertVisible:
     text: "Let Me Try It"
 
-# 15. Screenshot of child-friendly method picker
+# 16. Screenshot of child-friendly method picker
 - takeScreenshot: relearn-child-friendly-methods
-
-# 16. Go back to choice phase and verify labels persist
-- tapOn:
-    id: "relearn-back-to-choice"
-
-- assertVisible:
-    text: "Try Something New"
