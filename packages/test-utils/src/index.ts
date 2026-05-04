@@ -27,5 +27,5 @@ export {
   TEST_BOOK_ID,
   TEST_SHELF_ID,
   TEST_VOCABULARY_ID,
-  NIL_UUID,
+  TEST_NONEXISTENT_ID,
 } from './lib/fixture-ids.js';

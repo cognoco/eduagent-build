@@ -10,9 +10,9 @@
  * RFC 9562 validation. Trailing digits are intentionally stable across
  * runs so snapshot tests don't churn.
  *
- * `NIL_UUID` is the all-zero RFC 9562 nil UUID. Use it explicitly when
- * a test needs a sentinel "does not exist" identifier — never as a
- * placeholder for a real entity.
+ * `TEST_NONEXISTENT_ID` is reserved as a "definitely not in the DB"
+ * sentinel for negative-path tests — uses high octets so it cannot
+ * collide with any of the seeded fixture IDs above.
  */
 
 export const TEST_PROFILE_ID = '00000000-0000-4000-8000-000000000001';
@@ -36,4 +36,4 @@ export const TEST_SHELF_ID = '00000000-0000-4000-8000-000000000501';
 
 export const TEST_VOCABULARY_ID = '00000000-0000-4000-8000-000000000601';
 
-export const NIL_UUID = '00000000-0000-0000-0000-000000000000';
+export const TEST_NONEXISTENT_ID = '00000000-0000-4000-8000-0000ffffffff';
