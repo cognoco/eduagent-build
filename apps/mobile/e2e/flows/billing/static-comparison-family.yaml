@@ -1,0 +1,76 @@
+# Flow: Static Tier Comparison — Family Subscriber [BILLING-12, BUG-917]
+# Validates: a Family-tier user sees the static comparison cards including
+# their own Family card (read-only), and does NOT see a Pro card.
+# The static card section renders when RevenueCat offerings are unavailable
+# (always the case in E2E emulator) and the user's tier is 'family'.
+#
+# Tags: nightly, billing
+#
+# Journey: UX Journey 5 (Billing & Subscription)
+# Epics: Epic 5 (FR95-FR100), Epic 9 (RevenueCat IAP) [BUG-917]
+# Prerequisite: Seeded user on active Family subscription (scenario: subscription-family-active)
+appId: com.mentomate.app
+tags:
+  - nightly
+  - billing
+---
+# 1. Seed & sign in
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "subscription-family-active"
+      API_URL: ${API_URL}
+
+# 2. Verify home screen loaded
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 15000
+
+# 3. Navigate to More tab
+- tapOn:
+    text: "More"
+
+# 4. Wait for More screen — Learning Mode section is always above the fold
+- extendedWaitUntil:
+    visible:
+      id: "learning-mode-casual"
+    timeout: 10000
+
+# 5. Scroll to the Subscription row and tap it
+- scrollUntilVisible:
+    element:
+      id: "more-row-subscription"
+    direction: DOWN
+    timeout: 15000
+
+- tapOn:
+    id: "more-row-subscription"
+
+# 6. Verify subscription screen loaded
+- extendedWaitUntil:
+    visible:
+      id: "subscription-screen"
+    timeout: 15000
+
+- takeScreenshot: subscription-screen-family
+
+# 7. Scroll to the static tier comparison section
+#    (visible when RevenueCat returns no packages — always true in emulator)
+- scrollUntilVisible:
+    element:
+      id: "static-tier-family"
+    direction: DOWN
+    timeout: 20000
+
+# 8. Family card must be visible (current plan card for family users)
+- assertVisible:
+    id: "static-tier-family"
+
+- takeScreenshot: static-tier-family-visible
+
+# 9. Pro card must NOT be present — only shown for pro-tier users
+- assertNotVisible:
+    id: "static-tier-pro"
+
+- takeScreenshot: static-comparison-family-complete
