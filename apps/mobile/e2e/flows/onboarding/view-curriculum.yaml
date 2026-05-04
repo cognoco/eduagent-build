@@ -1,14 +1,19 @@
 # Flow 3: Home Screen Navigation & Curriculum Review
-# Validates: authenticated home screen elements, tab navigation,
-# and subjects visible on home screen after seeding.
+# Validates: authenticated home screen elements, tab navigation to Library v3,
+# and subjects visible on the shelf list after seeding.
 # Tags: smoke, onboarding
 #
 # Prerequisites:
 #   - User is signed in
 #   - At least one subject exists with a generated curriculum
 #   - API is running and reachable
-# Seeding handled by seed-and-run.sh. Uses learning-active scenario (needs subjects + curriculum).
-# Usage: ./scripts/seed-and-run.sh learning-active flows/onboarding/view-curriculum.yaml
+# Seeding handled by seed-and-run.sh. Uses onboarding-complete scenario (needs subjects + curriculum).
+# Usage: ./scripts/seed-and-run.sh onboarding-complete flows/onboarding/view-curriculum.yaml
+#
+# testIDs verified against:
+#   - apps/mobile/src/components/home/LearnerScreen.tsx (learner-screen, home-subject-carousel)
+#   - apps/mobile/src/app/(app)/library.tsx (shelves-list)
+#   - apps/mobile/src/components/library/ShelfRow.tsx (shelf-row-header-${subjectId})
 appId: com.mentomate.app
 tags:
   - smoke
@@ -45,26 +50,31 @@ tags:
 # 5. Screenshot: home screen with subjects
 - takeScreenshot: view-curriculum-01-home
 
-# 6. Navigate to Library tab (BUG-10: use accessibility label)
-- tapOn: "Library Tab"
+# 6. Navigate to Library tab
+- tapOn:
+    id: "tab-library"
 
-# 7. Wait for Library heading
+# 7. Wait for Library v3 shelf list to render (shelves-list is the single-pane view).
+#    library-tab-shelves was removed in Library v3 redesign.
 - extendedWaitUntil:
     visible:
-      text: "Library"
+      id: "shelves-list"
     timeout: 10000
 
-# 8. Verify Shelves tab is present on Library (default tab in 2-tab Library).
-#     subject-filter-tabs removed — Library is now Shelves/Books tabs.
-- assertVisible:
-    id: "library-tab-shelves"
-    optional: true
+# 8. Scroll to find the seeded subject's shelf row.
+#    seed-and-run.sh provides SUBJECT_ID for the active subject.
+- scrollUntilVisible:
+    element:
+      id: "shelf-row-header-${SUBJECT_ID}"
+    direction: DOWN
+    timeout: 5000
 
 # 9. Screenshot: Library content
 - takeScreenshot: view-curriculum-02-library
 
-# 10. Navigate back to Home tab (use accessibility label)
-- tapOn: "Home Tab"
+# 10. Navigate back to Home tab
+- tapOn:
+    id: "tab-home"
 
 # 11. Verify home screen is visible
 - extendedWaitUntil:
