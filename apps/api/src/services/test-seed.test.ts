@@ -31,6 +31,22 @@ function createMockDb(): Database {
       accounts: {
         findMany: jest.fn().mockResolvedValue([]),
       },
+      // Extended for scenarios that query curricula/topics (e.g. parent-subject-with-retention)
+      curricula: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'mock-curriculum-id',
+          subjectId: 'mock-subject-id',
+        }),
+      },
+      curriculumTopics: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'mock-topic-id',
+          curriculumId: 'mock-curriculum-id',
+        }),
+        findMany: jest.fn().mockResolvedValue([
+          { id: 'mock-topic-id', curriculumId: 'mock-curriculum-id' },
+        ]),
+      },
     },
   } as unknown as Database;
 }
@@ -40,7 +56,7 @@ function createMockDb(): Database {
 // ---------------------------------------------------------------------------
 
 describe('VALID_SCENARIOS', () => {
-  it('contains all 23 expected scenarios', () => {
+  it('contains all 38 expected scenarios', () => {
     expect(VALID_SCENARIOS).toEqual([
       'onboarding-complete',
       'onboarding-no-subject',
@@ -65,6 +81,22 @@ describe('VALID_SCENARIOS', () => {
       'language-subject-active',
       'parent-with-reports',
       'mentor-memory-populated',
+      'account-deletion-scheduled',
+      'parent-proxy',
+      'session-with-transcript',
+      'with-bookmarks',
+      'parent-with-weekly-report',
+      'parent-session-with-recap',
+      'parent-session-recap-empty',
+      'parent-subject-with-retention',
+      'parent-subject-no-retention',
+      'subscription-family-active',
+      'subscription-pro-active',
+      'quota-exceeded',
+      'forbidden',
+      'quiz-malformed-round',
+      'quiz-deterministic-wrong-answer',
+      'quiz-answer-check-fails',
     ]);
   });
 
@@ -174,4 +206,109 @@ describe('resetDatabase', () => {
 
     expect(result).toEqual({ deletedCount: 0, clerkUsersDeleted: 0 });
   });
+});
+
+// ---------------------------------------------------------------------------
+// New scenario-specific tests (Stage 0 — Task 0.1)
+// Each test verifies: (a) correct scenario name returned, (b) required IDs
+// present and non-empty, (c) db.insert called (proves rows were written).
+// Uses the same mock DB as the existing suite — no real DB connection.
+// ---------------------------------------------------------------------------
+
+describe('new Stage-0 scenarios return required IDs', () => {
+  const NEW_SCENARIOS: Array<{
+    scenario: SeedScenario;
+    requiredIds: string[];
+  }> = [
+    {
+      scenario: 'account-deletion-scheduled',
+      requiredIds: ['subjectId', 'subscriptionId'],
+    },
+    {
+      scenario: 'session-with-transcript',
+      requiredIds: ['subjectId', 'sessionId', 'topicId'],
+    },
+    {
+      scenario: 'parent-proxy',
+      requiredIds: [
+        'parentProfileId',
+        'childProfileId',
+        'subjectId',
+        'sessionId',
+        'topicId',
+      ],
+    },
+    {
+      scenario: 'with-bookmarks',
+      requiredIds: ['subjectId', 'sessionId', 'bookmarkId', 'topicId'],
+    },
+    {
+      scenario: 'parent-with-weekly-report',
+      requiredIds: ['childId', 'reportId'],
+    },
+    {
+      scenario: 'parent-session-with-recap',
+      requiredIds: ['childId', 'sessionId'],
+    },
+    {
+      scenario: 'parent-session-recap-empty',
+      requiredIds: ['childId', 'sessionId'],
+    },
+    {
+      scenario: 'parent-subject-with-retention',
+      requiredIds: ['topicId'],
+    },
+    {
+      scenario: 'parent-subject-no-retention',
+      requiredIds: [],
+    },
+    {
+      scenario: 'subscription-family-active',
+      requiredIds: ['subscriptionId', 'subjectId'],
+    },
+    {
+      scenario: 'subscription-pro-active',
+      requiredIds: ['subscriptionId', 'subjectId'],
+    },
+    {
+      scenario: 'quota-exceeded',
+      requiredIds: ['subscriptionId', 'subjectId', 'topicId'],
+    },
+    {
+      scenario: 'forbidden',
+      requiredIds: ['subjectId'],
+    },
+    {
+      scenario: 'quiz-malformed-round',
+      requiredIds: ['subjectId', 'roundId'],
+    },
+    {
+      scenario: 'quiz-deterministic-wrong-answer',
+      requiredIds: ['subjectId', 'roundId', 'wrongOptionIndex'],
+    },
+    {
+      scenario: 'quiz-answer-check-fails',
+      requiredIds: ['subjectId', 'roundId'],
+    },
+  ];
+
+  it.each(NEW_SCENARIOS)(
+    '$scenario returns correct scenario name and required IDs',
+    async ({ scenario, requiredIds }) => {
+      const mockDb = createMockDb();
+      const result = await seedScenario(mockDb, scenario, 'test@example.com');
+
+      expect(result.scenario).toBe(scenario);
+      expect(result.accountId).toBeTruthy();
+      expect(result.profileId).toBeTruthy();
+      expect(result.email).toBe('test@example.com');
+      expect(typeof result.password).toBe('string');
+
+      for (const idKey of requiredIds) {
+        expect(result.ids[idKey]).toBeTruthy();
+      }
+
+      expect(mockDb.insert).toHaveBeenCalled();
+    }
+  );
 });

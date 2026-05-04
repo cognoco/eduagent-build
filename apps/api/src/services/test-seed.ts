@@ -24,6 +24,7 @@ import {
   sessionEvents,
   sessionSummaries,
   monthlyReports,
+  weeklyReports,
   retentionCards,
   assessments,
   subscriptions,
@@ -33,6 +34,8 @@ import {
   streaks,
   needsDeepeningTopics,
   vocabulary,
+  bookmarks,
+  quizRounds,
   generateUUIDv7,
   type Database,
 } from '@eduagent/database';
@@ -83,7 +86,23 @@ export type SeedScenario =
   | 'language-learner'
   | 'language-subject-active'
   | 'parent-with-reports'
-  | 'mentor-memory-populated';
+  | 'mentor-memory-populated'
+  | 'account-deletion-scheduled'
+  | 'parent-proxy'
+  | 'session-with-transcript'
+  | 'with-bookmarks'
+  | 'parent-with-weekly-report'
+  | 'parent-session-with-recap'
+  | 'parent-session-recap-empty'
+  | 'parent-subject-with-retention'
+  | 'parent-subject-no-retention'
+  | 'subscription-family-active'
+  | 'subscription-pro-active'
+  | 'quota-exceeded'
+  | 'forbidden'
+  | 'quiz-malformed-round'
+  | 'quiz-deterministic-wrong-answer'
+  | 'quiz-answer-check-fails';
 
 /** Environment bindings needed by the seed service */
 export interface SeedEnv {
@@ -1826,6 +1845,1154 @@ async function seedMentorMemoryPopulated(
 }
 
 // ---------------------------------------------------------------------------
+// Scenario: account-deletion-scheduled
+// Account in deletion stage 2 (scheduled). The `deletionScheduledAt` column
+// on `accounts` is set to a future date to simulate a queued deletion that the
+// user can still cancel. Family / subscription flags ensure warning banners
+// render in the deletion flow.
+// ---------------------------------------------------------------------------
+
+async function seedAccountDeletionScheduled(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+
+  const accountId = generateUUIDv7();
+  await db.insert(accounts).values({
+    id: accountId,
+    clerkUserId,
+    email,
+    // Scheduled for deletion in 30 days
+    deletionScheduledAt: futureDate(30),
+  });
+
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Deletion Scheduled User',
+    birthYear: LEARNER_BIRTH_YEAR,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: 'parent-seed@example.com',
+    respondedAt: new Date(),
+  });
+
+  const subscriptionId = generateUUIDv7();
+  await db.insert(subscriptions).values({
+    id: subscriptionId,
+    accountId,
+    tier: 'free',
+    status: 'active',
+    currentPeriodStart: new Date(),
+    currentPeriodEnd: futureDate(30),
+  });
+
+  await db.insert(quotaPools).values({
+    id: generateUUIDv7(),
+    subscriptionId,
+    monthlyLimit: 100,
+    usedThisMonth: 5,
+    cycleResetAt: futureDate(30),
+  });
+
+  const { subjectId } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'General Studies'
+  );
+
+  return {
+    scenario: 'account-deletion-scheduled',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: { subjectId, subscriptionId },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Scenario: session-with-transcript
+// Learner with one completed session whose transcript blob is populated.
+// Returns SESSION_ID so Maestro flows can navigate directly to the transcript.
+// ---------------------------------------------------------------------------
+
+async function seedSessionWithTranscript(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Transcript User',
+    birthYear: LEARNER_BIRTH_YEAR,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: 'parent-seed@example.com',
+    respondedAt: new Date(),
+  });
+
+  const { subjectId, topicIds } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'Mathematics'
+  );
+
+  const topicId = topicIds[0];
+  if (!topicId) throw new Error('createSubjectWithCurriculum returned no topics');
+
+  const sessionId = generateUUIDv7();
+  const startedAt = pastDate(1);
+  const endedAt = new Date(startedAt.getTime() + 20 * 60 * 1000);
+
+  await db.insert(learningSessions).values({
+    id: sessionId,
+    profileId,
+    subjectId,
+    topicId,
+    sessionType: 'learning',
+    status: 'completed',
+    exchangeCount: 6,
+    startedAt,
+    lastActivityAt: endedAt,
+    endedAt,
+    wallClockSeconds: 1200,
+  });
+
+  // Populate the transcript via session events
+  const eventValues: Array<{
+    id: string;
+    sessionId: string;
+    profileId: string;
+    subjectId: string;
+    topicId: string;
+    eventType: 'user_message' | 'ai_response';
+    content: string;
+  }> = [
+    { id: generateUUIDv7(), sessionId, profileId, subjectId, topicId, eventType: 'user_message', content: 'What is the Pythagorean theorem?' },
+    { id: generateUUIDv7(), sessionId, profileId, subjectId, topicId, eventType: 'ai_response', content: 'The Pythagorean theorem states that in a right triangle, a² + b² = c².' },
+    { id: generateUUIDv7(), sessionId, profileId, subjectId, topicId, eventType: 'user_message', content: 'Can you give me an example?' },
+    { id: generateUUIDv7(), sessionId, profileId, subjectId, topicId, eventType: 'ai_response', content: 'Sure! If a = 3 and b = 4, then c = 5 because 9 + 16 = 25.' },
+    { id: generateUUIDv7(), sessionId, profileId, subjectId, topicId, eventType: 'user_message', content: 'How do I find the hypotenuse?' },
+    { id: generateUUIDv7(), sessionId, profileId, subjectId, topicId, eventType: 'ai_response', content: 'Square both legs, add them together, then take the square root.' },
+  ];
+
+  await db.insert(sessionEvents).values(eventValues);
+
+  await db.insert(sessionSummaries).values({
+    id: generateUUIDv7(),
+    sessionId,
+    profileId,
+    topicId,
+    content: 'We covered the Pythagorean theorem with concrete examples.',
+    aiFeedback: 'Great recall of the formula and the 3-4-5 example.',
+    highlight: 'User connected the abstract formula to a concrete triangle.',
+    narrative:
+      'The learner worked through Pythagoras step-by-step with growing confidence.',
+    conversationPrompt: 'Can you think of a real-world use for this theorem?',
+    engagementSignal: 'engaged',
+    status: 'accepted',
+  });
+
+  return {
+    scenario: 'session-with-transcript',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: { subjectId, sessionId, topicId },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Scenario: parent-proxy
+// Parent viewing a child's session transcript (proxy view). Builds on
+// session-with-transcript but wraps it in a parent+family-link structure.
+// Returns CHILD_PROFILE_ID and SESSION_ID.
+// ---------------------------------------------------------------------------
+
+async function seedParentProxy(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+
+  const parentProfileId = await createBaseProfile(db, accountId, {
+    displayName: 'Proxy Parent',
+    birthYear: 1985,
+    isOwner: true,
+  });
+
+  const childProfileId = await createBaseProfile(db, accountId, {
+    displayName: 'Proxy Child',
+    birthYear: 2014,
+    isOwner: false,
+  });
+
+  await db.insert(familyLinks).values({
+    id: generateUUIDv7(),
+    parentProfileId,
+    childProfileId,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId: childProfileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: email,
+    respondedAt: new Date(),
+  });
+
+  const { subjectId, topicIds } = await createSubjectWithCurriculum(
+    db,
+    childProfileId,
+    'Science'
+  );
+
+  const topicId = topicIds[0];
+  if (!topicId) throw new Error('createSubjectWithCurriculum returned no topics');
+
+  const sessionId = generateUUIDv7();
+  const startedAt = pastDate(1);
+  const endedAt = new Date(startedAt.getTime() + 18 * 60 * 1000);
+
+  await db.insert(learningSessions).values({
+    id: sessionId,
+    profileId: childProfileId,
+    subjectId,
+    topicId,
+    sessionType: 'learning',
+    status: 'completed',
+    exchangeCount: 5,
+    startedAt,
+    lastActivityAt: endedAt,
+    endedAt,
+    wallClockSeconds: 1080,
+  });
+
+  const eventValues = [
+    {
+      id: generateUUIDv7(),
+      sessionId,
+      profileId: childProfileId,
+      subjectId,
+      topicId,
+      eventType: 'user_message' as const,
+      content: 'How does photosynthesis work?',
+    },
+    {
+      id: generateUUIDv7(),
+      sessionId,
+      profileId: childProfileId,
+      subjectId,
+      topicId,
+      eventType: 'ai_response' as const,
+      content: 'Plants use sunlight, water, and CO₂ to produce glucose and oxygen.',
+    },
+    {
+      id: generateUUIDv7(),
+      sessionId,
+      profileId: childProfileId,
+      subjectId,
+      topicId,
+      eventType: 'user_message' as const,
+      content: 'Why do leaves turn green?',
+    },
+    {
+      id: generateUUIDv7(),
+      sessionId,
+      profileId: childProfileId,
+      subjectId,
+      topicId,
+      eventType: 'ai_response' as const,
+      content: 'Chlorophyll absorbs red and blue light but reflects green, making leaves appear green.',
+    },
+  ];
+
+  await db.insert(sessionEvents).values(eventValues);
+
+  await db.insert(sessionSummaries).values({
+    id: generateUUIDv7(),
+    sessionId,
+    profileId: childProfileId,
+    topicId,
+    content: 'We explored photosynthesis and why leaves are green.',
+    aiFeedback: 'Good connections between sunlight, chlorophyll, and colour.',
+    highlight: 'Linked chlorophyll to the colour we see.',
+    narrative:
+      'The learner understood photosynthesis as a conversion process and made the colour-absorption link independently.',
+    conversationPrompt: 'What would happen to a plant kept in the dark?',
+    engagementSignal: 'engaged',
+    status: 'accepted',
+  });
+
+  return {
+    scenario: 'parent-proxy',
+    accountId,
+    profileId: parentProfileId,
+    email,
+    password,
+    ids: { parentProfileId, childProfileId, subjectId, sessionId, topicId },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Scenario: with-bookmarks
+// Learner with ≥2 bookmarks. Returns BOOKMARK_ID (first bookmark).
+// ---------------------------------------------------------------------------
+
+async function seedWithBookmarks(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Bookmarks User',
+    birthYear: LEARNER_BIRTH_YEAR,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: 'parent-seed@example.com',
+    respondedAt: new Date(),
+  });
+
+  const { subjectId, topicIds } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'History'
+  );
+
+  const topicId = topicIds[0];
+  if (!topicId) throw new Error('createSubjectWithCurriculum returned no topics');
+
+  const sessionId = generateUUIDv7();
+  await db.insert(learningSessions).values({
+    id: sessionId,
+    profileId,
+    subjectId,
+    topicId,
+    sessionType: 'learning',
+    status: 'completed',
+    exchangeCount: 4,
+    endedAt: pastDate(1),
+  });
+
+  // Bookmarks reference raw event IDs (no FK — by design in schema)
+  const event1Id = generateUUIDv7();
+  const event2Id = generateUUIDv7();
+
+  const bookmarkId = generateUUIDv7();
+  await db.insert(bookmarks).values([
+    {
+      id: bookmarkId,
+      profileId,
+      sessionId,
+      eventId: event1Id,
+      subjectId,
+      topicId,
+      content: 'The Roman Republic was founded in 509 BC after the overthrow of the monarchy.',
+    },
+    {
+      id: generateUUIDv7(),
+      profileId,
+      sessionId,
+      eventId: event2Id,
+      subjectId,
+      topicId,
+      content: 'Julius Caesar crossed the Rubicon river in 49 BC, triggering the civil war.',
+    },
+  ]);
+
+  return {
+    scenario: 'with-bookmarks',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: { subjectId, sessionId, bookmarkId, topicId },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Scenario: parent-with-weekly-report
+// Parent + child + ≥1 weekly report. Distinct from parent-with-reports
+// (monthly). Returns CHILD_ID and REPORT_ID.
+// ---------------------------------------------------------------------------
+
+async function seedParentWithWeeklyReport(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const base = await seedParentWithChildren(db, email, env);
+  const parentProfileId = base.ids.parentProfileId;
+  const childProfileId = base.ids.childProfileId;
+
+  if (!parentProfileId || !childProfileId) {
+    throw new Error(
+      'parent-with-children seed did not return parent/child IDs'
+    );
+  }
+
+  const reportId = generateUUIDv7();
+  await db.insert(weeklyReports).values({
+    id: reportId,
+    profileId: parentProfileId,
+    childProfileId,
+    reportWeek: '2026-04-28', // Monday start
+    reportData: {
+      childName: 'Test Teen',
+      weekOf: 'April 28 – May 4, 2026',
+      thisWeek: {
+        totalSessions: 4,
+        totalActiveMinutes: 48,
+        topicsMastered: 2,
+        topicsExplored: 3,
+        vocabularyTotal: 12,
+        streakBest: 4,
+      },
+      lastWeek: null,
+      highlights: ['Completed the fractions unit', 'Consistent daily practice'],
+      nextSteps: ['Start decimals', 'Review area and perimeter'],
+      subjects: [
+        {
+          subjectName: 'Mathematics',
+          topicsMastered: 2,
+          topicsAttempted: 3,
+          topicsExplored: 3,
+          vocabularyTotal: 12,
+          activeMinutes: 48,
+          trend: 'growing',
+        },
+      ],
+      headlineStat: {
+        value: 4,
+        label: 'Sessions this week',
+        comparison: 'Up from 2 last week',
+      },
+    },
+  });
+
+  return {
+    ...base,
+    scenario: 'parent-with-weekly-report',
+    ids: {
+      ...base.ids,
+      childId: childProfileId,
+      reportId,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Scenario: parent-session-with-recap
+// Parent + child + completed session with backfilled recap (all fields set).
+// Returns CHILD_ID and SESSION_ID.
+// ---------------------------------------------------------------------------
+
+async function seedParentSessionWithRecap(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const base = await seedParentWithChildren(db, email, env);
+  const childProfileId = base.ids.childProfileId;
+  const subjectId = base.ids.subjectId;
+  const existingSessionId = base.ids.sessionId;
+
+  if (!childProfileId || !subjectId || !existingSessionId) {
+    throw new Error(
+      'parent-with-children seed did not return expected IDs'
+    );
+  }
+
+  // Add a backfilled recap summary to the session created in seedParentWithChildren
+  await db.insert(sessionSummaries).values({
+    id: generateUUIDv7(),
+    sessionId: existingSessionId,
+    profileId: childProfileId,
+    content: 'We worked through linear equations with increasing confidence.',
+    aiFeedback: 'Great perseverance when rearranging terms.',
+    highlight: 'Recognised the pattern for isolating the variable.',
+    narrative:
+      'The learner approached algebra methodically and self-corrected on the second equation without prompting.',
+    conversationPrompt: 'Can you spot any connection between this and the last topic?',
+    engagementSignal: 'engaged',
+    status: 'accepted',
+  });
+
+  return {
+    ...base,
+    scenario: 'parent-session-with-recap',
+    ids: {
+      ...base.ids,
+      childId: childProfileId,
+      sessionId: existingSessionId,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Scenario: parent-session-recap-empty
+// Same shape as parent-session-with-recap but recap fields are null
+// (pre-backfill state). Returns CHILD_ID and SESSION_ID.
+// ---------------------------------------------------------------------------
+
+async function seedParentSessionRecapEmpty(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const base = await seedParentWithChildren(db, email, env);
+  const childProfileId = base.ids.childProfileId;
+  const subjectId = base.ids.subjectId;
+  const existingSessionId = base.ids.sessionId;
+
+  if (!childProfileId || !subjectId || !existingSessionId) {
+    throw new Error(
+      'parent-with-children seed did not return expected IDs'
+    );
+  }
+
+  // Insert a summary with all nullable recap fields left null
+  await db.insert(sessionSummaries).values({
+    id: generateUUIDv7(),
+    sessionId: existingSessionId,
+    profileId: childProfileId,
+    // content, narrative, highlight, conversationPrompt all null — pre-backfill
+    status: 'pending',
+  });
+
+  return {
+    ...base,
+    scenario: 'parent-session-recap-empty',
+    ids: {
+      ...base.ids,
+      childId: childProfileId,
+      sessionId: existingSessionId,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Scenario: parent-subject-with-retention
+// Parent + child + subject with retentionStatus set and totalSessions ≥ 1.
+// retentionStatus is a computed value; we materialise it by inserting a
+// retentionCard that has been reviewed (failureCount 0 = 'strong').
+// ---------------------------------------------------------------------------
+
+async function seedParentSubjectWithRetention(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const base = await seedParentWithChildren(db, email, env);
+  const childProfileId = base.ids.childProfileId;
+  const subjectId = base.ids.subjectId;
+
+  if (!childProfileId || !subjectId) {
+    throw new Error(
+      'parent-with-children seed did not return childProfileId/subjectId'
+    );
+  }
+
+  // Fetch the curriculum for the child's subject, then pick the first topic
+  const curriculumRow = await db.query.curricula.findFirst({
+    where: (c, { eq: eqFn }) => eqFn(c.subjectId, subjectId),
+  });
+  if (!curriculumRow) throw new Error('No curriculum found for subject');
+
+  const topicRow = await db.query.curriculumTopics.findFirst({
+    where: (t, { eq: eqFn }) => eqFn(t.curriculumId, curriculumRow.id),
+  });
+  if (!topicRow) throw new Error('No topic found for curriculum');
+
+  await db.insert(retentionCards).values({
+    id: generateUUIDv7(),
+    profileId: childProfileId,
+    topicId: topicRow.id,
+    easeFactor: 2.5,
+    intervalDays: 7,
+    repetitions: 3,
+    failureCount: 0,
+    consecutiveSuccesses: 3,
+    xpStatus: 'verified',
+    nextReviewAt: futureDate(7),
+  });
+
+  return {
+    ...base,
+    scenario: 'parent-subject-with-retention',
+    ids: {
+      ...base.ids,
+      topicId: topicRow.id,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Scenario: parent-subject-no-retention
+// Same shape as parent-subject-with-retention but no retention data at all.
+// The child has a subject and at least one completed session but no
+// retentionCards row, representing the "not yet reviewed" state.
+// ---------------------------------------------------------------------------
+
+async function seedParentSubjectNoRetention(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const base = await seedParentWithChildren(db, email, env);
+  // No retention cards inserted — that's the distinguishing feature.
+  return {
+    ...base,
+    scenario: 'parent-subject-no-retention',
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Scenario: subscription-family-active
+// User on Family tier (active), RevenueCat offerings disabled so the
+// subscription screen falls back to static pricing cards.
+// ---------------------------------------------------------------------------
+
+async function seedSubscriptionFamilyActive(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const familyTier = getTierConfig('family');
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Family Subscriber',
+    birthYear: 1985,
+    isOwner: true,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: 'parent-seed@example.com',
+    respondedAt: new Date(),
+  });
+
+  const subscriptionId = generateUUIDv7();
+  await db.insert(subscriptions).values({
+    id: subscriptionId,
+    accountId,
+    tier: 'family',
+    status: 'active',
+    currentPeriodStart: new Date(),
+    currentPeriodEnd: futureDate(30),
+  });
+
+  await db.insert(quotaPools).values({
+    id: generateUUIDv7(),
+    subscriptionId,
+    monthlyLimit: familyTier.monthlyQuota,
+    usedThisMonth: 120,
+    cycleResetAt: futureDate(30),
+  });
+
+  const { subjectId } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'General Knowledge'
+  );
+
+  return {
+    scenario: 'subscription-family-active',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: { subscriptionId, subjectId },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Scenario: subscription-pro-active
+// User on Pro tier (active), RevenueCat offerings disabled for static fallback.
+// ---------------------------------------------------------------------------
+
+async function seedSubscriptionProActive(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const proTier = getTierConfig('pro');
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Pro Subscriber',
+    birthYear: 1982,
+    isOwner: true,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: 'parent-seed@example.com',
+    respondedAt: new Date(),
+  });
+
+  const subscriptionId = generateUUIDv7();
+  await db.insert(subscriptions).values({
+    id: subscriptionId,
+    accountId,
+    tier: 'pro',
+    status: 'active',
+    currentPeriodStart: new Date(),
+    currentPeriodEnd: futureDate(30),
+  });
+
+  await db.insert(quotaPools).values({
+    id: generateUUIDv7(),
+    subscriptionId,
+    monthlyLimit: proTier.monthlyQuota,
+    usedThisMonth: 250,
+    cycleResetAt: futureDate(30),
+  });
+
+  const { subjectId } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'Advanced Mathematics'
+  );
+
+  return {
+    scenario: 'subscription-pro-active',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: { subscriptionId, subjectId },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Scenario: quota-exceeded
+// User whose monthly quota is fully exhausted (distinct from daily-limit-reached
+// which caps only the daily allowance). Quiz launch will return
+// ApiResponseError.code === 'QUOTA_EXCEEDED'.
+// ---------------------------------------------------------------------------
+
+async function seedQuotaExceeded(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const freeTier = getTierConfig('free');
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Quota Exceeded User',
+    birthYear: LEARNER_BIRTH_YEAR,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: 'parent-seed@example.com',
+    respondedAt: new Date(),
+  });
+
+  const subscriptionId = generateUUIDv7();
+  await db.insert(subscriptions).values({
+    id: subscriptionId,
+    accountId,
+    tier: 'free',
+    status: 'active',
+    currentPeriodStart: new Date(),
+    currentPeriodEnd: futureDate(30),
+  });
+
+  await db.insert(quotaPools).values({
+    id: generateUUIDv7(),
+    subscriptionId,
+    monthlyLimit: freeTier.monthlyQuota,
+    // Monthly quota fully exhausted — this is the server-side cap
+    usedThisMonth: freeTier.monthlyQuota,
+    dailyLimit: freeTier.dailyLimit,
+    usedToday: 2, // Daily still has headroom; server caps on monthly
+    cycleResetAt: futureDate(30),
+  });
+
+  const { subjectId, topicIds } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'Mathematics'
+  );
+
+  const topicId = topicIds[0];
+  if (!topicId) throw new Error('createSubjectWithCurriculum returned no topics');
+
+  return {
+    scenario: 'quota-exceeded',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: { subscriptionId, subjectId, topicId },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Scenario: forbidden
+// User profile whose quiz launch will return FORBIDDEN (403). We achieve this
+// by creating the profile without linking it to a valid subscription — the
+// metering middleware will reject the request as FORBIDDEN when the account
+// lacks a subscription record.
+// ---------------------------------------------------------------------------
+
+async function seedForbidden(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Forbidden User',
+    birthYear: LEARNER_BIRTH_YEAR,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: 'parent-seed@example.com',
+    respondedAt: new Date(),
+  });
+
+  // Deliberately no subscription row — metering middleware returns FORBIDDEN
+  const { subjectId } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'Science'
+  );
+
+  return {
+    scenario: 'forbidden',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: { subjectId },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Scenario: quiz-malformed-round
+// A pre-inserted quiz round whose questions array contains a capitals question
+// where the options deduplicate to fewer than 2 unique values (BUG-812).
+// The mobile quiz/play screen checks for this and renders the malformed-round
+// fallback branch (testIDs: quiz-play-malformed, quiz-play-malformed-back).
+// Returns ROUND_ID so the E2E flow can navigate directly to
+// /quiz/play?roundId=<ROUND_ID>.
+// ---------------------------------------------------------------------------
+
+async function seedQuizMalformedRound(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Malformed Round User',
+    birthYear: LEARNER_BIRTH_YEAR,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: 'parent-seed@example.com',
+    respondedAt: new Date(),
+  });
+
+  const freeTier = getTierConfig('free');
+  const subscriptionId = generateUUIDv7();
+  await db.insert(subscriptions).values({
+    id: subscriptionId,
+    accountId,
+    tier: 'free',
+    status: 'active',
+    currentPeriodStart: new Date(),
+    currentPeriodEnd: futureDate(30),
+  });
+
+  await db.insert(quotaPools).values({
+    id: generateUUIDv7(),
+    subscriptionId,
+    monthlyLimit: freeTier.monthlyQuota,
+    usedThisMonth: 0,
+    cycleResetAt: futureDate(30),
+  });
+
+  const { subjectId } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'Geography'
+  );
+
+  // Build a round with a capitals question whose distractors are duplicates of
+  // the correct answer. After deduplication the options array collapses to 1
+  // entry — triggering the malformed-round guard in quiz/play.tsx.
+  const malformedQuestion = {
+    type: 'capitals',
+    country: 'France',
+    correctAnswer: 'Paris',
+    acceptedAliases: ['Paris'],
+    // All distractors are the same as correctAnswer — dedupes to 1 option
+    distractors: ['Paris', 'Paris', 'Paris'],
+    funFact: 'Paris is known as the City of Light.',
+    isLibraryItem: false,
+    topicId: null,
+    freeTextEligible: false,
+  };
+
+  const roundId = generateUUIDv7();
+  await db.insert(quizRounds).values({
+    id: roundId,
+    profileId,
+    activityType: 'capitals',
+    theme: 'European Capitals',
+    questions: [malformedQuestion],
+    total: 1,
+    libraryQuestionIndices: [],
+    status: 'active',
+  });
+
+  return {
+    scenario: 'quiz-malformed-round',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: { subjectId, roundId },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Scenario: quiz-deterministic-wrong-answer
+// A pre-inserted quiz round with a known-wrong option at a deterministic index.
+// The E2E dispute test taps option index 1 which is always wrong (correctAnswer
+// is at index 0 after the server side shuffle; we arrange distractors so the
+// round's stored question places the correct answer first in the options
+// presented to the client).
+// Returns ROUND_ID.
+// ---------------------------------------------------------------------------
+
+async function seedQuizDeterministicWrongAnswer(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Deterministic Quiz User',
+    birthYear: LEARNER_BIRTH_YEAR,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: 'parent-seed@example.com',
+    respondedAt: new Date(),
+  });
+
+  const freeTier = getTierConfig('free');
+  const subscriptionId = generateUUIDv7();
+  await db.insert(subscriptions).values({
+    id: subscriptionId,
+    accountId,
+    tier: 'free',
+    status: 'active',
+    currentPeriodStart: new Date(),
+    currentPeriodEnd: futureDate(30),
+  });
+
+  await db.insert(quotaPools).values({
+    id: generateUUIDv7(),
+    subscriptionId,
+    monthlyLimit: freeTier.monthlyQuota,
+    usedThisMonth: 0,
+    cycleResetAt: futureDate(30),
+  });
+
+  const { subjectId } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'Geography'
+  );
+
+  // Question with correctAnswer='Paris', distractors are clearly wrong.
+  // Index 0 = correct, index 1-3 = wrong — E2E flow taps index 1 to submit
+  // a known-wrong answer for the dispute test.
+  const deterministicQuestion = {
+    type: 'capitals',
+    country: 'France',
+    correctAnswer: 'Paris',
+    acceptedAliases: ['Paris'],
+    distractors: ['London', 'Berlin', 'Madrid'],
+    funFact: 'Paris has been the capital of France since the 10th century.',
+    isLibraryItem: false,
+    topicId: null,
+    freeTextEligible: false,
+  };
+
+  const roundId = generateUUIDv7();
+  await db.insert(quizRounds).values({
+    id: roundId,
+    profileId,
+    activityType: 'capitals',
+    theme: 'European Capitals',
+    questions: [deterministicQuestion],
+    total: 1,
+    libraryQuestionIndices: [],
+    status: 'active',
+  });
+
+  return {
+    scenario: 'quiz-deterministic-wrong-answer',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: { subjectId, roundId, wrongOptionIndex: '1' },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Scenario: quiz-answer-check-fails
+// Seed where POST /quiz/rounds/:id/check returns 5xx. We model this with a
+// quiz round in 'completed' status — the check endpoint returns 409/5xx for
+// already-completed rounds, simulating the "check fails" error path without
+// requiring an actual server fault.
+// Returns ROUND_ID.
+// ---------------------------------------------------------------------------
+
+async function seedQuizAnswerCheckFails(
+  db: Database,
+  email: string,
+  env: SeedEnv
+): Promise<SeedResult> {
+  const { clerkUserId, password } = await createClerkTestUser(email, env);
+  const { accountId } = await createBaseAccount(db, email, clerkUserId);
+  const profileId = await createBaseProfile(db, accountId, {
+    displayName: 'Quiz Check Fails User',
+    birthYear: LEARNER_BIRTH_YEAR,
+  });
+
+  await db.insert(consentStates).values({
+    id: generateUUIDv7(),
+    profileId,
+    consentType: 'GDPR',
+    status: 'CONSENTED',
+    parentEmail: 'parent-seed@example.com',
+    respondedAt: new Date(),
+  });
+
+  const freeTier = getTierConfig('free');
+  const subscriptionId = generateUUIDv7();
+  await db.insert(subscriptions).values({
+    id: subscriptionId,
+    accountId,
+    tier: 'free',
+    status: 'active',
+    currentPeriodStart: new Date(),
+    currentPeriodEnd: futureDate(30),
+  });
+
+  await db.insert(quotaPools).values({
+    id: generateUUIDv7(),
+    subscriptionId,
+    monthlyLimit: freeTier.monthlyQuota,
+    usedThisMonth: 0,
+    cycleResetAt: futureDate(30),
+  });
+
+  const { subjectId } = await createSubjectWithCurriculum(
+    db,
+    profileId,
+    'Geography'
+  );
+
+  // A completed round whose check endpoint will reject the request (already
+  // completed rounds cannot accept new answer submissions — the route returns
+  // 409 Conflict, which the mobile error handling maps to a 5xx-style error).
+  const question = {
+    type: 'capitals',
+    country: 'Germany',
+    correctAnswer: 'Berlin',
+    acceptedAliases: ['Berlin'],
+    distractors: ['Munich', 'Hamburg', 'Frankfurt'],
+    funFact: 'Berlin became the German capital in 1871.',
+    isLibraryItem: false,
+    topicId: null,
+    freeTextEligible: false,
+  };
+
+  const roundId = generateUUIDv7();
+  await db.insert(quizRounds).values({
+    id: roundId,
+    profileId,
+    activityType: 'capitals',
+    theme: 'European Capitals',
+    questions: [question],
+    results: [],
+    score: 1,
+    total: 1,
+    status: 'completed',
+    completedAt: new Date(),
+    libraryQuestionIndices: [],
+  });
+
+  return {
+    scenario: 'quiz-answer-check-fails',
+    accountId,
+    profileId,
+    email,
+    password,
+    ids: { subjectId, roundId },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Scenario: daily-limit-reached
 // Free-tier user who has hit the daily question cap (10/10) but still has
 // monthly quota remaining. Next LLM request should trigger 402 QUOTA_EXCEEDED
@@ -1939,6 +3106,22 @@ const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   'language-subject-active': seedLanguageSubjectActive,
   'parent-with-reports': seedParentWithReports,
   'mentor-memory-populated': seedMentorMemoryPopulated,
+  'account-deletion-scheduled': seedAccountDeletionScheduled,
+  'parent-proxy': seedParentProxy,
+  'session-with-transcript': seedSessionWithTranscript,
+  'with-bookmarks': seedWithBookmarks,
+  'parent-with-weekly-report': seedParentWithWeeklyReport,
+  'parent-session-with-recap': seedParentSessionWithRecap,
+  'parent-session-recap-empty': seedParentSessionRecapEmpty,
+  'parent-subject-with-retention': seedParentSubjectWithRetention,
+  'parent-subject-no-retention': seedParentSubjectNoRetention,
+  'subscription-family-active': seedSubscriptionFamilyActive,
+  'subscription-pro-active': seedSubscriptionProActive,
+  'quota-exceeded': seedQuotaExceeded,
+  'forbidden': seedForbidden,
+  'quiz-malformed-round': seedQuizMalformedRound,
+  'quiz-deterministic-wrong-answer': seedQuizDeterministicWrongAnswer,
+  'quiz-answer-check-fails': seedQuizAnswerCheckFails,
 };
 
 export const VALID_SCENARIOS = Object.keys(SCENARIO_MAP) as SeedScenario[];
