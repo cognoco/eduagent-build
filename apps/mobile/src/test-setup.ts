@@ -249,6 +249,21 @@ jest.mock('expo-secure-store', () => ({
   deleteItemAsync: jest.fn().mockResolvedValue(undefined),
 }));
 
+// expo-crypto loads a native module on import; mock to Node's randomUUID so
+// the outbox dedup-id path works under jest. The runtime app uses
+// expo-crypto's Hermes-safe implementation; this mock just keeps test parity.
+jest.mock('expo-crypto', () => {
+  const nodeCrypto = require('crypto');
+  return {
+    randomUUID: () => nodeCrypto.randomUUID(),
+    getRandomBytesAsync: async (size: number) =>
+      new Uint8Array(nodeCrypto.randomBytes(size)),
+    digestStringAsync: async (_alg: string, data: string) =>
+      nodeCrypto.createHash('sha256').update(data).digest('hex'),
+    CryptoDigestAlgorithm: { SHA256: 'SHA-256' },
+  };
+});
+
 jest.mock('@react-native-async-storage/async-storage', () => {
   const store = new Map<string, string>();
   return {

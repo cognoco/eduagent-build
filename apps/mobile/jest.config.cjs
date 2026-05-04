@@ -5,6 +5,7 @@ module.exports = {
   rootDir: '../..',
   preset: 'jest-expo',
   moduleFileExtensions: ['ts', 'js', 'html', 'tsx', 'jsx'],
+  setupFiles: ['<rootDir>/apps/mobile/jest.polyfills.js'],
   setupFilesAfterEnv: ['<rootDir>/apps/mobile/src/test-setup.ts'],
   testMatch: ['<rootDir>/apps/mobile/src/**/*.(spec|test).[jt]s?(x)'],
   moduleNameMapper: {
