@@ -1,0 +1,84 @@
+# Flow: Add-First-Child Gate — Parent owner with no children can add a child
+# Validates: solo parent (owner, no children) sees the Family section in More,
+#            taps "Add a child" row, and lands on the create-profile screen.
+# Tags: weekly, parent
+#
+# Journey: UX Journey 4 (Parent Oversight — onboarding entry)
+# Epics: Epic 5 (FR85 family linking)
+# Prerequisite: Parent owner account with no child profiles, family-tier subscription
+#               (scenario: parent-solo)
+#
+# Seed analysis (test-seed.ts):
+#   parent-solo: isOwner=true, no children → hasLinkedChildren()=false →
+#   home renders LearnerScreen (not ParentGateway). The "add first child"
+#   entry point lives in More → Family section → add-child-link Pressable,
+#   which calls handleAddChild() → router.push('/create-profile?for=child').
+#
+# testID mapping:
+#   more.tsx:
+#     - add-child-link                  -> "Add a child" Pressable in Family section
+#   create-profile.tsx:
+#     - create-profile-name             -> child name input (confirms navigation)
+#   _layout.tsx tabs:
+#     - tab-more                        -> More tab bar button
+appId: com.mentomate.app
+tags:
+  - weekly
+  - parent
+---
+# ── Setup ──────────────────────────────────────────────────────────────
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "parent-solo"
+      API_URL: ${API_URL}
+
+# parent-solo has no children → hasLinkedChildren=false → renders LearnerScreen
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 15000
+
+- takeScreenshot: add-first-child-01-home
+
+# ── Part 1: Navigate to More tab ─────────────────────────────────────
+# BUG-15: use text, not testID for the tab bar (tab label text is reliable).
+- tapOn:
+    text: "More"
+
+- extendedWaitUntil:
+    visible:
+      id: "learning-mode-section-header"
+    timeout: 10000
+
+- takeScreenshot: add-first-child-02-more-screen
+
+# ── Part 2: Assert Family section with add-child-link ─────────────────
+# The Family section is conditional on activeProfile.isOwner — parent-solo
+# is the account owner so this section always renders.
+- scrollUntilVisible:
+    element:
+      id: "add-child-link"
+    direction: DOWN
+    timeout: 10000
+
+- assertVisible:
+    id: "add-child-link"
+
+- takeScreenshot: add-first-child-03-family-section
+
+# ── Part 3: Tap add-child CTA → create-profile ────────────────────────
+- tapOn:
+    id: "add-child-link"
+
+# handleAddChild() checks tier (family/pro allowed) then pushes /create-profile?for=child.
+# parent-solo has a family-tier active subscription so no gate alert fires.
+- extendedWaitUntil:
+    visible:
+      id: "create-profile-name"
+    timeout: 10000
+
+- assertVisible:
+    id: "create-profile-name"
+
+- takeScreenshot: add-first-child-04-create-profile-reached
