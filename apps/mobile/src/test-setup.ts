@@ -238,6 +238,21 @@ jest.mock('expo-clipboard', () => ({
   setStringAsync: jest.fn().mockResolvedValue(undefined),
 }));
 
+// expo-haptics throws "method not available on ios" when invoked under jest
+// because there's no native binding. Stub the impact / notification / select
+// surfaces and the enum constants the project consumes via lib/haptics.ts.
+jest.mock('expo-haptics', () => ({
+  impactAsync: jest.fn().mockResolvedValue(undefined),
+  notificationAsync: jest.fn().mockResolvedValue(undefined),
+  selectionAsync: jest.fn().mockResolvedValue(undefined),
+  ImpactFeedbackStyle: { Light: 'light', Medium: 'medium', Heavy: 'heavy' },
+  NotificationFeedbackType: {
+    Success: 'success',
+    Warning: 'warning',
+    Error: 'error',
+  },
+}));
+
 jest.mock('expo-notifications', () => ({
   getPermissionsAsync: jest
     .fn()

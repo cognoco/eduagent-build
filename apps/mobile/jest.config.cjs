@@ -36,6 +36,9 @@ module.exports = {
     // segments before the canonical tail.
     '(?:^|[\\\\/])Libraries/Components/TextInput/TextInput$':
       '<rootDir>/apps/mobile/jest.text-input-mock.js',
+    // ActivityIndicator has the same Platform.OS module-eval capture pattern.
+    '(?:^|[\\\\/])Libraries/Components/ActivityIndicator/ActivityIndicator$':
+      '<rootDir>/apps/mobile/jest.activity-indicator-mock.js',
   },
   transform: {
     '\\.[jt]sx?$': [
