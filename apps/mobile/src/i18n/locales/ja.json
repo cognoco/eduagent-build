@@ -7,8 +7,8 @@
     "loading": "読み込み中...",
     "retry": "再試行",
     "goBack": "戻る",
-    "goHome": "ホームに戻る",
-    "tryAgain": "もう一度試す",
+    "goHome": "ホームへ",
+    "tryAgain": "再試行",
     "signOut": "サインアウト",
     "continue": "続ける",
     "delete": "削除",
@@ -20,55 +20,55 @@
     "noResults": "結果が見つかりません",
     "retryHint": "タップして再試行",
     "usageMeter": {
-      "questionsUsed": "使用した質問数 {{used}} / {{limit}}"
+      "questionsUsed": "{{used}} / {{limit}} 件の質問を使用しました"
     },
     "offlineBanner": {
       "noConnection": "インターネット接続がありません"
     },
     "timeoutLoader": {
       "title": "時間がかかりすぎています",
-      "message": "予想以上に時間がかかっています。接続を確認してもう一度お試しください。"
+      "message": "想定より時間がかかっています。接続を確認して、もう一度お試しください。"
     }
   },
   "errors": {
-    "generic": "予期せぬエラーが発生しました。もう一度お試しください。",
-    "networkError": "オフラインか、サーバーに接続できないようです。インターネット接続を確認してもう一度お試しください。",
+    "generic": "予期しないエラーが発生しました。もう一度お試しください。",
+    "networkError": "オフラインか、サーバーに接続できないようです。インターネット接続を確認して、もう一度お試しください。",
     "serverError": "サーバー側で問題が発生しました。しばらくしてからもう一度お試しください。",
-    "notFound": "そのページまたはアイテムは存在しません。",
+    "notFound": "そのページまたは項目は存在しません。",
     "resourceGone": "このリソースは利用できなくなりました。",
-    "rateLimited": "上限に達しました。しばらく待ってからもう一度お試しください。",
+    "rateLimited": "制限に達しました。しばらく待ってからもう一度お試しください。",
     "forbidden": "これを表示する権限がありません。",
-    "quotaExhausted": "今日のセッションをすべて使用しました。明日またお越しください！",
+    "quotaExhausted": "今日のセッションはすべて使用しました。また明日お越しください！",
     "sessionNotFound": "そのセッションは利用できなくなりました。新しいセッションを開始してください。",
     "sessionLimitReached": "セッションの上限に達しました。続けるには新しいセッションを開始してください。",
-    "badRequest": "うまくいきませんでした。入力を確認してもう一度お試しください。",
+    "badRequest": "うまくいきませんでした。入力を確認して、もう一度お試しください。",
     "exchangeLimitExceeded": "セッションの上限に達しました。続けるには新しいセッションを開始してください。",
     "subjectInactive": "この科目は現在一時停止中です。科目リストから再開できます。",
     "notLanguageLearning": "この科目は言語学習用に設定されていません。標準の学習パスをお試しください。",
-    "curriculumNotFound": "学習パスがまだ設定されていません。戻って最初にインタビューを開始してください。",
+    "curriculumNotFound": "学習パスがまだ設定されていません。戻って、まずインタビューを開始してください。",
     "topicNotFound": "そのトピックは現在利用できません。別のトピックを選んでみてください。",
-    "draftNotFound": "進捗が失われました。もう一度やり直してください。",
-    "profileNotFound": "プロフィールの読み込みに問題がありました。サインアウトして再度サインインしてください。",
+    "draftNotFound": "進行状況が失われました。もう一度やり直してください。",
+    "profileNotFound": "プロフィールの読み込み中に問題が発生しました。サインアウトしてから再度サインインしてください。",
     "alreadyCompleted": "これはすでに完了しています。戻って新しいものを選んでください。",
-    "validationFailed": "何か問題があったようです。入力内容を確認してもう一度お試しください。",
-    "timedOut": "返信に時間がかかりすぎました。再接続をタップしてもう一度お試しください。"
+    "validationFailed": "何かが正しくないようです。入力内容を確認して、もう一度お試しください。",
+    "timedOut": "返信に時間がかかりすぎました。タップして再接続し、もう一度お試しください。"
   },
   "errorBoundary": {
     "title": "問題が発生しました",
-    "message": "予期せぬエラーが発生しました。もう一度試すか、ホーム画面に戻ることができます。",
+    "message": "予期しないエラーが発生しました。再試行するか、ホーム画面に戻ることができます。",
     "sessionCrashTitle": "セッション画面がクラッシュしました"
   },
   "recovery": {
-    "tryAgain": "もう一度試す",
+    "tryAgain": "再試行",
     "goBack": "戻る",
-    "goHome": "ホームに戻る",
+    "goHome": "ホームへ",
     "signOut": "サインアウト"
   },
   "autoSuggest": {
     "title": "{{language}}でチャットしますか？",
     "message": "チューターに{{language}}で話してもらいますか？",
-    "accept": "はい、切り替えます",
-    "dismiss": "いいえ、結構です"
+    "accept": "はい、切り替える",
+    "dismiss": "いいえ"
   },
   "settings": {
     "appLanguage": "アプリの言語",
@@ -79,18 +79,18 @@
   "friendlyErrors": {
     "notLanguageLearning": "この科目は言語学習用に設定されていません。標準の学習パスをお試しください。",
     "subjectPaused": "この科目は現在一時停止中です。科目リストから再開できます。",
-    "curriculumNotFound": "学習パスがまだ設定されていません。戻って最初にインタビューを開始してください。",
+    "curriculumNotFound": "学習パスがまだ設定されていません。戻って、まずインタビューを開始してください。",
     "topicNotFound": "そのトピックは現在利用できません。別のトピックを選んでみてください。",
-    "draftNotFound": "進捗が失われました。もう一度やり直してください。",
-    "profileNotFound": "プロフィールの読み込みに問題がありました。サインアウトして再度サインインしてください。",
+    "draftNotFound": "進行状況が失われました。もう一度やり直してください。",
+    "profileNotFound": "プロフィールの読み込み中に問題が発生しました。サインアウトしてから再度サインインしてください。",
     "sessionNotFound": "そのセッションは利用できなくなりました。新しいセッションを開始してください。",
     "alreadyCompleted": "これはすでに完了しています。戻って新しいものを選んでください。",
-    "validationFailed": "何か問題があったようです。入力内容を確認してもう一度お試しください。"
+    "validationFailed": "何かが正しくないようです。入力内容を確認して、もう一度お試しください。"
   },
   "auth": {
     "index": {
-      "timeoutTitle": "予想以上に時間がかかっています",
-      "timeoutMessage": "接続を確認してもう一度お試しください。"
+      "timeoutTitle": "想定より時間がかかっています",
+      "timeoutMessage": "接続を確認して、もう一度お試しください。"
     },
     "ssoCallback": {
       "loadingLabel": "サインインを完了中",
@@ -99,10 +99,10 @@
     }
   },
   "home": {
-    "loadingTimeoutMessage": "予想以上に時間がかかっています。接続を確認してもう一度お試しください。",
-    "retryLoadingLabel": "読み込みを再試行",
-    "goToLibrary": "ライブラリへ行く",
-    "goToLibraryLabel": "ライブラリへ行く",
+    "loadingTimeoutMessage": "想定より時間がかかっています。接続を確認して、もう一度お試しください。",
+    "retryLoadingLabel": "再読み込み",
+    "goToLibrary": "ライブラリへ",
+    "goToLibraryLabel": "ライブラリへ",
     "moreOptions": "その他のオプション",
     "moreOptionsLabel": "その他のオプション",
     "parentGateway": {
@@ -110,7 +110,7 @@
       "practicedThisWeek": "{{name}}さんは今週{{minutes}}分練習しました",
       "notPracticedThisWeek": "{{name}}さんは今週練習していません",
       "checkProgress": "お子様の進捗を確認",
-      "learnSomething": "何か学ぶ",
+      "learnSomething": "何かを学ぶ",
       "dashboardError": "ダッシュボードを読み込めませんでした",
       "reviewHealth": "健康状態を確認"
     }
@@ -121,24 +121,24 @@
     "subtitle": "お子様の学習状況",
     "demoDashboardHint": "ダッシュボードはこのように表示されます",
     "errorTitle": "ダッシュボードを読み込めませんでした",
-    "errorMessage": "インターネット接続を確認してもう一度お試しください。",
-    "retryLoadingLabel": "ダッシュボードの読み込みを再試行",
+    "errorMessage": "インターネット接続を確認して、もう一度お試しください。",
+    "retryLoadingLabel": "ダッシュボードを再読み込み",
     "libraryButton": "ライブラリ",
-    "libraryFallbackLabel": "保護者用ライブラリを開く",
+    "libraryFallbackLabel": "保護者のライブラリを開く",
     "moreButton": "その他",
-    "moreFallbackLabel": "保護者設定を開く",
-    "emptyMessage": "まだお子様がリンクされていません。お子様のプロフィールを追加すると、ここに進捗が表示されます。",
+    "moreFallbackLabel": "保護者の設定を開く",
+    "emptyMessage": "まだお子様がリンクされていません。お子様のプロフィールを追加して、進捗をここで確認しましょう。",
     "addChild": "お子様を追加",
     "addChildLabel": "お子様を追加",
     "continueSolo": "一人で続ける",
     "continueSoloLabel": "一人で続ける",
     "linkChildCta": "お子様のアカウントをリンク",
-    "linkChildCtaLabel": "お子様のアカウントをリンクして始めましょう",
+    "linkChildCtaLabel": "開始するにはお子様のアカウントをリンクしてください",
     "demoPreviewLabel": "プレビュー",
     "demoPreviewMessage": "これはサンプルデータです。お子様が学習を始めると、実際の進捗がここに表示されます。",
-    "demoBannerLabel": "プレビューモード：これは、お子様が学習を始めた後のダッシュボードの表示例を示すサンプルデータです",
+    "demoBannerLabel": "プレビューモード：これは、お子様が学習を開始した後にダッシュボードがどのように表示されるかを示すサンプルデータです",
     "demoAlertTitle": "プレビューモード",
-    "demoAlertMessage": "実際のデータを見るには、お子様のアカウントをリンクしてください。"
+    "demoAlertMessage": "お子様のアカウントをリンクして、実際のデータを確認しましょう。"
   },
   "more": {
     "screenTitle": "その他",
@@ -149,14 +149,14 @@
       "subtitleWithChildren": "ご自身のセッションに適用されます。お子様の設定を変更するには、ダッシュボードからプロフィールを開いてください。",
       "childPreferencesAccessLabel": "{{name}}さんのプロフィール設定を開く",
       "childPreferencesLink": "{{name}}さんの設定を変更するには、プロフィールを開いてください →",
-      "familyPreferencesLink": "お子様の設定を変更するには、家族を開いてください →",
+      "familyPreferencesLink": "お子様の設定を変更するには、ファミリーを開いてください →",
       "casual": {
         "title": "エクスプローラー",
-        "description": "自分のペースで学びましょう。メンターはリラックスして励ましてくれます。すぐにポイントを獲得でき、復習をスキップできます。"
+        "description": "自分のペースで学習します。メンターはリラックスして励ましてくれます。すぐにポイントを獲得でき、要約をスキップできます。"
       },
       "serious": {
         "title": "チャレンジモード",
-        "description": "さらに上を目指しましょう。メンターが学習をサポートします。記憶を証明した後にポイントを獲得し、復習で知識を定着させます。"
+        "description": "さらに上を目指しましょう。メンターが学習をサポートします。覚えていることを証明した後にポイントを獲得し、要約で知識を定着させます。"
       }
     },
     "accommodation": {
@@ -167,34 +167,34 @@
       "viewAndManage": "表示と管理"
     },
     "family": {
-      "sectionHeader": "家族",
+      "sectionHeader": "ファミリー",
       "childProgress": "お子様の進捗",
       "childCount_one": "お子様 {{count}}人",
       "childCount_other": "お子様 {{count}}人",
       "addChild": "お子様を追加",
-      "addChildDescription": "プロフィールを作成して、お子様が自分のチューターと学べるようにしましょう",
+      "addChildDescription": "お子様が自分のメンターと学習できるようにプロフィールを作成します",
       "addChildAccessLabel": "お子様のプロフィールを追加",
       "yourChild": "あなたのお子様",
-      "openFamilyPreferencesAccessLabel": "家族設定を開く",
+      "openFamilyPreferencesAccessLabel": "ファミリー設定を開く",
       "upgradeRequiredTitle": "アップグレードが必要です",
       "upgradeRequiredMessage": "お子様のプロフィールを追加するには、ファミリーまたはプロのサブスクリプションが必要です。",
       "viewPlans": "プランを見る",
       "profileLimitTitle": "プロフィールの上限に達しました",
-      "profileLimitMessage": "{{plan}}プランでは最大{{max}}個のプロフィールをサポートしています。"
+      "profileLimitMessage": "{{plan}}プランでは、最大{{max}}個のプロフィールをサポートしています。"
     },
     "celebrations": {
-      "sectionHeader": "あなたのお祝い",
+      "sectionHeader": "お祝い",
       "allTitle": "すべてのお祝い",
-      "allDescription": "簡単な達成を含むすべてのマイルストーンを表示します",
+      "allDescription": "小さな成功を含むすべてのマイルストーンを表示します",
       "bigOnlyTitle": "大きなマイルストーンのみ",
-      "bigOnlyDescription": "コメットやオリオン座は表示し、小さなポップアップはスキップします",
+      "bigOnlyDescription": "大きな達成のみ表示し、小さなアニメーションはスキップします",
       "offTitle": "オフ",
       "offDescription": "アニメーションなしで静かにマイルストーンを記録します"
     },
     "notifications": {
       "sectionHeader": "通知",
       "pushTitle": "プッシュ通知",
-      "weeklyDigestTitle": "週次進捗ダイジェスト",
+      "weeklyDigestTitle": "週ごとの進捗ダイジェスト",
       "updateErrorTitle": "通知設定を更新できませんでした"
     },
     "account": {
@@ -211,7 +211,7 @@
       "reportAProblem": "問題を報告",
       "privacyPolicy": "プライバシーポリシー",
       "termsOfService": "利用規約",
-      "exportMyData": "データをエクスポート",
+      "exportMyData": "自分のデータをエクスポート",
       "deleteAccount": "アカウントを削除"
     },
     "export": {
@@ -242,16 +242,16 @@
   },
   "session": {
     "mentorMemory": {
-      "title": "チューターが知っていること",
+      "title": "私のチューターが知っていること",
       "subtitle": "チューターが記憶している内容を確認、編集、追加します。",
       "loadError": "現在、チューターの記憶を読み込めませんでした",
       "loadTimeout": {
         "title": "読み込みに時間がかかりすぎています",
-        "message": "接続を確認してもう一度お試しください。"
+        "message": "接続を確認して、もう一度お試しください。"
       },
       "nothingSaved": "まだ何も保存されていません。",
       "noticed": "{{date}}に気づきました",
-      "lastSeen": "{{date}}に最後に確認",
+      "lastSeen": "最終確認日：{{date}}",
       "bringBack": "元に戻す",
       "status": {
         "heading": "記憶ステータス",
@@ -263,24 +263,24 @@
       },
       "consent": {
         "title": "チューターの記憶を有効にする",
-        "description": "チューターにあなたの得意なこと、好みの説明、苦手なトピックなどを記憶させましょう。"
+        "description": "チューターに、あなたにとって効果的なこと（得意なこと、好みの説明、苦手なトピック）を記憶させましょう。"
       },
       "accommodation": {
         "setByParent": "保護者が設定で設定しました。",
         "shortBurst": {
-          "young": "チューターは特別な方法であなたに教えます！",
+          "young": "チューターは特別な方法で教えてくれるよ！",
           "mid": "学習スタイル：ショートバースト — 短い説明と多くの確認",
-          "older": "サポートモード：ショートバースト — 簡潔な説明、頻繁なチェックポイント"
+          "older": "学習サポートモード：ショートバースト — 簡潔な説明、頻繁なチェックポイント"
         },
         "audioFirst": {
-          "young": "チューターは特別な方法であなたに教えます！",
-          "mid": "学習スタイル：音声優先 — シンプルで話し言葉風の説明",
-          "older": "サポートモード：音声優先 — 話し言葉風の言語、音声サポート"
+          "young": "チューターは特別な方法で教えてくれるよ！",
+          "mid": "学習スタイル：音声優先 — シンプルな話し言葉での説明",
+          "older": "学習サポートモード：音声優先 — 話し言葉、音声サポート"
         },
         "predictable": {
-          "young": "チューターは特別な方法であなたに教えます！",
-          "mid": "学習スタイル：予測可能 — 明確な構造と段階的なセッション",
-          "older": "サポートモード：予測可能 — 構造化されたセッション、明確な移行"
+          "young": "チューターは特別な方法で教えてくれるよ！",
+          "mid": "学習スタイル：予測可能 — 明確な構成と段階的なセッション",
+          "older": "学習サポートモード：予測可能 — 構成化されたセッション、明確な移行"
         }
       },
       "sections": {
@@ -290,42 +290,42 @@
         "strengths": "得意なこと",
         "struggles": "改善中のこと",
         "communicationNotes": "コミュニケーションメモ",
-        "hiddenItems": "非表示のアイテム",
+        "hiddenItems": "非表示の項目",
         "privacy": "プライバシー"
       },
       "empty": {
         "title": "チューターはあなたのことを学んでいます",
-        "message": "学習を進めるにつれて、チューターはあなたの興味、得意なこと、学習方法を学びます。すべてがここに時間とともに追加されます。"
+        "message": "学習を進めるにつれて、チューターはあなたの興味、得意なこと、学習の好みを学びます。すべては時間とともにここに表示されます。"
       },
       "clearDialog": {
         "title": "チューターの記憶を消去しますか？",
-        "message": "これにより、チューターがあなたについて記憶したすべてが削除され、再度有効にするまで記憶機能はオフになります。",
+        "message": "これにより、チューターがあなたについて記憶したすべてが削除され、再度有効にするまで記憶機能がオフになります。",
         "confirm": "消去"
       },
       "clearAll": {
-        "label": "チューターの記憶をすべて消去",
+        "label": "すべてのチューターの記憶を消去",
         "accessibilityLabel": "{{name}}さんのチューターの記憶を消去",
         "defaultName": "このプロフィール"
       },
       "errors": {
         "clearFailed": "記憶を消去できませんでした",
-        "saveFailed": "保存できませんでした",
+        "saveFailed": "それを保存できませんでした",
         "updateFailed": "記憶を更新できませんでした",
         "enableFailed": "記憶を有効にできませんでした",
-        "deleteFailed": "アイテムを削除できませんでした",
-        "restoreFailed": "アイテムを復元できませんでした"
+        "deleteFailed": "項目を削除できませんでした",
+        "restoreFailed": "項目を復元できませんでした"
       }
     },
     "accessories": {
       "switchTopic": "トピックを切り替える",
-      "parkIt": "後でやる",
+      "parkIt": "保留する",
       "pickSubject": "科目を選ぶ",
       "adding": "追加中...",
       "newSubject": "+ 新しい科目",
       "createNewSubject": "新しい科目を作成",
       "createNewSubjectLabel": "新しい科目を作成",
       "problemProgress": "問題 {{current}} / {{total}}",
-      "imDone": "完了です",
+      "imDone": "完了",
       "nextProblem": "次の問題",
       "finishHomework": "宿題を終える",
       "walkMeThrough": "手順を教えて",
@@ -339,9 +339,9 @@
     },
     "quota": {
       "dailyLimitReached": "1日の上限に達しました",
-      "monthlyLimitReached": "月の上限に達しました",
-      "ownerDailyMessage": "今日は{{limit}}問中{{used}}問を使用しました。",
-      "ownerMonthlyMessage": "今月は{{limit}}問中{{used}}問を使用しました。",
+      "monthlyLimitReached": "月間上限に達しました",
+      "ownerDailyMessage": "今日は{{limit}}件中{{used}}件の質問を使用しました。",
+      "ownerMonthlyMessage": "今月は{{limit}}件中{{used}}件の質問を使用しました。",
       "upgradePlan": "プランをアップグレード",
       "topUpCreditsWithCount": "クレジットを追加（残り{{count}}）",
       "childDailyMessage": "今日の質問の上限に達しました。",
@@ -350,12 +350,12 @@
       "topUpCredits": "クレジットを追加"
     },
     "libraryPrompt": {
-      "wantToSee": "以前のレッスンを見ますか？",
-      "goToLibrary": "ライブラリへ行く"
+      "wantToSee": "前のレッスンを見ますか？",
+      "goToLibrary": "ライブラリへ"
     },
     "bookmarkNudge": {
       "message": "ブックマークアイコンをタップして、この瞬間をライブラリに保存しましょう。",
-      "gotIt": "わかりました",
+      "gotIt": "わかった",
       "dismissLabel": "ブックマークのヒントを閉じる",
       "bookmarkNow": "今すぐブックマーク",
       "bookmarkNowLabel": "この瞬間を今すぐブックマーク"
@@ -363,7 +363,7 @@
     "fluencyDrill": {
       "percentCorrect": "正解率 {{pct}}%",
       "dismiss": "閉じる",
-      "dismissLabel": "流暢さドリルを閉じる",
+      "dismissLabel": "流暢さドリルのヒントを閉じる",
       "title": "流暢さドリル",
       "skip": "スキップ",
       "skipLabel": "このドリル項目をスキップ"
@@ -374,7 +374,7 @@
       "imageUnavailable": "画像は利用できなくなりました",
       "emptyState": "会話はここに表示されます。",
       "listening": "聞き取り中…",
-      "speakNow": "今すぐ話してください — もう一度マイクをタップして停止",
+      "speakNow": "話してください — もう一度マイクをタップして停止",
       "processing": "処理中...",
       "inputUnavailable": "現在入力は利用できません",
       "switchToTextMode": "テキストモードに切り替え",
@@ -384,7 +384,7 @@
       "screenReaderVoiceNote": "スクリーンリーダーがオンです。音声入力は利用できません。下のテキスト入力を使用してください。"
     },
     "filingFailed": {
-      "retryInProgress": "再試行がすでに進行中です。",
+      "retryInProgress": "再試行はすでに進行中です。",
       "retryLimitReached": "再試行の上限に達しました。後でもう一度お試しください。",
       "couldNotStartRetry": "再試行を開始できませんでした。もう一度お試しください。",
       "retrying": "トピックの配置を再試行中...",
@@ -392,18 +392,18 @@
       "progressSaved": "全体の進捗は保存されました。トピックの配置は再試行されます。",
       "retryLabel": "トピックの配置を再試行",
       "retryingButton": "再試行中...",
-      "tryAgain": "もう一度試す",
+      "tryAgain": "再試行",
       "recovered": "トピックの配置が回復しました。"
     },
     "outboxFailed": {
-      "title": "一部のメッセージを送信できませんでした",
-      "description": "進捗が失われないように、コピーするかサポートに送信してください。",
+      "title": "一部のメッセージが送信できませんでした",
+      "description": "進捗が失われないように、メッセージをコピーするか、サポートに送信してください。",
       "copyMessage": "メッセージをコピー",
       "sendToSupport": "サポートに送信"
     },
     "expired": {
       "title": "セッションが終了しました",
-      "message": "このセッションは終了しました。学習を続けるには新しいセッションを開始してください。"
+      "message": "このセッションは終了しました。学習を続けるには、新しいセッションを開始してください。"
     },
     "notePrompt": {
       "writeNote": "メモを書く",
@@ -419,19 +419,19 @@
       "addFailedMessage": "もう一度お試しください",
       "adding": "追加中…",
       "yesAddLabel": "はい、ライブラリに追加します",
-      "yesAdd": "はい、追加します",
-      "noThanksLabel": "いいえ、結構です",
-      "noThanks": "いいえ、結構です"
+      "yesAdd": "はい、追加する",
+      "noThanksLabel": "いいえ",
+      "noThanks": "いいえ"
     },
     "parkingLot": {
       "title": "パーキングロット",
-      "description": "後で戻りたい質問やアイデアを書き留めましょう",
+      "description": "後で戻ってきたい質問やアイデアを書き留めましょう",
       "placeholder": "何を覚えておきたいですか？",
       "inputLabel": "パーキングロットのメモ",
-      "inputHint": "後で戻りたい質問やアイデアを入力してください",
+      "inputHint": "後で戻ってきたい質問やアイデアを入力してください",
       "saveButton": "保存",
-      "savedForLater": "後で保存しました",
-      "emptyState": "まだ何もありません"
+      "savedForLater": "後で見るために保存しました",
+      "emptyState": "まだ何も保留されていません"
     },
     "topicSwitcher": {
       "title": "トピックを切り替える",
@@ -440,7 +440,7 @@
     },
     "topicHeader": {
       "currentTopic": "トピック：",
-      "changeTopicLabel": "{{topic}}からトピックを変更",
+      "changeTopicLabel": "トピックを{{topic}}から変更",
       "changeTopic": "変更"
     }
   },
@@ -450,34 +450,34 @@
       "backLabel": "戻る",
       "loadError": "クイズデータを読み込めませんでした。",
       "tapToRetry": "タップして再試行してください。",
-      "retryLabel": "クイズデータの読み込みを再試行",
+      "retryLabel": "クイズデータを再読み込み",
       "capitalsTitle": "首都",
       "capitalsDefaultSubtitle": "世界の首都をテストしましょう",
       "guessWhoTitle": "誰でしょう",
       "guessWhoDefaultSubtitle": "ヒントから有名人の名前を当てましょう",
-      "vocabLockedTitle": "単語",
-      "vocabLockedSubtitle": "言語科目を追加して単語クイズをアンロックしましょう",
-      "bestScore": "ベスト: {{score}}/{{total}} · プレイ回数: {{played}}",
-      "played": "プレイ回数: {{played}}",
-      "vocabBasicsTitle": "{{language}}の基本",
-      "vocabPersonalisedTitle": "単語: {{language}}",
-      "vocabStarterSubtitle": "基本単語をストック — 自分の単語を{{threshold}}個記録して、パーソナライズされたラウンドをアンロックしましょう",
+      "vocabLockedTitle": "語彙",
+      "vocabLockedSubtitle": "言語科目を追加して語彙クイズをアンロックしましょう",
+      "bestScore": "ベスト：{{score}}/{{total}}・プレイ回数：{{played}}",
+      "played": "プレイ回数：{{played}}",
+      "vocabBasicsTitle": "{{language}}の基礎",
+      "vocabPersonalisedTitle": "語彙：{{language}}",
+      "vocabStarterSubtitle": "標準の単語を収録 — {{threshold}}個の自分の単語を記録して、パーソナライズされたラウンドをアンロックしましょう",
       "vocabPlayedSubtitleDefault": "新しい単語やフレーズを練習しましょう"
     },
     "launch": {
-      "loadingShuffling": "質問をシャッフル中...",
+      "loadingShuffling": "問題をシャッフル中...",
       "loadingPicking": "テーマを選択中...",
       "loadingAlmost": "もうすぐ準備完了...",
       "challengeTitle": "チャレンジラウンド",
-      "challengeBody": "ストリーク中です。今回は難しくなります。",
-      "challengeStart": "スタート",
-      "challengeLabel": "チャレンジラウンド。このラウンドは通常より難しいです。",
+      "challengeBody": "ストリークが続いています。今回は難易度が上がります。",
+      "challengeStart": "開始",
+      "challengeLabel": "チャレンジラウンド。このラウンドは通常より難しくなっています。",
       "challengeStartLabel": "チャレンジラウンドを開始",
       "hardTimeoutTitle": "クイズに時間がかかりすぎています",
-      "hardTimeoutMessage": "ラウンドの生成に予想以上に時間がかかりました。接続を確認してもう一度お試しください。",
+      "hardTimeoutMessage": "ラウンドの生成に想定より時間がかかりました。接続を確認して、もう一度お試しください。",
       "errorTitle": "ラウンドを作成できませんでした",
       "errorFallback": "もう一度試すか、戻って別のアクティビティを選んでください。",
-      "timedOutHint": "通常より時間がかかっています — 後でもう一度試したい場合はキャンセルをタップしてください。",
+      "timedOutHint": "通常より時間がかかっています — 後で再試行したい場合は「キャンセル」をタップしてください。",
       "cancelLabel": "キャンセル",
       "friendlyErrors": {
         "upstreamError": "クイズの作成中に問題が発生しました。もう一度お試しください！",
@@ -493,15 +493,15 @@
       "correct": "正解",
       "wrong": "不正解",
       "capitalQuestion": "{{country}}の首都",
-      "vocabularyQuestion": "翻訳: {{term}}",
+      "vocabularyQuestion": "翻訳：{{term}}",
       "guessWhoFallback": "誰でしょう",
-      "yourAnswer": "あなたの答え: {{answer}}",
-      "correctAnswer": "正解: {{answer}}",
-      "notNeeded": "(不要)",
+      "yourAnswer": "あなたの答え：{{answer}}",
+      "correctAnswer": "正解：{{answer}}",
+      "notNeeded": "（不要）",
       "cluesHeader": "ヒント",
       "didYouKnow": "知っていましたか？",
-      "expandedLabel": "Q{{num}}, {{correctness}}, タップしてヒントを非表示",
-      "collapsedLabel": "Q{{num}}, {{correctness}}, タップしてヒントを表示",
+      "expandedLabel": "Q{{num}}、{{correctness}}、タップしてヒントを非表示",
+      "collapsedLabel": "Q{{num}}、{{correctness}}、タップしてヒントを表示",
       "questionLabel": "Q{{num}}"
     },
     "history": {
@@ -509,7 +509,7 @@
       "goBack": "戻る",
       "loadingText": "履歴を読み込み中...",
       "errorTitle": "履歴を読み込めませんでした",
-      "errorMessage": "接続を確認してもう一度お試しください。",
+      "errorMessage": "接続を確認して、もう一度お試しください。",
       "emptyTitle": "まだラウンドがプレイされていません",
       "emptyMessage": "クイズを試して、ここに履歴を表示しましょう！",
       "tryQuiz": "クイズを試す",
@@ -520,7 +520,7 @@
       "activityLabels": {
         "capitals": "首都",
         "guessWho": "誰でしょう",
-        "vocabulary": "単語"
+        "vocabulary": "語彙"
       }
     }
   },
@@ -528,13 +528,13 @@
     "index": {
       "title": "ディクテーション",
       "errorTitle": "現在ディクテーションを作成できません",
-      "tryAgain": "もう一度試す",
+      "tryAgain": "再試行",
       "retryDictation": "ディクテーションを再試行",
       "tapToRetry": "タップして再試行",
       "tookTooLong": "時間がかかりすぎました — もう一度お試しください",
       "retryGenerating": "ディクテーションの生成を再試行",
       "pickingTopic": "トピックを選択中...",
-      "takesAFewSeconds": "これには数秒かかります",
+      "takesAFewSeconds": "数秒かかります",
       "cancelGenerating": "ディクテーションの生成をキャンセル",
       "iHaveAText": "テキストを持っています",
       "iHaveATextSubtitle": "自分のテキストを入力または貼り付け",
@@ -543,14 +543,14 @@
     },
     "complete": {
       "noSessionTitle": "完了するディクテーションがありません",
-      "noSessionMessage": "まずディクテーションを開始してください — 完了するとここに完了画面が表示されます。",
+      "noSessionMessage": "まずディクテーションを開始してください — 完了すると完了画面がここに表示されます。",
       "startDictation": "ディクテーションを開始",
       "cameraErrorTitle": "カメラエラー",
       "cameraErrorMessage": "カメラを開けませんでした。もう一度お試しください。",
       "photoErrorTitle": "写真エラー",
       "photoErrorMessage": "写真を読み取れませんでした。もう一度お試しください。",
-      "reviewFailedTitle": "確認に失敗しました",
-      "tryAgain": "もう一度試す",
+      "reviewFailedTitle": "レビューに失敗しました",
+      "tryAgain": "再試行",
       "skip": "スキップ",
       "couldNotSaveDictation": "ディクテーションの結果を保存できませんでした。",
       "couldNotSaveTitle": "結果を保存できませんでした",
@@ -562,7 +562,7 @@
       "wellDone": "よくできました！",
       "wantToCheck": "自分の解答を確認しますか？",
       "checkMyWriting": "書き取りを確認",
-      "imDone": "完了です",
+      "imDone": "完了",
       "tryAnotherDictation": "別のディクテーションを試す"
     },
     "playback": {
@@ -570,10 +570,10 @@
       "exitMessage": "ディクテーションの進捗は保存されません。",
       "keepGoing": "続ける",
       "leave": "終了する",
-      "noDataMessage": "ディクテーションデータが見つかりません。戻ってもう一度お試しください。",
-      "paceLabel": "ペース: {{pace}}。タップして変更。",
+      "noDataMessage": "ディクテーションデータが見つかりません。戻って、もう一度お試しください。",
+      "paceLabel": "ペース：{{pace}}。タップして変更。",
       "pace": {
-        "slow": "ゆっくり",
+        "slow": "遅い",
         "normal": "普通",
         "fast": "速い"
       },
@@ -582,7 +582,7 @@
       "skipToNext": "次の文へスキップ",
       "resumeDictation": "ディクテーションを再開",
       "pauseDictation": "ディクテーションを一時停止",
-      "ready": "準備...",
+      "ready": "準備完了...",
       "tapToContinue": "タップして続ける",
       "repeatLastPhrase": "最後のフレーズを繰り返す",
       "repeat": "リピート",
@@ -604,10 +604,10 @@
       "original": "原文",
       "youWrote": "あなたの解答",
       "error": "エラー",
-      "correctVersion": "正しい文章",
-      "nowTypeCorrect": "正しい文章を入力してください：",
-      "typeCorrectedPlaceholder": "正しい文章をここに入力…",
-      "typeCorrectedLabel": "修正した文章を入力",
+      "correctVersion": "正しいバージョン",
+      "nowTypeCorrect": "正しい文を入力してください：",
+      "typeCorrectedPlaceholder": "正しい文をここに入力…",
+      "typeCorrectedLabel": "修正された文を入力",
       "finish": "完了"
     },
     "textPreview": {
@@ -615,41 +615,41 @@
       "noTextMessage": "まずテキストを入力するか、写真を撮ってください。",
       "prepareErrorTitle": "問題が発生しました",
       "prepareErrorMessage": "ディクテーションを準備できませんでした。もう一度試しますか？",
-      "tryAgain": "もう一度試す",
+      "tryAgain": "再試行",
       "title": "テキストを確認",
       "subtitleFromPhoto": "写真からの間違いを編集してから、ディクテーションを開始してください。",
       "subtitleManual": "テキストを確認してから、ディクテーションを開始してください。",
       "inputPlaceholder": "ここにテキストを入力または貼り付け...",
-      "inputLabel": "ディクテーションのテキスト",
+      "inputLabel": "ディクテーションテキスト",
       "preparingDictation": "ディクテーションを準備中",
       "startDictation": "ディクテーションを開始",
       "preparing": "準備中...",
-      "takingLonger": "通常より時間がかかっています — キャンセルしてもう一度試すことができます。",
+      "takingLonger": "通常より時間がかかっています — キャンセルして再試行できます。",
       "cancelPreparing": "ディクテーションの準備をキャンセル"
     }
   },
   "library": {
     "title": "ライブラリ",
-    "subtitle": "{{subjectCount}}科目 · {{topicCount}}トピック",
+    "subtitle": "{{subjectCount}}科目・{{topicCount}}トピック",
     "subtitleNoTopics": "{{subjectCount}}科目",
-    "subtitleGuardian": "あなたの個人ライブラリ · {{subjectCount}}科目 · {{topicCount}}トピック",
-    "subtitleGuardianNoTopics": "あなたの個人ライブラリ · {{subjectCount}}科目",
+    "subtitleGuardian": "あなたの個人ライブラリ・{{subjectCount}}科目・{{topicCount}}トピック",
+    "subtitleGuardianNoTopics": "あなたの個人ライブラリ・{{subjectCount}}科目",
     "statusPaused": "一時停止中",
     "statusArchived": "アーカイブ済み",
     "loadTimeout": {
       "title": "ライブラリの読み込みに時間がかかりすぎています",
-      "message": "接続を確認してもう一度お試しください。"
+      "message": "接続を確認して、もう一度お試しください。"
     },
     "loadError": {
       "message": "ライブラリを読み込めませんでした。もう一度お試しください。"
     },
     "empty": {
       "title": "ライブラリは空です",
-      "message": "学習セッションを開始すると、ここに科目が表示されます。",
-      "goHome": "ホームへ行く"
+      "message": "学習セッションを開始すると、科目がここに表示されます。",
+      "goHome": "ホームへ"
     },
     "curriculumComplete": {
-      "title": "ここの内容はすべて学習済みです！",
+      "title": "ここではすべてを学習しました！",
       "message": "新しいことを学びたいときは新しい科目を追加するか、これらのトピックを復習し続けてください。",
       "addSubject": "別の科目を追加"
     },
@@ -673,28 +673,46 @@
       "updateErrorTitle": "科目を更新できませんでした"
     },
     "shelf": {
-      "missingParam": "科目がありません。戻ってもう一度お試しください。",
+      "missingParam": "科目がありません。戻って、もう一度お試しください。",
       "loading": "この棚を読み込み中...",
       "errorTitle": "この棚を読み込めませんでした",
       "fallbackTitle": "棚",
       "bookCount": "{{count}}冊の本",
       "topicProgress": "{{completed}}/{{total}}トピック",
-      "settingsAccessibilityLabel": "科目設定",
+      "settingsAccessibilityLabel": "科目の設定",
       "studyNext": "次に学習する",
       "browseAll": "すべての提案を閲覧",
-      "emptyPickTitle": "始める本を選んでください",
-      "emptyPickMessage": "上の「次に学習する」カードのいずれかをタップして開始します。",
+      "emptyPickTitle": "開始する本を選んでください",
+      "emptyPickMessage": "上の「次に学習する」カードのいずれかをタップして開始してください。",
       "emptyTitle": "この棚にはまだ本がありません。",
       "emptyMessage": "カリキュラムはまだ作成中です。しばらくしてからもう一度確認してください。",
       "organizing": "ライブラリを整理中...",
-      "skip": "スキップ — とにかく学習を始める",
-      "skipAccessibilityLabel": "スキップしてとにかく学習を始める",
+      "skip": "スキップ — とにかく学習を開始",
+      "skipAccessibilityLabel": "スキップしてとにかく学習を開始",
       "filingErrorTitle": "その本を追加できませんでした"
     },
     "noteMenu": {
       "title": "メモのオプション",
       "deleteTitle": "メモを削除",
       "deleteMessage": "このメモを削除してもよろしいですか？"
+    },
+    "row": {
+      "review": "復習",
+      "notStarted": "未開始",
+      "paused": "一時停止中",
+      "hasNotes": "メモあり",
+      "bookTopics": "{{progress}}トピック",
+      "shelfSubtitle_one": "{{count}}冊の本・{{progress}}トピック",
+      "shelfSubtitle_other": "{{count}}冊の本・{{progress}}トピック",
+      "shelfEmpty": "この科目にはまだ本がありません。トピックを学習すると、ここに整理されます。",
+      "bookAccessibilityLabel": "{{title}}、{{progress}}トピック{{retentionSuffix}}{{notesSuffix}}",
+      "bookRetentionSuffix": "、定着度{{status}}",
+      "bookNotesSuffix": "、メモあり",
+      "shelfAccessibilityLabel": "{{name}}の棚、{{subtitle}}{{pausedSuffix}}{{reviewSuffix}}。タップして{{action}}。",
+      "shelfPausedSuffix": "、一時停止中",
+      "shelfReviewSuffix": "、復習が必要",
+      "shelfActionExpand": "展開",
+      "shelfActionCollapse": "折りたたむ"
     }
   },
   "topic": {
@@ -704,7 +722,7 @@
       "inputPlaceholder": "覚えていることを説明してください...",
       "missingTitle": "トピックが見つかりません",
       "missingMessage": "このトピックを読み込めませんでした。ライブラリでトピックを選んでください。",
-      "goToLibrary": "ライブラリへ行く",
+      "goToLibrary": "ライブラリへ",
       "successPrompt": "準備ができたらライブラリに戻ってください。",
       "dontRemember": "覚えていません",
       "stillStuck": "まだわかりません",
@@ -713,20 +731,20 @@
   },
   "subject": {
     "settings": {
-      "fallbackTitle": "科目設定",
+      "fallbackTitle": "科目の設定",
       "missingTitle": "科目が選択されていません",
-      "missingMessage": "この科目を読み込めませんでした。ホームに戻ってもう一度お試しください。",
+      "missingMessage": "この科目を読み込めませんでした。ホームに戻って、もう一度お試しください。",
       "updateErrorTitle": "更新できませんでした",
-      "languageEmpty": "言語科目にはまだ科目固有の設定がありません。チューターはCEFRレベルと進捗に基づいて、単語、リスニング、ライティングの練習を自動的に調整します。",
-      "analogyTitle": "たとえ話の好み",
-      "analogyDescription": "たとえ話の分野を選択してください。チューターは概念を説明する際にこの分野のたとえ話を優先しますが、直接的な説明の方が明確な場合は強制しません。"
+      "languageEmpty": "言語科目にはまだ科目固有の設定がありません。チューターは、CEFRレベルと進捗に基づいて、語彙、リスニング、ライティングの練習を自動的に調整します。",
+      "analogyTitle": "アナロジーの好み",
+      "analogyDescription": "アナロジーの分野を選択してください。チューターは概念を説明する際にこの分野のアナロジーを優先しますが、直接的な説明の方が明確な場合は強制しません。"
     },
     "title": "新しい科目",
-    "prompt": "何を学びたいですか？科目名を入力するか、興味のあることを説明してください — 残りはこちらで考えます。",
+    "prompt": "何を学びたいですか？科目名を入力するか、興味のあることを説明してください — 残りは私たちが考えます。",
     "nameLabel": "科目名",
     "namePlaceholder": "例：微積分、世界史、「アリについて学ぶ」...",
     "resolveTookTooLong": "確認に時間がかかりすぎました — もう一度お試しください",
-    "resolveNetworkError": "この科目が存在するか確認できませんでした。接続を確認してもう一度お試しください。",
+    "resolveNetworkError": "この科目が存在するか確認できませんでした。接続を確認して、もう一度お試しください。",
     "enterSubjectNameError": "科目名を入力してください",
     "retryCheckLabel": "科目名の確認を再試行",
     "manageSubjects": "科目を管理",
@@ -736,65 +754,65 @@
     "suggestedSubjectsLabel": "おすすめの科目",
     "continueSubject": "{{name}}を続ける",
     "continueSubjectLabel": "{{name}}を続ける",
-    "startSubject": "{{name}}を始める",
-    "startSubjectLabel": "{{name}}を始める",
-    "notSureHint": "よくわからない？興味のあることを説明してください — 例：「植物がどうやって育つか知りたい」",
+    "startSubject": "{{name}}を開始",
+    "startSubjectLabel": "{{name}}を開始",
+    "notSureHint": "よくわかりませんか？興味のあることを説明してください — 例：「植物がどうやって育つか知りたい」",
     "checkingName": "科目名を確認中...",
     "somethingElse": "その他",
-    "somethingElseHint": "好きなだけ具体的に書いてください。",
+    "somethingElseHint": "好きなだけ具体的に記述してください。",
     "clarifyLabel": "具体的に何を学びたいですか？",
     "clarifyPlaceholder": "例：アリのコロニー、ローマ街道、分数の解き方...",
     "checkThisInstead": "代わりにこちらを確認",
     "useMyWords": "「{{words}}」を科目名として使用",
-    "useMyWordsLabel": "「{{words}}」を科目名として使用",
+    "useMyWordsLabel": "{{words}}を科目名として使用",
     "justUse": "「{{words}}」を使用",
-    "noMatchFallback": "うまく一致しませんでしたが、入力した言葉をそのまま使用できます。",
+    "noMatchFallback": "完全に一致するものは見つかりませんでしたが、あなたの言葉をそのまま使用できます。",
     "editSubjectNameLabel": "科目名を編集",
     "editInstead": "代わりに編集",
     "accept": "承認",
     "acceptSuggestionLabel": "提案を承認",
     "editSuggestionLabel": "提案を編集",
     "startLearning": "学習を開始",
-    "validationHint": "始めるには科目名を入力してください"
+    "validationHint": "開始するには科目名を入力してください"
   },
   "vocabulary": {
-    "fallbackTitle": "単語",
-    "screenSubtitle": "単語",
+    "fallbackTitle": "語彙",
+    "screenSubtitle": "語彙",
     "typeWord": "単語",
     "typePhrase": "フレーズ",
     "deleteAccessibilityLabel": "{{term}}を削除",
     "deleteDialog": {
       "title": "単語を削除",
-      "message": "この単語をあなたの単語リストから削除しますか？",
+      "message": "この単語を語彙から削除しますか？",
       "errorTitle": "削除できませんでした",
       "errorFallback": "問題が発生しました。もう一度お試しください。"
     },
     "noSubject": {
       "title": "科目が選択されていません",
-      "message": "この画面は科目の詳細ページから開いてください。ライブラリを閲覧して科目を選び、その単語リストを表示してください。",
+      "message": "この画面は科目の詳細ページから開いてください。ライブラリを閲覧して科目を選び、その語彙を表示してください。",
       "openLibrary": "ライブラリを開く",
       "backToProgress": "進捗に戻る"
     },
-    "loadError": "単語を読み込めませんでした。接続を確認してもう一度お試しください。",
+    "loadError": "語彙を読み込めませんでした。接続を確認して、もう一度お試しください。",
     "empty": {
-      "title": "まだ単語がありません",
+      "title": "まだ語彙がありません",
       "message": "言語セッションを完了して、単語リストの作成を始めましょう。"
     }
   },
   "consent": {
-    "sameEmailWarning": "これはあなた自身のメールアドレスです。保護者のメールアドレスを入力してください。",
+    "sameEmailWarning": "これはご自身のメールアドレスです。保護者のメールアドレスを入力してください。",
     "backToChild": "お子様に戻る",
     "deliveryFailedTitle": "まだ配信を確認できませんでした",
-    "deliverySentBody": "保護者の方に{{email}}宛にメールが届きます。承認され次第、お知らせします。",
-    "deliveryFailedBody": "同意メールが{{email}}に届いたことを確認できませんでした。アドレスを再確認してもう一度お試しください。",
+    "deliverySentBody": "保護者に{{email}}宛にメールが届きます。承認され次第、お知らせします。",
+    "deliveryFailedBody": "{{email}}への同意メールの到達を確認できませんでした。アドレスを再確認して、もう一度お試しください。",
     "deliveryFailedHint": "今すぐリクエストを再送信するか、戻って別のアドレスを入力できます。",
     "resendEmail": "メールを再送信"
   },
   "account": {
     "title": "アカウントを削除",
     "scheduledTitle": "アカウントは削除予定です。",
-    "scheduledBody": "すべてのデータは{{date}}に完全に削除されます。それまでいつでもキャンセルできます。",
-    "scheduledAccountActive": "猶予期間が終了するまでアカウントは有効です。",
+    "scheduledBody": "すべてのデータは{{date}}に完全に削除されます。それ以前であればいつでもキャンセルできます。",
+    "scheduledAccountActive": "猶予期間が終了するまで、アカウントは有効です。",
     "keepAccount": "考えが変わりました — アカウントを維持します",
     "keepAccountLabel": "考えが変わりました — アカウントを維持します",
     "signOutNow": "今すぐサインアウト",
@@ -803,18 +821,18 @@
     "signOutFailedMessage": "アプリを閉じて再度開き、もう一度サインインしてください。",
     "closeWithoutCancellingLabel": "キャンセルせずに閉じる",
     "familyWarningTitle": "リンクされたお子様のプロフィールがある場合",
-    "familyWarningBody": "お子様はMentoMateにアクセスできなくなります。進捗、学習履歴、同意記録はあなたのアカウントと共に完全に削除されます。家族のリンクは引き継がれません。",
-    "subscriptionWarningTitle": "サブスクリプションを別途キャンセルしてください",
-    "subscriptionWarningBodyPrefix": "App StoreまたはPlay Storeのサブスクリプションは",
+    "familyWarningBody": "お子様はMentoMateにアクセスできなくなります。進捗、学習履歴、同意記録は、あなたのアカウントと共に完全に削除されます。ファミリーリンクは引き継がれません。",
+    "subscriptionWarningTitle": "サブスクリプションは別途キャンセルしてください",
+    "subscriptionWarningBodyPrefix": "App StoreまたはPlay Storeのサブスクリプションは、",
     "subscriptionWarningNot": "自動的に",
     "subscriptionWarningBodySuffix": "キャンセルされません。アカウントを削除する前に、デバイスのサブスクリプション設定を開いてください。そうしないと、請求が続く可能性があります。",
     "confirmPromptPrefix": "以下に",
     "confirmPromptSuffix": "と入力して確認してください。",
-    "confirmInputLabel": "アカウント削除を確認するには「{{phrase}}」と入力してください",
+    "confirmInputLabel": "アカウント削除を確認するには{{phrase}}と入力してください",
     "permanentDelete": "アカウントを完全に削除",
     "permanentDeleteLabel": "アカウントを完全に削除",
     "warningBody1": "これにより、あなたのアカウントと、プロフィール、学習進捗、同意記録を含むすべての関連データが完全に削除されます。",
-    "warningBody2": "考え直すための7日間の猶予期間があります。その後、データは復元できません。",
+    "warningBody2": "7日間の猶予期間があり、その間に考え直すことができます。その後は、データを復元することはできません。",
     "understandDelete": "理解しました、アカウントを削除します",
     "understandDeleteLabel": "理解しました、アカウントを削除します"
   },
@@ -825,29 +843,29 @@
       "s1Title": "1. 当社について",
       "s1Body": "MentoMateは、Zwizzly（以下「当社」）が運営するAI搭載のチュータープラットフォームです。当社は、すべてのユーザー、特に11歳から17歳のお子様のプライバシー保護に努めています。当社は、EU一般データ保護規則（GDPR）に従って個人データを処理します。",
       "s2Title": "2. 収集するデータ",
-      "s2Body1": "アカウントデータ：メールアドレス、表示名、登録時に提供されるプロフィール情報。",
+      "s2Body1": "アカウントデータ：登録時に提供されるメールアドレス、表示名、プロフィール情報。",
       "s2Body2": "学習データ：科目、インタビューの回答、カリキュラムの進捗、セッションのやり取り、評価結果、定着度スコア、XP。",
-      "s2Body3": "デバイスデータ：プッシュ通知トークン、デバイスの種類、アプリのバージョン（通知の配信とサービス品質の維持のため）。",
-      "s2Body4": "当社は、位置情報、連絡先、写真（明示的に撮影した宿題の画像を除く）、閲覧履歴を収集しません。",
+      "s2Body3": "デバイスデータ：プッシュ通知トークン、デバイスタイプ、アプリのバージョン（通知の配信とサービス品質の維持のため）。",
+      "s2Body4": "当社は、位置情報、連絡先、写真（明示的に撮影した宿題の画像を除く）、閲覧履歴は収集しません。",
       "s3Title": "3. データの使用方法",
       "s3Body": "ソクラテス式対話と間隔反復を使用して、パーソナライズされたAIチューターを提供するため。カリキュラム、学習の洞察、進捗レポートを生成するため。オプトインした復習リマインダーや通知を送信するため。匿名化・集計された分析を通じてサービスを改善するため。",
       "s4Title": "4. 保護者の同意",
-      "s4Body1": "16歳未満のユーザーについては、個人データを処理する前に検証可能な保護者の同意が必要です。学習データが収集される前に、保護者がメールでお子様のアカウントを承認する必要があります。",
-      "s4Body2": "保護者は、保護者ダッシュボードからいつでも同意を撤回できます。撤回後、お子様のデータは7日間の猶予期間を経て完全に削除されます。",
+      "s4Body1": "16歳未満のユーザーについては、個人データを処理する前に検証可能な保護者の同意が必要です。保護者は、学習データが収集される前に、メールでお子様のアカウントを承認する必要があります。",
+      "s4Body2": "保護者は、保護者用ダッシュボードからいつでも同意を撤回できます。撤回後、お子様のデータは7日間の猶予期間を経て、完全に削除されます。",
       "s5Title": "5. AIによる処理",
-      "s5Body": "学習セッションは、教育的な応答を生成するために第三者のAIモデルプロバイダーによって処理されます。セッションの内容は処理のためにAIプロバイダーに送信されることがありますが、モデルのトレーニングには使用されません。当社は、個人を特定できる情報をAIプロバイダーと共有せず、学習コンテンツのみを共有します。",
+      "s5Body": "学習セッションは、教育的な応答を生成するために第三者のAIモデルプロバイダーによって処理されます。セッション内容は処理のためにAIプロバイダーに送信される場合がありますが、モデルのトレーニングには使用されません。当社は、個人を特定できる情報をAIプロバイダーと共有せず、学習コンテンツのみを共有します。",
       "s6Title": "6. データ共有",
-      "s6Body1": "当社はあなたのデータを販売しません。データは、認証プロバイダー（Clerk）でのサインイン、AIプロバイダーでの学習セッション、メールプロバイダー（Resend）での通知、エラー追跡（Sentry）でのアプリの安定性、アプリ内購入管理（RevenueCat）でのサブスクリプション処理、支払い処理業者でのサブスクリプション管理のためにのみ共有されます。",
-      "s6Body2": "13歳未満のユーザーについては、保護者の同意が得られるまでエラー追跡（Sentry）は無効になります。同意が撤回された場合、再度無効になります。",
+      "s6Body1": "当社はデータを販売しません。データは、認証プロバイダー（Clerk）でのサインイン、AIプロバイダーでの学習セッション、メールプロバイダー（Resend）での通知、エラー追跡（Sentry）でのアプリの安定性、アプリ内購入管理（RevenueCat）でのサブスクリプション処理、支払い処理業者でのサブスクリプション管理のためにのみ共有します。",
+      "s6Body2": "13歳未満のユーザーについては、保護者の同意が得られるまでエラー追跡（Sentry）は無効化されます。同意が撤回された場合、再度無効化されます。",
       "s7Title": "7. データ保持",
-      "s7Body": "当社は、あなたのアカウントが有効である限りデータを保持します。アカウントを削除すると、データは7日間の猶予期間（その間に削除をキャンセルできます）を経て、完全に削除されます。",
+      "s7Body": "当社は、アカウントが有効である限りデータを保持します。アカウントを削除すると、データは7日間の猶予期間（その間に削除をキャンセルできます）を経て、完全に削除されます。",
       "s8Title": "8. あなたの権利",
-      "s8Body1": "あなたには以下の権利があります：あなたのデータにアクセスする（設定のエクスポート機能経由）、不正確なデータを訂正する、アカウントとすべての関連データを削除する、データ処理の同意を撤回する、処理に異議を唱える、データポータビリティ。",
+      "s8Body1": "あなたには、自分のデータにアクセスする権利（設定のエクスポート機能経由）、不正確なデータを訂正する権利、アカウントとすべての関連データを削除する権利、データ処理への同意を撤回する権利、処理に異議を唱える権利、データポータビリティの権利があります。",
       "s8Body2": "これらの権利を行使するには、アプリ内設定を使用するか、privacy@mentomate.comまでご連絡ください。",
       "s9Title": "9. セキュリティ",
       "s9Body": "当社は、暗号化された接続（TLS）、安全な認証、各ユーザーが自分のデータにのみアクセスできるようにするプロファイルスコープのデータ分離など、業界標準のセキュリティ対策を使用しています。",
       "s10Title": "10. お問い合わせ",
-      "s10Body": "プライバシーに関するご質問やご懸念については、当社のデータ保護責任者（privacy@mentomate.com）までお問い合わせください。"
+      "s10Body": "プライバシーに関するご質問や懸念事項については、当社のデータ保護責任者（privacy@mentomate.com）までお問い合わせください。"
     },
     "terms": {
       "title": "利用規約",
@@ -855,26 +873,26 @@
       "s1Title": "1. 規約への同意",
       "s1Body": "MentoMateのアカウントを作成または使用することにより、これらの利用規約に同意したものとみなされます。18歳未満の場合は、保護者があなたに代わって同意する必要があります。",
       "s2Title": "2. サービスの説明",
-      "s2Body": "MentoMateは、ソクラテス式対話、間隔反復、適応型カリキュラムを通じてパーソナライズされた学習を提供するAI搭載のチュータープラットフォームです。このサービスは、保護者の監督のもと、11歳から15歳の学生向けに設計されています。",
+      "s2Body": "MentoMateは、ソクラテス式対話、間隔反復、適応型カリキュラムを通じてパーソナライズされた学習を提供するAI搭載のチュータープラットフォームです。このサービスは、保護者の監督のもと、11歳から15歳の生徒向けに設計されています。",
       "s3Title": "3. アカウントの責任",
       "s3Body": "アカウントの認証情報の機密性を維持する責任はあなたにあります。登録時には正確な情報を提供する必要があります。アカウントを他人と共有したり、複数のアカウントを作成したりしてはなりません。",
       "s4Title": "4. 許容される使用",
-      "s4Body": "MentoMateは教育目的のみに使用されます。以下の行為を行わないことに同意するものとします：違法な目的でサービスを使用する、安全機能を回避しようとする、有害、虐待的、または不適切なコンテンツを送信する、リバースエンジニアリングまたはAIモデルやアルゴリズムを抽出しようとする。",
+      "s4Body": "MentoMateは教育目的のみに使用されます。あなたは、違法な目的でサービスを使用しないこと、安全機能を回避しようとしないこと、有害、虐待的、または不適切なコンテンツを送信しないこと、リバースエンジニアリングやAIモデルまたはアルゴリズムの抽出を試みないことに同意します。",
       "s5Title": "5. AI生成コンテンツ",
-      "s5Body": "MentoMateはAIを使用して教育コンテンツを生成します。正確性を期すよう努めていますが、AIの応答には時折誤りが含まれることがあります。このサービスは学習補助であり、専門的な教育、チューター、学術的アドバイスに代わるものではありません。",
+      "s5Body": "MentoMateはAIを使用して教育コンテンツを生成します。正確性を期すよう努めていますが、AIの応答には時折誤りが含まれる場合があります。このサービスは学習補助であり、専門的な教育、チューター、学術的アドバイスに代わるものではありません。",
       "s6Title": "6. サブスクリプションと支払い",
       "s6Body": "MentoMateは、日次および月次の使用制限がある無料プランを提供しています。有料サブスクリプションは、Apple App StoreまたはGoogle Play Storeを通じて利用できます。サブスクリプションの条件、価格、キャンセルは、各アプリストアのポリシーに準拠します。返金は、購読したアプリストアを通じて処理されます。",
       "s7Title": "7. 知的財産",
       "s7Body": "すべてのMentoMateのコンテンツ、デザイン、技術はZwizzlyが所有しています。あなたの学習データ（セッションのやり取り、メモ、要約）はあなたに帰属します。当社は、サービスを提供するためにのみそれをライセンスします。",
       "s8Title": "8. 責任の制限",
-      "s8Body": "MentoMateは「現状有姿」で提供され、いかなる種類の保証もありません。当社は、あなたのサービス利用から生じるいかなる間接的、付随的、または結果的な損害についても責任を負いません。当社の総責任は、請求の前の12か月間にあなたがサービスに対して支払った金額に限定されます。",
+      "s8Body": "MentoMateは「現状有姿」で提供され、いかなる種類の保証もありません。当社は、サービスの利用から生じるいかなる間接的、付随的、または結果的な損害についても責任を負いません。当社の総責任は、請求の前の12か月間にサービスに対して支払った金額に限定されます。",
       "s9Title": "9. 終了",
-      "s9Body": "あなたはいつでも設定からアカウントを削除できます。当社は、これらの規約に違反するアカウントを停止または終了することがあります。終了時、あなたのデータは当社のプライバシーポリシーに従って処理されます。",
+      "s9Body": "あなたはいつでも設定からアカウントを削除できます。当社は、これらの規約に違反するアカウントを停止または終了させることがあります。終了時、あなたのデータは当社のプライバシーポリシーに従って処理されます。",
       "s10Title": "10. 規約の変更",
-      "s10Body": "当社は、これらの規約を随時更新することがあります。重要な変更については、メールまたはアプリ内通知でお知らせします。変更後の継続的な使用は、新しい規約への同意とみなされます。",
+      "s10Body": "当社は、これらの規約を随時更新することがあります。重大な変更については、メールまたはアプリ内通知でお知らせします。変更後の継続的な使用は、承諾とみなされます。",
       "s11Title": "11. 準拠法",
-      "s11Body": "これらの規約は、一般データ保護規則（GDPR）を含む、適用される欧州連合の法律に準拠します。いかなる紛争も、適用されるEUの消費者保護およびデータプライバシー規制に従って解決されます。",
-      "s12Title": "12. 連絡先",
+      "s11Body": "これらの規約は、一般データ保護規則（GDPR）を含む、欧州連合の適用法に準拠します。いかなる紛争も、適用されるEUの消費者保護およびデータプライバシー規制に従って解決されます。",
+      "s12Title": "12. お問い合わせ",
       "s12Body": "これらの規約に関するご質問は、legal@mentomate.comまでお問い合わせください。"
     }
   },
@@ -908,11 +926,11 @@
     "cancelAndGoBackLabel": "キャンセルして戻る",
     "cancelOcrLabel": "OCRをキャンセルして再撮影",
     "readingHomework": "{{subject}}の宿題を読み取り中...",
-    "ocrTimeout": "写真の読み取りに時間がかかりすぎています。接続を確認してもう一度試すか、問題を入力してください。",
-    "ocrDefaultError": "はっきりと読み取れませんでした。明るい場所でもう一度写真を撮ってみてください。",
+    "ocrTimeout": "写真の読み取りに時間がかかりすぎています。接続を確認して再試行するか、問題を入力してください。",
+    "ocrDefaultError": "はっきりと読み取れませんでした。明るい場所で再度写真を撮ってみてください。",
     "problemsFound": "見つかった問題はこちらです：",
     "addSkippedFragmentsLabel": "スキップされた部分を戻す",
-    "skippedFragments": "不明瞭な部分が{{count}}箇所スキップされました。タップして戻します。",
+    "skippedFragments": "不明瞭な部分が{{count}}箇所スキップされました。タップして戻してください。",
     "problemNumber": "問題 {{number}}",
     "removeProblemLabel": "問題 {{number}} を削除",
     "remove": "削除",
@@ -937,7 +955,7 @@
     "creatingSubject": "科目を作成中...",
     "startSessionLabel": "この問題でセッションを開始",
     "letsGo": "始めましょう",
-    "typeItOut": "代わりにタイプしますか？",
+    "typeItOut": "代わりに入力しますか？",
     "manualInputPlaceholder": "ここに問題を入力してください...",
     "typeManuallyLabel": "問題を手動で入力",
     "noSubjectsYet": "まだ科目がありません。",
@@ -961,13 +979,13 @@
     "hero": {
       "sessionsCompleted": "{{count}}セッション完了",
       "sessionsCompleted_other": "{{count}}セッション完了",
-      "sessionsCompletedSubtitle": "習得したトピックや単語は、進捗に応じて表示されます。",
-      "buildingLanguage": "言語力を構築中",
-      "buildingLanguageSubtitle": "{{count}}語以上。",
+      "sessionsCompletedSubtitle": "習得したトピックや語彙は、進捗に応じて表示されます。",
+      "buildingLanguage": "言語能力を構築中",
+      "buildingLanguageSubtitle": "{{count}}語以上を学習中。",
       "knowWords": "{{count}}語を知っています",
       "knowWordsSubtitle": "その知識は今やあなたのものです。",
       "buildingKnowledge": "知識を構築中",
-      "buildingKnowledgeSubtitle": "{{count}}トピック以上。",
+      "buildingKnowledgeSubtitle": "{{count}}トピック以上を学習中。",
       "masteredTopics": "{{count}}トピックを習得しました",
       "masteredTopicsSubtitle": "あなたの進捗は積み重なっています。",
       "masteredTopicsAndWords": "そして、科目全体で{{words}}語を知っています。"
@@ -975,34 +993,34 @@
     "newLearner": {
       "title": "{{count}}セッション完了しました。この調子で頑張りましょう！",
       "title_other": "{{count}}セッション完了しました。この調子で頑張りましょう！",
-      "subtitle": "あと{{count}}セッション完了すると、学習の旅全体が表示されます！",
-      "subtitle_other": "あと{{count}}セッション完了すると、学習の旅全体が表示されます！"
+      "subtitle": "あと{{count}}セッション完了すると、学習の旅の全体像が見えます！",
+      "subtitle_other": "あと{{count}}セッション完了すると、学習の旅の全体像が見えます！"
     },
     "empty": {
-      "title": "最初のセッションを開始",
-      "subtitle": "最初のセッションを開始すると、ここにあなたの進捗が表示されます"
+      "title": "最初のセッションを開始しましょう",
+      "subtitle": "最初のセッションを開始して、ここにあなたの進捗を表示しましょう"
     },
     "error": {
       "loadTitle": "進捗を読み込めませんでした",
       "loadMessageServer": "サーバー側で問題が発生しました。下にスワイプするか、以下をタップして再試行してください。",
-      "loadMessageNetwork": "接続を確認してもう一度お試しください。データは安全です。",
-      "goHome": "ホームへ行く"
+      "loadMessageNetwork": "接続を確認して、もう一度お試しください。あなたのデータは安全です。",
+      "goHome": "ホームへ"
     },
     "stats": {
       "sessions": "{{count}}セッション",
-      "streak": "{{count}}日ストリーク",
-      "viewVocabCount": "{{count}}語の単語を見る",
-      "viewVocab": "単語を見る",
+      "streak": "{{count}}日間のストリーク",
+      "viewVocabCount": "{{count}}語の語彙を表示",
+      "viewVocab": "語彙を表示",
       "wordsLink": "{{count}}語 →",
-      "vocabularyLink": "単語 →"
+      "vocabularyLink": "語彙 →"
     },
     "growth": {
       "title": "あなたの成長",
-      "subtitle": "習得したトピックと単語の週ごとの変化",
+      "subtitle": "習得したトピックと語彙の週ごとの変化",
       "emptyFoundation": "基礎を築いています。最初のトピックを習得すると、成長が見えるようになります。",
       "emptyInProgress": "{{count}}セッションをこなしました。この調子で頑張りましょう — 習熟度は繰り返し触れることで現れます。",
       "emptyInProgress_other": "{{count}}セッションをこなしました。この調子で頑張りましょう — 習熟度は繰り返し触れることで現れます。",
-      "emptyJustStarted": "始めたばかりです。この調子で頑張れば、ここにあなたの成長が表示されます。"
+      "emptyJustStarted": "始めたばかりです。この調子で頑張れば、あなたの成長がここに表示されます。"
     },
     "milestones": {
       "recentTitle": "最近のマイルストーン",
@@ -1012,18 +1030,18 @@
       "nextMilestone": "あと{{count}}セッション完了すると、次のマイルストーンに到達します。",
       "nextMilestone_other": "あと{{count}}セッション完了すると、次のマイルストーンに到達します。",
       "pageTitle": "あなたのマイルストーン",
-      "earned": "{{count}}マイルストーン獲得",
-      "earned_other": "{{count}}マイルストーン獲得",
+      "earned": "{{count}}個のマイルストーンを獲得",
+      "earned_other": "{{count}}個のマイルストーンを獲得",
       "errorTitle": "マイルストーンを読み込めませんでした",
-      "errorMessage": "接続を確認してもう一度お試しください。",
+      "errorMessage": "接続を確認して、もう一度お試しください。",
       "emptyTitle": "まだマイルストーンがありません",
-      "emptySubtitle": "セッションを完了し、トピックを習得して最初のマイルストーンを獲得しましょう。",
+      "emptySubtitle": "セッションを完了し、トピックを習得して、最初のマイルストーンを獲得しましょう。",
       "emptyBackLabel": "旅に戻る"
     },
     "saved": {
       "title": "保存済み",
       "pageTitle": "保存済み",
-      "viewLabel": "保存した説明を見る",
+      "viewLabel": "保存した説明を表示",
       "bookmarkLabel": "{{subject}}から保存したブックマーク",
       "removeBookmark": "ブックマークを削除",
       "tapToExpand": "タップして展開",
@@ -1036,72 +1054,72 @@
       "deleteConfirm": "削除",
       "deleteErrorTitle": "ブックマークを削除できませんでした",
       "errorLoad": "保存した回答を読み込めませんでした。",
-      "errorNetwork": "接続を確認してもう一度お試しください。",
+      "errorNetwork": "接続を確認して、もう一度お試しください。",
       "retryLabel": "保存したブックマークの読み込みを再試行",
       "emptyTitle": "まだ何も保存されていません",
       "emptySubtitle": "セッション中にページをブックマークすると、ここに表示されます。",
-      "goToLibrary": "ライブラリへ行く"
+      "goToLibrary": "ライブラリへ"
     },
     "subject": {
       "noSubjectTitle": "科目が選択されていません",
       "noSubjectSubtitle": "進捗ページから科目を選んで詳細を確認してください。",
       "backToProgress": "進捗に戻る",
       "loadingTooLong": "読み込みに時間がかかりすぎています",
-      "checkConnection": "接続を確認してもう一度お試しください。",
+      "checkConnection": "接続を確認して、もう一度お試しください。",
       "errorTitle": "この科目を読み込めませんでした",
       "errorMessageServer": "サーバー側で問題が発生しました。以下をタップして再試行してください。",
-      "errorMessageNetwork": "接続を確認してもう一度お試しください。",
+      "errorMessageNetwork": "接続を確認して、もう一度お試しください。",
       "fallbackTitle": "科目の進捗",
-      "topicsMastered": "計画された{{total}}トピック中{{mastered}}を習得",
+      "topicsMastered": "計画された{{total}}トピック中{{mastered}}トピックを習得",
       "noTopicsPlanned": "まだトピックが計画されていません",
       "topicsExplored": "{{count}}トピックを探求",
       "topicsExplored_other": "{{count}}トピックを探求",
-      "wordsTracked": "この科目で{{count}}語を追跡",
+      "wordsTracked": "この科目で{{count}}語を記録",
       "sessionsCompleted": "{{count}}セッション完了",
       "sessionsCompleted_other": "{{count}}セッション完了",
       "statStarted": "開始済み",
       "statNotStarted": "未開始",
       "statTimeSpent": "費やした時間",
       "statSessions": "セッション",
-      "vocabularyTitle": "単語",
-      "vocabularyBreakdown": "{{mastered}}習得済み • {{learning}}学習中 • {{new}}新規",
+      "vocabularyTitle": "語彙",
+      "vocabularyBreakdown": "{{mastered}}習得済み・{{learning}}学習中・{{new}}新規",
       "wordCount": "{{count}}語",
-      "viewAllVocab": "すべての単語を見る",
-      "viewAllVocabLink": "すべての単語を見る →",
+      "viewAllVocab": "すべての語彙を表示",
+      "viewAllVocabLink": "すべての語彙を表示 →",
       "languageMilestone": "言語マイルストーン",
       "milestoneLoadError": "マイルストーンデータを読み込めませんでした。",
       "retryMilestone": "マイルストーンの読み込みを再試行",
       "wordsProgress": "{{mastered}}/{{target}}語",
       "phrasesProgress": "{{mastered}}/{{target}}フレーズ",
-      "upNext": "次は: {{level}} — {{title}}",
-      "milestoneNoData": "セッションを完了して、マイルストーンの進捗追跡を開始しましょう。",
+      "upNext": "次は：{{level}} — {{title}}",
+      "milestoneNoData": "セッションを完了して、マイルストーンの進捗の追跡を開始しましょう。",
       "retentionTitle": "現在の定着度",
       "retentionLoadError": "現在、定着度データを読み込めませんでした。",
       "retryRetention": "定着度の読み込みを再試行",
       "retentionStrong": "知識は現在安定しているようです。",
-      "retentionFading": "軽い復習が知識を新鮮に保つのに役立ちます。",
-      "retentionWeak": "この科目はもう少し注意を払うと良いでしょう。",
+      "retentionFading": "軽い復習が、これを新鮮に保つのに役立ちます。",
+      "retentionWeak": "この科目は、もう少し注意を払うと良いでしょう。",
       "openShelf": "棚を開く",
       "goneTitle": "この科目は利用できなくなりました",
       "goneSubtitle": "削除されたか、別の科目に統合された可能性があります。"
     },
     "vocabulary": {
-      "pageTitle": "あなたの単語",
+      "pageTitle": "あなたの語彙",
       "totalWords": "全科目で{{count}}語",
-      "errorTitle": "単語を読み込めませんでした",
-      "errorMessage": "接続を確認してもう一度お試しください。",
-      "noLanguageMessage": "単語追跡は言語科目で利用できます。",
-      "newLearnerTitle": "ここにあなたの単語が増えていきます",
+      "errorTitle": "語彙を読み込めませんでした",
+      "errorMessage": "接続を確認して、もう一度お試しください。",
+      "noLanguageMessage": "語彙の追跡は言語科目で利用できます。",
+      "newLearnerTitle": "あなたの語彙はここで増えていきます",
       "newLearnerSubtitle": "学習を続けると、発見した単語がここに表示されます。",
-      "emptyTitle": "まだ単語がありません",
+      "emptyTitle": "まだ語彙がありません",
       "emptyBackLabel": "旅に戻る",
       "emptyMessageOne": "{{subject}}を練習して、単語リストの作成を始めましょう。",
       "emptyMessageMany": "言語科目を練習して、単語リストの作成を始めましょう。",
       "emptyMessageNone": "言語科目を始めると、学んだ単語がここに表示されます。",
-      "viewSubjectLabel": "{{subject}}の単語を見る",
+      "viewSubjectLabel": "{{subject}}の語彙を表示",
       "viewAllLink": "すべて見る →",
       "wordsSummary": "合計{{total}}語 — {{mastered}}語習得済み",
-      "learningAppend": ", {{count}}語学習中"
+      "learningAppend": "、{{count}}語学習中"
     }
   },
   "onboarding": {
@@ -1113,27 +1131,27 @@
     "languagePicker": {
       "title": "どの言語を学んでいますか？",
       "subtitle": "言語に特化した学習パスを設定します。",
-      "otherHint": "言語が見つかりませんか？検索するか、下にスクロールして「その他」を探してください。",
+      "otherHint": "言語が見つかりませんか？検索するか、「その他」までスクロールしてください。",
       "saving": "保存中…"
     },
     "languageSetup": {
       "title": "言語設定",
-      "subtitle": "この科目を、直接指導、単語追跡、スピーキング練習を備えた言語特化パスに切り替えます。",
+      "subtitle": "この科目を、直接指導、語彙追跡、スピーキング練習を備えた言語特化パスに切り替えます。",
       "learningHint": "{{language}}を学んでいるようですね！",
-      "approachHint": "単語、流暢さ、インプット、アウトプット練習を中心に構築された言語特化アプローチを使用します。",
+      "approachHint": "語彙、流暢さ、インプット、アウトプット練習を中心とした言語特化アプローチを使用します。",
       "noSubjectSelected": "言語科目が選択されていません",
       "nativeLanguageRequired": "母国語を入力してください。",
       "nativeLanguageLabel": "あなたの母国語",
-      "nativeLanguagePlaceholder": "あなたの言語を入力",
-      "currentLevelLabel": "現在のレベル",
+      "nativeLanguagePlaceholder": "言語を入力",
+      "currentLevelLabel": "あなたの現在のレベル",
       "startsAround": "{{level}}あたりから開始",
       "levels": {
         "A1": {
           "label": "完全な初心者",
-          "description": "基礎から始めて、日常の基本を構築します。"
+          "description": "基礎から始めて、日常の基本を築きます。"
         },
         "A2": {
-          "label": "基本は知っています",
+          "label": "基本的なことは知っています",
           "description": "簡単な状況に対応でき、範囲を広げたい方。"
         },
         "B1": {
@@ -1148,7 +1166,7 @@
     },
     "pronouns": {
       "title": "あなたの代名詞は何ですか？",
-      "subtitle": "体験をパーソナライズするのに役立ちます（任意）。",
+      "subtitle": "あなたの体験をパーソナライズするのに役立ちます（任意）。",
       "skipForNow": "今はスキップ",
       "saveErrorTitle": "代名詞を保存できませんでした",
       "saveErrorMessage": "問題が発生しました。もう一度お試しください。",
@@ -1160,7 +1178,7 @@
       "subtitle": "あなたの学習方法に合わせてレッスンを調整します（任意）。",
       "skipForNow": "今はスキップ",
       "loadErrorTitle": "サポート情報を読み込めませんでした",
-      "loadErrorMessage": "接続を確認してもう一度お試しください。",
+      "loadErrorMessage": "接続を確認して、もう一度お試しください。",
       "saveErrorTitle": "サポート情報を保存できませんでした",
       "saveErrorMessage": "問題が発生しました。もう一度お試しください。",
       "noSubjectTitle": "科目が選択されていません",
@@ -1169,9 +1187,9 @@
     },
     "analogyPreference": {
       "title": "どのように説明されるのが好きですか？",
-      "subtitle": "たとえ話のスタイルを選んでください（任意）。これは後で科目設定でいつでも変更できます。",
+      "subtitle": "アナロジーのスタイルを選んでください（任意）。これは後で科目の設定でいつでも変更できます。",
       "skipForNow": "今はスキップ",
-      "skipLabel": "たとえ話の好みをスキップ",
+      "skipLabel": "アナロジーの好みをスキップ",
       "saveErrorTitle": "好みを保存できませんでした"
     },
     "interestsContext": {
@@ -1186,7 +1204,7 @@
         },
         "work": {
           "label": "仕事 / キャリア",
-          "hint": "専門的で実用的な応用に焦点を当てます。"
+          "hint": "専門的で実践的な応用に焦点を当てます。"
         },
         "personal": {
           "label": "個人的な興味",
@@ -1201,8 +1219,8 @@
       "skipAll": "スキップ"
     },
     "interview": {
-      "missingSubject": "科目が選択されていません。戻ってもう一度お試しください。",
-      "sessionCreationStuck": "セッションの作成に予想以上に時間がかかっています。戻ってもう一度お試しください。",
+      "missingSubject": "科目が選択されていません。戻って、もう一度お試しください。",
+      "sessionCreationStuck": "セッションの作成に想定より時間がかかっています。戻って、もう一度お試しください。",
       "settingUp": "セッションを準備中…",
       "completionTitle": "評価完了！",
       "completionBody": "パーソナライズされたカリキュラムを作成するのに十分な情報を集めました。",
@@ -1223,7 +1241,7 @@
       "skipErrorTitle": "スキップできませんでした",
       "startLearning": "学習を開始",
       "streamErrorTitle": "問題が発生しました",
-      "tryAgainLabel": "もう一度試す",
+      "tryAgainLabel": "再試行",
       "settingUpCurriculum": "カリキュラムを準備中…",
       "skipButtonProminent": "インタビューをスキップ",
       "skipButton": "スキップ"
@@ -1233,23 +1251,23 @@
       "suggestChanges": "変更を提案",
       "loadingTimeout": {
         "title": "まだ読み込み中…",
-        "body": "カリキュラムの読み込みに予想以上に時間がかかっています。接続を確認してもう一度お試しください。"
+        "body": "カリキュラムの読み込みに想定より時間がかかっています。接続を確認して、もう一度お試しください。"
       },
       "loadingCurriculum": "カリキュラムを読み込み中...",
       "loadError": {
         "title": "カリキュラムを読み込めませんでした",
-        "body": "接続を確認してもう一度お試しください。"
+        "body": "接続を確認して、もう一度お試しください。"
       },
       "generating": {
         "title": "カリキュラムを作成中…",
-        "body": "通常、約10〜20秒かかります。"
+        "body": "通常、10〜20秒かかります。"
       },
       "noCurriculum": {
         "title": "まだカリキュラムがありません",
         "message": "評価インタビューを完了して、学習パスを生成してください。"
       },
       "versionInfo": "バージョン {{version}} — {{count}}トピック",
-      "whyOrderLabel": "{{title}}がこの順序である理由",
+      "whyOrderLabel": "なぜ{{title}}はこの順序なのですか",
       "whyOrder": "なぜこの順序？",
       "explaining": "説明中...",
       "skipTopicTitle": "このトピックをスキップしますか？",
@@ -1262,27 +1280,27 @@
       "addTopic": "トピックを追加",
       "placementCheck": {
         "mostSkipped": "このカリキュラムのほとんどをスキップしました",
-        "hint": "もっと速いパスが必要ですか？実力判定テストを受けるか、残りの上級トピックを続けるか、別の科目に切り替えることができます。",
-        "takePlacement": "実力判定テストを受ける",
+        "hint": "より速いパスをご希望ですか？プレースメントチェックを受けるか、残りの上級トピックを続けるか、別の科目に切り替えることができます。",
+        "takePlacement": "プレースメントチェックを受ける",
         "continueAdvanced": "上級トピックを続ける",
         "chooseDifferent": "別の科目を選ぶ"
       },
-      "startLearning": "学習を開始: {{title}}",
+      "startLearning": "学習を開始：{{title}}",
       "exploreFirst": "まず探検する",
       "continueToHome": "ホームへ進む",
       "challengeModal": {
         "title": "トピックを変更",
-        "body": "変更点を教えていただければ、学習パスを再生成します。",
-        "placeholder": "例：基本はすでに知っているので、入門トピックはスキップしてください...",
+        "body": "変更したい点を教えてください。学習パスを再生成します。",
+        "placeholder": "例：基礎はすでに知っているので、入門トピックはスキップしてください...",
         "regenerate": "再生成"
       },
       "addTopicModal": {
         "title": "トピックを追加",
-        "body": "生成されたカリキュラムにないものを追加します。まずきれいなタイトルを提案し、保存前に編集できます。",
+        "body": "生成されたカリキュラムにないものを追加してください。まずきれいなタイトルを提案し、保存する前に編集できます。",
         "topicLabel": "トピック",
         "topicPlaceholder": "例：三角法、フランス革命",
         "descriptionLabel": "説明",
-        "descriptionPlaceholder": "簡単な説明",
+        "descriptionPlaceholder": "短い説明",
         "minutesLabel": "推定時間（分）",
         "minutesPlaceholder": "30",
         "addTopic": "トピックを追加",
@@ -1301,10 +1319,10 @@
       "recentActivity": "最近のアクティビティ",
       "noRecentActivity": "最近のアクティビティはまだありません",
       "noSessionsYet": "まだセッションがありません",
-      "viewAllSessions": "すべてのセッションを見る",
+      "viewAllSessions": "すべてのセッションを表示",
       "subjectsExplored": "探求した科目",
       "noSubjectsYet": "まだ科目がありません",
-      "viewSubject": "{{name}}を見る",
+      "viewSubject": "{{name}}を表示",
       "openReports": "レポートを開く",
       "refreshActivity": "アクティビティを更新",
       "loadingChild": "お子様のデータを読み込み中...",
@@ -1331,7 +1349,7 @@
       "profileRemovedOrNoAccess": "プロフィールが削除されたか、アクセス権がなくなった可能性があります",
       "backToDashboard": "ダッシュボードに戻る",
       "noAccessToProfile": "このプロフィールへのアクセス権がありません",
-      "dayStreak": "{{count}}日ストリーク",
+      "dayStreak": "{{count}}日間のストリーク",
       "visibleProgress": "目に見える進捗",
       "topicsMastered": "習得したトピック",
       "wordsKnown": "知っている単語",
@@ -1339,27 +1357,27 @@
       "wordsThisWeek": "今週の単語",
       "openMonthlyReports": "月次レポートを開く",
       "monthlyReports": "月次レポート",
-      "monthlyReportsSummary": "お子様の毎月の学習の詳細な要約",
+      "monthlyReportsSummary": "毎月のお子様の学習の詳細な要約",
       "firstReportSoon": "最初のレポートは月末に届きます",
-      "progressUnlockMessage": "最初の数セッション後に進捗の詳細がアンロックされます",
+      "progressUnlockMessage": "進捗の詳細は最初の数セッション後にアンロックされます",
       "recentGrowth": "最近の成長",
       "recentGrowthSubtitle": "過去8週間に習得したトピック",
       "subjects": "科目",
-      "viewSubjectDetails": "{{name}}の詳細を見る",
+      "viewSubjectDetails": "{{name}}の詳細を表示",
       "childSearchedFor": "検索した内容",
       "recentSessions": "最近のセッション",
       "couldNotLoadSessions": "セッションを読み込めませんでした",
       "refreshChildProfile": "お子様のプロフィールを更新",
       "refresh": "更新",
-      "viewSessionFrom": "からのセッションを見る",
-      "mentorMemoryTitle": "チューターが{{name}}さんについて知っていること",
+      "viewSessionFrom": "からのセッションを表示",
+      "mentorMemoryTitle": "{{name}}についてチューターが知っていること",
       "mentorMemoryTitleFallback": "チューターの記憶",
       "setUpMentorMemory": "チューターの記憶を設定",
       "chooseWhatMentorRemembers": "チューターが記憶することを選択",
-      "viewWhatMentorKnows": "チューターが知っていることを見る",
+      "viewWhatMentorKnows": "チューターが知っていることを表示",
       "whatTheMentorKnows": "チューターが知っていること",
       "reviewAndAdjustPrivacy": "プライバシー設定を確認・調整",
-      "learningAccommodationTitle": "{{name}}さんの学習サポート",
+      "learningAccommodationTitle": "{{name}}さんのための学習サポート",
       "learningAccommodationTitleFallback": "学習サポート",
       "learningAccommodationDescription": "お子様の学習ニーズに合わせてチューターの教え方を調整します",
       "toggleDecisionGuide": "決定ガイドを表示",
@@ -1372,7 +1390,7 @@
       "retryConsentSettings": "再試行",
       "accountTitle": "アカウント — {{name}}",
       "accountTitleFallback": "アカウント",
-      "deletionPending": "削除保留中",
+      "deletionPending": "削除予定",
       "deletionCountdown": "アカウントは{{date}}に削除されます",
       "deletionProcessing": "削除処理中",
       "cancelDeletion": "削除をキャンセル",
@@ -1389,7 +1407,7 @@
     },
     "mentorMemory": {
       "title": "チューターの記憶",
-      "subtitle": "チューターが{{name}}さんについて知っていること",
+      "subtitle": "{{name}}についてチューターが知っていること",
       "toggleCollection": "記憶の収集を切り替え",
       "toggleInjection": "記憶の注入を切り替え",
       "collectionOn": "収集オン",
@@ -1399,13 +1417,13 @@
       "collectionDescription": "オンの場合、チューターはセッション中に{{name}}さんに関する観察を保存します。",
       "injectionDescription": "オンの場合、チューターは保存された観察を使用して{{name}}さんのセッションをパーソナライズします。",
       "tellTheMentor": "チューターに伝える",
-      "tellTheMentorPlaceholder": "{{name}}さんについてチューターにメモを追加…",
+      "tellTheMentorPlaceholder": "{{name}}さんについてチューターへのメモを追加…",
       "addNote": "メモを追加",
-      "hiddenItems": "{{count}}個の非表示アイテム",
+      "hiddenItems": "{{count}}個の非表示項目",
       "showHidden": "非表示を表示",
       "hideItem": "これを非表示",
       "noMemoryYet": "まだ記憶がありません",
-      "noMemoryDescription": "数回のセッション後、チューターは{{name}}さんに関する観察を保存し始めます。",
+      "noMemoryDescription": "チューターは数セッション後に{{name}}さんに関する観察の保存を開始します。",
       "privacyNote": "記憶はプライベートであり、あなたにのみ表示されます。",
       "correctionLabel": "訂正",
       "correctionPlaceholder": "代わりにチューターは何を知るべきですか？",
@@ -1415,7 +1433,7 @@
       "clearMemory": "すべての記憶を消去",
       "clearMemoryAlert": {
         "title": "すべての記憶を消去しますか？",
-        "message": "これにより、{{name}}さんのチューターの記憶がすべて完全に削除されます。",
+        "message": "これにより、{{name}}さんのすべてのチューターの記憶が完全に削除されます。",
         "confirm": "消去"
       },
       "loadingMemory": "記憶を読み込み中…",
@@ -1423,10 +1441,10 @@
       "memoryCleared": "記憶が消去されました",
       "noteSaved": "メモが保存されました",
       "correctionSaved": "訂正が保存されました",
-      "itemHidden": "アイテムが非表示になりました",
-      "couldNotDeleteItem": "このアイテムを削除できませんでした",
+      "itemHidden": "項目が非表示になりました",
+      "couldNotDeleteItem": "この項目を削除できませんでした",
       "pleaseTryAgain": "もう一度お試しください",
-      "couldNotRestoreItem": "このアイテムを復元できませんでした",
+      "couldNotRestoreItem": "この項目を復元できませんでした",
       "clearMemoryTitle": "すべての記憶を消去しますか？",
       "clearMemoryBody": "これにより、チューターがお子様について学んだすべてが削除されます。この操作は元に戻せません。",
       "clear": "消去",
@@ -1460,7 +1478,7 @@
       "couldNotLoadReports": "レポートを読み込めませんでした",
       "somethingWentWrong": "レポートの読み込み中に問題が発生しました。",
       "noReportsYet": "まだレポートがありません",
-      "noReportsDescription": "{{name}}さんが数回セッションを行うと、ここにレポートが表示されます。",
+      "noReportsDescription": "{{name}}さんが数セッションをこなすと、レポートがここに表示されます。",
       "firstReportEmptyTimeContext": "数日",
       "seeProgressNow": "今すぐ{{name}}さんの進捗を見る",
       "weeklySnapshot": "週次スナップショット",
@@ -1471,7 +1489,7 @@
       "subtitle": "月次および週次の学習要約",
       "loadingWeeklySnapshots": "週次スナップショットを読み込み中…",
       "couldNotLoadWeeklySnapshots": "週次スナップショットを読み込めませんでした",
-      "checkConnectionRetry": "接続を確認してもう一度お試しください",
+      "checkConnectionRetry": "接続を確認して、もう一度お試しください",
       "retryWeeklySnapshots": "週次スナップショットを再試行",
       "weeklySnapshots": "週次スナップショット",
       "weekOf": "の週",
@@ -1488,14 +1506,14 @@
       "topicsMastered": "習得したトピック",
       "totalWordsKnown": "知っている総単語数",
       "highlights": "ハイライト",
-      "whatsNext": "次は何",
+      "whatsNext": "次は何を",
       "subjectBreakdown": "科目別内訳",
-      "subjectStats": "{{topicsMastered}}トピック · {{vocabularyTotal}}単語 · {{activeMinutes}}分",
+      "subjectStats": "{{topicsMastered}}トピック・{{vocabularyTotal}}語・{{activeMinutes}}分",
       "reportGone": "このレポートは利用できなくなりました",
       "reportGoneBody": "アーカイブされたか、削除された可能性があります。",
       "backToReports": "レポートに戻る",
       "loadingReport": "レポートを読み込み中…",
-      "tryAgain": "もう一度試す",
+      "tryAgain": "再試行",
       "monthlyReport": "月次レポート",
       "subtitle": "今月のお子様の学習の要約",
       "totalWords": "総単語数",
@@ -1536,10 +1554,10 @@
       "unableToLoadSubject": "この科目を読み込めませんでした。",
       "couldNotLoadTopics": "トピックを読み込めませんでした",
       "somethingWentWrong": "問題が発生しました。もう一度お試しください。",
-      "viewTopicDetails": "{{title}}の詳細を見る",
+      "viewTopicDetails": "{{title}}の詳細を表示",
       "topicsCouldNotLoad": "トピックを読み込めませんでした",
       "retryLoadingTopics": "トピックの読み込みを再試行",
-      "topicsNewLearner": "数回のセッション後、ここにトピックが表示されます。",
+      "topicsNewLearner": "数セッション後にトピックがここに表示されます。",
       "noTopicsYet": "まだトピックがありません"
     },
     "topic": {
@@ -1547,12 +1565,12 @@
       "status": "ステータス",
       "statusUnknown": "不明",
       "understanding": "理解度",
-      "reviewStatus": "レビュー状況",
+      "reviewStatus": "復習ステータス",
       "sessionHistory": "セッション履歴",
       "noSessionsYet": "このトピックのセッションはまだありません",
       "timeOnApp": "アプリ利用時間 {{duration}}",
       "timeOnAppUnavailable": "アプリ利用時間 不明",
-      "viewSessionFrom": "{{date}}からのセッションを見る",
+      "viewSessionFrom": "{{date}}からのセッションを表示",
       "completionStatus": {
         "notStarted": "未開始",
         "inProgress": "開始済み",
@@ -1575,7 +1593,7 @@
       "sendNudge": "{{name}}さんに声かけを送る",
       "openChildProfile": "{{name}}さんのプロフィールを開く",
       "reportGoneTitle": "このレポートは利用できなくなりました",
-      "reportGoneBody": "アーカイブされたか、削除された可能性があります。他のレポートはすべて安全です。"
+      "reportGoneBody": "アーカイブされたか、削除された可能性があります。他のすべてのレポートは安全です。"
     }
   },
   "interview": {
@@ -1585,11 +1603,11 @@
       "softFallback": "まだ作業中です…"
     },
     "failed": {
-      "extractSignalsFailed": "セッションの読み取りに問題がありました。進捗は安全です。",
-      "topicResolutionFailed": "セッションをトピックに分類できませんでした。以下で再試行できます。",
+      "extractSignalsFailed": "セッションの読み取り中に問題が発生しました。あなたの進捗は安全です。",
+      "topicResolutionFailed": "セッションをトピックに整理できませんでした。以下で再試行できます。",
       "unknown": "セッションの終了中に問題が発生しました。以下で再試行できます。",
       "retryError": "再試行できませんでした。もう一度お試しください。",
-      "tryAgain": "もう一度試す",
+      "tryAgain": "再試行",
       "retrying": "再試行中…"
     }
   },
@@ -1601,7 +1619,7 @@
     "switchProfile": {
       "title": "{{name}}に切り替えますか？",
       "messageSingle": "{{name}}のプロフィールに切り替えようとしています。",
-      "otherProfiles": "他のプロフィール: {{names}}",
+      "otherProfiles": "他のプロフィール：{{names}}",
       "cancelHint": "現在のプロフィールにとどまるにはキャンセルしてください。",
       "switchButton": "プロフィールを切り替え",
       "errorTitle": "プロフィールを切り替えられませんでした",
@@ -1616,7 +1634,7 @@
       "celebrationLabel": "保護者があなたのアカウントを承認しました",
       "title": "承認されました！",
       "parentApproved": "保護者があなたのアカウントを承認しました。学習を始める準備ができました。",
-      "setupSubject": "始める科目を選んでください",
+      "setupSubject": "始めるために科目を選んでください",
       "letsGo": "始めましょう！"
     },
     "previewSubjectBrowser": {
@@ -1632,11 +1650,11 @@
       "homeworkHelp": "宿題のヘルプ",
       "practiceTest": "練習テスト",
       "howMentorHelps": "チューターの助け方",
-      "howMentorHelpsBody": "チューターはあなたの知識を記憶し、ペースに合わせて調整します",
+      "howMentorHelpsBody": "チューターはあなたが知っていることを記憶し、あなたのペースに合わせます",
       "snapPhoto": "写真を撮る",
       "mentorRemembers": "チューターが記憶",
       "trackProgress": "進捗を追跡",
-      "previewDisclaimer": "これはプレビューです — 保護者の承認後に全機能が利用可能になります"
+      "previewDisclaimer": "これはプレビューです — 保護者が承認するとフルアクセスがアンロックされます"
     },
     "createProfile": {
       "signOutFailedTitle": "サインアウトできませんでした",
@@ -1664,21 +1682,21 @@
       "emailSentFeedback": "メールを送信しました！",
       "parentEmailPlaceholder": "保護者のメールアドレス",
       "whileYouWait": "待っている間に…",
-      "previewIntro": "承認を待つ間、科目を閲覧したり、サンプルの指導をプレビューしたりできます",
+      "previewIntro": "承認を待つ間、科目を閲覧したり、サンプルのメンタリングをプレビューしたりできます",
       "browseSubjectsLabel": "科目を閲覧",
       "browseSubjects": "科目を閲覧",
       "browseSubjectsHint": "学べるすべてを探検",
-      "sampleMentoringLabel": "サンプルの指導を試す",
-      "sampleMentoring": "サンプルの指導",
+      "sampleMentoringLabel": "サンプルのメンタリングを試す",
+      "sampleMentoring": "サンプルのメンタリング",
       "sampleMentoringHint": "チューターがどのようにあなたと協力するかを見る"
     },
     "authRedirectTimeout": {
       "title": "時間がかかりすぎています",
-      "message": "サインインに予想以上に時間がかかっています。もう一度お試しください。"
+      "message": "サインインに想定より時間がかかっています。もう一度お試しください。"
     },
     "profileLoadTimeout": {
       "title": "時間がかかりすぎています",
-      "message": "プロフィールの読み込みに予想以上に時間がかかっています。もう一度お試しください。"
+      "message": "プロフィールの読み込みに想定より時間がかかっています。もう一度お試しください。"
     },
     "home": "ホーム",
     "homeLabel": "ホーム",
@@ -1703,7 +1721,7 @@
         "fallingBehind": "遅れ気味"
       },
       "noDataYet": "まだデータがありません",
-      "viewDetails": "詳細を見る"
+      "viewDetails": "詳細を表示"
     }
   },
   "ocrTimeout": "読み取りに時間がかかりすぎました — もう一度お試しください",
@@ -1718,12 +1736,12 @@
   "centerHomework": "宿題をフレームの中央に配置してください",
   "galleryLabel": "ギャラリーから選択",
   "takePhotoLabel": "写真を撮る",
-  "flashLabel": "フラッシュ: {{state}}",
+  "flashLabel": "フラッシュ：{{state}}",
   "flashOff": "オフ",
   "flashOn": "オン",
   "photoPreviewLabel": "写真プレビュー",
   "photoCaptured": "写真を撮影しました",
-  "retakeLabel": "再撮影",
+  "retakeLabel": "写真を再撮影",
   "retake": "再撮影",
   "useThisPhotoLabel": "この写真を使用",
   "useThis": "これを使用",
@@ -1759,7 +1777,7 @@
   "startSessionLabel": "セッションを開始",
   "letsGo": "始めましょう！",
   "ocrDefaultError": "宿題を読み取れませんでした",
-  "typeItOut": "手動で入力",
+  "typeItOut": "入力する",
   "manualInputPlaceholder": "ここに問題を入力または貼り付け…",
   "typeManuallyLabel": "宿題を手動で入力",
   "noSubjectsYet": "まだ科目がありません",
@@ -1767,21 +1785,21 @@
   "continueWithProblemLabel": "この問題で続ける",
   "continueArrow": "続ける →",
   "tryCameraAgainLabel": "もう一度カメラを試す",
-  "tryCameraAgain": "カメラを再試行",
+  "tryCameraAgain": "もう一度カメラを試す",
   "tryReadingAgainLabel": "もう一度読み取りを試す",
-  "openingMessage": "すでに知っていることを見つけましょう",
-  "passedMessage": "素晴らしい — このトピックの{{mastery}}%はすでに習得済みです",
-  "missingParams": "評価を開始できませんでした — 必要な情報がありません",
+  "openingMessage": "あなたがすでに知っていることを見つけましょう",
+  "passedMessage": "素晴らしい — このトピックの{{mastery}}%をすでに習得しています",
+  "missingParams": "評価を開始できませんでした — 必要な情報が不足しています",
   "title": "評価",
   "sameEmailWarning": "それは同じメールアドレスです — 保護者のメールアドレスを使用してください",
   "backToChild": "お子様に戻る",
   "deliveryFailedTitle": "メールが配信されませんでした",
   "deliverySentBody": "{{email}}に承認メールを送信しました",
   "deliveryFailedBody": "{{email}}にメールを配信できませんでした",
-  "deliveryFailedHint": "アドレスを確認してもう一度お試しください",
+  "deliveryFailedHint": "アドレスを確認して、もう一度お試しください",
   "resendEmail": "メールを再送信",
   "resolveTookTooLong": "時間がかかりすぎました — もう一度お試しください",
-  "resolveNetworkError": "接続を確認してもう一度お試しください",
+  "resolveNetworkError": "接続を確認して、もう一度お試しください",
   "enterSubjectNameError": "科目名を入力してください",
   "retryCheckLabel": "再試行",
   "manageSubjects": "科目を管理",
@@ -1796,35 +1814,35 @@
   "continueSubject": "続ける",
   "startSubjectLabel": "この科目を始める",
   "startSubject": "始める",
-  "notSureHint": "よくわからない？説明していただければお手伝いします",
+  "notSureHint": "よくわかりませんか？説明していただければお手伝いします",
   "checkingName": "確認中…",
   "somethingElse": "その他",
-  "somethingElseHint": "自分の言葉で学びたいことを説明してください",
-  "clarifyLabel": "あなたの科目を説明してください",
+  "somethingElseHint": "学びたいことを自分の言葉で説明してください",
+  "clarifyLabel": "科目を説明してください",
   "clarifyPlaceholder": "例：古代ローマの歴史…",
   "checkThisInstead": "代わりにこちらを確認",
   "useMyWordsLabel": "自分の言葉を使う",
   "useMyWords": "自分の言葉を使う",
   "noMatchFallback": "近い一致が見つかりませんでした",
-  "justUse": "「{{name}}」を使用",
+  "justUse": "「{{name}}」をそのまま使用",
   "editSubjectNameLabel": "科目名を編集",
   "editInstead": "編集",
-  "acceptSuggestionLabel": "提案を承認",
-  "accept": "承認",
+  "acceptSuggestionLabel": "提案を受け入れる",
+  "accept": "受け入れる",
   "editSuggestionLabel": "提案を編集",
   "startLearning": "学習を開始",
   "validationHint": "科目名は2〜80文字である必要があります",
-  "scheduledTitle": "削除予定",
+  "scheduledTitle": "削除が予定されています",
   "scheduledBody": "あなたのアカウントは{{date}}に削除される予定です",
   "scheduledAccountActive": "それまでアカウントは有効です",
-  "keepAccountLabel": "アカウントを維持",
+  "keepAccountLabel": "アカウントを維持する",
   "keepAccount": "アカウントを維持",
   "signOutFailedTitle": "サインアウトできませんでした",
   "signOutFailedMessage": "もう一度お試しください",
   "signOutNowLabel": "今すぐサインアウト",
   "signOutNow": "サインアウト",
   "closeWithoutCancellingLabel": "削除をキャンセルせずに閉じる",
-  "familyWarningTitle": "家族アカウントはアクセスを失います",
+  "familyWarningTitle": "ファミリーアカウントはアクセスを失います",
   "familyWarningBody": "あなたのアカウントにリンクされているお子様のプロフィールも削除されます",
   "subscriptionWarningTitle": "有効なサブスクリプション",
   "subscriptionWarningBodyPrefix": "有効なサブスクリプションがあります。アカウントを削除しても、",
@@ -1832,40 +1850,40 @@
   "subscriptionWarningBodySuffix": "キャンセルされません — 先にキャンセルしてください。",
   "confirmPromptPrefix": "「",
   "confirmPromptSuffix": "」と入力して確認",
-  "confirmInputLabel": "削除を確認するには「{{phrase}}」と入力してください",
-  "permanentDeleteLabel": "アカウントを完全に削除",
+  "confirmInputLabel": "削除を確認するには{{phrase}}と入力してください",
+  "permanentDeleteLabel": "アカウントを完全に削除する",
   "permanentDelete": "アカウントを削除",
   "warningBody1": "すべての学習データ、進捗、チューターの記憶が完全に削除されます。",
   "warningBody2": "この操作は元に戻せません。",
-  "understandDeleteLabel": "理解しました — アカウントを削除",
+  "understandDeleteLabel": "理解しました — アカウントを削除します",
   "understandDelete": "理解しました",
   "privacy": {
     "title": "プライバシーポリシー",
     "lastUpdated": "最終更新日：2025年5月",
     "s1Title": "当社について",
-    "s1Body": "EduAgentは、11歳以上の学習者向けに設計されたAI搭載の学習プラットフォームです。当社はあなたのプライバシーを保護し、データを慎重に取り扱うことを約束します。",
+    "s1Body": "EduAgentは、11歳以上の学習者向けに設計されたAI搭載の学習プラットフォームです。当社は、あなたのプライバシーを保護し、データを慎重に取り扱うことに尽力しています。",
     "s2Title": "収集するデータ",
-    "s2Body1": "アカウント情報：あなたの名前、メールアドレス、サインアップ時に提供するプロフィール詳細。",
+    "s2Body1": "アカウント情報：サインアップ時に提供される名前、メールアドレス、プロフィール詳細。",
     "s2Body2": "学習データ：セッションの記録、学習したトピック、進捗指標、チューターの記憶メモ。",
     "s2Body3": "利用データ：使用した機能や費やした時間など、アプリとのやり取りの方法。",
-    "s2Body4": "デバイスデータ：診断目的のためのデバイスの種類、オペレーティングシステム、アプリのバージョン。",
+    "s2Body4": "デバイスデータ：診断目的のためのデバイスタイプ、オペレーティングシステム、アプリのバージョン。",
     "s3Title": "データの使用方法",
-    "s3Body": "当社はあなたのデータを使用して、パーソナライズされた学習セッションを提供し、進捗を追跡し、製品を改善し、重要なアカウント通信を送信します。第三者にあなたのデータを販売することはありません。",
+    "s3Body": "当社は、パーソナライズされた学習セッションの提供、進捗の追跡、製品の改善、重要なアカウント通信の送信のためにあなたのデータを使用します。第三者にデータを販売することはありません。",
     "s4Title": "お子様のプライバシー",
-    "s4Body1": "16歳未満（またはお住まいの地域で適用される年齢）のユーザーについては、完全なアクセスが許可される前に保護者の同意が必要です。",
-    "s4Body2": "保護者は、保護者ダッシュボードを通じていつでもお子様のデータを確認、修正、または削除できます。",
+    "s4Body1": "16歳未満（またはお住まいの地域で適用される年齢）のユーザーについては、フルアクセスが許可される前に保護者の同意が必要です。",
+    "s4Body2": "保護者は、保護者用ダッシュボードを通じていつでもお子様のデータを確認、修正、削除できます。",
     "s5Title": "データ保持",
-    "s5Body": "当社は、あなたのアカウントが有効である限りデータを保持します。アカウントを削除すると、個人データは30日以内に完全に削除されます。",
+    "s5Body": "当社は、アカウントが有効である限りデータを保持します。アカウントを削除すると、個人データは30日以内に完全に削除されます。",
     "s6Title": "あなたの権利",
-    "s6Body1": "あなたには、個人データにアクセス、修正、または削除する権利があります。また、データのコピーを要求したり、いつでも同意を撤回したりすることもできます。",
+    "s6Body1": "あなたには、個人データにアクセス、修正、削除する権利があります。また、データのコピーを要求したり、いつでも同意を撤回したりすることもできます。",
     "s6Body2": "これらの権利を行使するには、privacy@eduagent.appまでご連絡ください。",
     "s7Title": "クッキーと追跡",
     "s7Body": "当社は、サインイン状態を維持し、設定を記憶するために必須のクッキーを使用します。広告や追跡クッキーは使用しません。",
     "s8Title": "第三者サービス",
-    "s8Body1": "当社は、認証（Clerk）、AI処理（OpenAI）、クラウドインフラストラクチャなど、プラットフォームを運営するために信頼できる第三者サービスを使用します。",
+    "s8Body1": "当社は、認証（Clerk）、AI処理（OpenAI）、クラウドインフラストラクチャなど、プラットフォームを運営するために信頼できる第三者サービスを使用しています。",
     "s8Body2": "これらのプロバイダーはデータ処理契約に拘束されており、自身の目的であなたのデータを使用することはできません。",
     "s9Title": "セキュリティ",
-    "s9Body": "当社は、転送中および保存中の暗号化を含む、業界標準のセキュリティ対策を使用してあなたのデータを保護します。",
+    "s9Body": "当社は、転送中および保存中の暗号化など、業界標準のセキュリティ対策を使用してデータを保護しています。",
     "s10Title": "お問い合わせ",
     "s10Body": "このポリシーに関するご質問は、privacy@eduagent.appまでお問い合わせください。"
   },
@@ -1877,21 +1895,21 @@
     "s2Title": "EduAgentを利用できる方",
     "s2Body": "EduAgentは11歳以上の学習者向けに設計されています。16歳未満のユーザーは保護者の同意が必要です。アカウントを作成することにより、これらの要件を満たしていることを確認したものとします。",
     "s3Title": "あなたのアカウント",
-    "s3Body": "アカウントの認証情報を安全に保つ責任はあなたにあります。アカウントが侵害されたと思われる場合は、直ちに当社に通知してください。",
+    "s3Body": "アカウントの認証情報を安全に保つ責任はあなたにあります。アカウントが侵害されたと思われる場合は、直ちにお知らせください。",
     "s4Title": "許容される使用",
     "s4Body": "EduAgentは、個人的、非商業的な学習目的でのみ使用できます。プラットフォームを悪用したり、安全対策を回避しようとしたり、他人を傷つけるために使用したりしてはなりません。",
     "s5Title": "AI生成コンテンツ",
-    "s5Body": "EduAgentはAIを使用して学習コンテンツを生成します。正確性を確保するよう努めていますが、AIの応答には時折誤りが含まれることがあります。重要な情報は信頼できる情報源で常に確認してください。",
+    "s5Body": "EduAgentはAIを使用して学習コンテンツを生成します。正確性を確保するよう努めていますが、AIの応答には時折誤りが含まれる場合があります。重要な情報は常に信頼できる情報源で確認してください。",
     "s6Title": "サブスクリプションと請求",
     "s6Body": "有料機能はサブスクリプションプランを通じて利用できます。サブスクリプションはキャンセルされない限り自動的に更新されます。返金は、関連するアプリストアのポリシーに従って処理されます。",
     "s7Title": "知的財産",
-    "s7Body": "EduAgentのすべてのコンテンツ、商標、技術は、当社または当社のライセンサーが所有しています。当社の書面による許可なく、プラットフォームのいかなる部分もコピー、複製、または配布することはできません。",
+    "s7Body": "EduAgentのすべてのコンテンツ、商標、技術は、当社または当社のライセンサーが所有しています。当社の書面による許可なく、プラットフォームのいかなる部分もコピー、複製、配布することはできません。",
     "s8Title": "プライバシー",
-    "s8Body": "EduAgentの使用は、これらの規約の一部を構成する当社のプライバシーポリシーにも準拠します。",
+    "s8Body": "EduAgentの利用は、これらの規約の一部を構成する当社のプライバシーポリシーにも準拠します。",
     "s9Title": "責任の制限",
-    "s9Body": "EduAgentは「現状有姿」で提供されます。当社は、プラットフォームの使用から生じるいかなる間接的、付随的、または結果的な損害についても責任を負いません。",
+    "s9Body": "EduAgentは「現状有姿」で提供されます。当社は、プラットフォームの利用から生じるいかなる間接的、付随的、または結果的な損害についても責任を負いません。",
     "s10Title": "これらの規約の変更",
-    "s10Body": "当社は、これらの規約を随時更新することがあります。重要な変更については通知します。変更が投稿された後のアプリの継続的な使用は、新しい規約への同意とみなされます。",
+    "s10Body": "当社は、これらの規約を随時更新することがあります。重大な変更についてはお知らせします。変更が掲載された後のアプリの継続的な使用は、新しい規約への同意とみなされます。",
     "s11Title": "準拠法",
     "s11Body": "これらの規約はノルウェーの法律に準拠します。いかなる紛争もノルウェーの裁判所で解決されるものとします。",
     "s12Title": "お問い合わせ",

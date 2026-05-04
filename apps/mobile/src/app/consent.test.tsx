@@ -12,40 +12,7 @@ const mockBack = jest.fn();
 const mockReplace = jest.fn();
 const mockCanGoBack = jest.fn();
 
-jest.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string, opts?: Record<string, unknown>) => {
-      const strings: Record<
-        string,
-        string | ((o?: Record<string, unknown>) => string)
-      > = {
-        sameEmailWarning:
-          "This is your own email. Please enter a parent or guardian's email address.",
-        backToChild: 'Back to child',
-        deliveryFailedTitle: "We couldn't confirm delivery yet",
-        deliverySentBody: (o) =>
-          `Your parent will get an email at ${
-            o?.email ?? ''
-          }. We'll let you know as soon as they approve.`,
-        deliveryFailedBody: (o) =>
-          `We could not confirm that the consent email reached ${
-            o?.email ?? ''
-          }. Please double-check the address and try again.`,
-        deliveryFailedHint:
-          'You can resend the request now or go back and enter a different email address.',
-        resendEmail: 'Resend email',
-        'common:goBack': 'Go Back',
-        'common:cancel': 'Cancel',
-        'common:close': 'Close',
-      };
-      const entry = strings[key];
-      if (entry === undefined) return key;
-      if (typeof entry === 'function') return entry(opts);
-      return entry;
-    },
-  }),
-  initReactI18next: { type: '3rdParty', init: jest.fn() },
-}));
+jest.mock('react-i18next', () => require('../test-utils/mock-i18n').i18nMock);
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({

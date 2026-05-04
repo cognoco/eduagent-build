@@ -27,7 +27,7 @@ export default function DeleteAccountScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useThemeColors();
-  const { t } = useTranslation('account');
+  const { t } = useTranslation();
   const { signOut } = useAuth();
   const deleteAccount = useDeleteAccount();
   const cancelDeletion = useCancelDeletion();
@@ -115,17 +115,17 @@ export default function DeleteAccountScreen() {
       >
         <View className="flex-row items-center justify-between mb-4">
           <Text className="text-h1 font-bold text-text-primary">
-            {t('title')}
+            {t('account.title')}
           </Text>
           <Pressable
             onPress={handleClose}
             className="min-h-[44px] min-w-[44px] items-center justify-center"
             testID="delete-account-close"
             accessibilityRole="button"
-            accessibilityLabel={t('common:close')}
+            accessibilityLabel={t('common.close')}
           >
             <Text className="text-body text-primary font-semibold">
-              {t('common:close')}
+              {t('common.close')}
             </Text>
           </Pressable>
         </View>
@@ -144,13 +144,13 @@ export default function DeleteAccountScreen() {
         {stage === 'scheduled' ? (
           <View testID="delete-account-scheduled">
             <Text className="text-body text-text-primary mb-2">
-              {t('scheduledTitle')}
+              {t('account.scheduledTitle')}
             </Text>
             <Text className="text-body text-text-secondary mb-2">
-              {t('scheduledBody', { date: formattedDate })}
+              {t('account.scheduledBody', { date: formattedDate })}
             </Text>
             <Text className="text-body-sm text-text-tertiary mb-6">
-              {t('scheduledAccountActive')}
+              {t('account.scheduledAccountActive')}
             </Text>
             <Pressable
               onPress={() => void onCancelDeletion()}
@@ -158,13 +158,13 @@ export default function DeleteAccountScreen() {
               className="bg-primary rounded-button py-3.5 items-center mb-3"
               testID="delete-account-keep"
               accessibilityRole="button"
-              accessibilityLabel={t('keepAccountLabel')}
+              accessibilityLabel={t('account.keepAccountLabel')}
             >
               {cancelDeletion.isPending ? (
                 <ActivityIndicator color={colors.textInverse} />
               ) : (
                 <Text className="text-body font-semibold text-text-inverse">
-                  {t('keepAccount')}
+                  {t('account.keepAccount')}
                 </Text>
               )}
             </Pressable>
@@ -173,18 +173,18 @@ export default function DeleteAccountScreen() {
                 // UX-DE-H2: surface signOut failure
                 void signOut().catch(() => {
                   platformAlert(
-                    t('signOutFailedTitle'),
-                    t('signOutFailedMessage')
+                    t('account.signOutFailedTitle'),
+                    t('account.signOutFailedMessage')
                   );
                 })
               }
               className="bg-surface rounded-button py-3.5 items-center mb-3"
               testID="delete-account-sign-out"
               accessibilityRole="button"
-              accessibilityLabel={t('signOutNowLabel')}
+              accessibilityLabel={t('account.signOutNowLabel')}
             >
               <Text className="text-body font-semibold text-text-primary">
-                {t('signOutNow')}
+                {t('account.signOutNow')}
               </Text>
             </Pressable>
             <Pressable
@@ -192,10 +192,10 @@ export default function DeleteAccountScreen() {
               className="bg-surface rounded-button py-3.5 items-center"
               testID="delete-account-dismiss"
               accessibilityRole="button"
-              accessibilityLabel={t('closeWithoutCancellingLabel')}
+              accessibilityLabel={t('account.closeWithoutCancellingLabel')}
             >
               <Text className="text-body font-semibold text-text-primary">
-                {t('common:close')}
+                {t('common.close')}
               </Text>
             </Pressable>
           </View>
@@ -208,10 +208,10 @@ export default function DeleteAccountScreen() {
               testID="delete-account-family-warning"
             >
               <Text className="text-body-sm font-semibold text-danger mb-1">
-                {t('familyWarningTitle')}
+                {t('account.familyWarningTitle')}
               </Text>
               <Text className="text-body-sm text-text-primary">
-                {t('familyWarningBody')}
+                {t('account.familyWarningBody')}
               </Text>
             </View>
 
@@ -222,25 +222,25 @@ export default function DeleteAccountScreen() {
               testID="delete-account-subscription-warning"
             >
               <Text className="text-body-sm font-semibold text-text-primary mb-1">
-                {t('subscriptionWarningTitle')}
+                {t('account.subscriptionWarningTitle')}
               </Text>
               <Text className="text-body-sm text-text-secondary">
-                {t('subscriptionWarningBodyPrefix')}{' '}
+                {t('account.subscriptionWarningBodyPrefix')}{' '}
                 <Text className="font-semibold">
-                  {t('subscriptionWarningNot')}
+                  {t('account.subscriptionWarningNot')}
                 </Text>{' '}
-                {t('subscriptionWarningBodySuffix')}
+                {t('account.subscriptionWarningBodySuffix')}
               </Text>
             </View>
 
             <Text className="text-body text-text-primary mb-2">
-              {t('confirmPromptPrefix')}{' '}
+              {t('account.confirmPromptPrefix')}{' '}
               <Text className="font-bold">{DELETE_CONFIRMATION_PHRASE}</Text>{' '}
-              {t('confirmPromptSuffix')}
+              {t('account.confirmPromptSuffix')}
             </Text>
             <TextInput
               testID="delete-account-confirm-input"
-              accessibilityLabel={t('confirmInputLabel', {
+              accessibilityLabel={t('account.confirmInputLabel', {
                 phrase: DELETE_CONFIRMATION_PHRASE,
               })}
               value={confirmText}
@@ -264,7 +264,7 @@ export default function DeleteAccountScreen() {
               testID="delete-account-confirm-final"
               accessibilityRole="button"
               accessibilityState={{ disabled: !canConfirm }}
-              accessibilityLabel={t('permanentDeleteLabel')}
+              accessibilityLabel={t('account.permanentDeleteLabel')}
             >
               {deleteAccount.isPending ? (
                 <ActivityIndicator
@@ -273,7 +273,7 @@ export default function DeleteAccountScreen() {
                 />
               ) : (
                 <Text className="text-body font-semibold text-text-inverse">
-                  {t('permanentDelete')}
+                  {t('account.permanentDelete')}
                 </Text>
               )}
             </Pressable>
@@ -284,20 +284,20 @@ export default function DeleteAccountScreen() {
               className="bg-surface rounded-button py-3.5 items-center"
               testID="delete-account-back-to-warning"
               accessibilityRole="button"
-              accessibilityLabel={t('common:goBack')}
+              accessibilityLabel={t('common.goBack')}
             >
               <Text className="text-body font-semibold text-text-primary">
-                {t('common:goBack')}
+                {t('common.goBack')}
               </Text>
             </Pressable>
           </View>
         ) : (
           <>
             <Text className="text-body text-text-secondary mb-4">
-              {t('warningBody1')}
+              {t('account.warningBody1')}
             </Text>
             <Text className="text-body text-text-secondary mb-6">
-              {t('warningBody2')}
+              {t('account.warningBody2')}
             </Text>
 
             <Pressable
@@ -306,10 +306,10 @@ export default function DeleteAccountScreen() {
               className="bg-danger rounded-button py-3.5 items-center mb-3"
               testID="delete-account-confirm"
               accessibilityRole="button"
-              accessibilityLabel={t('understandDeleteLabel')}
+              accessibilityLabel={t('account.understandDeleteLabel')}
             >
               <Text className="text-body font-semibold text-text-inverse">
-                {t('understandDelete')}
+                {t('account.understandDelete')}
               </Text>
             </Pressable>
 
@@ -318,10 +318,10 @@ export default function DeleteAccountScreen() {
               className="bg-surface rounded-button py-3.5 items-center"
               testID="delete-account-cancel"
               accessibilityRole="button"
-              accessibilityLabel={t('common:cancel')}
+              accessibilityLabel={t('common.cancel')}
             >
               <Text className="text-body font-semibold text-text-primary">
-                {t('common:cancel')}
+                {t('common.cancel')}
               </Text>
             </Pressable>
           </>

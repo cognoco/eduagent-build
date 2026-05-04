@@ -40,7 +40,7 @@ export default function ConsentScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useThemeColors();
-  const { t } = useTranslation('consent');
+  const { t } = useTranslation();
   const { profileId } = useLocalSearchParams<{
     profileId: string;
   }>();
@@ -249,7 +249,7 @@ export default function ConsentScreen() {
                     accessibilityRole="alert"
                     accessibilityLiveRegion="assertive"
                   >
-                    {t('sameEmailWarning')}
+                    {t('consent.sameEmailWarning')}
                   </Text>
                 )}
                 <Text className="text-body-sm text-text-secondary mb-6">
@@ -278,7 +278,7 @@ export default function ConsentScreen() {
                 <Button
                   variant="tertiary"
                   size="small"
-                  label={t('common:goBack')}
+                  label={t('common.goBack')}
                   onPress={handleClose}
                   testID="consent-cancel"
                 />
@@ -335,7 +335,7 @@ export default function ConsentScreen() {
                     accessibilityRole="alert"
                     accessibilityLiveRegion="assertive"
                   >
-                    {t('sameEmailWarning')}
+                    {t('consent.sameEmailWarning')}
                   </Text>
                 )}
                 <Text className="text-body-sm text-text-secondary mb-6">
@@ -355,7 +355,7 @@ export default function ConsentScreen() {
                 <Button
                   variant="tertiary"
                   size="small"
-                  label={t('backToChild')}
+                  label={t('consent.backToChild')}
                   onPress={() => transitionToPhase('child')}
                   testID="consent-back-to-child"
                 />
@@ -364,7 +364,7 @@ export default function ConsentScreen() {
                 <Button
                   variant="tertiary"
                   size="small"
-                  label={t('common:goBack')}
+                  label={t('common.goBack')}
                   onPress={handleClose}
                   testID="consent-parent-cancel"
                 />
@@ -377,24 +377,26 @@ export default function ConsentScreen() {
               <Text className="text-h1 font-bold text-text-primary mb-4">
                 {deliveryState === 'sent'
                   ? copy.successMessage
-                  : t('deliveryFailedTitle')}
+                  : t('consent.deliveryFailedTitle')}
               </Text>
               <Text className="text-body text-text-primary mb-2">
                 {deliveryState === 'sent' ? (
-                  <>{t('deliverySentBody', { email: parentEmail })}</>
+                  <>{t('consent.deliverySentBody', { email: parentEmail })}</>
                 ) : (
-                  <>{t('deliveryFailedBody', { email: parentEmail })}</>
+                  <>{t('consent.deliveryFailedBody', { email: parentEmail })}</>
                 )}
               </Text>
               <Text className="text-body text-text-secondary mb-8">
-                {deliveryState !== 'sent' ? t('deliveryFailedHint') : ''}
+                {deliveryState !== 'sent'
+                  ? t('consent.deliveryFailedHint')
+                  : ''}
               </Text>
               <Button
                 variant="primary"
                 label={
                   deliveryState === 'sent'
                     ? copy.handBackButton
-                    : t('common:goBack')
+                    : t('common.goBack')
                 }
                 onPress={() =>
                   deliveryState === 'sent'
@@ -416,7 +418,7 @@ export default function ConsentScreen() {
                 <Button
                   variant="tertiary"
                   size="small"
-                  label={t('resendEmail')}
+                  label={t('consent.resendEmail')}
                   onPress={onResendEmail}
                   loading={resending}
                   testID="consent-resend-email"

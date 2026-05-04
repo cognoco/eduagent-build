@@ -116,6 +116,82 @@ describe('validateTranslation', () => {
       expect.objectContaining({ type: 'length_exceeded', key: 'common.save' })
     );
   });
+
+  // Tiny source strings (< 6 chars) skip the length check entirely:
+  // "OK" → "D'accord" reads as 400% but is correct.
+  it('skips length check for source strings shorter than 6 chars', () => {
+    const tinySource = { common: { ok: 'OK' } };
+    const tinyTranslated = { common: { ok: "D'accord" } };
+    const result = validateTranslation(tinySource, tinyTranslated, 'fr');
+    expect(result.errors).toHaveLength(0);
+    expect(result.warnings).toHaveLength(0);
+  });
+
+  // Short 6–10 char sources have an absolute floor (sourceLen + 12).
+  // "Skip" (4) wouldn't apply (<6); "Cancel" (6) → 18 chars allowed.
+  it('allows short source strings to grow up to source+12 chars even past 200%', () => {
+    const shortSource = { common: { cancel: 'Cancel' } }; // 6 chars
+    // Norwegian "Avbryt handling" = 15 chars = 250% but ≤ 6+12=18 → OK
+    const shortTranslated = { common: { cancel: 'Avbryt handling' } };
+    const result = validateTranslation(shortSource, shortTranslated, 'nb');
+    expect(result.errors).toHaveLength(0);
+  });
+
+  // Past the absolute floor, short sources DO fail.
+  it('still rejects short source strings translated past source+12 chars', () => {
+    const shortSource = { common: { cancel: 'Cancel' } }; // 6 chars; floor = 18
+    // 25 chars > 18 floor AND > 200% ratio → fail
+    const shortTranslated = { common: { cancel: 'A'.repeat(25) } };
+    const result = validateTranslation(shortSource, shortTranslated, 'nb');
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContainEqual(
+      expect.objectContaining({ type: 'length_exceeded', key: 'common.cancel' })
+    );
+  });
+
+  // Stem matching: Polish nouns inflect by case (sesja → sesji/sesję/sesją).
+  // Bare-substring check used to reject grammatically-correct Polish; stem
+  // (4-letter prefix on diacritic-stripped form) accepts inflected forms.
+  it('passes when Polish translation uses an inflected form of the locked term', () => {
+    const src = { x: { y: 'No session today' } };
+    const tgt = { x: { y: 'Brak sesji dzisiaj' } }; // sesji = genitive of sesja
+    const glossary = { session: { pl: 'sesja' } };
+    const result = validateTranslation(src, tgt, 'pl', glossary);
+    expect(result.valid).toBe(true);
+  });
+
+  // Spanish sesión → sesiones (plural). Diacritic strip + stem "sesi"
+  // matches both forms.
+  it('passes when Spanish translation uses plural sesiones for source "session"', () => {
+    const src = { x: { y: 'session count' } };
+    const tgt = { x: { y: 'número de sesiones' } };
+    const glossary = { session: { es: 'sesión' } };
+    const result = validateTranslation(src, tgt, 'es', glossary);
+    expect(result.valid).toBe(true);
+  });
+
+  // Portuguese sessão → sessões (plural shifts the diacritic). Stem "sess"
+  // (on diacritic-stripped form) matches both.
+  it('passes when Portuguese translation uses plural sessões for source "session"', () => {
+    const src = { x: { y: 'session list' } };
+    const tgt = { x: { y: 'lista de sessões' } };
+    const glossary = { session: { pt: 'sessão' } };
+    const result = validateTranslation(src, tgt, 'pt', glossary);
+    expect(result.valid).toBe(true);
+  });
+
+  // Stem matching must still REJECT translations that share no stem with the
+  // expected term — otherwise the check is useless.
+  it('still rejects Polish translation that uses a wrong term entirely', () => {
+    const src = { x: { y: 'session count' } };
+    const tgt = { x: { y: 'liczba spotkań' } }; // "spotkanie" = meeting
+    const glossary = { session: { pl: 'sesja' } };
+    const result = validateTranslation(src, tgt, 'pl', glossary);
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContainEqual(
+      expect.objectContaining({ type: 'glossary_violation', key: 'x.y' })
+    );
+  });
 });
 
 describe('computeChangedKeys', () => {

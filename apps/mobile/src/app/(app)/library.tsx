@@ -367,10 +367,14 @@ export default function LibraryScreen() {
   const handleBookPress = useCallback(
     (subjectId: string, bookId: string) => {
       navigatingToChild.current = true;
-      // Single deep push: the [subjectId] layout exports
-      // `unstable_settings = { initialRouteName: 'index' }`, so this
-      // synthesizes a 2-deep stack (shelf index underneath book) without
-      // racing two synchronous router.push calls.
+      // Two-push pattern (CLAUDE.md cross-tab rule): unstable_settings only
+      // seeds one level deep, so we push the parent shelf first then the
+      // book child to ensure router.back() from the book screen lands on
+      // the shelf, not the Tabs root.
+      router.push({
+        pathname: '/(app)/shelf/[subjectId]',
+        params: { subjectId },
+      } as never);
       router.push({
         pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
         params: { subjectId, bookId },

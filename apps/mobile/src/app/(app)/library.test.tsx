@@ -494,13 +494,19 @@ describe('LibraryScreen', () => {
     // The ShelfRow mock renders book-row-book-1 when expanded=true.
     fireEvent.press(screen.getByTestId('book-row-book-1'));
 
-    // [CLAUDE.md cross-tab nav] Single deep push — inner layout's
-    // unstable_settings.initialRouteName = 'index' seeds the back stack.
-    expect(mockPush).toHaveBeenCalledWith({
+    // [CLAUDE.md cross-tab nav] Two-push pattern: parent shelf first,
+    // then book child. unstable_settings only seeds one level deep, so
+    // explicit ancestor push keeps router.back() landing on the shelf
+    // index rather than the Tabs root.
+    expect(mockPush).toHaveBeenCalledTimes(2);
+    expect(mockPush).toHaveBeenNthCalledWith(1, {
+      pathname: '/(app)/shelf/[subjectId]',
+      params: { subjectId: 'sub-1' },
+    });
+    expect(mockPush).toHaveBeenNthCalledWith(2, {
       pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
       params: { subjectId: 'sub-1', bookId: 'book-1' },
     });
-    expect(mockPush).toHaveBeenCalledTimes(1);
   });
 
   // -----------------------------------------------------------------------

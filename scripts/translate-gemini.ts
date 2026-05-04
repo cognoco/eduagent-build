@@ -171,6 +171,7 @@ interface CliOptions {
   full?: boolean;
   dryRun?: boolean;
   review?: boolean;
+  writeAnyway?: boolean;
 }
 
 function parseArgs(args: string[]): CliOptions {
@@ -180,6 +181,7 @@ function parseArgs(args: string[]): CliOptions {
     else if (args[i] === '--full') opts.full = true;
     else if (args[i] === '--dry-run') opts.dryRun = true;
     else if (args[i] === '--review') opts.review = true;
+    else if (args[i] === '--write-anyway') opts.writeAnyway = true;
   }
   return opts;
 }
@@ -322,17 +324,38 @@ async function main(): Promise<void> {
       }
 
       if (!validation.valid) {
-        console.error(`[${lang}] Validation FAILED:`);
-        for (const e of validation.errors) {
-          console.error(
-            `  ${e.type}: ${e.key}${e.variable ? ` (${e.variable})` : ''}${
-              e.detail ? ` — ${e.detail}` : ''
-            }`
-          );
+        // --write-anyway downgrades length_exceeded to a non-blocking warning
+        // (writes the file, but logs the offending keys so a human can patch
+        // them). Other error types (missing_key, missing_variable, extra_key,
+        // glossary_violation) ALWAYS hard-skip — those represent contract
+        // breaks, not UX-quality issues that a human can fix in 5 minutes.
+        const blocking = validation.errors.filter(
+          (e) => !(opts.writeAnyway && e.type === 'length_exceeded')
+        );
+        const downgraded = validation.errors.filter(
+          (e) => opts.writeAnyway && e.type === 'length_exceeded'
+        );
+        if (blocking.length > 0) {
+          console.error(`[${lang}] Validation FAILED:`);
+          for (const e of blocking) {
+            console.error(
+              `  ${e.type}: ${e.key}${e.variable ? ` (${e.variable})` : ''}${
+                e.detail ? ` — ${e.detail}` : ''
+              }`
+            );
+          }
+          console.error(`[${lang}] Skipping — previous file preserved`);
+          failed.push(lang);
+          return;
         }
-        console.error(`[${lang}] Skipping — previous file preserved`);
-        failed.push(lang);
-        return;
+        if (downgraded.length > 0) {
+          console.warn(
+            `[${lang}] Writing despite ${downgraded.length} length issue(s) — patch these manually:`
+          );
+          for (const e of downgraded) {
+            console.warn(`  NEEDS_PATCH ${e.key} — ${e.detail}`);
+          }
+        }
       }
 
       if (opts.review) {

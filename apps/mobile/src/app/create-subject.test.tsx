@@ -32,66 +32,7 @@ const mockFetch = createRoutedMockFetch({
   '/subjects': { subjects: [] },
 });
 
-jest.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string, opts?: Record<string, unknown>) => {
-      const strings: Record<
-        string,
-        string | ((o?: Record<string, unknown>) => string)
-      > = {
-        title: 'New subject',
-        prompt:
-          "What would you like to learn? Enter any subject or describe what interests you — we'll figure out the rest.",
-        nameLabel: 'Subject name',
-        namePlaceholder: "e.g. Calculus, World History, 'learn about ants'...",
-        resolveTookTooLong: 'Check took too long — try again',
-        resolveNetworkError:
-          'Could not check if this subject exists. Please check your connection and try again.',
-        enterSubjectNameError: 'Please enter a subject name',
-        retryCheckLabel: 'Retry checking subject name',
-        manageSubjects: 'Manage your subjects',
-        retryLoadSubjectsLabel: 'Retry loading your subjects',
-        subjectsLoadError: "Couldn't load your subjects.",
-        tapToRetry: 'Tap to retry',
-        suggestedSubjectsLabel: 'Suggested subjects',
-        continueSubject: (o) => `Continue ${o?.name ?? ''}`,
-        continueSubjectLabel: (o) => `Continue ${o?.name ?? ''}`,
-        startSubject: (o) => `Start ${o?.name ?? ''}`,
-        startSubjectLabel: (o) => `Start ${o?.name ?? ''}`,
-        notSureHint:
-          'Not sure? Just describe what interests you — like "I want to understand how plants grow"',
-        checkingName: 'Checking subject name...',
-        somethingElse: 'Something else',
-        somethingElseHint: 'Be as specific as you like.',
-        clarifyLabel: 'What exactly do you want to learn?',
-        clarifyPlaceholder:
-          'e.g. ant colonies, Roman roads, solving fractions...',
-        checkThisInstead: 'Check this instead',
-        useMyWords: (o) => `Just use "${o?.words ?? ''}" as my subject`,
-        useMyWordsLabel: (o) => `Just use ${o?.words ?? ''} as my subject`,
-        justUse: (o) => `Just use "${o?.words ?? ''}"`,
-        noMatchFallback:
-          "I couldn't match that cleanly, but we can still use your exact words.",
-        editSubjectNameLabel: 'Edit subject name',
-        editInstead: 'Edit instead',
-        accept: 'Accept',
-        acceptSuggestionLabel: 'Accept suggestion',
-        editSuggestionLabel: 'Edit suggestion',
-        startLearning: 'Start Learning',
-        validationHint: 'Enter a subject name to get started',
-        'common:cancel': 'Cancel',
-        'common:edit': 'Edit',
-        'common:retry': 'Retry',
-        'common:goBack': 'Go Back',
-      };
-      const entry = strings[key];
-      if (entry === undefined) return key;
-      if (typeof entry === 'function') return entry(opts);
-      return entry;
-    },
-  }),
-  initReactI18next: { type: '3rdParty', init: jest.fn() },
-}));
+jest.mock('react-i18next', () => require('../test-utils/mock-i18n').i18nMock);
 
 jest.mock('../lib/api-client', () =>
   require('../test-utils/mock-api-routes').mockApiClientFactory(mockFetch)
