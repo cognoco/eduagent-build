@@ -1,0 +1,68 @@
+# Flow: Family Pool Section Visibility [BILLING-08]
+# Validates: the family pool section (shared quota, member list) is visible
+# on the subscription screen for a Family-tier user.
+# The section is rendered only when subscription.tier === 'family'.
+#
+# Tags: nightly, billing
+#
+# Journey: UX Journey 5 (Billing & Subscription)
+# Epics: Epic 5 (FR95-FR100), Epic 9 (RevenueCat IAP)
+# Prerequisite: Seeded user on active Family subscription (scenario: subscription-family-active)
+appId: com.mentomate.app
+tags:
+  - nightly
+  - billing
+---
+# 1. Seed & sign in
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "subscription-family-active"
+      API_URL: ${API_URL}
+
+# 2. Verify home screen loaded
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 15000
+
+# 3. Navigate to More tab
+- tapOn:
+    text: "More"
+
+# 4. Wait for More screen — Learning Mode section is always above the fold
+- extendedWaitUntil:
+    visible:
+      id: "learning-mode-casual"
+    timeout: 10000
+
+# 5. Scroll to the Subscription row and tap it
+- scrollUntilVisible:
+    element:
+      id: "more-row-subscription"
+    direction: DOWN
+    timeout: 15000
+
+- tapOn:
+    id: "more-row-subscription"
+
+# 6. Verify subscription screen loaded
+- extendedWaitUntil:
+    visible:
+      id: "subscription-screen"
+    timeout: 15000
+
+- takeScreenshot: subscription-screen-family-pool
+
+# 7. Scroll to the family pool section
+- scrollUntilVisible:
+    element:
+      id: "family-pool-section"
+    direction: DOWN
+    timeout: 20000
+
+# 8. Family pool section must be visible for Family-tier users
+- assertVisible:
+    id: "family-pool-section"
+
+- takeScreenshot: family-pool-section-visible
