@@ -287,6 +287,15 @@ describe('ConsentScreen', () => {
       screen.getByTestId('consent-done');
     });
 
+    // Flush the 1000 ms safety timer that transitionToPhase registered.
+    // AnimatedMock fires animation callbacks synchronously but blocks the
+    // nested callback via its inAnimationCallback guard, so
+    // isTransitioningRef / isTransitioning are only reset by the safety timer
+    // — not by the animation-complete path. Without this flush the wrapping
+    // Animated.View still has pointerEvents:"none" and fireEvent.press is
+    // silently ignored by @testing-library/react-native.
+    flushFadeAnimation();
+
     fireEvent.press(screen.getByTestId('consent-done'));
     expect(mockBack).toHaveBeenCalled();
   });
@@ -462,6 +471,9 @@ describe('ConsentScreen', () => {
       screen.getByTestId('consent-done');
     });
 
+    // Flush the 1000 ms safety timer (same reason as the "Got it" test above).
+    flushFadeAnimation();
+
     fireEvent.press(screen.getByTestId('consent-done'));
     expect(mockBack).toHaveBeenCalled();
   });
@@ -487,6 +499,9 @@ describe('ConsentScreen', () => {
     await waitFor(() => {
       screen.getByTestId('consent-done');
     });
+
+    // Flush the 1000 ms safety timer (same reason as the "Got it" test above).
+    flushFadeAnimation();
 
     fireEvent.press(screen.getByTestId('consent-done'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
@@ -541,7 +556,14 @@ describe('ConsentScreen', () => {
     screen.getByText("We couldn't confirm delivery yet");
     screen.getByText(/could not confirm that the consent email reached/i);
 
+    // Flush the 1000 ms safety timer so isTransitioning resets to false and the
+    // Animated.View's pointerEvents:"none" lifts before we press the button.
+    flushFadeAnimation();
+
     fireEvent.press(screen.getByTestId('consent-done'));
+    // The "Go Back" button (deliveryState==='failed') calls transitionToPhase('parent').
+    // Flush the new safety timer started by that transition so the phase
+    // change is committed before asserting the view.
     flushFadeAnimation();
     expect(mockBack).not.toHaveBeenCalled();
     screen.getByTestId('consent-parent-view');

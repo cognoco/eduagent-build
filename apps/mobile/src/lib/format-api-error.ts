@@ -170,6 +170,25 @@ function isTechnicalMessage(msg: string): boolean {
   );
 }
 
+/**
+ * Single gate for "is this short message safe to render as user-facing copy?"
+ * Used by both the typed-BadRequestError branch, the generic 4xx fallback, and
+ * the bare-error tail to keep the technical-message rejection consistent. If
+ * any branch skips this check, JS engine errors (`Property 'crypto' doesn't
+ * exist`) and stack-traced strings can leak into chat bubbles.
+ */
+function shouldPassThroughUserMessage(msg: string): boolean {
+  const looksLikeStack =
+    /\n\s+at /.test(msg) || /at [A-Z]\w*\./.test(msg) || /^at \S/.test(msg);
+  return (
+    msg.length > 0 &&
+    msg.length < 200 &&
+    !looksLikeStack &&
+    !msg.toLowerCase().includes('undefined') &&
+    !isTechnicalMessage(msg)
+  );
+}
+
 /** Returns a friendly version if the message matches known jargon patterns. */
 function friendlyMessage(raw: string): string | null {
   for (const entry of FRIENDLY_MESSAGE_MAP) {
@@ -410,13 +429,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
   // user-facing message passthrough below), with a friendly override if matched.
   if (isBadRequestError(error)) {
     const msg = error.message;
-    const looksLikeStack =
-      /\n\s+at /.test(msg) || /at [A-Z]\w*\./.test(msg) || /^at \S/.test(msg);
-    const passThrough =
-      msg.length > 0 &&
-      msg.length < 200 &&
-      !looksLikeStack &&
-      !msg.toLowerCase().includes('undefined');
+    const passThrough = shouldPassThroughUserMessage(msg);
     return {
       message: passThrough
         ? friendlyMessage(msg) ?? msg
@@ -580,8 +593,10 @@ export function classifyApiError(error: unknown): FormattedApiError {
         };
       }
 
-      // 4xx client errors
-      if (apiMessage && apiMessage.length < 200) {
+      // 4xx client errors — same passthrough gate as the typed
+      // BadRequestError branch so technical / stack / runtime-error shapes
+      // never become chat bubbles.
+      if (apiMessage && shouldPassThroughUserMessage(apiMessage)) {
         return {
           message: friendlyMessage(apiMessage) ?? apiMessage,
           category: 'unknown',
@@ -604,18 +619,8 @@ export function classifyApiError(error: unknown): FormattedApiError {
       };
     }
 
-    // 6. Short, user-facing messages — pass through. Reject technical
-    // messages (LLM/JSON/stack/runtime-error shapes) so JS engine errors
-    // like `Property 'crypto' doesn't exist` never become chat bubbles.
-    const looksLikeStack =
-      /\n\s+at /.test(msg) || /at [A-Z]\w*\./.test(msg) || /^at \S/.test(msg);
-    if (
-      msg.length > 0 &&
-      msg.length < 200 &&
-      !looksLikeStack &&
-      !msgLower.includes('undefined') &&
-      !isTechnicalMessage(msg)
-    ) {
+    // 6. Short, user-facing messages — pass through via the shared gate.
+    if (shouldPassThroughUserMessage(msg)) {
       return {
         message: friendlyMessage(msg) ?? msg,
         category: 'unknown',
