@@ -1,6 +1,6 @@
 # Flow L1: Book Detail
-# Validates: library -> subject shelf -> book detail -> back navigation.
-# Tags: nightly, learning
+# Validates: library tab -> v3 shelf expansion -> book-row tap -> book detail -> back navigation.
+# Tags: pr-blocking, learning
 #
 # Journey: UX Journey 1 (Library & Content Discovery)
 # Epics: Epic 7 (Library)
@@ -8,12 +8,15 @@
 #
 # testIDs verified against:
 #   - apps/mobile/src/app/(app)/_layout.tsx (tab-library)
-#   - apps/mobile/src/components/library/ShelvesTab.tsx (shelves-list, subject-card-*)
-#   - apps/mobile/src/app/(app)/shelf/[subjectId]/index.tsx (shelf-screen, shelf-single-book, shelf-back)
-#   - apps/mobile/src/app/(app)/shelf/[subjectId]/book/[bookId].tsx (book-screen, book-back, book-notes-section, book-all-completed, book-empty-sessions, book-start-learning)
+#   - apps/mobile/src/app/(app)/library.tsx (shelves-list)
+#   - apps/mobile/src/components/library/ShelfRow.tsx (shelf-row-header-${subjectId})
+#   - apps/mobile/src/components/library/BookRow.tsx (book-row-${bookId})
+#   - apps/mobile/src/app/(app)/shelf/[subjectId]/index.tsx (shelf-screen, shelf-back)
+#   - apps/mobile/src/app/(app)/shelf/[subjectId]/book/[bookId].tsx (book-screen, book-back,
+#     book-notes-section, book-start-learning)
 appId: com.mentomate.app
 tags:
-  - nightly
+  - pr-blocking
   - learning
 ---
 - runFlow:
@@ -37,28 +40,24 @@ tags:
 
 - takeScreenshot: book-01-library
 
+# Expand the subject shelf by tapping the shelf row header.
+# In Library v3, shelves are inline expandable rows — there is no separate
+# ShelvesTab.tsx. shelf-row-header-${SUBJECT_ID} is the Pressable in ShelfRow.tsx.
 - tapOn:
-    id: "subject-card-${SUBJECT_ID}"
+    id: "shelf-row-header-${SUBJECT_ID}"
 
-- extendedWaitUntil:
-    visible:
-      id: "book-screen"
-    timeout: 10000
-    optional: true
+# After expanding, the book row for BOOK_ID must be visible inline.
+# book-row-${BOOK_ID} is the Pressable testID in BookRow.tsx.
+- assertVisible:
+    id: "book-row-${BOOK_ID}"
 
-- runFlow:
-    when:
-      visible:
-        id: "shelf-screen"
-    commands:
-      - takeScreenshot: book-02-shelf
-      - scrollUntilVisible:
-          element:
-            text: "World History"
-          direction: DOWN
-          timeout: 5000
-      - tapOn:
-          text: "World History"
+- takeScreenshot: book-02-shelf-expanded
+
+# Tap the book row — triggers handleBookPress which does a two-push pattern:
+# push shelf/[subjectId] then push shelf/[subjectId]/book/[bookId].
+# We land on book-screen directly.
+- tapOn:
+    id: "book-row-${BOOK_ID}"
 
 - extendedWaitUntil:
     visible:
@@ -82,13 +81,15 @@ tags:
 
 - takeScreenshot: book-04-scrolled
 
+# Navigate back: book-back goes to shelf-screen (the two-push pattern means
+# back lands on shelf first, then another back to library).
 - tapOn:
     id: "book-back"
 
 - extendedWaitUntil:
     visible:
       id: "shelf-screen"
-    timeout: 5000
+    timeout: 10000
     optional: true
 
 - runFlow:
@@ -99,9 +100,10 @@ tags:
       - tapOn:
           id: "shelf-back"
 
+# After backing through shelf, the library shelves-list must be visible again.
 - extendedWaitUntil:
     visible:
-      id: "subject-card-${SUBJECT_ID}"
+      id: "shelves-list"
     timeout: 10000
 
 - takeScreenshot: book-05-back-to-library
