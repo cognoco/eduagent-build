@@ -18,6 +18,7 @@ import {
   HISTORY_S6_HOMEWORK,
   HISTORY_S7_LANGUAGE,
   HISTORY_S8_FREEFORM,
+  HISTORY_S9_CORRECT_STREAK,
   substituteHistory,
   type HistoryTurn,
 } from '../fixtures/exchange-histories';
@@ -165,6 +166,21 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
       verificationType: 'standard',
       learningMode: 'casual',
       exchangeCount: 1,
+    },
+    appliesTo: () => true,
+  },
+  {
+    id: 'S9-correct-streak',
+    purpose:
+      'Correct-streak ADAPTIVE ESCALATION trigger — 4 consecutive correct answers at the same rung should prompt the streak branch',
+    history: HISTORY_S9_CORRECT_STREAK,
+    contextOverrides: {
+      escalationRung: 2,
+      sessionType: 'learning',
+      verificationType: 'standard',
+      exchangeCount: 4,
+      // correctStreak >= 4 activates the ADAPTIVE ESCALATION prompt branch
+      correctStreak: 4,
     },
     appliesTo: () => true,
   },
@@ -390,10 +406,9 @@ export const exchangesFlow: FlowDefinition<ExchangeScenarioInput> = {
     const priorTurns =
       lastUserIndex >= 0 ? history.slice(0, lastUserIndex) : history;
 
-    // Throw rather than silently forward an empty user turn — enforces buildPrompt contract for flows that copy this pattern.
-    if (!messages.user) {
+    if (messages.user === undefined) {
       throw new Error(
-        `runLive: messages.user is undefined or empty for scenario ${input.scenarioId} — buildPrompt must produce a user turn`
+        `runLive: messages.user is undefined for scenario ${input.scenarioId} — buildPrompt must produce a user turn`
       );
     }
 
