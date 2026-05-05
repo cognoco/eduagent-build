@@ -2797,10 +2797,10 @@ For each row in the table below, **open a Notion task** in the project's tracker
 
 | Event | Warn | Page | Notion task |
 |---|---|---|---|
-| `app/session.summary.failed` rate (24h) | >0.5% | >3% | _link_ |
-| `app/session.transcript.purged` failure rate (24h) | >2% | >5% | _link_ |
-| `app/session.purge.delayed` count | ≥1 | ≥10 | _link_ |
-| `app/summary.reconciliation.requeued` count (24h) | ≥1 | ≥10 | _link_ |
+| `app/session.summary.failed` rate (24h) | >0.5% | >3% | [Bug Tracker — summary.failed alert](https://www.notion.so/SLO-Retention-Alert-app-session-summary-failed-rate-24h-3578bce91f7c81e78213e0a71e33a9f5) |
+| `app/session.transcript.purged` failure rate (24h) | >2% | >5% | [Bug Tracker — transcript.purged alert](https://www.notion.so/SLO-Retention-Alert-app-session-transcript-purged-failure-rate-24h-3578bce91f7c81ca995ec16b8e6ebbd2) |
+| `app/session.purge.delayed` count | ≥1 | ≥10 | [Bug Tracker — purge.delayed alert](https://www.notion.so/SLO-Retention-Alert-app-session-purge-delayed-count-3578bce91f7c811290a5eb39301714be) |
+| `app/summary.reconciliation.requeued` count (24h) | ≥1 | ≥10 | [Bug Tracker — reconciliation.requeued alert](https://www.notion.so/SLO-Retention-Alert-app-summary-reconciliation-requeued-count-24h-3578bce91f7c81f2970dd52c289e32c9) |
 
 - [ ] **Step 6: Pre-merge verification**
 
