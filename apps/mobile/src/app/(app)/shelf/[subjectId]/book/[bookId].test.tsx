@@ -341,7 +341,7 @@ describe('BookScreen', () => {
     // removed during the Library v3 redesign.
     getByTestId('book-screen');
     getByText('Algebra');
-    getByText('0 of 2 topics done');
+    getByText('0 of 2 topics finished');
   });
 
   it('derives header progress from retention topics', () => {
@@ -371,7 +371,7 @@ describe('BookScreen', () => {
 
     const { getByText } = render(<BookScreen />);
 
-    getByText('2 of 3 topics done');
+    getByText('2 of 3 topics finished');
   });
 
   it('renders continue now and started from in-progress sessions', () => {
@@ -569,7 +569,7 @@ describe('BookScreen', () => {
     expect(refetchSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('renders the empty topics state with a build-learning-path CTA', () => {
+  it('renders the empty topics state with a setup CTA', () => {
     mockUseBookWithTopics.mockReturnValue(
       makeBookQuery({
         data: {
@@ -589,7 +589,8 @@ describe('BookScreen', () => {
     const { getByTestId, getByText } = render(<BookScreen />);
 
     getByTestId('topics-empty-state');
-    getByText('No topics yet');
+    getByText('This book is not ready yet');
+    getByText('Set up this book');
 
     fireEvent.press(getByTestId('topics-empty-build'));
     expect(mockPush).toHaveBeenCalledWith(

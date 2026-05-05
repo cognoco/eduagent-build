@@ -390,7 +390,7 @@ describe('LibraryScreen', () => {
 
     // New library v3 design: empty state uses library-empty testID
     screen.getByTestId('library-empty');
-    screen.getByText('Your library is empty');
+    screen.getByText('Your library will grow as you learn');
   });
 
   it('renders shelf rows for each subject', () => {

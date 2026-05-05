@@ -644,9 +644,9 @@
       "message": "Unable to load your library. Please try again."
     },
     "empty": {
-      "title": "Your library is empty",
-      "message": "Start a study session and your subjects will appear here.",
-      "goHome": "Go to Home"
+      "title": "Your library will grow as you learn",
+      "message": "Start with homework help or learn something new. Books and topics will appear here afterward.",
+      "goHome": "Back to Home"
     },
     "curriculumComplete": {
       "title": "You've covered everything here!",
@@ -702,8 +702,8 @@
       "browseAll": "Browse all suggestions",
       "emptyPickTitle": "Pick a book to start",
       "emptyPickMessage": "Tap one of the \"Study next\" cards above to begin.",
-      "emptyTitle": "No books on this shelf yet.",
-      "emptyMessage": "Your curriculum is still being built. Check back soon.",
+      "emptyTitle": "This shelf is still getting ready",
+      "emptyMessage": "If you just started this subject, try again in a moment. You can also go back and start from Home.",
       "organizing": "Organizing your library...",
       "skip": "Skip — start learning anyway",
       "skipAccessibilityLabel": "Skip and start learning anyway",

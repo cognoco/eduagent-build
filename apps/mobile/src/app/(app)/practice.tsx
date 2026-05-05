@@ -109,14 +109,19 @@ export default function PracticeScreen(): React.ReactElement {
         >
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </Pressable>
-        <Text className="text-h2 font-bold text-text-primary flex-1">
-          Practice
-        </Text>
+        <View className="flex-1">
+          <Text className="text-h2 font-bold text-text-primary">
+            Practice for a test
+          </Text>
+          <Text className="text-body-sm text-text-secondary mt-1">
+            Refresh what is fading, then check yourself.
+          </Text>
+        </View>
       </View>
 
       <View className="gap-4">
         <IntentCard
-          title="Review topics"
+          title="Refresh topics"
           subtitle={reviewSubtitle}
           icon="refresh-outline"
           // Keep the badge aligned with the review-summary API, but let the
@@ -168,7 +173,7 @@ export default function PracticeScreen(): React.ReactElement {
           </View>
         ) : null}
         <IntentCard
-          title="Recite (Beta)"
+          title="Recite from memory (Beta)"
           subtitle="Recite a poem or text from memory"
           icon="mic-outline"
           onPress={() =>
@@ -187,14 +192,14 @@ export default function PracticeScreen(): React.ReactElement {
           testID="practice-dictation"
         />
         <IntentCard
-          title="Quiz"
+          title="Quiz yourself"
           subtitle={quizSubtitle}
           icon="help-circle-outline"
           onPress={() => router.push('/(app)/quiz' as never)}
           testID="practice-quiz"
         />
         <IntentCard
-          title="History"
+          title="Quiz history"
           subtitle="View past quiz rounds"
           icon="time-outline"
           onPress={() => router.push('/(app)/quiz/history' as never)}

@@ -65,6 +65,15 @@ describe('PracticeScreen', () => {
     jest.restoreAllMocks();
   });
 
+  it('frames practice as a test-prep task surface', () => {
+    render(<PracticeScreen />);
+
+    screen.getByText('Practice for a test');
+    screen.getByText('Refresh what is fading, then check yourself.');
+    screen.getByText('Refresh topics');
+    screen.getByText('Quiz yourself');
+  });
+
   it('routes the back button to home', () => {
     render(<PracticeScreen />);
 

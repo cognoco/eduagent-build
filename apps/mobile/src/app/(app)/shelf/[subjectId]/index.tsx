@@ -393,9 +393,22 @@ export default function ShelfScreen() {
                 {t('library.shelf.emptyMessage')}
               </Text>
               <Pressable
+                onPress={handleRetry}
+                className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center mb-3 w-full"
+                testID="shelf-empty-retry"
+                accessibilityRole="button"
+                accessibilityLabel={t('common.retry')}
+              >
+                <Text className="text-text-inverse text-body font-semibold">
+                  {t('common.retry')}
+                </Text>
+              </Pressable>
+              <Pressable
                 onPress={handleBack}
-                className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
+                className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center w-full"
                 testID="shelf-empty-back"
+                accessibilityRole="button"
+                accessibilityLabel={t('common.back')}
               >
                 <Text className="text-text-primary text-body font-semibold">
                   {t('common.back')}

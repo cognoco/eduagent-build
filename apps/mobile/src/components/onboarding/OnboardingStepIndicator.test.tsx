@@ -29,5 +29,12 @@ describe('OnboardingStepIndicator', () => {
     render(<OnboardingStepIndicator step={2} totalSteps={4} />);
 
     screen.getByText('Step 2 of 4');
+    screen.getByText('Make it personal');
+  });
+
+  it('shows the plan label on the final setup step', () => {
+    render(<OnboardingStepIndicator step={4} totalSteps={4} />);
+
+    screen.getByText('Your plan');
   });
 });
