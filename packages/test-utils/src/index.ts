@@ -29,3 +29,11 @@ export {
   TEST_VOCABULARY_ID,
   TEST_NONEXISTENT_ID,
 } from './lib/fixture-ids.js';
+
+// Real-crypto JWT signing utilities for route and unit tests
+export {
+  TEST_KID,
+  TEST_JWKS,
+  signTestJwt,
+  getTestPublicJwk,
+} from './auth/test-jwt.js';

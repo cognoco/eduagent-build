@@ -21,6 +21,10 @@ import {
 } from '@eduagent/schemas';
 import { routeAndCall, type ChatMessage } from './llm';
 import {
+  writeMemoryFactsForAnalysis,
+  writeMemoryFactsForDeletion,
+} from './memory/memory-facts';
+import {
   escapeXml,
   renderPromptTemplate,
   sanitizeXmlValue,
@@ -1178,6 +1182,48 @@ async function updateWithRetry(
   return Boolean(updated);
 }
 
+async function getOrCreateLearningProfileTx(
+  tx: Database,
+  profileId: string
+): Promise<LearningProfileRow> {
+  const [locked] = await tx
+    .select()
+    .from(learningProfiles)
+    .where(eq(learningProfiles.profileId, profileId))
+    .for('update')
+    .limit(1);
+  if (locked) return locked;
+
+  await tx
+    .insert(learningProfiles)
+    .values({ profileId })
+    .onConflictDoNothing({ target: learningProfiles.profileId });
+
+  const [created] = await tx
+    .select()
+    .from(learningProfiles)
+    .where(eq(learningProfiles.profileId, profileId))
+    .for('update')
+    .limit(1);
+
+  if (!created) {
+    throw new Error(`Unable to create learning profile for ${profileId}`);
+  }
+  return created;
+}
+
+function mergeProfileState(
+  profile: LearningProfileRow,
+  updates: Record<string, unknown>
+): LearningProfileRow {
+  return {
+    ...profile,
+    ...updates,
+    version: profile.version + 1,
+    updatedAt: new Date(),
+  } as LearningProfileRow;
+}
+
 /**
  * Server-side only — called exclusively from Inngest session-completed pipeline.
  * The profileId originates from a trusted DB-sourced session row, not user input.
@@ -1202,42 +1248,48 @@ export async function applyAnalysis(
     return { fieldsUpdated: [], notifications: [] };
   }
 
-  const profile = await getOrCreateLearningProfile(db, profileId);
-  const { updates, fieldsUpdated, notifications } = buildAnalysisUpdates(
-    profile,
-    analysis,
-    source,
-    subjectName
-  );
+  const { finalFieldsUpdated, finalNotifications } = await db.transaction(
+    async (tx) => {
+      const profile = await getOrCreateLearningProfileTx(
+        tx as unknown as Database,
+        profileId
+      );
 
-  if (Object.keys(updates).length === 0) {
-    return { fieldsUpdated: [], notifications: [] };
-  }
+      if (
+        profile.memoryConsentStatus !== 'granted' ||
+        profile.memoryCollectionEnabled === false
+      ) {
+        return { finalFieldsUpdated: [], finalNotifications: [] };
+      }
 
-  let finalNotifications = notifications;
-  let finalFieldsUpdated = fieldsUpdated;
-  const updated = await updateWithRetry(
-    db,
-    profileId,
-    profile.version,
-    updates
-  );
-  if (!updated) {
-    const fresh = await getLearningProfile(db, profileId);
-    if (!fresh) return { fieldsUpdated: [], notifications: [] };
+      const { updates, fieldsUpdated, notifications } = buildAnalysisUpdates(
+        profile,
+        analysis,
+        source,
+        subjectName
+      );
 
-    const retry = buildAnalysisUpdates(fresh, analysis, source, subjectName);
-    // [CR-119.4]: Guard retry against empty updates — same check as the first
-    // attempt (line 952). Without this, an empty retry bumps version/updatedAt,
-    // potentially poisoning the optimistic lock for concurrent updates.
-    if (Object.keys(retry.updates).length > 0) {
-      await updateWithRetry(db, profileId, fresh.version, retry.updates);
+      if (Object.keys(updates).length === 0) {
+        return { finalFieldsUpdated: [], finalNotifications: [] };
+      }
+
+      const mergedState = mergeProfileState(profile, updates);
+      await tx
+        .update(learningProfiles)
+        .set({
+          ...updates,
+          version: sql`${learningProfiles.version} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(eq(learningProfiles.profileId, profileId));
+      await writeMemoryFactsForAnalysis(tx, profileId, mergedState);
+
+      return {
+        finalFieldsUpdated: fieldsUpdated,
+        finalNotifications: notifications,
+      };
     }
-    // Use retry-derived notifications — the first pass was based on a stale
-    // profile snapshot, so its notifications may be spurious.
-    finalNotifications = retry.notifications;
-    finalFieldsUpdated = retry.fieldsUpdated;
-  }
+  );
 
   if (finalNotifications.length > 0) {
     // [logging sweep] structured logger so PII fields land as JSON context
@@ -1306,39 +1358,35 @@ export async function deleteMemoryItem(
   subject?: string
 ): Promise<void> {
   await verifyProfileOwnership(db, profileId, accountId);
-  const profile = await getLearningProfile(db, profileId);
-  if (!profile) return;
+  await db.transaction(async (tx) => {
+    const [profile] = await tx
+      .select()
+      .from(learningProfiles)
+      .where(eq(learningProfiles.profileId, profileId))
+      .for('update')
+      .limit(1);
+    if (!profile) return;
 
-  const updates = buildDeleteMemoryItemUpdates(
-    profile,
-    category,
-    value,
-    suppress,
-    subject
-  );
-  if (!updates) return;
+    const updates = buildDeleteMemoryItemUpdates(
+      profile,
+      category,
+      value,
+      suppress,
+      subject
+    );
+    if (!updates) return;
 
-  const updated = await updateWithRetry(
-    db,
-    profileId,
-    profile.version,
-    updates
-  );
-  if (updated) return;
-
-  const fresh = await getLearningProfile(db, profileId);
-  if (!fresh) return;
-
-  const retryUpdates = buildDeleteMemoryItemUpdates(
-    fresh,
-    category,
-    value,
-    suppress,
-    subject
-  );
-  if (!retryUpdates) return;
-
-  await updateWithRetry(db, profileId, fresh.version, retryUpdates);
+    const mergedState = mergeProfileState(profile, updates);
+    await tx
+      .update(learningProfiles)
+      .set({
+        ...updates,
+        version: sql`${learningProfiles.version} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(eq(learningProfiles.profileId, profileId));
+    await writeMemoryFactsForDeletion(tx, profileId, mergedState);
+  });
 }
 
 function buildUnsuppressUpdates(

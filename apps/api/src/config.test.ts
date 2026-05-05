@@ -245,4 +245,21 @@ describe('validateEnv', () => {
     });
     expect(env.RETENTION_PURGE_ENABLED).toBe('true');
   });
+
+  it('MEMORY_FACTS_READ_ENABLED defaults to "false" when unset', () => {
+    const env = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+    });
+    expect(env.MEMORY_FACTS_READ_ENABLED).toBe('false');
+  });
+
+  it('MEMORY_FACTS_READ_ENABLED parses "true" for the read-path rollout', () => {
+    const env = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+      MEMORY_FACTS_READ_ENABLED: 'true',
+    });
+    expect(env.MEMORY_FACTS_READ_ENABLED).toBe('true');
+  });
 });

@@ -123,11 +123,25 @@ function buildStringArrayItems(
   category: MemoryCategoryKey,
   formatter: (s: string) => string
 ): CuratedMemoryItem[] {
-  return (items as string[]).map((value) => ({
-    category,
-    value,
-    statement: formatter(value),
-  }));
+  return items.flatMap((item) => {
+    const value =
+      typeof item === 'string'
+        ? item
+        : item &&
+          typeof item === 'object' &&
+          'label' in item &&
+          typeof item.label === 'string'
+        ? item.label
+        : null;
+    if (!value) return [];
+    return [
+      {
+        category,
+        value,
+        statement: formatter(value),
+      },
+    ];
+  });
 }
 
 // ---------------------------------------------------------------------------

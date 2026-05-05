@@ -63,6 +63,7 @@ import {
 import { generateRecallBridge } from '../services/recall-bridge';
 import { getProfileAgeBracket } from '../services/profile';
 import { markPersisted } from '../services/idempotency-marker';
+import { isMemoryFactsReadEnabled } from '../config';
 
 const logger = createLogger();
 const retryFilingParamsSchema = z.object({
@@ -74,6 +75,7 @@ type SessionRouteEnv = {
     DATABASE_URL: string;
     CLERK_JWKS_URL?: string;
     VOYAGE_API_KEY?: string;
+    MEMORY_FACTS_READ_ENABLED?: string;
     IDEMPOTENCY_KV?: KVNamespace;
     ENVIRONMENT?: string;
   };
@@ -200,6 +202,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const clientId = c.req.header('Idempotency-Key')?.trim() || undefined;
 
       const llmTier = c.get('llmTier');
+      const memoryFactsReadEnabled = isMemoryFactsReadEnabled(
+        c.env.MEMORY_FACTS_READ_ENABLED
+      );
 
       try {
         const result = await processMessage(
@@ -207,7 +212,12 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           profileId,
           sessionId,
           c.req.valid('json'),
-          { llmTier, voyageApiKey: c.env.VOYAGE_API_KEY, clientId }
+          {
+            llmTier,
+            voyageApiKey: c.env.VOYAGE_API_KEY,
+            clientId,
+            memoryFactsReadEnabled,
+          }
         );
         await markPersisted({
           kv: c.env.IDEMPOTENCY_KV,
@@ -332,6 +342,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       if (!session) return notFound(c, 'Session not found');
 
       const llmTier = c.get('llmTier');
+      const memoryFactsReadEnabled = isMemoryFactsReadEnabled(
+        c.env.MEMORY_FACTS_READ_ENABLED
+      );
 
       try {
         const { stream, onComplete } = await streamMessage(
@@ -343,6 +356,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             llmTier,
             voyageApiKey: c.env.VOYAGE_API_KEY,
             clientId,
+            memoryFactsReadEnabled,
           }
         );
 
@@ -406,6 +420,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                     llmTier,
                     voyageApiKey: c.env.VOYAGE_API_KEY,
                     clientId,
+                    memoryFactsReadEnabled,
                   }
                 );
                 const eventType = chunkCount === 0 ? 'chunk' : 'replace';
@@ -674,6 +689,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                 llmTier,
                 voyageApiKey: c.env.VOYAGE_API_KEY,
                 clientId,
+                memoryFactsReadEnabled,
               }
             );
             return streamSSEUtf8(c, async (sseStream) => {

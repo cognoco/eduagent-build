@@ -44,6 +44,7 @@ import {
   quizRounds,
   quizMissedItems,
   quizMasteryItems,
+  memoryFacts,
 } from './schema/index';
 
 // [BUG-704 / P-8] Single source of truth for the runtime DB enum
@@ -367,6 +368,30 @@ export function createScopedRepository(db: Database, profileId: string) {
       async findFirst(extraWhere?: SQL) {
         return db.query.sessionEmbeddings.findFirst({
           where: scopedWhere(sessionEmbeddings, extraWhere),
+        });
+      },
+    },
+    memoryFacts: {
+      async findManyActive(extraWhere?: SQL) {
+        return db.query.memoryFacts.findMany({
+          where: scopedWhere(
+            memoryFacts,
+            extraWhere
+              ? and(sql`${memoryFacts.supersededBy} IS NULL`, extraWhere)
+              : sql`${memoryFacts.supersededBy} IS NULL`
+          ),
+          orderBy: [asc(memoryFacts.createdAt), asc(memoryFacts.id)],
+        });
+      },
+      async findFirstActive(extraWhere?: SQL) {
+        return db.query.memoryFacts.findFirst({
+          where: scopedWhere(
+            memoryFacts,
+            extraWhere
+              ? and(sql`${memoryFacts.supersededBy} IS NULL`, extraWhere)
+              : sql`${memoryFacts.supersededBy} IS NULL`
+          ),
+          orderBy: [asc(memoryFacts.createdAt), asc(memoryFacts.id)],
         });
       },
     },

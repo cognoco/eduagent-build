@@ -59,9 +59,18 @@ const envSchema = z.object({
   // Retention Phase 1 — destructive transcript purge stays dark until the
   // summary-generation pipeline has baked in production long enough.
   RETENTION_PURGE_ENABLED: z.enum(['true', 'false']).default('false'),
+
+  // Memory architecture Phase 1 — keep reads on legacy JSONB until backfill
+  // and semantic parity gates pass. Dual-write is code-driven, this flag only
+  // controls prompt/read reconstruction.
+  MEMORY_FACTS_READ_ENABLED: z.enum(['true', 'false']).default('false'),
 });
 
 export type Env = z.infer<typeof envSchema>;
+
+export function isMemoryFactsReadEnabled(value: string | undefined): boolean {
+  return value === 'true';
+}
 
 // ---------------------------------------------------------------------------
 // Auth keys — required in BOTH staging and production.

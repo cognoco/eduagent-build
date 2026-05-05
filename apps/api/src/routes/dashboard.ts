@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import type { Database } from '@eduagent/database';
+import { createScopedRepository } from '@eduagent/database';
 import {
   historyQuerySchema,
   dashboardResponseSchema,
@@ -39,11 +40,17 @@ import {
   markWeeklyReportViewed,
 } from '../services/weekly-report';
 import { buildCuratedMemoryView } from '../services/curated-memory';
+import { readMemorySnapshotFromFacts } from '../services/memory/memory-facts';
 import { assertParentAccess } from '../services/family-access';
 import { notFound } from '../errors';
+import { isMemoryFactsReadEnabled } from '../config';
 
 type DashboardRouteEnv = {
-  Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
+  Bindings: {
+    DATABASE_URL: string;
+    CLERK_JWKS_URL?: string;
+    MEMORY_FACTS_READ_ENABLED?: string;
+  };
   Variables: {
     user: AuthUser;
     db: Database;
@@ -202,7 +209,23 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       );
     }
 
-    const memory = buildCuratedMemoryView(profile);
+    const snapshot = isMemoryFactsReadEnabled(c.env.MEMORY_FACTS_READ_ENABLED)
+      ? await readMemorySnapshotFromFacts(
+          createScopedRepository(db, childProfileId),
+          profile
+        )
+      : null;
+    const memory = buildCuratedMemoryView(
+      snapshot
+        ? {
+            ...profile,
+            interests: snapshot.interests,
+            strengths: snapshot.strengths,
+            struggles: snapshot.struggles,
+            communicationNotes: snapshot.communicationNotes,
+          }
+        : profile
+    );
     return c.json(childMemoryResponseSchema.parse({ memory }));
   })
 

@@ -54,6 +54,9 @@ export const learningProfiles = pgTable(
     recentlyResolvedTopics: jsonb('recently_resolved_topics')
       .notNull()
       .default([]),
+    memoryFactsBackfilledAt: timestamp('memory_facts_backfilled_at', {
+      withTimezone: true,
+    }),
     version: integer('version').notNull().default(1),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
