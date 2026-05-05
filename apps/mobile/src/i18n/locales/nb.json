@@ -740,7 +740,8 @@
       "shelfPausedSuffix": ", pauset",
       "shelfReviewSuffix": ", gjennomgang nødvendig",
       "shelfActionExpand": "utvide",
-      "shelfActionCollapse": "lukke"
+      "shelfActionCollapse": "lukke",
+      "shelfActionOpen": "åpne"
     }
   },
   "topic": {

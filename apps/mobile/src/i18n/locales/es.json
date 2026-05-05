@@ -714,7 +714,8 @@
       "shelfPausedSuffix": ", en pausa",
       "shelfReviewSuffix": ", necesita repaso",
       "shelfActionExpand": "expandir",
-      "shelfActionCollapse": "contraer"
+      "shelfActionCollapse": "contraer",
+      "shelfActionOpen": "abrir"
     },
     "shelf": {
       "missingParam": "Falta la materia. Vuelve e inténtalo de nuevo.",

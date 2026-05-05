@@ -714,7 +714,8 @@
       "shelfPausedSuffix": ", paused",
       "shelfReviewSuffix": ", review needed",
       "shelfActionExpand": "expand",
-      "shelfActionCollapse": "collapse"
+      "shelfActionCollapse": "collapse",
+      "shelfActionOpen": "open"
     },
     "shelf": {
       "missingParam": "Missing subject. Please go back and try again.",

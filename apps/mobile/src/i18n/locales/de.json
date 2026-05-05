@@ -714,7 +714,8 @@
       "shelfPausedSuffix": ", pausiert",
       "shelfReviewSuffix": ", Wiederholung erforderlich",
       "shelfActionExpand": "Erweitern",
-      "shelfActionCollapse": "Zuklappen"
+      "shelfActionCollapse": "Zuklappen",
+      "shelfActionOpen": "Öffnen"
     },
     "shelf": {
       "missingParam": "Fehlendes Fach. Bitte gehe zurück und versuche es erneut.",

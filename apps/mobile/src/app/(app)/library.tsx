@@ -11,7 +11,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { platformAlert } from '../../lib/platform-alert';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Subject, RetentionStatus } from '@eduagent/schemas';
 import {
@@ -24,7 +24,6 @@ import { useAllBooks } from '../../hooks/use-all-books';
 import { useThemeColors } from '../../lib/theme';
 import { useSubjects, useUpdateSubject } from '../../hooks/use-subjects';
 import { useOverallProgress } from '../../hooks/use-progress';
-import { useNoteTopicIds } from '../../hooks/use-notes';
 import { useApiClient } from '../../lib/api-client';
 import { isGuardianProfile, useProfile } from '../../lib/profile';
 import { combinedSignal } from '../../lib/query-timeout';
@@ -37,7 +36,6 @@ import {
 import { ShelfRow } from '../../components/library/ShelfRow';
 import { LibrarySearchBar } from '../../components/library/LibrarySearchBar';
 import { useLibrarySearch } from '../../hooks/use-library-search';
-import type { BookRowData } from '../../components/library/BookRow';
 import { ShimmerSkeleton } from '../../components/common/ShimmerSkeleton';
 
 // ---------------------------------------------------------------------------
@@ -133,12 +131,6 @@ export default function LibraryScreen() {
   const { activeProfile, profiles } = useProfile();
   const isGuardian = isGuardianProfile(activeProfile, profiles);
 
-  // ---- Expanded shelves state ---------------------------------------------
-  const [expandedShelves, setExpandedShelves] = useState<
-    Record<string, boolean>
-  >({});
-  const navigatingToChild = useRef(false);
-
   // ---- Search state -------------------------------------------------------
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -185,11 +177,6 @@ export default function LibraryScreen() {
 
   const updateSubject = useUpdateSubject();
   const allBooksQuery = useAllBooks();
-  const noteTopicIdsQuery = useNoteTopicIds();
-  const noteIdSet = useMemo(
-    () => new Set(noteTopicIdsQuery.data?.topicIds ?? []),
-    [noteTopicIdsQuery.data]
-  );
 
   // [BUG-732 / PERF-2] Single aggregate /library/retention call
   const libraryRetentionQuery = useQuery({
@@ -231,61 +218,21 @@ export default function LibraryScreen() {
     [progressQuery.data?.subjects]
   );
 
-  // ---- Per-book topic counts from retention data --------------------------
-  const topicCountsByBookId = useMemo(() => {
-    const totals = new Map<string, { total: number; completed: number }>();
-    for (const ret of retentionDataBySubjectId.values()) {
-      if (!Array.isArray(ret.topics)) continue;
-      for (const t of ret.topics) {
-        if (!t.bookId) continue;
-        const current = totals.get(t.bookId) ?? { total: 0, completed: 0 };
-        current.total += 1;
-        if (t.xpStatus === 'verified') current.completed += 1;
-        totals.set(t.bookId, current);
-      }
-    }
-    return totals;
-  }, [retentionDataBySubjectId]);
-
-  // ---- Enriched books (for shelf rows) ------------------------------------
-  const enrichedBooks = useMemo(() => {
-    return allBooksQuery.books.map((b) => {
-      const counts = topicCountsByBookId.get(b.book.id);
-      if (!counts) return b;
-      let status = b.status;
-      if (counts.total > 0) {
-        if (counts.completed === 0) status = 'NOT_STARTED';
-        else if (counts.completed >= counts.total) {
-          if (status !== 'REVIEW_DUE') status = 'COMPLETED';
-        } else {
-          status = 'IN_PROGRESS';
-        }
-      }
-      return {
-        ...b,
-        topicCount: counts.total,
-        completedCount: counts.completed,
-        status,
-      };
-    });
-  }, [allBooksQuery.books, topicCountsByBookId]);
-
   // ---- Books grouped by subjectId -----------------------------------------
   const booksBySubjectId = useMemo(() => {
-    const map = new Map<string, typeof enrichedBooks>();
-    for (const b of enrichedBooks) {
+    const map = new Map<string, typeof allBooksQuery.books>();
+    for (const b of allBooksQuery.books) {
       const list = map.get(b.subjectId) ?? [];
       list.push(b);
       map.set(b.subjectId, list);
     }
     return map;
-  }, [enrichedBooks]);
+  }, [allBooksQuery.books]);
 
   // ---- Total topic count for header subtitle ------------------------------
   // [BUG-971] Count ALL retention topics (including those with null bookId,
   // e.g. orphan topics or parking-lot entries) so the header subtitle matches
-  // the per-shelf totals served by progressQuery. topicCountsByBookId stays
-  // book-scoped on purpose — book rows must still exclude orphans.
+  // the per-shelf totals served by progressQuery.
   const totalTopicsAcrossBooks = useMemo(() => {
     let total = 0;
     for (const ret of retentionDataBySubjectId.values()) {
@@ -309,75 +256,13 @@ export default function LibraryScreen() {
     return ids;
   }, [searchResult.data]);
 
-  // Set of bookIds that match via server search
-  const serverMatchBookIds = useMemo<Set<string>>(() => {
-    if (!searchResult.data) return new Set();
-    const ids = new Set<string>();
-    for (const b of searchResult.data.books) ids.add(b.id);
-    for (const t of searchResult.data.topics) ids.add(t.bookId);
-    for (const n of searchResult.data.notes) ids.add(n.bookId);
-    return ids;
-  }, [searchResult.data]);
-
-  // ---- Focus effect: reset expansion to most-recently-active subject ------
-  // Only resets on tab switches, NOT when returning from a child screen (Book).
-  useFocusEffect(
-    useCallback(() => {
-      if (navigatingToChild.current) {
-        navigatingToChild.current = false;
-        return;
-      }
-      if (subjects.length === 0) return;
-      const activeSubjects = subjects.filter((s) => s.status === 'active');
-      let defaultSubjectId: string | null = null;
-
-      if (activeSubjects.length > 0) {
-        let latestTime = -Infinity;
-        for (const s of activeSubjects) {
-          const prog = progressBySubjectId.get(s.id);
-          const t = prog?.lastSessionAt
-            ? new Date(prog.lastSessionAt).getTime()
-            : -Infinity;
-          if (t > latestTime) {
-            latestTime = t;
-            defaultSubjectId = s.id;
-          }
-        }
-        if (defaultSubjectId === null) {
-          defaultSubjectId = activeSubjects[0]?.id ?? null;
-        }
-      }
-
-      if (defaultSubjectId) {
-        setExpandedShelves({ [defaultSubjectId]: true });
-      } else {
-        setExpandedShelves({});
-      }
-      setSearchQuery('');
-      setDebouncedQuery('');
-    }, [subjects, progressBySubjectId])
-  );
-
   // ---- Handlers -----------------------------------------------------------
 
-  const handleToggle = useCallback((subjectId: string) => {
-    setExpandedShelves((prev) => ({ ...prev, [subjectId]: !prev[subjectId] }));
-  }, []);
-
-  const handleBookPress = useCallback(
-    (subjectId: string, bookId: string) => {
-      navigatingToChild.current = true;
-      // Two-push pattern (CLAUDE.md cross-tab rule): unstable_settings only
-      // seeds one level deep, so we push the parent shelf first then the
-      // book child to ensure router.back() from the book screen lands on
-      // the shelf, not the Tabs root.
+  const handleShelfPress = useCallback(
+    (subjectId: string) => {
       router.push({
         pathname: '/(app)/shelf/[subjectId]',
         params: { subjectId },
-      } as never);
-      router.push({
-        pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
-        params: { subjectId, bookId },
       } as never);
     },
     [router]
@@ -404,70 +289,6 @@ export default function LibraryScreen() {
     }
   };
 
-  // ---- Build BookRowData per shelf ----------------------------------------
-
-  const buildBookRows = useCallback(
-    (subjectId: string, query: string): BookRowData[] => {
-      const books = booksBySubjectId.get(subjectId) ?? [];
-      const q = query.trim().toLowerCase();
-      return books
-        .filter((b) => {
-          if (!q) return true;
-          // client-side name match
-          const clientMatch = b.book.title.toLowerCase().includes(q);
-          // server match
-          const srvMatch = serverMatchBookIds.has(b.book.id);
-          return clientMatch || srvMatch;
-        })
-        .map((b) => {
-          const counts = topicCountsByBookId.get(b.book.id);
-          const total = counts?.total ?? 0;
-          const completed = counts?.completed ?? 0;
-          const topicProgress = `${completed}/${total}`;
-
-          // Compute book-level retention from per-topic data
-          const retData = retentionDataBySubjectId.get(subjectId);
-          let bookRetention: RetentionStatus | null = null;
-          if (Array.isArray(retData?.topics)) {
-            const bookTopics = retData!.topics.filter(
-              (t) => t.bookId === b.book.id
-            );
-            if (bookTopics.length > 0) {
-              let worst: RetentionStatus = 'strong';
-              for (const t of bookTopics) {
-                const r = deriveRetentionStatus(t);
-                if (RETENTION_ORDER[r] < RETENTION_ORDER[worst]) worst = r;
-              }
-              bookRetention = worst;
-            }
-          }
-
-          // Check if any topic in this book has a note
-          const hasNotes = (() => {
-            const retTopics = retData?.topics?.filter(
-              (t) => t.bookId === b.book.id
-            );
-            return (retTopics ?? []).some((t) => noteIdSet.has(t.topicId));
-          })();
-
-          return {
-            bookId: b.book.id,
-            title: b.book.title,
-            topicProgress,
-            retentionStatus: bookRetention,
-            hasNotes,
-          } satisfies BookRowData;
-        });
-    },
-    [
-      booksBySubjectId,
-      topicCountsByBookId,
-      retentionDataBySubjectId,
-      noteIdSet,
-      serverMatchBookIds,
-    ]
-  );
-
   // ---- Determine which shelves are visible (search filtering) -------------
 
   const visibleSubjects = useMemo(() => {
@@ -479,18 +300,6 @@ export default function LibraryScreen() {
       return clientMatch || serverMatch;
     });
   }, [subjects, debouncedQuery, serverMatchSubjectIds]);
-
-  // Auto-expand shelves that became visible via server search results
-  useEffect(() => {
-    if (!debouncedQuery.trim() || !searchResult.data) return;
-    const toExpand: Record<string, boolean> = {};
-    for (const subjectId of serverMatchSubjectIds) {
-      toExpand[subjectId] = true;
-    }
-    if (Object.keys(toExpand).length > 0) {
-      setExpandedShelves((prev) => ({ ...prev, ...toExpand }));
-    }
-  }, [searchResult.data, serverMatchSubjectIds, debouncedQuery]);
 
   // ---- Shimmer skeleton ---------------------------------------------------
 
@@ -717,7 +526,7 @@ export default function LibraryScreen() {
             </View>
           )}
 
-        {/* Shelf list */}
+        {/* Subject shelf list */}
         <View testID="shelves-list">
           {visibleSubjects.map((subject) => {
             const retData = retentionDataBySubjectId.get(subject.id);
@@ -729,8 +538,6 @@ export default function LibraryScreen() {
             const topicsCompleted = progress?.topicsCompleted ?? 0;
             const topicProgress = `${topicsCompleted}/${topicsTotal}`;
 
-            const bookRows = buildBookRows(subject.id, debouncedQuery);
-
             return (
               <ShelfRow
                 key={subject.id}
@@ -740,10 +547,7 @@ export default function LibraryScreen() {
                 topicProgress={topicProgress}
                 retentionStatus={retentionStatus}
                 isPaused={subject.status !== 'active'}
-                expanded={!!expandedShelves[subject.id]}
-                books={bookRows}
-                onToggle={handleToggle}
-                onBookPress={handleBookPress}
+                onPress={handleShelfPress}
               />
             );
           })}

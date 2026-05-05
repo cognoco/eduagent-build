@@ -1,6 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { ShelfRow } from './ShelfRow';
-import type { BookRowData } from './BookRow';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -29,30 +28,6 @@ jest.mock('../../lib/theme', () => ({
 // Fixtures
 // ---------------------------------------------------------------------------
 
-const sampleBooks: BookRowData[] = [
-  {
-    bookId: 'book-1',
-    title: 'Algebra Basics',
-    topicProgress: '5/8',
-    retentionStatus: 'strong',
-    hasNotes: false,
-  },
-  {
-    bookId: 'book-2',
-    title: 'Geometry',
-    topicProgress: '3/6',
-    retentionStatus: 'fading',
-    hasNotes: true,
-  },
-  {
-    bookId: 'book-3',
-    title: 'Calculus',
-    topicProgress: '10/18',
-    retentionStatus: null,
-    hasNotes: false,
-  },
-];
-
 const defaultProps = {
   subjectId: 'sub-math',
   name: 'Mathematics',
@@ -60,10 +35,7 @@ const defaultProps = {
   topicProgress: '18/32',
   retentionStatus: 'fading' as const,
   isPaused: false,
-  expanded: false,
-  books: sampleBooks,
-  onToggle: jest.fn(),
-  onBookPress: jest.fn(),
+  onPress: jest.fn(),
 };
 
 // ---------------------------------------------------------------------------
@@ -75,7 +47,7 @@ describe('ShelfRow', () => {
     jest.clearAllMocks();
   });
 
-  it('renders collapsed state with subject name and book/topic summary', () => {
+  it('renders subject name and book/topic summary', () => {
     render(<ShelfRow {...defaultProps} />);
 
     screen.getByTestId('shelf-row-header-sub-math');
@@ -88,43 +60,13 @@ describe('ShelfRow', () => {
     screen.getByTestId('shelf-row-icon-sub-math');
   });
 
-  it('does not render book rows when collapsed', () => {
-    render(<ShelfRow {...defaultProps} expanded={false} />);
-
-    expect(screen.queryByTestId('book-row-book-1')).toBeNull();
-    expect(screen.queryByTestId('book-row-book-2')).toBeNull();
-    expect(screen.queryByTestId('book-row-book-3')).toBeNull();
-  });
-
-  it('renders expanded state with book rows visible', () => {
-    render(<ShelfRow {...defaultProps} expanded={true} />);
-
-    screen.getByTestId('book-row-book-1');
-    screen.getByTestId('book-row-book-2');
-    screen.getByTestId('book-row-book-3');
-    screen.getByText('Algebra Basics');
-    screen.getByText('Geometry');
-    screen.getByText('Calculus');
-  });
-
-  it('calls onToggle with subjectId when header is pressed', () => {
-    const onToggle = jest.fn();
-    render(<ShelfRow {...defaultProps} onToggle={onToggle} />);
+  it('opens the subject shelf when header is pressed', () => {
+    const onPress = jest.fn();
+    render(<ShelfRow {...defaultProps} onPress={onPress} />);
 
     fireEvent.press(screen.getByTestId('shelf-row-header-sub-math'));
-    expect(onToggle).toHaveBeenCalledTimes(1);
-    expect(onToggle).toHaveBeenCalledWith('sub-math');
-  });
-
-  it('calls onBookPress with subjectId and bookId when a book is tapped', () => {
-    const onBookPress = jest.fn();
-    render(
-      <ShelfRow {...defaultProps} expanded={true} onBookPress={onBookPress} />
-    );
-
-    fireEvent.press(screen.getByTestId('book-row-book-2'));
-    expect(onBookPress).toHaveBeenCalledTimes(1);
-    expect(onBookPress).toHaveBeenCalledWith('sub-math', 'book-2');
+    expect(onPress).toHaveBeenCalledTimes(1);
+    expect(onPress).toHaveBeenCalledWith('sub-math');
   });
 
   it('renders paused chip when isPaused is true', () => {
@@ -187,7 +129,7 @@ describe('ShelfRow', () => {
   });
 
   it('header accessibilityLabel includes paused state', () => {
-    render(<ShelfRow {...defaultProps} isPaused={true} expanded={false} />);
+    render(<ShelfRow {...defaultProps} isPaused={true} />);
 
     const header = screen.getByTestId('shelf-row-header-sub-math');
     expect(header.props.accessibilityLabel).toContain('paused');
@@ -199,28 +141,9 @@ describe('ShelfRow', () => {
     expect(header.props.accessibilityLabel).toContain('review needed');
   });
 
-  it('header accessibilityLabel mentions expand/collapse state', () => {
-    render(<ShelfRow {...defaultProps} expanded={false} />);
-    const collapsedHeader = screen.getByTestId('shelf-row-header-sub-math');
-    expect(collapsedHeader.props.accessibilityLabel).toContain('expand');
-
-    render(<ShelfRow {...defaultProps} expanded={true} />);
-    // Re-query for the newly rendered header
-    const allHeaders = screen.getAllByTestId('shelf-row-header-sub-math');
-    const expandedHeader = allHeaders[allHeaders.length - 1];
-    expect(expandedHeader.props.accessibilityLabel).toContain('collapse');
-  });
-
-  it('shows "not started" for books with null retentionStatus when expanded', () => {
-    render(<ShelfRow {...defaultProps} expanded={true} />);
-
-    screen.getByText('not started');
-  });
-
-  it('shows notes indicator for books with hasNotes=true when expanded', () => {
-    render(<ShelfRow {...defaultProps} expanded={true} />);
-
-    // book-2 has hasNotes=true
-    screen.getByLabelText('Has notes');
+  it('header accessibilityLabel mentions the open action', () => {
+    render(<ShelfRow {...defaultProps} />);
+    const header = screen.getByTestId('shelf-row-header-sub-math');
+    expect(header.props.accessibilityLabel).toContain('open');
   });
 });

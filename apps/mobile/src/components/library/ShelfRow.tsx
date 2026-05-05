@@ -3,7 +3,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import type { RetentionStatus } from '@eduagent/schemas';
 import { useSubjectTint, useThemeColors } from '../../lib/theme';
-import { BookRow, type BookRowData } from './BookRow';
 
 interface ShelfRowProps {
   subjectId: string;
@@ -12,10 +11,7 @@ interface ShelfRowProps {
   topicProgress: string; // "18/32"
   retentionStatus: RetentionStatus | null;
   isPaused: boolean;
-  expanded: boolean;
-  books: BookRowData[];
-  onToggle: (subjectId: string) => void;
-  onBookPress: (subjectId: string, bookId: string) => void;
+  onPress: (subjectId: string) => void;
 }
 
 export function ShelfRow({
@@ -25,10 +21,7 @@ export function ShelfRow({
   topicProgress,
   retentionStatus,
   isPaused,
-  expanded,
-  books,
-  onToggle,
-  onBookPress,
+  onPress,
 }: ShelfRowProps): React.ReactElement {
   const { t } = useTranslation();
   const colors = useThemeColors();
@@ -50,16 +43,14 @@ export function ShelfRow({
       {/* Header row */}
       <Pressable
         testID={`shelf-row-header-${subjectId}`}
-        onPress={() => onToggle(subjectId)}
+        onPress={() => onPress(subjectId)}
         accessibilityRole="button"
         accessibilityLabel={t('library.row.shelfAccessibilityLabel', {
           name,
           subtitle,
           pausedSuffix: isPaused ? t('library.row.shelfPausedSuffix') : '',
           reviewSuffix: needsReview ? t('library.row.shelfReviewSuffix') : '',
-          action: expanded
-            ? t('library.row.shelfActionCollapse')
-            : t('library.row.shelfActionExpand'),
+          action: t('library.row.shelfActionOpen'),
         })}
         style={{
           flexDirection: 'row',
@@ -159,7 +150,7 @@ export function ShelfRow({
           ) : null}
 
           <Ionicons
-            name={expanded ? 'chevron-down' : 'chevron-forward'}
+            name="chevron-forward"
             size={16}
             color={colors.textSecondary}
             accessibilityElementsHidden
@@ -167,31 +158,6 @@ export function ShelfRow({
           />
         </View>
       </Pressable>
-
-      {/* Expanded book list */}
-      {expanded ? (
-        <View style={{ paddingLeft: 16 }}>
-          {books.length === 0 ? (
-            <View
-              style={{ paddingHorizontal: 16, paddingVertical: 12 }}
-              testID={`shelf-empty-${subjectId}`}
-            >
-              <Text style={{ fontSize: 13, color: colors.textSecondary }}>
-                {t('library.row.shelfEmpty')}
-              </Text>
-            </View>
-          ) : (
-            books.map((book) => (
-              <BookRow
-                key={book.bookId}
-                {...book}
-                tint={tint}
-                onPress={(bookId) => onBookPress(subjectId, bookId)}
-              />
-            ))
-          )}
-        </View>
-      ) : null}
     </View>
   );
 }

@@ -740,7 +740,8 @@
       "shelfPausedSuffix": "、一時停止中",
       "shelfReviewSuffix": "、復習が必要",
       "shelfActionExpand": "展開",
-      "shelfActionCollapse": "折りたたむ"
+      "shelfActionCollapse": "折りたたむ",
+      "shelfActionOpen": "開く"
     }
   },
   "topic": {

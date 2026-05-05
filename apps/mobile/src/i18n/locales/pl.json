@@ -714,7 +714,8 @@
       "shelfPausedSuffix": ", wstrzymany",
       "shelfReviewSuffix": ", wymaga powtórki",
       "shelfActionExpand": "rozwinąć",
-      "shelfActionCollapse": "zwinąć"
+      "shelfActionCollapse": "zwinąć",
+      "shelfActionOpen": "otworzyć"
     },
     "shelf": {
       "missingParam": "Brakujący przedmiot. Wróć i spróbuj ponownie.",
