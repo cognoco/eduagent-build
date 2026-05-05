@@ -19,6 +19,7 @@ import { OnboardingStepIndicator } from '../../../components/onboarding/Onboardi
 import { useUpdatePronouns } from '../../../hooks/use-onboarding-dimensions';
 import { useProfile } from '../../../lib/profile';
 import { goBackOrReplace } from '../../../lib/navigation';
+import { getOnboardingStepLabels } from '../../../lib/onboarding-step-labels';
 import { platformAlert } from '../../../lib/platform-alert';
 import { useThemeColors } from '../../../lib/theme';
 
@@ -51,6 +52,7 @@ export default function PronounsScreen(): React.ReactElement {
   }>();
   const step = Number(stepParam) || 2;
   const totalSteps = Number(totalStepsParam) || 4;
+  const stepLabels = getOnboardingStepLabels(t);
 
   // Compute age from birthYear — the learner's age on Dec 31 of the current
   // year rather than the exact birthdate, which we don't store. This is
@@ -176,7 +178,11 @@ export default function PronounsScreen(): React.ReactElement {
           <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </Pressable>
         {returnTo === 'settings' ? null : (
-          <OnboardingStepIndicator step={step} totalSteps={totalSteps} />
+          <OnboardingStepIndicator
+            step={step}
+            totalSteps={totalSteps}
+            stepLabels={stepLabels}
+          />
         )}
       </View>
 

@@ -16,6 +16,7 @@ import {
 import { useStartSession, useStreamMessage } from '../../../hooks/use-sessions';
 import { formatApiError } from '../../../lib/format-api-error';
 import { goBackOrReplace } from '../../../lib/navigation';
+import { getOnboardingStepLabels } from '../../../lib/onboarding-step-labels';
 import { platformAlert } from '../../../lib/platform-alert';
 import { Sentry } from '../../../lib/sentry';
 import { useProfile } from '../../../lib/profile';
@@ -58,6 +59,7 @@ export default function InterviewScreen() {
   const { activeProfile } = useProfile();
   const step = Number(stepParam) || 1;
   const totalSteps = Number(totalStepsParam) || 4;
+  const stepLabels = getOnboardingStepLabels(t);
 
   // BUG-316: Guard against empty/missing subjectId — hooks receive empty string
   // which triggers a 404 API call. Show error state instead.
@@ -733,7 +735,11 @@ export default function InterviewScreen() {
         title={title}
         headerBelow={
           !sessionPhase ? (
-            <OnboardingStepIndicator step={step} totalSteps={totalSteps} />
+            <OnboardingStepIndicator
+              step={step}
+              totalSteps={totalSteps}
+              stepLabels={stepLabels}
+            />
           ) : undefined
         }
         messages={messages}

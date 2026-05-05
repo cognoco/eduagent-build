@@ -34,6 +34,7 @@ import { formatApiError } from '../../../lib/format-api-error';
 import { useThemeColors } from '../../../lib/theme';
 import { platformAlert } from '../../../lib/platform-alert';
 import { FEATURE_FLAGS } from '../../../lib/feature-flags';
+import { getOnboardingStepLabels } from '../../../lib/onboarding-step-labels';
 import {
   SUPPORTED_LANGUAGES,
   setStoredLanguage,
@@ -87,6 +88,7 @@ export default function LanguagePickerScreen(): React.ReactElement {
   }>();
   const step = Number(stepParam) || 1;
   const totalSteps = Number(totalStepsParam) || 4;
+  const stepLabels = getOnboardingStepLabels(t);
 
   // Pre-select the learner's current language if one is set (e.g., they're
   // editing from Settings). Defaults to 'en' which mirrors the DB default —
@@ -256,7 +258,11 @@ export default function LanguagePickerScreen(): React.ReactElement {
           <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </Pressable>
         {returnTo === 'settings' ? null : (
-          <OnboardingStepIndicator step={step} totalSteps={totalSteps} />
+          <OnboardingStepIndicator
+            step={step}
+            totalSteps={totalSteps}
+            stepLabels={stepLabels}
+          />
         )}
       </View>
 

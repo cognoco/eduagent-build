@@ -105,6 +105,31 @@
     "goToLibraryLabel": "Zur Bibliothek",
     "moreOptions": "Weitere Optionen",
     "moreOptionsLabel": "Weitere Optionen",
+    "learner": {
+      "recommended": "Empfohlen",
+      "intentHeading": "Was brauchst du gerade?",
+      "askAnythingLabel": "Alles fragen",
+      "askAnythingPlaceholder": "Alles fragen...",
+      "yourSubjects": "Deine Fächer",
+      "newSubject": "Neues Fach",
+      "emptySubjectsTitle": "Deine Fächer erscheinen hier",
+      "emptySubjectsMessage": "Starte jetzt eins, oder nutze einfach Hausaufgabenhilfe, wenn du sie brauchst.",
+      "addSubject": "Fach hinzufügen",
+      "intentActions": {
+        "homework": {
+          "title": "Hausaufgabenhilfe",
+          "subtitle": "Mach ein Foto oder tippe die Aufgabe ein"
+        },
+        "practice": {
+          "title": "Für einen Test üben",
+          "subtitle": "Wiederhole, was verblasst, oder teste dich selbst"
+        },
+        "studyNew": {
+          "title": "Etwas Neues lernen",
+          "subtitle": "Starte ein Thema oder erstelle ein Fach"
+        }
+      }
+    },
     "parentGateway": {
       "seeHowTheyAreDoing": "Sieh, wie es ihnen geht",
       "practicedThisWeek": "{{name}} hat diese Woche {{minutes}} Min. geübt",
@@ -1133,7 +1158,13 @@
     "common": {
       "noSubjectSelected": "Kein Fach ausgewählt",
       "saving": "Wird gespeichert...",
-      "skip": "Überspringen"
+      "skip": "Überspringen",
+      "stepLabels": {
+        "quickChat": "Kurzer Chat",
+        "makeItPersonal": "Persönlich machen",
+        "supportOptions": "Unterstützung wählen",
+        "yourPlan": "Dein Plan"
+      }
     },
     "mentorLanguagePicker": {
       "title": "Welche Sprache soll dein Mentor sprechen?",

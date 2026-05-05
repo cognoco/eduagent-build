@@ -32,6 +32,11 @@ jest.mock('../../lib/api-client', () =>
   require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch)
 );
 
+jest.mock(
+  'react-i18next',
+  () => require('../../test-utils/mock-i18n').i18nMock
+);
+
 jest.mock('../../lib/profile', () => ({
   useProfile: () => ({
     activeProfile: {

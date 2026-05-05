@@ -105,6 +105,31 @@
     "goToLibraryLabel": "Ir a la biblioteca",
     "moreOptions": "Más opciones",
     "moreOptionsLabel": "Más opciones",
+    "learner": {
+      "recommended": "Recomendado",
+      "intentHeading": "¿Qué necesitas ahora?",
+      "askAnythingLabel": "Pregunta lo que quieras",
+      "askAnythingPlaceholder": "Pregunta lo que quieras...",
+      "yourSubjects": "Tus materias",
+      "newSubject": "Nueva materia",
+      "emptySubjectsTitle": "Tus materias aparecerán aquí",
+      "emptySubjectsMessage": "Empieza una ahora, o usa la ayuda con tareas cuando la necesites.",
+      "addSubject": "Agregar materia",
+      "intentActions": {
+        "homework": {
+          "title": "Ayuda con tareas",
+          "subtitle": "Toma una foto o escribe el problema"
+        },
+        "practice": {
+          "title": "Practicar para un examen",
+          "subtitle": "Repasa lo que se está olvidando o ponte a prueba"
+        },
+        "studyNew": {
+          "title": "Aprender algo nuevo",
+          "subtitle": "Empieza un tema o crea una materia"
+        }
+      }
+    },
     "parentGateway": {
       "seeHowTheyAreDoing": "Mira cómo les va",
       "practicedThisWeek": "{{name}} practicó {{minutes}} min esta semana",
@@ -1133,7 +1158,13 @@
     "common": {
       "noSubjectSelected": "No se seleccionó ninguna materia",
       "saving": "Guardando…",
-      "skip": "Omitir"
+      "skip": "Omitir",
+      "stepLabels": {
+        "quickChat": "Charla rápida",
+        "makeItPersonal": "Hazlo personal",
+        "supportOptions": "Opciones de apoyo",
+        "yourPlan": "Tu plan"
+      }
     },
     "mentorLanguagePicker": {
       "title": "¿En qué idioma debería hablar tu mentor?",
