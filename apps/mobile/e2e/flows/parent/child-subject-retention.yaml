@@ -1,0 +1,76 @@
+# Flow PARENT-12 (Arm A): Subject Retention Badge — Badge Present
+# Validates: when a topic has retentionStatus set AND totalSessions >= 1,
+#             the subject-retention-badge wrapper is rendered in the topic list.
+# Tags: nightly, parent
+# Seed: parent-subject-with-retention
+# Usage: ./e2e/scripts/seed-and-run.sh parent-subject-with-retention e2e/flows/parent/child-subject-retention.yaml
+#
+# testIDs verified against:
+#   apps/mobile/src/app/(app)/child/[profileId]/subjects/[subjectId].tsx
+#     subject-topics-scroll          (line 150)
+#     topic-card-${topic.topicId}    (line 187)
+#     subject-retention-badge        (added — wraps RetentionSignal when badge gating passes)
+appId: com.mentomate.app
+tags:
+  - nightly
+  - parent
+---
+# 1. Seed & sign in (parent-subject-with-retention seeds a parent with a child
+#    whose subject has a topic that has retentionStatus set and totalSessions >= 1)
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "parent-subject-with-retention"
+
+# 2. Wait for parent dashboard
+- extendedWaitUntil:
+    visible:
+      id: "dashboard-scroll"
+    timeout: 15000
+
+# 3. Tap primary action on the seeded child card
+- tapOn:
+    id: "dashboard-child-${CHILD_PROFILE_ID}-primary"
+
+# 4. Wait for child detail scroll view
+- extendedWaitUntil:
+    visible:
+      id: "child-detail-scroll"
+    timeout: 10000
+
+# 5. Scroll until the seeded subject card is visible
+- scrollUntilVisible:
+    element:
+      id: "subject-card-${SUBJECT_ID}"
+    direction: DOWN
+    timeout: 10000
+
+# 6. Tap the subject card to open topics list
+- tapOn:
+    id: "subject-card-${SUBJECT_ID}"
+
+# 7. Wait for the subject topics scroll view
+- extendedWaitUntil:
+    visible:
+      id: "subject-topics-scroll"
+    timeout: 10000
+
+- takeScreenshot: 01-subject-topics-loaded
+
+# 8. The retention badge must be visible — the seeded topic has retentionStatus
+#    set and totalSessions >= 1, so the gating condition passes
+- assertVisible:
+    id: "subject-retention-badge"
+
+- takeScreenshot: 02-retention-badge-present
+
+# 9. Navigate back to child detail
+- tapOn:
+    id: "back-button"
+
+- extendedWaitUntil:
+    visible:
+      id: "child-detail-scroll"
+    timeout: 10000
+
+- takeScreenshot: 03-back-to-child

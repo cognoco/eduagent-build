@@ -1,0 +1,87 @@
+# ACCOUNT-17: Child memory consent prompt
+# Navigates to a child's mentor-memory screen as the parent, asserts the
+# consent prompt is shown (memoryConsentStatus === 'pending'), taps Accept,
+# and confirms the prompt disappears and the memory controls become visible.
+#
+# Seed: parent-with-children — child has no learningProfiles row, so
+#   memoryConsentStatus defaults to 'pending' → consent prompt is rendered.
+#
+# testIDs verified against:
+#   - apps/mobile/src/components/memory-consent-prompt.tsx
+#       (memory-consent-grant, memory-consent-decline)
+#   - apps/mobile/src/app/(app)/child/[profileId]/mentor-memory.tsx
+#       (something-wrong-button rendered once consent is granted)
+#   - apps/mobile/e2e/flows/parent/child-mentor-memory.yaml
+#       (navigation pattern: dashboard-scroll → child-detail-scroll → mentor-memory-link)
+#
+# Usage: ./e2e/scripts/seed-and-run.sh parent-with-children e2e/flows/parent/child-memory-consent-prompt.yaml
+appId: com.mentomate.app
+tags:
+  - nightly
+  - parent
+---
+# 1. Seed & sign in
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "parent-with-children"
+      API_URL: ${API_URL}
+
+# 2. Wait for parent dashboard
+- extendedWaitUntil:
+    visible:
+      id: "dashboard-scroll"
+    timeout: 15000
+
+# 3. Tap child card to open child detail
+- tapOn:
+    id: "dashboard-child-${CHILD_PROFILE_ID}-primary"
+
+- extendedWaitUntil:
+    visible:
+      id: "child-detail-scroll"
+    timeout: 10000
+
+# 4. Scroll to the mentor-memory link and tap it
+- scrollUntilVisible:
+    element:
+      id: "mentor-memory-link"
+    direction: DOWN
+    timeout: 10000
+
+- tapOn:
+    id: "mentor-memory-link"
+
+# 5. Consent prompt must be visible before granting
+- extendedWaitUntil:
+    visible:
+      id: "memory-consent-grant"
+    timeout: 10000
+
+- assertVisible:
+    id: "memory-consent-decline"
+
+- takeScreenshot: 01-consent-prompt-visible
+
+# 6. Tap the grant button
+- tapOn:
+    id: "memory-consent-grant"
+
+# 7. After granting, the consent prompt disappears and the controls section is
+#    accessible — assert the "Something else is wrong" escape hatch is reachable
+#    (it renders unconditionally once memoryConsentStatus !== 'pending').
+- extendedWaitUntil:
+    notVisible:
+      id: "memory-consent-grant"
+    timeout: 10000
+
+- scrollUntilVisible:
+    element:
+      id: "something-wrong-button"
+    direction: DOWN
+    timeout: 10000
+
+- assertVisible:
+    id: "something-wrong-button"
+
+- takeScreenshot: 02-post-consent-controls-visible

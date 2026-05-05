@@ -1,0 +1,104 @@
+# Flow PARENT-11 (populated): Child Session Recap — Populated Arm
+# Validates: parent navigates from child detail into a session that has a full
+#             recap (narrative, highlight, engagement signal, conversation prompt),
+#             copies the conversation prompt, and sees the inline copy confirmation.
+# Tags: nightly, parent
+# Seed: parent-session-with-recap
+# Usage: ./e2e/scripts/seed-and-run.sh parent-session-with-recap e2e/flows/parent/child-session-recap.yaml
+#
+# testIDs verified against:
+#   apps/mobile/src/app/(app)/child/[profileId]/session/[sessionId].tsx
+#     session-metadata               (line 204)
+#     session-recap-narrative        (added — narrative container)
+#     session-recap-highlight        (added — highlight container)
+#     session-recap-conversation-prompt (added — conversation prompt container)
+#     session-recap-copy-prompt      (added — copy button, renamed from copy-conversation-prompt)
+#     session-recap-copy-prompt-toast (added — inline copied indicator, optional: transient)
+#   apps/mobile/src/components/parent/EngagementChip.tsx
+#     engagement-chip-${signal}      (line 58)
+appId: com.mentomate.app
+tags:
+  - nightly
+  - parent
+---
+# 1. Seed & sign in (parent-session-with-recap seeds a parent with a child who
+#    has a session containing narrative, highlight, engagement signal, and
+#    conversationPrompt)
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "parent-session-with-recap"
+
+# 2. Wait for parent dashboard
+- extendedWaitUntil:
+    visible:
+      id: "dashboard-scroll"
+    timeout: 15000
+
+# 3. Tap primary action on the seeded child card
+- tapOn:
+    id: "dashboard-child-${CHILD_PROFILE_ID}-primary"
+
+# 4. Wait for child detail scroll view
+- extendedWaitUntil:
+    visible:
+      id: "child-detail-scroll"
+    timeout: 10000
+
+# 5. Scroll until the session card is visible
+- scrollUntilVisible:
+    element:
+      id: "session-card-${SESSION_ID}"
+    direction: DOWN
+    timeout: 10000
+
+# 6. Tap the seeded session card
+- tapOn:
+    id: "session-card-${SESSION_ID}"
+
+# 7. Wait for session detail metadata card to confirm navigation
+- extendedWaitUntil:
+    visible:
+      id: "session-metadata"
+    timeout: 10000
+
+- takeScreenshot: 01-session-detail-loaded
+
+# 8. Assert recap blocks are visible
+- assertVisible:
+    id: "session-recap-narrative"
+
+- assertVisible:
+    id: "session-recap-highlight"
+
+# 9. Assert engagement chip (signal value matches what the seed inserts, e.g. "curious")
+- assertVisible:
+    id: "engagement-chip-curious"
+
+# 10. Assert conversation-prompt container
+- assertVisible:
+    id: "session-recap-conversation-prompt"
+
+- takeScreenshot: 02-recap-populated
+
+# 11. Tap the copy button
+- tapOn:
+    id: "session-recap-copy-prompt"
+
+# 12. Inline copy confirmation is transient — assert with optional
+- assertVisible:
+    id: "session-recap-copy-prompt-toast"
+    optional: true   # transient — permitted use of optional
+
+- takeScreenshot: 03-after-copy
+
+# 13. Navigate back to child detail
+- tapOn:
+    id: "session-detail-back-to-child"
+
+- extendedWaitUntil:
+    visible:
+      id: "child-detail-scroll"
+    timeout: 10000
+
+- takeScreenshot: 04-back-to-child

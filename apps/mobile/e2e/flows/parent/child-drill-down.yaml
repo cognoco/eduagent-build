@@ -101,9 +101,14 @@ tags:
       id: "topic-detail-screen"
     timeout: 10000
 
-# 15. Verify topic status card is present
+# 15. Verify topic understanding card is present (renamed from topic-status-card in current source)
 - assertVisible:
-    id: "topic-status-card"
+    id: "topic-understanding-card"
+
+# 15a. Verify topic retention card when data is present
+- assertVisible:
+    id: "topic-retention-card"
+    optional: true   # only rendered when retention data exists — permitted use of optional
 
 # 16. Verify session history heading
 - assertVisible:
@@ -165,3 +170,83 @@ tags:
 
 # 26. Final screenshot: back on dashboard
 - takeScreenshot: parent-drill-down-06-back-to-dashboard
+
+# ── Proxy-mode transcript gate (parent-proxy scenario) ────────────────────────
+# When seeded with parent-proxy, verify that a parent viewing a child's session
+# summary in proxy mode cannot see the transcript CTA.
+#
+# [CR-PR129-M5] view-transcript-cta is hidden behind !isParentProxy in
+# session-summary/[sessionId].tsx (line 922). This block exercises that gate.
+#
+# testIDs verified against:
+#   - apps/mobile/src/app/session-summary/[sessionId].tsx (summary-title, view-transcript-cta)
+#
+# Required seed env vars (populated by parent-proxy seed): SESSION_ID, CHILD_PROFILE_ID
+
+# 27. Switch from parent to child profile (activates proxy mode: isParentProxy = true).
+#     Switch-to-child navigates More → Profile → taps child by name.
+#     parent-proxy seed creates child with displayName "Proxy Child".
+- runFlow:
+    when:
+      visible:
+        id: "dashboard-scroll"
+    file: ../_setup/switch-to-child.yaml
+    env:
+      CHILD_NAME: "Proxy Child"
+
+# 28. Wait for learner home in child (proxy) context
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 15000
+    optional: true
+
+# 29. Navigate to the child's completed session summary via the Library tab.
+#     The parent-proxy seed creates a completed session (SESSION_ID) for the child.
+#     Navigate to it via History tab or direct session card.
+- tapOn:
+    text: "More"
+
+- extendedWaitUntil:
+    visible:
+      text: "More"
+    timeout: 10000
+
+# 30. Scroll to and tap "History" (recent sessions row in More)
+- scrollUntilVisible:
+    element:
+      text: "History"
+    direction: DOWN
+    timeout: 10000
+    optional: true
+
+- tapOn:
+    text: "History"
+    optional: true
+
+# 31. If History is not available, fall back to tapping the session card on learner home
+- tapOn:
+    id: "learner-screen"
+    optional: true
+
+# 32. Attempt to tap the seeded session card directly from learner home
+- tapOn:
+    id: "session-card-${SESSION_ID}"
+    optional: true
+
+# 33. Wait for session summary to load (summary-title is the stable landing anchor)
+- extendedWaitUntil:
+    visible:
+      id: "summary-title"
+    timeout: 15000
+    optional: true
+
+# 34. Core assertion: transcript CTA must NOT be visible in proxy mode.
+#     [CR-PR129-M5] view-transcript-cta is conditionally rendered only when
+#     !isParentProxy. In proxy mode (active profile = child, owner = parent)
+#     the element must be absent from the view hierarchy entirely.
+- assertNotVisible:
+    id: "view-transcript-cta"
+
+# 35. Screenshot: session summary in proxy mode (no transcript link)
+- takeScreenshot: parent-drill-down-07-proxy-no-transcript

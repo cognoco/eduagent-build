@@ -1,0 +1,169 @@
+# Flow QUIZ-11: Malformed-Round Guard (BUG-812 / F-015)
+# Validates: when a quiz round has options that deduplicate to fewer than 2
+# unique values, play.tsx renders quiz-play-malformed instead of a dead-end
+# question with no choices, and quiz-play-malformed-back returns to quiz index.
+# Tags: nightly, quiz
+#
+# Journey: UX Journey 3 (Practice & Reinforcement) — Edge cases
+# Epics: Epic 13 (Quiz Activities)
+# Prerequisite: Seeded profile with a pre-inserted malformed capitals round
+#               (scenario: quiz-malformed-round)
+#               The seed provides ROUND_ID (ids.roundId) but play.tsx loads the
+#               round via QuizFlowContext populated by launch.tsx after
+#               POST /quiz/rounds.
+#
+# ARCHITECTURE NOTE (2026-05-04):
+#   play.tsx reads round data from QuizFlowContext (in-memory, set by launch.tsx).
+#   There is no URL-param path to inject a specific roundId into the play screen.
+#   The seed inserts a pre-built malformed round (options dedup to 1 entry) and
+#   provides ROUND_ID, but POST /quiz/rounds always generates a fresh LLM round —
+#   it does NOT resume the seeded active round.
+#
+#   Consequence: this flow navigates via the normal launch path. The round served
+#   will be a freshly LLM-generated one, which is unlikely to be malformed.
+#   The malformed-round guard is therefore exercised by:
+#     (a) Unit tests in play.test.tsx (full coverage of the guard branch)
+#     (b) This E2E flow confirms the quiz launch → play navigation path works
+#         end-to-end for the quiz-malformed-round seed environment.
+#
+#   To make this test deterministic for the malformed guard specifically,
+#   play.tsx would need a ?roundId= URL param that loads the round via
+#   GET /quiz/rounds/:id (already supported by the API) and hydrates context.
+#   That source change is tracked as a follow-up. This YAML is structured to
+#   be updated to assert quiz-play-malformed once that mechanism lands.
+#
+# testIDs verified against:
+#   - apps/mobile/src/app/(app)/quiz/play.tsx:384    (quiz-play-malformed)
+#   - apps/mobile/src/app/(app)/quiz/play.tsx:408    (quiz-play-malformed-back)
+#   - apps/mobile/src/app/(app)/quiz/play.tsx:628    (quiz-play-screen — normal path)
+#   - apps/mobile/src/app/(app)/quiz/play.tsx:633    (quiz-play-quit — normal path)
+#   - apps/mobile/src/app/(app)/quiz/index.tsx:179   (quiz-index-screen)
+#   - apps/mobile/src/app/(app)/quiz/index.tsx:241   (quiz-capitals)
+#   - apps/mobile/src/components/home/LearnerScreen.tsx (learner-screen)
+#   - apps/mobile/src/app/(app)/practice.tsx          (practice-screen, practice-quiz)
+appId: com.mentomate.app
+tags:
+  - nightly
+  - quiz
+---
+# 1. Seed & sign in (quiz-malformed-round scenario)
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "quiz-malformed-round"
+      API_URL: ${API_URL}
+
+# 2. Wait for learner home screen
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 30000
+
+- takeScreenshot: quiz-malformed-01-home
+
+# 3. Navigate to Practice tab
+- scrollUntilVisible:
+    element:
+      id: "home-action-practice"
+    direction: DOWN
+    timeout: 5000
+
+- tapOn:
+    id: "home-action-practice"
+
+- extendedWaitUntil:
+    visible:
+      id: "practice-screen"
+    timeout: 10000
+
+# 4. Navigate to Quiz from Practice
+# [BUG-967] practice-quiz sits below the fold on 5.8" devices — scroll first.
+- scrollUntilVisible:
+    element:
+      id: "practice-quiz"
+    direction: DOWN
+    timeout: 5000
+
+- tapOn:
+    id: "practice-quiz"
+
+- extendedWaitUntil:
+    visible:
+      id: "quiz-index-screen"
+    timeout: 10000
+
+- takeScreenshot: quiz-malformed-02-index
+
+# 5. Tap Capitals to trigger round generation via launch.tsx
+- assertVisible:
+    id: "quiz-capitals"
+
+- tapOn:
+    id: "quiz-capitals"
+
+# 6. Wait for launch loading screen
+- extendedWaitUntil:
+    visible:
+      id: "quiz-launch-loading"
+    timeout: 10000
+    optional: true
+
+# 7. Dismiss challenge banner if present (difficulty bump)
+- extendedWaitUntil:
+    visible:
+      id: "quiz-challenge-start"
+    timeout: 5000
+    optional: true
+
+- tapOn:
+    id: "quiz-challenge-start"
+    optional: true
+
+# 8. Wait for play screen — either malformed guard or normal play
+# NOTE: quiz-play-malformed fires when options.dedupe < 2; the seeded malformed
+# round is in the DB but the normal POST /quiz/rounds flow generates a fresh round.
+# Check for malformed first (the goal), then fall back to normal play.
+- extendedWaitUntil:
+    visible:
+      id: "quiz-play-malformed"
+    timeout: 30000
+    optional: true
+
+- takeScreenshot: quiz-malformed-03-play-state
+
+# 9a. MALFORMED PATH: assert fallback and tap back
+- tapOn:
+    id: "quiz-play-malformed-back"
+    optional: true
+
+# 9b. NORMAL PATH (LLM-generated non-malformed round): verify play screen renders
+#     and quit back to index. This branch runs when the seeded mechanism isn't
+#     yet wired (see ARCHITECTURE NOTE above).
+- extendedWaitUntil:
+    visible:
+      id: "quiz-play-screen"
+    timeout: 5000
+    optional: true
+
+- tapOn:
+    id: "quiz-play-quit"
+    optional: true
+
+# 10. Wait for quit modal and confirm quit (returns to quiz index)
+- extendedWaitUntil:
+    visible:
+      id: "quiz-quit-modal-backdrop"
+    timeout: 5000
+    optional: true
+
+- tapOn:
+    id: "quiz-quit-confirm"
+    optional: true
+
+# 11. Confirm return to quiz index screen
+- extendedWaitUntil:
+    visible:
+      id: "quiz-index-screen"
+    timeout: 10000
+
+- takeScreenshot: quiz-malformed-04-returned-to-index

@@ -1,0 +1,124 @@
+# Flow LEARN-23 (Step 1): Session transcript view — learner reads their own chat history.
+# Validates: session-summary -> view-transcript-cta -> transcript screen -> back navigation.
+# Tags: nightly, learning
+#
+# Prerequisite: session-with-transcript seed (learner + completed session + transcript events).
+# Env vars injected by seed-and-run.sh: SESSION_ID, SUBJECT_ID, BOOK_ID
+#
+# testIDs verified against:
+#   - apps/mobile/src/app/session-summary/[sessionId].tsx (view-transcript-cta, summary-title)
+#   - apps/mobile/src/app/session-transcript/[sessionId].tsx
+#       (session-transcript-screen, transcript-exchange-0, session-transcript-back)
+#   - apps/mobile/src/components/library/ShelfRow.tsx (shelf-row-header-${SUBJECT_ID})
+#   - apps/mobile/src/components/library/BookRow.tsx (book-row-${BOOK_ID})
+#   - apps/mobile/src/app/(app)/shelf/[subjectId]/book/[bookId].tsx (session-${SESSION_ID})
+appId: com.mentomate.app
+tags:
+  - nightly
+  - learning
+---
+# 1. Seed & sign in
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "session-with-transcript"
+      API_URL: ${API_URL}
+
+# 2. Wait for learner home
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 15000
+
+# 3. Navigate to Library tab
+- tapOn:
+    id: "tab-library"
+
+- extendedWaitUntil:
+    visible:
+      id: "shelves-list"
+    timeout: 10000
+
+- takeScreenshot: transcript-01-library
+
+# 4. Expand the subject shelf (Mathematics)
+- tapOn:
+    id: "shelf-row-header-${SUBJECT_ID}"
+
+# 5. Tap the book row to open book detail
+- extendedWaitUntil:
+    visible:
+      id: "book-row-${BOOK_ID}"
+    timeout: 5000
+
+- tapOn:
+    id: "book-row-${BOOK_ID}"
+
+- extendedWaitUntil:
+    visible:
+      id: "book-screen"
+    timeout: 15000
+
+- takeScreenshot: transcript-02-book-detail
+
+# 6. Scroll to sessions section and tap the seeded completed session
+- scrollUntilVisible:
+    element:
+      id: "book-sessions-section"
+    direction: DOWN
+    timeout: 8000
+
+- tapOn:
+    id: "book-sessions-toggle"
+
+- extendedWaitUntil:
+    visible:
+      id: "session-${SESSION_ID}"
+    timeout: 8000
+
+- tapOn:
+    id: "session-${SESSION_ID}"
+
+# 7. Wait for session summary screen
+- extendedWaitUntil:
+    visible:
+      id: "summary-title"
+    timeout: 15000
+
+- takeScreenshot: transcript-03-session-summary
+
+# 8. Verify the "View full transcript" CTA is present and tap it
+- scrollUntilVisible:
+    element:
+      id: "view-transcript-cta"
+    direction: DOWN
+    timeout: 8000
+
+- assertVisible:
+    id: "view-transcript-cta"
+
+- tapOn:
+    id: "view-transcript-cta"
+
+# 9. Wait for transcript screen to load
+- extendedWaitUntil:
+    visible:
+      id: "session-transcript-screen"
+    timeout: 10000
+
+- takeScreenshot: transcript-04-transcript-loaded
+
+# 10. Verify at least the first exchange is present
+- assertVisible:
+    id: "transcript-exchange-0"
+
+# 11. Navigate back to session summary
+- tapOn:
+    id: "session-transcript-back"
+
+- extendedWaitUntil:
+    visible:
+      id: "summary-title"
+    timeout: 10000
+
+- takeScreenshot: transcript-05-back-to-summary

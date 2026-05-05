@@ -40,11 +40,10 @@ tags:
 # 5. Tap "Library" tab (BUG-10: use accessibility label, not truncated text)
 - tapOn: "Library Tab"
 
-# 6. Wait for Library to render — Shelves tab is the default view.
-#    Library is now a 2-tab layout (Shelves / Books); subject-filter-tabs is gone.
+# 6. Wait for Library to render — Library v3 single-pane; library-tab-shelves removed in PR #144.
 - extendedWaitUntil:
     visible:
-      id: "library-tab-shelves"
+      id: "shelves-list"
     timeout: 10000
     optional: true
 

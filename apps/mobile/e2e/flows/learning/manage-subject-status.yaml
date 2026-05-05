@@ -1,0 +1,127 @@
+# Flow: Manage Subject Status — Toggle active → paused → archived → active
+# Validates: manage-subjects modal opens from library, pause/archive/restore
+#            buttons work, and the shelf row reflects updated status.
+# Tags: weekly, learning
+#
+# Journey: UX Journey 2 (Daily Learning Loop → subject lifecycle)
+# Epics: Epic 3 (FR48 — Library management)
+# Prerequisite: Seeded learner with at least one active subject
+#               (scenario: learning-active — provides SUBJECT_ID)
+#
+# testID mapping (library.tsx):
+#   - manage-subjects-button              -> opens modal
+#   - manage-subjects-backdrop            -> transparent modal backdrop
+#   - manage-subjects-close               -> close button inside modal
+#   - pause-subject-${subjectId}          -> shown when subject.status==='active'
+#   - archive-subject-${subjectId}        -> shown for active or paused
+#   - resume-subject-${subjectId}         -> shown when subject.status==='paused'
+#   - restore-subject-${subjectId}        -> shown when subject.status==='archived'
+#
+#   ShelfRow (components/library/ShelfRow.tsx):
+#   - shelf-row-paused-${subjectId}       -> "Paused" chip rendered when paused
+#   - shelves-list                        -> shelf list container (library.tsx)
+appId: com.mentomate.app
+tags:
+  - weekly
+  - learning
+---
+# ── Setup ──────────────────────────────────────────────────────────────
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "learning-active"
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 15000
+
+# ── Navigate to Library ─────────────────────────────────────────────
+- tapOn:
+    id: "tab-library"
+
+- extendedWaitUntil:
+    visible:
+      id: "shelves-list"
+    timeout: 10000
+
+- takeScreenshot: manage-subject-01-library
+
+# ── Open manage-subjects modal ──────────────────────────────────────
+# The "Manage" button only renders when subjectsQuery.data.length > 0.
+# learning-active guarantees at least one subject so it is always present.
+- assertVisible:
+    id: "manage-subjects-button"
+
+- tapOn:
+    id: "manage-subjects-button"
+
+- extendedWaitUntil:
+    visible:
+      id: "pause-subject-${SUBJECT_ID}"
+    timeout: 10000
+
+- takeScreenshot: manage-subject-02-modal-open
+
+# ── Step A: Pause active subject ────────────────────────────────────
+- tapOn:
+    id: "pause-subject-${SUBJECT_ID}"
+
+# After the PATCH resolves the button switches to resume-subject (paused state).
+# Allow time for the API mutation and local cache update.
+- extendedWaitUntil:
+    visible:
+      id: "resume-subject-${SUBJECT_ID}"
+    timeout: 15000
+
+- assertVisible:
+    id: "resume-subject-${SUBJECT_ID}"
+
+- takeScreenshot: manage-subject-03-paused
+
+# ── Step B: Archive paused subject ──────────────────────────────────
+- tapOn:
+    id: "archive-subject-${SUBJECT_ID}"
+
+# After archive, button state becomes restore-subject.
+- extendedWaitUntil:
+    visible:
+      id: "restore-subject-${SUBJECT_ID}"
+    timeout: 15000
+
+- assertVisible:
+    id: "restore-subject-${SUBJECT_ID}"
+
+- takeScreenshot: manage-subject-04-archived
+
+# ── Step C: Restore archived subject back to active ─────────────────
+- tapOn:
+    id: "restore-subject-${SUBJECT_ID}"
+
+# After restore, buttons return to the active state (pause + archive).
+- extendedWaitUntil:
+    visible:
+      id: "pause-subject-${SUBJECT_ID}"
+    timeout: 15000
+
+- assertVisible:
+    id: "pause-subject-${SUBJECT_ID}"
+
+- takeScreenshot: manage-subject-05-restored-active
+
+# ── Close modal and verify shelf reflects state ──────────────────────
+- tapOn:
+    id: "manage-subjects-close"
+
+- extendedWaitUntil:
+    visible:
+      id: "shelves-list"
+    timeout: 10000
+
+# Shelf row for the subject should be back in normal (non-paused) state.
+# shelf-row-paused should NOT be visible (subject is active again).
+- assertNotVisible:
+    id: "shelf-row-paused-${SUBJECT_ID}"
+
+- takeScreenshot: manage-subject-06-shelf-normal

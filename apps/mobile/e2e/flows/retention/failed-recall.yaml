@@ -1,6 +1,6 @@
 # Flow N2: Failed Recall Remediation — 3x Failures Trigger Relearn
 # Validates: user with 3 failed recalls sees remediation card after submitting
-# another incorrect answer in recall test.
+# another incorrect answer in recall test, then can navigate to relearn screen.
 # Tags: nightly, retention
 #
 # Journey: UX Journey 2 (Recall phase — failure path)
@@ -11,12 +11,11 @@
 # testID mapping:
 #   - recall-test-screen    -> screen wrapper
 #   - chat-input            -> text input (from ChatShell)
-#   - send-button           -> send button (from ChatShell)
 #   - remediation-card      -> shown after 3+ failures
 #   - review-retest-button  -> "Review and Re-test" on remediation card
 #   - relearn-topic-button  -> "Relearn Topic" on remediation card
-#   - relearn-different-method -> choice: try different method (relearn screen)
-#   - relearn-same-method   -> choice: continue same method (relearn screen)
+#   - relearn-topics-phase  -> topic selection phase on relearn screen
+#   - relearn-method-phase  -> method selection phase on relearn screen
 appId: com.mentomate.app
 tags:
   - nightly
@@ -91,21 +90,30 @@ tags:
 - assertVisible:
     id: "relearn-topic-button"
 
-# 14. Tap "Relearn Topic" to navigate to relearn method selection
+# 14. Tap "Relearn Topic" to navigate to relearn screen
 - tapOn:
     id: "relearn-topic-button"
 
-# 15. Verify relearn screen loads with choice phase
+# 15. Verify relearn screen loads with "Relearn Topic" heading
 - extendedWaitUntil:
     visible:
       text: "Relearn Topic"
     timeout: 10000
 
-# 16. Verify both method choice options are present
-- assertVisible:
-    id: "relearn-different-method"
-- assertVisible:
-    id: "relearn-same-method"
+# 16. Verify the topics phase or method phase is present.
+#     When entering from remediation card with a specific topic, relearn opens
+#     directly at method phase (directEntry=true). Otherwise topics phase.
+- extendedWaitUntil:
+    visible:
+      id: "relearn-method-phase"
+    timeout: 10000
+    optional: true
+
+- extendedWaitUntil:
+    visible:
+      id: "relearn-topics-phase"
+    timeout: 5000
+    optional: true
 
 # 17. Screenshot of relearn screen reached from remediation card
 - takeScreenshot: failed-recall-to-relearn

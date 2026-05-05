@@ -1,0 +1,107 @@
+# ACCOUNT-18: Subject analogy preference — non-language subject shows picker
+#
+# Navigates from home → Library → shelf → subject settings (shelf-settings gear)
+# and asserts that the AnalogyDomainPicker is visible for a non-language subject
+# (General Studies from onboarding-complete seed). Selects a domain and confirms
+# the selection is reflected by the "Active" badge.
+#
+# Seed: onboarding-complete — creates a "General Studies" subject (pedagogyMode
+#   is NOT 'four_strands'), so the analogy picker must be rendered, not hidden.
+#
+# testIDs verified against:
+#   - apps/mobile/src/app/(app)/shelf/[subjectId]/index.tsx  (shelf-settings)
+#   - apps/mobile/src/app/(app)/subject/[subjectId].tsx
+#       (subject-settings-back, subject-settings-language-empty [must NOT appear])
+#   - apps/mobile/src/components/common/AnalogyDomainPicker.tsx
+#       (analogy-domain-picker, analogy-domain-none, analogy-domain-cooking, …)
+#
+# BUG-939 companion: subject-analogy-preference-language.yaml covers the hidden case.
+#
+# Usage: ./e2e/scripts/seed-and-run.sh onboarding-complete e2e/flows/account/subject-analogy-preference.yaml
+appId: com.mentomate.app
+tags:
+  - nightly
+  - account
+---
+# 1. Seed & sign in
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "onboarding-complete"
+      API_URL: ${API_URL}
+
+# 2. Wait for learner home
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 15000
+
+# 3. Navigate to Library tab
+- tapOn:
+    id: "tab-library"
+
+- extendedWaitUntil:
+    visible:
+      id: "shelves-list"
+    timeout: 10000
+
+# 4. Tap the shelf row header to navigate to the shelf screen
+- scrollUntilVisible:
+    element:
+      id: "shelf-row-header-${SUBJECT_ID}"
+    direction: DOWN
+    timeout: 10000
+
+- tapOn:
+    id: "shelf-row-header-${SUBJECT_ID}"
+
+- extendedWaitUntil:
+    visible:
+      id: "shelf-screen"
+    timeout: 10000
+
+- takeScreenshot: 01-shelf-screen
+
+# 5. Tap the settings gear (shelf-settings) to open subject settings
+- tapOn:
+    id: "shelf-settings"
+
+# 6. Wait for subject settings screen — back button confirms the screen loaded
+- extendedWaitUntil:
+    visible:
+      id: "subject-settings-back"
+    timeout: 10000
+
+# 7. For a non-language subject the analogy picker must be visible
+- assertVisible:
+    id: "analogy-domain-picker"
+
+# The language-empty placeholder must NOT be visible for non-language subjects
+- assertNotVisible:
+    id: "subject-settings-language-empty"
+
+- takeScreenshot: 02-analogy-picker-visible
+
+# 8. First option (No preference) is always above the fold
+- assertVisible:
+    id: "analogy-domain-none"
+
+# 9. Select "Cooking" to verify selection works
+- assertVisible:
+    id: "analogy-domain-cooking"
+
+- tapOn:
+    id: "analogy-domain-cooking"
+
+- takeScreenshot: 03-cooking-selected
+
+# 10. Navigate back via the subject-settings-back button
+- tapOn:
+    id: "subject-settings-back"
+
+- extendedWaitUntil:
+    visible:
+      id: "shelf-screen"
+    timeout: 10000
+
+- takeScreenshot: 04-back-to-shelf

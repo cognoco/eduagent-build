@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { setupClerkTestingToken } from '@clerk/testing/playwright';
 
 /**
  * [BUG-754] Top-of-funnel sign-up coverage. The pre-existing
@@ -17,6 +18,10 @@ import { expect, test } from '@playwright/test';
  */
 
 test.describe('[BUG-754] sign-up flow top-of-funnel', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupClerkTestingToken({ page });
+  });
+
   test('form renders with email, password, terms, and submit @smoke', async ({
     page,
   }) => {

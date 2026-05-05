@@ -1,0 +1,102 @@
+# Flow: Home Layout — Redesigned home screen element coverage
+# Validates: subject carousel, add-subject tile, ask-anything bar, action chips
+#            (study-new, homework, practice), and coach band continue affordance.
+# Tags: weekly, learning
+#
+# Journey: UX Journey 2 (Daily Learning Loop)
+# Epics: Epic 3 (FR1-FR12 redesigned home)
+# Prerequisite: Seeded learner with at least one active subject and a due session
+#               (scenario: learning-active — populates SUBJECT_ID and TOPIC_ID)
+#
+# testID mapping:
+#   LearnerScreen (components/home/LearnerScreen.tsx):
+#     - learner-screen                  -> root container
+#     - home-subject-carousel           -> horizontal ScrollView (subjects present)
+#     - home-subject-card-${subjectId}  -> individual subject card
+#     - home-add-subject-tile           -> "New subject" tile appended to carousel
+#     - home-ask-anything               -> "Ask anything" text input / bar
+#     - home-action-study-new           -> action chip: Study something new
+#     - home-action-homework            -> action chip: Homework help
+#     - home-action-practice            -> action chip: Practice
+#   CoachBand (components/home/CoachBand.tsx):
+#     - home-coach-band                 -> coach band container
+#     - home-coach-band-continue        -> Continue button (when resumable session)
+appId: com.mentomate.app
+tags:
+  - weekly
+  - learning
+---
+# ── Setup ──────────────────────────────────────────────────────────────
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "learning-active"
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 15000
+
+- takeScreenshot: home-layout-01-landed
+
+# ── Part 1: Subject carousel ──────────────────────────────────────────
+# learning-active seeds at least one subject, so the carousel branch renders.
+- assertVisible:
+    id: "home-subject-carousel"
+
+- assertVisible:
+    id: "home-subject-card-${SUBJECT_ID}"
+
+# The "New subject" add-tile is appended after the seeded cards when not in
+# parent-proxy mode (learner persona only). Assert it exists in the carousel.
+- assertVisible:
+    id: "home-add-subject-tile"
+
+- takeScreenshot: home-layout-02-carousel-visible
+
+# ── Part 2: Ask-anything bar ─────────────────────────────────────────
+- scrollUntilVisible:
+    element:
+      id: "home-ask-anything"
+    direction: DOWN
+    timeout: 10000
+
+- assertVisible:
+    id: "home-ask-anything"
+
+- takeScreenshot: home-layout-03-ask-anything
+
+# ── Part 3: Action chips ─────────────────────────────────────────────
+- scrollUntilVisible:
+    element:
+      id: "home-action-study-new"
+    direction: DOWN
+    timeout: 10000
+
+- assertVisible:
+    id: "home-action-study-new"
+
+- assertVisible:
+    id: "home-action-homework"
+
+- assertVisible:
+    id: "home-action-practice"
+
+- takeScreenshot: home-layout-04-action-chips
+
+# ── Part 4: Coach band (data-gated — present when a resumable session exists) ──
+# learning-active has a seeded incomplete session so coach-band-continue should
+# render. Permitted optional use: UI gated by data presence.
+- scrollUntilVisible:
+    element:
+      id: "home-coach-band"
+    direction: DOWN
+    timeout: 5000
+    optional: true
+
+- assertVisible:
+    id: "home-coach-band-continue"
+    optional: true
+
+- takeScreenshot: home-layout-05-coach-band

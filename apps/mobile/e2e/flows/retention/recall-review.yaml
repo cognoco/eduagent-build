@@ -1,6 +1,6 @@
-# Flow S4: Retention — Recall Test via Topic Detail
-# Validates: user can navigate to a topic detail screen, initiate a recall test,
-# and interact with the recall ChatShell (enter answer, receive feedback).
+# Flow S4: Retention — Practice Session via Topic Detail
+# Validates: user can navigate to a topic detail screen from Library,
+# tap the study CTA, and interact with the practice session (ChatShell).
 # Tags: smoke, retention
 #
 # Journey: UX Journey 2 (recall phase)
@@ -10,13 +10,12 @@
 #
 # testIDs verified against:
 #   - apps/mobile/src/app/(app)/_layout.tsx (tab-library)
-#   - apps/mobile/src/components/library/ShelvesTab.tsx (shelves-list, subject-card-*)
-#   - apps/mobile/src/app/(app)/topic/[topicId].tsx (secondary-recall-check)
-#   - apps/mobile/src/app/(app)/topic/recall-test.tsx (recall-test-screen)
-#   - apps/mobile/src/components/session/ChatShell.tsx (chat-input, send-button)
+#   - apps/mobile/src/components/library/ShelfRow.tsx (shelves-list, shelf-row-header-*)
+#   - apps/mobile/src/app/(app)/topic/[topicId].tsx (study-cta, topic-detail-scroll)
+#   - apps/mobile/src/components/session/ChatShell.tsx (chat-input)
 #
-# NOTE: recall-question, recall-answer-input, recall-submit are removed (KNOWN_DRIFT).
-# The recall screen now uses ChatShell pattern: recall-test-screen + chat-input.
+# NOTE: secondary-recall-check removed from topic detail (KNOWN_DRIFT resolved here).
+# Practice mode is now launched via study-cta which routes to session/practice mode.
 appId: com.mentomate.app
 tags:
   - smoke
@@ -48,10 +47,11 @@ tags:
 # 5. Screenshot: Library shelves
 - takeScreenshot: recall-01-library-shelves
 
-# 6. Tap the first subject shelf card.
+# 6. Tap the first subject shelf row header.
 #    SUBJECT_ID is injected by the seed helper for the retention-due scenario.
+#    ShelfRow uses testID="shelf-row-header-${subjectId}".
 - tapOn:
-    id: "subject-card-${SUBJECT_ID}"
+    id: "shelf-row-header-${SUBJECT_ID}"
 
 # 7. Wait for the shelf screen (shows books for the subject)
 - extendedWaitUntil:
@@ -62,19 +62,7 @@ tags:
 # 8. Screenshot: shelf with books
 - takeScreenshot: recall-02-shelf
 
-# 9. Tap the first book visible — retention-due seed has one book per subject
-- tapOn:
-    id: "book-screen"
-    optional: true
-
-# 9b. Fallback: if already on book screen, just wait
-- extendedWaitUntil:
-    visible:
-      id: "book-screen"
-    timeout: 5000
-    optional: true
-
-# 9c. Tap first book by scrolling to it via text (seed names the book "World History")
+# 9. Tap first book by text (seed names the book "World History")
 - tapOn:
     text: "World History"
     optional: true
@@ -86,8 +74,7 @@ tags:
     timeout: 10000
     optional: true
 
-# 11. Navigate to a topic that has retention data — tap first topic in the list
-#     The seed creates topics with due retention cards in this book.
+# 11. Navigate to a topic — tap first topic in the list
 - tapOn:
     text: "Topic"
     optional: true
@@ -95,26 +82,26 @@ tags:
 # 12. Wait for topic detail screen
 - extendedWaitUntil:
     visible:
-      id: "retention-card"
+      id: "topic-detail-scroll"
     timeout: 10000
 
 # 13. Screenshot: topic detail
 - takeScreenshot: recall-03-topic-detail
 
-# 14. Tap the "Test recall" secondary action button
+# 14. Tap the study CTA button (routes to practice session for overdue topic)
 - tapOn:
-    id: "secondary-recall-check"
+    id: "study-cta"
 
-# 15. Wait for recall test screen (ChatShell-based)
+# 15. Wait for session/practice screen (ChatShell-based)
 - extendedWaitUntil:
     visible:
-      id: "recall-test-screen"
-    timeout: 10000
+      id: "chat-input"
+    timeout: 15000
 
-# 16. Screenshot: recall test screen
-- takeScreenshot: recall-04-recall-screen
+# 16. Screenshot: practice session screen
+- takeScreenshot: recall-04-practice-session
 
-# 17. Enter recall answer via ChatShell input
+# 17. Enter an answer via ChatShell input
 - tapOn:
     id: "chat-input"
 
@@ -132,5 +119,5 @@ tags:
       id: "chat-input"
     timeout: 15000
 
-# 20. Screenshot: recall answered and feedback received
+# 20. Screenshot: answered and feedback received
 - takeScreenshot: recall-05-complete

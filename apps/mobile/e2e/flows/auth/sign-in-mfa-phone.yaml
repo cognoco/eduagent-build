@@ -1,0 +1,36 @@
+# Flow A-MFA-3: Sign-in MFA — Phone code branch
+#
+# BLOCKED: Same infrastructure gap as sign-in-mfa-email-code.yaml.
+# Phone-code MFA requires a Clerk test user with a verified phone number and
+# phone-code 2FA enrolled. The E2E environment uses real Clerk accounts;
+# without CLERK_TESTING_TOKEN wired, Clerk may rate-limit or block SMS delivery
+# to test phone numbers, making this branch non-deterministic.
+#
+# Unblock path:
+#   1. Wire CLERK_TESTING_TOKEN in Doppler — this bypasses SMS delivery and
+#      Clerk returns a deterministic test code.
+#   2. Add "mfa-phone" seed scenario to test-seed.ts enrolling phone-code 2FA
+#      with a Clerk-supported test phone number (+15555550100 or similar).
+#   3. Export ${MFA_CODE} from the seed response (or rely on CLERK_TESTING_TOKEN
+#      deterministic codes).
+#   4. Remove this BLOCKED comment and implement the flow below.
+#
+# testIDs (confirmed in apps/mobile/src/app/(auth)/sign-in.tsx):
+#   sign-in-verify-code  line 1030
+#   sign-in-verify-button line 1041
+#   sign-in-resend-code  line 1067
+#   sign-in-back-from-verify line 1078
+#
+# Seed scenario needed: "mfa-phone" (does not yet exist)
+# Run command: ./e2e/scripts/seed-and-run.sh --no-seed e2e/flows/auth/sign-in-mfa-phone.yaml
+
+# BLOCKED: implement after mfa-phone seed scenario + CLERK_TESTING_TOKEN are wired.
+appId: com.mentomate.app
+tags:
+  - weekly
+  - auth
+---
+# Placeholder: flow body will be written once infrastructure is unblocked.
+- launchApp:
+    appId: "com.mentomate.app"
+    stopApp: false

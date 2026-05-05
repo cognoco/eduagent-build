@@ -1,0 +1,109 @@
+# Flow LEARN-25: Library inline search — debounce + server results + empty state + clear.
+# Validates: search input -> server results (shelf filtered) -> clear X -> empty state -> clear button.
+# Tags: nightly, learning
+#
+# Prerequisite: learning-active seed (learner + "World History" subject + book).
+# Env vars: SUBJECT_ID, BOOK_ID
+#
+# testIDs verified against:
+#   - apps/mobile/src/components/library/LibrarySearchBar.tsx
+#       (library-search-input, library-search-clear)
+#   - apps/mobile/src/app/(app)/library.tsx
+#       (shelves-list, library-search-server-loading, library-search-empty,
+#        library-search-clear-results)
+#   - apps/mobile/src/components/library/ShelfRow.tsx (shelf-row-header-${SUBJECT_ID})
+#
+# Note: The plan referenced library-search-result-${BOOK_ID} which does not exist in source.
+# Search filters the shelves-list in place — matching subjects remain as shelf-row-header rows.
+# We assert shelf-row-header-${SUBJECT_ID} remains visible after a matching query, and
+# disappears after entering a no-match query (library-search-empty appears instead).
+appId: com.mentomate.app
+tags:
+  - nightly
+  - learning
+---
+# 1. Seed & sign in
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "learning-active"
+      API_URL: ${API_URL}
+
+# 2. Wait for learner home
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 15000
+
+# 3. Navigate to Library tab
+- tapOn:
+    id: "tab-library"
+
+- extendedWaitUntil:
+    visible:
+      id: "shelves-list"
+    timeout: 10000
+
+- takeScreenshot: search-01-library-loaded
+
+# 4. Tap search input and type a matching query ("World" matches "World History")
+- tapOn:
+    id: "library-search-input"
+
+- inputText: "World"
+
+# 5. Wait past 300ms debounce + server round-trip.
+#    The seeded subject "World History" should remain in visibleSubjects.
+- extendedWaitUntil:
+    visible:
+      id: "shelf-row-header-${SUBJECT_ID}"
+    timeout: 5000
+
+- takeScreenshot: search-02-results-visible
+
+# 6. Optional: server loading indicator may flash briefly
+- assertVisible:
+    id: "library-search-server-loading"
+    optional: true
+
+# 7. Verify the matching shelf is still present (search did not hide it)
+- assertVisible:
+    id: "shelf-row-header-${SUBJECT_ID}"
+
+# 8. Clear the search using the X button in the search bar
+- tapOn:
+    id: "library-search-clear"
+
+- takeScreenshot: search-03-cleared
+
+# 9. Library should show all shelves again after clear
+- extendedWaitUntil:
+    visible:
+      id: "shelves-list"
+    timeout: 5000
+
+# 10. Type a no-match query to trigger empty state
+- tapOn:
+    id: "library-search-input"
+
+- inputText: "zzzznoresults"
+
+# 11. Wait for empty state to appear (no matching subjects or topics)
+- extendedWaitUntil:
+    visible:
+      id: "library-search-empty"
+    timeout: 5000
+
+- takeScreenshot: search-04-empty-state
+
+# 12. Tap the "Clear search" button in the empty state to reset
+- tapOn:
+    id: "library-search-clear-results"
+
+# 13. Library should show all shelves again
+- extendedWaitUntil:
+    visible:
+      id: "shelves-list"
+    timeout: 5000
+
+- takeScreenshot: search-05-back-to-library

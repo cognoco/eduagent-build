@@ -6,6 +6,7 @@
 // contract drift loudly (see fallback branches below) instead of silently
 // returning empty rows.
 
+
 type BillingTier = 'free' | 'plus' | 'family' | 'pro';
 type BillingStatus = 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired';
 
@@ -105,6 +106,7 @@ export function createRouteMeteringFixture(
     createdAt: new Date('2026-05-01T00:00:00.000Z'),
     updatedAt: new Date('2026-05-01T00:00:00.000Z'),
   });
+
 
   const subscriptionAccessor = {
     findFirst: jest.fn(async () => ({

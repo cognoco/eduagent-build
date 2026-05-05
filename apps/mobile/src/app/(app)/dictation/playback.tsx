@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef } from 'react';
-import { BackHandler, Pressable, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { BackHandler, Modal, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,7 +7,6 @@ import { useTranslation } from 'react-i18next';
 import { useDictationPlayback } from '../../../hooks/use-dictation-playback';
 import { useDictationPreferences } from '../../../hooks/use-dictation-preferences';
 import { goBackOrReplace } from '../../../lib/navigation';
-import { platformAlert } from '../../../lib/platform-alert';
 import { useProfile } from '../../../lib/profile';
 import { useThemeColors } from '../../../lib/theme';
 import { useDictationData } from './_layout';
@@ -19,6 +18,7 @@ export default function PlaybackScreen(): React.ReactElement {
   const colors = useThemeColors();
   const { activeProfile } = useProfile();
   const { data } = useDictationData();
+  const [exitConfirmVisible, setExitConfirmVisible] = useState(false);
 
   const prefs = useDictationPreferences(activeProfile?.id);
 
@@ -55,20 +55,17 @@ export default function PlaybackScreen(): React.ReactElement {
   }, [playback.state, router]);
 
   // Back press confirmation — RF-09: progress is not auto-recorded, explicit user action only
+  // [DICT-05] Replaced platformAlert with an in-app Modal so Maestro can target
+  // the confirm button by testID and the flow survives i18n locale changes.
+  // Mirrors the quiz quit-confirm pattern (BUG-892 / quiz/play.tsx).
   const handleExit = useCallback(() => {
-    platformAlert(
-      t('dictation.playback.exitTitle'),
-      t('dictation.playback.exitMessage'),
-      [
-        { text: t('dictation.playback.keepGoing'), style: 'cancel' },
-        {
-          text: t('dictation.playback.leave'),
-          style: 'destructive',
-          onPress: () => router.replace('/(app)/practice' as never),
-        },
-      ]
-    );
-  }, [router, t]);
+    setExitConfirmVisible(true);
+  }, []);
+
+  const handleConfirmExit = useCallback(() => {
+    setExitConfirmVisible(false);
+    router.replace('/(app)/practice' as never);
+  }, [router]);
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -237,6 +234,60 @@ export default function PlaybackScreen(): React.ReactElement {
           </Text>
         </Pressable>
       </View>
+
+      {/* [DICT-05] Exit confirmation as in-app Modal — testID enables Maestro
+          to tap the confirm button without relying on translated text strings,
+          fixing i18n breakage in non-en locales. */}
+      <Modal
+        visible={exitConfirmVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setExitConfirmVisible(false)}
+      >
+        <Pressable
+          className="flex-1 bg-black/40 justify-center items-center px-6"
+          onPress={() => setExitConfirmVisible(false)}
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss"
+          testID="dictation-exit-modal-backdrop"
+        >
+          <Pressable
+            className="bg-background rounded-2xl w-full max-w-sm p-6"
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text className="text-h3 font-bold text-text-primary text-center">
+              {t('dictation.playback.exitTitle')}
+            </Text>
+            <Text className="text-body-sm text-text-secondary text-center mt-3 leading-relaxed">
+              {t('dictation.playback.exitMessage')}
+            </Text>
+            <View className="mt-5 gap-3">
+              <Pressable
+                onPress={handleConfirmExit}
+                className="bg-danger rounded-button py-3 items-center min-h-[48px] justify-center"
+                accessibilityRole="button"
+                accessibilityLabel={t('dictation.playback.leave')}
+                testID="dictation-exit-confirm"
+              >
+                <Text className="text-body font-semibold text-text-inverse">
+                  {t('dictation.playback.leave')}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setExitConfirmVisible(false)}
+                className="bg-surface rounded-button py-3 items-center min-h-[48px] justify-center"
+                accessibilityRole="button"
+                accessibilityLabel={t('dictation.playback.keepGoing')}
+                testID="dictation-exit-cancel"
+              >
+                <Text className="text-body font-semibold text-text-primary">
+                  {t('dictation.playback.keepGoing')}
+                </Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }

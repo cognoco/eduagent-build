@@ -1,15 +1,22 @@
 # Flow N5: Multi-Subject Management — View and Navigate Subjects
 # Validates: user with multiple subjects (active, paused, archived) can
-# view subjects on home screen, navigate between tabs, and see subject detail.
-# Tags: nightly, subjects
+# view subjects on home screen, navigate to Library v3 (single-pane shelf list),
+# and return to home.
+# Tags: pr-blocking, subjects
 #
 # Journey: UX Journey 1 (Subject Management)
 # Epics: Epic 1 (FR10-FR14), Epic 4 (FR70-FR72)
 # Prerequisite: Seeded user with Physics (active), Literature (paused),
 #               Art History (archived) (scenario: multi-subject)
+#
+# testIDs verified against:
+#   - apps/mobile/src/components/home/LearnerScreen.tsx (learner-screen,
+#     home-subject-carousel, home-subject-card-${id})
+#   - apps/mobile/src/app/(app)/library.tsx (shelves-list)
+#   - apps/mobile/src/app/(app)/_layout.tsx (tab-library, tab-home)
 appId: com.mentomate.app
 tags:
-  - nightly
+  - pr-blocking
   - subjects
 ---
 # 1. Seed & sign in
@@ -43,59 +50,50 @@ tags:
 # 3. Screenshot: home screen — captures what's actually rendering
 - takeScreenshot: multi-subject-01-home
 
-# 4. Physics (active subject) MUST be visible on home screen
+# 4. Physics (active subject) card MUST be visible on home screen.
+#    home-subject-card-${id} is the testID in LearnerScreen.tsx (home-subject-carousel).
+#    seed-and-run.sh provides ACTIVE_SUBJECT_ID for the Physics subject.
 - extendedWaitUntil:
     visible:
-      text: "Physics"
+      id: "home-subject-card-${ACTIVE_SUBJECT_ID}"
     timeout: 10000
-
-# ── Visual integrity: subject list section ─────────────────────────────
-# "Your subjects" heading must appear when subjects exist.
-# Catches empty-state rendering when data should be present (BUG-31 pattern).
-- scrollUntilVisible:
-    element:
-      text: "Your subjects"
-    direction: DOWN
-    timeout: 5000
 
 # ── Negative assertions: empty-state must NOT appear with real data ───
 # If seeded with subjects, the empty-state placeholder must not render.
-# Catches counter mismatch bugs where data loads but empty UI shows.
-# Full text match required — Maestro on Android can't reliably match substrings
-# inside React Native <Text> nodes (BUG-57 pattern).
 - assertNotVisible:
-    text: "Start learning — add your first subject"
+    id: "home-empty-subjects"
 
-# 5. Navigate to Library tab
-- tapOn: "Library Tab"
+# 5. Navigate to Library tab (v3 single-pane shelf list)
+- tapOn:
+    id: "tab-library"
 
-# 6. Wait for Library to render
+# 6. Wait for Library v3 shelf list to render
 - extendedWaitUntil:
     visible:
-      text: "Library"
+      id: "shelves-list"
     timeout: 10000
 
-# 7. Screenshot: Library content
+# 7. Verify at least one shelf row is present for the active subject
+- assertVisible:
+    id: "shelf-row-header-${ACTIVE_SUBJECT_ID}"
+
+# 8. Screenshot: Library v3 content
 - takeScreenshot: multi-subject-02-library
 
-# 8. Navigate back to Home tab
-- tapOn: "Home Tab"
+# 9. Navigate back to Home tab
+- tapOn:
+    id: "tab-home"
 
-# 9. Verify home screen is visible again
+# 10. Verify home screen is visible again
 - extendedWaitUntil:
     visible:
       id: "learner-screen"
     timeout: 10000
 
-# 10. Verify Physics still visible after round-trip
-- assertVisible:
-    text: "Physics"
-
-# 11. Tap the Physics subject card via testID (more reliable than text: "Physics"
-#     which can match multiple elements on screen — coaching card, subject card, etc.)
-#     seed-and-run.sh provides ACTIVE_SUBJECT_ID for the Physics subject.
+# 11. Tap the Physics subject card via testID.
+#     home-subject-card-${id} is in LearnerScreen's carousel.
 - tapOn:
-    id: "home-subject-${ACTIVE_SUBJECT_ID}"
+    id: "home-subject-card-${ACTIVE_SUBJECT_ID}"
 
 # 12. Wait for curriculum review screen (navigated from home tap).
 #     home.tsx navigates to /(learner)/onboarding/curriculum-review.

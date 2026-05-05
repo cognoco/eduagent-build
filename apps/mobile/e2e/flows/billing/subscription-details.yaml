@@ -50,9 +50,14 @@ tags:
       id: "subscription-screen"
     timeout: 30000
 
-# 7. Verify trial banner text
+# 7. Verify trial banner by testID
 - assertVisible:
-    text: "Trial active"
+    id: "trial-banner"
+
+# 7a. Verify trial end-date text when present (only when trialEndsAt is set)
+- assertVisible:
+    id: "trial-banner-ends-at"
+    optional: true   # only rendered when subscription.trialEndsAt is set — permitted use of optional
 
 # 8. Screenshot of trial banner
 - takeScreenshot: subscription-details-trial-banner

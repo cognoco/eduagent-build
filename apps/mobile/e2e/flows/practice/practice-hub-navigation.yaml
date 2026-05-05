@@ -1,0 +1,171 @@
+# Flow PRACTICE-01..02: Practice hub navigation
+# Validates: every menu item in the Practice screen navigates to its destination screen.
+# Tags: nightly, practice
+#
+# Journey: UX Journey 3 (Practice & Reinforcement)
+# Prerequisite: Seeded learner with an active subject (scenario: learning-active)
+#
+# testIDs verified against:
+#   - apps/mobile/src/components/home/LearnerScreen.tsx (home-action-practice)
+#   - apps/mobile/src/app/(app)/practice.tsx
+#       (practice-screen, practice-review, practice-recitation,
+#        practice-dictation, practice-quiz, practice-quiz-history, practice-back)
+#   - apps/mobile/src/app/(app)/topic/relearn.tsx (relearn-back)
+#   - apps/mobile/src/components/session/ChatShell.tsx (chat-shell-back)
+#   - apps/mobile/src/app/(app)/dictation/index.tsx (dictation-choice-back)
+#   - apps/mobile/src/app/(app)/quiz/index.tsx (quiz-back)
+#   - apps/mobile/src/app/(app)/quiz/history.tsx (quiz-history-back)
+appId: com.mentomate.app
+tags:
+  - nightly
+  - practice
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "learning-active"
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 15000
+
+# Navigate to Practice hub
+- scrollUntilVisible:
+    element:
+      id: "home-action-practice"
+    direction: DOWN
+    timeout: 5000
+
+- tapOn:
+    id: "home-action-practice"
+
+- extendedWaitUntil:
+    visible:
+      id: "practice-screen"
+    timeout: 10000
+
+- takeScreenshot: practice-hub-01-landing
+
+# ── Arm 1: Review ──
+- tapOn:
+    id: "practice-review"
+
+- extendedWaitUntil:
+    visible:
+      id: "relearn-back"
+    timeout: 10000
+
+- takeScreenshot: practice-hub-02-relearn
+
+- tapOn:
+    id: "relearn-back"
+
+- extendedWaitUntil:
+    visible:
+      id: "practice-screen"
+    timeout: 5000
+
+# ── Arm 2: Recitation ──
+- scrollUntilVisible:
+    element:
+      id: "practice-recitation"
+    direction: DOWN
+    timeout: 5000
+
+- tapOn:
+    id: "practice-recitation"
+
+# Session screen: assert chat-input renders (ChatShell always shows it)
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 15000
+
+- takeScreenshot: practice-hub-03-recitation-session
+
+- tapOn:
+    id: "chat-shell-back"
+
+- extendedWaitUntil:
+    visible:
+      id: "practice-screen"
+    timeout: 5000
+
+# ── Arm 3: Dictation ──
+- scrollUntilVisible:
+    element:
+      id: "practice-dictation"
+    direction: DOWN
+    timeout: 5000
+
+- tapOn:
+    id: "practice-dictation"
+
+- extendedWaitUntil:
+    visible:
+      id: "dictation-choice-back"
+    timeout: 10000
+
+- takeScreenshot: practice-hub-04-dictation
+
+- tapOn:
+    id: "dictation-choice-back"
+
+- extendedWaitUntil:
+    visible:
+      id: "practice-screen"
+    timeout: 5000
+
+# ── Arm 4: Quiz ──
+- scrollUntilVisible:
+    element:
+      id: "practice-quiz"
+    direction: DOWN
+    timeout: 5000
+
+- tapOn:
+    id: "practice-quiz"
+
+- extendedWaitUntil:
+    visible:
+      id: "quiz-index-screen"
+    timeout: 10000
+
+- takeScreenshot: practice-hub-05-quiz-index
+
+- tapOn:
+    id: "quiz-back"
+
+- extendedWaitUntil:
+    visible:
+      id: "practice-screen"
+    timeout: 5000
+
+# ── Arm 5: Quiz History ──
+- scrollUntilVisible:
+    element:
+      id: "practice-quiz-history"
+    direction: DOWN
+    timeout: 5000
+
+- tapOn:
+    id: "practice-quiz-history"
+
+- extendedWaitUntil:
+    visible:
+      id: "quiz-history-screen"
+    timeout: 10000
+
+- takeScreenshot: practice-hub-06-quiz-history
+
+- tapOn:
+    id: "quiz-history-back"
+
+- extendedWaitUntil:
+    visible:
+      id: "practice-screen"
+    timeout: 5000
+
+- takeScreenshot: practice-hub-07-back-at-hub

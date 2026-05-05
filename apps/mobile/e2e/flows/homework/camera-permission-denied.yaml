@@ -1,0 +1,70 @@
+# Flow: Homework Camera — Permanently-Denied Permission State
+# Validates: the camera permission screen shows open-settings-button (not
+#            grant-permission-button) when camera permission is permanently denied.
+# Tags: nightly, homework, camera
+#
+# Journey: UX Journey 2 (Homework phase — camera-first capture)
+# Epics: Epic 2 (Story 2.5 — Camera capture + OCR)
+# Prerequisite: Seeded user with completed learning session + subject
+#               (scenario: homework-ready) AND camera permission pre-revoked.
+#
+# IMPORTANT: This flow must be invoked via seed-and-run-permdenied.sh, NOT
+#            seed-and-run.sh. The permdenied wrapper calls:
+#              adb shell pm clear com.mentomate.app
+#              adb shell pm revoke com.mentomate.app android.permission.CAMERA
+#            which puts the device in "permission denied, cannot ask again" state.
+#
+# Run command:
+#   ./e2e/scripts/seed-and-run-permdenied.sh homework-ready e2e/flows/homework/camera-permission-denied.yaml
+#
+# testIDs verified against:
+#   - apps/mobile/src/app/(app)/homework/camera.tsx (open-settings-button, close-button)
+#   - apps/mobile/src/components/home/LearnerScreen.tsx (home-action-homework)
+appId: com.mentomate.app
+tags:
+  - nightly
+  - homework
+  - camera
+---
+# 1. Seed & sign in (homework-ready scenario)
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "homework-ready"
+      API_URL: ${API_URL}
+
+# 2. Wait for home screen
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 15000
+
+- takeScreenshot: camera-denied-01-home
+
+# 3. Navigate to homework camera via the home action button
+- scrollUntilVisible:
+    element:
+      id: "home-action-homework"
+    direction: DOWN
+    timeout: 5000
+
+- tapOn:
+    id: "home-action-homework"
+
+# 4. Verify permission screen is shown (Camera Access Needed)
+- extendedWaitUntil:
+    visible:
+      text: "Camera Access Needed"
+    timeout: 10000
+
+- takeScreenshot: camera-denied-02-permission-screen
+
+# 5. Assert permanently-denied state: open-settings-button visible (not grant-permission-button)
+- assertVisible:
+    id: "open-settings-button"
+
+# 6. Assert close button is present (escape from dead-end)
+- assertVisible:
+    id: "close-button"
+
+- takeScreenshot: camera-denied-03-permanently-denied

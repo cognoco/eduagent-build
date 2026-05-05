@@ -1,0 +1,142 @@
+# Flow QUIZ-05: Mid-round quit modal
+# Validates:
+#   Arm A — tap close → backdrop appears → tap cancel → round still active
+#   Arm B — tap close → tap confirm → returns to quiz index
+# Tags: nightly, quiz
+#
+# Journey: UX Journey 3 (Practice & Reinforcement)
+# Prerequisite: Seeded learner with an active subject (scenario: learning-active)
+#
+# testIDs verified against:
+#   - apps/mobile/src/app/(app)/practice.tsx (practice-screen, practice-quiz)
+#   - apps/mobile/src/app/(app)/quiz/index.tsx (quiz-index-screen, quiz-capitals)
+#   - apps/mobile/src/app/(app)/quiz/launch.tsx (quiz-challenge-start, quiz-launch-loading)
+#   - apps/mobile/src/app/(app)/quiz/play.tsx
+#       (quiz-play-screen, quiz-play-quit, quiz-quit-modal-backdrop,
+#        quiz-quit-cancel, quiz-quit-confirm, quiz-option-0, quiz-index-screen)
+#
+# [BUG-892] Quit confirmation uses an in-app Modal (not Alert.alert/window.confirm)
+# so this test exercises the real quit path on both mobile and web.
+appId: com.mentomate.app
+tags:
+  - nightly
+  - quiz
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "learning-active"
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 15000
+
+# Navigate to Practice → Quiz
+- scrollUntilVisible:
+    element:
+      id: "home-action-practice"
+    direction: DOWN
+    timeout: 5000
+
+- tapOn:
+    id: "home-action-practice"
+
+- extendedWaitUntil:
+    visible:
+      id: "practice-screen"
+    timeout: 10000
+
+- scrollUntilVisible:
+    element:
+      id: "practice-quiz"
+    direction: DOWN
+    timeout: 5000
+
+- tapOn:
+    id: "practice-quiz"
+
+- extendedWaitUntil:
+    visible:
+      id: "quiz-index-screen"
+    timeout: 10000
+
+- tapOn:
+    id: "quiz-capitals"
+
+# Optional challenge banner (shown for some accounts)
+- extendedWaitUntil:
+    visible:
+      id: "quiz-challenge-start"
+    timeout: 5000
+    optional: true
+
+- tapOn:
+    id: "quiz-challenge-start"
+    optional: true
+
+- extendedWaitUntil:
+    visible:
+      id: "quiz-play-screen"
+    timeout: 30000
+
+- takeScreenshot: quit-01-play-screen
+
+# Answer the first question so the round is genuinely in-progress
+- extendedWaitUntil:
+    visible:
+      id: "quiz-option-0"
+    timeout: 5000
+
+- tapOn:
+    id: "quiz-option-0"
+
+- takeScreenshot: quit-02-answered-first
+
+# ── Arm A: tap close → modal appears → cancel → round still active ──
+- tapOn:
+    id: "quiz-play-quit"
+
+- extendedWaitUntil:
+    visible:
+      id: "quiz-quit-modal-backdrop"
+    timeout: 5000
+
+- assertVisible:
+    id: "quiz-quit-modal-backdrop"
+
+- takeScreenshot: quit-03-modal-visible
+
+- tapOn:
+    id: "quiz-quit-cancel"
+
+# Modal dismissed — play screen must still be active
+- extendedWaitUntil:
+    visible:
+      id: "quiz-play-screen"
+    timeout: 5000
+
+- assertVisible:
+    id: "quiz-play-screen"
+
+- takeScreenshot: quit-04-round-still-active
+
+# ── Arm B: tap close → confirm → returns to quiz index ──
+- tapOn:
+    id: "quiz-play-quit"
+
+- extendedWaitUntil:
+    visible:
+      id: "quiz-quit-modal-backdrop"
+    timeout: 5000
+
+- tapOn:
+    id: "quiz-quit-confirm"
+
+- extendedWaitUntil:
+    visible:
+      id: "quiz-index-screen"
+    timeout: 10000
+
+- takeScreenshot: quit-05-returned-to-index

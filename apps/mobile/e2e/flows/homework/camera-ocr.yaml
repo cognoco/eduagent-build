@@ -57,9 +57,10 @@ tags:
     optional: true
 
 # ──────────────────────────────────────────────────
-# 4. Permission phase — camera access prompt
-#    The screen shows "Camera Access Needed" with a
-#    grant-permission-button or open-settings-button.
+# 4. Permission phase — first-request camera access prompt
+#    The screen shows "Camera Access Needed" with grant-permission-button.
+#    The permanently-denied path (open-settings-button) is covered separately
+#    in camera-permission-denied.yaml, run via seed-and-run-permdenied.sh.
 # ──────────────────────────────────────────────────
 - extendedWaitUntil:
     visible:

@@ -1,0 +1,105 @@
+# Flow LEARN-23 (Step 2): Session transcript — parent-proxy privacy gate.
+# Validates: [CR-PR129-M5] view-transcript-cta is hidden when isParentProxy=true.
+# Parent switches to child profile (proxy mode) and confirms no transcript link on session summary.
+# Tags: nightly, learning, parent
+#
+# Prerequisite: parent-proxy seed — parent account + child profile + completed session.
+# Env vars: CHILD_PROFILE_ID, SESSION_ID, SUBJECT_ID, BOOK_ID
+#
+# testIDs verified against:
+#   - apps/mobile/src/app/session-summary/[sessionId].tsx (summary-title, view-transcript-cta)
+#       view-transcript-cta is rendered only when !isParentProxy (line 922).
+#   - apps/mobile/src/components/library/ShelfRow.tsx (shelf-row-header-${SUBJECT_ID})
+#   - apps/mobile/src/components/library/BookRow.tsx (book-row-${BOOK_ID})
+#   - apps/mobile/src/app/(app)/shelf/[subjectId]/book/[bookId].tsx (session-${SESSION_ID})
+appId: com.mentomate.app
+tags:
+  - nightly
+  - learning
+  - parent
+---
+# 1. Seed & sign in (seeds as parent owner, lands on parent dashboard or learner home)
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "parent-proxy"
+      API_URL: ${API_URL}
+
+# 2. Switch active profile to child — activates proxy mode (isParentProxy = true)
+#    switch-to-child navigates More → Profiles → taps child by display name.
+#    parent-proxy seed names the child "Proxy Child".
+- runFlow:
+    file: ../_setup/switch-to-child.yaml
+    env:
+      CHILD_NAME: "Proxy Child"
+
+# 3. Wait for learner home in child (proxy) context
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 15000
+
+- takeScreenshot: proxy-transcript-01-learner-home
+
+# 4. Navigate to Library tab
+- tapOn:
+    id: "tab-library"
+
+- extendedWaitUntil:
+    visible:
+      id: "shelves-list"
+    timeout: 10000
+
+# 5. Expand the child's subject shelf (Science)
+- tapOn:
+    id: "shelf-row-header-${SUBJECT_ID}"
+
+# 6. Tap the book row to open book detail
+- extendedWaitUntil:
+    visible:
+      id: "book-row-${BOOK_ID}"
+    timeout: 5000
+
+- tapOn:
+    id: "book-row-${BOOK_ID}"
+
+- extendedWaitUntil:
+    visible:
+      id: "book-screen"
+    timeout: 15000
+
+- takeScreenshot: proxy-transcript-02-book-detail
+
+# 7. Scroll to sessions section and tap the seeded session
+- scrollUntilVisible:
+    element:
+      id: "book-sessions-section"
+    direction: DOWN
+    timeout: 8000
+
+- tapOn:
+    id: "book-sessions-toggle"
+
+- extendedWaitUntil:
+    visible:
+      id: "session-${SESSION_ID}"
+    timeout: 8000
+
+- tapOn:
+    id: "session-${SESSION_ID}"
+
+# 8. Wait for session summary screen
+- extendedWaitUntil:
+    visible:
+      id: "summary-title"
+    timeout: 15000
+
+- takeScreenshot: proxy-transcript-03-session-summary
+
+# 9. Core assertion: transcript CTA must NOT be visible in proxy mode.
+#    [CR-PR129-M5] view-transcript-cta is conditionally rendered only when
+#    !isParentProxy. In proxy mode the element must be absent from the hierarchy.
+- assertNotVisible:
+    id: "view-transcript-cta"
+
+- takeScreenshot: proxy-transcript-04-no-transcript-link

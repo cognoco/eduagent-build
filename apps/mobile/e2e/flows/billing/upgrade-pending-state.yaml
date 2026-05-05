@@ -1,0 +1,111 @@
+# Flow: Upgrade Pending State — Free user pre-webhook [BILLING-02]
+# Validates: subscription screen for a free-tier user whose RevenueCat purchase
+# is initiated but the webhook has not confirmed the upgrade (purchase-pending
+# seed). The emulator has no Play Store, so RevenueCat returns no offerings —
+# the screen renders the static no-offerings fallback. The purchase-polling-
+# indicator (testID="purchase-polling-indicator") is inside the offerings
+# section which is absent without RevenueCat; it cannot be asserted from seeded
+# state alone. We assert the UI state the user sees while waiting: free plan
+# card + upgrade button + static plan comparison.
+#
+# NOTE: purchase-polling-indicator is ephemeral component state (set only when
+# the user has just tapped "purchase" and the RevenueCat callback fires). It
+# requires a live sandbox purchase to assert. See BILLING-02 Step 4 for the
+# deferred sandbox-automation followup.
+#
+# Tags: weekly, billing
+#
+# Journey: UX Journey 5 (Billing & Subscription)
+# Epics: Epic 5 (FR95-FR100), Epic 9 (RevenueCat IAP)
+# Prerequisite: Seeded free-tier user with no confirmed upgrade (scenario: purchase-pending)
+appId: com.mentomate.app
+tags:
+  - weekly
+  - billing
+---
+# 1. Seed & sign in
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "purchase-pending"
+      API_URL: ${API_URL}
+
+# 2. Wait for home screen
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 15000
+
+# 3. Navigate to More tab
+- tapOn:
+    text: "More"
+
+# 4. Wait for More screen
+- extendedWaitUntil:
+    visible:
+      id: "learning-mode-casual"
+    timeout: 10000
+
+# 5. Scroll to and tap Subscription row
+- scrollUntilVisible:
+    element:
+      id: "more-row-subscription"
+    direction: DOWN
+    timeout: 15000
+
+- tapOn:
+    id: "more-row-subscription"
+
+# 6. Verify subscription screen loaded
+- extendedWaitUntil:
+    visible:
+      id: "subscription-screen"
+    timeout: 15000
+
+- takeScreenshot: upgrade-pending-subscription-screen
+
+# 7. Verify current plan shows Free tier
+- assertVisible:
+    id: "current-plan"
+
+# 8. Verify the Upgrade button is present (free tier, pre-confirmation)
+- assertVisible:
+    id: "free-upgrade-button"
+
+- takeScreenshot: upgrade-pending-free-upgrade-button
+
+# 9. Scroll down to the static tier comparison (no RevenueCat offerings in emulator)
+- scrollUntilVisible:
+    element:
+      id: "no-offerings"
+    direction: DOWN
+    timeout: 15000
+
+# 10. Verify static no-offerings section is shown (RevenueCat unavailable in emulator)
+- assertVisible:
+    id: "no-offerings"
+
+- takeScreenshot: upgrade-pending-no-offerings
+
+# 11. Verify static Free tier card is present and highlighted as current plan
+- assertVisible:
+    id: "static-tier-free"
+
+# 12. Verify static Plus tier card is present as the upgrade target
+- assertVisible:
+    id: "static-tier-plus"
+
+- takeScreenshot: upgrade-pending-static-tier-comparison
+
+# 13. Scroll down to restore purchases button
+- scrollUntilVisible:
+    element:
+      id: "restore-purchases-button"
+    direction: DOWN
+    timeout: 15000
+
+# 14. Restore purchases button must be available
+- assertVisible:
+    id: "restore-purchases-button"
+
+- takeScreenshot: upgrade-pending-state-complete

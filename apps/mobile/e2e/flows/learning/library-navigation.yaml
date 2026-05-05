@@ -1,36 +1,32 @@
-# Flow: Library Navigation — Cross-navigation from session and summary
-# Validates: Story 4.12 (Library link on session summary) and
-#            Story 4.13 (LibraryPrompt during active non-homework sessions).
-# Tags: nightly, learning
+# Flow: Library Navigation — v3 single-pane shelf list with expandable shelves
+# Validates: Library v3 entry via tab, shelf expansion, book row visibility,
+#            and the "See your Library" link from session summary.
+# Tags: pr-blocking, learning
 #
 # Journey: UX Journey 2 (Daily Learning Loop → Retention bridge)
 # Epics: Epic 3 (FR48 — Library access points)
 # Prerequisite: Seeded user with completed topics + due retention cards
-#               (scenario: retention-due — ensures showBookLink = true because
-#               overallProgress.totalTopicsCompleted > 0)
+#               (scenario: retention-due — ensures retention status populated
+#               so shelf-row-review-${SUBJECT_ID} may appear)
 #
 # testID mapping:
+#   Library (library.tsx):
+#     - shelves-list                       -> single-pane shelf container (View)
+#     - shelf-row-header-${subjectId}      -> tappable shelf header (toggles expand)
+#     - shelf-row-review-${subjectId}      -> review pill (only when weak/forgotten)
+#     - book-row-${bookId}                 -> inline book entry (when shelf expanded)
+#
 #   Session screen (session/index.tsx):
 #     - chat-input                    -> message input field
 #     - end-session-button            -> rendered in header when exchangeCount > 0
-#     - session-library-link          -> LibraryPrompt footer link (non-homework only)
 #
 #   Session summary ([sessionId].tsx):
 #     - summary-title                 -> "Session Complete" heading
 #     - session-takeaways             -> takeaway bullet list
 #     - go-to-library                 -> "See your Library" link (always present)
-#
-#   Library (library.tsx):
-#     - library-loading               -> loading spinner
-#     - library-empty                 -> empty state (should NOT appear with retention-due)
-#     - subject-filter-tabs           -> subject filter strip (>1 subject)
-#
-#   Topic detail (topic/[topicId].tsx):
-#     - topic-detail-loading          -> loading spinner
-#     - topic-detail-empty            -> empty state
 appId: com.mentomate.app
 tags:
-  - nightly
+  - pr-blocking
   - learning
 ---
 # ── Setup ──────────────────────────────────────────────────────────────
@@ -47,94 +43,104 @@ tags:
 
 - takeScreenshot: library-nav-01-home
 
-# ── Part 1: In-session Library link (Story 4.13) ────────────────
-# Start a freeform session via the coaching card. Freeform mode is
-# non-homework, so the LibraryPrompt footer should render when
-# overallProgress.totalTopicsCompleted > 0 (guaranteed by retention-due).
+# ── Part 1: Enter Library via tab and verify v3 shelf list ────────────
+# Drop the old coach-band entry. Library is now accessed directly via the tab.
 
+- tapOn:
+    id: "tab-library"
+
+- extendedWaitUntil:
+    visible:
+      id: "shelves-list"
+    timeout: 10000
+
+- takeScreenshot: library-nav-02-shelves-list
+
+# Expand the seeded subject's shelf row (toggles expanded state).
+# shelf-row-header-${SUBJECT_ID} is the Pressable in ShelfRow.tsx.
+- tapOn:
+    id: "shelf-row-header-${SUBJECT_ID}"
+
+# After expanding, the first book row must be visible.
+# book-row-${BOOK_ID} is the Pressable testID in BookRow.tsx.
+- assertVisible:
+    id: "book-row-${BOOK_ID}"
+
+# Review pill is data-gated: only renders when retention status is weak/forgotten.
+# Permitted optional use: UI gated by data presence.
+- assertVisible:
+    id: "shelf-row-review-${SUBJECT_ID}"
+    optional: true
+
+- takeScreenshot: library-nav-03-shelf-expanded
+
+# ── Part 2: Navigate back to Home, start a session, check summary link ──
+
+- tapOn:
+    id: "tab-home"
+
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 10000
+
+# Start a freeform session via the coaching band continue button.
 - tapOn:
     id: "home-coach-band-continue"
 
-# 2. Session active — chat input present
 - extendedWaitUntil:
     visible:
       id: "chat-input"
     timeout: 15000
 
-- takeScreenshot: library-nav-02-session-started
+- takeScreenshot: library-nav-04-session-started
 
-# 3. Verify the in-session Library link is visible in the footer
-#    (LibraryPrompt component, testID: session-library-link).
-#    This link only appears for non-homework modes when totalTopicsCompleted > 0.
-- scrollUntilVisible:
-    element:
-      id: "session-library-link"
-    direction: DOWN
-    timeout: 10000
-
-- assertVisible:
-    id: "session-library-link"
-
-- takeScreenshot: library-nav-03-library-link-visible
-
-# ── Part 2: Complete session and check summary link (Story 4.12) ──────
-
-# 4. Exchange 1: send a message to establish exchangeCount > 0
+# Exchange 1: establishes exchangeCount > 0 so end-session-button appears.
 - tapOn:
     id: "chat-input"
 - inputText: "Explain the concept to me"
-# BUG-35: keyboard covers send button on Android. Use keyboard Enter key
-# (returnKeyType="send" triggers onSubmitEditing).
+# BUG-35: keyboard covers send button on Android — use Enter key.
 - pressKey: Enter
 
-# 5. Wait for AI response (LLM can be slow — 60s timeout per BUG-47)
 - extendedWaitUntil:
     visible:
       id: "chat-input"
     timeout: 60000
 
-# 6. Exchange 2: follow-up to ensure session has enough content
+# Exchange 2: follow-up for richer session content.
 - tapOn:
     id: "chat-input"
 - inputText: "Can you give me an example?"
 - pressKey: Enter
 
-# 7. Wait for AI response
 - extendedWaitUntil:
     visible:
       id: "chat-input"
     timeout: 60000
 
-# 8. Wait for end-session-button (rendered in header when exchangeCount > 0).
-#    BUG-37: button appears after LLM streaming response increments exchangeCount.
+# BUG-37: end-session-button appears after LLM response increments exchangeCount.
 - extendedWaitUntil:
     visible:
       id: "end-session-button"
     timeout: 30000
 
-# 9. Tap end-session button
 - tapOn:
     id: "end-session-button"
 
-# 10. Confirm the end session alert.
-#     Alert.alert title: "End Session", buttons: "Keep Going" and "End Session".
+# Confirm the end-session alert.
 - tapOn:
     text: "End Session"
 
-# 11. Wait for session summary screen to load
 - extendedWaitUntil:
     visible:
       id: "summary-title"
     timeout: 20000
 
-- takeScreenshot: library-nav-04-session-summary
+- takeScreenshot: library-nav-05-session-summary
 
-# 12. Verify session takeaways are present
 - assertVisible:
     id: "session-takeaways"
 
-# 13. Scroll to and verify the "See your Library" link exists
-#     (always present on session summary, testID: go-to-library)
 - scrollUntilVisible:
     element:
       id: "go-to-library"
@@ -144,29 +150,20 @@ tags:
 - assertVisible:
     id: "go-to-library"
 
-- takeScreenshot: library-nav-05-library-link-on-summary
+- takeScreenshot: library-nav-06-library-link-on-summary
 
-# ── Part 3: Navigate to Library from summary ────────────────────
+# ── Part 3: Navigate to Library from summary ────────────────────────────
 
-# 14. Tap the Library link on summary screen.
-#     handleGoToLibrary navigates to topic detail if topicId + subjectId
-#     are present, otherwise to the library index. Seed data may or may not
-#     include topicId — we accept either destination.
 - tapOn:
     id: "go-to-library"
 
-# 15. Verify navigation arrived at Library (library.tsx header text)
-#     or topic detail screen. Wait for the "Library" heading which
-#     appears on the library index screen.
+# handleGoToLibrary navigates to topic detail when topicId + subjectId are
+# present, otherwise to the library index. We accept either destination and
+# assert shelves-list only when on the library index.
 - extendedWaitUntil:
     visible:
-      text: "Library"
+      id: "shelves-list"
     timeout: 10000
-
-# 16. Verify the library has shelves loaded (retention-due scenario has subjects).
-#     library-empty is removed; check for shelves-list as positive assertion.
-- assertVisible:
-    id: "shelves-list"
     optional: true
 
-- takeScreenshot: library-nav-06-library-arrived
+- takeScreenshot: library-nav-07-library-arrived

@@ -1,0 +1,81 @@
+# Flow PARENT-12 (Arm B): Subject Retention Badge — Badge Absent
+# Validates: when a topic has no retentionStatus (or totalSessions < 1),
+#             the subject-retention-badge wrapper is NOT rendered,
+#             and "At risk" copy does not appear anywhere on screen.
+# Tags: nightly, parent
+# Seed: parent-subject-no-retention
+# Usage: ./e2e/scripts/seed-and-run.sh parent-subject-no-retention e2e/flows/parent/child-subject-no-retention.yaml
+#
+# testIDs verified against:
+#   apps/mobile/src/app/(app)/child/[profileId]/subjects/[subjectId].tsx
+#     subject-topics-scroll          (line 150)
+#     subject-retention-badge        (added — only rendered when gating condition passes)
+appId: com.mentomate.app
+tags:
+  - nightly
+  - parent
+---
+# 1. Seed & sign in (parent-subject-no-retention seeds a parent with a child
+#    whose subject topic has retentionStatus=null or totalSessions=0,
+#    so the badge gating condition fails and no badge is rendered)
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "parent-subject-no-retention"
+
+# 2. Wait for parent dashboard
+- extendedWaitUntil:
+    visible:
+      id: "dashboard-scroll"
+    timeout: 15000
+
+# 3. Tap primary action on the seeded child card
+- tapOn:
+    id: "dashboard-child-${CHILD_PROFILE_ID}-primary"
+
+# 4. Wait for child detail scroll view
+- extendedWaitUntil:
+    visible:
+      id: "child-detail-scroll"
+    timeout: 10000
+
+# 5. Scroll until the seeded subject card is visible
+- scrollUntilVisible:
+    element:
+      id: "subject-card-${SUBJECT_ID}"
+    direction: DOWN
+    timeout: 10000
+
+# 6. Tap the subject card to open topics list
+- tapOn:
+    id: "subject-card-${SUBJECT_ID}"
+
+# 7. Wait for the subject topics scroll view
+- extendedWaitUntil:
+    visible:
+      id: "subject-topics-scroll"
+    timeout: 10000
+
+- takeScreenshot: 01-subject-topics-loaded
+
+# 8. Badge must NOT be visible — gating condition failed
+- assertNotVisible:
+    id: "subject-retention-badge"
+
+# 9. "At risk" copy must NOT appear — assertNotVisible by text is permitted
+#    for verifying absence (i18n risk only applies to positive assertions)
+- assertNotVisible:
+    text: "At risk"
+
+- takeScreenshot: 02-no-retention-badge-confirmed
+
+# 10. Navigate back to child detail
+- tapOn:
+    id: "back-button"
+
+- extendedWaitUntil:
+    visible:
+      id: "child-detail-scroll"
+    timeout: 10000
+
+- takeScreenshot: 03-back-to-child

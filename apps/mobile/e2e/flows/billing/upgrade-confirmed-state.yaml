@@ -1,0 +1,110 @@
+# Flow: Upgrade Confirmed State — Plus tier post-webhook [BILLING-02]
+# Validates: subscription screen for a user whose free→Plus upgrade has been
+# confirmed by the RevenueCat webhook (purchase-confirmed seed, tier=plus,
+# status=active). Asserts: current plan shows Plus, manage-billing section
+# visible, top-up section visible, no free-upgrade-button.
+#
+# Tags: weekly, billing
+#
+# Journey: UX Journey 5 (Billing & Subscription)
+# Epics: Epic 5 (FR95-FR100), Epic 9 (RevenueCat IAP)
+# Prerequisite: Seeded Plus-tier user post-webhook (scenario: purchase-confirmed)
+appId: com.mentomate.app
+tags:
+  - weekly
+  - billing
+---
+# 1. Seed & sign in
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "purchase-confirmed"
+      API_URL: ${API_URL}
+
+# 2. Wait for home screen
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 15000
+
+# 3. Navigate to More tab
+- tapOn:
+    text: "More"
+
+# 4. Wait for More screen
+- extendedWaitUntil:
+    visible:
+      id: "learning-mode-casual"
+    timeout: 10000
+
+# 5. Scroll to and tap Subscription row
+- scrollUntilVisible:
+    element:
+      id: "more-row-subscription"
+    direction: DOWN
+    timeout: 15000
+
+- tapOn:
+    id: "more-row-subscription"
+
+# 6. Verify subscription screen loaded
+- extendedWaitUntil:
+    visible:
+      id: "subscription-screen"
+    timeout: 15000
+
+- takeScreenshot: upgrade-confirmed-subscription-screen
+
+# 7. Verify current plan card present
+- assertVisible:
+    id: "current-plan"
+
+# 8. Verify the free-upgrade-button is NOT shown (paid tier)
+- assertNotVisible:
+    id: "free-upgrade-button"
+
+- takeScreenshot: upgrade-confirmed-plan-card
+
+# 9. Scroll down to static tier comparison
+#    (RevenueCat offerings absent in emulator — no-offerings section rendered)
+- scrollUntilVisible:
+    element:
+      id: "no-offerings"
+    direction: DOWN
+    timeout: 15000
+
+# 10. Verify no-offerings fallback is shown
+- assertVisible:
+    id: "no-offerings"
+
+# 11. Verify static Plus tier card is highlighted as current plan
+- assertVisible:
+    id: "static-tier-plus"
+
+- takeScreenshot: upgrade-confirmed-static-plus-highlighted
+
+# 12. Scroll down to top-up section (only visible for paid-tier users)
+- scrollUntilVisible:
+    element:
+      id: "top-up-section"
+    direction: DOWN
+    timeout: 15000
+
+# 13. Verify top-up section is present (gated behind isPaidTier)
+- assertVisible:
+    id: "top-up-section"
+
+- takeScreenshot: upgrade-confirmed-top-up-section
+
+# 14. Scroll down to manage section (deep links to Play Store subscriptions)
+- scrollUntilVisible:
+    element:
+      id: "manage-section"
+    direction: DOWN
+    timeout: 15000
+
+# 15. Verify manage-billing section is present
+- assertVisible:
+    id: "manage-section"
+
+- takeScreenshot: upgrade-confirmed-state-complete

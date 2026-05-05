@@ -110,19 +110,34 @@ export default function DictationCompleteScreen(): React.ReactElement {
     );
   }
 
-  const handleCheckWriting = async () => {
+  // [E2E] When EXPO_PUBLIC_E2E=1 the dev-client build exposes a gallery picker
+  // button (complete-pick-gallery testID). The wrapper script plants a test JPEG
+  // in the emulator gallery via ADB before running the flow so that the review
+  // LLM call receives a predictable image without requiring a real camera session.
+  const isE2E = process.env.EXPO_PUBLIC_E2E === '1';
+
+  const handleCheckWriting = async (
+    source: 'camera' | 'gallery' = 'camera'
+  ) => {
     // [BUG-692] Reset the cancelled flag at the start of each new attempt.
     reviewCancelledRef.current = false;
 
-    // 1. Launch camera
+    // 1. Launch camera (or gallery in E2E mode)
     let uri: string | undefined;
     let assetMimeType: string | undefined;
     try {
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
-        quality: 0.8,
-        allowsEditing: false,
-      });
+      const result =
+        source === 'gallery'
+          ? await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ['images'],
+              quality: 0.8,
+              allowsEditing: false,
+            })
+          : await ImagePicker.launchCameraAsync({
+              mediaTypes: ['images'],
+              quality: 0.8,
+              allowsEditing: false,
+            });
       if (result.canceled) return;
       const asset = result.assets?.[0];
       uri = asset?.uri;
@@ -330,7 +345,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
 
           <View className="w-full gap-3 mt-8">
             <Pressable
-              onPress={() => void handleCheckWriting()}
+              onPress={() => void handleCheckWriting('camera')}
               className="bg-primary rounded-xl py-4 items-center"
               testID="complete-check-writing"
               accessibilityRole="button"
@@ -343,6 +358,30 @@ export default function DictationCompleteScreen(): React.ReactElement {
                 </Text>
               </View>
             </Pressable>
+
+            {/* [E2E] Gallery picker — only visible in E2E dev-client builds (EXPO_PUBLIC_E2E=1).
+                The wrapper script plants a test JPEG in the emulator gallery via ADB before
+                running the flow so the LLM receives a predictable image. */}
+            {isE2E ? (
+              <Pressable
+                onPress={() => void handleCheckWriting('gallery')}
+                className="rounded-xl py-4 items-center bg-surface-elevated"
+                testID="complete-pick-gallery"
+                accessibilityRole="button"
+                accessibilityLabel="Pick from gallery (E2E)"
+              >
+                <View className="flex-row items-center">
+                  <Ionicons
+                    name="images-outline"
+                    size={20}
+                    color={colors.textPrimary}
+                  />
+                  <Text className="font-semibold text-body text-text-primary ml-2">
+                    Pick from gallery (E2E)
+                  </Text>
+                </View>
+              </Pressable>
+            ) : null}
 
             <Pressable
               onPress={() => void handleDone()}
