@@ -228,4 +228,21 @@ describe('validateEnv', () => {
       })
     ).toThrow('Invalid environment');
   });
+
+  it('RETENTION_PURGE_ENABLED defaults to "false" when unset', () => {
+    const env = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+    });
+    expect(env.RETENTION_PURGE_ENABLED).toBe('false');
+  });
+
+  it('RETENTION_PURGE_ENABLED parses "true" when the purge rollout is enabled', () => {
+    const env = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+      RETENTION_PURGE_ENABLED: 'true',
+    });
+    expect(env.RETENTION_PURGE_ENABLED).toBe('true');
+  });
 });

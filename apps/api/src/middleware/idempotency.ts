@@ -1,4 +1,5 @@
 import { createMiddleware } from 'hono/factory';
+import { ERROR_CODES } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import {
   buildIdempotencyCacheKey,
@@ -33,7 +34,7 @@ export function idempotencyPreflight(options: { flow: IdempotencyFlow }) {
     if (key.length > MAX_IDEMPOTENCY_KEY_LENGTH) {
       return c.json(
         {
-          code: 'INVALID_IDEMPOTENCY_KEY',
+          code: ERROR_CODES.INVALID_IDEMPOTENCY_KEY,
           message: `Idempotency-Key exceeds ${MAX_IDEMPOTENCY_KEY_LENGTH} characters`,
         },
         400

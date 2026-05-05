@@ -72,7 +72,7 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
         profileId,
         body.sessionId
       );
-      if (transcript) {
+      if (transcript?.archived === false) {
         sessionTranscript = transcript.exchanges
           .map(
             (e) => `${e.role === 'user' ? 'Learner' : 'Tutor'}: ${e.content}`

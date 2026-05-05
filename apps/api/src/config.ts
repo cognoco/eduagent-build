@@ -55,6 +55,10 @@ const envSchema = z.object({
   // Doppler to disable the feature without redeploying if the classifier
   // misfires in production. Default: 'true'.
   EMPTY_REPLY_GUARD_ENABLED: z.enum(['true', 'false']).default('true'),
+
+  // Retention Phase 1 — destructive transcript purge stays dark until the
+  // summary-generation pipeline has baked in production long enough.
+  RETENTION_PURGE_ENABLED: z.enum(['true', 'false']).default('false'),
 });
 
 export type Env = z.infer<typeof envSchema>;

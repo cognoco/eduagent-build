@@ -23,10 +23,24 @@
 //     { subscriptionId, accountId, source: 'revenuecat', timestamp }
 // ---------------------------------------------------------------------------
 
+import { z } from 'zod';
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
 
 const logger = createLogger();
+
+// Validates event payload shape so schema drift is detected as a structured
+// error rather than silently returning null fields. Matches AUDIT-INNGEST-1
+// pattern. All fields are optional because both senders (Stripe + RevenueCat)
+// provide different subsets.
+const paymentFailedPayloadSchema = z.object({
+  subscriptionId: z.string().optional(),
+  stripeSubscriptionId: z.string().optional(),
+  accountId: z.string().optional(),
+  attempt: z.number().optional(),
+  source: z.string().optional(),
+  timestamp: z.string().optional(),
+});
 
 export const paymentFailedObserve = inngest.createFunction(
   {
@@ -35,14 +49,15 @@ export const paymentFailedObserve = inngest.createFunction(
   },
   { event: 'app/payment.failed' },
   async ({ event }) => {
-    const data = event.data as {
-      subscriptionId?: string;
-      stripeSubscriptionId?: string;
-      accountId?: string;
-      attempt?: number;
-      source?: string;
-      timestamp?: string;
-    };
+    const parseResult = paymentFailedPayloadSchema.safeParse(event.data);
+    if (!parseResult.success) {
+      logger.error('billing.payment_failed.schema_drift', {
+        issues: parseResult.error.issues,
+        rawData: event.data,
+      });
+      return { status: 'schema_error' as const };
+    }
+    const data = parseResult.data;
 
     const source =
       data.source ?? (data.stripeSubscriptionId ? 'stripe' : 'unknown');

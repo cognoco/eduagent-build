@@ -141,7 +141,7 @@ export const freeformFilingRetry = inngest.createFunction(
       const fetched = await step.run('fetch-transcript', async () => {
         const db = getStepDatabase();
         const transcript = await getSessionTranscript(db, profileId, sessionId);
-        if (!transcript) return null;
+        if (!transcript || transcript.archived) return null;
         return transcript.exchanges
           .map(
             (e) => `${e.role === 'user' ? 'Learner' : 'Tutor'}: ${e.content}`
