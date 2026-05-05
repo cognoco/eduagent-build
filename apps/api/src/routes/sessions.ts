@@ -253,8 +253,15 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     const profileId = requireProfileId(c.get('profileId'));
     const sessionId = c.req.param('sessionId');
     const transcript = await getSessionTranscript(db, profileId, sessionId);
-    if (!transcript || transcript.archived)
-      return notFound(c, 'Session not found');
+    if (!transcript) return notFound(c, 'Session not found');
+    if (transcript.archived) {
+      return apiError(
+        c,
+        410,
+        ERROR_CODES.SESSION_ARCHIVED,
+        'Session transcript has been archived'
+      );
+    }
 
     const ageBracket = await getProfileAgeBracket(db, profileId);
     const result = await evaluateSessionDepth(transcript, { ageBracket });

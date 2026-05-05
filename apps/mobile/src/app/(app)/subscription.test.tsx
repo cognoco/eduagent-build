@@ -19,6 +19,7 @@ import {
 
 const mockBack = jest.fn();
 const mockPush = jest.fn();
+const mockReplace = jest.fn();
 
 // [F-029] Mock platformAlert to spy on it via Alert.alert, so existing
 // test assertions continue working after the Alert → platformAlert migration.
@@ -41,6 +42,7 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({
     back: mockBack,
     push: mockPush,
+    replace: mockReplace,
     canGoBack: jest.fn(() => true),
   }),
 }));
@@ -1296,12 +1298,12 @@ describe('SubscriptionScreen', () => {
   // Navigation
   // -------------------------------------------------------------------------
 
-  it('navigates back on back button press', () => {
+  it('returns to More on back button press', () => {
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
     fireEvent.press(screen.getByText('Back'));
 
-    expect(mockBack).toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/more');
   });
 
   // -------------------------------------------------------------------------

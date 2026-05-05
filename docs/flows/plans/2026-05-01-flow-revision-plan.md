@@ -192,7 +192,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | AUTH-08 | OAuth sign in / sign up (Google, Apple, OpenAI) | 🚫 | Blocked | | ✅ 05-01 | Platform-conditional by design: Google=Android/web, Apple=iOS only. Inventory updated for drift. Cannot test OAuth in web preview. |
 | AUTH-09 | SSO callback completion + fallback | 🚫 | Blocked | | | Depends on OAuth sign-in (AUTH-08); cannot reach callback without OAuth flow |
 | HOME-05 | Empty first-user state | ✅ | Pass | | | Tested after ACCOUNT-01: learner home shows intent cards (Learn/Ask/Practice/Homework) with 0 subjects. No redirect to create-subject (Maestro flow outdated). |
-| AUTH-13 | Deep-link auth redirect preservation (BUG-530) | ⬜ | — | | | Added 2026-05-04. Repro: open `/(app)/quiz/history` in web preview while signed out; expect to be sent to sign-in then back to `/quiz/history` (5-min TTL via `pending-auth-redirect.ts`). Verify both web sessionStorage and native fallback. |
+| AUTH-13 | Deep-link auth redirect preservation (BUG-530) | ✅ | Pass | | | 2026-05-05 Playwright web: unauthenticated `/quiz` redirected to sign-in, then returned to `/quiz` after login (`w03-deep-link-auth-redirect.spec.ts`). Native fallback still worth a later smoke, but web sessionStorage path passes. |
 | AUTH-14 | Sign-in transition spinner + stuck-state recovery | ⬜ | — | | | Added 2026-05-04. After successful `setActive()`, expect "Signing you in…" spinner; if redirect doesn't fire within `SESSION_TRANSITION_MS`, `ErrorFallback` with Try-again + Sign-up CTAs (testIDs `sign-in-transitioning`, `sign-in-transitioning-stuck`, `sign-in-stuck-retry`, `sign-in-stuck-signup`). To force the stuck path: throttle network or block `/me` after sign-in. |
 
 ---
@@ -226,13 +226,13 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| SUBJECT-01 | Create subject from learner home | ✅ | Pass | | | 2026-05-02: Verified after streaming unblocked. Home → Learn intent card → /create-subject → typed "Italian language basics" → classifier suggested "Italian Language focused on Basics" → Accept → /onboarding/interview |
+| SUBJECT-01 | Create subject from learner home | ✅ | Pass | [HOME-01 P2 fixed](https://www.notion.so/3578bce91f7c810a84bdd5f49f37a6de) | ✅ 05-05 | 2026-05-05 fix verified: `home-add-first-subject`, `home-add-subject-tile`, and `home-action-study-new` all target plain `/create-subject`; unit test passes and Playwright reaches create-subject/interview. |
 | SUBJECT-05 | Subject resolution + clarification suggestions | ✅ | Pass | | | LLM resolution works: "This sounds like Italian Language focused on Basics — shall we go with that?" with Accept/Edit buttons rendered. POST /v1/subjects/resolve → 200. |
 | SUBJECT-06 | Broad subject → pick a book | ✅ | Pass | | | "Math" → book picker rendered 7 books (Foundations of Algebra, Geometry, Pre-Calc, Calc I/II, Linear Algebra, Probability/Stats) with emoji icons + descriptions. Tap → /shelf/{id}/book/{id}. |
 | SUBJECT-07 | Focused subject / focused-book flow | ✅ | Pass | | | 2026-05-02: Typed "Italian verb conjugation - essere and avere" → classifier resolved "Italian focused on Verb Conjugation" → Accept → **skipped book picker** (unlike broad subjects) → direct to interview Step 1/4. Focused-book auto-generated. Correct differentiation from broad-pick (SUBJECT-06). |
 | SUBJECT-09 | Interview onboarding | ✅ | Pass | | | 2026-05-02: After durability-layer-fix deployed to staging, full interview verified. Step 1/4, multi-turn streaming worked, mentor responded with correct Italian phrase, page progress incremented 0→1→2, "I'm ready to start learning" envelope-driven button appeared and advanced to step 2. SUBJECT-09 P1 root cause was CORS Idempotency-Key gap (staging stale), now fixed. |
 | SUBJECT-10 | Analogy-preference onboarding | ✅ | Pass | | | Step 2/4 rendered with 7 options (No preference / Cooking / Sports / Building / Music / Nature / Gaming). Skip → advanced to step 3. |
-| SUBJECT-11 | Curriculum review | ❌ | Fail | [SUBJECT-11 P1](https://www.notion.so/SUBJECT-11-Interview-Done-button-bypasses-curriculum-generation-review-screen-shows-0-topics-3548bce91f7c81bb99baee766d33abc5) | | Step 4/4 rendered correctly but "Done" button bypasses curriculum generation — review screen shows 0 topics indefinitely. LLM-emitted "Ready to start learning" envelope path works (Italian flow triggered /interview/complete + curriculum populated). User-driven Done button does NOT fire /interview/complete. |
+| SUBJECT-11 | Curriculum review | ❌ | Fail | [SUBJECT-11 P1](https://www.notion.so/3578bce91f7c81578f78fda39f56706f) | | 2026-05-05 web after Home CTA fix: interview completes and POST `/interview/complete` + GET `/curriculum` return 200, but review still renders "No curriculum yet" with Retry/Go Home/Continue to home. |
 | SUBJECT-12 | View curriculum without committing | ✅ | Pass | | | Verified via Spanish shelf (seeded with 10 topics): Library → Spanish → book → all 10 topics rendered (Greetings, Numbers, Food, Home, Directions, Daily Routine, Shopping, Travel, Health, Past Experiences) without committing to start. |
 | SUBJECT-13 | Challenge curriculum (skip / add / explain ordering) | 🚫 | Blocked | | | "Suggest changes" button only available on curriculum-review screen during onboarding — would need a successful onboarding to test (currently blocked by SUBJECT-11). |
 | SUBJECT-14 | Placement / knowledge assessment | 🚫 | Blocked | | | Need to find the placement entry point — not part of standard 4-step interview flow |
@@ -248,7 +248,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| HOME-01 | Learner home with intent cards | ✅ | Pass | | | All 5 intent cards visible: Continue, Learn, Ask, Practice, Homework. All 4 tabs work (Home, Library, Progress, More). |
+| HOME-01 | Learner home redesigned carousel + quick actions | ✅ | Pass | [HOME-01 P2 fixed](https://www.notion.so/3578bce91f7c810a84bdd5f49f37a6de) | ✅ 05-05 | Current UI is the redesigned subject carousel / empty-subjects state / Ask Anything / quick-action row. `home-action-study-new`, `home-add-subject-tile`, and `home-add-first-subject` now navigate to `/create-subject`. |
 | HOME-06 | Resume interrupted session (Continue card) | ✅ | Pass | | | "Pick up Greetings & Introductions" card present; tapping opens learning session with correct topic. |
 | HOME-08 | Home loading-timeout fallback (10s) | 🚫 | Blocked | | | Cannot simulate 10s profile load timeout in web preview |
 | ACCOUNT-04 | Profile switching | ⚠️ | Pass w/ issues | | | Profile screen loads at /profiles showing current profile with Edit + Add profile. Only 1 profile exists — cannot test actual switching. |
@@ -288,7 +288,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | --- | --- | --- | --- | --- | --- | --- |
 | LEARN-08 | Library root (shelves / books / topics tabs) | ✅ | Pass | | | Shelves/Books tabs switch correctly, search/sort/filter present, shelf card shows progress + retention |
 | LEARN-09 | Subject shelf → book selection | ✅ | Pass | | | Shelf shows book count, topic progress, settings gear, book card with status |
-| LEARN-10 | Book detail + start learning from book | ✅ | Pass | | | Up next section, 10 topics listed, sticky Start CTA, session count, progress tracker |
+| LEARN-10 | Book detail + start learning from book | ✅ | Pass | [Book notes P1 fixed](https://www.notion.so/3578bce91f7c818686edd237554b4273) | ✅ 05-05 | Up next section, 10 topics listed, sticky Start CTA, session count, progress tracker. Book notes endpoint 500 fixed by schema repair migration; j11 Playwright flow passes. |
 | LEARN-11 | Manage subject status (active / paused / archived) | ✅ | Pass | [LEARN-11 P3](https://www.notion.so/3538bce91f7c810a846eea1521487111) | | Via Library "Manage" button — bottom sheet with Pause/Archive per subject. Web-only: nested button HTML error in console |
 | LEARN-12 | Topic detail | ✅ | Pass | | | Shows description, CEFR level, progress status, Start learning CTA |
 | ACCOUNT-18 | Subject analogy preference after setup | ⚠️ | Partial | | | Language subjects show "No subject-specific settings" + CEFR info. Analogy preference only for non-language — no non-language subject to test |
@@ -340,11 +340,11 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | PRACTICE-04 | "All caught up" empty state with countdown | ✅ | Pass | | | "Complete some topics first to unlock review" empty state variant |
 | QUIZ-01 | Quiz activity picker (Capitals / Vocab / Guess Who) | ✅ | Pass | | | 3 activities: Capitals, Vocabulary: Spanish (subject-aware), Guess Who |
 | QUIZ-02 | Round generation loading + 20s "still trying" hint | ⚠️ | Pass w/ issues | | | 2026-05-02: Loading screen verified (progress bar, "Almost ready...", Cancel button). Capitals round failed (LLM error → QUIZ-06 fallback). Guess Who round generated successfully (3 questions). "Still trying" 20s hint not observed — error appeared before 20s for Capitals. |
-| QUIZ-03 | Round play — multiple choice | 🚫 | Blocked | | | Capitals round generation failed (LLM error). Multiple-choice variant untested. |
+| QUIZ-03 | Round play — multiple choice | ✅ | Pass | | | 2026-05-05 Playwright web: Capitals quiz generated, multiple-choice answers accepted across the full round, answer feedback appeared, and transitions recovered with the hardened E2E wait. |
 | QUIZ-04 | Round play — Guess Who clue reveal | ✅ | Pass | | | 2026-05-02: Guess Who round 1/3 generated. Clue 1 displayed → "Reveal next clue" → Clue 2 revealed. Typed "Hypatia" → "You got it in 2 clues!" Correct answer + remaining clue shown. |
 | QUIZ-05 | Mid-round quit with confirm | 🚫 | Blocked | | | 2026-05-02: Quit button appears to trigger native confirm dialog — page freezes in web preview (cannot dismiss native dialogs). Needs native emulator. |
 | QUIZ-06 | Round complete error retry | ✅ | Pass | | | 2026-05-02: Verified via Capitals generation failure — "Couldn't create a round" + "Something went wrong creating your quiz. Try again!" + Retry + Go Back buttons. |
-| QUIZ-07 | Results screen (celebration tier + soft-fail streak) | 🚫 | Blocked | | | Needs completed round |
+| QUIZ-07 | Results screen (celebration tier + soft-fail streak) | ✅ | Pass | | | 2026-05-05 Playwright web: completed Capitals round showed `quiz-results-screen`, score, XP, missed-answer review, Play Again, Done, and View History actions; completion API returned 200 and quiz mastery upserts succeeded. |
 | QUIZ-08 | Quota / consent / forbidden typed errors | 🚫 | Blocked | | | Needs quota-capped account |
 | QUIZ-09 | Quiz history (grouping + empty state) | ✅ | Pass | | | Empty state: "No rounds played yet" + "Try a Quiz" CTA |
 | QUIZ-10 | Quiz round detail (per-question review) | 🚫 | Blocked | | | Needs completed rounds |
@@ -456,14 +456,14 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | PARENT-01 | Parent dashboard (live + demo) | ✅ | Pass | | | /dashboard: "Child progress" title, Timmy card with "0 sessions this week", data-gated message "After 4 more sessions..." |
 | PARENT-02 | Multi-child dashboard | 🚫 | Blocked | | | Only 1 child — needs 2+ children. Dashboard renders single-child correctly. |
 | PARENT-03 | Child detail drill-down | ✅ | Pass | | | /child/[id]: Timmy header, monthly reports (gated), recent growth (gated), subjects ("No subjects yet"), sessions ("No sessions yet"), mentor memory, accommodation radios, withdraw consent. |
-| PARENT-04 | Child subject → topic drill-down | 🚫 | Blocked | | | Timmy has no subjects — needs learning history |
+| PARENT-04 | Child subject → topic drill-down | ⚠️ | Pass w/ issues | [PARENT-04 P1 fixed](https://www.notion.so/3578bce91f7c8176b2bfd721c8f2cff2), [Back P2](https://www.notion.so/3578bce91f7c81e6bde6d4cfd6985774) | ✅ 05-05 | Schema repair migration fixed the child-subject API 500; Playwright reaches subject/topic data. Remaining UX bug: after browser back to dashboard, the visible Back button is unclickable because Home header content intercepts pointer events. |
 | PARENT-05 | Child session / transcript drill-down | 🚫 | Blocked | | | Timmy has no sessions — needs learning history |
 | PARENT-06 | Child monthly reports list + report detail | ✅ | Pass | | | "Monthly reports" button visible. "Your first report will appear after the first month of activity." (correct data-gate) |
 | PARENT-07 | Parent library view | 🚫 | Blocked | | | Needs child with subjects/books |
 | PARENT-08 | Subject raw-input audit | 🚫 | Blocked | | | Needs child with subjects |
 | PARENT-09 | Guided label tooltip | 🚫 | Blocked | | | Needs learning data |
 | PARENT-10 | Child-topic "Understanding" card + gated retention | ✅ | Pass | | | "Recent growth" section with correct data-gate: "Progress becomes easier to spot after a few more sessions." |
-| PARENT-11 | Child-session recap (narrative + clipboard + chip) | 🚫 | Blocked | | | "No sessions yet" — needs learning history |
+| PARENT-11 | Child-session recap (narrative + clipboard + chip) | ✅ | Pass | [PARENT-04 P1 fixed](https://www.notion.so/3578bce91f7c8176b2bfd721c8f2cff2) | ✅ 05-05 | Schema repair migration fixed the route blocker; j17 Playwright opens the recap and verifies `Copy conversation` via the copy toast. |
 | PARENT-12 | Child-subject detail retention badges (data-gated) | 🚫 | Blocked | | | "No subjects yet" — needs learning history |
 | CC-07 | Accommodation badge surfaces | ✅ | Pass | | | Child detail shows Learning Accommodation radios: None (Active), Short-Burst, Audio-First, Predictable. |
 | CC-08 | Parent-facing metric vocabulary canon | 🚫 | Blocked | | | Needs learning data for metrics to appear |
@@ -478,7 +478,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| BILLING-01 | Subscription screen + current-plan details | ✅ | Pass | | | Plus plan active, 1/700 used, 0% progress bar, resets June 1, Free vs Plus comparison, Restore Purchases button |
+| BILLING-01 | Subscription screen + current-plan details | ⚠️ | Pass w/ issues | [BILLING-01 P2](https://www.notion.so/3578bce91f7c8184b009e3be750ca727) | | 2026-05-05 Playwright web: plan details, usage, restore, BYOK, static Free/Plus cards render. Back button initially returned to `/home` instead of `/more`; fixed locally by replacing to `/(app)/more`. |
 | BILLING-02 | Upgrade plan purchase flow | 🚫 | Blocked | | | Store purchasing not available on web — noted in UI |
 | BILLING-03 | Trial / plan usage / family-pool detail | ✅ | Pass | | | Usage bar with count, reset date, percentage. Family pool: "2 of 4 profiles connected", "1988 shared questions left", member list. |
 | BILLING-04 | Restore purchases | ✅ | Pass | | | Button present on subscription screen (not clicked — store-dependent) |
@@ -489,7 +489,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | BILLING-09 | Top-up question credits | ✅ | Pass | | | "Buy 500 credits" button with "One-time purchase. Credits expire in 12 months." |
 | BILLING-10 | BYOK waitlist | ✅ | Pass | | | "Bring Your Own Key" section with waitlist description and Join button |
 | CC-06 | Top-up purchase confidence (two-stage polling) | 🚫 | Blocked | | | Needs active purchase flow (store-dependent) |
-| BILLING-11 | Trial state UI (BUG-966) | ⬜ | — | | | Added 2026-05-04. Slot I (trialing). Verify: `trial-banner` card above Current Plan with "Trial active" headline + optional `subscription.trialEndsAt`; status badge reads "Trial" not "Active". Coverage: `e2e/flows/billing/subscription-details.yaml` already seeds `trial-active`. |
+| BILLING-11 | Trial state UI (BUG-966) | ✅ | Pass | | | 2026-05-05 Playwright web: Subscription screen rendered `Trial active` banner above Current Plan and status badge read `Trial` (`j19-subscription-paywall-ui.spec.ts`). |
 | BILLING-12 | Pro / Family static tier comparison cards (BUG-917) | ⬜ | — | | | Added 2026-05-04. Pro or Family customer + RevenueCat offerings unavailable → PLANS block appends a read-only Family or Pro card (testIDs `static-tier-family`, `static-tier-pro`). Verify: no purchase action on these cards (preserves BUG-899 — no public upsell for store-unapproved SKUs). |
 
 ---
@@ -564,25 +564,25 @@ Update this once a batch is complete to track overall progress.
 
 | Batch | Section | Items | Status | Notes |
 | --- | --- | --- | --- | --- |
-| 1  | Pre-auth & Auth          | 14 | ⚠️ | 8✅ 1⚠️ 3🚫 2⬜ — +AUTH-13/14 added 2026-05-04 |
+| 1  | Pre-auth & Auth          | 14 | ⚠️ | 9✅ 1⚠️ 3🚫 1⬜ — +AUTH-13/14 added 2026-05-04; AUTH-13 web path verified 2026-05-05 |
 | 2  | First Profile + Consent  | 11 | ⚠️ | 6✅ 1⚠️ 2🚫 2⬜ — +ACCOUNT-27, SUBJECT-16/17 added 2026-05-04 (3 new) |
-| 3  | Subject Onboarding       | 12 | ⚠️ | 8✅ 1❌ 2🚫 1⬜ — +SUBJECT-18 added 2026-05-04 |
-| 4  | Learner Home + Resume    |  6 | ✅ | 4✅ 1⚠️ 1🚫 |
+| 3  | Subject Onboarding       | 12 | ⚠️ | 8✅ 1❌ 2🚫 1⬜ — +SUBJECT-18 added 2026-05-04; learner-home quick action fixed 2026-05-05; curriculum empty-state bug filed |
+| 4  | Learner Home + Resume    |  6 | ⚠️ | 4✅ 1⚠️ 1🚫 — HOME-01 updated for redesigned UI; all Home create-subject CTAs fixed 2026-05-05 |
 | 5  | Core Learning Sessions   | 12 | ⚠️ | 2❌ 1⚠️ 8🚫 1⬜ — +LEARN-23 added 2026-05-04 |
 | 6  | Library, Books, Topics   |  7 | ⚠️ | 5✅ 1⚠️ 1⬜ — +LEARN-25 added 2026-05-04 |
 | 7  | Retention & Recall       |  4 | 🚫 | 4🚫 — all need completed LLM sessions |
 | 8  | Progress / Vocab         |  7 | ⚠️ | 2✅ 4🚫 1⬜ — +LEARN-24 added 2026-05-04 |
-| 9  | Practice Hub + Quiz      | 18 | ⚠️ | 8✅ 2⚠️ 5🚫 3⬜ — +QUIZ-11/12/13 added 2026-05-04 |
+| 9  | Practice Hub + Quiz      | 18 | ⚠️ | 10✅ 2⚠️ 3🚫 3⬜ — +QUIZ-11/12/13 added 2026-05-04; Capitals full play/results path verified on web 2026-05-05 |
 | 10 | Dictation                | 10 | ⚠️ | 3✅ 7🚫 |
 | 11 | Homework                 |  8 | 🚫 | 1✅ 6🚫 1⬜ — +HOMEWORK-07 added 2026-05-04 |
 | 12 | Account / Settings       | 11 | ⚠️ | 7✅ 1⚠️ 1🚫 2⬜ — +ACCOUNT-28/29 added 2026-05-04 |
 | 13 | Account Deletion         |  2 | ⚠️ | 1✅ 1🚫 |
 | 14 | Parent Setup + Children  |  8 | ⚠️ | 7✅ 1⬜ — +ACCOUNT-30 added 2026-05-04 |
-| 15 | Parent Dashboard         | 17 | ⚠️ | 7✅ 9🚫 1⬜ — +PARENT-13 added 2026-05-04 |
-| 16 | Billing                  | 13 | ⚠️ | 7✅ 4🚫 2⬜ — +BILLING-11/12 added 2026-05-04 |
+| 15 | Parent Dashboard         | 17 | ⚠️ | 8✅ 1⚠️ 7🚫 1⬜ — +PARENT-13 added 2026-05-04; child-subject API 500 fixed 2026-05-05; remaining parent Back pointer-interception bug filed |
+| 16 | Billing                  | 13 | ⚠️ | 7✅ 1⚠️ 4🚫 1⬜ — +BILLING-11/12 added 2026-05-04; BILLING-11 web verified 2026-05-05 |
 | 17 | Cross-Cutting Final Pass | 11 | ⚠️ | 1✅ 1⚠️ 1🚫 8⬜ — +CC-11..18 added 2026-05-04 |
 | 18 | Regression Smoke         | 12 | ⚠️ | 4✅ 5🚫 3⬜ — +QA-10/11/12 added 2026-05-04 |
-| **Total** | | **184** | | **79✅ 10⚠️ 3❌ 62🚫 30⬜ — 2026-05-04: 30 new flows added from inventory refresh (untested); 2026-05-02 pass 2: +8 verified (SUBJECT-07/08, PRACTICE-03, DICT-03/04, QUIZ-02/04/06), LEARN-03 UI confirmed; LEARN-01/02 still broken; Guess Who quiz fully playable |
+| **Total** | | **184** | | **83✅ 12⚠️ 4❌ 58🚫 28⬜ — 2026-05-05: AUTH-13 + BILLING-11 web verified, BILLING-01 back bug fixed locally, HOME-01 create-subject CTAs fixed, Book notes + PARENT-04/PARENT-11 API 500s fixed by schema repair migration, new SUBJECT-11 curriculum-empty and parent Back pointer-interception bugs filed, QUIZ-03/07 Capitals play/results path verified; 2026-05-04: 30 new flows added from inventory refresh; 2026-05-02 pass 2: +8 verified (SUBJECT-07/08, PRACTICE-03, DICT-03/04, QUIZ-02/04/06), LEARN-03 UI confirmed; LEARN-01/02 still broken; Guess Who quiz fully playable |
 
 ### Coverage Audit
 

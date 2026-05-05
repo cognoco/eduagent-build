@@ -1,4 +1,11 @@
-import { pgTable, uuid, text, timestamp, index } from 'drizzle-orm/pg-core';
+import {
+  pgTable,
+  uuid,
+  text,
+  timestamp,
+  index,
+  uniqueIndex,
+} from 'drizzle-orm/pg-core';
 import { customType } from 'drizzle-orm/pg-core';
 import { profiles } from './profiles';
 import { learningSessions } from './sessions';
@@ -40,6 +47,10 @@ export const sessionEmbeddings = pgTable(
       .defaultNow(),
   },
   (table) => [
+    uniqueIndex('session_embeddings_session_profile_uq').on(
+      table.sessionId,
+      table.profileId
+    ),
     index('embeddings_hnsw_idx').using(
       'hnsw',
       table.embedding.op('vector_cosine_ops')

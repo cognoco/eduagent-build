@@ -515,6 +515,9 @@ importers:
 
   packages/database:
     dependencies:
+      '@eduagent/schemas':
+        specifier: workspace:*
+        version: link:../schemas
       '@neondatabase/serverless':
         specifier: ^0.10.4
         version: 0.10.4

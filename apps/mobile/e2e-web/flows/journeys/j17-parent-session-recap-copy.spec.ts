@@ -11,7 +11,6 @@ test('J-17 parent opens a session recap and copies the conversation prompt', asy
   const seed = await readSeedData('owner-with-children');
   const childProfileId = seed.ids.child1ProfileId;
   const subjectId = seed.ids.subject1Id;
-  const topicId = seed.ids.child1TopicId;
   const sessionId = seed.ids.session1Id;
 
   await page.goto('/home', { waitUntil: 'commit' });
@@ -20,9 +19,11 @@ test('J-17 parent opens a session recap and copies the conversation prompt', asy
   });
 
   await page.getByTestId('gateway-check-progress').click();
-  await page.getByTestId(`dashboard-child-${childProfileId}`).click();
+  await page.getByTestId(`dashboard-child-${childProfileId}-primary`).click();
   await page.getByTestId(`subject-card-${subjectId}`).click();
-  await page.getByTestId(`topic-card-${topicId}`).click();
+  await page
+    .getByRole('link', { name: /view mathematics topic 1 details/i })
+    .click();
   const topicDetail = page.getByTestId('topic-detail-screen');
   await expect(
     topicDetail.getByTestId(`session-card-${sessionId}`)
@@ -31,11 +32,16 @@ test('J-17 parent opens a session recap and copies the conversation prompt', asy
   });
 
   await topicDetail.getByTestId(`session-card-${sessionId}`).click();
-  await expect(page.getByTestId('copy-conversation-prompt')).toBeVisible({
+  const copyConversation = page.getByRole('button', {
+    name: /copy conversation/i,
+  });
+  await expect(copyConversation).toBeVisible({
     timeout: 30_000,
   });
   await expect(page.getByTestId('narrative-unavailable')).toHaveCount(0);
 
-  await page.getByTestId('copy-conversation-prompt').click();
-  await expect(page.getByText(/copied/i)).toBeVisible({ timeout: 30_000 });
+  await copyConversation.click();
+  await expect(page.getByTestId('session-recap-copy-prompt-toast')).toBeVisible(
+    { timeout: 30_000 }
+  );
 });

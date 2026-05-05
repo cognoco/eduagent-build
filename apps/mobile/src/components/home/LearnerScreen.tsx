@@ -34,6 +34,7 @@ import { CoachBand } from './CoachBand';
 import { SubjectCard } from './SubjectCard';
 
 const HOME_RETURN_PARAMS = { returnTo: LEARNER_HOME_RETURN_TO } as const;
+const CREATE_SUBJECT_FROM_HOME_HREF = '/create-subject' as const;
 
 const DEFAULT_SUBJECT_ICON: React.ComponentProps<typeof Ionicons>['name'] =
   'book-outline';
@@ -464,10 +465,7 @@ export function LearnerScreen({
                   <Pressable
                     testID="home-add-subject-tile"
                     onPress={() =>
-                      router.push({
-                        pathname: '/create-subject',
-                        params: HOME_RETURN_PARAMS,
-                      } as never)
+                      router.push(CREATE_SUBJECT_FROM_HOME_HREF as never)
                     }
                     className="rounded-2xl border border-dashed border-border items-center justify-center"
                     style={{ width: 96, height: 150, gap: 8 }}
@@ -501,10 +499,7 @@ export function LearnerScreen({
                 <Pressable
                   testID="home-add-first-subject"
                   onPress={() =>
-                    router.push({
-                      pathname: '/create-subject',
-                      params: HOME_RETURN_PARAMS,
-                    } as never)
+                    router.push(CREATE_SUBJECT_FROM_HOME_HREF as never)
                   }
                   className="bg-primary rounded-xl px-5 py-2.5 mt-1"
                 >
@@ -551,7 +546,7 @@ export function LearnerScreen({
                   testID: 'home-action-study-new',
                   icon: 'book-outline' as const,
                   label: 'Study new',
-                  route: '/create-subject',
+                  href: CREATE_SUBJECT_FROM_HOME_HREF,
                 },
                 {
                   testID: 'home-action-homework',
@@ -571,10 +566,12 @@ export function LearnerScreen({
                 key={action.testID}
                 testID={action.testID}
                 onPress={() =>
-                  router.push({
-                    pathname: action.route,
-                    params: HOME_RETURN_PARAMS,
-                  } as never)
+                  'href' in action
+                    ? router.push(action.href as never)
+                    : router.push({
+                        pathname: action.route,
+                        params: HOME_RETURN_PARAMS,
+                      } as never)
                 }
                 className="flex-1 bg-surface border border-border rounded-[14px] py-3 items-center"
                 style={{ gap: 4 }}

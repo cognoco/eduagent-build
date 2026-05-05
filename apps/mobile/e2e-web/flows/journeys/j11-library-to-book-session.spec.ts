@@ -17,11 +17,11 @@ test('J-11 learner → Library → shelf → book → start learning', async ({
   });
 
   await page.getByTestId('tab-library').click();
-  await expect(page.getByTestId(`subject-card-${subjectId}`)).toBeVisible({
+  await expect(page.getByTestId(`shelf-row-header-${subjectId}`)).toBeVisible({
     timeout: 30_000,
   });
 
-  await page.getByTestId(`subject-card-${subjectId}`).click();
+  await page.locator('[data-testid^="book-row-"]').first().click();
   await expect(page.getByTestId('book-screen')).toBeVisible({
     timeout: 30_000,
   });

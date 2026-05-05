@@ -131,9 +131,7 @@ export async function purgeSessionTranscript(
   const now = new Date();
 
   const outcome = await db.transaction(async (tx) => {
-    const txDb = tx as unknown as Database;
-
-    const updated = await txDb
+    const updated = await tx
       .update(sessionSummaries)
       .set({
         purgedAt: now,
@@ -156,7 +154,7 @@ export async function purgeSessionTranscript(
       };
     }
 
-    const replacedEmbeddings = await txDb
+    const replacedEmbeddings = await tx
       .delete(sessionEmbeddings)
       .where(
         and(
@@ -166,15 +164,25 @@ export async function purgeSessionTranscript(
       )
       .returning({ id: sessionEmbeddings.id });
 
-    await txDb.insert(sessionEmbeddings).values({
-      sessionId: row.sessionId,
-      profileId,
-      topicId: row.topicId ?? null,
-      content,
-      embedding: embedding.vector,
-    });
+    await tx
+      .insert(sessionEmbeddings)
+      .values({
+        sessionId: row.sessionId,
+        profileId,
+        topicId: row.topicId ?? null,
+        content,
+        embedding: embedding.vector,
+      })
+      .onConflictDoUpdate({
+        target: [sessionEmbeddings.sessionId, sessionEmbeddings.profileId],
+        set: {
+          topicId: row.topicId ?? null,
+          content,
+          embedding: embedding.vector,
+        },
+      });
 
-    const deletedEvents = await txDb
+    const deletedEvents = await tx
       .delete(sessionEvents)
       .where(
         and(

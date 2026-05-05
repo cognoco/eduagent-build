@@ -27,6 +27,7 @@ function makeMockDb() {
     leftJoin: jest.fn(),
     innerJoin: jest.fn(),
     where: jest.fn(),
+    orderBy: jest.fn(),
     limit: jest.fn(),
   };
   chain.select.mockReturnValue(chain);
@@ -34,6 +35,7 @@ function makeMockDb() {
   chain.leftJoin.mockReturnValue(chain);
   chain.innerJoin.mockReturnValue(chain);
   chain.where.mockReturnValue(chain);
+  chain.orderBy.mockReturnValue(chain);
   chain.limit.mockResolvedValue([]);
   return chain;
 }
@@ -135,11 +137,9 @@ describe('summaryReconciliationCron', () => {
       );
       expect(sentNames).not.toContain('app/session.completed');
       expect(sentNames).toEqual(
-        expect.arrayContaining([
-          'app/summary.reconciliation.scanned',
-          'app/summary.reconciliation.requeued',
-        ])
+        expect.arrayContaining(['app/summary.reconciliation.scanned'])
       );
+      expect(sentNames).not.toContain('app/summary.reconciliation.requeued');
     });
 
     it('still emits reconciliation metrics when every queue is empty', async () => {
@@ -160,6 +160,7 @@ describe('summaryReconciliationCron', () => {
         'notify-summary-reconciliation-scanned',
         expect.objectContaining({
           name: 'app/summary.reconciliation.scanned',
+          data: expect.objectContaining({ totalCount: 0 }),
         })
       );
     });
@@ -226,6 +227,7 @@ describe('summaryReconciliationCron', () => {
 
       // .where() is called once per query (3 total)
       expect(mockDb.where).toHaveBeenCalledTimes(3);
+      expect(mockDb.orderBy).toHaveBeenCalledTimes(3);
 
       for (const call of mockDb.where.mock.calls) {
         // The single argument to .where() is an AND(...) SQL object

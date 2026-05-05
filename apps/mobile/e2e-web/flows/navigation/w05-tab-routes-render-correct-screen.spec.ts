@@ -15,7 +15,7 @@ test('W-05 tab URLs render the correct screen on web', async ({ page }) => {
   });
 
   await page.goto('/library', { waitUntil: 'commit' });
-  await expect(page.getByTestId(`subject-card-${subjectId}`)).toBeVisible({
+  await expect(page.getByTestId(`shelf-row-header-${subjectId}`)).toBeVisible({
     timeout: 30_000,
   });
 

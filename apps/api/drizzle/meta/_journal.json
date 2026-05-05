@@ -386,6 +386,20 @@
       "when": 1777979260892,
       "tag": "0054_session_summary_retention",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1779000001000,
+      "tag": "0055_retention_query_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1779000002000,
+      "tag": "0056_schema_drift_repair",
+      "breakpoints": true
     }
   ]
 }

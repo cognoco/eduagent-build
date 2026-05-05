@@ -59,7 +59,7 @@ export async function getSubjectSessions(
   return rows.map((r) => ({
     id: r.id,
     topicId: r.topicId,
-    topicTitle: r.topicTitle ?? '',
+    topicTitle: r.topicTitle,
     bookId: r.bookId,
     bookTitle: r.bookTitle,
     chapter: r.chapter,

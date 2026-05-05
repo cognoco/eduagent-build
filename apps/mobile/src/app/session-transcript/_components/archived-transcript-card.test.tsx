@@ -13,7 +13,7 @@ describe('ArchivedTranscriptCard', () => {
         'Try a 4-digit dividend with a remainder next and talk through each step.',
       learnerRecap:
         'Today you connected division and remainders with solid progress.',
-      topicId: null,
+      topicId: '018f0f08-6f40-7c3f-8a41-18f19d552f10',
     },
     onContinueTopic: jest.fn(),
     onBack: jest.fn(),
@@ -39,6 +39,31 @@ describe('ArchivedTranscriptCard', () => {
     const { getByTestId } = render(<ArchivedTranscriptCard {...props} />);
     fireEvent.press(getByTestId('archived-continue-topic-cta'));
     expect(props.onContinueTopic).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides the continue CTA when there is no resumable topic', () => {
+    const { queryByTestId } = render(
+      <ArchivedTranscriptCard
+        {...props}
+        summary={{ ...props.summary, topicId: null }}
+      />
+    );
+    expect(queryByTestId('archived-continue-topic-cta')).toBeNull();
+  });
+
+  it('does not render an empty covered-topics section', () => {
+    const { queryByText, queryAllByTestId } = render(
+      <ArchivedTranscriptCard
+        {...props}
+        summary={{
+          ...props.summary,
+          topicsCovered: [],
+          sessionState: 'auto-closed',
+        }}
+      />
+    );
+    expect(queryByText("Here's what you covered:")).toBeNull();
+    expect(queryAllByTestId('archived-topic-chip')).toHaveLength(0);
   });
 
   it('calls onBack when the back affordance is pressed', () => {

@@ -2,7 +2,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { createReadStream } from 'node:fs';
-import { access, stat, readFile, writeFile, rename } from 'node:fs/promises';
+import { access, stat, readFile, writeFile, rename, rm } from 'node:fs/promises';
 import { constants as fsConstants } from 'node:fs';
 
 const projectRoot = process.cwd();
@@ -104,41 +104,59 @@ async function startServer() {
 // Expo's @expo/env always reads .env.local and ignores process.env overrides
 // for EXPO_PUBLIC_* vars, so we must edit the file directly.
 // ---------------------------------------------------------------------------
-const envLocalPath = path.join(projectRoot, '.env.local');
-const envBackupPath = path.join(projectRoot, '.env.local.e2e-bak');
+const envFilesToOverride = ['.env.local', '.env.development.local'].map(
+  (name) => ({
+    path: path.join(projectRoot, name),
+    backupPath: path.join(projectRoot, `${name}.e2e-bak`),
+  })
+);
 const apiUrl = process.env.PLAYWRIGHT_API_URL ?? 'http://127.0.0.1:8787';
+process.env.EXPO_PUBLIC_API_URL = apiUrl;
+const generatedEnvFiles = new Set();
 
-let envLocalOriginal = null;
-
-async function overrideEnvLocal() {
-  if (await fileExists(envLocalPath)) {
-    envLocalOriginal = await readFile(envLocalPath, 'utf-8');
-    await rename(envLocalPath, envBackupPath);
+function overrideApiUrl(contents) {
+  const replacement = `EXPO_PUBLIC_API_URL="${apiUrl}"`;
+  if (/^EXPO_PUBLIC_API_URL=.*/m.test(contents)) {
+    return contents.replace(/^EXPO_PUBLIC_API_URL=.*/m, replacement);
   }
-  // Write a minimal .env.local that points to the local API
-  const overridden = envLocalOriginal
-    ? envLocalOriginal.replace(
-        /^EXPO_PUBLIC_API_URL=.*/m,
-        `EXPO_PUBLIC_API_URL="${apiUrl}"`
-      )
-    : `EXPO_PUBLIC_API_URL="${apiUrl}"\n`;
-  await writeFile(envLocalPath, overridden, 'utf-8');
+  const suffix = contents.endsWith('\n') || contents.length === 0 ? '' : '\n';
+  return `${contents}${suffix}${replacement}\n`;
 }
 
-async function restoreEnvLocal() {
-  if (await fileExists(envBackupPath)) {
-    await rename(envBackupPath, envLocalPath);
+async function overrideEnvFiles() {
+  for (const envFile of envFilesToOverride) {
+    if (await fileExists(envFile.path)) {
+      const original = await readFile(envFile.path, 'utf-8');
+      await rename(envFile.path, envFile.backupPath);
+      await writeFile(envFile.path, overrideApiUrl(original), 'utf-8');
+      continue;
+    }
+    generatedEnvFiles.add(envFile.path);
+    await writeFile(envFile.path, `EXPO_PUBLIC_API_URL="${apiUrl}"\n`, 'utf-8');
   }
 }
 
-await overrideEnvLocal();
+async function restoreEnvFiles() {
+  for (const envFile of envFilesToOverride) {
+    if (await fileExists(envFile.backupPath)) {
+      await rename(envFile.backupPath, envFile.path);
+      generatedEnvFiles.delete(envFile.path);
+      continue;
+    }
+    if (generatedEnvFiles.has(envFile.path)) {
+      await rm(envFile.path, { force: true });
+    }
+  }
+}
+
+await overrideEnvFiles();
 
 const exportProcess = spawnPnpm([
   'exec', 'expo', 'export', '--platform', 'web', '--clear',
 ]);
 
 exportProcess.on('exit', async (code) => {
-  await restoreEnvLocal();
+  await restoreEnvFiles();
 
   if (code !== 0) {
     process.exit(code ?? 1);

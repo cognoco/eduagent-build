@@ -252,10 +252,7 @@ describe('LearnerScreen', () => {
 
     await waitFor(() => screen.getByTestId('home-action-study-new'));
     fireEvent.press(screen.getByTestId('home-action-study-new'));
-    expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/create-subject',
-      params: HOME_RETURN_PARAMS,
-    });
+    expect(mockPush).toHaveBeenCalledWith('/create-subject');
   });
 
   it('navigates to freeform session on Ask anything', async () => {
@@ -556,5 +553,25 @@ describe('LearnerScreen', () => {
       screen.getByTestId('home-add-first-subject');
       screen.getByText('Add a subject');
     });
+  });
+
+  it('navigates to create-subject on empty-state Add a subject CTA', async () => {
+    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+
+    await waitFor(() => screen.getByTestId('home-add-first-subject'));
+    fireEvent.press(screen.getByTestId('home-add-first-subject'));
+    expect(mockPush).toHaveBeenCalledWith('/create-subject');
+  });
+
+  it('navigates to create-subject on carousel New subject tile', async () => {
+    mockFetch.setRoute('/subjects', {
+      subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+    });
+
+    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+
+    await waitFor(() => screen.getByTestId('home-add-subject-tile'));
+    fireEvent.press(screen.getByTestId('home-add-subject-tile'));
+    expect(mockPush).toHaveBeenCalledWith('/create-subject');
   });
 });

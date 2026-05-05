@@ -11,6 +11,7 @@ import {
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
+import type { LlmSummary } from '@eduagent/schemas';
 import { profiles } from './profiles';
 import { subjects, curriculumTopics } from './subjects';
 import { generateUUIDv7 } from '../utils/uuid';
@@ -192,48 +193,60 @@ export const sessionEvents = pgTable(
   ]
 );
 
-export const sessionSummaries = pgTable('session_summaries', {
-  id: uuid('id')
-    .primaryKey()
-    .$defaultFn(() => generateUUIDv7()),
-  sessionId: uuid('session_id')
-    .notNull()
-    .references(() => learningSessions.id, { onDelete: 'cascade' }),
-  profileId: uuid('profile_id')
-    .notNull()
-    .references(() => profiles.id, { onDelete: 'cascade' }),
-  topicId: uuid('topic_id').references(() => curriculumTopics.id, {
-    onDelete: 'cascade',
-  }),
-  content: text('content'),
-  aiFeedback: text('ai_feedback'),
-  highlight: text('highlight'),
-  narrative: text('narrative'),
-  conversationPrompt: text('conversation_prompt'),
-  engagementSignal: text('engagement_signal'),
-  closingLine: text('closing_line'),
-  learnerRecap: text('learner_recap'),
-  nextTopicId: uuid('next_topic_id').references(() => curriculumTopics.id, {
-    onDelete: 'set null',
-  }),
-  nextTopicReason: text('next_topic_reason'),
-  status: summaryStatusEnum('status').notNull().default('pending'),
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  // Retention pipeline (Phase 1) — see
-  // docs/specs/2026-05-05-tiered-conversation-retention.md
-  // NOTE: `narrative` above remains the legacy parent-facing recap field.
-  // `llmSummary` is a separate self-note used for transcript retention.
-  llmSummary: jsonb('llm_summary'),
-  summaryGeneratedAt: timestamp('summary_generated_at', {
-    withTimezone: true,
-  }),
-  purgedAt: timestamp('purged_at', { withTimezone: true }),
-});
+export const sessionSummaries = pgTable(
+  'session_summaries',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .$defaultFn(() => generateUUIDv7()),
+    sessionId: uuid('session_id')
+      .notNull()
+      .references(() => learningSessions.id, { onDelete: 'cascade' }),
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    topicId: uuid('topic_id').references(() => curriculumTopics.id, {
+      onDelete: 'cascade',
+    }),
+    content: text('content'),
+    aiFeedback: text('ai_feedback'),
+    highlight: text('highlight'),
+    narrative: text('narrative'),
+    conversationPrompt: text('conversation_prompt'),
+    engagementSignal: text('engagement_signal'),
+    closingLine: text('closing_line'),
+    learnerRecap: text('learner_recap'),
+    nextTopicId: uuid('next_topic_id').references(() => curriculumTopics.id, {
+      onDelete: 'set null',
+    }),
+    nextTopicReason: text('next_topic_reason'),
+    status: summaryStatusEnum('status').notNull().default('pending'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    // Retention pipeline (Phase 1) — see
+    // docs/specs/2026-05-05-tiered-conversation-retention.md
+    // NOTE: `narrative` above remains the legacy parent-facing recap field.
+    // `llmSummary` is a separate self-note used for transcript retention.
+    llmSummary: jsonb('llm_summary').$type<LlmSummary | null>(),
+    summaryGeneratedAt: timestamp('summary_generated_at', {
+      withTimezone: true,
+    }),
+    purgedAt: timestamp('purged_at', { withTimezone: true }),
+  },
+  (table) => [
+    index('session_summaries_session_profile_idx').on(
+      table.sessionId,
+      table.profileId
+    ),
+    index('session_summaries_purge_eligible_idx')
+      .on(table.summaryGeneratedAt)
+      .where(sql`${table.purgedAt} IS NULL`),
+  ]
+);
 
 export const parkingLotItems = pgTable('parking_lot_items', {
   id: uuid('id')

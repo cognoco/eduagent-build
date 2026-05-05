@@ -83,22 +83,20 @@ export const transcriptPurgeCron = inngest.createFunction(
       }
     );
 
-    const delayedBlocked = delayed;
-
     if (candidates.length === 0) {
-      if (delayedBlocked.length > 0) {
+      if (delayed.length > 0) {
         await step.sendEvent('notify-purge-delayed', {
           name: 'app/session.purge.delayed',
           data: {
-            delayedCount: delayedBlocked.length,
-            sessionIds: delayedBlocked.map((candidate) => candidate.sessionId),
-            missingPreconditionCount: delayedBlocked.length,
+            delayedCount: delayed.length,
+            sessionIds: delayed.map((candidate) => candidate.sessionId),
+            missingPreconditionCount: delayed.length,
             timestamp: new Date().toISOString(),
           },
         });
       }
 
-      return { status: 'completed', queued: 0, delayed: delayedBlocked.length };
+      return { status: 'completed', queued: 0, delayed: delayed.length };
     }
 
     const timestamp = new Date().toISOString();
@@ -110,13 +108,13 @@ export const transcriptPurgeCron = inngest.createFunction(
       }))
     );
 
-    if (delayedBlocked.length > 0) {
+    if (delayed.length > 0) {
       await step.sendEvent('notify-purge-delayed', {
         name: 'app/session.purge.delayed',
         data: {
-          delayedCount: delayedBlocked.length,
-          sessionIds: delayedBlocked.map((candidate) => candidate.sessionId),
-          missingPreconditionCount: delayedBlocked.length,
+          delayedCount: delayed.length,
+          sessionIds: delayed.map((candidate) => candidate.sessionId),
+          missingPreconditionCount: delayed.length,
           timestamp,
         },
       });
@@ -125,7 +123,7 @@ export const transcriptPurgeCron = inngest.createFunction(
     return {
       status: 'completed',
       queued: candidates.length,
-      delayed: delayedBlocked.length,
+      delayed: delayed.length,
     };
   }
 );
@@ -139,8 +137,22 @@ export const transcriptPurgeHandler = inngest.createFunction(
   },
   { event: 'app/session.transcript.purge' },
   async ({ event, step }) => {
-    const { profileId, sessionSummaryId } =
-      transcriptPurgeEventDataSchema.parse(event.data);
+    const parsed = transcriptPurgeEventDataSchema.safeParse(event.data);
+    if (!parsed.success) {
+      captureException(new Error('Invalid transcript purge payload'), {
+        extra: {
+          surface: 'transcript-purge',
+          validationIssues: parsed.error.issues
+            .map(
+              (issue) => `${issue.path.join('.') || 'root'}: ${issue.message}`
+            )
+            .join('; '),
+        },
+      });
+      return { status: 'invalid_payload' as const };
+    }
+
+    const { profileId, sessionSummaryId } = parsed.data;
 
     const result = await step.run('purge-transcript', async () => {
       try {

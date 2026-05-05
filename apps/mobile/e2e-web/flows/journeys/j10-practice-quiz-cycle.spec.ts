@@ -12,7 +12,7 @@ test('J-10 learner → Practice → Quiz → launch → play → results → hom
     timeout: 60_000,
   });
 
-  await page.getByTestId('intent-practice').click();
+  await page.getByTestId('home-action-practice').click();
   await expect(page.getByTestId('practice-screen')).toBeVisible({
     timeout: 30_000,
   });
@@ -38,11 +38,48 @@ test('J-10 learner → Practice → Quiz → launch → play → results → hom
       .catch(() => false);
     if (resultsVisible) break;
 
-    await expect(quizScreen.getByTestId('quiz-option-0')).toBeVisible({
+    const firstOption = quizScreen.getByTestId('quiz-option-0');
+    await expect(
+      firstOption.or(page.getByTestId('quiz-results-screen'))
+    ).toBeVisible({
+      timeout: 30_000,
+    });
+    await page.waitForFunction(
+      () => {
+        const results = document.querySelector(
+          '[data-testid="quiz-results-screen"]'
+        );
+        const option = document.querySelector(
+          '[data-testid="quiz-play-screen"] [data-testid="quiz-option-0"]'
+        );
+        const isVisible = (element: Element | null) => {
+          if (!element) return false;
+          const style = window.getComputedStyle(element);
+          return (
+            element.getClientRects().length > 0 &&
+            style.visibility !== 'hidden' &&
+            style.display !== 'none'
+          );
+        };
+
+        return (
+          isVisible(results) ||
+          (isVisible(option) &&
+            !option.hasAttribute('disabled') &&
+            option.getAttribute('aria-disabled') !== 'true')
+        );
+      },
+      null,
+      { timeout: 30_000 }
+    );
+
+    if (await page.getByTestId('quiz-results-screen').isVisible()) break;
+
+    await expect(firstOption).toBeEnabled({
       timeout: 30_000,
     });
 
-    await quizScreen.getByTestId('quiz-option-0').click();
+    await firstOption.click();
     await expect(page.getByTestId('quiz-answer-feedback')).toBeVisible({
       timeout: 30_000,
     });

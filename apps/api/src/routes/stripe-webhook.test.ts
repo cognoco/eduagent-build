@@ -330,6 +330,56 @@ describe('signature verification', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Test-mode event guard
+// ---------------------------------------------------------------------------
+
+describe('test-mode event guard', () => {
+  it('skips test-mode events in production without invoking handlers', async () => {
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue({
+      ...makeStripeEvent('customer.subscription.updated', makeSubscription()),
+      livemode: false,
+    });
+
+    const res = await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      { ...TEST_ENV, ENVIRONMENT: 'production' }
+    );
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({
+      received: true,
+      skipped: true,
+    });
+    expect(updateSubscriptionFromWebhook).not.toHaveBeenCalled();
+  });
+
+  it('accepts test-mode events outside production so local and QA flows work', async () => {
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue({
+      ...makeStripeEvent('customer.subscription.updated', makeSubscription()),
+      livemode: false,
+    });
+
+    const res = await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      { ...TEST_ENV, ENVIRONMENT: 'development' }
+    );
+
+    expect(res.status).toBe(200);
+    expect(updateSubscriptionFromWebhook).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Stale event rejection
 // ---------------------------------------------------------------------------
 

@@ -1,5 +1,5 @@
 // @inngest-admin: cross-profile
-import { and, eq, gte, isNotNull, isNull, lt, or } from 'drizzle-orm';
+import { and, asc, eq, gte, isNotNull, isNull, lt, or } from 'drizzle-orm';
 import { learningSessions, sessionSummaries } from '@eduagent/database';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
@@ -49,6 +49,7 @@ export const summaryReconciliationCron = inngest.createFunction(
               isNull(sessionSummaries.id)
             )
           )
+          .orderBy(asc(learningSessions.endedAt))
           .limit(CREATE_LIMIT);
       }
     );
@@ -85,6 +86,7 @@ export const summaryReconciliationCron = inngest.createFunction(
               isNull(sessionSummaries.purgedAt)
             )
           )
+          .orderBy(asc(learningSessions.endedAt))
           .limit(REGENERATE_LIMIT);
       }
     );
@@ -121,11 +123,16 @@ export const summaryReconciliationCron = inngest.createFunction(
               isNull(sessionSummaries.purgedAt)
             )
           )
+          .orderBy(asc(learningSessions.endedAt))
           .limit(RECAP_LIMIT);
       }
     );
 
     const timestamp = new Date().toISOString();
+    const totalCount =
+      missingSummaries.length +
+      missingLlmSummaries.length +
+      missingRecaps.length;
 
     if (missingSummaries.length > 0) {
       await step.sendEvent(
@@ -163,20 +170,7 @@ export const summaryReconciliationCron = inngest.createFunction(
         createCount: missingSummaries.length,
         regenerateCount: missingLlmSummaries.length,
         recapCount: missingRecaps.length,
-        timestamp,
-      },
-    });
-
-    await step.sendEvent('notify-summary-reconciliation-requeued', {
-      name: 'app/summary.reconciliation.requeued',
-      data: {
-        createCount: missingSummaries.length,
-        regenerateCount: missingLlmSummaries.length,
-        recapCount: missingRecaps.length,
-        totalCount:
-          missingSummaries.length +
-          missingLlmSummaries.length +
-          missingRecaps.length,
+        totalCount,
         timestamp,
       },
     });

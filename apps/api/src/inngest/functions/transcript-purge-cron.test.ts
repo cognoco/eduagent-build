@@ -186,4 +186,28 @@ describe('transcriptPurgeHandler', () => {
       })
     );
   });
+
+  it('drops malformed purge payloads before touching transcript data', async () => {
+    const step = createStep();
+    const handler = (transcriptPurgeHandler as any).fn;
+
+    const result = await handler({
+      event: { data: { sessionSummaryId: 'not-a-uuid' } },
+      step,
+    });
+
+    expect(result).toEqual({ status: 'invalid_payload' });
+    expect(mockPurgeSessionTranscript).not.toHaveBeenCalled();
+    expect(step.run).not.toHaveBeenCalled();
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'Invalid transcript purge payload',
+      }),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          surface: 'transcript-purge',
+        }),
+      })
+    );
+  });
 });
