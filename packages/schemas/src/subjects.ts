@@ -490,6 +490,28 @@ export type GetBookSessionsResponse = z.infer<
   typeof getBookSessionsResponseSchema
 >;
 
+/** GET /subjects/:subjectId/sessions — one session entry */
+export const subjectSessionSchema = z.object({
+  id: z.string().uuid(),
+  topicId: z.string().uuid().nullable(),
+  topicTitle: z.string(),
+  bookId: z.string().uuid().nullable(),
+  bookTitle: z.string().nullable(),
+  chapter: z.string().nullable(),
+  sessionType: z.string(),
+  durationSeconds: z.number().int().nullable(),
+  createdAt: isoDateField,
+});
+export type SubjectSession = z.infer<typeof subjectSessionSchema>;
+
+/** GET /subjects/:subjectId/sessions */
+export const getSubjectSessionsResponseSchema = z.object({
+  sessions: z.array(subjectSessionSchema),
+});
+export type GetSubjectSessionsResponse = z.infer<
+  typeof getSubjectSessionsResponseSchema
+>;
+
 /** PATCH /subjects/:subjectId/books/:bookId/topics/:topicId/move */
 export const moveTopicResponseSchema = z.object({
   moved: z.literal(true),
