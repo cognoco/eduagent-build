@@ -1126,6 +1126,13 @@
       "retentionWeak": "この科目は、もう少し注意を払うと良いでしょう。",
       "openShelf": "棚を開く",
       "resume": "再開",
+      "hideSubject": "科目を非表示にする",
+      "hidingSubject": "科目を非表示にしています...",
+      "hideSubjectHint": "この科目をメイン画面から非表示にします。あとでライブラリから復元できます。",
+      "hideConfirmTitle": "{{subject}}を非表示にしますか？",
+      "hideConfirmMessage": "この科目はメイン画面から移動されます。学習履歴は保存され、あとでライブラリから復元できます。",
+      "hideConfirmAction": "科目を非表示",
+      "hideErrorTitle": "科目を非表示にできませんでした",
       "goneTitle": "この科目は利用できなくなりました",
       "goneSubtitle": "削除されたか、別の科目に統合された可能性があります。",
       "pastConversations": "過去の会話"

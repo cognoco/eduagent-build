@@ -16,6 +16,9 @@ import {
 } from '../../../../hooks/use-progress';
 import { useLanguageProgress } from '../../../../hooks/use-language-progress';
 import { formatMinutes } from '../../../../lib/format-relative-date';
+import { useUpdateSubject } from '../../../../hooks/use-subjects';
+import { platformAlert } from '../../../../lib/platform-alert';
+import { formatApiError } from '../../../../lib/format-api-error';
 
 function StatCard({
   label,
@@ -45,6 +48,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
     subjectId: subjectId ?? undefined,
   });
   const languageProgressQuery = useLanguageProgress(subjectId ?? '');
+  const updateSubject = useUpdateSubject();
   const languageProgress = languageProgressQuery.data;
 
   const subject = inventoryQuery.data?.subjects.find(
@@ -53,6 +57,40 @@ export default function ProgressSubjectScreen(): React.ReactElement {
   const legacyProgress = subjectProgressQuery.data;
   const isLanguageSubject =
     subject?.pedagogyMode === 'four_strands' || !!languageProgress;
+
+  const hideSubject = async (): Promise<void> => {
+    if (!subject) return;
+    try {
+      await updateSubject.mutateAsync({
+        subjectId: subject.subjectId,
+        status: 'archived',
+      });
+      router.replace('/(app)/progress' as never);
+    } catch (err: unknown) {
+      platformAlert(t('progress.subject.hideErrorTitle'), formatApiError(err));
+    }
+  };
+
+  const confirmHideSubject = (): void => {
+    if (!subject) return;
+    platformAlert(
+      t('progress.subject.hideConfirmTitle', {
+        subject: subject.subjectName,
+      }),
+      t('progress.subject.hideConfirmMessage'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('progress.subject.hideConfirmAction'),
+          style: 'destructive',
+          onPress: () => {
+            void hideSubject();
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  };
 
   // [M20] Timeout escape for the loading skeleton
   const [skeletonTimedOut, setSkeletonTimedOut] = useState(false);
@@ -494,6 +532,21 @@ export default function ProgressSubjectScreen(): React.ReactElement {
                 </Text>
               </Pressable>
             </View>
+            <Pressable
+              onPress={confirmHideSubject}
+              disabled={updateSubject.isPending}
+              className="mt-3 bg-surface rounded-button px-4 py-3 items-center min-h-[48px] justify-center"
+              accessibilityRole="button"
+              accessibilityLabel={t('progress.subject.hideSubject')}
+              accessibilityHint={t('progress.subject.hideSubjectHint')}
+              testID="progress-subject-hide"
+            >
+              <Text className="text-body font-semibold text-danger">
+                {updateSubject.isPending
+                  ? t('progress.subject.hidingSubject')
+                  : t('progress.subject.hideSubject')}
+              </Text>
+            </Pressable>
           </>
         ) : (
           // [EP15-C6] Dead-end fix — the prior version showed only text

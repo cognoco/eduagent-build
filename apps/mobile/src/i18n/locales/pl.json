@@ -1126,6 +1126,13 @@
       "retentionWeak": "Ten przedmiot skorzystałby na dodatkowej uwadze.",
       "openShelf": "Otwórz półkę",
       "resume": "Wznów",
+      "hideSubject": "Ukryj przedmiot",
+      "hidingSubject": "Ukrywanie przedmiotu...",
+      "hideSubjectHint": "Ukrywa ten przedmiot w głównych widokach. Możesz go później przywrócić z Biblioteki.",
+      "hideConfirmTitle": "Ukryć {{subject}}?",
+      "hideConfirmMessage": "To przeniesie przedmiot poza główne widoki. Twoja historia nauki zostanie zachowana, a przedmiot możesz przywrócić z Biblioteki.",
+      "hideConfirmAction": "Ukryj przedmiot",
+      "hideErrorTitle": "Nie udało się ukryć przedmiotu",
       "goneTitle": "Ten przedmiot nie jest już dostępny",
       "goneSubtitle": "Mógł zostać usunięty lub połączony z innym przedmiotem.",
       "pastConversations": "Poprzednie rozmowy"

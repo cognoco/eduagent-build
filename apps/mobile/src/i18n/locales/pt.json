@@ -1126,6 +1126,13 @@
       "retentionWeak": "Esta matéria se beneficiaria de um pouco de atenção extra.",
       "openShelf": "Abrir prateleira",
       "resume": "Retomar",
+      "hideSubject": "Ocultar matéria",
+      "hidingSubject": "Ocultando matéria...",
+      "hideSubjectHint": "Oculta esta matéria das suas visualizações principais. Você pode restaurá-la pela Biblioteca depois.",
+      "hideConfirmTitle": "Ocultar {{subject}}?",
+      "hideConfirmMessage": "Isso moverá a matéria para fora das suas visualizações principais. Seu histórico de aprendizagem fica salvo, e você pode restaurá-la pela Biblioteca.",
+      "hideConfirmAction": "Ocultar matéria",
+      "hideErrorTitle": "Não foi possível ocultar a matéria",
       "goneTitle": "Esta matéria não está mais disponível",
       "goneSubtitle": "Ela pode ter sido removida ou mesclada com outra matéria.",
       "pastConversations": "Conversas anteriores"
