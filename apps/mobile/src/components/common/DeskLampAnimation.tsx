@@ -148,7 +148,7 @@ export function DeskLampAnimation({
   const systemScheme = useColorScheme();
   const isDark = dark ?? systemScheme === 'dark';
   const reduceMotion = useReducedMotion();
-  const arm = color ?? (isDark ? '#26264e' : '#3a3a5e');
+  const arm = color ?? (isDark ? '#8fa3bd' : '#3a3a5e');
   const deskStroke = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)';
 
   const svgW = size * (VB_W / VB_H);
@@ -312,6 +312,9 @@ export function DeskLampAnimation({
           rx={22}
           ry={4.5}
           fill={BRASS_DEEP}
+          stroke={BRASS_HI}
+          strokeWidth={0.8}
+          strokeOpacity={isDark ? 0.9 : 0.35}
         />
         <Ellipse cx={BASE_X} cy={DESK_Y - 1} rx={22} ry={4.5} fill={BRASS} />
         <Ellipse cx={BASE_X} cy={DESK_Y - 6} rx={18} ry={3} fill={BRASS_DEEP} />

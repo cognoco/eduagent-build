@@ -49,7 +49,10 @@ export function SubjectCard({
       </View>
       <View>
         <Text className="text-[15px] font-bold text-text-primary">{name}</Text>
-        <Text className="text-[11px] text-text-tertiary mt-1" numberOfLines={2}>
+        <Text
+          className="text-[11px] text-text-secondary mt-1"
+          numberOfLines={2}
+        >
           {hint}
         </Text>
       </View>
@@ -57,7 +60,7 @@ export function SubjectCard({
         {topicsTotal > 0 && (
           <Text
             testID={`${testID}-topics`}
-            className="text-[10px] font-semibold text-text-tertiary"
+            className="text-[10px] font-semibold text-text-secondary"
           >
             {topicsCompleted}/{topicsTotal} topics
           </Text>

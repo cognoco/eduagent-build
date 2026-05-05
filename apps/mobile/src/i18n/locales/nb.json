@@ -109,6 +109,7 @@
       "recommended": "Anbefalt",
       "intentHeading": "Hva trenger du akkurat nå?",
       "askAnythingLabel": "Spør om hva som helst",
+      "askAnythingSubtitle": "Et raskt spørsmål, en studieidé eller noe uklart",
       "askAnythingPlaceholder": "Spør om hva som helst...",
       "yourSubjects": "Fagene dine",
       "newSubject": "Nytt fag",
@@ -1274,6 +1275,12 @@
       "skipAll": "Hopp over"
     },
     "interview": {
+      "title": "Sett opp {{target}}",
+      "newSubject": "faget ditt",
+      "openingWithTarget": "Hei! Jeg er læringskameraten din. Først må jeg lære litt om deg og {{target}}, så jeg kan veilede på riktig nivå i stedet for å gjette. Hva kan du allerede? Et grovt svar er helt fint.",
+      "openingGeneric": "Hei! Jeg er læringskameraten din. Først må jeg lære litt om deg, så jeg kan veilede på riktig nivå i stedet for å gjette. Hva kan du allerede? Et grovt svar er helt fint.",
+      "explainerTitle": "Hvorfor spør jeg først?",
+      "explainerBody": "Svarene dine hjelper meg å velge riktig startpunkt. Etter denne korte oppstarten kan jeg forklare, øve og hjelpe på en måte som passer deg.",
       "missingSubject": "Ingen emne valgt. Gå tilbake og prøv igjen.",
       "sessionCreationStuck": "Økten tar lengre tid enn forventet. Gå tilbake og prøv igjen.",
       "settingUp": "Setter opp økten din ...",

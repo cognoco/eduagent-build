@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { Ionicons } from '@expo/vector-icons';
 import {
   ChatShell,
   LivingBook,
@@ -20,6 +21,7 @@ import { getOnboardingStepLabels } from '../../../lib/onboarding-step-labels';
 import { platformAlert } from '../../../lib/platform-alert';
 import { Sentry } from '../../../lib/sentry';
 import { useProfile } from '../../../lib/profile';
+import { useThemeColors } from '../../../lib/theme';
 import { OutboxFailedBanner } from '../../../components/durability/OutboxFailedBanner';
 import { InterviewCompletingPanel } from '../../../components/interview/InterviewCompletingPanel';
 import { InterviewFailedPanel } from '../../../components/interview/InterviewFailedPanel';
@@ -30,9 +32,6 @@ import {
   recordFailure,
   type OutboxEntry,
 } from '../../../lib/message-outbox';
-
-const OPENING_MESSAGE =
-  "Hi! I'm your learning mate. Before we build your learning path — what do you already know about this subject? Even a rough sense is helpful.";
 
 export default function InterviewScreen() {
   const { t } = useTranslation();
@@ -56,6 +55,7 @@ export default function InterviewScreen() {
     totalSteps?: string;
   }>();
   const router = useRouter();
+  const colors = useThemeColors();
   const { activeProfile } = useProfile();
   const step = Number(stepParam) || 1;
   const totalSteps = Number(totalStepsParam) || 4;
@@ -93,14 +93,15 @@ export default function InterviewScreen() {
   const { stream: streamSessionMessage, isStreaming: isSessionStreaming } =
     useStreamMessage(activeSessionId ?? '');
 
+  const interviewTarget = bookTitle ?? subjectName;
   const openingMessage = useMemo(
     () =>
-      bookTitle
-        ? `Hi! I'm your learning mate. Before we start — what can you tell me about ${bookTitle}? Your best understanding, even a rough guess, is a great start.`
-        : subjectName
-        ? `Hi! I'm your learning mate. Before we build your learning path — what do you already know about ${subjectName}? Even a rough sense is helpful.`
-        : OPENING_MESSAGE,
-    [bookTitle, subjectName]
+      interviewTarget
+        ? t('onboarding.interview.openingWithTarget', {
+            target: interviewTarget,
+          })
+        : t('onboarding.interview.openingGeneric'),
+    [interviewTarget, t]
   );
 
   // BKT-C.2: Captured interest labels extracted from the interview transcript.
@@ -725,9 +726,9 @@ export default function InterviewScreen() {
   // ---------------------------------------------------------------------------
   const title = sessionPhase
     ? bookTitle ?? subjectName ?? 'Learning'
-    : bookTitle
-    ? `Interview: ${bookTitle}`
-    : `Interview: ${subjectName ?? 'New Subject'}`;
+    : t('onboarding.interview.title', {
+        target: interviewTarget ?? t('onboarding.interview.newSubject'),
+      });
 
   return (
     <View className="flex-1">
@@ -735,11 +736,33 @@ export default function InterviewScreen() {
         title={title}
         headerBelow={
           !sessionPhase ? (
-            <OnboardingStepIndicator
-              step={step}
-              totalSteps={totalSteps}
-              stepLabels={stepLabels}
-            />
+            <View>
+              <OnboardingStepIndicator
+                step={step}
+                totalSteps={totalSteps}
+                stepLabels={stepLabels}
+              />
+              <View
+                className="mx-1 rounded-2xl bg-surface px-4 py-3 border border-border"
+                testID="interview-explainer"
+              >
+                <View className="flex-row" style={{ gap: 10 }}>
+                  <Ionicons
+                    name="sparkles-outline"
+                    size={20}
+                    color={colors.primary}
+                  />
+                  <View className="flex-1">
+                    <Text className="text-body-sm font-semibold text-text-primary">
+                      {t('onboarding.interview.explainerTitle')}
+                    </Text>
+                    <Text className="text-body-sm text-text-secondary mt-1">
+                      {t('onboarding.interview.explainerBody')}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
           ) : undefined
         }
         messages={messages}

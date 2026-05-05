@@ -109,6 +109,7 @@
       "recommended": "Polecane",
       "intentHeading": "Czego teraz potrzebujesz?",
       "askAnythingLabel": "Zapytaj o cokolwiek",
+      "askAnythingSubtitle": "Szybkie pytanie, pomysł na naukę albo coś niejasnego",
       "askAnythingPlaceholder": "Zapytaj o cokolwiek...",
       "yourSubjects": "Twoje przedmioty",
       "newSubject": "Nowy przedmiot",
@@ -1274,6 +1275,12 @@
       "skipAll": "Pomiń"
     },
     "interview": {
+      "title": "Ustaw {{target}}",
+      "newSubject": "twój przedmiot",
+      "openingWithTarget": "Cześć! Jestem twoim towarzyszem nauki. Najpierw muszę dowiedzieć się trochę o tobie i {{target}}, żebym mógł pomagać na właściwym poziomie zamiast zgadywać. Co już wiesz? Wystarczy przybliżona odpowiedź.",
+      "openingGeneric": "Cześć! Jestem twoim towarzyszem nauki. Najpierw muszę dowiedzieć się trochę o tobie, żebym mógł pomagać na właściwym poziomie zamiast zgadywać. Co już wiesz? Wystarczy przybliżona odpowiedź.",
+      "explainerTitle": "Dlaczego najpierw pytam?",
+      "explainerBody": "Twoje odpowiedzi pomagają mi wybrać właściwy punkt startu. Po tej krótkiej konfiguracji mogę uczyć, pytać i wyjaśniać w sposób dopasowany do ciebie.",
       "missingSubject": "Nie wybrano przedmiotu. Wróć i spróbuj ponownie.",
       "sessionCreationStuck": "Tworzenie sesji trwa dłużej niż oczekiwano. Wróć i spróbuj ponownie.",
       "settingUp": "Konfigurowanie Twojej sesji…",

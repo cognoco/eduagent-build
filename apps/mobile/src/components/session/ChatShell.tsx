@@ -719,7 +719,7 @@ export function ChatShell({
                 className="items-center py-4"
                 testID="thinking-bulb-animation"
               >
-                <DeskLampAnimation size={80} />
+                <DeskLampAnimation size={120} />
               </View>
             )}
             {showIdleAnim && (
@@ -728,7 +728,7 @@ export function ChatShell({
                 testID="idle-pen-animation"
                 exiting={FadeOut.duration(200)}
               >
-                <MagicPenAnimation size={48} color={colors.primary} />
+                <MagicPenAnimation size={88} color={colors.primary} />
               </Animated.View>
             )}
             {footer}

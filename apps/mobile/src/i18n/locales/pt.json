@@ -109,6 +109,7 @@
       "recommended": "Recomendado",
       "intentHeading": "O que você precisa agora?",
       "askAnythingLabel": "Pergunte qualquer coisa",
+      "askAnythingSubtitle": "Uma pergunta rápida, ideia de estudo ou algo confuso",
       "askAnythingPlaceholder": "Pergunte qualquer coisa...",
       "yourSubjects": "Suas matérias",
       "newSubject": "Nova matéria",
@@ -1274,6 +1275,12 @@
       "skipAll": "Pular"
     },
     "interview": {
+      "title": "Configurar {{target}}",
+      "newSubject": "sua matéria",
+      "openingWithTarget": "Oi! Sou seu parceiro de aprendizagem. Primeiro preciso aprender um pouco sobre você e {{target}}, para orientar no nível certo em vez de adivinhar. O que você já sabe? Uma resposta aproximada está ótima.",
+      "openingGeneric": "Oi! Sou seu parceiro de aprendizagem. Primeiro preciso aprender um pouco sobre você, para orientar no nível certo em vez de adivinhar. O que você já sabe? Uma resposta aproximada está ótima.",
+      "explainerTitle": "Por que pergunto primeiro?",
+      "explainerBody": "Suas respostas me ajudam a escolher o ponto de partida certo. Depois desta configuração rápida, posso ensinar, perguntar e explicar de um jeito que combine com você.",
       "missingSubject": "Nenhuma matéria selecionada. Volte e tente novamente.",
       "sessionCreationStuck": "A sessão está demorando mais que o esperado. Volte e tente novamente.",
       "settingUp": "Configurando sua sessão…",
