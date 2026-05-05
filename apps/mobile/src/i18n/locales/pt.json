@@ -973,7 +973,6 @@
     "pageSubtitle": "Progresso que reflete o que você realmente sabe.",
     "startLearning": "Começar a aprender",
     "keepLearning": "Continuar aprendendo",
-    "yourSubjects": "Suas matérias",
     "refreshFailedTitle": "Falha na atualização",
     "refreshFailed": "Não conseguimos atualizar seu progresso agora.",
     "hero": {
@@ -1100,8 +1099,10 @@
       "retentionFading": "Uma revisão leve ajudaria a manter isso fresco.",
       "retentionWeak": "Esta matéria se beneficiaria de um pouco de atenção extra.",
       "openShelf": "Abrir prateleira",
+      "resume": "Retomar",
       "goneTitle": "Esta matéria não está mais disponível",
-      "goneSubtitle": "Ela pode ter sido removida ou mesclada com outra matéria."
+      "goneSubtitle": "Ela pode ter sido removida ou mesclada com outra matéria.",
+      "pastConversations": "Conversas anteriores"
     },
     "vocabulary": {
       "pageTitle": "Seu Vocabulário",
@@ -1120,6 +1121,12 @@
       "viewAllLink": "Ver todos →",
       "wordsSummary": "{{total}} palavras — {{mastered}} dominadas",
       "learningAppend": ", {{count}} aprendendo"
+    },
+    "subjectSessions": {
+      "title": "Conversas anteriores",
+      "empty": "Sem conversas ainda",
+      "untitledTopic": "Tópico sem título",
+      "openSessionFrom": "Abrir sessão de {{date}}"
     }
   },
   "onboarding": {

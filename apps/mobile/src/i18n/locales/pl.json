@@ -973,7 +973,6 @@
     "pageSubtitle": "Postępy, które odzwierciedlają to, co naprawdę wiesz.",
     "startLearning": "Rozpocznij naukę",
     "keepLearning": "Kontynuuj naukę",
-    "yourSubjects": "Twoje przedmioty",
     "refreshFailedTitle": "Odświeżanie nie powiodło się",
     "refreshFailed": "Nie mogliśmy teraz odświeżyć Twoich postępów.",
     "hero": {
@@ -1100,8 +1099,10 @@
       "retentionFading": "Lekka powtórka pomogłaby utrwalić tę wiedzę.",
       "retentionWeak": "Ten przedmiot skorzystałby na dodatkowej uwadze.",
       "openShelf": "Otwórz półkę",
+      "resume": "Wznów",
       "goneTitle": "Ten przedmiot nie jest już dostępny",
-      "goneSubtitle": "Mógł zostać usunięty lub połączony z innym przedmiotem."
+      "goneSubtitle": "Mógł zostać usunięty lub połączony z innym przedmiotem.",
+      "pastConversations": "Poprzednie rozmowy"
     },
     "vocabulary": {
       "pageTitle": "Twoje słownictwo",
@@ -1120,6 +1121,12 @@
       "viewAllLink": "Zobacz wszystkie →",
       "wordsSummary": "{{total}} słów — {{mastered}} opanowanych",
       "learningAppend": ", {{count}} w trakcie nauki"
+    },
+    "subjectSessions": {
+      "title": "Poprzednie rozmowy",
+      "empty": "Brak rozmów",
+      "untitledTopic": "Temat bez tytułu",
+      "openSessionFrom": "Otwórz sesję z {{date}}"
     }
   },
   "onboarding": {

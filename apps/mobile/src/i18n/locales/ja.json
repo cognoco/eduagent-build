@@ -973,7 +973,6 @@
     "pageSubtitle": "実際に知っていることを反映した進捗。",
     "startLearning": "学習を開始",
     "keepLearning": "学習を続ける",
-    "yourSubjects": "あなたの科目",
     "refreshFailedTitle": "更新に失敗しました",
     "refreshFailed": "現在、進捗を更新できませんでした。",
     "hero": {
@@ -1100,8 +1099,10 @@
       "retentionFading": "軽い復習が、これを新鮮に保つのに役立ちます。",
       "retentionWeak": "この科目は、もう少し注意を払うと良いでしょう。",
       "openShelf": "棚を開く",
+      "resume": "再開",
       "goneTitle": "この科目は利用できなくなりました",
-      "goneSubtitle": "削除されたか、別の科目に統合された可能性があります。"
+      "goneSubtitle": "削除されたか、別の科目に統合された可能性があります。",
+      "pastConversations": "過去の会話"
     },
     "vocabulary": {
       "pageTitle": "あなたの語彙",
@@ -1120,6 +1121,12 @@
       "viewAllLink": "すべて見る →",
       "wordsSummary": "合計{{total}}語 — {{mastered}}語習得済み",
       "learningAppend": "、{{count}}語学習中"
+    },
+    "subjectSessions": {
+      "title": "過去の会話",
+      "empty": "会話はまだありません",
+      "untitledTopic": "無題のトピック",
+      "openSessionFrom": "{{date}} のセッションを開く"
     }
   },
   "onboarding": {

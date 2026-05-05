@@ -973,7 +973,6 @@
     "pageSubtitle": "Fortschritt, der widerspiegelt, was du wirklich weißt.",
     "startLearning": "Lernen starten",
     "keepLearning": "Weiterlernen",
-    "yourSubjects": "Deine Fächer",
     "refreshFailedTitle": "Update fehlgeschlagen",
     "refreshFailed": "Wir konnten deinen Fortschritt gerade nicht aktualisieren.",
     "hero": {
@@ -1100,8 +1099,10 @@
       "retentionFading": "Eine leichte Wiederholung würde helfen, dies frisch zu halten.",
       "retentionWeak": "Dieses Fach würde von etwas zusätzlicher Aufmerksamkeit profitieren.",
       "openShelf": "Regal öffnen",
+      "resume": "Fortsetzen",
       "goneTitle": "Dieses Fach ist nicht mehr verfügbar",
-      "goneSubtitle": "Es wurde möglicherweise entfernt oder in ein anderes Fach integriert."
+      "goneSubtitle": "Es wurde möglicherweise entfernt oder in ein anderes Fach integriert.",
+      "pastConversations": "Vergangene Gespräche"
     },
     "vocabulary": {
       "pageTitle": "Deine Vokabeln",
@@ -1120,6 +1121,12 @@
       "viewAllLink": "Alle ansehen →",
       "wordsSummary": "{{total}} Wörter – {{mastered}} gemeistert",
       "learningAppend": ", {{count}} lernend"
+    },
+    "subjectSessions": {
+      "title": "Vergangene Gespräche",
+      "empty": "Noch keine Gespräche",
+      "untitledTopic": "Unbenanntes Thema",
+      "openSessionFrom": "Sitzung von {{date}} öffnen"
     }
   },
   "onboarding": {
