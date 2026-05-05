@@ -1,5 +1,8 @@
+// EXTERNAL boundary mock — routeAndCall is the LLM provider HTTP call. Per C1 D-MOCK-1 this is the formalized LLM external boundary.
+const mockRouteAndCall = jest.fn();
 jest.mock('../llm', () => ({
-  routeAndCall: jest.fn(),
+  ...(jest.requireActual('../llm') as Record<string, unknown>),
+  routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
 }));
 
 import { and, eq, inArray } from 'drizzle-orm';
@@ -17,7 +20,6 @@ import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { sm2 } from '@eduagent/retention';
 import { resolve } from 'path';
 import type { QuizQuestion } from '@eduagent/schemas';
-import { routeAndCall } from '../llm';
 import { completeQuizRound } from './complete-round';
 import { generateQuizRound } from './generate-round';
 import { getVocabularyRoundContext } from './queries';
@@ -195,7 +197,7 @@ describe('vocabulary quiz round lifecycle (integration)', () => {
     const { db, profile, subject } = await seedProfileAndSubject();
     await seedVocabularyBank(profile.id, subject.id);
 
-    (routeAndCall as jest.Mock).mockResolvedValue({
+    mockRouteAndCall.mockResolvedValue({
       response: JSON.stringify({
         theme: 'German Animals',
         targetLanguage: 'German',
@@ -249,6 +251,9 @@ describe('vocabulary quiz round lifecycle (integration)', () => {
     });
 
     expect(round.questions).toHaveLength(VOCAB_ROUND_SIZE);
+    // The real LLM router ran: verify the provider boundary was reached exactly once
+    // (generateQuizRound makes one routeAndCall for the discovery questions).
+    expect(mockRouteAndCall).toHaveBeenCalledTimes(1);
     const masteryQuestions = round.questions.filter(
       (question): question is Extract<QuizQuestion, { type: 'vocabulary' }> =>
         question.type === 'vocabulary' && question.isLibraryItem

@@ -14,7 +14,7 @@ import {
 import { eq, like } from 'drizzle-orm';
 import { PersistCurriculumError } from '@eduagent/schemas';
 
-// ── LLM boundary mock ────────────────────────────────────────────────────────
+// EXTERNAL boundary mock — routeAndCall is the LLM provider HTTP call. Per C1 D-MOCK-1 this is the formalized LLM external boundary.
 // routeAndCall is the true external boundary (provider API). Mock it here so
 // extractSignals and generateCurriculum run their real parsing/DB logic while
 // the network call is replaced with a deterministic fixture response.
@@ -24,9 +24,13 @@ jest.mock('../../services/llm', () => ({
   routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
 }));
 
+// EXTERNAL boundary mocks — sendPushNotification (Expo Push API) and sendEmail (Resend HTTP) are the network-egress boundaries. Per C1 D-MOCK-2, formatters/templating run real.
 const mockSendPush = jest.fn();
+const mockSendEmail = jest.fn();
 jest.mock('../../services/notifications', () => ({
+  ...(jest.requireActual('../../services/notifications') as Record<string, unknown>),
   sendPushNotification: (...args: unknown[]) => mockSendPush(...args),
+  sendEmail: (...args: unknown[]) => mockSendEmail(...args),
 }));
 
 const mockCaptureException = jest.fn();
@@ -247,6 +251,18 @@ describe('interview-persist-curriculum integration', () => {
       where: eq(curriculumTopics.curriculumId, curriculum!.id),
     });
     expect(topics.length).toBeGreaterThan(0);
+
+    // Notification boundary was reached with the correct interview_ready payload
+    // (proves sendPushNotification was called with real args, not silently skipped)
+    expect(mockSendPush).toHaveBeenCalledWith(
+      expect.anything(), // db
+      expect.objectContaining({
+        profileId,
+        title: 'Your learning path is ready',
+        body: 'Math is set up — tap to review',
+        type: 'interview_ready',
+      })
+    );
   });
 
   it('cache miss: empty signals triggers fresh extraction then persists', async () => {
