@@ -1,5 +1,6 @@
 import { Pressable, Text, View } from 'react-native';
 import type { BookProgressStatus, CurriculumBook } from '@eduagent/schemas';
+import type { SubjectTint } from '../../lib/design-tokens';
 
 interface BookCardProps {
   book: CurriculumBook;
@@ -7,6 +8,7 @@ interface BookCardProps {
   topicCount?: number;
   completedCount?: number;
   highlighted?: boolean;
+  tint?: SubjectTint;
   onPress: () => void;
 }
 
@@ -30,6 +32,7 @@ export function BookCard({
   topicCount,
   completedCount,
   highlighted = false,
+  tint,
   onPress,
 }: BookCardProps): React.ReactElement {
   const progressLabel =
@@ -45,12 +48,32 @@ export function BookCard({
       className={`rounded-card px-4 py-4 mb-3 ${STATUS_STYLES[status]} ${
         highlighted ? 'border border-primary' : ''
       }`}
+      style={
+        tint
+          ? {
+              borderWidth: 1,
+              borderColor: highlighted ? tint.solid : tint.soft,
+            }
+          : undefined
+      }
       accessibilityRole="button"
       accessibilityLabel={`${book.title}. ${STATUS_LABELS[status]}. ${progressLabel}.`}
       testID={`book-card-${book.id}`}
     >
       <View className="flex-row items-start">
-        <View className="w-12 h-12 rounded-2xl bg-surface-elevated items-center justify-center me-3">
+        <View
+          className="w-12 h-12 rounded-2xl bg-surface-elevated items-center justify-center me-3"
+          style={
+            tint
+              ? {
+                  backgroundColor: tint.soft,
+                  borderWidth: 1,
+                  borderColor: tint.solid,
+                }
+              : undefined
+          }
+          testID={`book-card-icon-${book.id}`}
+        >
           <Text className="text-2xl">{book.emoji ?? '📘'}</Text>
         </View>
 

@@ -1,9 +1,11 @@
 import { Pressable, Text } from 'react-native';
+import type { SubjectTint } from '../../lib/design-tokens';
 
 interface SuggestionCardProps {
   title: string;
   emoji?: string | null;
   description?: string | null;
+  tint?: SubjectTint;
   onPress: () => void;
   testID?: string;
 }
@@ -12,6 +14,7 @@ export function SuggestionCard({
   title,
   emoji,
   description,
+  tint,
   onPress,
   testID,
 }: SuggestionCardProps): React.ReactElement {
@@ -20,7 +23,15 @@ export function SuggestionCard({
       onPress={onPress}
       testID={testID}
       className="flex-1 min-w-[140px] max-w-[48%] rounded-card border border-border bg-surface-elevated p-4"
-      style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+      style={({ pressed }) => ({
+        opacity: pressed ? 0.7 : 1,
+        ...(tint
+          ? {
+              borderColor: tint.solid,
+              backgroundColor: tint.soft,
+            }
+          : {}),
+      })}
       accessibilityRole="button"
       accessibilityLabel={description ? `${title}: ${description}` : title}
     >

@@ -17,7 +17,7 @@ import {
   classifyApiError,
   recoveryActions,
 } from '../../../../lib/format-api-error';
-import { useThemeColors } from '../../../../lib/theme';
+import { useSubjectTint, useThemeColors } from '../../../../lib/theme';
 
 export default function ShelfScreen() {
   const { t } = useTranslation();
@@ -35,6 +35,7 @@ export default function ShelfScreen() {
   // than an array. The ?? operator only catches null/undefined, not objects.
   const books = Array.isArray(booksQuery.data) ? booksQuery.data : [];
   const subject = subjectsQuery.data?.find((s) => s.id === subjectId);
+  const shelfTint = useSubjectTint(subject?.name ?? subjectId ?? 'shelf');
 
   const { data: rawBookSuggestions } = useBookSuggestions(subjectId);
   const bookSuggestions = rawBookSuggestions ?? [];
@@ -277,6 +278,7 @@ export default function ShelfScreen() {
                 <View
                   className="h-full bg-primary rounded-full"
                   style={{
+                    backgroundColor: shelfTint.solid,
                     width: `${Math.round(
                       (completedTopics / totalTopics) * 100
                     )}%`,
@@ -320,6 +322,7 @@ export default function ShelfScreen() {
                 title={suggestion.title}
                 emoji={suggestion.emoji}
                 description={suggestion.description}
+                tint={shelfTint}
                 onPress={() => void handlePickBookSuggestion(suggestion)}
                 testID={`shelf-suggestion-${suggestion.id}`}
               />
@@ -336,6 +339,7 @@ export default function ShelfScreen() {
           } as never)
         }
         className="mx-4 mb-4 border border-dashed border-border rounded-xl py-3 items-center justify-center flex-row gap-2"
+        style={{ borderColor: shelfTint.solid }}
         testID="shelf-choose-book"
         accessibilityRole="button"
         accessibilityLabel={chooseBookButtonLabel}
@@ -345,9 +349,9 @@ export default function ShelfScreen() {
             bookSuggestions.length > 2 ? 'albums-outline' : 'add-circle-outline'
           }
           size={18}
-          color={themeColors.textSecondary}
+          color={shelfTint.solid}
         />
-        <Text className="text-text-muted">{chooseBookButtonLabel}</Text>
+        <Text style={{ color: shelfTint.solid }}>{chooseBookButtonLabel}</Text>
       </Pressable>
 
       {/* Book list */}
@@ -363,6 +367,7 @@ export default function ShelfScreen() {
             book={item}
             status={getBookStatus(item.id)}
             highlighted={item.id === suggestedBookId}
+            tint={shelfTint}
             onPress={() =>
               router.push({
                 pathname: '/(app)/shelf/[subjectId]/book/[bookId]',

@@ -56,12 +56,9 @@ export function useThemeColors(): ThemeColors {
  *
  * Applies accent preset overrides when a user has selected one.
  */
-export function useSubjectTint(subjectId: string): SubjectTint {
+export function useSubjectTint(seed: string): SubjectTint {
   const { colorScheme } = useTheme();
-  return useMemo(
-    () => pickSubjectTint(subjectId, colorScheme),
-    [subjectId, colorScheme]
-  );
+  return useMemo(() => pickSubjectTint(seed, colorScheme), [seed, colorScheme]);
 }
 
 export function useTokenVars(): ReturnType<typeof vars> {

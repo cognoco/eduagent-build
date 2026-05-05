@@ -78,6 +78,11 @@ jest.mock('../../../../lib/theme', () => ({
     textSecondary: '#888',
     textInverse: '#fff',
   }),
+  useSubjectTint: () => ({
+    name: 'teal',
+    solid: '#0f766e',
+    soft: 'rgba(15,118,110,0.14)',
+  }),
 }));
 
 jest.mock('../../../../lib/format-api-error', () => {

@@ -32,7 +32,7 @@ export function ShelfRow({
 }: ShelfRowProps): React.ReactElement {
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const tint = useSubjectTint(subjectId);
+  const tint = useSubjectTint(name || subjectId);
 
   // i18next pluralization picks shelfSubtitle_one vs shelfSubtitle_other based
   // on count, so the singular/plural form moves with the locale's plural rules
