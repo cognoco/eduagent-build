@@ -39,6 +39,34 @@ import {
   type OutboxEntry,
 } from '../../lib/message-outbox';
 
+const FIRST_TOPIC_ACK_PATTERN =
+  /^(ok(?:ay)?|yes|yep|yeah|ready|start|go ahead|sure|sounds good|let'?s go)[.!?\s]*$/i;
+
+export function buildSessionApiMessage(
+  text: string,
+  opts: {
+    effectiveMode: string;
+    topicName?: string;
+    messages: ChatMessage[];
+  }
+): string {
+  const trimmed = text.trim();
+  const isFirstLearnerTurn = !opts.messages.some(
+    (message) => message.role === 'user' && !message.isAutoSent
+  );
+
+  if (
+    opts.effectiveMode === 'learning' &&
+    opts.topicName &&
+    isFirstLearnerTurn &&
+    FIRST_TOPIC_ACK_PATTERN.test(trimmed)
+  ) {
+    return `I'm ready. Please start teaching me "${opts.topicName}" from the beginning.`;
+  }
+
+  return text;
+}
+
 export interface UseSessionStreamingOptions {
   // Route / derived params
   activeSessionId: string | null;
@@ -145,6 +173,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
     effectiveMode,
     topicId,
     topicName,
+    messages,
     inputMode,
     rawInput,
     resumeFromSessionId,
@@ -462,11 +491,17 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
           setHomeworkProblemsState(updatedProblems);
         }
 
+        const apiMessage = buildSessionApiMessage(text, {
+          effectiveMode,
+          topicName,
+          messages,
+        });
+
         // BUG-331: Update retry payload BEFORE ensureSession so that if
         // ensureSession fails and the user reconnects, we replay the correct
         // (current) message — not the payload from the previous send.
         lastRetryPayloadRef.current = {
-          text,
+          text: apiMessage,
           options: options
             ? {
                 sessionSubjectId: options.sessionSubjectId,
@@ -573,7 +608,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
                 profileId: activeProfileId,
                 flow: 'session',
                 surfaceKey: sid,
-                content: text,
+                content: apiMessage,
                 metadata: {
                   sessionId: sid,
                   ...(effectiveMode === 'homework' && homeworkMode
@@ -586,7 +621,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
         if (outboxEntry && activeProfileId) {
           await beginAttempt(activeProfileId, 'session', outboxEntry.id);
           lastRetryPayloadRef.current = {
-            text,
+            text: apiMessage,
             options: options
               ? {
                   sessionSubjectId: options.sessionSubjectId,
@@ -647,7 +682,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
         }
 
         await streamMessage(
-          text,
+          apiMessage,
           (accumulated) => {
             // [H6] Reset watchdog timestamp on each token.
             lastSseEventAt = Date.now();
@@ -665,7 +700,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
             const trackedExchange = shouldConvertToReconnect
               ? null
               : trackExchange({
-                  userMessage: text,
+                  userMessage: apiMessage,
                   escalationRung: result.escalationRung,
                 });
             const nextTrackerState =
@@ -917,6 +952,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       lastAiAtRef,
       lastExpectedMinutesRef,
       lastRetryPayloadRef,
+      messages,
       notePromptOffered,
       scheduleSilencePrompt,
       setExchangeCount,

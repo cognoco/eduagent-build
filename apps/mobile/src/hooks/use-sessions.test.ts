@@ -770,6 +770,39 @@ describe('useStreamMessage', () => {
       },
     });
   });
+
+  it('classifies server SSE error events as retryable upstream errors', async () => {
+    const { streamSSEViaXHR } = require('../lib/sse') as {
+      streamSSEViaXHR: jest.Mock;
+    };
+
+    streamSSEViaXHR.mockReturnValueOnce({
+      events: (async function* () {
+        yield {
+          type: 'error',
+          message:
+            'Something went wrong while generating a reply. Please try again.',
+        };
+      })(),
+      abort: jest.fn(),
+    });
+
+    const { result } = renderHook(() => useStreamMessage('session-1'), {
+      wrapper: createWrapper(),
+    });
+
+    let caught: unknown;
+    await act(async () => {
+      try {
+        await result.current.stream('Hello', jest.fn(), jest.fn(), 'session-1');
+      } catch (err) {
+        caught = err;
+      }
+    });
+
+    expect((caught as Error).name).toBe('UpstreamError');
+    expect((caught as Error & { status?: number }).status).toBe(502);
+  });
 });
 
 describe('useTopicParkingLot', () => {
