@@ -1,0 +1,23 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./out-tsc/jest",
+    "types": ["jest", "node", "@cloudflare/workers-types"],
+    "rootDir": "."
+  },
+  "include": ["jest.config.cjs", "src/**/*.ts", "eval-llm/**/*.ts"],
+  "references": [
+    {
+      "path": "../../packages/schemas/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/retention/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/database/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/test-utils/tsconfig.lib.json"
+    }
+  ]
+}
