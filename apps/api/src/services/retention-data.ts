@@ -12,6 +12,7 @@ import {
   gt,
   or,
   isNull,
+  isNotNull,
   lt,
   inArray,
   sql,
@@ -819,13 +820,31 @@ export async function startRelearn(
     sessionId = session?.id ?? null;
   }
 
-  const latestSummary = await db.query.sessionSummaries.findFirst({
-    where: and(
-      eq(sessionSummaries.profileId, profileId),
-      eq(sessionSummaries.topicId, input.topicId)
-    ),
-    orderBy: [desc(sessionSummaries.createdAt)],
-  });
+  // Scope the summary lookup through createScopedRepository so this read
+  // follows the project convention ("Reads must use createScopedRepository").
+  // The repo.db handle carries the profileId scope; the additional
+  // eq(sessionSummaries.topicId, input.topicId) narrows to this topic.
+  // Raw db.query is intentionally avoided here (unlike session-topic.ts which
+  // has a documented exception for multi-table joins requiring parent chains).
+  const repoForRecap = createScopedRepository(db, profileId);
+  const [latestSummary] = await repoForRecap.db
+    .select({
+      learnerRecap: sessionSummaries.learnerRecap,
+    })
+    .from(sessionSummaries)
+    .where(
+      and(
+        eq(sessionSummaries.profileId, profileId),
+        eq(sessionSummaries.topicId, input.topicId),
+        // Skip rows with null learnerRecap so the most-recent *populated*
+        // recap is returned. Without this filter, a null-recap row (e.g. the
+        // brand-new session just inserted above) would shadow older non-null
+        // recap text — users would see no recap on their first retry.
+        isNotNull(sessionSummaries.learnerRecap)
+      )
+    )
+    .orderBy(desc(sessionSummaries.createdAt))
+    .limit(1);
   const recap = latestSummary?.learnerRecap ?? null;
 
   const response: RelearnResponse = {
