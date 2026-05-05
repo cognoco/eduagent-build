@@ -15,6 +15,7 @@ Six audit lenses ran independently, each scoped to a specific aspect of consiste
 - **Mobile compliance** — do mobile components and screens follow the documented persona, styling, and navigation rules?
 - **Project scripts** — do all the `package.json` scripts resolve to real tools, with consistent naming across the monorepo?
 - **Dependencies** — are the dependency declarations across the monorepo consistent, fresh, and free of phantom or orphaned entries?
+- **Schema evolution** — are API response schemas current, complete, and consistently applied across all route files?
 
 Each lens produced a structured report. The audits were run as separate AI-agent sessions with no remediation in scope and no cross-pollination of opinions; findings reflect codebase state as of 2026-05-02, with no source changes since.
 
@@ -105,7 +106,7 @@ The severity distribution is bimodal — 2 RED, 5 YELLOW, 1 GREEN-leaning — no
 - **Manifest hygiene has an unusual property.** It doesn't block any other group, but any dependency-touching work landed before it creates merge conflicts the manifest cleanup will then have to absorb. The implication: do it early, or expect rebase cost on whatever else lands first.
 - **API project config is independent** but de-risks future tooling upgrades. Addressing it before a major Nx or ESLint upgrade is meaningfully easier than addressing it after one.
 - **Documentation consistency intersects with the cleanup-triage backlog.** Eight inbound-link conflicts in the cleanup-triage scope require coordinated edits when those files move. Ideally these land in the same PR or week.
-- **Mobile navigation, mobile design drift, the hygiene backlog, and test boundary** (in its smallest form) are independent of everything else and of each other. Smallest and most parallelizable.
+- **Mobile navigation, mobile design drift, and the hygiene backlog** are independent of everything else and of each other. Smallest and most parallelizable.
 
 ## What we didn't look at
 

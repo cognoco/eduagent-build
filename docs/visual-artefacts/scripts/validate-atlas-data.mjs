@@ -85,11 +85,14 @@ function validateBoards(data) {
     for (const lane of lanes) {
       assertNonEmptyString(lane.id, `board ${board.id}.lane.id`);
       assertNonEmptyString(lane.title, `board ${board.id}.lane.title`);
+      assertNonEmptyString(lane.description, `board ${board.id}.lane ${lane.id}.description`);
       assertArray(lane.nodeIds, `board ${board.id}.lane ${lane.id}.nodeIds`);
       if (lane.nodeIds.length === 0) {
         fail(`board ${board.id}.lane ${lane.id} must reference nodes`);
       }
     }
+
+    assertArray(board.decisionNotes, `board ${board.id}.decisionNotes`);
 
     const sourceRefs = assertArray(
       board.sourceRefs,
@@ -199,6 +202,14 @@ function validateLegends(data) {
   }
 }
 
+function validateStatuses(data) {
+  const statuses = assertArray(data.statuses, 'statuses');
+  if (statuses.length === 0) fail('statuses must include at least one entry');
+  for (const status of statuses) {
+    assertNonEmptyString(status.label, 'status.label');
+  }
+}
+
 function validateShellFiles() {
   const htmlPath = join(atlasRoot, 'atlas.html');
   if (!existsSync(htmlPath)) fail(`Missing atlas shell: ${htmlPath}`);
@@ -212,6 +223,7 @@ function validateShellFiles() {
     'id="board-stage"',
     'id="node-drawer"',
     'id="index-panel"',
+    'id="atlas-toast"',
     'data-action="previous"',
     'data-action="next"',
     'data-action="export"',
@@ -245,6 +257,7 @@ async function main() {
   validateLaneReferences(boards, nodeIds);
   validateLinks(data, boardIds, nodeIds);
   validateLegends(data);
+  validateStatuses(data);
   validateShellFiles();
   validateExportPath();
 

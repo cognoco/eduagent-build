@@ -29,9 +29,15 @@ function parseArgs(argv) {
     const arg = argv[index];
     if (arg === '--help' || arg === '-h') args.help = true;
     else if (arg === '--board') {
+      if (!argv[index + 1] || argv[index + 1].startsWith('--')) {
+        throw new Error('--board requires a value');
+      }
       args.board = argv[index + 1];
       index += 1;
     } else if (arg === '--out') {
+      if (!argv[index + 1] || argv[index + 1].startsWith('--')) {
+        throw new Error('--out requires a value');
+      }
       args.out = resolve(argv[index + 1]);
       index += 1;
     } else {
