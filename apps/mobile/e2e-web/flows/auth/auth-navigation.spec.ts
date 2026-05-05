@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test';
+import { setupClerkTestingToken } from '@clerk/testing/playwright';
 
 test('J-02 auth screen navigation works on web @smoke', async ({ page }) => {
+  await setupClerkTestingToken({ page });
   await page.goto('/sign-in', { waitUntil: 'commit' });
 
   await expect(page.getByTestId('sign-in-email')).toBeVisible({

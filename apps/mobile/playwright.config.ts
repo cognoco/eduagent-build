@@ -39,6 +39,7 @@ export default defineConfig({
     video: 'retain-on-failure',
     viewport: { width: 1440, height: 1080 },
   },
+  globalSetup: path.join(e2eWebDir, 'helpers', 'global-setup.ts'),
   globalTeardown: path.join(e2eWebDir, 'helpers', 'global-teardown.ts'),
   webServer: [
     ...(shouldStartLocalApi
