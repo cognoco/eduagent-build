@@ -38,6 +38,7 @@ import {
   generateSessionInsights,
 } from '../../services/session-highlights';
 import { generateLearnerRecap } from '../../services/session-recap';
+import { generateAndStoreLlmSummary } from '../../services/session-llm-summary';
 import {
   curriculumTopics,
   learningSessions,
@@ -907,6 +908,60 @@ export const sessionCompleted = inngest.createFunction(
               updatedAt: new Date(),
             })
             .where(eq(sessionSummaries.id, summaryRow.id));
+        })
+      )
+    );
+
+    outcomes.push(
+      await step.run('generate-llm-summary', async () =>
+        runIsolated('generate-llm-summary', profileId, async () => {
+          const db = getStepDatabase();
+
+          const summaryRow = await db.query.sessionSummaries.findFirst({
+            where: and(
+              eq(sessionSummaries.sessionId, sessionId),
+              eq(sessionSummaries.profileId, profileId)
+            ),
+            columns: { id: true },
+          });
+
+          if (!summaryRow) {
+            return;
+          }
+
+          const summary = await generateAndStoreLlmSummary(db, {
+            sessionId,
+            profileId,
+            summaryId: summaryRow.id,
+            subjectId: subjectId ?? null,
+            topicId: topicId ?? null,
+          });
+
+          if (!summary) {
+            await step.sendEvent('notify-session-summary-failed', {
+              name: 'app/session.summary.failed',
+              data: {
+                profileId,
+                sessionId,
+                sessionSummaryId: summaryRow.id,
+                timestamp: new Date().toISOString(),
+              },
+            });
+            return;
+          }
+
+          await step.sendEvent('notify-session-summary-generated', {
+            name: 'app/session.summary.generated',
+            data: {
+              profileId,
+              sessionId,
+              sessionSummaryId: summaryRow.id,
+              sessionState: summary.sessionState,
+              topicsCount: summary.topicsCovered.length,
+              narrativeLength: summary.narrative.length,
+              timestamp: new Date().toISOString(),
+            },
+          });
         })
       )
     );

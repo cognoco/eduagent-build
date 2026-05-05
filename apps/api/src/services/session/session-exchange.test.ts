@@ -254,4 +254,45 @@ describe('computeCorrectStreak', () => {
     ];
     expect(computeCorrectStreak(events, 2)).toBe(2);
   });
+
+  it('skips neutral ai_response events (no correctAnswer) rather than breaking the streak', () => {
+    // A hint or encouragement turn (no correctAnswer) between correct answers
+    // must NOT reset the streak. Only correctAnswer === false resets.
+    const events = [
+      {
+        eventType: 'ai_response',
+        metadata: { escalationRung: 2, correctAnswer: true },
+      },
+      {
+        // neutral hint turn — no correctAnswer field
+        eventType: 'ai_response',
+        metadata: { escalationRung: 2 },
+      },
+      {
+        eventType: 'ai_response',
+        metadata: { escalationRung: 2, correctAnswer: true },
+      },
+    ];
+    expect(computeCorrectStreak(events, 2)).toBe(2);
+  });
+
+  it('breaks on explicit correctAnswer === false, not on undefined', () => {
+    const events = [
+      {
+        eventType: 'ai_response',
+        metadata: { escalationRung: 2, correctAnswer: true },
+      },
+      {
+        eventType: 'ai_response',
+        metadata: { escalationRung: 2, correctAnswer: false },
+      },
+      {
+        eventType: 'ai_response',
+        metadata: { escalationRung: 2, correctAnswer: true },
+      },
+    ];
+    // Scanning backwards: first event (index 2) = correct → streak 1;
+    // second event (index 1) = false → break. Result: 1.
+    expect(computeCorrectStreak(events, 2)).toBe(1);
+  });
 });

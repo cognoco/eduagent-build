@@ -16,6 +16,7 @@ import {
   filingRetryEventSchema,
   RateLimitedError,
   streamFallbackFrameSchema,
+  getSubjectSessionsResponseSchema,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import { z } from 'zod';
@@ -47,6 +48,7 @@ import {
   evaluateSessionDepth,
   getResumeNudgeCandidate,
   claimSessionForFilingRetry,
+  getSubjectSessions,
 } from '../services/session';
 import type { LLMTier } from '../services/subscription';
 import { notFound, apiError } from '../errors';
@@ -94,6 +96,18 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     const nudge = await getResumeNudgeCandidate(db, profileId);
     return c.json({ nudge });
   })
+  // List past sessions for a subject (Past conversations on progress screen)
+  .get(
+    '/subjects/:subjectId/sessions',
+    zValidator('param', z.object({ subjectId: z.string().uuid() })),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { subjectId } = c.req.valid('param');
+      const sessions = await getSubjectSessions(db, profileId, subjectId);
+      return c.json(getSubjectSessionsResponseSchema.parse({ sessions }));
+    }
+  )
   // Start a new learning session for a subject
   .post(
     '/subjects/:subjectId/sessions',
@@ -239,7 +253,8 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     const profileId = requireProfileId(c.get('profileId'));
     const sessionId = c.req.param('sessionId');
     const transcript = await getSessionTranscript(db, profileId, sessionId);
-    if (!transcript) return notFound(c, 'Session not found');
+    if (!transcript || transcript.archived)
+      return notFound(c, 'Session not found');
 
     const ageBracket = await getProfileAgeBracket(db, profileId);
     const result = await evaluateSessionDepth(transcript, { ageBracket });
@@ -363,14 +378,24 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                 });
               }
             }
+            // Map error to a stable machine-readable code so clients can
+            // classify failures without brittle message parsing.
+            const errorCode: string = (() => {
+              if (streamErr instanceof RateLimitedError)
+                return 'quota_exhausted';
+              if (
+                streamErr instanceof Error &&
+                streamErr.message.includes('safety filters')
+              )
+                return 'safety_filter';
+              return 'unknown_error';
+            })();
             await sseStream.writeSSE({
               data: JSON.stringify({
                 type: 'error',
+                code: errorCode,
                 message:
-                  streamErr instanceof Error &&
-                  streamErr.message.includes('safety filters')
-                    ? errMsg
-                    : 'Something went wrong while generating a reply. Please try again.',
+                  'Something went wrong while generating a reply. Please try again.',
               }),
             });
             return;

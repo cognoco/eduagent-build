@@ -7,6 +7,7 @@ import {
   learningSessions,
   profiles,
   sessionEvents,
+  sessionSummaries,
   subjects,
   type Database,
 } from '@eduagent/database';
@@ -183,6 +184,52 @@ describe('session operations integration', () => {
         escalationRung: 2,
       }),
     ]);
+  });
+
+  it('returns the archived transcript shape when purgedAt is set', async () => {
+    const { profileId } = await seedProfile();
+    const subjectId = await seedSubject(profileId);
+
+    const session = await startSession(db, profileId, subjectId, {
+      subjectId,
+    });
+
+    await db.insert(sessionSummaries).values({
+      sessionId: session.id,
+      profileId,
+      topicId: null,
+      learnerRecap: 'You connected equivalent fractions to the picture model.',
+      llmSummary: {
+        narrative:
+          'Worked through equivalent fractions and matched each fraction to a visual model together.',
+        topicsCovered: ['equivalent fractions', 'visual model'],
+        sessionState: 'completed',
+        reEntryRecommendation:
+          'Resume with one more equivalent-fractions example and ask for the pattern aloud.',
+      },
+      status: 'accepted',
+      summaryGeneratedAt: new Date('2026-03-01T10:00:00.000Z'),
+      purgedAt: new Date('2026-04-01T10:00:00.000Z'),
+    });
+
+    const transcript = await getSessionTranscript(db, profileId, session.id);
+
+    expect(transcript).not.toBeNull();
+    expect(transcript?.archived).toBe(true);
+    if (transcript?.archived !== true) {
+      throw new Error('expected archived transcript response');
+    }
+    expect(transcript).toEqual(
+      expect.objectContaining({
+        archivedAt: '2026-04-01T10:00:00.000Z',
+        summary: expect.objectContaining({
+          topicId: null,
+          learnerRecap:
+            'You connected equivalent fractions to the picture model.',
+          sessionState: 'completed',
+        }),
+      })
+    );
   });
 
   it('syncs homework state, records lifecycle events once, and preserves tracking metadata', async () => {

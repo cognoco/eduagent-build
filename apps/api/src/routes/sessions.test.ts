@@ -293,6 +293,19 @@ jest.mock('../services/session', () => {
     claimSessionForFilingRetry: (
       jest.requireActual('../services/session') as Record<string, unknown>
     ).claimSessionForFilingRetry,
+    getSubjectSessions: jest.fn().mockResolvedValue([
+      {
+        id: '11111111-1111-4111-8111-111111111111',
+        topicId: '22222222-2222-4222-8222-222222222222',
+        topicTitle: 'Fractions',
+        bookId: '33333333-3333-4333-8333-333333333333',
+        bookTitle: 'Numbers',
+        chapter: 'Chapter 1',
+        sessionType: 'learning',
+        durationSeconds: 600,
+        createdAt: '2026-05-01T10:00:00.000Z',
+      },
+    ]),
   };
 });
 
@@ -378,6 +391,52 @@ const AUTH_HEADERS = {
 };
 
 describe('session routes', () => {
+  // -------------------------------------------------------------------------
+  // GET /v1/subjects/:subjectId/sessions
+  // -------------------------------------------------------------------------
+
+  describe('GET /v1/subjects/:subjectId/sessions', () => {
+    it('returns 200 with session list', async () => {
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/sessions`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(Array.isArray(body.sessions)).toBe(true);
+      expect(body.sessions[0]).toEqual(
+        expect.objectContaining({
+          id: expect.any(String),
+          topicTitle: 'Fractions',
+          bookTitle: 'Numbers',
+          sessionType: 'learning',
+        })
+      );
+    });
+
+    it('returns 400 with non-uuid subjectId', async () => {
+      const res = await app.request(
+        `/v1/subjects/not-a-uuid/sessions`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 401 without auth header', async () => {
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/sessions`,
+        { headers: {} },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(401);
+    });
+  });
+
   // -------------------------------------------------------------------------
   // POST /v1/subjects/:subjectId/sessions
   // -------------------------------------------------------------------------
@@ -558,6 +617,42 @@ describe('session routes', () => {
         expect.objectContaining({ isSystemPrompt: true })
       );
       expect(getSessionTranscript).toHaveBeenCalled();
+    });
+
+    it('returns 200 with archived transcript shape when session is archived', async () => {
+      (getSessionTranscript as jest.Mock).mockResolvedValueOnce({
+        archived: true,
+        archivedAt: new Date().toISOString(),
+        summary: {
+          narrative:
+            'Learner explored gravity and discussed how it pulls objects together. They asked thoughtful questions about why apples fall.',
+          topicsCovered: ['gravity'],
+          sessionState: 'completed' as const,
+          reEntryRecommendation:
+            'Pick up by reviewing how mass affects gravitational pull.',
+          learnerRecap: 'I learned gravity pulls things down.',
+          topicId: null,
+        },
+      });
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/transcript`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.archived).toBe(true);
+      expect(body.archivedAt).toBeTruthy();
+      expect(body.summary.narrative).toContain('gravity');
+      expect(body.summary.topicsCovered).toContain('gravity');
+      expect(body.summary.sessionState).toBe('completed');
+      expect(body.summary.learnerRecap).toBe(
+        'I learned gravity pulls things down.'
+      );
+      expect(body.session).toBeUndefined();
     });
   });
 
