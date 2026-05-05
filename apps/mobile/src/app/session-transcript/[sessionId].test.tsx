@@ -89,6 +89,7 @@ describe('SessionTranscriptScreen [BUG-889]', () => {
   it('renders an empty state when there are no exchanges', () => {
     mockTranscriptResult = {
       data: {
+        archived: false,
         session: {
           sessionId: 'sess-123',
           subjectId: 's',
@@ -108,9 +109,37 @@ describe('SessionTranscriptScreen [BUG-889]', () => {
     screen.getByTestId('session-transcript-empty');
   });
 
+  it('renders the archived transcript card when the transcript has been purged', () => {
+    mockTranscriptResult = {
+      data: {
+        archived: true,
+        archivedAt: '2026-03-12T10:00:00.000Z',
+        summary: {
+          narrative:
+            'Worked through long division and remainders by naming each step together.',
+          topicsCovered: ['long division', 'remainders'],
+          sessionState: 'completed',
+          reEntryRecommendation:
+            'Try a 4-digit dividend with a remainder on the next session.',
+          learnerRecap:
+            'Today you connected division and remainders with solid progress.',
+          topicId: null,
+        },
+      },
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    };
+
+    render(<SessionTranscriptScreen />);
+    screen.getByTestId('archived-transcript-card');
+    screen.getByText(/archived on/i);
+  });
+
   it('renders user and assistant exchanges in order, hiding system-prompt rows', () => {
     mockTranscriptResult = {
       data: {
+        archived: false,
         session: {
           sessionId: 'sess-123',
           subjectId: 's',
@@ -167,6 +196,7 @@ describe('SessionTranscriptScreen [BUG-889]', () => {
   it('Back button routes to library', () => {
     mockTranscriptResult = {
       data: {
+        archived: false,
         session: {
           sessionId: 'sess-123',
           subjectId: 's',
@@ -219,6 +249,7 @@ describe('SessionTranscriptScreen [BUG-889]', () => {
     ) {
       return {
         data: {
+          archived: false,
           session: {
             sessionId: 'sess-envelope',
             subjectId: 's',
