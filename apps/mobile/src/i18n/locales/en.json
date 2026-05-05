@@ -105,6 +105,31 @@
     "goToLibraryLabel": "Go to Library",
     "moreOptions": "More options",
     "moreOptionsLabel": "More options",
+    "learner": {
+      "recommended": "Recommended",
+      "intentHeading": "What do you need right now?",
+      "askAnythingLabel": "Ask anything",
+      "askAnythingPlaceholder": "Ask anything...",
+      "yourSubjects": "Your subjects",
+      "newSubject": "New subject",
+      "emptySubjectsTitle": "Your subjects will show up here",
+      "emptySubjectsMessage": "Start one now, or just use homework help when you need it.",
+      "addSubject": "Add a subject",
+      "intentActions": {
+        "homework": {
+          "title": "Homework help",
+          "subtitle": "Take a photo or type the problem"
+        },
+        "practice": {
+          "title": "Practice for a test",
+          "subtitle": "Review what is fading or quiz yourself"
+        },
+        "studyNew": {
+          "title": "Learn something new",
+          "subtitle": "Start a topic or build a subject"
+        }
+      }
+    },
     "parentGateway": {
       "seeHowTheyAreDoing": "See how they're doing",
       "practicedThisWeek": "{{name}} practiced {{minutes}} min this week",
@@ -1133,7 +1158,13 @@
     "common": {
       "noSubjectSelected": "No subject selected",
       "saving": "Saving…",
-      "skip": "Skip"
+      "skip": "Skip",
+      "stepLabels": {
+        "quickChat": "Quick chat",
+        "makeItPersonal": "Make it personal",
+        "supportOptions": "Support options",
+        "yourPlan": "Your plan"
+      }
     },
     "mentorLanguagePicker": {
       "title": "What language should your mentor speak?",

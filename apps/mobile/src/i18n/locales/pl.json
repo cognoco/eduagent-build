@@ -105,6 +105,31 @@
     "goToLibraryLabel": "Przejdź do Biblioteki",
     "moreOptions": "Więcej opcji",
     "moreOptionsLabel": "Więcej opcji",
+    "learner": {
+      "recommended": "Polecane",
+      "intentHeading": "Czego teraz potrzebujesz?",
+      "askAnythingLabel": "Zapytaj o cokolwiek",
+      "askAnythingPlaceholder": "Zapytaj o cokolwiek...",
+      "yourSubjects": "Twoje przedmioty",
+      "newSubject": "Nowy przedmiot",
+      "emptySubjectsTitle": "Twoje przedmioty pojawią się tutaj",
+      "emptySubjectsMessage": "Zacznij jeden teraz albo użyj pomocy w zadaniach, gdy jej potrzebujesz.",
+      "addSubject": "Dodaj przedmiot",
+      "intentActions": {
+        "homework": {
+          "title": "Pomoc w zadaniach",
+          "subtitle": "Zrób zdjęcie albo wpisz zadanie"
+        },
+        "practice": {
+          "title": "Ćwicz do sprawdzianu",
+          "subtitle": "Powtórz to, co się zaciera, albo sprawdź się"
+        },
+        "studyNew": {
+          "title": "Naucz się czegoś nowego",
+          "subtitle": "Zacznij temat albo utwórz przedmiot"
+        }
+      }
+    },
     "parentGateway": {
       "seeHowTheyAreDoing": "Zobacz, jak im idzie",
       "practicedThisWeek": "{{name}} ćwiczył(a) {{minutes}} min w tym tygodniu",
@@ -1133,7 +1158,13 @@
     "common": {
       "noSubjectSelected": "Nie wybrano przedmiotu",
       "saving": "Zapisywanie…",
-      "skip": "Pomiń"
+      "skip": "Pomiń",
+      "stepLabels": {
+        "quickChat": "Krótka rozmowa",
+        "makeItPersonal": "Dopasuj do siebie",
+        "supportOptions": "Opcje wsparcia",
+        "yourPlan": "Twój plan"
+      }
     },
     "mentorLanguagePicker": {
       "title": "W jakim języku powinien mówić Twój mentor?",

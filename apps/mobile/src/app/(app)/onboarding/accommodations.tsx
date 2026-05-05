@@ -10,6 +10,7 @@ import { useUpdateAccommodationMode } from '../../../hooks/use-learner-profile';
 import { ACCOMMODATION_OPTIONS } from '../../../lib/accommodation-options';
 import { classifyApiError } from '../../../lib/format-api-error';
 import { goBackOrReplace } from '../../../lib/navigation';
+import { getOnboardingStepLabels } from '../../../lib/onboarding-step-labels';
 import { platformAlert } from '../../../lib/platform-alert';
 import { useThemeColors } from '../../../lib/theme';
 import { ErrorFallback } from '../../../components/common/ErrorFallback';
@@ -36,6 +37,7 @@ export default function AccommodationsScreen(): React.ReactElement {
   }>();
   const step = Number(stepParam) || 3;
   const totalSteps = Number(totalStepsParam) || 4;
+  const stepLabels = getOnboardingStepLabels(t);
   const [selectedMode, setSelectedMode] = useState<AccommodationMode>('none');
   const updateAccommodation = useUpdateAccommodationMode();
 
@@ -145,7 +147,11 @@ export default function AccommodationsScreen(): React.ReactElement {
         >
           <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </Pressable>
-        <OnboardingStepIndicator step={step} totalSteps={totalSteps} />
+        <OnboardingStepIndicator
+          step={step}
+          totalSteps={totalSteps}
+          stepLabels={stepLabels}
+        />
       </View>
 
       <ScrollView

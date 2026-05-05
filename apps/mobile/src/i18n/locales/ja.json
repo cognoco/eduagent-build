@@ -105,6 +105,31 @@
     "goToLibraryLabel": "ライブラリへ",
     "moreOptions": "その他のオプション",
     "moreOptionsLabel": "その他のオプション",
+    "learner": {
+      "recommended": "おすすめ",
+      "intentHeading": "今、何をしたい？",
+      "askAnythingLabel": "なんでも質問",
+      "askAnythingPlaceholder": "なんでも質問...",
+      "yourSubjects": "あなたの科目",
+      "newSubject": "新しい科目",
+      "emptySubjectsTitle": "ここに科目が表示されます",
+      "emptySubjectsMessage": "今すぐ始めてもいいし、必要なときだけ宿題ヘルプを使っても大丈夫です。",
+      "addSubject": "科目を追加",
+      "intentActions": {
+        "homework": {
+          "title": "宿題ヘルプ",
+          "subtitle": "写真を撮るか、問題を入力"
+        },
+        "practice": {
+          "title": "テストに向けて練習",
+          "subtitle": "忘れかけている内容を復習したり、自分をテスト"
+        },
+        "studyNew": {
+          "title": "新しいことを学ぶ",
+          "subtitle": "トピックを始めるか、科目を作成"
+        }
+      }
+    },
     "parentGateway": {
       "seeHowTheyAreDoing": "お子様の様子を見る",
       "practicedThisWeek": "{{name}}さんは今週{{minutes}}分練習しました",
@@ -1133,7 +1158,13 @@
     "common": {
       "noSubjectSelected": "科目が選択されていません",
       "saving": "保存中…",
-      "skip": "スキップ"
+      "skip": "スキップ",
+      "stepLabels": {
+        "quickChat": "短いチャット",
+        "makeItPersonal": "自分向けに調整",
+        "supportOptions": "サポートの選択",
+        "yourPlan": "あなたの計画"
+      }
     },
     "mentorLanguagePicker": {
       "title": "メンターには何語で話してほしいですか？",

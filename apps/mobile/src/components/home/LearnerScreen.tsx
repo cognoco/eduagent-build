@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import type { Profile } from '@eduagent/schemas';
 import { BookPageFlipAnimation, ProfileSwitcher } from '../common';
 import {
@@ -42,8 +43,8 @@ const DEFAULT_SUBJECT_ICON: React.ComponentProps<typeof Ionicons>['name'] =
 type HomeIntentAction = {
   testID: string;
   icon: React.ComponentProps<typeof Ionicons>['name'];
-  title: string;
-  subtitle: string;
+  titleKey: string;
+  subtitleKey: string;
   route: '/create-subject' | '/(app)/homework/camera' | '/(app)/practice';
   highlight?: boolean;
 };
@@ -52,23 +53,23 @@ const HOME_INTENT_ACTIONS: HomeIntentAction[] = [
   {
     testID: 'home-action-homework',
     icon: 'camera-outline',
-    title: 'Homework help',
-    subtitle: 'Take a photo or type the problem',
+    titleKey: 'home.learner.intentActions.homework.title',
+    subtitleKey: 'home.learner.intentActions.homework.subtitle',
     route: '/(app)/homework/camera',
     highlight: true,
   },
   {
     testID: 'home-action-practice',
     icon: 'refresh-outline',
-    title: 'Practice for a test',
-    subtitle: 'Review what is fading or quiz yourself',
+    titleKey: 'home.learner.intentActions.practice.title',
+    subtitleKey: 'home.learner.intentActions.practice.subtitle',
     route: '/(app)/practice',
   },
   {
     testID: 'home-action-study-new',
     icon: 'book-outline',
-    title: 'Learn something new',
-    subtitle: 'Start a topic or build a subject',
+    titleKey: 'home.learner.intentActions.studyNew.title',
+    subtitleKey: 'home.learner.intentActions.studyNew.subtitle',
     route: '/create-subject',
   },
 ];
@@ -90,6 +91,7 @@ export function LearnerScreen({
   onBack,
   now,
 }: LearnerScreenProps): React.ReactElement {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const { colorScheme } = useTheme();
@@ -108,12 +110,10 @@ export function LearnerScreen({
     activeProfile && !activeProfile.isOwner && profiles.some((p) => p.isOwner)
   );
 
-  const coachBandDismissedRef = useRef(false);
-  const [, forceUpdate] = useState(0);
+  const [coachBandDismissed, setCoachBandDismissed] = useState(false);
 
   const dismissCoachBand = useCallback(() => {
-    coachBandDismissedRef.current = true;
-    forceUpdate((n) => n + 1);
+    setCoachBandDismissed(true);
   }, []);
 
   const [loadingTimedOut, setLoadingTimedOut] = useState(false);
@@ -407,9 +407,7 @@ export function LearnerScreen({
 
   const firstName = activeProfile?.displayName?.split(' ')[0] ?? 'there';
   const showCoachBand =
-    FEATURE_FLAGS.COACH_BAND_ENABLED &&
-    coachBand &&
-    !coachBandDismissedRef.current;
+    FEATURE_FLAGS.COACH_BAND_ENABLED && coachBand && !coachBandDismissed;
 
   return (
     <View className="flex-1 bg-background" testID="learner-screen">
@@ -438,10 +436,10 @@ export function LearnerScreen({
             </Pressable>
           ) : null}
           <View className="flex-1">
-            <Text className="text-[22px] font-bold text-text-primary leading-tight">
+            <Text className="text-h2 font-bold text-text-primary leading-tight">
               Hey {firstName}!
             </Text>
-            <Text className="text-[13px] text-text-secondary mt-0.5">
+            <Text className="text-body-sm text-text-secondary mt-0.5">
               {subtitle}
             </Text>
           </View>
@@ -460,12 +458,11 @@ export function LearnerScreen({
       >
         {showCoachBand && (
           <View>
-            <Text className="text-[11px] font-bold uppercase text-text-tertiary px-5 mt-4 mb-2">
-              Recommended
+            <Text className="text-caption font-bold uppercase text-text-tertiary px-5 mt-4 mb-2">
+              {t('home.learner.recommended')}
             </Text>
             <CoachBand
               headline={coachBand.headline}
-              eyebrow="Next up"
               now={now}
               onContinue={coachBand.onContinue}
               onDismiss={dismissCoachBand}
@@ -475,51 +472,56 @@ export function LearnerScreen({
 
         {!isParentProxy && (
           <View className={showCoachBand ? 'mt-1' : 'mt-5'}>
-            <Text className="text-[19px] font-bold text-text-primary px-5 mb-2">
-              What do you need right now?
+            <Text className="text-h3 font-bold text-text-primary px-5 mb-2">
+              {t('home.learner.intentHeading')}
             </Text>
             <View className="px-5" style={{ gap: 10 }}>
-              {HOME_INTENT_ACTIONS.map((action) => (
-                <Pressable
-                  key={action.testID}
-                  testID={action.testID}
-                  onPress={() =>
-                    router.push({
-                      pathname: action.route,
-                      params: HOME_RETURN_PARAMS,
-                    } as never)
-                  }
-                  className={`rounded-2xl border px-4 py-4 flex-row items-center ${
-                    action.highlight
-                      ? 'bg-primary-soft border-primary/40'
-                      : 'bg-surface border-border'
-                  }`}
-                  style={{ gap: 12 }}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${action.title}. ${action.subtitle}`}
-                >
-                  <View className="w-11 h-11 rounded-2xl bg-surface-elevated items-center justify-center">
+              {HOME_INTENT_ACTIONS.map((action) => {
+                const title = t(action.titleKey);
+                const subtitle = t(action.subtitleKey);
+
+                return (
+                  <Pressable
+                    key={action.testID}
+                    testID={action.testID}
+                    onPress={() =>
+                      router.push({
+                        pathname: action.route,
+                        params: HOME_RETURN_PARAMS,
+                      } as never)
+                    }
+                    className={`rounded-2xl border px-4 py-4 flex-row items-center ${
+                      action.highlight
+                        ? 'bg-primary-soft border-primary/40'
+                        : 'bg-surface border-border'
+                    }`}
+                    style={{ gap: 12 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${title}. ${subtitle}`}
+                  >
+                    <View className="w-11 h-11 rounded-2xl bg-surface-elevated items-center justify-center">
+                      <Ionicons
+                        name={action.icon}
+                        size={22}
+                        color={colors.primary}
+                      />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-body font-bold text-text-primary">
+                        {title}
+                      </Text>
+                      <Text className="text-body-sm text-text-secondary mt-1">
+                        {subtitle}
+                      </Text>
+                    </View>
                     <Ionicons
-                      name={action.icon}
-                      size={22}
-                      color={colors.primary}
+                      name="chevron-forward"
+                      size={20}
+                      color={colors.textSecondary}
                     />
-                  </View>
-                  <View className="flex-1">
-                    <Text className="text-[16px] font-bold text-text-primary">
-                      {action.title}
-                    </Text>
-                    <Text className="text-[13px] text-text-secondary mt-1">
-                      {action.subtitle}
-                    </Text>
-                  </View>
-                  <Ionicons
-                    name="chevron-forward"
-                    size={20}
-                    color={colors.textSecondary}
-                  />
-                </Pressable>
-              ))}
+                  </Pressable>
+                );
+              })}
             </View>
 
             <View className="px-5 mt-3">
@@ -534,15 +536,15 @@ export function LearnerScreen({
                 className="rounded-2xl bg-surface border border-border pl-4 pr-1.5 py-2.5 flex-row items-center"
                 style={{ gap: 8 }}
                 accessibilityRole="button"
-                accessibilityLabel="Ask anything"
+                accessibilityLabel={t('home.learner.askAnythingLabel')}
               >
                 <Ionicons
                   name="chatbubble-ellipses-outline"
                   size={14}
                   color={colors.muted}
                 />
-                <Text className="flex-1 text-[13px] text-text-tertiary">
-                  Ask anything...
+                <Text className="flex-1 text-body-sm text-text-tertiary">
+                  {t('home.learner.askAnythingPlaceholder')}
                 </Text>
                 <View className="w-8 h-8 rounded-full bg-surface-elevated items-center justify-center">
                   <Ionicons name="mic-outline" size={14} color={colors.muted} />
@@ -555,8 +557,8 @@ export function LearnerScreen({
         <View className={!isParentProxy ? 'mt-5' : 'mt-4'}>
           {subjectCards.length > 0 ? (
             <>
-              <Text className="text-[11px] font-bold uppercase text-text-tertiary px-5 mb-2.5">
-                Your subjects
+              <Text className="text-caption font-bold uppercase text-text-tertiary px-5 mb-2.5">
+                {t('home.learner.yourSubjects')}
               </Text>
               <ScrollView
                 testID="home-subject-carousel"
@@ -593,11 +595,11 @@ export function LearnerScreen({
                     accessibilityRole="button"
                     accessibilityLabel="Add a new subject"
                   >
-                    <Text className="text-[20px] text-text-tertiary opacity-70">
+                    <Text className="text-h3 text-text-tertiary opacity-70">
                       +
                     </Text>
-                    <Text className="text-xs font-bold text-text-tertiary">
-                      New subject
+                    <Text className="text-caption font-bold text-text-tertiary">
+                      {t('home.learner.newSubject')}
                     </Text>
                   </Pressable>
                 )}
@@ -616,11 +618,11 @@ export function LearnerScreen({
                   color={colors.textSecondary}
                   style={{ opacity: 0.6 }}
                 />
-                <Text className="text-sm font-semibold text-text-primary text-center px-6">
-                  Your subjects will show up here
+                <Text className="text-body-sm font-semibold text-text-primary text-center px-6">
+                  {t('home.learner.emptySubjectsTitle')}
                 </Text>
-                <Text className="text-[13px] text-text-secondary text-center px-6">
-                  Start one now, or just use homework help when you need it.
+                <Text className="text-body-sm text-text-secondary text-center px-6">
+                  {t('home.learner.emptySubjectsMessage')}
                 </Text>
                 <Pressable
                   testID="home-add-first-subject"
@@ -629,10 +631,10 @@ export function LearnerScreen({
                   }
                   className="bg-primary rounded-xl px-5 py-2.5 mt-1"
                   accessibilityRole="button"
-                  accessibilityLabel="Add a subject"
+                  accessibilityLabel={t('home.learner.addSubject')}
                 >
-                  <Text className="text-sm font-bold text-text-inverse">
-                    Add a subject
+                  <Text className="text-body-sm font-bold text-text-inverse">
+                    {t('home.learner.addSubject')}
                   </Text>
                 </Pressable>
               </View>

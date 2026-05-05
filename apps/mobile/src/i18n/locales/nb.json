@@ -105,6 +105,31 @@
     "goToLibraryLabel": "Gå til bibliotek",
     "moreOptions": "Flere alternativer",
     "moreOptionsLabel": "Flere alternativer",
+    "learner": {
+      "recommended": "Anbefalt",
+      "intentHeading": "Hva trenger du akkurat nå?",
+      "askAnythingLabel": "Spør om hva som helst",
+      "askAnythingPlaceholder": "Spør om hva som helst...",
+      "yourSubjects": "Fagene dine",
+      "newSubject": "Nytt fag",
+      "emptySubjectsTitle": "Fagene dine vises her",
+      "emptySubjectsMessage": "Start ett nå, eller bruk leksehjelp når du trenger det.",
+      "addSubject": "Legg til fag",
+      "intentActions": {
+        "homework": {
+          "title": "Leksehjelp",
+          "subtitle": "Ta et bilde eller skriv inn oppgaven"
+        },
+        "practice": {
+          "title": "Øv til en prøve",
+          "subtitle": "Repeter det som begynner å glippe, eller test deg selv"
+        },
+        "studyNew": {
+          "title": "Lær noe nytt",
+          "subtitle": "Start et tema eller bygg et fag"
+        }
+      }
+    },
     "parentGateway": {
       "seeHowTheyAreDoing": "Se hvordan det går med dem",
       "practicedThisWeek": "{{name}} har øvd i {{minutes}} min denne uken",
@@ -1133,7 +1158,13 @@
     "common": {
       "noSubjectSelected": "Ingen emne valgt",
       "saving": "Lagrer ...",
-      "skip": "Hopp over"
+      "skip": "Hopp over",
+      "stepLabels": {
+        "quickChat": "Kort prat",
+        "makeItPersonal": "Gjør det personlig",
+        "supportOptions": "Støttevalg",
+        "yourPlan": "Planen din"
+      }
     },
     "mentorLanguagePicker": {
       "title": "Hvilket språk skal mentoren din snakke?",
