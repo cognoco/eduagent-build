@@ -15,11 +15,8 @@ export interface TopicSession {
 /**
  * Returns completed or auto-closed sessions for a specific topic, filtered
  * to those with at least 1 exchange (excludes accidental opens). Profile
- * ownership is verified through the subjects table parent chain.
- *
- * Architectural note: uses direct db.select() instead of createScopedRepository
- * because the query requires a multi-table join (learningSessions → subjects)
- * with profileId enforced via subjects.profileId in the WHERE clause.
+ * ownership is verified through `subjects.profileId` — the sanctioned
+ * parent-chain join pattern (see CLAUDE.md).
  */
 export async function getTopicSessions(
   db: Database,

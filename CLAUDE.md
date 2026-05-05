@@ -24,7 +24,7 @@ Always use `/commit` for all commits in this repo. Never use `/zdx:commit`, `/my
 
 - `@eduagent/schemas` is the shared contract. Do not redefine API-facing types locally.
 - Business logic belongs in `services/`, not in route handlers. Route/service boundaries are lint-enforced (eslint G1 and G5 in `eslint.config.mjs`).
-- Reads must use `createScopedRepository(profileId)`.
+- Reads must use `createScopedRepository(profileId)` when the query operates on a single scoped table. For queries that join through a parent chain (e.g. `learning_sessions → curriculum_topics → curriculum_books → subjects`), use direct `db.select()` and enforce `profileId` via `subjects.profileId` (or the closest ancestor that owns it) in the WHERE clause. The scoped repo cannot express multi-table joins; the parent-chain pattern is the sanctioned alternative. Existing examples: `services/session/session-topic.ts`, `session-book.ts`, `session-subject.ts`.
 - Writes must include explicit `profileId` protection or verify ownership through the parent chain before updating child records.
 - Shared mobile components stay persona-unaware. Use semantic tokens and CSS variables, not persona checks or hardcoded hex colors.
 - Durable async work goes through Inngest. Do not fire-and-forget background work from route handlers.
@@ -36,7 +36,6 @@ Always use `/commit` for all commits in this repo. Never use `/zdx:commit`, `/my
 
 These deviations from the rules above exist in the codebase as of 2026-05-01. They are listed here so reviewers don't try to "fix" them in unrelated PRs and so new contributors don't take them as precedent. Each exception should either be tracked toward a refactor, or promoted into an explicit rule.
 
-- **`apps/api/src/services/session/session-topic.ts` uses direct `db.select()` instead of `createScopedRepository`**, because the query requires a multi-table join (`learningSessions → subjects`) with `profileId` enforced via `subjects.profileId` in the WHERE clause. `createScopedRepository` does not support multi-table joins that need to scope through a parent chain. This is the same pattern as the library-search service. **New services should use `createScopedRepository` when the query operates on a single scoped table.**
 - **`apps/mobile/tsconfig.json` declares `references[]: [{ "path": "../api" }]`**, in tension with the conceptual "mobile must not depend on api" rule. This is required so `import type { AppType } from '@eduagent/api'` resolves for the Hono RPC client. **Type-only imports** from `@eduagent/api` are accepted; runtime imports remain forbidden (they would pull API server code into the mobile bundle). See `docs/architecture.md` → "AppType" example for the rationale.
 
 ## Schema And Deploy Safety

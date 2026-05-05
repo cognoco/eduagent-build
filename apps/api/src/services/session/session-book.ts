@@ -22,13 +22,8 @@ export interface BookSession {
  * Returns sessions for a specific book, including both properly completed
  * and auto-closed sessions (which had real exchanges but were killed by the
  * stale-cleanup cron). Excludes accidental opens (requires at least 1
- * exchange). Profile ownership is verified through the subjects table
- * parent chain.
- *
- * Architectural exception: uses direct db.select() instead of createScopedRepository
- * because the query requires a multi-table join (learningSessions → curriculumTopics
- * → subjects) with profileId enforced via subjects.profileId in the WHERE clause.
- * The scoped repo's sessions.findMany cannot express this join.
+ * exchange). Profile ownership is verified through `subjects.profileId` —
+ * the sanctioned parent-chain join pattern (see CLAUDE.md).
  */
 export async function getBookSessions(
   db: Database,
