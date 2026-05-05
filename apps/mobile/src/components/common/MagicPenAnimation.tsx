@@ -14,7 +14,7 @@ import Animated, {
   Easing,
   type AnimatedProps,
 } from 'react-native-reanimated';
-import Svg, { Path, Rect, Line, Circle } from 'react-native-svg';
+import Svg, { Path, Rect, Line, Circle, Polygon } from 'react-native-svg';
 
 // ---------------------------------------------------------------------------
 // Fabric-safe animated component setup
@@ -25,13 +25,11 @@ type AnimatedPathComponent = ComponentType<
   AnimatedProps<ComponentProps<typeof Path>>
 >;
 let AnimatedPath: AnimatedPathComponent;
-let _penAnimationAvailable = true;
 try {
   AnimatedPath = Animated.createAnimatedComponent(
     Path
   ) as AnimatedPathComponent;
 } catch {
-  _penAnimationAvailable = false;
   AnimatedPath = Path as unknown as AnimatedPathComponent;
 }
 
@@ -78,6 +76,8 @@ const GRIP_RX = 4;
 
 // Nib: triangle from bottom of grip to a point
 const NIB_PATH = 'M34 78 L66 78 L50 100 Z';
+const NIB_LEFT_PATH = 'M34 78 L50 78 L50 100 Z';
+const NIB_RIGHT_PATH = 'M50 78 L66 78 L50 100 Z';
 
 // Slit: center line on nib
 const SLIT_X1 = 50;
@@ -151,7 +151,10 @@ export function MagicPenAnimation({
   testID,
 }: MagicPenAnimationProps): ReactNode {
   const reduceMotion = useReducedMotion();
-  const animationDisabled = reduceMotion || !_penAnimationAvailable;
+  // Only respect the user's motion setting here. If AnimatedPath is not
+  // available on a target, the ink stroke may be static, but the pen body still
+  // moves because it is animated as an Animated.View.
+  const animationDisabled = reduceMotion;
 
   // -------------------------------------------------------------------------
   // Pen sizing
@@ -452,6 +455,11 @@ export function MagicPenAnimation({
 
   // Droplet base size
   const dropletRadius = Math.max(3, size * 0.055);
+  const bodyColor = color;
+  const trimColor = INK_GLOW_COLOR;
+  const nibColor = '#f8fafc';
+  const nibShadowColor = '#dbeafe';
+  const outlineColor = '#111827';
 
   // -------------------------------------------------------------------------
   // Reduced motion: static render (pen mid-stroke, full line visible)
@@ -509,44 +517,54 @@ export function MagicPenAnimation({
             viewBox="0 0 100 100"
           >
             {/* Barrel */}
+            <Polygon
+              points="40,5 60,5 66,13 34,13"
+              fill={trimColor}
+              opacity={0.95}
+            />
             <Rect
               x={BARREL_X}
               y={BARREL_Y}
               width={BARREL_W}
               height={BARREL_H}
               rx={BARREL_RX}
-              fill={color}
-              stroke="#000000"
+              fill={bodyColor}
+              stroke={outlineColor}
               strokeWidth={1.5 / penScale}
               strokeOpacity={0.2}
             />
-            {/* Grip (slightly darker via opacity overlay) */}
+            <Rect
+              x={BARREL_X + 3}
+              y={BARREL_Y}
+              width={BARREL_W - 6}
+              height={9}
+              rx={4}
+              fill={trimColor}
+              opacity={0.95}
+            />
+            {/* Grip */}
             <Rect
               x={GRIP_X}
               y={GRIP_Y}
               width={GRIP_W}
               height={GRIP_H}
               rx={GRIP_RX}
-              fill={color}
-              stroke="#000000"
+              fill={trimColor}
+              stroke={outlineColor}
               strokeWidth={1.5 / penScale}
               strokeOpacity={0.2}
             />
-            {/* Dark tint on grip for depth */}
-            <Rect
-              x={GRIP_X}
-              y={GRIP_Y}
-              width={GRIP_W}
-              height={GRIP_H}
-              rx={GRIP_RX}
-              fill="#000000"
-              opacity={0.18}
+            {/* Split nib: pale metal plus blue shadow for depth. */}
+            <Path d={NIB_LEFT_PATH} fill={nibColor} strokeLinejoin="round" />
+            <Path
+              d={NIB_RIGHT_PATH}
+              fill={nibShadowColor}
+              strokeLinejoin="round"
             />
-            {/* Nib triangle */}
             <Path
               d={NIB_PATH}
-              fill={color}
-              stroke="#000000"
+              fill="none"
+              stroke={outlineColor}
               strokeWidth={1 / penScale}
               strokeOpacity={0.25}
               strokeLinejoin="round"
@@ -557,11 +575,12 @@ export function MagicPenAnimation({
               y1={SLIT_Y1}
               x2={SLIT_X2}
               y2={SLIT_Y2}
-              stroke="#000000"
+              stroke={outlineColor}
               strokeOpacity={0.3}
               strokeWidth={1 / penScale}
               strokeLinecap="round"
             />
+            <Circle cx={50} cy={97} r={1.5} fill={bodyColor} opacity={0.7} />
           </Svg>
         </View>
       </View>
@@ -740,26 +759,41 @@ export function MagicPenAnimation({
           viewBox="0 0 100 100"
         >
           {/* ----- Barrel ----- */}
+          <Polygon
+            points="40,5 60,5 66,13 34,13"
+            fill={trimColor}
+            opacity={0.95}
+          />
           <Rect
             x={BARREL_X}
             y={BARREL_Y}
             width={BARREL_W}
             height={BARREL_H}
             rx={BARREL_RX}
-            fill={color}
-            stroke="#000000"
+            fill={bodyColor}
+            stroke={outlineColor}
             strokeWidth={1.5 / penScale}
             strokeOpacity={0.2}
+          />
+          {/* Clip-like cap band: the second color keeps the pen from becoming a blob. */}
+          <Rect
+            x={BARREL_X + 3}
+            y={BARREL_Y}
+            width={BARREL_W - 6}
+            height={9}
+            rx={4}
+            fill={trimColor}
+            opacity={0.95}
           />
           {/* Barrel highlight stripe (white shimmer) */}
           <Rect
             x={BARREL_X + 8}
-            y={BARREL_Y + 4}
-            width={8}
-            height={BARREL_H - 8}
+            y={BARREL_Y + 14}
+            width={6}
+            height={BARREL_H - 20}
             rx={3}
             fill="#ffffff"
-            opacity={0.18}
+            opacity={0.22}
           />
 
           {/* ----- Grip ----- */}
@@ -769,27 +803,50 @@ export function MagicPenAnimation({
             width={GRIP_W}
             height={GRIP_H}
             rx={GRIP_RX}
-            fill={color}
-            stroke="#000000"
+            fill={trimColor}
+            stroke={outlineColor}
             strokeWidth={1.5 / penScale}
             strokeOpacity={0.2}
           />
-          {/* Dark tint on grip so it reads as slightly darker */}
-          <Rect
-            x={GRIP_X}
-            y={GRIP_Y}
-            width={GRIP_W}
-            height={GRIP_H}
-            rx={GRIP_RX}
-            fill="#000000"
-            opacity={0.18}
+          <Line
+            x1={GRIP_X + 6}
+            y1={GRIP_Y + 3}
+            x2={GRIP_X + 6}
+            y2={GRIP_Y + GRIP_H - 3}
+            stroke={outlineColor}
+            strokeOpacity={0.18}
+            strokeWidth={1 / penScale}
+          />
+          <Line
+            x1={GRIP_X + 17}
+            y1={GRIP_Y + 3}
+            x2={GRIP_X + 17}
+            y2={GRIP_Y + GRIP_H - 3}
+            stroke={outlineColor}
+            strokeOpacity={0.18}
+            strokeWidth={1 / penScale}
+          />
+          <Line
+            x1={GRIP_X + 28}
+            y1={GRIP_Y + 3}
+            x2={GRIP_X + 28}
+            y2={GRIP_Y + GRIP_H - 3}
+            stroke={outlineColor}
+            strokeOpacity={0.18}
+            strokeWidth={1 / penScale}
           />
 
           {/* ----- Nib (triangle) ----- */}
+          <Path d={NIB_LEFT_PATH} fill={nibColor} strokeLinejoin="round" />
+          <Path
+            d={NIB_RIGHT_PATH}
+            fill={nibShadowColor}
+            strokeLinejoin="round"
+          />
           <Path
             d={NIB_PATH}
-            fill={color}
-            stroke="#000000"
+            fill="none"
+            stroke={outlineColor}
             strokeWidth={1 / penScale}
             strokeOpacity={0.25}
             strokeLinejoin="round"
@@ -800,14 +857,14 @@ export function MagicPenAnimation({
             y1={SLIT_Y1}
             x2={SLIT_X2}
             y2={SLIT_Y2}
-            stroke="#000000"
+            stroke={outlineColor}
             strokeOpacity={0.3}
             strokeWidth={1.2 / penScale}
             strokeLinecap="round"
           />
 
           {/* Nib tip gleam — small white dot (static, no AnimatedCircle) */}
-          <Circle cx={50} cy={97} r={1.5} fill="#ffffff" opacity={0.55} />
+          <Circle cx={50} cy={97} r={1.5} fill={bodyColor} opacity={0.7} />
         </Svg>
       </Animated.View>
     </View>
