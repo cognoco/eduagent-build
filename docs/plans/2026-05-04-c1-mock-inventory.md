@@ -76,6 +76,15 @@ CLAUDE.md states **"No internal mocks in integration tests."** Four call sites a
    - `test: vocabulary.integration.test.ts` after fix must fail when `routeAndCall` formalization is reverted (break test for the LLM-router contract).
    - `test: interview-persist-curriculum.integration.test.ts` after fix must exercise the real `notifications.formatConsentRequestEmail` / `sendEmail` path against a seeded recipient row — assert the email payload, not just call counts.
 
+### Resolution (2026-05-05, branch `c1-mock-cleanup`)
+
+- **D-MOCK-1: `routeAndCall` is the formalized LLM external boundary.** All four `routeAndCall`-targeting `jest.mock` sites are reclassified EXTERNAL.
+  - Site 1 (`vocabulary.integration.test.ts`) converted to `requireActual + routeAndCall` stub to match sites 2 & 3.
+  - Sites 2 & 3 carry the formalization comment.
+- **D-MOCK-2: `sendPushNotification` + `sendEmail` are the formalized notification external boundaries.** `notifications.ts` formatters run real.
+  - Site 4 converted from full barrel mock to `requireActual + sendPushNotification, sendEmail` stub.
+- All four sites now run real router/parser/formatter code; only the actual network-egress calls are stubbed.
+
 ---
 
 ## ⚠️ Hit list 2 — Guard bypasses (~34 auth/billing + 1 rate-limit = ~35 sites)

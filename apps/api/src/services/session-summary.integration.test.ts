@@ -12,6 +12,7 @@ import {
 } from '@eduagent/database';
 import { and, eq, like } from 'drizzle-orm';
 
+// EXTERNAL boundary mock — routeAndCall is the LLM provider HTTP call. Per C1 D-MOCK-1 this is the formalized LLM external boundary.
 const mockRouteAndCall = jest.fn();
 
 jest.mock('./llm', () => {
