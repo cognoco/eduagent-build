@@ -707,6 +707,8 @@
       "topicProgress": "{{completed}}/{{total}}トピック",
       "settingsAccessibilityLabel": "科目の設定",
       "studyNext": "次に学習する",
+      "chooseBook": "本を選ぶ",
+      "chooseAnotherBook": "別の本を選ぶ",
       "browseAll": "すべての提案を閲覧",
       "emptyPickTitle": "開始する本を選んでください",
       "emptyPickMessage": "上の「次に学習する」カードのいずれかをタップして開始してください。",

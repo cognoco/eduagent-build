@@ -542,6 +542,45 @@ describe('ShelfScreen', () => {
   // -----------------------------------------------------------------------
   // Suggestion cards
   // -----------------------------------------------------------------------
+  it('[BUG-SHELF-BOOK-CTA] shows a choose-book path even when there are no suggestions', async () => {
+    mockFetch.setRoute('/book-suggestions', []);
+
+    const { getByTestId, getByText } = render(<ShelfScreen />, {
+      wrapper: TestWrapper,
+    });
+
+    await waitFor(() => {
+      getByTestId('shelf-choose-book');
+    });
+    getByText('Choose another book');
+
+    fireEvent.press(getByTestId('shelf-choose-book'));
+
+    expect(mockPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/(app)/pick-book/[subjectId]',
+        params: { subjectId: 'sub-1' },
+      })
+    );
+  });
+
+  it('labels the choose-book path as browse all when extra suggestions exist', async () => {
+    mockFetch.setRoute('/book-suggestions', [
+      { id: 'sug-1', title: 'Number Theory' },
+      { id: 'sug-2', title: 'Calculus Intro' },
+      { id: 'sug-3', title: 'Statistics' },
+    ]);
+
+    const { getByTestId, getByText } = render(<ShelfScreen />, {
+      wrapper: TestWrapper,
+    });
+
+    await waitFor(() => {
+      getByTestId('shelf-choose-book');
+    });
+    getByText('Browse all suggestions');
+  });
+
   it('shows book suggestion cards when suggestions exist', async () => {
     mockFetch.setRoute('/book-suggestions', [
       { id: 'sug-1', title: 'Number Theory' },

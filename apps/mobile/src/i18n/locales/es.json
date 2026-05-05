@@ -725,6 +725,8 @@
       "topicProgress": "{{completed}}/{{total}} temas",
       "settingsAccessibilityLabel": "Ajustes de la materia",
       "studyNext": "Próximo estudio",
+      "chooseBook": "Elegir un libro",
+      "chooseAnotherBook": "Elegir otro libro",
       "browseAll": "Explorar todas las sugerencias",
       "emptyPickTitle": "Elige un libro para empezar",
       "emptyPickMessage": "Toca una de las tarjetas de \"Estudiar a continuación\" de arriba para empezar.",

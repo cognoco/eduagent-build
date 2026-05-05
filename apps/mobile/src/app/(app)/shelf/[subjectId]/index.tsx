@@ -174,6 +174,12 @@ export default function ShelfScreen() {
     0
   );
   const showProgress = totalTopics > 0;
+  const chooseBookButtonLabel =
+    bookSuggestions.length > 2
+      ? t('library.shelf.browseAll')
+      : books.length > 0
+      ? t('library.shelf.chooseAnotherBook')
+      : t('library.shelf.chooseBook');
 
   if (isLoading) {
     return (
@@ -322,25 +328,27 @@ export default function ShelfScreen() {
         </View>
       )}
 
-      {/* Browse all link when more than 2 suggestions */}
-      {bookSuggestions.length > 2 && (
-        <Pressable
-          onPress={() =>
-            router.push({
-              pathname: '/(app)/pick-book/[subjectId]',
-              params: { subjectId },
-            } as never)
+      <Pressable
+        onPress={() =>
+          router.push({
+            pathname: '/(app)/pick-book/[subjectId]',
+            params: { subjectId },
+          } as never)
+        }
+        className="mx-4 mb-4 border border-dashed border-border rounded-xl py-3 items-center justify-center flex-row gap-2"
+        testID="shelf-choose-book"
+        accessibilityRole="button"
+        accessibilityLabel={chooseBookButtonLabel}
+      >
+        <Ionicons
+          name={
+            bookSuggestions.length > 2 ? 'albums-outline' : 'add-circle-outline'
           }
-          className="mx-4 mb-4 border border-dashed border-border rounded-xl py-3 items-center"
-          testID="shelf-browse-all-suggestions"
-          accessibilityRole="button"
-          accessibilityLabel={t('library.shelf.browseAll')}
-        >
-          <Text className="text-text-muted">
-            {t('library.shelf.browseAll')}
-          </Text>
-        </Pressable>
-      )}
+          size={18}
+          color={themeColors.textSecondary}
+        />
+        <Text className="text-text-muted">{chooseBookButtonLabel}</Text>
+      </Pressable>
 
       {/* Book list */}
       <FlatList

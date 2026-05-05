@@ -725,6 +725,8 @@
       "topicProgress": "{{completed}}/{{total}} Themen",
       "settingsAccessibilityLabel": "Facheinstellungen",
       "studyNext": "Als Nächstes lernen",
+      "chooseBook": "Buch auswählen",
+      "chooseAnotherBook": "Weiteres Buch auswählen",
       "browseAll": "Alle Vorschläge durchsuchen",
       "emptyPickTitle": "Wähle ein Buch zum Starten",
       "emptyPickMessage": "Tippe auf eine der „Als Nächstes lernen“-Karten oben, um zu beginnen.",
