@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { ComponentProps, ComponentType, ReactNode } from 'react';
-import { View } from 'react-native';
+import { Animated as RNAnimated, Easing as RNEasing, View } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -154,6 +154,9 @@ export function MagicPenAnimation({
   // available on a target, the ink stroke may be static, but the pen body still
   // moves because it is animated as an Animated.View.
   const animationDisabled = reduceMotion;
+  const penMotion = useRef(
+    new RNAnimated.Value(animationDisabled ? 0.55 : 0)
+  ).current;
 
   // -------------------------------------------------------------------------
   // Pen sizing
@@ -188,6 +191,46 @@ export function MagicPenAnimation({
   const dropletOpacity = useSharedValue(0);
   // sparkle: 0→1
   const sparkle = useSharedValue(0);
+
+  useEffect(() => {
+    if (animationDisabled) {
+      penMotion.stopAnimation();
+      penMotion.setValue(0.55);
+      return;
+    }
+
+    penMotion.setValue(0);
+    const loop = RNAnimated.loop(
+      RNAnimated.sequence([
+        RNAnimated.delay(DROP_IN_MS),
+        RNAnimated.timing(penMotion, {
+          toValue: 1,
+          duration: TRACE_MS,
+          easing: RNEasing.inOut(RNEasing.cubic),
+          useNativeDriver: true,
+        }),
+        RNAnimated.timing(penMotion, {
+          toValue: 1.08,
+          duration: FLICK_MS,
+          easing: RNEasing.out(RNEasing.cubic),
+          useNativeDriver: true,
+        }),
+        RNAnimated.timing(penMotion, {
+          toValue: 0,
+          duration: FLOAT_BACK_MS,
+          easing: RNEasing.out(RNEasing.cubic),
+          useNativeDriver: true,
+        }),
+        RNAnimated.delay(180),
+      ])
+    );
+
+    loop.start();
+    return () => {
+      loop.stop();
+      penMotion.stopAnimation();
+    };
+  }, [animationDisabled, penMotion]);
 
   // -------------------------------------------------------------------------
   // Animation loop
@@ -363,51 +406,6 @@ export function MagicPenAnimation({
     opacity: strokeFade.value,
   }));
 
-  // Pen body: drops in from above, tracks writing progress, flicks at end
-  const penBodyStyle = useAnimatedStyle(() => {
-    // Current nib position in drawing coords (0–100)
-    const drawX = PEN_START.x + (PEN_END.x - PEN_START.x) * progress.value;
-    const drawY = PEN_START.y + (PEN_END.y - PEN_START.y) * progress.value;
-
-    // Pixel position of nib tip in canvas space
-    const nibPixelX = drawX * drawingScale;
-    const nibPixelY = drawY * drawingScale;
-
-    // The pen container is rotated. The nib tip is at the bottom of the
-    // pen SVG viewBox (y=100 in pen coords), so after rotation the nib tip
-    // is at the container's lower-right corner. We offset the container so
-    // the nib tip lands at the nib pixel position.
-    //
-    // For the rotated square container of side L:
-    //   After rotation, top-left corner shifts by (-L/2, -L/2) from centre.
-    //   Nib is at bottom-centre of SVG = (L/2, L) in unrotated coords.
-    //   After rotation, nib tip relative to centre is roughly lower-centre.
-    //   ≈ (0, L * 0.7)  — approximately.
-    // We use a simpler empirical offset: nib tip ≈ 0.35 * container from left,
-    // 0.85 * container from top (tweaked for the pen shape).
-    const nibOffsetX = penContainerSize * 0.35;
-    const nibOffsetY = penContainerSize * 0.85;
-
-    // Drop-in: pen arrives from above (starts -size/2 above canvas)
-    const dropOffset = (1 - dropIn.value) * -(size * 0.5);
-
-    // Flick: slight upward rotate + translateY
-    const writingTilt = 34 + progress.value * 10;
-    const pathBobY = Math.sin(progress.value * Math.PI * 2) * 3;
-    const flickAngle = flick.value * -16; // degrees
-    const flickY = flick.value * -9; // pixels
-
-    return {
-      transform: [
-        { translateX: nibPixelX - nibOffsetX },
-        {
-          translateY: nibPixelY - nibOffsetY + dropOffset + flickY + pathBobY,
-        },
-        { rotate: `${writingTilt + flickAngle}deg` },
-      ],
-    };
-  });
-
   // Droplet at nib tip (Animated.View scale — Fabric-safe, no AnimatedCircle r=0)
   const dropletStyle = useAnimatedStyle(() => {
     // Position droplet at the current nib position
@@ -465,6 +463,48 @@ export function MagicPenAnimation({
   const outlineColor = '#111827';
   const capColor = '#0f766e';
   const clipColor = '#ccfbf1';
+  // The visible pen travel uses React Native core Animated. Reanimated SVG
+  // props can be static in Expo web previews, while core transform animation is
+  // reliable there and still works on native.
+  const nibOffsetX = penContainerSize * 0.35;
+  const nibOffsetY = penContainerSize * 0.85;
+  const penStartX = PEN_START.x * drawingScale - nibOffsetX;
+  const penEndX = PEN_END.x * drawingScale - nibOffsetX;
+  const penStartY = PEN_START.y * drawingScale - nibOffsetY;
+  const penEndY = PEN_END.y * drawingScale - nibOffsetY;
+  const penMidY = ((PEN_START.y + PEN_END.y) / 2) * drawingScale - nibOffsetY;
+  const penBodyMotionStyle = {
+    transform: [
+      {
+        translateX: penMotion.interpolate({
+          inputRange: [0, 1, 1.08],
+          outputRange: [penStartX, penEndX, penEndX + size * 0.04],
+          extrapolate: 'clamp',
+        }),
+      },
+      {
+        translateY: penMotion.interpolate({
+          inputRange: [0, 0.18, 0.5, 0.82, 1, 1.08],
+          outputRange: [
+            penStartY - size * 0.38,
+            penStartY + size * 0.03,
+            penMidY - size * 0.04,
+            penEndY + size * 0.04,
+            penEndY,
+            penEndY - size * 0.09,
+          ],
+          extrapolate: 'clamp',
+        }),
+      },
+      {
+        rotate: penMotion.interpolate({
+          inputRange: [0, 0.5, 1, 1.08],
+          outputRange: ['32deg', '39deg', '45deg', '26deg'],
+          extrapolate: 'clamp',
+        }),
+      },
+    ],
+  };
 
   // -------------------------------------------------------------------------
   // Reduced motion: static render (pen mid-stroke, full line visible)
@@ -478,8 +518,6 @@ export function MagicPenAnimation({
       PEN_START.y + (PEN_END.y - PEN_START.y) * staticProgress;
     const staticNibX = staticDrawX * drawingScale;
     const staticNibY = staticDrawY * drawingScale;
-    const nibOffsetX = penContainerSize * 0.35;
-    const nibOffsetY = penContainerSize * 0.85;
 
     return (
       <View
@@ -759,7 +797,7 @@ export function MagicPenAnimation({
       {/* The SVG uses a 100×100 viewBox with a large, clearly readable pen.  */}
       {/* Rotated by the animated style so it points upper-left to lower-right. */}
       {/* ------------------------------------------------------------------ */}
-      <Animated.View
+      <RNAnimated.View
         style={[
           {
             position: 'absolute',
@@ -768,7 +806,7 @@ export function MagicPenAnimation({
             width: penContainerSize,
             height: penContainerSize,
           },
-          penBodyStyle,
+          penBodyMotionStyle,
           { pointerEvents: 'none' },
         ]}
       >
@@ -899,7 +937,7 @@ export function MagicPenAnimation({
           {/* Nib tip gleam — small white dot (static, no AnimatedCircle) */}
           <Circle cx={50} cy={97} r={1.5} fill={bodyColor} opacity={0.7} />
         </Svg>
-      </Animated.View>
+      </RNAnimated.View>
     </View>
   );
 }
