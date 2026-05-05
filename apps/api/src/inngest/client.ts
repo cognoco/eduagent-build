@@ -6,6 +6,7 @@ import {
   setEmailFrom,
   setAppUrl,
   setSupportEmail,
+  setRetentionPurgeEnabled,
 } from './helpers';
 
 /**
@@ -41,6 +42,9 @@ const envBindingMiddleware = new InngestMiddleware({
         }
         if (env && typeof env['SUPPORT_EMAIL'] === 'string') {
           setSupportEmail(env['SUPPORT_EMAIL']);
+        }
+        if (env && typeof env['RETENTION_PURGE_ENABLED'] === 'string') {
+          setRetentionPurgeEnabled(env['RETENTION_PURGE_ENABLED']);
         }
         return {};
       },
