@@ -1,6 +1,10 @@
 import { Stack } from 'expo-router';
 import { useThemeColors } from '../../../../lib/theme';
 
+export const unstable_settings = {
+  initialRouteName: 'index',
+};
+
 export default function ChildDetailLayout() {
   const colors = useThemeColors();
   return (
