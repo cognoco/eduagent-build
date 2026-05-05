@@ -14,8 +14,10 @@ import {
   systemPromptBodySchema,
   ERROR_CODES,
   filingRetryEventSchema,
+  LlmStreamError,
   RateLimitedError,
   streamFallbackFrameSchema,
+  UpstreamLlmError,
   getSubjectSessionsResponseSchema,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
@@ -223,6 +225,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             err.message
           );
         }
+
         // Refund quota on LLM failure — user should not be charged for a failed exchange
         // [BUG-661 / A-21] safeRefundQuota escalates if the refund itself fails.
         if (subscriptionId) {
@@ -371,6 +374,86 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
               profileId,
               extra: { sessionId, phase: 'llm_stream' },
             });
+
+            const isSafetyFilterError =
+              streamErr instanceof Error &&
+              streamErr.message.includes('safety filters');
+            if (
+              chunkCount === 0 &&
+              !(streamErr instanceof RateLimitedError) &&
+              !isSafetyFilterError
+            ) {
+              logger.warn(
+                '[sessions/stream] Stream failed before visible text; trying non-streaming fallback',
+                {
+                  sessionId,
+                  error: errMsg,
+                  errorName:
+                    streamErr instanceof Error
+                      ? streamErr.name
+                      : typeof streamErr,
+                }
+              );
+              try {
+                const fallback = await processMessage(
+                  db,
+                  profileId,
+                  sessionId,
+                  input,
+                  {
+                    llmTier,
+                    voyageApiKey: c.env.VOYAGE_API_KEY,
+                    clientId,
+                  }
+                );
+                await sseStream.writeSSE({
+                  data: JSON.stringify({
+                    type: 'chunk',
+                    content: fallback.response,
+                  }),
+                });
+                await sseStream.writeSSE({
+                  data: JSON.stringify({
+                    type: 'done',
+                    exchangeCount: fallback.exchangeCount,
+                    escalationRung: fallback.escalationRung,
+                    expectedResponseMinutes:
+                      fallback.expectedResponseMinutes ?? 0,
+                    aiEventId: fallback.aiEventId,
+                  }),
+                });
+                await markPersisted({
+                  kv: c.env.IDEMPOTENCY_KV,
+                  profileId,
+                  flow: 'session',
+                  key: clientId,
+                });
+                return;
+              } catch (fallbackErr) {
+                logger.error(
+                  '[sessions/stream] Non-streaming fallback failed',
+                  {
+                    sessionId,
+                    error:
+                      fallbackErr instanceof Error
+                        ? fallbackErr.message
+                        : String(fallbackErr),
+                    errorName:
+                      fallbackErr instanceof Error
+                        ? fallbackErr.name
+                        : typeof fallbackErr,
+                  }
+                );
+                captureException(fallbackErr, {
+                  profileId,
+                  extra: {
+                    sessionId,
+                    phase: 'llm_stream_non_streaming_fallback',
+                  },
+                });
+              }
+            }
+
             if (subscriptionId) {
               try {
                 await safeRefundQuota(db, subscriptionId, {
@@ -390,11 +473,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             const errorCode: string = (() => {
               if (streamErr instanceof RateLimitedError)
                 return 'quota_exhausted';
-              if (
-                streamErr instanceof Error &&
-                streamErr.message.includes('safety filters')
-              )
-                return 'safety_filter';
+              if (isSafetyFilterError) return 'safety_filter';
               return 'unknown_error';
             })();
             await sseStream.writeSSE({
@@ -562,6 +641,87 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             err.message
           );
         }
+
+        const isSafetyFilterError =
+          err instanceof Error && err.message.includes('safety filters');
+        const isUpstreamLlmError =
+          err instanceof UpstreamLlmError ||
+          (err instanceof LlmStreamError &&
+            err.cause instanceof UpstreamLlmError);
+        if (
+          !(err instanceof RateLimitedError) &&
+          !isSafetyFilterError &&
+          !isUpstreamLlmError
+        ) {
+          logger.warn(
+            '[sessions/stream] Pre-stream setup failed; trying non-streaming fallback',
+            {
+              sessionId,
+              error: err instanceof Error ? err.message : String(err),
+              errorName: err instanceof Error ? err.name : typeof err,
+            }
+          );
+          try {
+            const fallback = await processMessage(
+              db,
+              profileId,
+              sessionId,
+              input,
+              {
+                llmTier,
+                voyageApiKey: c.env.VOYAGE_API_KEY,
+                clientId,
+              }
+            );
+            return streamSSEUtf8(c, async (sseStream) => {
+              await sseStream.writeSSE({
+                data: JSON.stringify({
+                  type: 'chunk',
+                  content: fallback.response,
+                }),
+              });
+              await sseStream.writeSSE({
+                data: JSON.stringify({
+                  type: 'done',
+                  exchangeCount: fallback.exchangeCount,
+                  escalationRung: fallback.escalationRung,
+                  expectedResponseMinutes:
+                    fallback.expectedResponseMinutes ?? 0,
+                  aiEventId: fallback.aiEventId,
+                }),
+              });
+              await markPersisted({
+                kv: c.env.IDEMPOTENCY_KV,
+                profileId,
+                flow: 'session',
+                key: clientId,
+              });
+            });
+          } catch (fallbackErr) {
+            logger.error(
+              '[sessions/stream] Pre-stream non-streaming fallback failed',
+              {
+                sessionId,
+                error:
+                  fallbackErr instanceof Error
+                    ? fallbackErr.message
+                    : String(fallbackErr),
+                errorName:
+                  fallbackErr instanceof Error
+                    ? fallbackErr.name
+                    : typeof fallbackErr,
+              }
+            );
+            captureException(fallbackErr, {
+              profileId,
+              extra: {
+                sessionId,
+                phase: 'llm_pre_stream_non_streaming_fallback',
+              },
+            });
+          }
+        }
+
         // Refund quota on LLM failure — user should not be charged for a failed exchange
         // [BUG-661 / A-21] safeRefundQuota escalates if the refund itself fails.
         if (subscriptionId) {

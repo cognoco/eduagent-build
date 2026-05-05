@@ -1264,6 +1264,105 @@ describe('session routes', () => {
       expect(body).toContain('"content":"world!"');
     });
 
+    it('[CHAT-STREAM-FALLBACK] falls back to non-streaming when the stream fails before visible text', async () => {
+      mockSafeRefundQuota.mockClear();
+      (processMessage as jest.Mock).mockResolvedValueOnce({
+        response: 'Non-streaming lesson response',
+        escalationRung: 1,
+        isUnderstandingCheck: false,
+        exchangeCount: 1,
+        expectedResponseMinutes: 3,
+        aiEventId: EVENT_ID,
+      });
+      const failingStream: AsyncIterable<string> = {
+        [Symbol.asyncIterator]() {
+          return {
+            async next() {
+              throw new Error('streamExchange threw');
+            },
+          };
+        },
+      };
+
+      (streamMessage as jest.Mock).mockResolvedValueOnce({
+        stream: failingStream,
+        onComplete: jest.fn(),
+      });
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'ok' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.text();
+      expect(body).toContain('"type":"chunk"');
+      expect(body).toContain('Non-streaming lesson response');
+      expect(body).toContain('"type":"done"');
+      expect(body).toContain(`"aiEventId":"${EVENT_ID}"`);
+      expect(body).not.toContain('"type":"error"');
+      expect(processMessage).toHaveBeenLastCalledWith(
+        expect.anything(),
+        'test-profile-id',
+        SESSION_ID,
+        { message: 'ok' },
+        expect.objectContaining({
+          clientId: undefined,
+          llmTier: 'premium',
+        })
+      );
+      expect(mockSafeRefundQuota).not.toHaveBeenCalled();
+    });
+
+    it('[CHAT-STREAM-FALLBACK] falls back to non-streaming when stream setup fails', async () => {
+      mockSafeRefundQuota.mockClear();
+      (streamMessage as jest.Mock).mockRejectedValueOnce(
+        new Error('streamExchange threw')
+      );
+      (processMessage as jest.Mock).mockResolvedValueOnce({
+        response: 'Pre-stream fallback lesson response',
+        escalationRung: 1,
+        isUnderstandingCheck: false,
+        exchangeCount: 1,
+        expectedResponseMinutes: 3,
+        aiEventId: EVENT_ID,
+      });
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'ok' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.text();
+      expect(body).toContain('"type":"chunk"');
+      expect(body).toContain('Pre-stream fallback lesson response');
+      expect(body).toContain('"type":"done"');
+      expect(body).toContain(`"aiEventId":"${EVENT_ID}"`);
+      expect(body).not.toContain('"type":"error"');
+      expect(processMessage).toHaveBeenLastCalledWith(
+        expect.anything(),
+        'test-profile-id',
+        SESSION_ID,
+        { message: 'ok' },
+        expect.objectContaining({
+          clientId: undefined,
+          llmTier: 'premium',
+        })
+      );
+      expect(mockSafeRefundQuota).not.toHaveBeenCalled();
+    });
+
     it('returns 400 with empty message', async () => {
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/stream`,
@@ -1525,6 +1624,9 @@ describe('session routes', () => {
       (streamMessage as jest.Mock).mockRejectedValueOnce(
         new Error('LLM provider unavailable')
       );
+      (processMessage as jest.Mock).mockRejectedValueOnce(
+        new Error('Fallback LLM provider unavailable')
+      );
 
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/stream`,
@@ -1589,6 +1691,9 @@ describe('session routes', () => {
           'streamExchange threw',
           new Error('envelope parse rejected before first chunk')
         )
+      );
+      (processMessage as jest.Mock).mockRejectedValueOnce(
+        new Error('Fallback LLM provider unavailable')
       );
 
       const res = await app.request(
