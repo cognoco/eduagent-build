@@ -17,8 +17,16 @@
  * 6. Both mutation endpoints require authentication (401 without token)
  */
 
-import { eq } from 'drizzle-orm';
-import { accounts } from '@eduagent/database';
+import { eq, sql } from 'drizzle-orm';
+import {
+  accounts,
+  learningSessions,
+  profiles,
+  sessionEmbeddings,
+  sessionEvents,
+  sessionSummaries,
+  subjects,
+} from '@eduagent/database';
 
 import {
   buildIntegrationEnv,
@@ -26,6 +34,7 @@ import {
   createIntegrationDb,
 } from './helpers';
 import { buildAuthHeaders } from './test-keys';
+import { executeDeletion } from '../../apps/api/src/services/deletion';
 
 // --- Inngest transport mock (external boundary) ---
 const mockInngestSend = jest.fn().mockResolvedValue({ ids: [] });
@@ -53,6 +62,14 @@ const AUTH_USER_ID = 'integration-deletion-user';
 const AUTH_EMAIL = 'integration-deletion@integration.test';
 
 async function createOwnerProfile(): Promise<string> {
+  const profile = await createOwnerProfileRecord();
+  return profile.profileId;
+}
+
+async function createOwnerProfileRecord(): Promise<{
+  profileId: string;
+  accountId: string;
+}> {
   const res = await app.request(
     '/v1/profiles',
     {
@@ -68,7 +85,18 @@ async function createOwnerProfile(): Promise<string> {
 
   expect(res.status).toBe(201);
   const body = await res.json();
-  return body.profile.id as string;
+  const profileId = body.profile.id as string;
+  const db = createIntegrationDb();
+  const row = await db.query.profiles.findFirst({
+    where: eq(profiles.id, profileId),
+    columns: { accountId: true },
+  });
+
+  if (!row) {
+    throw new Error(`Profile row missing after create: ${profileId}`);
+  }
+
+  return { profileId, accountId: row.accountId };
 }
 
 beforeEach(async () => {
@@ -280,5 +308,86 @@ describe('Integration: GET /v1/account/export', () => {
     expect(body.profiles.some((p: { id: string }) => p.id === profileId)).toBe(
       true
     );
+  });
+});
+
+describe('Integration: account deletion cascade', () => {
+  it('cascade-deletes all retention-pipeline rows for the deleted account', async () => {
+    const { profileId, accountId } = await createOwnerProfileRecord();
+    const db = createIntegrationDb();
+
+    const [subject] = await db
+      .insert(subjects)
+      .values({
+        profileId,
+        name: 'Mathematics',
+        status: 'active',
+        pedagogyMode: 'socratic',
+      })
+      .returning({ id: subjects.id });
+
+    const [session] = await db
+      .insert(learningSessions)
+      .values({
+        profileId,
+        subjectId: subject!.id,
+        sessionType: 'learning',
+        inputMode: 'text',
+        status: 'completed',
+        escalationRung: 1,
+        exchangeCount: 1,
+        endedAt: new Date(),
+      })
+      .returning({ id: learningSessions.id });
+
+    await db.insert(sessionSummaries).values({
+      sessionId: session!.id,
+      profileId,
+      topicId: null,
+      status: 'accepted',
+      learnerRecap: 'You connected the example back to the rule.',
+      llmSummary: {
+        narrative:
+          'Worked through algebra and balanced a one-step equation while naming each inverse operation.',
+        topicsCovered: ['algebra', 'inverse operations'],
+        sessionState: 'completed',
+        reEntryRecommendation:
+          'Resume with one more one-step equation and ask for the inverse-operation rule aloud.',
+      },
+      summaryGeneratedAt: new Date(),
+    });
+
+    await db.insert(sessionEvents).values({
+      sessionId: session!.id,
+      profileId,
+      subjectId: subject!.id,
+      eventType: 'user_message',
+      content: 'Can we do algebra?',
+    });
+
+    await db.insert(sessionEmbeddings).values({
+      sessionId: session!.id,
+      profileId,
+      topicId: null,
+      content: 'Algebra session summary',
+      embedding: Array.from({ length: 1024 }, () => 0.01),
+    });
+
+    await executeDeletion(db, accountId);
+
+    const summaries = await db.execute(
+      sql`SELECT count(*)::int AS c FROM session_summaries WHERE profile_id = ${profileId}`
+    );
+    expect((summaries.rows as Array<{ c: number }>)[0].c).toBe(0);
+
+    const embeddings = await db.execute(
+      sql`SELECT count(*)::int AS c FROM session_embeddings WHERE profile_id = ${profileId}`
+    );
+    expect((embeddings.rows as Array<{ c: number }>)[0].c).toBe(0);
+
+    const events = await db.execute(
+      sql`SELECT count(*)::int AS c FROM session_events WHERE profile_id = ${profileId}`
+    );
+    expect((events.rows as Array<{ c: number }>)[0].c).toBe(0);
   });
 });

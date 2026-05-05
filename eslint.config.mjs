@@ -400,7 +400,7 @@ export default [
           selector:
             "CallExpression[callee.property.name=/^(select|insert|update|delete)$/][callee.object.type='CallExpression'][callee.object.callee.object.name='c'][callee.object.callee.property.name='get'][callee.object.arguments.0.value='db']",
           message:
-            "Route files must not call .select/.insert/.update/.delete directly on c.get('db'). Move the query into services/* and use createScopedRepository(profileId). See CLAUDE.md.",
+            "Route files must not call .select/.insert/.update/.delete directly on c.get('db'). Move the query into services/* and use createScopedRepository(profileId). See CLAUDE.md. Note: this rule catches the c.get('db').op() chain; const-destructured db patterns (const db = c.get('db'); db.select()) are caught by G1 (no drizzle-orm imports in routes).",
         },
         {
           selector: 'ExportDefaultDeclaration',
