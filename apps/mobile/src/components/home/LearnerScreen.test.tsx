@@ -10,6 +10,10 @@ import {
   createRoutedMockFetch,
   extractJsonBody,
 } from '../../test-utils/mock-api-routes';
+import {
+  LEARNER_HOME_HREF,
+  LEARNER_HOME_RETURN_TO,
+} from '../../lib/navigation';
 
 const mockFetch = createRoutedMockFetch({
   '/coaching-card': { coldStart: false, card: null, fallback: null },
@@ -81,6 +85,7 @@ jest.mock('../../lib/theme', () => ({
     primary: '#00b4d8',
     primarySoft: 'rgba(0,180,216,0.16)',
     border: '#2a2a54',
+    muted: '#94a3b8',
   }),
   useTheme: () => ({ colorScheme: 'dark' }),
 }));
@@ -115,7 +120,7 @@ function createWrapper() {
 const { LearnerScreen } = require('./LearnerScreen');
 const { fetchCallsMatching } = require('../../test-utils/mock-api-routes');
 
-const HOME_RETURN_PARAMS = { returnTo: 'learner-home' };
+const HOME_RETURN_PARAMS = { returnTo: LEARNER_HOME_RETURN_TO };
 
 const defaultProps = {
   profiles: [{ id: 'p1', displayName: 'Alex', isOwner: true }],
@@ -294,7 +299,8 @@ describe('LearnerScreen', () => {
 
     await waitFor(() => screen.getByTestId('home-action-homework'));
     fireEvent.press(screen.getByTestId('home-action-homework'));
-    expect(mockPush).toHaveBeenCalledWith({
+    expect(mockPush).toHaveBeenNthCalledWith(1, LEARNER_HOME_HREF);
+    expect(mockPush).toHaveBeenNthCalledWith(2, {
       pathname: '/(app)/homework/camera',
       params: HOME_RETURN_PARAMS,
     });

@@ -18,6 +18,7 @@ import {
 import { useSubjects } from '../../hooks/use-subjects';
 import { getGreeting } from '../../lib/greeting';
 import {
+  LEARNER_HOME_HREF,
   LEARNER_HOME_RETURN_TO,
   pushLearningResumeTarget,
 } from '../../lib/navigation';
@@ -225,8 +226,6 @@ export function LearnerScreen({
           recoveryMarker.subjectName ??
           'your session'
         }.`,
-        isQuizDriven: false,
-        quizActivityType: undefined as string | undefined,
         onContinue: () => {
           void clearSessionRecoveryMarker(activeProfile?.id).catch((err) =>
             console.error(
@@ -263,8 +262,6 @@ export function LearnerScreen({
         headline: `Pick up where you left off in ${
           resumeTarget.topicTitle ?? resumeTarget.subjectName
         }.`,
-        isQuizDriven: false,
-        quizActivityType: undefined as string | undefined,
         onContinue: () =>
           pushLearningResumeTarget(
             router,
@@ -282,8 +279,6 @@ export function LearnerScreen({
       const topic = reviewSummary.nextReviewTopic;
       return {
         headline: `Revisit ${topic.topicTitle} — it's starting to fade.`,
-        isQuizDriven: false,
-        quizActivityType: undefined as string | undefined,
         onContinue: () =>
           router.push({
             pathname: '/(app)/topic/relearn',
@@ -295,8 +290,6 @@ export function LearnerScreen({
     if (quizDiscovery && dismissedQuizDiscoveryId !== quizDiscovery.id) {
       return {
         headline: quizDiscovery.title,
-        isQuizDriven: true,
-        quizActivityType: quizDiscovery.activityType as string | undefined,
         onContinue: () => {
           markQuizDiscoveryHandled();
           router.push({
@@ -408,6 +401,16 @@ export function LearnerScreen({
   const firstName = activeProfile?.displayName?.split(' ')[0] ?? 'there';
   const showCoachBand =
     FEATURE_FLAGS.COACH_BAND_ENABLED && coachBand && !coachBandDismissed;
+  const openIntentAction = (route: HomeIntentAction['route']): void => {
+    if (route === '/(app)/homework/camera') {
+      router.push(LEARNER_HOME_HREF as never);
+    }
+
+    router.push({
+      pathname: route,
+      params: HOME_RETURN_PARAMS,
+    } as never);
+  };
 
   return (
     <View className="flex-1 bg-background" testID="learner-screen">
@@ -484,12 +487,7 @@ export function LearnerScreen({
                   <Pressable
                     key={action.testID}
                     testID={action.testID}
-                    onPress={() =>
-                      router.push({
-                        pathname: action.route,
-                        params: HOME_RETURN_PARAMS,
-                      } as never)
-                    }
+                    onPress={() => openIntentAction(action.route)}
                     className={`rounded-2xl border px-4 py-4 flex-row items-center ${
                       action.highlight
                         ? 'bg-primary-soft border-primary/40'
