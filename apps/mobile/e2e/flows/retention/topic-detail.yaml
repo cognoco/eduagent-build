@@ -78,7 +78,7 @@ tags:
 # 8. Wait for topic detail screen to load (navigation from book to topic/[topicId])
 - extendedWaitUntil:
     visible:
-      id: "retention-card"
+      id: "topic-retention-card"
     timeout: 15000
 
 # 9. Verify retention card shows memory strength label

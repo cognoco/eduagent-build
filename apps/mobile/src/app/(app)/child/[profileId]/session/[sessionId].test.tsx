@@ -270,9 +270,9 @@ describe('SessionDetailScreen (summary-only)', () => {
 
     render(<SessionDetailScreen />);
 
-    fireEvent.press(screen.getByTestId('copy-conversation-prompt'));
+    fireEvent.press(screen.getByTestId('session-recap-copy-prompt'));
 
-    await waitFor(() => screen.getByText('parentView.session.copied'));
+    await waitFor(() => screen.getByTestId('session-recap-copy-prompt-toast'));
     expect(Clipboard.setStringAsync).toHaveBeenCalledWith(
       'Can you teach this back to me?'
     );

@@ -14,7 +14,7 @@
 # and returns { label: "Review this topic", variant: 'primary' }.
 #
 # testID mapping (topic/[topicId].tsx):
-#   - retention-card    -> retention metrics card (optional for this seed)
+#   - topic-retention-card -> retention metrics card (optional for this seed)
 #   - study-cta         -> sticky study CTA button (single, label varies by state)
 appId: com.mentomate.app
 tags:
@@ -60,7 +60,7 @@ tags:
 # 7. Wait for topic detail screen to load
 - extendedWaitUntil:
     visible:
-      id: "retention-card"
+      id: "topic-retention-card"
     timeout: 15000
     # learning-active may not seed retention cards; wait for Progress section instead
     optional: true
