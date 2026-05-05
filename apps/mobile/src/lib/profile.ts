@@ -76,6 +76,8 @@ export interface ProfileContextValue {
   activeProfile: Profile | null;
   switchProfile: (profileId: string) => Promise<SwitchProfileResult>;
   isLoading: boolean;
+  /** Set when the account's profile list could not be loaded. */
+  profileLoadError: unknown | null;
   /** Set when a saved profile was removed server-side and we fell back to owner */
   profileWasRemoved: boolean;
   /** Clear the profileWasRemoved flag after user acknowledges */
@@ -97,6 +99,7 @@ export const ProfileContext = createContext<ProfileContextValue>({
   activeProfile: null,
   switchProfile: async () => ({ success: true }),
   isLoading: true,
+  profileLoadError: null,
   profileWasRemoved: false,
   acknowledgeProfileRemoval: () => undefined,
 });
@@ -114,6 +117,7 @@ export function ProfileProvider({
     data: profiles = [],
     isLoading: isProfilesLoading,
     isFetching: isProfilesFetching,
+    error: profileLoadError,
   } = useProfiles();
   const client = useApiClient();
   const queryClient = useQueryClient();
@@ -296,6 +300,7 @@ export function ProfileProvider({
       activeProfile,
       switchProfile,
       isLoading,
+      profileLoadError,
       profileWasRemoved,
       acknowledgeProfileRemoval,
     }),
@@ -304,6 +309,7 @@ export function ProfileProvider({
       activeProfile,
       switchProfile,
       isLoading,
+      profileLoadError,
       profileWasRemoved,
       acknowledgeProfileRemoval,
     ]

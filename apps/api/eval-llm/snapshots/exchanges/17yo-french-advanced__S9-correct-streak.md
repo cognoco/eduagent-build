@@ -29,7 +29,7 @@
 ```json
 {
   "scenarioId": "S9-correct-streak",
-  "scenarioPurpose": "Correct-answer streak (correctStreak >= 4) — ADAPTIVE ESCALATION injection",
+  "scenarioPurpose": "Correct-streak ADAPTIVE ESCALATION trigger — 4 consecutive correct answers at the same rung should prompt the streak branch",
   "context": {
     "sessionId": "eval-17yo-french-advanced",
     "profileId": "eval-profile-17yo-french-advanced",
@@ -86,14 +86,11 @@
       "éphémère"
     ],
     "learningMode": "serious",
-    "exchangeCount": 8,
+    "exchangeCount": 4,
     "inputMode": "text",
     "llmTier": "standard",
     "verificationType": "standard",
-    "correctStreak": 4,
-    "retentionStatus": {
-      "status": "strong"
-    }
+    "correctStreak": 4
   }
 }
 ```
@@ -166,9 +163,6 @@ Use the learner memory naturally. Reference interests only when genuinely releva
 
 Memory hygiene: if multiple context sections overlap, use the overlap once and avoid repeating the same detail back to the learner.
 
-Retention status for this topic: STRONG.
-The learner has strong retention — challenge them. Ask application-level or transfer questions rather than recall.
-
 Scope boundaries:
 - Stay within the loaded topic and subject. Do not teach unrelated material even if the learner asks about it.
 - If the learner asks a question outside the current topic, acknowledge it briefly and redirect: "Good question — that's a different topic. Let's finish this one first, then you can start a session on that."
@@ -234,8 +228,8 @@ Then you need to account for the boundary condition.
 
 ## Builder notes
 
-- Scenario: S9-correct-streak — Correct-answer streak (correctStreak >= 4) — ADAPTIVE ESCALATION injection
+- Scenario: S9-correct-streak — Correct-streak ADAPTIVE ESCALATION trigger — 4 consecutive correct answers at the same rung should prompt the streak branch
 - Rung: 2, sessionType: learning, verification: standard
-- History turns: 8, exchangeCount: 8
+- History turns: 8, exchangeCount: 4
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
