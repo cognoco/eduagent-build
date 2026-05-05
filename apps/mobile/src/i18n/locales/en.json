@@ -1126,6 +1126,13 @@
       "retentionWeak": "This subject would benefit from some extra attention.",
       "openShelf": "Open shelf",
       "resume": "Resume",
+      "hideSubject": "Hide subject",
+      "hidingSubject": "Hiding subject...",
+      "hideSubjectHint": "Hides this subject from your main student views. You can restore it from Library later.",
+      "hideConfirmTitle": "Hide {{subject}}?",
+      "hideConfirmMessage": "This will move the subject out of your main views. Your learning history stays saved, and you can restore it from Library.",
+      "hideConfirmAction": "Hide subject",
+      "hideErrorTitle": "Could not hide subject",
       "goneTitle": "This subject is no longer available",
       "goneSubtitle": "It may have been removed or merged into another subject.",
       "pastConversations": "Past conversations"

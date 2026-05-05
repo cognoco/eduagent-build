@@ -1126,6 +1126,13 @@
       "retentionWeak": "Dieses Fach würde von etwas zusätzlicher Aufmerksamkeit profitieren.",
       "openShelf": "Regal öffnen",
       "resume": "Fortsetzen",
+      "hideSubject": "Fach ausblenden",
+      "hidingSubject": "Fach wird ausgeblendet...",
+      "hideSubjectHint": "Blendet dieses Fach in deinen Hauptansichten aus. Du kannst es später in der Bibliothek wiederherstellen.",
+      "hideConfirmTitle": "{{subject}} ausblenden?",
+      "hideConfirmMessage": "Dadurch wird das Fach aus deinen Hauptansichten verschoben. Dein Lernverlauf bleibt gespeichert, und du kannst es in der Bibliothek wiederherstellen.",
+      "hideConfirmAction": "Fach ausblenden",
+      "hideErrorTitle": "Fach konnte nicht ausgeblendet werden",
       "goneTitle": "Dieses Fach ist nicht mehr verfügbar",
       "goneSubtitle": "Es wurde möglicherweise entfernt oder in ein anderes Fach integriert.",
       "pastConversations": "Vergangene Gespräche"

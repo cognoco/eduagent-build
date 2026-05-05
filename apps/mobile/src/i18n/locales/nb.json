@@ -1126,6 +1126,13 @@
       "retentionWeak": "Dette emnet ville hatt godt av litt ekstra oppmerksomhet.",
       "openShelf": "Åpne hylle",
       "resume": "Fortsett",
+      "hideSubject": "Skjul emne",
+      "hidingSubject": "Skjuler emne...",
+      "hideSubjectHint": "Skjuler dette emnet fra hovedvisningene dine. Du kan gjenopprette det fra Bibliotek senere.",
+      "hideConfirmTitle": "Skjul {{subject}}?",
+      "hideConfirmMessage": "Dette flytter emnet ut av hovedvisningene dine. Læringshistorikken din blir lagret, og du kan gjenopprette emnet fra Bibliotek.",
+      "hideConfirmAction": "Skjul emne",
+      "hideErrorTitle": "Kunne ikke skjule emnet",
       "goneTitle": "Dette emnet er ikke lenger tilgjengelig",
       "goneSubtitle": "Det kan ha blitt fjernet eller slått sammen med et annet emne.",
       "pastConversations": "Tidligere samtaler"
