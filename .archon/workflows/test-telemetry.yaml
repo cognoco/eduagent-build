@@ -2,46 +2,62 @@ name: test-telemetry
 description: |
   Minimal smoke-test workflow for verifying that `archon-init-tracing`
   correctly tags Claude Code and Codex traces with archon-specific
-  OTEL resource attributes.
+  resource attributes.
 
   Three nodes:
-    1. init-tracing       — writes worktree-local .claude/settings.json
-                            and outputs the codex-variant attributes
-                            string for downstream Codex env: blocks
-    2. claude-ping        — Claude Code call (should be tagged
-                            `service.name=claude-code-archon`)
-    3. codex-ping         — Codex call (should be tagged
-                            `service.name=codex-archon`)
+    1. init-tracing  — writes worktree-local .claude/settings.json AND
+                       worktree-local .codex/config.toml so subsequent
+                       CC and Codex calls inherit archon-specific env.
+    2. claude-ping   — Claude Code call (trace should have
+                       env=archon-test-telemetry).
+    3. codex-ping    — Codex call (trace should have
+                       env=archon-test-telemetry).
 
   Verification (after running):
-    1. Open Logfire (or whichever OTEL backend is configured)
-    2. Filter by service.name in (claude-code-archon, codex-archon)
-    3. Confirm the run shows attributes:
-         archon.run_id   — UUID written by init-tracing
-         archon.workflow — "test-telemetry"
-         archon.repo     — repo basename (e.g. "Mentomate")
-    4. Both ping nodes should appear under the same archon.run_id
+    1. Open Logfire (zpm project).
+    2. Filter:  WHERE env = 'archon-test-telemetry'
+       — should match traces from BOTH ping nodes (CC and Codex).
+    3. Pivot:   GROUP BY service.name
+       — should show two rows:
+           service.name=claude-code-plugin  (from claude-ping)
+           service.name=codex_cli_rs        (from codex-ping)
+    4. CC trace should also carry these attributes (set via the worktree
+       .claude/settings.json's OTEL_RESOURCE_ATTRIBUTES):
+           archon.run_id    — UUID written by init-tracing
+           archon.workflow  — "test-telemetry"
+           archon.repo      — repo basename (e.g. "Mentomate")
+       (Codex trace cannot carry these until openai/codex#7821 lands;
+        only the `env` attribute differentiates Codex archon traces.)
+    5. Both ping traces should be filterable as a single run by
+       (service.name × env) pivot — for now use timestamp-proximity to
+       group them, since archon.run_id is CC-only.
 
   Usage:
     archon workflow run test-telemetry
 
-  This workflow performs no code changes and creates no PR — it exists
-  purely to validate the telemetry tagging design. Cheap and safe to
-  run as often as needed.
+  Performs no app code changes and creates no PR. Writes two scratch
+  config files into the worktree (.claude/settings.json and
+  .codex/config.toml) which are discarded with the worktree on cleanup.
+  Safe to run as often as needed.
 
 provider: claude
 model: claude-haiku-4-5-20251001
 
+# Worktree must be enabled — init-tracing writes project-scope config
+# files (.claude/settings.json, .codex/config.toml) into <cwd>. With
+# worktree disabled, those writes would land in the actual repo root
+# and pollute the project (and contradict the "no code changes" promise).
 worktree:
   enabled: true
 
 nodes:
   # ═══════════════════════════════════════════════════════════════
-  # PHASE 0: INIT TRACING — same node as the cleanup workflow.
-  # Writes .claude/settings.json into the worktree (Claude Code
-  # picks it up via project-scope override) and outputs the
-  # codex-variant resource-attributes string for the codex node's
-  # env: block.
+  # PHASE 0: INIT TRACING. Writes worktree-local config:
+  #   <cwd>/.claude/settings.json   (Claude Code project-scope override)
+  #   <cwd>/.codex/config.toml      (Codex project-scope override)
+  # Both files set the `env` resource attribute to
+  # "archon-test-telemetry" so all subsequent CC + Codex traces in this
+  # run are filterable by  WHERE env = 'archon-test-telemetry'.
   # ═══════════════════════════════════════════════════════════════
 
   - id: init-tracing
@@ -50,9 +66,10 @@ nodes:
     model: haiku
 
   # ═══════════════════════════════════════════════════════════════
-  # PHASE 1: CLAUDE PING — trivial Claude Code call. The trace this
-  # generates should carry service.name=claude-code-archon plus the
-  # archon.* attributes from the worktree-local settings.json.
+  # PHASE 1: CLAUDE PING. Trivial Claude Code call. Trace inherits the
+  # worktree-scope settings.json from init-tracing → lands in Logfire
+  # with service.name=claude-code-plugin (default), env=archon-test-telemetry,
+  # plus archon.run_id, archon.workflow, archon.repo as resource attributes.
   # ═══════════════════════════════════════════════════════════════
 
   - id: claude-ping
@@ -62,9 +79,17 @@ nodes:
     model: haiku
 
   # ═══════════════════════════════════════════════════════════════
-  # PHASE 2: CODEX PING — trivial Codex call. The env: block sets
-  # OTEL_RESOURCE_ATTRIBUTES from init-tracing's stdout (codex
-  # variant: service.name=codex-archon).
+  # PHASE 2: CODEX PING. Trivial Codex call. Trace inherits the
+  # worktree-scope .codex/config.toml from init-tracing → lands in
+  # Logfire with service.name=codex_cli_rs (default) and
+  # env=archon-test-telemetry. Per openai/codex#7821, custom resource
+  # attributes (archon.run_id etc.) cannot be set on Codex traces
+  # today — only the `env` field differentiates archon vs native.
+  #
+  # Note: NO `env:` block is needed here. Earlier versions of this
+  # workflow set `OTEL_RESOURCE_ATTRIBUTES: $init-tracing.output`, but
+  # Codex does not read that env var. The override happens via the
+  # worktree-local config.toml that init-tracing wrote.
   # ═══════════════════════════════════════════════════════════════
 
   - id: codex-ping
@@ -74,5 +99,3 @@ nodes:
     model: gpt-5.5
     modelReasoningEffort: low
     context: fresh
-    env:
-      OTEL_RESOURCE_ATTRIBUTES: $init-tracing.output

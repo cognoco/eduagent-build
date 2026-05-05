@@ -5,32 +5,36 @@ argument-hint: (no arguments)
 
 # Telemetry Ping (Codex)
 
-This command exists solely to generate a Codex trace inside an archon workflow run. The workflow node sets `OTEL_RESOURCE_ATTRIBUTES` via an `env:` block to the codex-variant string output by `archon-init-tracing`, so this Codex call should carry `service.name=codex-archon` plus the archon.* attributes (`archon.run_id`, `archon.workflow`, `archon.repo`).
+This command exists solely to generate a Codex trace inside an archon workflow run. By being invoked from within the worktree (where `archon-init-tracing` has written a project-scope `.codex/config.toml`), the resulting trace should carry `env=archon-<workflow>` as a resource attribute.
 
-Unlike the Claude variant, Codex doesn't read project-scope `.claude/settings.json` — the `env:` block in the workflow YAML is the override mechanism for Codex.
+`service.name` will remain at the Codex default (`codex_cli_rs`) — see `archon-init-tracing.md` for why differentiation happens via the `env` attribute instead of `service.name`.
+
+Codex also cannot carry `archon.run_id` / `archon.workflow` / `archon.repo` resource attributes today (per [openai/codex#7821](https://github.com/openai/codex/issues/7821)). Only the `env` field differentiates Codex archon traces from Codex native — accept this asymmetry with the CC variant for now.
+
+Unlike the Claude variant, Codex does NOT read `OTEL_RESOURCE_ATTRIBUTES` from the environment — its override mechanism is the project-scope `.codex/config.toml` that init-tracing wrote.
 
 ---
 
 ## Steps
 
-1. **Confirm the env var is set.** This proves the workflow YAML's `env:` block + init-tracing handoff is working:
+1. **Confirm the worktree-local config.toml is in place.** This proves init-tracing wrote it.
 
    ```bash
-   echo "$OTEL_RESOURCE_ATTRIBUTES"
+   cat .codex/config.toml
    ```
 
-   You should see `service.name=codex-archon` plus the archon.* attributes.
+   You should see an `[otel]` block with `environment = "archon-<workflow>"`. (Other `[otel]` settings — endpoint, auth, protocol — are inherited from `~/.codex/config.toml` and don't need to be repeated here.)
 
-2. **Extract the run-id** for the confirmation line:
+2. **Capture an ISO timestamp** to use in the confirmation line. Codex traces can't carry `archon.run_id` today, so timestamp proximity is how we'll match this trace to the parallel `claude-ping` trace:
 
    ```bash
-   echo "$OTEL_RESOURCE_ATTRIBUTES" | grep -oE 'archon.run_id=[^,]+'
+   date -u +%Y-%m-%dT%H:%M:%SZ
    ```
 
 3. **Emit a single confirmation line:**
 
    ```
-   Telemetry ping (Codex) — service=codex-archon, <archon.run_id=...>, ts=<ISO timestamp>
+   Telemetry ping (Codex) — service=codex_cli_rs, env=archon-<workflow>, ts=<ISO timestamp>
    ```
 
 That's the entire command. The trace Codex emits while reading this prompt and producing that line is what we're measuring.
@@ -39,11 +43,15 @@ That's the entire command. The trace Codex emits while reading this prompt and p
 
 ## Verification (after the workflow run)
 
-1. Open Logfire (or whichever OTEL backend Codex is configured to send to).
-2. Filter by `service.name=codex-archon`.
-3. Find the trace whose `archon.run_id` matches the one printed above (this should be the **same** run-id as the Claude ping — both nodes share the run-context from init-tracing).
-4. Confirm it carries `archon.workflow=test-telemetry` and `archon.repo=<basename of repo dir>`.
+1. Open Logfire (zpm project).
+2. Filter: `WHERE service.name = 'codex_cli_rs' AND env LIKE 'archon-%'`.
+3. Find the most recent trace matching the timestamp printed above.
+4. Confirm the trace carries:
+   - `service.name = codex_cli_rs` (default; tells you which tool emitted it)
+   - `env = archon-<workflow>`
 
-If the env var is empty or missing the archon.* attributes, the workflow YAML's `env: OTEL_RESOURCE_ATTRIBUTES: $init-tracing.output` interpolation isn't resolving — check init-tracing's stdout output format and confirm the workflow node is reading it correctly.
+To correlate this trace with the parallel `claude-ping` trace, use timestamp proximity (both should land within seconds of each other) or the run-id printed by the CC ping. Direct correlation by `archon.run_id` will not work for the Codex side until #7821 lands.
 
-If no trace shows up at all, Codex's OTEL configuration is missing at a layer above this workflow — out of scope for this test.
+If `env=native` shows up instead of `archon-<workflow>`, the project-scope `.codex/config.toml` isn't being picked up — verify the worktree has the file at `<cwd>/.codex/config.toml` and that the `codex` CLI is being invoked with cwd inside the worktree.
+
+If no trace shows up at all, Codex's OTEL configuration is missing at a layer above this workflow (`~/.codex/config.toml` not pointing at Logfire, network egress, etc.) — out of scope for this test.
