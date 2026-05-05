@@ -1126,6 +1126,7 @@
       "retentionWeak": "この科目は、もう少し注意を払うと良いでしょう。",
       "openShelf": "棚を開く",
       "resume": "再開",
+      "chooseNext": "次を選ぶ",
       "hideSubject": "科目を非表示にする",
       "hidingSubject": "科目を非表示にしています...",
       "hideSubjectHint": "この科目をメイン画面から非表示にします。あとでライブラリから復元できます。",
