@@ -928,6 +928,7 @@ export const sessionCompleted = inngest.createFunction(
     type LlmSummaryStepResult =
       | { kind: 'no-summary-row' }
       | { kind: 'no-summary-generated'; sessionSummaryId: string }
+      | { kind: 'errored'; sessionSummaryId: string | null }
       | {
           kind: 'generated';
           sessionSummaryId: string;
@@ -941,6 +942,7 @@ export const sessionCompleted = inngest.createFunction(
         outcome: StepOutcome;
         summaryResult: LlmSummaryStepResult;
       }> => {
+        let summaryRowId: string | null = null;
         try {
           const db = getStepDatabase();
 
@@ -958,6 +960,7 @@ export const sessionCompleted = inngest.createFunction(
               summaryResult: { kind: 'no-summary-row' },
             };
           }
+          summaryRowId = summaryRow.id;
 
           const summary = await generateAndStoreLlmSummary(db, {
             sessionId,
@@ -1000,20 +1003,25 @@ export const sessionCompleted = inngest.createFunction(
             profileId,
             error: err instanceof Error ? err.message : String(err),
           });
+          // Promote to `errored` so the failure event fires below — silent
+          // recovery without escalation is banned by CLAUDE.md.
           return {
             outcome: {
               step: 'generate-llm-summary',
               status: 'failed',
               error: err instanceof Error ? err.message : String(err),
             },
-            summaryResult: { kind: 'no-summary-row' },
+            summaryResult: { kind: 'errored', sessionSummaryId: summaryRowId },
           };
         }
       }
     );
     outcomes.push(llmSummaryStep.outcome);
 
-    if (llmSummaryStep.summaryResult.kind === 'no-summary-generated') {
+    if (
+      llmSummaryStep.summaryResult.kind === 'no-summary-generated' ||
+      llmSummaryStep.summaryResult.kind === 'errored'
+    ) {
       await step.sendEvent('notify-session-summary-failed', {
         name: 'app/session.summary.failed',
         data: {

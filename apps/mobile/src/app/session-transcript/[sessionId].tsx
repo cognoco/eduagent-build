@@ -124,21 +124,23 @@ export default function SessionTranscriptScreen() {
 
   if (transcript.data?.archived === true) {
     return (
-      <ArchivedTranscriptCard
-        archivedAt={transcript.data.archivedAt}
-        summary={transcript.data.summary}
-        onBack={() => goBackOrReplace(router, '/(app)/library')}
-        onContinueTopic={() => {
-          if (transcript.data?.archived !== true) return;
-          if (transcript.data.summary.topicId) {
+      <View
+        className="flex-1 bg-background"
+        style={{ paddingTop: insets.top + 8, paddingBottom: insets.bottom + 8 }}
+      >
+        <ArchivedTranscriptCard
+          archivedAt={transcript.data.archivedAt}
+          summary={transcript.data.summary}
+          onBack={() => goBackOrReplace(router, '/(app)/library')}
+          onContinueTopic={() => {
+            if (transcript.data?.archived !== true) return;
+            if (!transcript.data.summary.topicId) return;
             router.push(
               `/(app)/session/start?topicId=${transcript.data.summary.topicId}`
             );
-            return;
-          }
-          goBackOrReplace(router, '/(app)/library');
-        }}
-      />
+          }}
+        />
+      </View>
     );
   }
 

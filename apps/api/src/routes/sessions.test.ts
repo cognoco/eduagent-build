@@ -48,6 +48,7 @@ jest.mock('../services/profile', () => ({
     location: null,
     consentStatus: 'CONSENTED',
   }),
+  getProfileAgeBracket: jest.fn().mockResolvedValue('teen'),
   findOwnerProfile: jest.fn().mockResolvedValue({
     id: 'test-profile-id',
     birthYear: null,
@@ -228,6 +229,12 @@ jest.mock('../services/session', () => {
           isSystemPrompt: true,
         },
       ],
+    }),
+    evaluateSessionDepth: jest.fn().mockResolvedValue({
+      meaningful: true,
+      reason: 'enough learner detail',
+      method: 'heuristic',
+      topics: ['gravity'],
     }),
     recordSystemPrompt: jest.fn().mockResolvedValue(undefined),
     recordSessionEvent: jest.fn().mockResolvedValue(undefined),
@@ -653,6 +660,40 @@ describe('session routes', () => {
         'I learned gravity pulls things down.'
       );
       expect(body.session).toBeUndefined();
+    });
+  });
+
+  describe('POST /v1/sessions/:sessionId/evaluate-depth', () => {
+    it('returns 410 with SESSION_ARCHIVED when transcript has been purged', async () => {
+      (getSessionTranscript as jest.Mock).mockResolvedValueOnce({
+        archived: true,
+        archivedAt: new Date().toISOString(),
+        summary: {
+          narrative:
+            'Learner explored gravity and discussed how it pulls objects together. They asked thoughtful questions about why apples fall.',
+          topicsCovered: ['gravity'],
+          sessionState: 'completed' as const,
+          reEntryRecommendation:
+            'Pick up by reviewing how mass affects gravitational pull.',
+          learnerRecap: 'I learned gravity pulls things down.',
+          topicId: null,
+        },
+      });
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/evaluate-depth`,
+        { method: 'POST', headers: AUTH_HEADERS },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(410);
+      const body = await res.json();
+      expect(body).toEqual(
+        expect.objectContaining({
+          code: 'SESSION_ARCHIVED',
+          message: 'Session transcript has been archived',
+        })
+      );
     });
   });
 

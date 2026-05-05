@@ -7,6 +7,7 @@ import {
   type UseMutationResult,
 } from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-expo';
+import { transcriptResponseSchema } from '@eduagent/schemas';
 import type {
   CelebrationReason,
   ContentFlagInput,
@@ -425,7 +426,8 @@ export function useSessionTranscript(
           { init: { signal } }
         );
         await assertOk(res);
-        return (await res.json()) as TranscriptResponse;
+        const raw = await res.json();
+        return transcriptResponseSchema.parse(raw);
       } finally {
         cleanup();
       }

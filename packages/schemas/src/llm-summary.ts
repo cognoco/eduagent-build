@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { sessionTranscriptSchema } from './sessions.ts';
+import { sessionTranscriptSchema } from './sessions';
 
 const llmSummaryBaseSchema = z.object({
   narrative: z.string().min(40).max(1500),
@@ -24,18 +24,26 @@ function topicMatchesNarrative(narrative: string, topic: string): boolean {
   return pattern.test(narrative);
 }
 
+const narrativeMentionsTopic = (value: {
+  narrative: string;
+  topicsCovered: string[];
+  sessionState: string;
+}): boolean =>
+  value.topicsCovered.length === 0
+    ? value.sessionState === 'auto-closed'
+    : value.topicsCovered.some((topic) =>
+        topicMatchesNarrative(value.narrative, topic)
+      );
+
+const narrativeMentionsTopicOptions = {
+  message:
+    'narrative must mention at least one topic from topicsCovered by name; only auto-closed sessions may omit topicsCovered',
+  path: ['narrative'],
+};
+
 export const llmSummarySchema = llmSummaryBaseSchema.refine(
-  (value) =>
-    value.topicsCovered.length === 0
-      ? value.sessionState === 'auto-closed'
-      : value.topicsCovered.some((topic) =>
-          topicMatchesNarrative(value.narrative, topic)
-        ),
-  {
-    message:
-      'narrative must mention at least one topic from topicsCovered by name; only auto-closed sessions may omit topicsCovered',
-    path: ['narrative'],
-  }
+  narrativeMentionsTopic,
+  narrativeMentionsTopicOptions
 );
 export type LlmSummary = z.infer<typeof llmSummarySchema>;
 
@@ -44,19 +52,7 @@ export const archivedTranscriptSummarySchema = llmSummaryBaseSchema
     learnerRecap: z.string().min(1).nullable(),
     topicId: z.string().uuid().nullable(),
   })
-  .refine(
-    (value) =>
-      value.topicsCovered.length === 0
-        ? value.sessionState === 'auto-closed'
-        : value.topicsCovered.some((topic) =>
-            topicMatchesNarrative(value.narrative, topic)
-          ),
-    {
-      message:
-        'narrative must mention at least one topic from topicsCovered by name; only auto-closed sessions may omit topicsCovered',
-      path: ['narrative'],
-    }
-  );
+  .refine(narrativeMentionsTopic, narrativeMentionsTopicOptions);
 export type ArchivedTranscriptSummary = z.infer<
   typeof archivedTranscriptSummarySchema
 >;

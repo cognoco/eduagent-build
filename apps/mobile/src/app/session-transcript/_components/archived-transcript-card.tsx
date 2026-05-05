@@ -17,6 +17,8 @@ export function ArchivedTranscriptCard({
 }: Props) {
   const { i18n, t } = useTranslation();
   const colors = useThemeColors();
+  const hasTopics = summary.topicsCovered.length > 0;
+  const canContinueTopic = summary.topicId != null;
   const archivedDate = new Date(archivedAt).toLocaleDateString(i18n.language, {
     month: 'long',
     day: 'numeric',
@@ -43,27 +45,33 @@ export function ArchivedTranscriptCard({
             defaultValue: 'This conversation was archived on {{date}}.',
           })}
         </Text>
-        <Text className="text-body text-text-secondary mb-4">
-          {t('sessionTranscript.archived.intro', {
-            defaultValue: "Here's what you covered:",
-          })}
-        </Text>
 
         <Text className="text-body text-text-primary mb-4">
           {summary.narrative}
         </Text>
 
-        <View className="flex-row flex-wrap gap-2 mb-4">
-          {summary.topicsCovered.map((topic) => (
-            <View
-              key={topic}
-              testID="archived-topic-chip"
-              className="bg-surface-elevated rounded-pill px-3 py-1"
-            >
-              <Text className="text-caption text-text-primary">{topic}</Text>
+        {hasTopics ? (
+          <>
+            <Text className="text-body text-text-secondary mb-3">
+              {t('sessionTranscript.archived.intro', {
+                defaultValue: "Here's what you covered:",
+              })}
+            </Text>
+            <View className="flex-row flex-wrap gap-2 mb-4">
+              {summary.topicsCovered.map((topic) => (
+                <View
+                  key={topic}
+                  testID="archived-topic-chip"
+                  className="bg-surface-elevated rounded-pill px-3 py-1"
+                >
+                  <Text className="text-caption text-text-primary">
+                    {topic}
+                  </Text>
+                </View>
+              ))}
             </View>
-          ))}
-        </View>
+          </>
+        ) : null}
 
         {summary.learnerRecap ? (
           <Text className="text-body text-text-secondary italic mb-4">
@@ -75,21 +83,23 @@ export function ArchivedTranscriptCard({
           {summary.reEntryRecommendation}
         </Text>
 
-        <Pressable
-          testID="archived-continue-topic-cta"
-          onPress={onContinueTopic}
-          accessibilityRole="button"
-          accessibilityLabel={t('sessionTranscript.archived.continueCta', {
-            defaultValue: 'Continue this topic',
-          })}
-          className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
-        >
-          <Text className="text-body font-semibold text-text-inverse">
-            {t('sessionTranscript.archived.continueCta', {
+        {canContinueTopic ? (
+          <Pressable
+            testID="archived-continue-topic-cta"
+            onPress={onContinueTopic}
+            accessibilityRole="button"
+            accessibilityLabel={t('sessionTranscript.archived.continueCta', {
               defaultValue: 'Continue this topic',
             })}
-          </Text>
-        </Pressable>
+            className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
+          >
+            <Text className="text-body font-semibold text-text-inverse">
+              {t('sessionTranscript.archived.continueCta', {
+                defaultValue: 'Continue this topic',
+              })}
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
     </ScrollView>
   );

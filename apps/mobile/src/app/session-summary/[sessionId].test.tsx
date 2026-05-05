@@ -495,8 +495,8 @@ describe('SessionSummaryScreen', () => {
       archived: false,
       session: {
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
-        subjectId: 'sub-1',
-        topicId: 'topic-1',
+        subjectId: '550e8400-e29b-41d4-a716-446655440000',
+        topicId: '770e8400-e29b-41d4-a716-446655440000',
         sessionType: 'learning',
         verificationType: 'evaluate',
         startedAt: '2026-04-01T00:00:00.000Z',

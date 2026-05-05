@@ -494,7 +494,7 @@ export type GetBookSessionsResponse = z.infer<
 export const subjectSessionSchema = z.object({
   id: z.string().uuid(),
   topicId: z.string().uuid().nullable(),
-  topicTitle: z.string(),
+  topicTitle: z.string().nullable(),
   bookId: z.string().uuid().nullable(),
   bookTitle: z.string().nullable(),
   chapter: z.string().nullable(),

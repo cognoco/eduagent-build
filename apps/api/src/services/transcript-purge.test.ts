@@ -27,7 +27,8 @@ function createPurgeDb(summaryRow: Record<string, unknown> | null) {
   const deleteEventsWhere = jest.fn().mockReturnValue({
     returning: deleteEventsReturning,
   });
-  const insertValues = jest.fn().mockResolvedValue(undefined);
+  const onConflictDoUpdate = jest.fn().mockResolvedValue(undefined);
+  const insertValues = jest.fn().mockReturnValue({ onConflictDoUpdate });
   const updateReturning = jest.fn().mockResolvedValue([{ id: 'summary-1' }]);
   const updateWhere = jest.fn().mockReturnValue({
     returning: updateReturning,
@@ -65,6 +66,7 @@ function createPurgeDb(summaryRow: Record<string, unknown> | null) {
     deleteEmbeddingsReturning,
     deleteEventsReturning,
     insertValues,
+    onConflictDoUpdate,
     updateWhere,
     updateReturning,
   };
@@ -127,22 +129,24 @@ describe('purgeSessionTranscript', () => {
   });
 
   it('purges events, replaces embeddings, and stamps purgedAt inside one transaction', async () => {
-    const { db, insertValues, updateWhere } = createPurgeDb({
-      id: 'summary-1',
-      sessionId: 'session-1',
-      profileId: 'profile-1',
-      topicId: null,
-      llmSummary: {
-        narrative:
-          'Worked through fractions and named equivalent fractions while comparing visual models together.',
-        topicsCovered: ['fractions', 'equivalent fractions'],
-        sessionState: 'completed',
-        reEntryRecommendation:
-          'Resume with one more equivalent-fractions example and ask for the rule aloud.',
-      },
-      learnerRecap: 'You connected pictures to the fraction rule.',
-      purgedAt: null,
-    });
+    const { db, insertValues, onConflictDoUpdate, updateWhere } = createPurgeDb(
+      {
+        id: 'summary-1',
+        sessionId: 'session-1',
+        profileId: 'profile-1',
+        topicId: null,
+        llmSummary: {
+          narrative:
+            'Worked through fractions and named equivalent fractions while comparing visual models together.',
+          topicsCovered: ['fractions', 'equivalent fractions'],
+          sessionState: 'completed',
+          reEntryRecommendation:
+            'Resume with one more equivalent-fractions example and ask for the rule aloud.',
+        },
+        learnerRecap: 'You connected pictures to the fraction rule.',
+        purgedAt: null,
+      }
+    );
 
     mockGenerateEmbedding.mockResolvedValue({
       vector: [0.1, 0.2],
@@ -167,6 +171,15 @@ describe('purgeSessionTranscript', () => {
         sessionId: 'session-1',
         profileId: 'profile-1',
         embedding: [0.1, 0.2],
+      })
+    );
+    expect(onConflictDoUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target: expect.any(Array),
+        set: expect.objectContaining({
+          content: expect.any(String),
+          embedding: [0.1, 0.2],
+        }),
       })
     );
     expect(updateWhere).toHaveBeenCalled();

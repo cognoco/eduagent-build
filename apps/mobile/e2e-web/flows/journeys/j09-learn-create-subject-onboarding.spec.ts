@@ -11,15 +11,25 @@ test('J-09 learner → Learn → create subject → interview → curriculum →
     landingPath: '/home',
   });
 
-  // Learn intent → create-subject screen (no subjects → auto-redirect OR intent tap)
-  await page.getByTestId('intent-learn').click();
+  // Empty learner home → create-subject screen
+  await expect(page.getByTestId('home-empty-subjects')).toBeVisible({
+    timeout: 30_000,
+  });
+  await page.getByText('Add a subject').click();
   await expect(page.getByTestId('create-subject-name')).toBeVisible({
     timeout: 30_000,
   });
 
-  // Type the subject name and submit — real API resolves it and creates the subject
-  await page.getByTestId('create-subject-name').fill('Astronomy');
+  // Type a focused subject name and submit — real API resolves it and creates
+  // the focused-book path that proceeds directly to interview.
+  await page
+    .getByTestId('create-subject-name')
+    .fill('Italian verb conjugation - essere and avere');
   await page.getByTestId('create-subject-submit').click();
+  await expect(page.getByText(/shall we go with that/i)).toBeVisible({
+    timeout: 30_000,
+  });
+  await page.getByRole('button', { name: /accept suggestion/i }).click();
 
   // Interview screen: wait for the chat input to appear
   await expect(page.getByTestId('chat-input')).toBeVisible({ timeout: 30_000 });
@@ -57,16 +67,21 @@ test('J-09 learner → Learn → create subject → interview → curriculum →
   });
   await page.getByTestId('skip-interview-button').click();
 
-  // "Let's Go" / "view-curriculum-button" appears when interviewComplete is set
-  await expect(page.getByTestId('view-curriculum-button')).toBeVisible({
-    timeout: 30_000,
-  });
-  await page.getByTestId('view-curriculum-button').click();
+  // Some completions route through the explicit "view curriculum" handoff,
+  // while others advance directly to the analogy-preference step.
+  await expect(
+    page
+      .getByTestId('view-curriculum-button')
+      .or(page.getByTestId('analogy-preference-title'))
+  ).toBeVisible({ timeout: 30_000 });
+  if ((await page.getByTestId('view-curriculum-button').count()) > 0) {
+    await page.getByTestId('view-curriculum-button').click();
+    await expect(page.getByTestId('analogy-preference-title')).toBeVisible({
+      timeout: 30_000,
+    });
+  }
 
   // Analogy preference step — skip it
-  await expect(page.getByTestId('analogy-preference-title')).toBeVisible({
-    timeout: 30_000,
-  });
   await page.getByTestId('analogy-skip-button').click();
 
   // Accommodation step — skip it

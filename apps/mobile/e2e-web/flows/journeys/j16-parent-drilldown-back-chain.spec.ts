@@ -11,7 +11,6 @@ test('J-16 parent drill-down reaches topic detail and unwinds cleanly', async ({
   const seed = await readSeedData('owner-with-children');
   const childProfileId = seed.ids.child1ProfileId;
   const subjectId = seed.ids.subject1Id;
-  const topicId = seed.ids.child1TopicId;
 
   await page.goto('/home', { waitUntil: 'commit' });
   await expect(page.getByTestId('parent-gateway')).toBeVisible({
@@ -23,25 +22,24 @@ test('J-16 parent drill-down reaches topic detail and unwinds cleanly', async ({
     timeout: 30_000,
   });
 
-  await page.getByTestId(`dashboard-child-${childProfileId}`).click();
+  await page.getByTestId(`dashboard-child-${childProfileId}-primary`).click();
   await expect(page.getByTestId('child-detail-scroll')).toBeVisible({
     timeout: 30_000,
   });
 
   await page.getByTestId(`subject-card-${subjectId}`).click();
-  await expect(page.getByTestId('subject-topics-scroll')).toBeVisible({
+  const topicLink = page.getByRole('link', {
+    name: /view mathematics topic 1 details/i,
+  });
+  await expect(topicLink).toBeVisible({
     timeout: 30_000,
   });
 
-  await page.getByTestId(`topic-card-${topicId}`).click();
+  await topicLink.click();
   await expect(page.getByTestId('topic-detail-screen')).toBeVisible({
     timeout: 30_000,
   });
 
-  await page.goBack();
-  await expect(page.getByTestId('subject-topics-scroll')).toBeVisible({
-    timeout: 30_000,
-  });
   await page.goBack();
   await expect(page.getByTestId('child-detail-scroll')).toBeVisible({
     timeout: 30_000,

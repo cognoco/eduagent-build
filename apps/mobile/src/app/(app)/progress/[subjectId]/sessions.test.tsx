@@ -109,7 +109,7 @@ const SAMPLE_SESSIONS = [
   {
     id: 'sess-2',
     topicId: null,
-    topicTitle: '',
+    topicTitle: null,
     bookId: null,
     bookTitle: null,
     chapter: null,
@@ -181,7 +181,7 @@ describe('SubjectSessionsScreen', () => {
     screen.getByTestId('subject-session-sess-1');
     screen.getByTestId('subject-session-sess-2');
     screen.getByText('Fractions');
-    // Empty topicTitle falls back to "Untitled topic"
+    // Null topicTitle falls back to "Untitled topic"
     screen.getByText('Untitled topic');
 
     fireEvent.press(screen.getByTestId('subject-session-sess-1'));

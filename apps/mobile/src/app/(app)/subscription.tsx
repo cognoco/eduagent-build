@@ -24,7 +24,6 @@ import { PURCHASES_ERROR_CODE, PACKAGE_TYPE } from 'react-native-purchases';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../lib/theme';
-import { goBackOrReplace } from '../../lib/navigation';
 import { useProfile } from '../../lib/profile';
 import { useApiClient } from '../../lib/api-client';
 import { assertOk } from '../../lib/assert-ok';
@@ -467,7 +466,7 @@ function ChildPaywall(): React.ReactElement {
     >
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
+          onPress={() => router.replace('/(app)/more')}
           className="me-3 min-w-[44px] min-h-[44px] justify-center items-center"
           accessibilityLabel="Go back"
           accessibilityRole="button"
@@ -1117,7 +1116,7 @@ export default function SubscriptionScreen() {
     >
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
+          onPress={() => router.replace('/(app)/more')}
           className="me-3 min-w-[44px] min-h-[44px] justify-center items-center"
           accessibilityLabel="Go back"
           accessibilityRole="button"

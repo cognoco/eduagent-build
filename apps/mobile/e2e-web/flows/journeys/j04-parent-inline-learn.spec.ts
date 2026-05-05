@@ -15,7 +15,7 @@ test('J-04 parent taps Learn → sees learner view → back to parent gateway', 
   await expect(page.getByTestId('learner-screen')).toBeVisible({
     timeout: 30_000,
   });
-  await expect(page.getByTestId('intent-learn')).toBeVisible();
+  await expect(page.getByTestId('home-action-study-new')).toBeVisible();
 
   // Tap back — returns to parent gateway
   await page.getByTestId('learner-back').click();
