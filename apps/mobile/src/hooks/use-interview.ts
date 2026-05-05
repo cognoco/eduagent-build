@@ -60,6 +60,8 @@ export function useInterviewState(
       }
     },
     enabled: !!activeProfile && !!subjectId && callerEnabled,
+    refetchInterval: (query) =>
+      query.state.data?.status === 'completing' ? 3_000 : false,
   });
 }
 

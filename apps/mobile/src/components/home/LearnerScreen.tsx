@@ -45,7 +45,11 @@ type HomeIntentAction = {
   icon: React.ComponentProps<typeof Ionicons>['name'];
   titleKey: string;
   subtitleKey: string;
-  route: '/create-subject' | '/(app)/homework/camera' | '/(app)/practice';
+  route:
+    | '/create-subject'
+    | '/(app)/homework/camera'
+    | '/(app)/practice'
+    | '/(app)/session';
   highlight?: boolean;
 };
 
@@ -57,6 +61,13 @@ const HOME_INTENT_ACTIONS: HomeIntentAction[] = [
     subtitleKey: 'home.learner.intentActions.homework.subtitle',
     route: '/(app)/homework/camera',
     highlight: true,
+  },
+  {
+    testID: 'home-ask-anything',
+    icon: 'chatbubble-ellipses-outline',
+    titleKey: 'home.learner.askAnythingLabel',
+    subtitleKey: 'home.learner.askAnythingSubtitle',
+    route: '/(app)/session',
   },
   {
     testID: 'home-action-practice',
@@ -324,7 +335,10 @@ export function LearnerScreen({
 
       router.push({
         pathname: route,
-        params: HOME_RETURN_PARAMS,
+        params:
+          route === '/(app)/session'
+            ? { mode: 'freeform', ...HOME_RETURN_PARAMS }
+            : HOME_RETURN_PARAMS,
       } as never);
     },
     []
@@ -466,7 +480,7 @@ export function LearnerScreen({
       >
         {showCoachBand && (
           <View>
-            <Text className="text-caption font-bold uppercase text-text-tertiary px-5 mt-4 mb-2">
+            <Text className="text-caption font-bold uppercase text-text-secondary px-5 mt-4 mb-2">
               {t('home.learner.recommended')}
             </Text>
             <CoachBand
@@ -526,41 +540,13 @@ export function LearnerScreen({
                 );
               })}
             </View>
-
-            <View className="px-5 mt-3">
-              <Pressable
-                testID="home-ask-anything"
-                onPress={() =>
-                  router.push({
-                    pathname: '/(app)/session',
-                    params: { mode: 'freeform', ...HOME_RETURN_PARAMS },
-                  } as never)
-                }
-                className="rounded-2xl bg-surface border border-border pl-4 pr-1.5 py-2.5 flex-row items-center"
-                style={{ gap: 8 }}
-                accessibilityRole="button"
-                accessibilityLabel={t('home.learner.askAnythingLabel')}
-              >
-                <Ionicons
-                  name="chatbubble-ellipses-outline"
-                  size={14}
-                  color={colors.muted}
-                />
-                <Text className="flex-1 text-body-sm text-text-tertiary">
-                  {t('home.learner.askAnythingPlaceholder')}
-                </Text>
-                <View className="w-8 h-8 rounded-full bg-surface-elevated items-center justify-center">
-                  <Ionicons name="mic-outline" size={14} color={colors.muted} />
-                </View>
-              </Pressable>
-            </View>
           </View>
         )}
 
         <View className={!isParentProxy ? 'mt-5' : 'mt-4'}>
           {subjectCards.length > 0 ? (
             <>
-              <Text className="text-caption font-bold uppercase text-text-tertiary px-5 mb-2.5">
+              <Text className="text-caption font-bold uppercase text-text-secondary px-5 mb-2.5">
                 {t('home.learner.yourSubjects')}
               </Text>
               <ScrollView
@@ -601,10 +587,8 @@ export function LearnerScreen({
                     accessibilityRole="button"
                     accessibilityLabel={t('home.learner.newSubject')}
                   >
-                    <Text className="text-h3 text-text-tertiary opacity-70">
-                      +
-                    </Text>
-                    <Text className="text-caption font-bold text-text-tertiary">
+                    <Text className="text-h3 text-primary opacity-80">+</Text>
+                    <Text className="text-caption font-bold text-text-primary">
                       {t('home.learner.newSubject')}
                     </Text>
                   </Pressable>

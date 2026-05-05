@@ -55,29 +55,29 @@ interface MagicPenAnimationProps {
 // Anatomy (drawn pointing upper-left → lower-right at 45°, but the SVG is
 // drawn upright and rotated by the parent Animated.View):
 //
-//   Barrel:  rounded-rect, fills most of the viewBox width
-//   Grip:    slightly narrower rect below barrel (slightly darker shade)
-//   Nib:     triangle below grip
+//   Barrel:  slim rounded-rect, pencil-like rather than marker-like
+//   Grip:    narrower band below barrel
+//   Nib:     fine triangle below grip
 //   Slit:    thin line down the center of the nib
 // ---------------------------------------------------------------------------
 
 // All coordinates are in the 100×100 pen viewBox.
-// Barrel: wide, centre-heavy rectangle
-const BARREL_X = 20;
+// Barrel: slim, readable pencil body.
+const BARREL_X = 36;
 const BARREL_Y = 5;
-const BARREL_W = 60;
-const BARREL_H = 58;
-const BARREL_RX = 8;
+const BARREL_W = 28;
+const BARREL_H = 60;
+const BARREL_RX = 6;
 
 // Grip: slightly narrower, sits directly below barrel
-const GRIP_X = 26;
-const GRIP_Y = 63;
-const GRIP_W = 48;
-const GRIP_H = 16;
+const GRIP_X = 33;
+const GRIP_Y = 65;
+const GRIP_W = 34;
+const GRIP_H = 13;
 const GRIP_RX = 4;
 
 // Nib: triangle from bottom of grip to a point
-const NIB_PATH = 'M26 79 L74 79 L50 100 Z';
+const NIB_PATH = 'M34 78 L66 78 L50 100 Z';
 
 // Slit: center line on nib
 const SLIT_X1 = 50;

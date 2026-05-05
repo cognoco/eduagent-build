@@ -26,6 +26,7 @@ import {
 } from '../../../hooks/use-curriculum';
 import { formatApiError } from '../../../lib/format-api-error';
 import { ErrorFallback } from '../../../components/common/ErrorFallback';
+import { BookPageFlipAnimation } from '../../../components/common';
 
 const RELEVANCE_BG: Record<string, string> = {
   core: 'bg-primary/20',
@@ -390,7 +391,11 @@ export default function CurriculumScreen() {
         </View>
       ) : isLoading ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" testID="curriculum-loading" />
+          <BookPageFlipAnimation
+            size={280}
+            color={colors.accent}
+            testID="curriculum-loading"
+          />
           <Text className="text-text-secondary mt-2">
             {t('onboarding.curriculumReview.loadingCurriculum')}
           </Text>
@@ -433,7 +438,11 @@ export default function CurriculumScreen() {
           className="flex-1 items-center justify-center px-8"
           testID="curriculum-generating"
         >
-          <ActivityIndicator size="large" className="mb-4" />
+          <BookPageFlipAnimation
+            size={300}
+            color={colors.accent}
+            testID="curriculum-generating-book"
+          />
           <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
             {t('onboarding.curriculumReview.generating.title')}
           </Text>

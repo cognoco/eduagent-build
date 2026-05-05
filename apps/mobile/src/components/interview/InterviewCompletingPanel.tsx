@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { BookPageFlipAnimation } from '../common';
+import { useThemeColors } from '../../lib/theme';
 
 type CompletingTier = 'initial' | 'almost' | 'soft-fallback';
 
@@ -11,6 +13,7 @@ type CompletingTier = 'initial' | 'almost' | 'soft-fallback';
  */
 export function InterviewCompletingPanel() {
   const { t } = useTranslation();
+  const colors = useThemeColors();
   const [tier, setTier] = useState<CompletingTier>('initial');
 
   useEffect(() => {
@@ -34,7 +37,11 @@ export function InterviewCompletingPanel() {
       testID="interview-completing-panel"
       className="flex-1 items-center justify-center p-6"
     >
-      <ActivityIndicator size="large" className="mb-4" />
+      <BookPageFlipAnimation
+        size={280}
+        color={colors.accent}
+        testID="interview-completing-book"
+      />
       <Text className="text-body text-center text-text-secondary">
         {message}
       </Text>

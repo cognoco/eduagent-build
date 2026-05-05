@@ -57,7 +57,7 @@ export function CoachBand({
           <Text className="text-sm font-bold text-text-inverse">Continue</Text>
         </Pressable>
         {estimatedMinutes != null && (
-          <Text className="text-[11px] text-text-tertiary">
+          <Text className="text-[11px] text-text-secondary">
             {estimatedMinutes} min
           </Text>
         )}
@@ -70,7 +70,7 @@ export function CoachBand({
         accessibilityLabel="Dismiss recommendation"
         accessibilityRole="button"
       >
-        <Text className="text-text-tertiary text-base">×</Text>
+        <Text className="text-text-secondary text-base">×</Text>
       </Pressable>
     </View>
   );

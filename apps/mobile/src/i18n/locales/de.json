@@ -109,6 +109,7 @@
       "recommended": "Empfohlen",
       "intentHeading": "Was brauchst du gerade?",
       "askAnythingLabel": "Alles fragen",
+      "askAnythingSubtitle": "Kurze Frage, Lernidee oder etwas Verwirrendes",
       "askAnythingPlaceholder": "Alles fragen...",
       "yourSubjects": "Deine Fächer",
       "newSubject": "Neues Fach",
@@ -1274,6 +1275,12 @@
       "skipAll": "Überspringen"
     },
     "interview": {
+      "title": "{{target}} einrichten",
+      "newSubject": "dein Fach",
+      "openingWithTarget": "Hi! Ich bin dein Lernbegleiter. Zuerst muss ich ein wenig über dich und {{target}} erfahren, damit ich auf dem richtigen Niveau helfen kann, statt zu raten. Was weißt du schon? Eine grobe Antwort reicht völlig.",
+      "openingGeneric": "Hi! Ich bin dein Lernbegleiter. Zuerst muss ich ein wenig über dich erfahren, damit ich auf dem richtigen Niveau helfen kann, statt zu raten. Was weißt du schon? Eine grobe Antwort reicht völlig.",
+      "explainerTitle": "Warum frage ich zuerst?",
+      "explainerBody": "Deine Antworten helfen mir, den richtigen Startpunkt zu wählen. Nach dieser kurzen Einrichtung kann ich so erklären, üben und helfen, wie es zu dir passt.",
       "missingSubject": "Kein Fach ausgewählt. Bitte gehe zurück und versuche es erneut.",
       "sessionCreationStuck": "Sitzung dauert länger als erwartet. Bitte gehe zurück und versuche es erneut.",
       "settingUp": "Deine Sitzung wird eingerichtet...",
