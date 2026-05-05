@@ -269,7 +269,10 @@ describe('LearnerScreen', () => {
 
     await waitFor(() => screen.getByTestId('home-action-study-new'));
     fireEvent.press(screen.getByTestId('home-action-study-new'));
-    expect(mockPush).toHaveBeenCalledWith('/create-subject');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/create-subject',
+      params: HOME_RETURN_PARAMS,
+    });
   });
 
   it('navigates to freeform session on Ask anything', async () => {
