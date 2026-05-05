@@ -76,6 +76,7 @@ jest.mock('react-i18next', () => ({
         'progress.subject.openShelf': 'Open shelf',
         'progress.subject.pastConversations': 'Past conversations',
         'progress.subject.resume': 'Resume',
+        'progress.subject.chooseNext': 'Choose next',
         'progress.subject.hideSubject': 'Hide subject',
         'progress.subject.hidingSubject': 'Hiding subject...',
         'progress.subject.hideSubjectHint':
@@ -395,10 +396,10 @@ describe('ProgressSubjectScreen', () => {
       screen.getByText('45 min');
     });
 
-    it('shows "Resume", "Past conversations", and "Open shelf" buttons', () => {
+    it('shows "Choose next", "Past conversations", and "Open shelf" buttons when there is no resume target', () => {
       mockHooks();
       render(<ProgressSubjectScreen />);
-      screen.getByText('Resume');
+      screen.getByText('Choose next');
       screen.getByText('Past conversations');
       screen.getByText('Open shelf');
       screen.getByText('Hide subject');
@@ -414,13 +415,14 @@ describe('ProgressSubjectScreen', () => {
       });
     });
 
-    it('navigates to session on "Resume" press', () => {
+    it('opens the shelf on primary action press when there is no resume target', () => {
       mockHooks();
       render(<ProgressSubjectScreen />);
-      fireEvent.press(screen.getByText('Resume'));
-      expect(mockPush).toHaveBeenCalledWith(
-        '/(app)/session?mode=learning&subjectId=s1'
-      );
+      fireEvent.press(screen.getByText('Choose next'));
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/shelf/[subjectId]',
+        params: { subjectId: 's1' },
+      });
     });
 
     it('resumes the shared subject target on "Resume" press', () => {

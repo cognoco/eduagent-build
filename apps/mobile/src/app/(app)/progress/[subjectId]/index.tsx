@@ -57,6 +57,14 @@ export default function ProgressSubjectScreen(): React.ReactElement {
   const legacyProgress = subjectProgressQuery.data;
   const isLanguageSubject =
     subject?.pedagogyMode === 'four_strands' || !!languageProgress;
+  const canResumeSubject = !!resumeTargetQuery.data;
+
+  const openSubjectShelf = (targetSubjectId: string): void => {
+    router.push({
+      pathname: '/(app)/shelf/[subjectId]',
+      params: { subjectId: targetSubjectId },
+    } as never);
+  };
 
   const hideSubject = async (): Promise<void> => {
     if (!subject) return;
@@ -245,21 +253,25 @@ export default function ProgressSubjectScreen(): React.ReactElement {
           {subject ? (
             <Pressable
               onPress={() => {
-                if (resumeTargetQuery.data) {
+                if (canResumeSubject && resumeTargetQuery.data) {
                   pushLearningResumeTarget(router, resumeTargetQuery.data);
                   return;
                 }
-                router.push(
-                  `/(app)/session?mode=learning&subjectId=${subject.subjectId}` as never
-                );
+                openSubjectShelf(subject.subjectId);
               }}
               className="bg-primary rounded-button px-4 py-2 ms-2 items-center justify-center min-h-[40px]"
               accessibilityRole="button"
-              accessibilityLabel={t('progress.subject.resume')}
+              accessibilityLabel={
+                canResumeSubject
+                  ? t('progress.subject.resume')
+                  : t('progress.subject.chooseNext')
+              }
               testID="progress-subject-resume"
             >
               <Text className="text-body-sm font-semibold text-text-inverse">
-                {t('progress.subject.resume')}
+                {canResumeSubject
+                  ? t('progress.subject.resume')
+                  : t('progress.subject.chooseNext')}
               </Text>
             </Pressable>
           ) : null}
@@ -517,12 +529,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
                 </Text>
               </Pressable>
               <Pressable
-                onPress={() =>
-                  router.push({
-                    pathname: '/(app)/shelf/[subjectId]',
-                    params: { subjectId: subject.subjectId },
-                  } as never)
-                }
+                onPress={() => openSubjectShelf(subject.subjectId)}
                 className="bg-surface rounded-button px-4 py-3 items-center flex-1"
                 accessibilityRole="button"
                 accessibilityLabel={t('progress.subject.openShelf')}
