@@ -5,6 +5,13 @@ interface OnboardingStepIndicatorProps {
   totalSteps: number;
 }
 
+const DEFAULT_STEP_LABELS = [
+  'Quick chat',
+  'Make it personal',
+  'Support options',
+  'Your plan',
+];
+
 export function OnboardingStepIndicator({
   step,
   totalSteps,
@@ -13,7 +20,12 @@ export function OnboardingStepIndicator({
   const activeStep = Math.min(Math.max(step, 1), safeTotalSteps);
 
   return (
-    <View className="items-center py-3 gap-2">
+    <View
+      className="items-center py-3 gap-2"
+      accessibilityLabel={`Step ${activeStep} of ${safeTotalSteps}: ${
+        DEFAULT_STEP_LABELS[activeStep - 1] ?? 'Almost ready'
+      }`}
+    >
       <View className="flex-row gap-2">
         {Array.from({ length: safeTotalSteps }, (_, index) => {
           const stepNumber = index + 1;
@@ -30,9 +42,14 @@ export function OnboardingStepIndicator({
           );
         })}
       </View>
-      <Text className="text-xs text-muted">
-        Step {step} of {safeTotalSteps}
-      </Text>
+      <View className="items-center">
+        <Text className="text-xs text-muted">
+          Step {activeStep} of {safeTotalSteps}
+        </Text>
+        <Text className="text-body-sm font-semibold text-text-primary mt-1">
+          {DEFAULT_STEP_LABELS[activeStep - 1] ?? 'Almost ready'}
+        </Text>
+      </View>
     </View>
   );
 }

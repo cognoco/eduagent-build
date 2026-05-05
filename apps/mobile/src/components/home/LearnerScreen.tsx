@@ -38,6 +38,40 @@ const HOME_RETURN_PARAMS = { returnTo: LEARNER_HOME_RETURN_TO } as const;
 const DEFAULT_SUBJECT_ICON: React.ComponentProps<typeof Ionicons>['name'] =
   'book-outline';
 
+type HomeIntentAction = {
+  testID: string;
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  title: string;
+  subtitle: string;
+  route: '/create-subject' | '/(app)/homework/camera' | '/(app)/practice';
+  highlight?: boolean;
+};
+
+const HOME_INTENT_ACTIONS: HomeIntentAction[] = [
+  {
+    testID: 'home-action-homework',
+    icon: 'camera-outline',
+    title: 'Homework help',
+    subtitle: 'Take a photo or type the problem',
+    route: '/(app)/homework/camera',
+    highlight: true,
+  },
+  {
+    testID: 'home-action-practice',
+    icon: 'refresh-outline',
+    title: 'Practice for a test',
+    subtitle: 'Review what is fading or quiz yourself',
+    route: '/(app)/practice',
+  },
+  {
+    testID: 'home-action-study-new',
+    icon: 'book-outline',
+    title: 'Learn something new',
+    subtitle: 'Start a topic or build a subject',
+    route: '/create-subject',
+  },
+];
+
 export interface LearnerScreenProps {
   profiles: Profile[];
   activeProfile: Profile | null;
@@ -371,6 +405,10 @@ export function LearnerScreen({
   }
 
   const firstName = activeProfile?.displayName?.split(' ')[0] ?? 'there';
+  const showCoachBand =
+    FEATURE_FLAGS.COACH_BAND_ENABLED &&
+    coachBand &&
+    !coachBandDismissedRef.current;
 
   return (
     <View className="flex-1 bg-background" testID="learner-screen">
@@ -416,25 +454,108 @@ export function LearnerScreen({
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         showsVerticalScrollIndicator={false}
       >
-        {FEATURE_FLAGS.COACH_BAND_ENABLED &&
-          coachBand &&
-          !coachBandDismissedRef.current && (
+        {showCoachBand && (
+          <View>
+            <Text className="text-[11px] font-bold uppercase text-text-tertiary px-5 mt-4 mb-2">
+              Recommended
+            </Text>
             <CoachBand
               headline={coachBand.headline}
+              eyebrow="Next up"
               now={now}
               onContinue={coachBand.onContinue}
               onDismiss={dismissCoachBand}
             />
-          )}
+          </View>
+        )}
 
-        <View className="mt-1">
+        {!isParentProxy && (
+          <View className={showCoachBand ? 'mt-1' : 'mt-5'}>
+            <Text className="text-[19px] font-bold text-text-primary px-5 mb-2">
+              What do you need right now?
+            </Text>
+            <View className="px-5" style={{ gap: 10 }}>
+              {HOME_INTENT_ACTIONS.map((action) => (
+                <Pressable
+                  key={action.testID}
+                  testID={action.testID}
+                  onPress={() =>
+                    router.push({
+                      pathname: action.route,
+                      params: HOME_RETURN_PARAMS,
+                    } as never)
+                  }
+                  className={`rounded-2xl border px-4 py-4 flex-row items-center ${
+                    action.highlight
+                      ? 'bg-primary-soft border-primary/40'
+                      : 'bg-surface border-border'
+                  }`}
+                  style={{ gap: 12 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${action.title}. ${action.subtitle}`}
+                >
+                  <View className="w-11 h-11 rounded-2xl bg-surface-elevated items-center justify-center">
+                    <Ionicons
+                      name={action.icon}
+                      size={22}
+                      color={colors.primary}
+                    />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-[16px] font-bold text-text-primary">
+                      {action.title}
+                    </Text>
+                    <Text className="text-[13px] text-text-secondary mt-1">
+                      {action.subtitle}
+                    </Text>
+                  </View>
+                  <Ionicons
+                    name="chevron-forward"
+                    size={20}
+                    color={colors.textSecondary}
+                  />
+                </Pressable>
+              ))}
+            </View>
+
+            <View className="px-5 mt-3">
+              <Pressable
+                testID="home-ask-anything"
+                onPress={() =>
+                  router.push({
+                    pathname: '/(app)/session',
+                    params: { mode: 'freeform', ...HOME_RETURN_PARAMS },
+                  } as never)
+                }
+                className="rounded-2xl bg-surface border border-border pl-4 pr-1.5 py-2.5 flex-row items-center"
+                style={{ gap: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel="Ask anything"
+              >
+                <Ionicons
+                  name="chatbubble-ellipses-outline"
+                  size={14}
+                  color={colors.muted}
+                />
+                <Text className="flex-1 text-[13px] text-text-tertiary">
+                  Ask anything...
+                </Text>
+                <View className="w-8 h-8 rounded-full bg-surface-elevated items-center justify-center">
+                  <Ionicons name="mic-outline" size={14} color={colors.muted} />
+                </View>
+              </Pressable>
+            </View>
+          </View>
+        )}
+
+        <View className={!isParentProxy ? 'mt-5' : 'mt-4'}>
           {subjectCards.length > 0 ? (
             <>
-              <Text className="text-[11px] font-bold uppercase tracking-wider text-text-tertiary px-5 mb-2.5">
-                YOUR SUBJECTS
+              <Text className="text-[11px] font-bold uppercase text-text-tertiary px-5 mb-2.5">
+                Your subjects
               </Text>
               <ScrollView
                 testID="home-subject-carousel"
@@ -471,9 +592,11 @@ export function LearnerScreen({
                     }
                     className="rounded-2xl border border-dashed border-border items-center justify-center"
                     style={{ width: 96, height: 150, gap: 8 }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Add a new subject"
                   >
                     <Text className="text-[20px] text-text-tertiary opacity-70">
-                      ＋
+                      +
                     </Text>
                     <Text className="text-xs font-bold text-text-tertiary">
                       New subject
@@ -486,17 +609,20 @@ export function LearnerScreen({
             !isParentProxy && (
               <View
                 testID="home-empty-subjects"
-                className="mx-5 rounded-2xl border border-dashed border-border items-center justify-center py-10"
-                style={{ gap: 12 }}
+                className="mx-5 rounded-2xl border border-dashed border-border items-center justify-center py-7"
+                style={{ gap: 10 }}
               >
                 <Ionicons
                   name="book-outline"
-                  size={32}
+                  size={30}
                   color={colors.textSecondary}
                   style={{ opacity: 0.6 }}
                 />
-                <Text className="text-sm text-text-secondary text-center px-6">
-                  Pick a subject to start learning
+                <Text className="text-sm font-semibold text-text-primary text-center px-6">
+                  Your subjects will show up here
+                </Text>
+                <Text className="text-[13px] text-text-secondary text-center px-6">
+                  Start one now, or just use homework help when you need it.
                 </Text>
                 <Pressable
                   testID="home-add-first-subject"
@@ -507,6 +633,8 @@ export function LearnerScreen({
                     } as never)
                   }
                   className="bg-primary rounded-xl px-5 py-2.5 mt-1"
+                  accessibilityRole="button"
+                  accessibilityLabel="Add a subject"
                 >
                   <Text className="text-sm font-bold text-text-inverse">
                     Add a subject
@@ -516,81 +644,6 @@ export function LearnerScreen({
             )
           )}
         </View>
-
-        {!isParentProxy && (
-          <Pressable
-            testID="home-ask-anything"
-            onPress={() =>
-              router.push({
-                pathname: '/(app)/session',
-                params: { mode: 'freeform', ...HOME_RETURN_PARAMS },
-              } as never)
-            }
-            className="mx-5 mt-3 mb-1.5 rounded-2xl bg-surface border border-border pl-4 pr-1.5 py-2.5 flex-row items-center"
-            style={{ gap: 8 }}
-          >
-            <Ionicons
-              name="chatbubble-ellipses-outline"
-              size={14}
-              color={colors.muted}
-            />
-            <Text className="flex-1 text-[13px] text-text-tertiary">
-              Ask anything…
-            </Text>
-            <View className="w-8 h-8 rounded-full bg-surface-elevated items-center justify-center">
-              <Ionicons name="mic-outline" size={14} color={colors.muted} />
-            </View>
-          </Pressable>
-        )}
-
-        {!isParentProxy && (
-          <View className="flex-row px-5 pt-1.5 pb-3" style={{ gap: 8 }}>
-            {(
-              [
-                {
-                  testID: 'home-action-study-new',
-                  icon: 'book-outline' as const,
-                  label: 'Study new',
-                  route: '/create-subject',
-                },
-                {
-                  testID: 'home-action-homework',
-                  icon: 'camera-outline' as const,
-                  label: 'Homework',
-                  route: '/(app)/homework/camera',
-                },
-                {
-                  testID: 'home-action-practice',
-                  icon: 'game-controller-outline' as const,
-                  label: 'Practice',
-                  route: '/(app)/practice',
-                },
-              ] as const
-            ).map((action) => (
-              <Pressable
-                key={action.testID}
-                testID={action.testID}
-                onPress={() =>
-                  router.push({
-                    pathname: action.route,
-                    params: HOME_RETURN_PARAMS,
-                  } as never)
-                }
-                className="flex-1 bg-surface border border-border rounded-[14px] py-3 items-center"
-                style={{ gap: 4 }}
-              >
-                <Ionicons
-                  name={action.icon}
-                  size={20}
-                  color={colors.textSecondary}
-                />
-                <Text className="text-[11px] font-bold text-text-secondary">
-                  {action.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        )}
 
         {isParentProxy && (
           <View testID="intent-proxy-placeholder" className="px-5 mt-4">

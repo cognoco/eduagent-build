@@ -169,18 +169,24 @@ describe('LearnerScreen', () => {
     render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
 
     await waitFor(() => {
+      screen.getByText('What do you need right now?');
+      screen.getByText('Homework help');
+      screen.getByText('Take a photo or type the problem');
+      screen.getByText('Practice for a test');
+      screen.getByText('Review what is fading or quiz yourself');
+      screen.getByText('Learn something new');
       screen.getByTestId('home-empty-subjects');
       screen.getByTestId('home-add-first-subject');
       screen.getByTestId('home-ask-anything');
       screen.getByTestId('home-action-study-new');
       screen.getByTestId('home-action-homework');
       screen.getByTestId('home-action-practice');
-      screen.getByText('Pick a subject to start learning');
+      screen.getByText('Your subjects will show up here');
       expect(screen.queryByTestId('home-subject-carousel')).toBeNull();
     });
   });
 
-  it('shows action grid when subjects exist', async () => {
+  it('shows task-first intent choices when subjects exist', async () => {
     mockFetch.setRoute('/subjects', {
       subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
     });
@@ -188,6 +194,7 @@ describe('LearnerScreen', () => {
     render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
 
     await waitFor(() => {
+      screen.getByText('What do you need right now?');
       screen.getByTestId('home-subject-carousel');
       screen.getByTestId('home-ask-anything');
       screen.getByTestId('home-action-study-new');
@@ -554,6 +561,7 @@ describe('LearnerScreen', () => {
     await waitFor(() => {
       screen.getByTestId('home-empty-subjects');
       screen.getByTestId('home-add-first-subject');
+      screen.getByText('Your subjects will show up here');
       screen.getByText('Add a subject');
     });
   });

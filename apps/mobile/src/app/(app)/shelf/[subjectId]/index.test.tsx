@@ -1,7 +1,10 @@
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { RoutedMockFetch } from '../../../../test-utils/mock-api-routes';
+import {
+  fetchCallsMatching,
+  type RoutedMockFetch,
+} from '../../../../test-utils/mock-api-routes';
 import ShelfScreen from './index';
 
 jest.mock(
@@ -442,7 +445,31 @@ describe('ShelfScreen', () => {
     await waitFor(() => {
       getByTestId('shelf-empty');
     });
-    getByText('No books on this shelf yet.');
+    getByText('This shelf is still getting ready');
+    getByTestId('shelf-empty-retry');
+    getByTestId('shelf-empty-back');
+  });
+
+  it('empty state retry reloads shelf data', async () => {
+    mockFetch.setRoute('/subjects/sub-1/books', { books: [] });
+
+    const { getByTestId } = render(<ShelfScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      getByTestId('shelf-empty-retry');
+    });
+    const callsBeforeRetry = fetchCallsMatching(
+      mockFetch,
+      '/subjects/sub-1/books'
+    ).length;
+
+    fireEvent.press(getByTestId('shelf-empty-retry'));
+
+    await waitFor(() => {
+      expect(
+        fetchCallsMatching(mockFetch, '/subjects/sub-1/books').length
+      ).toBeGreaterThan(callsBeforeRetry);
+    });
   });
 
   it('empty state back button returns to library', async () => {

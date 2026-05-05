@@ -1170,7 +1170,7 @@ export default function BookScreen() {
                 />
               </View>
               <Text className="mt-1 text-caption text-text-secondary">
-                {doneTopics.length} of {activeTopics.length} topics done
+                {doneTopics.length} of {activeTopics.length} topics finished
               </Text>
             </View>
           ) : null}
@@ -1321,21 +1321,20 @@ export default function BookScreen() {
         {topics.length === 0 && book?.topicsGenerated && !needsGeneration ? (
           <View className="px-5 py-8" testID="topics-empty-state">
             <Text className="mb-2 text-center text-h3 font-semibold text-text-primary">
-              No topics yet
+              This book is not ready yet
             </Text>
             <Text className="mb-4 text-center text-body-sm text-text-secondary">
-              This book doesn't have any learning topics. Build a learning path
-              to get started.
+              Set up the topics first. Then you can start learning step by step.
             </Text>
             <Pressable
               onPress={handleBuildLearningPath}
               className="min-h-[48px] self-center items-center justify-center rounded-button bg-primary px-5 py-3"
               testID="topics-empty-build"
               accessibilityRole="button"
-              accessibilityLabel="Build a learning path"
+              accessibilityLabel="Set up this book"
             >
               <Text className="text-body font-semibold text-text-inverse">
-                Build learning path
+                Set up this book
               </Text>
             </Pressable>
           </View>
@@ -1390,7 +1389,7 @@ export default function BookScreen() {
                 Nothing to show yet.
               </Text>
               <Text className="mb-3 text-body-sm text-text-secondary">
-                Start your first session to see your progress here.
+                Start your first lesson to see your progress here.
               </Text>
               <Pressable
                 onPress={() => {
@@ -1405,10 +1404,10 @@ export default function BookScreen() {
                 className="min-h-[48px] flex-row items-center justify-center rounded-button bg-primary px-5 py-3"
                 testID="fallback-start"
                 accessibilityRole="button"
-                accessibilityLabel="Start first session"
+                accessibilityLabel="Start first lesson"
               >
                 <Text className="text-body font-semibold text-text-inverse">
-                  ▶ Start first session
+                  ▶ Start first lesson
                 </Text>
               </Pressable>
             </View>
@@ -1434,11 +1433,12 @@ export default function BookScreen() {
                 🎉
               </Text>
               <Text className="mb-1 text-h3 font-bold text-text-primary">
-                Book complete
+                You finished this book
               </Text>
               <Text className="mb-4 text-body-sm text-text-secondary">
                 You've studied all {activeTopics.length} topics in this book.
-                Keep them fresh with review, or move on to the next book.
+                Review them to keep them fresh, or go back and choose what to
+                learn next.
               </Text>
 
               <Pressable
@@ -1458,10 +1458,10 @@ export default function BookScreen() {
                 className="items-center py-2"
                 testID="book-complete-next"
                 accessibilityRole="button"
-                accessibilityLabel="Back to shelf to pick next book"
+                accessibilityLabel="Back to subject to pick what to learn next"
               >
                 <Text className="text-body-sm font-semibold text-primary">
-                  Back to shelf →
+                  Back to subject →
                 </Text>
               </Pressable>
             </View>
@@ -1636,10 +1636,10 @@ export default function BookScreen() {
                     className="mt-2 items-center py-2"
                     testID="book-build-path-link"
                     accessibilityRole="button"
-                    accessibilityLabel="Build a learning path"
+                    accessibilityLabel="Set up this book"
                   >
                     <Text className="text-body-sm text-text-secondary underline">
-                      Build a learning path
+                      Set up this book
                     </Text>
                   </Pressable>
                 ) : null}
