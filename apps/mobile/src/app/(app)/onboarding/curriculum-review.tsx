@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../../lib/theme';
 import { goBackOrReplace } from '../../../lib/navigation';
+import { getOnboardingStepLabels } from '../../../lib/onboarding-step-labels';
 import { platformAlert } from '../../../lib/platform-alert';
 import { OnboardingStepIndicator } from '../../../components/onboarding/OnboardingStepIndicator';
 import {
@@ -25,6 +26,7 @@ import {
 } from '../../../hooks/use-curriculum';
 import { formatApiError } from '../../../lib/format-api-error';
 import { ErrorFallback } from '../../../components/common/ErrorFallback';
+import { BookPageFlipAnimation } from '../../../components/common';
 
 const RELEVANCE_BG: Record<string, string> = {
   core: 'bg-primary/20',
@@ -76,6 +78,7 @@ export default function CurriculumScreen() {
   const colors = useThemeColors();
   const step = Number(stepParam) || 4;
   const totalSteps = Number(totalStepsParam) || 4;
+  const stepLabels = getOnboardingStepLabels(t);
 
   // [BUG-956] Poll while curriculum is null (Inngest generation in-flight).
   // Stop polling once data arrives or after the 90s timeout.
@@ -340,7 +343,11 @@ export default function CurriculumScreen() {
             </Text>
           </Pressable>
         </View>
-        <OnboardingStepIndicator step={step} totalSteps={totalSteps} />
+        <OnboardingStepIndicator
+          step={step}
+          totalSteps={totalSteps}
+          stepLabels={stepLabels}
+        />
       </View>
 
       {isLoading && loadingTimedOut ? (
@@ -384,7 +391,11 @@ export default function CurriculumScreen() {
         </View>
       ) : isLoading ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" testID="curriculum-loading" />
+          <BookPageFlipAnimation
+            size={280}
+            color={colors.accent}
+            testID="curriculum-loading"
+          />
           <Text className="text-text-secondary mt-2">
             {t('onboarding.curriculumReview.loadingCurriculum')}
           </Text>
@@ -427,7 +438,11 @@ export default function CurriculumScreen() {
           className="flex-1 items-center justify-center px-8"
           testID="curriculum-generating"
         >
-          <ActivityIndicator size="large" className="mb-4" />
+          <BookPageFlipAnimation
+            size={300}
+            color={colors.accent}
+            testID="curriculum-generating-book"
+          />
           <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
             {t('onboarding.curriculumReview.generating.title')}
           </Text>

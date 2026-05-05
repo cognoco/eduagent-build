@@ -16,15 +16,9 @@ const mockPush = jest.fn();
 const mockUseSubjects = jest.fn();
 const mockUseOverallProgress = jest.fn();
 const mockUseAllBooks = jest.fn();
-const mockUseNoteTopicIds = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush, replace: jest.fn() }),
-  useFocusEffect: (cb: () => void) => {
-    // Execute focus effect synchronously in tests so expansion state is set
-    const React = require('react');
-    React.useEffect(cb, []);
-  },
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -42,10 +36,6 @@ jest.mock('../../hooks/use-progress', () => ({
 
 jest.mock('../../hooks/use-all-books', () => ({
   useAllBooks: () => mockUseAllBooks(),
-}));
-
-jest.mock('../../hooks/use-notes', () => ({
-  useNoteTopicIds: () => mockUseNoteTopicIds(),
 }));
 
 jest.mock('../../components/progress', () => ({
@@ -145,38 +135,22 @@ jest.mock('../../components/library/ShelfRow', () => ({
   ShelfRow: ({
     subjectId,
     name,
-    expanded,
-    books,
-    onToggle,
-    onBookPress,
+    onPress,
   }: {
     subjectId: string;
     name: string;
-    expanded: boolean;
-    books: Array<{ bookId: string; title: string }>;
-    onToggle: (id: string) => void;
-    onBookPress: (subjectId: string, bookId: string) => void;
+    onPress: (id: string) => void;
   }) => {
     const { View, Text, Pressable } = require('react-native');
     return (
       <View>
         <Pressable
           testID={`shelf-row-header-${subjectId}`}
-          onPress={() => onToggle(subjectId)}
+          onPress={() => onPress(subjectId)}
           accessibilityRole="button"
         >
           <Text>{name}</Text>
         </Pressable>
-        {expanded &&
-          books.map((book) => (
-            <Pressable
-              key={book.bookId}
-              testID={`book-row-${book.bookId}`}
-              onPress={() => onBookPress(subjectId, book.bookId)}
-            >
-              <Text>{book.title}</Text>
-            </Pressable>
-          ))}
       </View>
     );
   },
@@ -264,10 +238,6 @@ describe('LibraryScreen', () => {
       isLoading: false,
       isError: false,
       refetch: jest.fn(),
-    });
-    mockUseNoteTopicIds.mockReturnValue({
-      data: { topicIds: [] },
-      isLoading: false,
     });
   });
 
@@ -390,7 +360,7 @@ describe('LibraryScreen', () => {
 
     // New library v3 design: empty state uses library-empty testID
     screen.getByTestId('library-empty');
-    screen.getByText('Your library is empty');
+    screen.getByText('Your library will grow as you learn');
   });
 
   it('renders shelf rows for each subject', () => {
@@ -425,9 +395,9 @@ describe('LibraryScreen', () => {
     screen.getByText('History');
   });
 
-  it('has no top-level tabs — library uses expandable shelf layout', () => {
-    // Library v3 redesign replaced Shelves/Books/Topics tabs with a single
-    // expandable shelf list. There are no tab controls at the library level.
+  it('has no top-level tabs — library opens subject shelves as the next level', () => {
+    // Library v3 redesign replaced Shelves/Books/Topics tabs with a subject
+    // shelf list. There are no tab controls at the library level.
     mockUseSubjects.mockReturnValue({
       data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
       isLoading: false,
@@ -442,15 +412,13 @@ describe('LibraryScreen', () => {
     expect(screen.queryByTestId('library-tab-shelves')).toBeNull();
     expect(screen.queryByTestId('library-tab-books')).toBeNull();
     expect(screen.queryByTestId('library-tab-topics')).toBeNull();
-    // Instead, the shelf list is the root navigation
+    // Instead, the subject shelf list is the root navigation.
     screen.getByTestId('shelves-list');
   });
 
-  it('navigates to book screen when a book row inside an expanded shelf is pressed', () => {
-    // Library v3: books are accessed by expanding a shelf row, not via a
-    // separate Books tab. Single deep push: shelf/[subjectId]/_layout exports
-    // unstable_settings.initialRouteName = 'index', which seeds the stack so
-    // router.back() from the book screen returns to the shelf index.
+  it('opens the subject shelf when a subject row is pressed', () => {
+    // Library is subject-first: books and suggestions live on the subject
+    // shelf screen instead of expanding inline inside the Library list.
     mockUseSubjects.mockReturnValue({
       data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
       isLoading: false,
@@ -459,50 +427,15 @@ describe('LibraryScreen', () => {
       data: { subjects: [] },
       isLoading: false,
     });
-    mockUseAllBooks.mockReturnValue({
-      books: [
-        {
-          book: {
-            id: 'book-1',
-            subjectId: 'sub-1',
-            title: 'Algebra',
-            description: null,
-            emoji: '📐',
-            sortOrder: 1,
-            topicsGenerated: true,
-            createdAt: '2026-01-01T00:00:00Z',
-            updatedAt: '2026-01-01T00:00:00Z',
-          },
-          subjectId: 'sub-1',
-          subjectName: 'Math',
-          topicCount: 5,
-          completedCount: 2,
-          status: 'IN_PROGRESS',
-        },
-      ],
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
-    });
 
     render(<LibraryScreen />, { wrapper: TestWrapper });
 
-    // The focus effect expands the first active subject automatically.
-    // The ShelfRow mock renders book-row-book-1 when expanded=true.
-    fireEvent.press(screen.getByTestId('book-row-book-1'));
+    fireEvent.press(screen.getByTestId('shelf-row-header-sub-1'));
 
-    // [CLAUDE.md cross-tab nav] Two-push pattern: parent shelf first,
-    // then book child. unstable_settings only seeds one level deep, so
-    // explicit ancestor push keeps router.back() landing on the shelf
-    // index rather than the Tabs root.
-    expect(mockPush).toHaveBeenCalledTimes(2);
-    expect(mockPush).toHaveBeenNthCalledWith(1, {
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/shelf/[subjectId]',
       params: { subjectId: 'sub-1' },
-    });
-    expect(mockPush).toHaveBeenNthCalledWith(2, {
-      pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
-      params: { subjectId: 'sub-1', bookId: 'book-1' },
     });
   });
 

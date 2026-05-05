@@ -4,6 +4,27 @@ import { MagicPenAnimation } from './MagicPenAnimation';
 // Note: react-native-reanimated and react-native-svg are mocked globally in
 // test-setup.ts. useReducedMotion defaults to () => false there.
 
+type JsonTree = ReturnType<ReturnType<typeof render>['toJSON']>;
+
+function hasNodeWithProps(
+  node: JsonTree,
+  expected: Record<string, unknown>
+): boolean {
+  if (!node || typeof node !== 'object') return false;
+  if ('props' in node) {
+    const matches = Object.entries(expected).every(
+      ([key, value]) => node.props?.[key] === value
+    );
+    if (matches) return true;
+  }
+  if ('children' in node && Array.isArray(node.children)) {
+    return node.children.some((child: unknown) =>
+      hasNodeWithProps(child as JsonTree, expected)
+    );
+  }
+  return false;
+}
+
 describe('MagicPenAnimation', () => {
   it('renders without crashing at default size', () => {
     const { getByTestId } = render(<MagicPenAnimation testID="pen" />);
@@ -37,6 +58,17 @@ describe('MagicPenAnimation', () => {
     expect(() => {
       render(<MagicPenAnimation testID="pen" color="#ff0000" />);
     }).not.toThrow();
+  });
+
+  it('renders the pen with distinct cap, clip, and metal nib colors', () => {
+    const { toJSON } = render(
+      <MagicPenAnimation testID="pen" color="#2dd4bf" />
+    );
+    const tree = toJSON();
+    expect(hasNodeWithProps(tree, { fill: '#0f766e' })).toBe(true);
+    expect(hasNodeWithProps(tree, { stroke: '#ccfbf1' })).toBe(true);
+    expect(hasNodeWithProps(tree, { fill: '#f8fafc' })).toBe(true);
+    expect(hasNodeWithProps(tree, { fill: '#dbeafe' })).toBe(true);
   });
 
   it('uses default props when none provided', () => {

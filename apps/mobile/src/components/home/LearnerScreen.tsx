@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import type { Profile } from '@eduagent/schemas';
 import { BookPageFlipAnimation, ProfileSwitcher } from '../common';
 import {
@@ -17,6 +18,7 @@ import {
 import { useSubjects } from '../../hooks/use-subjects';
 import { getGreeting } from '../../lib/greeting';
 import {
+  LEARNER_HOME_HREF,
   LEARNER_HOME_RETURN_TO,
   pushLearningResumeTarget,
 } from '../../lib/navigation';
@@ -39,6 +41,51 @@ const CREATE_SUBJECT_FROM_HOME_HREF = '/create-subject' as const;
 const DEFAULT_SUBJECT_ICON: React.ComponentProps<typeof Ionicons>['name'] =
   'book-outline';
 
+type HomeIntentAction = {
+  testID: string;
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  titleKey: string;
+  subtitleKey: string;
+  route:
+    | '/create-subject'
+    | '/(app)/homework/camera'
+    | '/(app)/practice'
+    | '/(app)/session';
+  highlight?: boolean;
+};
+
+const HOME_INTENT_ACTIONS: HomeIntentAction[] = [
+  {
+    testID: 'home-action-homework',
+    icon: 'camera-outline',
+    titleKey: 'home.learner.intentActions.homework.title',
+    subtitleKey: 'home.learner.intentActions.homework.subtitle',
+    route: '/(app)/homework/camera',
+    highlight: true,
+  },
+  {
+    testID: 'home-ask-anything',
+    icon: 'chatbubble-ellipses-outline',
+    titleKey: 'home.learner.askAnythingLabel',
+    subtitleKey: 'home.learner.askAnythingSubtitle',
+    route: '/(app)/session',
+  },
+  {
+    testID: 'home-action-practice',
+    icon: 'refresh-outline',
+    titleKey: 'home.learner.intentActions.practice.title',
+    subtitleKey: 'home.learner.intentActions.practice.subtitle',
+    route: '/(app)/practice',
+  },
+  {
+    testID: 'home-action-study-new',
+    icon: 'book-outline',
+    titleKey: 'home.learner.intentActions.studyNew.title',
+    subtitleKey: 'home.learner.intentActions.studyNew.subtitle',
+    route: '/create-subject',
+  },
+];
+
 export interface LearnerScreenProps {
   profiles: Profile[];
   activeProfile: Profile | null;
@@ -56,6 +103,7 @@ export function LearnerScreen({
   onBack,
   now,
 }: LearnerScreenProps): React.ReactElement {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const { colorScheme } = useTheme();
@@ -74,12 +122,10 @@ export function LearnerScreen({
     activeProfile && !activeProfile.isOwner && profiles.some((p) => p.isOwner)
   );
 
-  const coachBandDismissedRef = useRef(false);
-  const [, forceUpdate] = useState(0);
+  const [coachBandDismissed, setCoachBandDismissed] = useState(false);
 
   const dismissCoachBand = useCallback(() => {
-    coachBandDismissedRef.current = true;
-    forceUpdate((n) => n + 1);
+    setCoachBandDismissed(true);
   }, []);
 
   const [loadingTimedOut, setLoadingTimedOut] = useState(false);
@@ -191,8 +237,6 @@ export function LearnerScreen({
           recoveryMarker.subjectName ??
           'your session'
         }.`,
-        isQuizDriven: false,
-        quizActivityType: undefined as string | undefined,
         onContinue: () => {
           void clearSessionRecoveryMarker(activeProfile?.id).catch((err) =>
             console.error(
@@ -229,8 +273,6 @@ export function LearnerScreen({
         headline: `Pick up where you left off in ${
           resumeTarget.topicTitle ?? resumeTarget.subjectName
         }.`,
-        isQuizDriven: false,
-        quizActivityType: undefined as string | undefined,
         onContinue: () =>
           pushLearningResumeTarget(
             router,
@@ -248,8 +290,6 @@ export function LearnerScreen({
       const topic = reviewSummary.nextReviewTopic;
       return {
         headline: `Revisit ${topic.topicTitle} — it's starting to fade.`,
-        isQuizDriven: false,
-        quizActivityType: undefined as string | undefined,
         onContinue: () =>
           router.push({
             pathname: '/(app)/topic/relearn',
@@ -261,8 +301,6 @@ export function LearnerScreen({
     if (quizDiscovery && dismissedQuizDiscoveryId !== quizDiscovery.id) {
       return {
         headline: quizDiscovery.title,
-        isQuizDriven: true,
-        quizActivityType: quizDiscovery.activityType as string | undefined,
         onContinue: () => {
           markQuizDiscoveryHandled();
           router.push({
@@ -287,6 +325,25 @@ export function LearnerScreen({
     resumeTarget,
     reviewSummary,
   ]);
+
+  const openIntentAction = useCallback(
+    (route: HomeIntentAction['route']): void => {
+      if (route === '/(app)/homework/camera') {
+        // Seed the back stack before the nested camera route. There is no
+        // homework index screen, so Home is the clear return target.
+        router.push(LEARNER_HOME_HREF as never);
+      }
+
+      router.push({
+        pathname: route,
+        params:
+          route === '/(app)/session'
+            ? { mode: 'freeform', ...HOME_RETURN_PARAMS }
+            : HOME_RETURN_PARAMS,
+      } as never);
+    },
+    []
+  );
 
   if (isLoading) {
     return (
@@ -372,6 +429,8 @@ export function LearnerScreen({
   }
 
   const firstName = activeProfile?.displayName?.split(' ')[0] ?? 'there';
+  const showCoachBand =
+    FEATURE_FLAGS.COACH_BAND_ENABLED && coachBand && !coachBandDismissed;
 
   return (
     <View className="flex-1 bg-background" testID="learner-screen">
@@ -400,10 +459,10 @@ export function LearnerScreen({
             </Pressable>
           ) : null}
           <View className="flex-1">
-            <Text className="text-[22px] font-bold text-text-primary leading-tight">
+            <Text className="text-h2 font-bold text-text-primary leading-tight">
               Hey {firstName}!
             </Text>
-            <Text className="text-[13px] text-text-secondary mt-0.5">
+            <Text className="text-body-sm text-text-secondary mt-0.5">
               {subtitle}
             </Text>
           </View>
@@ -417,25 +476,79 @@ export function LearnerScreen({
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         showsVerticalScrollIndicator={false}
       >
-        {FEATURE_FLAGS.COACH_BAND_ENABLED &&
-          coachBand &&
-          !coachBandDismissedRef.current && (
+        {showCoachBand && (
+          <View>
+            <Text className="text-caption font-bold uppercase text-text-secondary px-5 mt-4 mb-2">
+              {t('home.learner.recommended')}
+            </Text>
             <CoachBand
               headline={coachBand.headline}
               now={now}
               onContinue={coachBand.onContinue}
               onDismiss={dismissCoachBand}
             />
-          )}
+          </View>
+        )}
 
-        <View className="mt-1">
+        {!isParentProxy && (
+          <View className={showCoachBand ? 'mt-1' : 'mt-5'}>
+            <Text className="text-h3 font-bold text-text-primary px-5 mb-2">
+              {t('home.learner.intentHeading')}
+            </Text>
+            <View className="px-5" style={{ gap: 10 }}>
+              {HOME_INTENT_ACTIONS.map((action) => {
+                const title = t(action.titleKey);
+                const subtitle = t(action.subtitleKey);
+
+                return (
+                  <Pressable
+                    key={action.testID}
+                    testID={action.testID}
+                    onPress={() => openIntentAction(action.route)}
+                    className={`rounded-2xl border px-4 py-4 flex-row items-center ${
+                      action.highlight
+                        ? 'bg-primary-soft border-primary/40'
+                        : 'bg-surface border-border'
+                    }`}
+                    style={{ gap: 12 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${title}. ${subtitle}`}
+                  >
+                    <View className="w-11 h-11 rounded-2xl bg-surface-elevated items-center justify-center">
+                      <Ionicons
+                        name={action.icon}
+                        size={22}
+                        color={colors.primary}
+                      />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-body font-bold text-text-primary">
+                        {title}
+                      </Text>
+                      <Text className="text-body-sm text-text-secondary mt-1">
+                        {subtitle}
+                      </Text>
+                    </View>
+                    <Ionicons
+                      name="chevron-forward"
+                      size={20}
+                      color={colors.textSecondary}
+                    />
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
+        <View className={!isParentProxy ? 'mt-5' : 'mt-4'}>
           {subjectCards.length > 0 ? (
             <>
-              <Text className="text-[11px] font-bold uppercase tracking-wider text-text-tertiary px-5 mb-2.5">
-                YOUR SUBJECTS
+              <Text className="text-caption font-bold uppercase text-text-secondary px-5 mb-2.5">
+                {t('home.learner.yourSubjects')}
               </Text>
               <ScrollView
                 testID="home-subject-carousel"
@@ -469,12 +582,12 @@ export function LearnerScreen({
                     }
                     className="rounded-2xl border border-dashed border-border items-center justify-center"
                     style={{ width: 96, height: 150, gap: 8 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('home.learner.newSubject')}
                   >
-                    <Text className="text-[20px] text-text-tertiary opacity-70">
-                      ＋
-                    </Text>
-                    <Text className="text-xs font-bold text-text-tertiary">
-                      New subject
+                    <Text className="text-h3 text-primary opacity-80">+</Text>
+                    <Text className="text-caption font-bold text-text-primary">
+                      {t('home.learner.newSubject')}
                     </Text>
                   </Pressable>
                 )}
@@ -484,17 +597,20 @@ export function LearnerScreen({
             !isParentProxy && (
               <View
                 testID="home-empty-subjects"
-                className="mx-5 rounded-2xl border border-dashed border-border items-center justify-center py-10"
-                style={{ gap: 12 }}
+                className="mx-5 rounded-2xl border border-dashed border-border items-center justify-center py-7"
+                style={{ gap: 10 }}
               >
                 <Ionicons
                   name="book-outline"
-                  size={32}
+                  size={30}
                   color={colors.textSecondary}
                   style={{ opacity: 0.6 }}
                 />
-                <Text className="text-sm text-text-secondary text-center px-6">
-                  Pick a subject to start learning
+                <Text className="text-body-sm font-semibold text-text-primary text-center px-6">
+                  {t('home.learner.emptySubjectsTitle')}
+                </Text>
+                <Text className="text-body-sm text-text-secondary text-center px-6">
+                  {t('home.learner.emptySubjectsMessage')}
                 </Text>
                 <Pressable
                   testID="home-add-first-subject"
@@ -502,92 +618,17 @@ export function LearnerScreen({
                     router.push(CREATE_SUBJECT_FROM_HOME_HREF as never)
                   }
                   className="bg-primary rounded-xl px-5 py-2.5 mt-1"
+                  accessibilityRole="button"
+                  accessibilityLabel={t('home.learner.addSubject')}
                 >
-                  <Text className="text-sm font-bold text-text-inverse">
-                    Add a subject
+                  <Text className="text-body-sm font-bold text-text-inverse">
+                    {t('home.learner.addSubject')}
                   </Text>
                 </Pressable>
               </View>
             )
           )}
         </View>
-
-        {!isParentProxy && (
-          <Pressable
-            testID="home-ask-anything"
-            onPress={() =>
-              router.push({
-                pathname: '/(app)/session',
-                params: { mode: 'freeform', ...HOME_RETURN_PARAMS },
-              } as never)
-            }
-            className="mx-5 mt-3 mb-1.5 rounded-2xl bg-surface border border-border pl-4 pr-1.5 py-2.5 flex-row items-center"
-            style={{ gap: 8 }}
-          >
-            <Ionicons
-              name="chatbubble-ellipses-outline"
-              size={14}
-              color={colors.muted}
-            />
-            <Text className="flex-1 text-[13px] text-text-tertiary">
-              Ask anything…
-            </Text>
-            <View className="w-8 h-8 rounded-full bg-surface-elevated items-center justify-center">
-              <Ionicons name="mic-outline" size={14} color={colors.muted} />
-            </View>
-          </Pressable>
-        )}
-
-        {!isParentProxy && (
-          <View className="flex-row px-5 pt-1.5 pb-3" style={{ gap: 8 }}>
-            {(
-              [
-                {
-                  testID: 'home-action-study-new',
-                  icon: 'book-outline' as const,
-                  label: 'Study new',
-                  href: CREATE_SUBJECT_FROM_HOME_HREF,
-                },
-                {
-                  testID: 'home-action-homework',
-                  icon: 'camera-outline' as const,
-                  label: 'Homework',
-                  route: '/(app)/homework/camera',
-                },
-                {
-                  testID: 'home-action-practice',
-                  icon: 'game-controller-outline' as const,
-                  label: 'Practice',
-                  route: '/(app)/practice',
-                },
-              ] as const
-            ).map((action) => (
-              <Pressable
-                key={action.testID}
-                testID={action.testID}
-                onPress={() =>
-                  'href' in action
-                    ? router.push(action.href as never)
-                    : router.push({
-                        pathname: action.route,
-                        params: HOME_RETURN_PARAMS,
-                      } as never)
-                }
-                className="flex-1 bg-surface border border-border rounded-[14px] py-3 items-center"
-                style={{ gap: 4 }}
-              >
-                <Ionicons
-                  name={action.icon}
-                  size={20}
-                  color={colors.textSecondary}
-                />
-                <Text className="text-[11px] font-bold text-text-secondary">
-                  {action.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        )}
 
         {isParentProxy && (
           <View testID="intent-proxy-placeholder" className="px-5 mt-4">

@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { ComponentProps, ComponentType, ReactNode } from 'react';
-import { View } from 'react-native';
+import { Animated as RNAnimated, Easing as RNEasing, View } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -14,7 +14,7 @@ import Animated, {
   Easing,
   type AnimatedProps,
 } from 'react-native-reanimated';
-import Svg, { Path, Rect, Line, Circle } from 'react-native-svg';
+import Svg, { Path, Rect, Line, Circle, Polygon } from 'react-native-svg';
 
 // ---------------------------------------------------------------------------
 // Fabric-safe animated component setup
@@ -25,13 +25,11 @@ type AnimatedPathComponent = ComponentType<
   AnimatedProps<ComponentProps<typeof Path>>
 >;
 let AnimatedPath: AnimatedPathComponent;
-let _penAnimationAvailable = true;
 try {
   AnimatedPath = Animated.createAnimatedComponent(
     Path
   ) as AnimatedPathComponent;
 } catch {
-  _penAnimationAvailable = false;
   AnimatedPath = Path as unknown as AnimatedPathComponent;
 }
 
@@ -47,37 +45,39 @@ interface MagicPenAnimationProps {
 }
 
 // ---------------------------------------------------------------------------
-// Pen SVG — viewBox 0 0 100 100, angled at 45°
+// Pen SVG — viewBox 0 0 100 100, animated at a writing angle.
 //
 // The pen is intentionally large within its viewBox so it stays legible at
 // the smallest render size (48px → penSize ≈ 30px).
 //
-// Anatomy (drawn pointing upper-left → lower-right at 45°, but the SVG is
-// drawn upright and rotated by the parent Animated.View):
+// Anatomy: the SVG is drawn upright and rotated by the parent Animated.View.
 //
-//   Barrel:  rounded-rect, fills most of the viewBox width
-//   Grip:    slightly narrower rect below barrel (slightly darker shade)
-//   Nib:     triangle below grip
+//   Barrel:  slim rounded-rect, pencil-like rather than marker-like
+//   Grip:    narrower band below barrel
+//   Nib:     fine triangle below grip
 //   Slit:    thin line down the center of the nib
 // ---------------------------------------------------------------------------
 
 // All coordinates are in the 100×100 pen viewBox.
-// Barrel: wide, centre-heavy rectangle
-const BARREL_X = 20;
-const BARREL_Y = 5;
-const BARREL_W = 60;
-const BARREL_H = 58;
-const BARREL_RX = 8;
+// Barrel: intentionally slim so the idle ornament reads as a pen, not a marker.
+const BARREL_X = 40;
+const BARREL_Y = 6;
+const BARREL_W = 20;
+const BARREL_H = 62;
+const BARREL_RX = 5;
 
-// Grip: slightly narrower, sits directly below barrel
-const GRIP_X = 26;
-const GRIP_Y = 63;
-const GRIP_W = 48;
-const GRIP_H = 16;
+// Grip: a separate second-color band below the barrel.
+const GRIP_X = 35;
+const GRIP_Y = 67;
+const GRIP_W = 30;
+const GRIP_H = 14;
 const GRIP_RX = 4;
 
-// Nib: triangle from bottom of grip to a point
-const NIB_PATH = 'M26 79 L74 79 L50 100 Z';
+// Nib: longer metal fountain-pen point, split into two tones.
+const NIB_PATH = 'M36 81 L64 81 L50 100 Z';
+const NIB_LEFT_PATH = 'M36 81 L50 81 L50 100 Z';
+const NIB_RIGHT_PATH = 'M50 81 L64 81 L50 100 Z';
+const NIB_SHOULDER_PATH = 'M39 81 L61 81 L58 86 L42 86 Z';
 
 // Slit: center line on nib
 const SLIT_X1 = 50;
@@ -90,19 +90,18 @@ const SLIT_Y2 = 98;
 // Kept readable (not micro-detailed). A gentle S-wave that looks like
 // natural handwriting motion.
 // ---------------------------------------------------------------------------
-const WRITING_PATH = 'M 8 70 C 20 40, 38 90, 52 55 S 78 38, 92 62';
+const WRITING_PATH = 'M 6 74 C 18 42, 36 88, 52 58 S 78 34, 94 54';
 const PATH_LENGTH = 140; // safe overestimate
 
 // ---------------------------------------------------------------------------
 // Pen follower: start and end coords of the writing path (in writing viewBox)
 // The nib tip should track from start to end.
 // ---------------------------------------------------------------------------
-const PEN_START = { x: 8, y: 70 };
-const PEN_END = { x: 92, y: 62 };
+const PEN_START = { x: 6, y: 74 };
+const PEN_END = { x: 94, y: 54 };
 
-// Approximate slope of path at start (for initial pen angle)
-// We use a fixed 45° angle throughout for simplicity, matching the pen body
-// orientation.
+// The pen angle changes slightly during the stroke so the idle ornament has
+// visible motion even when the drawing path is short.
 
 // ---------------------------------------------------------------------------
 // Ink droplet "glow" accent color (warm amber — per spec)
@@ -151,12 +150,18 @@ export function MagicPenAnimation({
   testID,
 }: MagicPenAnimationProps): ReactNode {
   const reduceMotion = useReducedMotion();
-  const animationDisabled = reduceMotion || !_penAnimationAvailable;
+  // Only respect the user's motion setting here. If AnimatedPath is not
+  // available on a target, the ink stroke may be static, but the pen body still
+  // moves because it is animated as an Animated.View.
+  const animationDisabled = reduceMotion;
+  const penMotion = useRef(
+    new RNAnimated.Value(animationDisabled ? 0.55 : 0)
+  ).current;
 
   // -------------------------------------------------------------------------
   // Pen sizing
   // The pen occupies 60% of the canvas along its major axis. Since the pen
-  // SVG viewBox is 100×100 and the pen is drawn upright (then rotated 45°),
+  // SVG viewBox is 100×100 and the pen is drawn upright, then rotated,
   // we make the pen container 60% of size. The barrel itself fills ~60% of
   // the viewBox width, so it's clearly visible even at 48px (penContainerSize
   // ≈ 29px → barrel ≈ 17px wide × 35px tall before rotation).
@@ -186,6 +191,46 @@ export function MagicPenAnimation({
   const dropletOpacity = useSharedValue(0);
   // sparkle: 0→1
   const sparkle = useSharedValue(0);
+
+  useEffect(() => {
+    if (animationDisabled) {
+      penMotion.stopAnimation();
+      penMotion.setValue(0.55);
+      return;
+    }
+
+    penMotion.setValue(0);
+    const loop = RNAnimated.loop(
+      RNAnimated.sequence([
+        RNAnimated.delay(DROP_IN_MS),
+        RNAnimated.timing(penMotion, {
+          toValue: 1,
+          duration: TRACE_MS,
+          easing: RNEasing.inOut(RNEasing.cubic),
+          useNativeDriver: true,
+        }),
+        RNAnimated.timing(penMotion, {
+          toValue: 1.08,
+          duration: FLICK_MS,
+          easing: RNEasing.out(RNEasing.cubic),
+          useNativeDriver: true,
+        }),
+        RNAnimated.timing(penMotion, {
+          toValue: 0,
+          duration: FLOAT_BACK_MS,
+          easing: RNEasing.out(RNEasing.cubic),
+          useNativeDriver: true,
+        }),
+        RNAnimated.delay(180),
+      ])
+    );
+
+    loop.start();
+    return () => {
+      loop.stop();
+      penMotion.stopAnimation();
+    };
+  }, [animationDisabled, penMotion]);
 
   // -------------------------------------------------------------------------
   // Animation loop
@@ -361,47 +406,6 @@ export function MagicPenAnimation({
     opacity: strokeFade.value,
   }));
 
-  // Pen body: drops in from above, tracks writing progress, flicks at end
-  const penBodyStyle = useAnimatedStyle(() => {
-    // Current nib position in drawing coords (0–100)
-    const drawX = PEN_START.x + (PEN_END.x - PEN_START.x) * progress.value;
-    const drawY = PEN_START.y + (PEN_END.y - PEN_START.y) * progress.value;
-
-    // Pixel position of nib tip in canvas space
-    const nibPixelX = drawX * drawingScale;
-    const nibPixelY = drawY * drawingScale;
-
-    // The pen container is rotated 45°. The nib tip is at the bottom of the
-    // pen SVG viewBox (y=100 in pen coords), so after rotation the nib tip
-    // is at the container's lower-right corner. We offset the container so
-    // the nib tip lands at the nib pixel position.
-    //
-    // For a 45° rotated square container of side L:
-    //   After rotation, top-left corner shifts by (-L/2, -L/2) from centre.
-    //   Nib is at bottom-centre of SVG = (L/2, L) in unrotated coords.
-    //   After 45° rotation, nib tip relative to centre ≈ (L/√2 * sin45, L/√2 * cos0)
-    //   ≈ (0, L * 0.7)  — approximately.
-    // We use a simpler empirical offset: nib tip ≈ 0.35 * container from left,
-    // 0.85 * container from top (tweaked for the pen shape).
-    const nibOffsetX = penContainerSize * 0.35;
-    const nibOffsetY = penContainerSize * 0.85;
-
-    // Drop-in: pen arrives from above (starts -size/2 above canvas)
-    const dropOffset = (1 - dropIn.value) * -(size * 0.5);
-
-    // Flick: slight upward rotate + translateY
-    const flickAngle = flick.value * -10; // degrees
-    const flickY = flick.value * -6; // pixels
-
-    return {
-      transform: [
-        { translateX: nibPixelX - nibOffsetX },
-        { translateY: nibPixelY - nibOffsetY + dropOffset + flickY },
-        { rotate: `${45 + flickAngle}deg` },
-      ],
-    };
-  });
-
   // Droplet at nib tip (Animated.View scale — Fabric-safe, no AnimatedCircle r=0)
   const dropletStyle = useAnimatedStyle(() => {
     // Position droplet at the current nib position
@@ -452,6 +456,55 @@ export function MagicPenAnimation({
 
   // Droplet base size
   const dropletRadius = Math.max(3, size * 0.055);
+  const bodyColor = color;
+  const trimColor = INK_GLOW_COLOR;
+  const nibColor = '#f8fafc';
+  const nibShadowColor = '#dbeafe';
+  const outlineColor = '#111827';
+  const capColor = '#0f766e';
+  const clipColor = '#ccfbf1';
+  // The visible pen travel uses React Native core Animated. Reanimated SVG
+  // props can be static in Expo web previews, while core transform animation is
+  // reliable there and still works on native.
+  const nibOffsetX = penContainerSize * 0.35;
+  const nibOffsetY = penContainerSize * 0.85;
+  const penStartX = PEN_START.x * drawingScale - nibOffsetX;
+  const penEndX = PEN_END.x * drawingScale - nibOffsetX;
+  const penStartY = PEN_START.y * drawingScale - nibOffsetY;
+  const penEndY = PEN_END.y * drawingScale - nibOffsetY;
+  const penMidY = ((PEN_START.y + PEN_END.y) / 2) * drawingScale - nibOffsetY;
+  const penBodyMotionStyle = {
+    transform: [
+      {
+        translateX: penMotion.interpolate({
+          inputRange: [0, 1, 1.08],
+          outputRange: [penStartX, penEndX, penEndX + size * 0.04],
+          extrapolate: 'clamp',
+        }),
+      },
+      {
+        translateY: penMotion.interpolate({
+          inputRange: [0, 0.18, 0.5, 0.82, 1, 1.08],
+          outputRange: [
+            penStartY - size * 0.38,
+            penStartY + size * 0.03,
+            penMidY - size * 0.04,
+            penEndY + size * 0.04,
+            penEndY,
+            penEndY - size * 0.09,
+          ],
+          extrapolate: 'clamp',
+        }),
+      },
+      {
+        rotate: penMotion.interpolate({
+          inputRange: [0, 0.5, 1, 1.08],
+          outputRange: ['32deg', '39deg', '45deg', '26deg'],
+          extrapolate: 'clamp',
+        }),
+      },
+    ],
+  };
 
   // -------------------------------------------------------------------------
   // Reduced motion: static render (pen mid-stroke, full line visible)
@@ -465,8 +518,6 @@ export function MagicPenAnimation({
       PEN_START.y + (PEN_END.y - PEN_START.y) * staticProgress;
     const staticNibX = staticDrawX * drawingScale;
     const staticNibY = staticDrawY * drawingScale;
-    const nibOffsetX = penContainerSize * 0.35;
-    const nibOffsetY = penContainerSize * 0.85;
 
     return (
       <View
@@ -498,7 +549,7 @@ export function MagicPenAnimation({
             transform: [
               { translateX: staticNibX - nibOffsetX },
               { translateY: staticNibY - nibOffsetY },
-              { rotate: '45deg' },
+              { rotate: `${34 + staticProgress * 10}deg` },
             ],
             pointerEvents: 'none',
           }}
@@ -509,44 +560,68 @@ export function MagicPenAnimation({
             viewBox="0 0 100 100"
           >
             {/* Barrel */}
+            <Polygon
+              points="40,6 60,6 64,14 36,14"
+              fill={capColor}
+              opacity={0.95}
+            />
             <Rect
               x={BARREL_X}
               y={BARREL_Y}
               width={BARREL_W}
               height={BARREL_H}
               rx={BARREL_RX}
-              fill={color}
-              stroke="#000000"
+              fill={bodyColor}
+              stroke={outlineColor}
               strokeWidth={1.5 / penScale}
               strokeOpacity={0.2}
             />
-            {/* Grip (slightly darker via opacity overlay) */}
+            <Rect
+              x={BARREL_X + 2}
+              y={BARREL_Y}
+              width={BARREL_W - 4}
+              height={10}
+              rx={3.5}
+              fill={trimColor}
+              opacity={0.95}
+            />
+            <Path
+              d="M57 17 C64 29, 62 43, 56 53"
+              stroke={clipColor}
+              strokeWidth={3 / penScale}
+              strokeOpacity={0.82}
+              fill="none"
+              strokeLinecap="round"
+            />
+            {/* Grip */}
             <Rect
               x={GRIP_X}
               y={GRIP_Y}
               width={GRIP_W}
               height={GRIP_H}
               rx={GRIP_RX}
-              fill={color}
-              stroke="#000000"
+              fill={trimColor}
+              stroke={outlineColor}
               strokeWidth={1.5 / penScale}
               strokeOpacity={0.2}
             />
-            {/* Dark tint on grip for depth */}
-            <Rect
-              x={GRIP_X}
-              y={GRIP_Y}
-              width={GRIP_W}
-              height={GRIP_H}
-              rx={GRIP_RX}
-              fill="#000000"
-              opacity={0.18}
+            {/* Split nib: pale metal plus blue shadow for depth. */}
+            <Path
+              d={NIB_SHOULDER_PATH}
+              fill={trimColor}
+              opacity={0.95}
+              strokeLinejoin="round"
             />
-            {/* Nib triangle */}
+            <Path d={NIB_LEFT_PATH} fill={nibColor} strokeLinejoin="round" />
+            <Path
+              d={NIB_RIGHT_PATH}
+              fill={nibShadowColor}
+              strokeLinejoin="round"
+            />
             <Path
               d={NIB_PATH}
-              fill={color}
-              stroke="#000000"
+              fill="none"
+              stroke={outlineColor}
               strokeWidth={1 / penScale}
               strokeOpacity={0.25}
               strokeLinejoin="round"
@@ -557,11 +632,12 @@ export function MagicPenAnimation({
               y1={SLIT_Y1}
               x2={SLIT_X2}
               y2={SLIT_Y2}
-              stroke="#000000"
+              stroke={outlineColor}
               strokeOpacity={0.3}
               strokeWidth={1 / penScale}
               strokeLinecap="round"
             />
+            <Circle cx={50} cy={97} r={1.5} fill={bodyColor} opacity={0.7} />
           </Svg>
         </View>
       </View>
@@ -719,9 +795,9 @@ export function MagicPenAnimation({
       {/* ------------------------------------------------------------------ */}
       {/* Pen body — Animated.View with static SVG inside (Fabric-safe)       */}
       {/* The SVG uses a 100×100 viewBox with a large, clearly readable pen.  */}
-      {/* Rotated 45° so it points upper-left to lower-right.                 */}
+      {/* Rotated by the animated style so it points upper-left to lower-right. */}
       {/* ------------------------------------------------------------------ */}
-      <Animated.View
+      <RNAnimated.View
         style={[
           {
             position: 'absolute',
@@ -730,7 +806,7 @@ export function MagicPenAnimation({
             width: penContainerSize,
             height: penContainerSize,
           },
-          penBodyStyle,
+          penBodyMotionStyle,
           { pointerEvents: 'none' },
         ]}
       >
@@ -740,26 +816,49 @@ export function MagicPenAnimation({
           viewBox="0 0 100 100"
         >
           {/* ----- Barrel ----- */}
+          <Polygon
+            points="40,6 60,6 64,14 36,14"
+            fill={capColor}
+            opacity={0.95}
+          />
           <Rect
             x={BARREL_X}
             y={BARREL_Y}
             width={BARREL_W}
             height={BARREL_H}
             rx={BARREL_RX}
-            fill={color}
-            stroke="#000000"
+            fill={bodyColor}
+            stroke={outlineColor}
             strokeWidth={1.5 / penScale}
             strokeOpacity={0.2}
           />
+          {/* Clip-like cap band: the second color keeps the pen from becoming a blob. */}
+          <Rect
+            x={BARREL_X + 2}
+            y={BARREL_Y}
+            width={BARREL_W - 4}
+            height={10}
+            rx={3.5}
+            fill={trimColor}
+            opacity={0.95}
+          />
+          <Path
+            d="M57 17 C64 29, 62 43, 56 53"
+            stroke={clipColor}
+            strokeWidth={3 / penScale}
+            strokeOpacity={0.82}
+            fill="none"
+            strokeLinecap="round"
+          />
           {/* Barrel highlight stripe (white shimmer) */}
           <Rect
-            x={BARREL_X + 8}
-            y={BARREL_Y + 4}
-            width={8}
-            height={BARREL_H - 8}
-            rx={3}
+            x={BARREL_X + 5}
+            y={BARREL_Y + 17}
+            width={4}
+            height={BARREL_H - 24}
+            rx={2}
             fill="#ffffff"
-            opacity={0.18}
+            opacity={0.22}
           />
 
           {/* ----- Grip ----- */}
@@ -769,27 +868,56 @@ export function MagicPenAnimation({
             width={GRIP_W}
             height={GRIP_H}
             rx={GRIP_RX}
-            fill={color}
-            stroke="#000000"
+            fill={trimColor}
+            stroke={outlineColor}
             strokeWidth={1.5 / penScale}
             strokeOpacity={0.2}
           />
-          {/* Dark tint on grip so it reads as slightly darker */}
-          <Rect
-            x={GRIP_X}
-            y={GRIP_Y}
-            width={GRIP_W}
-            height={GRIP_H}
-            rx={GRIP_RX}
-            fill="#000000"
-            opacity={0.18}
+          <Line
+            x1={GRIP_X + 6}
+            y1={GRIP_Y + 3}
+            x2={GRIP_X + 6}
+            y2={GRIP_Y + GRIP_H - 3}
+            stroke={outlineColor}
+            strokeOpacity={0.18}
+            strokeWidth={1 / penScale}
+          />
+          <Line
+            x1={GRIP_X + 17}
+            y1={GRIP_Y + 3}
+            x2={GRIP_X + 17}
+            y2={GRIP_Y + GRIP_H - 3}
+            stroke={outlineColor}
+            strokeOpacity={0.18}
+            strokeWidth={1 / penScale}
+          />
+          <Line
+            x1={GRIP_X + 28}
+            y1={GRIP_Y + 3}
+            x2={GRIP_X + 28}
+            y2={GRIP_Y + GRIP_H - 3}
+            stroke={outlineColor}
+            strokeOpacity={0.18}
+            strokeWidth={1 / penScale}
           />
 
           {/* ----- Nib (triangle) ----- */}
           <Path
+            d={NIB_SHOULDER_PATH}
+            fill={trimColor}
+            opacity={0.95}
+            strokeLinejoin="round"
+          />
+          <Path d={NIB_LEFT_PATH} fill={nibColor} strokeLinejoin="round" />
+          <Path
+            d={NIB_RIGHT_PATH}
+            fill={nibShadowColor}
+            strokeLinejoin="round"
+          />
+          <Path
             d={NIB_PATH}
-            fill={color}
-            stroke="#000000"
+            fill="none"
+            stroke={outlineColor}
             strokeWidth={1 / penScale}
             strokeOpacity={0.25}
             strokeLinejoin="round"
@@ -800,16 +928,16 @@ export function MagicPenAnimation({
             y1={SLIT_Y1}
             x2={SLIT_X2}
             y2={SLIT_Y2}
-            stroke="#000000"
+            stroke={outlineColor}
             strokeOpacity={0.3}
             strokeWidth={1.2 / penScale}
             strokeLinecap="round"
           />
 
           {/* Nib tip gleam — small white dot (static, no AnimatedCircle) */}
-          <Circle cx={50} cy={97} r={1.5} fill="#ffffff" opacity={0.55} />
+          <Circle cx={50} cy={97} r={1.5} fill={bodyColor} opacity={0.7} />
         </Svg>
-      </Animated.View>
+      </RNAnimated.View>
     </View>
   );
 }

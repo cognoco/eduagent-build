@@ -105,6 +105,32 @@
     "goToLibraryLabel": "ライブラリへ",
     "moreOptions": "その他のオプション",
     "moreOptionsLabel": "その他のオプション",
+    "learner": {
+      "recommended": "おすすめ",
+      "intentHeading": "今、何をしたい？",
+      "askAnythingLabel": "なんでも質問",
+      "askAnythingSubtitle": "短い質問、学習アイデア、わからないこと",
+      "askAnythingPlaceholder": "なんでも質問...",
+      "yourSubjects": "あなたの科目",
+      "newSubject": "新しい科目",
+      "emptySubjectsTitle": "ここに科目が表示されます",
+      "emptySubjectsMessage": "今すぐ始めてもいいし、必要なときだけ宿題ヘルプを使っても大丈夫です。",
+      "addSubject": "科目を追加",
+      "intentActions": {
+        "homework": {
+          "title": "宿題ヘルプ",
+          "subtitle": "写真を撮るか、問題を入力"
+        },
+        "practice": {
+          "title": "テストに向けて練習",
+          "subtitle": "忘れかけている内容を復習したり、自分をテスト"
+        },
+        "studyNew": {
+          "title": "新しいことを学ぶ",
+          "subtitle": "トピックを始めるか、科目を作成"
+        }
+      }
+    },
     "parentGateway": {
       "seeHowTheyAreDoing": "お子様の様子を見る",
       "practicedThisWeek": "{{name}}さんは今週{{minutes}}分練習しました",
@@ -681,6 +707,9 @@
       "topicProgress": "{{completed}}/{{total}}トピック",
       "settingsAccessibilityLabel": "科目の設定",
       "studyNext": "次に学習する",
+      "chooseBook": "本を探すか選ぶ",
+      "chooseAnotherBook": "別の本を探すか追加する",
+      "addAnotherBook": "別の本を追加",
       "browseAll": "すべての提案を閲覧",
       "emptyPickTitle": "開始する本を選んでください",
       "emptyPickMessage": "上の「次に学習する」カードのいずれかをタップして開始してください。",
@@ -712,7 +741,8 @@
       "shelfPausedSuffix": "、一時停止中",
       "shelfReviewSuffix": "、復習が必要",
       "shelfActionExpand": "展開",
-      "shelfActionCollapse": "折りたたむ"
+      "shelfActionCollapse": "折りたたむ",
+      "shelfActionOpen": "開く"
     }
   },
   "topic": {
@@ -1100,6 +1130,14 @@
       "retentionWeak": "この科目は、もう少し注意を払うと良いでしょう。",
       "openShelf": "棚を開く",
       "resume": "再開",
+      "chooseNext": "次を選ぶ",
+      "hideSubject": "科目を非表示にする",
+      "hidingSubject": "科目を非表示にしています...",
+      "hideSubjectHint": "この科目をメイン画面から非表示にします。あとでライブラリから復元できます。",
+      "hideConfirmTitle": "{{subject}}を非表示にしますか？",
+      "hideConfirmMessage": "この科目はメイン画面から移動されます。学習履歴は保存され、あとでライブラリから復元できます。",
+      "hideConfirmAction": "科目を非表示",
+      "hideErrorTitle": "科目を非表示にできませんでした",
       "goneTitle": "この科目は利用できなくなりました",
       "goneSubtitle": "削除されたか、別の科目に統合された可能性があります。",
       "pastConversations": "過去の会話"
@@ -1133,7 +1171,13 @@
     "common": {
       "noSubjectSelected": "科目が選択されていません",
       "saving": "保存中…",
-      "skip": "スキップ"
+      "skip": "スキップ",
+      "stepLabels": {
+        "quickChat": "短いチャット",
+        "makeItPersonal": "自分向けに調整",
+        "supportOptions": "サポートの選択",
+        "yourPlan": "あなたの計画"
+      }
     },
     "mentorLanguagePicker": {
       "title": "メンターには何語で話してほしいですか？",
@@ -1243,6 +1287,12 @@
       "skipAll": "スキップ"
     },
     "interview": {
+      "title": "{{target}}の準備",
+      "newSubject": "あなたの科目",
+      "openingWithTarget": "こんにちは！あなたの学習メイトです。まず、あなたと{{target}}について少し知りたいです。そうすれば、推測ではなく、ちょうどよいレベルでサポートできます。今知っていることを教えてください。ざっくりで大丈夫です。",
+      "openingGeneric": "こんにちは！あなたの学習メイトです。まず、あなたについて少し知りたいです。そうすれば、推測ではなく、ちょうどよいレベルでサポートできます。今知っていることを教えてください。ざっくりで大丈夫です。",
+      "explainerTitle": "なぜ最初に質問するの？",
+      "explainerBody": "あなたの答えで、ちょうどよい始め方を選べます。この短い準備のあと、あなたに合う説明や練習ができます。",
       "missingSubject": "科目が選択されていません。戻って、もう一度お試しください。",
       "sessionCreationStuck": "セッションの作成に想定より時間がかかっています。戻って、もう一度お試しください。",
       "settingUp": "セッションを準備中…",

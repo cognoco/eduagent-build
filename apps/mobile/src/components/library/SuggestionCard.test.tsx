@@ -49,4 +49,27 @@ describe('SuggestionCard', () => {
     );
     screen.getByTestId('suggestion-forests');
   });
+
+  it('uses subject tint for suggested books when provided', () => {
+    render(
+      <SuggestionCard
+        title="Forests"
+        onPress={jest.fn()}
+        testID="suggestion-forests"
+        tint={{
+          name: 'emerald',
+          solid: '#047857',
+          soft: 'rgba(4,120,87,0.14)',
+        }}
+      />
+    );
+
+    const card = screen.getByTestId('suggestion-forests');
+    expect(card.props.style).toEqual(
+      expect.objectContaining({
+        borderColor: '#047857',
+        backgroundColor: 'rgba(4,120,87,0.14)',
+      })
+    );
+  });
 });

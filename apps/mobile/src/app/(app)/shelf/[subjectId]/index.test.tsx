@@ -1,7 +1,10 @@
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { RoutedMockFetch } from '../../../../test-utils/mock-api-routes';
+import {
+  fetchCallsMatching,
+  type RoutedMockFetch,
+} from '../../../../test-utils/mock-api-routes';
 import ShelfScreen from './index';
 
 jest.mock(
@@ -74,6 +77,11 @@ jest.mock('../../../../lib/theme', () => ({
     accent: '#00bfa5',
     textSecondary: '#888',
     textInverse: '#fff',
+  }),
+  useSubjectTint: () => ({
+    name: 'teal',
+    solid: '#0f766e',
+    soft: 'rgba(15,118,110,0.14)',
   }),
 }));
 
@@ -442,7 +450,31 @@ describe('ShelfScreen', () => {
     await waitFor(() => {
       getByTestId('shelf-empty');
     });
-    getByText('No books on this shelf yet.');
+    getByText('This shelf is still getting ready');
+    getByTestId('shelf-empty-retry');
+    getByTestId('shelf-empty-back');
+  });
+
+  it('empty state retry reloads shelf data', async () => {
+    mockFetch.setRoute('/subjects/sub-1/books', { books: [] });
+
+    const { getByTestId } = render(<ShelfScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      getByTestId('shelf-empty-retry');
+    });
+    const callsBeforeRetry = fetchCallsMatching(
+      mockFetch,
+      '/subjects/sub-1/books'
+    ).length;
+
+    fireEvent.press(getByTestId('shelf-empty-retry'));
+
+    await waitFor(() => {
+      expect(
+        fetchCallsMatching(mockFetch, '/subjects/sub-1/books').length
+      ).toBeGreaterThan(callsBeforeRetry);
+    });
   });
 
   it('empty state back button returns to library', async () => {
@@ -515,6 +547,45 @@ describe('ShelfScreen', () => {
   // -----------------------------------------------------------------------
   // Suggestion cards
   // -----------------------------------------------------------------------
+  it('[BUG-SHELF-BOOK-CTA] shows an add-book path after existing books when there are no suggestions', async () => {
+    mockFetch.setRoute('/book-suggestions', []);
+
+    const { getByTestId, getByText } = render(<ShelfScreen />, {
+      wrapper: TestWrapper,
+    });
+
+    await waitFor(() => {
+      getByTestId('shelf-choose-book');
+    });
+    getByText('Add another book');
+
+    fireEvent.press(getByTestId('shelf-choose-book'));
+
+    expect(mockPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/(app)/pick-book/[subjectId]',
+        params: { subjectId: 'sub-1' },
+      })
+    );
+  });
+
+  it('labels the choose-book path as browse all when extra suggestions exist', async () => {
+    mockFetch.setRoute('/book-suggestions', [
+      { id: 'sug-1', title: 'Number Theory' },
+      { id: 'sug-2', title: 'Calculus Intro' },
+      { id: 'sug-3', title: 'Statistics' },
+    ]);
+
+    const { getByTestId, getByText } = render(<ShelfScreen />, {
+      wrapper: TestWrapper,
+    });
+
+    await waitFor(() => {
+      getByTestId('shelf-choose-book');
+    });
+    getByText('Browse all suggestions');
+  });
+
   it('shows book suggestion cards when suggestions exist', async () => {
     mockFetch.setRoute('/book-suggestions', [
       { id: 'sug-1', title: 'Number Theory' },
@@ -555,11 +626,10 @@ describe('ShelfScreen', () => {
       expect(mockPush).toHaveBeenCalledWith(
         expect.objectContaining({
           pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
-          params: expect.objectContaining({
+          params: {
             subjectId: 'sub-1',
             bookId: 'book-new',
-            autoStart: 'true',
-          }),
+          },
         })
       );
     });

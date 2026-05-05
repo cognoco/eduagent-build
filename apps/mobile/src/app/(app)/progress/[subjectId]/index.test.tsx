@@ -1,4 +1,9 @@
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+} from '@testing-library/react-native';
 
 import ProgressSubjectScreen from '.';
 
@@ -71,10 +76,21 @@ jest.mock('react-i18next', () => ({
         'progress.subject.openShelf': 'Open shelf',
         'progress.subject.pastConversations': 'Past conversations',
         'progress.subject.resume': 'Resume',
+        'progress.subject.chooseNext': 'Choose next',
+        'progress.subject.hideSubject': 'Hide subject',
+        'progress.subject.hidingSubject': 'Hiding subject...',
+        'progress.subject.hideSubjectHint':
+          'Hides this subject from your main student views. You can restore it from Library later.',
+        'progress.subject.hideConfirmTitle': `Hide ${opts?.subject ?? ''}?`,
+        'progress.subject.hideConfirmMessage':
+          'This will move the subject out of your main views. Your learning history stays saved, and you can restore it from Library.',
+        'progress.subject.hideConfirmAction': 'Hide subject',
+        'progress.subject.hideErrorTitle': 'Could not hide subject',
         'progress.subject.goneTitle': 'This subject is no longer available',
         'progress.subject.goneSubtitle':
           'It may have been removed or merged into another subject.',
         'progress.keepLearning': 'Keep learning',
+        'common.cancel': 'Cancel',
         'common.retry': 'Retry',
         'common.tryAgain': 'Try Again',
         'common.goBack': 'Go back',
@@ -160,6 +176,21 @@ jest.mock('../../../../hooks/use-language-progress', () => ({
   useLanguageProgress: (...args: unknown[]) => mockUseLanguageProgress(...args),
 }));
 
+const mockMutateSubjectAsync = jest.fn();
+const mockUseUpdateSubject = jest.fn();
+jest.mock('../../../../hooks/use-subjects', () => ({
+  useUpdateSubject: (...args: unknown[]) => mockUseUpdateSubject(...args),
+}));
+
+const mockPlatformAlert = jest.fn();
+jest.mock('../../../../lib/platform-alert', () => ({
+  platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
+}));
+
+jest.mock('../../../../lib/format-api-error', () => ({
+  formatApiError: (err: Error) => `formatted: ${err.message}`,
+}));
+
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
 const fullSubject = {
@@ -223,6 +254,11 @@ function mockHooks({
     refetch: languageProgressRefetch,
   });
 
+  mockUseUpdateSubject.mockReturnValue({
+    mutateAsync: mockMutateSubjectAsync,
+    isPending: false,
+  });
+
   return { inventoryRefetch, subjectProgressRefetch, languageProgressRefetch };
 }
 
@@ -232,6 +268,7 @@ describe('ProgressSubjectScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockLocalSearchParams.mockReturnValue({ subjectId: 's1' });
+    mockMutateSubjectAsync.mockResolvedValue({ subject: {} });
   });
 
   // ── Missing subjectId ────────────────────────────────────────────────────
@@ -359,12 +396,13 @@ describe('ProgressSubjectScreen', () => {
       screen.getByText('45 min');
     });
 
-    it('shows "Resume", "Past conversations", and "Open shelf" buttons', () => {
+    it('shows "Choose next", "Past conversations", and "Open shelf" buttons when there is no resume target', () => {
       mockHooks();
       render(<ProgressSubjectScreen />);
-      screen.getByText('Resume');
+      screen.getByText('Choose next');
       screen.getByText('Past conversations');
       screen.getByText('Open shelf');
+      screen.getByText('Hide subject');
     });
 
     it('navigates to subject sessions on "Past conversations" press', () => {
@@ -377,13 +415,14 @@ describe('ProgressSubjectScreen', () => {
       });
     });
 
-    it('navigates to session on "Resume" press', () => {
+    it('opens the shelf on primary action press when there is no resume target', () => {
       mockHooks();
       render(<ProgressSubjectScreen />);
-      fireEvent.press(screen.getByText('Resume'));
-      expect(mockPush).toHaveBeenCalledWith(
-        '/(app)/session?mode=learning&subjectId=s1'
-      );
+      fireEvent.press(screen.getByText('Choose next'));
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/shelf/[subjectId]',
+        params: { subjectId: 's1' },
+      });
     });
 
     it('resumes the shared subject target on "Resume" press', () => {
@@ -431,6 +470,67 @@ describe('ProgressSubjectScreen', () => {
         expect.anything(),
         '/(app)/progress'
       );
+    });
+
+    it('asks for confirmation before hiding the subject', () => {
+      mockHooks();
+      render(<ProgressSubjectScreen />);
+
+      fireEvent.press(screen.getByTestId('progress-subject-hide'));
+
+      expect(mockPlatformAlert).toHaveBeenCalledWith(
+        'Hide Math?',
+        'This will move the subject out of your main views. Your learning history stays saved, and you can restore it from Library.',
+        expect.arrayContaining([
+          expect.objectContaining({ text: 'Cancel', style: 'cancel' }),
+          expect.objectContaining({
+            text: 'Hide subject',
+            style: 'destructive',
+          }),
+        ]),
+        { cancelable: true }
+      );
+      expect(mockMutateSubjectAsync).not.toHaveBeenCalled();
+    });
+
+    it('archives the subject and returns to progress after confirmation', async () => {
+      mockHooks();
+      render(<ProgressSubjectScreen />);
+
+      fireEvent.press(screen.getByTestId('progress-subject-hide'));
+      const buttons = mockPlatformAlert.mock.calls[0]?.[2] as Array<{
+        text: string;
+        onPress?: () => void;
+      }>;
+      buttons.find((button) => button.text === 'Hide subject')?.onPress?.();
+
+      await waitFor(() => {
+        expect(mockMutateSubjectAsync).toHaveBeenCalledWith({
+          subjectId: 's1',
+          status: 'archived',
+        });
+      });
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/progress');
+    });
+
+    it('shows a friendly error if hiding fails', async () => {
+      mockMutateSubjectAsync.mockRejectedValueOnce(new Error('Nope'));
+      mockHooks();
+      render(<ProgressSubjectScreen />);
+
+      fireEvent.press(screen.getByTestId('progress-subject-hide'));
+      const buttons = mockPlatformAlert.mock.calls[0]?.[2] as Array<{
+        text: string;
+        onPress?: () => void;
+      }>;
+      buttons.find((button) => button.text === 'Hide subject')?.onPress?.();
+
+      await waitFor(() => {
+        expect(mockPlatformAlert).toHaveBeenLastCalledWith(
+          'Could not hide subject',
+          'formatted: Nope'
+        );
+      });
     });
 
     it('shows topics explored when total is null', () => {

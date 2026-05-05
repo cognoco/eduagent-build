@@ -105,6 +105,32 @@
     "goToLibraryLabel": "Gå til bibliotek",
     "moreOptions": "Flere alternativer",
     "moreOptionsLabel": "Flere alternativer",
+    "learner": {
+      "recommended": "Anbefalt",
+      "intentHeading": "Hva trenger du akkurat nå?",
+      "askAnythingLabel": "Spør om hva som helst",
+      "askAnythingSubtitle": "Et raskt spørsmål, en studieidé eller noe uklart",
+      "askAnythingPlaceholder": "Spør om hva som helst...",
+      "yourSubjects": "Fagene dine",
+      "newSubject": "Nytt fag",
+      "emptySubjectsTitle": "Fagene dine vises her",
+      "emptySubjectsMessage": "Start ett nå, eller bruk leksehjelp når du trenger det.",
+      "addSubject": "Legg til fag",
+      "intentActions": {
+        "homework": {
+          "title": "Leksehjelp",
+          "subtitle": "Ta et bilde eller skriv inn oppgaven"
+        },
+        "practice": {
+          "title": "Øv til en prøve",
+          "subtitle": "Repeter det som begynner å glippe, eller test deg selv"
+        },
+        "studyNew": {
+          "title": "Lær noe nytt",
+          "subtitle": "Start et tema eller bygg et fag"
+        }
+      }
+    },
     "parentGateway": {
       "seeHowTheyAreDoing": "Se hvordan det går med dem",
       "practicedThisWeek": "{{name}} har øvd i {{minutes}} min denne uken",
@@ -681,6 +707,9 @@
       "topicProgress": "{{completed}}/{{total}} temaer",
       "settingsAccessibilityLabel": "Emneinnstillinger",
       "studyNext": "Studer neste",
+      "chooseBook": "Utforsk eller velg en bok",
+      "chooseAnotherBook": "Utforsk eller legg til en annen bok",
+      "addAnotherBook": "Legg til en annen bok",
       "browseAll": "Bla gjennom alle forslag",
       "emptyPickTitle": "Velg en bok for å starte",
       "emptyPickMessage": "Trykk på et av \"Studer neste\"-kortene ovenfor for å begynne.",
@@ -712,7 +741,8 @@
       "shelfPausedSuffix": ", pauset",
       "shelfReviewSuffix": ", gjennomgang nødvendig",
       "shelfActionExpand": "utvide",
-      "shelfActionCollapse": "lukke"
+      "shelfActionCollapse": "lukke",
+      "shelfActionOpen": "åpne"
     }
   },
   "topic": {
@@ -1100,6 +1130,14 @@
       "retentionWeak": "Dette emnet ville hatt godt av litt ekstra oppmerksomhet.",
       "openShelf": "Åpne hylle",
       "resume": "Fortsett",
+      "chooseNext": "Velg neste",
+      "hideSubject": "Skjul emne",
+      "hidingSubject": "Skjuler emne...",
+      "hideSubjectHint": "Skjuler dette emnet fra hovedvisningene dine. Du kan gjenopprette det fra Bibliotek senere.",
+      "hideConfirmTitle": "Skjul {{subject}}?",
+      "hideConfirmMessage": "Dette flytter emnet ut av hovedvisningene dine. Læringshistorikken din blir lagret, og du kan gjenopprette emnet fra Bibliotek.",
+      "hideConfirmAction": "Skjul emne",
+      "hideErrorTitle": "Kunne ikke skjule emnet",
       "goneTitle": "Dette emnet er ikke lenger tilgjengelig",
       "goneSubtitle": "Det kan ha blitt fjernet eller slått sammen med et annet emne.",
       "pastConversations": "Tidligere samtaler"
@@ -1133,7 +1171,13 @@
     "common": {
       "noSubjectSelected": "Ingen emne valgt",
       "saving": "Lagrer ...",
-      "skip": "Hopp over"
+      "skip": "Hopp over",
+      "stepLabels": {
+        "quickChat": "Kort prat",
+        "makeItPersonal": "Gjør det personlig",
+        "supportOptions": "Støttevalg",
+        "yourPlan": "Planen din"
+      }
     },
     "mentorLanguagePicker": {
       "title": "Hvilket språk skal mentoren din snakke?",
@@ -1243,6 +1287,12 @@
       "skipAll": "Hopp over"
     },
     "interview": {
+      "title": "Sett opp {{target}}",
+      "newSubject": "faget ditt",
+      "openingWithTarget": "Hei! Jeg er læringskameraten din. Først må jeg lære litt om deg og {{target}}, så jeg kan veilede på riktig nivå i stedet for å gjette. Hva kan du allerede? Et grovt svar er helt fint.",
+      "openingGeneric": "Hei! Jeg er læringskameraten din. Først må jeg lære litt om deg, så jeg kan veilede på riktig nivå i stedet for å gjette. Hva kan du allerede? Et grovt svar er helt fint.",
+      "explainerTitle": "Hvorfor spør jeg først?",
+      "explainerBody": "Svarene dine hjelper meg å velge riktig startpunkt. Etter denne korte oppstarten kan jeg forklare, øve og hjelpe på en måte som passer deg.",
       "missingSubject": "Ingen emne valgt. Gå tilbake og prøv igjen.",
       "sessionCreationStuck": "Økten tar lengre tid enn forventet. Gå tilbake og prøv igjen.",
       "settingUp": "Setter opp økten din ...",

@@ -16,6 +16,7 @@ import type { InterestContext, InterestEntry } from '@eduagent/schemas';
 import { OnboardingStepIndicator } from '../../../components/onboarding/OnboardingStepIndicator';
 import { useUpdateInterestsContext } from '../../../hooks/use-onboarding-dimensions';
 import { goBackOrReplace } from '../../../lib/navigation';
+import { getOnboardingStepLabels } from '../../../lib/onboarding-step-labels';
 import { platformAlert } from '../../../lib/platform-alert';
 import { useThemeColors } from '../../../lib/theme';
 
@@ -66,6 +67,7 @@ export default function InterestsContextScreen(): React.ReactElement {
   }>();
   const step = Number(stepParam) || 2;
   const totalSteps = Number(totalStepsParam) || 4;
+  const stepLabels = getOnboardingStepLabels(t);
 
   // Parse and dedupe the incoming interest labels. Drop empties and cap at a
   // reasonable length so a rogue interview doesn't render 50 cards.
@@ -197,7 +199,11 @@ export default function InterestsContextScreen(): React.ReactElement {
         >
           <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </Pressable>
-        <OnboardingStepIndicator step={step} totalSteps={totalSteps} />
+        <OnboardingStepIndicator
+          step={step}
+          totalSteps={totalSteps}
+          stepLabels={stepLabels}
+        />
       </View>
 
       <ScrollView

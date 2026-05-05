@@ -60,6 +60,8 @@ export function useInterviewState(
       }
     },
     enabled: !!activeProfile && !!subjectId && callerEnabled,
+    refetchInterval: (query) =>
+      query.state.data?.status === 'completing' ? 3_000 : false,
   });
 }
 
@@ -216,6 +218,9 @@ export function useStreamInterviewMessage(
         for await (const event of events) {
           if (event.type === 'chunk') {
             accumulated += event.content;
+            onChunk(accumulated);
+          } else if (event.type === 'replace') {
+            accumulated = event.content;
             onChunk(accumulated);
           } else if (event.type === 'fallback') {
             fallback = {

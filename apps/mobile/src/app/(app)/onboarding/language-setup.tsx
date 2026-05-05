@@ -17,6 +17,7 @@ import { useConfigureLanguageSubject } from '../../../hooks/use-subjects';
 import { formatApiError } from '../../../lib/format-api-error';
 import { useThemeColors } from '../../../lib/theme';
 import { goBackOrReplace } from '../../../lib/navigation';
+import { getOnboardingStepLabels } from '../../../lib/onboarding-step-labels';
 
 const NATIVE_LANGUAGE_OPTIONS = [
   { code: 'en', label: 'English' },
@@ -90,6 +91,7 @@ export default function LanguageSetup() {
   const colors = useThemeColors(); // [BUG-118]
   const step = Number(stepParam) || 2;
   const totalSteps = Number(totalStepsParam) || 4;
+  const stepLabels = getOnboardingStepLabels(t);
   const [nativeLanguage, setNativeLanguage] = useState<string>('en');
   const [customLanguage, setCustomLanguage] = useState('');
   const [startingLevel, setStartingLevel] = useState<CefrLevel>('A1');
@@ -197,7 +199,11 @@ export default function LanguageSetup() {
         >
           <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </Pressable>
-        <OnboardingStepIndicator step={step} totalSteps={totalSteps} />
+        <OnboardingStepIndicator
+          step={step}
+          totalSteps={totalSteps}
+          stepLabels={stepLabels}
+        />
 
         <Text className="text-h2 font-bold text-text-primary">
           {t('onboarding.languageSetup.title')}

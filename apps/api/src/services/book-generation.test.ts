@@ -74,6 +74,47 @@ describe('book-generation', () => {
         expect(result.topics[0]?.title).toBe('What is a Fraction?');
       }
     });
+
+    it('includes age-register guidance in the subject structure prompt', async () => {
+      mockRouteAndCall.mockResolvedValueOnce({
+        response: JSON.stringify({
+          type: 'broad',
+          books: [
+            {
+              title: 'Human Biology',
+              description: 'Study body systems and health',
+              emoji: '🧬',
+              sortOrder: 1,
+            },
+          ],
+        }),
+        provider: 'mock',
+        model: 'mock-model',
+        latencyMs: 12,
+      });
+
+      await detectSubjectType('Biology', 20);
+
+      expect(mockRouteAndCall).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            role: 'system',
+            content: expect.stringContaining(
+              'For ages 18+, use clear adult-learning titles'
+            ),
+          }),
+          expect.objectContaining({
+            role: 'system',
+            content: expect.stringContaining('Avoid cutesy labels'),
+          }),
+          expect.objectContaining({
+            role: 'user',
+            content: expect.stringContaining('Learner age: 20'),
+          }),
+        ]),
+        2
+      );
+    });
   });
 
   describe('generateBookTopics', () => {
@@ -142,6 +183,49 @@ describe('book-generation', () => {
           expect.objectContaining({
             role: 'user',
             content: expect.stringContaining('I already know about pyramids'),
+          }),
+        ]),
+        2
+      );
+    });
+
+    it('asks for adult-appropriate book topic naming when the learner is adult', async () => {
+      mockRouteAndCall.mockResolvedValueOnce({
+        response: JSON.stringify({ topics: [], connections: [] }),
+        provider: 'mock',
+        model: 'mock-model',
+        latencyMs: 12,
+      });
+
+      await generateBookTopics(
+        'Life Sciences',
+        'Living things, ecosystems, and the human body',
+        20
+      );
+
+      expect(mockRouteAndCall).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            role: 'system',
+            content: expect.stringContaining(
+              'For ages 18+, use clear adult-learning titles'
+            ),
+          }),
+          expect.objectContaining({
+            role: 'system',
+            content: expect.stringContaining(
+              'never preschool, early-reader, or babyish wording'
+            ),
+          }),
+          expect.objectContaining({
+            role: 'system',
+            content: expect.stringContaining(
+              'Avoid cutesy labels, exclamation marks'
+            ),
+          }),
+          expect.objectContaining({
+            role: 'user',
+            content: expect.stringContaining('Learner age: 20'),
           }),
         ]),
         2

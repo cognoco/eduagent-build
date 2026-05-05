@@ -10,6 +10,10 @@ import {
   createRoutedMockFetch,
   extractJsonBody,
 } from '../../test-utils/mock-api-routes';
+import {
+  LEARNER_HOME_HREF,
+  LEARNER_HOME_RETURN_TO,
+} from '../../lib/navigation';
 
 const mockFetch = createRoutedMockFetch({
   '/coaching-card': { coldStart: false, card: null, fallback: null },
@@ -30,6 +34,11 @@ const mockFetch = createRoutedMockFetch({
 
 jest.mock('../../lib/api-client', () =>
   require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch)
+);
+
+jest.mock(
+  'react-i18next',
+  () => require('../../test-utils/mock-i18n').i18nMock
 );
 
 jest.mock('../../lib/profile', () => ({
@@ -76,6 +85,7 @@ jest.mock('../../lib/theme', () => ({
     primary: '#00b4d8',
     primarySoft: 'rgba(0,180,216,0.16)',
     border: '#2a2a54',
+    muted: '#94a3b8',
   }),
   useTheme: () => ({ colorScheme: 'dark' }),
 }));
@@ -110,7 +120,7 @@ function createWrapper() {
 const { LearnerScreen } = require('./LearnerScreen');
 const { fetchCallsMatching } = require('../../test-utils/mock-api-routes');
 
-const HOME_RETURN_PARAMS = { returnTo: 'learner-home' };
+const HOME_RETURN_PARAMS = { returnTo: LEARNER_HOME_RETURN_TO };
 
 const defaultProps = {
   profiles: [{ id: 'p1', displayName: 'Alex', isOwner: true }],
@@ -169,18 +179,24 @@ describe('LearnerScreen', () => {
     render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
 
     await waitFor(() => {
+      screen.getByText('What do you need right now?');
+      screen.getByText('Homework help');
+      screen.getByText('Take a photo or type the problem');
+      screen.getByText('Practice for a test');
+      screen.getByText('Review what is fading or quiz yourself');
+      screen.getByText('Learn something new');
       screen.getByTestId('home-empty-subjects');
       screen.getByTestId('home-add-first-subject');
       screen.getByTestId('home-ask-anything');
       screen.getByTestId('home-action-study-new');
       screen.getByTestId('home-action-homework');
       screen.getByTestId('home-action-practice');
-      screen.getByText('Pick a subject to start learning');
+      screen.getByText('Your subjects will show up here');
       expect(screen.queryByTestId('home-subject-carousel')).toBeNull();
     });
   });
 
-  it('shows action grid when subjects exist', async () => {
+  it('shows task-first intent choices when subjects exist', async () => {
     mockFetch.setRoute('/subjects', {
       subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
     });
@@ -188,6 +204,7 @@ describe('LearnerScreen', () => {
     render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
 
     await waitFor(() => {
+      screen.getByText('What do you need right now?');
       screen.getByTestId('home-subject-carousel');
       screen.getByTestId('home-ask-anything');
       screen.getByTestId('home-action-study-new');
@@ -252,7 +269,10 @@ describe('LearnerScreen', () => {
 
     await waitFor(() => screen.getByTestId('home-action-study-new'));
     fireEvent.press(screen.getByTestId('home-action-study-new'));
-    expect(mockPush).toHaveBeenCalledWith('/create-subject');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/create-subject',
+      params: HOME_RETURN_PARAMS,
+    });
   });
 
   it('navigates to freeform session on Ask anything', async () => {
@@ -282,7 +302,8 @@ describe('LearnerScreen', () => {
 
     await waitFor(() => screen.getByTestId('home-action-homework'));
     fireEvent.press(screen.getByTestId('home-action-homework'));
-    expect(mockPush).toHaveBeenCalledWith({
+    expect(mockPush).toHaveBeenNthCalledWith(1, LEARNER_HOME_HREF);
+    expect(mockPush).toHaveBeenNthCalledWith(2, {
       pathname: '/(app)/homework/camera',
       params: HOME_RETURN_PARAMS,
     });
@@ -551,6 +572,7 @@ describe('LearnerScreen', () => {
     await waitFor(() => {
       screen.getByTestId('home-empty-subjects');
       screen.getByTestId('home-add-first-subject');
+      screen.getByText('Your subjects will show up here');
       screen.getByText('Add a subject');
     });
   });

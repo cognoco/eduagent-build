@@ -105,6 +105,32 @@
     "goToLibraryLabel": "Przejdź do Biblioteki",
     "moreOptions": "Więcej opcji",
     "moreOptionsLabel": "Więcej opcji",
+    "learner": {
+      "recommended": "Polecane",
+      "intentHeading": "Czego teraz potrzebujesz?",
+      "askAnythingLabel": "Zapytaj o cokolwiek",
+      "askAnythingSubtitle": "Szybkie pytanie, pomysł na naukę albo coś niejasnego",
+      "askAnythingPlaceholder": "Zapytaj o cokolwiek...",
+      "yourSubjects": "Twoje przedmioty",
+      "newSubject": "Nowy przedmiot",
+      "emptySubjectsTitle": "Twoje przedmioty pojawią się tutaj",
+      "emptySubjectsMessage": "Zacznij jeden teraz albo użyj pomocy w zadaniach, gdy jej potrzebujesz.",
+      "addSubject": "Dodaj przedmiot",
+      "intentActions": {
+        "homework": {
+          "title": "Pomoc w zadaniach",
+          "subtitle": "Zrób zdjęcie albo wpisz zadanie"
+        },
+        "practice": {
+          "title": "Ćwicz do sprawdzianu",
+          "subtitle": "Powtórz to, co się zaciera, albo sprawdź się"
+        },
+        "studyNew": {
+          "title": "Naucz się czegoś nowego",
+          "subtitle": "Zacznij temat albo utwórz przedmiot"
+        }
+      }
+    },
     "parentGateway": {
       "seeHowTheyAreDoing": "Zobacz, jak im idzie",
       "practicedThisWeek": "{{name}} ćwiczył(a) {{minutes}} min w tym tygodniu",
@@ -688,7 +714,8 @@
       "shelfPausedSuffix": ", wstrzymany",
       "shelfReviewSuffix": ", wymaga powtórki",
       "shelfActionExpand": "rozwinąć",
-      "shelfActionCollapse": "zwinąć"
+      "shelfActionCollapse": "zwinąć",
+      "shelfActionOpen": "otworzyć"
     },
     "shelf": {
       "missingParam": "Brakujący przedmiot. Wróć i spróbuj ponownie.",
@@ -699,6 +726,9 @@
       "topicProgress": "{{completed}}/{{total}} tematów",
       "settingsAccessibilityLabel": "Ustawienia przedmiotu",
       "studyNext": "Ucz się dalej",
+      "chooseBook": "Przeglądaj lub wybierz książkę",
+      "chooseAnotherBook": "Przeglądaj lub dodaj inną książkę",
+      "addAnotherBook": "Dodaj inną książkę",
       "browseAll": "Przeglądaj wszystkie sugestie",
       "emptyPickTitle": "Wybierz książkę, aby zacząć",
       "emptyPickMessage": "Stuknij jedną z kart „Ucz się dalej” powyżej, aby rozpocząć.",
@@ -1100,6 +1130,14 @@
       "retentionWeak": "Ten przedmiot skorzystałby na dodatkowej uwadze.",
       "openShelf": "Otwórz półkę",
       "resume": "Wznów",
+      "chooseNext": "Wybierz następny",
+      "hideSubject": "Ukryj przedmiot",
+      "hidingSubject": "Ukrywanie przedmiotu...",
+      "hideSubjectHint": "Ukrywa ten przedmiot w głównych widokach. Możesz go później przywrócić z Biblioteki.",
+      "hideConfirmTitle": "Ukryć {{subject}}?",
+      "hideConfirmMessage": "To przeniesie przedmiot poza główne widoki. Twoja historia nauki zostanie zachowana, a przedmiot możesz przywrócić z Biblioteki.",
+      "hideConfirmAction": "Ukryj przedmiot",
+      "hideErrorTitle": "Nie udało się ukryć przedmiotu",
       "goneTitle": "Ten przedmiot nie jest już dostępny",
       "goneSubtitle": "Mógł zostać usunięty lub połączony z innym przedmiotem.",
       "pastConversations": "Poprzednie rozmowy"
@@ -1133,7 +1171,13 @@
     "common": {
       "noSubjectSelected": "Nie wybrano przedmiotu",
       "saving": "Zapisywanie…",
-      "skip": "Pomiń"
+      "skip": "Pomiń",
+      "stepLabels": {
+        "quickChat": "Krótka rozmowa",
+        "makeItPersonal": "Dopasuj do siebie",
+        "supportOptions": "Opcje wsparcia",
+        "yourPlan": "Twój plan"
+      }
     },
     "mentorLanguagePicker": {
       "title": "W jakim języku powinien mówić Twój mentor?",
@@ -1243,6 +1287,12 @@
       "skipAll": "Pomiń"
     },
     "interview": {
+      "title": "Ustaw {{target}}",
+      "newSubject": "twój przedmiot",
+      "openingWithTarget": "Cześć! Jestem twoim towarzyszem nauki. Najpierw muszę dowiedzieć się trochę o tobie i {{target}}, żebym mógł pomagać na właściwym poziomie zamiast zgadywać. Co już wiesz? Wystarczy przybliżona odpowiedź.",
+      "openingGeneric": "Cześć! Jestem twoim towarzyszem nauki. Najpierw muszę dowiedzieć się trochę o tobie, żebym mógł pomagać na właściwym poziomie zamiast zgadywać. Co już wiesz? Wystarczy przybliżona odpowiedź.",
+      "explainerTitle": "Dlaczego najpierw pytam?",
+      "explainerBody": "Twoje odpowiedzi pomagają mi wybrać właściwy punkt startu. Po tej krótkiej konfiguracji mogę uczyć, pytać i wyjaśniać w sposób dopasowany do ciebie.",
       "missingSubject": "Nie wybrano przedmiotu. Wróć i spróbuj ponownie.",
       "sessionCreationStuck": "Tworzenie sesji trwa dłużej niż oczekiwano. Wróć i spróbuj ponownie.",
       "settingUp": "Konfigurowanie Twojej sesji…",

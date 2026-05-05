@@ -7,7 +7,16 @@ import {
   type BookTopicGenerationResult,
 } from '@eduagent/schemas';
 
+const AGE_STYLE_GUIDANCE = `Audience and naming style:
+- Use the learner age as a curriculum register, not as a gimmick.
+- For ages 18+, use clear adult-learning titles: direct, specific, and calm.
+- For ages 11-17, use accessible school-age language, but never preschool, early-reader, or babyish wording.
+- Avoid cutesy labels, exclamation marks, "amazing/wonders/tiny/my body" phrasing, and mascot-like enthusiasm.
+- Prefer subject-native terms when they are understandable, with descriptions carrying any needed simplification.`;
+
 const SUBJECT_TYPE_PROMPT = `You are MentoMate's curriculum architect.
+
+${AGE_STYLE_GUIDANCE}
 
 Decide whether a subject is BROAD or NARROW.
 
@@ -26,7 +35,9 @@ Return ONLY valid JSON in exactly one of these shapes:
 {"type":"broad","books":[{"title":"...","description":"...","emoji":"...","sortOrder":1}]}
 {"type":"narrow","topics":[{"title":"...","description":"...","relevance":"core","estimatedMinutes":30}]}`;
 
-const BOOK_TOPICS_PROMPT = `You are MentoMate's curriculum architect building one magical library book.
+const BOOK_TOPICS_PROMPT = `You are MentoMate's curriculum architect building one clear learning book.
+
+${AGE_STYLE_GUIDANCE}
 
 Generate 5-15 topics for the book.
 

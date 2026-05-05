@@ -264,5 +264,27 @@ describe('ProfileProvider', () => {
 
     expect(result.current.profiles).toEqual([]);
     expect(result.current.activeProfile).toBeNull();
+    expect(result.current.profileLoadError).toBeNull();
+  });
+
+  it('[BUG-PROFILE-GATE] exposes profile load errors instead of treating them as no profiles', async () => {
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ message: 'Server error' }), {
+        status: 500,
+      })
+    );
+
+    const { result } = renderHook(() => useProfile(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.profileLoadError).toBeTruthy();
+    });
+
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.profiles).toEqual([]);
+    expect(result.current.activeProfile).toBeNull();
   });
 });

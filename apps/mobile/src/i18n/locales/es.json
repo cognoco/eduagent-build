@@ -105,6 +105,32 @@
     "goToLibraryLabel": "Ir a la biblioteca",
     "moreOptions": "Más opciones",
     "moreOptionsLabel": "Más opciones",
+    "learner": {
+      "recommended": "Recomendado",
+      "intentHeading": "¿Qué necesitas ahora?",
+      "askAnythingLabel": "Pregunta lo que quieras",
+      "askAnythingSubtitle": "Una pregunta rápida, una idea de estudio o algo confuso",
+      "askAnythingPlaceholder": "Pregunta lo que quieras...",
+      "yourSubjects": "Tus materias",
+      "newSubject": "Nueva materia",
+      "emptySubjectsTitle": "Tus materias aparecerán aquí",
+      "emptySubjectsMessage": "Empieza una ahora, o usa la ayuda con tareas cuando la necesites.",
+      "addSubject": "Agregar materia",
+      "intentActions": {
+        "homework": {
+          "title": "Ayuda con tareas",
+          "subtitle": "Toma una foto o escribe el problema"
+        },
+        "practice": {
+          "title": "Practicar para un examen",
+          "subtitle": "Repasa lo que se está olvidando o ponte a prueba"
+        },
+        "studyNew": {
+          "title": "Aprender algo nuevo",
+          "subtitle": "Empieza un tema o crea una materia"
+        }
+      }
+    },
     "parentGateway": {
       "seeHowTheyAreDoing": "Mira cómo les va",
       "practicedThisWeek": "{{name}} practicó {{minutes}} min esta semana",
@@ -688,7 +714,8 @@
       "shelfPausedSuffix": ", en pausa",
       "shelfReviewSuffix": ", necesita repaso",
       "shelfActionExpand": "expandir",
-      "shelfActionCollapse": "contraer"
+      "shelfActionCollapse": "contraer",
+      "shelfActionOpen": "abrir"
     },
     "shelf": {
       "missingParam": "Falta la materia. Vuelve e inténtalo de nuevo.",
@@ -699,6 +726,9 @@
       "topicProgress": "{{completed}}/{{total}} temas",
       "settingsAccessibilityLabel": "Ajustes de la materia",
       "studyNext": "Próximo estudio",
+      "chooseBook": "Explorar o elegir un libro",
+      "chooseAnotherBook": "Explorar o añadir otro libro",
+      "addAnotherBook": "Añadir otro libro",
       "browseAll": "Explorar todas las sugerencias",
       "emptyPickTitle": "Elige un libro para empezar",
       "emptyPickMessage": "Toca una de las tarjetas de \"Estudiar a continuación\" de arriba para empezar.",
@@ -1100,6 +1130,14 @@
       "retentionWeak": "A esta materia le vendría bien un poco de atención extra.",
       "openShelf": "Abrir estante",
       "resume": "Continuar",
+      "chooseNext": "Elegir siguiente",
+      "hideSubject": "Ocultar materia",
+      "hidingSubject": "Ocultando materia...",
+      "hideSubjectHint": "Oculta esta materia de tus vistas principales. Puedes restaurarla desde Biblioteca más tarde.",
+      "hideConfirmTitle": "¿Ocultar {{subject}}?",
+      "hideConfirmMessage": "Esto moverá la materia fuera de tus vistas principales. Tu historial de aprendizaje se mantiene guardado y puedes restaurarla desde Biblioteca.",
+      "hideConfirmAction": "Ocultar materia",
+      "hideErrorTitle": "No se pudo ocultar la materia",
       "goneTitle": "Esta materia ya no está disponible",
       "goneSubtitle": "Puede haber sido eliminada o fusionada con otra materia.",
       "pastConversations": "Conversaciones anteriores"
@@ -1133,7 +1171,13 @@
     "common": {
       "noSubjectSelected": "No se seleccionó ninguna materia",
       "saving": "Guardando…",
-      "skip": "Omitir"
+      "skip": "Omitir",
+      "stepLabels": {
+        "quickChat": "Charla rápida",
+        "makeItPersonal": "Hazlo personal",
+        "supportOptions": "Opciones de apoyo",
+        "yourPlan": "Tu plan"
+      }
     },
     "mentorLanguagePicker": {
       "title": "¿En qué idioma debería hablar tu mentor?",
@@ -1243,6 +1287,12 @@
       "skipAll": "Omitir"
     },
     "interview": {
+      "title": "Configurar {{target}}",
+      "newSubject": "tu materia",
+      "openingWithTarget": "¡Hola! Soy tu compañero de aprendizaje. Primero necesito conocer un poco sobre ti y {{target}}, para ayudarte en el nivel correcto en vez de adivinar. ¿Qué sabes ya? Una respuesta aproximada está perfecta.",
+      "openingGeneric": "¡Hola! Soy tu compañero de aprendizaje. Primero necesito conocer un poco sobre ti, para ayudarte en el nivel correcto en vez de adivinar. ¿Qué sabes ya? Una respuesta aproximada está perfecta.",
+      "explainerTitle": "¿Por qué pregunto primero?",
+      "explainerBody": "Tus respuestas me ayudan a elegir el punto de partida correcto. Después de esta configuración rápida, podré enseñar, preguntar y explicar de una forma que encaje contigo.",
       "missingSubject": "No se seleccionó ninguna materia. Vuelve e inténtalo de nuevo.",
       "sessionCreationStuck": "La sesión está tardando más de lo esperado. Vuelve e inténtalo de nuevo.",
       "settingUp": "Configurando tu sesión…",

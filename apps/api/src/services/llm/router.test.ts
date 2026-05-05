@@ -276,6 +276,34 @@ describe('LLM Router', () => {
       );
       warnSpy.mockRestore();
     });
+
+    it('[BUG-ANTHROPIC-FALLBACK] falls back from premium Anthropic to Gemini when OpenAI is absent', async () => {
+      _clearProviders();
+      _resetCircuits();
+      registerProvider(createFailingStreamProvider('anthropic'));
+      registerProvider(createMockProvider('gemini'));
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      const result = await routeAndStream(
+        [{ role: 'user', content: 'test' }],
+        1,
+        { llmTier: 'premium' }
+      );
+
+      expect(result.provider).toBe('anthropic');
+
+      const chunks: string[] = [];
+      for await (const chunk of result.stream) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks.join('')).toContain('Mock streamed');
+      expect(result.fallbackUsed).toBe(true);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('failed before first byte, trying fallback')
+      );
+      warnSpy.mockRestore();
+    });
   });
 
   describe('routeAndCall retry on transient failure', () => {

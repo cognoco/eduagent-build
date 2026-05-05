@@ -105,6 +105,32 @@
     "goToLibraryLabel": "Ir para a Biblioteca",
     "moreOptions": "Mais opções",
     "moreOptionsLabel": "Mais opções",
+    "learner": {
+      "recommended": "Recomendado",
+      "intentHeading": "O que você precisa agora?",
+      "askAnythingLabel": "Pergunte qualquer coisa",
+      "askAnythingSubtitle": "Uma pergunta rápida, ideia de estudo ou algo confuso",
+      "askAnythingPlaceholder": "Pergunte qualquer coisa...",
+      "yourSubjects": "Suas matérias",
+      "newSubject": "Nova matéria",
+      "emptySubjectsTitle": "Suas matérias aparecerão aqui",
+      "emptySubjectsMessage": "Comece uma agora, ou use ajuda com lição de casa quando precisar.",
+      "addSubject": "Adicionar matéria",
+      "intentActions": {
+        "homework": {
+          "title": "Ajuda com lição de casa",
+          "subtitle": "Tire uma foto ou digite o problema"
+        },
+        "practice": {
+          "title": "Praticar para uma prova",
+          "subtitle": "Revise o que está sumindo ou teste a si mesmo"
+        },
+        "studyNew": {
+          "title": "Aprender algo novo",
+          "subtitle": "Comece um tópico ou crie uma matéria"
+        }
+      }
+    },
     "parentGateway": {
       "seeHowTheyAreDoing": "Veja como eles estão indo",
       "practicedThisWeek": "{{name}} praticou {{minutes}} min esta semana",
@@ -688,7 +714,8 @@
       "shelfPausedSuffix": ", pausado",
       "shelfReviewSuffix": ", revisão necessária",
       "shelfActionExpand": "expandir",
-      "shelfActionCollapse": "recolher"
+      "shelfActionCollapse": "recolher",
+      "shelfActionOpen": "abrir"
     },
     "shelf": {
       "missingParam": "Matéria ausente. Volte e tente novamente.",
@@ -699,6 +726,9 @@
       "topicProgress": "{{completed}}/{{total}} tópicos",
       "settingsAccessibilityLabel": "Configurações da matéria",
       "studyNext": "Estudar a seguir",
+      "chooseBook": "Explorar ou escolher um livro",
+      "chooseAnotherBook": "Explorar ou adicionar outro livro",
+      "addAnotherBook": "Adicionar outro livro",
       "browseAll": "Ver todas as sugestões",
       "emptyPickTitle": "Escolha um livro para começar",
       "emptyPickMessage": "Toque em um dos cartões \"Estudar a seguir\" acima para começar.",
@@ -1100,6 +1130,14 @@
       "retentionWeak": "Esta matéria se beneficiaria de um pouco de atenção extra.",
       "openShelf": "Abrir prateleira",
       "resume": "Retomar",
+      "chooseNext": "Escolher próximo",
+      "hideSubject": "Ocultar matéria",
+      "hidingSubject": "Ocultando matéria...",
+      "hideSubjectHint": "Oculta esta matéria das suas visualizações principais. Você pode restaurá-la pela Biblioteca depois.",
+      "hideConfirmTitle": "Ocultar {{subject}}?",
+      "hideConfirmMessage": "Isso moverá a matéria para fora das suas visualizações principais. Seu histórico de aprendizagem fica salvo, e você pode restaurá-la pela Biblioteca.",
+      "hideConfirmAction": "Ocultar matéria",
+      "hideErrorTitle": "Não foi possível ocultar a matéria",
       "goneTitle": "Esta matéria não está mais disponível",
       "goneSubtitle": "Ela pode ter sido removida ou mesclada com outra matéria.",
       "pastConversations": "Conversas anteriores"
@@ -1133,7 +1171,13 @@
     "common": {
       "noSubjectSelected": "Nenhuma matéria selecionada",
       "saving": "Salvando…",
-      "skip": "Pular"
+      "skip": "Pular",
+      "stepLabels": {
+        "quickChat": "Conversa rápida",
+        "makeItPersonal": "Deixe pessoal",
+        "supportOptions": "Opções de apoio",
+        "yourPlan": "Seu plano"
+      }
     },
     "mentorLanguagePicker": {
       "title": "Em qual idioma seu mentor deve falar?",
@@ -1243,6 +1287,12 @@
       "skipAll": "Pular"
     },
     "interview": {
+      "title": "Configurar {{target}}",
+      "newSubject": "sua matéria",
+      "openingWithTarget": "Oi! Sou seu parceiro de aprendizagem. Primeiro preciso aprender um pouco sobre você e {{target}}, para orientar no nível certo em vez de adivinhar. O que você já sabe? Uma resposta aproximada está ótima.",
+      "openingGeneric": "Oi! Sou seu parceiro de aprendizagem. Primeiro preciso aprender um pouco sobre você, para orientar no nível certo em vez de adivinhar. O que você já sabe? Uma resposta aproximada está ótima.",
+      "explainerTitle": "Por que pergunto primeiro?",
+      "explainerBody": "Suas respostas me ajudam a escolher o ponto de partida certo. Depois desta configuração rápida, posso ensinar, perguntar e explicar de um jeito que combine com você.",
       "missingSubject": "Nenhuma matéria selecionada. Volte e tente novamente.",
       "sessionCreationStuck": "A sessão está demorando mais que o esperado. Volte e tente novamente.",
       "settingUp": "Configurando sua sessão…",

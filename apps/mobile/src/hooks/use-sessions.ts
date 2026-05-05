@@ -369,6 +369,9 @@ export function useStreamMessage(sessionId: string): {
           if (event.type === 'chunk') {
             accumulated += event.content;
             onChunk(accumulated);
+          } else if (event.type === 'replace') {
+            accumulated = event.content;
+            onChunk(accumulated);
           } else if (event.type === 'replay') {
             options?.onReplay?.(event);
             return;
@@ -390,7 +393,12 @@ export function useStreamMessage(sessionId: string): {
               fallback,
             });
           } else if (event.type === 'error') {
-            throw new Error(event.message);
+            const streamError = new Error(event.message) as Error & {
+              status?: number;
+            };
+            streamError.name = 'UpstreamError';
+            streamError.status = 502;
+            throw streamError;
           }
         }
       } finally {

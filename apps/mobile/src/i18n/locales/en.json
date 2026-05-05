@@ -105,6 +105,32 @@
     "goToLibraryLabel": "Go to Library",
     "moreOptions": "More options",
     "moreOptionsLabel": "More options",
+    "learner": {
+      "recommended": "Recommended",
+      "intentHeading": "What do you need right now?",
+      "askAnythingLabel": "Ask anything",
+      "askAnythingSubtitle": "Quick question, study idea, or something confusing",
+      "askAnythingPlaceholder": "Ask anything...",
+      "yourSubjects": "Your subjects",
+      "newSubject": "New subject",
+      "emptySubjectsTitle": "Your subjects will show up here",
+      "emptySubjectsMessage": "Start one now, or just use homework help when you need it.",
+      "addSubject": "Add a subject",
+      "intentActions": {
+        "homework": {
+          "title": "Homework help",
+          "subtitle": "Take a photo or type the problem"
+        },
+        "practice": {
+          "title": "Practice for a test",
+          "subtitle": "Review what is fading or quiz yourself"
+        },
+        "studyNew": {
+          "title": "Learn something new",
+          "subtitle": "Start a topic or build a subject"
+        }
+      }
+    },
     "parentGateway": {
       "seeHowTheyAreDoing": "See how they're doing",
       "practicedThisWeek": "{{name}} practiced {{minutes}} min this week",
@@ -644,9 +670,9 @@
       "message": "Unable to load your library. Please try again."
     },
     "empty": {
-      "title": "Your library is empty",
-      "message": "Start a study session and your subjects will appear here.",
-      "goHome": "Go to Home"
+      "title": "Your library will grow as you learn",
+      "message": "Start with homework help or learn something new. Books and topics will appear here afterward.",
+      "goHome": "Back to Home"
     },
     "curriculumComplete": {
       "title": "You've covered everything here!",
@@ -688,7 +714,8 @@
       "shelfPausedSuffix": ", paused",
       "shelfReviewSuffix": ", review needed",
       "shelfActionExpand": "expand",
-      "shelfActionCollapse": "collapse"
+      "shelfActionCollapse": "collapse",
+      "shelfActionOpen": "open"
     },
     "shelf": {
       "missingParam": "Missing subject. Please go back and try again.",
@@ -699,11 +726,14 @@
       "topicProgress": "{{completed}}/{{total}} topics",
       "settingsAccessibilityLabel": "Subject settings",
       "studyNext": "Study next",
+      "chooseBook": "Browse or choose a book",
+      "chooseAnotherBook": "Browse or add another book",
+      "addAnotherBook": "Add another book",
       "browseAll": "Browse all suggestions",
       "emptyPickTitle": "Pick a book to start",
       "emptyPickMessage": "Tap one of the \"Study next\" cards above to begin.",
-      "emptyTitle": "No books on this shelf yet.",
-      "emptyMessage": "Your curriculum is still being built. Check back soon.",
+      "emptyTitle": "This shelf is still getting ready",
+      "emptyMessage": "If you just started this subject, try again in a moment. You can also go back and start from Home.",
       "organizing": "Organizing your library...",
       "skip": "Skip — start learning anyway",
       "skipAccessibilityLabel": "Skip and start learning anyway",
@@ -1100,6 +1130,14 @@
       "retentionWeak": "This subject would benefit from some extra attention.",
       "openShelf": "Open shelf",
       "resume": "Resume",
+      "chooseNext": "Choose next",
+      "hideSubject": "Hide subject",
+      "hidingSubject": "Hiding subject...",
+      "hideSubjectHint": "Hides this subject from your main student views. You can restore it from Library later.",
+      "hideConfirmTitle": "Hide {{subject}}?",
+      "hideConfirmMessage": "This will move the subject out of your main views. Your learning history stays saved, and you can restore it from Library.",
+      "hideConfirmAction": "Hide subject",
+      "hideErrorTitle": "Could not hide subject",
       "goneTitle": "This subject is no longer available",
       "goneSubtitle": "It may have been removed or merged into another subject.",
       "pastConversations": "Past conversations"
@@ -1133,7 +1171,13 @@
     "common": {
       "noSubjectSelected": "No subject selected",
       "saving": "Saving…",
-      "skip": "Skip"
+      "skip": "Skip",
+      "stepLabels": {
+        "quickChat": "Quick chat",
+        "makeItPersonal": "Make it personal",
+        "supportOptions": "Support options",
+        "yourPlan": "Your plan"
+      }
     },
     "mentorLanguagePicker": {
       "title": "What language should your mentor speak?",
@@ -1243,6 +1287,12 @@
       "skipAll": "Skip"
     },
     "interview": {
+      "title": "Set up {{target}}",
+      "newSubject": "your subject",
+      "openingWithTarget": "Hi! I'm your learning mate. First I need to learn a little about you and {{target}}, so I can mentor at the right level instead of guessing. What do you already know? A rough answer is perfect.",
+      "openingGeneric": "Hi! I'm your learning mate. First I need to learn a little about you, so I can mentor at the right level instead of guessing. What do you already know? A rough answer is perfect.",
+      "explainerTitle": "Why am I asking first?",
+      "explainerBody": "Your answers help me choose the right starting point. After this quick setup, I can teach, quiz, and explain in a way that fits you.",
       "missingSubject": "No subject selected. Please go back and try again.",
       "sessionCreationStuck": "Session is taking longer than expected. Please go back and try again.",
       "settingUp": "Setting up your session…",

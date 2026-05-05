@@ -47,6 +47,12 @@ const STARTER_CHIPS = [
   'Programming',
 ] as const;
 
+function isStarterChipInput(input: string): boolean {
+  return STARTER_CHIPS.some(
+    (chip) => chip.toLowerCase() === input.trim().toLowerCase()
+  );
+}
+
 type ResolveState =
   | { phase: 'idle' }
   | { phase: 'resolving' }
@@ -116,7 +122,7 @@ export default function CreateSubjectScreen() {
   const doCreate = useCallback(
     async (
       subjectName: string,
-      rawInputOverride?: string,
+      rawInputOverride?: string | null,
       focus?: string,
       focusDescription?: string
     ) => {
@@ -125,10 +131,12 @@ export default function CreateSubjectScreen() {
       cancelledRef.current = false; // [BUG-692] reset on each new attempt
       try {
         const rawInput =
-          rawInputOverride ??
-          (originalInput && originalInput !== subjectName
-            ? originalInput
-            : undefined);
+          rawInputOverride === null
+            ? undefined
+            : rawInputOverride ??
+              (originalInput && originalInput !== subjectName
+                ? originalInput
+                : undefined);
         const result = await createSubject.mutateAsync({
           name: subjectName,
           ...(rawInput ? { rawInput } : {}),
@@ -298,15 +306,25 @@ export default function CreateSubjectScreen() {
       }
 
       setName(subjectName);
-      const effectiveFocus =
-        suggestionFocus ??
-        (originalInput &&
+      // If the learner began from a broad starter chip like "Science", the
+      // resolver's focus is a clarification label ("Biology: Life Sciences"),
+      // not enough learner intent to create a focused book. Let the API treat
+      // the picked subject as broad so the learner gets the book picker.
+      const isStarterCategoryRefinement =
+        originalInput !== '' &&
+        isStarterChipInput(originalInput) &&
+        originalInput.toLowerCase() !== subjectName.toLowerCase();
+      const derivedFocus =
+        originalInput &&
         originalInput.toLowerCase() !== subjectName.toLowerCase()
           ? originalInput
-          : undefined);
+          : undefined;
+      const effectiveFocus = isStarterCategoryRefinement
+        ? undefined
+        : suggestionFocus ?? derivedFocus;
       await doCreate(
         subjectName,
-        originalInput || undefined,
+        isStarterCategoryRefinement ? null : originalInput || undefined,
         effectiveFocus,
         effectiveFocus ? suggestion.description : undefined
       );

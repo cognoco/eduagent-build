@@ -1248,12 +1248,14 @@ export default function AppLayout() {
   const tokenVars = useTokenVars();
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
   const currentAppPath = toInternalAppRedirectPath(pathname);
   const {
     activeProfile,
     isLoading: isProfileLoading,
+    profileLoadError,
     profileWasRemoved,
     acknowledgeProfileRemoval,
     switchProfile,
@@ -1451,6 +1453,39 @@ export default function AppLayout() {
         testID="profile-loading"
       >
         <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
+  // If the profile query fails, do not treat it as "no profiles". That would
+  // push an existing user into first-time profile creation and can trigger a
+  // confusing add-profile subscription limit.
+  if (profileLoadError) {
+    return (
+      <View className="flex-1 bg-background">
+        <ErrorFallback
+          variant="centered"
+          title="We could not load your profile"
+          message="Retry loading your profile, or sign out and sign in again."
+          primaryAction={{
+            label: t('common.retry'),
+            onPress: () => {
+              setProfileLoadTimedOut(false);
+              void queryClient.invalidateQueries({ queryKey: ['profiles'] });
+              void queryClient.refetchQueries({ queryKey: ['profiles'] });
+            },
+            testID: 'profile-load-error-retry',
+          }}
+          secondaryAction={{
+            label: t('common.signOut'),
+            onPress: () => {
+              clearTransitionState();
+              void clerkSignOut();
+            },
+            testID: 'profile-load-error-signout',
+          }}
+          testID="profile-load-error"
+        />
       </View>
     );
   }

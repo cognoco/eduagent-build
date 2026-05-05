@@ -3,17 +3,26 @@ import { Text, View } from 'react-native';
 interface OnboardingStepIndicatorProps {
   step: number;
   totalSteps: number;
+  stepLabels?: string[];
 }
 
 export function OnboardingStepIndicator({
   step,
   totalSteps,
+  stepLabels,
 }: OnboardingStepIndicatorProps): React.ReactElement {
   const safeTotalSteps = Math.max(totalSteps, 1);
   const activeStep = Math.min(Math.max(step, 1), safeTotalSteps);
+  const activeStepLabel = stepLabels?.[activeStep - 1];
 
   return (
-    <View className="items-center py-3 gap-2">
+    <View
+      accessible={true}
+      className="items-center py-3 gap-2"
+      accessibilityLabel={`Step ${activeStep} of ${safeTotalSteps}${
+        activeStepLabel ? `: ${activeStepLabel}` : ''
+      }`}
+    >
       <View className="flex-row gap-2">
         {Array.from({ length: safeTotalSteps }, (_, index) => {
           const stepNumber = index + 1;
@@ -30,9 +39,16 @@ export function OnboardingStepIndicator({
           );
         })}
       </View>
-      <Text className="text-xs text-muted">
-        Step {step} of {safeTotalSteps}
-      </Text>
+      <View className="items-center">
+        <Text className="text-xs text-muted">
+          Step {activeStep} of {safeTotalSteps}
+        </Text>
+        {activeStepLabel ? (
+          <Text className="text-body-sm font-semibold text-text-primary mt-1">
+            {activeStepLabel}
+          </Text>
+        ) : null}
+      </View>
     </View>
   );
 }

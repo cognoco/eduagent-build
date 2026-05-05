@@ -114,6 +114,9 @@ export const SUBJECT_TINT_PALETTE = {
     { name: 'amber', solid: '#b45309', soft: 'rgba(180,83,9,0.14)' },
     { name: 'blue', solid: '#2563eb', soft: 'rgba(37,99,235,0.14)' },
     { name: 'rose', solid: '#db2777', soft: 'rgba(219,39,119,0.14)' },
+    { name: 'emerald', solid: '#047857', soft: 'rgba(4,120,87,0.14)' },
+    { name: 'cyan', solid: '#0891b2', soft: 'rgba(8,145,178,0.14)' },
+    { name: 'orange', solid: '#c2410c', soft: 'rgba(194,65,12,0.14)' },
   ],
   dark: [
     { name: 'teal', solid: '#2dd4bf', soft: 'rgba(45,212,191,0.18)' },
@@ -121,6 +124,9 @@ export const SUBJECT_TINT_PALETTE = {
     { name: 'amber', solid: '#eab308', soft: 'rgba(234,179,8,0.18)' },
     { name: 'blue', solid: '#60a5fa', soft: 'rgba(96,165,250,0.18)' },
     { name: 'rose', solid: '#f472b6', soft: 'rgba(244,114,182,0.18)' },
+    { name: 'emerald', solid: '#34d399', soft: 'rgba(52,211,153,0.18)' },
+    { name: 'cyan', solid: '#22d3ee', soft: 'rgba(34,211,238,0.18)' },
+    { name: 'orange', solid: '#fb923c', soft: 'rgba(251,146,60,0.18)' },
   ],
 } as const;
 

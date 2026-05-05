@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AnalogyDomainPicker } from '../../../components/common';
 import { OnboardingStepIndicator } from '../../../components/onboarding/OnboardingStepIndicator';
 import { useUpdateAnalogyDomain } from '../../../hooks/use-settings';
+import { getOnboardingStepLabels } from '../../../lib/onboarding-step-labels';
 import { platformAlert } from '../../../lib/platform-alert';
 import { useThemeColors } from '../../../lib/theme';
 import type { AnalogyDomain } from '@eduagent/schemas';
@@ -30,6 +31,7 @@ export default function AnalogyPreferenceScreen() {
   const insets = useSafeAreaInsets();
   const step = Number(stepParam) || 2;
   const totalSteps = Number(totalStepsParam) || 4;
+  const stepLabels = getOnboardingStepLabels(t);
   const [selectedDomain, setSelectedDomain] = useState<AnalogyDomain | null>(
     null
   );
@@ -117,7 +119,11 @@ export default function AnalogyPreferenceScreen() {
         >
           <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </Pressable>
-        <OnboardingStepIndicator step={step} totalSteps={totalSteps} />
+        <OnboardingStepIndicator
+          step={step}
+          totalSteps={totalSteps}
+          stepLabels={stepLabels}
+        />
         <Text
           className="text-h2 font-bold text-text-primary"
           testID="analogy-preference-title"

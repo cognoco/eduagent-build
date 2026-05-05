@@ -398,6 +398,25 @@ describe('AppLayout', () => {
     expect(screen.queryByTestId('redirect')).toBeNull();
   });
 
+  it('[BUG-PROFILE-GATE] shows a retryable profile-load error instead of create-profile gate', () => {
+    mockUseProfile.mockReturnValue({
+      profiles: [],
+      activeProfile: null,
+      isLoading: false,
+      profileLoadError: new Error('profiles failed'),
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: jest.fn(),
+      switchProfile: jest.fn(),
+    });
+
+    renderLayout();
+
+    screen.getByTestId('profile-load-error');
+    screen.getByText('We could not load your profile');
+    expect(screen.queryByTestId('create-profile-gate')).toBeNull();
+    expect(screen.queryByTestId('tabs')).toBeNull();
+  });
+
   // [BUG-914] When a parent (isOwner=true) is the active profile — typically
   // because they just tapped "Switch back" while impersonating a child — the
   // post-approval celebration must NOT render. The celebration addresses the

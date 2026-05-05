@@ -26,8 +26,44 @@ describe('OnboardingStepIndicator', () => {
   });
 
   it('shows step label text', () => {
+    render(
+      <OnboardingStepIndicator
+        step={2}
+        totalSteps={4}
+        stepLabels={[
+          'Quick chat',
+          'Make it personal',
+          'Support options',
+          'Your plan',
+        ]}
+      />
+    );
+
+    screen.getByText('Step 2 of 4');
+    screen.getByText('Make it personal');
+  });
+
+  it('stays label-agnostic when labels are not provided', () => {
     render(<OnboardingStepIndicator step={2} totalSteps={4} />);
 
     screen.getByText('Step 2 of 4');
+    expect(screen.queryByText('Make it personal')).toBeNull();
+  });
+
+  it('shows the plan label on the final setup step', () => {
+    render(
+      <OnboardingStepIndicator
+        step={4}
+        totalSteps={4}
+        stepLabels={[
+          'Quick chat',
+          'Make it personal',
+          'Support options',
+          'Your plan',
+        ]}
+      />
+    );
+
+    screen.getByText('Your plan');
   });
 });

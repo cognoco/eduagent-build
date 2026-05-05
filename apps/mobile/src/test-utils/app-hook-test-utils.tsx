@@ -82,6 +82,7 @@ export function createHookWrapper(options: CreateHookWrapperOptions = {}) {
     activeProfile,
     switchProfile: async () => ({ success: true }),
     isLoading: false,
+    profileLoadError: null,
     profileWasRemoved: false,
     acknowledgeProfileRemoval: () => undefined,
   };

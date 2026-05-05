@@ -42,6 +42,31 @@ describe('parseSSEStream', () => {
     });
   });
 
+  it('parses replace events from SSE stream', async () => {
+    const stream = createMockStream([
+      'data: {"type":"chunk","content":"Partial"}\n\n',
+      'data: {"type":"replace","content":"Recovered reply"}\n\n',
+      'data: {"type":"done","exchangeCount":1,"escalationRung":1}\n\n',
+    ]);
+
+    const events: StreamEvent[] = [];
+    for await (const event of parseSSEStream(mockResponse(stream))) {
+      events.push(event);
+    }
+
+    expect(events).toHaveLength(3);
+    expect(events[0]).toEqual({ type: 'chunk', content: 'Partial' });
+    expect(events[1]).toEqual({
+      type: 'replace',
+      content: 'Recovered reply',
+    });
+    expect(events[2]).toEqual({
+      type: 'done',
+      exchangeCount: 1,
+      escalationRung: 1,
+    });
+  });
+
   it('throws when response body is null', async () => {
     const gen = parseSSEStream(mockResponse(null));
     await expect(gen.next()).rejects.toThrow(

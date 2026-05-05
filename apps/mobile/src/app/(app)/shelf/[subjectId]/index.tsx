@@ -17,7 +17,7 @@ import {
   classifyApiError,
   recoveryActions,
 } from '../../../../lib/format-api-error';
-import { useThemeColors } from '../../../../lib/theme';
+import { useSubjectTint, useThemeColors } from '../../../../lib/theme';
 
 export default function ShelfScreen() {
   const { t } = useTranslation();
@@ -35,6 +35,7 @@ export default function ShelfScreen() {
   // than an array. The ?? operator only catches null/undefined, not objects.
   const books = Array.isArray(booksQuery.data) ? booksQuery.data : [];
   const subject = subjectsQuery.data?.find((s) => s.id === subjectId);
+  const shelfTint = useSubjectTint(subject?.name ?? subjectId ?? 'shelf');
 
   const { data: rawBookSuggestions } = useBookSuggestions(subjectId);
   const bookSuggestions = rawBookSuggestions ?? [];
@@ -89,13 +90,11 @@ export default function ShelfScreen() {
       // [BUG-692] If the user pressed Skip during the network round-trip,
       // they have already navigated away — do not push them into the book.
       if (filingSkipped.current) return;
-      // M-12: Pass autoStart so the book screen begins a session immediately
       router.push({
         pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
         params: {
           subjectId: result.shelfId,
           bookId: result.bookId,
-          autoStart: 'true',
         },
       } as never);
     } catch (err) {
@@ -174,6 +173,38 @@ export default function ShelfScreen() {
     0
   );
   const showProgress = totalTopics > 0;
+  const showBrowseAllSuggestions = bookSuggestions.length > 2;
+  const showAddBookFooter = bookSuggestions.length === 0 && books.length > 0;
+  const chooseBookButtonLabel = showBrowseAllSuggestions
+    ? t('library.shelf.browseAll')
+    : t('library.shelf.addAnotherBook');
+
+  const renderChooseBookButton = (
+    className = 'mx-4 mb-4 border border-dashed border-border rounded-xl py-3 items-center justify-center flex-row gap-2'
+  ) => (
+    <Pressable
+      onPress={() =>
+        router.push({
+          pathname: '/(app)/pick-book/[subjectId]',
+          params: { subjectId },
+        } as never)
+      }
+      className={className}
+      style={{ borderColor: shelfTint.solid }}
+      testID="shelf-choose-book"
+      accessibilityRole="button"
+      accessibilityLabel={chooseBookButtonLabel}
+    >
+      <Ionicons
+        name={
+          showBrowseAllSuggestions ? 'albums-outline' : 'add-circle-outline'
+        }
+        size={18}
+        color={shelfTint.solid}
+      />
+      <Text style={{ color: shelfTint.solid }}>{chooseBookButtonLabel}</Text>
+    </Pressable>
+  );
 
   if (isLoading) {
     return (
@@ -271,6 +302,7 @@ export default function ShelfScreen() {
                 <View
                   className="h-full bg-primary rounded-full"
                   style={{
+                    backgroundColor: shelfTint.solid,
                     width: `${Math.round(
                       (completedTopics / totalTopics) * 100
                     )}%`,
@@ -314,6 +346,7 @@ export default function ShelfScreen() {
                 title={suggestion.title}
                 emoji={suggestion.emoji}
                 description={suggestion.description}
+                tint={shelfTint}
                 onPress={() => void handlePickBookSuggestion(suggestion)}
                 testID={`shelf-suggestion-${suggestion.id}`}
               />
@@ -322,25 +355,7 @@ export default function ShelfScreen() {
         </View>
       )}
 
-      {/* Browse all link when more than 2 suggestions */}
-      {bookSuggestions.length > 2 && (
-        <Pressable
-          onPress={() =>
-            router.push({
-              pathname: '/(app)/pick-book/[subjectId]',
-              params: { subjectId },
-            } as never)
-          }
-          className="mx-4 mb-4 border border-dashed border-border rounded-xl py-3 items-center"
-          testID="shelf-browse-all-suggestions"
-          accessibilityRole="button"
-          accessibilityLabel={t('library.shelf.browseAll')}
-        >
-          <Text className="text-text-muted">
-            {t('library.shelf.browseAll')}
-          </Text>
-        </Pressable>
-      )}
+      {showBrowseAllSuggestions ? renderChooseBookButton() : null}
 
       {/* Book list */}
       <FlatList
@@ -355,6 +370,7 @@ export default function ShelfScreen() {
             book={item}
             status={getBookStatus(item.id)}
             highlighted={item.id === suggestedBookId}
+            tint={shelfTint}
             onPress={() =>
               router.push({
                 pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
@@ -363,6 +379,15 @@ export default function ShelfScreen() {
             }
           />
         )}
+        ListFooterComponent={
+          showAddBookFooter ? (
+            <View className="pt-1">
+              {renderChooseBookButton(
+                'mb-4 border border-dashed border-border rounded-xl py-3 items-center justify-center flex-row gap-2'
+              )}
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
           // [BUG-868] When there are no books yet but suggestions render
           // above, "Check back soon" wrongly told the user to wait passively
@@ -393,9 +418,22 @@ export default function ShelfScreen() {
                 {t('library.shelf.emptyMessage')}
               </Text>
               <Pressable
+                onPress={handleRetry}
+                className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center mb-3 w-full"
+                testID="shelf-empty-retry"
+                accessibilityRole="button"
+                accessibilityLabel={t('common.retry')}
+              >
+                <Text className="text-text-inverse text-body font-semibold">
+                  {t('common.retry')}
+                </Text>
+              </Pressable>
+              <Pressable
                 onPress={handleBack}
-                className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
+                className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center w-full"
                 testID="shelf-empty-back"
+                accessibilityRole="button"
+                accessibilityLabel={t('common.back')}
               >
                 <Text className="text-text-primary text-body font-semibold">
                   {t('common.back')}

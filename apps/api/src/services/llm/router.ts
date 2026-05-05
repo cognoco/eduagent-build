@@ -256,20 +256,26 @@ function getModelConfig(
 /**
  * Fallback config when primary provider fails. Returns null if no fallback.
  *
- * Intentionally one-directional for MVP: Gemini → OpenAI only.
- * Gemini is our primary (cheaper, safety-settings-native) provider. OpenAI is
- * the paid fallback. The reverse (OpenAI → Gemini) is not wired because in an
- * OpenAI-only deployment Gemini keys are absent, and in a dual-provider
- * deployment Gemini is already the primary. Extend when adding more providers.
+ * Premium requests prefer Anthropic, but Gemini is a valid fallback when the
+ * Anthropic provider is registered but unavailable (billing, outage, etc.).
+ * Standard/flash Gemini requests still use OpenAI as the paid fallback when
+ * present.
  */
 function getFallbackConfig(
   primary: ModelConfig,
   rung: EscalationRung
 ): ModelConfig | null {
-  // Only fall back if the fallback provider is actually registered
-  if (!providers.has('openai')) return null;
-  // Don't fall back to the same provider (OpenAI-only deployment)
-  if (primary.provider === 'openai') return null;
+  if (primary.provider === 'anthropic' && providers.has('gemini')) {
+    const isLight = rung <= 2;
+    return {
+      provider: 'gemini',
+      model: isLight ? 'gemini-2.5-flash' : 'gemini-2.5-pro',
+      maxTokens: MIN_REPLY_MAX_TOKENS,
+    };
+  }
+
+  // Gemini's paid fallback is OpenAI when configured.
+  if (primary.provider !== 'gemini' || !providers.has('openai')) return null;
 
   // [BUG-875] Fallback maxTokens matches the primary ceiling. Falling back
   // to a smaller token budget would mean a primary that ran out of tokens
