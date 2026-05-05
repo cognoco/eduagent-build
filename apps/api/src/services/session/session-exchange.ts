@@ -98,9 +98,13 @@ const MAX_CORRECT_STREAK = 5;
 
 /**
  * Counts the number of consecutive correct answers at `currentRung` from the
- * end of the event log, scanning backwards and stopping at the first
- * non-ai_response event that breaks the streak, a wrong answer, or a rung
- * change. Caps at MAX_CORRECT_STREAK to bound the value passed to the LLM.
+ * end of the event log, scanning backwards and skipping non-ai_response events
+ * (e.g. learner messages), breaking on a wrong answer or rung change.
+ * Caps at MAX_CORRECT_STREAK to bound the value passed to the LLM.
+ *
+ * Neutral ai_response events (no correctAnswer field, e.g. hints or
+ * encouragement turns) are skipped rather than treated as wrong — only an
+ * explicit correctAnswer === false resets the streak.
  */
 export function computeCorrectStreak(
   events: Array<{
@@ -117,7 +121,9 @@ export function computeCorrectStreak(
     if (!meta || typeof meta !== 'object') break;
     const m = meta as Record<string, unknown>;
     if (m.escalationRung !== currentRung) break;
-    if (m.correctAnswer !== true) break;
+    // Explicit wrong answer resets the streak; unevaluated turns are skipped.
+    if (m.correctAnswer === false) break;
+    if (m.correctAnswer !== true) continue;
     streak++;
     if (streak >= MAX_CORRECT_STREAK) break;
   }

@@ -379,6 +379,13 @@
       "when": 1778025600000,
       "tag": "0053_topic_notes_session_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1777979260892,
+      "tag": "0054_session_summary_retention",
+      "breakpoints": true
     }
   ]
 }

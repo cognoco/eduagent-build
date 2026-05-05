@@ -850,17 +850,18 @@ export default function ChildDetailScreen() {
           })}
         </Text>
         {showHowItsWorking && (
-          <Pressable
+          // Non-interactive status badge — analytics detail screen is not yet
+          // built. Using View (not Pressable) prevents a silent dead-end tap.
+          // Replace with Pressable + onPress once the detail screen exists.
+          <View
             className="flex-row items-center gap-2 self-start bg-surface rounded-full px-3 py-1.5 mb-4"
-            accessibilityRole="button"
-            accessibilityLabel={t('parentView.index.howItsWorking')}
             testID="accommodation-how-working"
           >
             <Ionicons name="analytics-outline" size={14} color="#6b7280" />
             <Text className="text-caption text-text-secondary">
               {t('parentView.index.howItsWorking')}
             </Text>
-          </Pressable>
+          </View>
         )}
 
         {/* UX-DE-L11: surface consent-query errors */}

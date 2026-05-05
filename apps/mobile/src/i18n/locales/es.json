@@ -973,7 +973,6 @@
     "pageSubtitle": "Un progreso que refleja lo que realmente sabes.",
     "startLearning": "Empezar a aprender",
     "keepLearning": "Seguir aprendiendo",
-    "yourSubjects": "Tus materias",
     "refreshFailedTitle": "Falló la actualización",
     "refreshFailed": "No pudimos actualizar tu progreso en este momento.",
     "hero": {
@@ -1100,8 +1099,10 @@
       "retentionFading": "Un repaso ligero ayudaría a mantener esto fresco.",
       "retentionWeak": "A esta materia le vendría bien un poco de atención extra.",
       "openShelf": "Abrir estante",
+      "resume": "Continuar",
       "goneTitle": "Esta materia ya no está disponible",
-      "goneSubtitle": "Puede haber sido eliminada o fusionada con otra materia."
+      "goneSubtitle": "Puede haber sido eliminada o fusionada con otra materia.",
+      "pastConversations": "Conversaciones anteriores"
     },
     "vocabulary": {
       "pageTitle": "Tu Vocabulario",
@@ -1120,6 +1121,12 @@
       "viewAllLink": "Ver todo →",
       "wordsSummary": "{{total}} palabras — {{mastered}} dominadas",
       "learningAppend": ", {{count}} aprendiendo"
+    },
+    "subjectSessions": {
+      "title": "Conversaciones anteriores",
+      "empty": "Aún no hay conversaciones",
+      "untitledTopic": "Tema sin título",
+      "openSessionFrom": "Abrir sesión del {{date}}"
     }
   },
   "onboarding": {
@@ -1949,6 +1956,13 @@
       "purchaseConfirmedBody": "Your subscription is being activated. It usually appears within a minute — pull down to refresh.",
       "topUpTitle": "Top-up",
       "topUpBody": "500 additional credits have been added!"
+    }
+  },
+  "sessionTranscript": {
+    "archived": {
+      "title": "Esta conversación se archivó el {{date}}.",
+      "intro": "Esto es lo que repasaste:",
+      "continueCta": "Continuar este tema"
     }
   }
 }

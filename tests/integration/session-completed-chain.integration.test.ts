@@ -38,6 +38,10 @@ import {
   jsonResponse,
 } from './fetch-interceptor';
 import { mockVoyageAI, type MockHandle } from './external-mocks';
+import {
+  createMockProvider,
+  registerProvider,
+} from '../../apps/api/src/services/llm';
 
 const mockCaptureException = jest.fn();
 
@@ -52,8 +56,15 @@ const AUTH_EMAIL = 'integration-session-completed@integration.test';
 const SESSION_TIMESTAMP = '2026-02-23T10:00:00.000Z';
 
 let voyageHandle: MockHandle;
+let scenarioCounter = 0;
+const createdScenarioIdentities: Array<{
+  clerkUserId: string;
+  email: string;
+}> = [];
 
 interface Scenario {
+  clerkUserId: string;
+  email: string;
   profileId: string;
   subjectId: string;
   topicId: string | null;
@@ -96,12 +107,16 @@ async function seedScenario(options?: {
 }): Promise<Scenario> {
   const db = createIntegrationDb();
   const includeTopic = options?.includeTopic ?? true;
+  const identitySuffix = `${Date.now()}-${scenarioCounter++}`;
+  const clerkUserId = `${AUTH_USER_ID}-${identitySuffix}`;
+  const email = `integration-session-completed+${identitySuffix}@integration.test`;
+  createdScenarioIdentities.push({ clerkUserId, email });
 
   const [account] = await db
     .insert(accounts)
     .values({
-      clerkUserId: AUTH_USER_ID,
-      email: AUTH_EMAIL,
+      clerkUserId,
+      email,
     })
     .returning();
 
@@ -238,11 +253,22 @@ async function seedScenario(options?: {
   }
 
   return {
+    clerkUserId,
+    email,
     profileId: profile!.id,
     subjectId: subject!.id,
     topicId,
     sessionId: session!.id,
   };
+}
+
+async function cleanupCreatedScenarios(): Promise<void> {
+  if (createdScenarioIdentities.length === 0) return;
+  const identities = createdScenarioIdentities.splice(0);
+  await cleanupAccounts({
+    emails: identities.map((identity) => identity.email),
+    clerkUserIds: identities.map((identity) => identity.clerkUserId),
+  });
 }
 
 async function loadRetentionCard(profileId: string, topicId: string) {
@@ -297,6 +323,24 @@ beforeAll(() => {
   // Register Voyage AI fetch interceptor — the real embeddings service
   // calls fetch('https://api.voyageai.com/...') which we intercept
   voyageHandle = mockVoyageAI();
+  // Integration setup registers a router-level mock Gemini provider. Override
+  // it for this suite so generate-llm-summary receives schema-valid JSON.
+  registerProvider({
+    ...createMockProvider('gemini'),
+    async chat() {
+      return {
+        content: JSON.stringify({
+          narrative:
+            'The learner explored photosynthesis and how plants turn sunlight into energy through their leaves.',
+          topicsCovered: ['photosynthesis'],
+          sessionState: 'completed',
+          reEntryRecommendation:
+            'Next time, look at how different plants adapt this process to their environment.',
+        }),
+        stopReason: 'stop',
+      };
+    },
+  });
 });
 
 beforeEach(async () => {
@@ -304,6 +348,7 @@ beforeEach(async () => {
   clearFetchCalls();
   process.env['VOYAGE_API_KEY'] = 'voyage-test-key';
 
+  await cleanupCreatedScenarios();
   await cleanupAccounts({
     emails: [AUTH_EMAIL],
     clerkUserIds: [AUTH_USER_ID],
@@ -315,6 +360,7 @@ afterEach(() => {
 });
 
 afterAll(async () => {
+  await cleanupCreatedScenarios();
   await cleanupAccounts({
     emails: [AUTH_EMAIL],
     clerkUserIds: [AUTH_USER_ID],
@@ -338,7 +384,7 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
 
     expect(result.status).toBe('completed');
     expect(result.sessionId).toBe(scenario.sessionId);
-    expect(result.outcomes).toHaveLength(16);
+    expect(result.outcomes).toHaveLength(17);
 
     const retentionCard = await loadRetentionCard(
       scenario.profileId,
@@ -447,9 +493,15 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
     expect(skippedMode!.consecutiveSummarySkips).toBe(1);
 
     await cleanupAccounts({
-      emails: [AUTH_EMAIL],
-      clerkUserIds: [AUTH_USER_ID],
+      emails: [skippedScenario.email],
+      clerkUserIds: [skippedScenario.clerkUserId],
     });
+    const skippedIdentityIndex = createdScenarioIdentities.findIndex(
+      (identity) => identity.email === skippedScenario.email
+    );
+    if (skippedIdentityIndex >= 0) {
+      createdScenarioIdentities.splice(skippedIdentityIndex, 1);
+    }
     clearFetchCalls();
 
     const acceptedScenario = await seedScenario({ initialSummarySkips: 3 });

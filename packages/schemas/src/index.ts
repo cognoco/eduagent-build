@@ -49,6 +49,7 @@ export * from './quiz-utils';
 
 // LLM Response Envelope (shared contract for all structured-output LLM flows)
 export * from './llm-envelope';
+export * from './llm-summary';
 
 // Stream fallback contract — SSE frame + typed reasons shared with mobile
 export * from './stream-fallback';

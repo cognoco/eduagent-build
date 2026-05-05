@@ -179,7 +179,9 @@ function setupScopedRepo({
     consecutiveSuccessCount: number;
     profileId?: string;
   }>,
+  latestSummary = undefined as { learnerRecap: string | null } | undefined,
 } = {}) {
+  const summaryRows = latestSummary ? [latestSummary] : [];
   (createScopedRepository as jest.Mock).mockReturnValue({
     subjects: {
       findFirst: jest.fn().mockResolvedValue(subjectFindFirst),
@@ -190,6 +192,17 @@ function setupScopedRepo({
     },
     needsDeepeningTopics: {
       findMany: jest.fn().mockResolvedValue(needsDeepeningFindMany),
+    },
+    db: {
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            orderBy: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue(summaryRows),
+            }),
+          }),
+        }),
+      }),
     },
   });
 }
@@ -848,12 +861,13 @@ describe('processRecallTest', () => {
 
 describe('startRelearn', () => {
   it('returns relearn confirmation with recap when a prior summary exists', async () => {
-    setupScopedRepo({ needsDeepeningFindMany: [] });
-    const db = createMockDb();
-    (db.query.sessionSummaries.findFirst as jest.Mock).mockResolvedValue({
-      id: 'summary-1',
-      learnerRecap: 'You already covered the core ideas last time.',
+    setupScopedRepo({
+      needsDeepeningFindMany: [],
+      latestSummary: {
+        learnerRecap: 'You already covered the core ideas last time.',
+      },
     });
+    const db = createMockDb();
     // Mock session creation with returning
     (db.insert as jest.Mock).mockReturnValue({
       values: jest.fn().mockReturnValue({

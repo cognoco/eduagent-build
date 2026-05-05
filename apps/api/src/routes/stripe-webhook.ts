@@ -411,6 +411,7 @@ export const stripeWebhookRoute = new Hono<{
     STRIPE_WEBHOOK_SECRET?: string;
     STRIPE_SECRET_KEY?: string;
     SUBSCRIPTION_KV?: KVNamespace;
+    ENVIRONMENT?: string;
   };
   Variables: {
     db: Database;
@@ -454,6 +455,18 @@ export const stripeWebhookRoute = new Hono<{
       ERROR_CODES.MISSING_SIGNATURE,
       'Invalid webhook signature'
     );
+  }
+
+  // [H-1 / BUG-624 parity] In production, test-mode events MUST NOT mutate
+  // state. A Stripe test-mode event signed with the production webhook secret
+  // could otherwise activate or cancel real subscriptions. Matches the
+  // RevenueCat SANDBOX guard pattern (rca-webhook.ts:687).
+  if (!event.livemode && c.env.ENVIRONMENT === 'production') {
+    logger.warn('[stripe] Rejected test-mode webhook event in production', {
+      eventType: event.type,
+      eventId: event.id,
+    });
+    return c.json({ received: true, skipped: true });
   }
 
   const db = c.get('db');

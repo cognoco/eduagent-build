@@ -224,6 +224,15 @@ export const sessionSummaries = pgTable('session_summaries', {
   updatedAt: timestamp('updated_at', { withTimezone: true })
     .notNull()
     .defaultNow(),
+  // Retention pipeline (Phase 1) — see
+  // docs/specs/2026-05-05-tiered-conversation-retention.md
+  // NOTE: `narrative` above remains the legacy parent-facing recap field.
+  // `llmSummary` is a separate self-note used for transcript retention.
+  llmSummary: jsonb('llm_summary'),
+  summaryGeneratedAt: timestamp('summary_generated_at', {
+    withTimezone: true,
+  }),
+  purgedAt: timestamp('purged_at', { withTimezone: true }),
 });
 
 export const parkingLotItems = pgTable('parking_lot_items', {

@@ -424,6 +424,7 @@ export function LearnerScreen({
           !coachBandDismissedRef.current && (
             <CoachBand
               headline={coachBand.headline}
+              now={now}
               onContinue={coachBand.onContinue}
               onDismiss={dismissCoachBand}
             />

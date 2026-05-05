@@ -58,7 +58,7 @@
 
 ## Track B remaining
 
-> ⚠️ Track B and Track C items below are **on hold** until the four pending audits above complete. New cross-issues surfaced by those audits may reshape these plans. Do not spawn execution worktrees for items below without first reconciling against the extended audit findings.
+> ⚠️ The four extended-scope recons are now complete (see section above). Before spawning execution worktrees for items below, reconcile against any new findings from those recon reports — TYPES-1 in particular reshaped the SCHEMA-2 surface estimate.
 
 
 
@@ -77,7 +77,7 @@
 - **AUDIT-SCHEMA-2** Response-schema gap — see [`2026-05-02-audit-schema-2-plan.md`](./2026-05-02-audit-schema-2-plan.md)
   - Severity: **YELLOW-leaning-RED** (escalated 2026-05-02 from unclassified after concrete recon)
   - Effort: multi-PR (~2-4 PRs over the course of the initiative)
-  - Why it matters: 36 of 41 route files (88%) violate the CLAUDE.md non-negotiable "`@eduagent/schemas` is the shared contract." Contract exists, ~50 response schemas defined, only `bookmarks.ts` actually uses them.
+  - Why it matters: 36 of 41 route files (88%) violate the CLAUDE.md non-negotiable "`@eduagent/schemas` is the shared contract." Contract exists, 22 response schemas defined (per TYPES-1 recon), and only `bookmarks.ts` currently uses response-schema parsing.
 
 - **AUDIT-INNGEST-2** Inngest event orphan sweep (escalated 2026-05-02 from unclassified after concrete recon)
   - Severity: YELLOW (silent recovery without escalation per CLAUDE.md)
@@ -137,7 +137,7 @@
   - Severity: YELLOW; Effort: ~2 hr (PR #135 only fixed migration 0017; broader audit pending)
   - Why: closes the CLAUDE.md "Schema And Deploy Safety" rule across history
 
-## Findings I could not classify confidently (still)
+## Formerly unclassified findings (now resolved)
 
 _(AUDIT-INNGEST-2 recon completed 2026-05-02; promoted to Track B above with concrete file list.)_
 

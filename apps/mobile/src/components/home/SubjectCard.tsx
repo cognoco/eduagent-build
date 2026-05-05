@@ -31,7 +31,11 @@ export function SubjectCard({
     <Pressable
       testID={testID}
       onPress={onPress}
-      accessibilityLabel={`${name}. ${hint}`}
+      accessibilityLabel={
+        topicsTotal > 0
+          ? `${name}. ${hint}. ${topicsCompleted}/${topicsTotal} topics`
+          : `${name}. ${hint}`
+      }
       accessibilityRole="button"
       className="w-[142px] rounded-2xl bg-surface border border-border p-3.5 pb-4"
       style={{ gap: 10 }}

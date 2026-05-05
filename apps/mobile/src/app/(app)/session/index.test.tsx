@@ -142,6 +142,7 @@ const mockSetParams = jest.fn();
 
 type TranscriptMockReturn = {
   data: null | {
+    archived: false;
     session: {
       sessionId: string;
       exchangeCount: number;
@@ -738,6 +739,7 @@ describe('SessionScreen homework flow', () => {
     });
     mockUseSessionTranscript.mockReturnValue({
       data: {
+        archived: false,
         session: {
           sessionId: 'session-1',
           exchangeCount: 2,
@@ -848,6 +850,7 @@ describe('SessionScreen homework flow', () => {
     });
     mockUseSessionTranscript.mockReturnValue({
       data: {
+        archived: false,
         session: {
           sessionId: 'session-1',
           exchangeCount: 0,

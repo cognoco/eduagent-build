@@ -6,6 +6,7 @@ import { eq, and, asc, desc, gte, isNull, lt, sql } from 'drizzle-orm';
 import {
   learningSessions,
   sessionEvents,
+  sessionSummaries,
   subjects,
   curricula,
   curriculumTopics,
@@ -20,9 +21,9 @@ import type {
   SessionCloseInput,
   SessionAnalyticsEventInput,
   ContentFlagInput,
-  SessionTranscript,
+  TranscriptResponse,
 } from '@eduagent/schemas';
-import { celebrationReasonSchema } from '@eduagent/schemas';
+import { celebrationReasonSchema, llmSummarySchema } from '@eduagent/schemas';
 import { insertSessionEvent } from './session-events';
 import { getSubject } from '../subject';
 import { createPendingSessionSummary } from '../summaries';
@@ -479,9 +480,60 @@ export async function getSessionTranscript(
   db: Database,
   profileId: string,
   sessionId: string
-): Promise<SessionTranscript | null> {
+): Promise<TranscriptResponse | null> {
   const session = await getSession(db, profileId, sessionId);
   if (!session) return null;
+
+  const purgedSummary = await db.query.sessionSummaries.findFirst({
+    where: and(
+      eq(sessionSummaries.sessionId, sessionId),
+      eq(sessionSummaries.profileId, profileId)
+    ),
+    columns: {
+      purgedAt: true,
+      llmSummary: true,
+      learnerRecap: true,
+      topicId: true,
+    },
+  });
+
+  if (purgedSummary?.purgedAt) {
+    const parsed = llmSummarySchema.safeParse(purgedSummary.llmSummary);
+    if (!parsed.success) {
+      logger.error('transcript: purgedAt set but llmSummary is invalid', {
+        sessionId,
+        profileId,
+        llmSummaryValid: parsed.success,
+      });
+      return {
+        archived: true,
+        archivedAt: purgedSummary.purgedAt.toISOString(),
+        summary: {
+          narrative:
+            'This conversation was archived, but its detailed retention summary is temporarily unavailable.',
+          topicsCovered: [],
+          sessionState: 'auto-closed',
+          reEntryRecommendation:
+            'Resume by asking what you remember from this conversation and choose the next useful practice step.',
+          learnerRecap: purgedSummary.learnerRecap ?? null,
+          topicId: purgedSummary.topicId ?? null,
+        },
+      };
+    }
+
+    return {
+      archived: true,
+      archivedAt: purgedSummary.purgedAt.toISOString(),
+      summary: {
+        narrative: parsed.data.narrative,
+        topicsCovered: parsed.data.topicsCovered,
+        sessionState: parsed.data.sessionState,
+        reEntryRecommendation: parsed.data.reEntryRecommendation,
+        learnerRecap: purgedSummary.learnerRecap ?? null,
+        topicId: purgedSummary.topicId ?? null,
+      },
+    };
+  }
 
   // [BUG-913] Tie-break by id when created_at collides. Batch inserts share
   // a single Postgres NOW() snapshot, so multiple events created in the same
@@ -573,6 +625,7 @@ export async function getSessionTranscript(
     : [];
 
   return {
+    archived: false,
     session: {
       sessionId: session.id,
       subjectId: session.subjectId,

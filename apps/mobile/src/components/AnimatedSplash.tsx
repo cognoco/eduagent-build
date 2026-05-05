@@ -35,12 +35,11 @@ import { tokens } from '../lib/design-tokens';
 // entire root layout import chain — no error boundary can catch it.
 // Reanimated's createAnimatedComponent return type widens SVG props with
 // SharedValue<T> variants that aren't compatible with the bare-props type
-// the JSX call sites need. ComponentType<any> is the pragmatic shape that
-// accepts both the wrapped component and the plain-component fallback.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let AnimatedCircle: ComponentType<any>;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let AnimatedPath: ComponentType<any>;
+// the JSX call sites need. ComponentType<Record<string, unknown>> is the
+// structural shape that accepts both the wrapped component and the plain-
+// component fallback while avoiding `any`.
+let AnimatedCircle: ComponentType<Record<string, unknown>>;
+let AnimatedPath: ComponentType<Record<string, unknown>>;
 let _splashAnimationAvailable = true;
 try {
   AnimatedCircle = Animated.createAnimatedComponent(Circle);

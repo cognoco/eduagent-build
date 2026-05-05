@@ -7,6 +7,7 @@ jest.mock('../runner/llm-client', () => ({
 import { exchangesFlow } from './exchanges';
 import { PROFILES, getProfile } from '../fixtures/profiles';
 import { buildMemoryBlock } from '../../src/services/learner-profile';
+import { sanitizeUserContent } from '../../src/services/exchanges';
 
 describe('exchangesFlow', () => {
   const generalProfile = getProfile('12yo-dinosaurs');
@@ -17,10 +18,10 @@ describe('exchangesFlow', () => {
   }
 
   describe('enumerateScenarios', () => {
-    it('returns 7 scenario inputs for a general (non-language) profile', () => {
+    it('returns 8 scenario inputs for a general (non-language) profile', () => {
       const scenarios =
         exchangesFlow.enumerateScenarios?.(generalProfile) ?? [];
-      expect(scenarios).toHaveLength(7);
+      expect(scenarios).toHaveLength(8);
       expect(scenarios.map((s) => s.scenarioId)).not.toContain(
         'S7-language-fluency'
       );
@@ -33,17 +34,19 @@ describe('exchangesFlow', () => {
           'S5-rung5-exit',
           'S6-homework-help',
           'S8-casual-freeform',
+          'S9-correct-streak',
         ])
       );
     });
 
-    it('returns 8 scenarios for a language-learning profile (includes S7)', () => {
+    it('returns 9 scenarios for a language-learning profile (includes S7 + S9)', () => {
       const scenarios =
         exchangesFlow.enumerateScenarios?.(languageProfile) ?? [];
-      expect(scenarios).toHaveLength(8);
+      expect(scenarios).toHaveLength(9);
       expect(scenarios.map((s) => s.scenarioId)).toContain(
         'S7-language-fluency'
       );
+      expect(scenarios.map((s) => s.scenarioId)).toContain('S9-correct-streak');
     });
 
     it('every scenario input has matching scenarioId and context', () => {
@@ -199,10 +202,12 @@ describe('exchangesFlow', () => {
         content: messages.system,
       });
 
-      // The last message is the user turn produced by buildPrompt
+      // The last message is the user turn produced by buildPrompt, passed through
+      // sanitizeUserContent — same transform runLive applies before forwarding to the LLM.
+      if (!messages.user) throw new Error('S2 must produce a user turn');
       expect(chatMessages[chatMessages.length - 1]).toEqual({
         role: 'user',
-        content: messages.user ?? '',
+        content: sanitizeUserContent(messages.user),
       });
 
       // Profile-level personalization options propagate
@@ -258,7 +263,7 @@ describe('exchangesFlow', () => {
       const messages = exchangesFlow.buildPrompt(s1.input);
 
       await expect(exchangesFlow.runLive?.(s1.input, messages)).rejects.toThrow(
-        /messages\.user is undefined or empty/
+        /messages\.user is undefined/
       );
 
       await expect(
@@ -266,7 +271,7 @@ describe('exchangesFlow', () => {
           system: messages.system,
           user: undefined,
         })
-      ).rejects.toThrow(/messages\.user is undefined or empty/);
+      ).rejects.toThrow(/messages\.user is undefined/);
       expect(mockRunHarnessLlm).not.toHaveBeenCalled();
     });
 

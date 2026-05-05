@@ -154,6 +154,39 @@ export function mockVoyageAI(): MockHandle {
 }
 
 // ---------------------------------------------------------------------------
+// Gemini LLM
+// ---------------------------------------------------------------------------
+
+/**
+ * Intercepts Gemini text-generation API calls and returns a default response
+ * containing a valid `llmSummarySchema`-shaped JSON string.
+ *
+ * The narrative mentions "photosynthesis" so it satisfies the
+ * `topicsCovered` cross-reference refinement when the test scenario uses
+ * that topic. Per-test overrides via `nextResponse()` for other shapes.
+ */
+export function mockGeminiLlm(): MockHandle {
+  return createMockHandle('generativelanguage.googleapis.com', () => {
+    const summary = {
+      narrative:
+        'The learner explored photosynthesis and how plants turn sunlight into energy through their leaves.',
+      topicsCovered: ['photosynthesis'],
+      sessionState: 'completed',
+      reEntryRecommendation:
+        'Next time, look at how different plants adapt this process to their environment.',
+    };
+    return jsonResponse({
+      candidates: [
+        {
+          content: { parts: [{ text: JSON.stringify(summary) }] },
+          finishReason: 'STOP',
+        },
+      ],
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Convenience: mock all external boundaries at once
 // ---------------------------------------------------------------------------
 
@@ -162,6 +195,7 @@ export interface AllMockHandles {
   expoPush: MockHandle;
   resendEmail: MockHandle;
   voyageAI: MockHandle;
+  geminiLlm: MockHandle;
 }
 
 /**
@@ -177,5 +211,6 @@ export function mockAllExternalBoundaries(): AllMockHandles {
     expoPush: mockExpoPush(),
     resendEmail: mockResendEmail(),
     voyageAI: mockVoyageAI(),
+    geminiLlm: mockGeminiLlm(),
   };
 }

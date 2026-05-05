@@ -47,7 +47,14 @@ const PUBLIC_PATHS = [
 ];
 
 function isPublicPath(path: string): boolean {
-  return PUBLIC_PATHS.some((p) => path.startsWith(p));
+  // Exact-prefix match: trailing-slash entries match any sub-path;
+  // bare entries (no trailing slash) require exact equality or a sub-path
+  // separator so /v1/health never accidentally matches /v1/healthz.
+  return PUBLIC_PATHS.some((p) =>
+    p.endsWith('/')
+      ? path.startsWith(p)
+      : path === p || path.startsWith(p + '/')
+  );
 }
 
 // ---------------------------------------------------------------------------

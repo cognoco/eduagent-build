@@ -973,7 +973,6 @@
     "pageSubtitle": "Fremgang som reflekterer hva du faktisk kan.",
     "startLearning": "Start læring",
     "keepLearning": "Fortsett å lære",
-    "yourSubjects": "Dine emner",
     "refreshFailedTitle": "Oppdatering mislyktes",
     "refreshFailed": "Vi kunne ikke oppdatere fremgangen din akkurat nå.",
     "hero": {
@@ -1100,8 +1099,10 @@
       "retentionFading": "En lett gjennomgang ville bidra til å holde dette friskt.",
       "retentionWeak": "Dette emnet ville hatt godt av litt ekstra oppmerksomhet.",
       "openShelf": "Åpne hylle",
+      "resume": "Fortsett",
       "goneTitle": "Dette emnet er ikke lenger tilgjengelig",
-      "goneSubtitle": "Det kan ha blitt fjernet eller slått sammen med et annet emne."
+      "goneSubtitle": "Det kan ha blitt fjernet eller slått sammen med et annet emne.",
+      "pastConversations": "Tidligere samtaler"
     },
     "vocabulary": {
       "pageTitle": "Ditt vokabular",
@@ -1120,6 +1121,12 @@
       "viewAllLink": "Se alle →",
       "wordsSummary": "{{total}} ord – {{mastered}} mestret",
       "learningAppend": ", {{count}} lærer"
+    },
+    "subjectSessions": {
+      "title": "Tidligere samtaler",
+      "empty": "Ingen samtaler ennå",
+      "untitledTopic": "Tema uten navn",
+      "openSessionFrom": "Åpne økt fra {{date}}"
     }
   },
   "onboarding": {
@@ -1949,6 +1956,13 @@
       "purchaseConfirmedBody": "Your subscription is being activated. It usually appears within a minute — pull down to refresh.",
       "topUpTitle": "Top-up",
       "topUpBody": "500 additional credits have been added!"
+    }
+  },
+  "sessionTranscript": {
+    "archived": {
+      "title": "Denne samtalen ble arkivert {{date}}.",
+      "intro": "Dette gikk dere gjennom:",
+      "continueCta": "Fortsett med dette temaet"
     }
   }
 }

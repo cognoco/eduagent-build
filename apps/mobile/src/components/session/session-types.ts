@@ -142,6 +142,10 @@ export function reconnectPromptForError(error: unknown): string {
 
   if (error instanceof Error) {
     if (error.name === 'UpstreamError') return SERVER_ERROR_PROMPT;
+    // CORS or server misconfiguration — surface config-error prompt so the
+    // user knows a retry is unlikely to help (matches use-session-streaming
+    // comment: "CORS/config → config error").
+    if (error.name === 'ConfigError') return CONFIG_ERROR_PROMPT;
     if (error.name === 'NetworkError' || error.name === 'TypeError')
       return RECONNECT_PROMPT;
   }

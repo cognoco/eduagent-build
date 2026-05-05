@@ -235,6 +235,7 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
             });
           }
         } catch (streamErr) {
+          // Interview flow is free; no quota to refund here (unlike sessions.ts).
           logger.error('[interview/stream] LLM stream failed', {
             draftId: draft.id,
             error:
@@ -246,14 +247,19 @@ export const interviewRoutes = new Hono<InterviewRouteEnv>()
             profileId,
             extra: { draftId: draft.id, phase: 'llm_stream' },
           });
+          // Map error to a stable machine-readable code so clients can
+          // classify failures without brittle message parsing.
+          const errorCode =
+            streamErr instanceof Error &&
+            streamErr.message.includes('safety filters')
+              ? 'safety_filter'
+              : 'unknown_error';
           await sseStream.writeSSE({
             data: JSON.stringify({
               type: 'error',
+              code: errorCode,
               message:
-                streamErr instanceof Error &&
-                streamErr.message.includes('safety filters')
-                  ? streamErr.message
-                  : 'Something went wrong while generating a reply. Please try again.',
+                'Something went wrong while generating a reply. Please try again.',
             }),
           });
           return;

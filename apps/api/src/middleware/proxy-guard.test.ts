@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { assertNotProxyMode } from './proxy-guard';
 import { bookmarkRoutes } from '../routes/bookmarks';
+import { noteRoutes } from '../routes/notes';
 
 function createApp(): InstanceType<typeof Hono> {
   const app = new Hono();
@@ -241,6 +242,80 @@ describe('assertNotProxyMode - real route integration', () => {
       },
       body: JSON.stringify({ eventId: '00000000-0000-4000-8000-000000000000' }),
     });
+
+    expect(res.status).toBe(403);
+    expect(dbCalled).not.toHaveBeenCalled();
+  });
+
+  // [BUG-973 / CCR-PR145-C-1 / BREAK] Notes write endpoints must reject proxy
+  // sessions. A non-owner profile (parent acting on child) must be blocked from
+  // creating, updating, or deleting notes on the child's profile.
+  it('[BREAK] returns 403 from notes POST when profileMeta.isOwner=false and header is absent', async () => {
+    const app = new Hono();
+    const dbCalled = jest.fn();
+
+    app.use('*', async (c, next) => {
+      c.set('db' as never, new Proxy({}, { get: () => dbCalled }));
+      c.set('profileId' as never, 'profile-test');
+      c.set('profileMeta' as never, { isOwner: false });
+      await next();
+    });
+    app.route('/', noteRoutes);
+
+    const res = await app.request(
+      '/subjects/00000000-0000-4000-8000-000000000001/topics/00000000-0000-4000-8000-000000000002/notes',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: 'note text' }),
+      }
+    );
+
+    expect(res.status).toBe(403);
+    expect(dbCalled).not.toHaveBeenCalled();
+  });
+
+  it('[BREAK] returns 403 from notes PATCH when profileMeta.isOwner=false and header is absent', async () => {
+    const app = new Hono();
+    const dbCalled = jest.fn();
+
+    app.use('*', async (c, next) => {
+      c.set('db' as never, new Proxy({}, { get: () => dbCalled }));
+      c.set('profileId' as never, 'profile-test');
+      c.set('profileMeta' as never, { isOwner: false });
+      await next();
+    });
+    app.route('/', noteRoutes);
+
+    const res = await app.request(
+      '/notes/00000000-0000-4000-8000-000000000001',
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: 'updated text' }),
+      }
+    );
+
+    expect(res.status).toBe(403);
+    expect(dbCalled).not.toHaveBeenCalled();
+  });
+
+  it('[BREAK] returns 403 from notes DELETE when profileMeta.isOwner=false and header is absent', async () => {
+    const app = new Hono();
+    const dbCalled = jest.fn();
+
+    app.use('*', async (c, next) => {
+      c.set('db' as never, new Proxy({}, { get: () => dbCalled }));
+      c.set('profileId' as never, 'profile-test');
+      c.set('profileMeta' as never, { isOwner: false });
+      await next();
+    });
+    app.route('/', noteRoutes);
+
+    const res = await app.request(
+      '/notes/00000000-0000-4000-8000-000000000001',
+      { method: 'DELETE' }
+    );
 
     expect(res.status).toBe(403);
     expect(dbCalled).not.toHaveBeenCalled();

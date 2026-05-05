@@ -159,6 +159,7 @@ export function getStepEmailFrom(): string {
 // ---------------------------------------------------------------------------
 
 let _supportEmail: string | undefined;
+let _retentionPurgeEnabled: string | undefined;
 
 /** Called by Inngest middleware to inject the SUPPORT_EMAIL binding. */
 export function setSupportEmail(email: string): void {
@@ -180,5 +181,22 @@ export function resetSupportEmail(): void {
 export function getStepSupportEmail(): string {
   return (
     _supportEmail ?? process.env['SUPPORT_EMAIL'] ?? 'support@mentomate.com'
+  );
+}
+
+/** Called by Inngest middleware to inject RETENTION_PURGE_ENABLED. */
+export function setRetentionPurgeEnabled(value: string): void {
+  _retentionPurgeEnabled = value;
+}
+
+/** Reset the injected flag — for test cleanup only. */
+export function resetRetentionPurgeEnabled(): void {
+  _retentionPurgeEnabled = undefined;
+}
+
+export function getStepRetentionPurgeEnabled(): boolean {
+  return (
+    (_retentionPurgeEnabled ?? process.env['RETENTION_PURGE_ENABLED']) ===
+    'true'
   );
 }

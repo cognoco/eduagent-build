@@ -14,6 +14,7 @@ import {
 } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
+import { assertNotProxyMode } from '../middleware/proxy-guard';
 import { notFound, NotFoundError } from '../errors';
 import {
   getNote,
@@ -123,6 +124,9 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
     zValidator('param', topicParamSchema),
     zValidator('json', createNoteInputSchema),
     async (c) => {
+      // [BUG-973 / CCR-PR145-C-1] Block writes from proxy sessions.
+      // A parent operating in proxy mode must not create notes on their child's profile.
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const { subjectId, topicId } = c.req.valid('param');
@@ -150,6 +154,8 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
     zValidator('param', noteIdParamSchema),
     zValidator('json', updateNoteInputSchema),
     async (c) => {
+      // [BUG-973 / CCR-PR145-C-1] Block writes from proxy sessions.
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const { noteId } = c.req.valid('param');
@@ -169,6 +175,8 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
     '/notes/:noteId',
     zValidator('param', noteIdParamSchema),
     async (c) => {
+      // [BUG-973 / CCR-PR145-C-1] Block writes from proxy sessions.
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const { noteId } = c.req.valid('param');
@@ -185,6 +193,8 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
     '/subjects/:subjectId/topics/:topicId/note',
     zValidator('param', topicParamSchema),
     async (c) => {
+      // [BUG-973 / CCR-PR145-C-1] Block writes from proxy sessions.
+      assertNotProxyMode(c);
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const { subjectId, topicId } = c.req.valid('param');

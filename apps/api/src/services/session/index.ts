@@ -93,3 +93,7 @@ export { evaluateSessionDepth } from './session-depth';
 // Topic sessions (Library v3)
 export { getTopicSessions } from './session-topic';
 export type { TopicSession } from './session-topic';
+
+// Subject sessions (Past conversations)
+export { getSubjectSessions } from './session-subject';
+export type { SubjectSession } from '@eduagent/schemas';

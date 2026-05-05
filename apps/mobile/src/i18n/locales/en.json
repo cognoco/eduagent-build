@@ -973,7 +973,6 @@
     "pageSubtitle": "Progress that reflects what you actually know.",
     "startLearning": "Start learning",
     "keepLearning": "Keep learning",
-    "yourSubjects": "Your subjects",
     "refreshFailedTitle": "Refresh failed",
     "refreshFailed": "We couldn't refresh your progress right now.",
     "hero": {
@@ -1100,8 +1099,10 @@
       "retentionFading": "A light review would help keep this fresh.",
       "retentionWeak": "This subject would benefit from some extra attention.",
       "openShelf": "Open shelf",
+      "resume": "Resume",
       "goneTitle": "This subject is no longer available",
-      "goneSubtitle": "It may have been removed or merged into another subject."
+      "goneSubtitle": "It may have been removed or merged into another subject.",
+      "pastConversations": "Past conversations"
     },
     "vocabulary": {
       "pageTitle": "Your Vocabulary",
@@ -1120,6 +1121,12 @@
       "viewAllLink": "View all →",
       "wordsSummary": "{{total}} words — {{mastered}} mastered",
       "learningAppend": ", {{count}} learning"
+    },
+    "subjectSessions": {
+      "title": "Past conversations",
+      "empty": "No conversations yet",
+      "untitledTopic": "Untitled topic",
+      "openSessionFrom": "Open session from {{date}}"
     }
   },
   "onboarding": {
@@ -1949,6 +1956,13 @@
       "purchaseConfirmedBody": "Your subscription is being activated. It usually appears within a minute — pull down to refresh.",
       "topUpTitle": "Top-up",
       "topUpBody": "500 additional credits have been added!"
+    }
+  },
+  "sessionTranscript": {
+    "archived": {
+      "title": "This conversation was archived on {{date}}.",
+      "intro": "Here's what you covered:",
+      "continueCta": "Continue this topic"
     }
   }
 }

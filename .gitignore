@@ -137,6 +137,10 @@ apps/mobile/**/*.png
 # Personal dev notes
 docs/test_start.md
 
+# Visual onboarding atlas — generated export artifacts (keep .gitkeep but not generated files)
+docs/visual-artefacts/exports/png/*.png
+docs/visual-artefacts/exports/pptx/*.pptx
+
 # Expo
 node_modules/
 .expo/

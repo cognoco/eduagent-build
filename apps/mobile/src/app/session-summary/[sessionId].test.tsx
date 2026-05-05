@@ -492,6 +492,7 @@ describe('SessionSummaryScreen', () => {
       },
     };
     mockTranscriptData = {
+      archived: false,
       session: {
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
         subjectId: 'sub-1',
@@ -1057,9 +1058,9 @@ describe('SessionSummaryScreen', () => {
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId('summary-input').props.value
-        ).toBe('unfinished thought about autotrophs');
+        expect(screen.getByTestId('summary-input').props.value).toBe(
+          'unfinished thought about autotrophs'
+        );
       });
     });
 
@@ -1197,9 +1198,9 @@ describe('SessionSummaryScreen', () => {
         screen.getByTestId('summary-resubmit-banner');
       });
       expect(screen.queryByTestId('summary-skipped-state')).toBeNull();
-      expect(
-        screen.getByTestId('summary-input').props.value
-      ).toBe('text I started last time but never submitted');
+      expect(screen.getByTestId('summary-input').props.value).toBe(
+        'text I started last time but never submitted'
+      );
     });
 
     it('clears the stale draft when the session is already submitted server-side', async () => {

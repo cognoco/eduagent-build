@@ -56,6 +56,16 @@ import { feedbackDeliveryFailed } from './functions/feedback-delivery-failed';
 import { orphanPersistFailed } from './functions/orphan-persist-failed';
 import { interviewPersistCurriculum } from './functions/interview-persist-curriculum';
 import { notificationSuppressedObserve } from './functions/notification-suppressed-observe';
+import {
+  learnerRecapRegenerate,
+  sessionSummaryCreate,
+  sessionSummaryRegenerate,
+} from './functions/summary-regenerate';
+import { summaryReconciliationCron } from './functions/summary-reconciliation-cron';
+import {
+  transcriptPurgeCron,
+  transcriptPurgeHandler,
+} from './functions/transcript-purge-cron';
 
 export {
   inngest,
@@ -100,6 +110,12 @@ export {
   orphanPersistFailed,
   interviewPersistCurriculum,
   notificationSuppressedObserve,
+  sessionSummaryCreate,
+  sessionSummaryRegenerate,
+  learnerRecapRegenerate,
+  summaryReconciliationCron,
+  transcriptPurgeCron,
+  transcriptPurgeHandler,
 };
 
 // All Inngest functions to register with the serve handler
@@ -146,4 +162,10 @@ export const functions = [
   orphanPersistFailed,
   interviewPersistCurriculum,
   notificationSuppressedObserve,
+  sessionSummaryCreate,
+  sessionSummaryRegenerate,
+  learnerRecapRegenerate,
+  summaryReconciliationCron,
+  transcriptPurgeCron,
+  transcriptPurgeHandler,
 ];

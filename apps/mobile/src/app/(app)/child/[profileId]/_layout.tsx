@@ -1,6 +1,10 @@
 import { Stack } from 'expo-router';
 import { useThemeColors } from '../../../../lib/theme';
 
+// CLAUDE.md: any nested layout with an index screen AND dynamic children must
+// export unstable_settings so cross-stack deep pushes land on index first.
+export const unstable_settings = { initialRouteName: 'index' };
+
 export default function ChildDetailLayout() {
   const colors = useThemeColors();
   return (

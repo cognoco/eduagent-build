@@ -229,12 +229,25 @@ const mockGenerateSessionInsights = jest
 const mockBuildBrowseHighlight = jest
   .fn()
   .mockReturnValue('Emma browsed a topic — 1 min');
+const mockGenerateAndStoreLlmSummary = jest.fn().mockResolvedValue({
+  narrative:
+    'Worked through algebra and named the balancing step while checking each move.',
+  topicsCovered: ['algebra', 'balancing equations'],
+  sessionState: 'completed',
+  reEntryRecommendation:
+    'Start with a new one-step equation and ask the learner to explain each inverse operation.',
+});
 
 jest.mock('../../services/session-highlights', () => ({
   generateSessionInsights: (...args: unknown[]) =>
     mockGenerateSessionInsights(...args),
   buildBrowseHighlight: (...args: unknown[]) =>
     mockBuildBrowseHighlight(...args),
+}));
+
+jest.mock('../../services/session-llm-summary', () => ({
+  generateAndStoreLlmSummary: (...args: unknown[]) =>
+    mockGenerateAndStoreLlmSummary(...args),
 }));
 
 const mockCaptureException = jest.fn();
@@ -427,6 +440,7 @@ describe('sessionCompleted', () => {
     mockCaptureException.mockClear();
     const localMockStep = {
       run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
+      sendEvent: jest.fn().mockResolvedValue(undefined),
       sleep: jest.fn(),
       waitForEvent: jest
         .fn()
@@ -474,6 +488,7 @@ describe('sessionCompleted', () => {
       'write-coaching-card',
       'generate-session-insights',
       'generate-learner-recap',
+      'generate-llm-summary',
       'analyze-learner-profile',
       'update-dashboard',
       'generate-embeddings',
@@ -492,6 +507,7 @@ describe('sessionCompleted', () => {
       .filter((o: any) => o.status !== 'skipped')
       .map((o: any) => o.status);
     expect(statuses).toEqual([
+      'ok',
       'ok',
       'ok',
       'ok',
@@ -1217,6 +1233,60 @@ describe('sessionCompleted', () => {
         TOPIC_ID,
         'User: What is algebra?\n\nAI: Algebra is...',
         'pa-test-key-123'
+      );
+    });
+  });
+
+  describe('generate-llm-summary step', () => {
+    it('stores the llm summary after learner recap generation', async () => {
+      await executeSteps(createEventData());
+
+      expect(mockGenerateAndStoreLlmSummary).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          sessionId: SESSION_ID,
+          profileId: PROFILE_ID,
+          subjectId: SUBJECT_ID,
+          topicId: TOPIC_ID,
+          summaryId: 'summary-1',
+        })
+      );
+    });
+
+    it('emits app/session.summary.generated without inline narrative text', async () => {
+      const { mockStep } = (await executeSteps(createEventData())) as any;
+
+      expect(mockStep.sendEvent).toHaveBeenCalledWith(
+        'notify-session-summary-generated',
+        expect.objectContaining({
+          name: 'app/session.summary.generated',
+          data: expect.objectContaining({
+            profileId: PROFILE_ID,
+            sessionId: SESSION_ID,
+            sessionSummaryId: 'summary-1',
+            topicsCount: 2,
+            sessionState: 'completed',
+            narrativeLength: expect.any(Number),
+          }),
+        })
+      );
+    });
+
+    it('emits app/session.summary.failed when summary generation returns null', async () => {
+      mockGenerateAndStoreLlmSummary.mockResolvedValueOnce(null);
+
+      const { mockStep } = (await executeSteps(createEventData())) as any;
+
+      expect(mockStep.sendEvent).toHaveBeenCalledWith(
+        'notify-session-summary-failed',
+        expect.objectContaining({
+          name: 'app/session.summary.failed',
+          data: expect.objectContaining({
+            profileId: PROFILE_ID,
+            sessionId: SESSION_ID,
+            sessionSummaryId: 'summary-1',
+          }),
+        })
       );
     });
   });
