@@ -314,6 +314,22 @@ export function LearnerScreen({
     reviewSummary,
   ]);
 
+  const openIntentAction = useCallback(
+    (route: HomeIntentAction['route']): void => {
+      if (route === '/(app)/homework/camera') {
+        // Seed the back stack before the nested camera route. There is no
+        // homework index screen, so Home is the clear return target.
+        router.push(LEARNER_HOME_HREF as never);
+      }
+
+      router.push({
+        pathname: route,
+        params: HOME_RETURN_PARAMS,
+      } as never);
+    },
+    []
+  );
+
   if (isLoading) {
     return (
       <ScrollView
@@ -400,16 +416,6 @@ export function LearnerScreen({
   const firstName = activeProfile?.displayName?.split(' ')[0] ?? 'there';
   const showCoachBand =
     FEATURE_FLAGS.COACH_BAND_ENABLED && coachBand && !coachBandDismissed;
-  const openIntentAction = (route: HomeIntentAction['route']): void => {
-    if (route === '/(app)/homework/camera') {
-      router.push(LEARNER_HOME_HREF as never);
-    }
-
-    router.push({
-      pathname: route,
-      params: HOME_RETURN_PARAMS,
-    } as never);
-  };
 
   return (
     <View className="flex-1 bg-background" testID="learner-screen">
@@ -593,7 +599,7 @@ export function LearnerScreen({
                     className="rounded-2xl border border-dashed border-border items-center justify-center"
                     style={{ width: 96, height: 150, gap: 8 }}
                     accessibilityRole="button"
-                    accessibilityLabel="Add a new subject"
+                    accessibilityLabel={t('home.learner.newSubject')}
                   >
                     <Text className="text-h3 text-text-tertiary opacity-70">
                       +

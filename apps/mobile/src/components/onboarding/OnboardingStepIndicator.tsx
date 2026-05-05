@@ -17,6 +17,7 @@ export function OnboardingStepIndicator({
 
   return (
     <View
+      accessible={true}
       className="items-center py-3 gap-2"
       accessibilityLabel={`Step ${activeStep} of ${safeTotalSteps}${
         activeStepLabel ? `: ${activeStepLabel}` : ''
