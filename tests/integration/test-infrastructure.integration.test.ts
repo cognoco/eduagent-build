@@ -418,21 +418,33 @@ describe('external-mocks', () => {
   });
 
   describe('mockAllExternalBoundaries', () => {
-    it('registers all four boundaries', async () => {
+    it('registers all five boundaries', async () => {
       mockAllExternalBoundaries();
 
-      // All four should respond without throwing
-      const [jwks, push, email, voyage] = await Promise.all([
+      // All five should respond without throwing
+      const [jwks, push, email, voyage, gemini] = await Promise.all([
         fetch('https://clerk.test/.well-known/jwks.json'),
         fetch('https://exp.host/--/api/v2/push/send', { method: 'POST' }),
         fetch('https://api.resend.com/emails', { method: 'POST' }),
         fetch('https://api.voyageai.com/v1/embeddings', { method: 'POST' }),
+        fetch(
+          'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=test',
+          { method: 'POST' }
+        ),
       ]);
 
       expect(jwks.status).toBe(200);
       expect(push.status).toBe(200);
       expect(email.status).toBe(200);
       expect(voyage.status).toBe(200);
+      expect(gemini.status).toBe(200);
+
+      const geminiBody = await gemini.json();
+      const text = geminiBody.candidates[0].content.parts[0].text;
+      expect(JSON.parse(text)).toMatchObject({
+        topicsCovered: ['photosynthesis'],
+        sessionState: 'completed',
+      });
     });
 
     it('returns individual handles for fine-grained control', async () => {

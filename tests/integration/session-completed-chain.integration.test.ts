@@ -496,12 +496,12 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
       emails: [skippedScenario.email],
       clerkUserIds: [skippedScenario.clerkUserId],
     });
-    createdScenarioIdentities.splice(
-      createdScenarioIdentities.findIndex(
-        (identity) => identity.email === skippedScenario.email
-      ),
-      1
+    const skippedIdentityIndex = createdScenarioIdentities.findIndex(
+      (identity) => identity.email === skippedScenario.email
     );
+    if (skippedIdentityIndex >= 0) {
+      createdScenarioIdentities.splice(skippedIdentityIndex, 1);
+    }
     clearFetchCalls();
 
     const acceptedScenario = await seedScenario({ initialSummarySkips: 3 });
