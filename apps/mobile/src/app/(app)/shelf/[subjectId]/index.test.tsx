@@ -552,7 +552,7 @@ describe('ShelfScreen', () => {
     await waitFor(() => {
       getByTestId('shelf-choose-book');
     });
-    getByText('Choose another book');
+    getByText('Browse or add another book');
 
     fireEvent.press(getByTestId('shelf-choose-book'));
 
