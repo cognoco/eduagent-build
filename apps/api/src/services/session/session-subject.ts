@@ -10,18 +10,9 @@ import {
   subjects,
   type Database,
 } from '@eduagent/database';
+import type { SubjectSession } from '@eduagent/schemas';
 
-export interface SubjectSession {
-  id: string;
-  topicId: string | null;
-  topicTitle: string;
-  bookId: string | null;
-  bookTitle: string | null;
-  chapter: string | null;
-  sessionType: string;
-  durationSeconds: number | null;
-  createdAt: string;
-}
+const SUBJECT_SESSIONS_LIMIT = 50;
 
 /**
  * Returns sessions for a subject across every topic and book, including
@@ -62,7 +53,8 @@ export async function getSubjectSessions(
         gte(learningSessions.exchangeCount, 1)
       )
     )
-    .orderBy(desc(learningSessions.createdAt));
+    .orderBy(desc(learningSessions.createdAt))
+    .limit(SUBJECT_SESSIONS_LIMIT);
 
   return rows.map((r) => ({
     id: r.id,

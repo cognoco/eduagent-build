@@ -1957,5 +1957,12 @@
       "topUpTitle": "Top-up",
       "topUpBody": "500 additional credits have been added!"
     }
+  },
+  "sessionTranscript": {
+    "archived": {
+      "title": "この会話は{{date}}にアーカイブされました。",
+      "intro": "学習した内容:",
+      "continueCta": "このトピックを続ける"
+    }
   }
 }

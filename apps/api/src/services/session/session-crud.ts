@@ -505,7 +505,20 @@ export async function getSessionTranscript(
         profileId,
         llmSummaryValid: parsed.success,
       });
-      return null;
+      return {
+        archived: true,
+        archivedAt: purgedSummary.purgedAt.toISOString(),
+        summary: {
+          narrative:
+            'This conversation was archived, but its detailed retention summary is temporarily unavailable.',
+          topicsCovered: [],
+          sessionState: 'auto-closed',
+          reEntryRecommendation:
+            'Resume by asking what you remember from this conversation and choose the next useful practice step.',
+          learnerRecap: purgedSummary.learnerRecap ?? null,
+          topicId: purgedSummary.topicId ?? null,
+        },
+      };
     }
 
     return {

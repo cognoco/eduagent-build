@@ -26,22 +26,37 @@ function topicMatchesNarrative(narrative: string, topic: string): boolean {
 
 export const llmSummarySchema = llmSummaryBaseSchema.refine(
   (value) =>
-    value.topicsCovered.length === 0 ||
-    value.topicsCovered.some((topic) =>
-      topicMatchesNarrative(value.narrative, topic)
-    ),
+    value.topicsCovered.length === 0
+      ? value.sessionState === 'auto-closed'
+      : value.topicsCovered.some((topic) =>
+          topicMatchesNarrative(value.narrative, topic)
+        ),
   {
     message:
-      'narrative must mention at least one topic from topicsCovered by name',
+      'narrative must mention at least one topic from topicsCovered by name; only auto-closed sessions may omit topicsCovered',
     path: ['narrative'],
   }
 );
 export type LlmSummary = z.infer<typeof llmSummarySchema>;
 
-export const archivedTranscriptSummarySchema = llmSummarySchema.safeExtend({
-  learnerRecap: z.string().min(1).nullable(),
-  topicId: z.string().uuid().nullable(),
-});
+export const archivedTranscriptSummarySchema = llmSummaryBaseSchema
+  .extend({
+    learnerRecap: z.string().min(1).nullable(),
+    topicId: z.string().uuid().nullable(),
+  })
+  .refine(
+    (value) =>
+      value.topicsCovered.length === 0
+        ? value.sessionState === 'auto-closed'
+        : value.topicsCovered.some((topic) =>
+            topicMatchesNarrative(value.narrative, topic)
+          ),
+    {
+      message:
+        'narrative must mention at least one topic from topicsCovered by name; only auto-closed sessions may omit topicsCovered',
+      path: ['narrative'],
+    }
+  );
 export type ArchivedTranscriptSummary = z.infer<
   typeof archivedTranscriptSummarySchema
 >;

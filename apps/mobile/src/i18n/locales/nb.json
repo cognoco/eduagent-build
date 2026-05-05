@@ -1957,5 +1957,12 @@
       "topUpTitle": "Top-up",
       "topUpBody": "500 additional credits have been added!"
     }
+  },
+  "sessionTranscript": {
+    "archived": {
+      "title": "Denne samtalen ble arkivert {{date}}.",
+      "intro": "Dette gikk dere gjennom:",
+      "continueCta": "Fortsett med dette temaet"
+    }
   }
 }

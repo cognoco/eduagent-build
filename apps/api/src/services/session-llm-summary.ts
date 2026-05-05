@@ -284,7 +284,7 @@ export async function generateLlmSummary(
       { role: 'assistant', content: result.response },
       {
         role: 'user',
-        content: `The previous JSON was invalid for this reason: ${lastReason}. Return a corrected JSON object only.`,
+        content: `The previous JSON was invalid for this reason: ${formatZodIssuesForAudit(lastZodError ?? lastReason)}. Return a corrected JSON object only.`,
       },
     ];
   }
@@ -309,8 +309,9 @@ export async function generateLlmSummary(
     sessionId: input.sessionId,
     reason: lastReason,
   });
-  // H1: throw so Inngest auto-retry handles transient LLM failures.
-  // Spec line 163: "On second failure, throw — Inngest auto-retry handles the rest."
+  // Throw so the caller can choose the recovery path: direct summary
+  // regeneration gets Inngest retries; soft session-completed callers rely on
+  // reconciliation to fill the gap.
   throw new Error('session summary generation failed validation');
 }
 

@@ -96,4 +96,4 @@ export type { TopicSession } from './session-topic';
 
 // Subject sessions (Past conversations)
 export { getSubjectSessions } from './session-subject';
-export type { SubjectSession } from './session-subject';
+export type { SubjectSession } from '@eduagent/schemas';

@@ -112,6 +112,16 @@ describe('llmSummarySchema', () => {
       }).success
     ).toBe(true);
   });
+
+  it('rejects empty topicsCovered for completed sessions', () => {
+    expect(
+      llmSummarySchema.safeParse({
+        ...valid,
+        topicsCovered: [],
+        sessionState: 'completed' as const,
+      }).success
+    ).toBe(false);
+  });
 });
 
 describe('transcriptResponseSchema', () => {

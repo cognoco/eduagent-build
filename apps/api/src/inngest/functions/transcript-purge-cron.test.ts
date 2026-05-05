@@ -70,8 +70,6 @@ describe('transcriptPurgeCron', () => {
           sessionSummaryId: 'summary-2',
           sessionId: 'session-2',
           profileId: 'profile-2',
-          missingSummary: true,
-          missingRecap: false,
         },
       ],
     });
@@ -99,6 +97,7 @@ describe('transcriptPurgeCron', () => {
         data: expect.objectContaining({
           delayedCount: 1,
           sessionIds: ['session-2'],
+          missingPreconditionCount: 1,
         }),
       })
     );
@@ -127,7 +126,10 @@ describe('transcriptPurgeHandler', () => {
     const handler = (transcriptPurgeHandler as any).fn;
     const result = await handler({
       event: {
-        data: { profileId: 'profile-1', sessionSummaryId: 'summary-1' },
+        data: {
+          profileId: '00000000-0000-7000-8000-000000000001',
+          sessionSummaryId: '00000000-0000-7000-8000-000000000002',
+        },
       },
       step,
     });
@@ -143,7 +145,7 @@ describe('transcriptPurgeHandler', () => {
       expect.objectContaining({
         name: 'app/session.transcript.purged',
         data: expect.objectContaining({
-          profileId: 'profile-1',
+          profileId: '00000000-0000-7000-8000-000000000001',
           sessionId: 'session-1',
           sessionSummaryId: 'summary-1',
           eventsDeleted: 3,
@@ -164,7 +166,10 @@ describe('transcriptPurgeHandler', () => {
     await expect(
       handler({
         event: {
-          data: { profileId: 'profile-1', sessionSummaryId: 'summary-1' },
+          data: {
+            profileId: '00000000-0000-7000-8000-000000000001',
+            sessionSummaryId: '00000000-0000-7000-8000-000000000002',
+          },
         },
         step,
       })
@@ -173,9 +178,9 @@ describe('transcriptPurgeHandler', () => {
     expect(mockCaptureException).toHaveBeenCalledWith(
       expect.objectContaining({ message: 'Voyage unavailable' }),
       expect.objectContaining({
-        profileId: 'profile-1',
+        profileId: '00000000-0000-7000-8000-000000000001',
         extra: expect.objectContaining({
-          sessionSummaryId: 'summary-1',
+          sessionSummaryId: '00000000-0000-7000-8000-000000000002',
           surface: 'transcript-purge',
         }),
       })

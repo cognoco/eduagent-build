@@ -75,6 +75,7 @@ export const summaryReconciliationCron = inngest.createFunction(
           )
           .where(
             and(
+              isNotNull(learningSessions.endedAt),
               gte(learningSessions.endedAt, since),
               lt(learningSessions.endedAt, sixHoursAgo),
               or(
@@ -112,6 +113,7 @@ export const summaryReconciliationCron = inngest.createFunction(
           )
           .where(
             and(
+              isNotNull(learningSessions.endedAt),
               gte(learningSessions.endedAt, recapSince),
               lt(learningSessions.endedAt, sixHoursAgo),
               isNotNull(sessionSummaries.summaryGeneratedAt),

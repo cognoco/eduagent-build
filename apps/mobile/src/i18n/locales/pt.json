@@ -1957,5 +1957,12 @@
       "topUpTitle": "Top-up",
       "topUpBody": "500 additional credits have been added!"
     }
+  },
+  "sessionTranscript": {
+    "archived": {
+      "title": "Esta conversa foi arquivada em {{date}}.",
+      "intro": "Aqui está o que você estudou:",
+      "continueCta": "Continuar este tópico"
+    }
   }
 }

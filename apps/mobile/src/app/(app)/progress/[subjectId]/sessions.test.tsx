@@ -40,7 +40,12 @@ jest.mock('react-native-safe-area-context', () => ({
 
 jest.mock('../../../../components/common', () => {
   const RN = jest.requireActual('react-native');
-  const ErrorFallback = ({ message, primaryAction, testID }: any) => (
+  const ErrorFallback = ({
+    message,
+    primaryAction,
+    secondaryAction,
+    testID,
+  }: any) => (
     <RN.View testID={testID}>
       <RN.Text>{message}</RN.Text>
       {primaryAction ? (
@@ -49,6 +54,14 @@ jest.mock('../../../../components/common', () => {
           testID={primaryAction.testID}
         >
           <RN.Text>{primaryAction.label}</RN.Text>
+        </RN.Pressable>
+      ) : null}
+      {secondaryAction ? (
+        <RN.Pressable
+          onPress={secondaryAction.onPress}
+          testID={secondaryAction.testID}
+        >
+          <RN.Text>{secondaryAction.label}</RN.Text>
         </RN.Pressable>
       ) : null}
     </RN.View>

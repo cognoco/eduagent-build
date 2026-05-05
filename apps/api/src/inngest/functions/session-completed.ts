@@ -854,7 +854,12 @@ export const sessionCompleted = inngest.createFunction(
               engagementSignal,
               updatedAt: new Date(),
             })
-            .where(eq(sessionSummaries.id, summaryRow.id));
+            .where(
+              and(
+                eq(sessionSummaries.id, summaryRow.id),
+                eq(sessionSummaries.profileId, profileId)
+              )
+            );
         })
       )
     );
@@ -907,14 +912,36 @@ export const sessionCompleted = inngest.createFunction(
               nextTopicReason: recap.nextTopicReason,
               updatedAt: new Date(),
             })
-            .where(eq(sessionSummaries.id, summaryRow.id));
+            .where(
+              and(
+                eq(sessionSummaries.id, summaryRow.id),
+                eq(sessionSummaries.profileId, profileId)
+              )
+            );
         })
       )
     );
 
-    outcomes.push(
-      await step.run('generate-llm-summary', async () =>
-        runIsolated('generate-llm-summary', profileId, async () => {
+    // Capture summary outcome from the work step; emit observability events
+    // OUTSIDE the step.run so retries don't duplicate them (Inngest memoises
+    // the run's return value but does not suppress inner step.sendEvent).
+    type LlmSummaryStepResult =
+      | { kind: 'no-summary-row' }
+      | { kind: 'no-summary-generated'; sessionSummaryId: string }
+      | {
+          kind: 'generated';
+          sessionSummaryId: string;
+          sessionState: string;
+          topicsCount: number;
+          narrativeLength: number;
+        };
+    const llmSummaryStep = await step.run(
+      'generate-llm-summary',
+      async (): Promise<{
+        outcome: StepOutcome;
+        summaryResult: LlmSummaryStepResult;
+      }> => {
+        try {
           const db = getStepDatabase();
 
           const summaryRow = await db.query.sessionSummaries.findFirst({
@@ -926,7 +953,10 @@ export const sessionCompleted = inngest.createFunction(
           });
 
           if (!summaryRow) {
-            return;
+            return {
+              outcome: { step: 'generate-llm-summary', status: 'ok' },
+              summaryResult: { kind: 'no-summary-row' },
+            };
           }
 
           const summary = await generateAndStoreLlmSummary(db, {
@@ -938,33 +968,75 @@ export const sessionCompleted = inngest.createFunction(
           });
 
           if (!summary) {
-            await step.sendEvent('notify-session-summary-failed', {
-              name: 'app/session.summary.failed',
-              data: {
-                profileId,
-                sessionId,
+            return {
+              outcome: { step: 'generate-llm-summary', status: 'ok' },
+              summaryResult: {
+                kind: 'no-summary-generated',
                 sessionSummaryId: summaryRow.id,
-                timestamp: new Date().toISOString(),
               },
-            });
-            return;
+            };
           }
 
-          await step.sendEvent('notify-session-summary-generated', {
-            name: 'app/session.summary.generated',
-            data: {
-              profileId,
-              sessionId,
+          return {
+            outcome: { step: 'generate-llm-summary', status: 'ok' },
+            summaryResult: {
+              kind: 'generated',
               sessionSummaryId: summaryRow.id,
               sessionState: summary.sessionState,
               topicsCount: summary.topicsCovered.length,
               narrativeLength: summary.narrative.length,
-              timestamp: new Date().toISOString(),
+            },
+          };
+        } catch (err) {
+          captureException(err, {
+            profileId,
+            extra: {
+              step: 'generate-llm-summary',
+              surface: 'session-completed',
             },
           });
-        })
-      )
+          logger.error('[session-completed] soft step failed', {
+            step: 'generate-llm-summary',
+            profileId,
+            error: err instanceof Error ? err.message : String(err),
+          });
+          return {
+            outcome: {
+              step: 'generate-llm-summary',
+              status: 'failed',
+              error: err instanceof Error ? err.message : String(err),
+            },
+            summaryResult: { kind: 'no-summary-row' },
+          };
+        }
+      }
     );
+    outcomes.push(llmSummaryStep.outcome);
+
+    if (llmSummaryStep.summaryResult.kind === 'no-summary-generated') {
+      await step.sendEvent('notify-session-summary-failed', {
+        name: 'app/session.summary.failed',
+        data: {
+          profileId,
+          sessionId,
+          sessionSummaryId: llmSummaryStep.summaryResult.sessionSummaryId,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } else if (llmSummaryStep.summaryResult.kind === 'generated') {
+      await step.sendEvent('notify-session-summary-generated', {
+        name: 'app/session.summary.generated',
+        data: {
+          profileId,
+          sessionId,
+          sessionSummaryId: llmSummaryStep.summaryResult.sessionSummaryId,
+          sessionState: llmSummaryStep.summaryResult.sessionState,
+          topicsCount: llmSummaryStep.summaryResult.topicsCount,
+          narrativeLength: llmSummaryStep.summaryResult.narrativeLength,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    }
 
     // Step 3: Analyze learner transcript and update learning profile (Epic 16).
     // [EP15-M3]: runs AFTER write-coaching-card — profile analysis is background

@@ -1,5 +1,6 @@
 // @inngest-admin: cross-profile
-import { and, isNotNull, isNull, lte, sql } from 'drizzle-orm';
+import { and, isNotNull, isNull, lte, or } from 'drizzle-orm';
+import { z } from 'zod';
 import { sessionSummaries } from '@eduagent/database';
 import { inngest } from '../client';
 import {
@@ -9,6 +10,11 @@ import {
 } from '../helpers';
 import { purgeSessionTranscript } from '../../services/transcript-purge';
 import { captureException } from '../../services/sentry';
+
+const transcriptPurgeEventDataSchema = z.object({
+  profileId: z.string().uuid(),
+  sessionSummaryId: z.string().uuid(),
+});
 
 const PURGE_LIMIT = 100;
 const DELAYED_LIMIT = 50;
@@ -40,6 +46,7 @@ export const transcriptPurgeCron = inngest.createFunction(
           and(
             isNull(sessionSummaries.purgedAt),
             isNotNull(sessionSummaries.llmSummary),
+            isNotNull(sessionSummaries.learnerRecap),
             isNotNull(sessionSummaries.summaryGeneratedAt),
             lte(sessionSummaries.summaryGeneratedAt, cutoff)
           )
@@ -59,16 +66,16 @@ export const transcriptPurgeCron = inngest.createFunction(
             sessionSummaryId: sessionSummaries.id,
             sessionId: sessionSummaries.sessionId,
             profileId: sessionSummaries.profileId,
-            missingSummary:
-              sql<boolean>`${sessionSummaries.llmSummary} IS NULL`.as(
-                'missingSummary'
-              ),
           })
           .from(sessionSummaries)
           .where(
             and(
               isNull(sessionSummaries.purgedAt),
               isNotNull(sessionSummaries.summaryGeneratedAt),
+              or(
+                isNull(sessionSummaries.llmSummary),
+                isNull(sessionSummaries.learnerRecap)
+              ),
               lte(sessionSummaries.summaryGeneratedAt, delayedCutoff)
             )
           )
@@ -76,9 +83,7 @@ export const transcriptPurgeCron = inngest.createFunction(
       }
     );
 
-    const delayedBlocked = delayed.filter(
-      (candidate) => candidate.missingSummary
-    );
+    const delayedBlocked = delayed;
 
     if (candidates.length === 0) {
       if (delayedBlocked.length > 0) {
@@ -87,9 +92,7 @@ export const transcriptPurgeCron = inngest.createFunction(
           data: {
             delayedCount: delayedBlocked.length,
             sessionIds: delayedBlocked.map((candidate) => candidate.sessionId),
-            missingSummaryCount: delayedBlocked.filter(
-              (candidate) => candidate.missingSummary
-            ).length,
+            missingPreconditionCount: delayedBlocked.length,
             timestamp: new Date().toISOString(),
           },
         });
@@ -113,9 +116,7 @@ export const transcriptPurgeCron = inngest.createFunction(
         data: {
           delayedCount: delayedBlocked.length,
           sessionIds: delayedBlocked.map((candidate) => candidate.sessionId),
-          missingSummaryCount: delayedBlocked.filter(
-            (candidate) => candidate.missingSummary
-          ).length,
+          missingPreconditionCount: delayedBlocked.length,
           timestamp,
         },
       });
@@ -138,10 +139,8 @@ export const transcriptPurgeHandler = inngest.createFunction(
   },
   { event: 'app/session.transcript.purge' },
   async ({ event, step }) => {
-    const { profileId, sessionSummaryId } = event.data as {
-      profileId: string;
-      sessionSummaryId: string;
-    };
+    const { profileId, sessionSummaryId } =
+      transcriptPurgeEventDataSchema.parse(event.data);
 
     const result = await step.run('purge-transcript', async () => {
       try {

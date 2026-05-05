@@ -3,22 +3,10 @@ import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
-
-export interface SubjectSession {
-  id: string;
-  topicId: string | null;
-  topicTitle: string;
-  bookId: string | null;
-  bookTitle: string | null;
-  chapter: string | null;
-  sessionType: string;
-  durationSeconds: number | null;
-  createdAt: string;
-}
-
-interface SubjectSessionsResponse {
-  sessions: SubjectSession[];
-}
+import type {
+  GetSubjectSessionsResponse,
+  SubjectSession,
+} from '@eduagent/schemas';
 
 export function useSubjectSessions(
   subjectId: string | undefined
@@ -37,7 +25,7 @@ export function useSubjectSessions(
           { init: { signal } }
         );
         await assertOk(res);
-        const data = (await res.json()) as SubjectSessionsResponse;
+        const data = (await res.json()) as GetSubjectSessionsResponse;
         return data.sessions;
       } finally {
         cleanup();

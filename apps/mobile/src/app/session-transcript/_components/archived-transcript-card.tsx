@@ -1,16 +1,23 @@
 import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import type { ArchivedTranscriptResponse } from '@eduagent/schemas';
+import { useThemeColors } from '../../../lib/theme';
 
 interface Props extends Omit<ArchivedTranscriptResponse, 'archived'> {
   onContinueTopic: () => void;
+  onBack: () => void;
 }
 
 export function ArchivedTranscriptCard({
   archivedAt,
   summary,
   onContinueTopic,
+  onBack,
 }: Props) {
-  const archivedDate = new Date(archivedAt).toLocaleDateString(undefined, {
+  const { i18n, t } = useTranslation();
+  const colors = useThemeColors();
+  const archivedDate = new Date(archivedAt).toLocaleDateString(i18n.language, {
     month: 'long',
     day: 'numeric',
     year: 'numeric',
@@ -19,11 +26,27 @@ export function ArchivedTranscriptCard({
   return (
     <ScrollView contentContainerStyle={{ padding: 24 }}>
       <View testID="archived-transcript-card">
+        <Pressable
+          testID="archived-transcript-back"
+          onPress={onBack}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.goBack')}
+          className="mb-4 min-h-[44px] min-w-[44px] self-start items-center justify-center"
+          hitSlop={8}
+        >
+          <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
+        </Pressable>
+
         <Text className="text-h3 font-semibold text-text-primary mb-2">
-          This conversation was archived on {archivedDate}.
+          {t('sessionTranscript.archived.title', {
+            date: archivedDate,
+            defaultValue: 'This conversation was archived on {{date}}.',
+          })}
         </Text>
         <Text className="text-body text-text-secondary mb-4">
-          Here&apos;s what you covered:
+          {t('sessionTranscript.archived.intro', {
+            defaultValue: "Here's what you covered:",
+          })}
         </Text>
 
         <Text className="text-body text-text-primary mb-4">
@@ -56,11 +79,15 @@ export function ArchivedTranscriptCard({
           testID="archived-continue-topic-cta"
           onPress={onContinueTopic}
           accessibilityRole="button"
-          accessibilityLabel="Continue this topic"
+          accessibilityLabel={t('sessionTranscript.archived.continueCta', {
+            defaultValue: 'Continue this topic',
+          })}
           className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
         >
           <Text className="text-body font-semibold text-text-inverse">
-            Continue this topic
+            {t('sessionTranscript.archived.continueCta', {
+              defaultValue: 'Continue this topic',
+            })}
           </Text>
         </Pressable>
       </View>

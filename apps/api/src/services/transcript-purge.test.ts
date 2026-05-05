@@ -28,7 +28,10 @@ function createPurgeDb(summaryRow: Record<string, unknown> | null) {
     returning: deleteEventsReturning,
   });
   const insertValues = jest.fn().mockResolvedValue(undefined);
-  const updateWhere = jest.fn().mockResolvedValue(undefined);
+  const updateReturning = jest.fn().mockResolvedValue([{ id: 'summary-1' }]);
+  const updateWhere = jest.fn().mockReturnValue({
+    returning: updateReturning,
+  });
 
   const db = {
     query: {
@@ -63,6 +66,7 @@ function createPurgeDb(summaryRow: Record<string, unknown> | null) {
     deleteEventsReturning,
     insertValues,
     updateWhere,
+    updateReturning,
   };
 }
 
@@ -176,6 +180,84 @@ describe('purgeSessionTranscript', () => {
         purgedAt: expect.any(Date),
       })
     );
+  });
+
+  it('skips and leaves transcript rows untouched when another worker already stamped purgedAt', async () => {
+    const { db, insertValues, deleteEmbeddingsReturning, updateReturning } =
+      createPurgeDb({
+        id: 'summary-1',
+        sessionId: 'session-1',
+        profileId: 'profile-1',
+        topicId: null,
+        llmSummary: {
+          narrative:
+            'Worked through fractions and named equivalent fractions while comparing visual models together.',
+          topicsCovered: ['fractions', 'equivalent fractions'],
+          sessionState: 'completed',
+          reEntryRecommendation:
+            'Resume with one more equivalent-fractions example and ask for the rule aloud.',
+        },
+        learnerRecap: 'You connected pictures to the fraction rule.',
+        purgedAt: null,
+      });
+
+    updateReturning.mockResolvedValueOnce([]);
+    mockGenerateEmbedding.mockResolvedValue({
+      vector: [0.1, 0.2],
+      dimensions: 2,
+      model: 'voyage-3.5',
+      provider: 'voyage',
+    });
+
+    const result = await purgeSessionTranscript(
+      db,
+      'profile-1',
+      'summary-1',
+      'voyage-key'
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'skipped',
+        reason: 'already_purged',
+      })
+    );
+    expect(insertValues).not.toHaveBeenCalled();
+    expect(deleteEmbeddingsReturning).not.toHaveBeenCalled();
+  });
+
+  it('skips rows whose learner recap is missing before generating embeddings', async () => {
+    const { db } = createPurgeDb({
+      id: 'summary-1',
+      sessionId: 'session-1',
+      profileId: 'profile-1',
+      topicId: null,
+      llmSummary: {
+        narrative:
+          'Worked through fractions and named equivalent fractions while comparing visual models together.',
+        topicsCovered: ['fractions', 'equivalent fractions'],
+        sessionState: 'completed',
+        reEntryRecommendation:
+          'Resume with one more equivalent-fractions example and ask for the rule aloud.',
+      },
+      learnerRecap: null,
+      purgedAt: null,
+    });
+
+    const result = await purgeSessionTranscript(
+      db,
+      'profile-1',
+      'summary-1',
+      'voyage-key'
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'skipped',
+        reason: 'missing_learner_recap',
+      })
+    );
+    expect(mockGenerateEmbedding).not.toHaveBeenCalled();
   });
 
   it('keeps DB writes untouched when Voyage embedding generation fails', async () => {

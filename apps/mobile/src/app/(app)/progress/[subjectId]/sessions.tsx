@@ -75,6 +75,15 @@ export default function SubjectSessionsScreen(): React.ReactElement {
                 onPress: () => void sessionsQuery.refetch(),
                 testID: 'subject-sessions-error-retry',
               }}
+              secondaryAction={{
+                label: t('common.goBack'),
+                onPress: () =>
+                  goBackOrReplace(
+                    router,
+                    `/(app)/progress/${subjectId ?? ''}` as never
+                  ),
+                testID: 'subject-sessions-error-back',
+              }}
               testID="subject-sessions-error"
             />
           </View>

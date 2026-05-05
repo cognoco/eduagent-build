@@ -16,6 +16,7 @@ describe('ArchivedTranscriptCard', () => {
       topicId: null,
     },
     onContinueTopic: jest.fn(),
+    onBack: jest.fn(),
   };
 
   it('renders archived date in a friendly format', () => {
@@ -38,5 +39,11 @@ describe('ArchivedTranscriptCard', () => {
     const { getByTestId } = render(<ArchivedTranscriptCard {...props} />);
     fireEvent.press(getByTestId('archived-continue-topic-cta'));
     expect(props.onContinueTopic).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls onBack when the back affordance is pressed', () => {
+    const { getByTestId } = render(<ArchivedTranscriptCard {...props} />);
+    fireEvent.press(getByTestId('archived-transcript-back'));
+    expect(props.onBack).toHaveBeenCalledTimes(1);
   });
 });

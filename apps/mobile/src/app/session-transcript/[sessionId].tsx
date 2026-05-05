@@ -127,6 +127,7 @@ export default function SessionTranscriptScreen() {
       <ArchivedTranscriptCard
         archivedAt={transcript.data.archivedAt}
         summary={transcript.data.summary}
+        onBack={() => goBackOrReplace(router, '/(app)/library')}
         onContinueTopic={() => {
           if (transcript.data?.archived !== true) return;
           if (transcript.data.summary.topicId) {

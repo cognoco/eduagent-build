@@ -144,7 +144,7 @@ export const sessionSummaryCreate = inngest.createFunction(
   async ({ event, step }) => {
     const payload = event.data as SummaryEventPayload;
 
-    return step.run('create-summary', async () => {
+    const result = await step.run('create-summary', async () => {
       const db = getStepDatabase();
       const summaryRow = await createPendingSessionSummary(
         db,
@@ -163,20 +163,35 @@ export const sessionSummaryCreate = inngest.createFunction(
       });
 
       if (!summary) {
-        await step.sendEvent(
-          'notify-session-summary-create-failed',
-          buildSummaryFailedEvent(payload, summaryRow.id)
-        );
-        return { status: 'skipped_no_summary', summaryId: summaryRow.id };
+        return {
+          status: 'skipped_no_summary' as const,
+          summaryId: summaryRow.id,
+        };
       }
 
+      return {
+        status: 'completed' as const,
+        summaryId: summaryRow.id,
+        summary,
+      };
+    });
+
+    if (result.status === 'skipped_no_summary') {
+      await step.sendEvent(
+        'notify-session-summary-create-failed',
+        buildSummaryFailedEvent(payload, result.summaryId)
+      );
+    } else {
       await step.sendEvent(
         'notify-session-summary-created',
-        buildSummaryGeneratedEvent(payload, summaryRow.id, summary)
+        buildSummaryGeneratedEvent(payload, result.summaryId, result.summary)
       );
+    }
 
-      return { status: 'completed', summaryId: summaryRow.id };
-    });
+    return {
+      status: result.status,
+      summaryId: result.summaryId,
+    };
   }
 );
 
@@ -189,9 +204,9 @@ export const sessionSummaryRegenerate = inngest.createFunction(
   async ({ event, step }) => {
     const payload = event.data as SummaryEventPayload;
 
-    return step.run('regenerate-summary', async () => {
+    const result = await step.run('regenerate-summary', async () => {
       const db = getStepDatabase();
-      const result = await generateAndStoreLlmSummary(db, {
+      const summary = await generateAndStoreLlmSummary(db, {
         sessionId: payload.sessionId,
         profileId: payload.profileId,
         summaryId: payload.sessionSummaryId,
@@ -199,27 +214,33 @@ export const sessionSummaryRegenerate = inngest.createFunction(
         topicId: payload.topicId ?? null,
       });
 
-      if (!result) {
-        await step.sendEvent(
-          'notify-session-summary-regenerate-failed',
-          buildSummaryFailedEvent(payload, payload.sessionSummaryId)
-        );
-      } else {
-        await step.sendEvent(
-          'notify-session-summary-regenerated',
-          buildSummaryGeneratedEvent(
-            payload,
-            payload.sessionSummaryId ?? null,
-            result
-          )
-        );
-      }
-
       return {
-        status: result ? 'completed' : 'skipped_no_summary',
-        regenerated: result != null,
+        status: summary ? 'completed' : 'skipped_no_summary',
+        regenerated: summary != null,
+        summary,
       };
     });
+
+    if (!result.summary) {
+      await step.sendEvent(
+        'notify-session-summary-regenerate-failed',
+        buildSummaryFailedEvent(payload, payload.sessionSummaryId)
+      );
+    } else {
+      await step.sendEvent(
+        'notify-session-summary-regenerated',
+        buildSummaryGeneratedEvent(
+          payload,
+          payload.sessionSummaryId ?? null,
+          result.summary
+        )
+      );
+    }
+
+    return {
+      status: result.status,
+      regenerated: result.regenerated,
+    };
   }
 );
 

@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import {
   sessionEmbeddings,
   sessionEvents,
@@ -90,6 +90,22 @@ export async function purgeSessionTranscript(
     };
   }
 
+  if (!row.learnerRecap) {
+    logger.warn('transcript-purge.skipped', {
+      surface: 'transcript-purge',
+      reason: 'missing_learner_recap',
+      profileId,
+      sessionId: row.sessionId,
+      sessionSummaryId,
+    });
+    return {
+      status: 'skipped',
+      reason: 'missing_learner_recap',
+      sessionId: row.sessionId,
+      sessionSummaryId,
+    };
+  }
+
   const parsed = llmSummarySchema.safeParse(row.llmSummary);
   if (!parsed.success) {
     logger.warn('transcript-purge.skipped', {
@@ -116,6 +132,29 @@ export async function purgeSessionTranscript(
 
   const outcome = await db.transaction(async (tx) => {
     const txDb = tx as unknown as Database;
+
+    const updated = await txDb
+      .update(sessionSummaries)
+      .set({
+        purgedAt: now,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(sessionSummaries.id, sessionSummaryId),
+          eq(sessionSummaries.profileId, profileId),
+          isNull(sessionSummaries.purgedAt)
+        )
+      )
+      .returning({ id: sessionSummaries.id });
+
+    if (updated.length === 0) {
+      return {
+        alreadyPurged: true,
+        eventsDeleted: 0,
+        embeddingRowsReplaced: 0,
+      };
+    }
 
     const replacedEmbeddings = await txDb
       .delete(sessionEmbeddings)
@@ -145,24 +184,28 @@ export async function purgeSessionTranscript(
       )
       .returning({ id: sessionEvents.id });
 
-    await txDb
-      .update(sessionSummaries)
-      .set({
-        purgedAt: now,
-        updatedAt: now,
-      })
-      .where(
-        and(
-          eq(sessionSummaries.id, sessionSummaryId),
-          eq(sessionSummaries.profileId, profileId)
-        )
-      );
-
     return {
+      alreadyPurged: false,
       eventsDeleted: deletedEvents.length,
       embeddingRowsReplaced: replacedEmbeddings.length,
     };
   });
+
+  if (outcome.alreadyPurged) {
+    logger.warn('transcript-purge.skipped', {
+      surface: 'transcript-purge',
+      reason: 'already_purged',
+      profileId,
+      sessionId: row.sessionId,
+      sessionSummaryId,
+    });
+    return {
+      status: 'skipped',
+      reason: 'already_purged',
+      sessionId: row.sessionId,
+      sessionSummaryId,
+    };
+  }
 
   logger.info('transcript-purge.completed', {
     profileId,
