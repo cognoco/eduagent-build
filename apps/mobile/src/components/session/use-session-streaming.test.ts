@@ -1,5 +1,8 @@
 import { renderHook, act } from '@testing-library/react-native';
-import { useSessionStreaming } from './use-session-streaming';
+import {
+  buildSessionApiMessage,
+  useSessionStreaming,
+} from './use-session-streaming';
 import { QuotaExceededError } from '../../lib/api-client';
 
 // Mock session components barrel (animateResponse)
@@ -189,6 +192,41 @@ function createMockOpts(overrides: Record<string, unknown> = {}) {
 // Tests
 // ---------------------------------------------------------------------------
 
+describe('buildSessionApiMessage', () => {
+  it('turns a first topic acknowledgement into a clear teaching request', () => {
+    expect(
+      buildSessionApiMessage('ok', {
+        effectiveMode: 'learning',
+        topicName: 'Cells',
+        messages: [{ id: 'opening', role: 'assistant', content: 'Ready?' }],
+      } as any)
+    ).toBe('I\'m ready. Please start teaching me "Cells" from the beginning.');
+  });
+
+  it('keeps substantive learner messages unchanged', () => {
+    expect(
+      buildSessionApiMessage('Can you explain cells?', {
+        effectiveMode: 'learning',
+        topicName: 'Cells',
+        messages: [{ id: 'opening', role: 'assistant', content: 'Ready?' }],
+      } as any)
+    ).toBe('Can you explain cells?');
+  });
+
+  it('keeps later acknowledgements unchanged', () => {
+    expect(
+      buildSessionApiMessage('ok', {
+        effectiveMode: 'learning',
+        topicName: 'Cells',
+        messages: [
+          { id: 'opening', role: 'assistant', content: 'Ready?' },
+          { id: 'user-1', role: 'user', content: 'Start here' },
+        ],
+      } as any)
+    ).toBe('ok');
+  });
+});
+
 describe('useSessionStreaming', () => {
   // Track silence timer refs across tests so afterEach can clear pending timers
   // created by scheduleSilencePrompt (real setTimeout with multi-minute delay).
@@ -299,6 +337,35 @@ describe('useSessionStreaming', () => {
   // -------------------------------------------------------------------------
 
   describe('continueWithMessage', () => {
+    it('expands a first topic acknowledgement before streaming', async () => {
+      const opts = makeOpts({
+        topicName: 'What Makes Something Alive?',
+        messages: [
+          {
+            id: 'opening',
+            role: 'assistant',
+            content: 'Today we are starting.',
+          },
+        ],
+      });
+      const { result } = renderHook(() => useSessionStreaming(opts as any));
+
+      await act(async () => {
+        await result.current.continueWithMessage('ok');
+      });
+
+      expect(opts.streamMessage).toHaveBeenCalledWith(
+        'I\'m ready. Please start teaching me "What Makes Something Alive?" from the beginning.',
+        expect.any(Function),
+        expect.any(Function),
+        'new-session-1',
+        expect.objectContaining({
+          idempotencyKey: expect.any(String),
+          onReplay: expect.any(Function),
+        })
+      );
+    });
+
     it('creates session, streams message, and updates state on success', async () => {
       const opts = makeOpts();
       const { result } = renderHook(() => useSessionStreaming(opts as any));
