@@ -51,6 +51,9 @@ function getAllScreenFiles(dir: string): string[] {
     for (const entry of entries) {
       const fullPath = path.join(currentDir, entry.name);
       if (entry.isDirectory()) {
+        // Skip _components/, _hooks/ etc — Expo Router non-route conventions
+        // for co-located helpers. These are not user-navigable screens.
+        if (entry.name.startsWith('_')) continue;
         walk(fullPath);
       } else if (
         entry.name.endsWith('.tsx') &&
