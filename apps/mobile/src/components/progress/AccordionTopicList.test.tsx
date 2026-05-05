@@ -2,10 +2,11 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import { AccordionTopicList } from './AccordionTopicList';
 
 const mockPush = jest.fn();
+const mockNavigate = jest.fn();
 const mockUseChildSubjectTopics = jest.fn();
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: mockPush }),
+  useRouter: () => ({ push: mockPush, navigate: mockNavigate }),
 }));
 
 jest.mock('../../hooks/use-dashboard', () => ({
@@ -177,6 +178,12 @@ describe('AccordionTopicList', () => {
 
     fireEvent.press(screen.getByTestId('accordion-topic-topic-1'));
 
+    expect(mockNavigate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/(app)/child/[profileId]',
+        params: { profileId: 'child-1' },
+      })
+    );
     expect(mockPush).toHaveBeenCalledWith(
       expect.objectContaining({
         pathname: '/(app)/child/[profileId]/topic/[topicId]',

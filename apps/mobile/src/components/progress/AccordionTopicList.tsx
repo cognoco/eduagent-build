@@ -90,6 +90,10 @@ export function AccordionTopicList({
             key={topic.topicId}
             onPress={(event) => {
               event?.stopPropagation?.();
+              router.navigate({
+                pathname: '/(app)/child/[profileId]',
+                params: { profileId: childProfileId },
+              } as never);
               router.push({
                 pathname: '/(app)/child/[profileId]/topic/[topicId]',
                 params: {
