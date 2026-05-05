@@ -27,13 +27,8 @@ export interface SubjectSession {
  * Returns sessions for a subject across every topic and book, including
  * properly completed and auto-closed sessions. Excludes accidental opens
  * (requires at least 1 exchange). Profile ownership is enforced through
- * `subjects.profileId`.
- *
- * Architectural exception: uses direct db.select() instead of
- * createScopedRepository because the query joins learningSessions →
- * curriculumTopics → curriculumBooks → subjects with profileId enforced via
- * subjects.profileId. The scoped repo cannot express this multi-table join.
- * Mirrors the pattern in session-book.ts.
+ * `subjects.profileId` — the sanctioned parent-chain join pattern
+ * (see CLAUDE.md).
  */
 export async function getSubjectSessions(
   db: Database,
