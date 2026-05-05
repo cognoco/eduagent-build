@@ -547,7 +547,7 @@ describe('ShelfScreen', () => {
   // -----------------------------------------------------------------------
   // Suggestion cards
   // -----------------------------------------------------------------------
-  it('[BUG-SHELF-BOOK-CTA] shows a choose-book path even when there are no suggestions', async () => {
+  it('[BUG-SHELF-BOOK-CTA] shows an add-book path after existing books when there are no suggestions', async () => {
     mockFetch.setRoute('/book-suggestions', []);
 
     const { getByTestId, getByText } = render(<ShelfScreen />, {
@@ -557,7 +557,7 @@ describe('ShelfScreen', () => {
     await waitFor(() => {
       getByTestId('shelf-choose-book');
     });
-    getByText('Browse or add another book');
+    getByText('Add another book');
 
     fireEvent.press(getByTestId('shelf-choose-book'));
 
@@ -626,11 +626,10 @@ describe('ShelfScreen', () => {
       expect(mockPush).toHaveBeenCalledWith(
         expect.objectContaining({
           pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
-          params: expect.objectContaining({
+          params: {
             subjectId: 'sub-1',
             bookId: 'book-new',
-            autoStart: 'true',
-          }),
+          },
         })
       );
     });

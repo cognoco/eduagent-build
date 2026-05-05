@@ -374,6 +374,43 @@ describe('BookScreen', () => {
     getByText('2 of 3 topics finished');
   });
 
+  it('offers to set up a fuller topic list when a book only has one starter topic', () => {
+    mockUseBookWithTopics.mockReturnValue(
+      makeBookQuery({
+        data: {
+          ...makeBookQuery().data,
+          book: {
+            ...makeBookQuery().data.book,
+            title: 'Introduction to Programming',
+          },
+          topics: [
+            makeTopic({
+              id: 'topic-1',
+              title: 'Introduction to Programming',
+              sortOrder: 1,
+            }),
+          ],
+        },
+      })
+    );
+
+    const { getByTestId, getByText } = render(<BookScreen />);
+
+    getByTestId('book-thin-path-card');
+    getByText('Create a fuller topic list');
+
+    fireEvent.press(getByTestId('book-thin-path-build'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/onboarding/interview',
+      params: {
+        subjectId: 'sub-1',
+        bookId: 'book-1',
+        bookTitle: 'Introduction to Programming',
+      },
+    });
+  });
+
   it('renders continue now and started from in-progress sessions', () => {
     const topics = [
       makeTopic({ id: 'topic-1', title: 'Linear Equations', sortOrder: 1 }),

@@ -379,7 +379,7 @@ export default function PickBookScreen(): React.ReactElement {
             testID="pick-book-empty"
           >
             <Text className="text-body text-text-secondary text-center">
-              No suggestions yet. Type what you want to learn below.
+              No suggestions yet. Type a book or topic you want to add.
             </Text>
           </View>
         )}
@@ -389,7 +389,7 @@ export default function PickBookScreen(): React.ReactElement {
           <View className="mb-6" testID="pick-book-custom-section">
             <TextInput
               className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-3 border border-border"
-              placeholder="What do you want to learn about?"
+              placeholder="Book or topic to add"
               placeholderTextColor={colors.muted}
               value={customText}
               onChangeText={setCustomText}

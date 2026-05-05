@@ -522,6 +522,7 @@ export default function BookScreen() {
       activeTopics.every((topic) => topicStudiedIds.has(topic.id)),
     [activeTopics, topicStudiedIds]
   );
+  const showThinBookSetup = activeTopics.length === 1 && !isBookComplete;
 
   const continueNowTopic = useMemo(() => {
     if (!continueNowTopicId) {
@@ -1337,6 +1338,31 @@ export default function BookScreen() {
                 Set up this book
               </Text>
             </Pressable>
+          </View>
+        ) : null}
+
+        {showThinBookSetup && !isReadOnly ? (
+          <View className="px-5 mb-4" testID="book-thin-path-card">
+            <View className="rounded-card border border-border bg-surface-elevated p-4">
+              <Text className="mb-1 text-body font-semibold text-text-primary">
+                Create a fuller topic list
+              </Text>
+              <Text className="mb-3 text-body-sm text-text-secondary">
+                This book only has one starting topic. Set up a clear sequence
+                before you study it.
+              </Text>
+              <Pressable
+                onPress={handleBuildLearningPath}
+                className="min-h-[44px] items-center justify-center rounded-button bg-primary px-5 py-3"
+                testID="book-thin-path-build"
+                accessibilityRole="button"
+                accessibilityLabel="Set up topic list"
+              >
+                <Text className="text-body-sm font-semibold text-text-inverse">
+                  Set up topic list
+                </Text>
+              </Pressable>
+            </View>
           </View>
         ) : null}
 

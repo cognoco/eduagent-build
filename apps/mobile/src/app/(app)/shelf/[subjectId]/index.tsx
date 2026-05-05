@@ -90,13 +90,11 @@ export default function ShelfScreen() {
       // [BUG-692] If the user pressed Skip during the network round-trip,
       // they have already navigated away — do not push them into the book.
       if (filingSkipped.current) return;
-      // M-12: Pass autoStart so the book screen begins a session immediately
       router.push({
         pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
         params: {
           subjectId: result.shelfId,
           bookId: result.bookId,
-          autoStart: 'true',
         },
       } as never);
     } catch (err) {
@@ -175,12 +173,38 @@ export default function ShelfScreen() {
     0
   );
   const showProgress = totalTopics > 0;
-  const chooseBookButtonLabel =
-    bookSuggestions.length > 2
-      ? t('library.shelf.browseAll')
-      : books.length > 0
-      ? t('library.shelf.chooseAnotherBook')
-      : t('library.shelf.chooseBook');
+  const showBrowseAllSuggestions = bookSuggestions.length > 2;
+  const showAddBookFooter = bookSuggestions.length === 0 && books.length > 0;
+  const chooseBookButtonLabel = showBrowseAllSuggestions
+    ? t('library.shelf.browseAll')
+    : t('library.shelf.addAnotherBook');
+
+  const renderChooseBookButton = (
+    className = 'mx-4 mb-4 border border-dashed border-border rounded-xl py-3 items-center justify-center flex-row gap-2'
+  ) => (
+    <Pressable
+      onPress={() =>
+        router.push({
+          pathname: '/(app)/pick-book/[subjectId]',
+          params: { subjectId },
+        } as never)
+      }
+      className={className}
+      style={{ borderColor: shelfTint.solid }}
+      testID="shelf-choose-book"
+      accessibilityRole="button"
+      accessibilityLabel={chooseBookButtonLabel}
+    >
+      <Ionicons
+        name={
+          showBrowseAllSuggestions ? 'albums-outline' : 'add-circle-outline'
+        }
+        size={18}
+        color={shelfTint.solid}
+      />
+      <Text style={{ color: shelfTint.solid }}>{chooseBookButtonLabel}</Text>
+    </Pressable>
+  );
 
   if (isLoading) {
     return (
@@ -331,28 +355,7 @@ export default function ShelfScreen() {
         </View>
       )}
 
-      <Pressable
-        onPress={() =>
-          router.push({
-            pathname: '/(app)/pick-book/[subjectId]',
-            params: { subjectId },
-          } as never)
-        }
-        className="mx-4 mb-4 border border-dashed border-border rounded-xl py-3 items-center justify-center flex-row gap-2"
-        style={{ borderColor: shelfTint.solid }}
-        testID="shelf-choose-book"
-        accessibilityRole="button"
-        accessibilityLabel={chooseBookButtonLabel}
-      >
-        <Ionicons
-          name={
-            bookSuggestions.length > 2 ? 'albums-outline' : 'add-circle-outline'
-          }
-          size={18}
-          color={shelfTint.solid}
-        />
-        <Text style={{ color: shelfTint.solid }}>{chooseBookButtonLabel}</Text>
-      </Pressable>
+      {showBrowseAllSuggestions ? renderChooseBookButton() : null}
 
       {/* Book list */}
       <FlatList
@@ -376,6 +379,15 @@ export default function ShelfScreen() {
             }
           />
         )}
+        ListFooterComponent={
+          showAddBookFooter ? (
+            <View className="pt-1">
+              {renderChooseBookButton(
+                'mb-4 border border-dashed border-border rounded-xl py-3 items-center justify-center flex-row gap-2'
+              )}
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
           // [BUG-868] When there are no books yet but suggestions render
           // above, "Check back soon" wrongly told the user to wait passively
