@@ -1,0 +1,78 @@
+name: test-telemetry
+description: |
+  Minimal smoke-test workflow for verifying that `archon-init-tracing`
+  correctly tags Claude Code and Codex traces with archon-specific
+  OTEL resource attributes.
+
+  Three nodes:
+    1. init-tracing       — writes worktree-local .claude/settings.json
+                            and outputs the codex-variant attributes
+                            string for downstream Codex env: blocks
+    2. claude-ping        — Claude Code call (should be tagged
+                            `service.name=claude-code-archon`)
+    3. codex-ping         — Codex call (should be tagged
+                            `service.name=codex-archon`)
+
+  Verification (after running):
+    1. Open Logfire (or whichever OTEL backend is configured)
+    2. Filter by service.name in (claude-code-archon, codex-archon)
+    3. Confirm the run shows attributes:
+         archon.run_id   — UUID written by init-tracing
+         archon.workflow — "test-telemetry"
+         archon.repo     — repo basename (e.g. "Mentomate")
+    4. Both ping nodes should appear under the same archon.run_id
+
+  Usage:
+    archon workflow run test-telemetry
+
+  This workflow performs no code changes and creates no PR — it exists
+  purely to validate the telemetry tagging design. Cheap and safe to
+  run as often as needed.
+
+provider: claude
+model: claude-haiku-4-5-20251001
+
+worktree:
+  enabled: true
+
+nodes:
+  # ═══════════════════════════════════════════════════════════════
+  # PHASE 0: INIT TRACING — same node as the cleanup workflow.
+  # Writes .claude/settings.json into the worktree (Claude Code
+  # picks it up via project-scope override) and outputs the
+  # codex-variant resource-attributes string for the codex node's
+  # env: block.
+  # ═══════════════════════════════════════════════════════════════
+
+  - id: init-tracing
+    command: archon-init-tracing
+    context: fresh
+    model: haiku
+
+  # ═══════════════════════════════════════════════════════════════
+  # PHASE 1: CLAUDE PING — trivial Claude Code call. The trace this
+  # generates should carry service.name=claude-code-archon plus the
+  # archon.* attributes from the worktree-local settings.json.
+  # ═══════════════════════════════════════════════════════════════
+
+  - id: claude-ping
+    command: telemetry-claude-ping
+    depends_on: [init-tracing]
+    context: fresh
+    model: haiku
+
+  # ═══════════════════════════════════════════════════════════════
+  # PHASE 2: CODEX PING — trivial Codex call. The env: block sets
+  # OTEL_RESOURCE_ATTRIBUTES from init-tracing's stdout (codex
+  # variant: service.name=codex-archon).
+  # ═══════════════════════════════════════════════════════════════
+
+  - id: codex-ping
+    command: telemetry-codex-ping
+    depends_on: [init-tracing]
+    provider: codex
+    model: gpt-5.5
+    modelReasoningEffort: low
+    context: fresh
+    env:
+      OTEL_RESOURCE_ATTRIBUTES: $init-tracing.output
