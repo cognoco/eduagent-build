@@ -19,20 +19,14 @@ import {
   sessionsUntilFullProgress,
 } from '../../../lib/progressive-disclosure';
 import { formatMinutes } from '../../../lib/format-relative-date';
+import { GrowthChart, MilestoneCard } from '../../../components/progress';
 import {
-  GrowthChart,
-  MilestoneCard,
-  SubjectCard,
-} from '../../../components/progress';
-import {
-  fetchLearningResumeTarget,
   useLearningResumeTarget,
   useProgressHistory,
   useProgressInventory,
   useProgressMilestones,
   useRefreshProgressSnapshot,
 } from '../../../hooks/use-progress';
-import { useApiClient } from '../../../lib/api-client';
 import { pushLearningResumeTarget } from '../../../lib/navigation';
 
 function heroCopy(
@@ -166,7 +160,6 @@ export default function ProgressScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const apiClient = useApiClient();
   const inventoryQuery = useProgressInventory();
   const resumeTargetQuery = useLearningResumeTarget();
   const historyQuery = useProgressHistory({ granularity: 'weekly' });
@@ -215,26 +208,6 @@ export default function ProgressScreen(): React.ReactElement {
     }
     router.push('/(app)/home' as never);
   }, [resumeTargetQuery.data, router]);
-
-  const handleSubjectResume = useCallback(
-    async (subjectId: string) => {
-      try {
-        const target = await fetchLearningResumeTarget(apiClient, {
-          subjectId,
-        });
-        if (target) {
-          pushLearningResumeTarget(router, target);
-          return;
-        }
-      } catch {
-        // Fall through to a subject-scoped learning session.
-      }
-      router.push(
-        `/(app)/session?mode=learning&subjectId=${subjectId}` as never
-      );
-    },
-    [apiClient, router]
-  );
 
   // [EP15-M2] Gate on primary query only so secondary queries don't cause
   // partial-load flicker when history lands before inventory (or vice versa).
@@ -413,31 +386,6 @@ export default function ProgressScreen(): React.ReactElement {
                 </View>
               ) : null}
             </View>
-
-            <Text className="text-h3 font-semibold text-text-primary mt-6 mb-2">
-              {t('progress.yourSubjects')}
-            </Text>
-            {inventory?.subjects
-              .filter((s) => !!s.subjectId)
-              .map((subject) => (
-                <View key={subject.subjectId} className="mt-3">
-                  <SubjectCard
-                    subject={subject}
-                    onPress={() => {
-                      router.push({
-                        pathname: '/(app)/progress/[subjectId]',
-                        params: { subjectId: subject.subjectId },
-                      } as never);
-                    }}
-                    onAction={(_action) => {
-                      // [BUG-540] 'review' removed from SubjectCardAction;
-                      // use 'learning' mode for consistency with home screen
-                      void handleSubjectResume(subject.subjectId);
-                    }}
-                    testID={`journey-subject-${subject.subjectId}`}
-                  />
-                </View>
-              ))}
 
             <View className="mt-6">
               <GrowthChart

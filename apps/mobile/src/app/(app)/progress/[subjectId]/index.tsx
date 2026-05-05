@@ -5,17 +5,17 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   goBackOrReplace,
   pushLearningResumeTarget,
-} from '../../../lib/navigation';
+} from '../../../../lib/navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ErrorFallback } from '../../../components/common';
-import { ProgressBar } from '../../../components/progress';
+import { ErrorFallback } from '../../../../components/common';
+import { ProgressBar } from '../../../../components/progress';
 import {
   useProgressInventory,
   useLearningResumeTarget,
   useSubjectProgress,
-} from '../../../hooks/use-progress';
-import { useLanguageProgress } from '../../../hooks/use-language-progress';
-import { formatMinutes } from '../../../lib/format-relative-date';
+} from '../../../../hooks/use-progress';
+import { useLanguageProgress } from '../../../../hooks/use-language-progress';
+import { formatMinutes } from '../../../../lib/format-relative-date';
 
 function StatCard({
   label,
@@ -204,6 +204,27 @@ export default function ProgressSubjectScreen(): React.ReactElement {
               </Text>
             ) : null}
           </View>
+          {subject ? (
+            <Pressable
+              onPress={() => {
+                if (resumeTargetQuery.data) {
+                  pushLearningResumeTarget(router, resumeTargetQuery.data);
+                  return;
+                }
+                router.push(
+                  `/(app)/session?mode=learning&subjectId=${subject.subjectId}` as never
+                );
+              }}
+              className="bg-primary rounded-button px-4 py-2 ms-2 items-center justify-center min-h-[40px]"
+              accessibilityRole="button"
+              accessibilityLabel={t('progress.subject.resume')}
+              testID="progress-subject-resume"
+            >
+              <Text className="text-body-sm font-semibold text-text-inverse">
+                {t('progress.subject.resume')}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
 
         {subject ? (
@@ -442,21 +463,19 @@ export default function ProgressSubjectScreen(): React.ReactElement {
 
             <View className="flex-row gap-3 mt-6">
               <Pressable
-                onPress={() => {
-                  if (resumeTargetQuery.data) {
-                    pushLearningResumeTarget(router, resumeTargetQuery.data);
-                    return;
-                  }
-                  router.push(
-                    `/(app)/session?mode=learning&subjectId=${subject.subjectId}` as never
-                  );
-                }}
-                className="bg-primary rounded-button px-4 py-3 items-center flex-1"
+                onPress={() =>
+                  router.push({
+                    pathname: '/(app)/progress/[subjectId]/sessions',
+                    params: { subjectId: subject.subjectId },
+                  } as never)
+                }
+                className="bg-surface rounded-button px-4 py-3 items-center flex-1"
                 accessibilityRole="button"
-                accessibilityLabel={t('progress.keepLearning')}
+                accessibilityLabel={t('progress.subject.pastConversations')}
+                testID="progress-subject-past-conversations"
               >
-                <Text className="text-body font-semibold text-text-inverse">
-                  {t('progress.keepLearning')}
+                <Text className="text-body font-semibold text-text-primary">
+                  {t('progress.subject.pastConversations')}
                 </Text>
               </Pressable>
               <Pressable

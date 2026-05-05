@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react-native';
 
-import ProgressSubjectScreen from './[subjectId]';
+import ProgressSubjectScreen from '.';
 
 jest.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: jest.fn() },
@@ -69,6 +69,8 @@ jest.mock('react-i18next', () => ({
         'progress.subject.retentionWeak':
           'This subject would benefit from some extra attention.',
         'progress.subject.openShelf': 'Open shelf',
+        'progress.subject.pastConversations': 'Past conversations',
+        'progress.subject.resume': 'Resume',
         'progress.subject.goneTitle': 'This subject is no longer available',
         'progress.subject.goneSubtitle':
           'It may have been removed or merged into another subject.',
@@ -98,13 +100,13 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
 }));
 
-jest.mock('../../../lib/navigation', () => ({
+jest.mock('../../../../lib/navigation', () => ({
   goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
   pushLearningResumeTarget: (...args: unknown[]) =>
     mockPushLearningResumeTarget(...args),
 }));
 
-jest.mock('../../../components/common', () => {
+jest.mock('../../../../components/common', () => {
   const { View, Text, Pressable } = require('react-native');
   return {
     ErrorFallback: (props: {
@@ -138,14 +140,14 @@ jest.mock('../../../components/common', () => {
   };
 });
 
-jest.mock('../../../components/progress', () => ({
+jest.mock('../../../../components/progress', () => ({
   ProgressBar: () => null,
 }));
 
 const mockUseProgressInventory = jest.fn();
 const mockUseSubjectProgress = jest.fn();
 const mockUseLearningResumeTarget = jest.fn();
-jest.mock('../../../hooks/use-progress', () => ({
+jest.mock('../../../../hooks/use-progress', () => ({
   useProgressInventory: (...args: unknown[]) =>
     mockUseProgressInventory(...args),
   useSubjectProgress: (...args: unknown[]) => mockUseSubjectProgress(...args),
@@ -154,7 +156,7 @@ jest.mock('../../../hooks/use-progress', () => ({
 }));
 
 const mockUseLanguageProgress = jest.fn();
-jest.mock('../../../hooks/use-language-progress', () => ({
+jest.mock('../../../../hooks/use-language-progress', () => ({
   useLanguageProgress: (...args: unknown[]) => mockUseLanguageProgress(...args),
 }));
 
@@ -357,23 +359,34 @@ describe('ProgressSubjectScreen', () => {
       screen.getByText('45 min');
     });
 
-    it('shows "Keep learning" and "Open shelf" buttons', () => {
+    it('shows "Resume", "Past conversations", and "Open shelf" buttons', () => {
       mockHooks();
       render(<ProgressSubjectScreen />);
-      screen.getByText('Keep learning');
+      screen.getByText('Resume');
+      screen.getByText('Past conversations');
       screen.getByText('Open shelf');
     });
 
-    it('navigates to session on "Keep learning" press', () => {
+    it('navigates to subject sessions on "Past conversations" press', () => {
       mockHooks();
       render(<ProgressSubjectScreen />);
-      fireEvent.press(screen.getByText('Keep learning'));
+      fireEvent.press(screen.getByText('Past conversations'));
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/progress/[subjectId]/sessions',
+        params: { subjectId: 's1' },
+      });
+    });
+
+    it('navigates to session on "Resume" press', () => {
+      mockHooks();
+      render(<ProgressSubjectScreen />);
+      fireEvent.press(screen.getByText('Resume'));
       expect(mockPush).toHaveBeenCalledWith(
         '/(app)/session?mode=learning&subjectId=s1'
       );
     });
 
-    it('resumes the shared subject target on "Keep learning" press', () => {
+    it('resumes the shared subject target on "Resume" press', () => {
       const target = {
         subjectId: 's1',
         subjectName: 'Math',
@@ -389,7 +402,7 @@ describe('ProgressSubjectScreen', () => {
       mockUseLearningResumeTarget.mockReturnValue({ data: target });
 
       render(<ProgressSubjectScreen />);
-      fireEvent.press(screen.getByText('Keep learning'));
+      fireEvent.press(screen.getByText('Resume'));
 
       expect(mockPushLearningResumeTarget).toHaveBeenCalledWith(
         expect.anything(),
