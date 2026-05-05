@@ -537,6 +537,8 @@ function SessionScreenInner() {
   } | null>(null);
 
   const transcript = useSessionTranscript(routeSessionId ?? '');
+  const liveTranscript =
+    transcript.data?.archived === false ? transcript.data : null;
 
   // Auto-resume the latest active/paused session when the user re-enters a
   // learning topic (e.g. tapping "Continue learning" on the topic screen,
@@ -691,6 +693,8 @@ function SessionScreenInner() {
     setBookmarkState(activeBookmarkState);
   }, [sessionBookmarksQuery.data, activeSessionId, routeSessionId]);
 
+  // '' is intentional: all consumers gate on truthiness or convert via `|| undefined`
+  // before use as a route param or API argument (see useCreateNote, ensureSession, writeSessionRecoveryMarker).
   const effectiveSubjectId = classifiedSubject?.subjectId ?? subjectId ?? '';
   const effectiveSubjectName = classifiedSubject?.subjectName ?? subjectName;
   const activeSubject = availableSubjects.find(
@@ -736,9 +740,9 @@ function SessionScreenInner() {
   }, []);
 
   useEffect(() => {
-    if (!routeSessionId || !transcript.data) return;
+    if (!routeSessionId || !liveTranscript) return;
 
-    const transcriptMessages = transcript.data.exchanges
+    const transcriptMessages = liveTranscript.exchanges
       .filter((entry, index, all) => {
         if (entry.role !== 'user') return true;
         return index !== all.length - 1 || all[index + 1]?.role === 'assistant';
@@ -771,16 +775,16 @@ function SessionScreenInner() {
             },
           ]
     );
-    setExchangeCount(transcript.data.session.exchangeCount);
+    setExchangeCount(liveTranscript.session.exchangeCount);
     setEscalationRung(
-      transcript.data.exchanges
+      liveTranscript.exchanges
         .filter((entry) => entry.role === 'assistant' && !entry.isSystemPrompt)
         .at(-1)?.escalationRung ?? 1
     );
-    setInputMode(transcript.data.session.inputMode ?? 'text');
+    setInputMode(liveTranscript.session.inputMode ?? 'text');
     setActiveSessionId(routeSessionId);
     setResumedBanner(true);
-  }, [routeSessionId, transcript.data]);
+  }, [liveTranscript, routeSessionId]);
 
   useEffect(() => {
     if (!sessionExpired) return;
@@ -814,7 +818,7 @@ function SessionScreenInner() {
         }
 
         const transcriptMilestones =
-          transcript.data?.session.milestonesReached ?? [];
+          liveTranscript?.session.milestonesReached ?? [];
         if (transcriptMilestones.length > 0) {
           hydrate(
             createMilestoneTrackerStateFromMilestones(transcriptMilestones)
@@ -833,7 +837,7 @@ function SessionScreenInner() {
     activeProfile?.id,
     hydrate,
     routeSessionId,
-    transcript.data?.session.milestonesReached,
+    liveTranscript?.session.milestonesReached,
   ]);
 
   useEffect(() => {
@@ -1450,9 +1454,7 @@ function SessionScreenInner() {
             ? 'Your session limit has been reached'
             : undefined
         }
-        verificationType={
-          transcript.data?.session.verificationType ?? undefined
-        }
+        verificationType={liveTranscript?.session.verificationType ?? undefined}
         inputMode={inputMode}
         onInputModeChange={handleInputModeChange}
         rightAction={headerRight}

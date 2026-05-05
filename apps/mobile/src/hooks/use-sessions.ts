@@ -18,7 +18,7 @@ import type {
   SessionMetadata,
   SessionAnalyticsEventInput,
   SessionSummary,
-  SessionTranscript,
+  TranscriptResponse,
   SessionType,
   RecallBridgeResult,
   VerificationType,
@@ -411,7 +411,7 @@ export function useStreamMessage(sessionId: string): {
 
 export function useSessionTranscript(
   sessionId: string
-): UseQueryResult<SessionTranscript | null> {
+): UseQueryResult<TranscriptResponse | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
@@ -425,7 +425,7 @@ export function useSessionTranscript(
           { init: { signal } }
         );
         await assertOk(res);
-        return (await res.json()) as SessionTranscript;
+        return (await res.json()) as TranscriptResponse;
       } finally {
         cleanup();
       }

@@ -109,6 +109,8 @@ export default function SessionSummaryScreen() {
   const skipSummary = useSkipSummary(sessionId ?? '');
   const session = useSession(sessionId ?? '');
   const transcript = useSessionTranscript(sessionId ?? '');
+  const liveTranscript =
+    transcript.data?.archived === false ? transcript.data : null;
   const { onSuccessfulRecall } = useRatingPrompt();
   const { activeProfile } = useProfile();
   const { isParentProxy } = useParentProxy();
@@ -132,7 +134,7 @@ export default function SessionSummaryScreen() {
     trimmedExchangeCount === '' ? NaN : Number(trimmedExchangeCount);
   const exchangeCountForRecap = Number.isFinite(parsedExchangeCount)
     ? parsedExchangeCount
-    : transcript.data?.session.exchangeCount ?? 0;
+    : liveTranscript?.session.exchangeCount ?? 0;
   const persistedSummary = useSessionSummary(sessionId ?? '', {
     refetchInterval: (data) => {
       if (recapTimedOut || exchangeCountForRecap < 3) {
@@ -250,7 +252,7 @@ export default function SessionSummaryScreen() {
   const displayAiFeedback = submitted
     ? aiFeedback
     : persisted?.aiFeedback ?? null;
-  const transcriptSessionType = transcript.data?.session.sessionType;
+  const transcriptSessionType = liveTranscript?.session.sessionType;
   const sessionType: 'learning' | 'freeform' | 'homework' =
     sessionTypeParam === 'homework' || transcriptSessionType === 'homework'
       ? 'homework'
@@ -283,7 +285,7 @@ export default function SessionSummaryScreen() {
 
   const isHomeworkSession = sessionType === 'homework';
 
-  const fallbackSession = transcript.data?.session;
+  const fallbackSession = liveTranscript?.session;
   // [BUG-801] Same parseInt-||-fallback anti-pattern as exchangeCountForRecap
   // above. An explicit "0" param must be honored, not silently overridden by
   // the server count. Reuses the trimmed/parsed result from line 124-126.
@@ -342,8 +344,8 @@ export default function SessionSummaryScreen() {
     }
   })();
   const isRecallSummary =
-    transcript.data?.session.verificationType === 'evaluate' ||
-    transcript.data?.session.verificationType === 'teach_back';
+    liveTranscript?.session.verificationType === 'evaluate' ||
+    liveTranscript?.session.verificationType === 'teach_back';
 
   const maybePromptForRecall = async (): Promise<void> => {
     if (!isRecallSummary) return;

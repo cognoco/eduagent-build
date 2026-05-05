@@ -23,6 +23,7 @@ import { stripEnvelopeJson } from '../../lib/strip-envelope';
 import { useThemeColors } from '../../lib/theme';
 import { ErrorFallback } from '../../components/common';
 import { formatApiError } from '../../lib/format-api-error';
+import { ArchivedTranscriptCard } from './_components/archived-transcript-card';
 
 function formatTimestamp(iso: string): string {
   const d = new Date(iso);
@@ -52,7 +53,10 @@ export default function SessionTranscriptScreen() {
   const transcript = useSessionTranscript(sessionId ?? '');
 
   const visibleExchanges = useMemo<SessionTranscriptExchange[]>(
-    () => (transcript.data?.exchanges ?? []).filter(isVisibleExchange),
+    () =>
+      transcript.data?.archived === false
+        ? transcript.data.exchanges.filter(isVisibleExchange)
+        : [],
     [transcript.data]
   );
 
@@ -115,6 +119,25 @@ export default function SessionTranscriptScreen() {
           }}
         />
       </View>
+    );
+  }
+
+  if (transcript.data?.archived === true) {
+    return (
+      <ArchivedTranscriptCard
+        archivedAt={transcript.data.archivedAt}
+        summary={transcript.data.summary}
+        onContinueTopic={() => {
+          if (transcript.data?.archived !== true) return;
+          if (transcript.data.summary.topicId) {
+            router.push(
+              `/(app)/session/start?topicId=${transcript.data.summary.topicId}`
+            );
+            return;
+          }
+          goBackOrReplace(router, '/(app)/library');
+        }}
+      />
     );
   }
 
