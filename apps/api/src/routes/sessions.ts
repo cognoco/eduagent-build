@@ -379,14 +379,16 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
               streamErr instanceof Error &&
               streamErr.message.includes('safety filters');
             if (
-              chunkCount === 0 &&
               !(streamErr instanceof RateLimitedError) &&
               !isSafetyFilterError
             ) {
               logger.warn(
-                '[sessions/stream] Stream failed before visible text; trying non-streaming fallback',
+                chunkCount === 0
+                  ? '[sessions/stream] Stream failed before visible text; trying non-streaming fallback'
+                  : '[sessions/stream] Stream failed after visible text; replacing partial reply with non-streaming fallback',
                 {
                   sessionId,
+                  chunkCount,
                   error: errMsg,
                   errorName:
                     streamErr instanceof Error
@@ -406,9 +408,10 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                     clientId,
                   }
                 );
+                const eventType = chunkCount === 0 ? 'chunk' : 'replace';
                 await sseStream.writeSSE({
                   data: JSON.stringify({
-                    type: 'chunk',
+                    type: eventType,
                     content: fallback.response,
                   }),
                 });

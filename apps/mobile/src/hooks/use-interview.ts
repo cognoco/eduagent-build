@@ -219,6 +219,9 @@ export function useStreamInterviewMessage(
           if (event.type === 'chunk') {
             accumulated += event.content;
             onChunk(accumulated);
+          } else if (event.type === 'replace') {
+            accumulated = event.content;
+            onChunk(accumulated);
           } else if (event.type === 'fallback') {
             fallback = {
               reason: event.reason,

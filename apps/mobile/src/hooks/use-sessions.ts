@@ -369,6 +369,9 @@ export function useStreamMessage(sessionId: string): {
           if (event.type === 'chunk') {
             accumulated += event.content;
             onChunk(accumulated);
+          } else if (event.type === 'replace') {
+            accumulated = event.content;
+            onChunk(accumulated);
           } else if (event.type === 'replay') {
             options?.onReplay?.(event);
             return;

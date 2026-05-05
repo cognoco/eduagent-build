@@ -628,6 +628,41 @@ describe('useStreamMessage', () => {
     });
   });
 
+  it('replaces accumulated streamed text when the server recovers a partial stream failure', async () => {
+    const { streamSSEViaXHR } = require('../lib/sse') as {
+      streamSSEViaXHR: jest.Mock;
+    };
+
+    streamSSEViaXHR.mockReturnValueOnce({
+      events: (async function* () {
+        yield { type: 'chunk', content: 'Hel' };
+        yield { type: 'replace', content: 'Recovered response' };
+        yield { type: 'done', exchangeCount: 1, escalationRung: 1 };
+      })(),
+      abort: jest.fn(),
+    });
+
+    const { result } = renderHook(() => useStreamMessage('session-1'), {
+      wrapper: createWrapper(),
+    });
+
+    const onChunk = jest.fn();
+    const onDone = jest.fn();
+
+    await act(async () => {
+      await result.current.stream('Hello', onChunk, onDone, 'session-1');
+    });
+
+    expect(onChunk).toHaveBeenNthCalledWith(1, 'Hel');
+    expect(onChunk).toHaveBeenNthCalledWith(2, 'Recovered response');
+    expect(onDone).toHaveBeenCalledWith(
+      expect.objectContaining({
+        exchangeCount: 1,
+        escalationRung: 1,
+      })
+    );
+  });
+
   // [BREAK / BUG-629 / I-1] If useStreamMessage stops injecting X-Proxy-Mode
   // on the SSE call, parent-proxy sessions silently bypass server proxy
   // enforcement. Asserts the header is present when getProxyMode returns true.

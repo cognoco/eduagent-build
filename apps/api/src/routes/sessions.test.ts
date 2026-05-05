@@ -1319,6 +1319,59 @@ describe('session routes', () => {
       expect(mockSafeRefundQuota).not.toHaveBeenCalled();
     });
 
+    it('[CHAT-STREAM-FALLBACK] replaces partial streamed text when fallback succeeds after visible text', async () => {
+      mockSafeRefundQuota.mockClear();
+      (processMessage as jest.Mock).mockResolvedValueOnce({
+        response: 'Recovered non-streaming lesson response',
+        escalationRung: 1,
+        isUnderstandingCheck: false,
+        exchangeCount: 1,
+        expectedResponseMinutes: 3,
+        aiEventId: EVENT_ID,
+      });
+
+      const failingStream = (async function* (): AsyncGenerator<string> {
+        yield 'Hello ';
+        throw new Error('streamExchange threw after visible text');
+      })();
+
+      (streamMessage as jest.Mock).mockResolvedValueOnce({
+        stream: failingStream,
+        onComplete: jest.fn(),
+      });
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'ok' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.text();
+      expect(body).toContain('"type":"chunk"');
+      expect(body).toContain('"content":"Hello "');
+      expect(body).toContain('"type":"replace"');
+      expect(body).toContain('Recovered non-streaming lesson response');
+      expect(body).toContain('"type":"done"');
+      expect(body).toContain(`"aiEventId":"${EVENT_ID}"`);
+      expect(body).not.toContain('"type":"error"');
+      expect(processMessage).toHaveBeenLastCalledWith(
+        expect.anything(),
+        'test-profile-id',
+        SESSION_ID,
+        { message: 'ok' },
+        expect.objectContaining({
+          clientId: undefined,
+          llmTier: 'premium',
+        })
+      );
+      expect(mockSafeRefundQuota).not.toHaveBeenCalled();
+    });
+
     it('[CHAT-STREAM-FALLBACK] falls back to non-streaming when stream setup fails', async () => {
       mockSafeRefundQuota.mockClear();
       (streamMessage as jest.Mock).mockRejectedValueOnce(

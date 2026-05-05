@@ -30,6 +30,11 @@ export interface StreamChunkEvent {
   content: string;
 }
 
+export interface StreamReplaceEvent {
+  type: 'replace';
+  content: string;
+}
+
 export type StreamFallbackReason =
   | 'empty_reply'
   | 'malformed_envelope'
@@ -78,6 +83,7 @@ export interface StreamErrorEvent {
 
 export type StreamEvent =
   | StreamChunkEvent
+  | StreamReplaceEvent
   | StreamFallbackEvent
   | StreamReplayEvent
   | StreamDoneEvent
@@ -89,6 +95,7 @@ export type StreamEvent =
  * interview done events carry `isComplete` instead. Both are valid. */
 function isValidStreamEvent(obj: Record<string, unknown>): boolean {
   if (obj.type === 'chunk') return typeof obj.content === 'string';
+  if (obj.type === 'replace') return typeof obj.content === 'string';
   if (obj.type === 'fallback') {
     return (
       typeof obj.reason === 'string' && typeof obj.fallbackText === 'string'
