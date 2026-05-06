@@ -96,6 +96,10 @@ temp/*
 # Local work-in-progress notes / coordination artifacts
 _wip/
 
+# Archon runtime artifacts
+.archon/state/
+.archon/.env
+
 # Local Claude Code settings (personal tool permissions, output style)
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
@@ -224,3 +228,5 @@ apps/api/.notion-*.json
 /notion_bugs_tmp.json
 /bug_ids.json
 .scratch/
+.claude/logs/diagnostics.jsonl
+.gstack/
