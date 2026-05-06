@@ -77,7 +77,7 @@ function parseDepthResponse(
     captureException(new Error('session-depth: no JSON object found'), {
       extra: {
         context: 'parseDepthResponse',
-        rawSlice: raw.slice(0, 500),
+        rawLength: raw.length,
       },
     });
     return null;
@@ -89,7 +89,7 @@ function parseDepthResponse(
       captureException(new Error('session-depth: schema validation failed'), {
         extra: {
           context: 'parseDepthResponse',
-          rawSlice: raw.slice(0, 500),
+          rawLength: raw.length,
           validationError: result.error.message,
         },
       });
@@ -100,7 +100,7 @@ function parseDepthResponse(
     captureException(err, {
       extra: {
         context: 'parseDepthResponse',
-        rawSlice: raw.slice(0, 500),
+        rawLength: raw.length,
       },
     });
     return null;
@@ -183,7 +183,7 @@ async function evaluateWithLlm(
       };
     }
     logger.warn('[session-depth] unparseable depth response', {
-      raw: raw.slice(0, 200),
+      rawLength: raw.length,
     });
   } catch (error) {
     logger.warn('[session-depth] depth gate failed', {

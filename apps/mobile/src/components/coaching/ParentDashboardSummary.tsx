@@ -142,31 +142,33 @@ function sessionWord(n: number): string {
   return n === 1 ? 'session' : 'sessions';
 }
 
-function consentStatusLabel(status: ConsentStatus | null | undefined): string {
+function consentStatusLabelKey(
+  status: ConsentStatus | null | undefined
+): string | null {
   switch (status) {
     case 'PENDING':
-      return 'Consent pending';
+      return 'coaching.parentDashboard.consent.pending';
     case 'PARENTAL_CONSENT_REQUESTED':
-      return 'Waiting for parent approval';
+      return 'coaching.parentDashboard.consent.parentalConsentRequested';
     case 'WITHDRAWN':
-      return 'Consent withdrawn';
+      return 'coaching.parentDashboard.consent.withdrawn';
     case 'CONSENTED':
-      return 'Consent active';
+      return 'coaching.parentDashboard.consent.consented';
     default:
-      return '';
+      return null;
   }
 }
 
-function engagementTrendLabel(
+function engagementTrendLabelKey(
   trend: 'increasing' | 'stable' | 'declining'
 ): string {
   switch (trend) {
     case 'increasing':
-      return 'Engagement increasing';
+      return 'coaching.parentDashboard.engagementTrend.increasing';
     case 'declining':
-      return 'Engagement declining';
+      return 'coaching.parentDashboard.engagementTrend.declining';
     case 'stable':
-      return 'Engagement stable';
+      return 'coaching.parentDashboard.engagementTrend.stable';
   }
 }
 
@@ -204,7 +206,8 @@ export function ParentDashboardSummary({
   const remaining = sessionsUntilFullProgress(totalSessions);
   const hasRestrictedConsent =
     consentStatus != null && consentStatus !== 'CONSENTED';
-  const consentLabel = consentStatusLabel(consentStatus);
+  const consentLabelKey = consentStatusLabelKey(consentStatus);
+  const consentLabel = consentLabelKey ? t(consentLabelKey) : '';
   const exchangeDelta = exchangesThisWeek - exchangesLastWeek;
   const guidedPercent = Math.round(guidedVsImmediateRatio * 100);
 
@@ -224,7 +227,10 @@ export function ParentDashboardSummary({
             hasRestrictedConsent ? 'bg-danger/10' : 'bg-primary/10'
           }`}
           testID="consent-status-badge"
-          accessibilityLabel={`Consent status: ${consentLabel}`}
+          accessibilityLabel={t(
+            'coaching.parentDashboard.consent.accessibilityLabel',
+            { status: consentLabel }
+          )}
         >
           <Text
             className={`text-caption font-semibold ${
@@ -240,7 +246,7 @@ export function ParentDashboardSummary({
           className="text-caption text-text-secondary"
           testID="consent-redacted-message"
         >
-          Learning metrics are hidden until consent is active.
+          {t('coaching.parentDashboard.consent.redactedMessage')}
         </Text>
       ) : null}
       {showFullSignals && !hasRestrictedConsent && (
@@ -251,7 +257,7 @@ export function ParentDashboardSummary({
               testID="engagement-trend-chip"
             >
               <Text className="text-caption font-semibold text-text-primary">
-                {engagementTrendLabel(progress.engagementTrend)}
+                {t(engagementTrendLabelKey(progress.engagementTrend))}
               </Text>
               <MetricInfoDot metricKey="engagement-trend" />
             </View>

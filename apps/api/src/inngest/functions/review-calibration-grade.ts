@@ -4,6 +4,8 @@ import {
   retentionCards,
   type Database,
 } from '@eduagent/database';
+import { reviewCalibrationRequestedEventSchema } from '@eduagent/schemas';
+import type { ReviewCalibrationRequestedEvent } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import {
@@ -18,37 +20,9 @@ import { captureException } from '../../services/sentry';
 const logger = createLogger();
 const RETEST_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
-interface ReviewCalibrationRequested {
-  profileId: string;
-  sessionId: string;
-  topicId: string;
-  learnerMessage: string;
-  topicTitle: string;
-  timestamp: string;
-}
-
-function parseEventData(data: unknown): ReviewCalibrationRequested | null {
-  if (!data || typeof data !== 'object') return null;
-  const payload = data as Record<string, unknown>;
-  if (
-    typeof payload.profileId !== 'string' ||
-    typeof payload.sessionId !== 'string' ||
-    typeof payload.topicId !== 'string' ||
-    typeof payload.learnerMessage !== 'string' ||
-    typeof payload.topicTitle !== 'string' ||
-    typeof payload.timestamp !== 'string'
-  ) {
-    return null;
-  }
-
-  return {
-    profileId: payload.profileId,
-    sessionId: payload.sessionId,
-    topicId: payload.topicId,
-    learnerMessage: payload.learnerMessage,
-    topicTitle: payload.topicTitle,
-    timestamp: payload.timestamp,
-  };
+function parseEventData(data: unknown): ReviewCalibrationRequestedEvent | null {
+  const parsed = reviewCalibrationRequestedEventSchema.safeParse(data);
+  return parsed.success ? parsed.data : null;
 }
 
 async function syncXpBestEffort(
@@ -93,6 +67,7 @@ export async function handleReviewCalibrationGrade({
   }
 
   const { profileId, sessionId, topicId, learnerMessage, topicTitle } = payload;
+  const eventAt = new Date(payload.timestamp);
 
   const card = await step.run('load-retention-card', async () => {
     const db = getStepDatabase();
@@ -120,8 +95,8 @@ export async function handleReviewCalibrationGrade({
   const quality = await step.run('grade-recall-quality', () =>
     evaluateRecallQuality(learnerMessage, topicTitle)
   );
-  const result = processRecallResult(state, quality);
-  const cooldownThreshold = new Date(Date.now() - RETEST_COOLDOWN_MS);
+  const result = processRecallResult(state, quality, eventAt.toISOString());
+  const cooldownThreshold = new Date(eventAt.getTime() - RETEST_COOLDOWN_MS);
 
   const persisted = await step.run('persist-retention-update', async () => {
     const db = getStepDatabase();
@@ -137,8 +112,8 @@ export async function handleReviewCalibrationGrade({
         nextReviewAt: result.newState.nextReviewAt
           ? new Date(result.newState.nextReviewAt)
           : null,
-        lastReviewedAt: new Date(),
-        updatedAt: new Date(),
+        lastReviewedAt: eventAt,
+        updatedAt: eventAt,
       })
       .where(
         and(

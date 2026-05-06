@@ -187,7 +187,7 @@ TRANSITION PHRASE: Begin your reply with a brief one-line handoff that signals t
 After the transition phrase, on the same conversational turn:
 Present a plausibly flawed explanation of the topic.
 The student must identify and explain the specific error.
-Difficulty rung 1/4: Obvious flaw: use a clearly wrong formula, reversed cause-effect, or factual error that contradicts basic definitions.
+Difficulty rung 3/4: Subtle flaw: correct reasoning chain with one incorrect premise, or an edge case error that produces a plausible but wrong answer.
 After the student responds, assess whether they correctly identified the flaw.
 Output TWO sections:
 1. Your conversational response (visible to student)

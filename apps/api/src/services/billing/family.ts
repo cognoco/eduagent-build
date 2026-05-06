@@ -296,12 +296,32 @@ export async function getUsageBreakdownForProfile(
   const [parentLink] = await db
     .select({ id: familyLinks.id })
     .from(familyLinks)
-    .where(eq(familyLinks.parentProfileId, viewer.id))
+    .where(
+      and(
+        eq(familyLinks.parentProfileId, viewer.id),
+        sql`exists (
+          select 1 from ${profiles} family_child
+          where family_child.id = ${familyLinks.childProfileId}
+            and family_child.account_id = ${viewer.accountId}
+            and family_child.archived_at is null
+        )`
+      )
+    )
     .limit(1);
   const [childLink] = await db
     .select({ id: familyLinks.id })
     .from(familyLinks)
-    .where(eq(familyLinks.childProfileId, viewer.id))
+    .where(
+      and(
+        eq(familyLinks.childProfileId, viewer.id),
+        sql`exists (
+          select 1 from ${profiles} family_parent
+          where family_parent.id = ${familyLinks.parentProfileId}
+            and family_parent.account_id = ${viewer.accountId}
+            and family_parent.archived_at is null
+        )`
+      )
+    )
     .limit(1);
   const familyOwnerProfileId = familyOwner?.id ?? null;
   const hasChildLink = parentLink != null;
@@ -338,7 +358,10 @@ export async function getUsageBreakdownForProfile(
       : false;
   const isOwnerBreakdownViewer =
     (viewer.isOwner && hasChildLink) ||
-    (sharingEnabled && familyOwnerProfileId != null && !isChild);
+    (sharingEnabled &&
+      familyOwnerProfileId != null &&
+      hasChildLink &&
+      !isChild);
   const visibleRows = isOwnerBreakdownViewer
     ? profileRows
     : isChild

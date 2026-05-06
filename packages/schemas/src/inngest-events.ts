@@ -83,3 +83,15 @@ export const appNotificationSuppressedEventSchema = z.object({
 export type AppNotificationSuppressedEvent = z.infer<
   typeof appNotificationSuppressedEventSchema
 >;
+
+export const reviewCalibrationRequestedEventSchema = z.object({
+  profileId: z.string().uuid(),
+  sessionId: z.string().uuid(),
+  topicId: z.string().uuid(),
+  learnerMessage: z.string().min(1),
+  topicTitle: z.string().min(1),
+  timestamp: z.string().datetime(),
+});
+export type ReviewCalibrationRequestedEvent = z.infer<
+  typeof reviewCalibrationRequestedEventSchema
+>;

@@ -79,31 +79,38 @@ describe('ParentDashboardSummary', () => {
     screen.getByTestId('metric-info-streak-xp');
   });
 
-  it('renders consent status and hides learning chips for restricted consent', () => {
-    render(
-      <ParentDashboardSummary
-        {...defaultProps}
-        consentStatus="WITHDRAWN"
-        progress={{
-          topicsMastered: 2,
-          vocabularyTotal: 0,
-          weeklyDeltaTopicsMastered: 1,
-          weeklyDeltaVocabularyTotal: null,
-          weeklyDeltaTopicsExplored: 1,
-          engagementTrend: 'increasing',
-          guidance: null,
-        }}
-      />
-    );
+  it.each([
+    ['WITHDRAWN', 'Consent withdrawn'],
+    ['PENDING', 'Consent pending'],
+    ['PARENTAL_CONSENT_REQUESTED', 'Waiting for parent approval'],
+  ] as const)(
+    'renders consent status and hides learning chips for restricted consent: %s',
+    (consentStatus, expectedLabel) => {
+      render(
+        <ParentDashboardSummary
+          {...defaultProps}
+          consentStatus={consentStatus}
+          progress={{
+            topicsMastered: 2,
+            vocabularyTotal: 0,
+            weeklyDeltaTopicsMastered: 1,
+            weeklyDeltaVocabularyTotal: null,
+            weeklyDeltaTopicsExplored: 1,
+            engagementTrend: 'increasing',
+            guidance: null,
+          }}
+        />
+      );
 
-    screen.getByTestId('consent-status-badge');
-    screen.getByText('Consent withdrawn');
-    screen.getByTestId('consent-redacted-message');
-    expect(screen.queryByTestId('engagement-trend-chip')).toBeNull();
-    expect(screen.queryByTestId('exchange-delta-chip')).toBeNull();
-    expect(screen.queryByTestId('guided-ratio-chip')).toBeNull();
-    expect(screen.queryByTestId('streak-xp-chip')).toBeNull();
-  });
+      screen.getByTestId('consent-status-badge');
+      screen.getByText(expectedLabel);
+      screen.getByTestId('consent-redacted-message');
+      expect(screen.queryByTestId('engagement-trend-chip')).toBeNull();
+      expect(screen.queryByTestId('exchange-delta-chip')).toBeNull();
+      expect(screen.queryByTestId('guided-ratio-chip')).toBeNull();
+      expect(screen.queryByTestId('streak-xp-chip')).toBeNull();
+    }
+  );
 
   it('renders down trend correctly', () => {
     render(

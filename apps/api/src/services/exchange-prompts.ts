@@ -8,6 +8,7 @@ import {
 import { getEscalationPromptGuidance } from './escalation';
 import { getEvaluateRungDescription } from './evaluate';
 import { buildFourStrandsPrompt } from './language-prompts';
+import type { EscalationRung } from './llm';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
 import type { ExchangeContext } from './exchanges';
 
@@ -205,6 +206,10 @@ export function getLearningModeGuidance(mode: LearningMode): string {
   );
 }
 
+function clampEvaluateRung(rung: EscalationRung): 1 | 2 | 3 | 4 {
+  return Math.min(4, Math.max(1, rung)) as 1 | 2 | 3 | 4;
+}
+
 function getExchangeEnvelopeInstruction(context: {
   isRecitation: boolean;
   isLanguageMode: boolean;
@@ -268,7 +273,13 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   const sections: string[] = [];
   const isLanguageMode = context.pedagogyMode === 'four_strands';
   const isRecitation = context.effectiveMode === 'recitation';
-  const isReviewMode = context.effectiveMode === 'review';
+  const isReviewMode =
+    context.effectiveMode === 'review' || context.effectiveMode === 'practice';
+  const isFirstLearnerVisibleTurn =
+    context.exchangeCount === 0 &&
+    !context.exchangeHistory.some(
+      (entry) => entry.role === 'user' || entry.role === 'assistant'
+    );
 
   // [PROMPT-INJECT-4] Sanitize every free-text field that comes from the
   // profile, curriculum tables, or teaching preferences before interpolation.
@@ -450,7 +461,7 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   if (
     !isRecitation &&
     !isReviewMode &&
-    context.exchangeCount === 0 &&
+    isFirstLearnerVisibleTurn &&
     context.sessionType === 'learning' &&
     !isLanguageMode
   ) {
@@ -485,14 +496,14 @@ export function buildSystemPrompt(context: ExchangeContext): string {
 
   if (
     isReviewMode &&
-    context.exchangeCount === 0 &&
+    isFirstLearnerVisibleTurn &&
     safeTopicTitle &&
     !isLanguageMode
   ) {
     sections.push(
       'Session type: REVIEW (calibrated relearning)\n' +
         'TRANSITION PHRASE: Begin with a brief one-line handoff that tells the learner this is a review check, not a fresh lesson.\n' +
-        `CALIBRATION QUESTION: The client may already have shown an opening question about <topic_title>${safeTopicTitle}</topic_title>. If the learner's latest message answers that question, do NOT ask it again — respond to what they remembered and use any gaps to guide the next teaching step.\n` +
+        `CALIBRATION QUESTION: The UI may already have presented an opening question about <topic_title>${safeTopicTitle}</topic_title>. If the learner's latest message answers that question, do NOT ask it again — respond to what they remembered and use any gaps to guide the next teaching step.\n` +
         'If the learner has not answered a calibration question yet, ask exactly one open question inviting them to say what they remember in their own words. Do NOT introduce new content before that answer.'
     );
   }
@@ -699,7 +710,9 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   // Note (2026-05-06): includes a TRANSITION PHRASE block added for the
   // learning-path-clarity-pass spec; migrate it with the rest of this section.
   if (context.verificationType === 'evaluate') {
-    const rung = context.evaluateDifficultyRung ?? 1;
+    const rung =
+      context.evaluateDifficultyRung ??
+      clampEvaluateRung(context.escalationRung);
     const rungDescription = getEvaluateRungDescription(rung);
     sections.push(
       "Session type: THINK DEEPER (Devil's Advocate)\n" +

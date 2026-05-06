@@ -7,7 +7,7 @@
 
 ## Phase 1: Family Summary Type Plumbing
 
-`apps/mobile/src/app/(app)/family.tsx` must declare the streak and XP fields already present in the shared `DashboardChild` contract:
+`apps/mobile/src/app/(app)/family.tsx` must consume the shared `DashboardChild` contract from `@eduagent/schemas` so the streak and XP fields already present in `dashboardChildSchema` remain aligned with the API response:
 
 | Field | Source contract | Purpose |
 |---|---|---|

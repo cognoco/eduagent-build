@@ -202,10 +202,13 @@ export default function BookScreen() {
 
   const handleSubjectBookmarksPress = useCallback(() => {
     if (!subjectId) return;
-    router.push({
-      pathname: '/(app)/progress/saved',
-      params: { subjectId },
-    } as never);
+    router.push('/(app)/progress' as never);
+    requestAnimationFrame(() => {
+      router.push({
+        pathname: '/(app)/progress/saved',
+        params: { subjectId },
+      } as never);
+    });
   }, [router, subjectId]);
 
   // --- Generation auto-trigger ---
@@ -217,7 +220,7 @@ export default function BookScreen() {
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   const [showNoteInput, setShowNoteInput] = useState(false);
   const [showBookCompletionBurst, setShowBookCompletionBurst] = useState(false);
-  const wasBookComplete = useRef(false);
+  const wasBookComplete = useRef<boolean | null>(null);
   const [editingNote, setEditingNote] = useState<{
     noteId: string;
     content: string;
@@ -537,6 +540,10 @@ export default function BookScreen() {
   );
 
   useEffect(() => {
+    if (wasBookComplete.current === null) {
+      wasBookComplete.current = isBookComplete;
+      return;
+    }
     if (isBookComplete && !wasBookComplete.current) {
       setShowBookCompletionBurst(true);
     }

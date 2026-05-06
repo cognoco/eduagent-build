@@ -7,7 +7,9 @@ const LOCALE_NON_ANSWERS: Record<ConversationLanguage | 'default', string[]> = {
   default: [
     'idk',
     "i don't know",
+    "i don't remember",
     'i dont know',
+    'i dont remember',
     'dunno',
     'no idea',
     'not sure',
@@ -20,7 +22,9 @@ const LOCALE_NON_ANSWERS: Record<ConversationLanguage | 'default', string[]> = {
   en: [
     'idk',
     "i don't know",
+    "i don't remember",
     'i dont know',
+    'i dont remember',
     'dunno',
     'no idea',
     'not sure',
@@ -63,6 +67,15 @@ function normalizeAnswer(text: string): string {
     .trim();
 }
 
+function hasCjkText(text: string): boolean {
+  return /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(text);
+}
+
+function matchesNonAnswerPhrase(normalized: string, token: string): boolean {
+  if (token.length <= 2) return normalized === token;
+  return normalized === token || normalized.includes(token);
+}
+
 export function isSubstantiveCalibrationAnswer(
   text: string,
   conversationLanguage?: ConversationLanguage
@@ -75,10 +88,14 @@ export function isSubstantiveCalibrationAnswer(
     ...(conversationLanguage ? LOCALE_NON_ANSWERS[conversationLanguage] : []),
   ].map(normalizeAnswer);
 
-  if (localeTokens.includes(normalized)) return false;
+  if (localeTokens.some((token) => matchesNonAnswerPhrase(normalized, token))) {
+    return false;
+  }
 
   const words = normalized.split(/\s+/).filter(Boolean);
-  if (words.length < MIN_SUBSTANTIVE_WORDS) return false;
+  if (!hasCjkText(normalized) && words.length < MIN_SUBSTANTIVE_WORDS) {
+    return false;
+  }
 
   return normalized.replace(/\s/g, '').length >= MIN_SUBSTANTIVE_CHARS;
 }

@@ -162,4 +162,4 @@ The flag is only consumed by the two onboarding screens; no other product surfac
 
 ## Why this is XS
 
-One conditional flip + one test. No new types, no new components, no migration. The audit calls it XS deliberately because the heavy lifting (fast-path code) shipped under TF-1..TF-8 / `f9da2998` and has been in prod-disabled state since.
+One conditional flip + one test. No new types, no new components, no migration. The audit calls it XS deliberately because the heavy lifting (fast-path code) shipped under TF-1..TF-8 and has been in prod-disabled state since.

@@ -196,7 +196,7 @@ describe('useCreateNote', () => {
     );
   });
 
-  it('sends append flag when provided', async () => {
+  it('creates a separate note for new content', async () => {
     const mockNote = {
       id: 'note-1',
       topicId: 'topic-1',

@@ -282,7 +282,10 @@ async function getLatestConsentStatus(
   childProfileId: string
 ): Promise<ConsentStatus | null> {
   const consentState = await db.query.consentStates.findFirst({
-    where: eq(consentStates.profileId, childProfileId),
+    where: and(
+      eq(consentStates.profileId, childProfileId),
+      eq(consentStates.consentType, 'GDPR')
+    ),
     orderBy: desc(consentStates.requestedAt),
     columns: { status: true },
   });

@@ -25,4 +25,21 @@ describe('isSubstantiveCalibrationAnswer', () => {
     expect(isSubstantiveCalibrationAnswer('maybe')).toBe(false);
     expect(isSubstantiveCalibrationAnswer('kind of yes')).toBe(false);
   });
+
+  it('rejects longer explicit non-answer phrases', () => {
+    expect(
+      isSubstantiveCalibrationAnswer(
+        "I don't remember any of this, it's been ages."
+      )
+    ).toBe(false);
+  });
+
+  it('accepts meaningful Japanese recall without whitespace-delimited words', () => {
+    expect(
+      isSubstantiveCalibrationAnswer(
+        '光合成は植物が光を使って栄養を作る仕組みです',
+        'ja'
+      )
+    ).toBe(true);
+  });
 });
