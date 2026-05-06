@@ -6,6 +6,8 @@ import {
 } from '../../services/consent';
 import { deleteProfile } from '../../services/deletion';
 
+const ARCHIVE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
 export const archiveCleanup = inngest.createFunction(
   {
     id: 'archive-cleanup',
@@ -34,6 +36,9 @@ export const archiveCleanup = inngest.createFunction(
       const profile = await getProfileForConsentRevocation(db, profileId);
       if (!profile?.archivedAt) {
         return { deleted: false, reason: 'not_archived' };
+      }
+      if (Date.now() - profile.archivedAt.getTime() < ARCHIVE_RETENTION_MS) {
+        return { deleted: false, reason: 'retention_window_not_elapsed' };
       }
 
       await deleteProfile(db, profileId);

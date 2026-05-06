@@ -21,6 +21,7 @@ import {
   notifyParentSubscribeResponseSchema,
   analogyDomainResponseSchema,
   nativeLanguageResponseSchema,
+  ForbiddenError,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
@@ -165,7 +166,9 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     }
 
     const value = await getWithdrawalArchivePreference(db, profileId);
-    return c.json(getWithdrawalArchivePreferenceResponseSchema.parse({ value }));
+    return c.json(
+      getWithdrawalArchivePreferenceResponseSchema.parse({ value })
+    );
   })
 
   .put(
@@ -184,12 +187,11 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
           accountId,
           body.value
         );
-        return c.json(updateWithdrawalArchivePreferenceResponseSchema.parse(result));
+        return c.json(
+          updateWithdrawalArchivePreferenceResponseSchema.parse(result)
+        );
       } catch (error) {
-        if (
-          error instanceof Error &&
-          error.message === 'Profile owner required'
-        ) {
+        if (error instanceof ForbiddenError) {
           return forbidden(c);
         }
         throw error;
@@ -208,9 +210,11 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
         profileId,
         accountId
       );
-      return c.json(getFamilyPoolBreakdownSharingResponseSchema.parse({ value }));
+      return c.json(
+        getFamilyPoolBreakdownSharingResponseSchema.parse({ value })
+      );
     } catch (error) {
-      if (error instanceof Error && error.message === 'Profile owner required') {
+      if (error instanceof ForbiddenError) {
         return forbidden(c);
       }
       throw error;
@@ -237,10 +241,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
           updateFamilyPoolBreakdownSharingResponseSchema.parse(result)
         );
       } catch (error) {
-        if (
-          error instanceof Error &&
-          error.message === 'Profile owner required'
-        ) {
+        if (error instanceof ForbiddenError) {
           return forbidden(c);
         }
         throw error;

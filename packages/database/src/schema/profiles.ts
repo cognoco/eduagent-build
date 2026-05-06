@@ -178,6 +178,10 @@ export const pendingNotices = pgTable(
       table.ownerProfileId,
       table.seenAt
     ),
+    check(
+      'pending_notices_type_check',
+      sql`${table.type} in ('consent_deleted', 'consent_archived')`
+    ),
   ]
 );
 

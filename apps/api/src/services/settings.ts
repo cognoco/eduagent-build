@@ -19,6 +19,7 @@ import type {
   CelebrationLevel,
   WithdrawalArchivePreference,
 } from '@eduagent/schemas';
+import { ForbiddenError } from '@eduagent/schemas';
 import type { NotificationPayload } from './notifications';
 
 // ---------------------------------------------------------------------------
@@ -251,7 +252,7 @@ export async function upsertWithdrawalArchivePreference(
     columns: { isOwner: true },
   });
   if (!profile?.isOwner) {
-    throw new Error('Profile owner required');
+    throw new ForbiddenError('Profile owner required');
   }
 
   await db
@@ -293,7 +294,7 @@ export async function getOwnedFamilyPoolBreakdownSharing(
     columns: { isOwner: true },
   });
   if (!profile?.isOwner) {
-    throw new Error('Profile owner required');
+    throw new ForbiddenError('Profile owner required');
   }
 
   return getFamilyPoolBreakdownSharing(db, ownerProfileId);
@@ -312,7 +313,7 @@ export async function upsertFamilyPoolBreakdownSharing(
     columns: { isOwner: true },
   });
   if (!profile?.isOwner) {
-    throw new Error('Profile owner required');
+    throw new ForbiddenError('Profile owner required');
   }
 
   await db

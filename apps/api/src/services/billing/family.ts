@@ -14,7 +14,7 @@ import {
   findSubscriptionById,
   findQuotaPool,
 } from '@eduagent/database';
-import type { SubscriptionTier } from '@eduagent/schemas';
+import type { FamilyMember, SubscriptionTier } from '@eduagent/schemas';
 import { getTierConfig } from '../subscription';
 import type { SubscriptionRow } from './types';
 import {
@@ -23,6 +23,8 @@ import {
   updateQuotaPoolLimit,
 } from './subscription-core';
 import { getFamilyPoolBreakdownSharing } from '../settings';
+
+export type { FamilyMember } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
 // getSubscriptionForProfile
@@ -117,14 +119,8 @@ export async function addToByokWaitlist(
 }
 
 // ---------------------------------------------------------------------------
-// FamilyMember type + listFamilyMembers
+// listFamilyMembers
 // ---------------------------------------------------------------------------
-
-export interface FamilyMember {
-  profileId: string;
-  displayName: string;
-  isOwner: boolean;
-}
 
 export interface UsageBreakdown {
   byProfile: Array<{

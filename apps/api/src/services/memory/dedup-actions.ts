@@ -138,7 +138,7 @@ export async function applyDedupAction(
       .where(
         and(
           eq(memoryFacts.id, neighbour.id),
-          eq(memoryFacts.profileId, candidate.profileId)
+          eq(memoryFacts.profileId, neighbour.profileId)
         )
       );
     return { kind: 'supersede', supersededId: neighbour.id };

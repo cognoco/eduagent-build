@@ -62,7 +62,8 @@ jest.mock('../../services/settings', () => ({
 }));
 
 const mockRecordPendingNotice = jest.fn().mockResolvedValue(undefined);
-jest.mock('../../services/notices', () => ({ // gc1-allow: stubs recordPendingNotice — real notices service inserts to DB, integration test would need real DB setup
+jest.mock('../../services/notices', () => ({
+  // gc1-allow: stubs recordPendingNotice — real notices service inserts to DB, integration test would need real DB setup
   recordPendingNotice: (...args: unknown[]) => mockRecordPendingNotice(...args),
 }));
 
@@ -264,6 +265,25 @@ describe('consentRevocation', () => {
     });
   });
 
+  it('hard-deletes conservatively when birth-year-only age is 13', async () => {
+    mockGetWithdrawalArchivePreference.mockResolvedValue('auto');
+    mockCalculateAge.mockReturnValue(13);
+
+    const { result } = await executeRevocation({
+      childProfileId: 'child-boundary',
+      parentProfileId: 'parent-001',
+    });
+
+    expect(result).toEqual({
+      status: 'deleted',
+      childProfileId: 'child-boundary',
+    });
+    expect(mockDeleteProfile).toHaveBeenCalledWith(
+      expect.anything(),
+      'child-boundary'
+    );
+  });
+
   describe('[BUG-699-FOLLOWUP] 24h push dedup', () => {
     it('skips notify-child push when a consent_expired notification was logged for the child in last 24h', async () => {
       // Warning allowed; child dedups; parent allowed.
@@ -394,6 +414,25 @@ describe('archive path — auto preference, age 14', () => {
 
     // delete must NOT have been called
     expect(mockDeleteProfile).not.toHaveBeenCalled();
+  });
+
+  it('records archive notice against the resolved owner profile', async () => {
+    mockGetWithdrawalArchivePreference.mockResolvedValue('auto');
+    mockCalculateAge.mockReturnValue(14);
+    mockGetFamilyOwnerProfileId.mockResolvedValue('owner-profile-001');
+
+    await executeRevocation({
+      childProfileId: 'child-014',
+      parentProfileId: 'coparent-profile-001',
+    });
+
+    expect(mockRecordPendingNotice).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        ownerProfileId: 'owner-profile-001',
+        type: 'consent_archived',
+      })
+    );
   });
 });
 

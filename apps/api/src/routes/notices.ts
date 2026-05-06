@@ -6,6 +6,7 @@ import type { Database } from '@eduagent/database';
 import { noticeSeenResponseSchema } from '@eduagent/schemas';
 
 import type { AuthUser } from '../middleware/auth';
+import { notFound } from '../errors';
 import { requireProfileId } from '../middleware/profile-scope';
 import { markPendingNoticeSeen } from '../services/notices';
 
@@ -33,7 +34,10 @@ export const noticesRoutes = new Hono<NoticesRouteEnv>().post(
     const profileId = requireProfileId(c.get('profileId'));
     const { id } = c.req.valid('param');
 
-    await markPendingNoticeSeen(db, profileId, id);
+    const seen = await markPendingNoticeSeen(db, profileId, id);
+    if (!seen) {
+      return notFound(c, 'Notice not found');
+    }
     return c.json(noticeSeenResponseSchema.parse({ seen: true }));
   }
 );

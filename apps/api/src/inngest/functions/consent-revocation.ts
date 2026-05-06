@@ -1,6 +1,6 @@
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { profiles } from '@eduagent/database';
 import {
   calculateAge,
@@ -108,22 +108,44 @@ export const consentRevocation = inngest.createFunction(
       );
       const age = calculateAge(childProfile.birthYear);
       return {
+        ownerProfileId,
         preference,
+        // 'never' = never archive, so it always hard-deletes. With only
+        // birthYear granularity, age 13 is treated conservatively as under
+        // the COPPA boundary because the birthday may not have happened yet.
         action:
-          age < 13 || preference === 'never'
+          age <= 13 || preference === 'never'
             ? ('delete' as const)
             : ('archive' as const),
       };
     });
 
     if (archiveDecision.action === 'archive') {
-      await step.run('archive-child-profile', async () => {
-        const db = getStepDatabase();
-        await db
-          .update(profiles)
-          .set({ archivedAt: new Date() })
-          .where(eq(profiles.id, childProfileId));
-      });
+      const archiveResult = await step.run(
+        'archive-child-profile',
+        async () => {
+          const db = getStepDatabase();
+          const status = await getConsentStatus(db, childProfileId);
+          if (status !== 'WITHDRAWN') {
+            return { archived: false, reason: 'consent_restored' };
+          }
+          await db
+            .update(profiles)
+            .set({ archivedAt: new Date() })
+            .where(
+              and(eq(profiles.id, childProfileId), isNull(profiles.archivedAt))
+            );
+          return { archived: true };
+        }
+      );
+      if (
+        archiveResult &&
+        typeof archiveResult === 'object' &&
+        'archived' in archiveResult &&
+        archiveResult.archived === false
+      ) {
+        return { status: 'restored', childProfileId };
+      }
 
       await step.sendEvent('schedule-archive-cleanup', {
         name: 'app/profile.archived',
@@ -153,7 +175,7 @@ export const consentRevocation = inngest.createFunction(
       await step.run('record-parent-archive-notice', async () => {
         const db = getStepDatabase();
         await recordPendingNotice(db, {
-          ownerProfileId: parentProfileId,
+          ownerProfileId: archiveDecision.ownerProfileId,
           type: 'consent_archived',
           childName: childProfile.displayName,
         });
@@ -222,8 +244,13 @@ export const consentRevocation = inngest.createFunction(
 
     await step.run('record-parent-delete-notice', async () => {
       const db = getStepDatabase();
+      const ownerProfileId = await getFamilyOwnerProfileId(
+        db,
+        childProfileId,
+        parentProfileId
+      );
       await recordPendingNotice(db, {
-        ownerProfileId: parentProfileId,
+        ownerProfileId,
         type: 'consent_deleted',
         childName: childProfile.displayName,
       });

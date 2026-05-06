@@ -73,8 +73,8 @@ export async function markPendingNoticeSeen(
   db: Database,
   ownerProfileId: string,
   noticeId: string
-): Promise<void> {
-  await db
+): Promise<boolean> {
+  const rows = await db
     .update(pendingNotices)
     .set({ seenAt: new Date() })
     .where(
@@ -83,5 +83,7 @@ export async function markPendingNoticeSeen(
         eq(pendingNotices.ownerProfileId, ownerProfileId),
         isNull(pendingNotices.seenAt)
       )
-    );
+    )
+    .returning({ id: pendingNotices.id });
+  return rows.length > 0;
 }

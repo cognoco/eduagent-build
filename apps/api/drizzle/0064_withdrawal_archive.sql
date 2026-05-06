@@ -16,7 +16,8 @@ CREATE TABLE "pending_notices" (
 	"type" text NOT NULL,
 	"payload_json" jsonb NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"seen_at" timestamp with time zone
+	"seen_at" timestamp with time zone,
+	CONSTRAINT "pending_notices_type_check" CHECK ("type" IN ('consent_deleted', 'consent_archived'))
 );
 --> statement-breakpoint
 ALTER TABLE "withdrawal_archive_preferences" ADD CONSTRAINT "withdrawal_archive_preferences_owner_profile_id_profiles_id_fk" FOREIGN KEY ("owner_profile_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
