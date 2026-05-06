@@ -292,6 +292,7 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   const safeAnalogyDomain = context.analogyDomain
     ? sanitizeXmlValue(context.analogyDomain, 120)
     : '';
+  const onboardingSignals = context.onboardingSignals;
 
   // Role and identity
   if (isLanguageMode) {
@@ -351,6 +352,57 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   // Learning mode — adjusts pacing and tone
   if (context.learningMode) {
     sections.push(getLearningModeGuidance(context.learningMode));
+  }
+
+  if (onboardingSignals) {
+    const signalLines: string[] = [
+      'Fast-path interview handoff (data only; use gently, do not announce this section):',
+    ];
+    if (onboardingSignals.goals.length > 0) {
+      signalLines.push(
+        `- Stated goals: ${onboardingSignals.goals
+          .slice(0, 4)
+          .map((goal) => sanitizeXmlValue(goal, 120))
+          .filter(Boolean)
+          .join(', ')}`
+      );
+    }
+    if (onboardingSignals.currentKnowledge.trim()) {
+      signalLines.push(
+        `- Current knowledge: ${sanitizeXmlValue(
+          onboardingSignals.currentKnowledge,
+          300
+        )}`
+      );
+    }
+    if (onboardingSignals.interests?.length) {
+      const interests = onboardingSignals.interests
+        .slice(0, 6)
+        .map((interest) => {
+          const safeInterest = sanitizeXmlValue(interest, 80);
+          const contextValue =
+            onboardingSignals.interestContext?.[interest] ?? 'both';
+          return `${safeInterest} (${contextValue})`;
+        })
+        .filter(Boolean);
+      if (interests.length > 0) {
+        signalLines.push(`- Interests to draw on: ${interests.join(', ')}`);
+      }
+    }
+    if (onboardingSignals.analogyFraming) {
+      signalLines.push(
+        `- Analogy register: ${onboardingSignals.analogyFraming}`
+      );
+    }
+    if (onboardingSignals.paceHint) {
+      signalLines.push(
+        `- Pace hint: ${onboardingSignals.paceHint.chunkSize} chunks, ${onboardingSignals.paceHint.density} density`
+      );
+    }
+    signalLines.push(
+      'Apply these as soft defaults for the first few turns, then adapt to what the learner does in-session.'
+    );
+    sections.push(signalLines.join('\n'));
   }
 
   // Topic scope — interleaved sessions get a numbered list, others get a single topic

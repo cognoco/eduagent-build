@@ -447,6 +447,27 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain("don't force an analogy");
   });
 
+  it('includes fast-path interview personalization hints when present', () => {
+    const prompt = buildSystemPrompt({
+      ...baseContext,
+      onboardingSignals: {
+        goals: ['understand volcanoes'],
+        experienceLevel: 'beginner',
+        currentKnowledge: 'Knows lava is hot',
+        interests: ['Minecraft'],
+        interestContext: { Minecraft: 'free_time' },
+        analogyFraming: 'playful',
+        paceHint: { density: 'low', chunkSize: 'short' },
+      },
+    });
+
+    expect(prompt).toContain('Fast-path interview handoff');
+    expect(prompt).toContain('understand volcanoes');
+    expect(prompt).toContain('Minecraft (free_time)');
+    expect(prompt).toContain('playful');
+    expect(prompt).toContain('short chunks, low density');
+  });
+
   it('omits analogy domain when not set', () => {
     const prompt = buildSystemPrompt(baseContext);
     expect(prompt).not.toContain('Analogy preference');

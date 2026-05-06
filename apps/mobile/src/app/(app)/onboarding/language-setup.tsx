@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next';
 import type { CefrLevel } from '@eduagent/schemas';
 import { OnboardingStepIndicator } from '../../../components/onboarding/OnboardingStepIndicator';
 import { useConfigureLanguageSubject } from '../../../hooks/use-subjects';
+import { useStartFirstCurriculumSession } from '../../../hooks/use-sessions';
 import { formatApiError } from '../../../lib/format-api-error';
 import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import { useThemeColors } from '../../../lib/theme';
@@ -89,6 +90,9 @@ export default function LanguageSetup() {
     totalSteps?: string;
   }>();
   const configureLanguageSubject = useConfigureLanguageSubject();
+  const startFirstCurriculumSession = useStartFirstCurriculumSession(
+    subjectId ?? ''
+  );
   const colors = useThemeColors(); // [BUG-118]
   const step = Number(stepParam) || 2;
   const totalSteps = Number(totalStepsParam) || 4;
@@ -146,11 +150,17 @@ export default function LanguageSetup() {
       // don't navigate to accommodations from a screen the user has already left.
       if (cancelledRef.current) return;
       if (FEATURE_FLAGS.ONBOARDING_FAST_PATH) {
+        const result = await startFirstCurriculumSession.mutateAsync({
+          sessionType: 'learning',
+          inputMode: 'text',
+        });
         router.replace({
           pathname: '/(app)/session',
           params: {
             mode: 'learning',
             subjectId,
+            sessionId: result.session.id,
+            topicId: result.session.topicId ?? undefined,
             subjectName: subjectName ?? languageName ?? '',
           },
         } as never);

@@ -26,6 +26,7 @@ import {
   type ExchangeFallback,
   type ExchangeFallbackReason,
   type LlmResponseEnvelope,
+  type ExtractedInterviewSignals,
 } from '@eduagent/schemas';
 import type { LLMTier } from './subscription';
 import {
@@ -184,6 +185,8 @@ export interface ExchangeContext {
   continuationDepth?: 'low' | 'mid' | 'high';
   /** Learner's display name — used to personalise the mentor's voice */
   learnerName?: string;
+  /** Interview-derived hints captured during fast-path onboarding. */
+  onboardingSignals?: ExtractedInterviewSignals;
 }
 
 /** Result of processing a single exchange */

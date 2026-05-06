@@ -23,7 +23,11 @@ import type {
   StruggleEntry,
   VerificationType,
 } from '@eduagent/schemas';
-import { LlmStreamError, classifyOrphanError } from '@eduagent/schemas';
+import {
+  LlmStreamError,
+  classifyOrphanError,
+  extractedInterviewSignalsSchema,
+} from '@eduagent/schemas';
 import { persistUserMessageOnly } from './persist-user-message-only';
 import {
   processExchange,
@@ -850,6 +854,15 @@ export async function prepareExchangeContext(
       ? learningHistoryParts.join('\n\n')
       : undefined;
   const sessionMetadata = session.metadata as Record<string, unknown> | null;
+  const onboardingSignals = extractedInterviewSignalsSchema.safeParse(
+    sessionMetadata?.onboardingFastPath &&
+      typeof sessionMetadata.onboardingFastPath === 'object' &&
+      !Array.isArray(sessionMetadata.onboardingFastPath)
+      ? (sessionMetadata.onboardingFastPath as Record<string, unknown>)[
+          'extractedSignals'
+        ]
+      : undefined
+  );
   const resumeFromSessionId =
     typeof sessionMetadata?.resumeFromSessionId === 'string'
       ? sessionMetadata.resumeFromSessionId
@@ -1128,6 +1141,9 @@ export async function prepareExchangeContext(
     continuationDepth,
     // Personalisation: learner's display name for the mentor to use naturally
     learnerName: profile?.displayName ?? undefined,
+    onboardingSignals: onboardingSignals.success
+      ? onboardingSignals.data
+      : undefined,
     // B.3: Consecutive correct-answer streak at the current escalation rung.
     // Used by the prompt to trigger adaptive escalation when streak >= 4.
     correctStreak: computeCorrectStreak(events, effectiveRung),

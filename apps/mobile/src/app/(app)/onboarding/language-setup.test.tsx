@@ -67,6 +67,7 @@ jest.mock('react-i18next', () => ({
 
 const mockReplace = jest.fn();
 const mockMutateAsync = jest.fn();
+const mockStartFirstCurriculumMutateAsync = jest.fn();
 const mockGoBackOrReplace = jest.fn();
 let mockIsPending = false;
 let mockSubjectId: string | undefined = 'test-id';
@@ -107,6 +108,13 @@ jest.mock('../../../hooks/use-subjects', () => ({
   }),
 }));
 
+jest.mock('../../../hooks/use-sessions', () => ({
+  useStartFirstCurriculumSession: () => ({
+    mutateAsync: mockStartFirstCurriculumMutateAsync,
+    isPending: false,
+  }),
+}));
+
 jest.mock('../../../lib/navigation', () => ({
   goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
 }));
@@ -129,6 +137,12 @@ describe('LanguageSetup', () => {
     mockSubjectId = 'test-id';
     mockIsPending = false;
     mockMutateAsync.mockResolvedValue({ subject: { id: 'test-id' } });
+    mockStartFirstCurriculumMutateAsync.mockResolvedValue({
+      session: {
+        id: 'session-1',
+        topicId: 'topic-1',
+      },
+    });
     FEATURE_FLAGS.ONBOARDING_FAST_PATH = false;
   });
 
@@ -221,6 +235,8 @@ describe('LanguageSetup', () => {
         params: {
           mode: 'learning',
           subjectId: 'test-id',
+          sessionId: 'session-1',
+          topicId: 'topic-1',
           subjectName: 'Spanish',
         },
       });

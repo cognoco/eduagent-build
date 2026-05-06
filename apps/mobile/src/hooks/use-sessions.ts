@@ -141,6 +141,43 @@ export function useStartSession(subjectId: string): UseMutationResult<
   });
 }
 
+export function useStartFirstCurriculumSession(
+  subjectId: string
+): UseMutationResult<
+  SessionStartResult,
+  Error,
+  {
+    bookId?: string;
+    sessionType?: SessionType;
+    verificationType?: VerificationType;
+    inputMode?: InputMode;
+  }
+> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: {
+      bookId?: string;
+      sessionType?: SessionType;
+      verificationType?: VerificationType;
+      inputMode?: InputMode;
+    }): Promise<SessionStartResult> => {
+      const res = await client.subjects[':subjectId'].sessions[
+        'first-curriculum'
+      ].$post({
+        param: { subjectId },
+        json: input,
+      });
+      await assertOk(res);
+      return (await res.json()) as SessionStartResult;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['sessions'] });
+    },
+  });
+}
+
 export function useSetSessionInputMode(
   sessionId: string
 ): UseMutationResult<SessionStartResult, Error, { inputMode: InputMode }> {

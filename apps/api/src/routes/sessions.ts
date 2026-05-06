@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import {
   ConflictError,
+  firstCurriculumSessionStartSchema,
   sessionStartSchema,
   sessionMessageSchema,
   sessionCloseSchema,
@@ -31,7 +32,9 @@ import { captureException } from '../services/sentry';
 import { createLogger } from '../services/logger';
 import {
   startSession,
+  startFirstCurriculumSession,
   SubjectInactiveError,
+  CurriculumSessionNotReadyError,
   SessionExchangeLimitError,
   getSession,
   clearContinuationDepth,
@@ -118,6 +121,35 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     }
   )
   // Start a new learning session for a subject
+  .post(
+    '/subjects/:subjectId/sessions/first-curriculum',
+    zValidator('json', firstCurriculumSessionStartSchema),
+    async (c) => {
+      assertNotProxyMode(c);
+      const db = c.get('db');
+      const subjectId = c.req.param('subjectId');
+      const input = c.req.valid('json');
+      const profileId = requireProfileId(c.get('profileId'));
+      try {
+        const session = await startFirstCurriculumSession(
+          db,
+          profileId,
+          subjectId,
+          input
+        );
+        return c.json({ session }, 201);
+      } catch (err) {
+        if (err instanceof CurriculumSessionNotReadyError) {
+          return apiError(c, 409, ERROR_CODES.CONFLICT, err.message);
+        }
+        if (err instanceof SubjectInactiveError) {
+          return apiError(c, 403, ERROR_CODES.SUBJECT_INACTIVE, err.message);
+        }
+        throw err;
+      }
+    }
+  )
+
   .post(
     '/subjects/:subjectId/sessions',
     zValidator('json', sessionStartSchema),

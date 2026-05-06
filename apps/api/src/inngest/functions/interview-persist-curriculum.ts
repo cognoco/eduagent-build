@@ -3,6 +3,7 @@ import { eq, and } from 'drizzle-orm';
 import { onboardingDrafts, type Database } from '@eduagent/database';
 import {
   PersistCurriculumError,
+  extractedInterviewSignalsSchema,
   interviewReadyToPersistEventSchema,
   type PersistFailureCode,
   type OnboardingDraft,
@@ -95,13 +96,6 @@ export const interviewPersistCurriculum = inngest.createFunction(
         bookId?: string;
       };
 
-    type ExtractedSignals = {
-      goals: string[];
-      experienceLevel: string;
-      currentKnowledge: string;
-      interests?: string[];
-    };
-
     const signals = await step.run('extract-signals', async () => {
       const db = getStepDatabase();
       const draft = await loadDraft(db, profileId, draftId);
@@ -109,24 +103,17 @@ export const interviewPersistCurriculum = inngest.createFunction(
       if (draft.status === 'completed')
         throw new NonRetriableError('draft-already-completed');
 
-      const cached = draft.extractedSignals as ExtractedSignals | null;
-      if (
-        cached &&
-        ((cached.goals?.length ?? 0) > 0 || (cached.interests?.length ?? 0) > 0)
-      ) {
-        return cached;
+      const cached = extractedInterviewSignalsSchema.safeParse(
+        draft.extractedSignals
+      );
+      if (cached.success) {
+        return cached.data;
       }
 
       try {
         const fresh = await extractSignals(
           draft.exchangeHistory as Parameters<typeof extractSignals>[0]
         );
-        if (
-          !fresh ||
-          (fresh.goals.length === 0 && (fresh.interests?.length ?? 0) === 0)
-        ) {
-          throw new PersistCurriculumError('empty_signals');
-        }
         return fresh;
       } catch (err) {
         if (err instanceof PersistCurriculumError) throw err;

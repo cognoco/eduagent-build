@@ -3,27 +3,35 @@
 // ---------------------------------------------------------------------------
 
 import { eq, and, asc, desc, gte, isNull, lt, sql } from 'drizzle-orm';
+import { z } from 'zod';
 import {
   learningSessions,
   sessionEvents,
   sessionSummaries,
+  onboardingDrafts,
   subjects,
   curricula,
   curriculumTopics,
+  curriculumBooks,
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
-import { z } from 'zod';
 import type {
   CelebrationReason,
   LearningSession,
   SessionStartInput,
+  FirstCurriculumSessionStartInput,
+  ExtractedInterviewSignals,
   SessionCloseInput,
   SessionAnalyticsEventInput,
   ContentFlagInput,
   TranscriptResponse,
 } from '@eduagent/schemas';
-import { celebrationReasonSchema, llmSummarySchema } from '@eduagent/schemas';
+import {
+  celebrationReasonSchema,
+  extractedInterviewSignalsSchema,
+  llmSummarySchema,
+} from '@eduagent/schemas';
 import { insertSessionEvent } from './session-events';
 import { getSubject } from '../subject';
 import { createPendingSessionSummary } from '../summaries';
@@ -60,6 +68,13 @@ export class SessionExchangeLimitError extends Error {
       `Session has reached the maximum of ${MAX_EXCHANGES_PER_SESSION} exchanges`
     );
     this.name = 'SessionExchangeLimitError';
+  }
+}
+
+export class CurriculumSessionNotReadyError extends Error {
+  constructor() {
+    super('Curriculum is still being prepared');
+    this.name = 'CurriculumSessionNotReadyError';
   }
 }
 
@@ -203,6 +218,109 @@ export async function startSession(
   });
 
   return mapSessionRow(row);
+}
+
+const FIRST_CURRICULUM_SESSION_WAIT_MS = 25_000;
+const FIRST_CURRICULUM_SESSION_POLL_MS = 750;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function loadLatestCompletedDraftSignals(
+  db: Database,
+  profileId: string,
+  subjectId: string
+): Promise<ExtractedInterviewSignals | undefined> {
+  const repo = createScopedRepository(db, profileId);
+  const row = await repo.onboardingDrafts.findFirst(
+    eq(onboardingDrafts.subjectId, subjectId),
+    desc(onboardingDrafts.updatedAt)
+  );
+  if (row?.status !== 'completed') {
+    return undefined;
+  }
+  const parsed = extractedInterviewSignalsSchema.safeParse(
+    row.extractedSignals
+  );
+  return parsed.success ? parsed.data : undefined;
+}
+
+async function findFirstAvailableTopicId(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+  bookId?: string
+): Promise<string | undefined> {
+  // Verify optional book belongs to this subject before using it as a filter.
+  if (bookId) {
+    const [book] = await db
+      .select({ id: curriculumBooks.id })
+      .from(curriculumBooks)
+      .innerJoin(subjects, eq(subjects.id, curriculumBooks.subjectId))
+      .where(
+        and(
+          eq(curriculumBooks.id, bookId),
+          eq(curriculumBooks.subjectId, subjectId),
+          eq(subjects.profileId, profileId)
+        )
+      )
+      .limit(1);
+    if (!book) {
+      throw new Error('Book not found in this subject');
+    }
+  }
+
+  const [topic] = await db
+    .select({ id: curriculumTopics.id })
+    .from(curriculumTopics)
+    .innerJoin(curricula, eq(curricula.id, curriculumTopics.curriculumId))
+    .innerJoin(subjects, eq(subjects.id, curricula.subjectId))
+    .where(
+      and(
+        eq(curricula.subjectId, subjectId),
+        eq(subjects.profileId, profileId),
+        eq(curriculumTopics.skipped, false),
+        ...(bookId ? [eq(curriculumTopics.bookId, bookId)] : [])
+      )
+    )
+    .orderBy(asc(curriculumTopics.sortOrder), asc(curriculumTopics.id))
+    .limit(1);
+  return topic?.id;
+}
+
+export async function startFirstCurriculumSession(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+  input: FirstCurriculumSessionStartInput
+): Promise<LearningSession> {
+  const deadline = Date.now() + FIRST_CURRICULUM_SESSION_WAIT_MS;
+
+  while (Date.now() <= deadline) {
+    const [topicId, extractedSignals] = await Promise.all([
+      findFirstAvailableTopicId(db, profileId, subjectId, input.bookId),
+      loadLatestCompletedDraftSignals(db, profileId, subjectId),
+    ]);
+
+    if (topicId && extractedSignals) {
+      return startSession(db, profileId, subjectId, {
+        subjectId,
+        topicId,
+        sessionType: input.sessionType ?? 'learning',
+        inputMode: input.inputMode ?? 'text',
+        verificationType: input.verificationType,
+        metadata: {
+          inputMode: input.inputMode ?? 'text',
+          onboardingFastPath: { extractedSignals },
+        },
+      });
+    }
+
+    await sleep(FIRST_CURRICULUM_SESSION_POLL_MS);
+  }
+
+  throw new CurriculumSessionNotReadyError();
 }
 
 export async function getSession(
