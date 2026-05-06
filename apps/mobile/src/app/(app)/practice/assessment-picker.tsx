@@ -1,23 +1,27 @@
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAssessmentEligibleTopics } from '../../../hooks/use-assessments';
 import { Button } from '../../../components/common/Button';
 import { ErrorFallback } from '../../../components/common/ErrorFallback';
 import { useThemeColors } from '../../../lib/theme';
 
-function formatStudiedAt(isoDate: string): string {
+type TranslationFn = (key: string, options?: Record<string, unknown>) => string;
+
+function formatStudiedAt(isoDate: string, t: TranslationFn): string {
   const diffDays = Math.floor(
     (Date.now() - new Date(isoDate).getTime()) / (1000 * 60 * 60 * 24)
   );
-  if (diffDays <= 0) return 'Studied today';
-  if (diffDays === 1) return 'Studied yesterday';
-  return `Studied ${diffDays} days ago`;
+  if (diffDays <= 0) return t('assessment.studiedToday');
+  if (diffDays === 1) return t('assessment.studiedYesterday');
+  return t('assessment.studiedDaysAgo', { count: diffDays });
 }
 
 export default function AssessmentPickerScreen(): React.ReactElement {
   const router = useRouter();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const {
@@ -42,17 +46,17 @@ export default function AssessmentPickerScreen(): React.ReactElement {
           onPress={() => router.back()}
           className="mr-3 min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('common.goBack', 'Go back')}
           testID="assessment-picker-back"
         >
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </Pressable>
         <View className="flex-1">
           <Text className="text-h2 font-bold text-text-primary">
-            Pick a topic to check
+            {t('assessment.pickerTitle')}
           </Text>
           <Text className="text-body-sm text-text-secondary mt-1">
-            You've studied these recently - pick one to prove what stuck.
+            {t('assessment.pickerSubtitle')}
           </Text>
         </View>
       </View>
@@ -60,37 +64,39 @@ export default function AssessmentPickerScreen(): React.ReactElement {
       {isError ? (
         <ErrorFallback
           variant="card"
-          message="Could not load topics ready for assessment."
+          message={t('assessment.pickerLoadError')}
           primaryAction={{
-            label: 'Try again',
+            label: t('common.tryAgain', 'Try again'),
             testID: 'assessment-picker-retry',
             onPress: () => {
               void refetch();
             },
           }}
           secondaryAction={{
-            label: 'Go back',
+            label: t('common.goBack', 'Go back'),
             testID: 'assessment-picker-error-back',
             onPress: () => router.back(),
           }}
         />
       ) : isLoading ? (
-        <Text className="text-body text-text-secondary">Loading topics...</Text>
+        <Text className="text-body text-text-secondary">
+          {t('assessment.pickerLoading')}
+        </Text>
       ) : topics.length === 0 ? (
         <View
           testID="assessment-picker-empty"
           className="bg-surface-elevated rounded-card px-4 py-5"
         >
           <Text className="text-body font-semibold text-text-primary">
-            You haven't studied any topics recently
+            {t('assessment.pickerEmptyTitle')}
           </Text>
           <Text className="text-body-sm text-text-secondary mt-1">
-            Start a session first, then come back to check what stuck.
+            {t('assessment.pickerEmptyBody')}
           </Text>
           <View className="mt-4">
             <Button
               variant="primary"
-              label="Browse topics"
+              label={t('assessment.pickerBrowseTopics')}
               testID="assessment-picker-browse"
               onPress={() => router.push('/(app)/library' as never)}
             />
@@ -104,7 +110,9 @@ export default function AssessmentPickerScreen(): React.ReactElement {
               testID={`assessment-topic-${topic.topicId}`}
               className="bg-surface-elevated rounded-card px-4 py-4 flex-row items-center active:opacity-80"
               accessibilityRole="button"
-              accessibilityLabel={`Start assessment for ${topic.topicTitle}`}
+              accessibilityLabel={t('assessment.pickerStartForTopic', {
+                title: topic.topicTitle,
+              })}
               onPress={() =>
                 router.push({
                   pathname: '/(app)/practice/assessment',
@@ -120,7 +128,8 @@ export default function AssessmentPickerScreen(): React.ReactElement {
                   {topic.topicTitle}
                 </Text>
                 <Text className="text-body-sm text-text-secondary mt-1">
-                  {topic.subjectName} - {formatStudiedAt(topic.lastStudiedAt)}
+                  {topic.subjectName} -{' '}
+                  {formatStudiedAt(topic.lastStudiedAt, t)}
                 </Text>
               </View>
               <Ionicons

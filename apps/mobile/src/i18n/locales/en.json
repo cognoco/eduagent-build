@@ -937,7 +937,18 @@
     "title": "Knowledge Check",
     "openingMessage": "Let's see what you've picked up so far. I'll ask a few questions — just do your best, and I'll help fill in any gaps.",
     "passedMessage": "You've got a solid grasp of most of this — {{mastery}}% mastery! The areas to revisit will show up in your Library.",
-    "missingParams": "This assessment can't be started — missing required information."
+    "missingParams": "This assessment can't be started — missing required information.",
+    "pickerTitle": "Pick a topic to check",
+    "pickerSubtitle": "You've studied these recently - pick one to prove what stuck.",
+    "pickerLoadError": "Could not load topics ready for assessment.",
+    "pickerLoading": "Loading topics...",
+    "pickerEmptyTitle": "You haven't studied any topics recently",
+    "pickerEmptyBody": "Start a session first, then come back to check what stuck.",
+    "pickerBrowseTopics": "Browse topics",
+    "pickerStartForTopic": "Start assessment for {{title}}",
+    "studiedToday": "Studied today",
+    "studiedYesterday": "Studied yesterday",
+    "studiedDaysAgo": "Studied {{count}} days ago"
   },
   "homework": {
     "permissionTitle": "Camera Access Needed",

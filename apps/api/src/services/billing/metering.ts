@@ -47,8 +47,12 @@ async function verifyProfileInSubscriptionAccount(
   return row.length > 0;
 }
 
+/**
+ * Must be called inside a db.transaction() callback so the usage audit row
+ * rolls back atomically with the quota update that caused it.
+ */
 async function recordUsageEvent(
-  db: Database,
+  db: Pick<Database, 'insert'>,
   subscriptionId: string,
   profileId: string,
   delta: 1 | -1
@@ -116,12 +120,7 @@ export async function decrementQuota(
       )
       .returning();
     if (updated && profileId) {
-      await recordUsageEvent(
-        tx as unknown as Database,
-        subscriptionId,
-        profileId,
-        1
-      );
+      await recordUsageEvent(tx, subscriptionId, profileId, 1);
     }
     return updated;
   });
@@ -227,12 +226,7 @@ export async function decrementQuota(
     }
 
     if (profileId) {
-      await recordUsageEvent(
-        tx as unknown as Database,
-        subscriptionId,
-        profileId,
-        1
-      );
+      await recordUsageEvent(tx, subscriptionId, profileId, 1);
     }
 
     return {
@@ -301,12 +295,7 @@ export async function incrementQuota(
       })
       .where(eq(quotaPools.subscriptionId, subscriptionId));
     if (profileId) {
-      await recordUsageEvent(
-        tx as unknown as Database,
-        subscriptionId,
-        profileId,
-        -1
-      );
+      await recordUsageEvent(tx, subscriptionId, profileId, -1);
     }
   });
 }

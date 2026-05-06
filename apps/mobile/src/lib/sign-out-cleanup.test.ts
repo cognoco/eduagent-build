@@ -7,6 +7,7 @@
 // ---------------------------------------------------------------------------
 
 import { clearProfileSecureStorageOnSignOut } from './sign-out-cleanup';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const mockDelete = jest.fn().mockResolvedValue(undefined);
 
@@ -20,6 +21,11 @@ jest.mock('./secure-storage', () => ({
 describe('clearProfileSecureStorageOnSignOut [BUG-723 / SEC-7]', () => {
   beforeEach(() => {
     mockDelete.mockClear();
+    jest.spyOn(AsyncStorage, 'multiRemove').mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('clears global keys even when no profileIds are passed', async () => {
@@ -98,6 +104,14 @@ describe('clearProfileSecureStorageOnSignOut [BUG-723 / SEC-7]', () => {
     // The empty string would yield malformed keys like `dictation-pace-` —
     // the helper must filter them out.
     expect(calledWith).not.toContain('dictation-pace-');
+  });
+
+  it('clears legacy account-scoped AsyncStorage keys on sign-out', async () => {
+    await clearProfileSecureStorageOnSignOut(['profile-a']);
+
+    expect(AsyncStorage.multiRemove).toHaveBeenCalledWith(
+      expect.arrayContaining(['i18n-auto-suggest-dismissed'])
+    );
   });
 
   // [CR-SIGNOUT-TIMEOUT-10] If SecureStore.deleteItemAsync hangs (Android

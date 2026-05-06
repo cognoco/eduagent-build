@@ -937,7 +937,18 @@
     "title": "知識チェック",
     "openingMessage": "これまでに学んだことを確認しましょう。いくつか質問をしますので、最善を尽くしてください。足りない部分は私が補います。",
     "passedMessage": "ほとんどの内容をしっかり理解していますね — {{mastery}}%の習熟度です！復習が必要な分野はライブラリに表示されます。",
-    "missingParams": "この評価は開始できません — 必要な情報が不足しています。"
+    "missingParams": "この評価は開始できません — 必要な情報が不足しています。",
+    "pickerTitle": "Pick a topic to check",
+    "pickerSubtitle": "You've studied these recently - pick one to prove what stuck.",
+    "pickerLoadError": "Could not load topics ready for assessment.",
+    "pickerLoading": "Loading topics...",
+    "pickerEmptyTitle": "You haven't studied any topics recently",
+    "pickerEmptyBody": "Start a session first, then come back to check what stuck.",
+    "pickerBrowseTopics": "Browse topics",
+    "pickerStartForTopic": "Start assessment for {{title}}",
+    "studiedToday": "Studied today",
+    "studiedYesterday": "Studied yesterday",
+    "studiedDaysAgo": "Studied {{count}} days ago"
   },
   "homework": {
     "permissionTitle": "カメラへのアクセスが必要です",

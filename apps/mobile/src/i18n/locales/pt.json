@@ -937,7 +937,18 @@
     "title": "Verificação de Conhecimento",
     "openingMessage": "Vamos ver o que você aprendeu até agora. Farei algumas perguntas — apenas faça o seu melhor, e eu ajudarei a preencher quaisquer lacunas.",
     "passedMessage": "Você tem um bom domínio da maior parte disso — {{mastery}}% de maestria! As áreas a serem revisitadas aparecerão na sua Biblioteca.",
-    "missingParams": "Esta avaliação não pode ser iniciada — faltam informações necessárias."
+    "missingParams": "Esta avaliação não pode ser iniciada — faltam informações necessárias.",
+    "pickerTitle": "Pick a topic to check",
+    "pickerSubtitle": "You've studied these recently - pick one to prove what stuck.",
+    "pickerLoadError": "Could not load topics ready for assessment.",
+    "pickerLoading": "Loading topics...",
+    "pickerEmptyTitle": "You haven't studied any topics recently",
+    "pickerEmptyBody": "Start a session first, then come back to check what stuck.",
+    "pickerBrowseTopics": "Browse topics",
+    "pickerStartForTopic": "Start assessment for {{title}}",
+    "studiedToday": "Studied today",
+    "studiedYesterday": "Studied yesterday",
+    "studiedDaysAgo": "Studied {{count}} days ago"
   },
   "homework": {
     "permissionTitle": "É necessário acesso à câmera",
