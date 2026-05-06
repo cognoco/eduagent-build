@@ -32,6 +32,7 @@ import {
   getChildSessions,
   getChildSessionDetail,
 } from '../services/dashboard';
+import { listPendingNotices } from '../services/notices';
 import { getLearningProfile } from '../services/learner-profile';
 import {
   listWeeklyReportsForParentChild,
@@ -62,8 +63,17 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
 
-    const children = await getChildrenForParent(db, profileId);
-    return c.json(dashboardResponseSchema.parse({ children, demoMode: false }));
+    const [children, pendingNotices] = await Promise.all([
+      getChildrenForParent(db, profileId),
+      listPendingNotices(db, profileId),
+    ]);
+    return c.json(
+      dashboardResponseSchema.parse({
+        children,
+        pendingNotices,
+        demoMode: false,
+      })
+    );
   })
 
   // Get detailed child data
@@ -330,6 +340,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     return c.json(
       demoDashboardDataSchema.parse({
         demoMode: true,
+        pendingNotices: [],
         children: [
           {
             profileId: 'demo-child-1',

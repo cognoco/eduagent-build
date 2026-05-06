@@ -7,10 +7,13 @@ import {
   pushTokenRegisterSchema,
   analogyDomainUpdateSchema,
   celebrationLevelUpdateSchema,
+  withdrawalArchivePreferenceUpdateSchema,
   nativeLanguageUpdateSchema,
   getNotificationsResponseSchema,
   getLearningModeResponseSchema,
   getCelebrationLevelResponseSchema,
+  getWithdrawalArchivePreferenceResponseSchema,
+  updateWithdrawalArchivePreferenceResponseSchema,
   pushTokenRegisteredResponseSchema,
   notifyParentSubscribeResponseSchema,
   analogyDomainResponseSchema,
@@ -27,6 +30,8 @@ import {
   upsertLearningMode,
   getCelebrationLevel,
   upsertCelebrationLevel,
+  getWithdrawalArchivePreference,
+  upsertWithdrawalArchivePreference,
   registerPushToken,
 } from '../services/settings';
 import { notifyParentToSubscribe } from '../services/notifications';
@@ -36,7 +41,7 @@ import {
   setAnalogyDomain,
   setNativeLanguage,
 } from '../services/retention-data';
-import { notFound, NotFoundError } from '../errors';
+import { forbidden, notFound, NotFoundError } from '../errors';
 
 type SettingsRouteEnv = {
   Bindings: {
@@ -137,6 +142,42 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
         body.celebrationLevel
       );
       return c.json(getCelebrationLevelResponseSchema.parse(result));
+    }
+  )
+
+  .get('/settings/withdrawal-archive', async (c) => {
+    const db = c.get('db');
+    const profileId = requireProfileId(c.get('profileId'));
+    const value = await getWithdrawalArchivePreference(db, profileId);
+    return c.json(getWithdrawalArchivePreferenceResponseSchema.parse({ value }));
+  })
+
+  .put(
+    '/settings/withdrawal-archive',
+    zValidator('json', withdrawalArchivePreferenceUpdateSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const accountId = c.get('account').id;
+      const body = c.req.valid('json');
+
+      try {
+        const result = await upsertWithdrawalArchivePreference(
+          db,
+          profileId,
+          accountId,
+          body.value
+        );
+        return c.json(updateWithdrawalArchivePreferenceResponseSchema.parse(result));
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          error.message === 'Profile owner required'
+        ) {
+          return forbidden(c);
+        }
+        throw error;
+      }
     }
   )
 

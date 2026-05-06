@@ -40,6 +40,8 @@ import {
   useUpdateLearningMode,
   useCelebrationLevel,
   useUpdateCelebrationLevel,
+  useWithdrawalArchivePreference,
+  useUpdateWithdrawalArchivePreference,
 } from '../../hooks/use-settings';
 import { useSubscription } from '../../hooks/use-subscription';
 import { ACCOMMODATION_OPTIONS } from '../../lib/accommodation-options';
@@ -203,6 +205,10 @@ export default function MoreScreen() {
   const { data: celebrationLevel, isLoading: celebrationLoading } =
     useCelebrationLevel();
   const updateCelebrationLevel = useUpdateCelebrationLevel();
+  const { data: withdrawalArchivePreference, isLoading: archivePrefLoading } =
+    useWithdrawalArchivePreference();
+  const updateWithdrawalArchivePreference =
+    useUpdateWithdrawalArchivePreference();
   const { data: learnerProfile } = useLearnerProfile();
   const updateAccommodation = useUpdateAccommodationMode();
   const { openFeedback } = useFeedbackContext();
@@ -249,6 +255,23 @@ export default function MoreScreen() {
 
   const pushEnabled = notifPrefs?.pushEnabled ?? false;
   const weeklyDigest = notifPrefs?.weeklyProgressPush ?? false;
+  const withdrawalArchiveOptions = [
+    {
+      value: 'auto',
+      title: t('more.privacy.withdrawalArchiveAuto'),
+      description: t('more.privacy.withdrawalArchiveAutoDescription'),
+    },
+    {
+      value: 'always',
+      title: t('more.privacy.withdrawalArchiveAlways'),
+      description: t('more.privacy.withdrawalArchiveAlwaysDescription'),
+    },
+    {
+      value: 'never',
+      title: t('more.privacy.withdrawalArchiveNever'),
+      description: t('more.privacy.withdrawalArchiveNeverDescription'),
+    },
+  ] as const;
 
   const handleTogglePush = useCallback(
     (value: boolean) => {
@@ -699,7 +722,43 @@ export default function MoreScreen() {
           testID="weekly-digest-toggle"
         />
 
-        {/* 7. Account — identity, language, subscription only */}
+        {/* 7. Privacy */}
+        {activeProfile?.isOwner ? (
+          <>
+            <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6">
+              {t('more.privacy.sectionHeader')}
+            </Text>
+            <Text className="text-body font-semibold text-text-primary mb-2">
+              {t('more.privacy.withdrawalArchiveTitle')}
+            </Text>
+            {withdrawalArchiveOptions.map((opt) => (
+              <LearningModeOption
+                key={opt.value}
+                title={opt.title}
+                description={opt.description}
+                selected={withdrawalArchivePreference === opt.value}
+                disabled={
+                  archivePrefLoading ||
+                  updateWithdrawalArchivePreference.isPending
+                }
+                onPress={() => {
+                  if (withdrawalArchivePreference === opt.value) return;
+                  updateWithdrawalArchivePreference.mutate(opt.value, {
+                    onError: () => {
+                      platformAlert(
+                        t('more.errors.couldNotSaveSetting'),
+                        t('more.privacy.withdrawalArchiveError')
+                      );
+                    },
+                  });
+                }}
+                testID={`more-withdrawal-archive-${opt.value}`}
+              />
+            ))}
+          </>
+        ) : null}
+
+        {/* 8. Account — identity, language, subscription only */}
         <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6">
           {t('more.account.sectionHeader')}
         </Text>
@@ -811,7 +870,7 @@ export default function MoreScreen() {
           />
         )}
 
-        {/* 8. Other — support, legal, data management */}
+        {/* 9. Other — support, legal, data management */}
         <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6">
           {t('more.other.sectionHeader')}
         </Text>

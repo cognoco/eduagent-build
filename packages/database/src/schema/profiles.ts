@@ -10,6 +10,7 @@ import {
   index,
   check,
   foreignKey,
+  jsonb,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { generateUUIDv7 } from '../utils/uuid';
@@ -22,6 +23,10 @@ export const consentStatusEnum = pgEnum('consent_status', [
   'CONSENTED',
   'WITHDRAWN',
 ]);
+export const withdrawalArchivePreferenceEnum = pgEnum(
+  'withdrawal_archive_preference',
+  ['auto', 'always', 'never']
+);
 
 export const accounts = pgTable('accounts', {
   id: uuid('id')
@@ -75,6 +80,7 @@ export const profiles = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
   },
   (table) => [
     index('profiles_account_id_idx').on(table.accountId),
@@ -92,6 +98,57 @@ export const profiles = pgTable(
     check(
       'profiles_pronouns_length_check',
       sql`${table.pronouns} IS NULL OR char_length(${table.pronouns}) <= 32`
+    ),
+  ]
+);
+
+export const withdrawalArchivePreferences = pgTable(
+  'withdrawal_archive_preferences',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .$defaultFn(() => generateUUIDv7()),
+    ownerProfileId: uuid('owner_profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' })
+      .unique(),
+    preference: withdrawalArchivePreferenceEnum('preference')
+      .notNull()
+      .default('auto'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index('withdrawal_archive_preferences_owner_profile_id_idx').on(
+      table.ownerProfileId
+    ),
+  ]
+);
+
+export const pendingNotices = pgTable(
+  'pending_notices',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .$defaultFn(() => generateUUIDv7()),
+    ownerProfileId: uuid('owner_profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    type: text('type').notNull(),
+    payloadJson: jsonb('payload_json').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    seenAt: timestamp('seen_at', { withTimezone: true }),
+  },
+  (table) => [
+    index('pending_notices_owner_unseen_idx').on(
+      table.ownerProfileId,
+      table.seenAt
     ),
   ]
 );

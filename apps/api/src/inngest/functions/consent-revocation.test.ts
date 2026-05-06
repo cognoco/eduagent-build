@@ -27,8 +27,16 @@ jest.mock('../client', () => {
 
 const mockGetConsentStatus = jest.fn();
 const mockGetProfileDisplayName = jest.fn();
+const mockGetProfileForConsentRevocation = jest.fn();
+const mockGetFamilyOwnerProfileId = jest.fn();
+const mockCalculateAge = jest.fn();
 jest.mock('../../services/consent', () => ({
+  calculateAge: (...args: unknown[]) => mockCalculateAge(...args),
+  getFamilyOwnerProfileId: (...args: unknown[]) =>
+    mockGetFamilyOwnerProfileId(...args),
   getConsentStatus: (...args: unknown[]) => mockGetConsentStatus(...args),
+  getProfileForConsentRevocation: (...args: unknown[]) =>
+    mockGetProfileForConsentRevocation(...args),
   getProfileDisplayName: (...args: unknown[]) =>
     mockGetProfileDisplayName(...args),
 }));
@@ -45,9 +53,17 @@ jest.mock('../../services/notifications', () => ({
 }));
 
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
+const mockGetWithdrawalArchivePreference = jest.fn().mockResolvedValue('never');
 jest.mock('../../services/settings', () => ({
   getRecentNotificationCount: (...args: unknown[]) =>
     mockGetRecentNotificationCount(...args),
+  getWithdrawalArchivePreference: (...args: unknown[]) =>
+    mockGetWithdrawalArchivePreference(...args),
+}));
+
+const mockRecordPendingNotice = jest.fn().mockResolvedValue(undefined);
+jest.mock('../../services/notices', () => ({
+  recordPendingNotice: (...args: unknown[]) => mockRecordPendingNotice(...args),
 }));
 
 import { consentRevocation } from './consent-revocation';
@@ -84,6 +100,14 @@ beforeEach(() => {
   process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
   mockGetConsentStatus.mockResolvedValue('WITHDRAWN');
   mockGetProfileDisplayName.mockResolvedValue('Liam');
+  mockGetProfileForConsentRevocation.mockResolvedValue({
+    displayName: 'Liam',
+    birthYear: 2018,
+    archivedAt: null,
+  });
+  mockGetFamilyOwnerProfileId.mockResolvedValue('parent-001');
+  mockCalculateAge.mockReturnValue(8);
+  mockGetWithdrawalArchivePreference.mockResolvedValue('never');
 });
 
 afterEach(() => {
@@ -230,9 +254,12 @@ describe('consentRevocation', () => {
       expect(stepNames).toEqual([
         'send-warning-push',
         'check-restoration',
+        'load-child-profile',
+        'choose-final-action',
         'notify-child',
         'delete-child-profile',
         'notify-parent',
+        'record-parent-delete-notice',
       ]);
     });
   });

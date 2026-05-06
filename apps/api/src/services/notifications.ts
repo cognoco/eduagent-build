@@ -35,6 +35,7 @@ export interface NotificationPayload {
     | 'consent_reminder'
     | 'consent_warning'
     | 'consent_expired'
+    | 'consent_archived'
     | 'subscribe_request'
     | 'recall_nudge'
     | 'weekly_progress'
@@ -232,6 +233,7 @@ export interface EmailPayload {
     | 'consent_reminder'
     | 'consent_warning'
     | 'consent_expired'
+    | 'consent_archived'
     | 'subscribe_request'
     | 'feedback';
 }

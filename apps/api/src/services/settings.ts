@@ -9,12 +9,14 @@ import {
   notificationLog,
   learningModes,
   profiles,
+  withdrawalArchivePreferences,
   type Database,
 } from '@eduagent/database';
 import type {
   NotificationPrefsInput,
   LearningMode,
   CelebrationLevel,
+  WithdrawalArchivePreference,
 } from '@eduagent/schemas';
 import type { NotificationPayload } from './notifications';
 
@@ -218,6 +220,48 @@ export async function upsertCelebrationLevel(
   }
 
   return { celebrationLevel };
+}
+
+// ---------------------------------------------------------------------------
+// Withdrawal Archive Preference
+// ---------------------------------------------------------------------------
+
+export async function getWithdrawalArchivePreference(
+  db: Database,
+  ownerProfileId: string
+): Promise<WithdrawalArchivePreference> {
+  const row = await db.query.withdrawalArchivePreferences.findFirst({
+    where: eq(withdrawalArchivePreferences.ownerProfileId, ownerProfileId),
+  });
+
+  return row?.preference ?? 'auto';
+}
+
+export async function upsertWithdrawalArchivePreference(
+  db: Database,
+  ownerProfileId: string,
+  accountId: string,
+  value: WithdrawalArchivePreference
+): Promise<{ value: WithdrawalArchivePreference }> {
+  await verifyProfileOwnership(db, ownerProfileId, accountId);
+
+  const profile = await db.query.profiles.findFirst({
+    where: eq(profiles.id, ownerProfileId),
+    columns: { isOwner: true },
+  });
+  if (!profile?.isOwner) {
+    throw new Error('Profile owner required');
+  }
+
+  await db
+    .insert(withdrawalArchivePreferences)
+    .values({ ownerProfileId, preference: value })
+    .onConflictDoUpdate({
+      target: withdrawalArchivePreferences.ownerProfileId,
+      set: { preference: value, updatedAt: new Date() },
+    });
+
+  return { value };
 }
 
 export async function getMedianResponseSeconds(

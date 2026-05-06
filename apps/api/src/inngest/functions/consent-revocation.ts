@@ -1,12 +1,21 @@
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
+import { eq } from 'drizzle-orm';
+import { profiles } from '@eduagent/database';
 import {
+  calculateAge,
+  getFamilyOwnerProfileId,
   getConsentStatus,
+  getProfileForConsentRevocation,
   getProfileDisplayName,
 } from '../../services/consent';
 import { deleteProfile } from '../../services/deletion';
 import { sendPushNotification } from '../../services/notifications';
-import { getRecentNotificationCount } from '../../services/settings';
+import {
+  getRecentNotificationCount,
+  getWithdrawalArchivePreference,
+} from '../../services/settings';
+import { recordPendingNotice } from '../../services/notices';
 
 /**
  * Scheduled consent revocation — 7-day grace period then cascade delete.
@@ -77,6 +86,84 @@ export const consentRevocation = inngest.createFunction(
       return { status: 'restored', childProfileId };
     }
 
+    const childProfile = await step.run('load-child-profile', async () => {
+      const db = getStepDatabase();
+      return getProfileForConsentRevocation(db, childProfileId);
+    });
+
+    if (!childProfile) {
+      return { status: 'already_deleted', childProfileId };
+    }
+
+    const archiveDecision = await step.run('choose-final-action', async () => {
+      const db = getStepDatabase();
+      const ownerProfileId = await getFamilyOwnerProfileId(
+        db,
+        childProfileId,
+        parentProfileId
+      );
+      const preference = await getWithdrawalArchivePreference(
+        db,
+        ownerProfileId
+      );
+      const age = calculateAge(childProfile.birthYear);
+      return {
+        preference,
+        action:
+          age < 13 || preference === 'never'
+            ? ('delete' as const)
+            : ('archive' as const),
+      };
+    });
+
+    if (archiveDecision.action === 'archive') {
+      await step.run('archive-child-profile', async () => {
+        const db = getStepDatabase();
+        await db
+          .update(profiles)
+          .set({ archivedAt: new Date() })
+          .where(eq(profiles.id, childProfileId));
+      });
+
+      await step.run('schedule-archive-cleanup', async () => {
+        await inngest.send({
+          name: 'app/profile.archived',
+          data: { profileId: childProfileId, parentProfileId },
+        });
+      });
+
+      await step.run('notify-parent-archived', async () => {
+        const db = getStepDatabase();
+        const recentCount = await getRecentNotificationCount(
+          db,
+          parentProfileId,
+          'consent_archived',
+          24
+        );
+        if (recentCount > 0) {
+          return { sent: false, reason: 'dedup_24h' };
+        }
+        await sendPushNotification(db, {
+          profileId: parentProfileId,
+          title: 'Account archived',
+          body: `${childProfile.displayName}'s account is archived for 30 days, then deleted.`,
+          type: 'consent_archived',
+        });
+        return { sent: true };
+      });
+
+      await step.run('record-parent-archive-notice', async () => {
+        const db = getStepDatabase();
+        await recordPendingNotice(db, {
+          ownerProfileId: parentProfileId,
+          type: 'consent_archived',
+          childName: childProfile.displayName,
+        });
+      });
+
+      return { status: 'archived', childProfileId };
+    }
+
     // Notify child before deletion (best effort).
     //
     // [BUG-699-FOLLOWUP] 24h notification-log dedup. Step.run memoizes within
@@ -129,10 +216,19 @@ export const consentRevocation = inngest.createFunction(
       await sendPushNotification(db, {
         profileId: parentProfileId,
         title: 'Data deleted',
-        body: "Your child's data has been permanently deleted as requested.",
+        body: `${childProfile.displayName}'s account has been permanently deleted as requested.`,
         type: 'consent_expired',
       });
       return { sent: true };
+    });
+
+    await step.run('record-parent-delete-notice', async () => {
+      const db = getStepDatabase();
+      await recordPendingNotice(db, {
+        ownerProfileId: parentProfileId,
+        type: 'consent_deleted',
+        childName: childProfile.displayName,
+      });
     });
 
     return { status: 'deleted', childProfileId };

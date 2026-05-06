@@ -14,6 +14,7 @@ import {
   sum,
   sql,
   isNotNull,
+  isNull,
 } from 'drizzle-orm';
 import {
   familyLinks,
@@ -553,7 +554,7 @@ export async function getChildrenForParent(
   // R-03: Batch queries to avoid N+1 per child profile.
   // Fetch all child profiles in a single query instead of one per loop iteration.
   const allChildProfiles = await db.query.profiles.findMany({
-    where: inArray(profiles.id, childProfileIds),
+    where: and(inArray(profiles.id, childProfileIds), isNull(profiles.archivedAt)),
   });
   const profilesById = new Map(allChildProfiles.map((p) => [p.id, p]));
 
@@ -880,7 +881,7 @@ export async function getChildDetail(
 
   // Step 1: Get the child's profile — 1 query
   const profile = await db.query.profiles.findFirst({
-    where: eq(profiles.id, childProfileId),
+    where: and(eq(profiles.id, childProfileId), isNull(profiles.archivedAt)),
   });
   if (!profile) return null;
   const consentState = await db.query.consentStates.findFirst({
@@ -1302,6 +1303,11 @@ export async function getChildSessions(
   // [EP15-I5] ForbiddenError → 403. Empty array now means "parent has
   // access and the child has no sessions", not "access denied".
   await assertParentAccess(db, parentProfileId, childProfileId);
+  const activeProfile = await db.query.profiles.findFirst({
+    where: and(eq(profiles.id, childProfileId), isNull(profiles.archivedAt)),
+    columns: { id: true },
+  });
+  if (!activeProfile) return [];
   return getProfileSessions(db, childProfileId);
 }
 

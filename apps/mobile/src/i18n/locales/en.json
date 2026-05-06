@@ -139,6 +139,12 @@
       "learnSomething": "Learn something",
       "dashboardError": "We couldn't load the dashboard",
       "reviewHealth": "Review health"
+    },
+    "notices": {
+      "consentArchivedTitle": "{{name}}'s account was archived",
+      "consentArchivedBody": "Data is retained for 30 days, then deleted.",
+      "consentDeletedTitle": "{{name}}'s account was deleted",
+      "consentDeletedBody": "The withdrawal grace period has ended."
     }
   },
   "dashboard": {
@@ -240,6 +246,17 @@
       "pushTitle": "Push notifications",
       "weeklyDigestTitle": "Weekly progress digest",
       "updateErrorTitle": "Could not update notification settings"
+    },
+    "privacy": {
+      "sectionHeader": "Privacy",
+      "withdrawalArchiveTitle": "When I withdraw consent for a child",
+      "withdrawalArchiveAuto": "Automatic",
+      "withdrawalArchiveAutoDescription": "Under-13 accounts are deleted at grace expiry. 13+ accounts are archived for 30 days, then deleted.",
+      "withdrawalArchiveAlways": "Always archive (30 days)",
+      "withdrawalArchiveAlwaysDescription": "13+ accounts only. Under-13 always deletes immediately for privacy compliance.",
+      "withdrawalArchiveNever": "Never archive - delete immediately",
+      "withdrawalArchiveNeverDescription": "Delete at grace expiry instead of keeping a 30-day archive.",
+      "withdrawalArchiveError": "Couldn't update setting. Try again."
     },
     "account": {
       "sectionHeader": "Account",
@@ -1504,7 +1521,7 @@
       "withdrawing": "Withdrawing…",
       "withdrawConsentConfirmTitle": "Withdraw consent?",
       "thisChild": "this child",
-      "withdrawConsentBody": "Withdrawing consent will stop all learning sessions for this child and delete their data.",
+      "withdrawConsentBody": "{{childName}}'s account and learning data will be deleted after a 7-day grace period. (For under-13 accounts, deletion is immediate at grace expiry to align with privacy law.)",
       "confirmWithdrawConsent": "Confirm — withdraw consent",
       "withdraw": "Withdraw"
     },
