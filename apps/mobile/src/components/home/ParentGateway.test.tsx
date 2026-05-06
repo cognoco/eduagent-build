@@ -14,6 +14,10 @@ jest.mock('../common', () => ({
   ProfileSwitcher: () => null,
 }));
 
+jest.mock('../family/WithdrawalCountdownBanner', () => ({
+  WithdrawalCountdownBanner: () => null,
+}));
+
 let mockDashboardData:
   | {
       children: Array<{

@@ -5,18 +5,18 @@ import { WithdrawalCountdownBanner } from './WithdrawalCountdownBanner';
 const mockUseDashboard = jest.fn();
 const mockMutate = jest.fn();
 
-jest.mock('../../hooks/use-dashboard', () => ({
+jest.mock('../../hooks/use-dashboard', () => ({ // gc1-allow: WithdrawalCountdownBanner reads dashboard data; mocking isolates banner rendering from real API calls.
   useDashboard: () => mockUseDashboard(),
 }));
 
-jest.mock('../../hooks/use-restore-consent', () => ({
+jest.mock('../../hooks/use-restore-consent', () => ({ // gc1-allow: restore-consent mutation is a network side effect; mocking lets tests verify CTA wiring without real API calls.
   useRestoreConsent: () => ({
     mutate: mockMutate,
     isPending: false,
   }),
 }));
 
-jest.mock('react-i18next', () => ({
+jest.mock('react-i18next', () => ({ // gc1-allow: i18next is an external library boundary; mocking gives stable translation output for snapshot assertions.
   useTranslation: () => require('../../test-utils/mock-i18n').i18nMock.useTranslation(),
 }));
 

@@ -17,29 +17,7 @@ type Child = {
   respondedAt: string | null;
 };
 
-type TestChild = {
-  id: string;
-  name: string;
-  consentStatus: string | null;
-  respondedAt: string | null;
-};
-
-export interface WithdrawalCountdownBannerProps {
-  testChildren?: TestChild[];
-}
-
-function normalizeTestChild(child: TestChild): Child {
-  return {
-    profileId: child.id,
-    displayName: child.name,
-    consentStatus: child.consentStatus,
-    respondedAt: child.respondedAt,
-  };
-}
-
-export function WithdrawalCountdownBanner({
-  testChildren,
-}: WithdrawalCountdownBannerProps): React.ReactElement | null {
+export function WithdrawalCountdownBanner(): React.ReactElement | null {
   const { t } = useTranslation();
   const { data } = useDashboard();
   const restoreConsent = useRestoreConsent();
@@ -48,9 +26,7 @@ export function WithdrawalCountdownBanner({
   );
   const [restoredName, setRestoredName] = React.useState<string | null>(null);
 
-  const children = testChildren
-    ? testChildren.map(normalizeTestChild)
-    : ((data?.children ?? []) as Child[]);
+  const children = (data?.children ?? []) as Child[];
   const inGrace = children.filter(
     (child) =>
       child.consentStatus === 'WITHDRAWN' && isInGracePeriod(child.respondedAt)
