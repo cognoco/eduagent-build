@@ -61,8 +61,10 @@ jobs:
       # Ensure base branch is available for git diff in validation scripts
       - name: Fetch base branch
         if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          git fetch origin ${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}
+          git fetch origin "${BASE_REF}:refs/remotes/origin/${BASE_REF}"
 
       # Detect which areas of the codebase changed (used to skip integration tests
       # when only mobile/non-API files changed)
@@ -148,12 +150,14 @@ jobs:
       # Guards" → "No new internal jest.mock()".
       - name: GC1 — no new internal jest.mock
         if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
           set -euo pipefail
-          violations=$(git diff "origin/${{ github.base_ref }}...HEAD" -- '*.test.ts' '*.test.tsx' \
+          violations=$(git diff "origin/${BASE_REF}...HEAD" -- '*.test.ts' '*.test.tsx' \
             | grep -E '^\+[^+]' \
-            | grep -E "jest\.mock\(['\"]\.\.?/" \
-            | grep -v 'gc1-allow' \
+            | grep -E "jest\.mock\(['\"\`]\.\.?/" \
+            | grep -iv 'gc1-allow' \
             || true)
           if [ -n "$violations" ]; then
             echo "::error::New internal jest.mock() call(s) detected. Use jest.requireActual() with targeted overrides, or add '// gc1-allow: <reason>' on the same line if external-boundary justified. See CLAUDE.md → 'No new internal jest.mock()'."
