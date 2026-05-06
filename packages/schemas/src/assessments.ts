@@ -16,6 +16,8 @@ export const assessmentStatusSchema = z.enum([
   'in_progress',
   'passed',
   'failed',
+  'borderline',
+  'failed_exhausted',
 ]);
 export type AssessmentStatus = z.infer<typeof assessmentStatusSchema>;
 
@@ -85,6 +87,7 @@ export const assessmentEvaluationSchema = z.object({
   nextDepth: verificationDepthSchema.optional(),
   masteryScore: z.number().min(0).max(1),
   qualityRating: z.number().int().min(0).max(5),
+  weakAreas: z.array(z.string().min(1).max(120)).max(8).optional(),
 });
 export type AssessmentEvaluation = z.infer<typeof assessmentEvaluationSchema>;
 
@@ -274,6 +277,7 @@ export type CreateAssessmentResponse = z.infer<
 
 export const submitAssessmentAnswerResponseSchema = z.object({
   evaluation: assessmentEvaluationSchema,
+  status: assessmentStatusSchema,
 });
 export type SubmitAssessmentAnswerResponse = z.infer<
   typeof submitAssessmentAnswerResponseSchema
@@ -290,6 +294,13 @@ export const quickCheckFeedbackResponseSchema = z.object({
 });
 export type QuickCheckFeedbackResponse = z.infer<
   typeof quickCheckFeedbackResponseSchema
+>;
+
+export const declineAssessmentRefreshResponseSchema = z.object({
+  ok: z.literal(true),
+});
+export type DeclineAssessmentRefreshResponse = z.infer<
+  typeof declineAssessmentRefreshResponseSchema
 >;
 
 // ---------------------------------------------------------------------------
@@ -414,3 +425,22 @@ export const stabilityResponseSchema = z.object({
   topics: z.array(topicStabilitySchema),
 });
 export type StabilityResponse = z.infer<typeof stabilityResponseSchema>;
+
+export const assessmentEligibleTopicSchema = z.object({
+  topicId: z.string().uuid(),
+  topicTitle: z.string(),
+  subjectId: z.string().uuid(),
+  subjectName: z.string(),
+  lastStudiedAt: z.string().datetime(),
+});
+export type AssessmentEligibleTopic = z.infer<
+  typeof assessmentEligibleTopicSchema
+>;
+
+/** GET /retention/assessment-eligible */
+export const assessmentEligibleTopicsResponseSchema = z.object({
+  topics: z.array(assessmentEligibleTopicSchema),
+});
+export type AssessmentEligibleTopicsResponse = z.infer<
+  typeof assessmentEligibleTopicsResponseSchema
+>;

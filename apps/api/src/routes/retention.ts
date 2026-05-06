@@ -15,6 +15,7 @@ import {
   deleteTeachingPreferenceResponseSchema,
   stabilityResponseSchema,
   evaluateEligibilitySchema,
+  assessmentEligibleTopicsResponseSchema,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
@@ -31,6 +32,7 @@ import {
   setTeachingPreference,
   deleteTeachingPreference,
   getStableTopics,
+  getAssessmentEligibleTopics,
 } from '../services/retention-data';
 import { checkEvaluateEligibility } from '../services/evaluate-data';
 import { notFound, NotFoundError } from '../errors';
@@ -62,6 +64,14 @@ export const retentionRoutes = new Hono<RetentionRouteEnv>()
     const profileId = requireProfileId(c.get('profileId'));
     const result = await getAllSubjectsRetention(db, profileId);
     return c.json(libraryRetentionResponseSchema.parse(result));
+  })
+
+  .get('/retention/assessment-eligible', async (c) => {
+    assertNotProxyMode(c);
+    const db = c.get('db');
+    const profileId = requireProfileId(c.get('profileId'));
+    const topics = await getAssessmentEligibleTopics(db, profileId);
+    return c.json(assessmentEligibleTopicsResponseSchema.parse({ topics }));
   })
 
   // Get retention status for all topics in subject

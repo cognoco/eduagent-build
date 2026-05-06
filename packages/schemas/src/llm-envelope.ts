@@ -30,6 +30,8 @@ export const llmResponseEnvelopeSchema = z.object({
       needs_deepening: z.boolean().optional(),
       /** Main loop: the AI message contains an understanding check. Observational. */
       understanding_check: z.boolean().optional(),
+      /** Continuation opener: delayed score for the learner's retrieval answer. */
+      retrieval_score: z.number().min(0).max(1).optional(),
     })
     .optional(),
 

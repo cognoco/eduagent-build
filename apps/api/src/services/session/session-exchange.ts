@@ -72,7 +72,10 @@ import {
 } from './session-crud';
 import { createLogger } from '../logger';
 import { captureException } from '../sentry';
-import { buildResumeContext } from './session-context-builders';
+import {
+  buildResumeContext,
+  loadPriorSessionMeta,
+} from './session-context-builders';
 import { projectAiResponseContent } from '../llm/project-response';
 
 const BANNED_FILLER_OPENERS = [
@@ -157,8 +160,48 @@ export interface ExchangeBehavioralMetrics {
   needsDeepening?: boolean;
   /** F6: LLM self-reported confidence — persisted so the next turn and analytics can read it. */
   confidence?: 'low' | 'medium' | 'high';
+  /** Continuation opener score from the LLM envelope. */
+  retrievalScore?: number;
   /** B.3 monitoring: consecutive correct-answer streak at the current escalation rung */
   correctStreak?: number;
+}
+
+function mapRetrievalScoreToDepth(score: number): 'low' | 'mid' | 'high' {
+  if (score >= 0.8) return 'high';
+  if (score >= 0.5) return 'mid';
+  return 'low';
+}
+
+async function updateSessionMetadata(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+  nextMetadata: Record<string, unknown>
+): Promise<void> {
+  await db
+    .update(learningSessions)
+    .set({ metadata: nextMetadata, updatedAt: new Date() })
+    .where(
+      and(
+        eq(learningSessions.id, sessionId),
+        eq(learningSessions.profileId, profileId)
+      )
+    );
+}
+
+async function applyContinuationScore(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+  metadata: Record<string, unknown>,
+  retrievalScore?: number
+): Promise<void> {
+  if (typeof retrievalScore !== 'number') return;
+  const nextMetadata = { ...metadata };
+  delete nextMetadata['continuationOpenerActive'];
+  delete nextMetadata['continuationOpenerStartedExchange'];
+  nextMetadata['continuationDepth'] = mapRetrievalScoreToDepth(retrievalScore);
+  await updateSessionMetadata(db, profileId, sessionId, nextMetadata);
 }
 
 // ---------------------------------------------------------------------------
@@ -807,6 +850,44 @@ export async function prepareExchangeContext(
     typeof sessionMetadata?.resumeFromSessionId === 'string'
       ? sessionMetadata.resumeFromSessionId
       : undefined;
+  let continuationOpenerPhase: 'probe' | 'score' | undefined;
+  let continuationDepth: 'low' | 'mid' | 'high' | undefined =
+    sessionMetadata?.continuationDepth === 'low' ||
+    sessionMetadata?.continuationDepth === 'mid' ||
+    sessionMetadata?.continuationDepth === 'high'
+      ? sessionMetadata.continuationDepth
+      : undefined;
+  const continuationOpenerActive =
+    sessionMetadata?.continuationOpenerActive === true;
+  const continuationCutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const priorSessionMeta = resumeFromSessionId
+    ? await loadPriorSessionMeta(db, profileId, resumeFromSessionId)
+    : null;
+
+  if (continuationOpenerActive && session.exchangeCount >= 3) {
+    continuationDepth = 'mid';
+    const nextMetadata = { ...(sessionMetadata ?? {}) };
+    delete nextMetadata['continuationOpenerActive'];
+    delete nextMetadata['continuationOpenerStartedExchange'];
+    nextMetadata['continuationDepth'] = continuationDepth;
+    await updateSessionMetadata(db, profileId, sessionId, nextMetadata);
+  } else if (continuationOpenerActive) {
+    continuationOpenerPhase = session.exchangeCount >= 1 ? 'score' : 'probe';
+  } else if (
+    session.exchangeCount === 0 &&
+    resumeFromSessionId &&
+    session.topicId &&
+    priorSessionMeta?.topicId === session.topicId &&
+    priorSessionMeta.endedAt &&
+    priorSessionMeta.endedAt >= continuationCutoff
+  ) {
+    continuationOpenerPhase = 'probe';
+    await updateSessionMetadata(db, profileId, sessionId, {
+      ...(sessionMetadata ?? {}),
+      continuationOpenerActive: true,
+      continuationOpenerStartedExchange: 0,
+    });
+  }
   const resumeContext = resumeFromSessionId
     ? await buildResumeContext(db, profileId, resumeFromSessionId)
     : undefined;
@@ -1033,6 +1114,14 @@ export async function prepareExchangeContext(
     // Client-side effective mode — drives mode-specific prompt sections (e.g. recitation)
     effectiveMode: (session.metadata as Record<string, unknown> | null)
       ?.effectiveMode as string | undefined,
+    gapAreas: Array.isArray(sessionMetadata?.gaps)
+      ? sessionMetadata.gaps
+          .map((gap) => String(gap).trim())
+          .filter((gap) => gap.length > 0)
+          .slice(0, 8)
+      : undefined,
+    continuationOpenerPhase,
+    continuationDepth,
     // Personalisation: learner's display name for the mentor to use naturally
     learnerName: profile?.displayName ?? undefined,
     // B.3: Consecutive correct-answer streak at the current escalation rung.
@@ -1082,6 +1171,9 @@ export async function persistExchangeResult(
       }),
       ...(behavioral.confidence !== undefined && {
         confidence: behavioral.confidence,
+      }),
+      ...(behavioral.retrievalScore !== undefined && {
+        retrievalScore: behavioral.retrievalScore,
       }),
     }),
   };
@@ -1374,8 +1466,17 @@ export async function processMessage(
       partialProgress: result.partialProgress,
       needsDeepening: result.needsDeepening,
       confidence: result.confidence,
+      retrievalScore: result.retrievalScore,
     },
     options?.clientId
+  );
+
+  await applyContinuationScore(
+    db,
+    profileId,
+    sessionId,
+    (session.metadata as Record<string, unknown> | null) ?? {},
+    result.retrievalScore
   );
 
   return {
@@ -1566,8 +1667,16 @@ export async function streamMessage(
           partialProgress: parsed.partialProgress,
           needsDeepening: parsed.needsDeepening,
           confidence: parsed.confidence,
+          retrievalScore: parsed.retrievalScore,
         },
         options?.clientId
+      );
+      await applyContinuationScore(
+        db,
+        profileId,
+        sessionId,
+        (session.metadata as Record<string, unknown> | null) ?? {},
+        parsed.retrievalScore
       );
       return {
         exchangeCount: persisted.exchangeCount,

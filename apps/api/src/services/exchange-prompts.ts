@@ -208,9 +208,12 @@ export function getLearningModeGuidance(mode: LearningMode): string {
 function getExchangeEnvelopeInstruction(context: {
   isRecitation: boolean;
   isLanguageMode: boolean;
+  includeRetrievalScore: boolean;
 }): string {
   const signals = context.isRecitation
     ? '  "signals": { "understanding_check": <bool> },'
+    : context.includeRetrievalScore
+    ? '  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool>, "retrieval_score": <0.0-1.0> },'
     : '  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool> },';
 
   const uiHints = context.isLanguageMode
@@ -229,6 +232,11 @@ function getExchangeEnvelopeInstruction(context: {
   signalGuidance.push(
     'Set `signals.understanding_check` to true when your reply asks the learner to explain, paraphrase, or otherwise confirm they understood — observational only.'
   );
+  if (context.includeRetrievalScore) {
+    signalGuidance.push(
+      'For this continuation opener scoring turn, set `signals.retrieval_score` from 0.0 (no recall) to 1.0 (perfect recall). Do not mention the score to the learner.'
+    );
+  }
 
   const fluencyLine = context.isLanguageMode
     ? '\n- When you start a fluency drill (rapid-fire translation, fill-blank, vocabulary recall), set `ui_hints.fluency_drill.active` to true and `ui_hints.fluency_drill.duration_s` to a value between 15 and 90. When you evaluate the drill result, set `active` to false and include `score` with `correct` and `total` integers.'
@@ -476,9 +484,37 @@ export function buildSystemPrompt(context: ExchangeContext): string {
     sections.push(learningHistory.slice(0, 4000));
   }
 
+  if (context.effectiveMode === 'gap_fill' && context.gapAreas?.length) {
+    sections.push(
+      'Focused refresh from assessment:\n' +
+        context.gapAreas
+          .map((gap) => `- ${sanitizeXmlValue(gap, 120)}`)
+          .join('\n') +
+        '\nStart by briefly refreshing these gaps, then ask one targeted check question.'
+    );
+  }
+
   const resumeContext = context.resumeContext?.trim();
   if (resumeContext) {
     sections.push(resumeContext.slice(0, 3000));
+  }
+
+  if (context.continuationOpenerPhase === 'probe') {
+    sections.push(
+      'CONTINUATION OPENER (probe turn): Before presenting new material, ask the learner 1-2 short retrieval questions about the current topic. This turn is the probe - DO NOT emit signals.retrieval_score yet. Just ask the questions in your reply.'
+    );
+  } else if (context.continuationOpenerPhase === 'score') {
+    sections.push(
+      'CONTINUATION OPENER (scoring turn): The learner just answered your retrieval question(s). Set signals.retrieval_score from 0.0 (no recall) to 1.0 (perfect recall). Do not mention the score to the learner.'
+    );
+  } else if (context.continuationDepth) {
+    const depthGuidance =
+      context.continuationDepth === 'high'
+        ? 'The learner recalled the prior topic well; skip recap and continue.'
+        : context.continuationDepth === 'mid'
+        ? 'The learner partly recalled the prior topic; refresh weak spots briefly before continuing.'
+        : 'The learner struggled to recall the prior topic; re-teach the essentials before advancing.';
+    sections.push(`Continuation depth: ${depthGuidance}`);
   }
 
   // Embedding memory context (pgvector semantic retrieval)
@@ -737,7 +773,11 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   // signals live in `signals`, UI widget hints live in `ui_hints`, and all
   // prose goes in `reply`. See docs/specs/2026-04-18-llm-response-envelope.md.
   sections.push(
-    getExchangeEnvelopeInstruction({ isRecitation, isLanguageMode })
+    getExchangeEnvelopeInstruction({
+      isRecitation,
+      isLanguageMode,
+      includeRetrievalScore: context.continuationOpenerPhase === 'score',
+    })
   );
 
   sections.push(

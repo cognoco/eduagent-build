@@ -8,6 +8,7 @@ import {
   getAssessmentResponseSchema,
   quickCheckFeedbackResponseSchema,
   chatExchangeSchema,
+  declineAssessmentRefreshResponseSchema,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
@@ -18,7 +19,9 @@ import {
   getAssessment,
   updateAssessment,
   loadTopicTitle,
+  MAX_ASSESSMENT_EXCHANGES,
 } from '../services/assessments';
+import { mapEvaluateQualityToSm2 } from '../services/evaluate';
 import { updateRetentionFromSession } from '../services/retention-data';
 import { insertSessionXpEntry } from '../services/xp';
 import { getSession } from '../services/session';
@@ -26,6 +29,12 @@ import { notFound } from '../errors';
 import { createLogger } from '../services/logger';
 
 const logger = createLogger();
+
+function countLearnerAnswers(
+  history: Array<{ role: 'user' | 'assistant'; content: string }>
+): number {
+  return history.filter((entry) => entry.role === 'user').length;
+}
 
 export const assessmentRoutes = new Hono<RouteEnv>()
   // Start a topic completion assessment
@@ -91,29 +100,46 @@ export const assessmentRoutes = new Hono<RouteEnv>()
         { role: 'assistant' as const, content: evaluation.feedback },
       ];
 
+      const answerCount = countLearnerAnswers(updatedHistory);
+      const capReached = answerCount >= MAX_ASSESSMENT_EXCHANGES;
       const newStatus = evaluation.passed
-        ? evaluation.shouldEscalateDepth
-          ? 'in_progress'
-          : 'passed'
+        ? 'passed'
+        : evaluation.masteryScore >= 0.6 &&
+          (capReached ||
+            !evaluation.shouldEscalateDepth ||
+            !evaluation.nextDepth)
+        ? 'borderline'
+        : capReached
+        ? 'failed_exhausted'
         : 'in_progress';
 
-      await updateAssessment(db, profileId, assessmentId, {
-        verificationDepth: evaluation.nextDepth ?? assessment.verificationDepth,
-        status: newStatus as 'in_progress' | 'passed' | 'failed',
-        masteryScore: evaluation.masteryScore,
-        qualityRating: evaluation.qualityRating,
-        exchangeHistory: updatedHistory,
-      });
+      const updatedAssessment = await updateAssessment(
+        db,
+        profileId,
+        assessmentId,
+        {
+          verificationDepth:
+            evaluation.nextDepth ?? assessment.verificationDepth,
+          status: newStatus,
+          masteryScore: evaluation.masteryScore,
+          qualityRating: evaluation.qualityRating,
+          exchangeHistory: updatedHistory,
+        }
+      );
 
-      // Wire passed standalone assessments into the retention lifecycle (Epic 3)
-      // Ensures assessment-only topics get SM-2 retention cards + XP tracking.
-      // Wrapped in a transaction so both succeed or neither does.
+      // Wire terminal standalone assessments into the retention lifecycle.
+      // Retention uses the same aggregate mastery signal as the pass gate.
       if (
-        newStatus === 'passed' &&
-        evaluation.qualityRating != null &&
+        newStatus !== 'in_progress' &&
         assessment.topicId &&
         assessment.subjectId
       ) {
+        const sm2Quality = mapEvaluateQualityToSm2(
+          evaluation.passed,
+          Math.round(evaluation.masteryScore * 5)
+        );
+        const sessionTimestamp =
+          updatedAssessment?.updatedAt ?? new Date().toISOString();
         await db.transaction(async (tx) => {
           // Cast: PgTransaction has all query methods; services only use
           // select/insert/update — $withAuth/batch are not called.
@@ -122,20 +148,48 @@ export const assessmentRoutes = new Hono<RouteEnv>()
             txDb,
             profileId,
             assessment.topicId,
-            evaluation.qualityRating
+            sm2Quality,
+            sessionTimestamp
           );
-          await insertSessionXpEntry(
-            txDb,
-            profileId,
-            assessment.topicId,
-            assessment.subjectId
-          );
+          if (newStatus === 'passed') {
+            await insertSessionXpEntry(
+              txDb,
+              profileId,
+              assessment.topicId,
+              assessment.subjectId
+            );
+          }
         });
       }
 
-      return c.json(submitAssessmentAnswerResponseSchema.parse({ evaluation }));
+      return c.json(
+        submitAssessmentAnswerResponseSchema.parse({
+          evaluation,
+          status: newStatus,
+        })
+      );
     }
   )
+
+  .patch('/assessments/:assessmentId/decline-refresh', async (c) => {
+    assertNotProxyMode(c);
+    const { db, profileId } = withProfile(c);
+    const assessmentId = c.req.param('assessmentId');
+
+    const assessment = await getAssessment(db, profileId, assessmentId);
+    if (!assessment) return notFound(c, 'Assessment not found');
+
+    logger.info('[assessments] learner declined assessment refresher', {
+      event: 'assessment.refresh_declined',
+      assessmentId,
+      profileId,
+      topicId: assessment.topicId,
+      status: assessment.status,
+      masteryScore: assessment.masteryScore,
+    });
+
+    return c.json(declineAssessmentRefreshResponseSchema.parse({ ok: true }));
+  })
 
   // Get assessment state
   .get('/assessments/:assessmentId', async (c) => {

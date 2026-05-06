@@ -268,13 +268,11 @@ export async function buildResumeContext(
   profileId: string,
   resumeFromSessionId: string
 ): Promise<string | undefined> {
-  const session = await db.query.learningSessions.findFirst({
-    where: and(
-      eq(learningSessions.id, resumeFromSessionId),
-      eq(learningSessions.profileId, profileId),
-      gte(learningSessions.exchangeCount, 1)
-    ),
-  });
+  const session = await loadPriorSessionMeta(
+    db,
+    profileId,
+    resumeFromSessionId
+  );
   if (!session) return undefined;
 
   const repo = createScopedRepository(db, profileId);
@@ -344,23 +342,40 @@ export async function buildResumeContext(
     sections.push(`Recent exchange:\n${transcriptLines.join('\n')}`);
   }
 
-  // BUG-888: Stronger resume opener directive. The previous instruction was
-  // a soft "briefly connect" — LLMs often ignored the prior context and
-  // produced generic opener turns ('Topic — ready when you are. Want me to
-  // start, or do you have a preference?'). That wastes a learner turn and
-  // makes the mentor feel disconnected from prior memory.
-  //
-  // Replace with an explicit MUST: cite at least one specific detail from
-  // either the previous summary or the recent transcript, then offer to
-  // pick up from there. Provide a concrete shape so the model has a
-  // template to fill in.
   sections.push(
     [
       'MANDATORY OPENER FORMAT: your first turn MUST reference at least one specific detail from the "Previous summary" or "Recent exchange" above (a concept, term, or question the learner mentioned). Do NOT produce a generic "ready when you are" opener.',
-      'Shape: "Last time we were working on <specific detail from above> — want to keep going there, or pivot to something else?"',
+      'Shape: "Last time we were working on <specific detail from above> - want to keep going there, or pivot to something else?"',
       'If they clearly choose another direction, adapt within the current subject/topic.',
     ].join(' ')
   );
 
   return `<resume_context>\n${sections.join('\n')}\n</resume_context>`;
+}
+
+export async function loadPriorSessionMeta(
+  db: Database,
+  profileId: string,
+  resumeFromSessionId: string
+): Promise<{
+  subjectId: string;
+  topicId: string | null;
+  endedAt: Date | null;
+  exchangeCount: number;
+} | null> {
+  const session = await db.query.learningSessions.findFirst({
+    where: and(
+      eq(learningSessions.id, resumeFromSessionId),
+      eq(learningSessions.profileId, profileId),
+      gte(learningSessions.exchangeCount, 1)
+    ),
+  });
+  return session
+    ? {
+        subjectId: session.subjectId,
+        topicId: session.topicId,
+        endedAt: session.endedAt,
+        exchangeCount: session.exchangeCount,
+      }
+    : null;
 }

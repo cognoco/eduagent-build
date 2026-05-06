@@ -10,6 +10,7 @@ import {
   eq,
   and,
   gt,
+  gte,
   or,
   isNull,
   isNotNull,
@@ -35,6 +36,7 @@ import type {
   RelearnTopicInput,
   NeedsDeepeningStatus,
   TopicStability,
+  AssessmentEligibleTopic,
 } from '@eduagent/schemas';
 import { sm2 } from '@eduagent/retention';
 import {
@@ -513,6 +515,57 @@ export async function getTopicRetention(
     eq(retentionCards.topicId, topicId)
   );
   return card ? mapRetentionCardRow(card) : null;
+}
+
+export async function getAssessmentEligibleTopics(
+  db: Database,
+  profileId: string
+): Promise<AssessmentEligibleTopic[]> {
+  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+  const rows = await db
+    .select({
+      topicId: learningSessions.topicId,
+      topicTitle: curriculumTopics.title,
+      subjectId: subjects.id,
+      subjectName: subjects.name,
+      endedAt: learningSessions.endedAt,
+      lastActivityAt: learningSessions.lastActivityAt,
+    })
+    .from(learningSessions)
+    .innerJoin(
+      curriculumTopics,
+      eq(learningSessions.topicId, curriculumTopics.id)
+    )
+    .innerJoin(subjects, eq(learningSessions.subjectId, subjects.id))
+    .where(
+      and(
+        eq(learningSessions.profileId, profileId),
+        eq(subjects.profileId, profileId),
+        isNotNull(learningSessions.topicId),
+        isNotNull(learningSessions.endedAt),
+        inArray(learningSessions.status, ['completed', 'auto_closed']),
+        gte(learningSessions.exchangeCount, 3),
+        gte(learningSessions.endedAt, cutoff)
+      )
+    )
+    .orderBy(desc(learningSessions.lastActivityAt));
+
+  const seen = new Set<string>();
+  const topics: AssessmentEligibleTopic[] = [];
+  for (const row of rows) {
+    if (!row.topicId || !row.endedAt || seen.has(row.topicId)) continue;
+    seen.add(row.topicId);
+    topics.push({
+      topicId: row.topicId,
+      topicTitle: row.topicTitle,
+      subjectId: row.subjectId,
+      subjectName: row.subjectName,
+      lastStudiedAt: (row.endedAt ?? row.lastActivityAt).toISOString(),
+    });
+  }
+
+  return topics;
 }
 
 /** Anti-cramming cooldown in milliseconds (24 hours — FR54) */

@@ -216,6 +216,10 @@ export const sessionMetadataSchema = z
     /** Session this learning chat is continuing from. Stored in metadata so
      *  completed-session handoffs do not require a migration. */
     resumeFromSessionId: z.string().uuid().optional(),
+    gaps: z.array(z.string().min(1).max(120)).max(8).optional(),
+    continuationOpenerActive: z.boolean().optional(),
+    continuationOpenerStartedExchange: z.number().int().min(0).optional(),
+    continuationDepth: z.enum(['low', 'mid', 'high']).optional(),
   })
   .strip();
 export type SessionMetadata = z.infer<typeof sessionMetadataSchema>;

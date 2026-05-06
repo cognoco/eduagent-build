@@ -215,6 +215,35 @@ export async function getSession(
   return row ? mapSessionRow(row) : null;
 }
 
+export async function clearContinuationDepth(
+  db: Database,
+  profileId: string,
+  sessionId: string
+): Promise<LearningSession | null> {
+  const session = await getSession(db, profileId, sessionId);
+  if (!session) return null;
+
+  const metadata = {
+    ...((session.metadata as Record<string, unknown> | undefined) ?? {}),
+  };
+  delete metadata['continuationDepth'];
+  delete metadata['continuationOpenerActive'];
+  delete metadata['continuationOpenerStartedExchange'];
+
+  const [row] = await db
+    .update(learningSessions)
+    .set({ metadata, updatedAt: new Date() })
+    .where(
+      and(
+        eq(learningSessions.id, sessionId),
+        eq(learningSessions.profileId, profileId)
+      )
+    )
+    .returning();
+
+  return row ? mapSessionRow(row) : null;
+}
+
 export async function closeSession(
   db: Database,
   profileId: string,

@@ -45,6 +45,7 @@ export {
   MAX_EXCHANGES_PER_SESSION,
   startSession,
   getSession,
+  clearContinuationDepth,
   closeSession,
   closeStaleSessions,
   getSessionCompletionContext,
