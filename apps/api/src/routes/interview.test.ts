@@ -17,9 +17,15 @@ jest.mock('../inngest/client', () => ({
 // Mock JWT module so auth middleware passes with a valid token
 // ---------------------------------------------------------------------------
 
-jest.mock('../middleware/jwt', () =>
-  require('../test-utils/auth-fixture').createJwtModuleMock()
-);
+// ---------------------------------------------------------------------------
+// Real JWT + real auth middleware — no jwt module mock
+// ---------------------------------------------------------------------------
+
+import {
+  installTestJwksInterceptor,
+  restoreTestFetch,
+} from '../test-utils/jwks-interceptor';
+import { clearJWKSCache } from '../middleware/jwt';
 
 // ---------------------------------------------------------------------------
 // Mock database module — middleware creates a stub db per request
@@ -148,10 +154,7 @@ import {
   getDraftState,
   updateDraft,
 } from '../services/interview';
-import {
-  AUTH_HEADERS as BASE_AUTH_HEADERS,
-  BASE_AUTH_ENV,
-} from '../test-utils/test-env';
+import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { ERROR_CODES, errorCodeSchema } from '@eduagent/schemas';
 
 const TEST_ENV = {
@@ -164,13 +167,19 @@ const TEST_ENV = {
 // to throw inside the route (500), so a UUID is required here.
 const PROFILE_ID = '00000000-0000-4000-8000-000000000001';
 
-const AUTH_HEADERS = {
-  ...BASE_AUTH_HEADERS,
-  'X-Profile-Id': PROFILE_ID,
-};
+const AUTH_HEADERS = makeAuthHeaders({ 'X-Profile-Id': PROFILE_ID });
 
 describe('interview routes', () => {
+  beforeAll(() => {
+    installTestJwksInterceptor();
+  });
+
+  afterAll(() => {
+    restoreTestFetch();
+  });
+
   beforeEach(() => {
+    clearJWKSCache();
     jest.clearAllMocks();
 
     // Reset default mocks after clearAllMocks

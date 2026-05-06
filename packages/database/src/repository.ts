@@ -13,6 +13,7 @@ import {
 } from 'drizzle-orm';
 import type { Database } from './client';
 import { applyStreakDecay } from './streaks-rules';
+import { VECTOR_DIM } from './schema/_pgvector';
 import {
   profiles,
   consentStates,
@@ -396,6 +397,50 @@ export function createScopedRepository(db: Database, profileId: string) {
           ),
           orderBy: [asc(memoryFacts.createdAt), asc(memoryFacts.id)],
         });
+      },
+      async findRelevant(
+        queryEmbedding: number[],
+        k: number,
+        extraWhere?: SQL
+      ) {
+        if (
+          queryEmbedding.length !== VECTOR_DIM ||
+          queryEmbedding.some((value) => !Number.isFinite(value)) ||
+          k <= 0
+        ) {
+          return [];
+        }
+
+        const overFetch = k * 4;
+        const queryLiteral = sql`${`[${queryEmbedding.join(',')}]`}::vector`;
+        const defaultFilters = and(
+          sql`${memoryFacts.supersededBy} IS NULL`,
+          sql`${memoryFacts.category} <> 'suppressed'`
+        );
+        const baseWhere = scopedWhere(
+          memoryFacts,
+          extraWhere ? and(defaultFilters, extraWhere) : defaultFilters
+        );
+
+        return db
+          .select({
+            id: memoryFacts.id,
+            profileId: memoryFacts.profileId,
+            category: memoryFacts.category,
+            text: memoryFacts.text,
+            textNormalized: memoryFacts.textNormalized,
+            metadata: memoryFacts.metadata,
+            sourceSessionIds: memoryFacts.sourceSessionIds,
+            sourceEventIds: memoryFacts.sourceEventIds,
+            observedAt: memoryFacts.observedAt,
+            confidence: memoryFacts.confidence,
+            createdAt: memoryFacts.createdAt,
+            distance: sql<number>`${memoryFacts.embedding} <=> ${queryLiteral}`,
+          })
+          .from(memoryFacts)
+          .where(and(baseWhere, sql`${memoryFacts.embedding} IS NOT NULL`))
+          .orderBy(sql`${memoryFacts.embedding} <=> ${queryLiteral}`)
+          .limit(overFetch);
       },
     },
     monthlyReports: {

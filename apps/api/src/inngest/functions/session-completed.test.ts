@@ -6,10 +6,16 @@ import {
   createDatabaseModuleMock,
   createTransactionalMockDb,
 } from '../../test-utils/database-module';
+import { PgDialect } from 'drizzle-orm/pg-core';
 
 const col = (name: string) => ({ name });
 const chainable = () => ({
-  from: () => ({ where: () => ({ limit: () => Promise.resolve([]) }) }),
+  from: () => ({
+    where: () => ({
+      orderBy: () => ({ limit: () => Promise.resolve([]) }),
+      limit: () => Promise.resolve([]),
+    }),
+  }),
 });
 const mockSessionCompletedDb = createTransactionalMockDb({
   query: {
@@ -67,6 +73,14 @@ const mockDatabaseModule = createDatabaseModuleMock({
     curriculumTopics: { id: col('id'), title: col('title') },
     learningProfiles: { profileId: col('profileId') },
     learningSessions: { id: col('id'), profileId: col('profileId') },
+    memoryFacts: {
+      id: col('id'),
+      profileId: col('profileId'),
+      text: col('text'),
+      category: col('category'),
+      embedding: col('embedding'),
+      supersededBy: col('supersededBy'),
+    },
     subjects: { id: col('id'), profileId: col('profileId') },
     sessionSummaries: {
       id: col('id'),
@@ -271,8 +285,9 @@ jest.mock('../../services/learner-profile', () => ({
   applyAnalysis: (...args: unknown[]) => mockApplyAnalysis(...args),
 }));
 
-import { sessionCompleted } from './session-completed';
+import { sessionCompleted, embedNewFactsForProfile } from './session-completed';
 import { createDatabase } from '@eduagent/database';
+import type { Database } from '@eduagent/database';
 
 // ---------------------------------------------------------------------------
 // Helpers — manual step extraction for sessionCompleted
@@ -490,6 +505,7 @@ describe('sessionCompleted', () => {
       'generate-learner-recap',
       'generate-llm-summary',
       'analyze-learner-profile',
+      'embed-new-memory-facts',
       'update-dashboard',
       'generate-embeddings',
       'extract-homework-summary',
@@ -507,6 +523,7 @@ describe('sessionCompleted', () => {
       .filter((o: any) => o.status !== 'skipped')
       .map((o: any) => o.status);
     expect(statuses).toEqual([
+      'ok',
       'ok',
       'ok',
       'ok',
@@ -779,7 +796,12 @@ describe('sessionCompleted', () => {
       // Override the createDatabase mock to return a db with the desired subject
       (createDatabase as jest.Mock).mockImplementationOnce(() => {
         const chainable = () => ({
-          from: () => ({ where: () => ({ limit: () => Promise.resolve([]) }) }),
+          from: () => ({
+            where: () => ({
+              orderBy: () => ({ limit: () => Promise.resolve([]) }),
+              limit: () => Promise.resolve([]),
+            }),
+          }),
         });
         const db: Record<string, unknown> = {
           query: {
@@ -2064,5 +2086,122 @@ describe('sessionCompleted', () => {
 
       consoleSpy.mockRestore();
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [I3] embedNewFactsForProfile — idempotent UPDATE guard
+//
+// Finding: if two concurrent session-completed runs overlap, both pay the
+// Voyage cost and the second writer's UPDATE would overwrite the first.
+// Fix: the UPDATE WHERE clause includes `isNull(memoryFacts.embedding)` so
+// a row that was already embedded by a concurrent run is a no-op.
+//
+// These tests verify:
+// 1. The UPDATE WHERE condition includes an IS NULL check on the embedding
+//    column, preventing double-writes in concurrent runs.
+// 2. When SELECT returns no rows (all already embedded — filtered by the
+//    SELECT-level isNull guard), the embedder is never called.
+// ---------------------------------------------------------------------------
+
+describe('embedNewFactsForProfile', () => {
+  const PROFILE_ID_EMB = '00000000-0000-4000-8000-000000000099';
+
+  it('[I3] UPDATE WHERE includes isNull(embedding) — prevents double-write on concurrent runs', async () => {
+    // Simulate SELECT returning one unembedded row.
+    const fakeRow = {
+      id: 'fact-abc',
+      text: 'Likes maths',
+      category: 'preference',
+    };
+
+    // Capture the WHERE condition passed to update().set().where() so we can
+    // verify it contains the IS NULL guard.
+    const capturedWhereArg: unknown[] = [];
+    const mockUpdate = {
+      set: jest.fn().mockReturnValue({
+        where: jest.fn().mockImplementation((cond: unknown) => {
+          capturedWhereArg.push(cond);
+          return Promise.resolve();
+        }),
+      }),
+    };
+
+    const mockDb = {
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            orderBy: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([fakeRow]),
+            }),
+          }),
+        }),
+      }),
+      update: jest.fn().mockReturnValue(mockUpdate),
+    } as unknown as Database;
+
+    const mockEmbedder = jest
+      .fn()
+      .mockResolvedValue({ ok: true, vector: [0.1, 0.2, 0.3] });
+
+    const result = await embedNewFactsForProfile(
+      mockDb,
+      PROFILE_ID_EMB,
+      mockEmbedder
+    );
+
+    // Embedder was called once for the unembedded row.
+    expect(mockEmbedder).toHaveBeenCalledTimes(1);
+    expect(result.embedded).toBe(1);
+    expect(result.failed).toBe(0);
+
+    // The WHERE condition must have been captured — no missing guard.
+    expect(capturedWhereArg).toHaveLength(1);
+
+    // Verify the WHERE condition serialises to SQL that contains IS NULL.
+    // This proves the idempotency guard: a concurrent second writer whose UPDATE
+    // fires after the first has already set embedding will be a no-op (0 rows
+    // matched) rather than overwriting the vector.
+    //
+    // PgDialect.sqlToQuery converts the drizzle condition to a SQL string with
+    // positional params, e.g. "($1 = $2 and $3 = $4 and $5 is null)".
+    const dialect = new PgDialect();
+    const whereCondition = capturedWhereArg[0] as { getSQL: () => unknown };
+    expect(typeof whereCondition?.getSQL).toBe('function');
+
+    const { sql: sqlString } = dialect.sqlToQuery(whereCondition.getSQL());
+    // The IS NULL guard must appear — if it were absent, a concurrent second
+    // writer would overwrite an already-set embedding vector.
+    expect(sqlString).toMatch(/\bis null\)?$/i);
+    expect(sqlString.match(/\bis null/gi)).toHaveLength(1);
+  });
+
+  it('[I3] embedder is not called when all rows already have embeddings (SELECT isNull filter)', async () => {
+    // When SELECT WHERE embedding IS NULL returns no rows, the embedder must not fire.
+    const mockDb = {
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            orderBy: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([]),
+            }),
+          }),
+        }),
+      }),
+      update: jest.fn(),
+    } as unknown as Database;
+
+    const mockEmbedder = jest.fn();
+
+    const result = await embedNewFactsForProfile(
+      mockDb,
+      PROFILE_ID_EMB,
+      mockEmbedder
+    );
+
+    expect(mockEmbedder).not.toHaveBeenCalled();
+    expect(mockDb.update).not.toHaveBeenCalled();
+    expect(result.embedded).toBe(0);
+    expect(result.scanned).toBe(0);
   });
 });

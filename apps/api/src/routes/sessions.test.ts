@@ -1,10 +1,12 @@
 // ---------------------------------------------------------------------------
-// Mock JWT module so auth middleware passes with a valid token
+// Real JWT + real auth middleware — no jwt module mock
 // ---------------------------------------------------------------------------
 
-jest.mock('../middleware/jwt', () =>
-  require('../test-utils/auth-fixture').createJwtModuleMock()
-);
+import {
+  installTestJwksInterceptor,
+  restoreTestFetch,
+} from '../test-utils/jwks-interceptor';
+import { clearJWKSCache } from '../middleware/jwt';
 
 // [BUG-666] capture mock used by the SSE-onComplete-failure break test
 const mockCaptureException = jest.fn();
@@ -382,22 +384,27 @@ import {
   SessionExchangeLimitError,
 } from '../services/session';
 import { app } from '../index';
-import {
-  AUTH_HEADERS as BASE_AUTH_HEADERS,
-  BASE_AUTH_ENV,
-} from '../test-utils/test-env';
+import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
   DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
 };
 
-const AUTH_HEADERS = {
-  ...BASE_AUTH_HEADERS,
-  'X-Profile-Id': 'test-profile-id',
-};
+const AUTH_HEADERS = makeAuthHeaders({ 'X-Profile-Id': 'test-profile-id' });
 
 describe('session routes', () => {
+  beforeAll(() => {
+    installTestJwksInterceptor();
+  });
+
+  afterAll(() => {
+    restoreTestFetch();
+  });
+
+  beforeEach(() => {
+    clearJWKSCache();
+  });
   // -------------------------------------------------------------------------
   // GET /v1/subjects/:subjectId/sessions
   // -------------------------------------------------------------------------

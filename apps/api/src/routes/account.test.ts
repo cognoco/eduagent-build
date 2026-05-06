@@ -1,10 +1,13 @@
 // ---------------------------------------------------------------------------
-// Mock JWT module so auth middleware passes with a valid token
+// Real JWT + real auth middleware — no jwt module mock
+// JWKS endpoint is intercepted via globalThis.fetch in beforeAll.
 // ---------------------------------------------------------------------------
 
-jest.mock('../middleware/jwt', () =>
-  require('../test-utils/auth-fixture').createJwtModuleMock()
-);
+import {
+  installTestJwksInterceptor,
+  restoreTestFetch,
+} from '../test-utils/jwks-interceptor';
+import { clearJWKSCache } from '../middleware/jwt';
 
 jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
@@ -82,7 +85,7 @@ jest.mock('../services/export', () => ({
 import { app } from '../index';
 import { inngest } from '../inngest/client';
 import { captureException } from '../services/sentry';
-import { AUTH_HEADERS, BASE_AUTH_ENV } from '../test-utils/test-env';
+import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
@@ -90,6 +93,18 @@ const TEST_ENV = {
 };
 
 describe('account routes', () => {
+  beforeAll(() => {
+    installTestJwksInterceptor();
+  });
+
+  afterAll(() => {
+    restoreTestFetch();
+  });
+
+  beforeEach(() => {
+    clearJWKSCache();
+  });
+
   // -------------------------------------------------------------------------
   // POST /v1/account/delete
   // -------------------------------------------------------------------------
@@ -104,7 +119,7 @@ describe('account routes', () => {
         '/v1/account/delete',
         {
           method: 'POST',
-          headers: AUTH_HEADERS,
+          headers: makeAuthHeaders(),
         },
         TEST_ENV
       );
@@ -133,7 +148,7 @@ describe('account routes', () => {
         '/v1/account/delete',
         {
           method: 'POST',
-          headers: AUTH_HEADERS,
+          headers: makeAuthHeaders(),
         },
         TEST_ENV
       );
@@ -183,7 +198,7 @@ describe('account routes', () => {
         '/v1/account/cancel-deletion',
         {
           method: 'POST',
-          headers: AUTH_HEADERS,
+          headers: makeAuthHeaders(),
         },
         TEST_ENV
       );
@@ -213,7 +228,7 @@ describe('account routes', () => {
     it('returns 200 with data export', async () => {
       const res = await app.request(
         '/v1/account/export',
-        { headers: AUTH_HEADERS },
+        { headers: makeAuthHeaders() },
         TEST_ENV
       );
 

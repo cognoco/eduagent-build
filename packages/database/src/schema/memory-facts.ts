@@ -10,7 +10,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { profiles } from './profiles';
-import { vector } from './_pgvector';
+import { vectorNullable } from './_pgvector';
 import { generateUUIDv7 } from '../utils/uuid';
 
 export const memoryFacts = pgTable(
@@ -37,7 +37,7 @@ export const memoryFacts = pgTable(
     observedAt: timestamp('observed_at', { withTimezone: true }).notNull(),
     supersededBy: uuid('superseded_by'),
     supersededAt: timestamp('superseded_at', { withTimezone: true }),
-    embedding: vector('embedding'),
+    embedding: vectorNullable('embedding'),
     confidence: text('confidence', {
       enum: ['low', 'medium', 'high'],
     })

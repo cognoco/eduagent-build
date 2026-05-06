@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Platform, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import type { KnowledgeInventory } from '@eduagent/schemas';
@@ -62,65 +62,51 @@ export function EarlyAdopterCard(): React.ReactElement | null {
 
   return (
     <View
-      className="bg-primary-soft rounded-card px-5 py-4 mb-4"
+      className="bg-primary-soft rounded-card mx-5 mt-3 flex-row items-center"
       testID="early-adopter-card"
       accessibilityRole="alert"
     >
-      <View className="flex-row items-start">
-        <View className="flex-1">
-          <Text className="text-body font-semibold text-text-primary mb-1">
-            You&apos;re one of our first users!
-          </Text>
-          <Text className="text-body-sm text-text-secondary mb-3">
-            Your feedback shapes MentoMate. If something feels off, let us know.
-          </Text>
-          <Pressable
-            onPress={openFeedback}
-            className="flex-row items-center self-start"
-            accessibilityRole="button"
-            accessibilityLabel="Send feedback"
-            testID="early-adopter-feedback-cta"
-          >
-            {/* [a11y sweep] decorative icon — Pressable parent carries the label */}
-            <View
-              testID="early-adopter-feedback-icon"
-              accessibilityElementsHidden
-              importantForAccessibility="no-hide-descendants"
-            >
-              <Ionicons
-                name="chatbubble-outline"
-                size={16}
-                color={colors.primary}
-              />
-            </View>
-            <Text className="text-body-sm font-semibold text-primary ml-1.5">
-              Send feedback
-            </Text>
-          </Pressable>
-        </View>
-        <Pressable
-          onPress={handleDismiss}
-          className="min-h-[32px] min-w-[32px] items-center justify-center -mt-1 -mr-1"
-          accessibilityRole="button"
-          accessibilityLabel="Dismiss"
-          hitSlop={8}
-          testID="early-adopter-dismiss"
+      <Pressable
+        onPress={openFeedback}
+        className="flex-1 flex-row items-center px-3 py-2 min-h-[44px]"
+        accessibilityRole="button"
+        accessibilityLabel="Send feedback — your input shapes MentoMate"
+        testID="early-adopter-feedback-cta"
+      >
+        {/* [a11y sweep] decorative icon — Pressable parent carries the label */}
+        <View
+          testID="early-adopter-feedback-icon"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
         >
-          {/* [a11y sweep] decorative icon — Pressable parent carries the label */}
-          <View
-            testID="early-adopter-dismiss-icon"
-            accessibilityElementsHidden
-            importantForAccessibility="no-hide-descendants"
-          >
-            <Ionicons name="close" size={18} color={colors.textSecondary} />
-          </View>
-        </Pressable>
-      </View>
-      {Platform.OS !== 'web' && (
-        <Text className="text-caption text-text-muted mt-2">
-          On your phone, shake it anytime to report a problem.
+          <Ionicons
+            name="chatbubble-outline"
+            size={16}
+            color={colors.primary}
+          />
+        </View>
+        <Text className="text-body-sm font-semibold text-text-primary ms-2 flex-1">
+          Early user — your feedback shapes MentoMate
         </Text>
-      )}
+        <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+      </Pressable>
+      <Pressable
+        onPress={handleDismiss}
+        className="min-h-[44px] min-w-[44px] items-center justify-center pe-2"
+        accessibilityRole="button"
+        accessibilityLabel="Dismiss"
+        hitSlop={4}
+        testID="early-adopter-dismiss"
+      >
+        {/* [a11y sweep] decorative icon — Pressable parent carries the label */}
+        <View
+          testID="early-adopter-dismiss-icon"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          <Ionicons name="close" size={16} color={colors.textSecondary} />
+        </View>
+      </Pressable>
     </View>
   );
 }

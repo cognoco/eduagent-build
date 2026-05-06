@@ -27,7 +27,15 @@ export type MemorySnapshot = {
   interestTimestamps: Record<string, string>;
 };
 
-type MemoryFactsWriter = Pick<Database, 'delete' | 'insert' | 'update'>;
+type MemoryFactsWriter = Pick<
+  Database,
+  'delete' | 'insert' | 'select' | 'update'
+>;
+
+export type MemoryFactSnapshotRow = Pick<
+  typeof memoryFacts.$inferSelect,
+  'category' | 'confidence' | 'metadata' | 'observedAt' | 'text'
+>;
 
 export function emptyMemorySnapshot(): MemorySnapshot {
   return {
@@ -148,41 +156,46 @@ export async function readMemorySnapshotFromFacts(
   const rows = await scoped.memoryFacts.findManyActive();
   const snapshot = emptyMemorySnapshot();
 
-  for (const row of rows) {
-    const metadata = metadataRecord(row.metadata);
-    switch (row.category) {
-      case 'strength': {
-        const entry = reconstructStrength(row.text, metadata, row.confidence);
-        if (entry) snapshot.strengths.push(entry);
-        break;
-      }
-      case 'struggle': {
-        const entry = reconstructStruggle(
-          row.text,
-          metadata,
-          row.confidence,
-          row.observedAt
-        );
-        if (entry) snapshot.struggles.push(entry);
-        break;
-      }
-      case 'interest': {
-        const entry = reconstructInterest(row.text, metadata);
-        snapshot.interests.push(entry);
-        snapshot.interestTimestamps[entry.label.toLowerCase()] =
-          row.observedAt.toISOString();
-        break;
-      }
-      case 'communication_note':
-        snapshot.communicationNotes.push(row.text);
-        break;
-      case 'suppressed':
-        snapshot.suppressedInferences.push(row.text);
-        break;
-    }
-  }
+  for (const row of rows) appendMemoryFactToSnapshot(snapshot, row);
 
   return snapshot;
+}
+
+export function appendMemoryFactToSnapshot(
+  snapshot: MemorySnapshot,
+  row: MemoryFactSnapshotRow
+): void {
+  const metadata = metadataRecord(row.metadata);
+  switch (row.category) {
+    case 'strength': {
+      const entry = reconstructStrength(row.text, metadata, row.confidence);
+      if (entry) snapshot.strengths.push(entry);
+      break;
+    }
+    case 'struggle': {
+      const entry = reconstructStruggle(
+        row.text,
+        metadata,
+        row.confidence,
+        row.observedAt
+      );
+      if (entry) snapshot.struggles.push(entry);
+      break;
+    }
+    case 'interest': {
+      const entry = reconstructInterest(row.text, metadata);
+      snapshot.interests.push(entry);
+      snapshot.interestTimestamps[entry.label.toLowerCase()] =
+        row.observedAt.toISOString();
+      break;
+    }
+    case 'communication_note':
+      snapshot.communicationNotes.push(row.text);
+      break;
+    case 'suppressed':
+      snapshot.suppressedInferences.push(row.text);
+      break;
+  }
 }
 
 export function buildProjectionFromMergedState(profile: {
@@ -213,11 +226,44 @@ export function buildProjectionFromMergedState(profile: {
   };
 }
 
+/**
+ * Atomicity: every caller passes a Drizzle transaction object (`tx`) opened by
+ * `db.transaction(async (tx) => { ... })` in the outer function: either
+ * `applyAnalysis` (learner-profile.ts:1224) or `deleteMemoryItem` /
+ * `unsuppressInference` (learner-profile.ts:1334, 1383). Each outer transaction
+ * also issues `SELECT ... FOR UPDATE` on the `learning_profiles` row before
+ * reaching this function, which serializes concurrent callers for the same
+ * profileId. The three statements below (SELECT existing, DELETE, INSERT) are
+ * therefore already inside a genuine Postgres BEGIN/COMMIT via
+ * `neon-serverless` (WebSocket driver). No additional batch or lock is needed
+ * here.
+ */
 export async function replaceActiveMemoryFactsForProfile(
   db: MemoryFactsWriter,
   profileId: string,
   projection: MemoryProjection
 ): Promise<void> {
+  const existing = await db
+    .select({
+      category: memoryFacts.category,
+      textNormalized: memoryFacts.textNormalized,
+      embedding: memoryFacts.embedding,
+    })
+    .from(memoryFacts)
+    .where(
+      and(
+        eq(memoryFacts.profileId, profileId),
+        sql`${memoryFacts.supersededBy} IS NULL`
+      )
+    );
+  // Keep category in the key because identical text in different categories can
+  // carry different semantics for downstream memory prompts.
+  const embeddingByKey = new Map<string, number[]>();
+  for (const row of existing) {
+    if (row.embedding === null) continue;
+    embeddingByKey.set(`${row.category}::${row.textNormalized}`, row.embedding);
+  }
+
   await db
     .delete(memoryFacts)
     .where(
@@ -229,6 +275,10 @@ export async function replaceActiveMemoryFactsForProfile(
 
   const rows = buildMemoryFactRowsFromProjection(profileId, projection);
   if (rows.length > 0) {
+    for (const row of rows) {
+      const key = `${row.category}::${row.textNormalized}`;
+      row.embedding = embeddingByKey.get(key) ?? null;
+    }
     await db.insert(memoryFacts).values(rows);
   }
 }

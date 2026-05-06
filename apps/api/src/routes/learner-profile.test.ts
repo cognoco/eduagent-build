@@ -9,10 +9,12 @@
 //     unauthorized access, and succeed only with a valid family link
 // ---------------------------------------------------------------------------
 
-// Mock JWT module so auth middleware passes with a valid token.
-jest.mock('../middleware/jwt', () =>
-  require('../test-utils/auth-fixture').createJwtModuleMock()
-);
+// Real JWT + real auth middleware — no jwt module mock.
+import {
+  installTestJwksInterceptor,
+  restoreTestFetch,
+} from '../test-utils/jwks-interceptor';
+import { clearJWKSCache } from '../middleware/jwt';
 
 jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
@@ -113,7 +115,7 @@ jest.mock('../services/learner-input', () => ({
 }));
 
 import { app } from '../index';
-import { BASE_AUTH_ENV } from '../test-utils/test-env';
+import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { extractDrizzleParamValues } from '../test-utils/drizzle-introspection';
 
 const TEST_ENV = {
@@ -125,11 +127,7 @@ const PARENT_PROFILE_ID = '770e8400-e29b-41d4-a716-446655440000';
 const OWN_CHILD_PROFILE_ID = '770e8400-e29b-41d4-a716-446655440001';
 const OTHER_FAMILY_CHILD_ID = '770e8400-e29b-41d4-a716-446655440099';
 
-const PARENT_HEADERS = {
-  Authorization: 'Bearer valid.jwt.token',
-  'Content-Type': 'application/json',
-  'X-Profile-Id': PARENT_PROFILE_ID,
-};
+const PARENT_HEADERS = makeAuthHeaders({ 'X-Profile-Id': PARENT_PROFILE_ID });
 
 const MINIMAL_PROFILE = {
   id: 'a0000000-0000-4000-a000-000000000001',
@@ -153,7 +151,16 @@ const MINIMAL_PROFILE = {
 };
 
 describe('learner-profile routes', () => {
+  beforeAll(() => {
+    installTestJwksInterceptor();
+  });
+
+  afterAll(() => {
+    restoreTestFetch();
+  });
+
   beforeEach(() => {
+    clearJWKSCache();
     jest.clearAllMocks();
     mockFindFamilyLink.mockResolvedValue({
       parentProfileId: PARENT_PROFILE_ID,

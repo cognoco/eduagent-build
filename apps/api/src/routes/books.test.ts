@@ -1,10 +1,12 @@
 // ---------------------------------------------------------------------------
-// Mock JWT module so auth middleware passes with a valid token
+// Real JWT + real auth middleware — no jwt module mock
 // ---------------------------------------------------------------------------
 
-jest.mock('../middleware/jwt', () =>
-  require('../test-utils/auth-fixture').createJwtModuleMock()
-);
+import {
+  installTestJwksInterceptor,
+  restoreTestFetch,
+} from '../test-utils/jwks-interceptor';
+import { clearJWKSCache } from '../middleware/jwt';
 
 // ---------------------------------------------------------------------------
 // Mock database module
@@ -124,10 +126,7 @@ import {
   getBookWithTopics,
   claimBookForGeneration,
 } from '../services/curriculum';
-import {
-  AUTH_HEADERS as BASE_AUTH_HEADERS,
-  BASE_AUTH_ENV,
-} from '../test-utils/test-env';
+import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 
 const mockGetBooks = getBooks as jest.MockedFunction<typeof getBooks>;
 const mockGetAllProfileBooks = getAllProfileBooks as jest.MockedFunction<
@@ -141,10 +140,7 @@ const mockClaimBookForGeneration =
 
 const TEST_ENV = { ...BASE_AUTH_ENV };
 
-const AUTH_HEADERS = {
-  ...BASE_AUTH_HEADERS,
-  'X-Profile-Id': 'test-profile-id',
-};
+const AUTH_HEADERS = makeAuthHeaders({ 'X-Profile-Id': 'test-profile-id' });
 
 const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
 const BOOK_ID = '550e8400-e29b-41d4-a716-446655440001';
@@ -154,7 +150,16 @@ const BOOK_ID = '550e8400-e29b-41d4-a716-446655440001';
 // ---------------------------------------------------------------------------
 
 describe('book routes', () => {
+  beforeAll(() => {
+    installTestJwksInterceptor();
+  });
+
+  afterAll(() => {
+    restoreTestFetch();
+  });
+
   beforeEach(() => {
+    clearJWKSCache();
     jest.clearAllMocks();
   });
 
@@ -194,10 +199,7 @@ describe('book routes', () => {
       const res = await app.request(
         '/v1/library/books',
         {
-          headers: {
-            Authorization: 'Bearer valid.jwt.token',
-            'Content-Type': 'application/json',
-          },
+          headers: makeAuthHeaders(),
         },
         TEST_ENV
       );

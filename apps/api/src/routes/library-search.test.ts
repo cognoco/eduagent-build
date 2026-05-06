@@ -1,10 +1,12 @@
 // ---------------------------------------------------------------------------
-// Mock JWT module so auth middleware passes with a valid token
+// Real JWT + real auth middleware — no jwt module mock
 // ---------------------------------------------------------------------------
 
-jest.mock('../middleware/jwt', () =>
-  require('../test-utils/auth-fixture').createJwtModuleMock()
-);
+import {
+  installTestJwksInterceptor,
+  restoreTestFetch,
+} from '../test-utils/jwks-interceptor';
+import { clearJWKSCache } from '../middleware/jwt';
 
 // ---------------------------------------------------------------------------
 // Mock database module
@@ -56,17 +58,13 @@ jest.mock('../services/library-search', () => ({
 // ---------------------------------------------------------------------------
 
 import { app } from '../index';
-import {
-  AUTH_HEADERS as BASE_AUTH_HEADERS,
-  BASE_AUTH_ENV,
-} from '../test-utils/test-env';
+import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 
 const TEST_ENV = { ...BASE_AUTH_ENV };
 
-const AUTH_HEADERS = {
-  ...BASE_AUTH_HEADERS,
+const AUTH_HEADERS = makeAuthHeaders({
   'X-Profile-Id': 'a0000000-0000-4000-a000-000000000001',
-};
+});
 
 // Valid RFC-4122 UUIDs used in mock data
 const SUBJECT_ID = 'a0000000-0000-4000-a000-000000000010';
@@ -101,7 +99,16 @@ const MOCK_RESULT = {
 // ---------------------------------------------------------------------------
 
 describe('GET /v1/library/search', () => {
+  beforeAll(() => {
+    installTestJwksInterceptor();
+  });
+
+  afterAll(() => {
+    restoreTestFetch();
+  });
+
   beforeEach(() => {
+    clearJWKSCache();
     jest.clearAllMocks();
   });
 
@@ -189,10 +196,7 @@ describe('GET /v1/library/search', () => {
     const res = await app.request(
       '/v1/library/search?q=test',
       {
-        headers: {
-          Authorization: 'Bearer valid.jwt.token',
-          'Content-Type': 'application/json',
-        },
+        headers: makeAuthHeaders(),
       },
       TEST_ENV
     );

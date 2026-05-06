@@ -1,10 +1,12 @@
 // ---------------------------------------------------------------------------
-// Mock JWT module so auth middleware passes with a valid token
+// Real JWT + real auth middleware — no jwt module mock
 // ---------------------------------------------------------------------------
 
-jest.mock('../middleware/jwt', () =>
-  require('../test-utils/auth-fixture').createJwtModuleMock()
-);
+import {
+  installTestJwksInterceptor,
+  restoreTestFetch,
+} from '../test-utils/jwks-interceptor';
+import { clearJWKSCache } from '../middleware/jwt';
 
 const mockDbInsert = jest.fn().mockReturnValue({
   values: jest.fn().mockReturnValue({
@@ -117,7 +119,9 @@ jest.mock('../services/stripe', () => ({
 }));
 
 import { app } from '../index';
-import { AUTH_HEADERS, BASE_AUTH_ENV } from '../test-utils/test-env';
+import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
+
+const AUTH_HEADERS = makeAuthHeaders();
 
 const TEST_ENV = {
   DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
@@ -166,7 +170,16 @@ function mockQuotaPool(overrides?: Record<string, unknown>) {
   };
 }
 
+beforeAll(() => {
+  installTestJwksInterceptor();
+});
+
+afterAll(() => {
+  restoreTestFetch();
+});
+
 beforeEach(() => {
+  clearJWKSCache();
   jest.clearAllMocks();
   mockGetSubscriptionByAccountId.mockResolvedValue(null);
   mockGetQuotaPool.mockResolvedValue(null);

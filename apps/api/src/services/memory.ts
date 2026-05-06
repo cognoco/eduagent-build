@@ -48,9 +48,10 @@ export async function retrieveRelevantMemory(
   profileId: string,
   currentMessage: string,
   voyageApiKey?: string,
-  limit?: number
+  limit?: number,
+  queryVector?: number[]
 ): Promise<MemoryRetrievalResult> {
-  if (!voyageApiKey) {
+  if (!voyageApiKey && !queryVector) {
     logger.warn(
       '[memory] VOYAGE_API_KEY not provided — embedding retrieval skipped for this exchange'
     );
@@ -58,14 +59,13 @@ export async function retrieveRelevantMemory(
   }
 
   try {
-    const embeddingResult = await generateEmbedding(
-      currentMessage,
-      voyageApiKey
-    );
+    const vector =
+      queryVector ??
+      (await generateEmbedding(currentMessage, voyageApiKey!)).vector;
 
     const similarTopics = await findSimilarTopics(
       db,
-      embeddingResult.vector,
+      vector,
       limit ?? DEFAULT_LIMIT,
       profileId
     );

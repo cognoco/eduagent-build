@@ -1,10 +1,12 @@
 // ---------------------------------------------------------------------------
-// Mock JWT module so auth middleware passes with a valid token
+// Real JWT + real auth middleware — no jwt module mock
 // ---------------------------------------------------------------------------
 
-jest.mock('../middleware/jwt', () =>
-  require('../test-utils/auth-fixture').createJwtModuleMock()
-);
+import {
+  installTestJwksInterceptor,
+  restoreTestFetch,
+} from '../test-utils/jwks-interceptor';
+import { clearJWKSCache } from '../middleware/jwt';
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
 import { createRouteMeteringFixture } from '../test-utils/route-metering-fixture';
@@ -57,10 +59,7 @@ import {
   getDictationStreak,
   fetchGenerateContext,
 } from '../services/dictation';
-import {
-  AUTH_HEADERS as BASE_AUTH_HEADERS,
-  BASE_AUTH_ENV,
-} from '../test-utils/test-env';
+import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
@@ -68,14 +67,20 @@ const TEST_ENV = {
   DATABASE_URL: 'postgresql://test:test@localhost/test',
 };
 
-const AUTH_HEADERS = {
-  ...BASE_AUTH_HEADERS,
-  'X-Profile-Id': 'test-profile-id',
-};
+const AUTH_HEADERS = makeAuthHeaders({ 'X-Profile-Id': 'test-profile-id' });
 
 const TODAY = new Date().toISOString().slice(0, 10);
 
+beforeAll(() => {
+  installTestJwksInterceptor();
+});
+
+afterAll(() => {
+  restoreTestFetch();
+});
+
 beforeEach(() => {
+  clearJWKSCache();
   jest.clearAllMocks();
   meteringFixture.reset();
 });
@@ -177,11 +182,7 @@ describe('POST /v1/dictation/prepare-homework', () => {
       '/v1/dictation/prepare-homework',
       {
         method: 'POST',
-        headers: {
-          Authorization: 'Bearer valid.jwt.token',
-          'Content-Type': 'application/json',
-          // No X-Profile-Id
-        },
+        headers: makeAuthHeaders(),
         body: JSON.stringify({ text: 'Hello world.' }),
       },
       TEST_ENV
@@ -289,10 +290,7 @@ describe('POST /v1/dictation/generate', () => {
       '/v1/dictation/generate',
       {
         method: 'POST',
-        headers: {
-          Authorization: 'Bearer valid.jwt.token',
-          // No X-Profile-Id
-        },
+        headers: makeAuthHeaders(),
       },
       TEST_ENV
     );
@@ -429,10 +427,7 @@ describe('POST /v1/dictation/result', () => {
       '/v1/dictation/result',
       {
         method: 'POST',
-        headers: {
-          Authorization: 'Bearer valid.jwt.token',
-          'Content-Type': 'application/json',
-        },
+        headers: makeAuthHeaders(),
         body: JSON.stringify({
           localDate: TODAY,
           sentenceCount: 5,
@@ -547,9 +542,7 @@ describe('GET /v1/dictation/streak', () => {
     const res = await app.request(
       '/v1/dictation/streak',
       {
-        headers: {
-          Authorization: 'Bearer valid.jwt.token',
-        },
+        headers: makeAuthHeaders(),
       },
       TEST_ENV
     );
@@ -627,11 +620,7 @@ describe('POST /v1/dictation/review', () => {
       '/v1/dictation/review',
       {
         method: 'POST',
-        headers: {
-          Authorization: 'Bearer valid.jwt.token',
-          'Content-Type': 'application/json',
-          // No X-Profile-Id
-        },
+        headers: makeAuthHeaders(),
         body: JSON.stringify(REVIEW_BODY),
       },
       TEST_ENV

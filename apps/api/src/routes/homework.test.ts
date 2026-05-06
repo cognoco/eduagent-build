@@ -1,10 +1,12 @@
 // ---------------------------------------------------------------------------
-// Mock JWT module so auth middleware passes with a valid token
+// Real JWT + real auth middleware — no jwt module mock
 // ---------------------------------------------------------------------------
 
-jest.mock('../middleware/jwt', () =>
-  require('../test-utils/auth-fixture').createJwtModuleMock()
-);
+import {
+  installTestJwksInterceptor,
+  restoreTestFetch,
+} from '../test-utils/jwks-interceptor';
+import { clearJWKSCache } from '../middleware/jwt';
 
 jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
@@ -86,23 +88,26 @@ jest.mock('../services/ocr', () => ({
 }));
 
 import { app } from '../index';
-import {
-  AUTH_HEADERS as BASE_AUTH_HEADERS,
-  BASE_AUTH_ENV,
-} from '../test-utils/test-env';
+import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { captureException } from '../services/sentry';
 
 const TEST_ENV = { ...BASE_AUTH_ENV };
 
-const AUTH_HEADERS = {
-  ...BASE_AUTH_HEADERS,
-  'X-Profile-Id': 'test-profile-id',
-};
+const AUTH_HEADERS = makeAuthHeaders({ 'X-Profile-Id': 'test-profile-id' });
 
 const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
 
 describe('homework routes', () => {
+  beforeAll(() => {
+    installTestJwksInterceptor();
+  });
+
+  afterAll(() => {
+    restoreTestFetch();
+  });
+
   beforeEach(() => {
+    clearJWKSCache();
     jest.clearAllMocks();
   });
 
@@ -259,6 +264,12 @@ describe('homework routes', () => {
   // -------------------------------------------------------------------------
 
   describe('POST /v1/ocr', () => {
+    // Multipart/form-data requests must NOT include Content-Type: application/json —
+    // the browser/fetch sets the multipart boundary automatically when body is FormData.
+    const { 'Content-Type': _omit, ...OCR_HEADERS } = makeAuthHeaders({
+      'X-Profile-Id': 'test-profile-id',
+    });
+
     it('returns 200 with structured OCR result for valid image', async () => {
       const formData = new FormData();
       formData.append(
@@ -270,10 +281,7 @@ describe('homework routes', () => {
         '/v1/ocr',
         {
           method: 'POST',
-          headers: {
-            Authorization: 'Bearer valid.jwt.token',
-            'X-Profile-Id': 'test-profile-id',
-          },
+          headers: OCR_HEADERS,
           body: formData,
         },
         TEST_ENV
@@ -299,10 +307,7 @@ describe('homework routes', () => {
         '/v1/ocr',
         {
           method: 'POST',
-          headers: {
-            Authorization: 'Bearer valid.jwt.token',
-            'X-Profile-Id': 'test-profile-id',
-          },
+          headers: OCR_HEADERS,
           body: formData,
         },
         TEST_ENV
@@ -322,10 +327,7 @@ describe('homework routes', () => {
         '/v1/ocr',
         {
           method: 'POST',
-          headers: {
-            Authorization: 'Bearer valid.jwt.token',
-            'X-Profile-Id': 'test-profile-id',
-          },
+          headers: OCR_HEADERS,
           body: formData,
         },
         TEST_ENV
@@ -341,10 +343,7 @@ describe('homework routes', () => {
         '/v1/ocr',
         {
           method: 'POST',
-          headers: {
-            Authorization: 'Bearer valid.jwt.token',
-            'X-Profile-Id': 'test-profile-id',
-          },
+          headers: OCR_HEADERS,
           body: formData,
         },
         TEST_ENV
@@ -366,10 +365,7 @@ describe('homework routes', () => {
         '/v1/ocr',
         {
           method: 'POST',
-          headers: {
-            Authorization: 'Bearer valid.jwt.token',
-            'X-Profile-Id': 'test-profile-id',
-          },
+          headers: OCR_HEADERS,
           body: formData,
         },
         TEST_ENV
@@ -394,10 +390,7 @@ describe('homework routes', () => {
         '/v1/ocr',
         {
           method: 'POST',
-          headers: {
-            Authorization: 'Bearer valid.jwt.token',
-            'X-Profile-Id': 'test-profile-id',
-          },
+          headers: OCR_HEADERS,
           body: formData,
         },
         TEST_ENV
@@ -425,10 +418,7 @@ describe('homework routes', () => {
         '/v1/ocr',
         {
           method: 'POST',
-          headers: {
-            Authorization: 'Bearer valid.jwt.token',
-            'X-Profile-Id': 'test-profile-id',
-          },
+          headers: OCR_HEADERS,
           body: formData,
         },
         TEST_ENV
@@ -454,10 +444,7 @@ describe('homework routes', () => {
         '/v1/ocr',
         {
           method: 'POST',
-          headers: {
-            Authorization: 'Bearer valid.jwt.token',
-            'X-Profile-Id': 'test-profile-id',
-          },
+          headers: OCR_HEADERS,
           body: formData,
         },
         TEST_ENV
@@ -485,10 +472,7 @@ describe('homework routes', () => {
         '/v1/ocr',
         {
           method: 'POST',
-          headers: {
-            Authorization: 'Bearer valid.jwt.token',
-            'X-Profile-Id': 'test-profile-id',
-          },
+          headers: OCR_HEADERS,
           body: formData,
         },
         TEST_ENV
@@ -538,10 +522,7 @@ describe('homework routes', () => {
         '/v1/ocr',
         {
           method: 'POST',
-          headers: {
-            Authorization: 'Bearer valid.jwt.token',
-            // No X-Profile-Id header — profileId will be undefined
-          },
+          headers: makeAuthHeaders(),
           body: formData,
         },
         TEST_ENV

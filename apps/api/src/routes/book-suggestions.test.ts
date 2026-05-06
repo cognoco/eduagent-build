@@ -1,10 +1,12 @@
 // ---------------------------------------------------------------------------
-// Mock JWT module so auth middleware passes with a valid token
+// Real JWT + real auth middleware — no jwt module mock
 // ---------------------------------------------------------------------------
 
-jest.mock('../middleware/jwt', () =>
-  require('../test-utils/auth-fixture').createJwtModuleMock()
-);
+import {
+  installTestJwksInterceptor,
+  restoreTestFetch,
+} from '../test-utils/jwks-interceptor';
+import { clearJWKSCache } from '../middleware/jwt';
 
 // ---------------------------------------------------------------------------
 // Mock database module — middleware creates a stub db per request
@@ -118,14 +120,28 @@ jest.mock('../services/sentry', () => ({
 // ---------------------------------------------------------------------------
 
 import { app } from '../index';
-import { AUTH_HEADERS, BASE_AUTH_ENV } from '../test-utils/test-env';
+import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
   DATABASE_URL: 'postgresql://mock/test',
 };
 
+const AUTH_HEADERS = makeAuthHeaders();
+
 describe('book-suggestions routes', () => {
+  beforeAll(() => {
+    installTestJwksInterceptor();
+  });
+
+  afterAll(() => {
+    restoreTestFetch();
+  });
+
+  beforeEach(() => {
+    clearJWKSCache();
+  });
+
   it('exports a Hono instance', async () => {
     const { bookSuggestionRoutes } = await import('./book-suggestions');
     expect(typeof bookSuggestionRoutes).toBe('object');
