@@ -212,7 +212,8 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const snapshot = isMemoryFactsReadEnabled(c.env.MEMORY_FACTS_READ_ENABLED)
       ? await readMemorySnapshotFromFacts(
           createScopedRepository(db, childProfileId),
-          profile
+          profile,
+          { respectInjectionToggle: false }
         )
       : null;
     const memory = buildCuratedMemoryView(

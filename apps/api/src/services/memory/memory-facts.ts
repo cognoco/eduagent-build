@@ -129,11 +129,14 @@ export async function readMemorySnapshotFromFacts(
     memoryConsentStatus?: string | null;
     memoryEnabled?: boolean;
     memoryInjectionEnabled?: boolean;
-  } | null
+  } | null,
+  options?: { respectInjectionToggle?: boolean }
 ): Promise<MemorySnapshot> {
+  const respectInjectionToggle = options?.respectInjectionToggle ?? true;
   const injectionEnabled =
     profile?.memoryConsentStatus === 'granted' &&
-    (profile.memoryInjectionEnabled ?? profile.memoryEnabled ?? true);
+    (!respectInjectionToggle ||
+      (profile.memoryInjectionEnabled ?? profile.memoryEnabled ?? true));
   if (!profile || !injectionEnabled) return emptyMemorySnapshot();
 
   const rows = await scoped.memoryFacts.findManyActive();

@@ -44,6 +44,10 @@ const envSchema = z.object({
   // Test seed — shared secret for /__test/* routes (optional, dev/staging only)
   TEST_SEED_SECRET: z.string().min(1).optional(),
 
+  // Maintenance endpoints — optional, managed through Doppler when an
+  // operator needs to trigger one-shot backfills.
+  MAINTENANCE_SECRET: z.string().min(1).optional(),
+
   // RevenueCat — webhook authentication
   REVENUECAT_WEBHOOK_SECRET: z.string().min(1).optional(),
 

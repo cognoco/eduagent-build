@@ -39,6 +39,7 @@ const PUBLIC_PATHS = [
   '/v1/consent/respond',
   '/v1/consent-page',
   '/v1/__test/',
+  '/v1/maintenance/',
   // Stripe post-checkout landing pages [UX-DE-M10] — must be reachable by
   // anyone holding the redirect URL, including users who let their session
   // lapse during checkout. Body contains only static HTML + deep links.

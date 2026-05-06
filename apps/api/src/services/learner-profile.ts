@@ -1154,34 +1154,6 @@ export async function getOrCreateLearningProfile(
   return retry;
 }
 
-/**
- * Server-side only — internal helper called by applyAnalysis and deleteMemoryItem.
- * The profileId is sourced from a DB row, not user input. No accountId guard required.
- */
-async function updateWithRetry(
-  db: Database,
-  profileId: string,
-  expectedVersion: number,
-  updates: Record<string, unknown>
-): Promise<boolean> {
-  const [updated] = await db
-    .update(learningProfiles)
-    .set({
-      ...updates,
-      version: sql`${learningProfiles.version} + 1`,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(learningProfiles.profileId, profileId),
-        eq(learningProfiles.version, expectedVersion)
-      )
-    )
-    .returning();
-
-  return Boolean(updated);
-}
-
 async function getOrCreateLearningProfileTx(
   tx: Database,
   profileId: string
@@ -1407,25 +1379,27 @@ export async function unsuppressInference(
   value: string
 ): Promise<void> {
   await verifyProfileOwnership(db, profileId, accountId);
-  const profile = await getLearningProfile(db, profileId);
-  if (!profile) return;
+  await db.transaction(async (tx) => {
+    const [profile] = await tx
+      .select()
+      .from(learningProfiles)
+      .where(eq(learningProfiles.profileId, profileId))
+      .for('update')
+      .limit(1);
+    if (!profile) return;
 
-  const updated = await updateWithRetry(
-    db,
-    profileId,
-    profile.version,
-    buildUnsuppressUpdates(profile, value)
-  );
-  if (updated) return;
-
-  const fresh = await getLearningProfile(db, profileId);
-  if (!fresh) return;
-  await updateWithRetry(
-    db,
-    profileId,
-    fresh.version,
-    buildUnsuppressUpdates(fresh, value)
-  );
+    const updates = buildUnsuppressUpdates(profile, value);
+    const mergedState = mergeProfileState(profile, updates);
+    await tx
+      .update(learningProfiles)
+      .set({
+        ...updates,
+        version: sql`${learningProfiles.version} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(eq(learningProfiles.profileId, profileId));
+    await writeMemoryFactsForDeletion(tx, profileId, mergedState);
+  });
 }
 
 export async function toggleMemoryEnabled(

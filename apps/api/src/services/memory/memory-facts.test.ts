@@ -60,4 +60,35 @@ describe('readMemorySnapshotFromFacts', () => {
       space: observedAt.toISOString(),
     });
   });
+
+  it('can read curated memory when injection is disabled', async () => {
+    const scoped = {
+      memoryFacts: {
+        findManyActive: jest.fn().mockResolvedValue([
+          {
+            category: 'interest',
+            text: 'football',
+            metadata: { context: 'free_time' },
+            confidence: 'medium',
+            observedAt: new Date('2026-05-01T12:00:00.000Z'),
+          },
+        ]),
+      },
+    } as unknown as ScopedRepository;
+
+    const snapshot = await readMemorySnapshotFromFacts(
+      scoped,
+      {
+        memoryConsentStatus: 'granted',
+        memoryEnabled: true,
+        memoryInjectionEnabled: false,
+      },
+      { respectInjectionToggle: false }
+    );
+
+    expect(snapshot.interests).toEqual([
+      { label: 'football', context: 'free_time' },
+    ]);
+    expect(scoped.memoryFacts.findManyActive).toHaveBeenCalledTimes(1);
+  });
 });
