@@ -14,23 +14,24 @@ import {
 import { eq, like } from 'drizzle-orm';
 import { PersistCurriculumError } from '@eduagent/schemas';
 
-// EXTERNAL boundary mock — routeAndCall is the LLM provider HTTP call. Per C1 D-MOCK-1 this is the formalized LLM external boundary.
-// routeAndCall is the true external boundary (provider API). Mock it here so
-// extractSignals and generateCurriculum run their real parsing/DB logic while
-// the network call is replaced with a deterministic fixture response.
+// EXTERNAL boundary mock (C1 D-MOCK-1) — routeAndCall is the LLM provider
+// HTTP call. Mocked here so extractSignals and generateCurriculum run their
+// real parsing/DB logic while the network call is replaced with a
+// deterministic fixture response.
 const mockRouteAndCall = jest.fn();
 jest.mock('../../services/llm', () => ({
   ...(jest.requireActual('../../services/llm') as Record<string, unknown>),
   routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
 }));
 
-// EXTERNAL boundary mocks — sendPushNotification (Expo Push API) and sendEmail (Resend HTTP) are the network-egress boundaries. Per C1 D-MOCK-2, formatters/templating run real.
+// EXTERNAL boundary mock (C1 D-MOCK-2) — sendPushNotification is the
+// Expo Push API egress point. interview-persist-curriculum.ts only sends
+// a push (no email path), so we stub only sendPushNotification and let
+// the real formatters/templating in services/notifications run.
 const mockSendPush = jest.fn();
-const mockSendEmail = jest.fn();
 jest.mock('../../services/notifications', () => ({
   ...(jest.requireActual('../../services/notifications') as Record<string, unknown>),
   sendPushNotification: (...args: unknown[]) => mockSendPush(...args),
-  sendEmail: (...args: unknown[]) => mockSendEmail(...args),
 }));
 
 const mockCaptureException = jest.fn();
