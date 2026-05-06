@@ -33,6 +33,7 @@ import { getSubjectTint } from '../../lib/subject-tints';
 import { useTheme } from '../../lib/theme';
 import { useThemeColors } from '../../lib/theme';
 import { CoachBand } from './CoachBand';
+import { EarlyAdopterCard } from './EarlyAdopterCard';
 import { SubjectCard } from './SubjectCard';
 
 const HOME_RETURN_PARAMS = { returnTo: LEARNER_HOME_RETURN_TO } as const;
@@ -479,6 +480,8 @@ export function LearnerScreen({
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         showsVerticalScrollIndicator={false}
       >
+        <EarlyAdopterCard />
+
         {showCoachBand && (
           <View>
             <Text className="text-caption font-bold uppercase text-text-secondary px-5 mt-4 mb-2">

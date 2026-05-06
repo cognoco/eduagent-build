@@ -191,6 +191,14 @@ export function FeedbackSheet({
                 We&apos;ll also include your app version and device info to help
                 us investigate.
               </Text>
+              {Platform.OS !== 'web' && (
+                <Text
+                  className="text-caption text-text-muted mt-2"
+                  testID="feedback-shake-hint"
+                >
+                  Tip: shake your phone anytime to open this.
+                </Text>
+              )}
             </ScrollView>
 
             <View className="px-5 pb-4">
