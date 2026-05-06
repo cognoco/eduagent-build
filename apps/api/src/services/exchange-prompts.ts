@@ -268,6 +268,7 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   const sections: string[] = [];
   const isLanguageMode = context.pedagogyMode === 'four_strands';
   const isRecitation = context.effectiveMode === 'recitation';
+  const isReviewMode = context.effectiveMode === 'review';
 
   // [PROMPT-INJECT-4] Sanitize every free-text field that comes from the
   // profile, curriculum tables, or teaching preferences before interpolation.
@@ -448,6 +449,7 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   // First-exchange teaching rule — teach one concrete idea, end with one learner action
   if (
     !isRecitation &&
+    !isReviewMode &&
     context.exchangeCount === 0 &&
     context.sessionType === 'learning' &&
     !isLanguageMode
@@ -478,6 +480,20 @@ export function buildSystemPrompt(context: ExchangeContext): string {
         '4. Offer to let them try again or move on.\n\n' +
         'Keep feedback encouraging. Use "not yet" framing for missed parts.\n' +
         'If you do not recognise the text, say so honestly and base feedback only on clarity and delivery.'
+    );
+  }
+
+  if (
+    isReviewMode &&
+    context.exchangeCount === 0 &&
+    safeTopicTitle &&
+    !isLanguageMode
+  ) {
+    sections.push(
+      'Session type: REVIEW (calibrated relearning)\n' +
+        'TRANSITION PHRASE: Begin with a brief one-line handoff that tells the learner this is a review check, not a fresh lesson.\n' +
+        `CALIBRATION QUESTION: The client may already have shown an opening question about <topic_title>${safeTopicTitle}</topic_title>. If the learner's latest message answers that question, do NOT ask it again — respond to what they remembered and use any gaps to guide the next teaching step.\n` +
+        'If the learner has not answered a calibration question yet, ask exactly one open question inviting them to say what they remember in their own words. Do NOT introduce new content before that answer.'
     );
   }
 
@@ -680,11 +696,18 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   // assessment block in free-text, which contradicts the envelope contract
   // (CLAUDE.md → "LLM Response Envelope"). Migrate to a dedicated envelope
   // signal (e.g. `signals.evaluate_assessment`) and parse via parseEnvelope.
+  // Note (2026-05-06): includes a TRANSITION PHRASE block added for the
+  // learning-path-clarity-pass spec; migrate it with the rest of this section.
   if (context.verificationType === 'evaluate') {
     const rung = context.evaluateDifficultyRung ?? 1;
     const rungDescription = getEvaluateRungDescription(rung);
     sections.push(
       "Session type: THINK DEEPER (Devil's Advocate)\n" +
+        'TRANSITION PHRASE: Begin your reply with a brief one-line handoff that signals the mode shift to the learner. Examples (vary; do not repeat verbatim across sessions):\n' +
+        '- "Quick check — let me try to trip you up."\n' +
+        '- "Let\'s see if you can spot the catch in this..."\n' +
+        '- "Here\'s a thought — tell me if you see the flaw."\n' +
+        'After the transition phrase, on the same conversational turn:\n' +
         'Present a plausibly flawed explanation of the topic.\n' +
         'The student must identify and explain the specific error.\n' +
         `Difficulty rung ${rung}/4: ${rungDescription}\n` +
@@ -701,9 +724,16 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   // assessment block must be migrated to an envelope signal (e.g.
   // `signals.teach_back_assessment`). Until then, the caller must parse
   // the raw response text for the trailing JSON block.
+  // Note (2026-05-06): includes a TRANSITION PHRASE block added for the
+  // learning-path-clarity-pass spec; migrate it with the rest of this section.
   if (context.verificationType === 'teach_back') {
     sections.push(
       'Session type: TEACH BACK (Feynman Technique)\n' +
+        'TRANSITION PHRASE: Begin your reply with a brief one-line handoff that signals the mode shift to the learner. Examples (vary; do not repeat verbatim across sessions):\n' +
+        '- "Want to try something? Teach it to me like I have never seen it."\n' +
+        '- "Let\'s flip roles for a minute — you teach, I listen."\n' +
+        '- "Quick Feynman check: explain it to me from scratch."\n' +
+        'After the transition phrase, on the same conversational turn:\n' +
         'You are a curious but clueless student who wants to learn about the topic.\n' +
         'The learner is the teacher — they must explain the concept to you.\n' +
         'Ask naive follow-up questions. Probe for gaps in the explanation.\n' +

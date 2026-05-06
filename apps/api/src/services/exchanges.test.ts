@@ -491,6 +491,15 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('challengePassed');
   });
 
+  it('includes a learner-facing transition phrase in EVALUATE prompt section', () => {
+    const prompt = buildSystemPrompt({
+      ...baseContext,
+      verificationType: 'evaluate',
+    });
+    expect(prompt).toMatch(/transition phrase/i);
+    expect(prompt).toMatch(/begin your reply with/i);
+  });
+
   it('defaults EVALUATE difficulty rung to 1 when not specified', () => {
     const prompt = buildSystemPrompt({
       ...baseContext,
@@ -512,10 +521,39 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('clarity');
   });
 
+  it('includes a learner-facing transition phrase in TEACH_BACK prompt section', () => {
+    const prompt = buildSystemPrompt({
+      ...baseContext,
+      verificationType: 'teach_back',
+    });
+    expect(prompt).toMatch(/transition phrase/i);
+    expect(prompt).toMatch(/begin your reply with/i);
+  });
+
   it('omits EVALUATE/TEACH_BACK sections for standard verification', () => {
     const prompt = buildSystemPrompt(baseContext);
     expect(prompt).not.toContain('THINK DEEPER');
     expect(prompt).not.toContain('TEACH BACK');
+  });
+
+  it('includes a calibration opener in REVIEW mode on turn 1', () => {
+    const prompt = buildSystemPrompt({
+      ...baseContext,
+      effectiveMode: 'review',
+      exchangeCount: 0,
+    });
+    expect(prompt).toMatch(/REVIEW \(calibrated relearning\)/);
+    expect(prompt).toMatch(/calibration question/i);
+    expect(prompt).not.toContain('FIRST TURN RULE');
+  });
+
+  it('does NOT include the calibration opener after turn 1 in REVIEW mode', () => {
+    const prompt = buildSystemPrompt({
+      ...baseContext,
+      effectiveMode: 'review',
+      exchangeCount: 1,
+    });
+    expect(prompt).not.toMatch(/REVIEW \(calibrated relearning\)/);
   });
 
   it('includes casual learning mode guidance when mode is casual', () => {
