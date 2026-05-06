@@ -11,7 +11,7 @@ jest.mock('@eduagent/database', () => {
 });
 
 jest.mock('../settings', () => ({
-  // gc1-allow: stubs getFamilyPoolBreakdownSharing — real settings module hits DB, not exercisable without full integration test setup
+  // gc1-allow: settings service hits real DB
   getFamilyPoolBreakdownSharing: (...args: unknown[]) =>
     mockGetFamilyPoolBreakdownSharing(...args),
 }));

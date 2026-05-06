@@ -1,11 +1,10 @@
-import { reviewCalibrationGrade } from './review-calibration-grade';
+import { handleReviewCalibrationGrade } from './review-calibration-grade';
 
 async function executeHandler(eventData: unknown) {
   const mockStep = {
     run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
   };
-  const handler = (reviewCalibrationGrade as any).fn;
-  const result = await handler({
+  const result = await handleReviewCalibrationGrade({
     event: { data: eventData, name: 'app/review.calibration.requested' },
     step: mockStep,
   });

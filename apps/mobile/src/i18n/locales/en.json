@@ -996,7 +996,8 @@
     "pickerStartForTopic": "Start assessment for {{title}}",
     "studiedToday": "Studied today",
     "studiedYesterday": "Studied yesterday",
-    "studiedDaysAgo": "Studied {{count}} days ago"
+    "studiedDaysAgo": "Studied {{count}} days ago",
+    "topicPassedNote": "Nice work - this topic is marked as passed, and weak spots will come back through review when they need attention."
   },
   "homework": {
     "permissionTitle": "Camera Access Needed",

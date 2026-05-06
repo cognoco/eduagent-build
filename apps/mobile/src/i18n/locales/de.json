@@ -996,7 +996,8 @@
     "pickerStartForTopic": "Überprüfung für {{title}} starten",
     "studiedToday": "Heute gelernt",
     "studiedYesterday": "Gestern gelernt",
-    "studiedDaysAgo": "Vor {{count}} Tagen gelernt"
+    "studiedDaysAgo": "Vor {{count}} Tagen gelernt",
+    "topicPassedNote": "Gut gemacht - dieses Thema ist als bestanden markiert, und Schwachstellen kommen in der Wiederholung zurück, wenn sie Aufmerksamkeit brauchen."
   },
   "homework": {
     "permissionTitle": "Kamerazugriff benötigt",

@@ -996,7 +996,8 @@
     "pickerStartForTopic": "Rozpocznij sprawdzanie dla {{title}}",
     "studiedToday": "Uczono się dzisiaj",
     "studiedYesterday": "Uczono się wczoraj",
-    "studiedDaysAgo": "Uczono się {{count}} dni temu"
+    "studiedDaysAgo": "Uczono się {{count}} dni temu",
+    "topicPassedNote": "Dobra robota - ten temat jest oznaczony jako zaliczony, a słabsze miejsca wrócą w powtórce, gdy będą wymagały uwagi."
   },
   "homework": {
     "permissionTitle": "Wymagany dostęp do aparatu",

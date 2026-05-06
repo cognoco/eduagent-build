@@ -800,6 +800,7 @@ export const curatedMemoryItemSchema = z.object({
   category: memoryCategoryKeySchema,
   value: z.string(),
   statement: z.string(),
+  confidence: z.enum(['low', 'medium', 'high']).optional(),
 });
 export type CuratedMemoryItem = z.infer<typeof curatedMemoryItemSchema>;
 

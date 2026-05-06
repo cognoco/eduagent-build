@@ -996,7 +996,8 @@
     "pickerStartForTopic": "Start vurdering for {{title}}",
     "studiedToday": "Studert i dag",
     "studiedYesterday": "Studert i går",
-    "studiedDaysAgo": "Studert for {{count}} dager siden"
+    "studiedDaysAgo": "Studert for {{count}} dager siden",
+    "topicPassedNote": "Bra jobbet - dette emnet er markert som bestått, og svake punkter kommer tilbake i repetisjon når de trenger oppmerksomhet."
   },
   "homework": {
     "permissionTitle": "Kameratilgang nødvendig",

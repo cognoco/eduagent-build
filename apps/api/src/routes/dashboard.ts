@@ -88,6 +88,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     // any future refactor (or a service that forgets the check) cannot
     // become an IDOR. 404 vs 403 are no longer indistinguishable.
     await assertParentAccess(db, parentProfileId, childProfileId);
+    await assertChildDashboardDataVisible(db, childProfileId);
 
     const child = await getChildDetail(db, parentProfileId, childProfileId);
     return c.json(childDetailResponseSchema.parse({ child }));

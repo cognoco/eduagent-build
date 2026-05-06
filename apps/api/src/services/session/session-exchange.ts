@@ -240,33 +240,6 @@ interface ReviewCalibrationDispatchPayload {
   timestamp: string;
 }
 
-async function markReviewCalibrationFired(
-  db: Database,
-  profileId: string,
-  sessionId: string,
-  firedAt: string
-): Promise<void> {
-  const [fresh] = await db
-    .select({ metadata: learningSessions.metadata })
-    .from(learningSessions)
-    .where(
-      and(
-        eq(learningSessions.id, sessionId),
-        eq(learningSessions.profileId, profileId)
-      )
-    )
-    .limit(1);
-
-  if (!fresh) return;
-  const metadata = (fresh.metadata ?? {}) as Record<string, unknown>;
-  if (metadata['reviewCalibrationFiredAt'] != null) return;
-
-  await updateSessionMetadata(db, profileId, sessionId, {
-    ...metadata,
-    reviewCalibrationFiredAt: firedAt,
-  });
-}
-
 async function maybeDispatchReviewCalibration(
   db: Database,
   profileId: string,
@@ -333,6 +306,9 @@ async function maybeDispatchReviewCalibration(
         return null;
       }
 
+      const timestamp = new Date().toISOString();
+      nextMetadata['reviewCalibrationFiredAt'] = timestamp;
+
       await tx
         .update(learningSessions)
         .set({ metadata: nextMetadata, updatedAt: new Date() })
@@ -343,7 +319,6 @@ async function maybeDispatchReviewCalibration(
           )
         );
 
-      const timestamp = new Date().toISOString();
       return {
         profileId,
         sessionId: session.id,
@@ -362,12 +337,6 @@ async function maybeDispatchReviewCalibration(
       name: 'app/review.calibration.requested',
       data: payload,
     });
-    await markReviewCalibrationFired(
-      db,
-      profileId,
-      session.id,
-      payload.timestamp
-    );
   } catch (err) {
     logger.warn('[session-exchange] review calibration dispatch failed', {
       event: 'review_calibration.dispatch_failed',

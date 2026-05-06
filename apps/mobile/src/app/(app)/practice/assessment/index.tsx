@@ -216,8 +216,7 @@ export default function AssessmentScreen() {
       ) : (
         <>
           <Text className="text-body-sm text-text-secondary">
-            Nice work — this topic is marked as passed, and weak spots will come
-            back through review when they need attention.
+            {t('assessment.topicPassedNote')}
           </Text>
           <Button
             variant="secondary"

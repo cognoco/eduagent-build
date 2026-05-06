@@ -996,7 +996,8 @@
     "pickerStartForTopic": "{{title}} の確認を開始",
     "studiedToday": "今日学習",
     "studiedYesterday": "昨日学習",
-    "studiedDaysAgo": "{{count}}日前に学習"
+    "studiedDaysAgo": "{{count}}日前に学習",
+    "topicPassedNote": "よくできました。このトピックは合格として記録され、弱いところは必要なタイミングで復習に戻ってきます。"
   },
   "homework": {
     "permissionTitle": "カメラへのアクセスが必要です",

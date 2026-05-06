@@ -996,7 +996,8 @@
     "pickerStartForTopic": "Iniciar evaluación de {{title}}",
     "studiedToday": "Estudiado hoy",
     "studiedYesterday": "Estudiado ayer",
-    "studiedDaysAgo": "Estudiado hace {{count}} días"
+    "studiedDaysAgo": "Estudiado hace {{count}} días",
+    "topicPassedNote": "Buen trabajo: este tema queda marcado como aprobado, y los puntos débiles volverán en el repaso cuando necesiten atención."
   },
   "homework": {
     "permissionTitle": "Se necesita acceso a la cámara",
