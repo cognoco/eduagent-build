@@ -29,7 +29,9 @@ import {
 import { getProfileAge } from './profile';
 import type { LLMTier } from './subscription';
 import {
+  analogyFramingSchema,
   interviewReadyToPersistEventSchema,
+  interestContextValueSchema,
   type InterviewReadyToPersistEvent,
   type InterviewContext,
   type InterviewResult,
@@ -37,6 +39,7 @@ import {
   type ExchangeEntry,
   type DraftStatus,
   type ExtractedInterviewSignals,
+  type InterestContextValue,
   type PaceHint,
 } from '@eduagent/schemas';
 import {
@@ -255,8 +258,6 @@ export function buildDraftResumeSummary(
 // Hard cap on extracted interests. Matches the prompt's "max 8" rule so a
 // verbose LLM response can't overflow what the mobile picker can render.
 const MAX_EXTRACTED_INTERESTS = 8;
-const INTEREST_CONTEXT_VALUES = new Set(['school', 'free_time', 'both']);
-const ANALOGY_FRAMING_VALUES = new Set(['concrete', 'abstract', 'playful']);
 
 // [BUG-771] Defensive character budget on the transcript body. A 4-exchange
 // interview can exceed the Flash context window when learners paste long
@@ -404,19 +405,18 @@ export async function extractSignals(
     !Array.isArray(parsed.interestContext)
       ? (parsed.interestContext as Record<string, unknown>)
       : {};
-  const interestContext: Record<string, 'school' | 'free_time' | 'both'> = {};
+  const interestContext: Record<string, InterestContextValue> = {};
   for (const interest of interests) {
     const rawValue = rawInterestContext[interest];
-    interestContext[interest] =
-      typeof rawValue === 'string' && INTEREST_CONTEXT_VALUES.has(rawValue)
-        ? (rawValue as 'school' | 'free_time' | 'both')
-        : 'both';
+    const parsedContext = interestContextValueSchema.safeParse(rawValue);
+    interestContext[interest] = parsedContext.success
+      ? parsedContext.data
+      : 'both';
   }
-  const analogyFraming =
-    typeof parsed.analogyFraming === 'string' &&
-    ANALOGY_FRAMING_VALUES.has(parsed.analogyFraming)
-      ? (parsed.analogyFraming as 'concrete' | 'abstract' | 'playful')
-      : 'concrete';
+  const parsedAnalogy = analogyFramingSchema.safeParse(parsed.analogyFraming);
+  const analogyFraming = parsedAnalogy.success
+    ? parsedAnalogy.data
+    : 'concrete';
   return {
     goals: rawGoals,
     experienceLevel:

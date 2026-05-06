@@ -4,7 +4,11 @@
 // ---------------------------------------------------------------------------
 
 import { and, desc, eq } from 'drizzle-orm';
-import { weeklyReports, type Database } from '@eduagent/database';
+import {
+  createScopedRepository,
+  weeklyReports,
+  type Database,
+} from '@eduagent/database';
 import type {
   WeeklyReportData,
   WeeklyReportRecord,
@@ -170,11 +174,11 @@ export async function listWeeklyReportsForProfile(
   db: Database,
   profileId: string
 ): Promise<WeeklyReportSummary[]> {
-  const rows = await db.query.weeklyReports.findMany({
-    where: eq(weeklyReports.childProfileId, profileId),
-    orderBy: desc(weeklyReports.reportWeek),
-    limit: 12,
-  });
+  const scoped = createScopedRepository(db, profileId);
+  const rows = await scoped.weeklyReports.findMany(
+    eq(weeklyReports.childProfileId, profileId),
+    { limit: 12 }
+  );
 
   return rows.map((row) =>
     weeklyReportSummarySchema.parse({

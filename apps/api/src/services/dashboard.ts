@@ -1128,14 +1128,12 @@ export async function getProfileSessions(
   db: Database,
   profileId: string
 ): Promise<ChildSession[]> {
-  const sessions = await db.query.learningSessions.findMany({
-    where: and(
-      eq(learningSessions.profileId, profileId),
-      gte(learningSessions.exchangeCount, 1)
-    ),
-    orderBy: desc(learningSessions.startedAt),
-    limit: 50,
-  });
+  const scoped = createScopedRepository(db, profileId);
+  const sessions = await scoped.sessions.findMany(
+    gte(learningSessions.exchangeCount, 1),
+    50,
+    desc(learningSessions.startedAt)
+  );
 
   if (sessions.length === 0) return [];
 

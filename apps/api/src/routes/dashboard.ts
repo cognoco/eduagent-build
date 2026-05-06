@@ -1,7 +1,6 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import type { Database } from '@eduagent/database';
-import { createScopedRepository } from '@eduagent/database';
 import {
   historyQuerySchema,
   dashboardResponseSchema,
@@ -39,11 +38,7 @@ import {
   getWeeklyReportForParentChild,
   markWeeklyReportViewed,
 } from '../services/weekly-report';
-import { buildCuratedMemoryView } from '../services/curated-memory';
-import {
-  hasMemoryFactsBackfillMarker,
-  readMemorySnapshotFromFacts,
-} from '../services/memory/memory-facts';
+import { buildCuratedMemoryViewForProfile } from '../services/curated-memory';
 import { assertParentAccess } from '../services/family-access';
 import { notFound } from '../errors';
 import { isMemoryFactsReadEnabled } from '../config';
@@ -212,25 +207,15 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       );
     }
 
-    const snapshot =
-      isMemoryFactsReadEnabled(c.env.MEMORY_FACTS_READ_ENABLED) &&
-      hasMemoryFactsBackfillMarker(profile)
-        ? await readMemorySnapshotFromFacts(
-            createScopedRepository(db, childProfileId),
-            profile,
-            { respectInjectionToggle: false }
-          )
-        : null;
-    const memory = buildCuratedMemoryView(
-      snapshot
-        ? {
-            ...profile,
-            interests: snapshot.interests,
-            strengths: snapshot.strengths,
-            struggles: snapshot.struggles,
-            communicationNotes: snapshot.communicationNotes,
-          }
-        : profile
+    const memory = await buildCuratedMemoryViewForProfile(
+      db,
+      childProfileId,
+      profile,
+      {
+        memoryFactsReadEnabled: isMemoryFactsReadEnabled(
+          c.env.MEMORY_FACTS_READ_ENABLED
+        ),
+      }
     );
     return c.json(childMemoryResponseSchema.parse({ memory }));
   })

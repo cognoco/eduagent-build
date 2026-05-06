@@ -1,5 +1,9 @@
 import { and, desc, eq } from 'drizzle-orm';
-import { monthlyReports, type Database } from '@eduagent/database';
+import {
+  createScopedRepository,
+  monthlyReports,
+  type Database,
+} from '@eduagent/database';
 import type {
   MonthlyReportData,
   MonthlyReportRecord,
@@ -256,10 +260,10 @@ export async function listMonthlyReportsForProfile(
   db: Database,
   profileId: string
 ): Promise<MonthlyReportSummary[]> {
-  const rows = await db.query.monthlyReports.findMany({
-    where: eq(monthlyReports.childProfileId, profileId),
-    orderBy: desc(monthlyReports.reportMonth),
-  });
+  const scoped = createScopedRepository(db, profileId);
+  const rows = await scoped.monthlyReports.findMany(
+    eq(monthlyReports.childProfileId, profileId)
+  );
 
   return rows.map((row) =>
     monthlyReportSummarySchema.parse({

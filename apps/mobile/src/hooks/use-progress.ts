@@ -22,6 +22,11 @@ import type {
   WeeklyReportRecord,
   WeeklyReportSummary,
 } from '@eduagent/schemas';
+import {
+  childReportsResponseSchema,
+  childSessionsResponseSchema,
+  weeklyReportsResponseSchema,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
@@ -461,7 +466,7 @@ export function useProfileSessions(
               { init: { signal } }
             );
         await assertOk(res);
-        const data = (await res.json()) as { sessions: ChildSession[] };
+        const data = childSessionsResponseSchema.parse(await res.json());
         return data.sessions;
       } finally {
         cleanup();
@@ -493,7 +498,7 @@ export function useProfileReports(
               { init: { signal } }
             );
         await assertOk(res);
-        const data = (await res.json()) as { reports: MonthlyReportSummary[] };
+        const data = childReportsResponseSchema.parse(await res.json());
         return data.reports;
       } finally {
         cleanup();
@@ -536,7 +541,7 @@ export function useProfileWeeklyReports(
               { init: { signal } }
             );
         await assertOk(res);
-        const data = (await res.json()) as { reports: WeeklyReportSummary[] };
+        const data = weeklyReportsResponseSchema.parse(await res.json());
         return data.reports;
       } finally {
         cleanup();
