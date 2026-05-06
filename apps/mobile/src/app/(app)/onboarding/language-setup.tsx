@@ -8,18 +8,17 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { getLocales } from 'expo-localization';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import type { CefrLevel } from '@eduagent/schemas';
-import { OnboardingStepIndicator } from '../../../components/onboarding/OnboardingStepIndicator';
 import { useConfigureLanguageSubject } from '../../../hooks/use-subjects';
 import { useStartFirstCurriculumSession } from '../../../hooks/use-sessions';
 import { formatApiError } from '../../../lib/format-api-error';
 import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import { useThemeColors } from '../../../lib/theme';
 import { goBackOrReplace } from '../../../lib/navigation';
-import { getOnboardingStepLabels } from '../../../lib/onboarding-step-labels';
 
 const NATIVE_LANGUAGE_OPTIONS = [
   { code: 'en', label: 'English' },
@@ -37,6 +36,27 @@ const NATIVE_LANGUAGE_OPTIONS = [
   { code: 'ms', label: 'Malay' },
   { code: 'other', label: 'Other' },
 ];
+
+const NATIVE_LANGUAGE_CODES = new Set(
+  NATIVE_LANGUAGE_OPTIONS.map((o) => o.code).filter((c) => c !== 'other')
+);
+
+/** Derive a pre-selected native language from the device locale.
+ *  Returns the matching NATIVE_LANGUAGE_CODES entry, or 'en' as fallback.
+ */
+function getDeviceNativeLanguage(): string {
+  try {
+    const tag = getLocales()[0]?.languageTag ?? 'en';
+    const lang = tag.split('-')[0] ?? 'en';
+    // nb-NO → 'nb', nn-NO → try 'nb' (Norwegian Nynorsk → Bokmål)
+    if (NATIVE_LANGUAGE_CODES.has(lang)) return lang;
+    // Norwegian Nynorsk maps to Norwegian Bokmål in the option list
+    if (lang === 'nn') return 'nb';
+  } catch {
+    // getLocales() can throw in test environments
+  }
+  return 'en';
+}
 
 const LEVEL_OPTIONS: Array<{
   label: string;
@@ -81,6 +101,7 @@ export default function LanguageSetup() {
     languageCode,
     step: stepParam,
     totalSteps: totalStepsParam,
+    returnTo,
   } = useLocalSearchParams<{
     subjectId?: string;
     subjectName?: string;
@@ -88,6 +109,7 @@ export default function LanguageSetup() {
     languageCode?: string;
     step?: string;
     totalSteps?: string;
+    returnTo?: string;
   }>();
   const configureLanguageSubject = useConfigureLanguageSubject();
   const startFirstCurriculumSession = useStartFirstCurriculumSession(
@@ -96,8 +118,9 @@ export default function LanguageSetup() {
   const colors = useThemeColors(); // [BUG-118]
   const step = Number(stepParam) || 2;
   const totalSteps = Number(totalStepsParam) || 4;
-  const stepLabels = getOnboardingStepLabels(t);
-  const [nativeLanguage, setNativeLanguage] = useState<string>('en');
+  const [nativeLanguage, setNativeLanguage] = useState<string>(() =>
+    getDeviceNativeLanguage()
+  );
   const [customLanguage, setCustomLanguage] = useState('');
   const [startingLevel, setStartingLevel] = useState<CefrLevel>('A1');
   const [error, setError] = useState('');
@@ -117,6 +140,10 @@ export default function LanguageSetup() {
     // BUG-692-FOLLOWUP: Mark the mutation as cancelled so the post-await
     // router.replace in handleContinue does not fire after back-navigation.
     cancelledRef.current = true;
+    if (returnTo === 'settings') {
+      goBackOrReplace(router, '/(app)/more' as never);
+      return;
+    }
     goBackOrReplace(router, {
       pathname: '/(app)/onboarding/interview',
       params: {
@@ -128,7 +155,15 @@ export default function LanguageSetup() {
         totalSteps: String(totalSteps),
       },
     });
-  }, [languageCode, languageName, router, subjectId, subjectName, totalSteps]);
+  }, [
+    languageCode,
+    languageName,
+    returnTo,
+    router,
+    subjectId,
+    subjectName,
+    totalSteps,
+  ]);
 
   const handleContinue = async () => {
     if (!subjectId) return;
@@ -149,6 +184,11 @@ export default function LanguageSetup() {
       // BUG-692-FOLLOWUP: User pressed Back while the mutation was in flight —
       // don't navigate to accommodations from a screen the user has already left.
       if (cancelledRef.current) return;
+      // ACCOUNT-29: Settings re-entry saves and routes back to More.
+      if (returnTo === 'settings') {
+        goBackOrReplace(router, '/(app)/more' as never);
+        return;
+      }
       if (FEATURE_FLAGS.ONBOARDING_FAST_PATH) {
         const result = await startFirstCurriculumSession.mutateAsync({
           sessionType: 'learning',
@@ -221,17 +261,14 @@ export default function LanguageSetup() {
         >
           <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </Pressable>
-        <OnboardingStepIndicator
-          step={step}
-          totalSteps={totalSteps}
-          stepLabels={stepLabels}
-        />
-
-        <Text className="text-h2 font-bold text-text-primary">
-          {t('onboarding.languageSetup.title')}
+        <Text
+          className="text-h2 font-bold text-text-primary"
+          testID="language-setup-calibration-title"
+        >
+          {t('onboarding.languageSetup.calibrationTitle')}
         </Text>
         <Text className="text-body text-text-secondary mt-2 mb-5">
-          {t('onboarding.languageSetup.subtitle')}
+          {t('onboarding.languageSetup.calibrationSubtitle')}
         </Text>
 
         <View className="bg-primary/10 rounded-card p-4 mb-6">

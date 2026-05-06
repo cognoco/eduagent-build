@@ -124,11 +124,11 @@
       },
       "intentActions": {
         "homework": {
-          "title": "Ayuda con tareas",
+          "title": "Ayuda con una tarea",
           "subtitle": "Toma una foto o escribe el problema"
         },
         "practice": {
-          "title": "Practicar para un examen",
+          "title": "Pon a prueba tus conocimientos",
           "subtitle": "Repasa lo que se está olvidando o ponte a prueba"
         },
         "studyNew": {
@@ -847,7 +847,11 @@
     "acceptSuggestionLabel": "Aceptar sugerencia",
     "editSuggestionLabel": "Editar sugerencia",
     "startLearning": "Empezar a aprender",
-    "validationHint": "Introduce un nombre de materia para empezar"
+    "validationHint": "Introduce un nombre de materia para empezar",
+    "weWillStartWith": "Empezaremos con {{subject}}.",
+    "start": "Empezar",
+    "changeSubject": "Cambiar",
+    "changeSubjectLabel": "Cambiar materia"
   },
   "vocabulary": {
     "fallbackTitle": "Vocabulario",
@@ -1307,6 +1311,8 @@
     },
     "languageSetup": {
       "title": "Configuración de idioma",
+      "calibrationTitle": "Verificación rápida",
+      "calibrationSubtitle": "¿Qué idioma hablas en casa? Un toque y empezamos.",
       "subtitle": "Cambiaremos esta materia a una ruta enfocada en el idioma con enseñanza directa, seguimiento de vocabulario y práctica de habla.",
       "learningHint": "¡Parece que estás aprendiendo {{language}}!",
       "approachHint": "Usaremos un enfoque centrado en el idioma, construido alrededor del vocabulario, la fluidez, la entrada y la práctica de salida.",

@@ -1053,6 +1053,156 @@ describe('CreateSubjectScreen', () => {
       );
     });
   });
+
+  // -----------------------------------------------------------------------
+  // 5a: Lighter confident-case copy
+  // -----------------------------------------------------------------------
+
+  it('[5a] resolved + single suggestion shows confident card with lighter copy', async () => {
+    setResolveResponse({
+      status: 'resolved',
+      resolvedName: 'Italian',
+      suggestions: [{ name: 'Italian', description: 'Italian language' }],
+      displayMessage: 'Italian works well.',
+    });
+
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'italian');
+    fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+    await waitFor(() => {
+      screen.getByTestId('subject-confident-card');
+    });
+
+    // Lighter "We'll start with" message
+    expect(screen.getByTestId('subject-confident-message').props.children).toBe(
+      "We'll start with Italian."
+    );
+
+    // Primary button says "Start", secondary says "Change"
+    expect(screen.getByText('Start')).toBeTruthy();
+    expect(screen.getByText('Change')).toBeTruthy();
+
+    // Heavier card must NOT be visible
+    expect(screen.queryByTestId('subject-single-suggestion-card')).toBeNull();
+  });
+
+  it('[5a] corrected status shows confident card with lighter copy', async () => {
+    setResolveResponse({
+      status: 'corrected',
+      resolvedName: 'Calculus',
+      suggestions: [],
+      displayMessage: 'Did you mean Calculus?',
+    });
+
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'caluclus');
+    fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+    await waitFor(() => {
+      screen.getByTestId('subject-confident-card');
+    });
+
+    expect(screen.getByTestId('subject-confident-message').props.children).toBe(
+      "We'll start with Calculus."
+    );
+    expect(screen.getByText('Start')).toBeTruthy();
+    expect(screen.getByText('Change')).toBeTruthy();
+
+    // Heavier card must NOT be visible
+    expect(screen.queryByTestId('subject-single-suggestion-card')).toBeNull();
+  });
+
+  it('[5a] tapping Start on confident card calls onAcceptSuggestion and navigates', async () => {
+    setResolveResponse({
+      status: 'resolved',
+      resolvedName: 'Italian',
+      suggestions: [{ name: 'Italian', description: 'Italian language' }],
+      displayMessage: 'Italian works well.',
+    });
+    createSubjectResponse = {
+      subject: { id: 'subject-italian', name: 'Italian' },
+    };
+
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'italian');
+    fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+    await waitFor(() => {
+      screen.getByTestId('subject-confident-card');
+    });
+
+    fireEvent.press(screen.getByTestId('subject-suggestion-accept'));
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith({
+        pathname: '/(app)/onboarding/interview',
+        params: {
+          subjectId: 'subject-italian',
+          subjectName: 'Italian',
+          step: '1',
+          totalSteps: '4',
+        },
+      });
+    });
+  });
+
+  it('[5a] tapping Change on confident card returns to edit state', async () => {
+    setResolveResponse({
+      status: 'resolved',
+      resolvedName: 'Italian',
+      suggestions: [{ name: 'Italian', description: 'Italian language' }],
+      displayMessage: 'Italian works well.',
+    });
+
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'italian');
+    fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+    await waitFor(() => {
+      screen.getByTestId('subject-confident-card');
+    });
+
+    fireEvent.press(screen.getByTestId('subject-suggestion-edit'));
+
+    // Card should be gone; input should be back
+    await waitFor(() => {
+      expect(screen.queryByTestId('subject-confident-card')).toBeNull();
+    });
+    expect(screen.getByTestId('create-subject-name').props.value).toBe(
+      'Italian'
+    );
+  });
+
+  it('[5a] resolved + multiple suggestions keeps heavier Accept/Edit card', async () => {
+    setResolveResponse({
+      status: 'resolved',
+      resolvedName: 'Spanish',
+      suggestions: [
+        { name: 'Spanish', description: 'Spanish language' },
+        { name: 'Spanish Literature', description: 'Hispanic literature' },
+      ],
+      displayMessage: 'Did you mean one of these?',
+    });
+
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'spanish');
+    fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+    await waitFor(() => {
+      screen.getByTestId('subject-single-suggestion-card');
+    });
+
+    // Heavier card with Accept/Edit — not the confident card
+    expect(screen.queryByTestId('subject-confident-card')).toBeNull();
+    expect(screen.getByTestId('subject-suggestion-accept')).toBeTruthy();
+    expect(screen.getByText('Accept')).toBeTruthy();
+  });
 });
 
 // [BUG-829] KeyboardAvoidingView behavior prop must use Platform.select

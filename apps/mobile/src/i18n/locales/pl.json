@@ -124,11 +124,11 @@
       },
       "intentActions": {
         "homework": {
-          "title": "Pomoc w zadaniach",
+          "title": "Pomoc z zadaniem",
           "subtitle": "Zrób zdjęcie albo wpisz zadanie"
         },
         "practice": {
-          "title": "Ćwicz do sprawdzianu",
+          "title": "Sprawdź się",
           "subtitle": "Powtórz to, co się zaciera, albo sprawdź się"
         },
         "studyNew": {
@@ -847,7 +847,11 @@
     "acceptSuggestionLabel": "Akceptuj sugestię",
     "editSuggestionLabel": "Edytuj sugestię",
     "startLearning": "Rozpocznij naukę",
-    "validationHint": "Wprowadź nazwę przedmiotu, aby rozpocząć"
+    "validationHint": "Wprowadź nazwę przedmiotu, aby rozpocząć",
+    "weWillStartWith": "Zaczniemy od {{subject}}.",
+    "start": "Zacznij",
+    "changeSubject": "Zmień",
+    "changeSubjectLabel": "Zmień przedmiot"
   },
   "vocabulary": {
     "fallbackTitle": "Słownictwo",
@@ -1307,6 +1311,8 @@
     },
     "languageSetup": {
       "title": "Konfiguracja języka",
+      "calibrationTitle": "Szybkie sprawdzenie",
+      "calibrationSubtitle": "Jakim językiem mówisz w domu? Jedno kliknięcie i zaczynamy.",
       "subtitle": "Przełączymy ten przedmiot na ścieżkę skoncentrowaną na języku z bezpośrednim nauczaniem, śledzeniem słownictwa i praktyką mówienia.",
       "learningHint": "Wygląda na to, że uczysz się języka: {{language}}!",
       "approachHint": "Użyjemy podejścia skoncentrowanego na języku, opartego na słownictwie, płynności, praktyce wejścia i wyjścia.",

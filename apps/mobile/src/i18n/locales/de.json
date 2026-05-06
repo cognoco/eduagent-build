@@ -124,11 +124,11 @@
       },
       "intentActions": {
         "homework": {
-          "title": "Hausaufgabenhilfe",
+          "title": "Hilfe bei einer Aufgabe",
           "subtitle": "Mach ein Foto oder tippe die Aufgabe ein"
         },
         "practice": {
-          "title": "Für einen Test üben",
+          "title": "Teste dich selbst",
           "subtitle": "Wiederhole, was verblasst, oder teste dich selbst"
         },
         "studyNew": {
@@ -847,7 +847,11 @@
     "acceptSuggestionLabel": "Vorschlag akzeptieren",
     "editSuggestionLabel": "Vorschlag bearbeiten",
     "startLearning": "Lernen starten",
-    "validationHint": "Gib einen Fachnamen ein, um zu beginnen"
+    "validationHint": "Gib einen Fachnamen ein, um zu beginnen",
+    "weWillStartWith": "Wir beginnen mit {{subject}}.",
+    "start": "Starten",
+    "changeSubject": "Ändern",
+    "changeSubjectLabel": "Fach ändern"
   },
   "vocabulary": {
     "fallbackTitle": "Vokabeln",
@@ -1307,6 +1311,8 @@
     },
     "languageSetup": {
       "title": "Spracheinrichtung",
+      "calibrationTitle": "Kurze Prüfung",
+      "calibrationSubtitle": "Welche Sprache sprichst du zu Hause? Ein Tipp, dann legen wir los.",
       "subtitle": "Wir werden dieses Fach in einen sprachfokussierten Pfad mit direktem Unterricht, Vokabelverfolgung und Sprechübungen umwandeln.",
       "learningHint": "Sieht so aus, als ob du {{language}} lernst!",
       "approachHint": "Wir werden einen sprachfokussierten Ansatz verwenden, der auf Vokabular, Sprachfluss, Input- und Output-Übungen basiert.",

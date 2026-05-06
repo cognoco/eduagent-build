@@ -124,11 +124,11 @@
       },
       "intentActions": {
         "homework": {
-          "title": "Leksehjelp",
+          "title": "Hjelp med en oppgave",
           "subtitle": "Ta et bilde eller skriv inn oppgaven"
         },
         "practice": {
-          "title": "Øv til en prøve",
+          "title": "Test deg selv",
           "subtitle": "Repeter det som begynner å glippe, eller test deg selv"
         },
         "studyNew": {
@@ -847,7 +847,11 @@
     "acceptSuggestionLabel": "Godta forslag",
     "editSuggestionLabel": "Rediger forslag",
     "startLearning": "Start læring",
-    "validationHint": "Skriv inn et emnenavn for å komme i gang"
+    "validationHint": "Skriv inn et emnenavn for å komme i gang",
+    "weWillStartWith": "Vi starter med {{subject}}.",
+    "start": "Start",
+    "changeSubject": "Endre",
+    "changeSubjectLabel": "Endre emne"
   },
   "vocabulary": {
     "fallbackTitle": "Vokabular",
@@ -1307,6 +1311,8 @@
     },
     "languageSetup": {
       "title": "Språkoppsett",
+      "calibrationTitle": "Rask sjekk",
+      "calibrationSubtitle": "Hvilket språk snakker du hjemme? Et trykk, så starter vi.",
       "subtitle": "Vi vil bytte dette emnet til en språkfokusert sti med direkte mentoring, vokabularsporing og taleøvelser.",
       "learningHint": "Ser ut som du lærer {{language}}!",
       "approachHint": "Vi vil bruke en språkfokusert tilnærming bygget rundt vokabular, flyt, input og output-øvelser.",

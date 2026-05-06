@@ -435,6 +435,13 @@ export default function CreateSubjectScreen() {
   const isAmbiguous =
     showSuggestion && resolveState.result.status === 'ambiguous';
   const isNoMatch = showSuggestion && resolveState.result.status === 'no_match';
+  // 5a: confident = spelling correction OR single resolved match.
+  // No backend schema change — derived from existing status + suggestions.length.
+  const isConfident =
+    showSuggestion &&
+    (resolveState.result.status === 'corrected' ||
+      (resolveState.result.status === 'resolved' &&
+        resolveState.result.suggestions.length === 1));
   const allowUseMyWords = isNoMatch || resolveRounds >= 2;
   const exactWords = (clarificationInput || originalInput || name).trim();
   const subjectLimitGuidance = isSubjectLimitError
@@ -804,10 +811,54 @@ export default function CreateSubjectScreen() {
           </View>
         )}
 
-        {/* Single suggestion: corrected or resolved */}
+        {/* Confident single match: corrected spelling or single resolved candidate — lighter copy */}
+        {isConfident && resolveState.phase === 'suggestion' && (
+          <View
+            className="bg-primary-soft rounded-card px-4 py-4 mb-4"
+            testID="subject-confident-card"
+          >
+            <Text
+              className="text-body text-text-primary mb-4"
+              testID="subject-confident-message"
+            >
+              {t('subject.weWillStartWith', {
+                subject: resolveState.result.resolvedName ?? name.trim(),
+              })}
+            </Text>
+            <View className="flex-row gap-3">
+              <Pressable
+                onPress={onAcceptSuggestion}
+                className="flex-1 bg-primary rounded-button py-3 items-center min-h-[44px] justify-center"
+                testID="subject-suggestion-accept"
+                accessibilityRole="button"
+                accessibilityLabel={t('subject.startSubjectLabel', {
+                  name: resolveState.result.resolvedName ?? name.trim(),
+                })}
+              >
+                <Text className="text-text-inverse font-semibold text-body-sm">
+                  {t('subject.start')}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={onEditSuggestion}
+                className="flex-1 bg-surface rounded-button py-3 items-center min-h-[44px] justify-center border border-border"
+                testID="subject-suggestion-edit"
+                accessibilityRole="button"
+                accessibilityLabel={t('subject.changeSubjectLabel')}
+              >
+                <Text className="text-text-primary font-semibold text-body-sm">
+                  {t('subject.changeSubject')}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+
+        {/* Single suggestion: resolved with multiple candidates (heavier Accept/Edit clarification) */}
         {showSuggestion &&
           !isAmbiguous &&
           !isNoMatch &&
+          !isConfident &&
           resolveState.phase === 'suggestion' && (
             <View
               className="bg-primary-soft rounded-card px-4 py-4 mb-4"

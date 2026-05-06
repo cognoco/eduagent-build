@@ -124,11 +124,11 @@
       },
       "intentActions": {
         "homework": {
-          "title": "Homework help",
+          "title": "Help with an assignment",
           "subtitle": "Take a photo or type the problem"
         },
         "practice": {
-          "title": "Practice for a test",
+          "title": "Test yourself",
           "subtitle": "Review what is fading or quiz yourself"
         },
         "studyNew": {
@@ -847,7 +847,11 @@
     "acceptSuggestionLabel": "Accept suggestion",
     "editSuggestionLabel": "Edit suggestion",
     "startLearning": "Start Learning",
-    "validationHint": "Enter a subject name to get started"
+    "validationHint": "Enter a subject name to get started",
+    "weWillStartWith": "We'll start with {{subject}}.",
+    "start": "Start",
+    "changeSubject": "Change",
+    "changeSubjectLabel": "Change subject"
   },
   "vocabulary": {
     "fallbackTitle": "Vocabulary",
@@ -1307,6 +1311,8 @@
     },
     "languageSetup": {
       "title": "Language setup",
+      "calibrationTitle": "Quick check",
+      "calibrationSubtitle": "Which language do you speak at home? One tap, then we start.",
       "subtitle": "We'll switch this subject into a language-focused path with direct instruction, vocabulary tracking, and speaking practice.",
       "learningHint": "Looks like you're learning {{language}}!",
       "approachHint": "We'll use a language-focused approach built around vocabulary, fluency, input, and output practice.",
