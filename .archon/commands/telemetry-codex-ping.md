@@ -7,6 +7,12 @@ argument-hint: (no arguments)
 
 This command exists solely to generate a Codex trace inside an archon workflow run. By being invoked from within the worktree (where `archon-init-tracing` has written a project-scope `.codex/config.toml`), the resulting trace should carry `env=archon-<workflow>` as a resource attribute.
 
+> **Service name depends on which Codex runtime emits the trace:**
+> - Native Codex CLI (Rust binary) emits `service.name = codex_cli_rs`.
+> - Archon's Codex provider (TypeScript SDK wrapper) emits `service.name = codex_sdk_ts`.
+>
+> This command emits via the native CLI inside the worktree, so the trace it produces will carry `codex_cli_rs`. The verification step at the bottom of this file queries Logfire for `codex_sdk_ts` because by that point we're inspecting the trace Archon's wrapper produced when it executed this prompt — different SDK, different layer, different `service.name`. Both traces should land within seconds of each other.
+
 `service.name` will remain at the Codex default (`codex_cli_rs`) — see `archon-init-tracing.md` for why differentiation happens via the `env` attribute instead of `service.name`.
 
 Codex also cannot carry `archon.run_id` / `archon.workflow` / `archon.repo` resource attributes today (per [openai/codex#7821](https://github.com/openai/codex/issues/7821)). Only the `env` field differentiates Codex archon traces from Codex native — accept this asymmetry with the CC variant for now.
@@ -44,12 +50,10 @@ That's the entire command. The trace Codex emits while reading this prompt and p
 ## Verification (after the workflow run)
 
 1. Open Logfire (zpm project).
-2. Filter: `WHERE service.name = 'codex_sdk_ts' AND env LIKE 'archon-%'`.
-   (Archon's Codex provider uses the TypeScript SDK, which emits `codex_sdk_ts`,
-   not the Rust CLI's `codex_cli_rs`.)
+2. Filter: `WHERE service.name = 'codex_sdk_ts' AND env LIKE 'archon-%'` (see runtime split note at top).
 3. Find the most recent trace matching the timestamp printed above.
 4. Confirm the trace carries:
-   - `service.name = codex_sdk_ts` (Archon's Codex provider uses the TS SDK)
+   - `service.name = codex_sdk_ts`
    - `env = archon-<workflow>`
 
 To correlate this trace with the parallel `claude-ping` trace, use timestamp proximity (both should land within seconds of each other) or the run-id printed by the CC ping. Direct correlation by `archon.run_id` will not work for the Codex side until #7821 lands.
