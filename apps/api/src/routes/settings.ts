@@ -8,12 +8,15 @@ import {
   analogyDomainUpdateSchema,
   celebrationLevelUpdateSchema,
   withdrawalArchivePreferenceUpdateSchema,
+  familyPoolBreakdownSharingUpdateSchema,
   nativeLanguageUpdateSchema,
   getNotificationsResponseSchema,
   getLearningModeResponseSchema,
   getCelebrationLevelResponseSchema,
   getWithdrawalArchivePreferenceResponseSchema,
   updateWithdrawalArchivePreferenceResponseSchema,
+  getFamilyPoolBreakdownSharingResponseSchema,
+  updateFamilyPoolBreakdownSharingResponseSchema,
   pushTokenRegisteredResponseSchema,
   notifyParentSubscribeResponseSchema,
   analogyDomainResponseSchema,
@@ -32,6 +35,8 @@ import {
   upsertCelebrationLevel,
   getWithdrawalArchivePreference,
   upsertWithdrawalArchivePreference,
+  getOwnedFamilyPoolBreakdownSharing,
+  upsertFamilyPoolBreakdownSharing,
   registerPushToken,
 } from '../services/settings';
 import { notifyParentToSubscribe } from '../services/notifications';
@@ -169,6 +174,57 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
           body.value
         );
         return c.json(updateWithdrawalArchivePreferenceResponseSchema.parse(result));
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          error.message === 'Profile owner required'
+        ) {
+          return forbidden(c);
+        }
+        throw error;
+      }
+    }
+  )
+
+  .get('/settings/family-pool-breakdown-sharing', async (c) => {
+    const db = c.get('db');
+    const profileId = requireProfileId(c.get('profileId'));
+    const accountId = c.get('account').id;
+
+    try {
+      const value = await getOwnedFamilyPoolBreakdownSharing(
+        db,
+        profileId,
+        accountId
+      );
+      return c.json(getFamilyPoolBreakdownSharingResponseSchema.parse({ value }));
+    } catch (error) {
+      if (error instanceof Error && error.message === 'Profile owner required') {
+        return forbidden(c);
+      }
+      throw error;
+    }
+  })
+
+  .put(
+    '/settings/family-pool-breakdown-sharing',
+    zValidator('json', familyPoolBreakdownSharingUpdateSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const accountId = c.get('account').id;
+      const body = c.req.valid('json');
+
+      try {
+        const result = await upsertFamilyPoolBreakdownSharing(
+          db,
+          profileId,
+          accountId,
+          body.value
+        );
+        return c.json(
+          updateFamilyPoolBreakdownSharingResponseSchema.parse(result)
+        );
       } catch (error) {
         if (
           error instanceof Error &&

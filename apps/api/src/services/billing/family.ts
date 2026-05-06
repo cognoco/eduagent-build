@@ -22,6 +22,7 @@ import {
   ensureFreeSubscription,
   updateQuotaPoolLimit,
 } from './subscription-core';
+import { getFamilyPoolBreakdownSharing } from '../settings';
 
 // ---------------------------------------------------------------------------
 // getSubscriptionForProfile
@@ -258,6 +259,13 @@ export async function getUsageBreakdownForProfile(
       id: profiles.id,
       displayName: profiles.displayName,
       isOwner: profiles.isOwner,
+      familyOwnerProfileId: sql<string | null>`(
+        select owner_profile.id
+        from ${profiles} owner_profile
+        where owner_profile.account_id = ${profiles.accountId}
+          and owner_profile.is_owner = true
+        limit 1
+      )`,
       hasChildLink: sql<boolean>`exists (
         select 1 from ${familyLinks}
         where ${familyLinks.parentProfileId} = ${profiles.id}
@@ -304,7 +312,13 @@ export async function getUsageBreakdownForProfile(
     .where(eq(profiles.accountId, sub.accountId))
     .groupBy(profiles.id, profiles.displayName);
 
-  const isOwnerBreakdownViewer = viewer.isOwner && viewer.hasChildLink;
+  const sharingEnabled =
+    viewer.familyOwnerProfileId != null
+      ? await getFamilyPoolBreakdownSharing(db, viewer.familyOwnerProfileId)
+      : false;
+  const isOwnerBreakdownViewer =
+    (viewer.isOwner && viewer.hasChildLink) ||
+    (sharingEnabled && viewer.hasChildLink);
   const visibleRows = isOwnerBreakdownViewer
     ? profileRows
     : profileRows.filter((row) => row.profileId === input.activeProfileId);

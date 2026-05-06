@@ -129,6 +129,34 @@ export const withdrawalArchivePreferences = pgTable(
   ]
 );
 
+export const familyPreferences = pgTable(
+  'family_preferences',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .$defaultFn(() => generateUUIDv7()),
+    ownerProfileId: uuid('owner_profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' })
+      .unique(),
+    poolBreakdownShared: boolean('pool_breakdown_shared')
+      .notNull()
+      .default(false),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index('family_preferences_owner_profile_id_idx').on(table.ownerProfileId),
+  ]
+);
+
+export type FamilyPreferences = typeof familyPreferences.$inferSelect;
+export type NewFamilyPreferences = typeof familyPreferences.$inferInsert;
+
 export const pendingNotices = pgTable(
   'pending_notices',
   {

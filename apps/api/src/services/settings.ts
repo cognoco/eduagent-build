@@ -10,6 +10,7 @@ import {
   learningModes,
   profiles,
   withdrawalArchivePreferences,
+  familyPreferences,
   type Database,
 } from '@eduagent/database';
 import type {
@@ -259,6 +260,67 @@ export async function upsertWithdrawalArchivePreference(
     .onConflictDoUpdate({
       target: withdrawalArchivePreferences.ownerProfileId,
       set: { preference: value, updatedAt: new Date() },
+    });
+
+  return { value };
+}
+
+// ---------------------------------------------------------------------------
+// Family Pool Breakdown Sharing
+// ---------------------------------------------------------------------------
+
+export async function getFamilyPoolBreakdownSharing(
+  db: Database,
+  ownerProfileId: string
+): Promise<boolean> {
+  const row = await db.query.familyPreferences.findFirst({
+    where: eq(familyPreferences.ownerProfileId, ownerProfileId),
+    columns: { poolBreakdownShared: true },
+  });
+
+  return row?.poolBreakdownShared ?? false;
+}
+
+export async function getOwnedFamilyPoolBreakdownSharing(
+  db: Database,
+  ownerProfileId: string,
+  accountId: string
+): Promise<boolean> {
+  await verifyProfileOwnership(db, ownerProfileId, accountId);
+
+  const profile = await db.query.profiles.findFirst({
+    where: eq(profiles.id, ownerProfileId),
+    columns: { isOwner: true },
+  });
+  if (!profile?.isOwner) {
+    throw new Error('Profile owner required');
+  }
+
+  return getFamilyPoolBreakdownSharing(db, ownerProfileId);
+}
+
+export async function upsertFamilyPoolBreakdownSharing(
+  db: Database,
+  ownerProfileId: string,
+  accountId: string,
+  value: boolean
+): Promise<{ value: boolean }> {
+  await verifyProfileOwnership(db, ownerProfileId, accountId);
+
+  const profile = await db.query.profiles.findFirst({
+    where: eq(profiles.id, ownerProfileId),
+    columns: { isOwner: true },
+  });
+  if (!profile?.isOwner) {
+    throw new Error('Profile owner required');
+  }
+
+  await db
+    .insert(familyPreferences)
+    .values({ ownerProfileId, poolBreakdownShared: value })
+    .onConflictDoUpdate({
+      target: familyPreferences.ownerProfileId,
+      set: { poolBreakdownShared: value, updatedAt: new Date() },
     });
 
   return { value };

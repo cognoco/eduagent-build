@@ -56,6 +56,13 @@ export type WithdrawalArchivePreferenceUpdate = z.infer<
   typeof withdrawalArchivePreferenceUpdateSchema
 >;
 
+export const familyPoolBreakdownSharingUpdateSchema = z.object({
+  value: z.boolean(),
+});
+export type FamilyPoolBreakdownSharingUpdate = z.infer<
+  typeof familyPoolBreakdownSharingUpdateSchema
+>;
+
 export const pendingCelebrationSchema = z.object({
   celebration: celebrationNameSchema,
   reason: celebrationReasonSchema,
@@ -163,6 +170,20 @@ export const updateWithdrawalArchivePreferenceResponseSchema = z.object({
 });
 export type UpdateWithdrawalArchivePreferenceResponse = z.infer<
   typeof updateWithdrawalArchivePreferenceResponseSchema
+>;
+
+export const getFamilyPoolBreakdownSharingResponseSchema = z.object({
+  value: z.boolean(),
+});
+export type GetFamilyPoolBreakdownSharingResponse = z.infer<
+  typeof getFamilyPoolBreakdownSharingResponseSchema
+>;
+
+export const updateFamilyPoolBreakdownSharingResponseSchema = z.object({
+  value: z.boolean(),
+});
+export type UpdateFamilyPoolBreakdownSharingResponse = z.infer<
+  typeof updateFamilyPoolBreakdownSharingResponseSchema
 >;
 
 // GET /celebrations/pending
