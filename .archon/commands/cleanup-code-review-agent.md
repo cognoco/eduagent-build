@@ -124,7 +124,7 @@ grep -r "interface {Name}\|class {Name}\|type {Name}" packages/ --include="*.ts"
 
 Write to `$ARTIFACTS_DIR/review/code-review-findings.md`:
 
-```markdown
+````markdown
 # Code Review Findings: {Work Order PR-ID}
 
 **Reviewer**: code-review-agent
@@ -153,10 +153,10 @@ Write to `$ARTIFACTS_DIR/review/code-review-findings.md`:
 {Clear description of what's wrong}
 
 **Evidence**:
-```typescript
+````typescript
 // Current code at {file}:{line}
 {problematic code snippet}
-```
+````
 
 **Why This Matters**:
 {Explain the impact - what could go wrong, why it violates standards}
@@ -240,7 +240,7 @@ Write to `$ARTIFACTS_DIR/review/code-review-findings.md`:
 - **Agent**: code-review-agent (cleanup variant)
 - **Timestamp**: {ISO timestamp}
 - **Artifact**: `$ARTIFACTS_DIR/review/code-review-findings.md`
-```
+````
 
 **PHASE_3_CHECKPOINT:**
 - [ ] Artifact file created

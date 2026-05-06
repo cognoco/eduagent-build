@@ -106,8 +106,8 @@ PREOF
 ### 2.2 Save PR Metadata
 
 ```bash
-PR_NUMBER=$(gh pr view HEAD --json number -q .number)
-PR_URL=$(gh pr view HEAD --json url -q .url)
+PR_NUMBER=$(gh pr view --json number -q .number)
+PR_URL=$(gh pr view --json url -q .url)
 echo "$PR_NUMBER" > $ARTIFACTS_DIR/.pr-number
 echo "$PR_URL" > $ARTIFACTS_DIR/.pr-url
 ```

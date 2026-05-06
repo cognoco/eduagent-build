@@ -32,7 +32,7 @@ Note which files are source vs test files, and the Work Order PR identifier.
 ### 1.2 Get Local Diff
 
 ```bash
-git diff origin/main...HEAD
+git diff "${BASE_BRANCH:-origin/main}...HEAD"
 ```
 
 (No GitHub PR exists yet; reviews run on the local worktree branch.)

@@ -168,7 +168,7 @@ mkdir -p $ARTIFACTS_DIR/review
 
 ```bash
 # Remove review directories older than 7 days
-find $ARTIFACTS_DIR/../reviews/pr-* -maxdepth 0 -mtime +7 -exec rm -rf {} \; 2>/dev/null || true
+find "$ARTIFACTS_DIR/../reviews" -maxdepth 1 -name 'pr-*' -type d -mtime +7 -exec rm -rf {} + 2>/dev/null || true
 ```
 
 ### 4.3 Create Scope Manifest
