@@ -406,7 +406,8 @@ describe('metering middleware', () => {
       // must have run BEFORE the handler — proving recall-bridge is metered.
       expect(mockDecrementQuota).toHaveBeenCalledWith(
         expect.anything(),
-        'sub-1'
+        'sub-1',
+        'test-profile-id'
       );
       expect(res.status).toBe(200);
     });
@@ -438,7 +439,8 @@ describe('metering middleware', () => {
 
       expect(mockDecrementQuota).toHaveBeenCalledWith(
         expect.anything(),
-        'sub-1'
+        'sub-1',
+        'test-profile-id'
       );
       expect(res.status).toBe(200);
     });
@@ -523,7 +525,8 @@ describe('metering middleware', () => {
       expect(res.status).toBe(200);
       expect(mockDecrementQuota).toHaveBeenCalledWith(
         expect.anything(),
-        'sub-1'
+        'sub-1',
+        'test-profile-id'
       );
     });
 
@@ -802,7 +805,8 @@ describe('metering middleware', () => {
       // Decrement called with the auto-provisioned subscription
       expect(mockDecrementQuota).toHaveBeenCalledWith(
         expect.anything(),
-        'sub-free'
+        'sub-free',
+        'test-profile-id'
       );
     });
   });
@@ -1002,7 +1006,8 @@ describe('metering middleware', () => {
       // Decrement still happened against DB
       expect(mockDecrementQuota).toHaveBeenCalledWith(
         expect.anything(),
-        'sub-1'
+        'sub-1',
+        'test-profile-id'
       );
     });
 
@@ -1202,11 +1207,18 @@ describe('metering middleware', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'hello' }),
         },
-        TEST_ENV
+        { ...TEST_ENV, SUBSCRIPTION_KV: {} as KVNamespace }
       );
 
       expect(res.status).toBe(200);
       expect(res.headers.get('X-Quota-Remaining')).toBe('499');
+      expect(mockWriteSubscriptionStatus).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-account-id',
+        expect.objectContaining({
+          usedThisMonth: 500,
+        })
+      );
     });
   });
 

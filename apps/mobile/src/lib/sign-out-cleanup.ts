@@ -63,8 +63,9 @@ export const PER_PROFILE_KEYS: ReadonlyArray<(profileId: string) => string> = [
 // comment justifying why it is per-account vs. device-level.
 //
 // app-ui-language: device preference, preserved across sign-out
-// i18n-auto-suggest-dismissed: per-user, cleared on sign-out
 export const GLOBAL_ASYNCSTORAGE_KEYS: ReadonlyArray<string> = [
+  // Legacy per-user dismissal from removed mentor-language suggestion UI.
+  // Keep clearing it so existing devices don't retain the orphaned key.
   'i18n-auto-suggest-dismissed',
 ];
 

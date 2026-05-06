@@ -6,7 +6,13 @@
  */
 
 import { and, eq } from 'drizzle-orm';
-import { assessments, retentionCards, xpLedger } from '@eduagent/database';
+import {
+  assessments,
+  generateUUIDv7,
+  profiles,
+  retentionCards,
+  xpLedger,
+} from '@eduagent/database';
 
 import { buildIntegrationEnv, cleanupAccounts } from './helpers';
 import {
@@ -144,6 +150,61 @@ describe('Integration: assessment routes', () => {
     expect(res.status).toBe(401);
   });
 
+  it('[BREAK / CR-FULL-2] rejects proxy-mode assessment answers', async () => {
+    const ownerProfile = await createOwnerProfile();
+    const childProfile = {
+      id: generateUUIDv7(),
+      accountId: ownerProfile.accountId,
+      isOwner: false,
+    };
+    const db = getIntegrationDb();
+    await db.insert(profiles).values({
+      id: childProfile.id,
+      accountId: childProfile.accountId,
+      displayName: 'Assessment Child',
+      birthYear: 2000,
+      isOwner: false,
+    });
+
+    const subject = await seedSubject(childProfile.id, 'Biology');
+    const curriculum = await seedCurriculum({
+      subjectId: subject.id,
+      topics: [{ title: 'Photosynthesis', sortOrder: 0 }],
+    });
+    const assessmentId = await seedAssessmentRecord({
+      profileId: childProfile.id,
+      subjectId: subject.id,
+      topicId: curriculum.topicIds[0]!,
+      verificationDepth: 'transfer',
+    });
+
+    const res = await app.request(
+      `/v1/assessments/${assessmentId}/answer`,
+      {
+        method: 'POST',
+        headers: buildAuthHeaders(
+          { sub: ASSESSMENTS_USER.userId, email: ASSESSMENTS_USER.email },
+          childProfile.id
+        ),
+        body: JSON.stringify({
+          answer: 'Plants use light to make sugars from carbon dioxide.',
+        }),
+      },
+      TEST_ENV
+    );
+
+    expect(ownerProfile.isOwner).toBe(true);
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.code).toBe('PROXY_MODE');
+
+    const unchanged = await db.query.assessments.findFirst({
+      where: eq(assessments.id, assessmentId),
+    });
+    expect(unchanged?.status).toBe('in_progress');
+    expect(mockChat).not.toHaveBeenCalled();
+  });
+
   it('returns and updates an assessment with real persistence', async () => {
     const profile = await createOwnerProfile();
     const subject = await seedSubject(profile.id, 'Biology');
@@ -156,7 +217,17 @@ describe('Integration: assessment routes', () => {
       profileId: profile.id,
       subjectId: subject.id,
       topicId,
+      verificationDepth: 'transfer',
     });
+    mockChat.mockResolvedValueOnce(
+      JSON.stringify({
+        feedback: 'Good reasoning!',
+        passed: true,
+        shouldEscalateDepth: false,
+        rawScore: 0.9,
+        qualityRating: 4,
+      })
+    );
 
     const getRes = await app.request(
       `/v1/assessments/${assessmentId}`,
@@ -197,7 +268,7 @@ describe('Integration: assessment routes', () => {
       feedback: 'Good reasoning!',
       passed: true,
       shouldEscalateDepth: false,
-      masteryScore: 0.45,
+      masteryScore: 0.9,
       qualityRating: 4,
     });
 
@@ -207,7 +278,7 @@ describe('Integration: assessment routes', () => {
     });
 
     expect(updated?.status).toBe('passed');
-    expect(Number(updated?.masteryScore)).toBe(0.45);
+    expect(Number(updated?.masteryScore)).toBe(0.9);
     expect(updated?.qualityRating).toBe(4);
     expect(updated?.exchangeHistory).toEqual([
       {
@@ -234,7 +305,17 @@ describe('Integration: assessment routes', () => {
       profileId: profile.id,
       subjectId: subject.id,
       topicId,
+      verificationDepth: 'transfer',
     });
+    mockChat.mockResolvedValueOnce(
+      JSON.stringify({
+        feedback: 'Good reasoning!',
+        passed: true,
+        shouldEscalateDepth: false,
+        rawScore: 0.9,
+        qualityRating: 4,
+      })
+    );
 
     const res = await app.request(
       `/v1/assessments/${assessmentId}/answer`,
@@ -271,7 +352,7 @@ describe('Integration: assessment routes', () => {
     expect(card?.lastReviewedAt).not.toBeNull();
     expect(card?.nextReviewAt).not.toBeNull();
     expect(xp).not.toBeUndefined();
-    expect(xp?.amount).toBe(45);
+    expect(xp?.amount).toBe(180);
     expect(xp?.status).toBe('verified');
   });
 
@@ -387,6 +468,36 @@ describe('Integration: assessment routes', () => {
     expect(res.status).toBe(404);
     const body = await res.json();
     expect(body.message).toBe('Assessment not found');
+  });
+
+  it('rejects declining a refresh for an in-progress assessment', async () => {
+    const profile = await createOwnerProfile();
+    const subject = await seedSubject(profile.id, 'Biology');
+    const curriculum = await seedCurriculum({
+      subjectId: subject.id,
+      topics: [{ title: 'Photosynthesis', sortOrder: 0 }],
+    });
+    const assessmentId = await seedAssessmentRecord({
+      profileId: profile.id,
+      subjectId: subject.id,
+      topicId: curriculum.topicIds[0]!,
+    });
+
+    const res = await app.request(
+      `/v1/assessments/${assessmentId}/decline-refresh`,
+      {
+        method: 'PATCH',
+        headers: buildAuthHeaders(
+          { sub: ASSESSMENTS_USER.userId, email: ASSESSMENTS_USER.email },
+          profile.id
+        ),
+      },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.message).toBe('Assessment is not in a terminal state');
   });
 
   it('returns 200 for a session quick check using the real session lookup', async () => {

@@ -3,7 +3,18 @@
 // Pure business logic + DB-aware query functions, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, gte, ne, inArray, desc, sum, sql } from 'drizzle-orm';
+import {
+  eq,
+  and,
+  gte,
+  ne,
+  inArray,
+  desc,
+  asc,
+  sum,
+  sql,
+  isNotNull,
+} from 'drizzle-orm';
 import {
   familyLinks,
   profiles,
@@ -1098,6 +1109,12 @@ export async function getChildSubjectTopics(
 // Child session list + transcript (parent trust feature)
 // ---------------------------------------------------------------------------
 
+export interface ChildSessionDrillScore {
+  correct: number;
+  total: number;
+  createdAt: string;
+}
+
 export interface ChildSession {
   sessionId: string;
   subjectId: string;
@@ -1118,6 +1135,12 @@ export interface ChildSession {
   narrative: string | null;
   conversationPrompt: string | null;
   engagementSignal: EngagementSignal | null;
+  /**
+   * Fluency-drill outcomes recorded during this session, oldest first.
+   * Empty when no scored drill happened. Used by per-topic detail to render
+   * a "Recent drills: 4/5, 3/5, 5/5" strip without a separate endpoint.
+   */
+  drills: ChildSessionDrillScore[];
 }
 
 /**
@@ -1147,7 +1170,7 @@ export async function getProfileSessions(
     ...new Set(sessions.map((s) => s.topicId).filter(Boolean) as string[]),
   ];
 
-  const [summaries, subjectRows, topicRows] = await Promise.all([
+  const [summaries, subjectRows, topicRows, drillRows] = await Promise.all([
     db.query.sessionSummaries.findMany({
       where: inArray(sessionSummaries.sessionId, sessionIds),
       columns: {
@@ -1170,6 +1193,25 @@ export async function getProfileSessions(
           columns: { id: true, title: true },
         })
       : Promise.resolve([]),
+    // Fluency-drill outcomes for each session, oldest first. Sparse: most
+    // ai_response rows have null drill columns, so the IS NOT NULL filter
+    // keeps the row count small even on the 50-session window.
+    db
+      .select({
+        sessionId: sessionEvents.sessionId,
+        drillCorrect: sessionEvents.drillCorrect,
+        drillTotal: sessionEvents.drillTotal,
+        createdAt: sessionEvents.createdAt,
+      })
+      .from(sessionEvents)
+      .where(
+        and(
+          inArray(sessionEvents.sessionId, sessionIds),
+          eq(sessionEvents.eventType, 'ai_response'),
+          isNotNull(sessionEvents.drillTotal)
+        )
+      )
+      .orderBy(asc(sessionEvents.createdAt)),
   ]);
 
   const summaryBySession = new Map(
@@ -1177,6 +1219,17 @@ export async function getProfileSessions(
   );
   const subjectNameById = new Map(subjectRows.map((s) => [s.id, s.name]));
   const topicTitleById = new Map(topicRows.map((t) => [t.id, t.title]));
+  const drillsBySession = new Map<string, ChildSessionDrillScore[]>();
+  for (const row of drillRows) {
+    if (row.drillCorrect == null || row.drillTotal == null) continue;
+    const list = drillsBySession.get(row.sessionId) ?? [];
+    list.push({
+      correct: row.drillCorrect,
+      total: row.drillTotal,
+      createdAt: row.createdAt.toISOString(),
+    });
+    drillsBySession.set(row.sessionId, list);
+  }
 
   return sessions.map((s) => {
     const metadata = getSessionMetadata(s.metadata);
@@ -1204,6 +1257,7 @@ export async function getProfileSessions(
       narrative: summary?.narrative ?? null,
       conversationPrompt: summary?.conversationPrompt ?? null,
       engagementSignal: parseEngagementSignal(summary?.engagementSignal),
+      drills: drillsBySession.get(s.id) ?? [],
     };
   });
 }
@@ -1292,6 +1346,7 @@ export async function getChildSessionDetail(
     narrative: summary?.narrative ?? null,
     conversationPrompt: summary?.conversationPrompt ?? null,
     engagementSignal: parseEngagementSignal(summary?.engagementSignal),
+    drills: [],
   };
 }
 

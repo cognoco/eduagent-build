@@ -27,6 +27,8 @@ export const assessmentStatusEnum = pgEnum('assessment_status', [
   'in_progress',
   'passed',
   'failed',
+  'borderline',
+  'failed_exhausted',
 ]);
 
 export const xpStatusEnum = pgEnum('xp_status', [

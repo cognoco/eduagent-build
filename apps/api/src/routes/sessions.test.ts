@@ -139,9 +139,16 @@ jest.mock('../services/session', () => {
       this.exchangeCount = count;
     }
   }
+  class _CurriculumSessionNotReadyError extends Error {
+    constructor() {
+      super('Curriculum is still being prepared');
+      this.name = 'CurriculumSessionNotReadyError';
+    }
+  }
   return {
     SubjectInactiveError: _SubjectInactiveError,
     SessionExchangeLimitError: _SessionExchangeLimitError,
+    CurriculumSessionNotReadyError: _CurriculumSessionNotReadyError,
     startSession: jest
       .fn()
       .mockImplementation((_db, _profileId, subjectId, input) => ({
@@ -149,6 +156,21 @@ jest.mock('../services/session', () => {
         subjectId,
         topicId: input.topicId ?? null,
         sessionType: 'learning',
+        status: 'active',
+        escalationRung: 1,
+        exchangeCount: 0,
+        startedAt: new Date().toISOString(),
+        lastActivityAt: new Date().toISOString(),
+        endedAt: null,
+        durationSeconds: null,
+      })),
+    startFirstCurriculumSession: jest
+      .fn()
+      .mockImplementation((_db, _profileId, subjectId, input) => ({
+        id: SESSION_ID,
+        subjectId,
+        topicId: '770e8400-e29b-41d4-a716-446655440001',
+        sessionType: input.sessionType ?? 'learning',
         status: 'active',
         escalationRung: 1,
         exchangeCount: 0,
@@ -381,6 +403,7 @@ import {
   recordSessionEvent,
   setSessionInputMode,
   skipSummary,
+  startFirstCurriculumSession,
   SessionExchangeLimitError,
 } from '../services/session';
 import { app } from '../index';
@@ -507,6 +530,35 @@ describe('session routes', () => {
       );
 
       expect(res.status).toBe(401);
+    });
+  });
+
+  describe('POST /v1/subjects/:subjectId/sessions/first-curriculum', () => {
+    it('starts a scoped first curriculum session', async () => {
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/sessions/first-curriculum`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ sessionType: 'learning', inputMode: 'text' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(201);
+      const body = await res.json();
+      expect(body.session.topicId).toBe(
+        '770e8400-e29b-41d4-a716-446655440001'
+      );
+      expect(startFirstCurriculumSession).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-profile-id',
+        SUBJECT_ID,
+        expect.objectContaining({
+          sessionType: 'learning',
+          inputMode: 'text',
+        })
+      );
     });
   });
 

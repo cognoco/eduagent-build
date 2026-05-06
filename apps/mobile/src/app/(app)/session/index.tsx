@@ -41,10 +41,12 @@ import {
   useStreamMessage,
   useStartSession,
   useCloseSession,
+  useSession,
   useSessionTranscript,
   useRecordSystemPrompt,
   useRecordSessionEvent,
   useSetSessionInputMode,
+  useClearContinuationDepth,
   useFlagSessionContent,
   useParkingLot,
   useAddParkingLotItem,
@@ -294,6 +296,46 @@ export default function SessionScreen() {
   );
 }
 
+/**
+ * Age-aware copy for the F6 confidence affordance. Three variants keep the
+ * metacognitive intent (learner signals uncertainty about their own
+ * understanding) but adjust phrasing to fit the learner's voice.
+ *
+ * Brackets follow `personaFromBirthYear` thresholds (under 13 / 13–17 / 18+).
+ * `null` birthYear falls back to the middle bracket — neutral default.
+ */
+function getConfidenceCopy(birthYear: number | null): {
+  label: string;
+  accessibilityLabel: string;
+  retryMessage: string;
+} {
+  const age = birthYear == null ? null : new Date().getFullYear() - birthYear;
+  if (age != null && age < 13) {
+    return {
+      label: 'Does this feel right? Tap to ask',
+      accessibilityLabel:
+        "If something doesn't make sense yet, that's okay! Tap here to ask the mentor to explain it a different way.",
+      retryMessage: "I don't get this — can you say it another way?",
+    };
+  }
+  if (age != null && age >= 18) {
+    return {
+      label: 'Not sure about this? Tap to ask',
+      accessibilityLabel:
+        'Need a different angle? Tap to ask for clarification or an alternate explanation.',
+      retryMessage:
+        "I'm not sure that was right — can you explain it differently?",
+    };
+  }
+  return {
+    label: 'Is this right? Tap to ask',
+    accessibilityLabel:
+      'Stuck on this answer? Tap to get it explained differently or work through it together.',
+    retryMessage:
+      "I'm not sure I get this — can you explain it differently?",
+  };
+}
+
 function SessionScreenInner() {
   const {
     mode,
@@ -309,6 +351,7 @@ function SessionScreenInner() {
     rawInput,
     recap,
     resumeFromSessionId,
+    gaps: rawGaps,
     returnTo,
     verificationType: routeVerificationType,
     imageUri: rawImageUri,
@@ -327,6 +370,7 @@ function SessionScreenInner() {
     rawInput?: string;
     recap?: string;
     resumeFromSessionId?: string;
+    gaps?: string;
     returnTo?: string;
     verificationType?: string;
     imageUri?: string;
@@ -335,6 +379,20 @@ function SessionScreenInner() {
   // [BUG-635] Coerce Expo Router's `string | string[]` to a single string.
   const imageUri = firstParam(rawImageUri);
   const imageMimeType = firstParam(rawImageMimeType);
+  const gaps = useMemo(() => {
+    const raw = firstParam(rawGaps);
+    if (!raw) return undefined;
+    try {
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return undefined;
+      return parsed
+        .map((gap) => String(gap).trim())
+        .filter((gap) => gap.length > 0)
+        .slice(0, 8);
+    } catch {
+      return undefined;
+    }
+  }, [rawGaps]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { activeProfile } = useProfile();
@@ -537,6 +595,10 @@ function SessionScreenInner() {
   } | null>(null);
 
   const transcript = useSessionTranscript(routeSessionId ?? '');
+  const activeSession = useSession(activeSessionId ?? '');
+  const clearContinuationDepth = useClearContinuationDepth(
+    activeSessionId ?? ''
+  );
   const liveTranscript =
     transcript.data?.archived === false ? transcript.data : null;
 
@@ -936,6 +998,7 @@ function SessionScreenInner() {
     inputMode,
     rawInput: rawInput ?? undefined,
     resumeFromSessionId: resumeFromSessionId ?? undefined,
+    gaps,
     verificationType: routeVerificationType ?? undefined,
     normalizedOcrText,
     homeworkCaptureSource,
@@ -1290,11 +1353,35 @@ function SessionScreenInner() {
     />
   ) : null;
 
+  const showSkipWarmup =
+    activeSession.data?.metadata?.continuationDepth === 'low' ||
+    activeSession.data?.metadata?.continuationDepth === 'mid' ||
+    activeSession.data?.metadata?.continuationDepth === 'high';
+  const skipWarmupChip = showSkipWarmup ? (
+    <View className="flex-row items-center gap-2 px-4 pb-2">
+      <Pressable
+        onPress={() => {
+          void clearContinuationDepth.mutateAsync();
+        }}
+        disabled={clearContinuationDepth.isPending}
+        className="bg-surface-elevated rounded-full px-3 py-1.5 items-center justify-center"
+        accessibilityRole="button"
+        accessibilityLabel="Skip the warm-up, jump in"
+        testID="session-skip-warmup"
+      >
+        <Text className="text-body-sm font-semibold text-text-secondary">
+          Skip the warm-up, jump in
+        </Text>
+      </Pressable>
+    </View>
+  ) : null;
+
   const headerBelow =
-    topicHeaderStrip || classifyErrorChip ? (
+    topicHeaderStrip || classifyErrorChip || skipWarmupChip ? (
       <View className="gap-2">
         {topicHeaderStrip}
         {classifyErrorChip}
+        {skipWarmupChip}
       </View>
     ) : null;
 
@@ -1389,25 +1476,26 @@ function SessionScreenInner() {
     // F6: Confidence indicator — shown only when the LLM reports low confidence
     // on this specific AI message. Dismissed when the learner taps it (sends a
     // follow-up) or when a new exchange completes (lowConfidenceMessageId resets).
+    // Copy varies by age bracket so the metacognitive prompt fits the learner's
+    // voice — younger ages get softer phrasing, adults get more direct.
     const showConfidenceIndicator =
       message.id === lowConfidenceMessageId &&
       !message.streaming &&
       !isStreaming;
+    const confidenceCopy = getConfidenceCopy(activeProfile?.birthYear ?? null);
     const confidenceIndicator = showConfidenceIndicator ? (
       <Pressable
         onPress={() => {
           setLowConfidenceMessageId(null);
-          void continueWithMessage(
-            "I'm not sure that was right — can you explain it differently?"
-          );
+          void continueWithMessage(confidenceCopy.retryMessage);
         }}
         className="rounded-full bg-surface-elevated px-3 py-1.5 self-start mt-1"
         testID="confidence-low-indicator"
         accessibilityRole="button"
-        accessibilityLabel="Not sure about this? Tap to ask for a different explanation"
+        accessibilityLabel={confidenceCopy.accessibilityLabel}
       >
         <Text className="text-caption font-semibold text-text-secondary">
-          Not sure about this? Tap to ask again
+          {confidenceCopy.label}
         </Text>
       </Pressable>
     ) : null;

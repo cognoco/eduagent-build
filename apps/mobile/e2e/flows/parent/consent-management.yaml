@@ -39,7 +39,7 @@ tags:
 # the app routes directly to (parent)/dashboard — no switch-to-parent needed.
 - extendedWaitUntil:
     visible:
-      id: "dashboard-scroll"
+      id: "family-scroll"
     timeout: 15000
 
 # 3. Tap "View details" button on child card to navigate to child detail

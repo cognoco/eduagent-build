@@ -31,6 +31,9 @@ import {
   getTopUpCreditsRemaining,
   getTopUpPriceCents,
   listFamilyMembers,
+  getUsageBreakdownForProfile,
+  getUsageEventsAvailableSince,
+  buildUsageDateLabels,
   addProfileToSubscription,
   // removeProfileFromSubscription, // disabled until invite/claim flow exists (CR-21)
   // ProfileRemovalNotImplementedError, // disabled until invite/claim flow exists (CR-21)
@@ -46,6 +49,7 @@ import { readSubscriptionStatus } from '../services/kv';
 import { apiError, notFound } from '../errors';
 import { BRAND_COLOR_PRIMARY } from '../services/brand';
 import { createLogger } from '../services/logger';
+import type { ProfileMeta } from '../middleware/profile-scope';
 
 const logger = createLogger();
 
@@ -67,6 +71,8 @@ type BillingRouteEnv = {
     user: AuthUser;
     db: Database;
     account: Account;
+    profileId: string | undefined;
+    profileMeta: ProfileMeta | undefined;
   };
 };
 
@@ -397,19 +403,66 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     const warningLevel = getWarningLevel(usedThisMonth, monthlyLimit);
     const dailyRemainingQuestions =
       dailyLimit !== null ? Math.max(0, dailyLimit - usedToday) : null;
+    const activeProfileId = c.get('profileId');
+    const activeProfileMeta = c.get('profileMeta');
+    const cycleResetAt = quota?.cycleResetAt ?? new Date().toISOString();
+    const resetDate = new Date(cycleResetAt);
+    const cycleStartAt =
+      subscription.currentPeriodStart ??
+      new Date(
+        Date.UTC(resetDate.getUTCFullYear(), resetDate.getUTCMonth() - 1, 1)
+      ).toISOString();
+    const usageBreakdown = activeProfileId
+      ? await getUsageBreakdownForProfile(db, {
+          subscriptionId: subscription.id,
+          activeProfileId,
+          monthlyLimit,
+          cycleStartAt,
+        })
+      : null;
+    const visibleUsedThisMonth =
+      usageBreakdown && !usageBreakdown.isOwnerBreakdownViewer
+        ? usageBreakdown.by_profile[0]?.used ?? 0
+        : usedThisMonth;
+    const visibleRemaining = usageBreakdown?.isOwnerBreakdownViewer
+      ? remaining
+      : calculateRemainingQuestions({
+          monthlyLimit,
+          usedThisMonth: visibleUsedThisMonth,
+          topUpCreditsRemaining,
+          dailyLimit,
+          usedToday,
+        });
+    const visibleWarningLevel = usageBreakdown?.isOwnerBreakdownViewer
+      ? warningLevel
+      : getWarningLevel(visibleUsedThisMonth, monthlyLimit);
+    const labels = buildUsageDateLabels({
+      resetsAt: cycleResetAt,
+      renewsAt: subscription.currentPeriodEnd,
+      timezone: account.timezone,
+      locale: activeProfileMeta?.conversationLanguage,
+    });
 
     return c.json(
       usageResponseSchema.parse({
         usage: {
           monthlyLimit,
-          usedThisMonth,
-          remainingQuestions: remaining,
+          usedThisMonth: visibleUsedThisMonth,
+          remainingQuestions: visibleRemaining,
           topUpCreditsRemaining,
-          warningLevel,
-          cycleResetAt: quota?.cycleResetAt ?? new Date().toISOString(),
+          warningLevel: visibleWarningLevel,
+          cycleResetAt,
           dailyLimit,
           usedToday,
           dailyRemainingQuestions,
+          ...(usageBreakdown
+            ? {
+                by_profile: usageBreakdown.by_profile,
+                family_aggregate: usageBreakdown.family_aggregate,
+                per_profile_available_since: getUsageEventsAvailableSince(),
+                ...labels,
+              }
+            : labels),
         },
       })
     );

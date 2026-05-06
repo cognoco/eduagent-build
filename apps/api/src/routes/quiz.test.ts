@@ -505,7 +505,7 @@ describe('Quiz routes', () => {
   describe('POST /v1/quiz/rounds (guess_who)', () => {
     it('generates a guess_who round with topic titles', async () => {
       // Mock the select().from().innerJoin()... chain used by getGuessWhoRoundContext
-      const { topUpCredits } = jest.requireActual(
+      const { profiles, topUpCredits } = jest.requireActual(
         '@eduagent/database'
       ) as typeof import('@eduagent/database');
       const chainResult = [
@@ -513,6 +513,15 @@ describe('Quiz routes', () => {
         { title: 'Marie Curie' },
         { title: 'Isaac Newton' },
       ];
+      const profileLimitFn = jest
+        .fn()
+        .mockResolvedValue([{ id: 'test-profile-id' }]);
+      const profileWhereFn = jest
+        .fn()
+        .mockReturnValue({ limit: profileLimitFn });
+      const profileInnerJoinFn = jest.fn().mockReturnValue({
+        where: profileWhereFn,
+      });
       const limitFn = jest.fn().mockResolvedValue(chainResult);
       const orderByFn = jest.fn().mockReturnValue({ limit: limitFn });
       const whereFn = jest.fn().mockReturnValue({ orderBy: orderByFn });
@@ -524,6 +533,11 @@ describe('Quiz routes', () => {
         if (table === topUpCredits) {
           return {
             where: jest.fn().mockResolvedValue([{ total: 0 }]),
+          };
+        }
+        if (table === profiles) {
+          return {
+            innerJoin: profileInnerJoinFn,
           };
         }
         return { innerJoin: innerJoinFn1 };

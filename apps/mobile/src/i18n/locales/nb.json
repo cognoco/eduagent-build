@@ -166,6 +166,13 @@
     "demoAlertTitle": "Forhåndsvisningsmodus",
     "demoAlertMessage": "Koble til barnets konto for å se ekte data."
   },
+  "family": {
+    "orientationCueBody": "Children, their progress, and family settings live here.",
+    "orientationCueDismiss": "Got it",
+    "orientationCueTitle": "This is your family hub",
+    "subtitle": "Everyone you're learning alongside.",
+    "title": "Family"
+  },
   "more": {
     "screenTitle": "Mer",
     "active": "Aktiv",
@@ -930,7 +937,18 @@
     "title": "Kunnskapssjekk",
     "openingMessage": "La oss se hva du har lært så langt. Jeg vil stille noen spørsmål – bare gjør ditt beste, så hjelper jeg deg med å fylle ut eventuelle hull.",
     "passedMessage": "Du har et solid grep om det meste av dette – {{mastery}}% mestring! Områdene som trenger repetisjon vil dukke opp i biblioteket ditt.",
-    "missingParams": "Denne vurderingen kan ikke startes – mangler nødvendig informasjon."
+    "missingParams": "Denne vurderingen kan ikke startes – mangler nødvendig informasjon.",
+    "pickerTitle": "Pick a topic to check",
+    "pickerSubtitle": "You've studied these recently - pick one to prove what stuck.",
+    "pickerLoadError": "Could not load topics ready for assessment.",
+    "pickerLoading": "Loading topics...",
+    "pickerEmptyTitle": "You haven't studied any topics recently",
+    "pickerEmptyBody": "Start a session first, then come back to check what stuck.",
+    "pickerBrowseTopics": "Browse topics",
+    "pickerStartForTopic": "Start assessment for {{title}}",
+    "studiedToday": "Studied today",
+    "studiedYesterday": "Studied yesterday",
+    "studiedDaysAgo": "Studied {{count}} days ago"
   },
   "homework": {
     "permissionTitle": "Kameratilgang nødvendig",
@@ -1640,6 +1658,7 @@
       "statusUnknown": "Ukjent",
       "understanding": "Forståelse",
       "reviewStatus": "Gjennomgangsstatus",
+      "recentDrills": "Recent drills",
       "sessionHistory": "Økthistorikk",
       "noSessionsYet": "Ingen økter for dette temaet ennå",
       "timeOnApp": "{{duration}} på appen",
@@ -1774,6 +1793,8 @@
     },
     "home": "Hjem",
     "homeLabel": "Hjem",
+    "family": "Family",
+    "familyLabel": "Family tab",
     "library": "Bibliotek",
     "libraryLabel": "Bibliotek",
     "progress": "Fremgang",

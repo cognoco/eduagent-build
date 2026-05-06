@@ -14,7 +14,10 @@ import {
   useStreamInterviewMessage,
   useForceCompleteInterview,
 } from '../../../hooks/use-interview';
-import { useStartSession, useStreamMessage } from '../../../hooks/use-sessions';
+import {
+  useStartFirstCurriculumSession,
+  useStreamMessage,
+} from '../../../hooks/use-sessions';
 import { formatApiError } from '../../../lib/format-api-error';
 import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import { goBackOrReplace } from '../../../lib/navigation';
@@ -83,9 +86,13 @@ export default function InterviewScreen() {
   // transitions into a learning session so the conversation never stops.
   // Hooks are called unconditionally (rules of hooks).
   // ---------------------------------------------------------------------------
-  const startSession = useStartSession(safeSubjectId ?? '');
-  const startSessionRef = useRef(startSession);
-  startSessionRef.current = startSession;
+  const startFirstCurriculumSession = useStartFirstCurriculumSession(
+    safeSubjectId ?? ''
+  );
+  const startFirstCurriculumSessionRef = useRef(
+    startFirstCurriculumSession
+  );
+  startFirstCurriculumSessionRef.current = startFirstCurriculumSession;
   const [sessionPhase, setSessionPhase] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const sessionCreatingRef = useRef(false);
@@ -114,15 +121,15 @@ export default function InterviewScreen() {
   );
 
   // ---------------------------------------------------------------------------
-  // Session transition: silently start a learning session after interview ends.
-  // The curriculum is already persisted server-side when isComplete fires.
+  // Session transition: fast path asks the API to wait for the completed
+  // draft + first materialized curriculum topic, then create a scoped session.
   // ---------------------------------------------------------------------------
   const transitionToSession = useCallback(async () => {
     if (sessionCreatingRef.current || !safeSubjectId) return;
     sessionCreatingRef.current = true;
     try {
-      const result = await startSessionRef.current.mutateAsync({
-        subjectId: safeSubjectId,
+      const result = await startFirstCurriculumSessionRef.current.mutateAsync({
+        ...(bookId ? { bookId } : {}),
         sessionType: 'learning',
         inputMode: 'text',
       });
@@ -149,7 +156,7 @@ export default function InterviewScreen() {
       setSessionCreationStuck(true);
       sessionCreatingRef.current = false;
     }
-  }, [safeSubjectId]);
+  }, [bookId, safeSubjectId]);
 
   const goToNextStep = useCallback(() => {
     if (!subjectId) return;

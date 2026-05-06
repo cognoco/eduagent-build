@@ -4,11 +4,18 @@ import {
   useQueryClient,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import type { Assessment, AssessmentEvaluation } from '@eduagent/schemas';
+import type {
+  Assessment,
+  AssessmentEligibleTopic,
+  AssessmentEvaluation,
+  AssessmentStatus,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
+
+export const assessmentEligibleTopicsQueryKey = ['assessments', 'eligible'];
 
 export function useAssessment(
   assessmentId: string
@@ -59,26 +66,86 @@ export function useCreateAssessment(subjectId: string, topicId: string) {
   });
 }
 
+export function useAssessmentEligibleTopics(): UseQueryResult<
+  AssessmentEligibleTopic[]
+> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: [...assessmentEligibleTopicsQueryKey, activeProfile?.id],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.retention['assessment-eligible'].$get(
+          {},
+          { init: { signal } }
+        );
+        await assertOk(res);
+        const data = (await res.json()) as {
+          topics: AssessmentEligibleTopic[];
+        };
+        return data.topics;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled: !!activeProfile,
+  });
+}
+
+interface SubmitAnswerInput {
+  answer: string;
+  assessmentId?: string;
+}
+
 export function useSubmitAnswer(assessmentId: string) {
   const client = useApiClient();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: {
-      answer: string;
-    }): Promise<{ evaluation: AssessmentEvaluation }> => {
+    mutationFn: async (
+      input: SubmitAnswerInput
+    ): Promise<{
+      evaluation: AssessmentEvaluation;
+      status: AssessmentStatus;
+    }> => {
+      const targetAssessmentId = input.assessmentId ?? assessmentId;
+      if (!targetAssessmentId) {
+        throw new Error('Assessment id is required to submit an answer.');
+      }
       const res = await client.assessments[':assessmentId'].answer.$post({
-        param: { assessmentId },
-        json: input,
+        param: { assessmentId: targetAssessmentId },
+        json: { answer: input.answer },
       });
       await assertOk(res);
-      return (await res.json()) as { evaluation: AssessmentEvaluation };
+      return (await res.json()) as {
+        evaluation: AssessmentEvaluation;
+        status: AssessmentStatus;
+      };
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      const targetAssessmentId = variables.assessmentId ?? assessmentId;
       void queryClient.invalidateQueries({
-        queryKey: ['assessment', assessmentId],
+        queryKey: ['assessment', targetAssessmentId],
       });
       void queryClient.invalidateQueries({ queryKey: ['progress'] });
+    },
+  });
+}
+
+export function useDeclineAssessmentRefresh(assessmentId: string) {
+  const client = useApiClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const res = await client.assessments[':assessmentId'][
+        'decline-refresh'
+      ].$patch({
+        param: { assessmentId },
+      });
+      await assertOk(res);
+      return await res.json();
     },
   });
 }

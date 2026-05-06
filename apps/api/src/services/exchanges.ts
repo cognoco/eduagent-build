@@ -26,6 +26,7 @@ import {
   type ExchangeFallback,
   type ExchangeFallbackReason,
   type LlmResponseEnvelope,
+  type ExtractedInterviewSignals,
 } from '@eduagent/schemas';
 import type { LLMTier } from './subscription';
 import {
@@ -176,8 +177,16 @@ export interface ExchangeContext {
   correctStreak?: number;
   /** Client-side effective mode — drives mode-specific prompt sections (e.g. recitation) */
   effectiveMode?: string;
+  /** Gap labels carried from a borderline assessment into a focused refresh session. */
+  gapAreas?: string[];
+  /** Continuation opener phase for same-topic resume sessions. */
+  continuationOpenerPhase?: 'probe' | 'score';
+  /** Continuation depth chosen after the opener score. */
+  continuationDepth?: 'low' | 'mid' | 'high';
   /** Learner's display name — used to personalise the mentor's voice */
   learnerName?: string;
+  /** Interview-derived hints captured during fast-path onboarding. */
+  onboardingSignals?: ExtractedInterviewSignals;
 }
 
 /** Result of processing a single exchange */
@@ -203,6 +212,8 @@ export interface ExchangeResult {
   fluencyDrill?: FluencyDrillAnnotation;
   /** F6: LLM self-reported confidence level. Absent means treat as 'medium'. */
   confidence?: 'low' | 'medium' | 'high';
+  /** Continuation opener score from the envelope, 0-1. */
+  retrievalScore?: number;
 }
 
 /** Streaming variant result */
@@ -362,6 +373,7 @@ export async function processExchange(
     notePromptPostSession: parsed.notePromptPostSession || undefined,
     fluencyDrill: parsed.fluencyDrill ?? undefined,
     confidence: parsed.confidence,
+    retrievalScore: parsed.retrievalScore,
   };
 }
 
@@ -433,6 +445,8 @@ export interface ParsedExchangeEnvelope {
   fluencyDrill: FluencyDrillAnnotation | null;
   /** F6: LLM self-reported confidence level. Absent means treat as 'medium'. */
   confidence?: 'low' | 'medium' | 'high';
+  /** Continuation opener score from the envelope, 0-1. */
+  retrievalScore?: number;
   /**
    * Interview-specific: LLM signalled readiness to close the interview.
    * False for non-interview flows and for every fallback-shaped parse result.
@@ -577,6 +591,10 @@ function envelopeToParsedExchange(
     notePromptPostSession: notePrompt?.post_session === true,
     fluencyDrill,
     confidence: envelope.confidence,
+    retrievalScore:
+      typeof signals.retrieval_score === 'number'
+        ? signals.retrieval_score
+        : undefined,
     readyToFinish: signals.ready_to_finish === true,
   };
 }
@@ -722,6 +740,7 @@ export function classifyExchangeOutcome(
       notePromptPostSession: false,
       fluencyDrill: null,
       confidence: undefined,
+      retrievalScore: undefined,
       readyToFinish: false,
     };
     return {
@@ -752,6 +771,7 @@ export function classifyExchangeOutcome(
     notePromptPostSession: false,
     fluencyDrill: null,
     confidence: undefined,
+    retrievalScore: undefined,
     readyToFinish: false,
   };
 

@@ -4,8 +4,8 @@ import { consentStatusSchema } from './consent.ts';
 export const locationSchema = z.enum(['EU', 'US', 'OTHER']);
 export type LocationType = z.infer<typeof locationSchema>;
 
-// BKT-C.1 — the tutor's speaking language. ISO 639-1. Initial list: 8
-// languages. Expanding this list requires a separate PR with L1-grammar QA.
+// BKT-C.1 — the tutor's speaking language. ISO 639-1. This is now the union
+// of UI locales plus older mentor-only locales retained for existing rows.
 export const conversationLanguageSchema = z.enum([
   'en',
   'cs',
@@ -15,6 +15,8 @@ export const conversationLanguageSchema = z.enum([
   'it',
   'pt',
   'pl',
+  'ja',
+  'nb',
 ]);
 export type ConversationLanguage = z.infer<typeof conversationLanguageSchema>;
 

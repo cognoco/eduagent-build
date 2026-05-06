@@ -18,7 +18,6 @@ import { useRouter } from 'expo-router';
 import { useAuth, useUser } from '@clerk/clerk-expo';
 import type {
   AccommodationMode,
-  ConversationLanguage,
   KnowledgeInventory,
   LearningMode,
 } from '@eduagent/schemas';
@@ -120,21 +119,6 @@ function ToggleRow({
     </View>
   );
 }
-
-// BKT-C.1 — Settings display names for the 8 supported mentor languages. Kept
-// inline (rather than imported from onboarding/language-picker.tsx) to avoid
-// Expo Router treating a shared helper under app/(app)/ as a route. The source
-// of truth for the allowed codes is packages/schemas/src/profiles.ts.
-const MENTOR_LANGUAGE_KEYS: Record<ConversationLanguage, string> = {
-  en: 'more.mentorLanguageLabels.en',
-  cs: 'more.mentorLanguageLabels.cs',
-  de: 'more.mentorLanguageLabels.de',
-  es: 'more.mentorLanguageLabels.es',
-  fr: 'more.mentorLanguageLabels.fr',
-  it: 'more.mentorLanguageLabels.it',
-  pl: 'more.mentorLanguageLabels.pl',
-  pt: 'more.mentorLanguageLabels.pt',
-};
 
 function LearningModeOption({
   title,
@@ -607,7 +591,7 @@ export default function MoreScreen() {
                   count: linkedChildren.length,
                 })}
                 onPress={() =>
-                  router.push('/(app)/dashboard?returnTo=more' as never)
+                  router.push(`${FAMILY_HOME_PATH}?returnTo=more` as never)
                 }
               />
             )}
@@ -725,23 +709,6 @@ export default function MoreScreen() {
           onPress={() => router.push('/profiles')}
         />
         <AccountSecurity visible={activeProfile?.isOwner ?? false} />
-        {/* BKT-C.1 — Mentor language edit path. Launches the same picker the */}
-        {/* interview onboarding uses, with returnTo=settings so the picker's */}
-        {/* onSave returns here instead of forward-routing into language-setup. */}
-        <SettingsRow
-          label={t('more.account.mentorLanguage')}
-          value={
-            activeProfile?.conversationLanguage
-              ? t(MENTOR_LANGUAGE_KEYS[activeProfile.conversationLanguage])
-              : undefined
-          }
-          onPress={() =>
-            router.push({
-              pathname: '/(app)/onboarding/language-picker',
-              params: { returnTo: 'settings' },
-            })
-          }
-        />
         {FEATURE_FLAGS.I18N_ENABLED && (
           <SettingsRow
             label={t('settings.appLanguage')}
@@ -765,7 +732,7 @@ export default function MoreScreen() {
               className="flex-1 bg-black/50 justify-end"
               onPress={() => setShowLanguagePicker(false)}
               accessibilityLabel={t('common.close')}
-              testID="language-picker-backdrop"
+              testID="app-language-backdrop"
             >
               <Pressable
                 onPress={(e) => e.stopPropagation()}
@@ -783,7 +750,7 @@ export default function MoreScreen() {
                     onPress={() => setShowLanguagePicker(false)}
                     accessibilityRole="button"
                     accessibilityLabel={t('common.close')}
-                    testID="language-picker-close"
+                    testID="app-language-close"
                     hitSlop={12}
                   >
                     <Ionicons

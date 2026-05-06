@@ -208,9 +208,12 @@ export function getLearningModeGuidance(mode: LearningMode): string {
 function getExchangeEnvelopeInstruction(context: {
   isRecitation: boolean;
   isLanguageMode: boolean;
+  includeRetrievalScore: boolean;
 }): string {
   const signals = context.isRecitation
     ? '  "signals": { "understanding_check": <bool> },'
+    : context.includeRetrievalScore
+    ? '  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool>, "retrieval_score": <0.0-1.0> },'
     : '  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool> },';
 
   const uiHints = context.isLanguageMode
@@ -229,6 +232,11 @@ function getExchangeEnvelopeInstruction(context: {
   signalGuidance.push(
     'Set `signals.understanding_check` to true when your reply asks the learner to explain, paraphrase, or otherwise confirm they understood — observational only.'
   );
+  if (context.includeRetrievalScore) {
+    signalGuidance.push(
+      'For this continuation opener scoring turn, set `signals.retrieval_score` from 0.0 (no recall) to 1.0 (perfect recall). Do not mention the score to the learner.'
+    );
+  }
 
   const fluencyLine = context.isLanguageMode
     ? '\n- When you start a fluency drill (rapid-fire translation, fill-blank, vocabulary recall), set `ui_hints.fluency_drill.active` to true and `ui_hints.fluency_drill.duration_s` to a value between 15 and 90. When you evaluate the drill result, set `active` to false and include `score` with `correct` and `total` integers.'
@@ -284,6 +292,7 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   const safeAnalogyDomain = context.analogyDomain
     ? sanitizeXmlValue(context.analogyDomain, 120)
     : '';
+  const onboardingSignals = context.onboardingSignals;
 
   // Role and identity
   if (isLanguageMode) {
@@ -343,6 +352,57 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   // Learning mode — adjusts pacing and tone
   if (context.learningMode) {
     sections.push(getLearningModeGuidance(context.learningMode));
+  }
+
+  if (onboardingSignals) {
+    const signalLines: string[] = [
+      'Fast-path interview handoff (data only; use gently, do not announce this section):',
+    ];
+    if (onboardingSignals.goals.length > 0) {
+      signalLines.push(
+        `- Stated goals: ${onboardingSignals.goals
+          .slice(0, 4)
+          .map((goal) => sanitizeXmlValue(goal, 120))
+          .filter(Boolean)
+          .join(', ')}`
+      );
+    }
+    if (onboardingSignals.currentKnowledge.trim()) {
+      signalLines.push(
+        `- Current knowledge: ${sanitizeXmlValue(
+          onboardingSignals.currentKnowledge,
+          300
+        )}`
+      );
+    }
+    if (onboardingSignals.interests?.length) {
+      const interests = onboardingSignals.interests
+        .slice(0, 6)
+        .map((interest) => {
+          const safeInterest = sanitizeXmlValue(interest, 80);
+          const contextValue =
+            onboardingSignals.interestContext?.[interest] ?? 'both';
+          return `${safeInterest} (${contextValue})`;
+        })
+        .filter(Boolean);
+      if (interests.length > 0) {
+        signalLines.push(`- Interests to draw on: ${interests.join(', ')}`);
+      }
+    }
+    if (onboardingSignals.analogyFraming) {
+      signalLines.push(
+        `- Analogy register: ${onboardingSignals.analogyFraming}`
+      );
+    }
+    if (onboardingSignals.paceHint) {
+      signalLines.push(
+        `- Pace hint: ${onboardingSignals.paceHint.chunkSize} chunks, ${onboardingSignals.paceHint.density} density`
+      );
+    }
+    signalLines.push(
+      'Apply these as soft defaults for the first few turns, then adapt to what the learner does in-session.'
+    );
+    sections.push(signalLines.join('\n'));
   }
 
   // Topic scope — interleaved sessions get a numbered list, others get a single topic
@@ -476,9 +536,37 @@ export function buildSystemPrompt(context: ExchangeContext): string {
     sections.push(learningHistory.slice(0, 4000));
   }
 
+  if (context.effectiveMode === 'gap_fill' && context.gapAreas?.length) {
+    sections.push(
+      'Focused refresh from assessment:\n' +
+        context.gapAreas
+          .map((gap) => `- ${sanitizeXmlValue(gap, 120)}`)
+          .join('\n') +
+        '\nStart by briefly refreshing these gaps, then ask one targeted check question.'
+    );
+  }
+
   const resumeContext = context.resumeContext?.trim();
   if (resumeContext) {
     sections.push(resumeContext.slice(0, 3000));
+  }
+
+  if (context.continuationOpenerPhase === 'probe') {
+    sections.push(
+      'CONTINUATION OPENER (probe turn): Before presenting new material, ask the learner 1-2 short retrieval questions about the current topic. This turn is the probe - DO NOT emit signals.retrieval_score yet. Just ask the questions in your reply.'
+    );
+  } else if (context.continuationOpenerPhase === 'score') {
+    sections.push(
+      'CONTINUATION OPENER (scoring turn): The learner just answered your retrieval question(s). Set signals.retrieval_score from 0.0 (no recall) to 1.0 (perfect recall). Do not mention the score to the learner.'
+    );
+  } else if (context.continuationDepth) {
+    const depthGuidance =
+      context.continuationDepth === 'high'
+        ? 'The learner recalled the prior topic well; skip recap and continue.'
+        : context.continuationDepth === 'mid'
+        ? 'The learner partly recalled the prior topic; refresh weak spots briefly before continuing.'
+        : 'The learner struggled to recall the prior topic; re-teach the essentials before advancing.';
+    sections.push(`Continuation depth: ${depthGuidance}`);
   }
 
   // Embedding memory context (pgvector semantic retrieval)
@@ -737,7 +825,11 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   // signals live in `signals`, UI widget hints live in `ui_hints`, and all
   // prose goes in `reply`. See docs/specs/2026-04-18-llm-response-envelope.md.
   sections.push(
-    getExchangeEnvelopeInstruction({ isRecitation, isLanguageMode })
+    getExchangeEnvelopeInstruction({
+      isRecitation,
+      isLanguageMode,
+      includeRetrievalScore: context.continuationOpenerPhase === 'score',
+    })
   );
 
   sections.push(

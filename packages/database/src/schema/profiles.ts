@@ -84,7 +84,7 @@ export const profiles = pgTable(
     }).onDelete('set null'),
     check(
       'profiles_conversation_language_check',
-      sql`${table.conversationLanguage} IN ('en','cs','es','fr','de','it','pt','pl')`
+      sql`${table.conversationLanguage} IN ('en','cs','es','fr','de','it','pt','pl','ja','nb')`
     ),
     // [BUG-978 / CCR-PR123-DB-1] DB-layer enforcement of the 32-char pronouns
     // cap. The Zod validator is primary; this CHECK closes the gap for any

@@ -41,15 +41,28 @@ import { useSubjects } from '../../hooks/use-subjects';
 import { usePermissionSetup } from '../../hooks/use-permission-setup';
 import { PermissionSetupGate } from '../../components/PermissionSetupGate';
 import { useParentProxy } from '../../hooks/use-parent-proxy';
+import { useFamilyPresence } from '../../hooks/use-family-presence';
 import {
   useActiveProfileRole,
   type ActiveProfileRole,
 } from '../../hooks/use-active-profile-role';
+import { useMentorLanguageSync } from '../../hooks/use-mentor-language-sync';
 
 // ─── Tab visibility whitelist ────────────────────────────────────────
 // Only these routes render a visible tab button. Every other route in
 // (app)/ is auto-hidden — no manual Tabs.Screen entry required.
-const VISIBLE_TABS = new Set(['home', 'library', 'progress', 'more']);
+const BASE_VISIBLE_TABS: ReadonlySet<string> = new Set([
+  'home',
+  'library',
+  'progress',
+  'more',
+]);
+
+export function computeVisibleTabs(hasFamily: boolean): Set<string> {
+  const next = new Set<string>(BASE_VISIBLE_TABS);
+  if (hasFamily) next.add('family');
+  return next;
+}
 
 // Routes where the entire tab bar is hidden (immersive / full-screen UX).
 const FULL_SCREEN_ROUTES = new Set([
@@ -75,6 +88,7 @@ const iconMap: Record<
   Home: { focused: 'home', default: 'home-outline' },
   Book: { focused: 'book', default: 'book-outline' },
   Progress: { focused: 'stats-chart', default: 'stats-chart-outline' },
+  Family: { focused: 'people', default: 'people-outline' },
   More: { focused: 'menu', default: 'menu-outline' },
 };
 
@@ -1260,7 +1274,13 @@ export default function AppLayout() {
     acknowledgeProfileRemoval,
     switchProfile,
   } = useProfile();
+  useMentorLanguageSync();
   const { isParentProxy, childProfile, parentProfile } = useParentProxy();
+  const { hasFamily } = useFamilyPresence();
+  const visibleTabs = React.useMemo(
+    () => computeVisibleTabs(hasFamily),
+    [hasFamily]
+  );
 
   // Sync Clerk auth state with RevenueCat identity (runs on auth change)
   useRevenueCatIdentity();
@@ -1508,7 +1528,7 @@ export default function AppLayout() {
 
   // Linked-parent accounts intentionally enter through /(app)/home now.
   // home.tsx renders ParentGateway for owners with child profiles and routes
-  // them to /(app)/dashboard only when they explicitly choose progress
+  // them to /(app)/family only when they explicitly choose progress
   // management. That keeps the adaptive home flow reachable.
 
   // Gate: block app access when parental consent is pending (COPPA/GDPR)
@@ -1564,7 +1584,7 @@ export default function AppLayout() {
           />
         )}
         {/* ─── Whitelist tab pattern ────────────────────────────────────
-           Only routes listed in VISIBLE_TABS render a tab button.
+           Only routes listed in visibleTabs render a tab button.
            Everything else is auto-hidden via screenOptions defaults.
            Adding a new route file to (app)/ will NEVER create a
            phantom tab — no manual Tabs.Screen entry needed.
@@ -1574,7 +1594,7 @@ export default function AppLayout() {
          ──────────────────────────────────────────────────────────── */}
         <Tabs
           screenOptions={({ route }) => {
-            const isVisible = VISIBLE_TABS.has(route.name);
+            const isVisible = visibleTabs.has(route.name);
             const isFullScreen = FULL_SCREEN_ROUTES.has(route.name);
             return {
               headerShown: false,
@@ -1645,6 +1665,17 @@ export default function AppLayout() {
               tabBarAccessibilityLabel: t('tabs.progressLabel'),
               tabBarIcon: ({ focused }) => (
                 <TabIcon name="Progress" focused={focused} />
+              ),
+            }}
+          />
+          <Tabs.Screen
+            name="family"
+            options={{
+              title: t('tabs.family'),
+              tabBarButtonTestID: 'tab-family',
+              tabBarAccessibilityLabel: t('tabs.familyLabel'),
+              tabBarIcon: ({ focused }) => (
+                <TabIcon name="Family" focused={focused} />
               ),
             }}
           />

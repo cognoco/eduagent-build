@@ -174,6 +174,15 @@ export const sessionEvents = pgTable(
     content: text('content').notNull(),
     metadata: jsonb('metadata').default({}),
     structuredAssessment: jsonb('structured_assessment'),
+    /**
+     * Fluency-drill outcome on ai_response events whose envelope reported a
+     * scored drill (`ui_hints.fluency_drill.score`). Sparse — non-null only
+     * when the LLM actually emitted a score for that turn. Persisted as
+     * dedicated columns rather than in metadata so the per-topic dashboard
+     * can range-scan recent drill outcomes without unpacking JSONB.
+     */
+    drillCorrect: integer('drill_correct'),
+    drillTotal: integer('drill_total'),
     clientId: text('client_id'),
     orphanReason: text('orphan_reason'),
     createdAt: timestamp('created_at', { withTimezone: true })

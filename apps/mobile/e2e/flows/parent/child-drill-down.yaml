@@ -33,7 +33,7 @@ tags:
 # the app routes directly to (parent)/dashboard — no switch-to-parent needed.
 - extendedWaitUntil:
     visible:
-      id: "dashboard-scroll"
+      id: "family-scroll"
     timeout: 15000
 
 # 3. Verify a child summary card rendered.
@@ -189,7 +189,7 @@ tags:
 - runFlow:
     when:
       visible:
-        id: "dashboard-scroll"
+        id: "family-scroll"
     file: ../_setup/switch-to-child.yaml
     env:
       CHILD_NAME: "Proxy Child"

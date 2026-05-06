@@ -47,6 +47,7 @@ export type MeteringEnv = {
   Variables: {
     db: Database;
     account: Account;
+    profileId: string | undefined;
     profileMeta: ProfileMeta;
     subscriptionId: string;
     llmTier: LLMTier;
@@ -306,7 +307,9 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     }
 
     // 4. Attempt to decrement quota (atomic, handles top-up FIFO fallback + daily guard)
-    const decrement = await decrementQuota(db, subscriptionId);
+    const profileMeta = c.get('profileMeta');
+    const profileId = c.get('profileId');
+    const decrement = await decrementQuota(db, subscriptionId, profileId);
 
     if (!decrement.success) {
       const isDailyExceeded = decrement.source === 'daily_exceeded';
@@ -337,7 +340,6 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     // Expose the LLM tier so session route handlers can thread it to the LLM router.
     // Per-profile premium flag overrides the subscription-level default — this is how
     // pro plans (2 premium profiles out of 6) and future AI upgrade add-ons work.
-    const profileMeta = c.get('profileMeta');
     const baseLlmTier = getTierConfig(tier).llmTier;
     c.set('llmTier', profileMeta?.hasPremiumLlm ? 'premium' : baseLlmTier);
 
@@ -347,7 +349,11 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     // cached count would each write original+1, understating actual usage.
     if (kv) {
       const atomicUsedMonth =
-        monthlyLimit - decrement.remainingMonthly - decrement.remainingTopUp;
+        decrement.source === 'top_up'
+          ? monthlyLimit
+          : monthlyLimit -
+            decrement.remainingMonthly -
+            decrement.remainingTopUp;
       const atomicUsedToday =
         dailyLimit !== null && decrement.remainingDaily !== null
           ? dailyLimit - decrement.remainingDaily

@@ -3,6 +3,7 @@ import { QueryClient } from '@tanstack/react-query';
 import { createQueryWrapper } from '../test-utils/app-hook-test-utils';
 import {
   useStartSession,
+  useStartFirstCurriculumSession,
   useSetSessionInputMode,
   useSendMessage,
   useCloseSession,
@@ -124,6 +125,56 @@ describe('useStartSession', () => {
     expect(body.topicId).toBe('topic-1');
     expect(body.sessionType).toBe('homework');
     expect(body.inputMode).toBe('voice');
+  });
+
+  it('starts the first curriculum session through the scoped fast-path endpoint', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          session: {
+            id: 'session-1',
+            subjectId: 'subject-1',
+            topicId: 'topic-1',
+            sessionType: 'learning',
+            status: 'active',
+            escalationRung: 1,
+            exchangeCount: 0,
+            startedAt: '2025-01-01T00:00:00Z',
+            lastActivityAt: '2025-01-01T00:00:00Z',
+            endedAt: null,
+            durationSeconds: null,
+          },
+        }),
+        { status: 201 }
+      )
+    );
+
+    const { result } = renderHook(
+      () => useStartFirstCurriculumSession('subject-1'),
+      {
+        wrapper: createWrapper(),
+      }
+    );
+
+    await act(async () => {
+      result.current.mutate({
+        bookId: 'book-1',
+        sessionType: 'learning',
+        inputMode: 'text',
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    const [url, fetchInit] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain('/subjects/subject-1/sessions/first-curriculum');
+    expect(JSON.parse(fetchInit.body as string)).toEqual({
+      bookId: 'book-1',
+      sessionType: 'learning',
+      inputMode: 'text',
+    });
   });
 
   it('passes homework metadata to the API when provided', async () => {

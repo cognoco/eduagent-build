@@ -39,7 +39,7 @@ import {
   ACCOMMODATION_GUIDE,
   ACCOMMODATION_OPTIONS,
 } from '../../../../lib/accommodation-options';
-import { goBackOrReplace } from '../../../../lib/navigation';
+import { FAMILY_HOME_PATH, goBackOrReplace } from '../../../../lib/navigation';
 import { SamplePreview } from '../../../../components/parent/SamplePreview';
 
 function SubjectSkeleton(): React.ReactNode {
@@ -285,7 +285,7 @@ export default function ChildDetailScreen() {
           </Pressable>
         )}
         <Pressable
-          onPress={() => router.replace('/(app)/dashboard' as never)}
+          onPress={() => router.replace(FAMILY_HOME_PATH as never)}
           className="bg-surface rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
           accessibilityRole="button"
           accessibilityLabel={t('parentView.index.backToDashboard')}

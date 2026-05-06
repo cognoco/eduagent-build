@@ -6096,7 +6096,7 @@ Replace fragile free-text markers and JSON-in-text patterns with a typed respons
 | 18.12 | **Eval harness** — `apps/api/eval-llm/` with 9 flows, 5 fixture profiles, `pnpm eval:llm`, `expectedResponseSchema` support | DONE |
 | 18.13 | **F4 Interview escape button** — "I'm ready to start learning" skip button + `useForceCompleteInterview` | DONE |
 | 18.14 | **F5 Friendly error messages** — `format-api-error.ts` with `FRIENDLY_MESSAGE_MAP` for kid-friendly errors | DONE (partial — no recovery action buttons yet) |
-| 18.15 | **F8 Memory source schema** — `sourceSessionId`/`sourceEventId` fields on `MemoryBlockEntry` | DONE (schema only — all values `null`) |
+| 18.15 | **F8 Memory source schema** — `sourceSessionId`/`sourceEventId` fields on `MemoryBlockEntry` | REVERTED 2026-05-06 — stub fields deleted; full F8 deferred until after Progress tab redesign settles, since source-tracking granularity (session vs event vs other) depends on the parent-facing surface. Mini-spec preserved in memory `project_f8_memory_source_refs.md`. Tracked as 18.26. |
 | 18.20 | **F7 Shorten interview** — soft target 3 via prompt (`interview-prompts.ts:9, 14-15`), hard cap 4 via `MAX_INTERVIEW_EXCHANGES` (`interview.ts:399`); per PM spec "3, worst case 4" | DONE |
 
 ### Remaining

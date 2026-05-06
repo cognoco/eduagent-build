@@ -668,6 +668,12 @@ const homeworkSummaryInlineSchema = z.object({
   displayTitle: z.string().min(1),
 });
 
+const childSessionDrillScoreSchema = z.object({
+  correct: z.number().int().min(0),
+  total: z.number().int().min(1),
+  createdAt: z.string().datetime(),
+});
+
 export const childSessionSchema = z.object({
   sessionId: z.string().uuid(),
   subjectId: z.string().uuid(),
@@ -690,6 +696,7 @@ export const childSessionSchema = z.object({
   engagementSignal: z
     .enum(['curious', 'stuck', 'breezing', 'focused', 'scattered'])
     .nullable(),
+  drills: z.array(childSessionDrillScoreSchema),
 });
 export type ChildSession = z.infer<typeof childSessionSchema>;
 

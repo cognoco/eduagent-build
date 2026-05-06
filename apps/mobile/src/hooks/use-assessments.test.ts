@@ -168,6 +168,46 @@ describe('useSubmitAnswer', () => {
     expect(result.current.data?.evaluation.passed).toBe(true);
   });
 
+  it('uses the mutation assessment id when provided', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          evaluation: {
+            passed: true,
+            masteryScore: 0.85,
+            feedback: 'Well done!',
+          },
+          status: 'passed',
+        }),
+        { status: 200 }
+      )
+    );
+
+    const { result } = renderHook(() => useSubmitAnswer(''), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      result.current.mutate({
+        assessmentId: 'created-assess-1',
+        answer: 'Photosynthesis converts light into energy.',
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    const request = mockFetch.mock.calls[0]?.[0] as Request | URL | string;
+    const requestUrl =
+      typeof request === 'string'
+        ? request
+        : request instanceof URL
+        ? request.toString()
+        : request.url;
+    expect(requestUrl).toContain('/assessments/created-assess-1/answer');
+  });
+
   it('handles submission errors', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response('Submission failed', { status: 500 })

@@ -166,6 +166,13 @@
     "demoAlertTitle": "Vorschaumodus",
     "demoAlertMessage": "Verknüpfe das Konto deines Kindes, um echte Daten zu sehen."
   },
+  "family": {
+    "orientationCueBody": "Children, their progress, and family settings live here.",
+    "orientationCueDismiss": "Got it",
+    "orientationCueTitle": "This is your family hub",
+    "subtitle": "Everyone you're learning alongside.",
+    "title": "Family"
+  },
   "more": {
     "screenTitle": "Mehr",
     "active": "Aktiv",
@@ -930,7 +937,18 @@
     "title": "Wissens-Check",
     "openingMessage": "Mal sehen, was du bisher gelernt hast. Ich stelle ein paar Fragen – gib einfach dein Bestes, und ich helfe dir, eventuelle Lücken zu füllen.",
     "passedMessage": "Du hast das meiste davon gut verstanden – {{mastery}}% gemeistert! Die Bereiche, die du wiederholen solltest, werden in deiner Bibliothek angezeigt.",
-    "missingParams": "Diese Bewertung kann nicht gestartet werden – erforderliche Informationen fehlen."
+    "missingParams": "Diese Bewertung kann nicht gestartet werden – erforderliche Informationen fehlen.",
+    "pickerTitle": "Pick a topic to check",
+    "pickerSubtitle": "You've studied these recently - pick one to prove what stuck.",
+    "pickerLoadError": "Could not load topics ready for assessment.",
+    "pickerLoading": "Loading topics...",
+    "pickerEmptyTitle": "You haven't studied any topics recently",
+    "pickerEmptyBody": "Start a session first, then come back to check what stuck.",
+    "pickerBrowseTopics": "Browse topics",
+    "pickerStartForTopic": "Start assessment for {{title}}",
+    "studiedToday": "Studied today",
+    "studiedYesterday": "Studied yesterday",
+    "studiedDaysAgo": "Studied {{count}} days ago"
   },
   "homework": {
     "permissionTitle": "Kamerazugriff benötigt",
@@ -1640,6 +1658,7 @@
       "statusUnknown": "Unbekannt",
       "understanding": "Verständnis",
       "reviewStatus": "Wiederholungsstatus",
+      "recentDrills": "Recent drills",
       "sessionHistory": "Sitzungsverlauf",
       "noSessionsYet": "Noch keine Sitzungen für dieses Thema",
       "timeOnApp": "{{duration}} in der App",
@@ -1774,6 +1793,8 @@
     },
     "home": "Start",
     "homeLabel": "Start",
+    "family": "Family",
+    "familyLabel": "Family tab",
     "library": "Bibliothek",
     "libraryLabel": "Bibliothek",
     "progress": "Fortschritt",

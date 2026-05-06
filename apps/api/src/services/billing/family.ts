@@ -3,11 +3,13 @@
 // Family member CRUD, pool status, cancellation cascade, profile limits
 // ---------------------------------------------------------------------------
 
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, gte, sql } from 'drizzle-orm';
 import {
   subscriptions,
+  usageEvents,
   profiles,
   byokWaitlist,
+  familyLinks,
   type Database,
   findSubscriptionById,
   findQuotaPool,
@@ -123,6 +125,75 @@ export interface FamilyMember {
   isOwner: boolean;
 }
 
+export interface UsageBreakdown {
+  by_profile: Array<{
+    profile_id: string;
+    name: string;
+    used: number;
+    is_self: boolean;
+  }>;
+  family_aggregate: { used: number; limit: number } | null;
+  isOwnerBreakdownViewer: boolean;
+}
+
+const USAGE_EVENTS_AVAILABLE_SINCE = '2026-05-06T00:00:00.000Z';
+
+export function getUsageEventsAvailableSince(): string {
+  return USAGE_EVENTS_AVAILABLE_SINCE;
+}
+
+function formatDateLabel(
+  dateIso: string | null,
+  timezone: string | null | undefined,
+  locale = 'en-US'
+): string | null {
+  if (!dateIso) return null;
+  const timeZone = timezone ?? 'UTC';
+  try {
+    return new Intl.DateTimeFormat(locale, {
+      timeZone,
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    }).format(new Date(dateIso));
+  } catch {
+    return new Intl.DateTimeFormat(locale, {
+      timeZone: 'UTC',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    }).format(new Date(dateIso));
+  }
+}
+
+export function buildUsageDateLabels(input: {
+  resetsAt: string;
+  renewsAt: string | null;
+  timezone?: string | null;
+  locale?: string | null;
+}): {
+  resets_at: string;
+  renews_at: string | null;
+  resets_at_label: string;
+  renews_at_label: string | null;
+} {
+  return {
+    resets_at: input.resetsAt,
+    renews_at: input.renewsAt,
+    resets_at_label:
+      formatDateLabel(
+        input.resetsAt,
+        input.timezone,
+        input.locale ?? undefined
+      ) ?? '',
+    renews_at_label: formatDateLabel(
+      input.renewsAt,
+      input.timezone,
+      input.locale ?? undefined
+    ),
+  };
+}
+
 /**
  * Lists all profiles under the same account (family) as the given subscription.
  */
@@ -145,6 +216,89 @@ export async function listFamilyMembers(
     displayName: r.displayName,
     isOwner: r.isOwner,
   }));
+}
+
+export async function getUsageBreakdownForProfile(
+  db: Database,
+  input: {
+    subscriptionId: string;
+    activeProfileId: string;
+    monthlyLimit: number;
+    cycleStartAt: string;
+  }
+): Promise<UsageBreakdown> {
+  const sub = await findSubscriptionById(db, input.subscriptionId);
+  if (!sub) {
+    return {
+      by_profile: [],
+      family_aggregate: null,
+      isOwnerBreakdownViewer: false,
+    };
+  }
+
+  const [viewer] = await db
+    .select({
+      id: profiles.id,
+      displayName: profiles.displayName,
+      isOwner: profiles.isOwner,
+      hasChildLink: sql<boolean>`exists (
+        select 1 from ${familyLinks}
+        where ${familyLinks.parentProfileId} = ${profiles.id}
+      )`,
+    })
+    .from(profiles)
+    .where(
+      and(
+        eq(profiles.accountId, sub.accountId),
+        eq(profiles.id, input.activeProfileId)
+      )
+    )
+    .limit(1);
+
+  if (!viewer) {
+    return {
+      by_profile: [],
+      family_aggregate: null,
+      isOwnerBreakdownViewer: false,
+    };
+  }
+
+  const profileRows = await db
+    .select({
+      profileId: profiles.id,
+      name: profiles.displayName,
+      used: sql<number>`coalesce(sum(${usageEvents.delta}), 0)::int`,
+    })
+    .from(profiles)
+    .leftJoin(
+      usageEvents,
+      and(
+        eq(usageEvents.profileId, profiles.id),
+        eq(usageEvents.subscriptionId, input.subscriptionId),
+        gte(usageEvents.occurredAt, new Date(input.cycleStartAt))
+      )
+    )
+    .where(eq(profiles.accountId, sub.accountId))
+    .groupBy(profiles.id, profiles.displayName);
+
+  const isOwnerBreakdownViewer = viewer.isOwner && viewer.hasChildLink;
+  const visibleRows = isOwnerBreakdownViewer
+    ? profileRows
+    : profileRows.filter((row) => row.profileId === input.activeProfileId);
+  const familyUsed = profileRows.reduce((sum, row) => sum + row.used, 0);
+
+  return {
+    by_profile: visibleRows.map((row) => ({
+      profile_id: row.profileId,
+      name: row.name,
+      used: row.used,
+      is_self: row.profileId === input.activeProfileId,
+    })),
+    family_aggregate: isOwnerBreakdownViewer
+      ? { used: familyUsed, limit: input.monthlyLimit }
+      : null,
+    isOwnerBreakdownViewer,
+  };
 }
 
 // ---------------------------------------------------------------------------

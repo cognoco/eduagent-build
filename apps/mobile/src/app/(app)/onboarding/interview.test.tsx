@@ -93,7 +93,7 @@ jest.mock('../../../hooks/use-interview', () => ({
 }));
 
 jest.mock('../../../hooks/use-sessions', () => ({
-  useStartSession: jest.fn(() => ({
+  useStartFirstCurriculumSession: jest.fn(() => ({
     mutateAsync: mockStartSessionMutateAsync,
     isPending: false,
   })),

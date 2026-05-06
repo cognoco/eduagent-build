@@ -4,7 +4,7 @@
 # How it works: navigates to More → taps "Parent (Light)" theme →
 # the routing guard in (learner)/_layout.tsx redirects to (parent)/dashboard.
 #
-# After this flow, the app is on the parent dashboard (dashboard-scroll).
+# After this flow, the app is on the parent dashboard (family-scroll).
 appId: com.mentomate.app
 ---
 # 1. Navigate to More tab
@@ -24,5 +24,5 @@ appId: com.mentomate.app
 # 4. Wait for parent dashboard to render
 - extendedWaitUntil:
     visible:
-      id: "dashboard-scroll"
+      id: "family-scroll"
     timeout: 15000

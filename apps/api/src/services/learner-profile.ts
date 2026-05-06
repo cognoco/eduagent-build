@@ -784,7 +784,10 @@ export interface MemoryBlockProfile {
 }
 
 // ---------------------------------------------------------------------------
-// MemoryBlock — structured return shape for F8 source traceability (P1.3/P1.4)
+// MemoryBlock — structured return shape pairing each rendered line with its
+// kind, so the truncation loop can pop the right entry. Provenance fields
+// (sourceSessionId/sourceEventId) were removed 2026-05-06 — see memory note
+// `project_f8_memory_source_refs.md` for the deferred F8 spec.
 // ---------------------------------------------------------------------------
 
 export interface MemoryBlockEntry {
@@ -797,10 +800,6 @@ export interface MemoryBlockEntry {
     | 'learning_style';
   /** The sentence as rendered in MemoryBlock.text */
   text: string;
-  /** Session ID that produced this memory signal, if known */
-  sourceSessionId?: string | null;
-  /** Event ID that produced this memory signal, if known */
-  sourceEventId?: string | null;
 }
 
 export interface MemoryBlock {
@@ -875,8 +874,6 @@ export function buildMemoryBlock(
     addSection(text, {
       kind: 'struggle',
       text,
-      sourceSessionId: null,
-      sourceEventId: null,
     });
   }
 
@@ -893,8 +890,6 @@ export function buildMemoryBlock(
     addSection(text, {
       kind: 'struggle',
       text,
-      sourceSessionId: null,
-      sourceEventId: null,
     });
   }
 
@@ -913,8 +908,6 @@ export function buildMemoryBlock(
     addSection(text, {
       kind: 'strength',
       text,
-      sourceSessionId: null,
-      sourceEventId: null,
     });
   }
 
@@ -946,8 +939,6 @@ export function buildMemoryBlock(
       addSection(text, {
         kind: 'learning_style',
         text,
-        sourceSessionId: null,
-        sourceEventId: null,
       });
     }
   }
@@ -976,8 +967,6 @@ export function buildMemoryBlock(
     addSection(text, {
       kind: 'interest',
       text,
-      sourceSessionId: null,
-      sourceEventId: null,
     });
   }
   if (freeTimeInterests.length > 0) {
@@ -986,8 +975,6 @@ export function buildMemoryBlock(
     addSection(text, {
       kind: 'interest',
       text,
-      sourceSessionId: null,
-      sourceEventId: null,
     });
   }
 
@@ -997,8 +984,6 @@ export function buildMemoryBlock(
     addSection(text, {
       kind: 'communication_note',
       text,
-      sourceSessionId: null,
-      sourceEventId: null,
     });
   }
 
@@ -1009,8 +994,6 @@ export function buildMemoryBlock(
     addSection(text, {
       kind: 'learning_style',
       text,
-      sourceSessionId: null,
-      sourceEventId: null,
     });
   }
 
@@ -1041,8 +1024,6 @@ export function buildMemoryBlock(
       addSection(text, {
         kind: 'urgency',
         text,
-        sourceSessionId: null,
-        sourceEventId: null,
       });
     }
   }
@@ -1058,8 +1039,6 @@ export function buildMemoryBlock(
     addSection(text, {
       kind: 'learning_style',
       text,
-      sourceSessionId: null,
-      sourceEventId: null,
     });
   }
 
@@ -1072,8 +1051,6 @@ export function buildMemoryBlock(
     addSection(text, {
       kind: 'communication_note',
       text,
-      sourceSessionId: null,
-      sourceEventId: null,
     });
   }
 

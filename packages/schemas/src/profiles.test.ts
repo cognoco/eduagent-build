@@ -27,11 +27,21 @@ import {
 } from './learning-profiles.js';
 
 describe('conversationLanguageSchema', () => {
-  it('[BKT-C.1] accepts every code in the canonical 8-language enum', () => {
-    // These 8 codes are the contract with the mobile language-picker and the
-    // DB CHECK constraint in migration 0035. Adding a 9th requires updating
-    // all three (schema enum, DB CHECK, language-picker.tsx).
-    for (const code of ['en', 'cs', 'es', 'fr', 'de', 'it', 'pt', 'pl']) {
+  it('[BKT-C.1] accepts every code in the canonical language enum', () => {
+    // This list is the contract with the DB CHECK constraint. It includes all
+    // UI locales plus older mentor-only locales retained for existing rows.
+    for (const code of [
+      'en',
+      'cs',
+      'es',
+      'fr',
+      'de',
+      'it',
+      'pt',
+      'pl',
+      'ja',
+      'nb',
+    ]) {
       expect(conversationLanguageSchema.parse(code)).toBe(code);
     }
   });
@@ -49,7 +59,6 @@ describe('conversationLanguageSchema', () => {
   it('[BKT-C.1] rejects arbitrary strings that look ISO-ish', () => {
     // Guard against "english", "spanish" etc. from a hand-rolled client.
     expect(() => conversationLanguageSchema.parse('english')).toThrow();
-    expect(() => conversationLanguageSchema.parse('ja')).toThrow(); // valid ISO but not in our supported set
     expect(() => conversationLanguageSchema.parse('zh')).toThrow();
   });
 });

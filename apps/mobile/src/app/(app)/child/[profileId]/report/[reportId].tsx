@@ -3,7 +3,10 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Sentry from '@sentry/react-native';
-import { goBackOrReplace } from '../../../../../lib/navigation';
+import {
+  FAMILY_HOME_PATH,
+  goBackOrReplace,
+} from '../../../../../lib/navigation';
 import { classifyApiError } from '../../../../../lib/format-api-error';
 import { ErrorFallback } from '../../../../../components/common';
 import {
@@ -50,7 +53,7 @@ export default function ChildReportDetailScreen(): React.ReactElement {
 
   const reportsHref = profileId
     ? (`/(app)/child/${profileId}/reports` as const)
-    : ('/(app)/dashboard' as const);
+    : FAMILY_HOME_PATH;
   const markViewed = useMarkChildReportViewed();
   const markViewedRef = useRef(markViewed);
   markViewedRef.current = markViewed;

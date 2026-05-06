@@ -6,7 +6,7 @@ import {
   useChildReports,
   useChildWeeklyReports,
 } from '../../../../hooks/use-progress';
-import { goBackOrReplace } from '../../../../lib/navigation';
+import { FAMILY_HOME_PATH, goBackOrReplace } from '../../../../lib/navigation';
 import { useTranslation } from 'react-i18next';
 
 /** Returns the formatted next report date and a human-friendly time context. */
@@ -82,7 +82,7 @@ export default function ChildReportsScreen(): React.ReactElement {
                 router,
                 profileId
                   ? (`/(app)/child/${profileId}` as const)
-                  : ('/(app)/dashboard' as const)
+                  : FAMILY_HOME_PATH
               )
             }
             className="me-3 py-2 pe-2"
@@ -253,7 +253,7 @@ export default function ChildReportsScreen(): React.ReactElement {
                     router,
                     profileId
                       ? (`/(app)/child/${profileId}` as const)
-                      : ('/(app)/dashboard' as const)
+                      : FAMILY_HOME_PATH
                   )
                 }
                 className="bg-background rounded-button px-4 py-3 items-center flex-1 min-h-[48px] justify-center"
@@ -342,7 +342,7 @@ export default function ChildReportsScreen(): React.ReactElement {
                   router,
                   profileId
                     ? (`/(app)/child/${profileId}` as const)
-                    : ('/(app)/dashboard' as const)
+                    : FAMILY_HOME_PATH
                 )
               }
               className="bg-primary rounded-button px-5 py-3 mt-4 min-h-[48px] justify-center"

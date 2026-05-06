@@ -210,12 +210,22 @@ export const sessionMetadataSchema = z
     inputMode: inputModeSchema.optional(),
     homework: homeworkSessionMetadataSchema.optional(),
     homeworkSummary: homeworkSummarySchema.optional(),
+    /** Fast onboarding handoff hints extracted from the interview. */
+    onboardingFastPath: z
+      .object({
+        extractedSignals: extractedInterviewSignalsSchema.optional(),
+      })
+      .optional(),
     /** F-10: UI mode stored at session creation so pipeline can distinguish
      *  practice/review from regular learning without a schema migration. */
     effectiveMode: z.string().optional(),
     /** Session this learning chat is continuing from. Stored in metadata so
      *  completed-session handoffs do not require a migration. */
     resumeFromSessionId: z.string().uuid().optional(),
+    gaps: z.array(z.string().min(1).max(120)).max(8).optional(),
+    continuationOpenerActive: z.boolean().optional(),
+    continuationOpenerStartedExchange: z.number().int().min(0).optional(),
+    continuationDepth: z.enum(['low', 'mid', 'high']).optional(),
   })
   .strip();
 export type SessionMetadata = z.infer<typeof sessionMetadataSchema>;
@@ -230,6 +240,15 @@ export const sessionStartSchema = z.object({
   rawInput: z.string().max(500).nullable().optional(),
 });
 export type SessionStartInput = z.infer<typeof sessionStartSchema>;
+
+export const firstCurriculumSessionStartSchema = sessionStartSchema
+  .omit({ subjectId: true, topicId: true, metadata: true, rawInput: true })
+  .extend({
+    bookId: z.string().uuid().optional(),
+  });
+export type FirstCurriculumSessionStartInput = z.infer<
+  typeof firstCurriculumSessionStartSchema
+>;
 
 export const sessionStatusSchema = z.enum([
   'active',

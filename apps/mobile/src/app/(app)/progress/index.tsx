@@ -12,7 +12,7 @@ import { classifyApiError } from '../../../lib/format-api-error';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ErrorFallback } from '../../../components/common';
+import { ErrorFallback, TrackedView } from '../../../components/common';
 import { SamplePreview } from '../../../components/parent/SamplePreview';
 import {
   isNewLearner,
@@ -252,6 +252,9 @@ export default function ProgressScreen(): React.ReactElement {
   const hasLanguageSubject = inventory?.subjects?.some(
     (s) => s.pedagogyMode === 'four_strands'
   );
+  const activeProfileHash = activeProfile
+    ? hashProfileId(activeProfile.id)
+    : null;
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
@@ -445,8 +448,30 @@ export default function ProgressScreen(): React.ReactElement {
 
             {activeProfile ? (
               <>
-                <WeeklyReportCard profileId={activeProfile.id} />
-                <MonthlyReportCard profileId={activeProfile.id} />
+                <TrackedView
+                  eventName="progress_report_viewed"
+                  dwellMs={1000}
+                  properties={{
+                    profile_id_hash: activeProfileHash,
+                    is_active_profile_owner: activeProfile.isOwner,
+                    report_type: 'weekly',
+                  }}
+                  testID="progress-weekly-report-tracker"
+                >
+                  <WeeklyReportCard profileId={activeProfile.id} />
+                </TrackedView>
+                <TrackedView
+                  eventName="progress_report_viewed"
+                  dwellMs={1000}
+                  properties={{
+                    profile_id_hash: activeProfileHash,
+                    is_active_profile_owner: activeProfile.isOwner,
+                    report_type: 'monthly',
+                  }}
+                  testID="progress-monthly-report-tracker"
+                >
+                  <MonthlyReportCard profileId={activeProfile.id} />
+                </TrackedView>
                 <RecentSessionsList profileId={activeProfile.id} />
               </>
             ) : null}

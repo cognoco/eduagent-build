@@ -4,7 +4,10 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import * as Sentry from '@sentry/react-native';
-import { goBackOrReplace } from '../../../../../lib/navigation';
+import {
+  FAMILY_HOME_PATH,
+  goBackOrReplace,
+} from '../../../../../lib/navigation';
 import { classifyApiError } from '../../../../../lib/format-api-error';
 import { ErrorFallback } from '../../../../../components/common';
 import {
@@ -96,7 +99,7 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
 
   const reportsHref = profileId
     ? (`/(app)/child/${profileId}/reports` as const)
-    : ('/(app)/dashboard' as const);
+    : FAMILY_HOME_PATH;
   const markViewed = useMarkWeeklyReportViewed();
   const markViewedRef = useRef(markViewed);
   markViewedRef.current = markViewed;
@@ -135,7 +138,7 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
                 router,
                 profileId
                   ? (`/(app)/child/${profileId}/reports` as const)
-                  : ('/(app)/dashboard' as const)
+                  : FAMILY_HOME_PATH
               )
             }
             className="me-3 py-2 pe-2"

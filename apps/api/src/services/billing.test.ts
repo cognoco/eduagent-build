@@ -193,8 +193,22 @@ function createMockDb({
     returning: returningFn,
   });
   const updateSet = jest.fn().mockReturnValue({ where: updateWhere });
-
-  return {
+  const createSelectChain = () => {
+    const terminal = {
+      limit: jest.fn().mockResolvedValue(selectResult),
+      then: (
+        onfulfilled?: (value: unknown[]) => unknown,
+        onrejected?: (reason: unknown) => unknown
+      ) => Promise.resolve(selectResult).then(onfulfilled, onrejected),
+    };
+    const chain = {
+      where: jest.fn().mockReturnValue(terminal),
+      innerJoin: jest.fn(),
+    };
+    chain.innerJoin.mockReturnValue(chain);
+    return chain;
+  };
+  const db = {
     query: {
       subscriptions: {
         findFirst: jest.fn().mockResolvedValue(subscriptionFindFirst),
@@ -216,11 +230,14 @@ function createMockDb({
     }),
     update: jest.fn().mockReturnValue({ set: updateSet }),
     select: jest.fn().mockReturnValue({
-      from: jest.fn().mockReturnValue({
-        where: jest.fn().mockResolvedValue(selectResult),
-      }),
+      from: jest.fn().mockReturnValue(createSelectChain()),
     }),
-  } as unknown as Database;
+  };
+  (db as { transaction: jest.Mock }).transaction = jest
+    .fn()
+    .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(db));
+
+  return db as unknown as Database;
 }
 
 // ---------------------------------------------------------------------------
@@ -632,7 +649,7 @@ describe('incrementQuota', () => {
 
 describe('safeRefundQuota [BUG-661]', () => {
   it('returns refunded:true on success and does not escalate', async () => {
-    const db = createMockDb();
+    const db = createMockDb({ selectResult: [{ profileId: 'p-1' }] });
     const result = await safeRefundQuota(db, subscriptionId, {
       route: 'sessions.message',
       profileId: 'p-1',
@@ -648,12 +665,24 @@ describe('safeRefundQuota [BUG-661]', () => {
   it('escalates and returns refunded:false when incrementQuota throws [BUG-661]', async () => {
     // Build a db whose .update().set().where() rejects.
     const dbErr = new Error('connection terminated');
+    const selectLimit = jest.fn().mockResolvedValue([{ profileId: 'p-1' }]);
+    const selectChain = {
+      innerJoin: jest.fn(),
+      where: jest.fn().mockReturnValue({ limit: selectLimit }),
+    };
+    selectChain.innerJoin.mockReturnValue(selectChain);
     const db = {
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue(selectChain),
+      }),
       update: jest.fn().mockReturnValue({
         set: jest.fn().mockReturnValue({
           where: jest.fn().mockRejectedValue(dbErr),
         }),
       }),
+      transaction: jest
+        .fn()
+        .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(db)),
     } as unknown as Database;
 
     const result = await safeRefundQuota(db, subscriptionId, {
@@ -1999,45 +2028,24 @@ describe('decrementQuota — concurrent over-decrement [4C.2]', () => {
   it('falls through to top-up when concurrent request consumed last monthly slot', async () => {
     // First UPDATE returns empty (monthly atomic guard fails because concurrent request
     // consumed the last slot). Pool shows monthly exhausted, daily OK. Top-up available.
-    const pool = {
+    const pool = mockQuotaPoolRow({
       monthlyLimit: 100,
       usedThisMonth: 100, // concurrent request consumed it
       dailyLimit: null,
       usedToday: 5,
-    };
+    });
     const topUp = mockTopUpRow({ remaining: 50 });
     const updatedTopUp = mockTopUpRow({ remaining: 49 });
 
-    const updateReturningFn = jest
-      .fn()
-      .mockResolvedValueOnce([]) // monthly: WHERE used < limit fails (concurrently consumed)
-      .mockResolvedValueOnce([updatedTopUp]) // top-up: succeeds
-      .mockResolvedValueOnce([{ dailyLimit: null, usedToday: 6 }]); // daily counter increment (guard passes; dailyLimit null)
-
-    const updateWhere = jest
-      .fn()
-      .mockReturnValue({ returning: updateReturningFn });
-    const updateSet = jest.fn().mockReturnValue({ where: updateWhere });
-
-    const db = {
-      query: {
-        subscriptions: { findFirst: jest.fn().mockResolvedValue(undefined) },
-        quotaPools: { findFirst: jest.fn().mockResolvedValue(pool) },
-        topUpCredits: { findFirst: jest.fn().mockResolvedValue(topUp) },
-        profiles: { findFirst: jest.fn().mockResolvedValue(undefined) },
-      },
-      insert: jest.fn().mockReturnValue({
-        values: jest.fn().mockReturnValue({
-          returning: jest.fn().mockResolvedValue([]),
-        }),
-      }),
-      update: jest.fn().mockReturnValue({ set: updateSet }),
-      select: jest.fn().mockReturnValue({
-        from: jest.fn().mockReturnValue({
-          where: jest.fn().mockResolvedValue([]),
-        }),
-      }),
-    } as unknown as Database;
+    const db = createMockDb({
+      quotaPoolFindFirst: pool,
+      topUpFindFirst: topUp,
+      updateReturningSequence: [
+        [], // monthly: WHERE used < limit fails (concurrently consumed)
+        [updatedTopUp], // top-up: succeeds
+        [{ dailyLimit: null, usedToday: 6 }], // daily counter increment
+      ],
+    });
 
     const result = await decrementQuota(db, subscriptionId);
 
@@ -2049,43 +2057,22 @@ describe('decrementQuota — concurrent over-decrement [4C.2]', () => {
   it('returns failure when concurrent request consumed last top-up credit', async () => {
     // Monthly exhausted, daily OK, top-up found but atomic decrement fails
     // (another request consumed the last credit first)
-    const pool = {
+    const pool = mockQuotaPoolRow({
       monthlyLimit: 100,
       usedThisMonth: 100,
       dailyLimit: null,
       usedToday: 5,
-    };
+    });
     const topUp = mockTopUpRow({ remaining: 1 });
 
-    const updateReturningFn = jest
-      .fn()
-      .mockResolvedValueOnce([]) // monthly: fails
-      .mockResolvedValueOnce([]); // top-up: concurrent race lost (remaining was 1 -> 0)
-
-    const updateWhere = jest
-      .fn()
-      .mockReturnValue({ returning: updateReturningFn });
-    const updateSet = jest.fn().mockReturnValue({ where: updateWhere });
-
-    const db = {
-      query: {
-        subscriptions: { findFirst: jest.fn().mockResolvedValue(undefined) },
-        quotaPools: { findFirst: jest.fn().mockResolvedValue(pool) },
-        topUpCredits: { findFirst: jest.fn().mockResolvedValue(topUp) },
-        profiles: { findFirst: jest.fn().mockResolvedValue(undefined) },
-      },
-      insert: jest.fn().mockReturnValue({
-        values: jest.fn().mockReturnValue({
-          returning: jest.fn().mockResolvedValue([]),
-        }),
-      }),
-      update: jest.fn().mockReturnValue({ set: updateSet }),
-      select: jest.fn().mockReturnValue({
-        from: jest.fn().mockReturnValue({
-          where: jest.fn().mockResolvedValue([]),
-        }),
-      }),
-    } as unknown as Database;
+    const db = createMockDb({
+      quotaPoolFindFirst: pool,
+      topUpFindFirst: topUp,
+      updateReturningSequence: [
+        [], // monthly: fails
+        [], // top-up: concurrent race lost (remaining was 1 -> 0)
+      ],
+    });
 
     const result = await decrementQuota(db, subscriptionId);
 
@@ -2101,39 +2088,19 @@ describe('decrementQuota — concurrent over-decrement [4C.2]', () => {
 
 describe('decrementQuota — daily quota consumed before monthly [4C.2]', () => {
   it('returns daily_exceeded when daily limit hit but monthly has remaining', async () => {
-    const pool = {
+    const pool = mockQuotaPoolRow({
       dailyLimit: 10,
       usedToday: 10,
       monthlyLimit: 500,
       usedThisMonth: 50,
-    };
+    });
 
-    // Atomic UPDATE fails due to daily guard
-    const updateReturningFn = jest.fn().mockResolvedValueOnce([]);
-    const updateWhere = jest
-      .fn()
-      .mockReturnValue({ returning: updateReturningFn });
-    const updateSet = jest.fn().mockReturnValue({ where: updateWhere });
-
-    const db = {
-      query: {
-        subscriptions: { findFirst: jest.fn().mockResolvedValue(undefined) },
-        quotaPools: { findFirst: jest.fn().mockResolvedValue(pool) },
-        topUpCredits: { findFirst: jest.fn().mockResolvedValue(undefined) },
-        profiles: { findFirst: jest.fn().mockResolvedValue(undefined) },
-      },
-      insert: jest.fn().mockReturnValue({
-        values: jest.fn().mockReturnValue({
-          returning: jest.fn().mockResolvedValue([]),
-        }),
-      }),
-      update: jest.fn().mockReturnValue({ set: updateSet }),
-      select: jest.fn().mockReturnValue({
-        from: jest.fn().mockReturnValue({
-          where: jest.fn().mockResolvedValue([]),
-        }),
-      }),
-    } as unknown as Database;
+    const db = createMockDb({
+      quotaPoolFindFirst: pool,
+      updateReturningSequence: [
+        [], // Atomic UPDATE fails due to daily guard
+      ],
+    });
 
     const result = await decrementQuota(db, subscriptionId);
 
@@ -2146,39 +2113,19 @@ describe('decrementQuota — daily quota consumed before monthly [4C.2]', () => 
 
   it('blocks top-up fallback when daily limit is hit', async () => {
     // Daily limit hit — even with top-up credits available, user cannot proceed
-    const pool = {
+    const pool = mockQuotaPoolRow({
       dailyLimit: 10,
       usedToday: 10,
       monthlyLimit: 100,
       usedThisMonth: 100,
-    };
+    });
     const topUp = mockTopUpRow({ remaining: 500 });
 
-    const updateReturningFn = jest.fn().mockResolvedValueOnce([]);
-    const updateWhere = jest
-      .fn()
-      .mockReturnValue({ returning: updateReturningFn });
-    const updateSet = jest.fn().mockReturnValue({ where: updateWhere });
-
-    const db = {
-      query: {
-        subscriptions: { findFirst: jest.fn().mockResolvedValue(undefined) },
-        quotaPools: { findFirst: jest.fn().mockResolvedValue(pool) },
-        topUpCredits: { findFirst: jest.fn().mockResolvedValue(topUp) },
-        profiles: { findFirst: jest.fn().mockResolvedValue(undefined) },
-      },
-      insert: jest.fn().mockReturnValue({
-        values: jest.fn().mockReturnValue({
-          returning: jest.fn().mockResolvedValue([]),
-        }),
-      }),
-      update: jest.fn().mockReturnValue({ set: updateSet }),
-      select: jest.fn().mockReturnValue({
-        from: jest.fn().mockReturnValue({
-          where: jest.fn().mockResolvedValue([]),
-        }),
-      }),
-    } as unknown as Database;
+    const db = createMockDb({
+      quotaPoolFindFirst: pool,
+      topUpFindFirst: topUp,
+      updateReturningSequence: [[]],
+    });
 
     const result = await decrementQuota(db, subscriptionId);
 
@@ -2197,43 +2144,22 @@ describe('decrementQuota — race with top-up expiry [4C.2]', () => {
   it('returns failure when top-up expires mid-decrement (findFirst returns row but atomic update fails)', async () => {
     // Monthly exhausted, daily OK. Top-up found in query but expired by the time
     // the atomic UPDATE runs (remaining check fails because row was deleted/expired)
-    const pool = {
+    const pool = mockQuotaPoolRow({
       monthlyLimit: 100,
       usedThisMonth: 100,
       dailyLimit: null,
       usedToday: 5,
-    };
+    });
     const topUp = mockTopUpRow({ remaining: 10 }); // Found by findFirst
 
-    const updateReturningFn = jest
-      .fn()
-      .mockResolvedValueOnce([]) // monthly: exhausted
-      .mockResolvedValueOnce([]); // top-up: expired between query and update
-
-    const updateWhere = jest
-      .fn()
-      .mockReturnValue({ returning: updateReturningFn });
-    const updateSet = jest.fn().mockReturnValue({ where: updateWhere });
-
-    const db = {
-      query: {
-        subscriptions: { findFirst: jest.fn().mockResolvedValue(undefined) },
-        quotaPools: { findFirst: jest.fn().mockResolvedValue(pool) },
-        topUpCredits: { findFirst: jest.fn().mockResolvedValue(topUp) },
-        profiles: { findFirst: jest.fn().mockResolvedValue(undefined) },
-      },
-      insert: jest.fn().mockReturnValue({
-        values: jest.fn().mockReturnValue({
-          returning: jest.fn().mockResolvedValue([]),
-        }),
-      }),
-      update: jest.fn().mockReturnValue({ set: updateSet }),
-      select: jest.fn().mockReturnValue({
-        from: jest.fn().mockReturnValue({
-          where: jest.fn().mockResolvedValue([]),
-        }),
-      }),
-    } as unknown as Database;
+    const db = createMockDb({
+      quotaPoolFindFirst: pool,
+      topUpFindFirst: topUp,
+      updateReturningSequence: [
+        [], // monthly: exhausted
+        [], // top-up: expired between query and update
+      ],
+    });
 
     const result = await decrementQuota(db, subscriptionId);
 
@@ -2438,32 +2364,12 @@ describe('decrementQuota — free-tier daily limit', () => {
       usedThisMonth: 50,
     });
 
-    // Atomic UPDATE returns empty (daily guard prevents increment)
-    const updateReturningFn = jest.fn().mockResolvedValueOnce([]);
-    const updateWhere = jest
-      .fn()
-      .mockReturnValue({ returning: updateReturningFn });
-    const updateSet = jest.fn().mockReturnValue({ where: updateWhere });
-
-    const db = {
-      query: {
-        subscriptions: { findFirst: jest.fn().mockResolvedValue(undefined) },
-        quotaPools: { findFirst: jest.fn().mockResolvedValue(pool) },
-        topUpCredits: { findFirst: jest.fn().mockResolvedValue(undefined) },
-        profiles: { findFirst: jest.fn().mockResolvedValue(undefined) },
-      },
-      insert: jest.fn().mockReturnValue({
-        values: jest.fn().mockReturnValue({
-          returning: jest.fn().mockResolvedValue([]),
-        }),
-      }),
-      update: jest.fn().mockReturnValue({ set: updateSet }),
-      select: jest.fn().mockReturnValue({
-        from: jest.fn().mockReturnValue({
-          where: jest.fn().mockResolvedValue([]),
-        }),
-      }),
-    } as unknown as Database;
+    const db = createMockDb({
+      quotaPoolFindFirst: pool,
+      updateReturningSequence: [
+        [], // Atomic UPDATE returns empty (daily guard prevents increment)
+      ],
+    });
 
     const result = await decrementQuota(db, subscriptionId);
 

@@ -26,6 +26,7 @@ import {
   SubjectInactiveError,
   SessionExchangeLimitError,
   processMessage,
+  persistExchangeResult,
   closeSession,
   closeStaleSessions,
   resetSessionStaticContextCache,
@@ -340,6 +341,104 @@ describe('Session lifecycle (integration)', () => {
       ),
     });
     expect(aiResponses).toHaveLength(1);
+  });
+
+  // -------------------------------------------------------------------------
+  // Drill score persistence — when the LLM envelope's
+  // `ui_hints.fluency_drill.score` is set, the score lands on the ai_response
+  // row's drill_correct/drill_total columns. When no score is emitted, both
+  // columns stay null.
+  //
+  // Pre-fix: drill score was extracted from the envelope and forwarded over
+  // SSE but never persisted. The per-topic dashboard surface had nothing to
+  // read. This test fails if the drill_correct/drill_total columns are not
+  // wired through behavioral metrics into the ai_response INSERT.
+  // -------------------------------------------------------------------------
+
+  it('[BREAK] persists drill_correct/drill_total when behavioral.drill* set', async () => {
+    const { profileId } = await seedProfile();
+    const subjectId = await seedSubject(profileId);
+    const session = await startSession(db, profileId, subjectId, {
+      sessionType: 'learning',
+    });
+
+    await persistExchangeResult(
+      db,
+      profileId,
+      session.id,
+      session,
+      'How many vocabulary words did I get right?',
+      'You got 4 out of 5 — strong session!',
+      session.escalationRung,
+      {
+        isUnderstandingCheck: false,
+        timeToAnswerMs: 1234,
+        hintCountInSession: 0,
+        drillCorrect: 4,
+        drillTotal: 5,
+      }
+    );
+
+    const [row] = await db
+      .select({
+        drillCorrect: sessionEvents.drillCorrect,
+        drillTotal: sessionEvents.drillTotal,
+      })
+      .from(sessionEvents)
+      .where(
+        and(
+          eq(sessionEvents.sessionId, session.id),
+          eq(sessionEvents.profileId, profileId),
+          eq(sessionEvents.eventType, 'ai_response')
+        )
+      )
+      .limit(1);
+
+    expect(row).toBeDefined();
+    expect(row!.drillCorrect).toBe(4);
+    expect(row!.drillTotal).toBe(5);
+  });
+
+  it('drill_correct/drill_total stay null when no drill score in behavioral', async () => {
+    const { profileId } = await seedProfile();
+    const subjectId = await seedSubject(profileId);
+    const session = await startSession(db, profileId, subjectId, {
+      sessionType: 'learning',
+    });
+
+    await persistExchangeResult(
+      db,
+      profileId,
+      session.id,
+      session,
+      'Tell me about photosynthesis',
+      'Plants convert sunlight into energy through chlorophyll.',
+      session.escalationRung,
+      {
+        isUnderstandingCheck: false,
+        timeToAnswerMs: 2000,
+        hintCountInSession: 0,
+      }
+    );
+
+    const [row] = await db
+      .select({
+        drillCorrect: sessionEvents.drillCorrect,
+        drillTotal: sessionEvents.drillTotal,
+      })
+      .from(sessionEvents)
+      .where(
+        and(
+          eq(sessionEvents.sessionId, session.id),
+          eq(sessionEvents.profileId, profileId),
+          eq(sessionEvents.eventType, 'ai_response')
+        )
+      )
+      .limit(1);
+
+    expect(row).toBeDefined();
+    expect(row!.drillCorrect).toBeNull();
+    expect(row!.drillTotal).toBeNull();
   });
 
   // -------------------------------------------------------------------------

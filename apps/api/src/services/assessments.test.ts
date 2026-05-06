@@ -175,7 +175,7 @@ describe('evaluateAssessmentAnswer', () => {
     );
 
     expect(result.masteryScore).toBeLessThanOrEqual(0.5);
-    expect(result.passed).toBe(true);
+    expect(result.passed).toBe(false);
   });
 
   it('caps mastery at 0.8 for explain depth', async () => {
@@ -344,7 +344,7 @@ describe('evaluateAssessmentAnswer', () => {
     );
 
     expect(result.feedback).toBe('Solid recall of the key concepts.');
-    expect(result.passed).toBe(true);
+    expect(result.passed).toBe(false);
     expect(result.masteryScore).toBeGreaterThan(0);
   });
 
@@ -503,8 +503,14 @@ function createAssessmentMockDb({
     | ReturnType<typeof mockAssessmentRow>
     | undefined,
   insertReturning = [] as ReturnType<typeof mockAssessmentRow>[],
+  updateReturning = [mockAssessmentRow()] as ReturnType<
+    typeof mockAssessmentRow
+  >[],
 } = {}) {
-  const updateWhere = jest.fn().mockResolvedValue(undefined);
+  const updateReturningFn = jest.fn().mockResolvedValue(updateReturning);
+  const updateWhere = jest
+    .fn()
+    .mockReturnValue({ returning: updateReturningFn });
   const updateSet = jest.fn().mockReturnValue({ where: updateWhere });
 
   return {

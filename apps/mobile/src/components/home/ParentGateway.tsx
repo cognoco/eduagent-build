@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { DashboardData, Profile } from '@eduagent/schemas';
 import { ProfileSwitcher } from '../common';
 import { useDashboard } from '../../hooks/use-dashboard';
+import { FAMILY_HOME_PATH } from '../../lib/navigation';
 import { getGreeting } from '../../lib/greeting';
 import { IntentCard } from './IntentCard';
 
@@ -119,7 +120,7 @@ export function ParentGateway({
             title={t('home.parentGateway.checkProgress')}
             subtitle={getChildHighlight(dashboard, t)}
             onPress={() =>
-              router.push('/(app)/dashboard?returnTo=home' as never)
+              router.push(`${FAMILY_HOME_PATH}?returnTo=home` as never)
             }
             testID="gateway-check-progress"
           />

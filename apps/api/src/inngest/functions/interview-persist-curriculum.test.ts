@@ -139,4 +139,45 @@ describe('interview-persist-curriculum (replay harness)', () => {
     expect(mockExtractSignals).toHaveBeenCalledTimes(2);
     expect(mockPersistCurriculum).toHaveBeenCalledTimes(1);
   });
+
+  it('persists curriculum when extraction returns neutral empty signals', async () => {
+    mockGetStepDatabase.mockReturnValue(
+      mockDb({
+        draft: { extractedSignals: {}, exchangeHistory: ['brief'] },
+      })
+    );
+    mockExtractSignals.mockResolvedValueOnce({
+      goals: [],
+      experienceLevel: 'beginner',
+      currentKnowledge: '',
+      interests: [],
+      paceHint: { density: 'low', chunkSize: 'short' },
+    });
+    mockPersistCurriculum.mockResolvedValue(undefined);
+    mockSendPush.mockResolvedValue(undefined);
+
+    const handler = (
+      interviewPersistCurriculum as unknown as {
+        fn: (...args: unknown[]) => unknown;
+      }
+    ).fn;
+
+    await handler({ event: makeEvent(), step: makeReplayHarness().step });
+
+    expect(mockExtractSignals).toHaveBeenCalledTimes(1);
+    expect(mockPersistCurriculum).toHaveBeenCalledTimes(1);
+    expect(mockPersistCurriculum).toHaveBeenCalledWith(
+      expect.anything(),
+      PROFILE,
+      SUBJECT,
+      'Math',
+      expect.objectContaining({
+        extractedSignals: expect.objectContaining({
+          goals: [],
+          interests: [],
+        }),
+      }),
+      undefined
+    );
+  });
 });

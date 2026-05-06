@@ -109,6 +109,13 @@ export default function TopicDetailScreen() {
     useChildSessions(profileId);
   const topicSessions = sessions?.filter((s) => s.topicId === topicId) ?? [];
 
+  // Most recent fluency-drill outcomes for this topic. Flat-mapped across
+  // sessions and sorted newest-first; capped at 5 so the strip stays scannable.
+  const recentDrills = topicSessions
+    .flatMap((s) => s.drills ?? [])
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+    .slice(0, 5);
+
   return (
     <View
       className="flex-1 bg-background"
@@ -234,6 +241,33 @@ export default function TopicDetailScreen() {
             );
           })()}
         </View>
+
+        {/* Recent fluency-drill scores for this topic, when any have been
+            recorded. Strip-style render keeps it scannable; tap-through and
+            full history are deferred until parents ask for it. */}
+        {recentDrills.length > 0 ? (
+          <View
+            className="bg-surface rounded-card p-4 mt-3"
+            testID="topic-recent-drills"
+          >
+            <Text className="text-body-sm font-medium text-text-secondary mb-2">
+              {t('parentView.topic.recentDrills', 'Recent drills')}
+            </Text>
+            <View className="flex-row flex-wrap gap-2">
+              {recentDrills.map((drill) => (
+                <View
+                  key={drill.createdAt}
+                  className="bg-primary-soft rounded-pill px-3 py-1"
+                  testID={`drill-score-${drill.createdAt}`}
+                >
+                  <Text className="text-body-sm font-semibold text-primary">
+                    {drill.correct}/{drill.total}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
 
         {/* Session History */}
         <Text className="text-h3 font-semibold text-text-primary mt-6 mb-2">

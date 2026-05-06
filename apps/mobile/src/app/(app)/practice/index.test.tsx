@@ -15,28 +15,32 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-jest.mock('../../lib/theme', () => ({
+jest.mock('../../../lib/theme', () => ({
   useThemeColors: () => ({
     textPrimary: '#ffffff',
     primary: '#00b4d8',
   }),
 }));
 
-jest.mock('../../lib/navigation', () => ({
+jest.mock('../../../lib/navigation', () => ({
   goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
   homeHrefForReturnTo: (returnTo: unknown) =>
     returnTo === 'learner-home' ? '/(app)/home?view=learner' : '/(app)/home',
 }));
 
-jest.mock('../../hooks/use-progress', () => ({
+jest.mock('../../../hooks/use-progress', () => ({
   useReviewSummary: () => mockUseReviewSummary(),
 }));
 
-jest.mock('../../hooks/use-quiz', () => ({
+jest.mock('../../../hooks/use-quiz', () => ({
   useQuizStats: () => mockUseQuizStats(),
 }));
 
-const PracticeScreen = require('./practice').default;
+jest.mock('../../../hooks/use-assessments', () => ({
+  useAssessmentEligibleTopics: () => ({ data: [], isError: false }),
+}));
+
+const PracticeScreen = require('./index').default;
 
 describe('PracticeScreen', () => {
   beforeEach(() => {
@@ -72,6 +76,7 @@ describe('PracticeScreen', () => {
     screen.getByText('Refresh what is fading, then check yourself.');
     screen.getByText('Refresh topics');
     screen.getByText('Quiz yourself');
+    screen.getByText('Prove I know this');
   });
 
   it('routes the back button to home', () => {

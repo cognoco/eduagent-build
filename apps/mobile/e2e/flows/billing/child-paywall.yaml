@@ -33,7 +33,7 @@ tags:
 
 # 1b. BUG-38 safety: PostApprovalLanding may appear after pm clear wipes
 # SecureStore. Dismiss if present BEFORE waiting for dashboard — otherwise
-# dashboard-scroll wait burns 30s and times out behind the modal.
+# family-scroll wait burns 30s and times out behind the modal.
 - tapOn:
     text: "Let's Go"
     # PostApprovalLanding only appears after SecureStore wipe — genuinely optional
@@ -43,7 +43,7 @@ tags:
 # on the expected landing screen before proceeding to profile switch.
 - extendedWaitUntil:
     visible:
-      id: "dashboard-scroll"
+      id: "family-scroll"
     timeout: 30000
 
 # 2. Switch to child profile (BUG-52 fix)

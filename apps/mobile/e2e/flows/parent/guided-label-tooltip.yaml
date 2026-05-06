@@ -32,7 +32,7 @@ tags:
 # 2. Wait for parent dashboard
 - extendedWaitUntil:
     visible:
-      id: "dashboard-scroll"
+      id: "family-scroll"
     timeout: 15000
 
 # 3. Tap "View details" on child card (single tap — double-tap causes double navigation)

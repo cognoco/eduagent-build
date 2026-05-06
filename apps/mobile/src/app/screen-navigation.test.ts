@@ -33,6 +33,8 @@ const EXIT_PATTERNS = [
 const EXEMPT_SCREENS: string[] = [
   // Root redirect — no UI, just redirects
   'index.tsx',
+  // Legacy redirect — no UI, preserved for old /dashboard deep links
+  '(app)/dashboard.tsx',
   // Tab screens — bottom tab navigation provides navigation
   '(app)/home.tsx',
   '(app)/library.tsx',

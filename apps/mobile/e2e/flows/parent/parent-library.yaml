@@ -10,7 +10,7 @@
 #
 # testIDs verified against:
 #   - apps/mobile/src/app/(app)/_layout.tsx (tab-library, tab-home)
-#   - apps/mobile/src/app/(app)/dashboard.tsx (dashboard-scroll)
+#   - apps/mobile/src/app/(app)/family.tsx (family-scroll)
 #   - apps/mobile/src/app/(app)/library.tsx (3-tab Library)
 #   - apps/mobile/src/components/library/LibraryTabs.tsx (library-tab-shelves, library-tab-books)
 #   - apps/mobile/src/components/library/ShelvesTab.tsx (shelves-list)
@@ -34,7 +34,7 @@ tags:
 # the app routes directly to (parent)/dashboard — no switch-to-parent needed.
 - extendedWaitUntil:
     visible:
-      id: "dashboard-scroll"
+      id: "family-scroll"
     timeout: 15000
 
 # 3. Verify we're on the parent dashboard
@@ -79,7 +79,7 @@ tags:
 # 13. Verify dashboard is visible again
 - extendedWaitUntil:
     visible:
-      id: "dashboard-scroll"
+      id: "family-scroll"
     timeout: 10000
 
 # 14. Final screenshot

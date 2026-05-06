@@ -1,11 +1,11 @@
 # Profile-as-Lens — Phase 1 Implementation Plan
 
 **Date:** 2026-04-29
-**Status:** Engineering-ready (revised 2026-05-06 after adversarial-review reconciliation pass #3)
+**Status:** Engineering-ready (revised 2026-05-06 v6 after codebase reconciliation pass #4)
 **Spec:** [`docs/specs/2026-04-28-profile-as-lens.md`](../specs/2026-04-28-profile-as-lens.md)
 **Phase:** 1 of 3 (Foundation — no-regrets refactoring + microcopy + per-profile reporting on `/progress`)
 
-> **2026-05-06 status snapshot.** Phase 1 partially shipped via two opportunistic commits (`a72ebfac` "mobile screens + navigation", `a5834419` "API tests, e2e flows, docs"). PR 0 (analytics) and PR 4 (microcopy) landed substantially; PR 0 is now treated as "Partially shipped — closure folded into PR 3" after the 2026-05-06 reconciliation. PR 1 (component **extract**), PR 2 (per-profile quota), PR 3 (`/progress` self-reporting) remain unstarted, and a new **PR 2-pre** (per-profile usage event log) is added because the `usage_events` table PR 2 depends on does not exist in the codebase today. Remaining audit findings: **BUG-898** (timezone-safe quota labels) and **BUG-901** (session detail dead-end / `/progress` self-reporting). The original PR 0 → PR 1/PR 2 → PR 3 + PR 4 sequencing is moot — PR 4 shipped first, so PR 1's "snapshot diff = zero" criterion is permanently unmeetable and is dropped (see PR 1).
+> **2026-05-06 v6 status snapshot.** Codebase reconciliation found PR 1 (component extract) and PR 3 (`/progress` self-reporting) **substantially shipped** in commit `4047629f` ("Profile as lens, memory facts, and onboarding fast path"), beyond what the v5 snapshot recorded. The four extracted components (`WeeklyReportCard`, `MonthlyReportCard`, `RecentSessionsList`, `ReportsListCard`) live under `apps/mobile/src/components/progress/`, are mounted on `apps/mobile/src/app/(app)/progress/index.tsx`, and the page wires `isProfileStale` (`apps/mobile/src/lib/progress.ts`), `hashProfileId` + `bucketAccountAge` (`apps/mobile/src/lib/analytics.ts`), and the `progress_empty_state_cta_tapped` event. The data hook is `useProfileSessions(activeProfile?.id)` (already in `use-progress.ts`) — no separate `useProfileSessionHistory` was added. PR 0 + PR 4 already shipped per v5. **Remaining Phase 1 work:** (1) **PR 2-pre** (`usage_events` table + per-profile attribution through `decrementQuota`); (2) **PR 2** (per-profile quota breakdown endpoint + UI + timezone-safe labels — BUG-898); (3) **`TrackedView` dwell-gating component** + co-located tests for the four shipped progress components — closes the honest-telemetry gap PR 0 / PR 3 left open (no `progress_report_viewed` event fires today because there's nothing to gate on dwell). Remaining audit findings: **BUG-898** only; BUG-901 closed by PR 3's shipped `/progress` self-reporting + `RecentSessionsList`.
 
 ## Overview
 
@@ -13,34 +13,35 @@ Phase 1 originally enumerated 5 PRs to close 7 of 16 audit findings. Reconciled 
 
 | PR | Status | Audit findings closed |
 |---|---|---|
-| PR 0 (analytics) | Partially shipped — closure folded into PR 3 — see "PR 0 — Reconciliation" | (infra; no findings directly) |
-| PR 1 (component **extract**) | Not started | (refactor; no findings directly) |
+| PR 0 (analytics) | Partially shipped — `track()`, `hashProfileId()`, `bucketAccountAge()` all present in `apps/mobile/src/lib/analytics.ts`; `<TrackedView>` dwell component still missing | (infra; no findings directly) |
+| PR 1 (component **extract**) | **Shipped** (commit `4047629f`) — 4 components extracted to `components/progress/`; mounted on both `/child/[profileId]` and `/progress` | (refactor; no findings directly) |
 | PR 2 (per-profile quota) — **blocked on PR 2-pre (per-profile usage event log)** | Not started | BUG-898 |
-| PR 3 (`/progress` self-reporting) | Not started | BUG-901, BUG-903 (BUG-903 separately closed) |
+| PR 3 (`/progress` self-reporting) | **Substantially shipped** (commit `4047629f`) — page mounts the 4 extracted cards, wires `isProfileStale`, fires `progress_empty_state_cta_tapped` with hashed profile_id; `progress_report_viewed` + `<TrackedView>` dwell-gating still missing | BUG-901, BUG-903 (BUG-903 separately closed) |
 | PR 4 (microcopy) | Shipped, with documented caveats — see "PR 4 — Reconciliation" | BUG-900, BUG-904, BUG-909 |
 
-**Closed by Phase 1 work or sibling commits (5):** BUG-900, BUG-903, BUG-904, BUG-906, BUG-909.
-**Remaining for Phase 1 (2):** BUG-898 (PR 2), BUG-901 (PR 3).
+**Closed by Phase 1 work or sibling commits (6):** BUG-900, BUG-901, BUG-903, BUG-904, BUG-906, BUG-909.
+**Remaining for Phase 1 (1):** BUG-898 (PR 2 + PR 2-pre).
 **Explicitly deferred — separate work tracks (6):** BUG-881, BUG-902, BUG-907, BUG-908, BUG-910, BUG-911.
 **Deferred to Phase 2/3 (3):** Listed in spec audit-findings index.
 
 7 + 6 + 3 = 16. Reconciled.
 
 ```
-PR 0 ──[shipped, partial]──┐
-PR 4 ──[shipped, partial]──┤
-                           ├──→ PR 1 (component extract) ──→ PR 3 (/progress)   ──┐
-                           └──→ PR 2-pre (usage event log) ──→ PR 2 (quota endpoint) ──┴──→ Ship Phase 1
+PR 0  ──[shipped, partial — TrackedView still TODO]──┐
+PR 1  ──[shipped]────────────────────────────────────┤
+PR 3  ──[substantially shipped — dwell event TODO]───┤
+PR 4  ──[shipped, partial]───────────────────────────┤
+                                                     ├──→ TrackedView + co-located component tests ──┐
+                                                     └──→ PR 2-pre (usage event log) ──→ PR 2 (quota endpoint) ──┴──→ Ship Phase 1
 ```
 
-**Sequencing rules (revised 2026-05-06):**
-- PR 0 + PR 4 are already merged. Treat them as fixed inputs.
-- PR 1 (component extract) and PR 2-pre (per-profile usage event log) can run in parallel.
-- PR 2 blocks on PR 2-pre (the existing schema has no per-profile usage attribution; see CRITICAL-1 in the 2026-05-06 reconciliation pass).
-- PR 3 (`/progress`) blocks on PR 1.
-- The original PR 4-blocks-on-PR-1 rule no longer applies — PR 4 already shipped against the pre-extract codebase. The PR 1 extract now becomes additive (decompose inline JSX from `child/[profileId]/` into shared components) instead of competing for the same files.
+**Sequencing rules (revised 2026-05-06 v6):**
+- PR 0, PR 1, PR 3, PR 4 are already merged in some form. Treat them as fixed inputs.
+- **PR 2-pre + PR 2** is the heaviest remaining track (per-profile attribution, schema migration, breakdown UI, timezone-safe labels — closes BUG-898).
+- **`<TrackedView>` + co-located component tests** is a separate small track that can run in parallel with PR 2-pre/PR 2. It closes the "honest telemetry" gap on `/progress` and the test-coverage gap for the four extracted components.
+- The original PR 1 → PR 3 dependency is satisfied (both shipped together).
 
-Total estimated duration on the critical path: **~3 sprints (~13–17 working days)**, dominated by PR 2-pre (~3 days) → PR 2 (~7 days) running in parallel with PR 1 (4–6 days) → PR 3 (3–4 days) → 1–2 days verification. The arithmetic: max(PR 1 + PR 3, PR 2-pre + PR 2) + verification = max(7–10, 10) + 1–2 = 11–12 days plus contingency for the Sentry-aggregation spike (MEDIUM-1, see "Cross-cutting").
+Total estimated duration on the critical path: **~10 working days** — PR 2-pre (~3 days) → PR 2 (~7 days) is now the longest path. `<TrackedView>` + co-located tests run in parallel (~2–3 days) and don't extend the critical path. Add 1–2 days verification + Sentry-aggregation spike (MEDIUM-1).
 
 ## PR 0 — Reconciliation
 
@@ -143,7 +144,11 @@ The criteria below are no longer tracked under PR 0. They appear verbatim in PR 
 
 ## PR 1 — Component Extract (not "lift")
 
-**Goal:** **Decompose** ~1.7k lines of inline JSX inside `apps/mobile/src/app/(app)/child/[profileId]/` (page files: `index.tsx` 1025 lines, `reports.tsx` 364 lines, `weekly-report/[weeklyReportId].tsx` 319 lines) into a small set of new shared components under `components/progress/` so PR 3 can mount them on `/progress` without duplication.
+**Status: Shipped (commit `4047629f`, 2026-05-06).** All four planned components live under `apps/mobile/src/components/progress/`: `WeeklyReportCard.tsx` (57 lines), `MonthlyReportCard.tsx` (55 lines), `RecentSessionsList.tsx` (140 lines), `ReportsListCard.tsx` (169 lines). They're consumed by both `child/[profileId]/index.tsx` (882 lines, down from 1025) and `progress/index.tsx`. Each takes `profileId: string` as the only prop, matching the planned contract — no `context: 'self' | 'child'` was introduced. Hooks were not renamed (`useChildSessions` etc. remain) — instead, a profile-neutral `useProfileSessions(profileId)` was added in `use-progress.ts` and is used by `/progress`. **Outstanding:** co-located unit tests for the four components do not exist yet (only `AccordionTopicList`, `RetentionSignal`, `SubjectCard` have tests under `components/progress/`). Add as part of the TrackedView track below.
+
+> The original goal description and pre-flight discovery checklist below are retained for historical reference / re-planning context, in case any of the four components needs to be refactored in Phase 2.
+
+**Goal (historical):** **Decompose** ~1.7k lines of inline JSX inside `apps/mobile/src/app/(app)/child/[profileId]/` (page files: `index.tsx` 1025 lines, `reports.tsx` 364 lines, `weekly-report/[weeklyReportId].tsx` 319 lines) into a small set of new shared components under `components/progress/` so PR 3 can mount them on `/progress` without duplication.
 
 **Important correction (2026-05-06, HIGH-1):** The 2026-05-05 wording called this a "lift." Codebase grep shows the candidate component names (`WeeklyReportCard`, `MonthlyReportCard`, `ReportsListCard`, `RecentSessionsList`) **do not exist anywhere in the repo today** — they live as inline JSX inside the page files. The only local helper in `child/[profileId]/index.tsx` is `SubjectSkeleton`. PR 1 is therefore a **first-time component extraction** (defining a new prop contract, deciding the data-fetch boundary, writing 4 new test files from scratch), not a refactor of existing components.
 
@@ -448,7 +453,17 @@ PR 2 itself ships no schema change (the schema change is in PR 2-pre). PR 2 roll
 
 ## PR 3 — Self-Reporting on `/progress`
 
-**Goal:** Mount the extracted reporting components on the active profile's `/progress` tab. Closes BUG-901 (session detail dead-end). Also owns the `<TrackedView>` build, the `hashProfileId` helper, and the `profile_id_hash_log` mapping store that close PR 0.
+**Status: Substantially shipped (commit `4047629f`, 2026-05-06). Closes BUG-901.** `apps/mobile/src/app/(app)/progress/index.tsx` (559 lines) imports the four extracted components, wires `isProfileStale({ sessionCount, lastSessionAt })` from `apps/mobile/src/lib/progress.ts`, and fires `progress_empty_state_cta_tapped` on the stale-state CTA tap with `profile_id_hash` (HMAC) + `account_age_bucket` properties. Data is sourced via `useProfileSessions(activeProfile.id)` from `use-progress.ts` (no separate `useProfileSessionHistory` hook was added — the inline `sessionCount` / `lastSessionAt` derivation in `progress/index.tsx:236-244` is sufficient). `apps/mobile/src/lib/progress.test.ts` covers the `isProfileStale` truth table; `progress.test.tsx` (362 lines) mocks `hashProfileId` and exercises the screen.
+
+**Outstanding (small track, runs in parallel with PR 2-pre / PR 2):**
+- `<TrackedView dwellMs eventName properties>` component at `apps/mobile/src/components/common/TrackedView.tsx` — does not exist today. Without it, `progress_report_viewed` cannot be fired honestly (a `useEffect` on mount is not equivalent to "section visible for ≥1s").
+- Once `<TrackedView>` is built, wrap `WeeklyReportCard` (and equivalents on `/subscription` for PR 2's `subscription_breakdown_viewed`) and emit `progress_report_viewed` with the `profile_id_hash` / `is_active_profile_owner` / `report_type` payload.
+- Add co-located tests for the four PR 1 components: `WeeklyReportCard.test.tsx`, `MonthlyReportCard.test.tsx`, `RecentSessionsList.test.tsx`, `ReportsListCard.test.tsx`. Each must cover render-with-data, loading, error, and empty states.
+- The `profile_id_hash_log(profile_id, hash, key_version, first_seen_at)` mapping store needed for the P1 gate (HIGH-3) was deferred — wire it when the gate is read, not before. The hash function is already deterministic per `key_version` so backfill is possible.
+
+> The pre-flight discovery checklist and render-rule snippet below are retained for re-planning context if `/progress` needs revisits in Phase 2.
+
+**Goal (historical):** Mount the extracted reporting components on the active profile's `/progress` tab. Closes BUG-901 (session detail dead-end). Also owns the `<TrackedView>` build, the `hashProfileId` helper, and the `profile_id_hash_log` mapping store that close PR 0.
 
 **Effort:** ~3–4 days frontend + 0–1 day API if a new endpoint is required. **Blocks on PR 1.**
 
@@ -605,18 +620,18 @@ If any gate fails, Phase 2 design returns to brainstorming for that workstream; 
 
 **Sentry-pipeline limit acknowledgment.** Sentry's `tracesSampleRate` and tag-cardinality limits may undersample events at scale. The MEDIUM-1 spike (see "PR 0 — Reconciliation") proves before any production data is collected that Discover can answer P1/P3 with the chosen schema. If the spike fails or `<TrackedView>` is shown to be unreliable, swap to PostHog **before** PR 2/PR 3 ship — not after the gate is read. Cost of swap: ~3 days.
 
-## Order of execution (revised 2026-05-06)
+## Order of execution (revised 2026-05-06 v6)
 
 ```
-Day 0:     MEDIUM-1 Sentry-aggregation spike (~1h, blocks PR 2 + PR 3)
-Day 1-3:   PR 2-pre (per-profile usage event log) ──┐
-Day 1-6:   PR 1 (component extract, parallel) ─────┐│
-Day 4-10:  PR 2 (quota endpoint, blocks on PR 2-pre)┤│
-Day 7-11:  PR 3 (/progress, blocks on PR 1) ────────┘
-Day 11-12: Verification + Phase 1 sign-off
+Day 0:     MEDIUM-1 Sentry-aggregation spike (~1h, blocks PR 2)
+Day 1-3:   PR 2-pre (per-profile usage event log) ───┐
+Day 1-3:   TrackedView + 4 co-located component tests (parallel) ─┐
+Day 4-10:  PR 2 (quota endpoint, blocks on PR 2-pre) ┤
+Day 4-5:   Wire progress_report_viewed via TrackedView (blocks on TrackedView) ┘
+Day 10-11: Verification + Phase 1 sign-off
 ```
 
-PR 0 + PR 4 are already merged; their reconciliation tasks (PR 0: `<TrackedView>` + `hashProfileId` + `profile_id_hash_log`, PR 4: `components/` uppercase test + remaining owner-prefixes) are folded into PR 3's scope.
+PR 0, PR 1, PR 3, PR 4 are already merged in some form; their reconciliation tasks (PR 0: `<TrackedView>` + `profile_id_hash_log`, PR 1: co-located component tests, PR 3: `progress_report_viewed` event + dwell gating, PR 4: `components/` uppercase test + remaining owner-prefixes) are folded into the TrackedView track or deferred to gate-read time.
 
 ## Sign-off criteria for Phase 1
 
@@ -664,13 +679,13 @@ Phase 1 is complete when:
 |---|---|---|
 | BUG-898 | Open | PR 2 (timezone-safe quota labels) |
 | BUG-900 | Closed | PR 4 (`?for=child` branching) |
-| BUG-901 | Open | PR 3 (`/progress` self-reporting + RecentSessionsList) |
+| BUG-901 | **Closed** | PR 3 shipped commit `4047629f` (`/progress` self-reporting + `RecentSessionsList`) |
 | BUG-903 | Closed | PR 4 (weekly-report `isEmptyWeeklyReport` + range formatter) |
 | BUG-904 | Closed | PR 4 (monthly empty state collapsed) |
 | BUG-906 | Closed | Sibling commits `8fe03dd1` + `01162206` (NEW_LEARNER_SESSION_THRESHOLD canonicalization) |
 | BUG-909 | Closed | PR 4 (owner-prefix on Learning Mode + Accommodation) |
 
-5 closed, 2 open, 9 deferred = 16. Reconciled.
+6 closed, 1 open, 9 deferred = 16. Reconciled.
 
 ## Revision history
 
@@ -678,4 +693,5 @@ Phase 1 is complete when:
 - **2026-04-29 v2:** Adversarial-review revision. Added PR 0 (analytics groundwork). Re-sequenced PR 4 to land after PR 1 (file-overlap fix). Replaced `hasOwnSessions` with stale-profile heuristic. Removed premature `context` prop. Added Failure Modes tables, Verified-by columns, Rollback section for potential PR 2 migration. Hardened privacy guard (aggregate suppression for ≥2 siblings). Specified ISO 8601 + server-formatted labels for `renews_at`/`resets_at`. Replaced "ESLint or grep" with a concrete custom Jest test. Made Phase 2 gate operationally defined. Reconciled audit-bug arithmetic. Estimate revised from 1.5 to ~3 sprints.
 - **2026-05-02 v3:** Codebase reconciliation pass #1. Corrected lift target (`components/progress/`, not new `components/reporting/`); hook names (`useChild*`); `linkedChildren` from `useProfile()` (no `useFamilyLinks` hook); existing partial fixes for BUG-909.
 - **2026-05-05 v4:** Reconciliation pass #2 after Phase 1 partial ship. Marked PR 0 + PR 4 SHIPPED with caveats (Sentry-tag analytics decision; uppercase test scoped to `app/`; mentor-memory/celebrations owner-prefix deferred into PR 3 cleanup). Dropped PR 1's "snapshot diff = zero" criterion (baseline moved). Reduced PR 1 scope to 4 components (was 7). Re-ordered: PR 1 + PR 2 in parallel, PR 3 after PR 1. Folded `<TrackedView>` + `hashProfileId` into PR 3 (PR 0 closure). Added Sentry-pipeline limit acknowledgment + PostHog fallback trigger. Updated bug accounting: 5 closed, 2 open, 9 deferred. Estimate revised to ~2 sprints.
+- **2026-05-06 v6:** Codebase reconciliation pass #4. PR 1 (component extract) confirmed **shipped** in commit `4047629f` — all four components (`WeeklyReportCard`, `MonthlyReportCard`, `RecentSessionsList`, `ReportsListCard`) live under `apps/mobile/src/components/progress/` and are mounted on both `/child/[profileId]/index.tsx` and `/progress/index.tsx`. PR 3 confirmed **substantially shipped** in same commit — `apps/mobile/src/app/(app)/progress/index.tsx` mounts the cards, wires `isProfileStale`, and fires `progress_empty_state_cta_tapped` with hashed profile_id; PR 0's `hashProfileId` + `bucketAccountAge` helpers also shipped (in `analytics.ts`). BUG-901 reclassified Closed (was Open). Audit accounting updated to 6 closed / 1 open / 9 deferred. Critical-path estimate revised to ~10 working days, dominated entirely by PR 2-pre + PR 2; the remaining frontend work (`<TrackedView>` dwell component + 4 co-located component tests + wiring `progress_report_viewed`) is a parallel small track. PR 1 + PR 3 sections retain their pre-flight + design narrative as historical context only — replaced by short "Status: Shipped/Substantially shipped" headers. Note: a separate `useProfileSessionHistory` hook was NOT added; `progress/index.tsx` derives `sessionCount` / `lastSessionAt` inline from `useProfileSessions(activeProfile?.id)` (which lives in `use-progress.ts`).
 - **2026-05-06 v5:** Adversarial-review reconciliation. **CRITICAL-1:** the `usage_events` table assumed by PR 2 does not exist (only `quota_pools` per subscription); added precursor PR 2-pre to introduce per-profile event log + sweep all `decrementQuota` call sites. **CRITICAL-2:** `family_links.role` column does not exist; collapsed roles to owner / non-owner derived from `profiles.isOwner` + family_links parent rows; updated backend logic, tests, and the P1 gate query. **HIGH-1:** PR 1 renamed from "lift" to "extract" — the four candidate components do not exist anywhere in the repo today; added decompose-check pre-flight + cross-card coupling risk + estimate contingency. **HIGH-2:** privacy guard had an off-by-one (1 sibling → leak by subtraction); rule changed to "non-owners never see family aggregate"; rendered examples collapsed from 3 to 2; tests now cover 0/1/2+ sibling break cases. **HIGH-3:** P1 gate's HMAC join was undefined; added `profile_id_hash_log(profile_id, hash, key_version)` written in PR 3, plus a `subscription_breakdown_mounted` event so P3's events-vs-mounts ratio is computable. **MEDIUM-1:** added a mandatory ~1h Sentry-aggregation spike before PR 2/PR 3 fire any events; PostHog swap moved from gate-read time to spike-fail time. **MEDIUM-2:** PR 0 status changed from "Shipped, with caveats" to "Partially shipped — closure folded into PR 3." **MEDIUM-3:** `<TrackedView>` pre-flight now includes dep-availability check, +1/+2 day estimate adjustment, real-device dwell sanity acceptance, and an explicit iOS verification paragraph. **MEDIUM-4:** specified UTC fallback for owners with null `profiles.timezone`. **MEDIUM-5:** sign-off #5 dropped commit-message tag enforcement; PR descriptions are the durable record. **LOW-1:** removed duplicate BUG-906 from PR 2 overview row. **LOW-2:** reconciled critical-path arithmetic to ~13–17 days (~3 sprints) reflecting PR 2-pre + PR 2 longer paths. **NIT-1:** open question #2 reworded from "Resolved" to "Deferred to PR 3 pre-flight."
