@@ -1286,7 +1286,7 @@ export const sessionCompleted = inngest.createFunction(
     );
     outcomes.push({ step: 'embed-new-memory-facts', status: 'ok' });
 
-    const dedupReport = await step.run('dedup-new-facts', async () => {
+    const dedupResult = await step.run('dedup-new-facts', async () => {
       const dedupConfig = getStepMemoryFactsDedupConfig();
       if (
         !isMemoryFactsDedupEnabled(dedupConfig.enabled) ||
@@ -1301,15 +1301,18 @@ export const sessionCompleted = inngest.createFunction(
         scoped: createScopedRepository(db, profileId),
         profileId,
         candidateIds: embedNewFactsResult.embeddedIds,
-        emit: async (eventName, payload) => {
-          await step.sendEvent(eventName, { name: eventName, data: payload });
-        },
         threshold: dedupConfig.threshold,
         cap: dedupConfig.maxLlmCalls,
       });
     });
-    if (dedupReport) {
+    if (dedupResult) {
       outcomes.push({ step: 'dedup-new-facts', status: 'ok' });
+      if (dedupResult.events.length > 0) {
+        await step.sendEvent(
+          'dedup-events',
+          dedupResult.events.map((e) => ({ name: e.name, data: e.data }))
+        );
+      }
     }
 
     // Step 3b: FR247.6 — Send struggle push notifications to parent

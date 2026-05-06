@@ -29,6 +29,11 @@ export type DedupPassReport = {
   failures: number;
 };
 
+export interface DedupEventTuple {
+  name: string;
+  data: Record<string, unknown>;
+}
+
 export interface DedupPassArgs {
   db: Database;
   scoped: ScopedRepository;
@@ -36,7 +41,6 @@ export interface DedupPassArgs {
   candidateIds?: string[];
   llm?: typeof runDedupLlm;
   llmDeps?: Parameters<typeof runDedupLlm>[1];
-  emit: (eventName: string, payload: Record<string, unknown>) => Promise<void>;
   threshold: number;
   cap: number;
 }
@@ -76,10 +80,19 @@ function decisionFromMemo(row: {
   return { action: row.decision } as DedupResponse;
 }
 
+export interface DedupPassResult {
+  report: DedupPassReport;
+  events: DedupEventTuple[];
+}
+
 export async function runDedupForProfile(
   args: DedupPassArgs
-): Promise<DedupPassReport> {
+): Promise<DedupPassResult> {
   const report = emptyReport();
+  const events: DedupEventTuple[] = [];
+  function emit(name: string, data: Record<string, unknown>): void {
+    events.push({ name, data });
+  }
   const candidateRows =
     args.candidateIds && args.candidateIds.length > 0
       ? await Promise.all(
@@ -93,7 +106,7 @@ export async function runDedupForProfile(
     report.candidatesProcessed += 1;
     if (!candidate || candidate.embedding === null) {
       report.skippedNoEmbedding += 1;
-      await args.emit('memory.dedup.skipped_no_embedding', {
+      emit('memory.dedup.skipped_no_embedding', {
         profileId: args.profileId,
         candidateId: candidate?.id ?? null,
       });
@@ -101,18 +114,15 @@ export async function runDedupForProfile(
     }
 
     if (await isSuppressedFact(args.scoped, candidate.text)) {
-      await args.db
-        .delete(memoryFacts)
-        .where(
-          and(
-            eq(memoryFacts.id, candidate.id),
-            eq(memoryFacts.profileId, args.profileId)
-          )
-        );
+      // Defence-in-depth: candidate should not appear here because
+      // findActiveCandidatesWithEmbedding excludes category='suppressed'.
+      // If it somehow leaked through (e.g. candidateIds list), skip and warn
+      // rather than deleting — the prewrite layer is the authoritative guard.
       report.suppressedSkips += 1;
-      await args.emit('memory.fact.suppressed_skip', {
+      emit('memory.fact.suppressed_skip', {
         profileId: args.profileId,
         candidateId: candidate.id,
+        warning: 'suppressed_fact_reached_dedup_pass',
       });
       continue;
     }
@@ -152,7 +162,7 @@ export async function runDedupForProfile(
         report.capHit = true;
         report.cappedSkipped += 1;
         report.keptAsNew += 1;
-        await args.emit('memory.dedup.capped_skip', {
+        emit('memory.dedup.capped_skip', {
           profileId: args.profileId,
           candidateId: candidate.id,
           neighbourId: best.id,
@@ -171,7 +181,7 @@ export async function runDedupForProfile(
       if (!llmResult.ok) {
         report.failures += 1;
         report.keptBoth += 1;
-        await args.emit('memory.dedup.failed', {
+        emit('memory.dedup.failed', {
           profileId: args.profileId,
           candidateId: candidate.id,
           neighbourId: best.id,
@@ -234,7 +244,7 @@ export async function runDedupForProfile(
     switch (outcome.kind) {
       case 'merge':
         report.merges += 1;
-        await args.emit('memory.fact.merged', {
+        emit('memory.fact.merged', {
           profileId: args.profileId,
           newFactId: outcome.newFactId,
           mergedFromIds: outcome.supersededIds,
@@ -243,7 +253,7 @@ export async function runDedupForProfile(
         break;
       case 'supersede':
         report.supersedes += 1;
-        await args.emit('memory.fact.merged', {
+        emit('memory.fact.merged', {
           profileId: args.profileId,
           newFactId: candidate.id,
           mergedFromIds: [outcome.supersededId],
@@ -260,7 +270,7 @@ export async function runDedupForProfile(
       case 'merge_rejected_metadata_mismatch':
         report.failures += 1;
         report.keptBoth += 1;
-        await args.emit('memory.dedup.failed', {
+        emit('memory.dedup.failed', {
           profileId: args.profileId,
           candidateId: candidate.id,
           neighbourId: best.id,
@@ -271,11 +281,11 @@ export async function runDedupForProfile(
   }
 
   if (report.capHit) {
-    await args.emit('memory.dedup.cap_hit', {
+    emit('memory.dedup.cap_hit', {
       profileId: args.profileId,
       cappedSkipped: report.cappedSkipped,
     });
   }
 
-  return report;
+  return { report, events };
 }

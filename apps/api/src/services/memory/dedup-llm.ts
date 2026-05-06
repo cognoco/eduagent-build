@@ -30,7 +30,7 @@ export async function runDedupLlm(
   let modelVersion: string;
   try {
     const result = await (deps.caller ?? routeAndCall)(messages, 1, {
-      llmTier: 'premium',
+      llmTier: 'flash',
       flow: 'memory-dedup',
     });
     raw = result.response;

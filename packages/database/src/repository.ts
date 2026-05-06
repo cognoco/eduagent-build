@@ -404,7 +404,8 @@ export function createScopedRepository(db: Database, profileId: string) {
             memoryFacts,
             and(
               sql`${memoryFacts.supersededBy} IS NULL`,
-              sql`${memoryFacts.embedding} IS NOT NULL`
+              sql`${memoryFacts.embedding} IS NOT NULL`,
+              sql`${memoryFacts.category} <> 'suppressed'`
             )
           ),
           orderBy: [asc(memoryFacts.createdAt), asc(memoryFacts.id)],
