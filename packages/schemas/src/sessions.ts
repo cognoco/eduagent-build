@@ -38,16 +38,45 @@ export const exchangeEntrySchema = z.object({
 });
 export type ExchangeEntry = z.infer<typeof exchangeEntrySchema>;
 
+// Interest context — narrow the meaning of an extracted interest to school
+// vs free-time vs both. The interview prompt infers this when the transcript
+// makes the register obvious; ambiguous interests default to 'both'.
+export const interestContextValueSchema = z.enum([
+  'school',
+  'free_time',
+  'both',
+]);
+export type InterestContextValue = z.infer<typeof interestContextValueSchema>;
+
+// Analogy framing — the LLM's read of the learner's preferred analogy register.
+// Mentor uses this to bias example choice in early sessions; defaults to
+// 'concrete' downstream when missing (safest for ages 11-14 per spec).
+export const analogyFramingSchema = z.enum(['concrete', 'abstract', 'playful']);
+export type AnalogyFraming = z.infer<typeof analogyFramingSchema>;
+
+// Pace hint — derived mechanically from transcript message length, not from
+// the LLM. `density` reflects how much info the learner packs per turn;
+// `chunkSize` reflects how much they tolerate back.
+export const paceHintSchema = z.object({
+  density: z.enum(['low', 'medium', 'high']),
+  chunkSize: z.enum(['short', 'medium', 'long']),
+});
+export type PaceHint = z.infer<typeof paceHintSchema>;
+
 // Extracted signals — structured data parsed from a completed interview.
-// `interests` is surfaced to the interests-context picker on mobile, which
-// lets the learner tag each extracted label as school / free-time / both.
-// Optional because the LLM extraction may return an empty array for short
-// or off-topic interviews — consumers MUST tolerate missing/empty interests.
+// `interests` and the fast-path fields (`interestContext`, `analogyFraming`,
+// `paceHint`) are all optional: short or off-topic interviews may yield
+// empty extraction, and consumers MUST tolerate missing fields by applying
+// neutral defaults. The interests-context picker (non-fast-path flow) and
+// downstream mentor prompts (fast-path) are the two consumers today.
 export const extractedInterviewSignalsSchema = z.object({
   goals: z.array(z.string()),
   experienceLevel: z.string(),
   currentKnowledge: z.string(),
   interests: z.array(z.string()).optional(),
+  interestContext: z.record(z.string(), interestContextValueSchema).optional(),
+  analogyFraming: analogyFramingSchema.optional(),
+  paceHint: paceHintSchema.optional(),
 });
 export type ExtractedInterviewSignals = z.infer<
   typeof extractedInterviewSignalsSchema

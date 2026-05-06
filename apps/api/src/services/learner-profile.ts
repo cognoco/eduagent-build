@@ -1,6 +1,7 @@
 import { and, eq, sql } from 'drizzle-orm';
 import {
   learningProfiles,
+  memoryFacts,
   profiles,
   subjects,
   type Database,
@@ -20,6 +21,10 @@ import {
   type StruggleEntry,
 } from '@eduagent/schemas';
 import { routeAndCall, type ChatMessage } from './llm';
+import {
+  writeMemoryFactsForAnalysis,
+  writeMemoryFactsForDeletion,
+} from './memory/memory-facts';
 import {
   escapeXml,
   renderPromptTemplate,
@@ -1150,32 +1155,46 @@ export async function getOrCreateLearningProfile(
   return retry;
 }
 
-/**
- * Server-side only — internal helper called by applyAnalysis and deleteMemoryItem.
- * The profileId is sourced from a DB row, not user input. No accountId guard required.
- */
-async function updateWithRetry(
-  db: Database,
-  profileId: string,
-  expectedVersion: number,
-  updates: Record<string, unknown>
-): Promise<boolean> {
-  const [updated] = await db
-    .update(learningProfiles)
-    .set({
-      ...updates,
-      version: sql`${learningProfiles.version} + 1`,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(learningProfiles.profileId, profileId),
-        eq(learningProfiles.version, expectedVersion)
-      )
-    )
-    .returning();
+async function getOrCreateLearningProfileTx(
+  tx: Database,
+  profileId: string
+): Promise<LearningProfileRow> {
+  const [locked] = await tx
+    .select()
+    .from(learningProfiles)
+    .where(eq(learningProfiles.profileId, profileId))
+    .for('update')
+    .limit(1);
+  if (locked) return locked;
 
-  return Boolean(updated);
+  await tx
+    .insert(learningProfiles)
+    .values({ profileId })
+    .onConflictDoNothing({ target: learningProfiles.profileId });
+
+  const [created] = await tx
+    .select()
+    .from(learningProfiles)
+    .where(eq(learningProfiles.profileId, profileId))
+    .for('update')
+    .limit(1);
+
+  if (!created) {
+    throw new Error(`Unable to create learning profile for ${profileId}`);
+  }
+  return created;
+}
+
+function mergeProfileState(
+  profile: LearningProfileRow,
+  updates: Record<string, unknown>
+): LearningProfileRow {
+  return {
+    ...profile,
+    ...updates,
+    version: profile.version + 1,
+    updatedAt: new Date(),
+  } as LearningProfileRow;
 }
 
 /**
@@ -1202,42 +1221,48 @@ export async function applyAnalysis(
     return { fieldsUpdated: [], notifications: [] };
   }
 
-  const profile = await getOrCreateLearningProfile(db, profileId);
-  const { updates, fieldsUpdated, notifications } = buildAnalysisUpdates(
-    profile,
-    analysis,
-    source,
-    subjectName
-  );
+  const { finalFieldsUpdated, finalNotifications } = await db.transaction(
+    async (tx) => {
+      const profile = await getOrCreateLearningProfileTx(
+        tx as unknown as Database,
+        profileId
+      );
 
-  if (Object.keys(updates).length === 0) {
-    return { fieldsUpdated: [], notifications: [] };
-  }
+      if (
+        profile.memoryConsentStatus !== 'granted' ||
+        profile.memoryCollectionEnabled === false
+      ) {
+        return { finalFieldsUpdated: [], finalNotifications: [] };
+      }
 
-  let finalNotifications = notifications;
-  let finalFieldsUpdated = fieldsUpdated;
-  const updated = await updateWithRetry(
-    db,
-    profileId,
-    profile.version,
-    updates
-  );
-  if (!updated) {
-    const fresh = await getLearningProfile(db, profileId);
-    if (!fresh) return { fieldsUpdated: [], notifications: [] };
+      const { updates, fieldsUpdated, notifications } = buildAnalysisUpdates(
+        profile,
+        analysis,
+        source,
+        subjectName
+      );
 
-    const retry = buildAnalysisUpdates(fresh, analysis, source, subjectName);
-    // [CR-119.4]: Guard retry against empty updates — same check as the first
-    // attempt (line 952). Without this, an empty retry bumps version/updatedAt,
-    // potentially poisoning the optimistic lock for concurrent updates.
-    if (Object.keys(retry.updates).length > 0) {
-      await updateWithRetry(db, profileId, fresh.version, retry.updates);
+      if (Object.keys(updates).length === 0) {
+        return { finalFieldsUpdated: [], finalNotifications: [] };
+      }
+
+      const mergedState = mergeProfileState(profile, updates);
+      await tx
+        .update(learningProfiles)
+        .set({
+          ...updates,
+          version: sql`${learningProfiles.version} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(eq(learningProfiles.profileId, profileId));
+      await writeMemoryFactsForAnalysis(tx, profileId, mergedState);
+
+      return {
+        finalFieldsUpdated: fieldsUpdated,
+        finalNotifications: notifications,
+      };
     }
-    // Use retry-derived notifications — the first pass was based on a stale
-    // profile snapshot, so its notifications may be spurious.
-    finalNotifications = retry.notifications;
-    finalFieldsUpdated = retry.fieldsUpdated;
-  }
+  );
 
   if (finalNotifications.length > 0) {
     // [logging sweep] structured logger so PII fields land as JSON context
@@ -1306,39 +1331,35 @@ export async function deleteMemoryItem(
   subject?: string
 ): Promise<void> {
   await verifyProfileOwnership(db, profileId, accountId);
-  const profile = await getLearningProfile(db, profileId);
-  if (!profile) return;
+  await db.transaction(async (tx) => {
+    const [profile] = await tx
+      .select()
+      .from(learningProfiles)
+      .where(eq(learningProfiles.profileId, profileId))
+      .for('update')
+      .limit(1);
+    if (!profile) return;
 
-  const updates = buildDeleteMemoryItemUpdates(
-    profile,
-    category,
-    value,
-    suppress,
-    subject
-  );
-  if (!updates) return;
+    const updates = buildDeleteMemoryItemUpdates(
+      profile,
+      category,
+      value,
+      suppress,
+      subject
+    );
+    if (!updates) return;
 
-  const updated = await updateWithRetry(
-    db,
-    profileId,
-    profile.version,
-    updates
-  );
-  if (updated) return;
-
-  const fresh = await getLearningProfile(db, profileId);
-  if (!fresh) return;
-
-  const retryUpdates = buildDeleteMemoryItemUpdates(
-    fresh,
-    category,
-    value,
-    suppress,
-    subject
-  );
-  if (!retryUpdates) return;
-
-  await updateWithRetry(db, profileId, fresh.version, retryUpdates);
+    const mergedState = mergeProfileState(profile, updates);
+    await tx
+      .update(learningProfiles)
+      .set({
+        ...updates,
+        version: sql`${learningProfiles.version} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(eq(learningProfiles.profileId, profileId));
+    await writeMemoryFactsForDeletion(tx, profileId, mergedState);
+  });
 }
 
 function buildUnsuppressUpdates(
@@ -1359,25 +1380,27 @@ export async function unsuppressInference(
   value: string
 ): Promise<void> {
   await verifyProfileOwnership(db, profileId, accountId);
-  const profile = await getLearningProfile(db, profileId);
-  if (!profile) return;
+  await db.transaction(async (tx) => {
+    const [profile] = await tx
+      .select()
+      .from(learningProfiles)
+      .where(eq(learningProfiles.profileId, profileId))
+      .for('update')
+      .limit(1);
+    if (!profile) return;
 
-  const updated = await updateWithRetry(
-    db,
-    profileId,
-    profile.version,
-    buildUnsuppressUpdates(profile, value)
-  );
-  if (updated) return;
-
-  const fresh = await getLearningProfile(db, profileId);
-  if (!fresh) return;
-  await updateWithRetry(
-    db,
-    profileId,
-    fresh.version,
-    buildUnsuppressUpdates(fresh, value)
-  );
+    const updates = buildUnsuppressUpdates(profile, value);
+    const mergedState = mergeProfileState(profile, updates);
+    await tx
+      .update(learningProfiles)
+      .set({
+        ...updates,
+        version: sql`${learningProfiles.version} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(eq(learningProfiles.profileId, profileId));
+    await writeMemoryFactsForDeletion(tx, profileId, mergedState);
+  });
 }
 
 export async function toggleMemoryEnabled(
@@ -1491,9 +1514,12 @@ export async function deleteAllMemory(
   accountId: string | undefined
 ): Promise<void> {
   await verifyProfileOwnership(db, profileId, accountId);
-  await db
-    .delete(learningProfiles)
-    .where(eq(learningProfiles.profileId, profileId));
+  await db.transaction(async (tx) => {
+    await tx.delete(memoryFacts).where(eq(memoryFacts.profileId, profileId));
+    await tx
+      .delete(learningProfiles)
+      .where(eq(learningProfiles.profileId, profileId));
+  });
 }
 
 const MAX_TRANSCRIPT_EVENTS = 100;

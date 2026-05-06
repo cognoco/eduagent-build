@@ -16,6 +16,7 @@ import {
 } from '../../../hooks/use-interview';
 import { useStartSession, useStreamMessage } from '../../../hooks/use-sessions';
 import { formatApiError } from '../../../lib/format-api-error';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { getOnboardingStepLabels } from '../../../lib/onboarding-step-labels';
 import { platformAlert } from '../../../lib/platform-alert';
@@ -112,8 +113,51 @@ export default function InterviewScreen() {
     null
   );
 
+  // ---------------------------------------------------------------------------
+  // Session transition: silently start a learning session after interview ends.
+  // The curriculum is already persisted server-side when isComplete fires.
+  // ---------------------------------------------------------------------------
+  const transitionToSession = useCallback(async () => {
+    if (sessionCreatingRef.current || !safeSubjectId) return;
+    sessionCreatingRef.current = true;
+    try {
+      const result = await startSessionRef.current.mutateAsync({
+        subjectId: safeSubjectId,
+        sessionType: 'learning',
+        inputMode: 'text',
+      });
+      setActiveSessionId(result.session.id);
+      setSessionPhase(true);
+    } catch (err) {
+      // [BUG-803] Surface the failure via the existing
+      // session-creation-stuck retry UX (Try Again + Go Back) instead of
+      // silently swapping to the "Let's Go" card — which made it look like
+      // the interview succeeded when in reality the session never started
+      // and there was no retry path. Sentry capture replaces the prior
+      // console.error-only logging so failures are observable in production.
+      Sentry.captureException(err, {
+        tags: {
+          component: 'InterviewScreen',
+          action: 'transition-to-session',
+        },
+      });
+      console.error(
+        '[Interview→Session] Session creation FAILED, surfacing retry:',
+        err
+      );
+      setSessionPhase(true);
+      setSessionCreationStuck(true);
+      sessionCreatingRef.current = false;
+    }
+  }, [safeSubjectId]);
+
   const goToNextStep = useCallback(() => {
     if (!subjectId) return;
+
+    if (sessionPhase) {
+      router.replace('/(app)/home' as never);
+      return;
+    }
 
     const baseParams = {
       subjectId,
@@ -121,6 +165,22 @@ export default function InterviewScreen() {
       step: String(Math.min(step + 1, totalSteps)),
       totalSteps: String(totalSteps),
     };
+
+    if (FEATURE_FLAGS.ONBOARDING_FAST_PATH) {
+      if (languageCode) {
+        router.replace({
+          pathname: '/(app)/onboarding/language-setup',
+          params: {
+            ...baseParams,
+            languageCode,
+            languageName: languageName ?? '',
+          },
+        } as never);
+        return;
+      }
+      void transitionToSession();
+      return;
+    }
 
     // BKT-C.2: If the interview yielded interest labels, route through the
     // interests-context picker before the language/analogy fork. The picker
@@ -175,10 +235,12 @@ export default function InterviewScreen() {
     languageCode,
     languageName,
     router,
+    sessionPhase,
     step,
     subjectId,
     subjectName,
     totalSteps,
+    transitionToSession,
   ]);
 
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -231,44 +293,6 @@ export default function InterviewScreen() {
     () => messages.filter((m) => m.role === 'user' && !m.isAutoSent).length,
     [messages]
   );
-
-  // ---------------------------------------------------------------------------
-  // Session transition: silently start a learning session after interview ends.
-  // The curriculum is already persisted server-side when isComplete fires.
-  // ---------------------------------------------------------------------------
-  const transitionToSession = useCallback(async () => {
-    if (sessionCreatingRef.current || !safeSubjectId) return;
-    sessionCreatingRef.current = true;
-    try {
-      const result = await startSessionRef.current.mutateAsync({
-        subjectId: safeSubjectId,
-        sessionType: 'learning',
-        inputMode: 'text',
-      });
-      setActiveSessionId(result.session.id);
-      setSessionPhase(true);
-    } catch (err) {
-      // [BUG-803] Surface the failure via the existing
-      // session-creation-stuck retry UX (Try Again + Go Back) instead of
-      // silently swapping to the "Let's Go" card — which made it look like
-      // the interview succeeded when in reality the session never started
-      // and there was no retry path. Sentry capture replaces the prior
-      // console.error-only logging so failures are observable in production.
-      Sentry.captureException(err, {
-        tags: {
-          component: 'InterviewScreen',
-          action: 'transition-to-session',
-        },
-      });
-      console.error(
-        '[Interview→Session] Session creation FAILED, surfacing retry:',
-        err
-      );
-      setSessionPhase(true);
-      setSessionCreationStuck(true);
-      sessionCreatingRef.current = false;
-    }
-  }, [safeSubjectId]);
 
   // [BUG-816 / F-MOB-18] If router pushes the screen with a different
   // subjectId while it's still mounted, every piece of interview-screen-local

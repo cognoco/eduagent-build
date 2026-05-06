@@ -37,6 +37,8 @@ import {
   topicSuggestions,
   curriculumBooks,
   curriculumTopics,
+  monthlyReports,
+  weeklyReports,
   learningProfiles,
   vocabulary,
   vocabularyRetentionCards,
@@ -44,6 +46,7 @@ import {
   quizRounds,
   quizMissedItems,
   quizMasteryItems,
+  memoryFacts,
 } from './schema/index';
 
 // [BUG-704 / P-8] Single source of truth for the runtime DB enum
@@ -81,10 +84,11 @@ export function createScopedRepository(db: Database, profileId: string) {
     },
 
     sessions: {
-      async findMany(extraWhere?: SQL, limit?: number) {
+      async findMany(extraWhere?: SQL, limit?: number, orderBy?: SQL | SQL[]) {
         return db.query.learningSessions.findMany({
           where: scopedWhere(learningSessions, extraWhere),
           ...(limit ? { limit } : {}),
+          ...(orderBy ? { orderBy } : {}),
         });
       },
       async findFirst(extraWhere?: SQL) {
@@ -367,6 +371,58 @@ export function createScopedRepository(db: Database, profileId: string) {
       async findFirst(extraWhere?: SQL) {
         return db.query.sessionEmbeddings.findFirst({
           where: scopedWhere(sessionEmbeddings, extraWhere),
+        });
+      },
+    },
+    memoryFacts: {
+      async findManyActive(extraWhere?: SQL) {
+        return db.query.memoryFacts.findMany({
+          where: scopedWhere(
+            memoryFacts,
+            extraWhere
+              ? and(sql`${memoryFacts.supersededBy} IS NULL`, extraWhere)
+              : sql`${memoryFacts.supersededBy} IS NULL`
+          ),
+          orderBy: [asc(memoryFacts.createdAt), asc(memoryFacts.id)],
+        });
+      },
+      async findFirstActive(extraWhere?: SQL) {
+        return db.query.memoryFacts.findFirst({
+          where: scopedWhere(
+            memoryFacts,
+            extraWhere
+              ? and(sql`${memoryFacts.supersededBy} IS NULL`, extraWhere)
+              : sql`${memoryFacts.supersededBy} IS NULL`
+          ),
+          orderBy: [asc(memoryFacts.createdAt), asc(memoryFacts.id)],
+        });
+      },
+    },
+    monthlyReports: {
+      async findMany(extraWhere?: SQL, options?: { limit?: number }) {
+        return db.query.monthlyReports.findMany({
+          where: scopedWhere(monthlyReports, extraWhere),
+          orderBy: desc(monthlyReports.reportMonth),
+          ...(options?.limit ? { limit: options.limit } : {}),
+        });
+      },
+      async findFirst(extraWhere?: SQL) {
+        return db.query.monthlyReports.findFirst({
+          where: scopedWhere(monthlyReports, extraWhere),
+        });
+      },
+    },
+    weeklyReports: {
+      async findMany(extraWhere?: SQL, options?: { limit?: number }) {
+        return db.query.weeklyReports.findMany({
+          where: scopedWhere(weeklyReports, extraWhere),
+          orderBy: desc(weeklyReports.reportWeek),
+          ...(options?.limit ? { limit: options.limit } : {}),
+        });
+      },
+      async findFirst(extraWhere?: SQL) {
+        return db.query.weeklyReports.findFirst({
+          where: scopedWhere(weeklyReports, extraWhere),
         });
       },
     },

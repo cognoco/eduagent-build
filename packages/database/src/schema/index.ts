@@ -8,6 +8,7 @@ export * from './progress';
 export * from './snapshots';
 export * from './billing';
 export * from './embeddings';
+export * from './memory-facts';
 export * from './language';
 export * from './notes';
 export * from './learning-profiles';

@@ -12,5 +12,6 @@
     "types": ["node", "jest"]
   },
   "include": ["src/**/*.ts"],
-  "references": []
+  "references": [],
+  "exclude": ["jest.config.cjs", "src/**/*.spec.ts", "src/**/*.test.ts"]
 }

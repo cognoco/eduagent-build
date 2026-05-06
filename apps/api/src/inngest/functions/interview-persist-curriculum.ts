@@ -1,6 +1,6 @@
 import { NonRetriableError } from 'inngest';
 import { eq, and } from 'drizzle-orm';
-import { onboardingDrafts } from '@eduagent/database';
+import { onboardingDrafts, type Database } from '@eduagent/database';
 import {
   PersistCurriculumError,
   interviewReadyToPersistEventSchema,
@@ -99,7 +99,7 @@ export const interviewPersistCurriculum = inngest.createFunction(
       goals: string[];
       experienceLevel: string;
       currentKnowledge: string;
-      interests: string[];
+      interests?: string[];
     };
 
     const signals = await step.run('extract-signals', async () => {
@@ -123,7 +123,7 @@ export const interviewPersistCurriculum = inngest.createFunction(
         );
         if (
           !fresh ||
-          (fresh.goals.length === 0 && fresh.interests.length === 0)
+          (fresh.goals.length === 0 && (fresh.interests?.length ?? 0) === 0)
         ) {
           throw new PersistCurriculumError('empty_signals');
         }
@@ -170,23 +170,29 @@ export const interviewPersistCurriculum = inngest.createFunction(
           createdAt: draft.createdAt.toISOString(),
           updatedAt: draft.updatedAt.toISOString(),
         };
-        await persistCurriculum(
-          db,
-          profileId,
-          subjectId,
-          subjectName,
-          draftForPersist,
-          bookId
-        );
-        await db
-          .update(onboardingDrafts)
-          .set({ status: 'completed', failureCode: null })
-          .where(
-            and(
-              eq(onboardingDrafts.id, draftId),
-              eq(onboardingDrafts.profileId, profileId)
-            )
+        // A7: atomize topic insert + topicsGenerated flag + draft.status flip so
+        // the polling endpoint never observes "topics exist, status='completing'".
+        // neon-serverless WS driver supports interactive transactions.
+        await db.transaction(async (tx) => {
+          const txDb = tx as unknown as Database;
+          await persistCurriculum(
+            txDb,
+            profileId,
+            subjectId,
+            subjectName,
+            draftForPersist,
+            bookId
           );
+          await tx
+            .update(onboardingDrafts)
+            .set({ status: 'completed', failureCode: null })
+            .where(
+              and(
+                eq(onboardingDrafts.id, draftId),
+                eq(onboardingDrafts.profileId, profileId)
+              )
+            );
+        });
       } catch (err) {
         if (err instanceof PersistCurriculumError) throw err;
         throw new PersistCurriculumError(

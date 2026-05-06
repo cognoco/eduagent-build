@@ -2,6 +2,12 @@
 // Curated Memory View — Parent-facing categorized presentation of learning profile
 // ---------------------------------------------------------------------------
 
+import { createScopedRepository, type Database } from '@eduagent/database';
+import {
+  hasMemoryFactsBackfillMarker,
+  readMemorySnapshotFromFacts,
+} from './memory/memory-facts';
+
 export type MemoryCategoryKey =
   | 'struggles'
   | 'interests'
@@ -123,11 +129,25 @@ function buildStringArrayItems(
   category: MemoryCategoryKey,
   formatter: (s: string) => string
 ): CuratedMemoryItem[] {
-  return (items as string[]).map((value) => ({
-    category,
-    value,
-    statement: formatter(value),
-  }));
+  return items.flatMap((item) => {
+    const value =
+      typeof item === 'string'
+        ? item
+        : item &&
+          typeof item === 'object' &&
+          'label' in item &&
+          typeof item.label === 'string'
+        ? item.label
+        : null;
+    if (!value) return [];
+    return [
+      {
+        category,
+        value,
+        statement: formatter(value),
+      },
+    ];
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -208,4 +228,34 @@ export function buildCuratedMemoryView(profile: {
       accommodationMode: profile.accommodationMode ?? null,
     },
   };
+}
+
+export async function buildCuratedMemoryViewForProfile(
+  db: Database,
+  profileId: string,
+  profile: Parameters<typeof buildCuratedMemoryView>[0] & {
+    memoryFactsBackfilledAt?: Date | string | null;
+  },
+  options?: { memoryFactsReadEnabled?: boolean }
+): Promise<CuratedMemoryView> {
+  const snapshot =
+    options?.memoryFactsReadEnabled && hasMemoryFactsBackfillMarker(profile)
+      ? await readMemorySnapshotFromFacts(
+          createScopedRepository(db, profileId),
+          profile,
+          { respectInjectionToggle: false }
+        )
+      : null;
+
+  return buildCuratedMemoryView(
+    snapshot
+      ? {
+          ...profile,
+          interests: snapshot.interests,
+          strengths: snapshot.strengths,
+          struggles: snapshot.struggles,
+          communicationNotes: snapshot.communicationNotes,
+        }
+      : profile
+  );
 }

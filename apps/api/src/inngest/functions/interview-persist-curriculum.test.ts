@@ -85,7 +85,7 @@ function mockDb({
     where: jest.fn().mockReturnThis(),
     returning: jest.fn().mockResolvedValue([{ id: DRAFT }]),
   };
-  return {
+  const db: Record<string, unknown> = {
     query: {
       onboardingDrafts: {
         findFirst: jest
@@ -95,6 +95,12 @@ function mockDb({
     },
     update: jest.fn().mockReturnValue(updateChain),
   };
+  // A7: persist-curriculum step now wraps writes in db.transaction().
+  // The unit test mocks persistCurriculum and the inner update, so the
+  // transaction wrapper just needs to invoke its callback with a tx-shaped
+  // value. Reusing `db` is fine — the txDb cast in the SUT erases the type.
+  db['transaction'] = jest.fn(async (cb: (tx: unknown) => unknown) => cb(db));
+  return db;
 }
 
 describe('interview-persist-curriculum (replay harness)', () => {

@@ -5,6 +5,9 @@ import {
   useProgressInventory,
   useProgressHistory,
   useProgressMilestones,
+  useProfileSessions,
+  useProfileReports,
+  useProfileWeeklyReports,
   useRefreshProgressSnapshot,
 } from '../../hooks/use-progress';
 import ProgressScreen from './progress/index';
@@ -79,6 +82,22 @@ jest.mock('react-i18next', () => ({
 }));
 
 jest.mock('../../hooks/use-progress');
+jest.mock('../../lib/profile', () => ({
+  useProfile: () => ({
+    activeProfile: {
+      id: 'test-profile-id',
+      displayName: 'Test Learner',
+      createdAt: '2026-01-01T00:00:00Z',
+      isOwner: true,
+    },
+    profiles: [],
+  }),
+}));
+jest.mock('../../lib/analytics', () => ({
+  bucketAccountAge: jest.fn(() => '91+'),
+  hashProfileId: jest.fn((id: string) => `hashed-${id}`),
+  track: jest.fn(),
+}));
 jest.mock('../../lib/api-client', () => ({
   useApiClient: () => ({}),
 }));
@@ -152,6 +171,49 @@ function mockHooks(
   (useRefreshProgressSnapshot as jest.Mock).mockReturnValue({
     mutateAsync: jest.fn(),
     isPending: false,
+  });
+  (useProfileSessions as jest.Mock).mockReturnValue({
+    data:
+      inventory && inventory.global.totalSessions > 0
+        ? [
+            {
+              sessionId: 'session-1',
+              subjectId: 'subject-1',
+              subjectName: 'Math',
+              topicId: null,
+              topicTitle: null,
+              sessionType: 'learning',
+              startedAt: new Date().toISOString(),
+              endedAt: null,
+              exchangeCount: 1,
+              escalationRung: 1,
+              durationSeconds: 60,
+              wallClockSeconds: 60,
+              displayTitle: 'Learning',
+              displaySummary: null,
+              homeworkSummary: null,
+              highlight: null,
+              narrative: null,
+              conversationPrompt: null,
+              engagementSignal: null,
+            },
+          ]
+        : [],
+    isLoading: false,
+    isError: false,
+    refetch: jest.fn(),
+  });
+  (useProfileReports as jest.Mock).mockReturnValue({
+    data: [],
+    isLoading: false,
+    isError: false,
+    refetch: jest.fn(),
+  });
+  (useProfileWeeklyReports as jest.Mock).mockReturnValue({
+    data: [],
+    isLoading: false,
+    isError: false,
+    refetch: jest.fn(),
   });
   (useLearningResumeTarget as jest.Mock).mockReturnValue({
     data: null,

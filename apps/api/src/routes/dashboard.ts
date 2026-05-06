@@ -38,12 +38,17 @@ import {
   getWeeklyReportForParentChild,
   markWeeklyReportViewed,
 } from '../services/weekly-report';
-import { buildCuratedMemoryView } from '../services/curated-memory';
+import { buildCuratedMemoryViewForProfile } from '../services/curated-memory';
 import { assertParentAccess } from '../services/family-access';
 import { notFound } from '../errors';
+import { isMemoryFactsReadEnabled } from '../config';
 
 type DashboardRouteEnv = {
-  Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
+  Bindings: {
+    DATABASE_URL: string;
+    CLERK_JWKS_URL?: string;
+    MEMORY_FACTS_READ_ENABLED?: string;
+  };
   Variables: {
     user: AuthUser;
     db: Database;
@@ -202,7 +207,16 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       );
     }
 
-    const memory = buildCuratedMemoryView(profile);
+    const memory = await buildCuratedMemoryViewForProfile(
+      db,
+      childProfileId,
+      profile,
+      {
+        memoryFactsReadEnabled: isMemoryFactsReadEnabled(
+          c.env.MEMORY_FACTS_READ_ENABLED
+        ),
+      }
+    );
     return c.json(childMemoryResponseSchema.parse({ memory }));
   })
 

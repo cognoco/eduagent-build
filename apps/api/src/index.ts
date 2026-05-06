@@ -73,6 +73,7 @@ import { quizRoutes } from './routes/quiz';
 import { feedbackRoutes } from './routes/feedback';
 import { supportRoutes } from './routes/support';
 import { librarySearchRoutes } from './routes/library-search';
+import { maintenanceRoutes } from './routes/maintenance';
 
 type Bindings = {
   ENVIRONMENT: string;
@@ -100,6 +101,7 @@ type Bindings = {
   EMAIL_FROM?: string;
   SENTRY_DSN?: string;
   TEST_SEED_SECRET?: string;
+  MAINTENANCE_SECRET?: string;
   REVENUECAT_WEBHOOK_SECRET?: string;
   SUPPORT_EMAIL?: string;
   DEPLOY_SHA?: string;
@@ -152,6 +154,7 @@ api.use(
       'X-Profile-Id',
       'X-Proxy-Mode',
       'Idempotency-Key',
+      'X-Maintenance-Secret',
     ],
     allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     exposeHeaders: [
@@ -229,6 +232,7 @@ const routes = api
   .route('/', revenuecatWebhookRoute)
   .route('/', resendWebhookRoute)
   .route('/', testSeedRoutes)
+  .route('/', maintenanceRoutes)
   .route('/', filingRoutes)
   .route('/', bookSuggestionRoutes)
   .route('/', topicSuggestionRoutes)

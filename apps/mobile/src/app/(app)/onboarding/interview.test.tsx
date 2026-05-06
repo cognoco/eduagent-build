@@ -103,6 +103,16 @@ jest.mock('../../../hooks/use-sessions', () => ({
   })),
 }));
 
+jest.mock('../../../lib/feature-flags', () => ({
+  FEATURE_FLAGS: {
+    ONBOARDING_FAST_PATH: false,
+    COACH_BAND_ENABLED: true,
+    MIC_IN_PILL_ENABLED: true,
+    I18N_ENABLED: true,
+  },
+}));
+
+const { FEATURE_FLAGS } = require('../../../lib/feature-flags');
 const InterviewScreen = require('./interview').default;
 
 describe('InterviewScreen', () => {
@@ -121,6 +131,7 @@ describe('InterviewScreen', () => {
     });
     // Default: forceComplete succeeds with no extracted interests
     mockForceCompleteMutateAsync.mockResolvedValue({ extractedSignals: null });
+    FEATURE_FLAGS.ONBOARDING_FAST_PATH = false;
   });
 
   it('renders the onboarding step indicator', () => {
@@ -182,6 +193,91 @@ describe('InterviewScreen', () => {
 
     // Must navigate forward (router.replace) — not stay on the interview screen.
     expect(mockReplace).toHaveBeenCalled();
+  });
+
+  it('routes directly to a learning session for a non-language subject when ONBOARDING_FAST_PATH is true', async () => {
+    FEATURE_FLAGS.ONBOARDING_FAST_PATH = true;
+    mockStream.mockImplementation(
+      async (
+        _msg: string,
+        onChunk: (accumulated: string) => void,
+        onDone: (result: { isComplete: boolean; exchangeCount: number }) => void
+      ) => {
+        onChunk('Ready.');
+        onDone({ isComplete: true, exchangeCount: 1 });
+      }
+    );
+
+    render(<InterviewScreen />);
+    fireEvent.press(screen.getByTestId('chat-shell-send'));
+
+    await waitFor(() => screen.getByTestId('view-curriculum-button'));
+    fireEvent.press(screen.getByTestId('view-curriculum-button'));
+
+    await waitFor(() => {
+      expect(mockStartSessionMutateAsync).toHaveBeenCalledTimes(1);
+    });
+    expect(mockReplace).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/(app)/onboarding/interests-context',
+      })
+    );
+  });
+
+  it('still routes to interests-context when ONBOARDING_FAST_PATH is false', async () => {
+    const { useInterviewState } = require('../../../hooks/use-interview');
+    useInterviewState.mockReturnValueOnce({
+      data: {
+        status: 'completed',
+        exchangeHistory: [],
+        extractedSignals: { interests: ['football'] },
+      },
+      isLoading: false,
+    });
+
+    render(<InterviewScreen />);
+    fireEvent.press(screen.getByTestId('view-curriculum-button'));
+
+    expect(mockReplace).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/(app)/onboarding/interests-context',
+      })
+    );
+  });
+
+  it('routes to language-setup for language subjects when fast-path is on', async () => {
+    FEATURE_FLAGS.ONBOARDING_FAST_PATH = true;
+    mockSearchParams = {
+      subjectId: 'subject-1',
+      subjectName: 'Spanish',
+      languageCode: 'es',
+      languageName: 'Spanish',
+      step: '1',
+      totalSteps: '4',
+    };
+    mockStream.mockImplementation(
+      async (
+        _msg: string,
+        onChunk: (accumulated: string) => void,
+        onDone: (result: { isComplete: boolean; exchangeCount: number }) => void
+      ) => {
+        onChunk('Ready.');
+        onDone({ isComplete: true, exchangeCount: 1 });
+      }
+    );
+
+    render(<InterviewScreen />);
+    fireEvent.press(screen.getByTestId('chat-shell-send'));
+
+    await waitFor(() => screen.getByTestId('view-curriculum-button'));
+    fireEvent.press(screen.getByTestId('view-curriculum-button'));
+
+    expect(mockReplace).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/(app)/onboarding/language-setup',
+      })
+    );
+    expect(mockStartSessionMutateAsync).not.toHaveBeenCalled();
   });
 
   it('disables input after a stream error and lets the learner retry', async () => {

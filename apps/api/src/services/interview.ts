@@ -29,13 +29,18 @@ import {
 import { getProfileAge } from './profile';
 import type { LLMTier } from './subscription';
 import {
+  analogyFramingSchema,
   interviewReadyToPersistEventSchema,
+  interestContextValueSchema,
   type InterviewReadyToPersistEvent,
   type InterviewContext,
   type InterviewResult,
   type OnboardingDraft,
   type ExchangeEntry,
   type DraftStatus,
+  type ExtractedInterviewSignals,
+  type InterestContextValue,
+  type PaceHint,
 } from '@eduagent/schemas';
 import {
   INTERVIEW_SYSTEM_PROMPT,
@@ -261,15 +266,45 @@ const MAX_EXTRACTED_INTERESTS = 8;
 // budget with margin for the system prompt + envelope wrapper.
 const MAX_TRANSCRIPT_CHARS = 12000;
 
+export function inferPaceHint(exchangeHistory: ExchangeEntry[]): PaceHint {
+  const userTurns = exchangeHistory
+    .filter((entry) => entry.role === 'user')
+    .map((entry) => entry.content.trim())
+    .filter((content) => content.length > 0);
+
+  if (userTurns.length === 0) {
+    return { density: 'medium', chunkSize: 'medium' };
+  }
+
+  const averageChars =
+    userTurns.reduce((sum, content) => sum + content.length, 0) /
+    userTurns.length;
+
+  if (averageChars <= 24) {
+    return { density: 'low', chunkSize: 'short' };
+  }
+  if (averageChars >= 240) {
+    return { density: 'high', chunkSize: 'long' };
+  }
+  return { density: 'medium', chunkSize: 'medium' };
+}
+
+function defaultExtractedSignals(
+  history: ExchangeEntry[]
+): ExtractedInterviewSignals {
+  return {
+    goals: [],
+    experienceLevel: 'beginner',
+    currentKnowledge: '',
+    interests: [],
+    paceHint: inferPaceHint(history),
+  };
+}
+
 export async function extractSignals(
   exchangeHistory: ExchangeEntry[],
   options?: { llmTier?: LLMTier }
-): Promise<{
-  goals: string[];
-  experienceLevel: string;
-  currentKnowledge: string;
-  interests: string[];
-}> {
+): Promise<ExtractedInterviewSignals> {
   // [PROMPT-INJECT-9] exchangeHistory is raw learner+assistant text.
   // Entity-encode each turn so a crafted message cannot close the
   // <transcript> tag or inject directives, then wrap in a named tag and
@@ -320,12 +355,7 @@ export async function extractSignals(
         },
       }
     );
-    return {
-      goals: [],
-      experienceLevel: 'beginner',
-      currentKnowledge: '',
-      interests: [],
-    };
+    return defaultExtractedSignals(exchangeHistory);
   }
 
   let parsed: Record<string, unknown>;
@@ -339,12 +369,7 @@ export async function extractSignals(
         jsonStrSample: jsonStr.slice(0, 200),
       },
     });
-    return {
-      goals: [],
-      experienceLevel: 'beginner',
-      currentKnowledge: '',
-      interests: [],
-    };
+    return defaultExtractedSignals(exchangeHistory);
   }
 
   // Coerce and dedupe interests defensively — the LLM occasionally emits
@@ -374,6 +399,24 @@ export async function extractSignals(
         .map((g) => g.trim())
         .filter((g) => g.length > 0)
     : [];
+  const rawInterestContext =
+    parsed.interestContext &&
+    typeof parsed.interestContext === 'object' &&
+    !Array.isArray(parsed.interestContext)
+      ? (parsed.interestContext as Record<string, unknown>)
+      : {};
+  const interestContext: Record<string, InterestContextValue> = {};
+  for (const interest of interests) {
+    const rawValue = rawInterestContext[interest];
+    const parsedContext = interestContextValueSchema.safeParse(rawValue);
+    interestContext[interest] = parsedContext.success
+      ? parsedContext.data
+      : 'both';
+  }
+  const parsedAnalogy = analogyFramingSchema.safeParse(parsed.analogyFraming);
+  const analogyFraming = parsedAnalogy.success
+    ? parsedAnalogy.data
+    : 'concrete';
   return {
     goals: rawGoals,
     experienceLevel:
@@ -385,6 +428,9 @@ export async function extractSignals(
         ? parsed.currentKnowledge
         : '',
     interests,
+    ...(interests.length > 0 ? { interestContext } : {}),
+    analogyFraming,
+    paceHint: inferPaceHint(exchangeHistory),
   };
 }
 

@@ -1,4 +1,10 @@
 export const FEATURE_FLAGS = {
+  // Subject onboarding fast path (spec 2026-05-05). Build-time only:
+  // enabled for dev/staging unless explicitly disabled, false in production.
+  ONBOARDING_FAST_PATH:
+    process.env.EXPO_PUBLIC_ONBOARDING_FAST_PATH === 'true' ||
+    (process.env.EXPO_PUBLIC_ONBOARDING_FAST_PATH !== 'false' &&
+      process.env.NODE_ENV !== 'production'),
   COACH_BAND_ENABLED: true,
   MIC_IN_PILL_ENABLED: true,
   // Live multi-language pipeline (docs/_archive/plans/done/2026-05-03-llm-powered-i18n.md).

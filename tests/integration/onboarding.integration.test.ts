@@ -280,6 +280,8 @@ describe('Integration: Onboarding interview routes', () => {
       experienceLevel: 'beginner',
       currentKnowledge: 'basic arithmetic',
       interests: [],
+      analogyFraming: 'concrete',
+      paceHint: { density: 'medium', chunkSize: 'medium' },
     });
 
     // Curriculum persist is now async via Inngest — verify the dispatch happened
@@ -294,6 +296,46 @@ describe('Integration: Onboarding interview routes', () => {
         data: expect.objectContaining({ profileId, subjectId: subject.id }),
       })
     );
+  });
+
+  it('round-trips fast-path signals through onboardingDrafts JSONB column', async () => {
+    const profileId = await createOwnerProfile();
+    const subject = await seedSubject(profileId, 'Calculus');
+    const db = createIntegrationDb();
+    const fullSignals = {
+      goals: ['learn calculus'],
+      experienceLevel: 'beginner',
+      currentKnowledge: 'algebra basics',
+      interests: ['football', 'dinosaurs'],
+      interestContext: { football: 'free_time', dinosaurs: 'both' },
+      analogyFraming: 'concrete',
+      paceHint: { density: 'medium', chunkSize: 'short' },
+    };
+
+    await db.insert(onboardingDrafts).values({
+      profileId,
+      subjectId: subject.id,
+      exchangeHistory: [{ role: 'user', content: 'hi' }],
+      extractedSignals: fullSignals,
+      status: 'completed',
+      expiresAt: null,
+    });
+
+    const res = await app.request(
+      `/v1/subjects/${subject.id}/interview`,
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId
+        ),
+      },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.state.extractedSignals).toEqual(fullSignals);
   });
 
   it('streams onboarding completion over SSE and persists the completed draft', async () => {

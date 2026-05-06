@@ -111,6 +111,16 @@ jest.mock('../../../lib/navigation', () => ({
   goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
 }));
 
+jest.mock('../../../lib/feature-flags', () => ({
+  FEATURE_FLAGS: {
+    ONBOARDING_FAST_PATH: false,
+    COACH_BAND_ENABLED: true,
+    MIC_IN_PILL_ENABLED: true,
+    I18N_ENABLED: true,
+  },
+}));
+
+const { FEATURE_FLAGS } = require('../../../lib/feature-flags');
 const LanguageSetup = require('./language-setup').default;
 
 describe('LanguageSetup', () => {
@@ -119,6 +129,7 @@ describe('LanguageSetup', () => {
     mockSubjectId = 'test-id';
     mockIsPending = false;
     mockMutateAsync.mockResolvedValue({ subject: { id: 'test-id' } });
+    FEATURE_FLAGS.ONBOARDING_FAST_PATH = false;
   });
 
   it('renders the onboarding step indicator', () => {
@@ -195,6 +206,30 @@ describe('LanguageSetup', () => {
         },
       });
     });
+  });
+
+  it('routes to session when ONBOARDING_FAST_PATH is true', async () => {
+    FEATURE_FLAGS.ONBOARDING_FAST_PATH = true;
+
+    render(<LanguageSetup />);
+
+    fireEvent.press(screen.getByTestId('language-setup-continue'));
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith({
+        pathname: '/(app)/session',
+        params: {
+          mode: 'learning',
+          subjectId: 'test-id',
+          subjectName: 'Spanish',
+        },
+      });
+    });
+    expect(mockReplace).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/(app)/onboarding/accommodations',
+      })
+    );
   });
 
   it('disables Continue button and hides the label when pending', () => {

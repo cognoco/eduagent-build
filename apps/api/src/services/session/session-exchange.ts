@@ -45,6 +45,10 @@ import {
 } from '../prior-learning';
 import { buildMemoryBlock, buildAccommodationBlock } from '../learner-profile';
 import { retrieveRelevantMemory } from '../memory';
+import {
+  hasMemoryFactsBackfillMarker,
+  readMemorySnapshotFromFacts,
+} from '../memory/memory-facts';
 import { getTeachingPreference } from '../retention-data';
 import { shouldTriggerEvaluate } from '../evaluate';
 import { shouldTriggerTeachBack } from '../teach-back';
@@ -287,6 +291,7 @@ export async function prepareExchangeContext(
     voyageApiKey?: string;
     homeworkMode?: 'help_me' | 'check_answer';
     llmTier?: import('../subscription').LLMTier;
+    memoryFactsReadEnabled?: boolean;
   }
 ): Promise<ExchangePrep> {
   // 1. Load session
@@ -831,21 +836,39 @@ export async function prepareExchangeContext(
     }
   }
 
+  const memorySnapshot =
+    learningProfile &&
+    options?.memoryFactsReadEnabled &&
+    hasMemoryFactsBackfillMarker(learningProfile)
+      ? await readMemorySnapshotFromFacts(
+          createScopedRepository(db, profileId),
+          learningProfile
+        )
+      : null;
+
   const memoryBlock = learningProfile
     ? buildMemoryBlock(
         {
           learningStyle:
             (learningProfile.learningStyle as LearningStyle | null) ?? null,
-          interests: Array.isArray(learningProfile.interests)
+          interests: memorySnapshot
+            ? memorySnapshot.interests
+            : Array.isArray(learningProfile.interests)
             ? learningProfile.interests
             : [],
-          strengths: (Array.isArray(learningProfile.strengths)
-            ? learningProfile.strengths
-            : []) as StrengthEntry[],
-          struggles: (Array.isArray(learningProfile.struggles)
-            ? learningProfile.struggles
-            : []) as StruggleEntry[],
-          communicationNotes: Array.isArray(learningProfile.communicationNotes)
+          strengths: memorySnapshot
+            ? memorySnapshot.strengths
+            : ((Array.isArray(learningProfile.strengths)
+                ? learningProfile.strengths
+                : []) as StrengthEntry[]),
+          struggles: memorySnapshot
+            ? memorySnapshot.struggles
+            : ((Array.isArray(learningProfile.struggles)
+                ? learningProfile.struggles
+                : []) as StruggleEntry[]),
+          communicationNotes: memorySnapshot
+            ? memorySnapshot.communicationNotes
+            : Array.isArray(learningProfile.communicationNotes)
             ? learningProfile.communicationNotes
             : [],
           memoryEnabled: learningProfile.memoryEnabled,
@@ -1218,6 +1241,7 @@ export async function processMessage(
     voyageApiKey?: string;
     llmTier?: import('../subscription').LLMTier;
     clientId?: string;
+    memoryFactsReadEnabled?: boolean;
   }
 ): Promise<{
   response: string;
@@ -1321,6 +1345,7 @@ export async function streamMessage(
     voyageApiKey?: string;
     llmTier?: import('../subscription').LLMTier;
     clientId?: string;
+    memoryFactsReadEnabled?: boolean;
   }
 ): Promise<{
   stream: AsyncIterable<string>;

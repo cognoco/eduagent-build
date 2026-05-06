@@ -12,6 +12,15 @@
 // data between profiles in user-visible output (notifications,
 // recommendations). When in doubt, scope by profileId at the leaf even
 // when scanning broadly.
+//
+// Ops-only: fire manually from Inngest dashboard after a confirmed
+// cold-start or deploy incident that left sessions stranded.
+// No automatic trigger by design — see filing-timed-out-observer design doc
+// (docs/_archive/specs/Done/2026-04-29-filing-timed-out-observer-design.md).
+// A cron-driven janitor would silently file sessions that piled up because
+// filing-completed-observe or filing-timed-out-observe regressed, masking the
+// live-path bug. The manual trigger forces an operator to ask "why are there
+// stranded sessions?" before recovering them. Do not fire speculatively.
 
 import { and, asc, eq, gt, gte, inArray, isNull, or } from 'drizzle-orm';
 import { learningSessions } from '@eduagent/database';

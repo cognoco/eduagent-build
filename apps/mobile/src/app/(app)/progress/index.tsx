@@ -19,15 +19,26 @@ import {
   sessionsUntilFullProgress,
 } from '../../../lib/progressive-disclosure';
 import { formatMinutes } from '../../../lib/format-relative-date';
-import { GrowthChart, MilestoneCard } from '../../../components/progress';
+import {
+  GrowthChart,
+  MilestoneCard,
+  MonthlyReportCard,
+  RecentSessionsList,
+  ReportsListCard,
+  WeeklyReportCard,
+} from '../../../components/progress';
 import {
   useLearningResumeTarget,
   useProgressHistory,
   useProgressInventory,
   useProgressMilestones,
+  useProfileSessions,
   useRefreshProgressSnapshot,
 } from '../../../hooks/use-progress';
 import { pushLearningResumeTarget } from '../../../lib/navigation';
+import { useProfile } from '../../../lib/profile';
+import { isProfileStale } from '../../../lib/progress';
+import { bucketAccountAge, hashProfileId, track } from '../../../lib/analytics';
 
 function heroCopy(
   input: {
@@ -160,7 +171,9 @@ export default function ProgressScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { activeProfile } = useProfile();
   const inventoryQuery = useProgressInventory();
+  const profileSessionsQuery = useProfileSessions(activeProfile?.id);
   const resumeTargetQuery = useLearningResumeTarget();
   const historyQuery = useProgressHistory({ granularity: 'weekly' });
   const milestonesQuery = useProgressMilestones(5);
@@ -220,6 +233,19 @@ export default function ProgressScreen(): React.ReactElement {
     !!inventory &&
     inventory.global.totalSessions === 0 &&
     inventory.subjects.length === 0;
+  const sessionCount =
+    profileSessionsQuery.data?.length ?? inventory?.global.totalSessions ?? 0;
+  const lastSessionAt =
+    profileSessionsQuery.data?.[0]?.startedAt ??
+    inventory?.subjects
+      ?.map((subject) => subject.lastSessionAt)
+      .filter((value): value is string => typeof value === 'string')
+      .sort((a, b) => b.localeCompare(a))[0] ??
+    null;
+  const isStale =
+    !!inventory &&
+    !profileSessionsQuery.isLoading &&
+    isProfileStale({ sessionCount, lastSessionAt });
 
   const newLearner = !isEmpty && isNewLearner(inventory?.global.totalSessions);
   const remaining = sessionsUntilFullProgress(inventory?.global.totalSessions);
@@ -272,7 +298,7 @@ export default function ProgressScreen(): React.ReactElement {
             }}
             testID="progress-error-state"
           />
-        ) : isEmpty ? (
+        ) : isEmpty || isStale ? (
           <View className="bg-coaching-card rounded-card p-5">
             <Text className="text-h3 font-semibold text-text-primary">
               {t('progress.empty.title')}
@@ -281,7 +307,17 @@ export default function ProgressScreen(): React.ReactElement {
               {t('progress.empty.subtitle')}
             </Text>
             <Pressable
-              onPress={handleGlobalResume}
+              onPress={() => {
+                if (activeProfile) {
+                  track('progress_empty_state_cta_tapped', {
+                    profile_id_hash: hashProfileId(activeProfile.id),
+                    account_age_bucket: bucketAccountAge(
+                      activeProfile.createdAt
+                    ),
+                  });
+                }
+                router.push('/(app)/library' as never);
+              }}
               className="bg-primary rounded-button px-4 py-3 mt-4 items-center"
               accessibilityRole="button"
               accessibilityLabel={t('progress.startLearning')}
@@ -407,6 +443,14 @@ export default function ProgressScreen(): React.ReactElement {
               />
             </View>
 
+            {activeProfile ? (
+              <>
+                <WeeklyReportCard profileId={activeProfile.id} />
+                <MonthlyReportCard profileId={activeProfile.id} />
+                <RecentSessionsList profileId={activeProfile.id} />
+              </>
+            ) : null}
+
             <View className="flex-row items-center justify-between mt-6 mb-2">
               <Text className="text-h3 font-semibold text-text-primary">
                 {t('progress.milestones.recentTitle')}
@@ -491,6 +535,10 @@ export default function ProgressScreen(): React.ReactElement {
                 className="text-text-tertiary"
               />
             </Pressable>
+
+            {activeProfile ? (
+              <ReportsListCard profileId={activeProfile.id} />
+            ) : null}
 
             <Pressable
               onPress={handleGlobalResume}

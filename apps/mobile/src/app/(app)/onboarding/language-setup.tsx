@@ -15,6 +15,7 @@ import type { CefrLevel } from '@eduagent/schemas';
 import { OnboardingStepIndicator } from '../../../components/onboarding/OnboardingStepIndicator';
 import { useConfigureLanguageSubject } from '../../../hooks/use-subjects';
 import { formatApiError } from '../../../lib/format-api-error';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import { useThemeColors } from '../../../lib/theme';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { getOnboardingStepLabels } from '../../../lib/onboarding-step-labels';
@@ -144,6 +145,17 @@ export default function LanguageSetup() {
       // BUG-692-FOLLOWUP: User pressed Back while the mutation was in flight —
       // don't navigate to accommodations from a screen the user has already left.
       if (cancelledRef.current) return;
+      if (FEATURE_FLAGS.ONBOARDING_FAST_PATH) {
+        router.replace({
+          pathname: '/(app)/session',
+          params: {
+            mode: 'learning',
+            subjectId,
+            subjectName: subjectName ?? languageName ?? '',
+          },
+        } as never);
+        return;
+      }
       router.replace({
         pathname: '/(app)/onboarding/accommodations',
         params: {

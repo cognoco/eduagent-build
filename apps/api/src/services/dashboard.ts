@@ -1124,23 +1124,16 @@ export interface ChildSession {
  * Lists recent sessions for a child, with parent access check.
  * Returns up to 50 most recent sessions ordered by startedAt descending.
  */
-export async function getChildSessions(
+export async function getProfileSessions(
   db: Database,
-  parentProfileId: string,
-  childProfileId: string
+  profileId: string
 ): Promise<ChildSession[]> {
-  // [EP15-I5] ForbiddenError → 403. Empty array now means "parent has
-  // access and the child has no sessions", not "access denied".
-  await assertParentAccess(db, parentProfileId, childProfileId);
-
-  const sessions = await db.query.learningSessions.findMany({
-    where: and(
-      eq(learningSessions.profileId, childProfileId),
-      gte(learningSessions.exchangeCount, 1)
-    ),
-    orderBy: desc(learningSessions.startedAt),
-    limit: 50,
-  });
+  const scoped = createScopedRepository(db, profileId);
+  const sessions = await scoped.sessions.findMany(
+    gte(learningSessions.exchangeCount, 1),
+    50,
+    desc(learningSessions.startedAt)
+  );
 
   if (sessions.length === 0) return [];
 
@@ -1213,6 +1206,17 @@ export async function getChildSessions(
       engagementSignal: parseEngagementSignal(summary?.engagementSignal),
     };
   });
+}
+
+export async function getChildSessions(
+  db: Database,
+  parentProfileId: string,
+  childProfileId: string
+): Promise<ChildSession[]> {
+  // [EP15-I5] ForbiddenError → 403. Empty array now means "parent has
+  // access and the child has no sessions", not "access denied".
+  await assertParentAccess(db, parentProfileId, childProfileId);
+  return getProfileSessions(db, childProfileId);
 }
 
 function parseEngagementSignal(

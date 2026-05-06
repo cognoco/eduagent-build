@@ -6,24 +6,11 @@ import {
   index,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
-import { customType } from 'drizzle-orm/pg-core';
 import { profiles } from './profiles';
 import { learningSessions } from './sessions';
 import { curriculumTopics } from './subjects';
+import { vector } from './_pgvector';
 import { generateUUIDv7 } from '../utils/uuid';
-
-/** Custom pgvector type for Drizzle ORM — 1024 dimensions (Voyage AI voyage-3.5) */
-const vector = customType<{ data: number[]; driverData: string }>({
-  dataType() {
-    return 'vector(1024)';
-  },
-  toDriver(value: number[]): string {
-    return `[${value.join(',')}]`;
-  },
-  fromDriver(value: string): number[] {
-    return JSON.parse(value);
-  },
-});
 
 export const sessionEmbeddings = pgTable(
   'session_embeddings',
