@@ -7,6 +7,7 @@ import {
   interviewReadyToPersistEventSchema,
   type PersistFailureCode,
   type OnboardingDraft,
+  type ExtractedInterviewSignals,
 } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
@@ -20,6 +21,17 @@ const logger = createLogger();
 function classifyError(err: unknown): PersistFailureCode {
   if (err instanceof PersistCurriculumError) return err.code;
   return 'unknown';
+}
+
+function hasCachedSignalContent(signals: ExtractedInterviewSignals): boolean {
+  return (
+    signals.goals.some((goal) => goal.trim().length > 0) ||
+    signals.currentKnowledge.trim().length > 0 ||
+    (signals.interests ?? []).some((interest) => interest.trim().length > 0) ||
+    Object.keys(signals.interestContext ?? {}).length > 0 ||
+    signals.analogyFraming !== undefined ||
+    signals.paceHint !== undefined
+  );
 }
 
 async function loadDraft(
@@ -106,7 +118,7 @@ export const interviewPersistCurriculum = inngest.createFunction(
       const cached = extractedInterviewSignalsSchema.safeParse(
         draft.extractedSignals
       );
-      if (cached.success) {
+      if (cached.success && hasCachedSignalContent(cached.data)) {
         return cached.data;
       }
 
