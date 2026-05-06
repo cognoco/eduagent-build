@@ -4,7 +4,10 @@
 
 import { createScopedRepository, type Database } from '@eduagent/database';
 import type {
-  ConfidenceLevel,
+  CuratedMemoryItem,
+  CuratedMemoryView,
+  MemoryCategory,
+  MemoryCategoryKey,
   StrengthEntry,
   StruggleEntry,
 } from '@eduagent/schemas';
@@ -13,41 +16,13 @@ import {
   readMemorySnapshotFromFacts,
 } from './memory/memory-facts';
 
-export type MemoryCategoryKey =
-  | 'struggles'
-  | 'interests'
-  | 'strengths'
-  | 'communicationNotes'
-  | 'learningStyle';
-
-export interface CuratedMemoryItem {
-  category: MemoryCategoryKey;
-  value: string;
-  statement: string;
-  confidence?: ConfidenceLevel;
-}
-
-export interface MemoryCategory {
-  label: string;
-  items: CuratedMemoryItem[];
-}
-
-export interface ParentTellItem {
-  id: string;
-  content: string;
-  createdAt: string;
-}
-
-export interface CuratedMemoryView {
-  categories: MemoryCategory[];
-  parentContributions: ParentTellItem[];
-  settings: {
-    memoryEnabled: boolean;
-    collectionEnabled: boolean;
-    injectionEnabled: boolean;
-    accommodationMode: string | null;
-  };
-}
+export type {
+  CuratedMemoryItem,
+  CuratedMemoryView,
+  MemoryCategory,
+  MemoryCategoryKey,
+  ParentTellItem,
+} from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
 // Column → Label mapping
