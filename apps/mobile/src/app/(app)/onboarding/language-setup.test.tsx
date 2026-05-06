@@ -343,4 +343,34 @@ describe('LanguageSetup', () => {
       expect.objectContaining({ pathname: '/(app)/onboarding/interview' })
     );
   });
+
+  it('[BUG-692-FOLLOWUP] fast path does not route to session when user presses Back during session creation', async () => {
+    FEATURE_FLAGS.ONBOARDING_FAST_PATH = true;
+    mockMutateAsync.mockResolvedValue({ subject: { id: 'test-id' } });
+
+    let resolveSession!: (value: {
+      session: { id: string; topicId: string };
+    }) => void;
+    mockStartFirstCurriculumMutateAsync.mockReturnValue(
+      new Promise<{ session: { id: string; topicId: string } }>((resolve) => {
+        resolveSession = resolve;
+      })
+    );
+
+    render(<LanguageSetup />);
+
+    fireEvent.press(screen.getByTestId('language-setup-continue'));
+
+    await waitFor(() => {
+      expect(mockStartFirstCurriculumMutateAsync).toHaveBeenCalled();
+    });
+
+    fireEvent.press(screen.getByTestId('language-setup-back'));
+    resolveSession({ session: { id: 'session-1', topicId: 'topic-1' } });
+
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(mockGoBackOrReplace).toHaveBeenCalledTimes(1);
+  });
 });

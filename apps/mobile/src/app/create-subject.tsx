@@ -437,8 +437,12 @@ export default function CreateSubjectScreen() {
   const isNoMatch = showSuggestion && resolveState.result.status === 'no_match';
   // 5a: confident = spelling correction OR single resolved match.
   // No backend schema change — derived from existing status + suggestions.length.
+  // Both branches require suggestions.length <= 1; if the resolver ever returns
+  // 'corrected' with multiple alternates, fall through to the heavier card so
+  // the alternates aren't silently hidden.
   const isConfident =
     showSuggestion &&
+    resolveState.result.suggestions.length <= 1 &&
     (resolveState.result.status === 'corrected' ||
       (resolveState.result.status === 'resolved' &&
         resolveState.result.suggestions.length === 1));

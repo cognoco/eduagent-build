@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getLocales } from 'expo-localization';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import type { CefrLevel } from '@eduagent/schemas';
@@ -141,7 +141,7 @@ export default function LanguageSetup() {
     // router.replace in handleContinue does not fire after back-navigation.
     cancelledRef.current = true;
     if (returnTo === 'settings') {
-      goBackOrReplace(router, '/(app)/more' as never);
+      goBackOrReplace(router, '/(app)/more' as Href);
       return;
     }
     goBackOrReplace(router, {
@@ -186,7 +186,7 @@ export default function LanguageSetup() {
       if (cancelledRef.current) return;
       // ACCOUNT-29: Settings re-entry saves and routes back to More.
       if (returnTo === 'settings') {
-        goBackOrReplace(router, '/(app)/more' as never);
+        goBackOrReplace(router, '/(app)/more' as Href);
         return;
       }
       if (FEATURE_FLAGS.ONBOARDING_FAST_PATH) {
@@ -194,6 +194,7 @@ export default function LanguageSetup() {
           sessionType: 'learning',
           inputMode: 'text',
         });
+        if (cancelledRef.current) return;
         router.replace({
           pathname: '/(app)/session',
           params: {
