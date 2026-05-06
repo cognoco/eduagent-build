@@ -1,5 +1,6 @@
 import { View, Text } from 'react-native';
-import { useTranslation, type TFunction } from 'react-i18next';
+import type { TFunction } from 'i18next';
+import { useTranslation } from 'react-i18next';
 
 import { type CopyRegister } from '../../lib/copy-register';
 import { useThemeColors } from '../../lib/theme';

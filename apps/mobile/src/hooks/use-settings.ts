@@ -96,7 +96,7 @@ export function useCelebrationLevel(): UseQueryResult<CelebrationLevel> {
           { init: { signal } }
         );
         await assertOk(res);
-        const data = await res.json();
+        const data = (await res.json()) as { celebrationLevel: CelebrationLevel };
         return data.celebrationLevel as CelebrationLevel;
       } finally {
         cleanup();
@@ -120,7 +120,9 @@ export function useWithdrawalArchivePreference(): UseQueryResult<WithdrawalArchi
           { init: { signal } }
         );
         await assertOk(res);
-        const data = await res.json();
+        const data = (await res.json()) as {
+          value: WithdrawalArchivePreference;
+        };
         return data.value as WithdrawalArchivePreference;
       } finally {
         cleanup();
