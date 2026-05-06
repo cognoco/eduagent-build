@@ -35,9 +35,9 @@ describe('getParentRetentionInfo', () => {
     expect(getParentRetentionInfo(null, 5, 'in_progress')).toBeNull();
   });
 
-  it('maps strong to "Remembering well"', () => {
+  it('maps strong to "Still remembered"', () => {
     expect(getParentRetentionInfo('strong', 3, 'in_progress')).toEqual({
-      label: 'Remembering well',
+      label: 'Still remembered',
       colorKey: 'retentionStrong',
     });
   });
@@ -49,16 +49,16 @@ describe('getParentRetentionInfo', () => {
     });
   });
 
-  it('maps weak to "Needs a review"', () => {
+  it('maps weak to "Needs a quick refresh"', () => {
     expect(getParentRetentionInfo('weak', 3, 'in_progress')).toEqual({
-      label: 'Needs a review',
+      label: 'Needs a quick refresh',
       colorKey: 'retentionWeak',
     });
   });
 
-  it('maps forgotten to "Needs a review"', () => {
+  it('maps forgotten to "Needs a fresh pass"', () => {
     expect(getParentRetentionInfo('forgotten', 3, 'in_progress')).toEqual({
-      label: 'Needs a review',
+      label: 'Needs a fresh pass',
       colorKey: 'retentionWeak',
     });
   });

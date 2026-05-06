@@ -1,8 +1,7 @@
 import { View, Text } from 'react-native';
-import { useTranslation } from 'react-i18next';
+import { useTranslation, type TFunction } from 'react-i18next';
 
-import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
-import { copyRegisterFor, type CopyRegister } from '../../lib/copy-register';
+import { type CopyRegister } from '../../lib/copy-register';
 import { useThemeColors } from '../../lib/theme';
 
 export interface GrowthChartDatum {
@@ -16,6 +15,8 @@ interface GrowthChartProps {
   subtitle?: string;
   data: GrowthChartDatum[];
   emptyMessage?: string;
+  /** Copy register for a11y labels and legend text. Defaults to 'adult'. */
+  register?: CopyRegister;
 }
 
 /**
@@ -25,19 +26,23 @@ interface GrowthChartProps {
 function buildChartA11yLabel(
   title: string,
   data: GrowthChartDatum[],
-  register: CopyRegister
+  register: CopyRegister,
+  t: TFunction
 ): string {
   const points = data
     .map((item) => {
-      const primary =
+      const primaryKey =
         register === 'child'
-          ? `${item.value} topics learned`
-          : `${item.value} topics mastered`;
+          ? 'progress.growthChart.a11y.topicsLearned'
+          : 'progress.growthChart.a11y.topicsMastered';
+      const primary = `${item.value} ${t(primaryKey)}`;
       const secondary =
         item.secondaryValue != null
-          ? register === 'child'
-            ? `, ${item.secondaryValue} words added`
-            : `, ${item.secondaryValue} vocabulary growth`
+          ? ` ${item.secondaryValue} ${t(
+              register === 'child'
+                ? 'progress.growthChart.a11y.wordsAdded'
+                : 'progress.growthChart.a11y.vocabularyGrowth'
+            )}`
           : '';
       return `${item.label}: ${primary}${secondary}`;
     })
@@ -50,10 +55,9 @@ export function GrowthChart({
   subtitle,
   data,
   emptyMessage = 'Keep going and your growth will show up here.',
+  register = 'adult',
 }: GrowthChartProps): React.ReactElement {
   const { t } = useTranslation();
-  const role = useActiveProfileRole();
-  const register = copyRegisterFor(role);
   const colors = useThemeColors();
   const maxValue = Math.max(
     1,
@@ -85,7 +89,7 @@ export function GrowthChart({
           <View
             accessible
             accessibilityRole="text"
-            accessibilityLabel={buildChartA11yLabel(title, data, register)}
+            accessibilityLabel={buildChartA11yLabel(title, data, register, t)}
           >
             <View
               className="flex-row items-end gap-3 h-28"

@@ -117,10 +117,10 @@
       "emptySubjectsMessage": "Start ett nå, eller bruk leksehjelp når du trenger det.",
       "addSubject": "Legg til fag",
       "quota": {
-        "line": "{{questionsLeftToday}} questions left today · {{questionsLeftMonth}} left this month",
-        "lineDailyOnly": "{{questionsLeftToday}} questions left today",
-        "lineMonthlyOnly": "{{questionsLeftMonth}} questions left this month",
-        "lineUnlimited": "Plenty of questions today"
+        "line": "{{questionsLeftToday}} spørsmål igjen i dag · {{questionsLeftMonth}} igjen denne måneden",
+        "lineDailyOnly": "{{questionsLeftToday}} spørsmål igjen i dag",
+        "lineMonthlyOnly": "{{questionsLeftMonth}} spørsmål igjen denne måneden",
+        "lineUnlimited": "Masser av spørsmål i dag"
       },
       "intentActions": {
         "homework": {
@@ -147,10 +147,10 @@
       "reviewHealth": "Gjennomgå helse"
     },
     "notices": {
-      "consentArchivedTitle": "{{name}}'s account was archived",
-      "consentArchivedBody": "Data is retained for 30 days, then deleted.",
-      "consentDeletedTitle": "{{name}}'s account was deleted",
-      "consentDeletedBody": "The withdrawal grace period has ended."
+      "consentArchivedTitle": "{{name}}s konto ble arkivert",
+      "consentArchivedBody": "Data beholdes i 30 dager og slettes deretter.",
+      "consentDeletedTitle": "{{name}}s konto ble slettet",
+      "consentDeletedBody": "Angreretten er utløpt."
     }
   },
   "dashboard": {
@@ -185,15 +185,15 @@
     "subtitle": "Alle du lærer sammen med.",
     "title": "Familie",
     "withdrawal": {
-      "bannerTitleSingle": "{{name}}'s account closes in {{days}} {{daysWord}}",
-      "bannerTitleMulti": "{{count}} accounts closing soon",
-      "bannerCta": "Reverse",
-      "bannerCtaShort": "Undo",
-      "daysOne": "day",
-      "daysOther": "days",
-      "restoreErrorTitle": "Couldn't reverse withdrawal",
-      "restoreErrorBody": "Try again in a moment.",
-      "restoreSuccessToast": "Withdrawal reversed for {{name}}"
+      "bannerTitleSingle": "{{name}}s konto avsluttes om {{days}} {{daysWord}}",
+      "bannerTitleMulti": "{{count}} kontoer avsluttes snart",
+      "bannerCta": "Angre",
+      "bannerCtaShort": "Angre",
+      "daysOne": "dag",
+      "daysOther": "dager",
+      "restoreErrorTitle": "Kunne ikke angre tilbaketrekkingen",
+      "restoreErrorBody": "Prøv igjen om et øyeblikk.",
+      "restoreSuccessToast": "Tilbaketrekkingen er angret for {{name}}"
     }
   },
   "more": {
@@ -237,9 +237,9 @@
       "viewPlans": "Se abonnementer",
       "profileLimitTitle": "Profilgrense nådd",
       "profileLimitMessage": "Ditt {{plan}}-abonnement støtter opptil {{max}} profiler.",
-      "breakdownSharingTitle": "Share usage breakdown with family",
-      "breakdownSharingDescription": "Let everyone in your family see how each profile uses the family pool. Children only see the breakdown when this is on.",
-      "breakdownSharingError": "Couldn't update setting. Try again."
+      "breakdownSharingTitle": "Del forbruksoversikt med familien",
+      "breakdownSharingDescription": "La alle i familien se hvordan hver profil bruker familiekvoten. Barn ser bare oversikten når dette er slått på.",
+      "breakdownSharingError": "Kunne ikke oppdatere innstillingen. Prøv igjen."
     },
     "celebrations": {
       "sectionHeader": "Dine feiringer",
@@ -299,15 +299,15 @@
     },
     "appVersion": "MentoMate v1.0.0",
     "privacy": {
-      "sectionHeader": "Privacy",
-      "withdrawalArchiveTitle": "When I withdraw consent for a child",
-      "withdrawalArchiveAuto": "Automatic",
-      "withdrawalArchiveAutoDescription": "Under-13 accounts are deleted at grace expiry. 13+ accounts are archived for 30 days, then deleted.",
-      "withdrawalArchiveAlways": "Always archive (30 days)",
-      "withdrawalArchiveAlwaysDescription": "13+ accounts only. Under-13 always deletes immediately for privacy compliance.",
-      "withdrawalArchiveNever": "Never archive - delete immediately",
-      "withdrawalArchiveNeverDescription": "Delete at grace expiry instead of keeping a 30-day archive.",
-      "withdrawalArchiveError": "Couldn't update setting. Try again."
+      "sectionHeader": "Personvern",
+      "withdrawalArchiveTitle": "Når jeg trekker tilbake samtykke for et barn",
+      "withdrawalArchiveAuto": "Automatisk",
+      "withdrawalArchiveAutoDescription": "Kontoer under 13 år slettes ved fristens utløp. Kontoer fra 13 år arkiveres i 30 dager og slettes deretter.",
+      "withdrawalArchiveAlways": "Arkiver alltid (30 dager)",
+      "withdrawalArchiveAlwaysDescription": "Gjelder kun kontoer fra 13 år. Kontoer under 13 år slettes alltid umiddelbart av personvernhensyn.",
+      "withdrawalArchiveNever": "Arkiver aldri – slett umiddelbart",
+      "withdrawalArchiveNeverDescription": "Slett ved fristens utløp i stedet for å beholde et 30-dagers arkiv.",
+      "withdrawalArchiveError": "Kunne ikke oppdatere innstillingen. Prøv igjen."
     }
   },
   "session": {
@@ -1076,28 +1076,28 @@
     },
     "register": {
       "child": {
-        "weekTitle": "Your week",
-        "monthTitle": "Your month",
-        "growthTitle": "What you learned",
-        "growthSubtitle": "Your weekly wins",
-        "masteredTopicsHero": "You learned {{count}} topics. Steady wins.",
-        "retentionStrong": "What came back to you this week.",
-        "retentionFading": "Worth a quick refresh.",
-        "retentionWeak": "Worth coming back to.",
-        "growthPrimaryLegend": "Topics learned",
-        "growthSecondaryLegend": "Words added"
+        "weekTitle": "Din uke",
+        "monthTitle": "Din måned",
+        "growthTitle": "Det du har lært",
+        "growthSubtitle": "Ukens gevinster",
+        "masteredTopicsHero": "Du lærte {{count}} temaer. Stødig fremgang.",
+        "retentionStrong": "Det du husket denne uken.",
+        "retentionFading": "Verdt en liten oppfriskning.",
+        "retentionWeak": "Verdt å komme tilbake til.",
+        "growthPrimaryLegend": "Temaer lært",
+        "growthSecondaryLegend": "Ord lagt til"
       },
       "adult": {
-        "weekTitle": "Weekly report",
-        "monthTitle": "Monthly report",
-        "growthTitle": "Your growth",
-        "growthSubtitle": "Weekly changes in topics mastered and vocabulary",
-        "masteredTopicsHero": "You've mastered {{count}} topics. Your progress keeps stacking up.",
-        "retentionStrong": "Still remembered.",
-        "retentionFading": "Getting fuzzy — a quick review will help.",
-        "retentionWeak": "Needs a quick refresh.",
-        "growthPrimaryLegend": "Topics mastered",
-        "growthSecondaryLegend": "Vocabulary growth"
+        "weekTitle": "Ukesrapport",
+        "monthTitle": "Månedsrapport",
+        "growthTitle": "Din vekst",
+        "growthSubtitle": "Ukentlige endringer i mestrede temaer og vokabular",
+        "masteredTopicsHero": "Du har mestret {{count}} temaer. Fremgangen din fortsetter å bygge seg opp.",
+        "retentionStrong": "Fremdeles husket.",
+        "retentionFading": "Begynner å glippe – en rask gjennomgang vil hjelpe.",
+        "retentionWeak": "Trenger en rask oppfriskning.",
+        "growthPrimaryLegend": "Temaer mestret",
+        "growthSecondaryLegend": "Vokabularvekst"
       }
     },
     "newLearner": {
@@ -1246,6 +1246,28 @@
       "empty": "Ingen samtaler ennå",
       "untitledTopic": "Tema uten navn",
       "openSessionFrom": "Åpne økt fra {{date}}"
+    },
+    "retention": {
+      "strong": {
+        "label": "Fremdeles husket"
+      },
+      "fading": {
+        "label": "Begynner å glippe"
+      },
+      "weak": {
+        "label": "Trenger en rask oppfriskning"
+      },
+      "forgotten": {
+        "label": "Trenger en ny gjennomgang"
+      }
+    },
+    "growthChart": {
+      "a11y": {
+        "topicsLearned": "temaer lært",
+        "topicsMastered": "temaer mestret",
+        "wordsAdded": "ord lagt til",
+        "vocabularyGrowth": "vokabularvekst"
+      }
     }
   },
   "onboarding": {

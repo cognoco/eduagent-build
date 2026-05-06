@@ -451,6 +451,7 @@ export default function ProgressScreen(): React.ReactElement {
                 title={t(`progress.register.${register}.growthTitle`)}
                 subtitle={t(`progress.register.${register}.growthSubtitle`)}
                 data={growthData}
+                register={register}
                 emptyMessage={
                   // [F-043] Distinguish brand-new users from users who have
                   // sessions but no mastery data yet (mastery takes repeat exposures).

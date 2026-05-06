@@ -83,7 +83,7 @@ describe('ParentDashboardSummary', () => {
 
     screen.getByText('Mathematics');
     screen.getByText('Science');
-    screen.getByText('Remembering well');
+    screen.getByText('Still remembered');
     screen.getByText('A few things to refresh');
   });
 

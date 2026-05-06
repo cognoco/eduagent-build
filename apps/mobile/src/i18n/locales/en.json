@@ -1246,6 +1246,28 @@
       "empty": "No conversations yet",
       "untitledTopic": "Untitled topic",
       "openSessionFrom": "Open session from {{date}}"
+    },
+    "retention": {
+      "strong": {
+        "label": "Still remembered"
+      },
+      "fading": {
+        "label": "Getting fuzzy"
+      },
+      "weak": {
+        "label": "Needs a quick refresh"
+      },
+      "forgotten": {
+        "label": "Needs a fresh pass"
+      }
+    },
+    "growthChart": {
+      "a11y": {
+        "topicsLearned": "topics learned",
+        "topicsMastered": "topics mastered",
+        "wordsAdded": "words added",
+        "vocabularyGrowth": "vocabulary growth"
+      }
     }
   },
   "onboarding": {

@@ -104,7 +104,7 @@ jest.mock('react-i18next', () => ({
 
 jest.mock('../../hooks/use-progress');
 const mockUseActiveProfileRole = jest.fn();
-jest.mock('../../hooks/use-active-profile-role', () => ({
+jest.mock('../../hooks/use-active-profile-role', () => ({ // gc1-allow: progress screen varies register copy by role; mocking the role hook isolates register-driven rendering from auth state.
   useActiveProfileRole: () => mockUseActiveProfileRole(),
 }));
 jest.mock('../../lib/profile', () => ({

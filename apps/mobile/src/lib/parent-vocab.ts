@@ -43,8 +43,9 @@ export function getParentRetentionInfo(
         colorKey: 'retentionFading',
       };
     case 'weak':
-    case 'forgotten':
       return { label: 'Needs a quick refresh', colorKey: 'retentionWeak' };
+    case 'forgotten':
+      return { label: 'Needs a fresh pass', colorKey: 'retentionWeak' };
     default:
       return null;
   }

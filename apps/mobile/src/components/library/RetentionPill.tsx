@@ -1,4 +1,5 @@
 import { Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import type { RetentionStatus } from '@eduagent/schemas';
 import { useThemeColors } from '../../lib/theme';
 
@@ -8,11 +9,11 @@ interface RetentionPillProps {
   testID?: string;
 }
 
-const STATUS_LABEL: Record<RetentionStatus, string> = {
-  strong: 'Still remembered',
-  fading: 'Getting fuzzy',
-  weak: 'Needs a quick refresh',
-  forgotten: 'Needs a fresh pass',
+const STATUS_KEY: Record<RetentionStatus, string> = {
+  strong: 'progress.retention.strong.label',
+  fading: 'progress.retention.fading.label',
+  weak: 'progress.retention.weak.label',
+  forgotten: 'progress.retention.forgotten.label',
 };
 
 export function RetentionPill({
@@ -20,6 +21,7 @@ export function RetentionPill({
   size = 'default',
   testID,
 }: RetentionPillProps) {
+  const { t } = useTranslation();
   const colors = useThemeColors();
 
   const dotColor = (() => {
@@ -39,10 +41,12 @@ export function RetentionPill({
   const fontSize = size === 'large' ? 14 : 12;
   const showLabel = size !== 'small';
 
+  const label = t(STATUS_KEY[status]);
+
   return (
     <View
       testID={testID}
-      accessibilityLabel={`Memory check: ${STATUS_LABEL[status]}`}
+      accessibilityLabel={`Memory check: ${label}`}
       style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
     >
       <View
@@ -62,7 +66,7 @@ export function RetentionPill({
             fontWeight: '500',
           }}
         >
-          {STATUS_LABEL[status]}
+          {label}
         </Text>
       ) : null}
     </View>

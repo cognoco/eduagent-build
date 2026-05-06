@@ -120,7 +120,7 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockLocalSearchParams(),
 }));
 
-jest.mock('../../../../hooks/use-active-profile-role', () => ({
+jest.mock('../../../../hooks/use-active-profile-role', () => ({ // gc1-allow: subject progress screen varies retention copy by role; mocking the role hook pins the register for deterministic assertions.
   useActiveProfileRole: () => 'owner',
 }));
 

@@ -15,9 +15,12 @@ describe('RetentionSignal', () => {
     expect(screen.queryByText('Getting fuzzy')).toBeNull();
   });
 
-  it('maps forgotten to the same parent-facing review copy', () => {
+  it('maps forgotten to a distinct parent-facing review copy (M4)', () => {
     render(<RetentionSignal status="forgotten" parentFacing />);
 
-    screen.getByText('Needs a quick refresh');
+    // M4 fix: 'forgotten' differentiates from 'weak' — parent-vocab now
+    // returns "Needs a fresh pass" for forgotten, matching RetentionSignal.
+    screen.getByText('Needs a fresh pass');
+    expect(screen.queryByText('Needs a quick refresh')).toBeNull();
   });
 });
