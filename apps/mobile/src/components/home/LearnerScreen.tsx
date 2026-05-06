@@ -33,6 +33,7 @@ import { getSubjectTint } from '../../lib/subject-tints';
 import { useTheme } from '../../lib/theme';
 import { useThemeColors } from '../../lib/theme';
 import { CoachBand } from './CoachBand';
+import { ChildQuotaLine } from './ChildQuotaLine';
 import { EarlyAdopterCard } from './EarlyAdopterCard';
 import { SubjectCard } from './SubjectCard';
 
@@ -466,6 +467,7 @@ export function LearnerScreen({
             <Text className="text-body-sm text-text-secondary mt-0.5">
               {subtitle}
             </Text>
+            {!isParentProxy ? <ChildQuotaLine /> : null}
           </View>
         </View>
         <ProfileSwitcher

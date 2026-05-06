@@ -1,4 +1,8 @@
 import { View, Text } from 'react-native';
+import { useTranslation } from 'react-i18next';
+
+import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
+import { copyRegisterFor, type CopyRegister } from '../../lib/copy-register';
 import { useThemeColors } from '../../lib/theme';
 
 export interface GrowthChartDatum {
@@ -18,18 +22,27 @@ interface GrowthChartProps {
  * [BUG-649 / ACC-5] Build a screen-reader summary of the chart data so users
  * with visual impairments hear the trend instead of an opaque bar grid.
  */
-function buildChartA11yLabel(title: string, data: GrowthChartDatum[]): string {
+function buildChartA11yLabel(
+  title: string,
+  data: GrowthChartDatum[],
+  register: CopyRegister
+): string {
   const points = data
     .map((item) => {
-      const primary = `${item.value} topics mastered`;
+      const primary =
+        register === 'child'
+          ? `${item.value} topics learned`
+          : `${item.value} topics mastered`;
       const secondary =
         item.secondaryValue != null
-          ? `, ${item.secondaryValue} vocabulary growth`
+          ? register === 'child'
+            ? `, ${item.secondaryValue} words added`
+            : `, ${item.secondaryValue} vocabulary growth`
           : '';
       return `${item.label}: ${primary}${secondary}`;
     })
     .join('. ');
-  return `Growth chart. ${title}. ${points}`;
+  return `${title}. ${points}`;
 }
 
 export function GrowthChart({
@@ -38,6 +51,9 @@ export function GrowthChart({
   data,
   emptyMessage = 'Keep going and your growth will show up here.',
 }: GrowthChartProps): React.ReactElement {
+  const { t } = useTranslation();
+  const role = useActiveProfileRole();
+  const register = copyRegisterFor(role);
   const colors = useThemeColors();
   const maxValue = Math.max(
     1,
@@ -69,7 +85,7 @@ export function GrowthChart({
           <View
             accessible
             accessibilityRole="text"
-            accessibilityLabel={buildChartA11yLabel(title, data)}
+            accessibilityLabel={buildChartA11yLabel(title, data, register)}
           >
             <View
               className="flex-row items-end gap-3 h-28"
@@ -119,7 +135,7 @@ export function GrowthChart({
                 style={{ backgroundColor: colors.primary }}
               />
               <Text className="text-caption text-text-secondary">
-                Topics mastered
+                {t(`progress.register.${register}.growthPrimaryLegend`)}
               </Text>
             </View>
             {data.some((item) => item.secondaryValue != null) ? (
@@ -129,7 +145,7 @@ export function GrowthChart({
                   style={{ backgroundColor: colors.accent }}
                 />
                 <Text className="text-caption text-text-secondary">
-                  Vocabulary growth
+                  {t(`progress.register.${register}.growthSecondaryLegend`)}
                 </Text>
               </View>
             ) : null}

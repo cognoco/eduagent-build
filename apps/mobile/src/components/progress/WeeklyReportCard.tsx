@@ -4,6 +4,7 @@ import { useProfileWeeklyReports } from '../../hooks/use-progress';
 
 type ReportingComponentProps = {
   profileId: string;
+  title?: string;
 };
 
 function formatWeek(weekStart: string): string {
@@ -15,6 +16,7 @@ function formatWeek(weekStart: string): string {
 
 export function WeeklyReportCard({
   profileId,
+  title,
 }: ReportingComponentProps): React.ReactElement {
   const { t } = useTranslation();
   const reportsQuery = useProfileWeeklyReports(profileId);
@@ -23,7 +25,7 @@ export function WeeklyReportCard({
   return (
     <View className="bg-surface rounded-card p-4 mt-6" testID="weekly-report">
       <Text className="text-body font-semibold text-text-primary">
-        {t('parentView.reports.weeklySnapshots')}
+        {title ?? t('parentView.reports.weeklySnapshots')}
       </Text>
       {reportsQuery.isLoading ? (
         <Text className="text-body-sm text-text-secondary mt-2">

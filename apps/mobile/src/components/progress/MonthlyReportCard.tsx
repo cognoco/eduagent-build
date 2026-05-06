@@ -4,6 +4,7 @@ import { useProfileReports } from '../../hooks/use-progress';
 
 type ReportingComponentProps = {
   profileId: string;
+  title?: string;
 };
 
 function formatMonth(reportMonth: string): string {
@@ -15,6 +16,7 @@ function formatMonth(reportMonth: string): string {
 
 export function MonthlyReportCard({
   profileId,
+  title,
 }: ReportingComponentProps): React.ReactElement {
   const { t } = useTranslation();
   const reportsQuery = useProfileReports(profileId);
@@ -23,7 +25,7 @@ export function MonthlyReportCard({
   return (
     <View className="bg-surface rounded-card p-4 mt-4" testID="monthly-report">
       <Text className="text-body font-semibold text-text-primary">
-        {t('parentView.reports.monthlyReports')}
+        {title ?? t('parentView.reports.monthlyReports')}
       </Text>
       {reportsQuery.isLoading ? (
         <Text className="text-body-sm text-text-secondary mt-2">

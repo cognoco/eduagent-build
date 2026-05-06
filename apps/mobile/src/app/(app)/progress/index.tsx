@@ -27,6 +27,7 @@ import {
   ReportsListCard,
   WeeklyReportCard,
 } from '../../../components/progress';
+import { useActiveProfileRole } from '../../../hooks/use-active-profile-role';
 import {
   useLearningResumeTarget,
   useProgressHistory,
@@ -36,6 +37,7 @@ import {
   useRefreshProgressSnapshot,
 } from '../../../hooks/use-progress';
 import { pushLearningResumeTarget } from '../../../lib/navigation';
+import { copyRegisterFor, type CopyRegister } from '../../../lib/copy-register';
 import { useProfile } from '../../../lib/profile';
 import { isProfileStale } from '../../../lib/progress';
 import { bucketAccountAge, hashProfileId, track } from '../../../lib/analytics';
@@ -46,12 +48,27 @@ function heroCopy(
     vocabularyTotal: number;
     totalSessions: number;
   },
+  register: CopyRegister,
   t: (key: string, opts?: Record<string, unknown>) => string
 ): {
   title: string;
   subtitle: string;
 } {
   const { topicsMastered, vocabularyTotal, totalSessions } = input;
+
+  if (register === 'child' && topicsMastered > 0) {
+    return {
+      title: t('progress.register.child.masteredTopicsHero', {
+        count: topicsMastered,
+      }),
+      subtitle:
+        vocabularyTotal > 0
+          ? t('progress.hero.masteredTopicsAndWords', {
+              words: vocabularyTotal,
+            })
+          : t('progress.register.child.growthSubtitle'),
+    };
+  }
 
   // [F-043] User has sessions but nothing mastered yet — show encouragement
   if (topicsMastered === 0 && vocabularyTotal === 0 && totalSessions > 0) {
@@ -169,6 +186,8 @@ function LoadingBlock(): React.ReactElement {
 
 export default function ProgressScreen(): React.ReactElement {
   const { t } = useTranslation();
+  const role = useActiveProfileRole();
+  const register = copyRegisterFor(role);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { activeProfile } = useProfile();
@@ -186,6 +205,7 @@ export default function ProgressScreen(): React.ReactElement {
       vocabularyTotal: inventory?.global.vocabularyTotal ?? 0,
       totalSessions: inventory?.global.totalSessions ?? 0,
     },
+    register,
     t
   );
 
@@ -428,8 +448,8 @@ export default function ProgressScreen(): React.ReactElement {
 
             <View className="mt-6">
               <GrowthChart
-                title={t('progress.growth.title')}
-                subtitle={t('progress.growth.subtitle')}
+                title={t(`progress.register.${register}.growthTitle`)}
+                subtitle={t(`progress.register.${register}.growthSubtitle`)}
                 data={growthData}
                 emptyMessage={
                   // [F-043] Distinguish brand-new users from users who have
@@ -458,7 +478,10 @@ export default function ProgressScreen(): React.ReactElement {
                   }}
                   testID="progress-weekly-report-tracker"
                 >
-                  <WeeklyReportCard profileId={activeProfile.id} />
+                  <WeeklyReportCard
+                    profileId={activeProfile.id}
+                    title={t(`progress.register.${register}.weekTitle`)}
+                  />
                 </TrackedView>
                 <TrackedView
                   eventName="progress_report_viewed"
@@ -470,7 +493,10 @@ export default function ProgressScreen(): React.ReactElement {
                   }}
                   testID="progress-monthly-report-tracker"
                 >
-                  <MonthlyReportCard profileId={activeProfile.id} />
+                  <MonthlyReportCard
+                    profileId={activeProfile.id}
+                    title={t(`progress.register.${register}.monthTitle`)}
+                  />
                 </TrackedView>
                 <RecentSessionsList profileId={activeProfile.id} />
               </>

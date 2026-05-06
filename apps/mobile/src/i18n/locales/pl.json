@@ -116,6 +116,12 @@
       "emptySubjectsTitle": "Twoje przedmioty pojawią się tutaj",
       "emptySubjectsMessage": "Zacznij jeden teraz albo użyj pomocy w zadaniach, gdy jej potrzebujesz.",
       "addSubject": "Dodaj przedmiot",
+      "quota": {
+        "line": "{{questionsLeftToday}} questions left today · {{questionsLeftMonth}} left this month",
+        "lineDailyOnly": "{{questionsLeftToday}} questions left today",
+        "lineMonthlyOnly": "{{questionsLeftMonth}} questions left this month",
+        "lineUnlimited": "Plenty of questions today"
+      },
       "intentActions": {
         "homework": {
           "title": "Pomoc w zadaniach",
@@ -1067,6 +1073,32 @@
       "masteredTopics": "Opanowałeś(-aś) {{count}} tematów",
       "masteredTopicsSubtitle": "Twoje postępy wciąż się kumulują.",
       "masteredTopicsAndWords": "I znasz {{words}} słów we wszystkich swoich przedmiotach."
+    },
+    "register": {
+      "child": {
+        "weekTitle": "Your week",
+        "monthTitle": "Your month",
+        "growthTitle": "What you learned",
+        "growthSubtitle": "Your weekly wins",
+        "masteredTopicsHero": "You learned {{count}} topics. Steady wins.",
+        "retentionStrong": "What came back to you this week.",
+        "retentionFading": "Worth a quick refresh.",
+        "retentionWeak": "Worth coming back to.",
+        "growthPrimaryLegend": "Topics learned",
+        "growthSecondaryLegend": "Words added"
+      },
+      "adult": {
+        "weekTitle": "Weekly report",
+        "monthTitle": "Monthly report",
+        "growthTitle": "Your growth",
+        "growthSubtitle": "Weekly changes in topics mastered and vocabulary",
+        "masteredTopicsHero": "You've mastered {{count}} topics. Your progress keeps stacking up.",
+        "retentionStrong": "Still remembered.",
+        "retentionFading": "Getting fuzzy — a quick review will help.",
+        "retentionWeak": "Needs a quick refresh.",
+        "growthPrimaryLegend": "Topics mastered",
+        "growthSecondaryLegend": "Vocabulary growth"
+      }
     },
     "newLearner": {
       "title": "Ukończyłeś(-aś) {{count}} sesję. Tak trzymaj!",

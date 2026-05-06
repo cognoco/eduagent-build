@@ -116,6 +116,12 @@
       "emptySubjectsTitle": "Your subjects will show up here",
       "emptySubjectsMessage": "Start one now, or just use homework help when you need it.",
       "addSubject": "Add a subject",
+      "quota": {
+        "line": "{{questionsLeftToday}} questions left today · {{questionsLeftMonth}} left this month",
+        "lineDailyOnly": "{{questionsLeftToday}} questions left today",
+        "lineMonthlyOnly": "{{questionsLeftMonth}} questions left this month",
+        "lineUnlimited": "Plenty of questions today"
+      },
       "intentActions": {
         "homework": {
           "title": "Homework help",
@@ -1067,6 +1073,32 @@
       "masteredTopics": "You've mastered {{count}} topics",
       "masteredTopicsSubtitle": "Your progress keeps stacking up.",
       "masteredTopicsAndWords": "And you know {{words}} words across your subjects."
+    },
+    "register": {
+      "child": {
+        "weekTitle": "Your week",
+        "monthTitle": "Your month",
+        "growthTitle": "What you learned",
+        "growthSubtitle": "Your weekly wins",
+        "masteredTopicsHero": "You learned {{count}} topics. Steady wins.",
+        "retentionStrong": "What came back to you this week.",
+        "retentionFading": "Worth a quick refresh.",
+        "retentionWeak": "Worth coming back to.",
+        "growthPrimaryLegend": "Topics learned",
+        "growthSecondaryLegend": "Words added"
+      },
+      "adult": {
+        "weekTitle": "Weekly report",
+        "monthTitle": "Monthly report",
+        "growthTitle": "Your growth",
+        "growthSubtitle": "Weekly changes in topics mastered and vocabulary",
+        "masteredTopicsHero": "You've mastered {{count}} topics. Your progress keeps stacking up.",
+        "retentionStrong": "Still remembered.",
+        "retentionFading": "Getting fuzzy — a quick review will help.",
+        "retentionWeak": "Needs a quick refresh.",
+        "growthPrimaryLegend": "Topics mastered",
+        "growthSecondaryLegend": "Vocabulary growth"
+      }
     },
     "newLearner": {
       "title": "You've completed {{count}} session. Keep going!",

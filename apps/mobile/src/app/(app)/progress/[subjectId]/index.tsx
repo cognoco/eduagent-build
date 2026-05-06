@@ -14,11 +14,13 @@ import {
   useLearningResumeTarget,
   useSubjectProgress,
 } from '../../../../hooks/use-progress';
+import { useActiveProfileRole } from '../../../../hooks/use-active-profile-role';
 import { useLanguageProgress } from '../../../../hooks/use-language-progress';
 import { formatMinutes } from '../../../../lib/format-relative-date';
 import { useUpdateSubject } from '../../../../hooks/use-subjects';
 import { platformAlert } from '../../../../lib/platform-alert';
 import { formatApiError } from '../../../../lib/format-api-error';
+import { copyRegisterFor } from '../../../../lib/copy-register';
 
 function StatCard({
   label,
@@ -39,6 +41,8 @@ function StatCard({
 
 export default function ProgressSubjectScreen(): React.ReactElement {
   const { t } = useTranslation();
+  const role = useActiveProfileRole();
+  const register = copyRegisterFor(role);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { subjectId } = useLocalSearchParams<{ subjectId: string }>();
@@ -503,10 +507,10 @@ export default function ProgressSubjectScreen(): React.ReactElement {
                 </Text>
                 <Text className="text-body-sm text-text-secondary mt-1">
                   {legacyProgress.retentionStatus === 'strong'
-                    ? t('progress.subject.retentionStrong')
+                    ? t(`progress.register.${register}.retentionStrong`)
                     : legacyProgress.retentionStatus === 'fading'
-                    ? t('progress.subject.retentionFading')
-                    : t('progress.subject.retentionWeak')}
+                    ? t(`progress.register.${register}.retentionFading`)
+                    : t(`progress.register.${register}.retentionWeak`)}
                 </Text>
               </View>
             ) : null}
