@@ -41,10 +41,12 @@ import {
   useStreamMessage,
   useStartSession,
   useCloseSession,
+  useSession,
   useSessionTranscript,
   useRecordSystemPrompt,
   useRecordSessionEvent,
   useSetSessionInputMode,
+  useClearContinuationDepth,
   useFlagSessionContent,
   useParkingLot,
   useAddParkingLotItem,
@@ -309,6 +311,7 @@ function SessionScreenInner() {
     rawInput,
     recap,
     resumeFromSessionId,
+    gaps: rawGaps,
     returnTo,
     verificationType: routeVerificationType,
     imageUri: rawImageUri,
@@ -327,6 +330,7 @@ function SessionScreenInner() {
     rawInput?: string;
     recap?: string;
     resumeFromSessionId?: string;
+    gaps?: string;
     returnTo?: string;
     verificationType?: string;
     imageUri?: string;
@@ -335,6 +339,20 @@ function SessionScreenInner() {
   // [BUG-635] Coerce Expo Router's `string | string[]` to a single string.
   const imageUri = firstParam(rawImageUri);
   const imageMimeType = firstParam(rawImageMimeType);
+  const gaps = useMemo(() => {
+    const raw = firstParam(rawGaps);
+    if (!raw) return undefined;
+    try {
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return undefined;
+      return parsed
+        .map((gap) => String(gap).trim())
+        .filter((gap) => gap.length > 0)
+        .slice(0, 8);
+    } catch {
+      return undefined;
+    }
+  }, [rawGaps]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { activeProfile } = useProfile();
@@ -537,6 +555,10 @@ function SessionScreenInner() {
   } | null>(null);
 
   const transcript = useSessionTranscript(routeSessionId ?? '');
+  const activeSession = useSession(activeSessionId ?? '');
+  const clearContinuationDepth = useClearContinuationDepth(
+    activeSessionId ?? ''
+  );
   const liveTranscript =
     transcript.data?.archived === false ? transcript.data : null;
 
@@ -936,6 +958,7 @@ function SessionScreenInner() {
     inputMode,
     rawInput: rawInput ?? undefined,
     resumeFromSessionId: resumeFromSessionId ?? undefined,
+    gaps,
     verificationType: routeVerificationType ?? undefined,
     normalizedOcrText,
     homeworkCaptureSource,
@@ -1290,11 +1313,35 @@ function SessionScreenInner() {
     />
   ) : null;
 
+  const showSkipWarmup =
+    activeSession.data?.metadata?.continuationDepth === 'low' ||
+    activeSession.data?.metadata?.continuationDepth === 'mid' ||
+    activeSession.data?.metadata?.continuationDepth === 'high';
+  const skipWarmupChip = showSkipWarmup ? (
+    <View className="flex-row items-center gap-2 px-4 pb-2">
+      <Pressable
+        onPress={() => {
+          void clearContinuationDepth.mutateAsync();
+        }}
+        disabled={clearContinuationDepth.isPending}
+        className="bg-surface-elevated rounded-full px-3 py-1.5 items-center justify-center"
+        accessibilityRole="button"
+        accessibilityLabel="Skip the warm-up, jump in"
+        testID="session-skip-warmup"
+      >
+        <Text className="text-body-sm font-semibold text-text-secondary">
+          Skip the warm-up, jump in
+        </Text>
+      </Pressable>
+    </View>
+  ) : null;
+
   const headerBelow =
-    topicHeaderStrip || classifyErrorChip ? (
+    topicHeaderStrip || classifyErrorChip || skipWarmupChip ? (
       <View className="gap-2">
         {topicHeaderStrip}
         {classifyErrorChip}
+        {skipWarmupChip}
       </View>
     ) : null;
 

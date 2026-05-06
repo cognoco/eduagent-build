@@ -165,6 +165,29 @@ export function useSetSessionInputMode(
   });
 }
 
+export function useClearContinuationDepth(
+  sessionId: string
+): UseMutationResult<SessionStartResult, Error, void> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const res = await client.sessions[':sessionId'][
+        'clear-continuation-depth'
+      ].$patch({
+        param: { sessionId },
+      });
+      await assertOk(res);
+      return (await res.json()) as SessionStartResult;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['session', sessionId] });
+      void queryClient.invalidateQueries({ queryKey: ['sessions'] });
+    },
+  });
+}
+
 export function useSyncHomeworkState(
   sessionId: string
 ): UseMutationResult<

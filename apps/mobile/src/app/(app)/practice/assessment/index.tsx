@@ -2,19 +2,21 @@ import { useState, useCallback } from 'react';
 import { View, Text } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import type { AssessmentEvaluation, AssessmentStatus } from '@eduagent/schemas';
 import {
   ChatShell,
   animateResponse,
   type ChatMessage,
-} from '../../components/session';
+} from '../../../../components/session';
 import {
   useCreateAssessment,
+  useDeclineAssessmentRefresh,
   useSubmitAnswer,
-} from '../../hooks/use-assessments';
-import { formatApiError } from '../../lib/format-api-error';
-import { goBackOrReplace } from '../../lib/navigation';
-import { Button } from '../../components/common/Button';
-import { ErrorFallback } from '../../components/common/ErrorFallback';
+} from '../../../../hooks/use-assessments';
+import { formatApiError } from '../../../../lib/format-api-error';
+import { goBackOrReplace } from '../../../../lib/navigation';
+import { Button } from '../../../../components/common/Button';
+import { ErrorFallback } from '../../../../components/common/ErrorFallback';
 
 export default function AssessmentScreen() {
   const router = useRouter();
@@ -27,6 +29,11 @@ export default function AssessmentScreen() {
   const createAssessment = useCreateAssessment(subjectId ?? '', topicId ?? '');
   const [assessmentId, setAssessmentId] = useState<string | null>(null);
   const submitAnswer = useSubmitAnswer(assessmentId ?? '');
+  const declineRefresh = useDeclineAssessmentRefresh(assessmentId ?? '');
+  const [terminalResult, setTerminalResult] = useState<{
+    evaluation: AssessmentEvaluation;
+    status: AssessmentStatus;
+  } | null>(null);
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -61,10 +68,13 @@ export default function AssessmentScreen() {
         const result = await submitAnswer.mutateAsync({ answer: text });
         const evaluation = result.evaluation;
         const feedback = evaluation.feedback;
-        const passed = evaluation.passed;
+        const terminalStatus = result.status !== 'in_progress';
 
         animateResponse(feedback, setMessages, setIsStreaming, () => {
-          if (passed) {
+          if (terminalStatus) {
+            setTerminalResult(result);
+          }
+          if (result.status === 'passed') {
             setMessages((prev) => [
               ...prev,
               {
@@ -90,6 +100,7 @@ export default function AssessmentScreen() {
       assessmentId,
       createAssessment,
       submitAnswer,
+      t,
     ]
   );
 
@@ -116,14 +127,110 @@ export default function AssessmentScreen() {
     );
   }
 
+  const masteryPercent = terminalResult
+    ? Math.round(terminalResult.evaluation.masteryScore * 100)
+    : 0;
+  const bandLabel =
+    masteryPercent >= 90
+      ? 'Excellent'
+      : masteryPercent >= 80
+      ? 'Good'
+      : masteryPercent >= 70
+      ? 'Meets the bar'
+      : masteryPercent >= 60
+      ? 'Core ideas are there'
+      : 'Needs another look';
+  const weakAreas = terminalResult?.evaluation.weakAreas ?? [];
+
+  const resultCard = terminalResult ? (
+    <View
+      testID="assessment-result-card"
+      className="bg-surface-elevated rounded-card px-4 py-4 gap-3"
+    >
+      <Text className="text-body font-semibold text-text-primary">
+        You got {masteryPercent}%! {bandLabel}.
+      </Text>
+      {terminalResult.status === 'borderline' ? (
+        <>
+          <Text className="text-body-sm text-text-secondary">
+            You got the core ideas. Want a quick catch-up on the bits you
+            weren't sure about?
+          </Text>
+          <View className="gap-2">
+            <Button
+              label="Yes, show me what I missed"
+              testID="assessment-gap-fill"
+              onPress={() =>
+                router.push({
+                  pathname: '/(app)/session',
+                  params: {
+                    subjectId,
+                    topicId,
+                    mode: 'gap_fill',
+                    gaps: JSON.stringify(weakAreas),
+                  },
+                } as never)
+              }
+            />
+            <Button
+              variant="secondary"
+              label="No thanks, I'm done"
+              testID="assessment-decline-refresh"
+              loading={declineRefresh.isPending}
+              onPress={() => {
+                void declineRefresh.mutateAsync();
+                goBackOrReplace(router, '/(app)/practice' as const);
+              }}
+            />
+          </View>
+        </>
+      ) : terminalResult.status === 'failed_exhausted' ? (
+        <>
+          <Text className="text-body-sm text-text-secondary">
+            That topic needs another look. Let's go through it together.
+          </Text>
+          <View className="gap-2">
+            <Button
+              label="Start a session"
+              testID="assessment-start-session"
+              onPress={() =>
+                router.push({
+                  pathname: '/(app)/session',
+                  params: { subjectId, topicId, mode: 'learning' },
+                } as never)
+              }
+            />
+            <Button
+              variant="secondary"
+              label="Not now"
+              testID="assessment-not-now"
+              onPress={() =>
+                goBackOrReplace(router, '/(app)/practice' as const)
+              }
+            />
+          </View>
+        </>
+      ) : (
+        <Button
+          variant="secondary"
+          label="Done"
+          testID="assessment-done"
+          onPress={() => goBackOrReplace(router, '/(app)/practice' as const)}
+        />
+      )}
+    </View>
+  ) : null;
+
   return (
     <ChatShell
       title={t('assessment.title')}
       messages={messages}
       onSend={handleSend}
       isStreaming={isStreaming}
+      inputDisabled={!!terminalResult}
       footer={
-        lastError ? (
+        resultCard ??
+        (lastError ? (
           <ErrorFallback
             variant="card"
             message={lastError}
@@ -147,7 +254,7 @@ export default function AssessmentScreen() {
               onPress: () => goBackOrReplace(router, '/(app)/home' as const),
             }}
           />
-        ) : undefined
+        ) : undefined)
       }
     />
   );

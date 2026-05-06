@@ -3,12 +3,13 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { IntentCard } from '../../components/home/IntentCard';
-import { useQuizStats } from '../../hooks/use-quiz';
-import { goBackOrReplace, homeHrefForReturnTo } from '../../lib/navigation';
-import { useReviewSummary } from '../../hooks/use-progress';
-import { useThemeColors } from '../../lib/theme';
-import { useParentProxy } from '../../hooks/use-parent-proxy';
+import { IntentCard } from '../../../components/home/IntentCard';
+import { useQuizStats } from '../../../hooks/use-quiz';
+import { goBackOrReplace, homeHrefForReturnTo } from '../../../lib/navigation';
+import { useReviewSummary } from '../../../hooks/use-progress';
+import { useThemeColors } from '../../../lib/theme';
+import { useParentProxy } from '../../../hooks/use-parent-proxy';
+import { useAssessmentEligibleTopics } from '../../../hooks/use-assessments';
 
 function formatTimeUntil(isoDate: string): string {
   const diff = new Date(isoDate).getTime() - Date.now();
@@ -31,6 +32,8 @@ export default function PracticeScreen(): React.ReactElement {
   const { isParentProxy } = useParentProxy();
   const { data: reviewSummary, isError: reviewError } = useReviewSummary();
   const { data: quizStats, isError: statsError } = useQuizStats();
+  const { data: assessmentTopics, isError: assessmentTopicsError } =
+    useAssessmentEligibleTopics();
 
   const reviewDueCount = reviewSummary?.totalOverdue ?? 0;
   const hasOverdue = reviewDueCount > 0;
@@ -82,6 +85,14 @@ export default function PracticeScreen(): React.ReactElement {
         .filter(Boolean)
         .join(' · ')
     : 'Test yourself with multiple choice questions';
+  const assessmentCount = assessmentTopics?.length ?? 0;
+  const assessmentSubtitle = assessmentTopicsError
+    ? 'Could not load assessment topics'
+    : assessmentCount > 0
+    ? `${assessmentCount} ${
+        assessmentCount === 1 ? 'topic' : 'topics'
+      } ready to test`
+    : 'Study a topic first';
 
   const handleBack = () => {
     goBackOrReplace(router, homeHrefForReturnTo(returnTo));
@@ -197,6 +208,15 @@ export default function PracticeScreen(): React.ReactElement {
           icon="help-circle-outline"
           onPress={() => router.push('/(app)/quiz' as never)}
           testID="practice-quiz"
+        />
+        <IntentCard
+          title="Prove I know this"
+          subtitle={assessmentSubtitle}
+          icon="checkmark-circle-outline"
+          onPress={() =>
+            router.push('/(app)/practice/assessment-picker' as never)
+          }
+          testID="practice-assessment"
         />
         <IntentCard
           title="Quiz history"

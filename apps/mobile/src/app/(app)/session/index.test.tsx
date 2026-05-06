@@ -133,6 +133,7 @@ function createWrapper() {
 const mockStartSession = jest.fn();
 const mockCloseSession = jest.fn();
 const mockStream = jest.fn();
+const mockClearContinuationDepth = jest.fn();
 const mockRecordSystemPrompt = jest.fn();
 const mockRecordSessionEvent = jest.fn();
 const mockSetSessionInputMode = jest.fn();
@@ -164,6 +165,7 @@ const mockUseSessionTranscript = jest.fn<TranscriptMockReturn, [string?]>(
   () => ({ data: null })
 );
 jest.mock('../../../hooks/use-sessions', () => ({
+  useSession: () => ({ data: null }),
   useStartSession: () => ({
     mutateAsync: mockStartSession,
   }),
@@ -172,6 +174,10 @@ jest.mock('../../../hooks/use-sessions', () => ({
   }),
   useStreamMessage: () => ({
     stream: mockStream,
+  }),
+  useClearContinuationDepth: () => ({
+    mutateAsync: mockClearContinuationDepth,
+    isPending: false,
   }),
   useSessionTranscript: (sessionId: string) =>
     mockUseSessionTranscript(sessionId),

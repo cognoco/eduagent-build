@@ -79,6 +79,7 @@ export interface UseSessionStreamingOptions {
   inputMode: InputMode;
   rawInput: string | undefined;
   resumeFromSessionId: string | undefined;
+  gaps: string[] | undefined;
   verificationType: string | undefined; // 3E.1/3E.2: teach_back or evaluate
   normalizedOcrText: string | undefined;
   homeworkCaptureSource: HomeworkCaptureSource | undefined;
@@ -177,6 +178,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
     inputMode,
     rawInput,
     resumeFromSessionId,
+    gaps,
     verificationType,
     normalizedOcrText,
     homeworkCaptureSource,
@@ -283,6 +285,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
               inputMode,
               effectiveMode,
               ...(resumeFromSessionId ? { resumeFromSessionId } : {}),
+              ...(gaps && gaps.length > 0 ? { gaps } : {}),
               ...(effectiveMode === 'homework' &&
               homeworkProblemsState.length > 0
                 ? {
@@ -326,6 +329,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
               inputMode,
               effectiveMode,
               ...(resumeFromSessionId ? { resumeFromSessionId } : {}),
+              ...(gaps && gaps.length > 0 ? { gaps } : {}),
               ...(effectiveMode === 'homework' &&
               homeworkProblemsState.length > 0
                 ? {
@@ -378,6 +382,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       startSession,
       setActiveSessionId,
       resumeFromSessionId,
+      gaps,
       homeworkProblemsState,
       currentProblemIndex,
       normalizedOcrText,
