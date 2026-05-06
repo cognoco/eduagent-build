@@ -14,6 +14,7 @@ import { platformAlert } from '../../lib/platform-alert';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ParentDashboardSummary } from '../../components/coaching';
 import { FamilyOrientationCue } from '../../components/family/FamilyOrientationCue';
+import { WithdrawalCountdownBanner } from '../../components/family/WithdrawalCountdownBanner';
 import type { RetentionStatus } from '../../components/progress';
 import { useDashboard } from '../../hooks/use-dashboard';
 
@@ -173,6 +174,7 @@ export default function FamilyScreen() {
           />
         }
       >
+        <WithdrawalCountdownBanner />
         <FamilyOrientationCue />
         {dashboardLoading || (!dashboard && !isError) ? (
           <>

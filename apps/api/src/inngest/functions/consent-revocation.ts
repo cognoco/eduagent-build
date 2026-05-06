@@ -1,6 +1,9 @@
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
-import { getConsentStatus } from '../../services/consent';
+import {
+  getConsentStatus,
+  getProfileDisplayName,
+} from '../../services/consent';
 import { deleteProfile } from '../../services/deletion';
 import { sendPushNotification } from '../../services/notifications';
 import { getRecentNotificationCount } from '../../services/settings';
@@ -9,10 +12,12 @@ import { getRecentNotificationCount } from '../../services/settings';
  * Scheduled consent revocation — 7-day grace period then cascade delete.
  *
  * Mirrors the account-deletion pattern:
- * 1. Sleep 7 days
- * 2. Check if consent was restored (status changed back to CONSENTED)
- * 3. If still WITHDRAWN, delete the child profile (FK cascades handle all data)
- * 4. Notify parent of completion
+ * 1. Sleep 6 days
+ * 2. Warn the parent 24h before closure, if consent is still withdrawn
+ * 3. Sleep 1 more day
+ * 4. Check if consent was restored (status changed back to CONSENTED)
+ * 5. If still WITHDRAWN, delete the child profile (FK cascades handle all data)
+ * 6. Notify parent of completion
  */
 export const consentRevocation = inngest.createFunction(
   {
@@ -29,8 +34,37 @@ export const consentRevocation = inngest.createFunction(
   async ({ event, step }) => {
     const { childProfileId, parentProfileId } = event.data;
 
-    // Wait 7-day grace period
-    await step.sleep('revocation-grace-period', '7d');
+    await step.sleep('warning-mark', '6d');
+
+    await step.run('send-warning-push', async () => {
+      const db = getStepDatabase();
+      const status = await getConsentStatus(db, childProfileId);
+      if (status !== 'WITHDRAWN') {
+        return { sent: false, reason: 'restored' };
+      }
+
+      const recentCount = await getRecentNotificationCount(
+        db,
+        parentProfileId,
+        'consent_warning',
+        24
+      );
+      if (recentCount > 0) {
+        return { sent: false, reason: 'dedup_24h' };
+      }
+
+      const childName =
+        (await getProfileDisplayName(db, childProfileId)) ?? 'Your child';
+      await sendPushNotification(db, {
+        profileId: parentProfileId,
+        title: 'Account closing tomorrow',
+        body: `${childName}'s account closes tomorrow. You can still reverse.`,
+        type: 'consent_warning',
+      });
+      return { sent: true };
+    });
+
+    await step.sleep('grace-end', '1d');
 
     // Check if consent was restored during grace period
     const restored = await step.run('check-restoration', async () => {

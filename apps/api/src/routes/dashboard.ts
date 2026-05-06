@@ -334,6 +334,8 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
           {
             profileId: 'demo-child-1',
             displayName: 'Alex',
+            consentStatus: null,
+            respondedAt: null,
             // [BUG-876] Subject names must match the `subjects[]` array below
             // exactly so the dashboard summary, the subjects list, the library,
             // the shelf, and progress all read as the same canonical word.
@@ -360,6 +362,8 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
           {
             profileId: 'demo-child-2',
             displayName: 'Sam',
+            consentStatus: null,
+            respondedAt: null,
             summary:
               'Sam: English \u2014 steady progress. 3 sessions this week (\u2192 same as last week).',
             sessionsThisWeek: 3,

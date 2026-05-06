@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { DashboardData, Profile } from '@eduagent/schemas';
 import { ProfileSwitcher } from '../common';
+import { WithdrawalCountdownBanner } from '../family/WithdrawalCountdownBanner';
 import { useDashboard } from '../../hooks/use-dashboard';
 import { FAMILY_HOME_PATH } from '../../lib/navigation';
 import { getGreeting } from '../../lib/greeting';
@@ -98,6 +99,8 @@ export function ParentGateway({
           paddingBottom: insets.bottom + 24,
         }}
       >
+        <WithdrawalCountdownBanner />
+
         {isError && (
           <Pressable
             onPress={() => void refetch()}

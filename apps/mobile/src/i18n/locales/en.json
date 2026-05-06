@@ -171,7 +171,18 @@
     "orientationCueDismiss": "Got it",
     "orientationCueTitle": "This is your family hub",
     "subtitle": "Everyone you're learning alongside.",
-    "title": "Family"
+    "title": "Family",
+    "withdrawal": {
+      "bannerTitleSingle": "{{name}}'s account closes in {{days}} {{daysWord}}",
+      "bannerTitleMulti": "{{count}} accounts closing soon",
+      "bannerCta": "Reverse",
+      "bannerCtaShort": "Undo",
+      "daysOne": "day",
+      "daysOther": "days",
+      "restoreErrorTitle": "Couldn't reverse withdrawal",
+      "restoreErrorBody": "Try again in a moment.",
+      "restoreSuccessToast": "Withdrawal reversed for {{name}}"
+    }
   },
   "more": {
     "screenTitle": "More",
@@ -1140,12 +1151,12 @@
       "phrasesProgress": "{{mastered}}/{{target}} phrases",
       "upNext": "Up next: {{level}} — {{title}}",
       "milestoneNoData": "Complete a session to start tracking your milestone progress.",
-      "retentionTitle": "Current retention",
-      "retentionLoadError": "We couldn't load retention data right now.",
-      "retryRetention": "Retry loading retention",
-      "retentionStrong": "Knowledge feels stable right now.",
-      "retentionFading": "A light review would help keep this fresh.",
-      "retentionWeak": "This subject would benefit from some extra attention.",
+      "retentionTitle": "Memory check",
+      "retentionLoadError": "We couldn't load what needs review right now.",
+      "retryRetention": "Retry loading review status",
+      "retentionStrong": "Still remembered.",
+      "retentionFading": "Getting fuzzy — a quick review will help.",
+      "retentionWeak": "Needs a quick refresh.",
       "openShelf": "Open shelf",
       "resume": "Resume",
       "chooseNext": "Choose next",

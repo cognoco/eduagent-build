@@ -49,6 +49,13 @@ jest.mock('../../components/family/FamilyOrientationCue', () => ({
   },
 }));
 
+jest.mock('../../components/family/WithdrawalCountdownBanner', () => ({
+  WithdrawalCountdownBanner: () => {
+    const { View } = require('react-native');
+    return <View testID="withdrawal-countdown-banner" />;
+  },
+}));
+
 const FamilyScreen = require('./family').default;
 
 describe('FamilyScreen', () => {
@@ -95,5 +102,11 @@ describe('FamilyScreen', () => {
     fireEvent.press(screen.getByTestId('family-back'));
     expect(mockBack).toHaveBeenCalled();
     expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('renders WithdrawalCountdownBanner', () => {
+    render(<FamilyScreen />);
+
+    expect(screen.getByTestId('withdrawal-countdown-banner')).toBeTruthy();
   });
 });

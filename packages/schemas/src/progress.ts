@@ -8,6 +8,7 @@ import {
   weeklyReportSummarySchema,
   weeklyReportRecordSchema,
 } from './snapshots';
+import { consentStatusSchema } from './consent';
 
 export const learningModeSchema = z.enum(['serious', 'casual']);
 export type LearningMode = z.infer<typeof learningModeSchema>;
@@ -245,6 +246,8 @@ export type DashboardChildProgress = z.infer<
 export const dashboardChildSchema = z.object({
   profileId: z.string().uuid(),
   displayName: z.string(),
+  consentStatus: consentStatusSchema.nullable(),
+  respondedAt: z.string().datetime().nullable(),
   summary: z.string(),
   sessionsThisWeek: z.number().int(),
   sessionsLastWeek: z.number().int(),

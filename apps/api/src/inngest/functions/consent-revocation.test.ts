@@ -26,8 +26,11 @@ jest.mock('../client', () => {
 });
 
 const mockGetConsentStatus = jest.fn();
+const mockGetProfileDisplayName = jest.fn();
 jest.mock('../../services/consent', () => ({
   getConsentStatus: (...args: unknown[]) => mockGetConsentStatus(...args),
+  getProfileDisplayName: (...args: unknown[]) =>
+    mockGetProfileDisplayName(...args),
 }));
 
 const mockDeleteProfile = jest.fn().mockResolvedValue(undefined);
@@ -80,6 +83,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
   mockGetConsentStatus.mockResolvedValue('WITHDRAWN');
+  mockGetProfileDisplayName.mockResolvedValue('Liam');
 });
 
 afterEach(() => {
@@ -101,20 +105,70 @@ describe('consentRevocation', () => {
     );
   });
 
-  it('sleeps 7 days before checking restoration', async () => {
+  it('sleeps at the 6-day warning mark and the 1-day grace end', async () => {
     const { mockStep } = await executeRevocation({
       childProfileId: 'child-001',
       parentProfileId: 'parent-001',
     });
 
-    expect(mockStep.sleep).toHaveBeenCalledWith(
-      'revocation-grace-period',
-      '7d'
+    expect(mockStep.sleep).toHaveBeenCalledWith('warning-mark', '6d');
+    expect(mockStep.sleep).toHaveBeenCalledWith('grace-end', '1d');
+  });
+
+  it('sends a consent_warning push to the parent at the 6-day mark', async () => {
+    await executeRevocation({
+      childProfileId: 'child-001',
+      parentProfileId: 'parent-001',
+    });
+
+    expect(mockGetRecentNotificationCount).toHaveBeenCalledWith(
+      expect.anything(),
+      'parent-001',
+      'consent_warning',
+      24
+    );
+    expect(mockSendPushNotification).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        profileId: 'parent-001',
+        type: 'consent_warning',
+        body: "Liam's account closes tomorrow. You can still reverse.",
+      })
+    );
+  });
+
+  it('does not send a warning if consent was restored before the 6-day mark', async () => {
+    mockGetConsentStatus.mockResolvedValue('CONSENTED');
+
+    await executeRevocation({
+      childProfileId: 'child-001',
+      parentProfileId: 'parent-001',
+    });
+
+    expect(mockSendPushNotification).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ type: 'consent_warning' })
+    );
+  });
+
+  it('does not send a duplicate warning if one was sent in the last 24h', async () => {
+    mockGetRecentNotificationCount.mockResolvedValueOnce(1);
+
+    await executeRevocation({
+      childProfileId: 'child-001',
+      parentProfileId: 'parent-001',
+    });
+
+    expect(mockSendPushNotification).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ type: 'consent_warning' })
     );
   });
 
   it('returns restored without pushing or deleting when consent was restored', async () => {
-    mockGetConsentStatus.mockResolvedValueOnce('CONSENTED');
+    mockGetConsentStatus
+      .mockResolvedValueOnce('CONSENTED')
+      .mockResolvedValueOnce('CONSENTED');
 
     const { result } = await executeRevocation({
       childProfileId: 'child-001',
@@ -138,9 +192,18 @@ describe('consentRevocation', () => {
         childProfileId: 'child-001',
       });
 
-      // Child push
+      // Warning push
       expect(mockSendPushNotification).toHaveBeenNthCalledWith(
         1,
+        expect.anything(),
+        expect.objectContaining({
+          profileId: 'parent-001',
+          type: 'consent_warning',
+        })
+      );
+      // Child push
+      expect(mockSendPushNotification).toHaveBeenNthCalledWith(
+        2,
         expect.anything(),
         expect.objectContaining({
           profileId: 'child-001',
@@ -154,7 +217,7 @@ describe('consentRevocation', () => {
       );
       // Parent push
       expect(mockSendPushNotification).toHaveBeenNthCalledWith(
-        2,
+        3,
         expect.anything(),
         expect.objectContaining({
           profileId: 'parent-001',
@@ -165,6 +228,7 @@ describe('consentRevocation', () => {
       // Step ordering: notify-child before delete-child-profile before notify-parent
       const stepNames = mockStep.run.mock.calls.map((c) => c[0]);
       expect(stepNames).toEqual([
+        'send-warning-push',
         'check-restoration',
         'notify-child',
         'delete-child-profile',
@@ -175,10 +239,11 @@ describe('consentRevocation', () => {
 
   describe('[BUG-699-FOLLOWUP] 24h push dedup', () => {
     it('skips notify-child push when a consent_expired notification was logged for the child in last 24h', async () => {
-      // First call (child) returns 1 → dedup; second call (parent) returns 0 → push
+      // Warning allowed; child dedups; parent allowed.
       mockGetRecentNotificationCount
-        .mockResolvedValueOnce(1) // child dedup
-        .mockResolvedValueOnce(0); // parent allowed
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(1)
+        .mockResolvedValueOnce(0);
 
       await executeRevocation({
         childProfileId: 'child-dup',
@@ -186,14 +251,14 @@ describe('consentRevocation', () => {
       });
 
       expect(mockGetRecentNotificationCount).toHaveBeenNthCalledWith(
-        1,
+        2,
         expect.anything(),
         'child-dup',
         'consent_expired',
         24
       );
-      // Only the parent push should have fired.
-      expect(mockSendPushNotification).toHaveBeenCalledTimes(1);
+      // Warning + parent expired should have fired.
+      expect(mockSendPushNotification).toHaveBeenCalledTimes(2);
       expect(mockSendPushNotification).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({ profileId: 'parent-001' })
@@ -202,8 +267,9 @@ describe('consentRevocation', () => {
 
     it('skips notify-parent push when a consent_expired notification was logged for the parent in last 24h', async () => {
       mockGetRecentNotificationCount
-        .mockResolvedValueOnce(0) // child allowed
-        .mockResolvedValueOnce(1); // parent dedup
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(1);
 
       await executeRevocation({
         childProfileId: 'child-001',
@@ -211,14 +277,14 @@ describe('consentRevocation', () => {
       });
 
       expect(mockGetRecentNotificationCount).toHaveBeenNthCalledWith(
-        2,
+        3,
         expect.anything(),
         'parent-dup',
         'consent_expired',
         24
       );
-      // Only the child push should have fired.
-      expect(mockSendPushNotification).toHaveBeenCalledTimes(1);
+      // Warning + child expired should have fired.
+      expect(mockSendPushNotification).toHaveBeenCalledTimes(2);
       expect(mockSendPushNotification).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({ profileId: 'child-001' })
@@ -227,6 +293,7 @@ describe('consentRevocation', () => {
 
     it('skips both pushes when both child and parent already received recent notifications', async () => {
       mockGetRecentNotificationCount
+        .mockResolvedValueOnce(0)
         .mockResolvedValueOnce(1)
         .mockResolvedValueOnce(1);
 
@@ -240,7 +307,11 @@ describe('consentRevocation', () => {
         status: 'deleted',
         childProfileId: 'child-dup',
       });
-      expect(mockSendPushNotification).not.toHaveBeenCalled();
+      expect(mockSendPushNotification).toHaveBeenCalledTimes(1);
+      expect(mockSendPushNotification).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ type: 'consent_warning' })
+      );
       // Profile deletion proceeds regardless of push dedup.
       expect(mockDeleteProfile).toHaveBeenCalledWith(
         expect.anything(),
@@ -256,7 +327,7 @@ describe('consentRevocation', () => {
         parentProfileId: 'parent-001',
       });
 
-      expect(mockSendPushNotification).toHaveBeenCalledTimes(2);
+      expect(mockSendPushNotification).toHaveBeenCalledTimes(3);
     });
   });
 });

@@ -511,6 +511,17 @@ export async function getChildNameByToken(
   return profile?.displayName ?? null;
 }
 
+export async function getProfileDisplayName(
+  db: Database,
+  profileId: string
+): Promise<string | null> {
+  const profile = await db.query.profiles.findFirst({
+    where: eq(profiles.id, profileId),
+    columns: { displayName: true },
+  });
+  return profile?.displayName ?? null;
+}
+
 /**
  * Returns the current consent state for a profile including parentEmail.
  *

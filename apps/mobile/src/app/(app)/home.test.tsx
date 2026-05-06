@@ -85,6 +85,7 @@ jest.mock('../../components/home', () => {
   return {
     ParentGateway: () => (
       <View testID="parent-gateway">
+        <View testID="withdrawal-countdown-banner" />
         <Text>ParentGateway</Text>
       </View>
     ),
@@ -131,6 +132,19 @@ describe('HomeScreen intent router', () => {
 
     screen.getByTestId('parent-gateway');
     expect(screen.queryByTestId('learner-screen')).toBeNull();
+  });
+
+  it('renders WithdrawalCountdownBanner for parent gateway', () => {
+    mockProfiles = [
+      { id: 'p1', displayName: 'Maria', isOwner: true },
+      { id: 'c1', displayName: 'Emma', isOwner: false },
+    ];
+    mockActiveProfile = makeActiveProfile(mockProfiles[0]!);
+    const Wrapper = createWrapper();
+
+    render(<HomeScreen />, { wrapper: Wrapper });
+
+    expect(screen.getByTestId('withdrawal-countdown-banner')).toBeTruthy();
   });
 
   it('restores the parent learner view when view=learner is in the route', () => {
