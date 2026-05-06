@@ -183,6 +183,7 @@ beforeEach(async () => {
   // in CI's PostgreSQL service container. The SM-2 assertions use the
   // same sm2() function as the production code, so both sides compute
   // from the same real Date and the assertions still match.
+  jest.clearAllMocks();
   await cleanupTestAccounts();
 });
 
@@ -251,9 +252,34 @@ describe('vocabulary quiz round lifecycle (integration)', () => {
     });
 
     expect(round.questions).toHaveLength(VOCAB_ROUND_SIZE);
-    // The real LLM router ran: verify the provider boundary was reached exactly once
-    // (generateQuizRound makes one routeAndCall for the discovery questions).
+    // Break-test for D-MOCK-1: prove the real `buildVocabularyPrompt` and
+    // `generateQuizRound` orchestration ran before reaching the provider
+    // boundary. If `jest.requireActual` is dropped, the barrel becomes a
+    // bare stub, the real prompt builder no longer runs, and these
+    // content/shape assertions fail. A simple `toHaveBeenCalledTimes(1)`
+    // would pass even with a full barrel mock — these don't.
     expect(mockRouteAndCall).toHaveBeenCalledTimes(1);
+    expect(mockRouteAndCall).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          role: 'system',
+          content: expect.stringContaining('Activity: Vocabulary quiz'),
+        }),
+        expect.objectContaining({
+          role: 'user',
+          content: 'Generate the quiz round.',
+        }),
+      ]),
+      1,
+      expect.objectContaining({ ageBracket: expect.any(String) })
+    );
+    const [systemPrompt] = mockRouteAndCall.mock.calls[0][0] as Array<{
+      role: string;
+      content: string;
+    }>;
+    expect(systemPrompt.content).toContain(
+      `Maximum CEFR level: ${context.cefrCeiling}`
+    );
     const masteryQuestions = round.questions.filter(
       (question): question is Extract<QuizQuestion, { type: 'vocabulary' }> =>
         question.type === 'vocabulary' && question.isLibraryItem
