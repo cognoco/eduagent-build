@@ -384,6 +384,11 @@
         "enableFailed": "No se pudo activar la memoria",
         "deleteFailed": "No se pudo eliminar el elemento",
         "restoreFailed": "No se pudo restaurar el elemento"
+      },
+      "interestContext": {
+        "school": "Escuela",
+        "freeTime": "Tiempo libre",
+        "both": "Ambos"
       }
     },
     "accessories": {
@@ -532,7 +537,9 @@
       "vocabBasicsTitle": "Básicos de {{language}}",
       "vocabPersonalisedTitle": "Vocabulario: {{language}}",
       "vocabStarterSubtitle": "Palabras iniciales de stock — registra {{threshold}} de las tuyas para desbloquear rondas personalizadas",
-      "vocabPlayedSubtitleDefault": "Practica nuevas palabras y frases"
+      "vocabPlayedSubtitleDefault": "Practica nuevas palabras y frases",
+      "challengeExplainerTitle": "Rondas de desafío",
+      "challengeExplainerBody": "Cuando vas bien, el mentor puede hacer que la siguiente ronda sea más difícil."
     },
     "launch": {
       "loadingShuffling": "Mezclando preguntas...",
@@ -1172,7 +1179,9 @@
       "retryLabel": "Reintentar carga de marcadores guardados",
       "emptyTitle": "Nada guardado todavía",
       "emptySubtitle": "Marca páginas durante las sesiones para encontrarlas aquí.",
-      "goToLibrary": "Ir a la Biblioteca"
+      "goToLibrary": "Ir a la Biblioteca",
+      "subjectPageTitle": "Guardados en esta asignatura",
+      "subjectSubtitle": "Solo se muestran marcadores de esta asignatura."
     },
     "subject": {
       "noSubjectTitle": "No se seleccionó ninguna materia",
@@ -1653,7 +1662,12 @@
       "whatSeemsWrongDescription": "Describe la corrección y el mentor la tendrá en cuenta",
       "correctionNoted": "Corrección anotada",
       "couldNotSaveCorrection": "No se pudo guardar la corrección",
-      "submit": "Enviar"
+      "submit": "Enviar",
+      "confidence": {
+        "low": "Señal inicial",
+        "medium": "Patrón repetido",
+        "high": "Señal fuerte"
+      }
     },
     "reports": {
       "title": "Informes",

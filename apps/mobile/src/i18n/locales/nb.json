@@ -384,6 +384,11 @@
         "enableFailed": "Kunne ikke aktivere minnet",
         "deleteFailed": "Kunne ikke slette element",
         "restoreFailed": "Kunne ikke gjenopprette element"
+      },
+      "interestContext": {
+        "school": "Skole",
+        "freeTime": "Fritid",
+        "both": "Begge"
       }
     },
     "accessories": {
@@ -532,7 +537,9 @@
       "vocabBasicsTitle": "{{language}} grunnleggende",
       "vocabPersonalisedTitle": "Vokabular: {{language}}",
       "vocabStarterSubtitle": "Standard startord – registrer {{threshold}} av dine egne for å låse opp personlige runder",
-      "vocabPlayedSubtitleDefault": "Øv på nye ord og uttrykk"
+      "vocabPlayedSubtitleDefault": "Øv på nye ord og uttrykk",
+      "challengeExplainerTitle": "Utfordringsrunder",
+      "challengeExplainerBody": "Når du er i flyt, kan mentoren gjøre neste runde vanskeligere."
     },
     "launch": {
       "loadingShuffling": "Stokker spørsmål ...",
@@ -1172,7 +1179,9 @@
       "retryLabel": "Prøv å laste lagrede bokmerker på nytt",
       "emptyTitle": "Ingenting lagret ennå",
       "emptySubtitle": "Bokmerk sider under økter for å finne dem her.",
-      "goToLibrary": "Gå til bibliotek"
+      "goToLibrary": "Gå til bibliotek",
+      "subjectPageTitle": "Lagret i dette faget",
+      "subjectSubtitle": "Bare bokmerker fra dette faget vises."
     },
     "subject": {
       "noSubjectTitle": "Ingen emne valgt",
@@ -1653,7 +1662,12 @@
       "whatSeemsWrongDescription": "Beskriv korreksjonen, og mentoren vil ta den i betraktning",
       "correctionNoted": "Korreksjon notert",
       "couldNotSaveCorrection": "Kunne ikke lagre korreksjon",
-      "submit": "Send inn"
+      "submit": "Send inn",
+      "confidence": {
+        "low": "Tidlig signal",
+        "medium": "Gjentatt mønster",
+        "high": "Sterkt signal"
+      }
     },
     "reports": {
       "title": "Rapporter",

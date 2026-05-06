@@ -5,12 +5,7 @@
 import { renderHook, waitFor, act } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
 import { createQueryWrapper } from '../test-utils/app-hook-test-utils';
-import {
-  useBookNotes,
-  useCreateNote,
-  useNoteTopicIds,
-  useDeleteNote,
-} from './use-notes';
+import { useBookNotes, useCreateNote, useNoteTopicIds } from './use-notes';
 
 const mockFetch = jest.fn();
 jest.mock('../lib/api-client', () => ({
@@ -321,74 +316,5 @@ describe('useNoteTopicIds', () => {
     });
 
     expect(result.current.error).toBeInstanceOf(Error);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// useDeleteNote
-// ---------------------------------------------------------------------------
-
-describe('useDeleteNote', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient?.clear();
-  });
-
-  it('deletes a note and invalidates book-notes cache', async () => {
-    mockFetch.mockResolvedValueOnce(new Response(null, { status: 204 }));
-
-    const wrapper = createWrapper();
-    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
-
-    const { result } = renderHook(() => useDeleteNote('subject-1', 'book-1'), {
-      wrapper,
-    });
-
-    await act(async () => {
-      await result.current.mutateAsync('topic-1');
-    });
-
-    await waitFor(() => {
-      expect(result.current.isSuccess).toBe(true);
-    });
-
-    expect(mockFetch).toHaveBeenCalled();
-    expect(invalidateSpy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        queryKey: ['book-notes', 'subject-1', 'book-1', 'test-profile-id'],
-      })
-    );
-  });
-
-  it('throws when subjectId is undefined', async () => {
-    const { result } = renderHook(() => useDeleteNote(undefined, 'book-1'), {
-      wrapper: createWrapper(),
-    });
-
-    await act(async () => {
-      await expect(result.current.mutateAsync('topic-1')).rejects.toThrow(
-        'subjectId and topicId are required'
-      );
-    });
-  });
-
-  it('handles API error (404)', async () => {
-    mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ error: 'Note not found' }), { status: 404 })
-    );
-
-    const { result } = renderHook(() => useDeleteNote('subject-1', 'book-1'), {
-      wrapper: createWrapper(),
-    });
-
-    await act(async () => {
-      await expect(
-        result.current.mutateAsync('nonexistent-topic')
-      ).rejects.toThrow();
-    });
   });
 });

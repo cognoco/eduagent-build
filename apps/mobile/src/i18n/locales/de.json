@@ -384,6 +384,11 @@
         "enableFailed": "Gedächtnis konnte nicht aktiviert werden",
         "deleteFailed": "Element konnte nicht gelöscht werden",
         "restoreFailed": "Wiederherstellen fehlgeschlagen"
+      },
+      "interestContext": {
+        "school": "Schule",
+        "freeTime": "Freizeit",
+        "both": "Beides"
       }
     },
     "accessories": {
@@ -532,7 +537,9 @@
       "vocabBasicsTitle": "{{language}}-Grundlagen",
       "vocabPersonalisedTitle": "Vokabeln: {{language}}",
       "vocabStarterSubtitle": "Standard-Startwörter – zeichne {{threshold}} deiner eigenen auf, um personalisierte Runden freizuschalten",
-      "vocabPlayedSubtitleDefault": "Übe neue Wörter und Sätze"
+      "vocabPlayedSubtitleDefault": "Übe neue Wörter und Sätze",
+      "challengeExplainerTitle": "Herausforderungsrunden",
+      "challengeExplainerBody": "Wenn du einen guten Lauf hast, kann der Mentor die nächste Runde schwieriger machen."
     },
     "launch": {
       "loadingShuffling": "Fragen werden gemischt...",
@@ -1172,7 +1179,9 @@
       "retryLabel": "Gespeicherte Lesezeichen erneut laden",
       "emptyTitle": "Noch nichts gespeichert",
       "emptySubtitle": "Setze während der Sitzungen Lesezeichen, um sie hier zu finden.",
-      "goToLibrary": "Zur Bibliothek"
+      "goToLibrary": "Zur Bibliothek",
+      "subjectPageTitle": "In diesem Fach gespeichert",
+      "subjectSubtitle": "Es werden nur Lesezeichen aus diesem Fach angezeigt."
     },
     "subject": {
       "noSubjectTitle": "Kein Fach ausgewählt",
@@ -1653,7 +1662,12 @@
       "whatSeemsWrongDescription": "Beschreibe die Korrektur und der Mentor wird sie berücksichtigen",
       "correctionNoted": "Korrektur vermerkt",
       "couldNotSaveCorrection": "Korrektur konnte nicht gespeichert werden",
-      "submit": "Senden"
+      "submit": "Senden",
+      "confidence": {
+        "low": "Frühes Signal",
+        "medium": "Wiederholtes Muster",
+        "high": "Starkes Signal"
+      }
     },
     "reports": {
       "title": "Berichte",

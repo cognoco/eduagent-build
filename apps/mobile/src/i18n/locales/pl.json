@@ -384,6 +384,11 @@
         "enableFailed": "Nie można włączyć pamięci",
         "deleteFailed": "Nie można usunąć elementu",
         "restoreFailed": "Nie można przywrócić elementu"
+      },
+      "interestContext": {
+        "school": "Szkoła",
+        "freeTime": "Czas wolny",
+        "both": "Oba"
       }
     },
     "accessories": {
@@ -532,7 +537,9 @@
       "vocabBasicsTitle": "Podstawy: {{language}}",
       "vocabPersonalisedTitle": "Słownictwo: {{language}}",
       "vocabStarterSubtitle": "Zapas słów startowych — zapisz {{threshold}} własnych, aby odblokować spersonalizowane rundy",
-      "vocabPlayedSubtitleDefault": "Ćwicz nowe słowa i zwroty"
+      "vocabPlayedSubtitleDefault": "Ćwicz nowe słowa i zwroty",
+      "challengeExplainerTitle": "Rundy z wyzwaniem",
+      "challengeExplainerBody": "Gdy dobrze ci idzie, mentor może utrudnić następną rundę."
     },
     "launch": {
       "loadingShuffling": "Mieszanie pytań...",
@@ -1172,7 +1179,9 @@
       "retryLabel": "Spróbuj ponownie załadować zapisane zakładki",
       "emptyTitle": "Jeszcze nic nie zapisano",
       "emptySubtitle": "Dodawaj zakładki do stron podczas sesji, aby je tutaj znaleźć.",
-      "goToLibrary": "Przejdź do Biblioteki"
+      "goToLibrary": "Przejdź do Biblioteki",
+      "subjectPageTitle": "Zapisane w tym przedmiocie",
+      "subjectSubtitle": "Pokazywane są tylko zakładki z tego przedmiotu."
     },
     "subject": {
       "noSubjectTitle": "Nie wybrano przedmiotu",
@@ -1653,7 +1662,12 @@
       "whatSeemsWrongDescription": "Opisz poprawkę, a mentor weźmie ją pod uwagę",
       "correctionNoted": "Poprawka odnotowana",
       "couldNotSaveCorrection": "Nie można zapisać poprawki",
-      "submit": "Prześlij"
+      "submit": "Prześlij",
+      "confidence": {
+        "low": "Wczesny sygnał",
+        "medium": "Powtarzający się wzorzec",
+        "high": "Silny sygnał"
+      }
     },
     "reports": {
       "title": "Raporty",

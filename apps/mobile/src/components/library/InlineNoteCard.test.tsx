@@ -36,6 +36,13 @@ describe('InlineNoteCard', () => {
     expect(baseProps.onLongPress).toHaveBeenCalledWith('note-1');
   });
 
+  it('calls onSourcePress from the source line', () => {
+    const onSourcePress = jest.fn();
+    render(<InlineNoteCard {...baseProps} onSourcePress={onSourcePress} />);
+    fireEvent.press(screen.getByTestId('note-card-note-1-source'));
+    expect(onSourcePress).toHaveBeenCalledTimes(1);
+  });
+
   it('renders without source line for quick notes', () => {
     render(<InlineNoteCard {...baseProps} sourceLine="Note · Apr 24" />);
     expect(screen.getByText('Note · Apr 24')).toBeTruthy();

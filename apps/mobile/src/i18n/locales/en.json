@@ -363,6 +363,11 @@
         "hiddenItems": "Hidden Items",
         "privacy": "Privacy"
       },
+      "interestContext": {
+        "school": "School",
+        "freeTime": "Free time",
+        "both": "Both"
+      },
       "empty": {
         "title": "Your mentor is getting to know you",
         "message": "As you study, your mentor will learn about your interests, strengths, and how you like to learn. Everything will appear here over time."
@@ -523,6 +528,8 @@
       "retryLabel": "Retry loading quiz data",
       "capitalsTitle": "Capitals",
       "capitalsDefaultSubtitle": "Test yourself on world capitals",
+      "challengeExplainerTitle": "Challenge rounds",
+      "challengeExplainerBody": "When you're on a roll, the mentor may make the next round harder.",
       "guessWhoTitle": "Guess Who",
       "guessWhoDefaultSubtitle": "Name the famous person from clues",
       "vocabLockedTitle": "Vocabulary",
@@ -1155,6 +1162,8 @@
     "saved": {
       "title": "Saved",
       "pageTitle": "Saved",
+      "subjectPageTitle": "Saved in this subject",
+      "subjectSubtitle": "Only bookmarks from this subject are shown.",
       "viewLabel": "View saved explanations",
       "bookmarkLabel": "Saved bookmark from {{subject}}",
       "removeBookmark": "Remove bookmark",
@@ -1644,6 +1653,11 @@
       "useWhatMentorKnows": "Use what the mentor knows",
       "useWhatMentorKnowsDescription": "Let the mentor personalise sessions using what it has learned",
       "noObservationsYet": "No observations yet",
+      "confidence": {
+        "low": "Early signal",
+        "medium": "Repeated pattern",
+        "high": "Strong signal"
+      },
       "bringBack": "Bring back",
       "privacy": "Privacy",
       "exportMemorySummary": "Export memory summary",

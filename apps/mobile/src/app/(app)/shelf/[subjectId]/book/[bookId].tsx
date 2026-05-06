@@ -6,7 +6,10 @@ import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import type { CurriculumTopic, RetentionStatus } from '@eduagent/schemas';
 import * as Sentry from '@sentry/react-native';
-import { MagicPenAnimation } from '../../../../../components/common';
+import {
+  CelebrationAnimation,
+  MagicPenAnimation,
+} from '../../../../../components/common';
 import { ShimmerSkeleton } from '../../../../../components/common/ShimmerSkeleton';
 import { SessionRow } from '../../../../../components/library/SessionRow';
 import { ChapterDivider } from '../../../../../components/library/ChapterDivider';
@@ -197,6 +200,14 @@ export default function BookScreen() {
     goBackOrReplace(router, '/(app)/library' as never);
   }, [router, subjectId]);
 
+  const handleSubjectBookmarksPress = useCallback(() => {
+    if (!subjectId) return;
+    router.push({
+      pathname: '/(app)/progress/saved',
+      params: { subjectId },
+    } as never);
+  }, [router, subjectId]);
+
   // --- Generation auto-trigger ---
   const [genPhase, setGenPhase] = useState<GenerationPhase>('idle');
   const alreadyPending = useRef(false);
@@ -205,6 +216,8 @@ export default function BookScreen() {
   const [showTopicPicker, setShowTopicPicker] = useState(false);
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   const [showNoteInput, setShowNoteInput] = useState(false);
+  const [showBookCompletionBurst, setShowBookCompletionBurst] = useState(false);
+  const wasBookComplete = useRef(false);
   const [editingNote, setEditingNote] = useState<{
     noteId: string;
     content: string;
@@ -522,6 +535,14 @@ export default function BookScreen() {
       activeTopics.every((topic) => topicStudiedIds.has(topic.id)),
     [activeTopics, topicStudiedIds]
   );
+
+  useEffect(() => {
+    if (isBookComplete && !wasBookComplete.current) {
+      setShowBookCompletionBurst(true);
+    }
+    wasBookComplete.current = isBookComplete;
+  }, [isBookComplete]);
+
   const showThinBookSetup = activeTopics.length === 1 && !isBookComplete;
 
   const continueNowTopic = useMemo(() => {
@@ -612,6 +633,20 @@ export default function BookScreen() {
           sessionId: session.id,
           subjectId,
           ...(session.topicId ? { topicId: session.topicId } : {}),
+        },
+      } as never);
+    },
+    [router, subjectId]
+  );
+
+  const handleNoteSourcePress = useCallback(
+    (sessionId: string, topicId?: string | null) => {
+      router.push({
+        pathname: '/session-summary/[sessionId]',
+        params: {
+          sessionId,
+          subjectId,
+          ...(topicId ? { topicId } : {}),
         },
       } as never);
     },
@@ -1126,6 +1161,20 @@ export default function BookScreen() {
           >
             <Ionicons name="arrow-back" size={24} color={themeColors.accent} />
           </Pressable>
+          <View className="flex-1" />
+          <Pressable
+            onPress={handleSubjectBookmarksPress}
+            className="p-2 -me-2"
+            accessibilityRole="button"
+            accessibilityLabel="View saved bookmarks for this subject"
+            testID="book-subject-bookmarks"
+          >
+            <Ionicons
+              name="bookmark-outline"
+              size={22}
+              color={themeColors.accent}
+            />
+          </Pressable>
         </View>
 
         {/* Book hero */}
@@ -1213,6 +1262,7 @@ export default function BookScreen() {
                     </View>
                   );
                 }
+                const sourceSessionId = note.sessionId;
                 return (
                   <InlineNoteCard
                     key={note.id}
@@ -1222,6 +1272,12 @@ export default function BookScreen() {
                     sourceLine={formatSourceLine(note)}
                     updatedAt={note.updatedAt}
                     onLongPress={handleNoteLongPress}
+                    onSourcePress={
+                      sourceSessionId
+                        ? () =>
+                            handleNoteSourcePress(sourceSessionId, note.topicId)
+                        : undefined
+                    }
                     testID={`note-${note.id}`}
                   />
                 );
@@ -1458,6 +1514,17 @@ export default function BookScreen() {
               >
                 🎉
               </Text>
+              {showBookCompletionBurst ? (
+                <View className="absolute end-4 top-3">
+                  <CelebrationAnimation
+                    size={88}
+                    color={themeColors.success}
+                    accentColor={themeColors.accent}
+                    onComplete={() => setShowBookCompletionBurst(false)}
+                    testID="book-complete-celebration"
+                  />
+                </View>
+              ) : null}
               <Text className="mb-1 text-h3 font-bold text-text-primary">
                 You finished this book
               </Text>

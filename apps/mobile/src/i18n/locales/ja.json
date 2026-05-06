@@ -384,6 +384,11 @@
         "enableFailed": "記憶を有効にできませんでした",
         "deleteFailed": "項目を削除できませんでした",
         "restoreFailed": "項目を復元できませんでした"
+      },
+      "interestContext": {
+        "school": "学校",
+        "freeTime": "自由時間",
+        "both": "両方"
       }
     },
     "accessories": {
@@ -532,7 +537,9 @@
       "vocabBasicsTitle": "{{language}}の基礎",
       "vocabPersonalisedTitle": "語彙：{{language}}",
       "vocabStarterSubtitle": "標準の単語を収録 — {{threshold}}個の自分の単語を記録して、パーソナライズされたラウンドをアンロックしましょう",
-      "vocabPlayedSubtitleDefault": "新しい単語やフレーズを練習しましょう"
+      "vocabPlayedSubtitleDefault": "新しい単語やフレーズを練習しましょう",
+      "challengeExplainerTitle": "チャレンジラウンド",
+      "challengeExplainerBody": "調子がよいときは、メンターが次のラウンドを少し難しくすることがあります。"
     },
     "launch": {
       "loadingShuffling": "問題をシャッフル中...",
@@ -1172,7 +1179,9 @@
       "retryLabel": "保存したブックマークの読み込みを再試行",
       "emptyTitle": "まだ何も保存されていません",
       "emptySubtitle": "セッション中にページをブックマークすると、ここに表示されます。",
-      "goToLibrary": "ライブラリへ"
+      "goToLibrary": "ライブラリへ",
+      "subjectPageTitle": "この科目で保存済み",
+      "subjectSubtitle": "この科目のブックマークだけを表示しています。"
     },
     "subject": {
       "noSubjectTitle": "科目が選択されていません",
@@ -1653,7 +1662,12 @@
       "whatSeemsWrongDescription": "訂正内容を説明してください。メンターがそれを考慮します",
       "correctionNoted": "訂正を記録しました",
       "couldNotSaveCorrection": "訂正を保存できませんでした",
-      "submit": "送信"
+      "submit": "送信",
+      "confidence": {
+        "low": "初期のサイン",
+        "medium": "繰り返し見られる傾向",
+        "high": "強いサイン"
+      }
     },
     "reports": {
       "title": "レポート",

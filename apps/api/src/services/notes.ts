@@ -279,44 +279,6 @@ export async function getNotesForBook(
 }
 
 /**
- * Delete the most-recently-created note for a specific topic+profile pair.
- * Returns true if a row was deleted, false if none existed.
- *
- * Verifies subject → book → topic ownership to prevent IDOR.
- *
- * @deprecated — superseded by `deleteNoteById` (DELETE /notes/:noteId).
- * Migration 0048 dropped the (topic_id, profile_id) unique constraint to
- * allow multi-note per topic, so deleting by (topicId, profileId) alone
- * could silently wipe ALL notes for the topic. To prevent data loss this
- * function now resolves the most-recently-created note ID and delegates to
- * `deleteNoteById`, so at most one note is removed per call.
- */
-export async function deleteNote(
-  db: Database,
-  profileId: string,
-  subjectId: string,
-  topicId: string
-): Promise<boolean> {
-  await verifyTopicOwnership(db, profileId, subjectId, topicId);
-
-  // Find the most recent note for this topic+profile pair. Multi-note topics
-  // accumulate notes; older mobile clients calling this deprecated endpoint
-  // should only remove the latest note — not the entire thread.
-  const repo = createScopedRepository(db, profileId);
-  const [latest] = await repo.db
-    .select({ id: topicNotes.id })
-    .from(topicNotes)
-    .where(
-      and(eq(topicNotes.topicId, topicId), eq(topicNotes.profileId, profileId))
-    )
-    .orderBy(desc(topicNotes.createdAt))
-    .limit(1);
-
-  if (!latest) return false;
-  return deleteNoteById(db, profileId, latest.id);
-}
-
-/**
  * Get all topic IDs that have notes for a given profile.
  * Used by the mobile client to show note indicators on topic cards.
  */
