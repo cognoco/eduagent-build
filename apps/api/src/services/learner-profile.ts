@@ -136,11 +136,11 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-function normalizeMemoryValue(value: string | null | undefined): string {
+export function normalizeMemoryValue(value: string | null | undefined): string {
   return (value ?? '').trim().toLowerCase();
 }
 
-function sameNormalized(
+export function sameNormalized(
   left: string | null | undefined,
   right: string | null | undefined
 ): boolean {
