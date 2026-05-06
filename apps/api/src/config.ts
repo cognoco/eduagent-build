@@ -69,6 +69,20 @@ const envSchema = z.object({
   // controls prompt/read reconstruction.
   MEMORY_FACTS_READ_ENABLED: z.enum(['true', 'false']).default('false'),
   MEMORY_FACTS_RELEVANCE_RETRIEVAL: z.enum(['true', 'false']).default('false'),
+  MEMORY_FACTS_DEDUP_ENABLED: z.enum(['true', 'false']).default('false'),
+  MEMORY_FACTS_DEDUP_THRESHOLD: z.coerce.number().min(0).max(2).default(0.15),
+  MAX_DEDUP_LLM_CALLS_PER_SESSION: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(100)
+    .default(10),
+  MEMORY_FACTS_DEDUP_ROLLOUT_PCT: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(100)
+    .default(0),
 
   // Subject onboarding fast path (spec 2026-05-05). Build-time-ish env flag:
   // backend default remains false unless Doppler sets it for dev/staging.
@@ -85,6 +99,30 @@ export function isMemoryFactsRelevanceEnabled(
   value: string | undefined
 ): boolean {
   return value === 'true';
+}
+
+export function isMemoryFactsDedupEnabled(value: string | undefined): boolean {
+  return value === 'true';
+}
+
+/**
+ * Stable profile rollout gate. Hashing keeps a profile either in or out for
+ * the whole rollout window, avoiding session-to-session oscillation.
+ */
+export function isProfileInDedupRollout(
+  profileId: string,
+  pct: number
+): boolean {
+  if (pct <= 0) return false;
+  if (pct >= 100) return true;
+
+  let hash = 0x811c9dc5;
+  const id = profileId.toLowerCase();
+  for (let i = 0; i < id.length; i++) {
+    hash ^= id.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0) % 100 < pct;
 }
 
 export function isOnboardingFastPathEnabled(

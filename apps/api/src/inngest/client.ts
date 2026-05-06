@@ -7,6 +7,7 @@ import {
   setAppUrl,
   setSupportEmail,
   setRetentionPurgeEnabled,
+  setMemoryFactsDedupConfig,
 } from './helpers';
 
 /**
@@ -45,6 +46,26 @@ const envBindingMiddleware = new InngestMiddleware({
         }
         if (env && typeof env['RETENTION_PURGE_ENABLED'] === 'string') {
           setRetentionPurgeEnabled(env['RETENTION_PURGE_ENABLED']);
+        }
+        if (env) {
+          setMemoryFactsDedupConfig({
+            enabled:
+              typeof env['MEMORY_FACTS_DEDUP_ENABLED'] === 'string'
+                ? env['MEMORY_FACTS_DEDUP_ENABLED']
+                : undefined,
+            threshold:
+              typeof env['MEMORY_FACTS_DEDUP_THRESHOLD'] === 'string'
+                ? env['MEMORY_FACTS_DEDUP_THRESHOLD']
+                : undefined,
+            maxLlmCalls:
+              typeof env['MAX_DEDUP_LLM_CALLS_PER_SESSION'] === 'string'
+                ? env['MAX_DEDUP_LLM_CALLS_PER_SESSION']
+                : undefined,
+            rolloutPct:
+              typeof env['MEMORY_FACTS_DEDUP_ROLLOUT_PCT'] === 'string'
+                ? env['MEMORY_FACTS_DEDUP_ROLLOUT_PCT']
+                : undefined,
+          });
         }
         return {};
       },

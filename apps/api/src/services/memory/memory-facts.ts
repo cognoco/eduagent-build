@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import {
   learningProfiles,
   memoryFacts,
@@ -250,12 +250,7 @@ export async function replaceActiveMemoryFactsForProfile(
       embedding: memoryFacts.embedding,
     })
     .from(memoryFacts)
-    .where(
-      and(
-        eq(memoryFacts.profileId, profileId),
-        sql`${memoryFacts.supersededBy} IS NULL`
-      )
-    );
+    .where(eq(memoryFacts.profileId, profileId));
   // Keep category in the key because identical text in different categories can
   // carry different semantics for downstream memory prompts.
   const embeddingByKey = new Map<string, number[]>();
@@ -264,14 +259,7 @@ export async function replaceActiveMemoryFactsForProfile(
     embeddingByKey.set(`${row.category}::${row.textNormalized}`, row.embedding);
   }
 
-  await db
-    .delete(memoryFacts)
-    .where(
-      and(
-        eq(memoryFacts.profileId, profileId),
-        sql`${memoryFacts.supersededBy} IS NULL`
-      )
-    );
+  await db.delete(memoryFacts).where(eq(memoryFacts.profileId, profileId));
 
   const rows = buildMemoryFactRowsFromProjection(profileId, projection);
   if (rows.length > 0) {

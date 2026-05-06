@@ -398,6 +398,32 @@ export function createScopedRepository(db: Database, profileId: string) {
           orderBy: [asc(memoryFacts.createdAt), asc(memoryFacts.id)],
         });
       },
+      async findActiveCandidatesWithEmbedding() {
+        return db.query.memoryFacts.findMany({
+          where: scopedWhere(
+            memoryFacts,
+            and(
+              sql`${memoryFacts.supersededBy} IS NULL`,
+              sql`${memoryFacts.embedding} IS NOT NULL`
+            )
+          ),
+          orderBy: [asc(memoryFacts.createdAt), asc(memoryFacts.id)],
+        });
+      },
+      async findCascadeAncestry(factId: string) {
+        return db.execute(sql`
+          WITH RECURSIVE ancestry AS (
+            SELECT * FROM ${memoryFacts}
+              WHERE ${memoryFacts.id} = ${factId}
+                AND ${memoryFacts.profileId} = ${profileId}
+            UNION
+            SELECT m.* FROM ${memoryFacts} m
+              INNER JOIN ancestry a ON m.superseded_by = a.id
+              WHERE m.profile_id = ${profileId}
+          )
+          SELECT * FROM ancestry
+        `);
+      },
       async findRelevant(
         queryEmbedding: number[],
         k: number,
