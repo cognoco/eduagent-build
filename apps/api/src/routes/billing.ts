@@ -76,6 +76,58 @@ type BillingRouteEnv = {
   };
 };
 
+function getTimeZoneOffsetMs(instant: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).formatToParts(instant);
+  const values = Object.fromEntries(
+    parts
+      .filter((part) => part.type !== 'literal')
+      .map((part) => [part.type, part.value])
+  );
+  const localAsUtc = Date.UTC(
+    Number(values.year),
+    Number(values.month) - 1,
+    Number(values.day),
+    Number(values.hour),
+    Number(values.minute),
+    Number(values.second)
+  );
+  return localAsUtc - instant.getTime();
+}
+
+function getStartOfTodayInTimeZone(now: Date, timeZone: string): Date {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(now);
+  const values = Object.fromEntries(
+    parts
+      .filter((part) => part.type !== 'literal')
+      .map((part) => [part.type, part.value])
+  );
+  const localMidnightAsUtc = Date.UTC(
+    Number(values.year),
+    Number(values.month) - 1,
+    Number(values.day)
+  );
+  let start = new Date(
+    localMidnightAsUtc -
+      getTimeZoneOffsetMs(new Date(localMidnightAsUtc), timeZone)
+  );
+  start = new Date(localMidnightAsUtc - getTimeZoneOffsetMs(start, timeZone));
+  return start;
+}
+
 /**
  * Maps a tier + interval to the corresponding Stripe price ID from env bindings.
  */
@@ -413,15 +465,11 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     // Day start in account timezone (defaults to UTC). Used to scope today's
     // per-profile usage so non-owner viewers don't see family-wide aggregates.
     const dayStartAt = (() => {
-      const tz = account.timezone ?? 'UTC';
       try {
-        const ymd = new Intl.DateTimeFormat('en-CA', {
-          timeZone: tz,
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-        }).format(new Date());
-        return new Date(`${ymd}T00:00:00Z`).toISOString();
+        return getStartOfTodayInTimeZone(
+          new Date(),
+          account.timezone ?? 'UTC'
+        ).toISOString();
       } catch {
         const now = new Date();
         return new Date(

@@ -3,7 +3,7 @@
 // Family member CRUD, pool status, cancellation cascade, profile limits
 // ---------------------------------------------------------------------------
 
-import { and, eq, gte, sql } from 'drizzle-orm';
+import { and, eq, gte, isNull, sql } from 'drizzle-orm';
 import {
   subscriptions,
   usageEvents,
@@ -220,7 +220,10 @@ export async function listFamilyMembers(
   }
 
   const rows = await db.query.profiles.findMany({
-    where: eq(profiles.accountId, sub.accountId),
+    where: and(
+      eq(profiles.accountId, sub.accountId),
+      isNull(profiles.archivedAt)
+    ),
   });
 
   return rows.map((r) => ({
@@ -266,6 +269,7 @@ export async function getUsageBreakdownForProfile(
         from ${profiles} owner_profile
         where owner_profile.account_id = ${profiles.accountId}
           and owner_profile.is_owner = true
+          and owner_profile.archived_at is null
         limit 1
       )`,
       hasChildLink: sql<boolean>`exists (
@@ -281,7 +285,8 @@ export async function getUsageBreakdownForProfile(
     .where(
       and(
         eq(profiles.accountId, sub.accountId),
-        eq(profiles.id, input.activeProfileId)
+        eq(profiles.id, input.activeProfileId),
+        isNull(profiles.archivedAt)
       )
     )
     .limit(1);
@@ -316,7 +321,9 @@ export async function getUsageBreakdownForProfile(
         gte(usageEvents.occurredAt, new Date(input.cycleStartAt))
       )
     )
-    .where(eq(profiles.accountId, sub.accountId))
+    .where(
+      and(eq(profiles.accountId, sub.accountId), isNull(profiles.archivedAt))
+    )
     .groupBy(profiles.id, profiles.displayName);
 
   const sharingEnabled =
@@ -325,7 +332,7 @@ export async function getUsageBreakdownForProfile(
       : false;
   const isOwnerBreakdownViewer =
     (viewer.isOwner && viewer.hasChildLink) ||
-    (sharingEnabled && viewer.familyOwnerProfileId != null);
+    (sharingEnabled && viewer.familyOwnerProfileId != null && !viewer.isChild);
   const visibleRows = isOwnerBreakdownViewer
     ? profileRows
     : viewer.isChild

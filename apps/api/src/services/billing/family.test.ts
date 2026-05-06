@@ -10,7 +10,7 @@ jest.mock('@eduagent/database', () => {
   };
 });
 
-jest.mock('../settings', () => ({
+jest.mock('../settings', () => ({ // gc1-allow: stubs getFamilyPoolBreakdownSharing — real settings module hits DB, not exercisable without full integration test setup
   getFamilyPoolBreakdownSharing: (...args: unknown[]) =>
     mockGetFamilyPoolBreakdownSharing(...args),
 }));
@@ -138,7 +138,7 @@ describe('getUsageBreakdownForProfile family-pool sharing', () => {
     expect(result.selfUsedThisMonth).toBe(7);
   });
 
-  it('shows child viewers the full breakdown when owner sharing is enabled', async () => {
+  it('hides breakdown from child viewers even when owner sharing is enabled', async () => {
     mockGetFamilyPoolBreakdownSharing.mockResolvedValue(true);
     const db = createUsageBreakdownDb({
       viewer: {
@@ -163,14 +163,15 @@ describe('getUsageBreakdownForProfile family-pool sharing', () => {
       dayStartAt: '2026-05-06T00:00:00.000Z',
     });
 
-    expect(result.isOwnerBreakdownViewer).toBe(true);
-    expect(result.byProfile.map((row) => row.profile_id)).toEqual([
-      'owner-1',
-      'child-1',
-    ]);
-    expect(result.familyAggregate).toEqual({ used: 17, limit: 100 });
-    expect(result.selfUsedToday).toBeNull();
-    expect(result.selfUsedThisMonth).toBeNull();
+    // Children must never see the full family breakdown, even when the owner
+    // enables sharing. Sharing is for non-owner adults (co-parents) only (C2).
+    expect(result.isOwnerBreakdownViewer).toBe(false);
+    expect(result.byProfile).toHaveLength(0);
+    expect(result.familyAggregate).toBeNull();
+    // selfUsedToday and selfUsedThisMonth must reflect the child's own events
+    // only — never the family aggregate.
+    expect(result.selfUsedToday).toBe(3);
+    expect(result.selfUsedThisMonth).toBe(7);
   });
 
   it('keeps non-owner adult viewers scoped to their own row when owner sharing is disabled', async () => {
