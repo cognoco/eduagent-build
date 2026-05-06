@@ -2,6 +2,9 @@ import { and, eq, isNull } from 'drizzle-orm';
 
 import { pendingNotices, type Database } from '@eduagent/database';
 import type { PendingNotice, PendingNoticeType } from '@eduagent/schemas';
+import { createLogger } from './logger';
+
+const logger = createLogger();
 
 interface PendingNoticePayload {
   childName: string;
@@ -46,15 +49,24 @@ export async function listPendingNotices(
     orderBy: (table, { asc }) => [asc(table.createdAt)],
   });
 
-  return rows.map((row) => ({
-    id: row.id,
-    type:
-      row.type === 'consent_deleted' || row.type === 'consent_archived'
-        ? row.type
-        : 'consent_deleted',
-    payload: parsePayload(row.payloadJson),
-    createdAt: row.createdAt.toISOString(),
-  }));
+  return rows.flatMap((row) => {
+    if (row.type !== 'consent_deleted' && row.type !== 'consent_archived') {
+      logger.warn(
+        { noticeId: row.id, type: row.type },
+        'pending_notices.type unknown — row skipped'
+      );
+      return [];
+    }
+    const knownType: PendingNoticeType = row.type;
+    return [
+      {
+        id: row.id,
+        type: knownType,
+        payload: parsePayload(row.payloadJson),
+        createdAt: row.createdAt.toISOString(),
+      } satisfies PendingNotice,
+    ];
+  });
 }
 
 export async function markPendingNoticeSeen(

@@ -9,7 +9,7 @@
 
 import { createDatabaseModuleMock } from '../../test-utils/database-module';
 
-const mockDatabaseModule = createDatabaseModuleMock();
+const mockDatabaseModule = createDatabaseModuleMock({ includeActual: true });
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
@@ -62,7 +62,7 @@ jest.mock('../../services/settings', () => ({
 }));
 
 const mockRecordPendingNotice = jest.fn().mockResolvedValue(undefined);
-jest.mock('../../services/notices', () => ({
+jest.mock('../../services/notices', () => ({ // gc1-allow: stubs recordPendingNotice — real notices service inserts to DB, integration test would need real DB setup
   recordPendingNotice: (...args: unknown[]) => mockRecordPendingNotice(...args),
 }));
 
@@ -356,6 +356,44 @@ describe('consentRevocation', () => {
 
       expect(mockSendPushNotification).toHaveBeenCalledTimes(3);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// I4 — auto preference + age 14 → archive path, step.sendEvent fires
+// ---------------------------------------------------------------------------
+
+describe('archive path — auto preference, age 14', () => {
+  it('archives profile and emits schedule-archive-cleanup event via step.sendEvent', async () => {
+    mockGetWithdrawalArchivePreference.mockResolvedValue('auto');
+    // age 14 → archive (auto + age >= 13)
+    mockCalculateAge.mockReturnValue(14);
+
+    const { result, mockStep } = await executeRevocation({
+      childProfileId: 'child-014',
+      parentProfileId: 'parent-001',
+    });
+
+    expect(result).toEqual({ status: 'archived', childProfileId: 'child-014' });
+
+    // archive-child-profile step must have run
+    const stepRunNames = mockStep.run.mock.calls.map((c: unknown[]) => c[0]);
+    expect(stepRunNames).toContain('archive-child-profile');
+
+    // schedule-archive-cleanup must be dispatched via step.sendEvent (not step.run)
+    expect(mockStep.sendEvent).toHaveBeenCalledWith(
+      'schedule-archive-cleanup',
+      expect.objectContaining({
+        name: 'app/profile.archived',
+        data: expect.objectContaining({
+          profileId: 'child-014',
+          parentProfileId: 'parent-001',
+        }),
+      })
+    );
+
+    // delete must NOT have been called
+    expect(mockDeleteProfile).not.toHaveBeenCalled();
   });
 });
 

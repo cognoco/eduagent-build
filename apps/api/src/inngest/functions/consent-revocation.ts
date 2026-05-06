@@ -125,11 +125,9 @@ export const consentRevocation = inngest.createFunction(
           .where(eq(profiles.id, childProfileId));
       });
 
-      await step.run('schedule-archive-cleanup', async () => {
-        await inngest.send({
-          name: 'app/profile.archived',
-          data: { profileId: childProfileId, parentProfileId },
-        });
+      await step.sendEvent('schedule-archive-cleanup', {
+        name: 'app/profile.archived',
+        data: { profileId: childProfileId, parentProfileId },
       });
 
       await step.run('notify-parent-archived', async () => {

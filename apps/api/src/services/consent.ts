@@ -706,20 +706,32 @@ export async function restoreConsent(
   }
 
   const now = new Date();
-  const [row] = await db
-    .update(consentStates)
-    .set({
-      status: 'CONSENTED',
-      respondedAt: now,
-      updatedAt: now,
-    })
-    .where(
-      and(
-        eq(consentStates.id, existing.id),
-        eq(consentStates.profileId, childProfileId)
+
+  // Atomically flip consent status AND clear archivedAt so the archive-cleanup
+  // Inngest function cannot race and hard-delete a restored profile (C1).
+  const [row] = await db.transaction(async (tx) => {
+    const updated = await tx
+      .update(consentStates)
+      .set({
+        status: 'CONSENTED',
+        respondedAt: now,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(consentStates.id, existing.id),
+          eq(consentStates.profileId, childProfileId)
+        )
       )
-    )
-    .returning();
+      .returning();
+
+    await tx
+      .update(profiles)
+      .set({ archivedAt: null })
+      .where(eq(profiles.id, childProfileId));
+
+    return updated;
+  });
 
   if (!row) throw new Error('Update on consentStates did not return a row');
   return mapConsentRow(row);
