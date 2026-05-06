@@ -1,3 +1,10 @@
+import { sql } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/neon-serverless';
+import { Pool, neonConfig } from '@neondatabase/serverless';
+import ws from 'ws';
+
+neonConfig.webSocketConstructor = ws;
+
 // scripts/measure-time-to-first-prompt.ts
 //
 // Measure time from subject creation to first mentor `ai_response` event
@@ -165,8 +172,117 @@ export function aggregate(rows: ReadonlyArray<RawRow>): ResultBundle {
   };
 }
 
+function parseArgs(): { from: Date; to: Date } {
+  const args = process.argv.slice(2);
+  const get = (flag: string): string | undefined => {
+    const idx = args.indexOf(flag);
+    return idx >= 0 ? args[idx + 1] : undefined;
+  };
+  const fromStr = get('--from');
+  const toStr = get('--to');
+  if (!fromStr || !toStr) {
+    throw new Error('Usage: --from YYYY-MM-DD --to YYYY-MM-DD (both required)');
+  }
+  return {
+    from: new Date(`${fromStr}T00:00:00Z`),
+    to: new Date(`${toStr}T00:00:00Z`),
+  };
+}
+
 async function main(): Promise<void> {
-  throw new Error('not implemented');
+  const { from, to } = parseArgs();
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    throw new Error('DATABASE_URL not set — run via `doppler run -c stg --`');
+  }
+
+  const pool = new Pool({ connectionString: databaseUrl });
+  const db = drizzle(pool);
+
+  try {
+    // Cohort: profiles whose ALL-TIME-FIRST subject was created in [from, to).
+    // Note the structure: we compute the all-time-first subject per profile
+    // FIRST (across all of subjects history), then filter by the window.
+    // Doing it the other way around (`WHERE created_at >= from` before
+    // `DISTINCT ON`) silently includes returning users whose 2nd/3rd subjects
+    // happened to fall in the window, which contaminates the metric with
+    // warm-path latency that 5d (curriculum pre-warm) cannot move.
+    //
+    // For each cohort subject, find the FIRST learning_session for that
+    // subject and the FIRST ai_response in that session. firstSessionStartedAt
+    // is null if no session ever started; firstAiResponseAt is null if a
+    // session started but the LLM never replied. isLanguage = subjects
+    // .language_code IS NOT NULL.
+    const result = await db.execute(sql`
+    WITH all_time_first_subject AS (
+      SELECT DISTINCT ON (profile_id)
+        id AS subject_id,
+        profile_id,
+        language_code,
+        created_at AS subject_created_at
+      FROM subjects
+      ORDER BY profile_id, created_at ASC
+    ),
+    cohort AS (
+      SELECT * FROM all_time_first_subject
+      WHERE subject_created_at >= ${from} AND subject_created_at < ${to}
+    ),
+    first_session AS (
+      SELECT DISTINCT ON (subject_id)
+        id AS session_id,
+        subject_id,
+        started_at
+      FROM learning_sessions
+      WHERE subject_id IN (SELECT subject_id FROM cohort)
+      ORDER BY subject_id, started_at ASC
+    ),
+    first_ai AS (
+      SELECT DISTINCT ON (session_id)
+        session_id,
+        created_at AS first_ai_at
+      FROM session_events
+      WHERE session_id IN (SELECT session_id FROM first_session)
+        AND event_type = 'ai_response'
+      ORDER BY session_id, created_at ASC, id ASC
+    )
+    SELECT
+      c.subject_id,
+      c.profile_id,
+      (c.language_code IS NOT NULL) AS is_language,
+      c.subject_created_at,
+      fs.started_at AS first_session_started_at,
+      fa.first_ai_at
+    FROM cohort c
+    LEFT JOIN first_session fs ON fs.subject_id = c.subject_id
+    LEFT JOIN first_ai fa ON fa.session_id = fs.session_id
+  `);
+
+    // neon-serverless returns native Date for timestamptz, not string —
+    // accept both since the Date constructor handles either input.
+    const rows: RawRow[] = (result.rows as Array<Record<string, unknown>>).map(
+      (r) => ({
+        subjectId: r.subject_id as string,
+        profileId: r.profile_id as string,
+        isLanguage: r.is_language as boolean,
+        subjectCreatedAt: new Date(r.subject_created_at as string | Date),
+        firstSessionStartedAt:
+          r.first_session_started_at == null
+            ? null
+            : new Date(r.first_session_started_at as string | Date),
+        firstAiResponseAt:
+          r.first_ai_at == null
+            ? null
+            : new Date(r.first_ai_at as string | Date),
+      })
+    );
+
+    const bundle = aggregate(rows);
+    bundle.windowStart = from.toISOString();
+    bundle.windowEnd = to.toISOString();
+    console.log(JSON.stringify(bundle, null, 2));
+  } finally {
+    await pool.end();
+  }
 }
 
 if (require.main === module) {

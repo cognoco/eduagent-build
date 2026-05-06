@@ -35,6 +35,7 @@
     "verify:postinstall-safety": "node scripts/verify-no-secret-postinstall.cjs",
     "secrets:sync": "node scripts/sync-secrets.js",
     "eval:llm": "tsx apps/api/eval-llm/index.ts",
+    "measure:t2fp": "tsx scripts/measure-time-to-first-prompt.ts",
     "translate": "doppler run -- tsx scripts/translate.ts",
     "check:i18n": "tsx scripts/check-i18n-staleness.ts",
     "check:i18n:orphans": "tsx scripts/check-i18n-orphan-keys.ts"
