@@ -15,6 +15,11 @@ describe('ParentDashboardSummary', () => {
     sessionsLastWeek: 2,
     totalTimeThisWeek: 85,
     totalTimeLastWeek: 40,
+    exchangesThisWeek: 14,
+    exchangesLastWeek: 6,
+    guidedVsImmediateRatio: 0.5,
+    currentStreak: 4,
+    totalXp: 120,
     onDrillDown: jest.fn(),
   };
 
@@ -42,6 +47,62 @@ describe('ParentDashboardSummary', () => {
     screen.getByText(
       '4 sessions, 1h 25m this week (\u2191 up from 2 sessions, 40m last week)'
     );
+  });
+
+  it('renders hidden family-summary chips', () => {
+    render(
+      <ParentDashboardSummary
+        {...defaultProps}
+        progress={{
+          topicsMastered: 2,
+          vocabularyTotal: 0,
+          weeklyDeltaTopicsMastered: 1,
+          weeklyDeltaVocabularyTotal: null,
+          weeklyDeltaTopicsExplored: 1,
+          engagementTrend: 'increasing',
+          guidance: null,
+        }}
+      />
+    );
+
+    screen.getByTestId('engagement-trend-chip');
+    screen.getByText('Engagement increasing');
+    screen.getByTestId('exchange-delta-chip');
+    screen.getByText('+8 exchanges');
+    screen.getByTestId('guided-ratio-chip');
+    screen.getByText('50% guided');
+    screen.getByTestId('streak-xp-chip');
+    screen.getByText('4-day streak • 120 XP');
+    screen.getByTestId('metric-info-engagement-trend');
+    screen.getByTestId('metric-info-exchange-delta');
+    screen.getByTestId('metric-info-guided-ratio');
+    screen.getByTestId('metric-info-streak-xp');
+  });
+
+  it('renders consent status and hides learning chips for restricted consent', () => {
+    render(
+      <ParentDashboardSummary
+        {...defaultProps}
+        consentStatus="WITHDRAWN"
+        progress={{
+          topicsMastered: 2,
+          vocabularyTotal: 0,
+          weeklyDeltaTopicsMastered: 1,
+          weeklyDeltaVocabularyTotal: null,
+          weeklyDeltaTopicsExplored: 1,
+          engagementTrend: 'increasing',
+          guidance: null,
+        }}
+      />
+    );
+
+    screen.getByTestId('consent-status-badge');
+    screen.getByText('Consent withdrawn');
+    screen.getByTestId('consent-redacted-message');
+    expect(screen.queryByTestId('engagement-trend-chip')).toBeNull();
+    expect(screen.queryByTestId('exchange-delta-chip')).toBeNull();
+    expect(screen.queryByTestId('guided-ratio-chip')).toBeNull();
+    expect(screen.queryByTestId('streak-xp-chip')).toBeNull();
   });
 
   it('renders down trend correctly', () => {

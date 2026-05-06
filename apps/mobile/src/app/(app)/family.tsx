@@ -65,9 +65,16 @@ function renderChildCards(
     sessionsLastWeek: number;
     totalTimeThisWeek: number;
     totalTimeLastWeek: number;
+    exchangesThisWeek: number;
+    exchangesLastWeek: number;
+    guidedVsImmediateRatio: number;
     trend: string;
     retentionTrend?: string;
     totalSessions?: number;
+    currentStreak: number;
+    longestStreak: number;
+    totalXp: number;
+    consentStatus: string | null;
     subjects: { name: string; retentionStatus: string }[];
     progress?: {
       topicsMastered: number;
@@ -91,11 +98,24 @@ function renderChildCards(
       sessionsLastWeek={child.sessionsLastWeek}
       totalTimeThisWeek={child.totalTimeThisWeek}
       totalTimeLastWeek={child.totalTimeLastWeek}
+      exchangesThisWeek={child.exchangesThisWeek}
+      exchangesLastWeek={child.exchangesLastWeek}
+      guidedVsImmediateRatio={child.guidedVsImmediateRatio}
       trend={child.trend as 'up' | 'down' | 'stable'}
       retentionTrend={
         child.retentionTrend as 'improving' | 'declining' | 'stable' | undefined
       }
       totalSessions={child.totalSessions}
+      currentStreak={child.currentStreak}
+      totalXp={child.totalXp}
+      consentStatus={
+        child.consentStatus as
+          | 'PENDING'
+          | 'PARENTAL_CONSENT_REQUESTED'
+          | 'CONSENTED'
+          | 'WITHDRAWN'
+          | null
+      }
       progress={child.progress}
       subjects={child.subjects.map((s) => ({
         name: s.name,

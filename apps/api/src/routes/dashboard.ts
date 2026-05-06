@@ -31,6 +31,7 @@ import {
   getChildSubjectTopics,
   getChildSessions,
   getChildSessionDetail,
+  assertChildDashboardDataVisible,
 } from '../services/dashboard';
 import { listPendingNotices } from '../services/notices';
 import { getLearningProfile } from '../services/learner-profile';
@@ -197,6 +198,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const childProfileId = c.req.param('profileId');
 
     await assertParentAccess(db, parentProfileId, childProfileId);
+    await assertChildDashboardDataVisible(db, childProfileId);
     const profile = await getLearningProfile(db, childProfileId);
 
     if (!profile) {
@@ -284,6 +286,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
     // [BUG-834] Defense-in-depth at route entry.
     await assertParentAccess(db, parentProfileId, childProfileId);
+    await assertChildDashboardDataVisible(db, childProfileId);
 
     const reports = await listWeeklyReportsForParentChild(
       db,
@@ -301,6 +304,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
     // [BUG-834] Defense-in-depth at route entry.
     await assertParentAccess(db, parentProfileId, childProfileId);
+    await assertChildDashboardDataVisible(db, childProfileId);
 
     const report = await getWeeklyReportForParentChild(
       db,
@@ -324,6 +328,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
       // [BUG-834] Defense-in-depth at route entry.
       await assertParentAccess(db, parentProfileId, childProfileId);
+      await assertChildDashboardDataVisible(db, childProfileId);
 
       await markWeeklyReportViewed(
         db,

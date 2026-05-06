@@ -2,6 +2,9 @@ import { type ReactNode } from 'react';
 import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+
+import type { ConsentStatus } from '@eduagent/schemas';
+
 import { BaseCoachingCard } from './BaseCoachingCard';
 import { RetentionSignal, type RetentionStatus } from '../progress';
 import { useThemeColors } from '../../lib/theme';
@@ -10,6 +13,7 @@ import {
   sessionsUntilFullProgress,
 } from '../../lib/progressive-disclosure';
 import { SamplePreview } from '../parent/SamplePreview';
+import { MetricInfoDot } from '../parent/MetricInfoDot';
 
 interface SubjectInfo {
   name: string;
@@ -26,6 +30,12 @@ interface ParentDashboardSummaryProps {
   sessionsLastWeek: number;
   totalTimeThisWeek: number;
   totalTimeLastWeek: number;
+  exchangesThisWeek?: number;
+  exchangesLastWeek?: number;
+  guidedVsImmediateRatio?: number;
+  currentStreak?: number;
+  totalXp?: number;
+  consentStatus?: ConsentStatus | null;
   retentionTrend?: 'improving' | 'declining' | 'stable';
   totalSessions?: number;
   progress?: {
@@ -132,6 +142,39 @@ function sessionWord(n: number): string {
   return n === 1 ? 'session' : 'sessions';
 }
 
+function consentStatusLabel(status: ConsentStatus | null | undefined): string {
+  switch (status) {
+    case 'PENDING':
+      return 'Consent pending';
+    case 'PARENTAL_CONSENT_REQUESTED':
+      return 'Waiting for parent approval';
+    case 'WITHDRAWN':
+      return 'Consent withdrawn';
+    case 'CONSENTED':
+      return 'Consent active';
+    default:
+      return '';
+  }
+}
+
+function engagementTrendLabel(
+  trend: 'increasing' | 'stable' | 'declining'
+): string {
+  switch (trend) {
+    case 'increasing':
+      return 'Engagement increasing';
+    case 'declining':
+      return 'Engagement declining';
+    case 'stable':
+      return 'Engagement stable';
+  }
+}
+
+function signedDelta(value: number): string {
+  if (value > 0) return `+${value}`;
+  return String(value);
+}
+
 export function ParentDashboardSummary({
   profileId,
   childName,
@@ -142,6 +185,12 @@ export function ParentDashboardSummary({
   sessionsLastWeek,
   totalTimeThisWeek,
   totalTimeLastWeek,
+  exchangesThisWeek = 0,
+  exchangesLastWeek = 0,
+  guidedVsImmediateRatio = 0,
+  currentStreak = 0,
+  totalXp = 0,
+  consentStatus,
   retentionTrend,
   totalSessions,
   progress,
@@ -153,6 +202,11 @@ export function ParentDashboardSummary({
   const aggregateSignal = deriveAggregateSignal(subjects);
   const showFullSignals = !isNewLearner(totalSessions);
   const remaining = sessionsUntilFullProgress(totalSessions);
+  const hasRestrictedConsent =
+    consentStatus != null && consentStatus !== 'CONSENTED';
+  const consentLabel = consentStatusLabel(consentStatus);
+  const exchangeDelta = exchangesThisWeek - exchangesLastWeek;
+  const guidedPercent = Math.round(guidedVsImmediateRatio * 100);
 
   const trendText = `${sessionsThisWeek} ${sessionWord(
     sessionsThisWeek
@@ -164,8 +218,84 @@ export function ParentDashboardSummary({
 
   const metadata = (
     <>
+      {consentLabel ? (
+        <View
+          className={`self-start rounded-full px-3 py-1 mb-2 ${
+            hasRestrictedConsent ? 'bg-danger/10' : 'bg-primary/10'
+          }`}
+          testID="consent-status-badge"
+          accessibilityLabel={`Consent status: ${consentLabel}`}
+        >
+          <Text
+            className={`text-caption font-semibold ${
+              hasRestrictedConsent ? 'text-danger' : 'text-primary'
+            }`}
+          >
+            {consentLabel}
+          </Text>
+        </View>
+      ) : null}
+      {hasRestrictedConsent ? (
+        <Text
+          className="text-caption text-text-secondary"
+          testID="consent-redacted-message"
+        >
+          Learning metrics are hidden until consent is active.
+        </Text>
+      ) : null}
+      {showFullSignals && !hasRestrictedConsent && (
+        <View className="flex-row flex-wrap gap-2 mt-1.5">
+          {progress ? (
+            <View
+              className="flex-row items-center gap-1 bg-background rounded-full px-3 py-1.5"
+              testID="engagement-trend-chip"
+            >
+              <Text className="text-caption font-semibold text-text-primary">
+                {engagementTrendLabel(progress.engagementTrend)}
+              </Text>
+              <MetricInfoDot metricKey="engagement-trend" />
+            </View>
+          ) : null}
+          <View
+            className="flex-row items-center gap-1 bg-background rounded-full px-3 py-1.5"
+            testID="exchange-delta-chip"
+          >
+            <Text className="text-caption font-semibold text-text-primary">
+              {signedDelta(exchangeDelta)} exchanges
+            </Text>
+            <MetricInfoDot metricKey="exchange-delta" />
+          </View>
+          {guidedVsImmediateRatio > 0 ? (
+            <View
+              className="flex-row items-center gap-1 bg-background rounded-full px-3 py-1.5"
+              testID="guided-ratio-chip"
+            >
+              <Text className="text-caption font-semibold text-text-primary">
+                {guidedPercent}% guided
+              </Text>
+              <MetricInfoDot metricKey="guided-ratio" />
+            </View>
+          ) : null}
+          {currentStreak > 0 || totalXp > 0 ? (
+            <View
+              className="flex-row items-center gap-1 bg-background rounded-full px-3 py-1.5"
+              testID="streak-xp-chip"
+            >
+              <Text className="text-caption font-semibold text-text-primary">
+                {[
+                  currentStreak > 0 ? `${currentStreak}-day streak` : null,
+                  totalXp > 0 ? `${totalXp} XP` : null,
+                ]
+                  .filter(Boolean)
+                  .join(' • ')}
+              </Text>
+              <MetricInfoDot metricKey="streak-xp" />
+            </View>
+          ) : null}
+        </View>
+      )}
       {showFullSignals ? (
-        aggregateSignal ? (
+        !hasRestrictedConsent && aggregateSignal ? (
           <View
             className="flex-row items-center mt-1"
             testID="aggregate-signal"
@@ -185,16 +315,16 @@ export function ParentDashboardSummary({
               {t(AGGREGATE_SIGNAL_CONFIG[aggregateSignal].labelKey)}
             </Text>
           </View>
-        ) : (
+        ) : !hasRestrictedConsent ? (
           <Text
             className="text-caption text-text-secondary mt-1"
             testID="aggregate-signal-empty"
           >
             {t('coaching.parentDashboard.noDataYet')}
           </Text>
-        )
+        ) : null
       ) : null}
-      {showFullSignals && (
+      {showFullSignals && !hasRestrictedConsent && (
         <Text
           className="text-caption text-text-secondary mt-1"
           accessibilityLabel={`Trend: ${trendText}`}
@@ -203,7 +333,7 @@ export function ParentDashboardSummary({
         </Text>
       )}
       {showFullSignals ? (
-        retentionTrend ? (
+        !hasRestrictedConsent && retentionTrend ? (
           <View
             className="flex-row items-center mt-1.5"
             testID="retention-trend-badge"
@@ -219,16 +349,16 @@ export function ParentDashboardSummary({
               {t(RETENTION_TREND_CONFIG[retentionTrend].labelKey)}
             </Text>
           </View>
-        ) : (
+        ) : !hasRestrictedConsent ? (
           <Text
             className="text-caption text-text-secondary mt-1.5"
             testID="retention-trend-empty"
           >
             {t('coaching.parentDashboard.noDataYet')}
           </Text>
-        )
+        ) : null
       ) : null}
-      {showFullSignals && progress ? (
+      {showFullSignals && !hasRestrictedConsent && progress ? (
         <View className="mt-3 gap-2">
           <View className="flex-row flex-wrap gap-2">
             <View className="bg-background rounded-full px-3 py-1.5">
@@ -265,7 +395,7 @@ export function ParentDashboardSummary({
           ) : null}
         </View>
       ) : null}
-      {showFullSignals && subjects.length > 0 ? (
+      {showFullSignals && !hasRestrictedConsent && subjects.length > 0 ? (
         <View className="flex-row flex-wrap gap-2 mt-2">
           {subjects.map((subject) => (
             <View
@@ -280,7 +410,7 @@ export function ParentDashboardSummary({
           ))}
         </View>
       ) : null}
-      {!showFullSignals ? (
+      {!showFullSignals && !hasRestrictedConsent ? (
         <View className="mt-2" testID="parent-dashboard-teaser">
           <SamplePreview
             unlockMessage={`After ${remaining} more ${

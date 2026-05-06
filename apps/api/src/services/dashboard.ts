@@ -33,6 +33,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import {
+  ForbiddenError,
   engagementSignalSchema,
   NEW_LEARNER_SESSION_THRESHOLD,
 } from '@eduagent/schemas';
@@ -225,6 +226,80 @@ export function calculateTrend(
 export function calculateGuidedRatio(guided: number, total: number): number {
   if (total === 0) return 0;
   return Math.min(1, Math.max(0, guided / total));
+}
+
+function isChildLearningDataVisible(
+  status: ConsentStatus | null | undefined
+): boolean {
+  return status == null || status === 'CONSENTED';
+}
+
+function redactedConsentSummary(
+  displayName: string,
+  status: ConsentStatus | null | undefined
+): string {
+  switch (status) {
+    case 'PENDING':
+      return `${displayName}: consent is pending. Learning metrics are hidden until consent is active.`;
+    case 'PARENTAL_CONSENT_REQUESTED':
+      return `${displayName}: waiting for parent approval. Learning metrics are hidden until consent is active.`;
+    case 'WITHDRAWN':
+      return `${displayName}: consent has been withdrawn. Learning metrics are hidden.`;
+    default:
+      return `${displayName}: learning metrics are hidden until consent is active.`;
+  }
+}
+
+function redactDashboardChild(child: DashboardChild): DashboardChild {
+  if (isChildLearningDataVisible(child.consentStatus)) return child;
+
+  return {
+    profileId: child.profileId,
+    displayName: child.displayName,
+    consentStatus: child.consentStatus,
+    respondedAt: child.respondedAt,
+    summary: redactedConsentSummary(child.displayName, child.consentStatus),
+    sessionsThisWeek: 0,
+    sessionsLastWeek: 0,
+    totalTimeThisWeek: 0,
+    totalTimeLastWeek: 0,
+    exchangesThisWeek: 0,
+    exchangesLastWeek: 0,
+    trend: 'stable',
+    subjects: [],
+    guidedVsImmediateRatio: 0,
+    retentionTrend: 'stable',
+    totalSessions: 0,
+    progress: null,
+    currentStreak: 0,
+    longestStreak: 0,
+    totalXp: 0,
+  };
+}
+
+async function getLatestConsentStatus(
+  db: Database,
+  childProfileId: string
+): Promise<ConsentStatus | null> {
+  const consentState = await db.query.consentStates.findFirst({
+    where: eq(consentStates.profileId, childProfileId),
+    orderBy: desc(consentStates.requestedAt),
+    columns: { status: true },
+  });
+
+  return consentState?.status ?? null;
+}
+
+export async function assertChildDashboardDataVisible(
+  db: Database,
+  childProfileId: string
+): Promise<void> {
+  const status = await getLatestConsentStatus(db, childProfileId);
+  if (!isChildLearningDataVisible(status)) {
+    throw new ForbiddenError(
+      'Child learning data is hidden until consent is active.'
+    );
+  }
 }
 
 export interface GuidedMetrics {
@@ -554,7 +629,10 @@ export async function getChildrenForParent(
   // R-03: Batch queries to avoid N+1 per child profile.
   // Fetch all child profiles in a single query instead of one per loop iteration.
   const allChildProfiles = await db.query.profiles.findMany({
-    where: and(inArray(profiles.id, childProfileIds), isNull(profiles.archivedAt)),
+    where: and(
+      inArray(profiles.id, childProfileIds),
+      isNull(profiles.archivedAt)
+    ),
   });
   const profilesById = new Map(allChildProfiles.map((p) => [p.id, p]));
 
@@ -826,7 +904,7 @@ export async function getChildrenForParent(
       totalSessions
     );
 
-    return {
+    return redactDashboardChild({
       profileId: p.childProfileId,
       displayName: p.displayName,
       consentStatus: p.consentStatus,
@@ -855,7 +933,7 @@ export async function getChildrenForParent(
       currentStreak: streaksByProfile.get(p.childProfileId)?.currentStreak ?? 0,
       longestStreak: streaksByProfile.get(p.childProfileId)?.longestStreak ?? 0,
       totalXp: xpByProfile.get(p.childProfileId) ?? 0,
-    };
+    });
   });
 
   return children;
@@ -1026,7 +1104,7 @@ export async function getChildDetail(
     totalSessions
   );
 
-  return {
+  return redactDashboardChild({
     profileId: childProfileId,
     displayName: profile.displayName,
     consentStatus: consentState?.status ?? null,
@@ -1056,7 +1134,7 @@ export async function getChildDetail(
     currentStreak: streakData?.currentStreak ?? 0,
     longestStreak: streakData?.longestStreak ?? 0,
     totalXp: xpResult[0]?.totalXp ?? 0,
-  };
+  });
 }
 
 /**
@@ -1070,6 +1148,7 @@ export async function getChildSubjectTopics(
 ): Promise<TopicProgress[]> {
   // [EP15-I5] See assertParentAccess comment — ForbiddenError → 403.
   await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertChildDashboardDataVisible(db, childProfileId);
 
   // Verify the subject belongs to the child before querying curriculum (IDOR guard).
   const childSubject = await db.query.subjects.findFirst({
@@ -1303,6 +1382,7 @@ export async function getChildSessions(
   // [EP15-I5] ForbiddenError → 403. Empty array now means "parent has
   // access and the child has no sessions", not "access denied".
   await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertChildDashboardDataVisible(db, childProfileId);
   const activeProfile = await db.query.profiles.findFirst({
     where: and(eq(profiles.id, childProfileId), isNull(profiles.archivedAt)),
     columns: { id: true },
@@ -1326,6 +1406,7 @@ export async function getChildSessionDetail(
   sessionId: string
 ): Promise<ChildSession | null> {
   await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertChildDashboardDataVisible(db, childProfileId);
 
   const session = await db.query.learningSessions.findFirst({
     where: and(
@@ -1424,6 +1505,7 @@ export async function getChildInventory(
   // [EP15-I5] Return type tightened from `| null`. Access denial now
   // throws (→ 403); the only remaining path is a valid inventory.
   await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertChildDashboardDataVisible(db, childProfileId);
   return buildKnowledgeInventory(db, childProfileId);
 }
 
@@ -1439,6 +1521,7 @@ export async function getChildProgressHistory(
 ): Promise<ProgressHistory> {
   // [EP15-I5] Return type tightened — access denial throws, not returns null.
   await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertChildDashboardDataVisible(db, childProfileId);
   return buildProgressHistory(db, childProfileId, input);
 }
 
@@ -1450,6 +1533,7 @@ export async function getChildReports(
   // [EP15-I5] Access denial throws (→ 403). Empty array now means "no
   // reports yet for this child" — semantically distinct from forbidden.
   await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertChildDashboardDataVisible(db, childProfileId);
   return listMonthlyReportsForParentChild(db, parentProfileId, childProfileId);
 }
 
@@ -1461,6 +1545,7 @@ export async function getChildReportDetail(
 ): Promise<MonthlyReportRecord | null> {
   // [EP15-I5] null now only means "access granted but report not found".
   await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertChildDashboardDataVisible(db, childProfileId);
   return getMonthlyReportForParentChild(
     db,
     parentProfileId,
@@ -1478,5 +1563,6 @@ export async function markChildReportViewed(
   // [EP15-I5] Previously silently returned on access denial, letting an
   // unauthorized POST pretend to succeed. Now throws → 403.
   await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertChildDashboardDataVisible(db, childProfileId);
   await markMonthlyReportViewed(db, parentProfileId, childProfileId, reportId);
 }
