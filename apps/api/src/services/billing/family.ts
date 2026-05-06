@@ -260,22 +260,7 @@ export async function getUsageBreakdownForProfile(
       id: profiles.id,
       displayName: profiles.displayName,
       isOwner: profiles.isOwner,
-      familyOwnerProfileId: sql<string | null>`(
-        select owner_profile.id
-        from ${profiles} owner_profile
-        where owner_profile.account_id = ${profiles.accountId}
-          and owner_profile.is_owner = true
-          and owner_profile.archived_at is null
-        limit 1
-      )`,
-      hasChildLink: sql<boolean>`exists (
-        select 1 from ${familyLinks}
-        where ${familyLinks.parentProfileId} = ${profiles.id}
-      )`,
-      isChild: sql<boolean>`exists (
-        select 1 from ${familyLinks}
-        where ${familyLinks.childProfileId} = ${profiles.id}
-      )`,
+      accountId: profiles.accountId,
     })
     .from(profiles)
     .where(
@@ -296,6 +281,31 @@ export async function getUsageBreakdownForProfile(
       selfUsedThisMonth: null,
     };
   }
+
+  const [familyOwner] = await db
+    .select({ id: profiles.id })
+    .from(profiles)
+    .where(
+      and(
+        eq(profiles.accountId, viewer.accountId),
+        eq(profiles.isOwner, true),
+        isNull(profiles.archivedAt)
+      )
+    )
+    .limit(1);
+  const [parentLink] = await db
+    .select({ id: familyLinks.id })
+    .from(familyLinks)
+    .where(eq(familyLinks.parentProfileId, viewer.id))
+    .limit(1);
+  const [childLink] = await db
+    .select({ id: familyLinks.id })
+    .from(familyLinks)
+    .where(eq(familyLinks.childProfileId, viewer.id))
+    .limit(1);
+  const familyOwnerProfileId = familyOwner?.id ?? null;
+  const hasChildLink = parentLink != null;
+  const isChild = childLink != null;
 
   const profileRows = await db
     .select({
@@ -323,15 +333,15 @@ export async function getUsageBreakdownForProfile(
     .groupBy(profiles.id, profiles.displayName);
 
   const sharingEnabled =
-    viewer.familyOwnerProfileId != null
-      ? await getFamilyPoolBreakdownSharing(db, viewer.familyOwnerProfileId)
+    familyOwnerProfileId != null
+      ? await getFamilyPoolBreakdownSharing(db, familyOwnerProfileId)
       : false;
   const isOwnerBreakdownViewer =
-    (viewer.isOwner && viewer.hasChildLink) ||
-    (sharingEnabled && viewer.familyOwnerProfileId != null && !viewer.isChild);
+    (viewer.isOwner && hasChildLink) ||
+    (sharingEnabled && familyOwnerProfileId != null && !isChild);
   const visibleRows = isOwnerBreakdownViewer
     ? profileRows
-    : viewer.isChild
+    : isChild
     ? []
     : profileRows.filter((row) => row.profileId === input.activeProfileId);
   const familyUsed = profileRows.reduce((sum, row) => sum + row.used, 0);

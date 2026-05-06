@@ -10,7 +10,8 @@ jest.mock('@eduagent/database', () => {
   };
 });
 
-jest.mock('../settings', () => ({ // gc1-allow: stubs getFamilyPoolBreakdownSharing — real settings module hits DB, not exercisable without full integration test setup
+jest.mock('../settings', () => ({
+  // gc1-allow: stubs getFamilyPoolBreakdownSharing — real settings module hits DB, not exercisable without full integration test setup
   getFamilyPoolBreakdownSharing: (...args: unknown[]) =>
     mockGetFamilyPoolBreakdownSharing(...args),
 }));
@@ -35,15 +36,39 @@ function createUsageBreakdownDb(input: {
     usedToday: number;
   }>;
 }): Database {
+  const selectLimit = (rows: unknown[]) => ({
+    from: jest.fn().mockReturnValue({
+      where: jest.fn().mockReturnValue({
+        limit: jest.fn().mockResolvedValue(rows),
+      }),
+    }),
+  });
+
   const select = jest
     .fn()
-    .mockReturnValueOnce({
-      from: jest.fn().mockReturnValue({
-        where: jest.fn().mockReturnValue({
-          limit: jest.fn().mockResolvedValue([input.viewer]),
-        }),
-      }),
-    })
+    .mockReturnValueOnce(
+      selectLimit([
+        {
+          id: input.viewer.id,
+          displayName: input.viewer.displayName,
+          isOwner: input.viewer.isOwner,
+          accountId: 'account-1',
+        },
+      ])
+    )
+    .mockReturnValueOnce(
+      selectLimit(
+        input.viewer.familyOwnerProfileId
+          ? [{ id: input.viewer.familyOwnerProfileId }]
+          : []
+      )
+    )
+    .mockReturnValueOnce(
+      selectLimit(input.viewer.hasChildLink ? [{ id: 'parent-link-1' }] : [])
+    )
+    .mockReturnValueOnce(
+      selectLimit(input.viewer.isChild ? [{ id: 'child-link-1' }] : [])
+    )
     .mockReturnValueOnce({
       from: jest.fn().mockReturnValue({
         leftJoin: jest.fn().mockReturnValue({
