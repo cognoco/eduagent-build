@@ -14,7 +14,7 @@ jest.mock('../common', () => ({
   ProfileSwitcher: () => null,
 }));
 
-jest.mock('../family/WithdrawalCountdownBanner', () => ({
+jest.mock('../family/WithdrawalCountdownBanner', () => ({ // gc1-allow: ParentGateway tests layout/child summaries; countdown banner behavior is covered by its own component tests.
   WithdrawalCountdownBanner: () => null,
 }));
 

@@ -20,7 +20,7 @@ jest.mock('react-i18next', () => ({ // gc1-allow: i18next is an external library
   useTranslation: () => require('../../test-utils/mock-i18n').i18nMock.useTranslation(),
 }));
 
-jest.mock('../../lib/platform-alert', () => ({
+jest.mock('../../lib/platform-alert', () => ({ // gc1-allow: platformAlert is a native display side effect; mocking lets the banner test assert CTA feedback safely.
   platformAlert: jest.fn(),
 }));
 

@@ -37,7 +37,7 @@ const USER_B = {
 // jest.mock is hoisted; capture the send spy via module.__esModule access
 // rather than a closure to avoid TDZ. Tests that need to assert on send
 // can import the mocked module directly.
-jest.mock('../../apps/api/src/inngest/client', () => ({
+jest.mock('../../apps/api/src/inngest/client', () => ({ // gc1-allow: Inngest is an external async boundary for this route integration break test; DB and route code remain real.
   inngest: {
     send: jest.fn(),
     createFunction: jest.fn().mockImplementation((config: { id?: string }) => {

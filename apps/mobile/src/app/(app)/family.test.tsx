@@ -39,7 +39,7 @@ jest.mock('../../hooks/use-dashboard', () => ({
   }),
 }));
 
-jest.mock('../../hooks/use-active-profile-role', () => ({
+jest.mock('../../hooks/use-active-profile-role', () => ({ // gc1-allow: Family route redirect depends on active role; mocking the hook isolates route-guard behavior from auth state.
   useActiveProfileRole: () => mockUseActiveProfileRole(),
 }));
 
@@ -54,7 +54,7 @@ jest.mock('../../components/family/FamilyOrientationCue', () => ({
   },
 }));
 
-jest.mock('../../components/family/WithdrawalCountdownBanner', () => ({
+jest.mock('../../components/family/WithdrawalCountdownBanner', () => ({ // gc1-allow: FamilyScreen only verifies the banner slot is present; banner behavior is covered in its own focused test.
   WithdrawalCountdownBanner: () => {
     const { View } = require('react-native');
     return <View testID="withdrawal-countdown-banner" />;
