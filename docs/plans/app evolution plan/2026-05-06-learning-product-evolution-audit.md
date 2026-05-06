@@ -227,106 +227,91 @@ BYO material is not starting from zero, but the current implementation is homewo
 
 ---
 
+> **Verification pass (2026-05-06):** Every "Today" claim below was re-checked against the actual codebase. Most original claims understated what is already shipped — the dominant pattern across this repo is "built and present, but not user-visible because the surface is gated, the UI doesn't render the data, or the deletion of an old surface never happened." Sizes have been adjusted accordingly. The genuine net-new work in this plan is much smaller than the first draft suggested.
+
 ## What Needs Changing
 
 ### A. Make The First Turn Teach, Not Interview
 
-**Today**
-- Subject creation leads into an onboarding interview screen.
-- The interview prompt is better than before, but the screen still says "Set up," "Step 1 of 4," and "Why am I asking first?"
-- The conversation is persisted in `onboarding_drafts`, not `learning_sessions`.
-- The learner can still experience this as setup before learning.
+**Today (verified)**
+- Subject creation leads into an onboarding interview screen. Interview screen still uses "Step 1 of 4" framing.
+- The fast-path session transition, 25s polling loop, signal extraction from interview, and full session-streaming branch in `interview.tsx` (lines 89–102, 520–563) are **all built and tested**. They are in the bundle but never reached in production because `ONBOARDING_FAST_PATH` is `false` there.
+- The conversation is persisted in `onboarding_drafts`, not `learning_sessions`. Signal extraction (`interview.ts → extractSignals`) reads from in-process `ExchangeEntry[]`, not from a `learning_sessions` transcript.
+- **Pre-warm is genuinely missing.** `interview-persist-curriculum.ts` is only dispatched after the full interview completes (from `routes/interview.ts`). `subjects.ts` emits zero curriculum events. No `materialize-*` Inngest function exists outside the post-interview path.
 
 **Desired**
-- After subject confirmation, the first learner-visible turn should feel like tutoring:
-  - one tiny explanation or example
-  - one active prompt
-  - no "I need to learn about you first" framing
+- After subject confirmation, the first learner-visible turn should feel like tutoring (one tiny explanation, one active prompt, no "I need to learn about you first" framing).
 - Diagnostic signals should be extracted from that learning interaction.
 
-**Change size:** L to XL
+**Change size:** **M** (was: L to XL — overstated)
 
-**Why substantial**
-- A true "first tutoring turn" means deciding whether the conversation belongs in `onboarding_drafts`, `learning_sessions`, or both.
-- Curriculum materialization currently depends on completed interview drafts.
-- The first session needs a topic/curriculum anchor, but the learner should not wait on visible setup.
-
-**Likely implementation options**
-1. **M-sized pre-warm:** Trigger curriculum materialization from the `create-subject` mutation (not from `onboarding_drafts.completed`), so by the time the learner finishes turn 1, `topicId` is usually ready. Keeps interview backend; reframes interview screen as first practice. Cheapest unlock for the time-to-first-prompt budget. **Required precondition for Section E's timing — without pre-warm, the path preview at session-end risks showing a placeholder.**
-2. **L-sized bridge:** Option 1 + restyle the interview screen as "warm first practice" and fast-path to session after 1-2 active turns.
-3. **XL architecture:** Merge interview and first tutoring turn into `learning_sessions`, then run signal extraction and curriculum materialization from the session transcript. Drops the `extractedSignals` requirement from `startFirstCurriculumSession` (`session-crud.ts:223-324` — currently waits up to 25s for both `topicId` and `extractedSignals`).
-
-**Latency floor today**
-`startFirstCurriculumSession` polls every 750ms for up to 25s, blocking until both `topicId` exists *and* `onboarding_drafts.status = 'completed'` with parsed `extractedSignals`. The 25s wait alone can blow any sub-30s time-to-first-prompt budget; option 1 (pre-warm) is what makes the budget reachable without the XL rewrite.
+**Why moderate, not substantial**
+- The teach-first prompt rule, fast-path routing code, signal extraction, and session transition are already built. The audit's first draft mistook "shipped but flag-gated off in prod" for "needs to be built."
+- The only genuinely new code is **pre-warm** — wire `subjects.ts` (or the `create-subject` mutation) to dispatch curriculum materialization on subject creation, not on interview completion.
+- The XL "merge interview into `learning_sessions`" architecture is genuinely not started, but is no longer required for Slice 1 — the fast-path bypass plus pre-warm achieves the product feeling without it.
 
 **Recommendation**
-Start with options 1 + 2 (pre-warm + bridge) unless we deliberately schedule the architecture work. It gets the product feeling right sooner and preserves existing curriculum/draft machinery.
+Ship pre-warm + flip `ONBOARDING_FAST_PATH` default to on in production. That is the work. The "L bridge" and "XL architecture" options from the original audit are no longer in scope for this slice.
 
 ### B. Make First Win Happen Within 30 Seconds
 
-**Today**
-- The first useful educational moment may happen in the interview, but it is wrapped in setup UI.
-- After two interview turns, the user may still hit another setup screen if fast path is off.
+**Today (verified)**
+- **The first-turn prompt rule is already enforced.** `exchange-prompts.ts` (lines 449–469) and `interview-prompts.ts` (lines 8–27, `INTERVIEW_SYSTEM_PROMPT`) both require: open with one concrete fact/insight, then ask one focused question. This is unconditional — not flag-gated.
+- The reason the first win does not feel like a win in production is the fast-path bypass not firing (Section A) and the chatty fun-fact opener at exchange `count === 0` (Section F), not a missing prompt rule.
+- **Time-to-first-prompt telemetry is genuinely missing.** Zero matches for `time_to_first`, `first_token_latency`, `ttfp`, or any `first_prompt_latency` metric. There is no baseline to measure against. The "30 seconds" target in the original audit was unmeasurable as written.
 
 **Desired**
-- The first visible response should create a small win:
-  - "Io sono means I am. What do you think you are is?"
-  - "A fraction is a part of a whole. Which is bigger: 3/4 or 2/3?"
-- The learner should answer/solve/explain before seeing any preferences.
+- The first visible response should create a small win the learner can answer/solve/explain before seeing any preference screen.
+- A measurable baseline for time-to-first-active-prompt exists.
 
-**Change size:** M to L
+**Change size:** **M** (was: M to L — telemetry is the only real lift)
 
-**Why substantial**
-- Prompt/copy changes are moderate.
-- Guaranteeing the flow always reaches a learning prompt quickly needs E2E coverage and timeout/error behavior.
+**Why moderate**
+- Prompt rule shipped.
+- Net-new: emit a `time_to_first_active_prompt` metric at session-create → first-token boundary, capture a 7-day staging baseline before Wave 1 begins.
 
 **Recommendation**
-Define this as the primary acceptance criterion for the next PR.
+Add the telemetry hook in Wave 1, capture baseline, then make "P50 drop ≥ 40%" the milestone acceptance criterion (already in Slice 1's acceptance list).
 
 ### C. Keep Subject Confirmation, But Make It Lighter
 
-**Today**
-- Direct matches skip confirmation.
-- Other resolved cases show a full suggestion card with `Accept` and `Edit`.
-- The card reads like approval of the classifier rather than momentum into learning.
+**Today (verified)**
+- `direct_match` already calls `doCreate()` immediately and skips the suggestion card (`create-subject.tsx` line 252).
+- All other resolved cases (`corrected`, `resolved`) hit the same Accept/Edit JSX (lines 808–855), regardless of resolver confidence.
+- **Backend gap:** `SubjectResolveResult` (`packages/schemas/src/subjects.ts` lines 95–106) has no `confidence` field. The classify endpoint carries per-candidate confidence floats; the resolve endpoint exposes only `status`, `resolvedName`, `focus`, `focusDescription`, `suggestions`, `displayMessage`. The mobile client cannot vary copy by confidence without a backend schema addition first.
 
 **Desired**
-- Keep correction control.
-- For confident single suggestions, use lighter copy:
-  - "We'll start with Italian - Verb conjugation."
-  - Primary CTA: "Start"
-  - Secondary CTA: "Change"
-- For ambiguous / no-match cases, keep heavier clarification.
+- For confident single suggestions, lighter copy ("We'll start with Italian — Verb conjugation," primary `Start`, secondary `Change`).
+- Ambiguous / no-match cases keep heavier clarification.
 
-**Change size:** S to M
+**Change size:** **S to M** (unchanged, but with the schema dependency surfaced)
 
 **Why not huge**
 - Mostly mobile UI/copy and tests in `create-subject`.
-- Backend classification can stay intact.
+- Add a `confidence: number` (or `isHighConfidence: boolean`) field on `SubjectResolveResult`, populated from the existing classify result. This is a tiny backend change but a real one — not pure mobile/copy work as the original audit implied.
 
 ### D. Defer Preference Collection
 
-**Today**
-- `analogy-preference`, `interests-context`, `accommodations`, and `curriculum-review` still exist.
-- Fast path can bypass them when enabled.
-- Settings affordance for "Tell the Mentor how you learn best" is not clearly in place as a replacement.
-- Accommodations persistence and migration need investigation before deletion.
+**Today (verified — original audit substantially understated this)**
+- `analogy-preference`, `interests-context`, `accommodations`, `curriculum-review` still exist as routes (`onboarding/_layout.tsx` lines 23–26).
+- Fast path bypasses them when the flag is on.
+- **The "settings replacement" the original audit said was "not clearly in place" is shipped in three locations:**
+  - `more.tsx` (lines 561–585) renders the `LearningModeOption` accommodations selector, backed by `useUpdateAccommodationMode()` — same endpoint the onboarding screen uses.
+  - `subject/[subjectId].tsx` (lines 26, 109–115) renders `AnalogyDomainPicker` with `useAnalogyDomain()` per-subject.
+  - `mentor-memory.tsx` (both learner and parent variants) renders `TellMentorInput`, backed by `tellMentorInputSchema` in `packages/schemas/src/learning-profiles.ts`.
+- Accommodations is already profile-level (not per-subject), so no migration is required to delete the per-subject onboarding screen.
+- **Genuinely missing:** a *post-session adjustment* prompt — no Inngest function, no recap UI slot, no hook for "want me to use more analogies next time?" `post-session-suggestions.ts` generates topic suggestions, not style adjustments.
 
 **Desired**
 - No metacognitive preference screens in required per-subject onboarding.
-- Preferences become opt-in settings or post-session adjustments.
-- Accommodations remain parent/profile-level and careful.
+- Preferences live in opt-in settings (already exist) and post-session adjustments (genuinely new — small).
 
-**Change size:** M for bypass, L for cleanup/deletion
+**Change size:** **S for bypass, M for cleanup/deletion + post-session prompt** (was: M / L — overstated)
 
-**Why substantial**
-- Bypass is already mostly implemented.
-- Deleting screens safely requires:
-  - settings replacement
-  - i18n cleanup
-  - E2E updates
-  - accommodations data audit
-  - rollback plan
+**Why moderate, not substantial**
+- Bypass is essentially a flag flip.
+- Deletion has fewer prerequisites than the original audit assumed: settings replacement is already live in three surfaces; accommodations doesn't need a data migration.
+- The only net-new build is the post-session "adjust style" prompt + recap slot — small, optional, and doesn't block the deletion.
 
 **Recommendation**
 
@@ -338,130 +323,104 @@ Accommodations data audit (parent/profile-level migration) is part of the deleti
 
 ### E. Show Structure After The First Win
 
-**Today**
-- Curriculum generation exists.
-- `curriculum-review` can show the plan as a separate setup step.
-- Library/progress show topics and books after creation/progress.
-- The first learning session does not clearly say: "Here is the path I am setting up."
+**Today (verified — original audit significantly understated this)**
+- **The post-session "next topic" recap card is already shipped end-to-end.** API generates `nextTopicId`, `nextTopicTitle`, `nextTopicReason` via LLM (`session-recap.ts` lines 33–34, 79, 107–125, 387–388). Schema fields exist on `sessionSummarySchema` (`packages/schemas/src/sessions.ts` lines 426–428). Mobile renders `session-next-topic-card` at `session-summary/[sessionId].tsx` lines 1034–1074 with title, reason, and a "Continue learning" CTA. The reason is also fed back into the next session's system prompt via `session-context-builders.ts` line 324.
+- **`topicOrder` (the ordered topic id list, ready for "present tense → irregulars → ...") is computed and present in the API response** (`apps/api/src/services/curriculum.ts` line 1473, schema at `packages/schemas/src/subjects.ts` line 333). **The mobile client does not consume it anywhere** — zero references in mobile source. Wiring it to an ordered-list view in the recap is small.
+- **Genuinely missing:** the home / dashboard "next time we'll start with X" teaser at second-session open. No hook, no payload field, no component. `dashboard.tsx` and `snapshot-aggregation.ts` produce no teaser data.
 
 **Desired**
-- At the end of the first session, show a lightweight path preview as part of the recap:
-  - "I'll build this as: present tense -> irregulars -> sentence practice -> mixed recall."
-- A soft "next time we'll start with X" teaser surfaces at second-session open.
-- The learner gets structure after value, not before. One answer is not value — a completed session is.
+- The recap surfaces the upcoming path (e.g., "I'll build this as: present tense → irregulars → sentence practice → mixed recall"), populated from `topicOrder`.
+- A soft pre-session teaser at second-session open.
 - Parent/adult users can inspect the path in Library/Progress at any point.
 
 **Why not "after the first active answer"**
-- One answer gives near-zero behavioral signal.
-- Curriculum may not be fully materialized yet (see Section A — without pre-warm, materialization can race the first answer). Promising a path the system doesn't have is the "AI tutor with setup screens" feel we are removing.
-- This timing depends on Section A option 1 (pre-warm) shipping first; without it, the recap may show a placeholder.
+- One answer gives near-zero behavioral signal. Curriculum may not be fully materialized yet without Section A's pre-warm.
 
-**Change size:** M to L
+**Change size:** **S to M** (was: M to L — overstated)
 
-**Why substantial**
-- Primary surface is the existing `session-recap` block — extends a built surface rather than inventing one.
-- Secondary surface is second-session open teaser.
-- Backend curriculum already exists, but the "path promise" copy and recap integration are missing.
+**Why moderate, not substantial**
+- The recap card surface, the LLM-generated next-step copy, and the backend ordered-topic list are all already shipped.
+- Net-new work: render `topicOrder` as an ordered-list view inside the existing recap card; add a small home-screen teaser hook + payload field for the second-session-open case.
 
 ### F. Make Active Practice The Default Product Behavior
 
-**Today**
-- The session prompt already says explain -> verify -> next concept.
-- Quiz, dictation, recall, relearn, teach-back, and evaluate flows exist.
-- Some first-turn guidance still says "fun fact" and "invite conversation," which can become chatty rather than active.
+**Today (verified)**
+- The "explain → verify → next concept" cycle is in `getSessionTypeGuidance` (`exchange-prompts.ts` line 158).
+- **The chatty fun-fact opener is unconditional, not a leftover.** `exchange-prompts.ts` lines 455–468 fire on every `exchangeCount === 0 && sessionType === 'learning' && !isLanguageMode && !isRecitation` turn: *"Open with a surprising or fun fact about it to spark curiosity, then invite them into the conversation..."* No flag gates this. Removing it is a prompt edit.
+- Quiz, dictation, recall, relearn, teach-back, evaluate flows exist as standalone screens but **have no inline trigger from the chat session.** The Practice hub (`/(app)/practice/index.tsx`) is a separately navigated screen. The session screen has no "ask for a quiz" or "switch to practice mode" button.
+- **Eval rule for "ends with exactly one learner action" is genuinely missing.** Zero matches in `eval-llm/` for `endsWith`, `exactly one`, `learner action`, or `actionCount`. The harness tracks `understandingCheck` signal *distribution*, not per-response structural assertion.
+- **`evaluate` and `teach_back` paths still emit JSON blocks in free text** (`exchange-prompts.ts` lines 687–722, marked `TODO: EVAL-MIGRATION`). They have not been migrated to `signals.evaluate_assessment` / `signals.teach_back_assessment` envelope fields.
 
 **Desired**
-- Every learning session includes an action:
-  - answer
-  - solve
-  - explain back
-  - compare
-  - debug
-  - apply
-  - recall
-- The first turn should not be passive exposition.
+- Every learning session includes an action (answer/solve/explain back/compare/debug/apply/recall).
+- The first turn is not passive exposition.
 
-**Change size:** M
+**Change size:** **M** (unchanged)
 
 **Why moderate**
-- Core mechanics exist.
-- The change is mainly prompt policy, eval harness coverage, and UI acceptance checks.
+- Net-new work: edit the fun-fact prompt block to require an active opening; add eval assertion for "first reply ends with one learner action"; optionally add inline practice-mode CTAs to the chat session.
+- Bonus opportunity: clean up the EVAL-MIGRATION TODOs while in the prompt files.
 
 **Recommendation**
-Add a prompt/eval rule: first learning response must end with exactly one learner action, unless answering an urgent direct question.
+Add a prompt/eval rule: first learning response must end with exactly one learner action, unless answering an urgent direct question. Remove the unconditional fun-fact opener.
 
 ### G. Turn Progress Into Proof Of Improvement
 
-**Today**
-- Progress uses topics mastered, sessions, vocabulary, growth, milestones, retention cards, and subject stats.
-- Some language is still metric/gradebook-like: mastered, retention, status, weak/fading/forgotten.
-- The data can show review timing and remembered concepts, but the UI rarely says "you remembered this after X days."
+**Today (verified — original audit understated this; data plumbing is largely done)**
+- **Topic-level deltas are already computed and present in the API:** `weeklyDeltaTopicsMastered`, `weeklyDeltaVocabularyTotal`, `weeklyDeltaTopicsExplored` (`packages/schemas/src/progress.ts` lines 266–269). They are rendered **only on the parent dashboard** (`ParentDashboardSummary.tsx` lines 237–256, `child/[profileId]/index.tsx` lines 389–403). The learner-facing progress screen does not consume any of these fields.
+- **`daysSinceLastReview` is computed and reaches the LLM as retention context** (`exchange-prompts.ts` lines 604–606: `last reviewed N day(s) ago`). It does not reach any UI label. `RetentionPill.tsx` and `RetentionSignal.tsx` show static enum strings only — no elapsed-days branch and no commented-out one.
+- **`retentionCardsDue / Strong / Fading` is computed in `snapshot-aggregation.ts`** (lines 398–415) and present in `progressMetricsSchema`. The learner UI does not surface "you remembered this after X days" copy from any of these fields.
+- **Spaced-recall infrastructure is fully shipped and running.** `recall-nudge.ts` is an hourly Inngest cron; `recall-nudge-send.ts` delivers push notifications. They send pushes but do not produce an in-app proof card.
+- `GrowthChart.tsx` exists and renders cumulative bar charts (topics mastered + vocabulary growth). No "before/after" or topic-level delta component exists.
 
 **Desired**
-- Progress answers: "Am I actually getting better?"
-- Use human proof:
-  - "You remembered this after 9 days."
-  - "This one is getting fuzzy."
-  - "You can now do X without help."
-  - "Quick refresh today, then you are back on track."
+- Progress answers: "Am I actually getting better?" with human proof copy ("You remembered this after 9 days," "This one is getting fuzzy," "Quick refresh today, then you are back on track").
 
-**Change size:** M for first slice, L for full progress redesign
+**Change size:** **M** (was: M for first slice + L for proof cards — the L was based on assuming the data layer was missing; it isn't)
 
-**Why substantial**
-- Label replacement is easy.
-- Proof of retained ability may require:
-  - richer API fields
-  - topic-level deltas
-  - "before/after" comparisons
-  - delayed recall outcomes surfaced in Progress
+**Why moderate**
+- The data layer is done. This is primarily a **UI exposure** project.
+- Net-new work: pass `daysSinceLastReview` into `RetentionPill` and `RetentionSignal` and add a "remembered after N days" / "getting fuzzy after N days" branch; render `weeklyDelta*` fields on the learner progress screen (component already runs on the parent side); design and ship one new "proof card" component using the shipped retention metrics.
+- Removing the residual gradebook-style copy is plain string work.
 
 **Recommendation**
-Do not let vocabulary work consume the project. Treat emotional retention language as a thin UI layer, then separately design proof cards.
+Treat Slice 3 as exposure, not redesign. Do not let it grow into a Progress tab redo.
 
 ### H. Bring-Your-Own-Material As A General Learning Layer
 
-**Today**
-- Homework photo/OCR and notes/bookmarks exist.
-- Dictation can use photo/text.
-- No general upload/link/transcript ingestion.
+**Today (verified — the "XL" sizing is correct)**
+- **OCR and multimodal pass-through are already provider-abstracted and not homework-coupled.** `apps/api/src/services/ocr.ts` exposes `OcrProvider` / `GeminiOcrProvider` / `StubOcrProvider` taking only `ArrayBuffer + mimeType`. `exchanges.ts` `ImageData` (line 73) and `buildUserContent()` (line 78) accept image input on `streamMessage` / `streamExchange` regardless of caller. The wedge for re-using OCR + multimodal LLM on non-homework inputs is shorter than the audit implied.
+- **No object storage exists.** `apps/api/wrangler.toml` has zero `[[r2_buckets]]` blocks. Images today flow as base64 in request bodies. PDF / general document upload requires net-new R2 setup.
+- **PDF / YouTube / transcript / general document ingestion confirmed missing.** Zero references to `pdf`, `pdf-parse`, `youtube`, `.vtt`, or video-transcript tooling. `transcript-purge-cron.ts` handles session transcript cleanup, not ingestion. Notes are scoped to `topicId`, bookmarks to `sessionId/eventId`. No `Material`, `Document`, `Source`, or `Asset` schema in `packages/schemas/`.
 
 **Desired**
-- Learner can paste/upload/link material and EduAgent turns it into:
-  - questions
-  - explanations
-  - drills
-  - projects
-  - recall checks
-  - study plan
+- Learner can paste/upload/link material and EduAgent turns it into questions / explanations / drills / projects / recall checks / study plan.
 
-**Change size:** XL
+**Change size:** **XL** (confirmed)
 
 **Why substantial**
-- Requires ingestion, parsing, storage, source attribution, chunking, retrieval, safety/privacy, and product surfaces.
-- PDFs and video transcripts bring new file/storage/security concerns.
+- Net-new infrastructure: R2 bucket + multipart upload + PDF parser + (eventually) transcript fetcher + a `material` / `document` schema + library surface.
+- Existing OCR + multimodal pass-through is the wedge — but does not reduce the storage / parsing / retrieval scope.
 
 **Recommendation**
-Do not bundle this with onboarding. Treat as a later major spec. Existing homework/OCR is the wedge.
+Do not bundle with onboarding. Slice 4 only.
 
 ### I. Projects Or Real Outputs
 
-**Today**
-- The product has exercises, quizzes, dictation, recall, and homework.
-- It does not yet guide learners toward durable artifacts like essays, apps, portfolios, mock certifications, or language conversation milestones.
+**Today (verified — original audit understated milestone work; project/essay gap is real)**
+- **Milestone tracking is fully shipped, not partial.** `packages/schemas/src/snapshots.ts` lines 129–140 define `milestoneTypeSchema` with 9 values: `vocabulary_count`, `topic_mastered_count`, `session_count`, `streak_length`, `subject_mastered`, `book_completed`, `learning_time`, `cefr_level_up`, `topics_explored`. `apps/api/src/services/milestone-detection.ts` runs detection through `session-completed` Inngest. Thresholds defined and live. `cefr_level_up` is wired with a dedicated `/subjects/:subjectId/cefr-progress` route. `apps/mobile/src/app/(app)/progress/milestones.tsx` exists. Achievement set (`evaluate_success`, `teach_back_success`, `streak_7`, `streak_30`, `curriculum_complete`) is delivered in the session completion response.
+- **`book_completed` is in the milestone enum but has no detection branch.** Schema-without-logic — fires never.
+- **Essays / portfolios / projects / artifacts confirmed missing.** "essay" appears only in one prompt string ("Teens want speed, not essays"). No essay evaluation, no portfolio schema, no project session mode. `assessmentSchema.verificationDepth` is `recall | explain | transfer` only. No `evaluate-essay`, `grade-project`, or similar Inngest functions. Practice hub has 6 cards; none project-shaped.
 
 **Desired**
-- Serious learners can produce proof:
-  - build a small app
-  - write an essay
-  - pass a mock exam
-  - hold a language conversation
-  - solve exam-style problems
-  - prepare a portfolio artifact
+- Serious learners can produce proof: small app, essay, mock exam, language conversation, exam-style problems, portfolio artifact.
 
-**Change size:** XL
+**Change size:** **L to XL** (was: XL — milestone tracking already provides the conversation/CEFR/streak side; project/essay is the remaining XL)
 
 **Recommendation**
-This is course-replacement territory. Keep it as long-term strategy, not near-term onboarding work.
+- **Quick win in scope before Slice 5:** wire the `book_completed` detection branch — schema field exists, just no logic behind it.
+- The conversation-milestone / CEFR / streak / subject-mastery facets of "proof" are already delivered via milestones; the remaining gap is artefact production (essays, projects, portfolios).
+- Keep the artefact side as long-term strategy.
 
 ---
 
