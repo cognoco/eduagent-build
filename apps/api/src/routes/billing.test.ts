@@ -55,6 +55,16 @@ const mockListFamilyMembers = jest.fn();
 const mockAddProfileToSubscription = jest.fn();
 const mockRemoveProfileFromSubscription = jest.fn();
 const mockGetFamilyPoolStatus = jest.fn();
+const mockGetUsageBreakdownForProfile = jest.fn();
+const mockGetUsageEventsAvailableSince = jest
+  .fn()
+  .mockReturnValue('2026-05-06T00:00:00.000Z');
+const mockBuildUsageDateLabels = jest.fn((input) => ({
+  resets_at: input.resetsAt,
+  renews_at: input.renewsAt,
+  resets_at_label: 'February 15, 2025',
+  renews_at_label: input.renewsAt ? 'February 15, 2025' : null,
+}));
 
 jest.mock('../services/billing', () => ({
   getSubscriptionByAccountId: (...args: unknown[]) =>
@@ -75,6 +85,12 @@ jest.mock('../services/billing', () => ({
   removeProfileFromSubscription: (...args: unknown[]) =>
     mockRemoveProfileFromSubscription(...args),
   getFamilyPoolStatus: (...args: unknown[]) => mockGetFamilyPoolStatus(...args),
+  getUsageBreakdownForProfile: (...args: unknown[]) =>
+    mockGetUsageBreakdownForProfile(...args),
+  getUsageEventsAvailableSince: (...args: unknown[]) =>
+    mockGetUsageEventsAvailableSince(...args),
+  buildUsageDateLabels: (...args: unknown[]) =>
+    mockBuildUsageDateLabels(...args),
 }));
 
 // ---------------------------------------------------------------------------
@@ -189,6 +205,7 @@ beforeEach(() => {
   mockAddProfileToSubscription.mockResolvedValue(null);
   mockRemoveProfileFromSubscription.mockResolvedValue(null);
   mockGetFamilyPoolStatus.mockResolvedValue(null);
+  mockGetUsageBreakdownForProfile.mockResolvedValue(null);
 });
 
 describe('billing routes', () => {

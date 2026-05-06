@@ -29,6 +29,7 @@ import { useApiClient } from '../../lib/api-client';
 import { assertOk } from '../../lib/assert-ok';
 
 import { UsageMeter } from '../../components/common';
+import { TrackedView } from '../../components/common/TrackedView';
 import {
   useSubscription,
   useUsage,
@@ -45,6 +46,7 @@ import {
 } from '../../hooks/use-revenuecat';
 import { useNotifyParentSubscribe } from '../../hooks/use-settings';
 import { useXpSummary } from '../../hooks/use-streaks';
+import { track } from '../../lib/analytics';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -139,6 +141,13 @@ function getTiersToCompare(
     return [...TIER_FEATURES, PRO_TIER_ENTRY];
   }
   return TIER_FEATURES;
+}
+
+function childCountBucket(count: number): '0' | '1' | '2-3' | '4+' {
+  if (count <= 0) return '0';
+  if (count === 1) return '1';
+  if (count <= 3) return '2-3';
+  return '4+';
 }
 
 /** Map RevenueCat PACKAGE_TYPE to human-readable period labels. */
@@ -587,7 +596,7 @@ export default function SubscriptionScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useThemeColors();
-  const { activeProfile } = useProfile();
+  const { activeProfile, profiles = [] } = useProfile();
   const client = useApiClient();
   const { t } = useTranslation();
 
@@ -612,6 +621,22 @@ export default function SubscriptionScreen() {
     subscription?.tier === 'family'
   );
   const byokWaitlist = useJoinByokWaitlist();
+  const linkedChildCount = activeProfile?.isOwner
+    ? profiles.filter((profile) => profile.id !== activeProfile.id).length
+    : 0;
+  const breakdownAnalytics = {
+    is_owner: activeProfile?.isOwner === true,
+    breakdown_section_visible: Boolean(usage?.by_profile?.length),
+    child_count_bucket: childCountBucket(linkedChildCount),
+  };
+
+  useEffect(() => {
+    if (!usage) return;
+    track('subscription_breakdown_mounted', {
+      is_owner: activeProfile?.isOwner === true,
+      child_count_bucket: childCountBucket(linkedChildCount),
+    });
+  }, [activeProfile?.isOwner, linkedChildCount, usage]);
 
   // BUG-399: Persistent "already joined" flag for BYOK waitlist
   const [byokJoined, setByokJoined] = useState(false);
@@ -1306,56 +1331,110 @@ export default function SubscriptionScreen() {
           {/* Usage meter */}
           {usage && (
             <View className="mt-4">
-              <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2">
-                Usage this month
-              </Text>
-              <View className="bg-surface rounded-card px-4 py-3.5">
-                <UsageMeter
-                  used={usage.usedThisMonth}
-                  limit={usage.monthlyLimit}
-                  warningLevel={usage.warningLevel}
-                />
-                {/* BUG-395: Show daily usage for free-tier users who have a daily cap */}
+              <TrackedView
+                eventName="subscription_breakdown_viewed"
+                dwellMs={2000}
+                properties={breakdownAnalytics}
+                testID="subscription-usage-tracker"
+              >
+                <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2">
+                  Usage this month
+                </Text>
+                <View className="bg-surface rounded-card px-4 py-3.5">
+                  <UsageMeter
+                    used={usage.usedThisMonth}
+                    limit={usage.monthlyLimit}
+                    warningLevel={usage.warningLevel}
+                  />
+                  {/* BUG-395: Show daily usage for free-tier users who have a daily cap */}
+                  {usage.dailyLimit != null && (
+                    <View className="mt-2" testID="daily-usage">
+                      <Text className="text-caption text-text-secondary">
+                        Today: {usage.usedToday} / {usage.dailyLimit} daily
+                        questions
+                      </Text>
+                    </View>
+                  )}
+                  {usage.topUpCreditsRemaining > 0 && (
+                    <Text className="text-caption text-text-secondary mt-2">
+                      + {usage.topUpCreditsRemaining} top-up credits remaining
+                    </Text>
+                  )}
+                  {usage.by_profile && usage.by_profile.length > 0 ? (
+                    <View className="border-t border-border mt-3 pt-3">
+                      {usage.by_profile.map((row) => (
+                        <View
+                          key={row.profile_id}
+                          className="flex-row items-center justify-between py-1"
+                          testID={`usage-profile-${row.profile_id}`}
+                        >
+                          <Text className="text-caption text-text-secondary">
+                            {row.is_self && activeProfile?.isOwner
+                              ? 'Your share'
+                              : row.is_self
+                              ? 'Your usage'
+                              : row.name}
+                          </Text>
+                          <Text className="text-caption font-semibold text-text-primary">
+                            {row.used} questions
+                          </Text>
+                        </View>
+                      ))}
+                      {usage.family_aggregate ? (
+                        <View
+                          className="flex-row items-center justify-between py-1"
+                          testID="usage-family-aggregate"
+                        >
+                          <Text className="text-caption text-text-secondary">
+                            Family aggregate
+                          </Text>
+                          <Text className="text-caption font-semibold text-text-primary">
+                            {usage.family_aggregate.used} /{' '}
+                            {usage.family_aggregate.limit}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  ) : null}
+                  <Text className="text-caption text-text-secondary mt-1">
+                    Quota resets{' '}
+                    {usage.resets_at_label ??
+                      new Date(usage.cycleResetAt).toLocaleDateString(
+                        undefined,
+                        {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                        }
+                      )}
+                  </Text>
+                  {usage.renews_at_label ? (
+                    <Text className="text-caption text-text-secondary mt-1">
+                      Subscription renews {usage.renews_at_label}
+                    </Text>
+                  ) : null}
+                </View>
+                {/* BUG-395: Show daily quota for free-tier users */}
                 {usage.dailyLimit != null && (
-                  <View className="mt-2" testID="daily-usage">
-                    <Text className="text-caption text-text-secondary">
-                      Today: {usage.usedToday} / {usage.dailyLimit} daily
-                      questions
+                  <View
+                    className="bg-surface rounded-card px-4 py-3.5 mt-2"
+                    testID="daily-usage-card"
+                  >
+                    <UsageMeter
+                      used={usage.usedToday}
+                      limit={usage.dailyLimit}
+                      warningLevel={
+                        usage.usedToday >= usage.dailyLimit
+                          ? 'exceeded'
+                          : 'none'
+                      }
+                    />
+                    <Text className="text-caption text-text-secondary mt-1">
+                      Daily limit — resets at midnight
                     </Text>
                   </View>
                 )}
-                {usage.topUpCreditsRemaining > 0 && (
-                  <Text className="text-caption text-text-secondary mt-2">
-                    + {usage.topUpCreditsRemaining} top-up credits remaining
-                  </Text>
-                )}
-                <Text className="text-caption text-text-secondary mt-1">
-                  Resets{' '}
-                  {new Date(usage.cycleResetAt).toLocaleDateString(undefined, {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                  })}
-                </Text>
-              </View>
-              {/* BUG-395: Show daily quota for free-tier users */}
-              {usage.dailyLimit != null && (
-                <View
-                  className="bg-surface rounded-card px-4 py-3.5 mt-2"
-                  testID="daily-usage-card"
-                >
-                  <UsageMeter
-                    used={usage.usedToday}
-                    limit={usage.dailyLimit}
-                    warningLevel={
-                      usage.usedToday >= usage.dailyLimit ? 'exceeded' : 'none'
-                    }
-                  />
-                  <Text className="text-caption text-text-secondary mt-1">
-                    Daily limit — resets at midnight
-                  </Text>
-                </View>
-              )}
+              </TrackedView>
             </View>
           )}
 

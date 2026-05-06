@@ -16,4 +16,5 @@ export { MagicPenAnimation } from './MagicPenAnimation';
 export { ProfileSwitcher } from './ProfileSwitcher';
 export { ShimmerSkeleton } from './ShimmerSkeleton';
 export { TimeoutLoader } from './TimeoutLoader';
+export { TrackedView } from './TrackedView';
 export { UsageMeter } from './UsageMeter';

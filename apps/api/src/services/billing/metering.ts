@@ -6,7 +6,10 @@
 import { and, eq, sql } from 'drizzle-orm';
 import {
   quotaPools,
+  profiles,
+  subscriptions,
   topUpCredits,
+  usageEvents,
   type Database,
   findQuotaPool,
 } from '@eduagent/database';
@@ -27,6 +30,36 @@ export interface DecrementResult {
   remainingDaily: number | null;
 }
 
+async function verifyProfileInSubscriptionAccount(
+  db: Database,
+  subscriptionId: string,
+  profileId: string
+): Promise<boolean> {
+  const row = await db
+    .select({ profileId: profiles.id })
+    .from(profiles)
+    .innerJoin(subscriptions, eq(subscriptions.accountId, profiles.accountId))
+    .where(
+      and(eq(subscriptions.id, subscriptionId), eq(profiles.id, profileId))
+    )
+    .limit(1);
+
+  return row.length > 0;
+}
+
+async function recordUsageEvent(
+  db: Database,
+  subscriptionId: string,
+  profileId: string,
+  delta: 1 | -1
+): Promise<void> {
+  await db.insert(usageEvents).values({
+    subscriptionId,
+    profileId,
+    delta,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // decrementQuota
 // ---------------------------------------------------------------------------
@@ -45,24 +78,53 @@ export interface DecrementResult {
  */
 export async function decrementQuota(
   db: Database,
-  subscriptionId: string
+  subscriptionId: string,
+  profileId?: string
 ): Promise<DecrementResult> {
+  if (profileId) {
+    const ownsProfile = await verifyProfileInSubscriptionAccount(
+      db,
+      subscriptionId,
+      profileId
+    );
+    if (!ownsProfile) {
+      return {
+        success: false,
+        source: 'none',
+        remainingMonthly: 0,
+        remainingTopUp: 0,
+        remainingDaily: null,
+      };
+    }
+  }
+
   // 1. Try monthly quota — atomic: succeeds only if monthly AND daily limits allow
-  const [monthlyUpdated] = await db
-    .update(quotaPools)
-    .set({
-      usedThisMonth: sql`${quotaPools.usedThisMonth} + 1`,
-      usedToday: sql`${quotaPools.usedToday} + 1`,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(quotaPools.subscriptionId, subscriptionId),
-        sql`${quotaPools.usedThisMonth} < ${quotaPools.monthlyLimit}`,
-        sql`(${quotaPools.dailyLimit} IS NULL OR ${quotaPools.usedToday} < ${quotaPools.dailyLimit})`
+  const monthlyUpdated = await db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(quotaPools)
+      .set({
+        usedThisMonth: sql`${quotaPools.usedThisMonth} + 1`,
+        usedToday: sql`${quotaPools.usedToday} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(quotaPools.subscriptionId, subscriptionId),
+          sql`${quotaPools.usedThisMonth} < ${quotaPools.monthlyLimit}`,
+          sql`(${quotaPools.dailyLimit} IS NULL OR ${quotaPools.usedToday} < ${quotaPools.dailyLimit})`
+        )
       )
-    )
-    .returning();
+      .returning();
+    if (updated && profileId) {
+      await recordUsageEvent(
+        tx as unknown as Database,
+        subscriptionId,
+        profileId,
+        1
+      );
+    }
+    return updated;
+  });
 
   if (monthlyUpdated) {
     return {
@@ -104,16 +166,18 @@ export async function decrementQuota(
 
   // 2. Monthly exhausted, daily OK — fall back to top-up credits (FIFO)
   const now = new Date();
-  const topUp = await db.query.topUpCredits.findFirst({
-    where: sql`${topUpCredits.subscriptionId} = ${subscriptionId}
-      AND ${topUpCredits.remaining} > 0
-      AND ${topUpCredits.expiresAt} > ${now}`,
-    orderBy: sql`${topUpCredits.purchasedAt} ASC`,
-  });
+  const topUpResult = await db.transaction(async (tx) => {
+    const topUp = await tx.query.topUpCredits.findFirst({
+      where: sql`${topUpCredits.subscriptionId} = ${subscriptionId}
+        AND ${topUpCredits.remaining} > 0
+        AND ${topUpCredits.expiresAt} > ${now}`,
+      orderBy: sql`${topUpCredits.purchasedAt} ASC`,
+    });
 
-  if (topUp) {
+    if (!topUp) return null;
+
     // Atomic: only succeeds if remaining > 0 (concurrent request may have consumed it)
-    const [updatedTopUp] = await db
+    const [updatedTopUp] = await tx
       .update(topUpCredits)
       .set({
         remaining: sql`${topUpCredits.remaining} - 1`,
@@ -123,55 +187,68 @@ export async function decrementQuota(
       )
       .returning();
 
-    if (updatedTopUp) {
-      // [S-2 / BUG-627] Atomically increment usedToday WITH a daily-limit
-      // guard. The previous unguarded UPDATE allowed two concurrent top-up
-      // consumers to both pass the line-91 snapshot check at usedToday=
-      // dailyLimit-1, both decrement a top-up credit, then both add +1 to
-      // usedToday — ending at dailyLimit+1 and silently bypassing the cap.
-      const [updatedPool] = await db
-        .update(quotaPools)
-        .set({
-          usedToday: sql`${quotaPools.usedToday} + 1`,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(quotaPools.subscriptionId, subscriptionId),
-            sql`(${quotaPools.dailyLimit} IS NULL OR ${quotaPools.usedToday} < ${quotaPools.dailyLimit})`
-          )
+    if (!updatedTopUp) return null;
+
+    // [S-2 / BUG-627] Atomically increment usedToday WITH a daily-limit
+    // guard. The previous unguarded UPDATE allowed two concurrent top-up
+    // consumers to both pass the line-91 snapshot check at usedToday=
+    // dailyLimit-1, both decrement a top-up credit, then both add +1 to
+    // usedToday — ending at dailyLimit+1 and silently bypassing the cap.
+    const [updatedPool] = await tx
+      .update(quotaPools)
+      .set({
+        usedToday: sql`${quotaPools.usedToday} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(quotaPools.subscriptionId, subscriptionId),
+          sql`(${quotaPools.dailyLimit} IS NULL OR ${quotaPools.usedToday} < ${quotaPools.dailyLimit})`
         )
-        .returning();
+      )
+      .returning();
 
-      if (!updatedPool) {
-        // Daily cap was reached between the snapshot check and this UPDATE
-        // (concurrent top-up race). Roll back the top-up decrement so the
-        // user is not charged for a request that did not go through.
-        await db
-          .update(topUpCredits)
-          .set({ remaining: sql`${topUpCredits.remaining} + 1` })
-          .where(eq(topUpCredits.id, updatedTopUp.id));
-
-        return {
-          success: false,
-          source: 'daily_exceeded',
-          remainingMonthly: Math.max(0, pool.monthlyLimit - pool.usedThisMonth),
-          remainingTopUp: 0,
-          remainingDaily: 0,
-        };
-      }
+    if (!updatedPool) {
+      // Daily cap was reached between the snapshot check and this UPDATE
+      // (concurrent top-up race). Roll back the top-up decrement so the
+      // user is not charged for a request that did not go through.
+      await tx
+        .update(topUpCredits)
+        .set({ remaining: sql`${topUpCredits.remaining} + 1` })
+        .where(eq(topUpCredits.id, updatedTopUp.id));
 
       return {
-        success: true,
-        source: 'top_up',
-        remainingMonthly: 0,
-        remainingTopUp: updatedTopUp.remaining,
-        remainingDaily:
-          updatedPool.dailyLimit !== null
-            ? updatedPool.dailyLimit - updatedPool.usedToday
-            : null,
+        success: false,
+        source: 'daily_exceeded' as const,
+        remainingMonthly: Math.max(0, pool.monthlyLimit - pool.usedThisMonth),
+        remainingTopUp: 0,
+        remainingDaily: 0,
       };
     }
+
+    if (profileId) {
+      await recordUsageEvent(
+        tx as unknown as Database,
+        subscriptionId,
+        profileId,
+        1
+      );
+    }
+
+    return {
+      success: true,
+      source: 'top_up' as const,
+      remainingMonthly: 0,
+      remainingTopUp: updatedTopUp.remaining,
+      remainingDaily:
+        updatedPool.dailyLimit !== null
+          ? updatedPool.dailyLimit - updatedPool.usedToday
+          : null,
+    };
+  });
+
+  if (topUpResult) {
+    return topUpResult;
   }
 
   // 3. Both exhausted or no top-ups available
@@ -200,16 +277,38 @@ export async function decrementQuota(
  */
 export async function incrementQuota(
   db: Database,
-  subscriptionId: string
+  subscriptionId: string,
+  profileId?: string
 ): Promise<void> {
-  await db
-    .update(quotaPools)
-    .set({
-      usedThisMonth: sql`GREATEST(${quotaPools.usedThisMonth} - 1, 0)`,
-      usedToday: sql`GREATEST(${quotaPools.usedToday} - 1, 0)`,
-      updatedAt: new Date(),
-    })
-    .where(eq(quotaPools.subscriptionId, subscriptionId));
+  if (profileId) {
+    const ownsProfile = await verifyProfileInSubscriptionAccount(
+      db,
+      subscriptionId,
+      profileId
+    );
+    if (!ownsProfile) {
+      throw new Error('Profile does not belong to subscription account');
+    }
+  }
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(quotaPools)
+      .set({
+        usedThisMonth: sql`GREATEST(${quotaPools.usedThisMonth} - 1, 0)`,
+        usedToday: sql`GREATEST(${quotaPools.usedToday} - 1, 0)`,
+        updatedAt: new Date(),
+      })
+      .where(eq(quotaPools.subscriptionId, subscriptionId));
+    if (profileId) {
+      await recordUsageEvent(
+        tx as unknown as Database,
+        subscriptionId,
+        profileId,
+        -1
+      );
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -237,7 +336,7 @@ export async function safeRefundQuota(
   context: { route: string; profileId?: string; sessionId?: string }
 ): Promise<{ refunded: boolean }> {
   try {
-    await incrementQuota(db, subscriptionId);
+    await incrementQuota(db, subscriptionId, context.profileId);
     return { refunded: true };
   } catch (refundErr) {
     logger.error('[metering] Quota refund failed — user may be overcharged', {

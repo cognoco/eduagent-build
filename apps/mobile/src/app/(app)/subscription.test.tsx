@@ -76,6 +76,10 @@ jest.mock('../../lib/profile', () => ({
   }),
 }));
 
+jest.mock('../../lib/analytics', () => ({
+  track: jest.fn(),
+}));
+
 jest.mock('../../components/common', () => ({
   UsageMeter: () => null,
 }));
