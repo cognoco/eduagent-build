@@ -37,29 +37,35 @@ report() {
   fi
 }
 
-# Extract claimed numbers from CLAUDE.md
-# Strategy: grep -oE to isolate "number + keyword", then grab the number.
-# This avoids sed greedy-matching pitfalls with comma-separated numbers like "1,300".
-parse_before() {
-  # Extract number immediately before a keyword: "1,300 API tests" → "1,300"
-  local keyword="$1"
-  grep -m1 "[0-9][0-9,]* ${keyword}" "$REPO_ROOT/CLAUDE.md" \
-    | grep -oE "[0-9][0-9,]* ${keyword}" \
-    | grep -oE '^[0-9][0-9,]*'
+# Extract claimed numbers from the current CLAUDE.md snapshot format.
+parse_snapshot_line() {
+  local label="$1"
+  grep -m1 "^- ${label}:" "$REPO_ROOT/CLAUDE.md" || true
 }
 
-parse_after_all() {
-  # Extract number after "All": "All 20 route groups" → "20"
-  grep -m1 "All [0-9]" "$REPO_ROOT/CLAUDE.md" \
-    | grep -oE 'All [0-9,]+' \
-    | grep -oE '[0-9,]+'
+parse_snapshot_value() {
+  local label="$1" pattern="$2" occurrence="${3:-first}"
+  local line matches
+
+  line=$(parse_snapshot_line "$label")
+  if [ -z "$line" ]; then
+    return 0
+  fi
+
+  matches=$(printf "%s\n" "$line" | grep -oE "$pattern" || true)
+  if [ -z "$matches" ]; then
+    return 0
+  fi
+
+  if [ "$occurrence" = "last" ]; then
+    printf "%s\n" "$matches" | tail -n1 | grep -oE '~?[0-9][0-9,]*' | head -n1
+  else
+    printf "%s\n" "$matches" | head -n1 | grep -oE '~?[0-9][0-9,]*' | head -n1
+  fi
 }
 
-parse_paren_suites() {
-  # Extract number in parens: "(41 test suites)" → "41"
-  grep -m1 '([0-9].*test suites)' "$REPO_ROOT/CLAUDE.md" \
-    | grep -oE '[0-9,]+ test suites' \
-    | grep -oE '^[0-9,]+'
+strip_claimed_count() {
+  strip_commas "$1" | tr -d '~'
 }
 
 echo ""
@@ -67,56 +73,54 @@ echo "CLAUDE.md Validation Report"
 echo "==========================="
 
 # API tests
-claimed_raw=$(parse_before "API tests")
+claimed_raw=$(parse_snapshot_value "API" '~?[0-9][0-9,]* tests' last)
 if [ -n "$claimed_raw" ]; then
-  report "API tests" "$(count_api_tests)" "$claimed_raw" "$(strip_commas "$claimed_raw")"
+  report "API tests" "$(count_api_tests)" "$claimed_raw" "$(strip_claimed_count "$claimed_raw")"
 else
   printf "  ? %-25s  (pattern not found in CLAUDE.md)\n" "API tests"
   failures=$((failures + 1))
 fi
 
 # Mobile tests
-claimed_raw=$(parse_before "mobile tests")
+claimed_raw=$(parse_snapshot_value "Mobile" '~?[0-9][0-9,]* tests' last)
 if [ -n "$claimed_raw" ]; then
-  report "Mobile tests" "$(count_mobile_tests)" "$claimed_raw" "$(strip_commas "$claimed_raw")"
+  report "Mobile tests" "$(count_mobile_tests)" "$claimed_raw" "$(strip_claimed_count "$claimed_raw")"
 else
   printf "  ? %-25s  (pattern not found in CLAUDE.md)\n" "Mobile tests"
   failures=$((failures + 1))
 fi
 
 # Integration suites
-claimed_raw=$(parse_before "integration test suites")
+claimed_raw=$(parse_snapshot_value "Cross-package integration tests" '[0-9][0-9,]* suites')
 if [ -n "$claimed_raw" ]; then
-  report "Integration suites" "$(count_integration_suites)" "$claimed_raw" "$(strip_commas "$claimed_raw")"
+  report "Integration suites" "$(count_integration_suites)" "$claimed_raw" "$(strip_claimed_count "$claimed_raw")"
 else
   printf "  ? %-25s  (pattern not found in CLAUDE.md)\n" "Integration suites"
   failures=$((failures + 1))
 fi
 
 # Route groups
-claimed_raw=$(parse_after_all)
+claimed_raw=$(parse_snapshot_value "API" '[0-9][0-9,]* route groups')
 if [ -n "$claimed_raw" ]; then
-  report "Route groups" "$(count_route_groups)" "$claimed_raw" "$(strip_commas "$claimed_raw")"
+  report "Route groups" "$(count_route_groups)" "$claimed_raw" "$(strip_claimed_count "$claimed_raw")"
 else
   printf "  ? %-25s  (pattern not found in CLAUDE.md)\n" "Route groups"
   failures=$((failures + 1))
 fi
 
 # Mobile suites
-claimed_raw=$(parse_paren_suites)
+claimed_raw=$(parse_snapshot_value "Mobile" '[0-9][0-9,]* test suites')
 if [ -n "$claimed_raw" ]; then
-  report "Mobile suites" "$(count_mobile_suites)" "$claimed_raw" "$(strip_commas "$claimed_raw")"
+  report "Mobile suites" "$(count_mobile_suites)" "$claimed_raw" "$(strip_claimed_count "$claimed_raw")"
 else
   printf "  ? %-25s  (pattern not found in CLAUDE.md)\n" "Mobile suites"
   failures=$((failures + 1))
 fi
 
 # Inngest functions (match line with a number before the keyword, skipping prose-only lines)
-claimed_raw=$(grep -m1 "[0-9] Inngest functions" "$REPO_ROOT/CLAUDE.md" \
-  | grep -oE '[0-9,]+ Inngest' \
-  | grep -oE '^[0-9,]+')
+claimed_raw=$(parse_snapshot_value "API" '[0-9][0-9,]* Inngest functions')
 if [ -n "$claimed_raw" ]; then
-  report "Inngest functions" "$(count_inngest_functions)" "$claimed_raw" "$(strip_commas "$claimed_raw")"
+  report "Inngest functions" "$(count_inngest_functions)" "$claimed_raw" "$(strip_claimed_count "$claimed_raw")"
 else
   printf "  ? %-25s  (pattern not found in CLAUDE.md)\n" "Inngest functions"
   failures=$((failures + 1))
