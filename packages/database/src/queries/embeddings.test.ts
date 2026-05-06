@@ -1,18 +1,12 @@
 import { findSimilarTopics, storeEmbedding } from './embeddings.js';
 import type { Database } from '../client.js';
 
-// ---------------------------------------------------------------------------
-// Mocks
-// ---------------------------------------------------------------------------
-
-jest.mock('../utils/uuid', () => ({
-  generateUUIDv7: jest.fn(() => '01933b3c-0000-7000-8000-000000000099'),
-}));
-
 const TEST_PROFILE_ID = '01933b3c-0000-7000-8000-000000000001';
 const TEST_SESSION_ID = '01933b3c-0000-7000-8000-000000000002';
 const TEST_TOPIC_ID = '01933b3c-0000-7000-8000-000000000003';
 const TEST_EMBEDDING = [0.1, 0.2, 0.3];
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
 
 function createMockDb() {
   const execute = jest.fn().mockResolvedValue({ rows: [] });
@@ -124,7 +118,7 @@ describe('storeEmbedding', () => {
 
     expect(insert).toHaveBeenCalledTimes(1);
     expect(values).toHaveBeenCalledWith({
-      id: '01933b3c-0000-7000-8000-000000000099',
+      id: expect.stringMatching(UUID_PATTERN),
       sessionId: TEST_SESSION_ID,
       profileId: TEST_PROFILE_ID,
       topicId: TEST_TOPIC_ID,
