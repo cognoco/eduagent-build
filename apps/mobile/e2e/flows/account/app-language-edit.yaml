@@ -56,10 +56,10 @@ tags:
 # 7. Verify the picker bottom sheet appeared
 - extendedWaitUntil:
     visible:
-      id: "language-picker-backdrop"
+      id: "app-language-backdrop"
     timeout: 10000
 
-- takeScreenshot: language-picker-open
+- takeScreenshot: app-language-open
 
 # 8. Tap the Norwegian (nb) language option
 - tapOn:
@@ -67,7 +67,7 @@ tags:
 
 # 9. Bottom sheet should close after selection
 - assertNotVisible:
-    id: "language-picker-backdrop"
+    id: "app-language-backdrop"
 
 - takeScreenshot: language-changed-nb
 
@@ -95,7 +95,7 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: "language-picker-backdrop"
+      id: "app-language-backdrop"
     timeout: 10000
 
 # 12. Select English (en) to restore default
@@ -103,7 +103,7 @@ tags:
     id: "language-option-en"
 
 - assertNotVisible:
-    id: "language-picker-backdrop"
+    id: "app-language-backdrop"
 
 # 13. Verify locale reset: sign-out button should read "Log out" (English)
 - scrollUntilVisible:

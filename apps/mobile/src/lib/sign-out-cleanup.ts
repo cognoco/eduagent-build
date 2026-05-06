@@ -63,10 +63,7 @@ export const PER_PROFILE_KEYS: ReadonlyArray<(profileId: string) => string> = [
 // comment justifying why it is per-account vs. device-level.
 //
 // app-ui-language: device preference, preserved across sign-out
-// i18n-auto-suggest-dismissed: per-user, cleared on sign-out
-export const GLOBAL_ASYNCSTORAGE_KEYS: ReadonlyArray<string> = [
-  'i18n-auto-suggest-dismissed',
-];
+export const GLOBAL_ASYNCSTORAGE_KEYS: ReadonlyArray<string> = [];
 
 // Global keys that should reset when no one is signed in. Excludes onboarding
 // flags that legitimately survive sign-out cycles (e.g., a user who signs out

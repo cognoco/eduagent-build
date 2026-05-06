@@ -17,8 +17,6 @@ export default function OnboardingLayout() {
         contentStyle: { backgroundColor: colors.background },
       }}
     >
-      {/* BKT-C.1 — profile-wide tutor language (ahead of subject interview) */}
-      <Stack.Screen name="language-picker" />
       {/* BKT-C.1 — pronouns picker (self-skips when learner age < 13) */}
       <Stack.Screen name="pronouns" />
       <Stack.Screen name="interview" />

@@ -46,6 +46,7 @@ import {
   useActiveProfileRole,
   type ActiveProfileRole,
 } from '../../hooks/use-active-profile-role';
+import { useMentorLanguageSync } from '../../hooks/use-mentor-language-sync';
 
 // ─── Tab visibility whitelist ────────────────────────────────────────
 // Only these routes render a visible tab button. Every other route in
@@ -1273,6 +1274,7 @@ export default function AppLayout() {
     acknowledgeProfileRemoval,
     switchProfile,
   } = useProfile();
+  useMentorLanguageSync();
   const { isParentProxy, childProfile, parentProfile } = useParentProxy();
   const { hasFamily } = useFamilyPresence();
   const visibleTabs = React.useMemo(

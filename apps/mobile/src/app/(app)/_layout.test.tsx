@@ -113,6 +113,10 @@ jest.mock('../../hooks/use-revenuecat', () => ({
   useRevenueCatIdentity: jest.fn(),
 }));
 
+jest.mock('../../hooks/use-mentor-language-sync', () => ({
+  useMentorLanguageSync: jest.fn(),
+}));
+
 jest.mock('../../lib/sentry', () => ({
   evaluateSentryForProfile: jest.fn(),
   // useParentProxy (rendered inside _layout) catches SecureStore failures

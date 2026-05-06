@@ -106,9 +106,7 @@ const SAFETY_RULES =
   'dangerous or harmful activities; or content undermining civic integrity. ' +
   'If a request touches these areas, politely decline and redirect to the learning topic.';
 
-// BKT-C.1 — ISO 639-1 → English name for the preamble line. Kept narrow; if a
-// 9th language is added, extend this table and the whitelist in the Zod enum
-// and the DB CHECK simultaneously.
+// BKT-C.1 — ISO 639-1 → English name for the preamble line.
 const CONVERSATION_LANGUAGE_NAMES: Record<ConversationLanguage, string> = {
   en: 'English',
   cs: 'Czech',
@@ -118,6 +116,8 @@ const CONVERSATION_LANGUAGE_NAMES: Record<ConversationLanguage, string> = {
   it: 'Italian',
   pt: 'Portuguese',
   pl: 'Polish',
+  ja: 'Japanese',
+  nb: 'Norwegian',
 };
 
 function getSafetyPreamble(ageBracket?: AgeBracket): string {

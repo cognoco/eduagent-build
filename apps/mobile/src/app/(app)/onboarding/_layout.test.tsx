@@ -28,7 +28,6 @@ describe('onboarding/_layout.tsx', () => {
     const names = capturedScreens.map((s) => s.name);
     expect(names).toEqual(
       expect.arrayContaining([
-        'language-picker',
         'pronouns',
         'interview',
         'interests-context',

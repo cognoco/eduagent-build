@@ -129,6 +129,19 @@ describe('updateConversationLanguage (integration)', () => {
     expect(updated?.conversationLanguage).toBe('cs');
   });
 
+  it('accepts widened UI locales', async () => {
+    const { account, profile } = await seedAccountAndProfile(0);
+    const db = createIntegrationDb();
+
+    await updateConversationLanguage(db, profile.id, account.id, 'ja');
+    await updateConversationLanguage(db, profile.id, account.id, 'nb');
+
+    const updated = await db.query.profiles.findFirst({
+      where: eq(profiles.id, profile.id),
+    });
+    expect(updated?.conversationLanguage).toBe('nb');
+  });
+
   it('throws OnboardingNotFoundError when accountId does not match', async () => {
     const { profile: profileA } = await seedAccountAndProfile(0);
     const { account: accountB } = await seedAccountAndProfile(1);

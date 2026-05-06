@@ -104,16 +104,8 @@ export default function PronounsScreen(): React.ReactElement {
   }, [ageGated, navigateForward]);
 
   const handleBack = useCallback(() => {
-    goBackOrReplace(router, {
-      pathname: '/(app)/onboarding/language-picker',
-      params: {
-        subjectId: subjectId ?? '',
-        subjectName: subjectName ?? '',
-        step: String(Math.max(step - 1, 1)),
-        totalSteps: String(totalSteps),
-      },
-    });
-  }, [router, subjectId, subjectName, step, totalSteps]);
+    goBackOrReplace(router, '/(app)/home' as const);
+  }, [router]);
 
   const handleSkip = useCallback(() => {
     // Skip writes null to clear any prior pronouns (Settings edit case) and
