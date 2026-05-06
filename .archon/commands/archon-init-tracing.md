@@ -66,13 +66,60 @@ tool emitted the trace. Two-D pivot in queries: `(service.name, env)`.
    ```
    This is `archon.run_id`.
 
-2. **Determine workflow context**:
-   - `archon.workflow` — name of the running workflow (from env, workflow
-     YAML metadata, or fall back to `unknown-workflow`).
-   - `archon.repo` — basename of the repo dir (`git rev-parse --show-toplevel`,
-     last path segment).
+2. **Determine workflow context** (parse from the worktree path — no
+   Archon env var carries this):
+
+   Archon does **not** inject `ARCHON_WORKFLOW`, `ARCHON_REPO`, or any
+   similar env var. The only signal available inside a running workflow node
+   is the worktree directory path, whose layout is always:
+   `~/.archon/workspaces/<owner>/<repo>/worktrees/archon/<task-dir>`
+
+   Use PowerShell `Split-Path` — not bash `basename/dirname` — because this
+   command runs on Windows inside a Claude Code session.
+
+   ```powershell
+   # cwd IS the worktree directory when this command runs
+   $cwd = (Get-Location).Path
+
+   # archon.repo — 3 levels up from the worktree dir
+   # path:  .../workspaces/<owner>/<repo>/worktrees/archon/<task-dir>
+   #                          ^--- 3 Split-Path -Parent hops up, then -Leaf
+   $archonRepo = Split-Path -Leaf (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $cwd)))
+
+   # archon.workflow — strip 'task-' prefix and '-<unix-ms>' suffix from
+   # the worktree directory basename.
+   # task-<workflow>-<13-digit-timestamp>  e.g. task-test-telemetry-1778008100772
+   $taskDir = Split-Path -Leaf $cwd
+   if ($taskDir -match '^task-(.+)-\d{10,}$') {
+       $archonWorkflow = $Matches[1]
+   } else {
+       # Non-task workflow types (issue-, thread-, pr-review, etc.) don't
+       # encode a YAML workflow name in their branch name. Fall back to a
+       # safe sentinel so traces are still tagged rather than blank.
+       $archonWorkflow = "unknown-workflow"
+   }
+   ```
+
    - `archon.pr` — read from `$ARGUMENTS` if the workflow takes a PR
      identifier (e.g. `PR-16`); omit otherwise.
+
+   ## Why
+
+   Archon's Claude provider passes `process.env` through unmodified and does
+   not inject any workflow-identity env vars. The workflow executor knows the
+   workflow name at call time (it's the `workflow.name` field), but it does
+   not write a manifest file into the worktree and does not propagate the
+   name via env. `git rev-parse --show-toplevel` returns the worktree path
+   itself (not the canonical repo root) when run inside a worktree, so it
+   would produce the wrong value for `archon.repo`. Path parsing from the
+   worktree layout is the only reliable signal.
+
+   The layout `~/.archon/workspaces/<owner>/<repo>/worktrees/archon/<task-dir>`
+   is hardcoded in `@archon/git/src/worktree.ts` `getWorktreeBase()` →
+   `getProjectWorktreesPath()`. Only `task` workflow types encode the YAML
+   `name:` in `<task-dir>` as `task-<name>-<unix_ms>`. Other workflow types
+   (issue, pr, thread, review) use a different format without the workflow
+   YAML name, so they fall through to `unknown-workflow`.
 
 3. **Compute the environment label** — `archon-<workflow>` (e.g.
    `archon-execute-cleanup-pr`). This is the differentiator both tools share.
@@ -175,4 +222,7 @@ In Logfire after the workflow runs:
 - Two-D pivot for the four-channel view:
   `GROUP BY service.name, env` →
   `(claude-code-plugin, native)`, `(claude-code-plugin, archon-…)`,
-  `(codex_cli_rs, native)`, `(codex_cli_rs, archon-…)`
+  `(codex_cli_rs, native)`, `(codex_sdk_ts, archon-…)`
+  Note: Archon's Codex provider uses the TypeScript SDK (`codex_sdk_ts`),
+  not the Rust CLI (`codex_cli_rs`). Direct CLI usage → `codex_cli_rs`;
+  Archon workflows → `codex_sdk_ts`.

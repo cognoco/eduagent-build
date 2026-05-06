@@ -44,10 +44,12 @@ That's the entire command. The trace Codex emits while reading this prompt and p
 ## Verification (after the workflow run)
 
 1. Open Logfire (zpm project).
-2. Filter: `WHERE service.name = 'codex_cli_rs' AND env LIKE 'archon-%'`.
+2. Filter: `WHERE service.name = 'codex_sdk_ts' AND env LIKE 'archon-%'`.
+   (Archon's Codex provider uses the TypeScript SDK, which emits `codex_sdk_ts`,
+   not the Rust CLI's `codex_cli_rs`.)
 3. Find the most recent trace matching the timestamp printed above.
 4. Confirm the trace carries:
-   - `service.name = codex_cli_rs` (default; tells you which tool emitted it)
+   - `service.name = codex_sdk_ts` (Archon's Codex provider uses the TS SDK)
    - `env = archon-<workflow>`
 
 To correlate this trace with the parallel `claude-ping` trace, use timestamp proximity (both should land within seconds of each other) or the run-id printed by the CC ping. Direct correlation by `archon.run_id` will not work for the Codex side until #7821 lands.

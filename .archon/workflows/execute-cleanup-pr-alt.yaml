@@ -1,4 +1,4 @@
-name: execute-cleanup-pr
+name: execute-cleanup-pr-alt
 description: |
   Execute a cleanup-plan.md work package by PR number.
   Usage: archon workflow run execute-cleanup-pr --branch cleanup-pr-XX "PR-16"
@@ -25,9 +25,8 @@ description: |
 
   NOT for: Non-cleanup work, feature development, or PRs not in cleanup-plan.md.
 
-provider: codex
-model: gpt-5.5
-modelReasoningEffort: high
+provider: claude
+model: claude-opus-4-6[1m]
 
 worktree:
   enabled: true
@@ -41,7 +40,6 @@ nodes:
   - id: init-tracing
     command: archon-init-tracing
     context: fresh
-    provider: claude
     model: haiku
 
   # PHASE 1: EXTRACT — Parse cleanup-plan.md for this PR
@@ -61,7 +59,6 @@ nodes:
     command: cleanup-install
     depends_on: [extract]
     context: fresh
-    provider: claude
     model: haiku
 
   # PHASE 2: IMPLEMENT — Phase-by-phase loop with fresh context
@@ -189,21 +186,18 @@ nodes:
     command: cleanup-pr-review-scope
     depends_on: [validate]
     context: fresh
-    provider: claude
     model: sonnet
 
   - id: code-review
     command: cleanup-code-review-agent
     depends_on: [review-scope]
     context: fresh
-    provider: claude
     model: sonnet
 
   - id: test-coverage
     command: cleanup-test-coverage-agent
     depends_on: [review-scope]
     context: fresh
-    provider: claude
     model: sonnet
 
   # Adversarial review by a different LLM (Codex / GPT).
@@ -214,8 +208,8 @@ nodes:
   - id: adversarial-review
     command: cleanup-adversarial-review
     depends_on: [review-scope, init-tracing]
-    provider: claude
-    model: claude-opus-4-6
+    provider: codex
+    model: gpt-5.5
     modelReasoningEffort: high
     context: fresh
     env:
@@ -225,7 +219,7 @@ nodes:
   # synthesize creates the artifact only (no GitHub post yet).
   # fix-locally applies CRITICAL/HIGH fixes and commits to the
   # worktree branch (no push yet — push happens in Phase 6).
-
+  
   - id: synthesize
     command: cleanup-synthesize-review
     depends_on: [code-review, test-coverage, adversarial-review]
@@ -240,32 +234,29 @@ nodes:
   # PHASE 6: PUSH + CREATE PR
   # Single push covers both the implement-loop commits and the
   # fix-locally commit, so CI runs only once.
-
+  
   # Push via command node (not bash) — bash nodes run in WSL on Windows,
   # which breaks git worktree path resolution. Command nodes use PowerShell.
   - id: push
     command: cleanup-push
     depends_on: [fix-locally]
     context: fresh
-    provider: claude
     model: sonnet
 
   - id: create-pr
     command: cleanup-create-pr
     depends_on: [push]
     context: fresh
-    provider: claude
     model: sonnet
 
   # PHASE 7: POST REVIEW COMMENTS (PR now exists)
   # Posts the consolidated review + fix report as PR comments,
   # using the PR number written by cleanup-create-pr.
-
+  
   - id: post-review-comments
     command: cleanup-post-review-comments
     depends_on: [create-pr]
     context: fresh
-    provider: claude
     model: sonnet
 
   # PHASE 8: FINAL SUMMARY
@@ -274,5 +265,4 @@ nodes:
     command: archon-workflow-summary
     depends_on: [post-review-comments]
     context: fresh
-    provider: codex
-    model: gpt-5.5
+    model: sonnet

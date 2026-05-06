@@ -4,14 +4,20 @@ description: |
   correctly tags Claude Code and Codex traces with archon-specific
   resource attributes.
 
-  Three nodes:
-    1. init-tracing  — writes worktree-local .claude/settings.json AND
-                       worktree-local .codex/config.toml so subsequent
-                       CC and Codex calls inherit archon-specific env.
-    2. claude-ping   — Claude Code call (trace should have
-                       env=archon-test-telemetry).
-    3. codex-ping    — Codex call (trace should have
-                       env=archon-test-telemetry).
+  Four nodes:
+    1. init-tracing       — writes worktree-local .claude/settings.json AND
+                            worktree-local .codex/config.toml so subsequent
+                            CC and Codex calls inherit archon-specific env.
+    2. claude-ping        — Claude Code call (trace should have
+                            env=archon-test-telemetry).
+    3. codex-ping         — Codex call via .codex/config.toml only (trace
+                            should have env=archon-test-telemetry).
+    4. codex-envvar-probe — Codex call with OTEL_RESOURCE_ATTRIBUTES set in
+                            the env: block, in addition to config.toml.
+                            Tests whether Codex reads that env var, which
+                            decides whether the env: block on
+                            adversarial-review in execute-cleanup-pr.yaml
+                            is doing anything.
 
   Verification (after running):
     1. Open Logfire (zpm project).
@@ -99,3 +105,36 @@ nodes:
     model: gpt-5.5
     modelReasoningEffort: low
     context: fresh
+
+  # ═══════════════════════════════════════════════════════════════
+  # PHASE 3: CODEX ENVVAR PROBE. Distinct from codex-ping in exactly
+  # one way: this node ALSO sets `OTEL_RESOURCE_ATTRIBUTES` via the
+  # `env:` block, with a unique marker that does NOT appear anywhere
+  # in `.codex/config.toml`. Whether that marker shows up on the
+  # resulting trace decides one open question:
+  #
+  #   Does the Codex CLI honor `OTEL_RESOURCE_ATTRIBUTES` from the
+  #   process environment, or is `.codex/config.toml` the only
+  #   effective override mechanism?
+  #
+  # The marker chosen — archon.test_marker=envvar_propagated — is
+  # a literal string (NOT an interpolation of $init-tracing.output)
+  # so we can be certain about what we expect to see on the trace.
+  #
+  # This probe was added because an earlier assertion that "Codex
+  # doesn't read OTEL_RESOURCE_ATTRIBUTES" was carried in code
+  # comments without empirical verification. The result of running
+  # this workflow tells us whether the env: block on
+  # adversarial-review in execute-cleanup-pr.yaml is doing
+  # anything or is dead code.
+  # ═══════════════════════════════════════════════════════════════
+
+  - id: codex-envvar-probe
+    command: telemetry-codex-envvar-probe
+    depends_on: [init-tracing]
+    provider: codex
+    model: gpt-5.5
+    modelReasoningEffort: low
+    context: fresh
+    env:
+      OTEL_RESOURCE_ATTRIBUTES: archon.test_marker=envvar_propagated

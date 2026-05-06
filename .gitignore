@@ -224,3 +224,5 @@ apps/api/.notion-*.json
 /notion_bugs_tmp.json
 /bug_ids.json
 .scratch/
+.claude/logs/diagnostics.jsonl
+.gstack/
