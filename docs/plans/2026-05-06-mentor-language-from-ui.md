@@ -55,34 +55,35 @@
 ## Task 1: Widen DB whitelist + Zod enum
 
 **Files:**
-- Create: `apps/api/drizzle/<NNNN>_widen_conversation_language.sql`
-- Modify: `packages/database/src/schema/profiles.ts:66-88`
+- Create: `apps/api/drizzle/<NNNN>_widen_conversation_language.sql` (auto-generated)
+- Modify: `packages/database/src/schema/profiles.ts:85-88` (table-level `check()` constraint)
 - Modify: `packages/schemas/src/profiles.ts:9-19`
 
 The current 8-language whitelist (`en, cs, es, fr, de, it, pt, pl`) doesn't include `ja` or `nb`, both of which the UI ships. Widen to the union of UI locales + currently-allowed mentor locales.
 
-- [ ] **Step 1: Generate migration**
-
-```bash
-pnpm run db:generate
-```
-
-This will create a new migration file under `apps/api/drizzle/` once the schema is updated in step 2. If it doesn't, write the SQL by hand based on the existing `0035_onboarding_dimensions.sql` pattern.
-
-- [ ] **Step 2: Update schema CHECK constraint**
-
-In `packages/database/src/schema/profiles.ts`, change the `conversationLanguage` column's CHECK constraint to include all UI locales:
+The constraint is a **table-level `check()`** from `drizzle-orm/pg-core`, defined at `profiles.ts:85-88` as:
 
 ```ts
-conversationLanguage: text('conversation_language')
-  .notNull()
-  .default('en'),
-// CHECK (conversation_language IN ('en','cs','es','fr','de','it','pt','pl','ja','nb'))
+check(
+  'profiles_conversation_language_check',
+  sql`${table.conversationLanguage} IN ('en','cs','es','fr','de','it','pt','pl')`
+),
 ```
 
-(Match the exact pattern used in the existing schema — likely `.check(...)` or a `pgTable` table-level constraint.)
+- [ ] **Step 1: Update schema CHECK constraint**
 
-- [ ] **Step 3: Update Zod enum**
+In `packages/database/src/schema/profiles.ts:85-88`, widen the IN list:
+
+```ts
+check(
+  'profiles_conversation_language_check',
+  sql`${table.conversationLanguage} IN ('en','cs','es','fr','de','it','pt','pl','ja','nb')`
+),
+```
+
+Do **not** edit the column definition itself (`profiles.ts:66`); only the table-level `check()` array entry changes.
+
+- [ ] **Step 2: Update Zod enum**
 
 In `packages/schemas/src/profiles.ts`:
 
@@ -92,10 +93,17 @@ export const conversationLanguageSchema = z.enum([
 ]);
 ```
 
-- [ ] **Step 4: Generate + commit migration**
+- [ ] **Step 3: Generate migration**
 
 ```bash
 pnpm run db:generate
+```
+
+Drizzle should emit SQL of the form `ALTER TABLE "profiles" DROP CONSTRAINT "profiles_conversation_language_check"; ALTER TABLE "profiles" ADD CONSTRAINT "profiles_conversation_language_check" CHECK (...)`. If `db:generate` produces nothing, the schema edit didn't change the constraint signature — re-check Step 1. As a fallback, hand-write the migration based on the pattern in `apps/api/drizzle/0035_onboarding_dimensions.sql`.
+
+- [ ] **Step 4: Apply to dev DB**
+
+```bash
 pnpm run db:push:dev
 ```
 
@@ -108,6 +116,26 @@ pnpm exec nx run api:test -- onboarding.integration
 Expected: PASS. Add a test case asserting `nb` and `ja` are accepted values.
 
 - [ ] **Step 6: Commit via /commit**
+
+---
+
+## Task 1.5: Confirm `language-setup.tsx` does not write `conversation_language`
+
+**Files (read-only):**
+- `apps/mobile/src/app/(app)/onboarding/language-setup.tsx`
+- Any service it calls into
+
+The per-subject `nativeLanguage` flow is out of scope, but it shares vocabulary with the column we're collapsing. Before deleting the picker, confirm the language-learning subject setup does NOT also patch `conversation_language` as a side effect — if it does, removing the picker creates a hidden write path.
+
+- [ ] **Step 1: Grep**
+
+```
+Grep: pattern="conversationLanguage|conversation_language", path="apps/mobile/src/app/(app)/onboarding/language-setup.tsx"
+```
+
+Expected: zero hits. If hits exist, document them and decide whether they should also be removed (likely yes — the whole point is "UI is the only axis").
+
+- [ ] **Step 2: No commit needed unless code changed**
 
 ---
 
@@ -128,17 +156,28 @@ import i18next from 'i18next';
 import { useMentorLanguageSync } from './use-mentor-language-sync';
 
 const mutate = jest.fn();
+let isPending = false;
+const useUpdateConversationLanguage = jest.fn(() => ({ mutate, isPending }));
+const useActiveProfile = jest.fn(() => ({
+  activeProfile: { profileId: 'p1', conversationLanguage: 'en' },
+}));
+
 jest.mock('./use-onboarding-dimensions', () => ({
-  useUpdateConversationLanguage: () => ({ mutate, isPending: false }),
+  get useUpdateConversationLanguage() {
+    return useUpdateConversationLanguage;
+  },
 }));
 jest.mock('./use-active-profile', () => ({
-  useActiveProfile: () => ({
-    activeProfile: { profileId: 'p1', conversationLanguage: 'en' },
-  }),
+  get useActiveProfile() {
+    return useActiveProfile;
+  },
 }));
 
 describe('useMentorLanguageSync', () => {
-  beforeEach(() => mutate.mockClear());
+  beforeEach(() => {
+    mutate.mockClear();
+    isPending = false;
+  });
 
   it('patches profile when i18next language differs from stored value', async () => {
     await i18next.changeLanguage('nb');
@@ -159,16 +198,15 @@ describe('useMentorLanguageSync', () => {
   });
 
   it('skips when mutation is already in flight', async () => {
-    // re-mock with isPending: true
-    jest.doMock('./use-onboarding-dimensions', () => ({
-      useUpdateConversationLanguage: () => ({ mutate, isPending: true }),
-    }));
+    isPending = true; // toggled before render; the mocked hook closes over the live binding
     await i18next.changeLanguage('nb');
     renderHook(() => useMentorLanguageSync());
     await waitFor(() => expect(mutate).not.toHaveBeenCalled());
   });
 });
 ```
+
+**Why the `let isPending` indirection:** `jest.doMock` after the test file's top-level `import` does not retroactively rewrite the bound symbol — the hook under test has already imported the original mock factory. Using a mutable closure variable lets each test toggle the mock's return value before render without re-importing.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -239,9 +277,9 @@ export default function AppLayout() {
 }
 ```
 
-- [ ] **Step 2: Update the existing layout test if it asserts hooks**
+- [ ] **Step 2: Read the existing layout test before editing**
 
-Open `apps/mobile/src/app/(app)/_layout.test.tsx` (already in WIP per git status). If it shallow-renders the layout, ensure mocks for `useMentorLanguageSync` exist or the hook gracefully handles a no-profile state.
+`apps/mobile/src/app/(app)/_layout.test.tsx` is already modified (uncommitted) on this branch — `git status` shows it dirty. **Read it first** to understand the in-progress changes before adding mocks; do not overwrite. If it shallow-renders the layout, add a mock for `useMentorLanguageSync` returning `undefined` (the hook has no return value) so the test does not require a real `i18next`/profile mount. If it deep-renders, the hook should already be a no-op when `activeProfile` is undefined — confirm by reading the implementation.
 
 - [ ] **Step 3: Run layout tests**
 
