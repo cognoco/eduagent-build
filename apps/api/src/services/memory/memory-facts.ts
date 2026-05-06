@@ -256,12 +256,12 @@ export async function replaceActiveMemoryFactsForProfile(
         sql`${memoryFacts.supersededBy} IS NULL`
       )
     );
-  const embeddingByKey = new Map<string, number[] | null>();
+  // Keep category in the key because identical text in different categories can
+  // carry different semantics for downstream memory prompts.
+  const embeddingByKey = new Map<string, number[]>();
   for (const row of existing) {
-    embeddingByKey.set(
-      `${row.category}::${row.textNormalized}`,
-      row.embedding ?? null
-    );
+    if (row.embedding === null) continue;
+    embeddingByKey.set(`${row.category}::${row.textNormalized}`, row.embedding);
   }
 
   await db

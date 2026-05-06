@@ -50,6 +50,7 @@ import { makeEmbedderFromEnv } from '../memory/embed-fact';
 import {
   hasMemoryFactsBackfillMarker,
   readMemorySnapshotFromFacts,
+  type MemorySnapshot,
 } from '../memory/memory-facts';
 import { getRelevantMemories } from '../memory/relevance';
 import { getTeachingPreference } from '../retention-data';
@@ -323,24 +324,21 @@ export async function prepareExchangeContext(
   // CFLF-23: For freeform sessions with rawInput, also scan prior sessions
   // by the learner's original intent so the very first exchange has rich context.
   const isFreeformWithRawInput = isFreeform && !!session.rawInput;
-  let userMessageVector: number[] | undefined;
-  if (options?.voyageApiKey) {
-    try {
-      const embedding = await generateEmbedding(
-        userMessage,
-        options.voyageApiKey
-      );
-      userMessageVector = embedding.vector;
-    } catch (err) {
-      logger.warn(
-        '[session-exchange] userMessage embedding failed; memory falls back',
-        {
-          event: 'session_exchange.user_msg_embedding.failed',
-          reason: err instanceof Error ? err.message : String(err),
-        }
-      );
-    }
-  }
+  const userMessageVectorPromise: Promise<number[] | undefined> =
+    options?.voyageApiKey
+      ? generateEmbedding(userMessage, options.voyageApiKey)
+          .then((embedding) => embedding.vector)
+          .catch((err) => {
+            logger.warn(
+              '[session-exchange] userMessage embedding failed; memory falls back',
+              {
+                event: 'session_exchange.user_msg_embedding.failed',
+                reason: err instanceof Error ? err.message : String(err),
+              }
+            );
+            return undefined;
+          })
+      : Promise.resolve(undefined);
 
   // BUG-70: Supplementary data is static within a session (priorTopics,
   // teachingPref, learningMode, learningProfile, crossSubjectHighlights).
@@ -402,13 +400,15 @@ export async function prepareExchangeContext(
       // session-crud.ts getSessionTranscript for the full rationale.
       orderBy: [asc(sessionEvents.createdAt), asc(sessionEvents.id)],
     }),
-    retrieveRelevantMemory(
-      db,
-      profileId,
-      userMessage,
-      options?.voyageApiKey,
-      undefined,
-      userMessageVector
+    userMessageVectorPromise.then((userMessageVector) =>
+      retrieveRelevantMemory(
+        db,
+        profileId,
+        userMessage,
+        options?.voyageApiKey,
+        undefined,
+        userMessageVector
+      )
     ),
     // FR92: Load session metadata for interleaved topic list
     isInterleaved
@@ -865,27 +865,41 @@ export async function prepareExchangeContext(
     }
   }
 
+  const userMessageVector = await userMessageVectorPromise;
   const scopedRepo = createScopedRepository(db, profileId);
-  const memorySnapshot =
+  let memorySnapshot: MemorySnapshot | null = null;
+  if (
     learningProfile &&
     options?.memoryFactsRelevanceEnabled &&
     hasMemoryFactsBackfillMarker(learningProfile)
-      ? (
-          await getRelevantMemories({
-            profileId,
-            queryText: userMessage,
-            queryVector: userMessageVector,
-            k: 8,
-            profile: learningProfile,
-            scoped: scopedRepo,
-            embedder: makeEmbedderFromEnv(options.voyageApiKey),
-          })
-        ).snapshot
-      : learningProfile &&
-        options?.memoryFactsReadEnabled &&
-        hasMemoryFactsBackfillMarker(learningProfile)
-      ? await readMemorySnapshotFromFacts(scopedRepo, learningProfile)
-      : null;
+  ) {
+    const relevanceResult = await getRelevantMemories({
+      profileId,
+      queryText: userMessage,
+      queryVector: userMessageVector,
+      k: 8,
+      profile: learningProfile,
+      scoped: scopedRepo,
+      embedder: makeEmbedderFromEnv(options.voyageApiKey),
+    });
+    if (relevanceResult.source !== 'relevance') {
+      logger.warn('[memory_facts] relevance fallback', {
+        event: 'memory_facts.relevance.fallback',
+        source: relevanceResult.source,
+        profileId,
+      });
+    }
+    memorySnapshot = relevanceResult.snapshot;
+  } else if (
+    learningProfile &&
+    options?.memoryFactsReadEnabled &&
+    hasMemoryFactsBackfillMarker(learningProfile)
+  ) {
+    memorySnapshot = await readMemorySnapshotFromFacts(
+      scopedRepo,
+      learningProfile
+    );
+  }
 
   const memoryBlock = learningProfile
     ? buildMemoryBlock(

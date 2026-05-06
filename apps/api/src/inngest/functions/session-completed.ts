@@ -50,7 +50,7 @@ import {
   subjects,
   type Database,
 } from '@eduagent/database';
-import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { cefrLevelSchema, verificationTypeSchema } from '@eduagent/schemas';
 import {
   analyzeSessionTranscript,
@@ -86,6 +86,7 @@ export async function embedNewFactsForProfile(
         sql`${memoryFacts.supersededBy} IS NULL`
       )
     )
+    .orderBy(desc(memoryFacts.createdAt), desc(memoryFacts.id))
     .limit(options?.limit ?? 50);
 
   let embedded = 0;

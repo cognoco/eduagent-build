@@ -94,6 +94,25 @@ describe('embedFactText', () => {
     });
   });
 
+  it.each([401, 403])(
+    'classifies a %i auth response as transient',
+    async (status) => {
+      const fn: EmbeddingFn = async () => {
+        throw new Error(
+          `Voyage AI embedding request failed (${status}): auth failed`
+        );
+      };
+
+      const result = await embedFactText('some fact', fn);
+
+      expect(result).toMatchObject({
+        ok: false,
+        class: 'transient',
+        reason: 'transient',
+      });
+    }
+  );
+
   it('classifies a 500 response as transient', async () => {
     const fn: EmbeddingFn = async () => {
       throw new Error(

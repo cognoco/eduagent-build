@@ -40,6 +40,7 @@ function classifyVoyageError(err: unknown): EmbedFailureClass {
     const rawStatus = match[1];
     if (!rawStatus) return 'transient';
     const status = parseInt(rawStatus, 10);
+    if (status === 401 || status === 403) return 'transient';
     if (status === 429) return 'rate_limited';
     if (status >= 400 && status < 500) return 'invalid_input';
     if (status >= 500) return 'transient';

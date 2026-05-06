@@ -17,10 +17,12 @@ export interface RelevanceWeights {
 
 // Defaults match spec at docs/specs/2026-05-05-memory-architecture-upgrade.md
 export const DEFAULT_WEIGHTS: RelevanceWeights = {
-  relevance: 0.7,
-  recency: 0.3,
-  halflifeDays: 90,
+  relevance: 0.85,
+  recency: 0.15,
+  halflifeDays: 180,
 };
+
+const STAGE1_CANDIDATE_MULTIPLIER = 4;
 
 export interface RelevanceResult {
   snapshot: MemorySnapshot;
@@ -76,7 +78,7 @@ export async function getRelevantMemories(
 
   const candidates = await args.scoped.memoryFacts.findRelevant(
     queryVector,
-    args.k
+    args.k * STAGE1_CANDIDATE_MULTIPLIER
   );
   if (candidates.length === 0) {
     return {
@@ -115,7 +117,8 @@ function scoreRow(
     0,
     (now.getTime() - observedAt.getTime()) / 86_400_000
   );
-  const relevance = 1 - row.distance / 2;
+  const distance = Math.min(2, Math.max(0, row.distance));
+  const relevance = 1 - distance / 2;
   const recency = Math.exp(-ageDays / weights.halflifeDays);
 
   return relevance * weights.relevance + recency * weights.recency;

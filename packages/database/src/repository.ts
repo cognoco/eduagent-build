@@ -13,6 +13,7 @@ import {
 } from 'drizzle-orm';
 import type { Database } from './client';
 import { applyStreakDecay } from './streaks-rules';
+import { VECTOR_DIM } from './schema/_pgvector';
 import {
   profiles,
   consentStates,
@@ -402,9 +403,15 @@ export function createScopedRepository(db: Database, profileId: string) {
         k: number,
         extraWhere?: SQL
       ) {
-        if (queryEmbedding.length === 0 || k <= 0) return [];
+        if (
+          queryEmbedding.length !== VECTOR_DIM ||
+          queryEmbedding.some((value) => !Number.isFinite(value)) ||
+          k <= 0
+        ) {
+          return [];
+        }
 
-        const overFetch = Math.max(k * 4, k);
+        const overFetch = k * 4;
         const queryLiteral = sql`${`[${queryEmbedding.join(',')}]`}::vector`;
         const defaultFilters = and(
           sql`${memoryFacts.supersededBy} IS NULL`,

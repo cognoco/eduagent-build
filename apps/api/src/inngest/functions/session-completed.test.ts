@@ -10,7 +10,12 @@ import { PgDialect } from 'drizzle-orm/pg-core';
 
 const col = (name: string) => ({ name });
 const chainable = () => ({
-  from: () => ({ where: () => ({ limit: () => Promise.resolve([]) }) }),
+  from: () => ({
+    where: () => ({
+      orderBy: () => ({ limit: () => Promise.resolve([]) }),
+      limit: () => Promise.resolve([]),
+    }),
+  }),
 });
 const mockSessionCompletedDb = createTransactionalMockDb({
   query: {
@@ -791,7 +796,12 @@ describe('sessionCompleted', () => {
       // Override the createDatabase mock to return a db with the desired subject
       (createDatabase as jest.Mock).mockImplementationOnce(() => {
         const chainable = () => ({
-          from: () => ({ where: () => ({ limit: () => Promise.resolve([]) }) }),
+          from: () => ({
+            where: () => ({
+              orderBy: () => ({ limit: () => Promise.resolve([]) }),
+              limit: () => Promise.resolve([]),
+            }),
+          }),
         });
         const db: Record<string, unknown> = {
           query: {
@@ -2121,7 +2131,9 @@ describe('embedNewFactsForProfile', () => {
       select: jest.fn().mockReturnValue({
         from: jest.fn().mockReturnValue({
           where: jest.fn().mockReturnValue({
-            limit: jest.fn().mockResolvedValue([fakeRow]),
+            orderBy: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([fakeRow]),
+            }),
           }),
         }),
       }),
@@ -2160,7 +2172,8 @@ describe('embedNewFactsForProfile', () => {
     const { sql: sqlString } = dialect.sqlToQuery(whereCondition.getSQL());
     // The IS NULL guard must appear — if it were absent, a concurrent second
     // writer would overwrite an already-set embedding vector.
-    expect(sqlString).toMatch(/is null/i);
+    expect(sqlString).toMatch(/\bis null\)?$/i);
+    expect(sqlString.match(/\bis null/gi)).toHaveLength(1);
   });
 
   it('[I3] embedder is not called when all rows already have embeddings (SELECT isNull filter)', async () => {
@@ -2169,7 +2182,9 @@ describe('embedNewFactsForProfile', () => {
       select: jest.fn().mockReturnValue({
         from: jest.fn().mockReturnValue({
           where: jest.fn().mockReturnValue({
-            limit: jest.fn().mockResolvedValue([]),
+            orderBy: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([]),
+            }),
           }),
         }),
       }),
