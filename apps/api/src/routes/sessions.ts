@@ -73,9 +73,13 @@ import {
 } from '../config';
 
 const logger = createLogger();
-const retryFilingParamsSchema = z.object({
-  sessionId: z.string().uuid(),
-});
+
+// [BUG-CONT-DEPTH-SWEEP] Follow-up: apply zValidator('param', sessionIdParamsSchema)
+// to ALL /:sessionId endpoints in this file (GET /sessions/:sessionId,
+// /transcript, /evaluate-depth, /recall-bridge, /close, etc.) for consistent
+// UUID validation and early rejection of malformed IDs.
+
+// retryFilingParamsSchema was byte-identical to sessionIdParamsSchema; consolidated.
 const sessionIdParamsSchema = z.object({
   sessionId: z.string().uuid(),
 });
@@ -199,7 +203,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
 
   .post(
     '/sessions/:sessionId/retry-filing',
-    zValidator('param', retryFilingParamsSchema),
+    zValidator('param', sessionIdParamsSchema),
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
