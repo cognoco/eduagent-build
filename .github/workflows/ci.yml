@@ -141,6 +141,26 @@ jobs:
       - name: Prompt marker-token check
         run: bash scripts/check-prompt-markers.sh
 
+      # GC1 ratchet (Tier 1): block PRs that add NEW relative-path jest.mock()
+      # calls in test files. Existing legacy sites are grandfathered. To allow
+      # a legitimate new internal mock, add `// gc1-allow: <reason>` on the
+      # same line as the jest.mock(...) call. See CLAUDE.md → "Code Quality
+      # Guards" → "No new internal jest.mock()".
+      - name: GC1 — no new internal jest.mock
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          violations=$(git diff "origin/${{ github.base_ref }}...HEAD" -- '*.test.ts' '*.test.tsx' \
+            | grep -E '^\+[^+]' \
+            | grep -E "jest\.mock\(['\"]\.\.?/" \
+            | grep -v 'gc1-allow' \
+            || true)
+          if [ -n "$violations" ]; then
+            echo "::error::New internal jest.mock() call(s) detected. Use jest.requireActual() with targeted overrides, or add '// gc1-allow: <reason>' on the same line if external-boundary justified. See CLAUDE.md → 'No new internal jest.mock()'."
+            echo "$violations"
+            exit 1
+          fi
+
       # Structural-regression guards under scripts/ (BUG-979 / BUG-974). Nx
       # does not pick these up — they live outside any project — so we run
       # them directly through ts-jest via scripts/jest.config.cjs.
