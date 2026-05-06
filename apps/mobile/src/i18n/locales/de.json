@@ -166,6 +166,13 @@
     "demoAlertTitle": "Vorschaumodus",
     "demoAlertMessage": "Verknüpfe das Konto deines Kindes, um echte Daten zu sehen."
   },
+  "family": {
+    "orientationCueBody": "Children, their progress, and family settings live here.",
+    "orientationCueDismiss": "Got it",
+    "orientationCueTitle": "This is your family hub",
+    "subtitle": "Everyone you're learning alongside.",
+    "title": "Family"
+  },
   "more": {
     "screenTitle": "Mehr",
     "active": "Aktiv",
@@ -1774,6 +1781,8 @@
     },
     "home": "Start",
     "homeLabel": "Start",
+    "family": "Family",
+    "familyLabel": "Family tab",
     "library": "Bibliothek",
     "libraryLabel": "Bibliothek",
     "progress": "Fortschritt",

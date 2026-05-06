@@ -122,7 +122,7 @@ describe('ParentGateway', () => {
     fireEvent.press(screen.getByTestId('gateway-check-progress'));
     // [BUG-905] Pass returnTo=home so the dashboard back button lands the
     // parent on Home, not on the More tab.
-    expect(mockPush).toHaveBeenCalledWith('/(app)/dashboard?returnTo=home');
+    expect(mockPush).toHaveBeenCalledWith('/(app)/family?returnTo=home');
   });
 
   it('calls onLearn when "Learn something" is pressed', () => {

@@ -166,6 +166,13 @@
     "demoAlertTitle": "プレビューモード",
     "demoAlertMessage": "お子様のアカウントをリンクして、実際のデータを確認しましょう。"
   },
+  "family": {
+    "orientationCueBody": "Children, their progress, and family settings live here.",
+    "orientationCueDismiss": "Got it",
+    "orientationCueTitle": "This is your family hub",
+    "subtitle": "Everyone you're learning alongside.",
+    "title": "Family"
+  },
   "more": {
     "screenTitle": "その他",
     "active": "アクティブ",
@@ -1774,6 +1781,8 @@
     },
     "home": "ホーム",
     "homeLabel": "ホーム",
+    "family": "Family",
+    "familyLabel": "Family tab",
     "library": "ライブラリ",
     "libraryLabel": "ライブラリ",
     "progress": "進捗",

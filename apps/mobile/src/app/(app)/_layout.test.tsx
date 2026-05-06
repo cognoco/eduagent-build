@@ -136,6 +136,7 @@ jest.mock('../../components/feedback/FeedbackProvider', () => ({
 // Route: GET /subjects → { subjects: [] }
 
 const AppLayout = require('./_layout').default;
+const { computeVisibleTabs } = require('./_layout');
 
 describe('AppLayout', () => {
   let testQueryClient: QueryClient;
@@ -220,6 +221,22 @@ describe('AppLayout', () => {
       '/subjects',
       () =>
         new Response(JSON.stringify({ subjects: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+    );
+    mockFetch.setRoute(
+      '/dashboard',
+      () =>
+        new Response(JSON.stringify({ children: [], demoMode: false }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+    );
+    mockFetch.setRoute(
+      '/dashboard/demo',
+      () =>
+        new Response(JSON.stringify({ children: [], demoMode: true }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         })
@@ -746,6 +763,22 @@ describe('AppLayout', () => {
     await waitFor(() => {
       screen.getByTestId('tabs');
     });
+  });
+});
+
+describe('computeVisibleTabs', () => {
+  it('does not include family when no linked children are present', () => {
+    const tabs = computeVisibleTabs(false);
+    expect(tabs.has('home')).toBe(true);
+    expect(tabs.has('library')).toBe(true);
+    expect(tabs.has('progress')).toBe(true);
+    expect(tabs.has('more')).toBe(true);
+    expect(tabs.has('family')).toBe(false);
+  });
+
+  it('includes family when linked children are present', () => {
+    const tabs = computeVisibleTabs(true);
+    expect(tabs.has('family')).toBe(true);
   });
 });
 

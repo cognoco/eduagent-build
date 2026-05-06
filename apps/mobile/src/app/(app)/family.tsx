@@ -1,0 +1,284 @@
+import {
+  View,
+  Text,
+  Pressable,
+  ScrollView,
+  RefreshControl,
+  ActivityIndicator,
+} from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import type { Href } from 'expo-router';
+import { useTranslation } from 'react-i18next';
+import { goBackOrReplace } from '../../lib/navigation';
+import { platformAlert } from '../../lib/platform-alert';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ParentDashboardSummary } from '../../components/coaching';
+import { FamilyOrientationCue } from '../../components/family/FamilyOrientationCue';
+import type { RetentionStatus } from '../../components/progress';
+import { useDashboard } from '../../hooks/use-dashboard';
+
+function CardSkeleton(): React.ReactNode {
+  return (
+    <View
+      className="bg-coaching-card rounded-card p-5 mt-4"
+      testID="family-skeleton"
+    >
+      <View className="bg-border rounded h-6 w-1/2 mb-3" />
+      <View className="bg-border rounded h-4 w-full mb-2" />
+      <View className="bg-border rounded h-4 w-3/4 mb-4" />
+      <View className="flex-row gap-2 mb-4">
+        <View className="bg-border rounded-full h-7 w-24" />
+        <View className="bg-border rounded-full h-7 w-20" />
+      </View>
+      <View className="bg-border rounded-button h-12 w-full" />
+    </View>
+  );
+}
+
+function DemoBanner(): React.ReactNode {
+  const { t } = useTranslation();
+  return (
+    <View
+      className="bg-accent/10 border border-accent/30 rounded-card px-4 py-3 mt-2 mb-2"
+      testID="demo-banner"
+      accessibilityRole="header"
+      accessibilityLabel={t('dashboard.demoBannerLabel')}
+    >
+      <Text className="text-body-sm font-semibold text-accent">
+        {t('dashboard.demoPreviewLabel')}
+      </Text>
+      <Text className="text-caption text-text-secondary mt-1">
+        {t('dashboard.demoPreviewMessage')}
+      </Text>
+    </View>
+  );
+}
+
+function renderChildCards(
+  children: {
+    profileId: string;
+    displayName: string;
+    summary: string;
+    sessionsThisWeek: number;
+    sessionsLastWeek: number;
+    totalTimeThisWeek: number;
+    totalTimeLastWeek: number;
+    trend: string;
+    retentionTrend?: string;
+    totalSessions?: number;
+    subjects: { name: string; retentionStatus: string }[];
+    progress?: {
+      topicsMastered: number;
+      vocabularyTotal: number;
+      weeklyDeltaTopicsMastered: number | null;
+      weeklyDeltaVocabularyTotal: number | null;
+      weeklyDeltaTopicsExplored: number | null;
+      engagementTrend: 'increasing' | 'stable' | 'declining';
+      guidance: string | null;
+    } | null;
+  }[],
+  onDrillDown: (profileId: string) => void
+): React.ReactNode {
+  return children.map((child) => (
+    <ParentDashboardSummary
+      key={child.profileId}
+      profileId={child.profileId}
+      childName={child.displayName}
+      summary={child.summary}
+      sessionsThisWeek={child.sessionsThisWeek}
+      sessionsLastWeek={child.sessionsLastWeek}
+      totalTimeThisWeek={child.totalTimeThisWeek}
+      totalTimeLastWeek={child.totalTimeLastWeek}
+      trend={child.trend as 'up' | 'down' | 'stable'}
+      retentionTrend={
+        child.retentionTrend as 'improving' | 'declining' | 'stable' | undefined
+      }
+      totalSessions={child.totalSessions}
+      progress={child.progress}
+      subjects={child.subjects.map((s) => ({
+        name: s.name,
+        retentionStatus: s.retentionStatus as RetentionStatus,
+      }))}
+      onDrillDown={() => onDrillDown(child.profileId)}
+    />
+  ));
+}
+
+export default function FamilyScreen() {
+  const { t } = useTranslation();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { returnTo: rawReturnTo } = useLocalSearchParams<{
+    returnTo?: string;
+  }>();
+  // [BUG-905] Honor returnTo so the back button lands the parent on the screen
+  // they came from. Defaults to /home — most parent dashboard entries originate
+  // there via the "Check child's progress" intent card.
+  const returnTo = Array.isArray(rawReturnTo) ? rawReturnTo[0] : rawReturnTo;
+  const backFallback: Href =
+    returnTo === 'more' ? '/(app)/more' : '/(app)/home';
+  const {
+    data: dashboard,
+    isLoading: dashboardLoading,
+    isError,
+    refetch,
+    isRefetching,
+  } = useDashboard();
+
+  const isDemo = dashboard?.demoMode === true;
+
+  const handleDrillDown = (profileId: string): void => {
+    if (isDemo) {
+      platformAlert(
+        t('dashboard.demoAlertTitle'),
+        t('dashboard.demoAlertMessage'),
+        [{ text: t('common.done') }]
+      );
+      return;
+    }
+    router.push({
+      pathname: '/(app)/child/[profileId]',
+      params: { profileId },
+    } as never);
+  };
+
+  return (
+    <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
+      <View className="px-5 pt-4 pb-2">
+        <Pressable
+          onPress={() => goBackOrReplace(router, backFallback)}
+          className="mb-2 self-start"
+          hitSlop={12}
+          testID="family-back"
+          accessibilityLabel={t('dashboard.backLabel')}
+          accessibilityRole="button"
+        >
+          <Text className="text-body text-accent">← {t('common.back')}</Text>
+        </Pressable>
+        <Text className="text-h1 font-bold text-text-primary">
+          {t('family.title')}
+        </Text>
+        <Text className="text-body-sm text-text-secondary mt-1">
+          {isDemo ? t('dashboard.demoDashboardHint') : t('family.subtitle')}
+        </Text>
+      </View>
+      <ScrollView
+        className="flex-1 px-5"
+        contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
+        testID="family-scroll"
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={() => refetch()}
+          />
+        }
+      >
+        <FamilyOrientationCue />
+        {dashboardLoading || (!dashboard && !isError) ? (
+          <>
+            <CardSkeleton />
+            <CardSkeleton />
+          </>
+        ) : isError ? (
+          <View className="items-center justify-center py-12 px-4">
+            <Text className="text-h3 font-semibold text-text-primary mb-2">
+              {t('dashboard.errorTitle')}
+            </Text>
+            <Text className="text-body text-text-secondary text-center mb-4">
+              {t('dashboard.errorMessage')}
+            </Text>
+            <Pressable
+              onPress={() => refetch()}
+              disabled={isRefetching}
+              className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
+              accessibilityLabel={t('dashboard.retryLoadingLabel')}
+              accessibilityRole="button"
+              testID="family-retry-button"
+            >
+              {isRefetching ? (
+                <ActivityIndicator
+                  size="small"
+                  color="white"
+                  testID="dashboard-retry-loading"
+                />
+              ) : (
+                <Text className="text-text-inverse text-body font-semibold">
+                  {t('common.retry')}
+                </Text>
+              )}
+            </Pressable>
+            <View className="flex-row gap-3 mt-3">
+              <Pressable
+                onPress={() => router.replace('/(app)/library' as never)}
+                className="bg-surface rounded-button px-5 py-3 min-h-[48px] items-center justify-center"
+                accessibilityRole="button"
+                accessibilityLabel={t('dashboard.libraryFallbackLabel')}
+                testID="dashboard-library-fallback"
+              >
+                <Text className="text-body font-semibold text-text-primary">
+                  {t('dashboard.libraryButton')}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => router.replace('/(app)/more' as never)}
+                className="bg-surface rounded-button px-5 py-3 min-h-[48px] items-center justify-center"
+                accessibilityRole="button"
+                accessibilityLabel={t('dashboard.moreFallbackLabel')}
+                testID="dashboard-more-fallback"
+              >
+                <Text className="text-body font-semibold text-text-primary">
+                  {t('dashboard.moreButton')}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : dashboard?.children && dashboard.children.length > 0 ? (
+          <>
+            {isDemo && <DemoBanner />}
+            {renderChildCards(dashboard.children, handleDrillDown)}
+            {isDemo && (
+              <Pressable
+                onPress={() => router.push('/(app)/more' as never)}
+                className="bg-accent rounded-button mt-6 py-3 min-h-[48px] items-center justify-center"
+                accessibilityRole="button"
+                accessibilityLabel={t('dashboard.linkChildCtaLabel')}
+                testID="demo-link-child-cta"
+              >
+                <Text className="text-body font-semibold text-white">
+                  {t('dashboard.linkChildCta')}
+                </Text>
+              </Pressable>
+            )}
+          </>
+        ) : (
+          <View className="py-8 items-center" testID="dashboard-empty">
+            <Text className="text-body text-text-secondary text-center mb-6">
+              {t('dashboard.emptyMessage')}
+            </Text>
+            <Pressable
+              onPress={() => router.push('/(app)/more' as never)}
+              className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center mb-3"
+              accessibilityRole="button"
+              accessibilityLabel={t('dashboard.addChildLabel')}
+              testID="dashboard-empty-add-child"
+            >
+              <Text className="text-body font-semibold text-text-inverse">
+                {t('dashboard.addChild')}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => goBackOrReplace(router, '/(app)/home')}
+              accessibilityRole="button"
+              accessibilityLabel={t('dashboard.continueSoloLabel')}
+              testID="dashboard-empty-solo"
+            >
+              <Text className="text-body text-primary font-semibold">
+                {t('dashboard.continueSolo')}
+              </Text>
+            </Pressable>
+          </View>
+        )}
+      </ScrollView>
+    </View>
+  );
+}

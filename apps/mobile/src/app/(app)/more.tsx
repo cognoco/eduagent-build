@@ -607,7 +607,7 @@ export default function MoreScreen() {
                   count: linkedChildren.length,
                 })}
                 onPress={() =>
-                  router.push('/(app)/dashboard?returnTo=more' as never)
+                  router.push(`${FAMILY_HOME_PATH}?returnTo=more` as never)
                 }
               />
             )}

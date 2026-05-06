@@ -279,7 +279,7 @@ describe('MoreScreen — Learning Mode', () => {
     expect(mockTrack).toHaveBeenCalledWith('child_progress_navigated', {
       source: 'more_section',
     });
-    expect(mockPush).toHaveBeenCalledWith('/(app)/dashboard');
+    expect(mockPush).toHaveBeenCalledWith('/(app)/family');
   });
 
   // BUG-909: When the profile is an owner with linked children, the

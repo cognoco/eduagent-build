@@ -166,6 +166,13 @@
     "demoAlertTitle": "Forhåndsvisningsmodus",
     "demoAlertMessage": "Koble til barnets konto for å se ekte data."
   },
+  "family": {
+    "orientationCueBody": "Children, their progress, and family settings live here.",
+    "orientationCueDismiss": "Got it",
+    "orientationCueTitle": "This is your family hub",
+    "subtitle": "Everyone you're learning alongside.",
+    "title": "Family"
+  },
   "more": {
     "screenTitle": "Mer",
     "active": "Aktiv",
@@ -1774,6 +1781,8 @@
     },
     "home": "Hjem",
     "homeLabel": "Hjem",
+    "family": "Family",
+    "familyLabel": "Family tab",
     "library": "Bibliotek",
     "libraryLabel": "Bibliotek",
     "progress": "Fremgang",
