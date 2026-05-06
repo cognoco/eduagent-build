@@ -139,6 +139,12 @@
       "learnSomething": "Lerne etwas",
       "dashboardError": "Wir konnten das Dashboard nicht laden",
       "reviewHealth": "Gesundheit überprüfen"
+    },
+    "notices": {
+      "consentArchivedTitle": "{{name}}'s account was archived",
+      "consentArchivedBody": "Data is retained for 30 days, then deleted.",
+      "consentDeletedTitle": "{{name}}'s account was deleted",
+      "consentDeletedBody": "The withdrawal grace period has ended."
     }
   },
   "dashboard": {
@@ -282,7 +288,18 @@
       "pl": "Polnisch",
       "pt": "Portugiesisch"
     },
-    "appVersion": "MentoMate v1.0.0"
+    "appVersion": "MentoMate v1.0.0",
+    "privacy": {
+      "sectionHeader": "Privacy",
+      "withdrawalArchiveTitle": "When I withdraw consent for a child",
+      "withdrawalArchiveAuto": "Automatic",
+      "withdrawalArchiveAutoDescription": "Under-13 accounts are deleted at grace expiry. 13+ accounts are archived for 30 days, then deleted.",
+      "withdrawalArchiveAlways": "Always archive (30 days)",
+      "withdrawalArchiveAlwaysDescription": "13+ accounts only. Under-13 always deletes immediately for privacy compliance.",
+      "withdrawalArchiveNever": "Never archive - delete immediately",
+      "withdrawalArchiveNeverDescription": "Delete at grace expiry instead of keeping a 30-day archive.",
+      "withdrawalArchiveError": "Couldn't update setting. Try again."
+    }
   },
   "session": {
     "mentorMemory": {
@@ -1504,7 +1521,7 @@
       "withdrawing": "Wird widerrufen...",
       "withdrawConsentConfirmTitle": "Zustimmung widerrufen?",
       "thisChild": "dieses Kind",
-      "withdrawConsentBody": "Das Widerrufen der Zustimmung stoppt alle Lernsitzungen für dieses Kind und löscht seine Daten.",
+      "withdrawConsentBody": "{{childName}}'s account and learning data will be deleted after a 7-day grace period. (For under-13 accounts, deletion is immediate at grace expiry to align with privacy law.)",
       "confirmWithdrawConsent": "Bestätigen – Zustimmung widerrufen",
       "withdraw": "Widerrufen"
     },

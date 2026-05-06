@@ -9,6 +9,7 @@ import {
   usePendingCelebrations,
 } from '../../hooks/use-celebrations';
 import { useCelebrationLevel } from '../../hooks/use-settings';
+import { useAckNotice, useDashboard } from '../../hooks/use-dashboard';
 import { useProfile } from '../../lib/profile';
 
 /** True when the active user is the account owner AND has at least one child profile. */
@@ -32,6 +33,8 @@ export default function HomeScreen(): React.ReactElement {
   const { data: celebrationLevel = 'all' } = useCelebrationLevel();
   const { data: pendingCelebrations } = usePendingCelebrations();
   const markCelebrationsSeen = useMarkCelebrationsSeen();
+  const { data: dashboard } = useDashboard();
+  const ackNotice = useAckNotice();
   const isOwner = activeProfile?.isOwner === true;
   const { CelebrationOverlay } = useCelebration({
     queue: pendingCelebrations ?? [],
@@ -55,6 +58,14 @@ export default function HomeScreen(): React.ReactElement {
   const [loadingTimedOut, setLoadingTimedOut] = useState(false);
   const isParentGatewayEligible = hasLinkedChildren(activeProfile, profiles);
   const [showLearnerView, setShowLearnerView] = useState(false);
+  const firstNotice = isOwner ? dashboard?.pendingNotices?.[0] : undefined;
+  const [visibleNoticeId, setVisibleNoticeId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (firstNotice?.id) {
+      setVisibleNoticeId(firstNotice.id);
+    }
+  }, [firstNotice?.id]);
 
   useEffect(() => {
     if (!isLoading) {
@@ -75,6 +86,15 @@ export default function HomeScreen(): React.ReactElement {
       setShowLearnerView(true);
     }
   }, [isParentGatewayEligible, view]);
+
+  useEffect(() => {
+    if (!firstNotice || visibleNoticeId !== firstNotice.id) return;
+    const timer = setTimeout(() => {
+      setVisibleNoticeId(null);
+      ackNotice.mutate({ id: firstNotice.id });
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [ackNotice, firstNotice, visibleNoticeId]);
 
   // Neutral placeholder while profiles load — prevents flash of wrong content
   // (e.g. parent briefly seeing LearnerScreen before ParentGateway renders).
@@ -157,6 +177,27 @@ export default function HomeScreen(): React.ReactElement {
         />
       )}
       {CelebrationOverlay}
+      {firstNotice && visibleNoticeId === firstNotice.id ? (
+        <View
+          className="absolute left-5 right-5 bottom-8 bg-surface border border-border rounded-card px-4 py-3"
+          testID="post-grace-notice-toast"
+        >
+          <Text className="text-body font-semibold text-text-primary">
+            {firstNotice.type === 'consent_archived'
+              ? t('home.notices.consentArchivedTitle', {
+                  name: firstNotice.payload.childName,
+                })
+              : t('home.notices.consentDeletedTitle', {
+                  name: firstNotice.payload.childName,
+                })}
+          </Text>
+          <Text className="text-body-sm text-text-secondary mt-1">
+            {firstNotice.type === 'consent_archived'
+              ? t('home.notices.consentArchivedBody')
+              : t('home.notices.consentDeletedBody')}
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }

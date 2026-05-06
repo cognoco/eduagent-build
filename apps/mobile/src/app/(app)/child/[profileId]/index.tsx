@@ -834,7 +834,8 @@ export default function ChildDetailScreen() {
             </Text>
             <Text className="text-body-sm text-text-secondary text-center mt-3 leading-relaxed">
               {t('parentView.index.withdrawConsentBody', {
-                name: child?.displayName ?? t('parentView.index.thisChild'),
+                childName:
+                  child?.displayName ?? t('parentView.index.thisChild'),
               })}
             </Text>
             <View className="mt-5 gap-3">
