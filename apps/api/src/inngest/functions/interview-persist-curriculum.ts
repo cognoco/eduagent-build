@@ -99,7 +99,7 @@ export const interviewPersistCurriculum = inngest.createFunction(
       goals: string[];
       experienceLevel: string;
       currentKnowledge: string;
-      interests: string[];
+      interests?: string[];
     };
 
     const signals = await step.run('extract-signals', async () => {
@@ -123,7 +123,7 @@ export const interviewPersistCurriculum = inngest.createFunction(
         );
         if (
           !fresh ||
-          (fresh.goals.length === 0 && fresh.interests.length === 0)
+          (fresh.goals.length === 0 && (fresh.interests?.length ?? 0) === 0)
         ) {
           throw new PersistCurriculumError('empty_signals');
         }

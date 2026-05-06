@@ -79,6 +79,7 @@ import {
   processInterviewExchange,
   streamInterviewExchange,
   extractSignals,
+  inferPaceHint,
   getOrCreateDraft,
   getDraftState,
   updateDraft,
@@ -766,6 +767,55 @@ describe('extractSignals', () => {
     expect(result.interests).toEqual(['chess club', 'anime', 'football']);
   });
 
+  it('extracts fast-path interest context and analogy framing', async () => {
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response: JSON.stringify({
+        goals: ['learn fractions'],
+        experienceLevel: 'beginner',
+        currentKnowledge: 'some division',
+        interests: ['football', 'science club'],
+        interestContext: {
+          football: 'free_time',
+          'science club': 'school',
+        },
+        analogyFraming: 'playful',
+      }),
+    });
+
+    const result = await extractSignals([
+      {
+        role: 'user',
+        content: 'I play football after school and like science club jokes.',
+      },
+    ]);
+
+    expect(result.interestContext).toEqual({
+      football: 'free_time',
+      'science club': 'school',
+    });
+    expect(result.analogyFraming).toBe('playful');
+    expect(result.paceHint).toEqual({ density: 'medium', chunkSize: 'medium' });
+  });
+
+  it('defaults weak fast-path fields conservatively', async () => {
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response: JSON.stringify({
+        goals: [],
+        experienceLevel: 'beginner',
+        currentKnowledge: '',
+        interests: ['chess'],
+        interestContext: { chess: 'unknown' },
+        analogyFraming: 'sarcastic',
+      }),
+    });
+
+    const result = await extractSignals([{ role: 'user', content: 'ok' }]);
+
+    expect(result.interestContext).toEqual({ chess: 'both' });
+    expect(result.analogyFraming).toBe('concrete');
+    expect(result.paceHint).toEqual({ density: 'low', chunkSize: 'short' });
+  });
+
   it('[BKT-C.2] returns empty interests array when field missing', async () => {
     // Backward compat: prompt asks for interests but a legacy cached response
     // or off-schema reply omits them. Consumers must tolerate [].
@@ -958,6 +1008,34 @@ describe('extractSignals', () => {
 
     const result = await extractSignals([{ role: 'user', content: 'hi' }]);
     expect(result.goals).toEqual(['learn long division', 'master decimals']);
+  });
+});
+
+describe('inferPaceHint', () => {
+  it('returns short/low for terse user turns', () => {
+    const hint = inferPaceHint([
+      { role: 'user', content: 'ok' },
+      { role: 'assistant', content: '...' },
+      { role: 'user', content: 'idk' },
+      { role: 'assistant', content: '...' },
+      { role: 'user', content: 'sure' },
+    ]);
+    expect(hint).toEqual({ density: 'low', chunkSize: 'short' });
+  });
+
+  it('returns long/high for verbose user turns', () => {
+    const longText = 'I really want to understand this because '.repeat(20);
+    const hint = inferPaceHint([
+      { role: 'user', content: longText },
+      { role: 'assistant', content: '...' },
+      { role: 'user', content: longText },
+    ]);
+    expect(hint).toEqual({ density: 'high', chunkSize: 'long' });
+  });
+
+  it('returns medium defaults when no user turns exist', () => {
+    const hint = inferPaceHint([{ role: 'assistant', content: 'hello' }]);
+    expect(hint).toEqual({ density: 'medium', chunkSize: 'medium' });
   });
 });
 

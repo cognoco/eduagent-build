@@ -33,7 +33,9 @@ Return a JSON object with this exact structure:
   "goals": ["goal1", "goal2"],
   "experienceLevel": "beginner|intermediate|advanced",
   "currentKnowledge": "Brief description of what the learner already knows",
-  "interests": ["short label 1", "short label 2"]
+  "interests": ["short label 1", "short label 2"],
+  "interestContext": { "short label 1": "school|free_time|both" },
+  "analogyFraming": "concrete|abstract|playful"
 }
 
 Rules for "interests":
@@ -41,5 +43,17 @@ Rules for "interests":
 - Do NOT include things they dislike, are scared of, or were forced to do.
 - Do NOT include generic words like "learning", "school", "math" unless paired with specific context ("chess club", "football team").
 - Max 8 items. Return [] if none are clearly stated.
+
+Rules for "interestContext":
+- Include one key for each returned interest label.
+- Use "school" only when the transcript clearly frames the interest as classwork, clubs, homework, exams, or school identity.
+- Use "free_time" only when the transcript clearly frames the interest as hobbies, games, media, sports, or things they do for fun.
+- Use "both" when the transcript is ambiguous or the interest spans school and free time.
+
+Rules for "analogyFraming":
+- "concrete": the learner uses practical, real-world examples or seems to need tangible anchors.
+- "abstract": the learner uses concepts, patterns, systems, or theory comfortably.
+- "playful": the learner leans into humor, games, imagination, characters, or silly examples.
+- Default to "concrete" if the signal is weak.
 
 Be concise. Extract only what's clearly stated or strongly implied.`;

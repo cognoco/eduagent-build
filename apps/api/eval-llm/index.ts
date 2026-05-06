@@ -32,6 +32,7 @@ import { sessionSummaryFlow } from './flows/session-summary';
 import { filingPreSessionFlow } from './flows/filing-pre-session';
 import { exchangesFlow } from './flows/exchanges';
 import { interviewFlow } from './flows/interview';
+import { interviewSignalsFlow } from './flows/interview-signals';
 import { interviewOrphanFlow } from './flows/interview-orphan';
 import { probesFlow } from './flows/probes';
 import {
@@ -80,6 +81,7 @@ const FLOWS: FlowDefinition[] = [
   filingPreSessionFlow as FlowDefinition,
   exchangesFlow as FlowDefinition,
   interviewFlow as FlowDefinition,
+  interviewSignalsFlow as FlowDefinition,
   interviewOrphanFlow as FlowDefinition,
   probesFlow as FlowDefinition,
 ];
