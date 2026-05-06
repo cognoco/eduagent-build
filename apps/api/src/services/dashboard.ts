@@ -1346,6 +1346,7 @@ export async function getChildSessionDetail(
     narrative: summary?.narrative ?? null,
     conversationPrompt: summary?.conversationPrompt ?? null,
     engagementSignal: parseEngagementSignal(summary?.engagementSignal),
+    drills: [],
   };
 }
 
