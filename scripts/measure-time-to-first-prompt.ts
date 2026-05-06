@@ -85,7 +85,84 @@ export function percentile(
 }
 
 export function aggregate(rows: ReadonlyArray<RawRow>): ResultBundle {
-  throw new Error('not implemented');
+  const empty: CohortStats = {
+    count: 0,
+    p50Seconds: null,
+    p75Seconds: null,
+    p90Seconds: null,
+  };
+  const emptyBundle: ResultBundle = {
+    windowStart: '',
+    windowEnd: '',
+    totalFirstSubjects: 0,
+    reachedFirstPrompt: 0,
+    buckets: {
+      reachedWithinCap: 0,
+      delayedStart: 0,
+      noAiAfterSessionStart: 0,
+      noSession: 0,
+    },
+    overall: { ...empty },
+    language: { ...empty },
+    nonLanguage: { ...empty },
+  };
+
+  if (rows.length === 0) return emptyBundle;
+
+  const buckets = {
+    reachedWithinCap: [] as RawRow[],
+    delayedStart: 0,
+    noAiAfterSessionStart: 0,
+    noSession: 0,
+  };
+
+  const secondsFor = (r: RawRow): number =>
+    Math.round(
+      (r.firstAiResponseAt!.getTime() - r.subjectCreatedAt.getTime()) / 1000
+    );
+
+  for (const r of rows) {
+    if (r.firstSessionStartedAt === null) {
+      buckets.noSession += 1;
+      continue;
+    }
+    if (r.firstAiResponseAt === null) {
+      buckets.noAiAfterSessionStart += 1;
+      continue;
+    }
+    if (secondsFor(r) > REACHED_CAP_SECONDS) {
+      buckets.delayedStart += 1;
+      continue;
+    }
+    buckets.reachedWithinCap.push(r);
+  }
+
+  function statsFor(subset: ReadonlyArray<RawRow>): CohortStats {
+    const sorted = subset.map(secondsFor).sort((a, b) => a - b);
+    const n = sorted.length;
+    const p50 = n >= MIN_COHORT_FOR_P50 ? percentile(sorted, 50) : null;
+    const p75 = n >= MIN_COHORT_FOR_P75_P90 ? percentile(sorted, 75) : null;
+    const p90 = n >= MIN_COHORT_FOR_P75_P90 ? percentile(sorted, 90) : null;
+    return { count: n, p50Seconds: p50, p75Seconds: p75, p90Seconds: p90 };
+  }
+
+  return {
+    windowStart: '',
+    windowEnd: '',
+    totalFirstSubjects: rows.length,
+    reachedFirstPrompt: buckets.reachedWithinCap.length,
+    buckets: {
+      reachedWithinCap: buckets.reachedWithinCap.length,
+      delayedStart: buckets.delayedStart,
+      noAiAfterSessionStart: buckets.noAiAfterSessionStart,
+      noSession: buckets.noSession,
+    },
+    overall: statsFor(buckets.reachedWithinCap),
+    language: statsFor(buckets.reachedWithinCap.filter((r) => r.isLanguage)),
+    nonLanguage: statsFor(
+      buckets.reachedWithinCap.filter((r) => !r.isLanguage)
+    ),
+  };
 }
 
 async function main(): Promise<void> {
