@@ -49,6 +49,7 @@ jest.mock('../services/settings', () => { // gc1-allow: uses requireActual with 
 
 import { app } from '../index';
 import { BASE_AUTH_ENV, makeAuthHeaders } from '../test-utils/test-env';
+import { ForbiddenError } from '@eduagent/schemas';
 
 const AUTH_HEADERS = makeAuthHeaders();
 const PROFILE_HEADERS = { ...AUTH_HEADERS, 'X-Profile-Id': 'profile-1' };
@@ -153,7 +154,7 @@ describe('settings routes', () => {
 
   it('PUT /v1/settings/family-pool-breakdown-sharing rejects non-owner callers', async () => {
     mockUpsertFamilyPoolBreakdownSharing.mockRejectedValue(
-      new Error('Profile owner required')
+      new ForbiddenError('Profile owner required')
     );
 
     const res = await app.request(
