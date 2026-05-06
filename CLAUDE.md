@@ -82,18 +82,10 @@ Changed code is not fixed code. Every fix must be verified, not just applied. Th
 
 - **Security fixes require a "break test."** Every fix tagged CRITICAL or HIGH in a security or data-integrity context must include at least one negative-path test that attempts the exact attack being prevented (unauthorized access, missing auth, invalid input). Use the red-green regression pattern (see `superpowers:verification-before-completion` → "Regression tests"): write the test, watch it pass, revert the fix, watch it fail, restore.
 - **Silent recovery without escalation is banned.** Any `catch` block or fallback path in billing, auth, or webhook code that silently recovers must also emit a structured metric or Inngest event. `console.warn` alone is never sufficient — if you can't query how many times the fallback fired in the last 24 hours, the "recovery" is invisible.
-<<<<<<< HEAD
-- **Sweep when you fix.** When you fix a drift that has 3+ sibling locations, you have two acceptable options: (a) install a forward-only guard test that fails CI on new violations AND sweep all current sites in the same PR, or (b) document a deferred sweep with a tracked ID, owner, and target date. Never silently fix one of N — the next contributor reads the partial state as "the team's preferred way" and the inconsistency perpetuates. Pattern reference: BUG-743 / `apps/api/src/services/llm/integration-mock-guard.test.ts`.
-=======
-- **Sweep when you fix.** When you fix a drift that has 3+ sibling locations, either (a) sweep all current sites in the same PR with a forward-only guard test, or (b) document a deferred sweep with a tracked ID, owner, and target date. Never silently fix one of N.
 
-<<<<<<< HEAD
-Commit-specific rules (finding-ID references, Verified-By tables, sweep-audit blocks) live in `/my:commit`.
->>>>>>> 22df8044 (plan(audit): execution audit fixes + D-C4-3 revised to option C)
+- **Sweep when you fix.** When you fix a drift that has 3+ sibling locations, you have two acceptable options: (a) install a forward-only guard test that fails CI on new violations AND sweep all current sites in the same PR, or (b) document a deferred sweep with a tracked ID, owner, and target date. Never silently fix one of N — the next contributor reads the partial state as "the team's preferred way" and the inconsistency perpetuates. 
 
-=======
->>>>>>> 80a9f5ab (chore(claude): promote commit command to skill + archive old command)
-Commit-specific rules (finding-ID references, Verified-By tables, sweep-audit blocks) live in `/commit`.
+- Commit-specific rules (finding-ID references, Verified-By tables, sweep-audit blocks) live in `/commit`.
 
 ## Code Quality Guards
 
@@ -103,13 +95,6 @@ These rules catch bugs that survive type-checking and only surface at runtime. L
 - **Response bodies are single-use.** Never call both `.json()` and `.text()` on the same `fetch` Response — the body stream is consumed on first read. If you need both JSON parsing with a text fallback, read `.text()` once and `JSON.parse` it manually. Applies to `assertOk`-style helpers, error-extraction middleware, and SSE error handlers.
 - **Classify errors before formatting.** When code branches on error *type* (reconnectable vs. fatal, quota vs. network) and also formats errors for display, classify the **raw** error object first, then format for the user. Never string-match on the output of `formatApiError` — the formatter strips status codes, error codes, and keywords classifiers depend on.
 - **Clean up all artifacts when removing a feature.** Grep the entire project for all references: types, imports, constants, SecureStore keys, commented-out JSX, fallback branches. Orphaned types create false confidence, unreachable fallback branches inflate coverage, leaked storage keys waste device storage forever.
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-- **Verify JSX handler references exist.** Every `onPress`, `onSubmit`, or event handler referenced in JSX must be defined or imported in the component scope. A missing handler is a **runtime crash** (`ReferenceError`), not a lint warning. After adding any `Pressable`/`Button`, search the file for the handler name.
->>>>>>> 22df8044 (plan(audit): execution audit fixes + D-C4-3 revised to option C)
-=======
->>>>>>> 80a9f5ab (chore(claude): promote commit command to skill + archive old command)
 
 ## Secrets Management
 
