@@ -5,7 +5,7 @@
 #
 # Journey: UX Journey 4 (Parent Oversight)
 # Tab bar (from (parent)/_layout.tsx):
-#   "Home"          → dashboard.tsx    (testID: dashboard-scroll)
+#   "Home"          → dashboard.tsx    (testID: family-scroll)
 #   "Library"       → library.tsx      (3-tab: Shelves/Books; testID: library-tab-shelves)
 #   "More"          → more.tsx         (testID: sign-out-button)
 appId: com.mentomate.app
@@ -25,7 +25,7 @@ tags:
 # the app routes directly to (parent)/dashboard — no switch-to-parent needed.
 - extendedWaitUntil:
     visible:
-      id: "dashboard-scroll"
+      id: "family-scroll"
     timeout: 15000
 
 # 3. Verify "Home" heading on dashboard
@@ -95,7 +95,7 @@ tags:
 # 16. Verify dashboard is visible again
 - extendedWaitUntil:
     visible:
-      id: "dashboard-scroll"
+      id: "family-scroll"
     timeout: 10000
 
 # 17. Final screenshot: back on Home tab

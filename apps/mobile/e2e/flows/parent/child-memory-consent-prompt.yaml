@@ -12,7 +12,7 @@
 #   - apps/mobile/src/app/(app)/child/[profileId]/mentor-memory.tsx
 #       (something-wrong-button rendered once consent is granted)
 #   - apps/mobile/e2e/flows/parent/child-mentor-memory.yaml
-#       (navigation pattern: dashboard-scroll → child-detail-scroll → mentor-memory-link)
+#       (navigation pattern: family-scroll → child-detail-scroll → mentor-memory-link)
 #
 # Usage: ./e2e/scripts/seed-and-run.sh parent-with-children e2e/flows/parent/child-memory-consent-prompt.yaml
 appId: com.mentomate.app
@@ -30,7 +30,7 @@ tags:
 # 2. Wait for parent dashboard
 - extendedWaitUntil:
     visible:
-      id: "dashboard-scroll"
+      id: "family-scroll"
     timeout: 15000
 
 # 3. Tap child card to open child detail

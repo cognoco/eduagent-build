@@ -23,7 +23,7 @@ tags:
 # 2. Wait for parent dashboard
 - extendedWaitUntil:
     visible:
-      id: "dashboard-scroll"
+      id: "family-scroll"
     timeout: 15000
 
 # ── Visual integrity: dashboard heading ────────────────────────────────
@@ -86,7 +86,7 @@ tags:
 # Wait for dashboard to reload
 - extendedWaitUntil:
     visible:
-      id: "dashboard-scroll"
+      id: "family-scroll"
     timeout: 10000
 
 # ── Drill into Child 2 (Lucas) ────────────────────────────────────────
@@ -116,7 +116,7 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: "dashboard-scroll"
+      id: "family-scroll"
     timeout: 10000
 
 # ── Drill into Child 3 (Sofia — no sessions) ─────────────────────────
@@ -146,7 +146,7 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: "dashboard-scroll"
+      id: "family-scroll"
     timeout: 10000
 
 - takeScreenshot: multi-child-06-complete

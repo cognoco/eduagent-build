@@ -13,7 +13,7 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: "dashboard-scroll"
+      id: "family-scroll"
     timeout: 15000
 
 - runFlow:

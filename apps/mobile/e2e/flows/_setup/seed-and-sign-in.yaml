@@ -31,7 +31,7 @@
 # parent dashboard, PostApprovalLanding). Maestro YAML has no OR/assertAny
 # construct. Auth success is verified by EACH CALLING FLOW, which must
 # include a mandatory wait for its expected landing screen (e.g.,
-# learner-screen or dashboard-scroll). If auth fails silently here,
+# learner-screen or family-scroll). If auth fails silently here,
 # the calling flow's mandatory assertion will catch it with a clear error.
 appId: com.mentomate.app
 ---
@@ -88,7 +88,7 @@ appId: com.mentomate.app
 # ── Step 3: Wait for post-auth screen ──
 # After sign-in, the app may land on one of three screens depending on persona/state:
 #   a) Learner home (id: learner-screen) — most common
-#   b) Parent dashboard (id: dashboard-scroll) — parent persona scenarios (BUG-33)
+#   b) Parent dashboard (id: family-scroll) — parent persona scenarios (BUG-33)
 #   c) PostApprovalLanding ("You're approved!") — onboarding-complete scenario (BUG-38)
 # We check for learner-screen first (30s timeout covers most cases).
 # If it's not found, the flow continues — individual flows handle their landing screen.
@@ -99,15 +99,15 @@ appId: com.mentomate.app
     optional: true
 
 # BUG-33: Parent scenarios route to (parent)/dashboard, not (learner)/home.
-# Accept dashboard-scroll as a valid post-auth landing.
+# Accept family-scroll as a valid post-auth landing.
 - extendedWaitUntil:
     visible:
-      id: "dashboard-scroll"
+      id: "family-scroll"
     timeout: 5000
     optional: true
 
 # BUG-566: parent-with-children lands on ParentGateway, not learner-screen
-# or dashboard-scroll. Recognize it as a valid home screen.
+# or family-scroll. Recognize it as a valid home screen.
 - extendedWaitUntil:
     visible:
       id: "parent-gateway"
@@ -136,11 +136,11 @@ appId: com.mentomate.app
 # a Practice Session (for scenarios with active sessions like retention-due,
 # homework-ready, failed-recall-3x). The session screen hides the tab bar,
 # so we can't tap Home. Instead, conditionally press Back to return to home
-# only when NEITHER learner-screen NOR dashboard-scroll is visible.
-# BUG-48: Parent scenarios redirect from home to dashboard-scroll. The brief
+# only when NEITHER learner-screen NOR family-scroll is visible.
+# BUG-48: Parent scenarios redirect from home to family-scroll. The brief
 # learner-screen appearance followed by redirect caused the old notVisible
 # check to fire incorrectly, pressing Back and navigating away from dashboard.
-# Fix: use return-to-home-safe.yaml which checks for dashboard-scroll first.
+# Fix: use return-to-home-safe.yaml which checks for family-scroll first.
 - runFlow:
     when:
       notVisible:
@@ -148,7 +148,7 @@ appId: com.mentomate.app
     file: return-to-home-safe.yaml
 
 # After all dismiss/return logic, wait for home screen (optional — parent
-# scenarios route to dashboard-scroll which was already handled above).
+# scenarios route to family-scroll which was already handled above).
 - extendedWaitUntil:
     visible:
       id: "learner-screen"
