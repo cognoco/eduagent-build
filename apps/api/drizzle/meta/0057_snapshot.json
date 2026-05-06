@@ -4800,6 +4800,12 @@
               "nulls": "last"
             },
             {
+              "expression": "COALESCE(\"metadata\"->>'context', '')",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            },
+            {
               "expression": "text_normalized",
               "isExpression": false,
               "asc": true,

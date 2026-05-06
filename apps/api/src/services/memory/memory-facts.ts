@@ -40,6 +40,12 @@ export function emptyMemorySnapshot(): MemorySnapshot {
   };
 }
 
+export function hasMemoryFactsBackfillMarker(profile: {
+  memoryFactsBackfilledAt?: Date | string | null;
+}): boolean {
+  return Boolean(profile.memoryFactsBackfilledAt);
+}
+
 function metadataRecord(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
   return value as Record<string, unknown>;

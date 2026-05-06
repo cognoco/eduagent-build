@@ -45,7 +45,10 @@ import {
 } from '../prior-learning';
 import { buildMemoryBlock, buildAccommodationBlock } from '../learner-profile';
 import { retrieveRelevantMemory } from '../memory';
-import { readMemorySnapshotFromFacts } from '../memory/memory-facts';
+import {
+  hasMemoryFactsBackfillMarker,
+  readMemorySnapshotFromFacts,
+} from '../memory/memory-facts';
 import { getTeachingPreference } from '../retention-data';
 import { shouldTriggerEvaluate } from '../evaluate';
 import { shouldTriggerTeachBack } from '../teach-back';
@@ -834,7 +837,9 @@ export async function prepareExchangeContext(
   }
 
   const memorySnapshot =
-    learningProfile && options?.memoryFactsReadEnabled
+    learningProfile &&
+    options?.memoryFactsReadEnabled &&
+    hasMemoryFactsBackfillMarker(learningProfile)
       ? await readMemorySnapshotFromFacts(
           createScopedRepository(db, profileId),
           learningProfile

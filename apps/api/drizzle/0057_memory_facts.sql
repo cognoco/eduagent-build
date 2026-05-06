@@ -45,6 +45,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS "memory_facts_active_unique_idx"
     "profile_id",
     "category",
     COALESCE("metadata"->>'subject', ''),
+    COALESCE("metadata"->>'context', ''),
     "text_normalized"
   )
   WHERE "superseded_by" IS NULL;

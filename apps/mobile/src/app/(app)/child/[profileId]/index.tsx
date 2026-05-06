@@ -426,7 +426,9 @@ export default function ChildDetailScreen() {
         ) : null}
 
         {/* Reports card — always visible */}
-        {profileId ? <ReportsListCard profileId={profileId} /> : null}
+        {profileId ? (
+          <ReportsListCard profileId={profileId} interactive />
+        ) : null}
 
         {history ? (
           <View className="mt-4">

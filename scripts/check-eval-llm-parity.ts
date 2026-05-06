@@ -22,7 +22,7 @@ function extractSections(md: string): Map<string, Set<string>> {
   const headerRe = new RegExp(
     `(^|\\n)(#{1,4}\\s*)?(${SECTION_HEADERS.map(escapeRegExp).join(
       '|'
-    )})\\b[^\\n]*`,
+    )})(?=\\s|$)[^\\n]*`,
     'gi'
   );
   const positions: Array<{ header: string; start: number }> = [];

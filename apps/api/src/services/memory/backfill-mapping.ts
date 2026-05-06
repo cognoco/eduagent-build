@@ -184,7 +184,7 @@ export function buildMemoryFactRowsFromProjection(
   profileId: string,
   projection: MemoryProjection
 ): MemoryFactInsert[] {
-  return [
+  return dedupeMemoryFactRows([
     ...projection.strengths.map((entry) =>
       mapStrengthToFact(profileId, entry, projection.createdAt)
     ),
@@ -205,7 +205,33 @@ export function buildMemoryFactRowsFromProjection(
     ...projection.suppressedInferences.map((value) =>
       mapSuppressedInferenceToFact(profileId, value, projection.createdAt)
     ),
-  ];
+  ]);
+}
+
+export function memoryFactIdentityKey(row: MemoryFactInsert): string {
+  const metadata =
+    row.metadata &&
+    typeof row.metadata === 'object' &&
+    !Array.isArray(row.metadata)
+      ? (row.metadata as Record<string, unknown>)
+      : {};
+  return [
+    row.profileId,
+    row.category,
+    typeof metadata['subject'] === 'string' ? metadata['subject'] : '',
+    typeof metadata['context'] === 'string' ? metadata['context'] : '',
+    row.textNormalized,
+  ].join('\u001f');
+}
+
+export function dedupeMemoryFactRows(
+  rows: MemoryFactInsert[]
+): MemoryFactInsert[] {
+  const byIdentity = new Map<string, MemoryFactInsert>();
+  for (const row of rows) {
+    byIdentity.set(memoryFactIdentityKey(row), row);
+  }
+  return [...byIdentity.values()];
 }
 
 export function buildBackfillRowsForProfile(profile: {
@@ -304,7 +330,7 @@ export function buildBackfillRowsForProfile(profile: {
       mapSuppressedInferenceToFact(profile.profileId, value, profile.createdAt)
   );
 
-  return { rows, malformed };
+  return { rows: dedupeMemoryFactRows(rows), malformed };
 }
 
 export function coerceConfidence(value: unknown): ConfidenceLevel {

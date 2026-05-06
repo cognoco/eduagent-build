@@ -1,6 +1,7 @@
 import { and, eq, sql } from 'drizzle-orm';
 import {
   learningProfiles,
+  memoryFacts,
   profiles,
   subjects,
   type Database,
@@ -1513,9 +1514,12 @@ export async function deleteAllMemory(
   accountId: string | undefined
 ): Promise<void> {
   await verifyProfileOwnership(db, profileId, accountId);
-  await db
-    .delete(learningProfiles)
-    .where(eq(learningProfiles.profileId, profileId));
+  await db.transaction(async (tx) => {
+    await tx.delete(memoryFacts).where(eq(memoryFacts.profileId, profileId));
+    await tx
+      .delete(learningProfiles)
+      .where(eq(learningProfiles.profileId, profileId));
+  });
 }
 
 const MAX_TRANSCRIPT_EVENTS = 100;

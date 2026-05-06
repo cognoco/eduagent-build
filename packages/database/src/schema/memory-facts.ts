@@ -79,6 +79,7 @@ export const memoryFacts = pgTable(
         table.profileId,
         table.category,
         sql`COALESCE(${table.metadata}->>'subject', '')`,
+        sql`COALESCE(${table.metadata}->>'context', '')`,
         table.textNormalized
       )
       .where(sql`${table.supersededBy} IS NULL`),

@@ -36,15 +36,17 @@ export const memoryFactsBackfill = inngest.createFunction(
           let rowsInserted = 0;
 
           for (const profileId of batch) {
-            const profile = await db.query.learningProfiles.findFirst({
-              where: eq(learningProfiles.profileId, profileId),
-            });
-            if (!profile || profile.memoryFactsBackfilledAt) continue;
+            const result = await db.transaction(async (tx) => {
+              const [profile] = await tx
+                .select()
+                .from(learningProfiles)
+                .where(eq(learningProfiles.profileId, profileId))
+                .for('update')
+                .limit(1);
+              if (!profile || profile.memoryFactsBackfilledAt) return null;
 
-            const built = buildBackfillRowsForProfile(profile);
-            malformed += built.malformed.length;
+              const built = buildBackfillRowsForProfile(profile);
 
-            await db.transaction(async (tx) => {
               await tx
                 .delete(memoryFacts)
                 .where(eq(memoryFacts.profileId, profileId));
@@ -58,12 +60,16 @@ export const memoryFactsBackfill = inngest.createFunction(
                   updatedAt: new Date(),
                 })
                 .where(eq(learningProfiles.profileId, profileId));
+
+              return built;
             });
+            if (!result) continue;
 
             profiles += 1;
-            rowsInserted += built.rows.length;
+            malformed += result.malformed.length;
+            rowsInserted += result.rows.length;
 
-            for (const item of built.malformed) {
+            for (const item of result.malformed) {
               logger.warn('[memory_facts.backfill] malformed memory entry', {
                 event: 'memory_facts.backfill.malformed',
                 profileId,

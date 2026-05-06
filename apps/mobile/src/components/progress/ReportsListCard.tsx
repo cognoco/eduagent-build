@@ -1,7 +1,6 @@
 import { Pressable, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { useProfile } from '../../lib/profile';
 import {
   useProfileReports,
   useProfileWeeklyReports,
@@ -9,24 +8,33 @@ import {
 
 type ReportingComponentProps = {
   profileId: string;
+  interactive?: boolean;
 };
 
 function formatDateOnly(isoDate: string, options: Intl.DateTimeFormatOptions) {
-  return new Date(`${isoDate}T00:00:00Z`).toLocaleDateString(
-    undefined,
-    options
-  );
+  return new Date(`${isoDate}T00:00:00Z`).toLocaleDateString(undefined, {
+    ...options,
+    timeZone: 'UTC',
+  });
 }
 
 export function ReportsListCard({
   profileId,
+  interactive = false,
 }: ReportingComponentProps): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
-  const { activeProfile } = useProfile();
   const weeklyReports = useProfileWeeklyReports(profileId);
   const monthlyReports = useProfileReports(profileId);
-  const isActiveProfile = activeProfile?.id === profileId;
+  const weeklyItems = weeklyReports.data ?? [];
+  const monthlyItems = monthlyReports.data ?? [];
+  const hasRenderableReports =
+    weeklyItems.length > 0 || monthlyItems.length > 0;
+  const showLoading =
+    !hasRenderableReports &&
+    (weeklyReports.isLoading || monthlyReports.isLoading);
+  const showError =
+    !hasRenderableReports && (weeklyReports.isError || monthlyReports.isError);
 
   return (
     <View className="bg-surface rounded-card p-4 mt-6" testID="reports-list">
@@ -34,7 +42,7 @@ export function ReportsListCard({
         <Text className="text-body font-semibold text-text-primary">
           {t('parentView.reports.weeklySnapshots')}
         </Text>
-        {!isActiveProfile ? (
+        {interactive ? (
           <Pressable
             onPress={() =>
               router.push({
@@ -53,11 +61,11 @@ export function ReportsListCard({
         ) : null}
       </View>
 
-      {weeklyReports.isLoading || monthlyReports.isLoading ? (
+      {showLoading ? (
         <Text className="text-body-sm text-text-secondary mt-2">
           {t('parentView.reports.loadingReports')}
         </Text>
-      ) : weeklyReports.isError || monthlyReports.isError ? (
+      ) : showError ? (
         <View className="mt-2" testID="reports-list-error">
           <Text className="text-body-sm text-text-secondary">
             {t('parentView.reports.checkConnectionRetry')}
@@ -77,13 +85,13 @@ export function ReportsListCard({
             </Text>
           </Pressable>
         </View>
-      ) : (weeklyReports.data?.length ?? 0) > 0 ? (
-        weeklyReports.data?.slice(0, 3).map((report) => (
+      ) : weeklyItems.length > 0 ? (
+        weeklyItems.slice(0, 3).map((report) => (
           <Pressable
             key={report.id}
-            disabled={isActiveProfile}
+            disabled={!interactive}
             className={`bg-background rounded-card p-3 mt-3${
-              isActiveProfile ? '' : ''
+              interactive ? '' : ''
             }`}
             testID={`weekly-report-card-${report.id}`}
             onPress={() =>
@@ -93,7 +101,7 @@ export function ReportsListCard({
                 params: { profileId, weeklyReportId: report.id },
               } as never)
             }
-            accessibilityRole={isActiveProfile ? undefined : 'button'}
+            accessibilityRole={interactive ? 'button' : undefined}
             accessibilityLabel={`${t(
               'parentView.reports.weekOf'
             )} ${formatDateOnly(report.reportWeek, {
@@ -116,11 +124,11 @@ export function ReportsListCard({
             </Text>
           </Pressable>
         ))
-      ) : (monthlyReports.data?.length ?? 0) > 0 ? (
-        monthlyReports.data?.slice(0, 3).map((report) => (
+      ) : monthlyItems.length > 0 ? (
+        monthlyItems.slice(0, 3).map((report) => (
           <Pressable
             key={report.id}
-            disabled={isActiveProfile}
+            disabled={!interactive}
             className="bg-background rounded-card p-3 mt-3"
             testID={`report-card-${report.id}`}
             onPress={() =>
@@ -129,7 +137,7 @@ export function ReportsListCard({
                 params: { profileId, reportId: report.id },
               } as never)
             }
-            accessibilityRole={isActiveProfile ? undefined : 'button'}
+            accessibilityRole={interactive ? 'button' : undefined}
             accessibilityLabel={t('parentView.reports.openReport', {
               month: report.reportMonth,
             })}

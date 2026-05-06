@@ -154,6 +154,11 @@ export default function InterviewScreen() {
   const goToNextStep = useCallback(() => {
     if (!subjectId) return;
 
+    if (sessionPhase) {
+      router.replace('/(app)/home' as never);
+      return;
+    }
+
     const baseParams = {
       subjectId,
       subjectName: subjectName ?? '',
@@ -230,6 +235,7 @@ export default function InterviewScreen() {
     languageCode,
     languageName,
     router,
+    sessionPhase,
     step,
     subjectId,
     subjectName,

@@ -11,6 +11,8 @@ import {
 
 import { buildBackfillRowsForProfile } from '../../../apps/api/src/services/memory/backfill-mapping';
 
+const seededAccountIds = new Set<string>();
+
 export async function setupTestDb(): Promise<{
   db: Database;
   cleanup: () => Promise<void>;
@@ -18,15 +20,13 @@ export async function setupTestDb(): Promise<{
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error('DATABASE_URL must be set for integration tests');
   const db = createDatabase(url);
-  const seededAccountIds: string[] = [];
 
   return {
     db,
     cleanup: async () => {
-      if (seededAccountIds.length === 0) return;
-      await db.delete(accounts).where(eq(accounts.id, seededAccountIds[0]));
-      for (const accountId of seededAccountIds.slice(1)) {
+      for (const accountId of seededAccountIds) {
         await db.delete(accounts).where(eq(accounts.id, accountId));
+        seededAccountIds.delete(accountId);
       }
     },
   };
@@ -54,6 +54,7 @@ export async function seedLearningProfile(
     clerkUserId: `integration-memory-${accountId}`,
     email: `memory-${accountId}@integration.test`,
   });
+  seededAccountIds.add(accountId);
   await db.insert(profiles).values({
     id: profileId,
     accountId,
@@ -84,6 +85,13 @@ export async function runBackfillForOneProfile(
   });
   if (!profile) throw new Error(`Missing learning profile ${profileId}`);
   const built = buildBackfillRowsForProfile(profile);
+  if (built.malformed.length > 0) {
+    throw new Error(
+      `Malformed memory-facts backfill for ${profileId}: ${JSON.stringify(
+        built.malformed
+      )}`
+    );
+  }
   await db.transaction(async (tx) => {
     await tx.delete(memoryFacts).where(eq(memoryFacts.profileId, profileId));
     if (built.rows.length > 0) {
