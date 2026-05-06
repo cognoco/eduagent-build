@@ -56,6 +56,7 @@ import {
 import { feedbackDeliveryFailed } from './functions/feedback-delivery-failed';
 import { orphanPersistFailed } from './functions/orphan-persist-failed';
 import { interviewPersistCurriculum } from './functions/interview-persist-curriculum';
+import { subjectPrewarmCurriculum } from './functions/subject-prewarm-curriculum';
 import { notificationSuppressedObserve } from './functions/notification-suppressed-observe';
 import {
   learnerRecapRegenerate,
@@ -113,6 +114,7 @@ export {
   askSilentClassifyOnFailure,
   orphanPersistFailed,
   interviewPersistCurriculum,
+  subjectPrewarmCurriculum,
   notificationSuppressedObserve,
   sessionSummaryCreate,
   sessionSummaryRegenerate,
@@ -168,6 +170,7 @@ export const functions = [
   askSilentClassifyOnFailure,
   orphanPersistFailed,
   interviewPersistCurriculum,
+  subjectPrewarmCurriculum,
   notificationSuppressedObserve,
   sessionSummaryCreate,
   sessionSummaryRegenerate,

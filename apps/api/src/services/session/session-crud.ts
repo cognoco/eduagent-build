@@ -13,6 +13,7 @@ import {
   curricula,
   curriculumTopics,
   curriculumBooks,
+  bookSuggestions,
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
@@ -41,6 +42,7 @@ import { mapSessionRow } from './session-events';
 import { clearSessionStaticContext } from './session-cache';
 import { projectAiResponseContent } from '../llm/project-response';
 import { createLogger } from '../logger';
+import { addBreadcrumb } from '../sentry';
 import type { TimedEvent } from './session-context-builders';
 
 const logger = createLogger();
@@ -289,12 +291,34 @@ async function findFirstAvailableTopicId(
   return topic?.id;
 }
 
+async function loadSubjectStructureType(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+  bookId?: string
+): Promise<'focused_book' | 'narrow' | 'broad'> {
+  const suggestionCount = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(bookSuggestions)
+    .innerJoin(subjects, eq(subjects.id, bookSuggestions.subjectId))
+    .where(
+      and(
+        eq(bookSuggestions.subjectId, subjectId),
+        eq(subjects.profileId, profileId)
+      )
+    );
+  if ((suggestionCount[0]?.count ?? 0) > 0) return 'broad';
+  if (bookId) return 'focused_book';
+  return 'narrow';
+}
+
 export async function startFirstCurriculumSession(
   db: Database,
   profileId: string,
   subjectId: string,
   input: FirstCurriculumSessionStartInput
 ): Promise<LearningSession> {
+  const startedAt = Date.now();
   const deadline = Date.now() + FIRST_CURRICULUM_SESSION_WAIT_MS;
 
   while (Date.now() <= deadline) {
@@ -304,6 +328,28 @@ export async function startFirstCurriculumSession(
     ]);
 
     if (topicId && extractedSignals) {
+      const topicAvailableMs = Date.now() - startedAt;
+      const structureType = await loadSubjectStructureType(
+        db,
+        profileId,
+        subjectId,
+        input.bookId
+      );
+      const prewarmHit = topicAvailableMs < FIRST_CURRICULUM_SESSION_POLL_MS;
+      addBreadcrumb(
+        'first curriculum session topic check',
+        'curriculum.first-session',
+        'info',
+        { prewarmHit, topicAvailableMs, structureType }
+      );
+      logger.info('first_curriculum_session_topic_check', {
+        profileId,
+        subjectId,
+        bookId: input.bookId,
+        prewarmHit,
+        topicAvailableMs,
+        structureType,
+      });
       return startSession(db, profileId, subjectId, {
         subjectId,
         topicId,

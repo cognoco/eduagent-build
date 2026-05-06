@@ -91,6 +91,7 @@ import { inngest } from '../inngest/client';
 import type { InterviewContext, OnboardingDraft } from '@eduagent/schemas';
 import { routeAndCall, routeAndStream } from './llm';
 import { generateCurriculum } from './curriculum';
+import * as bookGeneration from './book-generation';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
 const profileId = 'test-profile-id';
@@ -132,6 +133,9 @@ function createMockDb({
   curriculumInsertReturning = [
     { id: 'curriculum-1', subjectId, version: 1 },
   ] as Array<{ id: string; subjectId: string; version: number }>,
+  bookFindFirstResult = undefined as
+    | { id: string; subjectId: string; topicsGenerated: boolean }
+    | undefined,
 } = {}): Database {
   // Track insert calls to distinguish between different table inserts
   const insertMock = jest.fn().mockImplementation(() => ({
@@ -154,6 +158,15 @@ function createMockDb({
       },
       subjects: {
         findFirst: jest.fn().mockResolvedValue({ id: subjectId }),
+      },
+      profiles: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: profileId,
+          birthYear: new Date().getUTCFullYear() - 12,
+        }),
+      },
+      curriculumBooks: {
+        findFirst: jest.fn().mockResolvedValue(bookFindFirstResult),
       },
     },
     insert: insertMock,
@@ -1398,6 +1411,92 @@ describe('persistCurriculum', () => {
     // Verify no curriculum was inserted
     expect(db.insert).not.toHaveBeenCalled();
     expect(generateCurriculum).not.toHaveBeenCalled();
+  });
+
+  it('skips book-scoped generation when prewarm already populated topics', async () => {
+    const generateBookTopicsSpy = jest
+      .spyOn(bookGeneration, 'generateBookTopics')
+      .mockResolvedValue({
+        topics: [],
+        connections: [],
+      });
+    const draft: OnboardingDraft = {
+      id: 'draft-1',
+      profileId,
+      subjectId,
+      exchangeHistory: [{ role: 'user', content: 'I know leaf basics' }],
+      extractedSignals: { currentKnowledge: 'leaf basics' },
+      status: 'completed',
+      failureCode: null,
+      expiresAt: null,
+      createdAt: NOW.toISOString(),
+      updatedAt: NOW.toISOString(),
+    };
+    const bookId = '550e8400-e29b-41d4-a716-446655440099';
+    const db = createMockDb({
+      bookFindFirstResult: { id: bookId, subjectId, topicsGenerated: true },
+    });
+
+    await persistCurriculum(
+      db,
+      profileId,
+      subjectId,
+      'Botany',
+      draft,
+      bookId,
+      'Tea'
+    );
+
+    expect(generateBookTopicsSpy).not.toHaveBeenCalled();
+    expect(db.insert).not.toHaveBeenCalled();
+    generateBookTopicsSpy.mockRestore();
+  });
+
+  it('skips book-scoped insert when prewarm finishes during the LLM call', async () => {
+    const generateBookTopicsSpy = jest
+      .spyOn(bookGeneration, 'generateBookTopics')
+      .mockResolvedValue({
+        topics: [
+          {
+            title: 'Tea Botany',
+            description: 'Plant structure for tea',
+            sortOrder: 0,
+            estimatedMinutes: 30,
+          },
+        ],
+        connections: [],
+      });
+    const draft: OnboardingDraft = {
+      id: 'draft-1',
+      profileId,
+      subjectId,
+      exchangeHistory: [{ role: 'user', content: 'I know leaf basics' }],
+      extractedSignals: { currentKnowledge: 'leaf basics' },
+      status: 'completed',
+      failureCode: null,
+      expiresAt: null,
+      createdAt: NOW.toISOString(),
+      updatedAt: NOW.toISOString(),
+    };
+    const bookId = '550e8400-e29b-41d4-a716-446655440099';
+    const db = createMockDb();
+    (db.query.curriculumBooks.findFirst as jest.Mock)
+      .mockResolvedValueOnce({ id: bookId, subjectId, topicsGenerated: false })
+      .mockResolvedValueOnce({ id: bookId, subjectId, topicsGenerated: true });
+
+    await persistCurriculum(
+      db,
+      profileId,
+      subjectId,
+      'Botany',
+      draft,
+      bookId,
+      'Tea'
+    );
+
+    expect(generateBookTopicsSpy).toHaveBeenCalledTimes(1);
+    expect(db.insert).not.toHaveBeenCalled();
+    generateBookTopicsSpy.mockRestore();
   });
 });
 
