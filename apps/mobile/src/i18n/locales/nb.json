@@ -1658,6 +1658,7 @@
       "statusUnknown": "Ukjent",
       "understanding": "Forståelse",
       "reviewStatus": "Gjennomgangsstatus",
+      "recentDrills": "Recent drills",
       "sessionHistory": "Økthistorikk",
       "noSessionsYet": "Ingen økter for dette temaet ennå",
       "timeOnApp": "{{duration}} på appen",

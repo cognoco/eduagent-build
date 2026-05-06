@@ -1658,6 +1658,7 @@
       "statusUnknown": "Desconhecido",
       "understanding": "Compreensão",
       "reviewStatus": "Status da revisão",
+      "recentDrills": "Recent drills",
       "sessionHistory": "Histórico de Sessões",
       "noSessionsYet": "Nenhuma sessão para este tópico ainda",
       "timeOnApp": "{{duration}} no aplicativo",

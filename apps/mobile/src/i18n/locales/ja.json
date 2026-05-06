@@ -1658,6 +1658,7 @@
       "statusUnknown": "不明",
       "understanding": "理解度",
       "reviewStatus": "復習ステータス",
+      "recentDrills": "Recent drills",
       "sessionHistory": "セッション履歴",
       "noSessionsYet": "このトピックのセッションはまだありません",
       "timeOnApp": "アプリ利用時間 {{duration}}",
