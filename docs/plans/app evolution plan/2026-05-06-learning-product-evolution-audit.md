@@ -317,7 +317,7 @@ Add the telemetry hook in Wave 1, capture baseline, then make "P50 drop ≥ 40%"
 
 Bypass first, then delete — but with a hard deletion trigger this time. The two prior attempts (Conversation-First, Teach-First) bypassed without ever deleting, which is why this is the third attempt.
 
-Concrete trigger: **delete `interview.tsx`, `analogy-preference.tsx`, `interests-context.tsx`, `accommodations.tsx`, and `curriculum-review.tsx` no later than 14 days after Wave 3 ships.** If the replacement settings surface (post-session adjustments + opt-in preferences in `more.tsx`) is not ready by then, Wave 3 does not ship — the work waits until the deletion PR can land in the same milestone. "Bypass now, delete later" without a date is the failure mode this plan is specifically trying to avoid.
+Concrete trigger: **PR 5h** (see Slice 1 sequencing table) deletes `interview.tsx`, `analogy-preference.tsx`, `interests-context.tsx`, `accommodations.tsx`, and `curriculum-review.tsx` **no later than 14 days after Wave 3 ships.** Owner assigned before Wave 1 begins. If 5h has not landed by deadline, Slice 1 is incomplete (see acceptance criteria → file-count guardrail). "Bypass now, delete later" without a named PR and a date is the failure mode this plan is specifically trying to avoid.
 
 Accommodations data audit (parent/profile-level migration) is part of the deletion PR, not a blocker on bypass.
 
@@ -447,17 +447,19 @@ This slice ships as a milestone of small PRs, not one large PR. Each PR is indep
 | # | Change | Surface | Size | Depends on | Parallel-safe with |
 | --- | --- | --- | --- | --- | --- |
 | 5a | Lighter subject confirmation copy | `create-subject.tsx`, tests | XS | — | 5b, 5d, 5g |
-| 5b | First-turn prompt rule + eval baseline | `interview-prompts.ts` or `exchange-prompts.ts`, eval harness | S | — | 5a, 5d, 5g |
+| 5b | First-turn prompt rule + eval baseline + remove fun-fact opener | `interview-prompts.ts`, `exchange-prompts.ts`, eval harness | S | — | 5a, 5d, 5g |
 | 5d | Pre-warm curriculum on subject create | `subject-classify.ts` / Inngest trigger | M | — | 5a, 5b, 5g |
 | 5g | `language-setup` reframe + locale default | `language-setup.tsx`, i18n | S | — | 5a, 5b, 5d |
 | 5c | Default `ONBOARDING_FAST_PATH` on for staging | `feature-flags.ts` | XS | 5d (else 25s wait exposes to users) | 5e |
 | 5e | Bypass analogy/interests/accommodations/curriculum-review | mobile routing | M | 5b (prompt rule must hold before bypass) | 5c |
 | 5f | E2E: create-subject → first active prompt, language + non-language | Maestro/Playwright | M | all of 5a-5e | — |
+| 5h | **Delete** old onboarding screens (`interview.tsx`, `analogy-preference.tsx`, `interests-context.tsx`, `accommodations.tsx`, `curriculum-review.tsx`) + i18n key sweep + E2E updates + accommodations data audit verification | mobile routing, i18n, E2E | M | 5f (E2E green proves the new flow works without the old screens) | — |
 
 **Wave plan**
 - **Wave 1 (parallel):** 5a, 5b, 5d, 5g.
 - **Wave 2 (parallel):** 5c, 5e.
 - **Wave 3:** 5f.
+- **Wave 4:** 5h. **Deadline: ≤ 14 days after Wave 3 ships.** Owner: TBD (assign before Wave 1 begins). If 5h has not landed by deadline, Slice 1 is incomplete regardless of how 5a-5f feel in staging — see acceptance criteria below.
 
 **Acceptance criteria for the milestone**
 - P50 time-to-first-active-prompt drops by at least 40% versus a measured baseline captured before Wave 1 begins. (Replaces the earlier "30 seconds" target — that number was unmeasured.)
@@ -466,29 +468,32 @@ This slice ships as a milestone of small PRs, not one large PR. Each PR is indep
 - No analogy, accommodations, interests-context, or curriculum-review screen appears before the first learning prompt for either path.
 - Subject classification correction path remains.
 - Eval harness baseline updated for the new first-turn prompt rule.
-- **File-count guardrail:** the milestone is not complete until the file count under `apps/mobile/src/app/(app)/onboarding/` drops by at least four (the four screens listed in Section D's deletion trigger). Performance and UX criteria can pass while the old screens remain on disk — that is exactly how the prior two attempts ended. If the deletion PR has not landed within 14 days of Wave 3, Slice 1 has not succeeded regardless of how the new flow feels in staging.
+- **File-count guardrail (PR 5h):** the milestone is not complete until 5h has landed and the file count under `apps/mobile/src/app/(app)/onboarding/` has dropped by at least four (the four screens listed in Section D's deletion trigger). Performance and UX criteria can pass while the old screens remain on disk — that is exactly how the prior two attempts ended. If 5h has not landed within 14 days of Wave 3, Slice 1 has not succeeded regardless of how the new flow feels in staging.
 
 ### Slice 2 — Post-First-Win Path Preview
 
 **Goal:** Give structure after value.
 
 Includes:
-- first-session or post-turn plan preview
-- Library/subject shelf path clarity
-- Progress subject detail starts showing "what you can do next"
+- recap-card extension that renders the existing `topicOrder` as an ordered-list view
+- second-session-open teaser (genuinely new — small home payload + component)
+- Library/subject shelf path clarity (mostly already there; minor copy)
 
-**Size:** M to L
+**Size:** **S to M** (was M to L — see Section E re-verification: the next-topic recap card is already shipped end-to-end, `topicOrder` is in the API response; this is wire-up, not invention)
 
 ### Slice 3 — Progress Proof Language
 
 **Goal:** Progress feels like retained ability, not gradebook metrics.
 
 Includes:
-- memory-status labels
-- proof cards / remembered-after-X-days copy
+- memory-status labels (string change)
+- "remembered after N days" / "getting fuzzy after N days" branches in `RetentionPill` and `RetentionSignal` (data already exists — `daysSinceLastReview` is computed, just not surfaced in the UI)
+- learner-side rendering of `weeklyDelta*` fields (already rendered on the parent dashboard; component exists)
+- one new "proof card" component using shipped retention metrics
 - parent/learner vocabulary boundary
+- **`book_completed` milestone detection branch** (Section I quick win — schema enum value exists in `milestoneTypeSchema`; detection logic in `apps/api/src/services/milestone-detection.ts` has no `book_completed` branch and the milestone never fires today). Add detection + threshold; surfaces automatically through the existing milestones screen and session-complete payload. Bundled here so it doesn't become another "built but never wired" item.
 
-**Size:** M for labels; L for proof cards
+**Size:** **M** (was M for labels + L for proof cards — the L was based on assuming the data layer was missing; it isn't; `book_completed` is small and additive)
 
 ### Slice 4 — Bring-Your-Own-Material Expansion
 
@@ -524,17 +529,23 @@ The "First PR" framing has been replaced by Slice 1's milestone (above). Wave 1 
 **User story:** When my subject is confidently classified, I want a single-tap "Start" rather than an "Accept / Edit" approval screen, so the moment feels like momentum into learning.
 
 **Acceptance**
-- Confident single-suggestion case shows "We'll start with [subject]." with primary `Start` and secondary `Change`.
-- Ambiguous and no-match cases keep the heavier clarification card.
+- "Confident" is defined for this PR as `status === 'resolved' && suggestions.length === 1`. No backend schema change. (A future PR may add a numeric `confidence` field to `SubjectResolveResult` — out of scope for 5a.)
+- Confident case (per the heuristic above) shows "We'll start with [subject]." with primary `Start` and secondary `Change`.
+- `corrected` status (spelling fix) also takes the lighter copy. `resolved` with `suggestions.length > 1` and no-match cases keep the heavier clarification card.
 - Direct-match path is unchanged (already skips confirmation).
 
 ### 5b — First-turn prompt rule + eval baseline
 
 **User story:** When I read the first mentor message, I want to learn one concrete thing and be asked to do something with it, so the app feels like a tutor, not an intake form.
 
+**Scope clarification:** This PR is the **only** Wave 1 owner of `exchange-prompts.ts` and `interview-prompts.ts`. It includes both the new rule AND the removal of the conflicting fun-fact opener (Section F). Without bundling these, the first turn would end up: open with a fun fact (still in the prompt) + teach one concrete idea + ask one action — three things instead of one teach + one action. Section F has no separate Wave 1 PR; its prompt-edit work lives here.
+
 **Acceptance**
 - Prompt rule added: first learning response must teach exactly one concrete idea and end with exactly one learner action, unless answering an urgent direct question.
-- Eval harness Tier 1 snapshot captures the new rule. Tier 2 (`pnpm eval:llm --live`) confirms the rule holds against real LLM responses for the existing scenario matrix.
+- Fun-fact opener block removed from `exchange-prompts.ts` (current source: lines 455–468 — *"Open with a surprising or fun fact about it to spark curiosity, then invite them into the conversation..."*). The first-exchange branch retains nothing that asks the model to be conversational/chatty before the active prompt.
+- Eval harness Tier 1 snapshot captures both changes (new rule + removed opener). Tier 2 (`pnpm eval:llm --live`) confirms the rule holds against real LLM responses for the existing scenario matrix and that the LLM no longer opens with a generic fun fact.
+- Eval rule (or harness assertion) added: first learning response ends with exactly one learner action.
+- Out of scope for 5b: the `EVAL-MIGRATION` TODOs on `evaluate` / `teach_back` envelope migration (Section F) — separate follow-up.
 
 ### 5d — Pre-warm curriculum on subject creation
 
@@ -554,10 +565,110 @@ The "First PR" framing has been replaced by Slice 1's milestone (above). Wave 1 
 - Step indicator and "Step 2 of 4" copy removed; framed as quick calibration.
 - First mentor turn after submission satisfies the 5b rule.
 
+### 5h — Delete old onboarding screens (Wave 4)
+
+**User story:** As an engineer, when I look at `apps/mobile/src/app/(app)/onboarding/`, I want only the screens we actually use to be present, so future contributors aren't tempted to wire production traffic through dead code paths (the failure mode of the previous two attempts).
+
+**Owner:** TBD (assign before Wave 1 begins).
+**Deadline:** ≤ 14 days after Wave 3 (5f) ships and is green in staging.
+
+**Acceptance**
+- Files deleted: `apps/mobile/src/app/(app)/onboarding/interview.tsx`, `analogy-preference.tsx`, `interests-context.tsx`, `accommodations.tsx`, `curriculum-review.tsx` (and their `.test.tsx` siblings).
+- `onboarding/_layout.tsx` updated to remove the deleted routes.
+- i18n keys belonging only to the deleted screens removed across all 7 locales (sweep with grep, not just one).
+- Any imports / route references to the deleted files removed (typecheck must pass).
+- Accommodations data audit: confirm no per-subject accommodations data exists in production (it shouldn't — accommodations is profile-level — but verify before deletion). If unexpected data is found, migrate to the profile-level field as part of this PR.
+- E2E flows updated to reflect the new path; no Maestro/Playwright spec still drives through a deleted screen.
+- `ONBOARDING_FAST_PATH` flag removed entirely (the bypass code paths it gated are now the only paths). Net feature-flag count drops by one.
+- Post-merge: file count under `apps/mobile/src/app/(app)/onboarding/` is at most: `_layout.tsx`, `_layout.test.tsx`, `language-setup.tsx`, `language-setup.test.tsx`, `pronouns.tsx` (and any test counterpart). No more.
+
+**Out of scope for 5h**
+- Building the post-session "adjust style" prompt from Section D's "genuinely missing" item. That is a separate follow-up — replacement settings already exist in `more.tsx`, `subject/[subjectId].tsx`, and `mentor-memory.tsx`.
+
 **Likely verification (per PR)**
 - `pnpm exec jest --findRelatedTests <changed files> --no-coverage`
 - `pnpm exec nx run api:typecheck`
 - `cd apps/mobile && pnpm exec tsc --noEmit`
 - For 5b/5d: `pnpm eval:llm` (Tier 1) and `pnpm eval:llm --live` (Tier 2) where prompt or context inputs change.
 - Wave 3 only: Maestro/Playwright journey for create-subject → first active prompt, both language and non-language paths.
+
+---
+
+## Appendix — Baseline Attempted 2026-05-06: Deferred Until Store Launch
+
+A baseline measurement was attempted on 2026-05-06 against both staging and production via `pnpm measure:t2fp` (script: `scripts/measure-time-to-first-prompt.ts`). **No usable real-onboarding rows were found.** The slice 1 success criterion that depends on a measured baseline (P50 drops by ≥40%) is therefore **deferred** until production has real users — currently blocked by store publishing (Apple enrollment pending; Google Play account flagged 2026-03-26). This appendix records what was tried, what was found, what was learned, and what unblocks the baseline.
+
+### Window attempted
+
+`--from 2026-04-01 --to 2026-05-06`. Cohort: profiles whose all-time-first subject was created in the window.
+
+### Result against staging (`mentomate-stg`)
+
+```json
+{
+  "totalFirstSubjects": 314,
+  "buckets": {
+    "reachedWithinCap": 0,
+    "delayedStart": 1,
+    "belowMinReply": 93,
+    "noAiAfterSessionStart": 143,
+    "noSession": 77
+  }
+}
+```
+
+Bucket sum check: 0 + 1 + 93 + 143 + 77 = 314 ✅ (matches `totalFirstSubjects`).
+
+The 93 rows that initially looked like "reached first prompt" all had a first-AI gap of either negative seconds or sub-5s. A diagnostic (`scripts/diagnose-t2fp.ts`) showed two populations:
+
+1. **Backdated seed fixtures** — `learning_sessions.started_at` set to exactly 1 day before `subjects.created_at` (gap = -86,400s). Identifiable by the negative gap.
+2. **E2E test runs** — subject + session + ai_response all written within the same second (gap = 0.4–0.5s). Real human onboarding cannot finish that fast (interview turn + curriculum gen + first-session boot have a floor of several seconds at minimum).
+
+To prevent these from polluting percentiles, `aggregate()` now applies a `MIN_HUMAN_REPLY_SECONDS = 5` floor; rows below that — including all negatives — bucket as `belowMinReply`.
+
+### Result against production (`mentomate-prd`)
+
+```json
+{
+  "totalFirstSubjects": 0
+}
+```
+
+Production has zero subjects in the window because the app isn't shipped to either store yet. There are no real users.
+
+### Secondary signal worth tracking
+
+Even without percentile data, the staging diagnostic surfaced a Slice-1-relevant observation: **143 / 314 staging subjects (46%)** have a `learning_sessions` row but no `ai_response` event in `session_events`. This bucket — `noAiAfterSessionStart` — is consistent with the plan's naming caveat: interview AI replies live in `onboarding_drafts.exchangeHistory`, not `session_events`. So `noAiAfterSessionStart` here likely means "user started a session, never got past the interview, abandoned." If 5d (curriculum pre-warm) and Wave 1 work succeed, this bucket should shrink — even before percentile data is available, that distribution shift is observable signal.
+
+The 77 `noSession` count is similarly informative: subject created, no session ever started. Wave 1 should drop this number too if "Start Learning" actually starts learning faster.
+
+### What unblocks a real baseline
+
+- Store launch (any platform — App Store, Google Play, web/PWA) producing real-user onboarding events in `mentomate-prd`.
+- A re-run of `pnpm measure:t2fp --from <date> --to <date>` against `prd` after ~30 days of real traffic for statistical power (≥ `MIN_COHORT_FOR_P75_P90` = 20 reached rows per cohort).
+
+### Re-run instructions
+
+```bash
+# After store launch, capture pre-5d baseline against production:
+C:/Tools/doppler/doppler.exe run -p mentomate -c prd -- \
+  pnpm measure:t2fp --from <FROM> --to <TO>
+
+# After 5d ships, capture post-5d numbers against the same window length:
+C:/Tools/doppler/doppler.exe run -p mentomate -c prd -- \
+  pnpm measure:t2fp --from <FROM> --to <TO>
+```
+
+Append each run's JSON below this section as a dated row. Do not overwrite — comparisons need history.
+
+### Slice 1 success criterion revision
+
+Until a real baseline exists, the criterion shifts from quantitative-only to a tiered structure:
+
+1. **Pre-launch (now):** No number-anchored criterion. Slice 1 ships behind the existing fast-path flag and is judged qualitatively (does the first turn feel like learning, per the audit's prose).
+2. **Post-launch + ~30 days traffic:** Capture pre-5d baseline. Slice 1 success becomes "non-language P50 drops by ≥40% post-5d, OR `noSession` + `noAiAfterSessionStart` combined drop by ≥30%." The OR is intentional — the bucket-distribution shift is measurable even at small N where percentile noise dominates.
+
+### Diagnostic script
+
+`scripts/diagnose-t2fp.ts` is a one-off diagnostic that probes language_code distribution, event_type histogram, and a sample of cohort rows with raw timestamps + computed gap. Re-run when the next baseline produces unexpected numbers; faster than re-investigating from scratch.
 
