@@ -1,6 +1,12 @@
-jest.mock('../middleware/jwt', () =>
-  require('../test-utils/auth-fixture').createJwtModuleMock()
-);
+// ---------------------------------------------------------------------------
+// Real JWT + real auth middleware — no jwt module mock
+// ---------------------------------------------------------------------------
+
+import {
+  installTestJwksInterceptor,
+  restoreTestFetch,
+} from '../test-utils/jwks-interceptor';
+import { clearJWKSCache } from '../middleware/jwt';
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
 
@@ -95,10 +101,7 @@ import {
   listVocabulary,
   reviewVocabulary,
 } from '../services/vocabulary';
-import {
-  AUTH_HEADERS as BASE_AUTH_HEADERS,
-  BASE_AUTH_ENV,
-} from '../test-utils/test-env';
+import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import {
   SubjectNotFoundError,
   VocabularyNotFoundError,
@@ -106,16 +109,24 @@ import {
 
 const TEST_ENV = { ...BASE_AUTH_ENV };
 
-const AUTH_HEADERS = {
-  ...BASE_AUTH_HEADERS,
+const AUTH_HEADERS = makeAuthHeaders({
   'X-Profile-Id': 'a0000000-0000-4000-a000-000000000001',
-};
+});
 
 const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
 const VOCABULARY_ID = '770e8400-e29b-41d4-a716-446655440000';
 
 describe('vocabulary routes', () => {
+  beforeAll(() => {
+    installTestJwksInterceptor();
+  });
+
+  afterAll(() => {
+    restoreTestFetch();
+  });
+
   beforeEach(() => {
+    clearJWKSCache();
     jest.clearAllMocks();
   });
 

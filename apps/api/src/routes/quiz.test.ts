@@ -1,6 +1,12 @@
-jest.mock('../middleware/jwt', () =>
-  require('../test-utils/auth-fixture').createJwtModuleMock()
-);
+// ---------------------------------------------------------------------------
+// Real JWT + real auth middleware — no jwt module mock
+// ---------------------------------------------------------------------------
+
+import {
+  installTestJwksInterceptor,
+  restoreTestFetch,
+} from '../test-utils/jwks-interceptor';
+import { clearJWKSCache } from '../middleware/jwt';
 
 import {
   createDatabaseModuleMock,
@@ -106,20 +112,14 @@ jest.mock('../services/llm', () => ({
 
 import { app } from '../index';
 import { routeAndCall } from '../services/llm';
-import {
-  AUTH_HEADERS as BASE_AUTH_HEADERS,
-  BASE_AUTH_ENV,
-} from '../test-utils/test-env';
+import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
   DATABASE_URL: 'postgresql://test:test@localhost/test',
 };
 
-const AUTH_HEADERS = {
-  ...BASE_AUTH_HEADERS,
-  'X-Profile-Id': 'test-profile-id',
-};
+const AUTH_HEADERS = makeAuthHeaders({ 'X-Profile-Id': 'test-profile-id' });
 
 let meteringFixture: ReturnType<typeof createRouteMeteringFixture>;
 
@@ -187,7 +187,16 @@ const COMPLETED_ROUND = {
   ],
 };
 
+beforeAll(() => {
+  installTestJwksInterceptor();
+});
+
+afterAll(() => {
+  restoreTestFetch();
+});
+
 beforeEach(() => {
+  clearJWKSCache();
   jest.clearAllMocks();
   (mockDb as any).query = {
     quizRounds: {
@@ -259,10 +268,7 @@ describe('Quiz routes', () => {
         '/v1/quiz/rounds',
         {
           method: 'POST',
-          headers: {
-            Authorization: 'Bearer valid.jwt.token',
-            'Content-Type': 'application/json',
-          },
+          headers: makeAuthHeaders(),
           body: JSON.stringify({ activityType: 'capitals' }),
         },
         TEST_ENV

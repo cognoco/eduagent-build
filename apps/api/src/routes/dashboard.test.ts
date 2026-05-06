@@ -1,10 +1,12 @@
 // ---------------------------------------------------------------------------
-// Mock JWT module so auth middleware passes with a valid token
+// Real JWT + real auth middleware — no jwt module mock
 // ---------------------------------------------------------------------------
 
-jest.mock('../middleware/jwt', () =>
-  require('../test-utils/auth-fixture').createJwtModuleMock()
-);
+import {
+  installTestJwksInterceptor,
+  restoreTestFetch,
+} from '../test-utils/jwks-interceptor';
+import { clearJWKSCache } from '../middleware/jwt';
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
 
@@ -79,10 +81,7 @@ jest.mock('../services/weekly-report', () => ({
 
 import { app } from '../index';
 import { ForbiddenError } from '../errors';
-import {
-  AUTH_HEADERS as BASE_AUTH_HEADERS,
-  BASE_AUTH_ENV,
-} from '../test-utils/test-env';
+import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { extractDrizzleParamValues } from '../test-utils/drizzle-introspection';
 
 const TEST_ENV = {
@@ -90,16 +89,22 @@ const TEST_ENV = {
   DATABASE_URL: 'postgresql://test:test@localhost/test',
 };
 
-const AUTH_HEADERS = {
-  ...BASE_AUTH_HEADERS,
-  'X-Profile-Id': 'test-profile-id',
-};
+const AUTH_HEADERS = makeAuthHeaders({ 'X-Profile-Id': 'test-profile-id' });
 
 const PROFILE_ID = '770e8400-e29b-41d4-a716-446655440000';
 const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
 
 describe('dashboard routes', () => {
+  beforeAll(() => {
+    installTestJwksInterceptor();
+  });
+
+  afterAll(() => {
+    restoreTestFetch();
+  });
+
   beforeEach(() => {
+    clearJWKSCache();
     jest.clearAllMocks();
     mockFindFamilyLink.mockResolvedValue({
       parentProfileId: 'test-profile-id',
@@ -130,10 +135,7 @@ describe('dashboard routes', () => {
       const res = await app.request(
         '/v1/dashboard',
         {
-          headers: {
-            Authorization: 'Bearer valid.jwt.token',
-            'Content-Type': 'application/json',
-          },
+          headers: makeAuthHeaders(),
         },
         TEST_ENV
       );

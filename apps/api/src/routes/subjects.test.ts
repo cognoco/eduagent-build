@@ -1,10 +1,12 @@
 // ---------------------------------------------------------------------------
-// Mock JWT module so auth middleware passes with a valid token
+// Real JWT + real auth middleware — no jwt module mock
 // ---------------------------------------------------------------------------
 
-jest.mock('../middleware/jwt', () =>
-  require('../test-utils/auth-fixture').createJwtModuleMock()
-);
+import {
+  installTestJwksInterceptor,
+  restoreTestFetch,
+} from '../test-utils/jwks-interceptor';
+import { clearJWKSCache } from '../middleware/jwt';
 
 // ---------------------------------------------------------------------------
 // Mock database module — middleware creates a stub db per request
@@ -136,19 +138,24 @@ import { classifySubject } from '../services/subject-classify';
 import { captureException } from '../services/sentry';
 import { UpstreamLlmError, SubjectNotFoundError } from '@eduagent/schemas';
 import { SubjectNotLanguageLearningError } from '../services/subject';
-import {
-  AUTH_HEADERS as BASE_AUTH_HEADERS,
-  BASE_AUTH_ENV,
-} from '../test-utils/test-env';
+import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 
 const TEST_ENV = { ...BASE_AUTH_ENV };
 
-const AUTH_HEADERS = {
-  ...BASE_AUTH_HEADERS,
-  'X-Profile-Id': 'test-profile-id',
-};
+const AUTH_HEADERS = makeAuthHeaders({ 'X-Profile-Id': 'test-profile-id' });
 
 describe('subject routes', () => {
+  beforeAll(() => {
+    installTestJwksInterceptor();
+  });
+
+  afterAll(() => {
+    restoreTestFetch();
+  });
+
+  beforeEach(() => {
+    clearJWKSCache();
+  });
   // -------------------------------------------------------------------------
   // POST /v1/subjects/resolve
   // -------------------------------------------------------------------------
