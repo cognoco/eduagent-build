@@ -11,6 +11,7 @@ import { platformAlert } from '../../lib/platform-alert';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Redirect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { InterestContext } from '@eduagent/schemas';
 import { personaFromBirthYear, useProfile } from '../../lib/profile';
 import { formatApiError } from '../../lib/format-api-error';
 import { Sentry } from '../../lib/sentry';
@@ -37,6 +38,25 @@ import {
 import { MemoryConsentPrompt } from '../../components/memory-consent-prompt';
 import { useParentProxy } from '../../hooks/use-parent-proxy';
 import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
+import { useUpdateInterestsContext } from '../../hooks/use-onboarding-dimensions';
+
+const INTEREST_CONTEXT_OPTIONS: Array<{
+  value: InterestContext;
+  labelKey: string;
+}> = [
+  {
+    value: 'school',
+    labelKey: 'session.mentorMemory.interestContext.school',
+  },
+  {
+    value: 'free_time',
+    labelKey: 'session.mentorMemory.interestContext.freeTime',
+  },
+  {
+    value: 'both',
+    labelKey: 'session.mentorMemory.interestContext.both',
+  },
+];
 
 export default function MentorMemoryScreen() {
   const { t } = useTranslation();
@@ -50,6 +70,7 @@ export default function MentorMemoryScreen() {
   const toggleInjection = useToggleMemoryInjection();
   const unsuppress = useUnsuppressInference();
   const grantConsent = useGrantMemoryConsent();
+  const updateInterestsContext = useUpdateInterestsContext();
   const { isParentProxy } = useParentProxy();
   const role = useActiveProfileRole();
   const [draft, setDraft] = useState('');
@@ -178,6 +199,28 @@ export default function MentorMemoryScreen() {
       })();
     },
     [toggleInjection, t]
+  );
+
+  const handleInterestContextChange = useCallback(
+    async (label: string, context: InterestContext) => {
+      const interests = profile?.interests ?? [];
+      try {
+        await updateInterestsContext.mutateAsync({
+          interests: interests.map((interest) =>
+            interest.label === label ? { ...interest, context } : interest
+          ),
+        });
+      } catch (err) {
+        platformAlert(
+          t('session.mentorMemory.errors.updateFailed'),
+          formatApiError(err)
+        );
+        Sentry.captureException(err, {
+          tags: { surface: 'mentor-memory', action: 'update_interest_context' },
+        });
+      }
+    },
+    [profile?.interests, t, updateInterestsContext]
   );
 
   const consentStatus = profile?.memoryConsentStatus ?? 'pending';
@@ -462,6 +505,7 @@ export default function MentorMemoryScreen() {
                     date: formatRelativeDate(ts),
                   })
                 : undefined;
+              const context = interest.context;
               return (
                 <MemoryRow
                   key={label}
@@ -487,7 +531,44 @@ export default function MentorMemoryScreen() {
                       });
                     }
                   }}
-                />
+                >
+                  <View className="flex-row flex-wrap gap-2">
+                    {INTEREST_CONTEXT_OPTIONS.map((option) => {
+                      const selected = option.value === context;
+                      return (
+                        <Pressable
+                          key={option.value}
+                          onPress={() =>
+                            void handleInterestContextChange(
+                              label,
+                              option.value
+                            )
+                          }
+                          disabled={updateInterestsContext.isPending}
+                          className={`rounded-full px-3 py-1.5 ${
+                            selected ? 'bg-primary' : 'bg-surface-elevated'
+                          }`}
+                          accessibilityRole="button"
+                          accessibilityState={{
+                            selected,
+                            disabled: updateInterestsContext.isPending,
+                          }}
+                          testID={`interest-context-${label}-${option.value}`}
+                        >
+                          <Text
+                            className={`text-caption font-semibold ${
+                              selected
+                                ? 'text-text-inverse'
+                                : 'text-text-secondary'
+                            }`}
+                          >
+                            {t(option.labelKey)}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </MemoryRow>
               );
             })
           ) : (

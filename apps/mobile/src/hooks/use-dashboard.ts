@@ -248,6 +248,25 @@ export function useChildSessionDetail(
   });
 }
 
+type ChildMemoryConfidence = 'low' | 'medium' | 'high';
+
+interface ChildMemory {
+  categories: Array<{
+    label: string;
+    items: Array<{
+      category:
+        | 'struggles'
+        | 'interests'
+        | 'strengths'
+        | 'communicationNotes'
+        | 'learningStyle';
+      value: string;
+      statement: string;
+      confidence?: ChildMemoryConfidence;
+    }>;
+  }>;
+}
+
 export function useChildMemory(childProfileId: string | undefined) {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -264,7 +283,7 @@ export function useChildMemory(childProfileId: string | undefined) {
         );
         await assertOk(res);
         const data = await res.json();
-        return data.memory;
+        return data.memory as ChildMemory;
       } finally {
         cleanup();
       }

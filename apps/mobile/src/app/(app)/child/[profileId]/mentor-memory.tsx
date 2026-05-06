@@ -39,6 +39,14 @@ import { assertOk } from '../../../../lib/assert-ok';
 import { goBackOrReplace } from '../../../../lib/navigation';
 import { useApiClient } from '../../../../lib/api-client';
 
+function confidenceDetail(
+  confidence: 'low' | 'medium' | 'high' | undefined,
+  t: (key: string) => string
+): string | undefined {
+  if (!confidence) return undefined;
+  return t(`parentView.mentorMemory.confidence.${confidence}`);
+}
+
 export default function ChildMentorMemoryScreen() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -84,7 +92,7 @@ export default function ChildMentorMemoryScreen() {
         );
       }
     },
-    [deleteItem]
+    [deleteItem, t]
   );
 
   const safeUnsuppress = useCallback(
@@ -98,7 +106,7 @@ export default function ChildMentorMemoryScreen() {
         );
       }
     },
-    [unsuppress]
+    [unsuppress, t]
   );
 
   const handleDeleteAll = useCallback(() => {
@@ -124,7 +132,7 @@ export default function ChildMentorMemoryScreen() {
         },
       ]
     );
-  }, [childProfileId, deleteAll]);
+  }, [childProfileId, deleteAll, t]);
 
   const handleTellMentor = useCallback(async () => {
     if (!childProfileId || draft.trim().length === 0) return;
@@ -145,7 +153,7 @@ export default function ChildMentorMemoryScreen() {
         t('parentView.mentorMemory.pleaseTryAgain')
       );
     }
-  }, [childProfileId, draft, tellMentor]);
+  }, [childProfileId, draft, tellMentor, t]);
 
   const handleToggleCollection = useCallback(
     (value: boolean) => {
@@ -390,6 +398,7 @@ export default function ChildMentorMemoryScreen() {
               <MemoryRow
                 key={`${item.category}-${item.value}`}
                 label={item.statement}
+                detail={confidenceDetail(item.confidence, t)}
                 onRemove={() =>
                   void safeDelete({
                     childProfileId,

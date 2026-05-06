@@ -3,6 +3,11 @@
 // ---------------------------------------------------------------------------
 
 import { createScopedRepository, type Database } from '@eduagent/database';
+import type {
+  ConfidenceLevel,
+  StrengthEntry,
+  StruggleEntry,
+} from '@eduagent/schemas';
 import {
   hasMemoryFactsBackfillMarker,
   readMemorySnapshotFromFacts,
@@ -19,6 +24,7 @@ export interface CuratedMemoryItem {
   category: MemoryCategoryKey;
   value: string;
   statement: string;
+  confidence?: ConfidenceLevel;
 }
 
 export interface MemoryCategory {
@@ -95,22 +101,12 @@ function serializeLearningStyle(
 // Strength / Struggle item builders
 // ---------------------------------------------------------------------------
 
-interface StrengthEntry {
-  subject: string;
-  topics: string[];
-}
-
-interface StruggleEntry {
-  topic: string;
-  subject?: string;
-  severity?: string;
-}
-
 function buildStrengthItems(strengths: unknown[]): CuratedMemoryItem[] {
   return (strengths as StrengthEntry[]).map((entry) => ({
     category: 'strengths' as const,
     value: entry.subject,
     statement: `Strong in ${entry.subject}: ${entry.topics.join(', ')}`,
+    confidence: entry.confidence,
   }));
 }
 
@@ -121,6 +117,7 @@ function buildStruggleItems(struggles: unknown[]): CuratedMemoryItem[] {
     statement: entry.subject
       ? `Struggles with ${entry.topic} (${entry.subject})`
       : `Struggles with ${entry.topic}`,
+    confidence: entry.confidence,
   }));
 }
 
