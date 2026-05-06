@@ -164,6 +164,10 @@ export interface ExchangeBehavioralMetrics {
   retrievalScore?: number;
   /** B.3 monitoring: consecutive correct-answer streak at the current escalation rung */
   correctStreak?: number;
+  /** Fluency-drill score correct count, when the envelope's ui_hints.fluency_drill.score was set. */
+  drillCorrect?: number;
+  /** Fluency-drill score total count, when the envelope's ui_hints.fluency_drill.score was set. */
+  drillTotal?: number;
 }
 
 function mapRetrievalScoreToDepth(score: number): 'low' | 'mid' | 'high' {
@@ -1282,6 +1286,10 @@ export async function persistExchangeResult(
   }
 
   // Atomic guard passed — now persist the events.
+  // Drill score is sparse: only set on ai_response when the LLM emitted a
+  // scored fluency drill on this turn. Null on every other exchange.
+  const drillCorrect = behavioral?.drillCorrect ?? null;
+  const drillTotal = behavioral?.drillTotal ?? null;
   const insertedEvents = clientId
     ? await db
         .insert(sessionEvents)
@@ -1292,6 +1300,8 @@ export async function persistExchangeResult(
           eventType: 'ai_response' as const,
           content: aiResponse,
           metadata: aiMetadata,
+          drillCorrect,
+          drillTotal,
         })
         .returning({
           id: sessionEvents.id,
@@ -1314,6 +1324,8 @@ export async function persistExchangeResult(
             eventType: 'ai_response' as const,
             content: aiResponse,
             metadata: aiMetadata,
+            drillCorrect,
+            drillTotal,
           },
         ])
         .returning({
@@ -1668,6 +1680,8 @@ export async function streamMessage(
           needsDeepening: parsed.needsDeepening,
           confidence: parsed.confidence,
           retrievalScore: parsed.retrievalScore,
+          drillCorrect: parsed.fluencyDrill?.score?.correct,
+          drillTotal: parsed.fluencyDrill?.score?.total,
         },
         options?.clientId
       );

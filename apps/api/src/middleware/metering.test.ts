@@ -1207,11 +1207,18 @@ describe('metering middleware', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'hello' }),
         },
-        TEST_ENV
+        { ...TEST_ENV, SUBSCRIPTION_KV: {} as KVNamespace }
       );
 
       expect(res.status).toBe(200);
       expect(res.headers.get('X-Quota-Remaining')).toBe('499');
+      expect(mockWriteSubscriptionStatus).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-account-id',
+        expect.objectContaining({
+          usedThisMonth: 500,
+        })
+      );
     });
   });
 

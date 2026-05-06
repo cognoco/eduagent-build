@@ -116,6 +116,7 @@ export const usageEvents = pgTable(
       table.profileId,
       table.occurredAt
     ),
+    check('usage_events_delta_range', sql`${table.delta} IN (1, -1)`),
   ]
 );
 

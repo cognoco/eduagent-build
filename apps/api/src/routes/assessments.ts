@@ -72,6 +72,7 @@ export const assessmentRoutes = new Hono<RouteEnv>()
     '/assessments/:assessmentId/answer',
     zValidator('json', assessmentAnswerSchema),
     async (c) => {
+      assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const assessmentId = c.req.param('assessmentId');
       const { answer } = c.req.valid('json');

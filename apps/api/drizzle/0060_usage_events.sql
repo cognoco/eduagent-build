@@ -3,7 +3,8 @@ CREATE TABLE "usage_events" (
   "subscription_id" uuid NOT NULL,
   "profile_id" uuid NOT NULL,
   "occurred_at" timestamp with time zone DEFAULT now() NOT NULL,
-  "delta" integer DEFAULT 1 NOT NULL
+  "delta" integer DEFAULT 1 NOT NULL,
+  CONSTRAINT "usage_events_delta_range" CHECK ("delta" IN (1, -1))
 );
 
 ALTER TABLE "usage_events" ENABLE ROW LEVEL SECURITY;

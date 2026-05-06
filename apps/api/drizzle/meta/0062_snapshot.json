@@ -1,6 +1,6 @@
 {
-  "id": "511c59ce-7ce2-4256-a911-050b90b7e03a",
-  "prevId": "8a80397e-dea1-447c-b9c6-42abd72accec",
+  "id": "6fa2274f-a7ed-45e4-a83a-5fc8de70d129",
+  "prevId": "511c59ce-7ce2-4256-a911-050b90b7e03a",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -3194,6 +3194,18 @@
         "structured_assessment": {
           "name": "structured_assessment",
           "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "drill_correct": {
+          "name": "drill_correct",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "drill_total": {
+          "name": "drill_total",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false
         },

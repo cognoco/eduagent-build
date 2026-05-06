@@ -1,6 +1,6 @@
 {
-  "id": "511c59ce-7ce2-4256-a911-050b90b7e03a",
-  "prevId": "8a80397e-dea1-447c-b9c6-42abd72accec",
+  "id": "8a80397e-dea1-447c-b9c6-42abd72accec",
+  "prevId": "dd5981d0-f0ec-4569-a467-c4e703cdfbc1",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1823,7 +1823,7 @@
       "checkConstraints": {
         "profiles_conversation_language_check": {
           "name": "profiles_conversation_language_check",
-          "value": "\"profiles\".\"conversation_language\" IN ('en','cs','es','fr','de','it','pt','pl','ja','nb')"
+          "value": "\"profiles\".\"conversation_language\" IN ('en','cs','es','fr')"
         },
         "profiles_pronouns_length_check": {
           "name": "profiles_pronouns_length_check",

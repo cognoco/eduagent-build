@@ -349,7 +349,11 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     // cached count would each write original+1, understating actual usage.
     if (kv) {
       const atomicUsedMonth =
-        monthlyLimit - decrement.remainingMonthly - decrement.remainingTopUp;
+        decrement.source === 'top_up'
+          ? monthlyLimit
+          : monthlyLimit -
+            decrement.remainingMonthly -
+            decrement.remainingTopUp;
       const atomicUsedToday =
         dailyLimit !== null && decrement.remainingDaily !== null
           ? dailyLimit - decrement.remainingDaily

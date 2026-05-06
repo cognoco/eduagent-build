@@ -6,7 +6,13 @@
  */
 
 import { and, eq } from 'drizzle-orm';
-import { assessments, retentionCards, xpLedger } from '@eduagent/database';
+import {
+  assessments,
+  generateUUIDv7,
+  profiles,
+  retentionCards,
+  xpLedger,
+} from '@eduagent/database';
 
 import { buildIntegrationEnv, cleanupAccounts } from './helpers';
 import {
@@ -142,6 +148,61 @@ describe('Integration: assessment routes', () => {
     );
 
     expect(res.status).toBe(401);
+  });
+
+  it('[BREAK / CR-FULL-2] rejects proxy-mode assessment answers', async () => {
+    const ownerProfile = await createOwnerProfile();
+    const childProfile = {
+      id: generateUUIDv7(),
+      accountId: ownerProfile.accountId,
+      isOwner: false,
+    };
+    const db = getIntegrationDb();
+    await db.insert(profiles).values({
+      id: childProfile.id,
+      accountId: childProfile.accountId,
+      displayName: 'Assessment Child',
+      birthYear: 2000,
+      isOwner: false,
+    });
+
+    const subject = await seedSubject(childProfile.id, 'Biology');
+    const curriculum = await seedCurriculum({
+      subjectId: subject.id,
+      topics: [{ title: 'Photosynthesis', sortOrder: 0 }],
+    });
+    const assessmentId = await seedAssessmentRecord({
+      profileId: childProfile.id,
+      subjectId: subject.id,
+      topicId: curriculum.topicIds[0]!,
+      verificationDepth: 'transfer',
+    });
+
+    const res = await app.request(
+      `/v1/assessments/${assessmentId}/answer`,
+      {
+        method: 'POST',
+        headers: buildAuthHeaders(
+          { sub: ASSESSMENTS_USER.userId, email: ASSESSMENTS_USER.email },
+          childProfile.id
+        ),
+        body: JSON.stringify({
+          answer: 'Plants use light to make sugars from carbon dioxide.',
+        }),
+      },
+      TEST_ENV
+    );
+
+    expect(ownerProfile.isOwner).toBe(true);
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.code).toBe('PROXY_MODE');
+
+    const unchanged = await db.query.assessments.findFirst({
+      where: eq(assessments.id, assessmentId),
+    });
+    expect(unchanged?.status).toBe('in_progress');
+    expect(mockChat).not.toHaveBeenCalled();
   });
 
   it('returns and updates an assessment with real persistence', async () => {
