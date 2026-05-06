@@ -223,6 +223,7 @@ Removing `curriculum-review.tsx` is safe only if Mentor session 1 reads the mate
    (b) Slim to single screen with smart defaults: L1 = UI conversation language, CEFR inferred from session 1 behavior.
    (c) Defer entirely — Mentor asks in turn 1.
    Recommend (b). Action item: pick before phase 2.
+   **Phase 2 decision (2026-05-05):** Use option (a), keep `language-setup` as-is for this implementation. This preserves the 2-screen language-subject path while fast-pathing the generic path; slimming is deferred to a follow-up spec.
 
 2. **`pick-book` for broad subjects — still needed?**
    Currently a kid who creates "Math" picks one book before tutoring. Alternative: dive into Mentor and let it scaffold book selection conversationally.
@@ -237,6 +238,7 @@ Removing `curriculum-review.tsx` is safe only if Mentor session 1 reads the mate
 
 5. **Engagement metrics — hard gate, must be defined before Phase 2 starts**
    Phase 4 (deletion) cannot trigger without a defined metric and threshold. Candidate primary: time from `create-subject` → first tutoring exchange. Candidate secondaries: subject-creation completion rate, session-1 message count, day-2 retention. Per-user A/B is out of scope — comparison is staging-baseline vs staging-with-fast-path, then prod-pre-flip vs prod-post-flip windows. **Owner + threshold values must be filled in before Phase 2 merges.**
+   **Phase 4 gate decision (2026-05-05):** Owner: product/UX analytics owner for onboarding. Primary metric: median time from tapping create-subject submit to first learner-visible tutoring exchange. Threshold: fast-path median must be at least 60% lower than the prod pre-flip baseline, with no worse than a 2 percentage point regression in subject-creation completion rate and no worse than a 5% regression in day-2 return among learners who create a subject. Bake window: at least 2 weeks at 100% prod before deletion.
 
 ---
 
