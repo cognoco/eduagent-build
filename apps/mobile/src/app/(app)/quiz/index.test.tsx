@@ -23,6 +23,9 @@ jest.mock('react-i18next', () => {
     'quiz.index.retryLabel': 'Retry loading quiz data',
     'quiz.index.capitalsTitle': 'Capitals',
     'quiz.index.capitalsDefaultSubtitle': 'Test yourself on world capitals',
+    'quiz.index.challengeExplainerTitle': 'Challenge rounds',
+    'quiz.index.challengeExplainerBody':
+      "When you're on a roll, the mentor may make the next round harder.",
     'quiz.index.guessWhoTitle': 'Guess Who',
     'quiz.index.guessWhoDefaultSubtitle': 'Name the famous person from clues',
     'quiz.index.vocabLockedTitle': 'Vocabulary',
@@ -211,6 +214,8 @@ describe('QuizIndexScreen', () => {
   describe('[BUG-752] render states', () => {
     it('renders Capitals and Guess Who cards with default subtitles when no stats', () => {
       render(<QuizIndexScreen />, { wrapper: Wrapper });
+      screen.getByTestId('quiz-challenge-explainer');
+      screen.getByText('Challenge rounds');
       screen.getByTestId('quiz-capitals');
       screen.getByTestId('quiz-guess-who');
       screen.getByText(/test yourself on world capitals/i);

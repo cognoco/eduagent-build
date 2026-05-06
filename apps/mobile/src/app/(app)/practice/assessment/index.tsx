@@ -214,12 +214,18 @@ export default function AssessmentScreen() {
           </View>
         </>
       ) : (
-        <Button
-          variant="secondary"
-          label="Done"
-          testID="assessment-done"
-          onPress={() => goBackOrReplace(router, '/(app)/practice' as const)}
-        />
+        <>
+          <Text className="text-body-sm text-text-secondary">
+            Nice work — this topic is marked as passed, and weak spots will come
+            back through review when they need attention.
+          </Text>
+          <Button
+            variant="secondary"
+            label="Done"
+            testID="assessment-done"
+            onPress={() => goBackOrReplace(router, '/(app)/practice' as const)}
+          />
+        </>
       )}
     </View>
   ) : null;

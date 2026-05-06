@@ -1,3 +1,18 @@
+/**
+ * Session-depth evaluation gates the filing prompt for unscoped sessions.
+ *
+ * The "Add to library?" modal in the mobile session footer
+ * (apps/mobile/src/components/session/SessionFooter.tsx) appears ONLY when:
+ *   1. Session mode is 'freeform' or 'homework' (scoped sessions are
+ *      implicitly filed by their topic linkage), AND
+ *   2. This evaluator returns `meaningful: true` for the session transcript.
+ *
+ * Opt-in default ("No thanks" leaves the session unfiled) is intentional.
+ *
+ * If you change this evaluator's thresholds, also update the spec:
+ * docs/specs/2026-05-06-learning-path-clarity-pass.md (Q4).
+ */
+
 import { z } from 'zod';
 import {
   detectedTopicSchema,
