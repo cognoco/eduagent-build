@@ -68,6 +68,7 @@ const envSchema = z.object({
   // and semantic parity gates pass. Dual-write is code-driven, this flag only
   // controls prompt/read reconstruction.
   MEMORY_FACTS_READ_ENABLED: z.enum(['true', 'false']).default('false'),
+  MEMORY_FACTS_RELEVANCE_RETRIEVAL: z.enum(['true', 'false']).default('false'),
 
   // Subject onboarding fast path (spec 2026-05-05). Build-time-ish env flag:
   // backend default remains false unless Doppler sets it for dev/staging.
@@ -77,6 +78,12 @@ const envSchema = z.object({
 export type Env = z.infer<typeof envSchema>;
 
 export function isMemoryFactsReadEnabled(value: string | undefined): boolean {
+  return value === 'true';
+}
+
+export function isMemoryFactsRelevanceEnabled(
+  value: string | undefined
+): boolean {
   return value === 'true';
 }
 

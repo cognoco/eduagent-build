@@ -397,6 +397,44 @@ export function createScopedRepository(db: Database, profileId: string) {
           orderBy: [asc(memoryFacts.createdAt), asc(memoryFacts.id)],
         });
       },
+      async findRelevant(
+        queryEmbedding: number[],
+        k: number,
+        extraWhere?: SQL
+      ) {
+        if (queryEmbedding.length === 0 || k <= 0) return [];
+
+        const overFetch = Math.max(k * 4, k);
+        const queryLiteral = sql`${`[${queryEmbedding.join(',')}]`}::vector`;
+        const defaultFilters = and(
+          sql`${memoryFacts.supersededBy} IS NULL`,
+          sql`${memoryFacts.category} <> 'suppressed'`
+        );
+        const baseWhere = scopedWhere(
+          memoryFacts,
+          extraWhere ? and(defaultFilters, extraWhere) : defaultFilters
+        );
+
+        return db
+          .select({
+            id: memoryFacts.id,
+            profileId: memoryFacts.profileId,
+            category: memoryFacts.category,
+            text: memoryFacts.text,
+            textNormalized: memoryFacts.textNormalized,
+            metadata: memoryFacts.metadata,
+            sourceSessionIds: memoryFacts.sourceSessionIds,
+            sourceEventIds: memoryFacts.sourceEventIds,
+            observedAt: memoryFacts.observedAt,
+            confidence: memoryFacts.confidence,
+            createdAt: memoryFacts.createdAt,
+            distance: sql<number>`${memoryFacts.embedding} <=> ${queryLiteral}`,
+          })
+          .from(memoryFacts)
+          .where(and(baseWhere, sql`${memoryFacts.embedding} IS NOT NULL`))
+          .orderBy(sql`${memoryFacts.embedding} <=> ${queryLiteral}`)
+          .limit(overFetch);
+      },
     },
     monthlyReports: {
       async findMany(extraWhere?: SQL, options?: { limit?: number }) {

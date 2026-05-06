@@ -1,4 +1,8 @@
-import { validateEnv, validateProductionKeys } from './config';
+import {
+  isMemoryFactsRelevanceEnabled,
+  validateEnv,
+  validateProductionKeys,
+} from './config';
 import type { Env } from './config';
 
 // ---------------------------------------------------------------------------
@@ -261,5 +265,32 @@ describe('validateEnv', () => {
       MEMORY_FACTS_READ_ENABLED: 'true',
     });
     expect(env.MEMORY_FACTS_READ_ENABLED).toBe('true');
+  });
+
+  it('MEMORY_FACTS_RELEVANCE_RETRIEVAL defaults to "false" when unset', () => {
+    const env = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+    });
+    expect(env.MEMORY_FACTS_RELEVANCE_RETRIEVAL).toBe('false');
+  });
+
+  it('MEMORY_FACTS_RELEVANCE_RETRIEVAL parses "true"', () => {
+    const env = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+      MEMORY_FACTS_RELEVANCE_RETRIEVAL: 'true',
+    });
+    expect(env.MEMORY_FACTS_RELEVANCE_RETRIEVAL).toBe('true');
+  });
+
+  it('isMemoryFactsRelevanceEnabled returns false when undefined', () => {
+    expect(isMemoryFactsRelevanceEnabled(undefined)).toBe(false);
+  });
+
+  it('isMemoryFactsRelevanceEnabled returns true only for "true"', () => {
+    expect(isMemoryFactsRelevanceEnabled('true')).toBe(true);
+    expect(isMemoryFactsRelevanceEnabled('false')).toBe(false);
+    expect(isMemoryFactsRelevanceEnabled('TRUE')).toBe(false);
   });
 });

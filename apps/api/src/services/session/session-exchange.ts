@@ -44,11 +44,14 @@ import {
   buildCrossSubjectContext,
 } from '../prior-learning';
 import { buildMemoryBlock, buildAccommodationBlock } from '../learner-profile';
+import { generateEmbedding } from '../embeddings';
 import { retrieveRelevantMemory } from '../memory';
+import { makeEmbedderFromEnv } from '../memory/embed-fact';
 import {
   hasMemoryFactsBackfillMarker,
   readMemorySnapshotFromFacts,
 } from '../memory/memory-facts';
+import { getRelevantMemories } from '../memory/relevance';
 import { getTeachingPreference } from '../retention-data';
 import { shouldTriggerEvaluate } from '../evaluate';
 import { shouldTriggerTeachBack } from '../teach-back';
@@ -292,6 +295,7 @@ export async function prepareExchangeContext(
     homeworkMode?: 'help_me' | 'check_answer';
     llmTier?: import('../subscription').LLMTier;
     memoryFactsReadEnabled?: boolean;
+    memoryFactsRelevanceEnabled?: boolean;
   }
 ): Promise<ExchangePrep> {
   // 1. Load session
@@ -319,6 +323,24 @@ export async function prepareExchangeContext(
   // CFLF-23: For freeform sessions with rawInput, also scan prior sessions
   // by the learner's original intent so the very first exchange has rich context.
   const isFreeformWithRawInput = isFreeform && !!session.rawInput;
+  let userMessageVector: number[] | undefined;
+  if (options?.voyageApiKey) {
+    try {
+      const embedding = await generateEmbedding(
+        userMessage,
+        options.voyageApiKey
+      );
+      userMessageVector = embedding.vector;
+    } catch (err) {
+      logger.warn(
+        '[session-exchange] userMessage embedding failed; memory falls back',
+        {
+          event: 'session_exchange.user_msg_embedding.failed',
+          reason: err instanceof Error ? err.message : String(err),
+        }
+      );
+    }
+  }
 
   // BUG-70: Supplementary data is static within a session (priorTopics,
   // teachingPref, learningMode, learningProfile, crossSubjectHighlights).
@@ -380,7 +402,14 @@ export async function prepareExchangeContext(
       // session-crud.ts getSessionTranscript for the full rationale.
       orderBy: [asc(sessionEvents.createdAt), asc(sessionEvents.id)],
     }),
-    retrieveRelevantMemory(db, profileId, userMessage, options?.voyageApiKey),
+    retrieveRelevantMemory(
+      db,
+      profileId,
+      userMessage,
+      options?.voyageApiKey,
+      undefined,
+      userMessageVector
+    ),
     // FR92: Load session metadata for interleaved topic list
     isInterleaved
       ? db
@@ -838,8 +867,22 @@ export async function prepareExchangeContext(
 
   const memorySnapshot =
     learningProfile &&
-    options?.memoryFactsReadEnabled &&
+    options?.memoryFactsRelevanceEnabled &&
     hasMemoryFactsBackfillMarker(learningProfile)
+      ? (
+          await getRelevantMemories({
+            profileId,
+            queryText: userMessage,
+            queryVector: userMessageVector,
+            k: 8,
+            profile: learningProfile,
+            scoped: createScopedRepository(db, profileId),
+            embedder: makeEmbedderFromEnv(options.voyageApiKey),
+          })
+        ).snapshot
+      : learningProfile &&
+        options?.memoryFactsReadEnabled &&
+        hasMemoryFactsBackfillMarker(learningProfile)
       ? await readMemorySnapshotFromFacts(
           createScopedRepository(db, profileId),
           learningProfile
@@ -1242,6 +1285,7 @@ export async function processMessage(
     llmTier?: import('../subscription').LLMTier;
     clientId?: string;
     memoryFactsReadEnabled?: boolean;
+    memoryFactsRelevanceEnabled?: boolean;
   }
 ): Promise<{
   response: string;
@@ -1346,6 +1390,7 @@ export async function streamMessage(
     llmTier?: import('../subscription').LLMTier;
     clientId?: string;
     memoryFactsReadEnabled?: boolean;
+    memoryFactsRelevanceEnabled?: boolean;
   }
 ): Promise<{
   stream: AsyncIterable<string>;

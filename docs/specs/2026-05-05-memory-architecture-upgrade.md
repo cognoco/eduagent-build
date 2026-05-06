@@ -304,7 +304,7 @@ Deploy gate: 100% pass on the semantic parity suite before flipping `MEMORY_FACT
 |---|---|---|
 | Today | 0 | 0 |
 | Phase 1 | 0 | 0 |
-| Phase 2 | 0 | +N (one per new fact written this session, typically 1-5) |
+| Phase 2 | 0 | Write-side: +N (one per new or text-changed fact written this session, typically 1-5). Query-side: +M per session, where M = number of user turns; the current user-message embedding is shared between similar-topic retrieval and `memory_facts` relevance retrieval so this is not 2M. |
 | Phase 3 | +min(K, 10) Haiku-tier calls (K = facts that hit similarity threshold; capped per session by `MAX_DEDUP_LLM_CALLS_PER_SESSION = 10`) | same as Phase 2 |
 
 Phase 3's per-fact dedup call is the cost-watch item. Mitigations: (a) Haiku-tier model, (b) only fires when a candidate fact has a near-duplicate in storage, (c) hard per-session cap of 10 LLM calls (component 8), (d) implementation-time exploration of folding the dedup decision into the existing `analyzeSessionTranscript` prompt as a multi-section structured output (would eliminate the per-fact call entirely). Tracked in Open Questions.
