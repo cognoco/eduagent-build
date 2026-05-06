@@ -7,7 +7,9 @@
 **Phase:** 2 of 3 — scoped to PR 6 only
 **Goal:** Promote child-management surfaces out of `/more` into a dedicated `Family` bottom tab, conditionally mounted when the user has at least one linked child profile.
 
-**Architecture:** Move the existing `dashboard.tsx` body into a new `family.tsx` route, repoint `FAMILY_HOME_PATH` to it, mount it as a 5th visible tab gated on `useDashboard().data?.children.length > 0`, redirect `/dashboard` indefinitely to `/family` for any deep links, and ship a single dismissible inline orientation cue on first visit (SecureStore-backed). No backend changes.
+**Architecture:** Move the existing `dashboard.tsx` body into a new `family.tsx` route, repoint `FAMILY_HOME_PATH` to it, mount it as a 5th visible tab gated on **(a) active profile is a parent (`useActiveProfileRole() === 'parent'`) AND (b) `useDashboard()` returns real (non-demo) children**, redirect `/dashboard` indefinitely to `/family` for any deep links, and ship a single dismissible inline orientation cue on first visit (SecureStore-backed). No backend changes.
+
+**Phase 1 gate decision:** The spec (line 25) gates Phase 2 on validating Phase 1 telemetry. Phase 1 PR 1/2/3 are unstarted. Per user direction, this plan proceeds without Phase 1 telemetry — the kill criterion (spec line 37: post-launch tap rate <5%) becomes a post-launch monitor rather than a pre-merge gate. If a Phase 1 prerequisite turns up during implementation, stop and re-plan.
 
 **Tech stack:** Expo Router v6 Tabs, React Query (existing `useDashboard` hook), SecureStore (Expo-safe key), `react-i18next`, NativeWind. Mobile only.
 
@@ -28,7 +30,9 @@ Phase 1 PR 1/2/3 are independent of this plan and remain unstarted (per `2026-04
 
 - Working tree on a feature branch (suggested name: `phase2-family-tab`). Confirm with `git status` before starting.
 - `pnpm exec nx run-many -t typecheck` passes on the base branch (sanity check).
-- `useDashboard` is the source of truth for "does the user have linked children". The hook returns `DashboardData` shaped as `{ children: DashboardChild[]; demoMode: boolean; ... }`. We treat `data?.children?.length ?? 0 > 0` as "has family".
+- `useDashboard` plus `useActiveProfileRole` are the sources of truth for "should Family tab mount". The dashboard hook returns `DashboardData` shaped as `{ children: DashboardChild[]; demoMode: boolean; ... }`. We treat `role === 'parent' && data?.demoMode === false && (data?.children?.length ?? 0) > 0` as "has family".
+- **Why the `demoMode` gate matters:** `apps/mobile/src/hooks/use-dashboard.ts:62-69` silently falls back to `/dashboard/demo` when the real dashboard returns zero children. The demo endpoint (`apps/api/src/routes/dashboard.ts:339-345`) returns one fake child `'demo-child-1'` with `demoMode: true`. Without the demo gate, every parent with no linked children would see a Family tab populated with fake demo data.
+- **Why the role gate matters:** spec line 276 — *"The Family tab — never appears for child profiles regardless of relationships."* `useDashboard` is `enabled: !!activeProfile` and runs for child profiles too, so we cannot rely on the dashboard payload alone. `useActiveProfileRole()` (`apps/mobile/src/hooks/use-active-profile-role.ts:20`) already returns the discriminated role.
 
 ## File structure
 
@@ -49,14 +53,21 @@ Phase 1 PR 1/2/3 are independent of this plan and remain unstarted (per `2026-04
 - `apps/mobile/src/app/(app)/dashboard.test.tsx` — collapse to redirect-coverage tests; original screen-behavior tests move to `family.test.tsx`.
 - `apps/mobile/src/lib/navigation.ts` — `FAMILY_HOME_PATH = '/(app)/family'`.
 - `apps/mobile/src/lib/navigation.test.ts` — update assertion to new path.
-- `apps/mobile/src/components/home/ParentGateway.tsx` — replace any literal `/(app)/dashboard` push with `FAMILY_HOME_PATH`. Verify with grep — there is at least one direct reference per `Grep` results.
-- `apps/mobile/src/components/home/ParentGateway.test.tsx` — update assertions to new path.
+- `apps/mobile/src/components/home/ParentGateway.tsx` — replace literal `'/(app)/dashboard?returnTo=home'` with `` `${FAMILY_HOME_PATH}?returnTo=home` ``. (Plain `FAMILY_HOME_PATH` is path-only; query string must be concatenated explicitly.)
+- `apps/mobile/src/components/home/ParentGateway.test.tsx` — update assertion at line 125 (`'/(app)/dashboard?returnTo=home'` → `'/(app)/family?returnTo=home'`).
+- `apps/mobile/src/app/(app)/more.tsx` — line 610 has a literal `'/(app)/dashboard?returnTo=more'` despite the file already importing `FAMILY_HOME_PATH` (line 49). Replace with `` `${FAMILY_HOME_PATH}?returnTo=more` ``.
+- `apps/mobile/src/app/(app)/more.test.tsx` — line 282 asserts `'/(app)/dashboard'`. Update to `'/(app)/family'`.
+- `apps/mobile/src/app/(app)/child/[profileId]/index.tsx` — line 288 `router.replace('/(app)/dashboard' as never)`. Replace with `FAMILY_HOME_PATH`.
+- `apps/mobile/src/app/(app)/child/[profileId]/reports.tsx` — three literals (lines 85, 256, 345). Replace each with `FAMILY_HOME_PATH`.
+- `apps/mobile/src/app/(app)/child/[profileId]/report/[reportId].tsx` — line 53 literal. Replace with `FAMILY_HOME_PATH`.
+- `apps/mobile/src/app/(app)/child/[profileId]/weekly-report/[weeklyReportId].tsx` — two literals (lines 99, 138). Replace each with `FAMILY_HOME_PATH`.
+- For each `child/*` file, update its co-located test if any assertions reference the old literal — verify with the Task 6 grep pass.
 - `apps/mobile/src/i18n/locales/en.json` — add `tabs.family`, `tabs.familyLabel`, `family.title`, `family.subtitle` (move from `dashboard.title`/`dashboard.subtitle` if reusable; otherwise add new), `family.orientationCueTitle`, `family.orientationCueBody`, `family.orientationCueDismiss`. Other locale files (`de`, `es`, `ja`, `nb`, `pl`, `pt`) get the same keys with English fallback strings — translation pass not required for this PR.
 
 **Not modified (intentional):**
 
 - API endpoints — none change.
-- `apps/mobile/src/app/(app)/more.tsx` — already imports `FAMILY_HOME_PATH`. Switching the constant retargets it automatically.
+- The decision NOT to delete the old `dashboard.*` i18n keys after the cutover. Because the redirect is indefinite (per spec line 163), `family.tsx` still relies on most `dashboard.*` keys (renaming all of them is out of scope for this PR). A future cleanup PR can rename them once the redirect is sunset; track it as a follow-up rather than mixing it into this plan.
 
 ---
 
@@ -74,18 +85,29 @@ import { renderHook } from '@testing-library/react-native';
 import { useFamilyPresence } from './use-family-presence';
 
 const mockUseDashboard = jest.fn();
+const mockUseActiveProfileRole = jest.fn();
 jest.mock('./use-dashboard', () => ({
   useDashboard: () => mockUseDashboard(),
 }));
+jest.mock('./use-active-profile-role', () => ({
+  useActiveProfileRole: () => mockUseActiveProfileRole(),
+}));
 
 describe('useFamilyPresence', () => {
+  beforeEach(() => {
+    mockUseDashboard.mockReset();
+    mockUseActiveProfileRole.mockReset();
+  });
+
   it('returns hasFamily=false while loading', () => {
+    mockUseActiveProfileRole.mockReturnValue('parent');
     mockUseDashboard.mockReturnValue({ data: undefined, isLoading: true });
     const { result } = renderHook(() => useFamilyPresence());
     expect(result.current).toEqual({ hasFamily: false, isLoading: true });
   });
 
   it('returns hasFamily=false when children list is empty', () => {
+    mockUseActiveProfileRole.mockReturnValue('parent');
     mockUseDashboard.mockReturnValue({
       data: { children: [], demoMode: false },
       isLoading: false,
@@ -94,7 +116,8 @@ describe('useFamilyPresence', () => {
     expect(result.current).toEqual({ hasFamily: false, isLoading: false });
   });
 
-  it('returns hasFamily=true when at least one child is linked', () => {
+  it('returns hasFamily=true when at least one real child is linked', () => {
+    mockUseActiveProfileRole.mockReturnValue('parent');
     mockUseDashboard.mockReturnValue({
       data: { children: [{ profileId: 'c1' }], demoMode: false },
       isLoading: false,
@@ -103,16 +126,56 @@ describe('useFamilyPresence', () => {
     expect(result.current).toEqual({ hasFamily: true, isLoading: false });
   });
 
-  it('treats demoMode children as real (demo still shows family)', () => {
+  it('returns hasFamily=false when dashboard payload is demo data (parent has no real children)', () => {
+    // Regression guard: useDashboard silently falls back to /dashboard/demo
+    // when children.length === 0, returning fake demo-child-1 with demoMode:true.
+    // Family tab must NOT mount in this case.
+    mockUseActiveProfileRole.mockReturnValue('parent');
     mockUseDashboard.mockReturnValue({
-      data: { children: [{ profileId: 'demo' }], demoMode: true },
+      data: { children: [{ profileId: 'demo-child-1' }], demoMode: true },
       isLoading: false,
     });
     const { result } = renderHook(() => useFamilyPresence());
-    expect(result.current.hasFamily).toBe(true);
+    expect(result.current.hasFamily).toBe(false);
+  });
+
+  it('returns hasFamily=false on a child profile, even with non-empty children list', () => {
+    // Per spec line 276: Family tab never appears for child profiles
+    // regardless of relationships.
+    mockUseActiveProfileRole.mockReturnValue('child');
+    mockUseDashboard.mockReturnValue({
+      data: { children: [{ profileId: 'c1' }], demoMode: false },
+      isLoading: false,
+    });
+    const { result } = renderHook(() => useFamilyPresence());
+    expect(result.current.hasFamily).toBe(false);
+  });
+
+  it('returns hasFamily=false on a parent-impersonating-child (proxy) session', () => {
+    // useActiveProfileRole returns 'parent-as-child' for proxy sessions.
+    // Family tab is a parent-seat surface — suppress it during proxy.
+    mockUseActiveProfileRole.mockReturnValue('parent-as-child');
+    mockUseDashboard.mockReturnValue({
+      data: { children: [{ profileId: 'c1' }], demoMode: false },
+      isLoading: false,
+    });
+    const { result } = renderHook(() => useFamilyPresence());
+    expect(result.current.hasFamily).toBe(false);
+  });
+
+  it('returns hasFamily=false when role is not yet resolved (null)', () => {
+    mockUseActiveProfileRole.mockReturnValue(null);
+    mockUseDashboard.mockReturnValue({
+      data: { children: [{ profileId: 'c1' }], demoMode: false },
+      isLoading: false,
+    });
+    const { result } = renderHook(() => useFamilyPresence());
+    expect(result.current.hasFamily).toBe(false);
   });
 });
 ```
+
+> **Note:** Verify the exact role string for proxy sessions by reading `apps/mobile/src/hooks/use-active-profile-role.ts` before writing the test — adjust the literal (`'parent-as-child'`) to match the actual discriminated union value. Whatever the value, the rule is: only the plain `'parent'` role mounts the tab.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -124,15 +187,35 @@ Expected: FAIL with "Cannot find module './use-family-presence'".
 ```typescript
 // apps/mobile/src/hooks/use-family-presence.ts
 import { useDashboard } from './use-dashboard';
+import { useActiveProfileRole } from './use-active-profile-role';
 
 export interface FamilyPresence {
   hasFamily: boolean;
   isLoading: boolean;
 }
 
+/**
+ * Whether the active profile should see the Family tab.
+ *
+ * Three guards stack:
+ *   1. Role must be exactly 'parent' (not 'child', not proxy/impersonation,
+ *      not null/loading). Spec line 276: Family tab never appears for child
+ *      profiles regardless of relationships.
+ *   2. The dashboard payload must NOT be demo data. useDashboard falls back
+ *      to /dashboard/demo when the real response has zero children, so a
+ *      bare children-length check would incorrectly mount the tab for any
+ *      parent with no linked children.
+ *   3. At least one real child must be present.
+ */
 export function useFamilyPresence(): FamilyPresence {
+  const role = useActiveProfileRole();
   const { data, isLoading } = useDashboard();
-  const hasFamily = (data?.children?.length ?? 0) > 0;
+
+  const isParent = role === 'parent';
+  const isReal = data?.demoMode === false;
+  const hasRealChildren = (data?.children?.length ?? 0) > 0;
+  const hasFamily = isParent && isReal && hasRealChildren;
+
   return { hasFamily, isLoading };
 }
 ```
@@ -140,7 +223,7 @@ export function useFamilyPresence(): FamilyPresence {
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `cd apps/mobile && pnpm exec jest --findRelatedTests src/hooks/use-family-presence.test.ts --no-coverage`
-Expected: PASS, 4 tests.
+Expected: PASS, 7 tests.
 
 - [ ] **Step 5: Commit (using `/commit`)**
 
@@ -401,20 +484,20 @@ Inside the `ScrollView` body, place `<FamilyOrientationCue />` immediately above
 Add inside the existing `describe('FamilyScreen', ...)` block:
 
 ```tsx
-it('renders the FamilyOrientationCue at the top of the screen', () => {
-  // The cue is rendered conditionally on SecureStore — pass the "show" branch.
-  // The component itself owns its visibility logic; this assertion only
-  // verifies the screen mounts the component as a child.
-  // Note: the component returns null while SecureStore is pending, so this
-  // test relies on the component being present in the tree. We assert by
-  // mock — see the cue's own test for render-state coverage.
-  // ...rendering the screen and asserting a stable testID below requires
-  // resolving SecureStore. The simplest way is to mock SecureStore directly
-  // here and await the cue.
+it('mounts the FamilyOrientationCue inside the screen', async () => {
+  // Mock SecureStore at the top of family.test.tsx so the cue resolves to
+  // its visible state during render. (Place the mock alongside the existing
+  // top-level mocks; do not re-mock per-test.)
+  //   jest.mock('../../lib/secure-storage', () => ({
+  //     getItemAsync: jest.fn().mockResolvedValue(null),
+  //     setItemAsync: jest.fn().mockResolvedValue(undefined),
+  //   }));
+  render(<FamilyScreen />);
+  expect(await screen.findByTestId('family-orientation-cue')).toBeTruthy();
 });
 ```
 
-If a reliable assertion proves awkward in this test file, drop this `it` block — the cue's own test already covers the rendering logic and Step 7 verifies the wiring at the file-presence level via a grep-style assertion is not necessary. Skip if it fights the existing `family.test.tsx` mock setup.
+The cue's own test (`FamilyOrientationCue.test.tsx`) covers the SecureStore branches in detail; this assertion only proves the wiring (cue is mounted by the screen). If the SecureStore mock cannot be added at the top of `family.test.tsx` without breaking other tests, scope it inside this single `it` via `jest.doMock` + `jest.isolateModules` rather than dropping the assertion.
 
 - [ ] **Step 7: Run all three test files**
 
@@ -453,7 +536,7 @@ b. Find the existing `VISIBLE_TABS` constant:
 const VISIBLE_TABS = new Set(['home', 'library', 'progress', 'more']);
 ```
 
-Replace it with a derivation. Keep the original as an immutable base; the per-render set is computed inside the component:
+Replace it with a derivation. Keep the original as an immutable base; extract the per-render derivation into a small exported pure function so it can be unit-tested directly without fighting the Expo Router Tabs mock:
 
 ```tsx
 const BASE_VISIBLE_TABS: ReadonlySet<string> = new Set([
@@ -462,17 +545,21 @@ const BASE_VISIBLE_TABS: ReadonlySet<string> = new Set([
   'progress',
   'more',
 ]);
+
+export function computeVisibleTabs(hasFamily: boolean): ReadonlySet<string> {
+  if (!hasFamily) return BASE_VISIBLE_TABS;
+  return new Set([...BASE_VISIBLE_TABS, 'family']);
+}
 ```
 
 c. Inside `AppLayout`, after the existing `useParentProxy` line, add:
 
 ```tsx
 const { hasFamily } = useFamilyPresence();
-const visibleTabs = React.useMemo(() => {
-  const next = new Set<string>(BASE_VISIBLE_TABS);
-  if (hasFamily) next.add('family');
-  return next;
-}, [hasFamily]);
+const visibleTabs = React.useMemo(
+  () => computeVisibleTabs(hasFamily),
+  [hasFamily]
+);
 ```
 
 d. In the `screenOptions` callback, replace the `VISIBLE_TABS.has(route.name)` reference with `visibleTabs.has(route.name)`.
@@ -503,54 +590,41 @@ g. Verify by reading: when `hasFamily` is `false`, the `screenOptions` callback 
 
 - [ ] **Step 2: Add tab-visibility tests**
 
-In `apps/mobile/src/app/(app)/_layout.test.tsx`, find an existing top-level `describe` block. Add a new block:
+In `apps/mobile/src/app/(app)/_layout.test.tsx`, find an existing top-level `describe` block. Add a new block that asserts the pure derivation directly — no `jest.doMock`, no `jest.resetModules`, no fighting the Tabs mock:
 
 ```tsx
-describe('Family tab visibility', () => {
-  beforeEach(() => {
-    mockUseProfile.mockReturnValue({
-      activeProfile: {
-        id: 'p1',
-        displayName: 'Parent',
-        birthYear: 1990,
-        consentStatus: 'CONSENTED',
-      },
-      profiles: [],
-      isLoading: false,
-      profileLoadError: null,
-      profileWasRemoved: false,
-      acknowledgeProfileRemoval: jest.fn(),
-      switchProfile: jest.fn(),
-    });
-    mockUsePathname.mockReturnValue('/(app)/home');
-    (useAuth as jest.Mock).mockReturnValue({
-      isLoaded: true,
-      isSignedIn: true,
-    });
+import { computeVisibleTabs } from './_layout';
+
+describe('computeVisibleTabs', () => {
+  it('returns the base 4-tab set when hasFamily=false', () => {
+    const tabs = computeVisibleTabs(false);
+    expect([...tabs].sort()).toEqual(['home', 'library', 'more', 'progress']);
   });
 
-  it('mounts a family Tabs.Screen when useFamilyPresence reports hasFamily=true', () => {
-    jest.doMock('../../hooks/use-family-presence', () => ({
-      useFamilyPresence: () => ({ hasFamily: true, isLoading: false }),
-    }));
-    // Re-import the layout fresh after re-mocking
-    jest.resetModules();
-    const AppLayout = require('./_layout').default;
-    render(
-      <QueryClientProvider client={new QueryClient()}>
-        <AppLayout />
-      </QueryClientProvider>
-    );
-    // The mock Tabs.Screen returns null, so we cannot assert on its presence
-    // by testID. Instead, capture it: replace the Tabs mock to record names.
-    // (See Step 3 for an alternative if this assertion is awkward.)
+  it('adds the family tab when hasFamily=true', () => {
+    const tabs = computeVisibleTabs(true);
+    expect(tabs.has('family')).toBe(true);
+    expect([...tabs].sort()).toEqual([
+      'family',
+      'home',
+      'library',
+      'more',
+      'progress',
+    ]);
+  });
+
+  it('never mutates the base set across calls', () => {
+    const a = computeVisibleTabs(false);
+    const b = computeVisibleTabs(true);
+    // Calling with true must not have leaked 'family' into a future hasFamily=false call.
+    expect(computeVisibleTabs(false).has('family')).toBe(false);
+    expect(a.has('family')).toBe(false);
+    expect(b.has('family')).toBe(true);
   });
 });
 ```
 
-If the existing `Tabs.Screen` mock makes per-screen assertions awkward, replace the assertion with a render-style check: assert that `screen.queryByTestId('tab-family')` is non-null when `hasFamily=true` and null when `hasFamily=false`. The `tabBarButtonTestID` option propagates to Expo Router's tab button rendering — adapt the mock if necessary so that the test can observe the option.
-
-If any of this fights the existing test infrastructure, **simpler alternative**: write a unit test against the `visibleTabs` derivation logic by extracting it into a tiny exported pure function `computeVisibleTabs(hasFamily: boolean): Set<string>` and asserting its output directly. This is cheaper than fighting the Tabs mock and the test still proves the rule.
+This proves the rule that drives tab mounting without rendering the layout. The full screen-render integration is covered indirectly via Task 7 manual verification.
 
 - [ ] **Step 3: Run all _layout tests**
 
@@ -685,15 +759,44 @@ describe('DashboardRedirect (legacy /dashboard route)', () => {
 
 - [ ] **Step 6: Update `ParentGateway.tsx`**
 
-Read `apps/mobile/src/components/home/ParentGateway.tsx`. Find every literal `'/(app)/dashboard'` reference. If `FAMILY_HOME_PATH` is not already imported, import it from `../../lib/navigation`. Replace each literal with `FAMILY_HOME_PATH`. If a reference already uses the constant, leave it untouched.
+`apps/mobile/src/components/home/ParentGateway.tsx:122` currently reads:
 
-If there is logic that branches on the path, be careful: `as Href` casts may need to remain. Verify with `tsc --noEmit` after.
+```tsx
+router.push('/(app)/dashboard?returnTo=home' as never)
+```
+
+`FAMILY_HOME_PATH` is path-only — the query string must be concatenated. Import the constant and update to:
+
+```tsx
+import { FAMILY_HOME_PATH } from '../../lib/navigation';
+// ...
+router.push(`${FAMILY_HOME_PATH}?returnTo=home` as never)
+```
+
+(`as never` is preserved because `home.tsx` and `ParentGateway.tsx` already cast at this site; tightening to `as Href` is out of scope.)
 
 - [ ] **Step 7: Update `ParentGateway.test.tsx`**
 
-In `apps/mobile/src/components/home/ParentGateway.test.tsx`, replace any assertion that compares against `'/(app)/dashboard'` with `'/(app)/family'`.
+`apps/mobile/src/components/home/ParentGateway.test.tsx:125` asserts `'/(app)/dashboard?returnTo=home'`. Update to `'/(app)/family?returnTo=home'`.
 
-- [ ] **Step 8: Run all affected tests**
+- [ ] **Step 8: Update `more.tsx` and `more.test.tsx`**
+
+`apps/mobile/src/app/(app)/more.tsx:610` has a literal `'/(app)/dashboard?returnTo=more'` despite the file already importing `FAMILY_HOME_PATH` (line 49). Update to `` `${FAMILY_HOME_PATH}?returnTo=more` ``.
+
+`apps/mobile/src/app/(app)/more.test.tsx:282` asserts `expect(mockPush).toHaveBeenCalledWith('/(app)/dashboard')`. Update to `'/(app)/family'`. (If a sibling assertion targets the `?returnTo=more` variant, update it to `'/(app)/family?returnTo=more'`.)
+
+- [ ] **Step 9: Update `child/*` route files**
+
+These six files contain hardcoded `/(app)/dashboard` literals that survive the constant flip but route through the redirect (double-hop). Replace each with `FAMILY_HOME_PATH`:
+
+- `apps/mobile/src/app/(app)/child/[profileId]/index.tsx:288` — `router.replace('/(app)/dashboard' as never)` → `router.replace(FAMILY_HOME_PATH as never)`
+- `apps/mobile/src/app/(app)/child/[profileId]/reports.tsx` — three occurrences (lines 85, 256, 345)
+- `apps/mobile/src/app/(app)/child/[profileId]/report/[reportId].tsx:53`
+- `apps/mobile/src/app/(app)/child/[profileId]/weekly-report/[weeklyReportId].tsx` — two occurrences (lines 99, 138)
+
+Each file must add `import { FAMILY_HOME_PATH } from '../../../../lib/navigation';` (relative depth varies per file — count the segments). Update any co-located test assertions in the same pass.
+
+- [ ] **Step 10: Run all affected tests**
 
 Run:
 ```
@@ -703,29 +806,32 @@ cd apps/mobile && pnpm exec jest --findRelatedTests \
   src/app/(app)/family.test.tsx \
   src/app/(app)/more.test.tsx \
   src/components/home/ParentGateway.test.tsx \
+  src/app/(app)/child \
   --no-coverage
 ```
 
-Expected: PASS across all five files.
+Expected: PASS across all affected files.
 
-- [ ] **Step 9: Run typecheck**
+- [ ] **Step 11: Run typecheck**
 
 Run: `cd apps/mobile && pnpm exec tsc --noEmit`
 Expected: 0 errors.
 
-- [ ] **Step 10: Commit (using `/commit`)**
+- [ ] **Step 12: Commit (using `/commit`)**
 
 ```
-feat(mobile): switch FAMILY_HOME_PATH to /family and redirect /dashboard
+feat(mobile): switch FAMILY_HOME_PATH to /family, redirect /dashboard, sweep literals
 ```
 
 ---
 
-## Task 6: Sweep audit — find any remaining hard-coded `/(app)/dashboard` references
+## Task 6: Verification sweep — confirm no remaining hard-coded `/(app)/dashboard` references
 
-After Task 5 the constant has flipped, but raw string literals elsewhere in the codebase may still target `/dashboard`. This task is a deliberate sweep — per the repo rule "Sweep when you fix" (CLAUDE.md → Fix Development Rules).
+The cleanup is performed in Task 5 (steps 6–9) so the constant flip and the literal sweep ship together — per "Sweep when you fix" (CLAUDE.md → Fix Development Rules) and per the spec's intent that `/dashboard` survives only as the redirect file.
 
-- [ ] **Step 1: Grep for stragglers**
+This task is a **verification pass**: re-grep to confirm Task 5 didn't miss anything, and only commit if it did.
+
+- [ ] **Step 1: Grep for non-test stragglers**
 
 Run from the repo root:
 
@@ -733,7 +839,14 @@ Run from the repo root:
 rg -n "/\(app\)/dashboard" apps/mobile/src --glob '!*.test.*'
 ```
 
-Expected: only the redirect in `dashboard.tsx` (which is the legitimate target inside `<Redirect href=... />`) and possibly an entry in `lib/navigation.ts` (the old `FAMILY_HOME_PATH` value — should now read `/family`).
+Expected results (and only these):
+- `apps/mobile/src/app/(app)/dashboard.tsx` — the legitimate redirect target inside `<Redirect href={...} />` and JSDoc comments.
+
+NOT expected (would indicate Task 5 missed a site):
+- `more.tsx`, `ParentGateway.tsx`, any `child/*` route file, or any other source file outside `dashboard.tsx`.
+- `lib/navigation.ts` (`FAMILY_HOME_PATH` should now read `/(app)/family`).
+
+If anything else is reported, return to Task 5 step 9 and update it before committing this task.
 
 - [ ] **Step 2: Grep for the bare path used as a literal**
 
@@ -741,9 +854,7 @@ Expected: only the redirect in `dashboard.tsx` (which is the legitimate target i
 rg -n '"dashboard"' apps/mobile/src --glob '*.tsx' --glob '!*.test.*'
 ```
 
-Inspect each match. The `_layout.tsx` `Tabs.Screen` for `name="dashboard"` does **not** need to change — Expo Router still requires the route file `dashboard.tsx` to exist (we kept it as the redirect file), so the `Tabs.Screen name="dashboard"` continues to apply auto-hide rules to it (it never appears in `BASE_VISIBLE_TABS` either way, so it stays hidden). If it somehow ends up rendering as a visible tab, the user would briefly see it before the redirect — review the tab-bar render path.
-
-If you do find `Tabs.Screen name="dashboard"`, leave it alone unless its presence demonstrably breaks something. A defensive `href: null, tabBarItemStyle: { display: 'none' }` was already the auto-hide default for non-whitelisted routes.
+Inspect each match. The `_layout.tsx` `Tabs.Screen` for `name="dashboard"` is **not present** in our updated layout (we never added one — the file is auto-hidden because `dashboard` isn't in `BASE_VISIBLE_TABS`). If a phantom `Tabs.Screen name="dashboard"` appears, it predates this plan and is unrelated; leave it alone.
 
 - [ ] **Step 3: Grep for test fixtures**
 
@@ -751,7 +862,11 @@ If you do find `Tabs.Screen name="dashboard"`, leave it alone unless its presenc
 rg -n '/\(app\)/dashboard' apps/mobile/src --glob '*.test.*'
 ```
 
-Update any test fixtures that hard-code the literal path to reflect the new path, **unless** the test specifically asserts the old path is preserved as a redirect target — in which case the literal should remain.
+Expected results:
+- `apps/mobile/src/app/(app)/dashboard.test.tsx` — asserts the redirect *target* path inside `<Redirect>` calls. Literals here are correct (the test verifies behaviour of the redirect itself).
+
+NOT expected:
+- Any `more.test.tsx`, `ParentGateway.test.tsx`, or `child/*.test.tsx` literals. If found, Task 5 missed an assertion update — fix it before committing this task.
 
 - [ ] **Step 4: Run the broader test suite for the app folder**
 
@@ -763,12 +878,12 @@ Expected: PASS.
 Run: `pnpm exec nx lint mobile`
 Expected: 0 errors (warnings tolerated only if pre-existing on main).
 
-- [ ] **Step 6: Commit (using `/commit`) — only if Step 1–3 surfaced changes**
+- [ ] **Step 6: Commit (using `/commit`) — only if the verification surfaced fixes**
 
-If the sweep found and corrected any hard-coded paths:
+If steps 1–3 surfaced any missed literals that you corrected here:
 
 ```
-chore(mobile): sweep remaining /dashboard literals to /family
+chore(mobile): sweep stragglers from /dashboard → /family migration
 ```
 
 If the sweep was clean, no commit — note this fact in the next conversation turn.
@@ -787,7 +902,8 @@ Use the project's standard dev launcher (one of the Doppler-wrapped commands or 
 
 Sign in / switch to a profile with `family_links` empty.
 - Confirm the bottom-tab bar shows exactly **4 tabs**: Home, Library, Progress, More. No Family tab.
-- Tap More → cross-link to "Family" should still navigate (it now lands on `/family`, which renders an empty children list / error state because `useDashboard` returns no children for solo). This is acceptable — the spec says solo learners shouldn't reach Family in normal nav, and the cross-link from `more.tsx` was always conditional on having children.
+- Confirm `useFamilyPresence().hasFamily` is `false` even though `useDashboard` falls back to `/dashboard/demo` and returns one fake child. (Use the React DevTools or a temporary `console.log` if needed; remove before commit.)
+- Confirm the More tab does NOT render the cross-link to "Family" — `more.tsx` already gates on having children, so the link should be absent. If the link appears for a no-child profile, that's a separate bug pre-dating this plan; flag it but do not fix here.
 
 - [ ] **Step 3: Verify with one or more linked children**
 
@@ -806,9 +922,17 @@ In a deep-link-capable build, navigate to `/(app)/dashboard?returnTo=more` direc
 
 From Home, use any "Check child's progress" intent card or `more.tsx` cross-link — should land on Family without bouncing through `/dashboard`. Verify by inspecting the URL on web; on native, verify back-button behavior follows the new path.
 
-- [ ] **Step 6: If any verification fails, fix the underlying cause and re-run.** Do not loosen tests or take shortcuts.
+- [ ] **Step 6: Verify icon distinctness in the tab bar**
 
-- [ ] **Step 7: Final commit only if Steps 1–5 surfaced changes**
+Inspect the tab bar visually with all 5 tabs visible. Confirm `people-outline` (Family) is visually distinct from the other four icons (`home-outline`, `book-outline`, `stats-chart-outline`, `menu-outline`). If two icons read as a near-collision at thumbnail size, swap Family to a less ambiguous Ionicon (`person-add-outline` or similar).
+
+- [ ] **Step 7: Verify proxy/impersonation suppresses the tab**
+
+Switch to a child profile via the parent's proxy flow (the ProxyBanner appears at the top). Confirm the Family tab is hidden during proxy — the rule is parent-seat surface only.
+
+- [ ] **Step 8: If any verification fails, fix the underlying cause and re-run.** Do not loosen tests or take shortcuts.
+
+- [ ] **Step 9: Final commit only if Steps 1–7 surfaced changes**
 
 If verification surfaced any code change, commit it via `/commit`. If verification was clean, no commit needed.
 
@@ -832,11 +956,26 @@ Spec acceptance items 4–10 are out of scope for this plan (they cover PR 5, 7,
 - BUG-897: scattered child management surfaces — Family becomes the single home.
 - BUG-905: hardcoded back-to-`/more`. Already partially closed by `returnTo` plumbing in `dashboard.tsx`; this plan preserves that plumbing on `family.tsx`.
 
+## Failure modes
+
+Per CLAUDE.md UX Resilience rule "Spec failure modes before coding". Every state below has a Recovery cell — if any cannot be filled, the design is incomplete.
+
+| State | Trigger | User sees | Recovery |
+|---|---|---|---|
+| `useDashboard` returns 5xx on initial launch (parent with kids) | API outage or auth blip | 4-tab bar (no Family). `home.tsx` ParentGateway shows its existing dashboard error retry | Tap retry on ParentGateway error card → on success, tab bar re-renders with 5 tabs. No code-level recovery needed; existing error surface handles it. |
+| `useDashboard` returns 5xx on initial launch (child profile) | API outage | 4-tab bar (no Family — correct, since role gate would suppress it anyway) | None needed; child-profile UX is unchanged. |
+| Active profile switches parent → child mid-session | User tap on profile switcher | Family tab disappears on next render. If user was on `/(app)/family`, they remain on the screen but the tab button vanishes | After switch, Expo Router still has the screen mounted but no tab button. Add to Task 7 step 7: confirm `goBackOrReplace(router, '/(app)/home')` is the recovery if the user was viewing Family at switch time. If not already wired, add a `useEffect` in `family.tsx` that redirects to `/(app)/home` when `useFamilyPresence().hasFamily` flips to `false`. |
+| Active profile switches child → parent (with kids) | User tap on profile switcher | 4-tab → 5-tab transition; Family tab appears | None — orientation cue handles the announcement. |
+| SecureStore unavailable for `FamilyOrientationCue` (corrupted/locked) | Device-level SecureStore fault | Cue may show on every launch | Per `FamilyOrientationCue.tsx` Step 3 catch block: on read error, show the cue (fail-open). On write error, swallow silently (worst case: cue shows once more). Both branches are tested. |
+| Cold launch race: parent with kids, dashboard query in flight | First app launch after sign-in | 4 tabs render briefly → 5 tabs render after dashboard resolves (~200–800ms) | Acceptable per spec line 56 *"announced when added"*. Mitigation deferred (see follow-up below) — cache last-known `hasFamily` to SecureStore for an instant 5-tab seed. |
+| Deep link to `/(app)/dashboard?returnTo=foo` after cutover | External entry (push, bookmark) | Brief mount of `DashboardRedirect`, then `/family?returnTo=foo` | `<Redirect>` handles synchronously; covered by `dashboard.test.tsx` redirect tests. |
+| Proxy/impersonation session active | Parent viewing child via proxy | Family tab hidden (suppressed by `useFamilyPresence` role check) | None needed. Verified in Task 7 Step 7. |
+
 ## Risks and rollback
 
-- **Risk: tab-bar layout regression on small phones (5.8" Galaxy S10e, per memory).** A 5-tab bar leaves less width per item. Verify in Task 7 that no tab label is clipped on the smallest device. If clipping occurs, drop the `tabBarLabelStyle.fontSize` from 12 to 11 for that build, or shorten the "Family" label to "Family" (it's already the shortest reasonable choice).
-- **Risk: `useDashboard` is request-driven; the Family tab visibility ticks after the network round-trip.** First-launch behavior is: 4 tabs render → `useDashboard` resolves → tab bar re-renders with 5 tabs. This is acceptable per spec ("transitions are announced once, quietly"). The orientation cue covers the announcement.
-- **Risk: a child profile's `useDashboard` returns 0 children but the tab unexpectedly mounts.** Defensive: `useFamilyPresence` returns `hasFamily=false` while `isLoading=true`, so the tab never mounts during the initial loading state. Verify behavior in Task 7 with a child profile.
+- **Risk: tab-bar layout regression on small phones (5.8" Galaxy S10e, per memory).** A 5-tab bar leaves less width per item. Verify in Task 7 that no tab label is clipped on the smallest device. If clipping occurs, drop the `tabBarLabelStyle.fontSize` from 12 to 11 for that build, or shorten the "Family" label.
+- **Risk: cold-launch tab-bar flicker.** First-launch behavior is: 4 tabs render → `useDashboard` resolves → tab bar re-renders with 5 tabs. Acceptable per spec but conspicuous on every launch. **Follow-up:** stash last-known `hasFamily` in SecureStore (key `family_presence_cached_v1`) and seed `useFamilyPresence` with it for an instant 5-tab render. Out of scope for this plan; tracked as a refinement.
+- **Risk: orphan `dashboard.*` i18n keys.** The redirect is indefinite, and `family.tsx` keeps using most `dashboard.*` keys. We accept the orphan for now (see "Not modified (intentional)"). Cleanup is a follow-up if/when the redirect is sunset.
 - **Rollback: revert all commits from Tasks 1–6 in reverse order.** No DB changes. No API changes. No persisted state survives uninstall. The SecureStore key (`family_orientation_cue_dismissed_v1`) is harmless to leave behind even if the feature reverts.
 
 ## Out of scope (explicit deferrals)
