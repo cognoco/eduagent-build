@@ -420,6 +420,153 @@ describe('Integration: assessment routes', () => {
     expect(xp).toBeUndefined();
   });
 
+  it('marks the assessment borderline at transfer depth when mastery lands in 0.6-0.69', async () => {
+    const profile = await createOwnerProfile();
+    const subject = await seedSubject(profile.id, 'Biology');
+    const curriculum = await seedCurriculum({
+      subjectId: subject.id,
+      topics: [{ title: 'Photosynthesis', sortOrder: 0 }],
+    });
+    const topicId = curriculum.topicIds[0]!;
+    const assessmentId = await seedAssessmentRecord({
+      profileId: profile.id,
+      subjectId: subject.id,
+      topicId,
+      verificationDepth: 'transfer',
+    });
+
+    // rawScore 0.65 → mastery 0.65 at transfer cap (1.0). Below the 0.7
+    // pass gate but at/above the 0.6 borderline floor; with no further
+    // depth to escalate to the route resolves to `borderline`.
+    mockChat.mockResolvedValueOnce(
+      JSON.stringify({
+        feedback: 'Close, but not quite.',
+        passed: false,
+        shouldEscalateDepth: false,
+        rawScore: 0.65,
+        qualityRating: 3,
+      })
+    );
+
+    const res = await app.request(
+      `/v1/assessments/${assessmentId}/answer`,
+      {
+        method: 'POST',
+        headers: buildAuthHeaders(
+          { sub: ASSESSMENTS_USER.userId, email: ASSESSMENTS_USER.email },
+          profile.id
+        ),
+        body: JSON.stringify({
+          answer: 'Plants convert sunlight into food, mostly using water.',
+        }),
+      },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe('borderline');
+
+    const db = getIntegrationDb();
+    const updated = await db.query.assessments.findFirst({
+      where: eq(assessments.id, assessmentId),
+    });
+    expect(updated?.status).toBe('borderline');
+    expect(Number(updated?.masteryScore)).toBeCloseTo(0.65);
+
+    // Borderline is a terminal state — declining a refresh must succeed.
+    const declineRes = await app.request(
+      `/v1/assessments/${assessmentId}/decline-refresh`,
+      {
+        method: 'PATCH',
+        headers: buildAuthHeaders(
+          { sub: ASSESSMENTS_USER.userId, email: ASSESSMENTS_USER.email },
+          profile.id
+        ),
+      },
+      TEST_ENV
+    );
+    expect(declineRes.status).toBe(200);
+  });
+
+  it('marks the assessment failed_exhausted when mastery stays low and the cap is reached', async () => {
+    const profile = await createOwnerProfile();
+    const subject = await seedSubject(profile.id, 'Biology');
+    const curriculum = await seedCurriculum({
+      subjectId: subject.id,
+      topics: [{ title: 'Photosynthesis', sortOrder: 0 }],
+    });
+    const topicId = curriculum.topicIds[0]!;
+
+    // Pre-seed three prior learner answers so the next submission triggers
+    // the MAX_ASSESSMENT_EXCHANGES = 4 cap on the server side.
+    const priorHistory = [
+      { role: 'assistant' as const, content: 'Q1' },
+      { role: 'user' as const, content: 'A1' },
+      { role: 'assistant' as const, content: 'Q2' },
+      { role: 'user' as const, content: 'A2' },
+      { role: 'assistant' as const, content: 'Q3' },
+      { role: 'user' as const, content: 'A3' },
+    ];
+    const assessmentId = await seedAssessmentRecord({
+      profileId: profile.id,
+      subjectId: subject.id,
+      topicId,
+      verificationDepth: 'transfer',
+      exchangeHistory: priorHistory,
+    });
+
+    // rawScore 0.2 → mastery 0.2 — below the 0.6 borderline floor and
+    // below the 0.7 pass gate. With the cap reached on this answer the
+    // route must resolve to `failed_exhausted`.
+    mockChat.mockResolvedValueOnce(
+      JSON.stringify({
+        feedback: 'Several core ideas are missing.',
+        passed: false,
+        shouldEscalateDepth: false,
+        rawScore: 0.2,
+        qualityRating: 1,
+      })
+    );
+
+    const res = await app.request(
+      `/v1/assessments/${assessmentId}/answer`,
+      {
+        method: 'POST',
+        headers: buildAuthHeaders(
+          { sub: ASSESSMENTS_USER.userId, email: ASSESSMENTS_USER.email },
+          profile.id
+        ),
+        body: JSON.stringify({ answer: 'I do not know.' }),
+      },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe('failed_exhausted');
+
+    const db = getIntegrationDb();
+    const updated = await db.query.assessments.findFirst({
+      where: eq(assessments.id, assessmentId),
+    });
+    expect(updated?.status).toBe('failed_exhausted');
+
+    // Failed-exhausted is a terminal state — declining a refresh must succeed.
+    const declineRes = await app.request(
+      `/v1/assessments/${assessmentId}/decline-refresh`,
+      {
+        method: 'PATCH',
+        headers: buildAuthHeaders(
+          { sub: ASSESSMENTS_USER.userId, email: ASSESSMENTS_USER.email },
+          profile.id
+        ),
+      },
+      TEST_ENV
+    );
+    expect(declineRes.status).toBe(200);
+  });
+
   it('returns 400 for an empty assessment answer', async () => {
     const profile = await createOwnerProfile();
     const subject = await seedSubject(profile.id, 'Biology');
