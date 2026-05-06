@@ -64,7 +64,11 @@ export const paceHintSchema = z.object({
 export type PaceHint = z.infer<typeof paceHintSchema>;
 
 // Extracted signals — structured data parsed from a completed interview.
-// Optional fast-path fields let consumers apply neutral defaults when missing.
+// `interests` and the fast-path fields (`interestContext`, `analogyFraming`,
+// `paceHint`) are all optional: short or off-topic interviews may yield
+// empty extraction, and consumers MUST tolerate missing fields by applying
+// neutral defaults. The interests-context picker (non-fast-path flow) and
+// downstream mentor prompts (fast-path) are the two consumers today.
 export const extractedInterviewSignalsSchema = z.object({
   goals: z.array(z.string()),
   experienceLevel: z.string(),

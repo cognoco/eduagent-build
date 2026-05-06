@@ -131,7 +131,10 @@ export default function InterviewScreen() {
     } catch (err) {
       // [BUG-803] Surface the failure via the existing
       // session-creation-stuck retry UX (Try Again + Go Back) instead of
-      // silently swapping to the "Let's Go" card.
+      // silently swapping to the "Let's Go" card — which made it look like
+      // the interview succeeded when in reality the session never started
+      // and there was no retry path. Sentry capture replaces the prior
+      // console.error-only logging so failures are observable in production.
       Sentry.captureException(err, {
         tags: {
           component: 'InterviewScreen',
