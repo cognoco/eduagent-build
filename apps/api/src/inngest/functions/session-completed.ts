@@ -1,5 +1,9 @@
 import { inngest } from '../client';
-import { getStepDatabase, getStepVoyageApiKey } from '../helpers';
+import {
+  getStepDatabase,
+  getStepMemoryFactsDedupConfig,
+  getStepVoyageApiKey,
+} from '../helpers';
 import {
   updateRetentionFromSession,
   updateNeedsDeepeningProgress,
@@ -41,6 +45,7 @@ import { generateLearnerRecap } from '../../services/session-recap';
 import { generateAndStoreLlmSummary } from '../../services/session-llm-summary';
 import {
   curriculumTopics,
+  createScopedRepository,
   learningSessions,
   memoryFacts,
   profiles,
@@ -63,6 +68,11 @@ import {
   makeEmbedderFromEnv,
   type FactEmbedder,
 } from '../../services/memory/embed-fact';
+import {
+  isMemoryFactsDedupEnabled,
+  isProfileInDedupRollout,
+} from '../../config';
+import { runDedupForProfile } from '../../services/memory/dedup-pass';
 
 const logger = createLogger();
 
@@ -71,7 +81,13 @@ export async function embedNewFactsForProfile(
   profileId: string,
   embedder: FactEmbedder,
   options?: { limit?: number }
-): Promise<{ embedded: number; failed: number; scanned: number }> {
+): Promise<{
+  embedded: number;
+  failed: number;
+  scanned: number;
+  embeddedIds: string[];
+  failedIds: string[];
+}> {
   const rows = await db
     .select({
       id: memoryFacts.id,
@@ -91,6 +107,8 @@ export async function embedNewFactsForProfile(
 
   let embedded = 0;
   let failed = 0;
+  const embeddedIds: string[] = [];
+  const failedIds: string[] = [];
   for (const row of rows) {
     logger.info('[memory_facts] embed-on-write attempted', {
       event: 'memory_facts.embed_on_write.attempted',
@@ -102,6 +120,7 @@ export async function embedNewFactsForProfile(
     const result = await embedder(row.text);
     if (!result.ok) {
       failed += 1;
+      failedIds.push(row.id);
       logger.warn('[memory_facts] embed-on-write failed', {
         event: 'memory_facts.embed_on_write.failed',
         profileId,
@@ -122,9 +141,10 @@ export async function embedNewFactsForProfile(
         )
       );
     embedded += 1;
+    embeddedIds.push(row.id);
   }
 
-  return { embedded, failed, scanned: rows.length };
+  return { embedded, failed, scanned: rows.length, embeddedIds, failedIds };
 }
 
 // ---------------------------------------------------------------------------
@@ -1234,31 +1254,63 @@ export const sessionCompleted = inngest.createFunction(
     );
     outcomes.push(analyzeOutcome);
 
-    outcomes.push(
-      await step.run('embed-new-memory-facts', async () =>
-        runIsolated('embed-new-memory-facts', profileId, async () => {
-          let apiKey: string | undefined;
-          try {
-            apiKey = getStepVoyageApiKey();
-          } catch {
-            logger.warn('[memory_facts] embed-on-write skipped', {
-              event: 'memory_facts.embed_on_write.skipped',
-              profileId,
-              reason: 'no_voyage_key',
-            });
-            return;
-          }
-
-          const db = getStepDatabase();
-          await embedNewFactsForProfile(
-            db,
+    const embedNewFactsResult = await step.run(
+      'embed-new-memory-facts',
+      async () => {
+        let apiKey: string | undefined;
+        try {
+          apiKey = getStepVoyageApiKey();
+        } catch {
+          logger.warn('[memory_facts] embed-on-write skipped', {
+            event: 'memory_facts.embed_on_write.skipped',
             profileId,
-            makeEmbedderFromEnv(apiKey),
-            { limit: 50 }
-          );
-        })
-      )
+            reason: 'no_voyage_key',
+          });
+          return {
+            embedded: 0,
+            failed: 0,
+            scanned: 0,
+            embeddedIds: [],
+            failedIds: [],
+          };
+        }
+
+        const db = getStepDatabase();
+        return embedNewFactsForProfile(
+          db,
+          profileId,
+          makeEmbedderFromEnv(apiKey),
+          { limit: 50 }
+        );
+      }
     );
+    outcomes.push({ step: 'embed-new-memory-facts', status: 'ok' });
+
+    const dedupReport = await step.run('dedup-new-facts', async () => {
+      const dedupConfig = getStepMemoryFactsDedupConfig();
+      if (
+        !isMemoryFactsDedupEnabled(dedupConfig.enabled) ||
+        !isProfileInDedupRollout(profileId, dedupConfig.rolloutPct)
+      ) {
+        return null;
+      }
+
+      const db = getStepDatabase();
+      return runDedupForProfile({
+        db,
+        scoped: createScopedRepository(db, profileId),
+        profileId,
+        candidateIds: embedNewFactsResult.embeddedIds,
+        emit: async (eventName, payload) => {
+          await step.sendEvent(eventName, { name: eventName, data: payload });
+        },
+        threshold: dedupConfig.threshold,
+        cap: dedupConfig.maxLlmCalls,
+      });
+    });
+    if (dedupReport) {
+      outcomes.push({ step: 'dedup-new-facts', status: 'ok' });
+    }
 
     // Step 3b: FR247.6 — Send struggle push notifications to parent
     const pendingStruggleNotifications = analyzeOutcome.notifications ?? [];
