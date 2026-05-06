@@ -581,7 +581,7 @@ describe('processTeachBackCompletion', () => {
       ],
     });
 
-    await processTeachBackCompletion(db, profileId, sessionId, topicId);
+    await processTeachBackCompletion(db, profileId, sessionId);
 
     expect(mapTeachBackRubricToSm2).not.toHaveBeenCalled();
     expect(db.update).not.toHaveBeenCalled();
@@ -611,7 +611,7 @@ describe('processTeachBackCompletion', () => {
       ],
     });
 
-    await processTeachBackCompletion(db, profileId, sessionId, topicId);
+    await processTeachBackCompletion(db, profileId, sessionId);
 
     // Should update the event with structured assessment
     expect(db.update).toHaveBeenCalled();
@@ -636,7 +636,7 @@ describe('processTeachBackCompletion', () => {
       selectResults: [[]],
     });
 
-    await processTeachBackCompletion(db, profileId, sessionId, topicId);
+    await processTeachBackCompletion(db, profileId, sessionId);
 
     expect(db.update).not.toHaveBeenCalled();
   });
@@ -679,7 +679,7 @@ describe('processTeachBackCompletion', () => {
     });
     (db as unknown as { update: jest.Mock }).update = updateSpy;
 
-    await processTeachBackCompletion(db, profileId, sessionId, topicId);
+    await processTeachBackCompletion(db, profileId, sessionId);
 
     expect(updateSpy).toHaveBeenCalledTimes(1);
     expect(eventUpdateSetSpy).toHaveBeenCalledWith(

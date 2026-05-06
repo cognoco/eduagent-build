@@ -1384,8 +1384,7 @@ describe('sessionCompleted', () => {
       expect(mockProcessTeachBackCompletion).toHaveBeenCalledWith(
         expect.anything(), // db
         PROFILE_ID,
-        SESSION_ID,
-        TOPIC_ID
+        SESSION_ID
       );
       expect(mockProcessEvaluateCompletion).not.toHaveBeenCalled();
       const outcome = result.outcomes.find(
