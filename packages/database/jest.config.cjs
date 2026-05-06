@@ -15,6 +15,7 @@ module.exports = {
   testEnvironment: 'node',
   setupFiles: [join(__dirname, 'jest.setup.ts')],
   testMatch: ['<rootDir>/src/**/*.(spec|test).[jt]s?(x)'],
+  modulePathIgnorePatterns: ['\\.claude/worktrees'],
   transform: {
     '^.+\\.[tj]s$': ['@swc/jest', swcJestConfig],
   },
