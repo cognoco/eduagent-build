@@ -733,3 +733,38 @@ describe('MoreScreen — impersonation hides destructive actions (BUG-915)', () 
     screen.getByTestId('more-row-subscription');
   });
 });
+
+// [C4] A child profile signed in directly (isOwner: false, not impersonating)
+// must not see Subscription, Delete account, or Export my data — those rows
+// operate on the parent's billing account, not the child's profile.
+describe('MoreScreen — child profile hides owner-only rows (C4)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockIsParentProxy = false;
+    mockActiveProfile = {
+      id: 'child-1',
+      displayName: 'Mia',
+      isOwner: false,
+    };
+    mockProfiles = [mockActiveProfile];
+    mockSubscription = { tier: 'free' };
+    mockFamilySubscription = null;
+    mockExportMutateAsync.mockResolvedValue({
+      account: {
+        email: 'parent@example.com',
+        createdAt: '2026-04-10T10:00:00.000Z',
+      },
+      profiles: [],
+      consentStates: [],
+      exportedAt: '2026-04-10T10:00:00.000Z',
+    });
+  });
+
+  it('hides Subscription, Delete account, and Export my data for a child profile', () => {
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    expect(screen.queryByTestId('more-row-subscription')).toBeNull();
+    expect(screen.queryByTestId('more-row-delete-account')).toBeNull();
+    expect(screen.queryByTestId('more-row-export')).toBeNull();
+  });
+});

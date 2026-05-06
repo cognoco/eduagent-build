@@ -888,9 +888,10 @@ export default function MoreScreen() {
             </Pressable>
           </Modal>
         )}
-        {/* [BUG-915] Hide Subscription in impersonation — billing is the
-            parent account's, not the child profile's. */}
-        {!isImpersonating && (
+        {/* [BUG-915] Hide Subscription for child profiles and impersonation —
+            billing is the parent account's, not the child profile's.
+            C4: also hide for native child profiles (role === 'child'). */}
+        {role === 'owner' && (
           <SettingsRow
             label={t('more.account.subscription')}
             value={
@@ -926,9 +927,10 @@ export default function MoreScreen() {
           label={t('more.other.termsOfService')}
           onPress={() => router.push('/terms')}
         />
-        {/* [BUG-915] Hide Export my data and Delete account in impersonation —
-            both operate on the parent's underlying account. */}
-        {!isImpersonating && (
+        {/* [BUG-915] Hide Export my data and Delete account for child profiles
+            and impersonation — both operate on the parent's underlying account.
+            C4: also hide for native child profiles (role === 'owner' guard). */}
+        {role === 'owner' && (
           <SettingsRow
             label={t('more.other.exportMyData')}
             onPress={exportData.isPending ? undefined : handleExport}
@@ -940,7 +942,7 @@ export default function MoreScreen() {
             testID="more-row-export"
           />
         )}
-        {!isImpersonating && (
+        {role === 'owner' && (
           <SettingsRow
             label={t('more.other.deleteAccount')}
             onPress={() => router.push('/delete-account')}

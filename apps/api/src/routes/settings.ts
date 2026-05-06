@@ -153,6 +153,17 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
   .get('/settings/withdrawal-archive', async (c) => {
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
+
+    // I5: mirror the PUT endpoint's owner gate — only account owners may read
+    // the withdrawal-archive preference.
+    const profile = await db.query.profiles.findFirst({
+      where: (t, { eq: eqFn }) => eqFn(t.id, profileId),
+      columns: { isOwner: true },
+    });
+    if (!profile?.isOwner) {
+      return forbidden(c);
+    }
+
     const value = await getWithdrawalArchivePreference(db, profileId);
     return c.json(getWithdrawalArchivePreferenceResponseSchema.parse({ value }));
   })
