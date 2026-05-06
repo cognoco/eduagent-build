@@ -3,6 +3,7 @@
 > Revision history
 > - 2026-05-05 — initial draft
 > - 2026-05-06 — adversarial review applied (CRITICAL-1..3, HIGH-1..5, MEDIUM-1..5, LOW-1..2). See § "Review Findings Applied" at the end of the doc.
+> - 2026-05-06 — product decisions applied: Q1 (`passed` gated at 0.7 in prompt + server), mapper unified on existing `mapEvaluateQualityToSm2` (no new sibling), `weakAreas` confirmed. See § "Product Decisions Applied" at the end of the doc.
 
 ## Summary
 
@@ -94,16 +95,16 @@ The subtitle data comes from the same `useAssessmentEligibleTopics` hook (count 
 The result UX depends on the assessment "ending." Three end states are now defined explicitly (resolves CRITICAL-2):
 
 - **Pass**: `evaluation.passed === true && !shouldEscalateDepth` — current behaviour, status set to `passed`.
-- **Borderline**: `masteryScore` in 0.50–0.69 inclusive AND (`exchangeCount >= 4` OR LLM emits `passed: false` with no escalation possible) — new server-side terminator. Status set to a new value `borderline` (DB enum extension required — see Schema Changes below).
-- **Natural exit**: `exchangeCount >= 6` and no terminal verdict yet — status set to `failed_exhausted`. SM-2 fires with the score-derived quality. The 6-turn cap is the hard ceiling; the LLM cannot block termination.
+- **Borderline**: `masteryScore` in 0.60–0.69 inclusive AND (`exchangeCount >= 4` OR LLM emits `passed: false` with no escalation possible) — new server-side terminator. Status set to a new value `borderline` (DB enum extension required — see Schema Changes below).
+- **Natural exit**: `exchangeCount >= 4` and no terminal verdict yet — status set to `failed_exhausted`. SM-2 fires with the score-derived quality. The 4-turn cap is the hard ceiling; the LLM cannot block termination. Configurable via `MAX_ASSESSMENT_EXCHANGES = 4` constant alongside `MAX_INTERVIEW_EXCHANGES`.
 
 When the result is `passed`, the existing code already shows `assessment.passedMessage` (line 73). Add a score display card that appears after the pass message:
 
 - Shows mastery percentage and a band label ("Excellent", "Good", "Meets the bar")
-- If score 0.5–0.69 (status `borderline`): show a "Want a quick refresher on the parts you missed?" CTA with "Yes please" and "No thanks" buttons
-- "Yes please" routes to `/(app)/practice/assessment/../session` (after relocation) with params `{ subjectId, topicId, mode: 'gap_fill', gaps: JSON.stringify(weakAreas) }` — the session creation picks these up in metadata. **The SM-2 update fires server-side at the moment the assessment is judged borderline, NOT deferred to the gap-fill session** (HIGH-5). Quality is computed via `mapAssessmentScoreToSm2Quality`; the gap-fill session updating retention again later is fine — the double-counting guard handles it.
+- If score 0.6–0.69 (status `borderline`): show a "Want a quick refresher on the parts you missed?" CTA with "Yes please" and "No thanks" buttons (soft offer; default action is leaving)
+- "Yes please" routes to `/(app)/practice/assessment/../session` (after relocation) with params `{ subjectId, topicId, mode: 'gap_fill', gaps: JSON.stringify(weakAreas) }` — the session creation picks these up in metadata. **The SM-2 update fires server-side at the moment the assessment is judged borderline, NOT deferred to the gap-fill session** (HIGH-5). Quality is computed via `mapEvaluateQualityToSm2(false, Math.round(masteryScore * 5))`; the gap-fill session updating retention again later is fine — the double-counting guard handles it.
 - "No thanks" calls `PATCH /assessments/:id/decline-refresh` — server-side this is now a *display-only* signal (the SM-2 row was already updated when the assessment ended). The endpoint records the decline for analytics.
-- Below 0.5 (status `failed_exhausted`): same offer, softer framing ("Want to revisit this topic?"), same agency — no auto-route. SM-2 fires when the assessment exits with quality from `mapAssessmentScoreToSm2Quality(masteryScore)`.
+- Below 0.6 (status `failed_exhausted`): **stronger framing toward relearn** — "That topic needs another look. Let's go through it together." Primary CTA "Start a session" routes to relearn for this topic; secondary "Not now" exits. Default action emphasises action, not exit. Human override (Not now) preserved per `feedback_human_override_everywhere`. SM-2 fires when the assessment exits with quality from `mapEvaluateQualityToSm2(false, Math.round(masteryScore * 5))`.
 
 ### Copy
 
@@ -111,10 +112,12 @@ When the result is `passed`, the existing code already shows `assessment.passedM
 - Picker screen title: "Pick a topic to check"
 - Picker subtitle: "You've studied these recently — pick one to prove what stuck."
 - Pass card: "You got [N]%! [Band label]."
-- Borderline CTA (0.5-0.69): "You got the core ideas. Want a quick catch-up on the bits you weren't sure about?"
-- Decline button: "No thanks, I'm done"
-- Accept button: "Yes, show me what I missed"
-- Fail offer (<0.5): "That topic might need another look. Want to revisit it?"
+- Borderline CTA (0.6-0.69, soft offer): "You got the core ideas. Want a quick catch-up on the bits you weren't sure about?"
+  - Decline: "No thanks, I'm done"
+  - Accept: "Yes, show me what I missed"
+- Failed nudge (<0.6, stronger framing): "That topic needs another look. Let's go through it together."
+  - Primary: "Start a session" (routes to relearn)
+  - Secondary: "Not now"
 
 ### Proxy mode
 
@@ -131,7 +134,9 @@ Practice hub already redirects parent-proxy on the mobile side (`practice.tsx:90
 |---|---|---|
 | `assessmentStatusEnum` (DB) | Add `borderline` and `failed_exhausted` values | Distinct end states for SM-2 wiring |
 | `assessmentEvaluationSchema` | Add `weakAreas: z.array(z.string()).max(8).optional()` | Forward-carry gap labels for borderline CTA |
-| `ASSESSMENT_EVAL_SYSTEM_PROMPT` | Add JSON contract line for `weakAreas` | LLM contract |
+| `sessionMetadataSchema` (`packages/schemas/src/sessions.ts`) | Add `gaps: z.array(z.string()).max(8).optional()` | Q3 — schema is `.strip()`, unknown fields silently dropped, so gap-fill payload would vanish without this addition |
+| `ASSESSMENT_EVAL_SYSTEM_PROMPT` | Add JSON contract line for `weakAreas`; teach the 0.7 pass threshold ("Set `passed: true` when `masteryScore >= 0.7`") | LLM contract + Q1 prompt half of the belt-and-braces gate |
+| `services/assessments.ts` parser (`parseAssessmentEvaluation`) | Override `passed = parsed.masteryScore >= 0.7` after coercion | Q1 server-side hard cap; ignores LLM drift per CLAUDE.md envelope-signal rule |
 
 DB enum extension is non-destructive (additive), no rollback section needed. Migration via `pnpm run db:generate` then `db:migrate:dev`; no `drizzle-kit push` against staging/prod per CLAUDE.md.
 
@@ -207,32 +212,35 @@ Per CLAUDE.md `feedback_human_override_everywhere`, the learner gets an explicit
 
 ## SM-2 Integration Plan
 
-### Score-to-quality curve (assessment → SM-2)
+### Mapper: reuse `mapEvaluateQualityToSm2`, drive it from `masteryScore`
 
-The SM-2 `quality` scale is 0–5. The assessment `masteryScore` is 0–1. Map:
+All three end states (pass, borderline, failed_exhausted) route the SM-2 update through the existing `mapEvaluateQualityToSm2(passed: boolean, rawQuality: number)` from `apps/api/src/services/evaluate.ts:64-74`, with **aggregate mastery as the rawQuality input**:
 
-| masteryScore | quality | Meaning |
-|---|---|---|
-| < 0.30 | 1 | Very poor; interval shrinks aggressively |
-| 0.30–0.49 | 2 | Failed; matches `mapEvaluateQualityToSm2` floor |
-| 0.50–0.69 | 3 | Borderline; modest interval reduction |
-| 0.70–0.79 | 4 | Passes UX gate; comfortable extension |
-| ≥ 0.80 | 5 | Excellent; confident extension |
+```ts
+mapEvaluateQualityToSm2(passed, Math.round(masteryScore * 5))
+```
 
-> **Floor consistency (MEDIUM-2):** This curve floors at 1, not 0, intentionally — a learner who showed up and answered should not have retention erased to "total blackout." This matches the spirit of `mapEvaluateQualityToSm2` (floors at 2-3 for fail) while being slightly harsher because assessment is a higher-stakes check. Both functions document the floor; reviewers comparing the two should see the rationale on each.
+where `passed = masteryScore >= 0.7` (the server hard cap from Q1).
 
-Function: `mapAssessmentScoreToSm2Quality(masteryScore: number): number` added to `retention-data.ts` (the existing file with all SM-2 plumbing). This is the integration point both end states (borderline, failed_exhausted) call.
+> **Why aggregate mastery, not `qualityRating`:** `qualityRating` reflects the LLM's grade for the *last answer* in the conversation; `masteryScore` reflects the LLM's grade for the *whole assessment*. Both come from the same LLM response, but only `masteryScore` is the signal the 0.7 pass gate uses. Mixing the two for SM-2 introduces the bug HIGH-4 originally surfaced — a learner who aces the last answer after fumbling earlier ones gets a more generous SM-2 grade than aggregate scoring would warrant. Driving SM-2 from `masteryScore` keeps "what passes" and "what SM-2 sees" coupled to the same number forever.
 
-The pass path keeps using `evaluation.qualityRating` directly — it is the LLM's first-class judgement of answer quality and is more granular than a score-derived band.
+> **Why reuse `mapEvaluateQualityToSm2`, not add a sibling:** the existing function has the failure floor we need (quality 2-3 for fail, never 0-1) — see `evaluate.ts:55-57`. Wrapping `Math.round(masteryScore * 5)` in the existing call gets the floor for free. No new mapping function; if `evaluate.ts` and `teach-back.ts` are ever refactored into a shared verification mapper, assessment lands in that refactor automatically.
 
-> **No "fallback" claim (HIGH-4):** Earlier drafts said `mapAssessmentScoreToSm2Quality` was a "fallback if qualityRating is null." That path can never execute (qualityRating is non-nullable per schema and always coerced to a number by the parser). The function is used **only** for the borderline and failed_exhausted paths, where the LLM's `qualityRating` reflects the answer-by-answer quality rather than the overall mastery signal we want for retention.
+> **Latent bug fixed:** the existing wiring at `assessments.ts:111-126` passes raw `evaluation.qualityRating` straight into `updateRetentionFromSession` with no failure floor. A learner who fails an assessment with `qualityRating: 0` today wipes their SM-2 card on that topic. The `Math.round(masteryScore * 5)` route closes this. (Even at `masteryScore = 0`, the function returns 2, not 0.)
+
+> **Numerical sanity check** (for reviewers): `0.30 → round(1.5) = 2 → fail-floor 3`, `0.49 → round(2.45) = 2 → 3`, `0.50 → round(2.5) = 3 → 3`, `0.69 → round(3.45) = 3 → 3`, `0.70 → round(3.5) = 4 → pass-floor 4`, `0.80 → round(4) = 4 → 4`, `0.90 → round(4.5) = 5 → 5`. Clean monotonic step at the 0.7 boundary.
+
+> **HIGH-4 superseded:** score-derived band table removed; `mapAssessmentScoreToSm2Quality` not added.
 
 ### Where the wiring lives
 
-The route handler in `apps/api/src/routes/assessments.ts` (lines 111-134) already calls `updateRetentionFromSession` when `newStatus === 'passed'`. Two extensions:
+The route handler in `apps/api/src/routes/assessments.ts` (lines 111-134) already calls `updateRetentionFromSession` when `newStatus === 'passed'`. Three extensions, all using the same mapper:
 
-1. **Borderline path.** When `newStatus === 'borderline'`, fire `updateRetentionFromSession` with `mapAssessmentScoreToSm2Quality(masteryScore)` and the assessment's `updatedAt` ISO string as `sessionTimestamp`. This is server-side and unconditional — does NOT depend on whether the user taps "Yes please" or "No thanks."
-2. **Failed-exhausted path.** When `newStatus === 'failed_exhausted'` (6-turn cap reached without pass), same call.
+All three paths use the same call: `mapEvaluateQualityToSm2(passed, Math.round(masteryScore * 5))`.
+
+1. **Pass path (existing, modified).** Replace the raw `evaluation.qualityRating` argument with `Math.round(masteryScore * 5)`. Applies the failure floor consistently, drives SM-2 from the same signal as the 0.7 pass gate, and fixes the latent bug noted above.
+2. **Borderline path (new).** When `newStatus === 'borderline'`, fire `updateRetentionFromSession` with `mapEvaluateQualityToSm2(false, Math.round(masteryScore * 5))` and the assessment's `updatedAt` ISO string as `sessionTimestamp`. Server-side and unconditional — does NOT depend on whether the user taps "Yes please" or "No thanks."
+3. **Failed-exhausted path (new).** When `newStatus === 'failed_exhausted'` (cap reached without pass), same call shape.
 
 `sessionTimestamp` (MEDIUM-4): every call site passes the assessment's `updatedAt` as ISO. Without it, a borderline-then-pass sequence on the same topic within seconds (rare but possible) silently drops the second update due to the `card.updatedAt >= timestamp` guard at `retention-data.ts:1191-1196`.
 
@@ -249,6 +257,7 @@ The route handler in `apps/api/src/routes/assessments.ts` (lines 111-134) alread
 | State | Trigger | User sees | Recovery |
 |---|---|---|---|
 | Picker loads empty | No completed sessions in 30 days with ≥3 exchanges | "You haven't studied any topics recently — start a session first" + Browse CTA | Tap Browse → library |
+| Failed-nudge "Start a session" tap fails | Relearn route navigation error | Toast "Couldn't open the topic — try again" | Retry; SM-2 already updated so no retention regression |
 | Picker API 500 | `GET /retention/assessment-eligible` fails | Error card with "Try again" | Retry or go back |
 | Picker request blocked by proxy mode | Parent in proxy mode hits the endpoint | 403 (via `assertNotProxyMode`) | Mobile redirect should prevent reaching this; if it does, Switch back to parent profile |
 | Assessment create fails | `POST /subjects/:s/topics/:t/assessments` 4xx/5xx | Error card with retry (existing `ErrorFallback` pattern) | Retry |
@@ -257,7 +266,7 @@ The route handler in `apps/api/src/routes/assessments.ts` (lines 111-134) alread
 | Gap-fill session create fails | Session creation after "Yes please" tap | Toast "Couldn't start session — try again" | Retry. SM-2 already updated, so no learner-visible regression |
 | Decline-refresh PATCH fails | Network glitch on "No thanks" | Silent client-side retry (analytics, not load-bearing) | None needed — UX continues |
 | `subjectId` or `topicId` missing | Deep-link with bad params | `assessment.missingParams` text + Go Back (existing, lines 96-117) | Go back |
-| Natural-exit reached at 6 exchanges | LLM never returned `passed` | Result card shown with `failed_exhausted` framing; SM-2 already updated | "Want to revisit?" CTA |
+| Natural-exit reached at 4 exchanges | LLM never returned `passed` | Result card shown with `failed_exhausted` framing; SM-2 already updated | "Want to revisit?" CTA |
 
 ### Feature 2 — Continuation Opener
 
@@ -274,13 +283,19 @@ The route handler in `apps/api/src/routes/assessments.ts` (lines 111-134) alread
 
 ## Open Questions
 
-These must be resolved before Pass 1 implementation begins. The plan body assumes the resolution noted in parentheses but flags each here for product confirmation.
+All five open questions and the mapper question are resolved (see § "Product Decisions Applied").
 
-1. **Pass threshold UX gate**: The product owner says 0.7. Should the `passed` field returned to the mobile client also change to reflect the 0.7 threshold (currently the LLM decides `passed`)? Or is it UX-only, leaving `passed` as the LLM's binary? *(Plan assumes: server-side gate. The route inspects `masteryScore` against 0.7 and overrides `passed` if needed before returning to mobile.)*
-2. **Natural-exit cap value**: The plan uses `exchangeCount >= 6` for `failed_exhausted`. Is 6 turns the right ceiling? *(Plan assumes: 6. Configurable via `MAX_ASSESSMENT_EXCHANGES` constant alongside `MAX_INTERVIEW_EXCHANGES`.)*
-3. **Gap-fill session metadata acceptance**: Does the session creation route today accept a `gaps` metadata field? `learningSessions.metadata` is untyped JSONB so no DB migration is needed, but the session creation API call shape needs confirming. *(Plan assumes: pass-through via metadata; no API schema change needed beyond accepting the extra field.)*
-4. **Decline-refresh as analytics-only**: Confirmed acceptable that the endpoint records the decline but does NOT alter SM-2 (which already fired at borderline). *(Plan assumes: yes, this is the cleaner separation.)*
-5. **Below-0.5 UX**: The plan treats <0.5 the same as borderline (offer, don't force). The product owner said "flag for confirmation" — confirm whether a stronger nudge toward relearn is wanted. *(Plan assumes: same UX, softer copy; SM-2 still fires automatically at exit.)*
+_All open questions resolved as of 2026-05-06._
+
+### Resolved (2026-05-06)
+
+- ~~**Q1 — Pass threshold UX gate**~~: Belt + braces — prompt teaches `passed: true when masteryScore >= 0.7`, server overrides `passed = masteryScore >= 0.7` in `parseAssessmentEvaluation` regardless of LLM output. Coupled forever; no drift possible.
+- ~~**Q2 — Natural-exit cap**~~: 4 turns. `MAX_ASSESSMENT_EXCHANGES = 4`. Tighter than initial 6; matches kid attention span and avoids the assessment feeling like a session.
+- ~~**Q3 — Gap-fill session metadata**~~: `sessionMetadataSchema` extended with `gaps: z.array(z.string()).max(8).optional()`. Required because the schema uses `.strip()` and would silently drop the field otherwise. Same pattern as the existing `homework` and `resumeFromSessionId` keys.
+- ~~**Q4 — Decline-refresh as analytics-only**~~: Confirmed. Endpoint records decline; SM-2 was already updated at borderline transition.
+- ~~**Q5 — Below-0.6 framing**~~: Stronger nudge, not soft offer. Pass at ≥0.7, borderline at 0.6-0.69 (soft "want a refresher?"), failed at <0.6 (stronger "let's go through it together" with primary CTA = Start a session). Human override preserved on both paths.
+- **Mapper architecture**: No new sibling. Reuse `mapEvaluateQualityToSm2(passed, Math.round(masteryScore * 5))` for all three end states. Fixes a latent failure-floor bug in the existing pass path.
+- **Per-question gap data**: Confirmed needed. `weakAreas: string[]` added to evaluation schema and prompt.
 
 ---
 
@@ -316,16 +331,17 @@ Phase boundaries:
 | `apps/mobile/src/app/(app)/practice/assessment-picker.tsx` | New topic-picker screen |
 | `apps/mobile/src/hooks/use-assessments.ts` | Add `useAssessmentEligibleTopics` (query key `['assessments', 'eligible']`) |
 | `apps/api/src/routes/retention.ts` | Add `GET /retention/assessment-eligible` (with `assertNotProxyMode`) |
-| `apps/api/src/services/retention-data.ts` | Add `getAssessmentEligibleTopics`, `mapAssessmentScoreToSm2Quality` |
+| `apps/api/src/services/retention-data.ts` | Add `getAssessmentEligibleTopics` |
 
 ### Phase 1c — Result UX & SM-2
 
 | File | Purpose |
 |---|---|
 | `apps/mobile/src/app/(app)/practice/assessment/index.tsx` | Add result card, borderline CTA, decline flow, fail offer |
-| `apps/api/src/routes/assessments.ts` | Add `borderline` and `failed_exhausted` end-state handling; SM-2 calls with `sessionTimestamp`; add `PATCH /assessments/:id/decline-refresh` (with `assertNotProxyMode`) |
-| `apps/api/src/services/assessments.ts` | Natural-exit detection at `MAX_ASSESSMENT_EXCHANGES`; status transition to `borderline`/`failed_exhausted` |
+| `apps/api/src/routes/assessments.ts` | Replace raw `qualityRating` SM-2 call with `mapEvaluateQualityToSm2(passed, Math.round(masteryScore * 5))`; add `borderline` and `failed_exhausted` end-state handling; SM-2 calls with `sessionTimestamp`; add `PATCH /assessments/:id/decline-refresh` (with `assertNotProxyMode`) |
+| `apps/api/src/services/assessments.ts` | Q1 server hard cap in parser (`passed = masteryScore >= 0.7`); update `ASSESSMENT_EVAL_SYSTEM_PROMPT` (0.7 threshold + `weakAreas` contract); natural-exit detection at `MAX_ASSESSMENT_EXCHANGES = 4`; status transition to `borderline`/`failed_exhausted` |
 | `packages/schemas/src/assessments.ts` | Add `borderline`, `failed_exhausted` to status enum; add `weakAreas?: string[]` to `assessmentEvaluationSchema` |
+| `packages/schemas/src/sessions.ts` | Add `gaps: z.array(z.string()).max(8).optional()` to `sessionMetadataSchema` (Q3) |
 | (drizzle migration) | DB enum addition for the two new status values |
 
 ### Phase 2 — Continuation opener
@@ -354,7 +370,7 @@ This revision incorporates findings from the 2026-05-06 adversarial review.
 | HIGH-1 | `/retention/...` route placed in `assessments.ts` | Moved to `routes/retention.ts` |
 | HIGH-2 | Missing `practice/_layout.tsx` and `unstable_settings` for the new nested layout | Phase 1a route restructure documented |
 | HIGH-3 | Cross-stack push to `/assessment` would break back button | Assessment relocated under `(app)/practice/assessment/` (option A) |
-| HIGH-4 | "MasteryScore curve as fallback if `qualityRating` null" was dead code | Reframed: not a fallback; used for borderline / failed_exhausted only |
+| HIGH-4 | "MasteryScore curve as fallback if `qualityRating` null" was dead code | Reframed: not a fallback; used for borderline / failed_exhausted only. **Superseded 2026-05-06** — score-derived bands removed entirely; all three paths use `mapEvaluateQualityToSm2`. See § "Product Decisions Applied". |
 | HIGH-5 | "Yes please" deferred SM-2 to gap-fill session — abandonment dropped retention update | SM-2 fires at borderline transition server-side; decline / accept are display-only |
 | MEDIUM-1 | Adding `weakAreas` to bespoke JSON shape, not envelope | Documented as sanctioned deferral; envelope migration tracked separately |
 | MEDIUM-2 | Third inconsistent SM-2 mapping floor | Curve revised; rationale now matches `mapEvaluateQualityToSm2` documentation pattern |
@@ -363,3 +379,61 @@ This revision incorporates findings from the 2026-05-06 adversarial review.
 | MEDIUM-5 | Two callers without explicit shared query key | Query key `['assessments', 'eligible']` documented |
 | LOW-1 | `exchangeCount >= 1` floor unjustified | Raised to `>= 3` with rationale |
 | LOW-2 | Open Questions material to implementation, not actually deferrable | Each question now has a "Plan assumes:" line; resolution required before Phase 1b |
+
+---
+
+## Product Decisions Applied (2026-05-06)
+
+Three decisions resolved by the product owner after adversarial review.
+
+### 1. Q1 — `passed` gate at 0.7 (prompt + server hard cap)
+
+The LLM is taught the threshold AND the server enforces it. CLAUDE.md mandates "every envelope signal must have a server-side hard cap so the flow terminates even if the LLM never emits the signal" — same principle applied to threshold-gated booleans.
+
+- **Prompt**: `ASSESSMENT_EVAL_SYSTEM_PROMPT` adds: "Set `passed: true` when `masteryScore >= 0.7`, otherwise `passed: false`."
+- **Server**: `parseAssessmentEvaluation` overrides after coercion: `const passed = parsed.masteryScore >= 0.7`. The LLM's `passed` value is ignored.
+
+`passed` and `masteryScore` stay coupled forever. If the LLM drifts (model upgrade, prompt regression), the threshold holds.
+
+### 2. Mapper architecture — reuse `mapEvaluateQualityToSm2`, drive from `masteryScore`
+
+The existing function in `evaluate.ts:64-74` accepts the right shape (`passed: boolean`, `rawQuality: number 0–5`). For all three end states the call is identical:
+
+```ts
+mapEvaluateQualityToSm2(passed, Math.round(masteryScore * 5))
+```
+
+where `passed = masteryScore >= 0.7` (the Q1 server hard cap).
+
+Four benefits:
+
+1. **Single source of truth for SM-2.** "What passes" and "what SM-2 sees" are both driven by `masteryScore`. The two cannot drift.
+2. **Fixes the latent failure-floor bug.** The current `assessments.ts:111-126` passes raw `qualityRating` into `updateRetentionFromSession`. A learner who fails with `qualityRating: 0` wipes their SM-2 card. The new call returns 2 even at `masteryScore: 0`.
+3. **No new mapping function.** Pass, borderline, failed_exhausted all call the same line.
+4. **Sets up future refactor.** If `evaluate.ts` and `teach-back.ts` are ever unified into a shared verification mapper, assessment lands in that refactor automatically.
+
+`qualityRating` is no longer the SM-2 input. It remains in the schema and is still emitted by the LLM (used for analytics and possible future per-answer telemetry), but it no longer drives retention.
+
+### 3. Per-question gap data (`weakAreas`) — confirmed
+
+Without `weakAreas` the borderline "Want a refresher on the parts you missed?" CTA cannot scope the follow-up session — it would open a generic re-teach. Schema addition retained as planned: `weakAreas: z.array(z.string()).max(8).optional()` on `assessmentEvaluationSchema` plus one prompt-contract line.
+
+### 4. Q2 — Natural-exit cap at 4 turns
+
+`MAX_ASSESSMENT_EXCHANGES = 4`. Tighter than the initial 6 to keep the assessment feeling like a check, not a session. Trade-off: an LLM that wants 5+ probing questions cannot finish; the floor is acceptable because the failure-floor mapper protects retention from a premature cap.
+
+If the eval harness shows the LLM regularly needs more turns to reach a confident verdict, raise to 5. The constant is the single tuning knob.
+
+### 5. Q3 — Gap-fill session metadata: extend `sessionMetadataSchema`
+
+The session creation payload is parsed by `sessionStartSchema → sessionMetadataSchema` (`packages/schemas/src/sessions.ts:194-220`). The metadata schema uses `.strip()`, which silently drops unknown keys. Sending `{ metadata: { gaps: [...] } }` without a schema addition would lose the field with no error.
+
+Resolution: add one optional field to `sessionMetadataSchema`:
+
+```ts
+gaps: z.array(z.string()).max(8).optional(),
+```
+
+Same pattern as `homework`, `homeworkSummary`, `effectiveMode`, `resumeFromSessionId` — additive, no DB migration (metadata is JSONB), follows the existing convention of putting cross-flow handoff data in metadata to avoid migrations.
+
+The downstream session prompt builder reads `gaps` and switches into gap-targeting mode (subset of the topic, not full re-teach). That prompt-builder change is outside this plan's scope but is a follow-up requirement once gap-fill is wired — flagged here so it isn't missed.
