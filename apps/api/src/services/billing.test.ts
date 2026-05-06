@@ -639,7 +639,9 @@ describe('incrementQuota', () => {
     // incrementQuota is a best-effort refund: if the row doesn't exist, it's
     // a no-op. The test verifies no exception is thrown.
     const db = createMockDb({ updateReturning: [] });
-    await expect(incrementQuota(db, subscriptionId)).resolves.toBeUndefined();
+    await expect(incrementQuota(db, subscriptionId)).resolves.toEqual({
+      success: true,
+    });
   });
 });
 

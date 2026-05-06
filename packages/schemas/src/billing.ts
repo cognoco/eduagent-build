@@ -45,6 +45,7 @@ export const usageProfileBreakdownRowSchema = z.object({
   profile_id: z.string().uuid(),
   name: z.string(),
   used: z.number().int(),
+  usedToday: z.number().int(),
   is_self: z.boolean(),
 });
 export type UsageProfileBreakdownRow = z.infer<
@@ -57,26 +58,24 @@ export const usageFamilyAggregateSchema = z.object({
 });
 export type UsageFamilyAggregate = z.infer<typeof usageFamilyAggregateSchema>;
 
-export const usageSchema = z
-  .object({
-    monthlyLimit: z.number().int(),
-    usedThisMonth: z.number().int(),
-    remainingQuestions: z.number().int(),
-    topUpCreditsRemaining: z.number().int(),
-    warningLevel: z.enum(['none', 'soft', 'hard', 'exceeded']),
-    cycleResetAt: z.string().datetime(),
-    dailyLimit: z.number().int().nullable(),
-    usedToday: z.number().int(),
-    dailyRemainingQuestions: z.number().int().nullable(),
-    by_profile: z.array(usageProfileBreakdownRowSchema).optional(),
-    family_aggregate: usageFamilyAggregateSchema.nullable().optional(),
-    resets_at: z.string().datetime().optional(),
-    renews_at: z.string().datetime().nullable().optional(),
-    resets_at_label: z.string().optional(),
-    renews_at_label: z.string().nullable().optional(),
-    per_profile_available_since: z.string().datetime().optional(),
-  })
-  .passthrough();
+export const usageSchema = z.object({
+  monthlyLimit: z.number().int(),
+  usedThisMonth: z.number().int(),
+  remainingQuestions: z.number().int(),
+  topUpCreditsRemaining: z.number().int(),
+  warningLevel: z.enum(['none', 'soft', 'hard', 'exceeded']),
+  cycleResetAt: z.string().datetime(),
+  dailyLimit: z.number().int().nullable(),
+  usedToday: z.number().int(),
+  dailyRemainingQuestions: z.number().int().nullable(),
+  byProfile: z.array(usageProfileBreakdownRowSchema).optional(),
+  familyAggregate: usageFamilyAggregateSchema.nullable().optional(),
+  resetsAt: z.string().datetime().optional(),
+  renewsAt: z.string().datetime().nullable().optional(),
+  resetsAtLabel: z.string().optional(),
+  renewsAtLabel: z.string().nullable().optional(),
+  perProfileAvailableSince: z.string().datetime().optional(),
+});
 export type Usage = z.infer<typeof usageSchema>;
 
 export const checkoutResponseSchema = z.object({
