@@ -42,6 +42,8 @@ import {
   useUpdateCelebrationLevel,
   useWithdrawalArchivePreference,
   useUpdateWithdrawalArchivePreference,
+  useFamilyPoolBreakdownSharing,
+  useUpdateFamilyPoolBreakdownSharing,
 } from '../../hooks/use-settings';
 import { useSubscription } from '../../hooks/use-subscription';
 import { ACCOMMODATION_OPTIONS } from '../../lib/accommodation-options';
@@ -98,19 +100,28 @@ function ToggleRow({
   onToggle,
   disabled,
   testID,
+  description,
 }: {
   label: string;
   value: boolean;
   onToggle: (v: boolean) => void;
   disabled?: boolean;
   testID?: string;
+  description?: string;
 }) {
   return (
     <View
       className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3 mb-2"
       testID={testID}
     >
-      <Text className="text-body text-text-primary">{label}</Text>
+      <View className="flex-1 pr-3">
+        <Text className="text-body text-text-primary">{label}</Text>
+        {description ? (
+          <Text className="text-body-sm text-text-secondary mt-1">
+            {description}
+          </Text>
+        ) : null}
+      </View>
       <Switch
         value={value}
         onValueChange={onToggle}
@@ -209,6 +220,10 @@ export default function MoreScreen() {
     useWithdrawalArchivePreference();
   const updateWithdrawalArchivePreference =
     useUpdateWithdrawalArchivePreference();
+  const { data: familyPoolBreakdownSharing, isLoading: breakdownSharingLoading } =
+    useFamilyPoolBreakdownSharing();
+  const updateFamilyPoolBreakdownSharing =
+    useUpdateFamilyPoolBreakdownSharing();
   const { data: learnerProfile } = useLearnerProfile();
   const updateAccommodation = useUpdateAccommodationMode();
   const { openFeedback } = useFeedbackContext();
@@ -618,6 +633,26 @@ export default function MoreScreen() {
                 }
               />
             )}
+            <ToggleRow
+              label={t('more.family.breakdownSharingTitle')}
+              description={t('more.family.breakdownSharingDescription')}
+              value={familyPoolBreakdownSharing ?? false}
+              onToggle={(value) => {
+                updateFamilyPoolBreakdownSharing.mutate(value, {
+                  onError: () => {
+                    platformAlert(
+                      t('more.errors.couldNotSaveSetting'),
+                      t('more.family.breakdownSharingError')
+                    );
+                  },
+                });
+              }}
+              disabled={
+                breakdownSharingLoading ||
+                updateFamilyPoolBreakdownSharing.isPending
+              }
+              testID="more-breakdown-sharing-toggle"
+            />
             <Pressable
               onPress={handleAddChild}
               className="bg-surface rounded-card px-4 py-3.5 mb-2"

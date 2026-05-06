@@ -106,6 +106,7 @@ const mockNotifData = {
 const mockLearningModeMutate = jest.fn();
 const mockCelebrationLevelMutate = jest.fn();
 const mockWithdrawalArchivePreferenceMutate = jest.fn();
+const mockFamilyPoolBreakdownSharingMutate = jest.fn();
 let mockLearningMode: string | undefined = 'serious';
 let mockLearningModeLoading = false;
 let mockLearningModePending = false;
@@ -116,6 +117,9 @@ let mockWithdrawalArchivePreference: 'auto' | 'always' | 'never' | undefined =
   'auto';
 let mockWithdrawalArchivePreferenceLoading = false;
 let mockWithdrawalArchivePreferencePending = false;
+let mockFamilyPoolBreakdownSharing = false;
+let mockFamilyPoolBreakdownSharingLoading = false;
+let mockFamilyPoolBreakdownSharingPending = false;
 
 jest.mock('../../hooks/use-settings', () => ({
   useNotificationSettings: () => ({
@@ -149,6 +153,14 @@ jest.mock('../../hooks/use-settings', () => ({
   useUpdateWithdrawalArchivePreference: () => ({
     mutate: mockWithdrawalArchivePreferenceMutate,
     isPending: mockWithdrawalArchivePreferencePending,
+  }),
+  useFamilyPoolBreakdownSharing: () => ({
+    data: mockFamilyPoolBreakdownSharing,
+    isLoading: mockFamilyPoolBreakdownSharingLoading,
+  }),
+  useUpdateFamilyPoolBreakdownSharing: () => ({
+    mutate: mockFamilyPoolBreakdownSharingMutate,
+    isPending: mockFamilyPoolBreakdownSharingPending,
   }),
 }));
 
@@ -198,6 +210,9 @@ describe('MoreScreen — Learning Mode', () => {
     mockWithdrawalArchivePreference = 'auto';
     mockWithdrawalArchivePreferenceLoading = false;
     mockWithdrawalArchivePreferencePending = false;
+    mockFamilyPoolBreakdownSharing = false;
+    mockFamilyPoolBreakdownSharingLoading = false;
+    mockFamilyPoolBreakdownSharingPending = false;
   });
 
   it('renders the Learning Mode section header', () => {
@@ -524,6 +539,42 @@ describe('MoreScreen — Learning Mode', () => {
 
     expect(mockWithdrawalArchivePreferenceMutate).toHaveBeenCalledWith(
       'always',
+      expect.objectContaining({ onError: expect.any(Function) })
+    );
+  });
+
+  it('shows the breakdown sharing toggle only for the owner profile', () => {
+    const ownerRender = render(<MoreScreen />, { wrapper: createWrapper() });
+
+    screen.getByTestId('more-breakdown-sharing-toggle');
+    ownerRender.unmount();
+
+    mockActiveProfile = {
+      id: 'child-1',
+      displayName: 'Mia',
+      isOwner: false,
+    };
+    mockProfiles = [mockActiveProfile];
+
+    const { unmount } = render(<MoreScreen />, { wrapper: createWrapper() });
+
+    expect(screen.queryByTestId('more-breakdown-sharing-toggle')).toBeNull();
+    unmount();
+  });
+
+  it('updates family pool breakdown sharing when toggled', () => {
+    mockFamilyPoolBreakdownSharing = false;
+
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    fireEvent(
+      screen.getByTestId('more-breakdown-sharing-toggle-switch'),
+      'valueChange',
+      true
+    );
+
+    expect(mockFamilyPoolBreakdownSharingMutate).toHaveBeenCalledWith(
+      true,
       expect.objectContaining({ onError: expect.any(Function) })
     );
   });

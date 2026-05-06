@@ -130,6 +130,30 @@ export function useWithdrawalArchivePreference(): UseQueryResult<WithdrawalArchi
   });
 }
 
+export function useFamilyPoolBreakdownSharing(): UseQueryResult<boolean> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['settings', 'family-pool-breakdown-sharing', activeProfile?.id],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.settings['family-pool-breakdown-sharing'].$get(
+          {},
+          { init: { signal } }
+        );
+        await assertOk(res);
+        const data = (await res.json()) as { value: boolean };
+        return data.value;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled: !!activeProfile?.id && activeProfile.isOwner === true,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Mutation hooks
 // ---------------------------------------------------------------------------
@@ -225,12 +249,45 @@ export function useUpdateWithdrawalArchivePreference(): UseMutationResult<
         json: { value },
       });
       await assertOk(res);
-      const data = await res.json();
+      const data = (await res.json()) as { value: WithdrawalArchivePreference };
       return data.value as WithdrawalArchivePreference;
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ['settings', 'withdrawal-archive', activeProfile?.id],
+      });
+    },
+  });
+}
+
+export function useUpdateFamilyPoolBreakdownSharing(): UseMutationResult<
+  boolean,
+  Error,
+  boolean
+> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+  const { activeProfile } = useProfile();
+
+  return useMutation({
+    mutationFn: async (value: boolean) => {
+      const res = await client.settings['family-pool-breakdown-sharing'].$put({
+        json: { value },
+      });
+      await assertOk(res);
+      const data = (await res.json()) as { value: boolean };
+      return data.value;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: [
+          'settings',
+          'family-pool-breakdown-sharing',
+          activeProfile?.id,
+        ],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['usage', activeProfile?.id],
       });
     },
   });

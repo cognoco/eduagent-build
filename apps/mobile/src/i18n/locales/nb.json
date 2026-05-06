@@ -230,7 +230,10 @@
       "upgradeRequiredMessage": "Å legge til barneprofiler krever et Familie- eller Pro-abonnement.",
       "viewPlans": "Se abonnementer",
       "profileLimitTitle": "Profilgrense nådd",
-      "profileLimitMessage": "Ditt {{plan}}-abonnement støtter opptil {{max}} profiler."
+      "profileLimitMessage": "Ditt {{plan}}-abonnement støtter opptil {{max}} profiler.",
+      "breakdownSharingTitle": "Share usage breakdown with family",
+      "breakdownSharingDescription": "Let everyone in your family see how each profile uses the family pool. Children only see the breakdown when this is on.",
+      "breakdownSharingError": "Couldn't update setting. Try again."
     },
     "celebrations": {
       "sectionHeader": "Dine feiringer",

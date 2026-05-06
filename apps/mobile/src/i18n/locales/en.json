@@ -230,7 +230,10 @@
       "upgradeRequiredMessage": "Adding child profiles requires a Family or Pro subscription.",
       "viewPlans": "View plans",
       "profileLimitTitle": "Profile limit reached",
-      "profileLimitMessage": "Your {{plan}} plan supports up to {{max}} profiles."
+      "profileLimitMessage": "Your {{plan}} plan supports up to {{max}} profiles.",
+      "breakdownSharingTitle": "Share usage breakdown with family",
+      "breakdownSharingDescription": "Let everyone in your family see how each profile uses the family pool. Children only see the breakdown when this is on.",
+      "breakdownSharingError": "Couldn't update setting. Try again."
     },
     "celebrations": {
       "sectionHeader": "Your celebrations",

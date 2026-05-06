@@ -230,7 +230,10 @@
       "upgradeRequiredMessage": "Adicionar perfis de criança requer uma assinatura Família ou Pro.",
       "viewPlans": "Ver planos",
       "profileLimitTitle": "Limite de perfis atingido",
-      "profileLimitMessage": "Seu plano {{plan}} suporta até {{max}} perfis."
+      "profileLimitMessage": "Seu plano {{plan}} suporta até {{max}} perfis.",
+      "breakdownSharingTitle": "Share usage breakdown with family",
+      "breakdownSharingDescription": "Let everyone in your family see how each profile uses the family pool. Children only see the breakdown when this is on.",
+      "breakdownSharingError": "Couldn't update setting. Try again."
     },
     "celebrations": {
       "sectionHeader": "Suas comemorações",

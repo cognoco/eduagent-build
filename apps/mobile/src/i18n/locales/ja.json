@@ -230,7 +230,10 @@
       "upgradeRequiredMessage": "お子様のプロフィールを追加するには、ファミリーまたはプロのサブスクリプションが必要です。",
       "viewPlans": "プランを見る",
       "profileLimitTitle": "プロフィールの上限に達しました",
-      "profileLimitMessage": "{{plan}}プランでは、最大{{max}}個のプロフィールをサポートしています。"
+      "profileLimitMessage": "{{plan}}プランでは、最大{{max}}個のプロフィールをサポートしています。",
+      "breakdownSharingTitle": "Share usage breakdown with family",
+      "breakdownSharingDescription": "Let everyone in your family see how each profile uses the family pool. Children only see the breakdown when this is on.",
+      "breakdownSharingError": "Couldn't update setting. Try again."
     },
     "celebrations": {
       "sectionHeader": "お祝い",

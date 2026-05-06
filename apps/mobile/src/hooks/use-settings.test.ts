@@ -5,9 +5,11 @@ import {
   useNotificationSettings,
   useLearningMode,
   useCelebrationLevel,
+  useFamilyPoolBreakdownSharing,
   useUpdateNotificationSettings,
   useUpdateLearningMode,
   useUpdateCelebrationLevel,
+  useUpdateFamilyPoolBreakdownSharing,
   useRegisterPushToken,
 } from './use-settings';
 
@@ -33,7 +35,7 @@ jest.mock('../lib/api-client', () => ({
 
 jest.mock('../lib/profile', () => ({
   useProfile: () => ({
-    activeProfile: { id: 'test-profile-id' },
+    activeProfile: { id: 'test-profile-id', isOwner: true },
   }),
 }));
 
@@ -161,6 +163,33 @@ describe('useCelebrationLevel', () => {
   });
 });
 
+describe('useFamilyPoolBreakdownSharing', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    queryClient.clear();
+  });
+
+  it('fetches family pool breakdown sharing from API', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ value: true }), { status: 200 })
+    );
+
+    const { result } = renderHook(() => useFamilyPoolBreakdownSharing(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(result.current.data).toBe(true);
+  });
+});
+
 describe('useUpdateNotificationSettings', () => {
   beforeEach(() => {
     mockFetch.mockReset();
@@ -282,5 +311,48 @@ describe('useUpdateCelebrationLevel', () => {
     });
 
     expect(mockFetch).toHaveBeenCalled();
+  });
+});
+
+describe('useUpdateFamilyPoolBreakdownSharing', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    queryClient.clear();
+  });
+
+  it('calls PUT with the sharing value', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ value: true }), { status: 200 })
+    );
+
+    const wrapper = createWrapper();
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+
+    const { result } = renderHook(
+      () => useUpdateFamilyPoolBreakdownSharing(),
+      {
+        wrapper,
+      }
+    );
+
+    await act(async () => {
+      await result.current.mutateAsync(true);
+    });
+
+    expect(mockFetch).toHaveBeenCalled();
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: [
+        'settings',
+        'family-pool-breakdown-sharing',
+        'test-profile-id',
+      ],
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['usage', 'test-profile-id'],
+    });
   });
 });
