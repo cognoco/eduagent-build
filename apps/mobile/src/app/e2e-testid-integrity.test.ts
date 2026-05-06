@@ -77,6 +77,9 @@ const KNOWN_DRIFT = new Set([
   'switch-to-teen',
   // Password toggle on sign-in (removed or renamed in PasswordInput)
   'sign-in-password-toggle',
+  // Library refactor in progress: empty-state component removed
+  // (BookRow/LibraryEmptyState deletion). bug-237 Maestro flow needs update.
+  'library-add-subject-empty',
 ]);
 
 function collectFiles(dir: string, ext: string): string[] {

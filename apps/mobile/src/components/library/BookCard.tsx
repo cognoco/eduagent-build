@@ -5,8 +5,6 @@ import type { SubjectTint } from '../../lib/design-tokens';
 interface BookCardProps {
   book: CurriculumBook;
   status: BookProgressStatus;
-  topicCount?: number;
-  completedCount?: number;
   highlighted?: boolean;
   tint?: SubjectTint;
   onPress: () => void;
@@ -29,18 +27,11 @@ const STATUS_LABELS: Record<BookProgressStatus, string> = {
 export function BookCard({
   book,
   status,
-  topicCount,
-  completedCount,
   highlighted = false,
   tint,
   onPress,
 }: BookCardProps): React.ReactElement {
-  const progressLabel =
-    typeof topicCount === 'number'
-      ? `${completedCount ?? 0}/${topicCount} topics`
-      : book.topicsGenerated
-      ? 'Ready to open'
-      : 'Build this book';
+  const progressLabel = book.topicsGenerated ? 'Ready to open' : 'Build this book';
 
   return (
     <Pressable
