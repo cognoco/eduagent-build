@@ -6,6 +6,9 @@ import {
   upsertLearningMode,
   getCelebrationLevel,
   upsertCelebrationLevel,
+  getFamilyPoolBreakdownSharing,
+  getOwnedFamilyPoolBreakdownSharing,
+  upsertFamilyPoolBreakdownSharing,
   getMedianResponseSeconds,
   updateMedianResponseSeconds,
   getLearningModeRules,
@@ -29,8 +32,16 @@ const TEST_ACCOUNT_ID = 'test-account-id';
 
 function createMockDb({
   findFirstResult = undefined as Record<string, unknown> | undefined,
+  familyPreferencesFindFirstResult = undefined as
+    | Record<string, unknown>
+    | undefined,
+  profileFindFirstResult = { isOwner: true } as
+    | Record<string, unknown>
+    | undefined,
   selectResult = [{ id: profileId }] as Record<string, unknown>[],
 } = {}): Database {
+  const onConflictDoUpdate = jest.fn().mockResolvedValue(undefined);
+  const values = jest.fn().mockReturnValue({ onConflictDoUpdate });
   return {
     query: {
       notificationPreferences: {
@@ -39,9 +50,15 @@ function createMockDb({
       learningModes: {
         findFirst: jest.fn().mockResolvedValue(findFirstResult),
       },
+      familyPreferences: {
+        findFirst: jest.fn().mockResolvedValue(familyPreferencesFindFirstResult),
+      },
+      profiles: {
+        findFirst: jest.fn().mockResolvedValue(profileFindFirstResult),
+      },
     },
     insert: jest.fn().mockReturnValue({
-      values: jest.fn().mockResolvedValue(undefined),
+      values,
     }),
     update: jest.fn().mockReturnValue({
       set: jest.fn().mockReturnValue({
@@ -265,6 +282,62 @@ describe('upsertCelebrationLevel', () => {
       upsertCelebrationLevel(db, profileId, TEST_ACCOUNT_ID, 'big_only')
     ).resolves.toEqual({ celebrationLevel: 'big_only' });
     expect(db.update).toHaveBeenCalled();
+  });
+});
+
+describe('family pool breakdown sharing', () => {
+  it('returns false when no row exists', async () => {
+    const db = createMockDb({ familyPreferencesFindFirstResult: undefined });
+
+    await expect(getFamilyPoolBreakdownSharing(db, profileId)).resolves.toBe(
+      false
+    );
+  });
+
+  it('returns the stored value', async () => {
+    const db = createMockDb({
+      familyPreferencesFindFirstResult: { poolBreakdownShared: true },
+    });
+
+    await expect(getFamilyPoolBreakdownSharing(db, profileId)).resolves.toBe(
+      true
+    );
+  });
+
+  it('requires an owner profile for owned reads', async () => {
+    const db = createMockDb({ profileFindFirstResult: { isOwner: false } });
+
+    await expect(
+      getOwnedFamilyPoolBreakdownSharing(db, profileId, TEST_ACCOUNT_ID)
+    ).rejects.toThrow('Profile owner required');
+  });
+
+  it('upserts the owner setting', async () => {
+    const db = createMockDb();
+
+    await expect(
+      upsertFamilyPoolBreakdownSharing(
+        db,
+        profileId,
+        TEST_ACCOUNT_ID,
+        true
+      )
+    ).resolves.toEqual({ value: true });
+
+    expect(db.insert).toHaveBeenCalled();
+  });
+
+  it('rejects writes from non-owner profiles', async () => {
+    const db = createMockDb({ profileFindFirstResult: { isOwner: false } });
+
+    await expect(
+      upsertFamilyPoolBreakdownSharing(
+        db,
+        profileId,
+        TEST_ACCOUNT_ID,
+        true
+      )
+    ).rejects.toThrow('Profile owner required');
   });
 });
 
