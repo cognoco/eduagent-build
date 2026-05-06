@@ -1,19 +1,5 @@
 import { Hono } from 'hono';
 import type { Database } from '@eduagent/database';
-import type { AuthUser } from '../middleware/auth';
-import { requireProfileId } from '../middleware/profile-scope';
-import {
-  getSubjectProgress,
-  getTopicProgress,
-  getOverallProgress,
-  getContinueSuggestion,
-  getLearningResumeTarget,
-  getActiveSessionForTopic,
-  resolveTopicSubject,
-} from '../services/progress';
-import { getOverdueTopicsGrouped } from '../services/overdue-topics';
-import { getProfileOverdueCount } from '../services/retention-data';
-import { notFound } from '../errors';
 import {
   subjectProgressEndpointResponseSchema,
   topicProgressEndpointResponseSchema,
@@ -24,7 +10,27 @@ import {
   topicResolveResponseSchema,
   resumeTargetResponseSchema,
   continueSuggestionResponseSchema,
+  childSessionsResponseSchema,
+  childReportsResponseSchema,
+  weeklyReportsResponseSchema,
 } from '@eduagent/schemas';
+import type { AuthUser } from '../middleware/auth';
+import { requireProfileId } from '../middleware/profile-scope';
+import { notFound } from '../errors';
+import { getProfileSessions } from '../services/dashboard';
+import { listMonthlyReportsForProfile } from '../services/monthly-report';
+import { getOverdueTopicsGrouped } from '../services/overdue-topics';
+import {
+  getSubjectProgress,
+  getTopicProgress,
+  getOverallProgress,
+  getContinueSuggestion,
+  getLearningResumeTarget,
+  getActiveSessionForTopic,
+  resolveTopicSubject,
+} from '../services/progress';
+import { getProfileOverdueCount } from '../services/retention-data';
+import { listWeeklyReportsForProfile } from '../services/weekly-report';
 
 type ProgressRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -90,6 +96,34 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
 
     const result = await getOverdueTopicsGrouped(db, profileId);
     return c.json(overdueTopicsResponseSchema.parse(result));
+  })
+
+  // List sessions for the active profile. Used by /progress self-reporting.
+  .get('/progress/sessions', async (c) => {
+    const db = c.get('db');
+    const profileId = requireProfileId(c.get('profileId'));
+
+    const sessions = await getProfileSessions(db, profileId);
+    return c.json(childSessionsResponseSchema.parse({ sessions }));
+  })
+
+  // List monthly reports for the active profile. Parent-facing dashboard
+  // routes still enforce parent-child access separately.
+  .get('/progress/reports', async (c) => {
+    const db = c.get('db');
+    const profileId = requireProfileId(c.get('profileId'));
+
+    const reports = await listMonthlyReportsForProfile(db, profileId);
+    return c.json(childReportsResponseSchema.parse({ reports }));
+  })
+
+  // List weekly reports for the active profile.
+  .get('/progress/weekly-reports', async (c) => {
+    const db = c.get('db');
+    const profileId = requireProfileId(c.get('profileId'));
+
+    const reports = await listWeeklyReportsForProfile(db, profileId);
+    return c.json(weeklyReportsResponseSchema.parse({ reports }));
   })
 
   // Get active/paused session for a specific topic [F-4]

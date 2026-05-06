@@ -126,6 +126,8 @@ jest.mock('../../../../hooks/use-learner-profile', () => ({
 
 jest.mock('../../../../components/progress', () => ({
   GrowthChart: () => null,
+  RecentSessionsList: () => null,
+  ReportsListCard: () => null,
   RetentionSignal: () => null,
   SubjectCard: () => null,
   hasSubjectActivity: () => false,

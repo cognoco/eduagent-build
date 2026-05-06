@@ -166,6 +166,31 @@ export async function listWeeklyReportsForParentChild(
   );
 }
 
+export async function listWeeklyReportsForProfile(
+  db: Database,
+  profileId: string
+): Promise<WeeklyReportSummary[]> {
+  const rows = await db.query.weeklyReports.findMany({
+    where: eq(weeklyReports.childProfileId, profileId),
+    orderBy: desc(weeklyReports.reportWeek),
+    limit: 12,
+  });
+
+  return rows.map((row) =>
+    weeklyReportSummarySchema.parse({
+      id: row.id,
+      reportWeek: row.reportWeek,
+      viewedAt: row.viewedAt?.toISOString() ?? null,
+      createdAt: row.createdAt.toISOString(),
+      headlineStat: (row.reportData as WeeklyReportData).headlineStat ?? {
+        label: 'Progress',
+        value: 0,
+        comparison: '',
+      },
+    })
+  );
+}
+
 export async function getWeeklyReportForParentChild(
   db: Database,
   parentProfileId: string,

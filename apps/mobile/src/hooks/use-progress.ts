@@ -16,6 +16,7 @@ import type {
   OverdueTopic,
   OverdueTopicsResponse,
   ProgressHistory,
+  ChildSession,
   SubjectProgress,
   TopicProgress,
   WeeklyReportRecord,
@@ -438,6 +439,113 @@ export function useProgressMilestones(
     enabled: !!activeProfile,
     // [BUG-503] Milestones don't change mid-session.
     staleTime: 2 * 60 * 1000,
+  });
+}
+
+export function useProfileSessions(
+  profileId: string | undefined
+): UseQueryResult<ChildSession[]> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['progress', 'profile', profileId, 'sessions', activeProfile?.id],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const isActiveProfile = profileId === activeProfile?.id;
+        const res = isActiveProfile
+          ? await client.progress.sessions.$get({}, { init: { signal } })
+          : await client.dashboard.children[':profileId'].sessions.$get(
+              { param: { profileId: profileId ?? '' } },
+              { init: { signal } }
+            );
+        await assertOk(res);
+        const data = (await res.json()) as { sessions: ChildSession[] };
+        return data.sessions;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled:
+      !!activeProfile &&
+      !!profileId &&
+      (profileId === activeProfile.id || activeProfile.isOwner === true),
+  });
+}
+
+export function useProfileReports(
+  profileId: string | undefined
+): UseQueryResult<MonthlyReportSummary[]> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['progress', 'profile', profileId, 'reports', activeProfile?.id],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const isActiveProfile = profileId === activeProfile?.id;
+        const res = isActiveProfile
+          ? await client.progress.reports.$get({}, { init: { signal } })
+          : await client.dashboard.children[':profileId'].reports.$get(
+              { param: { profileId: profileId ?? '' } },
+              { init: { signal } }
+            );
+        await assertOk(res);
+        const data = (await res.json()) as { reports: MonthlyReportSummary[] };
+        return data.reports;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled:
+      !!activeProfile &&
+      !!profileId &&
+      (profileId === activeProfile.id || activeProfile.isOwner === true),
+  });
+}
+
+export function useProfileWeeklyReports(
+  profileId: string | undefined
+): UseQueryResult<WeeklyReportSummary[]> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: [
+      'progress',
+      'profile',
+      profileId,
+      'weekly-reports',
+      activeProfile?.id,
+    ],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const isActiveProfile = profileId === activeProfile?.id;
+        const res = isActiveProfile
+          ? await client.progress['weekly-reports'].$get(
+              {},
+              { init: { signal } }
+            )
+          : await client.dashboard.children[':profileId'][
+              'weekly-reports'
+            ].$get(
+              { param: { profileId: profileId ?? '' } },
+              { init: { signal } }
+            );
+        await assertOk(res);
+        const data = (await res.json()) as { reports: WeeklyReportSummary[] };
+        return data.reports;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled:
+      !!activeProfile &&
+      !!profileId &&
+      (profileId === activeProfile.id || activeProfile.isOwner === true),
   });
 }
 

@@ -252,6 +252,30 @@ export async function listMonthlyReportsForParentChild(
   );
 }
 
+export async function listMonthlyReportsForProfile(
+  db: Database,
+  profileId: string
+): Promise<MonthlyReportSummary[]> {
+  const rows = await db.query.monthlyReports.findMany({
+    where: eq(monthlyReports.childProfileId, profileId),
+    orderBy: desc(monthlyReports.reportMonth),
+  });
+
+  return rows.map((row) =>
+    monthlyReportSummarySchema.parse({
+      id: row.id,
+      reportMonth: row.reportMonth,
+      viewedAt: row.viewedAt?.toISOString() ?? null,
+      createdAt: row.createdAt.toISOString(),
+      headlineStat: (row.reportData as MonthlyReportData).headlineStat ?? {
+        label: 'Progress',
+        value: 0,
+        comparison: '',
+      },
+    })
+  );
+}
+
 export async function getMonthlyReportForParentChild(
   db: Database,
   parentProfileId: string,

@@ -4,3 +4,7 @@ export { ProgressBar } from './ProgressBar';
 export { GrowthChart } from './GrowthChart';
 export { MilestoneCard } from './MilestoneCard';
 export { SubjectCard, hasSubjectActivity } from './SubjectCard';
+export { MonthlyReportCard } from './MonthlyReportCard';
+export { RecentSessionsList } from './RecentSessionsList';
+export { ReportsListCard } from './ReportsListCard';
+export { WeeklyReportCard } from './WeeklyReportCard';

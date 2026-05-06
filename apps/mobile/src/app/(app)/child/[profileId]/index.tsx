@@ -9,19 +9,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfile } from '../../../../lib/profile';
 import {
   GrowthChart,
+  RecentSessionsList,
   RetentionSignal,
+  ReportsListCard,
   SubjectCard,
   hasSubjectActivity,
   type RetentionStatus,
 } from '../../../../components/progress';
-import {
-  useChildDetail,
-  useChildSessions,
-} from '../../../../hooks/use-dashboard';
+import { useChildDetail } from '../../../../hooks/use-dashboard';
 import {
   useChildInventory,
   useChildProgressHistory,
-  useChildReports,
 } from '../../../../hooks/use-progress';
 import { useCelebration } from '../../../../hooks/use-celebration';
 import {
@@ -51,33 +49,6 @@ function SubjectSkeleton(): React.ReactNode {
       <View className="bg-border rounded h-4 w-1/3" />
     </View>
   );
-}
-
-function formatDuration(seconds: number | null): string {
-  if (seconds === null || seconds === 0) return '--';
-  const mins = Math.round(seconds / 60);
-  if (mins < 1) return '<1 min';
-  return `${mins} min`;
-}
-
-function formatTimeOnApp(
-  seconds: number | null,
-  t: (key: string, opts?: Record<string, unknown>) => string
-): string {
-  const duration = formatDuration(seconds);
-  return duration === '--'
-    ? t('parentView.index.timeOnAppUnavailable')
-    : t('parentView.index.timeOnApp', { duration });
-}
-
-function formatSessionDate(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 }
 
 function formatWeekLabel(iso: string): string {
@@ -157,18 +128,11 @@ export default function ChildDetailScreen() {
     isError,
     refetch,
   } = useChildDetail(profileId);
-  const {
-    data: sessions,
-    isLoading: sessionsLoading,
-    isError: sessionsError,
-    refetch: refetchSessions,
-  } = useChildSessions(profileId);
   const { data: inventory } = useChildInventory(profileId);
   const { data: history } = useChildProgressHistory(profileId, {
     granularity: 'weekly',
   });
   const visibleSubjects = inventory?.subjects.filter(hasSubjectActivity) ?? [];
-  const { data: reports } = useChildReports(profileId);
   const pendingCelebrations = usePendingCelebrations({
     profileId,
     viewer: 'parent',
@@ -462,30 +426,7 @@ export default function ChildDetailScreen() {
         ) : null}
 
         {/* Reports card — always visible */}
-        <View className="bg-surface rounded-card p-4 mt-4">
-          <Pressable
-            onPress={() => {
-              if (!profileId) return;
-              router.push({
-                pathname: '/(app)/child/[profileId]/reports',
-                params: { profileId },
-              } as never);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={t('parentView.index.openMonthlyReports')}
-            testID="child-reports-link"
-          >
-            <Text className="text-body font-semibold text-text-primary">
-              {t('parentView.index.monthlyReports')}
-              {reports && reports.length > 0 ? ` (${reports.length})` : ''}
-            </Text>
-            <Text className="text-body-sm text-text-secondary mt-1">
-              {reports && reports.length > 0
-                ? t('parentView.index.monthlyReportsSummary')
-                : t('parentView.index.firstReportSoon')}
-            </Text>
-          </Pressable>
-        </View>
+        {profileId ? <ReportsListCard profileId={profileId} /> : null}
 
         {history ? (
           <View className="mt-4">
@@ -607,93 +548,7 @@ export default function ChildDetailScreen() {
         )}
 
         {/* Recent Sessions */}
-        <Text className="text-h3 font-semibold text-text-primary mt-6 mb-2">
-          {t('parentView.index.recentSessions')}
-        </Text>
-        {sessionsLoading ? (
-          <>
-            <SubjectSkeleton />
-            <SubjectSkeleton />
-          </>
-        ) : sessionsError ? (
-          <View className="py-4 items-center">
-            <Text className="text-body text-text-secondary text-center mb-3">
-              {t('parentView.index.couldNotLoadSessions')}
-            </Text>
-            <Pressable
-              onPress={() => void refetchSessions()}
-              className="bg-surface rounded-button px-5 py-3 min-h-[48px] items-center justify-center"
-              accessibilityRole="button"
-              accessibilityLabel={t('parentView.index.refreshChildProfile')}
-              testID="child-profile-refresh"
-            >
-              <Text className="text-body font-semibold text-text-primary">
-                {t('parentView.index.refresh')}
-              </Text>
-            </Pressable>
-          </View>
-        ) : sessions && sessions.length > 0 ? (
-          sessions.map((session) => (
-            <Pressable
-              key={session.sessionId}
-              onPress={() => {
-                if (!profileId) return;
-                router.push({
-                  pathname: '/(app)/child/[profileId]/session/[sessionId]',
-                  params: {
-                    profileId,
-                    sessionId: session.sessionId,
-                  },
-                } as never);
-              }}
-              className="bg-surface rounded-card p-4 mt-3"
-              accessibilityLabel={t('parentView.index.viewSessionFrom', {
-                date: formatSessionDate(session.startedAt),
-              })}
-              accessibilityRole="button"
-              testID={`session-card-${session.sessionId}`}
-            >
-              <View className="flex-row items-center justify-between mb-1">
-                <Text className="text-body font-medium text-text-primary">
-                  {session.homeworkSummary?.displayTitle ??
-                    formatSessionDate(session.startedAt)}
-                </Text>
-                <Text className="text-caption text-text-secondary">
-                  {session.homeworkSummary
-                    ? formatSessionDate(session.startedAt)
-                    : session.sessionType}
-                </Text>
-              </View>
-              {session.displaySummary ? (
-                <Text className="text-caption text-text-secondary mb-2">
-                  {session.displaySummary}
-                </Text>
-              ) : null}
-              {session.highlight && (
-                <Text
-                  className="text-text-tertiary mt-0.5 text-xs"
-                  numberOfLines={2}
-                >
-                  {session.highlight}
-                </Text>
-              )}
-              <Text className="text-caption text-text-secondary">
-                {formatTimeOnApp(
-                  session.wallClockSeconds ?? session.durationSeconds,
-                  t
-                )}
-              </Text>
-            </Pressable>
-          ))
-        ) : (
-          <View className="mx-4 mt-4 rounded-xl bg-surface p-6">
-            <Text className="text-text-secondary text-center text-base">
-              {t('parentView.index.noSessionsYet', {
-                name: child?.displayName ?? t('parentView.index.yourChild'),
-              })}
-            </Text>
-          </View>
-        )}
+        {profileId ? <RecentSessionsList profileId={profileId} /> : null}
 
         <Text className="text-h3 font-semibold text-text-primary mt-6 mb-2">
           {child?.displayName
