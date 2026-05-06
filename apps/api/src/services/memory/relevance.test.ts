@@ -58,6 +58,22 @@ function addDays(date: Date, days: number): Date {
 }
 
 describe('getRelevantMemories', () => {
+  it('returns no_profile when profile is null', async () => {
+    const result = await getRelevantMemories({
+      profileId: 'p1',
+      queryText: 'fractions',
+      k: 5,
+      profile: null,
+      scoped: stubScoped(),
+      embedder: stubEmbedder(),
+    });
+
+    expect(result).toEqual({
+      snapshot: emptyMemorySnapshot(),
+      source: 'no_profile',
+    });
+  });
+
   it('returns empty snapshot when memory injection is disabled', async () => {
     const result = await getRelevantMemories({
       profileId: 'p1',
@@ -88,7 +104,7 @@ describe('getRelevantMemories', () => {
     expect(result.snapshot).toEqual(emptyMemorySnapshot());
   });
 
-  it('falls back to recency when stage 1 returns fewer than k items', async () => {
+  it('falls back to recency when stage 1 returns no candidates', async () => {
     const scoped = stubScoped({
       relevant: [],
       active: [makeRelevantRow({ text: 'recent note' })],
@@ -105,6 +121,27 @@ describe('getRelevantMemories', () => {
 
     expect(result.source).toBe('recency_fallback');
     expect(result.snapshot.communicationNotes).toEqual(['recent note']);
+  });
+
+  it('uses relevance when a small profile has fewer candidates than k', async () => {
+    const scoped = stubScoped({
+      relevant: [
+        makeRelevantRow({ text: 'only embedded note', distance: 0.1 }),
+      ],
+      active: [makeRelevantRow({ text: 'recent fallback note' })],
+    });
+
+    const result = await getRelevantMemories({
+      profileId: 'p1',
+      queryText: 'fractions',
+      k: 5,
+      profile: grantedProfile(),
+      scoped,
+      embedder: stubEmbedder(),
+    });
+
+    expect(result.source).toBe('relevance');
+    expect(result.snapshot.communicationNotes).toEqual(['only embedded note']);
   });
 
   it('blends relevance and recency so old-tight beats recent-loose', async () => {

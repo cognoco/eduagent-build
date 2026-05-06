@@ -19,14 +19,19 @@ describe('embedFactText', () => {
     expect((result as { vector: number[] }).vector).toHaveLength(1024);
   });
 
-  it('returns ok:false with reason when fn throws', async () => {
+  it('returns ok:false with class:transient for a generic error', async () => {
     const fn: EmbeddingFn = async () => {
       throw new Error('voyage 503');
     };
 
-    await expect(embedFactText('Fractions are hard', fn)).resolves.toEqual({
+    const result = await embedFactText('Fractions are hard', fn);
+
+    expect(result).toMatchObject({
       ok: false,
-      reason: 'voyage 503',
+      // Generic errors without the Voyage status pattern are transient.
+      class: 'transient',
+      reason: 'transient',
+      message: 'voyage 503',
     });
   });
 
@@ -35,14 +40,88 @@ describe('embedFactText', () => {
 
     const result = await embedFactText('   ', fn as unknown as EmbeddingFn);
 
-    expect(result).toEqual({ ok: false, reason: 'empty_text' });
+    expect(result).toMatchObject({
+      ok: false,
+      class: 'empty_text',
+      reason: 'empty_text',
+    });
     expect(fn).not.toHaveBeenCalled();
   });
 
   it('returns no_voyage_key when no API key is configured', async () => {
-    await expect(makeEmbedderFromEnv(undefined)('text')).resolves.toEqual({
+    const result = await makeEmbedderFromEnv(undefined)('text');
+
+    expect(result).toMatchObject({
       ok: false,
+      class: 'no_voyage_key',
       reason: 'no_voyage_key',
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Classified error branches
+  // ---------------------------------------------------------------------------
+
+  it('classifies a 429 response as rate_limited', async () => {
+    const fn: EmbeddingFn = async () => {
+      throw new Error(
+        'Voyage AI embedding request failed (429): rate limit exceeded'
+      );
+    };
+
+    const result = await embedFactText('some fact', fn);
+
+    expect(result).toMatchObject({
+      ok: false,
+      class: 'rate_limited',
+      reason: 'rate_limited',
+    });
+  });
+
+  it('classifies a 400 response as invalid_input', async () => {
+    const fn: EmbeddingFn = async () => {
+      throw new Error(
+        'Voyage AI embedding request failed (400): bad request - input too long'
+      );
+    };
+
+    const result = await embedFactText('some fact', fn);
+
+    expect(result).toMatchObject({
+      ok: false,
+      class: 'invalid_input',
+      reason: 'invalid_input',
+    });
+  });
+
+  it('classifies a 500 response as transient', async () => {
+    const fn: EmbeddingFn = async () => {
+      throw new Error(
+        'Voyage AI embedding request failed (500): internal server error'
+      );
+    };
+
+    const result = await embedFactText('some fact', fn);
+
+    expect(result).toMatchObject({
+      ok: false,
+      class: 'transient',
+      reason: 'transient',
+    });
+  });
+
+  it('classifies a network error (no status) as transient', async () => {
+    const fn: EmbeddingFn = async () => {
+      throw new TypeError('Failed to fetch');
+    };
+
+    const result = await embedFactText('some fact', fn);
+
+    expect(result).toMatchObject({
+      ok: false,
+      class: 'transient',
+      reason: 'transient',
+      message: 'Failed to fetch',
     });
   });
 });

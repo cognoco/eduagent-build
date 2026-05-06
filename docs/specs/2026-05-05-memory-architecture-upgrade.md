@@ -256,7 +256,7 @@ Deploy gate: 100% pass on the semantic parity suite before flipping `MEMORY_FACT
 - Consent gate at the top: if `!profile.memoryEnabled || !profile.memoryInjectionEnabled`, return `[]` immediately. No DB read, no embed call.
 - Two-stage retrieval:
   - Stage 1 (SQL): fetch top-K' candidates via pgvector's `<=>` cosine-distance operator (lower-is-better). K' = 4·K to absorb post-filter shrinkage from cross-profile or superseded rows. The HNSW index is partial on `superseded_by IS NULL` so superseded rows never enter the candidate set.
-  - Stage 2 (app-side): blend `score = (1 - distance/2) * w_relevance + exp(-age_days / halflife_days) * w_recency`. `distance` is the pgvector cosine distance ∈ [0, 2]; `(1 - distance/2)` normalizes to [0, 1]. Default halflife 90 days, default weights `w_relevance=0.7`, `w_recency=0.3`. Sort by score desc, take top N.
+  - Stage 2 (app-side): blend `score = (1 - distance/2) * w_relevance + exp(-age_days / halflife_days) * w_recency`. `distance` is the pgvector cosine distance ∈ [0, 2]; `(1 - distance/2)` normalizes to [0, 1]. Default halflife 180 days, default weights `w_relevance=0.85`, `w_recency=0.15`. Sort by score desc, take top N. These defaults intentionally favor semantic relevance so stale-but-specific facts are not crowded out by recent generic notes.
 - Falls back to recency-only when the candidate set has any `embedding IS NULL` (transition state) or when stage-1 returns < K results.
 
 **4. A/B comparison harness** — existing eval-llm harness adds a flow that takes the same fixture session and runs it through (a) recency-only injection and (b) relevance-based injection, snapshots both prompts. Reviewed manually before flipping the flag.
@@ -379,7 +379,7 @@ Phase 3's per-fact dedup call is the cost-watch item. Mitigations: (a) Haiku-tie
 ### Phase 2
 - [ ] Embedding written within 30s of `applyAnalysis` for ≥99% of new facts.
 - [ ] Backfill cron picks up `embedding IS NULL` rows hourly; backlog stays under 1000 rows.
-- [ ] `getRelevantMemories(profileId, queryText, k)` returns top-k via two-stage retrieval: stage-1 SQL uses pgvector `<=>` cosine-distance operator with K' = 4·K over-fetch against the partial HNSW index; stage-2 app-side blends `(1 - distance/2) * w_relevance + exp(-age/halflife) * w_recency`. Falls back to recency-only when stage 1 returns <k items or any candidate has `embedding IS NULL`.
+- [ ] `getRelevantMemories(profileId, queryText, k)` returns top-k via two-stage retrieval: stage-1 SQL uses pgvector `<=>` cosine-distance operator with K' = 4·K over-fetch against the partial HNSW index; stage-2 app-side blends `(1 - distance/2) * w_relevance + exp(-age/halflife) * w_recency`. Falls back to recency-only when stage 1 returns no candidates or the query embedding cannot be generated.
 - [ ] `getRelevantMemories` is wrapped in `createScopedRepository(profileId)` and gates on consent flags. Both verified by break tests.
 - [ ] A/B harness produces side-by-side prompt snapshots for fixture sessions; manual review gate passes before flag flip.
 - [ ] Recency-only retrieval still works when `MEMORY_FACTS_RELEVANCE_RETRIEVAL` flag is off (rollback path).
@@ -416,7 +416,7 @@ These are surfaced for explicit confirmation, not as blockers — the spec's def
 
 ## Open Questions for Implementation Plan
 
-1. Concrete recency decay half-life for Phase 2 retrieval (default 90 days; tune in implementation).
+1. Concrete recency decay half-life for Phase 2 retrieval (implementation default 180 days; tune with A/B results).
 2. Concrete cosine similarity threshold for Phase 3 dedup (default 0.85; tune in A/B).
 3. Choice of dedup LLM (default Haiku-tier; budget concern at high write volume).
 4. Whether to fold the dedup LLM call into the existing `analyzeSessionTranscript` prompt as a multi-section structured output (would eliminate the per-fact extra call).

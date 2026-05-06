@@ -9,6 +9,7 @@ export * from './snapshots';
 export * from './billing';
 export * from './embeddings';
 export * from './memory-facts';
+export { vectorToDriver } from './_pgvector';
 export * from './language';
 export * from './notes';
 export * from './learning-profiles';

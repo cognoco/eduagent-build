@@ -865,6 +865,7 @@ export async function prepareExchangeContext(
     }
   }
 
+  const scopedRepo = createScopedRepository(db, profileId);
   const memorySnapshot =
     learningProfile &&
     options?.memoryFactsRelevanceEnabled &&
@@ -876,17 +877,14 @@ export async function prepareExchangeContext(
             queryVector: userMessageVector,
             k: 8,
             profile: learningProfile,
-            scoped: createScopedRepository(db, profileId),
+            scoped: scopedRepo,
             embedder: makeEmbedderFromEnv(options.voyageApiKey),
           })
         ).snapshot
       : learningProfile &&
         options?.memoryFactsReadEnabled &&
         hasMemoryFactsBackfillMarker(learningProfile)
-      ? await readMemorySnapshotFromFacts(
-          createScopedRepository(db, profileId),
-          learningProfile
-        )
+      ? await readMemorySnapshotFromFacts(scopedRepo, learningProfile)
       : null;
 
   const memoryBlock = learningProfile

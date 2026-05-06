@@ -1,7 +1,9 @@
 import {
   vector,
   vectorFromDriver,
+  vectorNullableFromDriver,
   vectorNullable,
+  vectorNullableToDriver,
   vectorToDriver,
   VECTOR_DIM,
 } from './_pgvector.js';
@@ -28,7 +30,16 @@ describe('pgvector customType', () => {
     expect(back[0]).toBeCloseTo(0);
   });
 
-  it('vectorNullable round-trips null', () => {
-    expect(null).toBeNull();
+  it('vectorNullable helpers round-trip null', () => {
+    expect(vectorNullableToDriver(null)).toBeNull();
+    expect(vectorNullableFromDriver(null)).toBeNull();
+  });
+
+  it('vectorNullable helpers round-trip vectors', () => {
+    const v = [0.25, 0.5, 0.75];
+    const driver = vectorNullableToDriver(v);
+
+    expect(driver).toBe('[0.25,0.5,0.75]');
+    expect(vectorNullableFromDriver(driver)).toEqual(v);
   });
 });

@@ -15,15 +15,16 @@ export interface RelevanceWeights {
   halflifeDays: number;
 }
 
+// Defaults match spec at docs/specs/2026-05-05-memory-architecture-upgrade.md
 export const DEFAULT_WEIGHTS: RelevanceWeights = {
-  relevance: 0.85,
-  recency: 0.15,
-  halflifeDays: 180,
+  relevance: 0.7,
+  recency: 0.3,
+  halflifeDays: 90,
 };
 
 export interface RelevanceResult {
   snapshot: MemorySnapshot;
-  source: 'relevance' | 'recency_fallback' | 'consent_gate';
+  source: 'relevance' | 'recency_fallback' | 'consent_gate' | 'no_profile';
 }
 
 export interface GetRelevantMemoriesArgs {
@@ -52,12 +53,16 @@ export async function getRelevantMemories(
   const weights = { ...DEFAULT_WEIGHTS, ...(args.weights ?? {}) };
   const now = args.now ?? new Date();
 
-  const consentGranted = args.profile?.memoryConsentStatus === 'granted';
+  if (args.profile === null) {
+    return { snapshot: emptyMemorySnapshot(), source: 'no_profile' };
+  }
+
+  const consentGranted = args.profile.memoryConsentStatus === 'granted';
   const injectionEnabled =
     consentGranted &&
-    args.profile?.memoryEnabled !== false &&
-    args.profile?.memoryInjectionEnabled !== false;
-  if (!args.profile || !injectionEnabled) {
+    args.profile.memoryEnabled !== false &&
+    args.profile.memoryInjectionEnabled !== false;
+  if (!injectionEnabled) {
     return { snapshot: emptyMemorySnapshot(), source: 'consent_gate' };
   }
 
@@ -73,7 +78,7 @@ export async function getRelevantMemories(
     queryVector,
     args.k
   );
-  if (candidates.length < args.k) {
+  if (candidates.length === 0) {
     return {
       snapshot: await readMemorySnapshotFromFacts(args.scoped, args.profile),
       source: 'recency_fallback',
