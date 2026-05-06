@@ -6,6 +6,8 @@ CREATE TABLE "usage_events" (
   "delta" integer DEFAULT 1 NOT NULL
 );
 
+ALTER TABLE "usage_events" ENABLE ROW LEVEL SECURITY;
+
 ALTER TABLE "usage_events"
   ADD CONSTRAINT "usage_events_subscription_id_subscriptions_id_fk"
   FOREIGN KEY ("subscription_id")
