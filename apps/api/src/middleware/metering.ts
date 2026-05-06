@@ -348,12 +348,13 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     // avoid stale-read races under concurrency — two requests reading the same
     // cached count would each write original+1, understating actual usage.
     if (kv) {
+      // Single formula for both branches: `remainingMonthly` is already 0 in
+      // the top-up path, so `monthlyLimit - 0 - remainingTopUp` is the same
+      // accounting as the monthly-source path. Branching to literal
+      // `monthlyLimit` made the cache report fully exhausted on the very
+      // first top-up consumption and blocked the user until KV TTL expired.
       const atomicUsedMonth =
-        decrement.source === 'top_up'
-          ? monthlyLimit
-          : monthlyLimit -
-            decrement.remainingMonthly -
-            decrement.remainingTopUp;
+        monthlyLimit - decrement.remainingMonthly - decrement.remainingTopUp;
       const atomicUsedToday =
         dailyLimit !== null && decrement.remainingDaily !== null
           ? dailyLimit - decrement.remainingDaily

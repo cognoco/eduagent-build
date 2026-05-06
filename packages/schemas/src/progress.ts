@@ -8,6 +8,7 @@ import {
   weeklyReportSummarySchema,
   weeklyReportRecordSchema,
 } from './snapshots';
+import { consentStatusSchema } from './consent';
 
 export const learningModeSchema = z.enum(['serious', 'casual']);
 export type LearningMode = z.infer<typeof learningModeSchema>;
@@ -38,6 +39,29 @@ export type CelebrationReason = z.infer<typeof celebrationReasonSchema>;
 
 export const celebrationLevelSchema = z.enum(['all', 'big_only', 'off']);
 export type CelebrationLevel = z.infer<typeof celebrationLevelSchema>;
+
+export const withdrawalArchivePreferenceSchema = z.enum([
+  'auto',
+  'always',
+  'never',
+]);
+export type WithdrawalArchivePreference = z.infer<
+  typeof withdrawalArchivePreferenceSchema
+>;
+
+export const withdrawalArchivePreferenceUpdateSchema = z.object({
+  value: withdrawalArchivePreferenceSchema,
+});
+export type WithdrawalArchivePreferenceUpdate = z.infer<
+  typeof withdrawalArchivePreferenceUpdateSchema
+>;
+
+export const familyPoolBreakdownSharingUpdateSchema = z.object({
+  value: z.boolean(),
+});
+export type FamilyPoolBreakdownSharingUpdate = z.infer<
+  typeof familyPoolBreakdownSharingUpdateSchema
+>;
 
 export const pendingCelebrationSchema = z.object({
   celebration: celebrationNameSchema,
@@ -132,6 +156,34 @@ export const getCelebrationLevelResponseSchema = z.object({
 });
 export type GetCelebrationLevelResponse = z.infer<
   typeof getCelebrationLevelResponseSchema
+>;
+
+export const getWithdrawalArchivePreferenceResponseSchema = z.object({
+  value: withdrawalArchivePreferenceSchema,
+});
+export type GetWithdrawalArchivePreferenceResponse = z.infer<
+  typeof getWithdrawalArchivePreferenceResponseSchema
+>;
+
+export const updateWithdrawalArchivePreferenceResponseSchema = z.object({
+  value: withdrawalArchivePreferenceSchema,
+});
+export type UpdateWithdrawalArchivePreferenceResponse = z.infer<
+  typeof updateWithdrawalArchivePreferenceResponseSchema
+>;
+
+export const getFamilyPoolBreakdownSharingResponseSchema = z.object({
+  value: z.boolean(),
+});
+export type GetFamilyPoolBreakdownSharingResponse = z.infer<
+  typeof getFamilyPoolBreakdownSharingResponseSchema
+>;
+
+export const updateFamilyPoolBreakdownSharingResponseSchema = z.object({
+  value: z.boolean(),
+});
+export type UpdateFamilyPoolBreakdownSharingResponse = z.infer<
+  typeof updateFamilyPoolBreakdownSharingResponseSchema
 >;
 
 // GET /celebrations/pending
@@ -245,6 +297,8 @@ export type DashboardChildProgress = z.infer<
 export const dashboardChildSchema = z.object({
   profileId: z.string().uuid(),
   displayName: z.string(),
+  consentStatus: consentStatusSchema.nullable(),
+  respondedAt: z.string().datetime().nullable(),
   summary: z.string(),
   sessionsThisWeek: z.number().int(),
   sessionsLastWeek: z.number().int(),
@@ -271,6 +325,22 @@ export const dashboardChildSchema = z.object({
 });
 export type DashboardChild = z.infer<typeof dashboardChildSchema>;
 
+export const pendingNoticeTypeSchema = z.enum([
+  'consent_archived',
+  'consent_deleted',
+]);
+export type PendingNoticeType = z.infer<typeof pendingNoticeTypeSchema>;
+
+export const pendingNoticeSchema = z.object({
+  id: z.string().uuid(),
+  type: pendingNoticeTypeSchema,
+  payload: z.object({
+    childName: z.string(),
+  }),
+  createdAt: z.string().datetime(),
+});
+export type PendingNotice = z.infer<typeof pendingNoticeSchema>;
+
 export const coachingCardCelebrationResponseSchema = z.object({
   pendingCelebrations: z.array(pendingCelebrationSchema),
 });
@@ -282,6 +352,7 @@ export type CoachingCardCelebrationResponse = z.infer<
 
 export const dashboardDataSchema = z.object({
   children: z.array(dashboardChildSchema),
+  pendingNotices: z.array(pendingNoticeSchema).default([]),
   demoMode: z.boolean(),
 });
 export type DashboardData = z.infer<typeof dashboardDataSchema>;
@@ -784,6 +855,11 @@ export const reportViewedResponseSchema = z.object({
 });
 export type ReportViewedResponse = z.infer<typeof reportViewedResponseSchema>;
 
+export const noticeSeenResponseSchema = z.object({
+  seen: z.literal(true),
+});
+export type NoticeSeenResponse = z.infer<typeof noticeSeenResponseSchema>;
+
 // GET /dashboard/children/:profileId/weekly-reports
 export const weeklyReportsResponseSchema = z.object({
   reports: z.array(weeklyReportSummarySchema),
@@ -806,6 +882,7 @@ const demoDashboardChildSchema = dashboardChildSchema.extend({
 
 export const demoDashboardDataSchema = z.object({
   children: z.array(demoDashboardChildSchema),
+  pendingNotices: z.array(pendingNoticeSchema).default([]),
   demoMode: z.literal(true),
 });
 export type DemoDashboardData = z.infer<typeof demoDashboardDataSchema>;

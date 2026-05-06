@@ -1,9 +1,33 @@
 # Profile-as-Lens — Reporting, Navigation, and Quiet Defaults
 
-**Date:** 2026-04-28 (rev 4 — 2026-04-29 — phased rollout, premise-tested gates)
-**Status:** Phase 1 ready for review · Phase 2/3 conditional on validation
+**Date:** 2026-04-28 (rev 5 — 2026-05-06 — scope narrowed after Phase 1 shipped)
+**Status:** Phase 1 SHIPPED · Phase 2 partially shipped · Phase 2 PR 7/9 + Phase 3 PR 8 DEFERRED
 **Author:** Driven by parent-flow audit findings (BUG-896 → BUG-911)
 **Related:** [`project_parent_visibility_spec.md` (memory)](../../) — extends progress-highlights work
+
+## Scope decision — 2026-05-06
+
+This rev locks in which remaining PRs are actually shipping vs. deferred, based on (a) Phase 1 having landed without the planned 30-60 day telemetry window — so the gating premises remain unverified — and (b) engineering judgment on cost vs. value of each remaining PR.
+
+**Shipped (verified in code):**
+- Phase 1 PR 1 — reporting components lifted to `apps/mobile/src/components/progress/`
+- Phase 1 PR 2 — per-profile quota at `subscription.tsx:1363-1398` (server-gated to owners with children)
+- Phase 1 PR 3 — `/progress` self-reporting wired
+- Phase 1 PR 4 — microcopy pass (assumed shipped alongside; not separately audited)
+- Phase 2 PR 6 — Family tab landed
+
+**Shipping next (plans written):**
+- Phase 2 PR 6b — withdrawal countdown banner + 24h push (`docs/plans/2026-05-06-profile-as-lens-phase-2-pr-6b-withdrawal-countdown.md`)
+- Phase 2 PR 5-slice — **only** the family-pool breakdown sharing toggle. The other four rows of the Privacy & Lenses panel depend on PR 7 / PR 11 / Phase 1 PR 2 and are not built. Toggle lives in More → Family section, not in a dedicated panel.
+- Phase 3 PR 11 — withdrawal consent rev (under-13 immediate deletion is privacy-law alignment, not optional)
+- Phase 3 PR 10 — child user-shape design pass (UX register + UI-layer privacy boundary for an 11+ user base)
+
+**Deferred — premise unverified, payoff unclear, or high cost:**
+- Phase 2 PR 7 — Multi-lens Home. The existing `ParentGateway`/`LearnerScreen` split already serves the dual-identity case adequately. The Self-lens mechanism remains undecided (spec line 154), the gating telemetry was never collected, and the spec itself names this as the largest architectural commitment. Revisit only if `/progress` usage telemetry shows parents actively want a Home-level Self lens.
+- Phase 2 PR 9 — Soft-state lens rendering. Depends on PR 7 lenses existing. The pieces that matter as banners (Paused, Quota-locked) can be added ad hoc when those states surface real UX problems.
+- Phase 3 PR 8 — Send a Nudge. Premise P5 ("parents want app-mediated nudges vs. the text message they already send") is unverified. Revisit as a Plus-tier retention feature if/when retention becomes the lever.
+
+The deferred items are not killed; they're paused. If telemetry or user research after the next four PRs land changes the picture, this section gets revised. For now, the Phase 1 → 2 → 3 gating rhetoric in the rest of this document should be read with this scope decision overlaid: the spec describes the full design space, and this section names which subset is actually being built.
 
 ## Purpose
 
@@ -328,21 +352,21 @@ The child sees their own exit acknowledged from their own seat.
 
 ## Migration path
 
-| Phase | PR | Scope | Effort | Closes |
-|-------|----|----|--------|--------|
-| **1** | 1 | Component lift — extract reporting into `components/reporting/` | ~1 sprint | Foundation |
-| **1** | 2 | Per-profile quota endpoint + owner breakdown rendering | ~3 days | BUG-906, BUG-898 |
-| **1** | 3 | Self-reporting on `/progress` for active profile (when has data) | ~3 days | BUG-901, BUG-903, BUG-904 |
-| **1** | 4 | Microcopy pass — sentence case, uppercase ban, `for=child`, scaling cross-links | ~1 day | BUG-900, BUG-909 |
-| **--** | -- | **Phase 1 → Phase 2 gate: validate P1, P2, P3 with telemetry + user research (~30-60 days)** | -- | -- |
-| **2** | 5 | Privacy & Lenses settings panel + per-profile notifications + breakdown sharing toggle | ~3 days | New surface |
-| **2** | 6 | Family tab + indefinite /dashboard redirect + cross-tab withdrawal countdown + 24h push | ~1.5 sprints | BUG-896, BUG-897, BUG-905 |
-| **2** | 7 | Multi-lens Home (mechanism for Self-lens chosen at Phase 2 design time, recency-sorted per-child, Empty Home, Stale Returning, long-press reorder, kebab hide) | ~1.5 sprints | New shape |
-| **2** | 9 | Soft-state lens rendering | ~3 days | New surface |
-| **--** | -- | **Phase 2 → Phase 3 gate: validate P5, P6 with user research; Phase 2 architecture proven solid** | -- | -- |
-| **3** | 8 | Send a Nudge — consent at profile creation, throttle, neutral copy | ~1 sprint | New feature |
-| **3** | 10 | Child user-shape design pass — copy register, restricted views, withdrawal acknowledgement | ~1 sprint | Children-as-users |
-| **3** | 11 | Withdrawal consent rev — age-conditional default, forward-looking setting, no in-flow toggle | ~3 days | Privacy alignment |
+| Phase | PR | Status | Scope | Effort | Closes |
+|-------|----|--------|----|--------|--------|
+| **1** | 1 | ✅ shipped | Component lift — reporting components at `apps/mobile/src/components/progress/` | ~1 sprint | Foundation |
+| **1** | 2 | ✅ shipped | Per-profile quota endpoint + owner breakdown rendering (`subscription.tsx:1363-1398`) | ~3 days | BUG-906, BUG-898 |
+| **1** | 3 | ✅ shipped | Self-reporting on `/progress` for active profile | ~3 days | BUG-901, BUG-903, BUG-904 |
+| **1** | 4 | ✅ shipped | Microcopy pass — sentence case, uppercase ban, `for=child`, scaling cross-links | ~1 day | BUG-900, BUG-909 |
+| **--** | -- | ⊘ skipped | Phase 1 → Phase 2 telemetry gate not collected; scope decision overlaid instead (see top of doc) | -- | -- |
+| **2** | 5 | ◐ slice only | **Slice:** family-pool breakdown sharing toggle in More → Family. Other four rows deferred. | ~2 days | New surface |
+| **2** | 6 | ✅ shipped | Family tab + indefinite /dashboard redirect | ~1.5 sprints | BUG-896, BUG-897, BUG-905 |
+| **2** | 6b | 📋 plan written | Cross-tab withdrawal countdown banner + 24h push | ~3 days | Withdrawal grace UX |
+| **2** | 7 | ⊗ deferred | Multi-lens Home — premise unverified; existing ParentGateway/LearnerScreen serves use case | ~1.5 sprints | (deferred) |
+| **2** | 9 | ⊗ deferred | Soft-state lens rendering — depends on PR 7 | ~3 days | (deferred) |
+| **3** | 8 | ⊗ deferred | Send a Nudge — premise P5 unverified | ~1 sprint | (deferred) |
+| **3** | 10 | 📋 planning | Child user-shape design pass — copy register, restricted views, quota copy | ~1 sprint | Children-as-users |
+| **3** | 11 | 📋 planning | Withdrawal consent rev — age-conditional default, forward-looking setting | ~3 days | Privacy alignment |
 
 PR 6 + PR 7 ship behind `home_lens_v2` flag. Phase 2 and Phase 3 PRs each behind their own flag.
 
@@ -390,3 +414,13 @@ v3 over-corrected — every behavior an explicit user decision. v3 traded survei
 
 ### Round 4 (premise + phasing, addressed in rev 4 — this revision)
 Three core changes: (a) auto-enable Self lens dropped from Phase 1 entirely — no Home surface for Self lens until Phase 2 with evidence-based mechanism design; (b) phased rollout structure with explicit gates and falsification protocol; (c) Premises and Unknowns section names load-bearing assumptions and what would falsify each. The spec now reads as "here's the foundation, here's what we don't know yet, here's how we'll know it" rather than "here's what we're building."
+
+### Round 5 (scope decision after Phase 1 shipped, addressed in rev 5 — 2026-05-06)
+Phase 1 shipped without the planned 30-60 day telemetry gate. Rather than stall the rest of the spec waiting for evidence that's no longer being collected, this rev locks in which remaining PRs ship vs. defer based on engineering judgment:
+
+- **Ship (4 PRs):** PR 6b (countdown + push), PR 5-slice (breakdown sharing toggle only), PR 11 (withdrawal consent rev), PR 10 (child user-shape pass).
+- **Defer (3 PRs):** PR 7 (Multi-lens Home — existing ParentGateway/LearnerScreen serves the case, mechanism still undecided), PR 9 (depends on PR 7), PR 8 (Send a Nudge — premise unverified, parents already nudge off-platform).
+- **PR 5 narrowed:** the Privacy & Lenses panel doesn't ship as a panel. The single buildable row (breakdown sharing toggle) lives in More → Family and is owner-gated. The other four rows depend on unbuilt PRs.
+- **Setting home for PR 11's `archive_when_i_withdraw_consent`:** moved from Privacy & Lenses (which doesn't exist) to More, following the existing `useCelebrationLevel` pattern.
+
+The "Scope decision" section at the top of the document is the canonical statement; everything below describes the full design space the spec was originally written for.

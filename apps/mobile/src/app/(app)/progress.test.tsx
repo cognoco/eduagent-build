@@ -41,6 +41,27 @@ jest.mock('react-i18next', () => ({
         return 'Your progress keeps stacking up.';
       if (key === 'progress.hero.masteredTopicsAndWords')
         return `And you know ${opts?.words ?? ''} words across your subjects.`;
+      if (key === 'progress.register.child.weekTitle') return 'Your week';
+      if (key === 'progress.register.child.monthTitle') return 'Your month';
+      if (key === 'progress.register.child.growthTitle')
+        return 'What you learned';
+      if (key === 'progress.register.child.growthSubtitle')
+        return 'Your weekly wins';
+      if (key === 'progress.register.child.masteredTopicsHero')
+        return `You learned ${opts?.count ?? ''} topics. Steady wins.`;
+      if (key === 'progress.register.child.growthPrimaryLegend')
+        return 'Topics learned';
+      if (key === 'progress.register.child.growthSecondaryLegend')
+        return 'Words added';
+      if (key === 'progress.register.adult.weekTitle') return 'Weekly report';
+      if (key === 'progress.register.adult.monthTitle') return 'Monthly report';
+      if (key === 'progress.register.adult.growthTitle') return 'Your growth';
+      if (key === 'progress.register.adult.growthSubtitle')
+        return 'Weekly changes in topics mastered and vocabulary';
+      if (key === 'progress.register.adult.growthPrimaryLegend')
+        return 'Topics mastered';
+      if (key === 'progress.register.adult.growthSecondaryLegend')
+        return 'Vocabulary growth';
       // New learner
       if (key === 'progress.newLearner.title') {
         const count = opts?.count as number;
@@ -82,6 +103,10 @@ jest.mock('react-i18next', () => ({
 }));
 
 jest.mock('../../hooks/use-progress');
+const mockUseActiveProfileRole = jest.fn();
+jest.mock('../../hooks/use-active-profile-role', () => ({ // gc1-allow: progress screen varies register copy by role; mocking the role hook isolates register-driven rendering from auth state.
+  useActiveProfileRole: () => mockUseActiveProfileRole(),
+}));
 jest.mock('../../lib/profile', () => ({
   useProfile: () => ({
     activeProfile: {
@@ -222,7 +247,10 @@ function mockHooks(
 }
 
 describe('ProgressScreen — progressive disclosure', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseActiveProfileRole.mockReturnValue('owner');
+  });
 
   it('shows new learner teaser when totalSessions < 4', () => {
     mockHooks({
@@ -297,6 +325,39 @@ describe('ProgressScreen — progressive disclosure', () => {
     render(<ProgressScreen />);
 
     expect(screen.queryByTestId('progress-new-learner-teaser')).toBeNull();
+  });
+
+  it('uses child register copy for child profiles', () => {
+    mockUseActiveProfileRole.mockReturnValue('child');
+    mockHooks({
+      inventory: {
+        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
+        subjects: [fullSubject],
+      },
+    });
+
+    render(<ProgressScreen />);
+
+    screen.getByText('You learned 3 topics. Steady wins.');
+    screen.getByText('What you learned');
+    screen.getByText('Your week');
+    expect(screen.queryByText('Your growth')).toBeNull();
+    expect(screen.queryByText('Weekly report')).toBeNull();
+  });
+
+  it('uses adult register copy for owner profiles', () => {
+    mockHooks({
+      inventory: {
+        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
+        subjects: [fullSubject],
+      },
+    });
+
+    render(<ProgressScreen />);
+
+    screen.getByText('Your growth');
+    screen.getByText('Weekly report');
+    expect(screen.queryByText('Your week')).toBeNull();
   });
 
   it('navigates to home when Start learning pressed in teaser', () => {

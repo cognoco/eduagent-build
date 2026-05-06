@@ -7,14 +7,21 @@ import {
   pushTokenRegisterSchema,
   analogyDomainUpdateSchema,
   celebrationLevelUpdateSchema,
+  withdrawalArchivePreferenceUpdateSchema,
+  familyPoolBreakdownSharingUpdateSchema,
   nativeLanguageUpdateSchema,
   getNotificationsResponseSchema,
   getLearningModeResponseSchema,
   getCelebrationLevelResponseSchema,
+  getWithdrawalArchivePreferenceResponseSchema,
+  updateWithdrawalArchivePreferenceResponseSchema,
+  getFamilyPoolBreakdownSharingResponseSchema,
+  updateFamilyPoolBreakdownSharingResponseSchema,
   pushTokenRegisteredResponseSchema,
   notifyParentSubscribeResponseSchema,
   analogyDomainResponseSchema,
   nativeLanguageResponseSchema,
+  ForbiddenError,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
@@ -27,6 +34,10 @@ import {
   upsertLearningMode,
   getCelebrationLevel,
   upsertCelebrationLevel,
+  getWithdrawalArchivePreference,
+  upsertWithdrawalArchivePreference,
+  getOwnedFamilyPoolBreakdownSharing,
+  upsertFamilyPoolBreakdownSharing,
   registerPushToken,
 } from '../services/settings';
 import { notifyParentToSubscribe } from '../services/notifications';
@@ -36,7 +47,7 @@ import {
   setAnalogyDomain,
   setNativeLanguage,
 } from '../services/retention-data';
-import { notFound, NotFoundError } from '../errors';
+import { forbidden, notFound, NotFoundError } from '../errors';
 
 type SettingsRouteEnv = {
   Bindings: {
@@ -137,6 +148,104 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
         body.celebrationLevel
       );
       return c.json(getCelebrationLevelResponseSchema.parse(result));
+    }
+  )
+
+  .get('/settings/withdrawal-archive', async (c) => {
+    const db = c.get('db');
+    const profileId = requireProfileId(c.get('profileId'));
+
+    // I5: mirror the PUT endpoint's owner gate — only account owners may read
+    // the withdrawal-archive preference.
+    const profile = await db.query.profiles.findFirst({
+      where: (t, { eq: eqFn }) => eqFn(t.id, profileId),
+      columns: { isOwner: true },
+    });
+    if (!profile?.isOwner) {
+      return forbidden(c);
+    }
+
+    const value = await getWithdrawalArchivePreference(db, profileId);
+    return c.json(
+      getWithdrawalArchivePreferenceResponseSchema.parse({ value })
+    );
+  })
+
+  .put(
+    '/settings/withdrawal-archive',
+    zValidator('json', withdrawalArchivePreferenceUpdateSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const accountId = c.get('account').id;
+      const body = c.req.valid('json');
+
+      try {
+        const result = await upsertWithdrawalArchivePreference(
+          db,
+          profileId,
+          accountId,
+          body.value
+        );
+        return c.json(
+          updateWithdrawalArchivePreferenceResponseSchema.parse(result)
+        );
+      } catch (error) {
+        if (error instanceof ForbiddenError) {
+          return forbidden(c);
+        }
+        throw error;
+      }
+    }
+  )
+
+  .get('/settings/family-pool-breakdown-sharing', async (c) => {
+    const db = c.get('db');
+    const profileId = requireProfileId(c.get('profileId'));
+    const accountId = c.get('account').id;
+
+    try {
+      const value = await getOwnedFamilyPoolBreakdownSharing(
+        db,
+        profileId,
+        accountId
+      );
+      return c.json(
+        getFamilyPoolBreakdownSharingResponseSchema.parse({ value })
+      );
+    } catch (error) {
+      if (error instanceof ForbiddenError) {
+        return forbidden(c);
+      }
+      throw error;
+    }
+  })
+
+  .put(
+    '/settings/family-pool-breakdown-sharing',
+    zValidator('json', familyPoolBreakdownSharingUpdateSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const accountId = c.get('account').id;
+      const body = c.req.valid('json');
+
+      try {
+        const result = await upsertFamilyPoolBreakdownSharing(
+          db,
+          profileId,
+          accountId,
+          body.value
+        );
+        return c.json(
+          updateFamilyPoolBreakdownSharingResponseSchema.parse(result)
+        );
+      } catch (error) {
+        if (error instanceof ForbiddenError) {
+          return forbidden(c);
+        }
+        throw error;
+      }
     }
   )
 

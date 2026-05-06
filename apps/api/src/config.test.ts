@@ -1,5 +1,7 @@
 import {
+  isMemoryFactsDedupEnabled,
   isMemoryFactsRelevanceEnabled,
+  isProfileInDedupRollout,
   validateEnv,
   validateProductionKeys,
 } from './config';
@@ -292,5 +294,98 @@ describe('validateEnv', () => {
     expect(isMemoryFactsRelevanceEnabled('true')).toBe(true);
     expect(isMemoryFactsRelevanceEnabled('false')).toBe(false);
     expect(isMemoryFactsRelevanceEnabled('TRUE')).toBe(false);
+  });
+
+  it('MEMORY_FACTS_DEDUP_ENABLED defaults to "false" when unset', () => {
+    const env = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+    });
+    expect(env.MEMORY_FACTS_DEDUP_ENABLED).toBe('false');
+    expect(isMemoryFactsDedupEnabled(env.MEMORY_FACTS_DEDUP_ENABLED)).toBe(
+      false
+    );
+  });
+
+  it('MEMORY_FACTS_DEDUP_THRESHOLD defaults to 0.15', () => {
+    const env = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+    });
+    expect(env.MEMORY_FACTS_DEDUP_THRESHOLD).toBe(0.15);
+  });
+
+  it('MAX_DEDUP_LLM_CALLS_PER_SESSION defaults to 10', () => {
+    const env = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+    });
+    expect(env.MAX_DEDUP_LLM_CALLS_PER_SESSION).toBe(10);
+  });
+
+  it('MEMORY_FACTS_DEDUP_ROLLOUT_PCT defaults to 0', () => {
+    const env = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+    });
+    expect(env.MEMORY_FACTS_DEDUP_ROLLOUT_PCT).toBe(0);
+  });
+
+  it('parses memory-facts dedup env values', () => {
+    const env = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+      MEMORY_FACTS_DEDUP_ENABLED: 'true',
+      MEMORY_FACTS_DEDUP_THRESHOLD: '0.12',
+      MAX_DEDUP_LLM_CALLS_PER_SESSION: '7',
+      MEMORY_FACTS_DEDUP_ROLLOUT_PCT: '25',
+    });
+    expect(env.MEMORY_FACTS_DEDUP_ENABLED).toBe('true');
+    expect(env.MEMORY_FACTS_DEDUP_THRESHOLD).toBe(0.12);
+    expect(env.MAX_DEDUP_LLM_CALLS_PER_SESSION).toBe(7);
+    expect(env.MEMORY_FACTS_DEDUP_ROLLOUT_PCT).toBe(25);
+  });
+
+  it('isMemoryFactsDedupEnabled returns true only for "true"', () => {
+    expect(isMemoryFactsDedupEnabled('true')).toBe(true);
+    expect(isMemoryFactsDedupEnabled('false')).toBe(false);
+    expect(isMemoryFactsDedupEnabled(undefined)).toBe(false);
+    expect(isMemoryFactsDedupEnabled('yes')).toBe(false);
+  });
+});
+
+describe('isProfileInDedupRollout', () => {
+  it('returns false at 0% and true at 100%', () => {
+    expect(
+      isProfileInDedupRollout('00000000-0000-0000-0000-000000000001', 0)
+    ).toBe(false);
+    expect(
+      isProfileInDedupRollout('00000000-0000-0000-0000-000000000001', 100)
+    ).toBe(true);
+  });
+
+  it('is deterministic and monotonic for the same profile', () => {
+    const id = '12345678-1234-1234-1234-123456789012';
+    expect(isProfileInDedupRollout(id, 50)).toBe(
+      isProfileInDedupRollout(id, 50)
+    );
+    for (let pct = 0; pct < 100; pct++) {
+      if (isProfileInDedupRollout(id, pct)) {
+        expect(isProfileInDedupRollout(id, pct + 1)).toBe(true);
+      }
+    }
+  });
+
+  it('rolls out approximately the requested percentage', () => {
+    let inRollout = 0;
+    const count = 10_000;
+    for (let i = 0; i < count; i++) {
+      const id = `${i
+        .toString(16)
+        .padStart(8, '0')}-0000-0000-0000-000000000000`;
+      if (isProfileInDedupRollout(id, 30)) inRollout++;
+    }
+    expect(inRollout / count).toBeGreaterThan(0.25);
+    expect(inRollout / count).toBeLessThan(0.35);
   });
 });

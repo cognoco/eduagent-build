@@ -15,8 +15,43 @@ import {
 } from '@eduagent/database';
 import { captureException } from '../sentry';
 import { createLogger } from '../logger';
+import { inngest } from '../../inngest/client';
 
 const logger = createLogger();
+
+/**
+ * Emits a structured event on quota ownership mismatch so we can query how
+ * often a stale or hostile profileId was sent for a subscription that does
+ * not own it. CLAUDE.md requires any silent-recovery branch in billing code
+ * to emit a structured signal — bare `logger.warn` cannot answer "how often
+ * is this firing in the last 24h" from telemetry.
+ */
+async function emitOwnershipMismatchEvent(input: {
+  flow: 'decrement' | 'increment';
+  subscriptionId: string;
+  profileId: string;
+}): Promise<void> {
+  try {
+    await inngest.send({
+      name: 'app/billing.ownership.mismatch',
+      data: {
+        flow: input.flow,
+        subscriptionId: input.subscriptionId,
+        profileId: input.profileId,
+      },
+    });
+  } catch (err) {
+    // Telemetry must never block billing logic. The structured logger.warn
+    // line below is the secondary observable so a transient Inngest outage
+    // does not erase the signal entirely.
+    logger.warn('[metering] Inngest emit failed for ownership mismatch', {
+      flow: input.flow,
+      subscriptionId: input.subscriptionId,
+      profileId: input.profileId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -24,7 +59,7 @@ const logger = createLogger();
 
 export interface DecrementResult {
   success: boolean;
-  source: 'monthly' | 'top_up' | 'none' | 'daily_exceeded';
+  source: 'monthly' | 'top_up' | 'none' | 'daily_exceeded' | 'profile_mismatch';
   remainingMonthly: number;
   remainingTopUp: number;
   remainingDaily: number | null;
@@ -92,9 +127,20 @@ export async function decrementQuota(
       profileId
     );
     if (!ownsProfile) {
+      logger.warn('[metering] decrementQuota ownership mismatch', {
+        event: 'metering.ownership_mismatch',
+        flow: 'decrement',
+        subscriptionId,
+        profileId,
+      });
+      await emitOwnershipMismatchEvent({
+        flow: 'decrement',
+        subscriptionId,
+        profileId,
+      });
       return {
         success: false,
-        source: 'none',
+        source: 'profile_mismatch',
         remainingMonthly: 0,
         remainingTopUp: 0,
         remainingDaily: null,
@@ -269,11 +315,16 @@ export async function decrementQuota(
  * Refunds always go to the monthly pool (simpler, avoids FIFO complications).
  * Also refunds the daily counter to keep both in sync.
  */
+export interface IncrementResult {
+  success: boolean;
+  reason?: 'profile_mismatch';
+}
+
 export async function incrementQuota(
   db: Database,
   subscriptionId: string,
   profileId?: string
-): Promise<void> {
+): Promise<IncrementResult> {
   if (profileId) {
     const ownsProfile = await verifyProfileInSubscriptionAccount(
       db,
@@ -281,7 +332,18 @@ export async function incrementQuota(
       profileId
     );
     if (!ownsProfile) {
-      throw new Error('Profile does not belong to subscription account');
+      logger.warn('[metering] incrementQuota ownership mismatch', {
+        event: 'metering.ownership_mismatch',
+        flow: 'increment',
+        subscriptionId,
+        profileId,
+      });
+      await emitOwnershipMismatchEvent({
+        flow: 'increment',
+        subscriptionId,
+        profileId,
+      });
+      return { success: false, reason: 'profile_mismatch' };
     }
   }
 
@@ -298,6 +360,7 @@ export async function incrementQuota(
       await recordUsageEvent(tx, subscriptionId, profileId, -1);
     }
   });
+  return { success: true };
 }
 
 // ---------------------------------------------------------------------------
@@ -325,7 +388,21 @@ export async function safeRefundQuota(
   context: { route: string; profileId?: string; sessionId?: string }
 ): Promise<{ refunded: boolean }> {
   try {
-    await incrementQuota(db, subscriptionId, context.profileId);
+    const result = await incrementQuota(db, subscriptionId, context.profileId);
+    if (!result.success) {
+      // Structured non-error path: a profile/subscription mismatch is a caller
+      // bug or a stale request, not an unexpected runtime failure. Log it but
+      // do NOT escalate to Sentry — that path is reserved for genuine outages
+      // (DB down, transaction failure) where customers risk silent overcharge.
+      logger.warn('[metering] Quota refund skipped — profile mismatch', {
+        subscriptionId,
+        profileId: context.profileId,
+        route: context.route,
+        sessionId: context.sessionId,
+        reason: result.reason,
+      });
+      return { refunded: false };
+    }
     return { refunded: true };
   } catch (refundErr) {
     logger.error('[metering] Quota refund failed — user may be overcharged', {

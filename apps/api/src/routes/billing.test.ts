@@ -71,10 +71,10 @@ const mockGetUsageEventsAvailableSince = jest
   .fn()
   .mockReturnValue('2026-05-06T00:00:00.000Z');
 const mockBuildUsageDateLabels = jest.fn((input) => ({
-  resets_at: input.resetsAt,
-  renews_at: input.renewsAt,
-  resets_at_label: 'February 15, 2025',
-  renews_at_label: input.renewsAt ? 'February 15, 2025' : null,
+  resetsAt: input.resetsAt,
+  renewsAt: input.renewsAt,
+  resetsAtLabel: 'February 15, 2025',
+  renewsAtLabel: input.renewsAt ? 'February 15, 2025' : null,
 }));
 
 jest.mock('../services/billing', () => ({
@@ -612,16 +612,11 @@ describe('billing routes', () => {
       mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
       mockGetQuotaPool.mockResolvedValue(mockQuotaPool({ usedThisMonth: 450 }));
       mockGetUsageBreakdownForProfile.mockResolvedValue({
-        by_profile: [
-          {
-            profile_id: childProfileId,
-            name: 'Child',
-            used: 12,
-            is_self: true,
-          },
-        ],
-        family_aggregate: { used: 450, limit: 500 },
+        byProfile: [],
+        familyAggregate: null,
         isOwnerBreakdownViewer: false,
+        selfUsedToday: 3,
+        selfUsedThisMonth: 12,
       });
 
       const res = await app.request(
@@ -634,8 +629,15 @@ describe('billing routes', () => {
 
       const body = await res.json();
       expect(body.usage.usedThisMonth).toBe(12);
-      expect(body.usage.remainingQuestions).toBe(488);
-      expect(body.usage.family_aggregate).toEqual({ used: 450, limit: 500 });
+      // Non-owner viewers see the family pool's actual remaining (50 = 500-450),
+      // NOT a per-child extrapolation (would be 488 = 500-12). Their personal
+      // contribution shows in usedThisMonth, without a per-profile breakdown.
+      expect(body.usage.remainingQuestions).toBe(50);
+      expect(body.usage.byProfile).toEqual([]);
+      expect(body.usage.familyAggregate).toBeNull();
+      // usedToday must be the viewer's own daily count, not the family
+      // aggregate — preventing children from inferring siblings' activity.
+      expect(body.usage.usedToday).toBe(3);
       expect(mockBuildUsageDateLabels).toHaveBeenCalledWith(
         expect.objectContaining({ locale: 'nb' })
       );

@@ -59,7 +59,7 @@ describe('TopicHeader', () => {
       />
     );
     // RetentionPill renders the status label
-    screen.getByText('Strong');
+    screen.getByText('Still remembered');
   });
 
   it('does not render RetentionPill when retentionStatus is null', () => {
@@ -71,10 +71,10 @@ describe('TopicHeader', () => {
         lastStudiedText="Last studied 3 days ago"
       />
     );
-    expect(screen.queryByText('Strong')).toBeNull();
-    expect(screen.queryByText('Fading')).toBeNull();
-    expect(screen.queryByText('Weak')).toBeNull();
-    expect(screen.queryByText('Forgotten')).toBeNull();
+    expect(screen.queryByText('Still remembered')).toBeNull();
+    expect(screen.queryByText('Getting fuzzy')).toBeNull();
+    expect(screen.queryByText('Needs a quick refresh')).toBeNull();
+    expect(screen.queryByText('Needs a fresh pass')).toBeNull();
   });
 
   it('renders lastStudiedText', () => {
@@ -100,7 +100,7 @@ describe('TopicHeader', () => {
     );
     screen.getByText('Algebra');
     screen.getByText('Chapter 2: Equations');
-    screen.getByText('Fading');
+    screen.getByText('Getting fuzzy');
     screen.getByText('Last studied yesterday');
   });
 });

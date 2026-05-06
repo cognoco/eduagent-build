@@ -105,12 +105,21 @@ const mockNotifData = {
 
 const mockLearningModeMutate = jest.fn();
 const mockCelebrationLevelMutate = jest.fn();
+const mockWithdrawalArchivePreferenceMutate = jest.fn();
+const mockFamilyPoolBreakdownSharingMutate = jest.fn();
 let mockLearningMode: string | undefined = 'serious';
 let mockLearningModeLoading = false;
 let mockLearningModePending = false;
 let mockCelebrationLevel: 'all' | 'big_only' | 'off' | undefined = 'all';
 let mockCelebrationLevelLoading = false;
 let mockCelebrationLevelPending = false;
+let mockWithdrawalArchivePreference: 'auto' | 'always' | 'never' | undefined =
+  'auto';
+let mockWithdrawalArchivePreferenceLoading = false;
+let mockWithdrawalArchivePreferencePending = false;
+let mockFamilyPoolBreakdownSharing = false;
+let mockFamilyPoolBreakdownSharingLoading = false;
+let mockFamilyPoolBreakdownSharingPending = false;
 
 jest.mock('../../hooks/use-settings', () => ({
   useNotificationSettings: () => ({
@@ -136,6 +145,22 @@ jest.mock('../../hooks/use-settings', () => ({
   useUpdateCelebrationLevel: () => ({
     mutate: mockCelebrationLevelMutate,
     isPending: mockCelebrationLevelPending,
+  }),
+  useWithdrawalArchivePreference: () => ({
+    data: mockWithdrawalArchivePreference,
+    isLoading: mockWithdrawalArchivePreferenceLoading,
+  }),
+  useUpdateWithdrawalArchivePreference: () => ({
+    mutate: mockWithdrawalArchivePreferenceMutate,
+    isPending: mockWithdrawalArchivePreferencePending,
+  }),
+  useFamilyPoolBreakdownSharing: () => ({
+    data: mockFamilyPoolBreakdownSharing,
+    isLoading: mockFamilyPoolBreakdownSharingLoading,
+  }),
+  useUpdateFamilyPoolBreakdownSharing: () => ({
+    mutate: mockFamilyPoolBreakdownSharingMutate,
+    isPending: mockFamilyPoolBreakdownSharingPending,
   }),
 }));
 
@@ -182,6 +207,12 @@ describe('MoreScreen — Learning Mode', () => {
     mockCelebrationLevel = 'all';
     mockCelebrationLevelLoading = false;
     mockCelebrationLevelPending = false;
+    mockWithdrawalArchivePreference = 'auto';
+    mockWithdrawalArchivePreferenceLoading = false;
+    mockWithdrawalArchivePreferencePending = false;
+    mockFamilyPoolBreakdownSharing = false;
+    mockFamilyPoolBreakdownSharingLoading = false;
+    mockFamilyPoolBreakdownSharingPending = false;
   });
 
   it('renders the Learning Mode section header', () => {
@@ -475,6 +506,78 @@ describe('MoreScreen — Learning Mode', () => {
       expect.objectContaining({ onError: expect.any(Function) })
     );
   });
+
+  it('shows withdrawal archive options only for the owner profile', () => {
+    const ownerRender = render(<MoreScreen />, { wrapper: createWrapper() });
+
+    screen.getByTestId('more-withdrawal-archive-auto');
+    screen.getByTestId('more-withdrawal-archive-always');
+    screen.getByTestId('more-withdrawal-archive-never');
+    ownerRender.unmount();
+
+    mockActiveProfile = {
+      id: 'child-1',
+      displayName: 'Mia',
+      isOwner: false,
+    };
+    mockProfiles = [mockActiveProfile];
+
+    const { unmount } = render(<MoreScreen />, { wrapper: createWrapper() });
+
+    expect(screen.queryByTestId('more-withdrawal-archive-auto')).toBeNull();
+    expect(screen.queryByTestId('more-withdrawal-archive-always')).toBeNull();
+    expect(screen.queryByTestId('more-withdrawal-archive-never')).toBeNull();
+    unmount();
+  });
+
+  it('updates withdrawal archive preference when selecting always archive', () => {
+    mockWithdrawalArchivePreference = 'auto';
+
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    fireEvent.press(screen.getByTestId('more-withdrawal-archive-always'));
+
+    expect(mockWithdrawalArchivePreferenceMutate).toHaveBeenCalledWith(
+      'always',
+      expect.objectContaining({ onError: expect.any(Function) })
+    );
+  });
+
+  it('shows the breakdown sharing toggle only for the owner profile', () => {
+    const ownerRender = render(<MoreScreen />, { wrapper: createWrapper() });
+
+    screen.getByTestId('more-breakdown-sharing-toggle');
+    ownerRender.unmount();
+
+    mockActiveProfile = {
+      id: 'child-1',
+      displayName: 'Mia',
+      isOwner: false,
+    };
+    mockProfiles = [mockActiveProfile];
+
+    const { unmount } = render(<MoreScreen />, { wrapper: createWrapper() });
+
+    expect(screen.queryByTestId('more-breakdown-sharing-toggle')).toBeNull();
+    unmount();
+  });
+
+  it('updates family pool breakdown sharing when toggled', () => {
+    mockFamilyPoolBreakdownSharing = false;
+
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    fireEvent(
+      screen.getByTestId('more-breakdown-sharing-toggle-switch'),
+      'valueChange',
+      true
+    );
+
+    expect(mockFamilyPoolBreakdownSharingMutate).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({ onError: expect.any(Function) })
+    );
+  });
 });
 
 describe('MoreScreen — Account Actions', () => {
@@ -628,5 +731,40 @@ describe('MoreScreen — impersonation hides destructive actions (BUG-915)', () 
     screen.getByTestId('more-row-delete-account');
     screen.getByTestId('more-row-export');
     screen.getByTestId('more-row-subscription');
+  });
+});
+
+// [C4] A child profile signed in directly (isOwner: false, not impersonating)
+// must not see Subscription, Delete account, or Export my data — those rows
+// operate on the parent's billing account, not the child's profile.
+describe('MoreScreen — child profile hides owner-only rows (C4)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockIsParentProxy = false;
+    mockActiveProfile = {
+      id: 'child-1',
+      displayName: 'Mia',
+      isOwner: false,
+    };
+    mockProfiles = [mockActiveProfile];
+    mockSubscription = { tier: 'free' };
+    mockFamilySubscription = null;
+    mockExportMutateAsync.mockResolvedValue({
+      account: {
+        email: 'parent@example.com',
+        createdAt: '2026-04-10T10:00:00.000Z',
+      },
+      profiles: [],
+      consentStates: [],
+      exportedAt: '2026-04-10T10:00:00.000Z',
+    });
+  });
+
+  it('hides Subscription, Delete account, and Export my data for a child profile', () => {
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    expect(screen.queryByTestId('more-row-subscription')).toBeNull();
+    expect(screen.queryByTestId('more-row-delete-account')).toBeNull();
+    expect(screen.queryByTestId('more-row-export')).toBeNull();
   });
 });

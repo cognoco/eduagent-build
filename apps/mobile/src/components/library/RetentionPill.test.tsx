@@ -11,25 +11,25 @@ jest.mock('../../lib/theme', () => ({
 }));
 
 describe('RetentionPill', () => {
-  it('renders strong status with green dot and label', () => {
+  it('renders still-remembered status with green dot and label', () => {
     render(<RetentionPill status="strong" />);
-    expect(screen.getByText('Strong')).toBeTruthy();
+    expect(screen.getByText('Still remembered')).toBeTruthy();
     expect(screen.getByTestId('retention-pill-dot')).toBeTruthy();
   });
 
-  it('renders fading status', () => {
+  it('renders getting-fuzzy status', () => {
     render(<RetentionPill status="fading" />);
-    expect(screen.getByText('Fading')).toBeTruthy();
+    expect(screen.getByText('Getting fuzzy')).toBeTruthy();
   });
 
   it('renders compact variant (no label)', () => {
     render(<RetentionPill status="weak" size="small" />);
-    expect(screen.queryByText('Weak')).toBeNull();
+    expect(screen.queryByText('Needs a quick refresh')).toBeNull();
     expect(screen.getByTestId('retention-pill-dot')).toBeTruthy();
   });
 
   it('renders large variant', () => {
     render(<RetentionPill status="strong" size="large" />);
-    expect(screen.getByText('Strong')).toBeTruthy();
+    expect(screen.getByText('Still remembered')).toBeTruthy();
   });
 });

@@ -3,7 +3,7 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, asc, sql } from 'drizzle-orm';
+import { eq, and, asc, sql, isNull } from 'drizzle-orm';
 import { profiles, familyLinks, type Database } from '@eduagent/database';
 import { createLogger } from './logger';
 
@@ -84,7 +84,7 @@ export async function listProfiles(
   accountId: string
 ): Promise<Profile[]> {
   const rows = await db.query.profiles.findMany({
-    where: eq(profiles.accountId, accountId),
+    where: and(eq(profiles.accountId, accountId), isNull(profiles.archivedAt)),
   });
   const mapped = await Promise.all(
     rows.map(async (row) => {
@@ -110,7 +110,11 @@ export async function findOwnerProfile(
 ): Promise<Profile | null> {
   // Targeted query: owner profile directly
   const ownerRow = await db.query.profiles.findFirst({
-    where: and(eq(profiles.accountId, accountId), eq(profiles.isOwner, true)),
+    where: and(
+      eq(profiles.accountId, accountId),
+      eq(profiles.isOwner, true),
+      isNull(profiles.archivedAt)
+    ),
   });
 
   if (ownerRow) {
@@ -127,7 +131,7 @@ export async function findOwnerProfile(
     }
   );
   const fallbackRow = await db.query.profiles.findFirst({
-    where: eq(profiles.accountId, accountId),
+    where: and(eq(profiles.accountId, accountId), isNull(profiles.archivedAt)),
     orderBy: [asc(profiles.createdAt)],
   });
   if (!fallbackRow) return null;
@@ -236,7 +240,7 @@ export async function createProfileWithLimitCheck(
     const [countRow] = await txDb
       .select({ count: sql<number>`COUNT(*)::int` })
       .from(profiles)
-      .where(eq(profiles.accountId, accountId));
+      .where(and(eq(profiles.accountId, accountId), isNull(profiles.archivedAt)));
     const profileCount = countRow?.count ?? 0;
     const isFirstProfile = profileCount === 0;
 
@@ -260,7 +264,8 @@ export async function createProfileWithLimitCheck(
       const ownerProfile = await txDb.query.profiles.findFirst({
         where: and(
           eq(profiles.accountId, accountId),
-          eq(profiles.isOwner, true)
+          eq(profiles.isOwner, true),
+          isNull(profiles.archivedAt)
         ),
         columns: { id: true },
       });
@@ -291,7 +296,11 @@ export async function getProfile(
   accountId: string
 ): Promise<Profile | null> {
   const row = await db.query.profiles.findFirst({
-    where: and(eq(profiles.id, profileId), eq(profiles.accountId, accountId)),
+    where: and(
+      eq(profiles.id, profileId),
+      eq(profiles.accountId, accountId),
+      isNull(profiles.archivedAt)
+    ),
   });
   if (!row) return null;
   const status = await getConsentStatus(db, row.id);
@@ -333,7 +342,11 @@ export async function switchProfile(
   accountId: string
 ): Promise<{ profileId: string } | null> {
   const row = await db.query.profiles.findFirst({
-    where: and(eq(profiles.id, profileId), eq(profiles.accountId, accountId)),
+    where: and(
+      eq(profiles.id, profileId),
+      eq(profiles.accountId, accountId),
+      isNull(profiles.archivedAt)
+    ),
   });
   return row ? { profileId: row.id } : null;
 }

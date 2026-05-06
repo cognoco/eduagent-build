@@ -30,6 +30,19 @@ const mockFetch = createRoutedMockFetch({
     totalTopicsVerified: 0,
   },
   '/subjects': { subjects: [] },
+  '/usage': {
+    usage: {
+      monthlyLimit: 100,
+      usedThisMonth: 16,
+      remainingQuestions: 84,
+      topUpCreditsRemaining: 0,
+      warningLevel: 'none',
+      cycleResetAt: '2026-06-01T00:00:00Z',
+      dailyLimit: 10,
+      usedToday: 3,
+      dailyRemainingQuestions: 7,
+    },
+  },
 });
 
 jest.mock('../../lib/api-client', () =>
@@ -160,6 +173,19 @@ describe('LearnerScreen', () => {
       totalTopicsVerified: 0,
     });
     mockFetch.setRoute('/subjects', { subjects: [] });
+    mockFetch.setRoute('/usage', {
+      usage: {
+        monthlyLimit: 100,
+        usedThisMonth: 16,
+        remainingQuestions: 84,
+        topUpCreditsRemaining: 0,
+        warningLevel: 'none',
+        cycleResetAt: '2026-06-01T00:00:00Z',
+        dailyLimit: 10,
+        usedToday: 3,
+        dailyRemainingQuestions: 7,
+      },
+    });
     mockReadSessionRecoveryMarker.mockResolvedValue(null);
     mockClearSessionRecoveryMarker.mockResolvedValue(undefined);
     mockIsRecoveryMarkerFresh.mockReturnValue(true);
@@ -193,6 +219,14 @@ describe('LearnerScreen', () => {
       screen.getByTestId('home-action-practice');
       screen.getByText('Your subjects will show up here');
       expect(screen.queryByTestId('home-subject-carousel')).toBeNull();
+    });
+  });
+
+  it('shows the child quota line on Home', async () => {
+    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      screen.getByText(/7 questions left today.*84 left this month/);
     });
   });
 

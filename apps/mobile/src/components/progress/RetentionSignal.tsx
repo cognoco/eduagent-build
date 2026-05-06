@@ -1,5 +1,6 @@
 import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../lib/theme';
 import { getParentRetentionInfo } from '../../lib/parent-vocab';
 import type { RetentionStatus } from '@eduagent/schemas';
@@ -14,7 +15,7 @@ interface RetentionSignalProps {
 const CONFIG: Record<
   RetentionStatus,
   {
-    label: string;
+    labelKey: string;
     icon: keyof typeof Ionicons.glyphMap;
     colorKey:
       | 'retentionStrong'
@@ -25,25 +26,25 @@ const CONFIG: Record<
   }
 > = {
   strong: {
-    label: 'Strong',
+    labelKey: 'progress.retention.strong.label',
     icon: 'leaf',
     colorKey: 'retentionStrong',
     textColor: 'text-retention-strong',
   },
   fading: {
-    label: 'Fading',
+    labelKey: 'progress.retention.fading.label',
     icon: 'flame',
     colorKey: 'retentionFading',
     textColor: 'text-retention-fading',
   },
   weak: {
-    label: 'Weak',
+    labelKey: 'progress.retention.weak.label',
     icon: 'sparkles',
     colorKey: 'retentionWeak',
     textColor: 'text-retention-weak',
   },
   forgotten: {
-    label: 'Forgotten',
+    labelKey: 'progress.retention.forgotten.label',
     icon: 'leaf-outline',
     colorKey: 'retentionForgotten',
     textColor: 'text-retention-forgotten',
@@ -55,14 +56,15 @@ export function RetentionSignal({
   compact,
   parentFacing,
 }: RetentionSignalProps) {
-  const { label, icon, colorKey, textColor } = CONFIG[status];
+  const { t } = useTranslation();
+  const { labelKey, icon, colorKey, textColor } = CONFIG[status];
   const colors = useThemeColors();
   // Use parent-vocab canonical labels when parent-facing to keep a single
   // source of truth for parent-friendly retention terminology.
   const parentInfo = parentFacing
     ? getParentRetentionInfo(status, 1, 'in_progress')
     : null;
-  const displayLabel = parentInfo?.label ?? label;
+  const displayLabel = parentInfo?.label ?? t(labelKey);
 
   return (
     <View

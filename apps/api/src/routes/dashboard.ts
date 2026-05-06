@@ -32,6 +32,7 @@ import {
   getChildSessions,
   getChildSessionDetail,
 } from '../services/dashboard';
+import { listPendingNotices } from '../services/notices';
 import { getLearningProfile } from '../services/learner-profile';
 import {
   listWeeklyReportsForParentChild,
@@ -62,8 +63,17 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
 
-    const children = await getChildrenForParent(db, profileId);
-    return c.json(dashboardResponseSchema.parse({ children, demoMode: false }));
+    const [children, pendingNotices] = await Promise.all([
+      getChildrenForParent(db, profileId),
+      listPendingNotices(db, profileId),
+    ]);
+    return c.json(
+      dashboardResponseSchema.parse({
+        children,
+        pendingNotices,
+        demoMode: false,
+      })
+    );
   })
 
   // Get detailed child data
@@ -330,10 +340,13 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     return c.json(
       demoDashboardDataSchema.parse({
         demoMode: true,
+        pendingNotices: [],
         children: [
           {
             profileId: 'demo-child-1',
             displayName: 'Alex',
+            consentStatus: null,
+            respondedAt: null,
             // [BUG-876] Subject names must match the `subjects[]` array below
             // exactly so the dashboard summary, the subjects list, the library,
             // the shelf, and progress all read as the same canonical word.
@@ -360,6 +373,8 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
           {
             profileId: 'demo-child-2',
             displayName: 'Sam',
+            consentStatus: null,
+            respondedAt: null,
             summary:
               'Sam: English \u2014 steady progress. 3 sessions this week (\u2192 same as last week).',
             sessionsThisWeek: 3,

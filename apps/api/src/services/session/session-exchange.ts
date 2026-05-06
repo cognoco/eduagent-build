@@ -201,11 +201,27 @@ async function applyContinuationScore(
   db: Database,
   profileId: string,
   sessionId: string,
-  metadata: Record<string, unknown>,
   retrievalScore?: number
 ): Promise<void> {
   if (typeof retrievalScore !== 'number') return;
-  const nextMetadata = { ...metadata };
+  // Re-read session metadata so we layer on top of any updates
+  // prepareExchangeContext / persistExchangeResult wrote during this turn.
+  // The previously-passed `session.metadata` snapshot was captured at request
+  // start, before `updateSessionMetadata` set `continuationOpenerActive: true`,
+  // so spreading that snapshot here clobbered the freshly-written flag.
+  const [fresh] = await db
+    .select({ metadata: learningSessions.metadata })
+    .from(learningSessions)
+    .where(
+      and(
+        eq(learningSessions.id, sessionId),
+        eq(learningSessions.profileId, profileId)
+      )
+    )
+    .limit(1);
+  const nextMetadata = {
+    ...((fresh?.metadata as Record<string, unknown> | null) ?? {}),
+  };
   delete nextMetadata['continuationOpenerActive'];
   delete nextMetadata['continuationOpenerStartedExchange'];
   nextMetadata['continuationDepth'] = mapRetrievalScoreToDepth(retrievalScore);
@@ -1495,17 +1511,13 @@ export async function processMessage(
       needsDeepening: result.needsDeepening,
       confidence: result.confidence,
       retrievalScore: result.retrievalScore,
+      drillCorrect: result.fluencyDrill?.score?.correct,
+      drillTotal: result.fluencyDrill?.score?.total,
     },
     options?.clientId
   );
 
-  await applyContinuationScore(
-    db,
-    profileId,
-    sessionId,
-    (session.metadata as Record<string, unknown> | null) ?? {},
-    result.retrievalScore
-  );
+  await applyContinuationScore(db, profileId, sessionId, result.retrievalScore);
 
   return {
     response: result.response,
@@ -1705,7 +1717,6 @@ export async function streamMessage(
         db,
         profileId,
         sessionId,
-        (session.metadata as Record<string, unknown> | null) ?? {},
         parsed.retrievalScore
       );
       return {

@@ -3,7 +3,7 @@
 // Family member CRUD, pool status, cancellation cascade, profile limits
 // ---------------------------------------------------------------------------
 
-import { and, eq, gte, sql } from 'drizzle-orm';
+import { and, eq, gte, isNull, sql } from 'drizzle-orm';
 import {
   subscriptions,
   usageEvents,
@@ -14,7 +14,7 @@ import {
   findSubscriptionById,
   findQuotaPool,
 } from '@eduagent/database';
-import type { SubscriptionTier } from '@eduagent/schemas';
+import type { FamilyMember, SubscriptionTier } from '@eduagent/schemas';
 import { getTierConfig } from '../subscription';
 import type { SubscriptionRow } from './types';
 import {
@@ -22,6 +22,9 @@ import {
   ensureFreeSubscription,
   updateQuotaPoolLimit,
 } from './subscription-core';
+import { getFamilyPoolBreakdownSharing } from '../settings';
+
+export type { FamilyMember } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
 // getSubscriptionForProfile
@@ -116,24 +119,27 @@ export async function addToByokWaitlist(
 }
 
 // ---------------------------------------------------------------------------
-// FamilyMember type + listFamilyMembers
+// listFamilyMembers
 // ---------------------------------------------------------------------------
 
-export interface FamilyMember {
-  profileId: string;
-  displayName: string;
-  isOwner: boolean;
-}
-
 export interface UsageBreakdown {
-  by_profile: Array<{
+  byProfile: Array<{
     profile_id: string;
     name: string;
     used: number;
+    usedToday: number;
     is_self: boolean;
   }>;
-  family_aggregate: { used: number; limit: number } | null;
+  familyAggregate: { used: number; limit: number } | null;
   isOwnerBreakdownViewer: boolean;
+  /**
+   * Per-profile usage today for the active viewer's row. Used to scope
+   * `usedToday` in the response so non-owner viewers cannot infer family
+   * members' daily activity. `null` when the viewer is the owner (the raw
+   * subscription-level aggregate is shown instead).
+   */
+  selfUsedToday: number | null;
+  selfUsedThisMonth: number | null;
 }
 
 const USAGE_EVENTS_AVAILABLE_SINCE = '2026-05-06T00:00:00.000Z';
@@ -148,6 +154,8 @@ function formatDateLabel(
   locale = 'en-US'
 ): string | null {
   if (!dateIso) return null;
+  const date = new Date(dateIso);
+  if (Number.isNaN(date.getTime())) return null;
   const timeZone = timezone ?? 'UTC';
   try {
     return new Intl.DateTimeFormat(locale, {
@@ -155,14 +163,14 @@ function formatDateLabel(
       year: 'numeric',
       month: 'long',
       day: 'numeric',
-    }).format(new Date(dateIso));
+    }).format(date);
   } catch {
     return new Intl.DateTimeFormat(locale, {
       timeZone: 'UTC',
       year: 'numeric',
       month: 'long',
       day: 'numeric',
-    }).format(new Date(dateIso));
+    }).format(date);
   }
 }
 
@@ -172,21 +180,21 @@ export function buildUsageDateLabels(input: {
   timezone?: string | null;
   locale?: string | null;
 }): {
-  resets_at: string;
-  renews_at: string | null;
-  resets_at_label: string;
-  renews_at_label: string | null;
+  resetsAt: string;
+  renewsAt: string | null;
+  resetsAtLabel: string;
+  renewsAtLabel: string | null;
 } {
   return {
-    resets_at: input.resetsAt,
-    renews_at: input.renewsAt,
-    resets_at_label:
+    resetsAt: input.resetsAt,
+    renewsAt: input.renewsAt,
+    resetsAtLabel:
       formatDateLabel(
         input.resetsAt,
         input.timezone,
         input.locale ?? undefined
       ) ?? '',
-    renews_at_label: formatDateLabel(
+    renewsAtLabel: formatDateLabel(
       input.renewsAt,
       input.timezone,
       input.locale ?? undefined
@@ -208,7 +216,10 @@ export async function listFamilyMembers(
   }
 
   const rows = await db.query.profiles.findMany({
-    where: eq(profiles.accountId, sub.accountId),
+    where: and(
+      eq(profiles.accountId, sub.accountId),
+      isNull(profiles.archivedAt)
+    ),
   });
 
   return rows.map((r) => ({
@@ -225,14 +236,22 @@ export async function getUsageBreakdownForProfile(
     activeProfileId: string;
     monthlyLimit: number;
     cycleStartAt: string;
+    /**
+     * Inclusive lower-bound for "today" in the account's local timezone,
+     * expressed as ISO. Used to derive per-profile daily usage so non-owner
+     * viewers do not see family-wide daily aggregates.
+     */
+    dayStartAt: string;
   }
 ): Promise<UsageBreakdown> {
   const sub = await findSubscriptionById(db, input.subscriptionId);
   if (!sub) {
     return {
-      by_profile: [],
-      family_aggregate: null,
+      byProfile: [],
+      familyAggregate: null,
       isOwnerBreakdownViewer: false,
+      selfUsedToday: null,
+      selfUsedThisMonth: null,
     };
   }
 
@@ -241,25 +260,40 @@ export async function getUsageBreakdownForProfile(
       id: profiles.id,
       displayName: profiles.displayName,
       isOwner: profiles.isOwner,
+      familyOwnerProfileId: sql<string | null>`(
+        select owner_profile.id
+        from ${profiles} owner_profile
+        where owner_profile.account_id = ${profiles.accountId}
+          and owner_profile.is_owner = true
+          and owner_profile.archived_at is null
+        limit 1
+      )`,
       hasChildLink: sql<boolean>`exists (
         select 1 from ${familyLinks}
         where ${familyLinks.parentProfileId} = ${profiles.id}
+      )`,
+      isChild: sql<boolean>`exists (
+        select 1 from ${familyLinks}
+        where ${familyLinks.childProfileId} = ${profiles.id}
       )`,
     })
     .from(profiles)
     .where(
       and(
         eq(profiles.accountId, sub.accountId),
-        eq(profiles.id, input.activeProfileId)
+        eq(profiles.id, input.activeProfileId),
+        isNull(profiles.archivedAt)
       )
     )
     .limit(1);
 
   if (!viewer) {
     return {
-      by_profile: [],
-      family_aggregate: null,
+      byProfile: [],
+      familyAggregate: null,
       isOwnerBreakdownViewer: false,
+      selfUsedToday: null,
+      selfUsedThisMonth: null,
     };
   }
 
@@ -268,6 +302,11 @@ export async function getUsageBreakdownForProfile(
       profileId: profiles.id,
       name: profiles.displayName,
       used: sql<number>`coalesce(sum(${usageEvents.delta}), 0)::int`,
+      usedToday: sql<number>`coalesce(sum(case when ${
+        usageEvents.occurredAt
+      } >= ${new Date(input.dayStartAt)} then ${
+        usageEvents.delta
+      } else 0 end), 0)::int`,
     })
     .from(profiles)
     .leftJoin(
@@ -278,26 +317,42 @@ export async function getUsageBreakdownForProfile(
         gte(usageEvents.occurredAt, new Date(input.cycleStartAt))
       )
     )
-    .where(eq(profiles.accountId, sub.accountId))
+    .where(
+      and(eq(profiles.accountId, sub.accountId), isNull(profiles.archivedAt))
+    )
     .groupBy(profiles.id, profiles.displayName);
 
-  const isOwnerBreakdownViewer = viewer.isOwner && viewer.hasChildLink;
+  const sharingEnabled =
+    viewer.familyOwnerProfileId != null
+      ? await getFamilyPoolBreakdownSharing(db, viewer.familyOwnerProfileId)
+      : false;
+  const isOwnerBreakdownViewer =
+    (viewer.isOwner && viewer.hasChildLink) ||
+    (sharingEnabled && viewer.familyOwnerProfileId != null && !viewer.isChild);
   const visibleRows = isOwnerBreakdownViewer
     ? profileRows
+    : viewer.isChild
+    ? []
     : profileRows.filter((row) => row.profileId === input.activeProfileId);
   const familyUsed = profileRows.reduce((sum, row) => sum + row.used, 0);
+  const selfRow = profileRows.find(
+    (row) => row.profileId === input.activeProfileId
+  );
 
   return {
-    by_profile: visibleRows.map((row) => ({
+    byProfile: visibleRows.map((row) => ({
       profile_id: row.profileId,
       name: row.name,
       used: row.used,
+      usedToday: row.usedToday,
       is_self: row.profileId === input.activeProfileId,
     })),
-    family_aggregate: isOwnerBreakdownViewer
+    familyAggregate: isOwnerBreakdownViewer
       ? { used: familyUsed, limit: input.monthlyLimit }
       : null,
     isOwnerBreakdownViewer,
+    selfUsedToday: isOwnerBreakdownViewer ? null : selfRow?.usedToday ?? 0,
+    selfUsedThisMonth: isOwnerBreakdownViewer ? null : selfRow?.used ?? 0,
   };
 }
 

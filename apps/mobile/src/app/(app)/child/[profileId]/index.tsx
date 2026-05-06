@@ -39,6 +39,7 @@ import {
   ACCOMMODATION_GUIDE,
   ACCOMMODATION_OPTIONS,
 } from '../../../../lib/accommodation-options';
+import { getGracePeriodDaysRemaining } from '../../../../lib/consent-grace';
 import { FAMILY_HOME_PATH, goBackOrReplace } from '../../../../lib/navigation';
 import { SamplePreview } from '../../../../components/parent/SamplePreview';
 
@@ -90,18 +91,6 @@ function buildGrowthData(
           : undefined,
     };
   });
-}
-
-const GRACE_PERIOD_DAYS = 7;
-
-function getGracePeriodDaysRemaining(respondedAt: string | null): number {
-  if (!respondedAt) return GRACE_PERIOD_DAYS;
-  const revokedDate = new Date(respondedAt);
-  const deadline = new Date(revokedDate);
-  deadline.setDate(deadline.getDate() + GRACE_PERIOD_DAYS);
-  const now = new Date();
-  const msRemaining = deadline.getTime() - now.getTime();
-  return Math.max(0, Math.ceil(msRemaining / (1000 * 60 * 60 * 24)));
 }
 
 export default function ChildDetailScreen() {
@@ -845,7 +834,8 @@ export default function ChildDetailScreen() {
             </Text>
             <Text className="text-body-sm text-text-secondary text-center mt-3 leading-relaxed">
               {t('parentView.index.withdrawConsentBody', {
-                name: child?.displayName ?? t('parentView.index.thisChild'),
+                childName:
+                  child?.displayName ?? t('parentView.index.thisChild'),
               })}
             </Text>
             <View className="mt-5 gap-3">

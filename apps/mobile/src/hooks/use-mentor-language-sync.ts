@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import i18next from 'i18next';
 import { conversationLanguageSchema } from '@eduagent/schemas';
 
@@ -8,6 +8,7 @@ import { useUpdateConversationLanguage } from './use-onboarding-dimensions';
 export function useMentorLanguageSync(): void {
   const { activeProfile } = useProfile();
   const { mutate, isPending } = useUpdateConversationLanguage();
+  const lastSyncedRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!activeProfile || isPending) return;
@@ -16,6 +17,8 @@ export function useMentorLanguageSync(): void {
       const parsed = conversationLanguageSchema.safeParse(i18next.language);
       if (!parsed.success) return;
       if (parsed.data === activeProfile.conversationLanguage) return;
+      if (parsed.data === lastSyncedRef.current) return;
+      lastSyncedRef.current = parsed.data;
       mutate({ conversationLanguage: parsed.data });
     };
 

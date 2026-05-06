@@ -6382,7 +6382,7 @@
           "value": "\"usage_events\".\"delta\" IN (1, -1)"
         }
       },
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     }
   },
   "enums": {

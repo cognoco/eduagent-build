@@ -3,7 +3,7 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, desc, and, sql } from 'drizzle-orm';
+import { eq, desc, and, sql, inArray } from 'drizzle-orm';
 import {
   consentStates,
   familyLinks,
@@ -127,7 +127,7 @@ function mapConsentRow(row: typeof consentStates.$inferSelect): ConsentState {
 // ---------------------------------------------------------------------------
 
 /** Approximate age from birth year using the current calendar year. */
-function calculateAge(birthYear: number): number {
+export function calculateAge(birthYear: number): number {
   return new Date().getFullYear() - birthYear;
 }
 
@@ -511,6 +511,53 @@ export async function getChildNameByToken(
   return profile?.displayName ?? null;
 }
 
+export async function getProfileDisplayName(
+  db: Database,
+  profileId: string
+): Promise<string | null> {
+  const profile = await db.query.profiles.findFirst({
+    where: eq(profiles.id, profileId),
+    columns: { displayName: true },
+  });
+  return profile?.displayName ?? null;
+}
+
+export async function getProfileForConsentRevocation(
+  db: Database,
+  profileId: string
+): Promise<{
+  displayName: string;
+  birthYear: number;
+  archivedAt: Date | null;
+} | null> {
+  const profile = await db.query.profiles.findFirst({
+    where: eq(profiles.id, profileId),
+    columns: { displayName: true, birthYear: true, archivedAt: true },
+  });
+
+  return profile ?? null;
+}
+
+export async function getFamilyOwnerProfileId(
+  db: Database,
+  childProfileId: string,
+  fallbackParentProfileId: string
+): Promise<string> {
+  const links = await db.query.familyLinks.findMany({
+    where: eq(familyLinks.childProfileId, childProfileId),
+    columns: { parentProfileId: true },
+  });
+  const parentProfileIds = links.map((link) => link.parentProfileId);
+  if (parentProfileIds.length === 0) return fallbackParentProfileId;
+
+  const owners = await db.query.profiles.findMany({
+    where: and(inArray(profiles.id, parentProfileIds), eq(profiles.isOwner, true)),
+    columns: { id: true },
+  });
+
+  return owners[0]?.id ?? fallbackParentProfileId;
+}
+
 /**
  * Returns the current consent state for a profile including parentEmail.
  *
@@ -659,20 +706,32 @@ export async function restoreConsent(
   }
 
   const now = new Date();
-  const [row] = await db
-    .update(consentStates)
-    .set({
-      status: 'CONSENTED',
-      respondedAt: now,
-      updatedAt: now,
-    })
-    .where(
-      and(
-        eq(consentStates.id, existing.id),
-        eq(consentStates.profileId, childProfileId)
+
+  // Atomically flip consent status AND clear archivedAt so the archive-cleanup
+  // Inngest function cannot race and hard-delete a restored profile (C1).
+  const [row] = await db.transaction(async (tx) => {
+    const updated = await tx
+      .update(consentStates)
+      .set({
+        status: 'CONSENTED',
+        respondedAt: now,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(consentStates.id, existing.id),
+          eq(consentStates.profileId, childProfileId)
+        )
       )
-    )
-    .returning();
+      .returning();
+
+    await tx
+      .update(profiles)
+      .set({ archivedAt: null })
+      .where(eq(profiles.id, childProfileId));
+
+    return updated;
+  });
 
   if (!row) throw new Error('Update on consentStates did not return a row');
   return mapConsentRow(row);

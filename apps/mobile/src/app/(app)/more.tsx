@@ -40,6 +40,10 @@ import {
   useUpdateLearningMode,
   useCelebrationLevel,
   useUpdateCelebrationLevel,
+  useWithdrawalArchivePreference,
+  useUpdateWithdrawalArchivePreference,
+  useFamilyPoolBreakdownSharing,
+  useUpdateFamilyPoolBreakdownSharing,
 } from '../../hooks/use-settings';
 import { useSubscription } from '../../hooks/use-subscription';
 import { ACCOMMODATION_OPTIONS } from '../../lib/accommodation-options';
@@ -96,19 +100,28 @@ function ToggleRow({
   onToggle,
   disabled,
   testID,
+  description,
 }: {
   label: string;
   value: boolean;
   onToggle: (v: boolean) => void;
   disabled?: boolean;
   testID?: string;
+  description?: string;
 }) {
   return (
     <View
       className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3 mb-2"
       testID={testID}
     >
-      <Text className="text-body text-text-primary">{label}</Text>
+      <View className="flex-1 pr-3">
+        <Text className="text-body text-text-primary">{label}</Text>
+        {description ? (
+          <Text className="text-body-sm text-text-secondary mt-1">
+            {description}
+          </Text>
+        ) : null}
+      </View>
       <Switch
         value={value}
         onValueChange={onToggle}
@@ -203,6 +216,14 @@ export default function MoreScreen() {
   const { data: celebrationLevel, isLoading: celebrationLoading } =
     useCelebrationLevel();
   const updateCelebrationLevel = useUpdateCelebrationLevel();
+  const { data: withdrawalArchivePreference, isLoading: archivePrefLoading } =
+    useWithdrawalArchivePreference();
+  const updateWithdrawalArchivePreference =
+    useUpdateWithdrawalArchivePreference();
+  const { data: familyPoolBreakdownSharing, isLoading: breakdownSharingLoading } =
+    useFamilyPoolBreakdownSharing();
+  const updateFamilyPoolBreakdownSharing =
+    useUpdateFamilyPoolBreakdownSharing();
   const { data: learnerProfile } = useLearnerProfile();
   const updateAccommodation = useUpdateAccommodationMode();
   const { openFeedback } = useFeedbackContext();
@@ -249,6 +270,23 @@ export default function MoreScreen() {
 
   const pushEnabled = notifPrefs?.pushEnabled ?? false;
   const weeklyDigest = notifPrefs?.weeklyProgressPush ?? false;
+  const withdrawalArchiveOptions = [
+    {
+      value: 'auto',
+      title: t('more.privacy.withdrawalArchiveAuto'),
+      description: t('more.privacy.withdrawalArchiveAutoDescription'),
+    },
+    {
+      value: 'always',
+      title: t('more.privacy.withdrawalArchiveAlways'),
+      description: t('more.privacy.withdrawalArchiveAlwaysDescription'),
+    },
+    {
+      value: 'never',
+      title: t('more.privacy.withdrawalArchiveNever'),
+      description: t('more.privacy.withdrawalArchiveNeverDescription'),
+    },
+  ] as const;
 
   const handleTogglePush = useCallback(
     (value: boolean) => {
@@ -595,6 +633,26 @@ export default function MoreScreen() {
                 }
               />
             )}
+            <ToggleRow
+              label={t('more.family.breakdownSharingTitle')}
+              description={t('more.family.breakdownSharingDescription')}
+              value={familyPoolBreakdownSharing ?? false}
+              onToggle={(value) => {
+                updateFamilyPoolBreakdownSharing.mutate(value, {
+                  onError: () => {
+                    platformAlert(
+                      t('more.errors.couldNotSaveSetting'),
+                      t('more.family.breakdownSharingError')
+                    );
+                  },
+                });
+              }}
+              disabled={
+                breakdownSharingLoading ||
+                updateFamilyPoolBreakdownSharing.isPending
+              }
+              testID="more-breakdown-sharing-toggle"
+            />
             <Pressable
               onPress={handleAddChild}
               className="bg-surface rounded-card px-4 py-3.5 mb-2"
@@ -699,7 +757,43 @@ export default function MoreScreen() {
           testID="weekly-digest-toggle"
         />
 
-        {/* 7. Account — identity, language, subscription only */}
+        {/* 7. Privacy */}
+        {activeProfile?.isOwner ? (
+          <>
+            <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6">
+              {t('more.privacy.sectionHeader')}
+            </Text>
+            <Text className="text-body font-semibold text-text-primary mb-2">
+              {t('more.privacy.withdrawalArchiveTitle')}
+            </Text>
+            {withdrawalArchiveOptions.map((opt) => (
+              <LearningModeOption
+                key={opt.value}
+                title={opt.title}
+                description={opt.description}
+                selected={withdrawalArchivePreference === opt.value}
+                disabled={
+                  archivePrefLoading ||
+                  updateWithdrawalArchivePreference.isPending
+                }
+                onPress={() => {
+                  if (withdrawalArchivePreference === opt.value) return;
+                  updateWithdrawalArchivePreference.mutate(opt.value, {
+                    onError: () => {
+                      platformAlert(
+                        t('more.errors.couldNotSaveSetting'),
+                        t('more.privacy.withdrawalArchiveError')
+                      );
+                    },
+                  });
+                }}
+                testID={`more-withdrawal-archive-${opt.value}`}
+              />
+            ))}
+          </>
+        ) : null}
+
+        {/* 8. Account — identity, language, subscription only */}
         <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6">
           {t('more.account.sectionHeader')}
         </Text>
@@ -794,9 +888,10 @@ export default function MoreScreen() {
             </Pressable>
           </Modal>
         )}
-        {/* [BUG-915] Hide Subscription in impersonation — billing is the
-            parent account's, not the child profile's. */}
-        {!isImpersonating && (
+        {/* [BUG-915] Hide Subscription for child profiles and impersonation —
+            billing is the parent account's, not the child profile's.
+            C4: also hide for native child profiles (role === 'child'). */}
+        {role === 'owner' && (
           <SettingsRow
             label={t('more.account.subscription')}
             value={
@@ -811,7 +906,7 @@ export default function MoreScreen() {
           />
         )}
 
-        {/* 8. Other — support, legal, data management */}
+        {/* 9. Other — support, legal, data management */}
         <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6">
           {t('more.other.sectionHeader')}
         </Text>
@@ -832,9 +927,10 @@ export default function MoreScreen() {
           label={t('more.other.termsOfService')}
           onPress={() => router.push('/terms')}
         />
-        {/* [BUG-915] Hide Export my data and Delete account in impersonation —
-            both operate on the parent's underlying account. */}
-        {!isImpersonating && (
+        {/* [BUG-915] Hide Export my data and Delete account for child profiles
+            and impersonation — both operate on the parent's underlying account.
+            C4: also hide for native child profiles (role === 'owner' guard). */}
+        {role === 'owner' && (
           <SettingsRow
             label={t('more.other.exportMyData')}
             onPress={exportData.isPending ? undefined : handleExport}
@@ -846,7 +942,7 @@ export default function MoreScreen() {
             testID="more-row-export"
           />
         )}
-        {!isImpersonating && (
+        {role === 'owner' && (
           <SettingsRow
             label={t('more.other.deleteAccount')}
             onPress={() => router.push('/delete-account')}

@@ -8,6 +8,15 @@ before restoring the narrower check constraint. If any profile still has a
 newly allowed value, the rollback statement will fail rather than silently
 destroying data.
 
+## UX impact
+
+The recovery `UPDATE` silently resets every affected profile's
+`conversation_language` to `'en'`. Operators must communicate this change
+to the affected users before running the rollback — their mentor will
+abruptly switch to English on the next session, which is jarring without
+notice. If the population is small, a per-profile email or in-app
+notification ahead of the rollback is the recommended posture.
+
 Recovery procedure:
 
 ```sql

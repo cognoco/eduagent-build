@@ -145,6 +145,7 @@ describe('useSubmitAnswer', () => {
             masteryScore: 0.85,
             feedback: 'Well done!',
           },
+          status: 'passed',
         }),
         { status: 200 }
       )

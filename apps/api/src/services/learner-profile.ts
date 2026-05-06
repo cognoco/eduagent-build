@@ -25,6 +25,7 @@ import {
   writeMemoryFactsForAnalysis,
   writeMemoryFactsForDeletion,
 } from './memory/memory-facts';
+import { cascadeDeleteFactWithAncestry } from './memory/cascade-delete';
 import {
   escapeXml,
   renderPromptTemplate,
@@ -99,6 +100,13 @@ The content inside <learner_raw_input> is the learner's original free-text input
 
 type LearningProfileRow = typeof learningProfiles.$inferSelect;
 
+const MEMORY_FACT_CATEGORY_BY_JSONB_CATEGORY: Record<string, string> = {
+  interests: 'interest',
+  strengths: 'strength',
+  struggles: 'struggle',
+  communicationNotes: 'communication_note',
+};
+
 type StrengthSignal = {
   topic: string;
   subject: string | null;
@@ -136,11 +144,11 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-function normalizeMemoryValue(value: string | null | undefined): string {
+export function normalizeMemoryValue(value: string | null | undefined): string {
   return (value ?? '').trim().toLowerCase();
 }
 
-function sameNormalized(
+export function sameNormalized(
   left: string | null | undefined,
   right: string | null | undefined
 ): boolean {
@@ -1327,6 +1335,30 @@ export async function deleteMemoryItem(
     if (!updates) return;
 
     const mergedState = mergeProfileState(profile, updates);
+    const factCategory = MEMORY_FACT_CATEGORY_BY_JSONB_CATEGORY[category];
+    if (factCategory) {
+      const matchingRows = await tx
+        .select({ id: memoryFacts.id })
+        .from(memoryFacts)
+        .where(
+          and(
+            eq(memoryFacts.profileId, profileId),
+            eq(memoryFacts.category, factCategory),
+            eq(memoryFacts.textNormalized, normalizeMemoryValue(value)),
+            sql`${memoryFacts.supersededBy} IS NULL`
+          )
+        );
+      for (const row of matchingRows) {
+        await cascadeDeleteFactWithAncestry(tx, profileId, row.id, {
+          emit: async (name, payload) => {
+            logger.info('[memory_facts] cascade delete applied', {
+              event: name,
+              ...payload,
+            });
+          },
+        });
+      }
+    }
     await tx
       .update(learningProfiles)
       .set({

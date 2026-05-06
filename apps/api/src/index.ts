@@ -59,6 +59,7 @@ import { languageProgressRoutes } from './routes/language-progress';
 import { coachingCardRoutes } from './routes/coaching-card';
 import { celebrationRoutes } from './routes/celebrations';
 import { dashboardRoutes } from './routes/dashboard';
+import { noticesRoutes } from './routes/notices';
 import { billingRoutes } from './routes/billing';
 import { stripeWebhookRoute } from './routes/stripe-webhook';
 import { testSeedRoutes } from './routes/test-seed';
@@ -227,6 +228,7 @@ const routes = api
   .route('/', coachingCardRoutes)
   .route('/', celebrationRoutes)
   .route('/', dashboardRoutes)
+  .route('/', noticesRoutes)
   .route('/', billingRoutes)
   .route('/', stripeWebhookRoute)
   .route('/', revenuecatWebhookRoute)

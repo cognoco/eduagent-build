@@ -30,6 +30,7 @@ import { assertOk } from '../../lib/assert-ok';
 
 import { UsageMeter } from '../../components/common';
 import { TrackedView } from '../../components/common/TrackedView';
+import { ParentOnly } from '../../components/_internal/ParentOnly';
 import {
   useSubscription,
   useUsage,
@@ -593,6 +594,14 @@ function ChildPaywall(): React.ReactElement {
 // ---------------------------------------------------------------------------
 
 export default function SubscriptionScreen() {
+  return (
+    <ParentOnly>
+      <SubscriptionContent />
+    </ParentOnly>
+  );
+}
+
+function SubscriptionContent(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useThemeColors();
@@ -626,7 +635,7 @@ export default function SubscriptionScreen() {
     : 0;
   const breakdownAnalytics = {
     is_owner: activeProfile?.isOwner === true,
-    breakdown_section_visible: Boolean(usage?.by_profile?.length),
+    breakdown_section_visible: Boolean(usage?.byProfile?.length),
     child_count_bucket: childCountBucket(linkedChildCount),
   };
 
@@ -1360,9 +1369,9 @@ export default function SubscriptionScreen() {
                       + {usage.topUpCreditsRemaining} top-up credits remaining
                     </Text>
                   )}
-                  {usage.by_profile && usage.by_profile.length > 0 ? (
+                  {usage.byProfile && usage.byProfile.length > 0 ? (
                     <View className="border-t border-border mt-3 pt-3">
-                      {usage.by_profile.map((row) => (
+                      {usage.byProfile.map((row) => (
                         <View
                           key={row.profile_id}
                           className="flex-row items-center justify-between py-1"
@@ -1380,7 +1389,7 @@ export default function SubscriptionScreen() {
                           </Text>
                         </View>
                       ))}
-                      {usage.family_aggregate ? (
+                      {usage.familyAggregate ? (
                         <View
                           className="flex-row items-center justify-between py-1"
                           testID="usage-family-aggregate"
@@ -1389,8 +1398,8 @@ export default function SubscriptionScreen() {
                             Family aggregate
                           </Text>
                           <Text className="text-caption font-semibold text-text-primary">
-                            {usage.family_aggregate.used} /{' '}
-                            {usage.family_aggregate.limit}
+                            {usage.familyAggregate.used} /{' '}
+                            {usage.familyAggregate.limit}
                           </Text>
                         </View>
                       ) : null}
@@ -1398,7 +1407,7 @@ export default function SubscriptionScreen() {
                   ) : null}
                   <Text className="text-caption text-text-secondary mt-1">
                     Quota resets{' '}
-                    {usage.resets_at_label ??
+                    {usage.resetsAtLabel ??
                       new Date(usage.cycleResetAt).toLocaleDateString(
                         undefined,
                         {
@@ -1408,9 +1417,9 @@ export default function SubscriptionScreen() {
                         }
                       )}
                   </Text>
-                  {usage.renews_at_label ? (
+                  {usage.renewsAtLabel ? (
                     <Text className="text-caption text-text-secondary mt-1">
-                      Subscription renews {usage.renews_at_label}
+                      Subscription renews {usage.renewsAtLabel}
                     </Text>
                   ) : null}
                 </View>

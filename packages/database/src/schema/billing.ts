@@ -118,7 +118,7 @@ export const usageEvents = pgTable(
     ),
     check('usage_events_delta_range', sql`${table.delta} IN (1, -1)`),
   ]
-);
+).enableRLS();
 
 export const topUpCredits = pgTable(
   'top_up_credits',

@@ -1,4 +1,8 @@
 import { View, Text } from 'react-native';
+import type { TFunction } from 'i18next';
+import { useTranslation } from 'react-i18next';
+
+import { type CopyRegister } from '../../lib/copy-register';
 import { useThemeColors } from '../../lib/theme';
 
 export interface GrowthChartDatum {
@@ -12,24 +16,39 @@ interface GrowthChartProps {
   subtitle?: string;
   data: GrowthChartDatum[];
   emptyMessage?: string;
+  /** Copy register for a11y labels and legend text. Defaults to 'adult'. */
+  register?: CopyRegister;
 }
 
 /**
  * [BUG-649 / ACC-5] Build a screen-reader summary of the chart data so users
  * with visual impairments hear the trend instead of an opaque bar grid.
  */
-function buildChartA11yLabel(title: string, data: GrowthChartDatum[]): string {
+function buildChartA11yLabel(
+  title: string,
+  data: GrowthChartDatum[],
+  register: CopyRegister,
+  t: TFunction
+): string {
   const points = data
     .map((item) => {
-      const primary = `${item.value} topics mastered`;
+      const primaryKey =
+        register === 'child'
+          ? 'progress.growthChart.a11y.topicsLearned'
+          : 'progress.growthChart.a11y.topicsMastered';
+      const primary = `${item.value} ${t(primaryKey)}`;
       const secondary =
         item.secondaryValue != null
-          ? `, ${item.secondaryValue} vocabulary growth`
+          ? ` ${item.secondaryValue} ${t(
+              register === 'child'
+                ? 'progress.growthChart.a11y.wordsAdded'
+                : 'progress.growthChart.a11y.vocabularyGrowth'
+            )}`
           : '';
       return `${item.label}: ${primary}${secondary}`;
     })
     .join('. ');
-  return `Growth chart. ${title}. ${points}`;
+  return `${title}. ${points}`;
 }
 
 export function GrowthChart({
@@ -37,7 +56,9 @@ export function GrowthChart({
   subtitle,
   data,
   emptyMessage = 'Keep going and your growth will show up here.',
+  register = 'adult',
 }: GrowthChartProps): React.ReactElement {
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const maxValue = Math.max(
     1,
@@ -69,7 +90,7 @@ export function GrowthChart({
           <View
             accessible
             accessibilityRole="text"
-            accessibilityLabel={buildChartA11yLabel(title, data)}
+            accessibilityLabel={buildChartA11yLabel(title, data, register, t)}
           >
             <View
               className="flex-row items-end gap-3 h-28"
@@ -119,7 +140,7 @@ export function GrowthChart({
                 style={{ backgroundColor: colors.primary }}
               />
               <Text className="text-caption text-text-secondary">
-                Topics mastered
+                {t(`progress.register.${register}.growthPrimaryLegend`)}
               </Text>
             </View>
             {data.some((item) => item.secondaryValue != null) ? (
@@ -129,7 +150,7 @@ export function GrowthChart({
                   style={{ backgroundColor: colors.accent }}
                 />
                 <Text className="text-caption text-text-secondary">
-                  Vocabulary growth
+                  {t(`progress.register.${register}.growthSecondaryLegend`)}
                 </Text>
               </View>
             ) : null}

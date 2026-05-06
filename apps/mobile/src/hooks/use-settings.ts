@@ -11,6 +11,7 @@ import type {
   AnalogyDomain,
   CelebrationLevel,
   LanguageCode,
+  WithdrawalArchivePreference,
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
@@ -95,13 +96,63 @@ export function useCelebrationLevel(): UseQueryResult<CelebrationLevel> {
           { init: { signal } }
         );
         await assertOk(res);
-        const data = await res.json();
+        const data = (await res.json()) as { celebrationLevel: CelebrationLevel };
         return data.celebrationLevel as CelebrationLevel;
       } finally {
         cleanup();
       }
     },
     enabled: !!activeProfile,
+  });
+}
+
+export function useWithdrawalArchivePreference(): UseQueryResult<WithdrawalArchivePreference> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['settings', 'withdrawal-archive', activeProfile?.id],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.settings['withdrawal-archive'].$get(
+          {},
+          { init: { signal } }
+        );
+        await assertOk(res);
+        const data = (await res.json()) as {
+          value: WithdrawalArchivePreference;
+        };
+        return data.value as WithdrawalArchivePreference;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled: !!activeProfile?.id && activeProfile.isOwner === true,
+  });
+}
+
+export function useFamilyPoolBreakdownSharing(): UseQueryResult<boolean> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['settings', 'family-pool-breakdown-sharing', activeProfile?.id],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.settings['family-pool-breakdown-sharing'].$get(
+          {},
+          { init: { signal } }
+        );
+        await assertOk(res);
+        const data = (await res.json()) as { value: boolean };
+        return data.value;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled: !!activeProfile?.id && activeProfile.isOwner === true,
   });
 }
 
@@ -180,6 +231,65 @@ export function useUpdateCelebrationLevel(): UseMutationResult<
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ['settings', 'celebration-level', activeProfile?.id],
+      });
+    },
+  });
+}
+
+export function useUpdateWithdrawalArchivePreference(): UseMutationResult<
+  WithdrawalArchivePreference,
+  Error,
+  WithdrawalArchivePreference
+> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+  const { activeProfile } = useProfile();
+
+  return useMutation({
+    mutationFn: async (value: WithdrawalArchivePreference) => {
+      const res = await client.settings['withdrawal-archive'].$put({
+        json: { value },
+      });
+      await assertOk(res);
+      const data = (await res.json()) as { value: WithdrawalArchivePreference };
+      return data.value as WithdrawalArchivePreference;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ['settings', 'withdrawal-archive', activeProfile?.id],
+      });
+    },
+  });
+}
+
+export function useUpdateFamilyPoolBreakdownSharing(): UseMutationResult<
+  boolean,
+  Error,
+  boolean
+> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+  const { activeProfile } = useProfile();
+
+  return useMutation({
+    mutationFn: async (value: boolean) => {
+      const res = await client.settings['family-pool-breakdown-sharing'].$put({
+        json: { value },
+      });
+      await assertOk(res);
+      const data = (await res.json()) as { value: boolean };
+      return data.value;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: [
+          'settings',
+          'family-pool-breakdown-sharing',
+          activeProfile?.id,
+        ],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['usage', activeProfile?.id],
       });
     },
   });

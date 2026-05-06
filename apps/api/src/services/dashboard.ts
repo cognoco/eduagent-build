@@ -14,6 +14,7 @@ import {
   sum,
   sql,
   isNotNull,
+  isNull,
 } from 'drizzle-orm';
 import {
   familyLinks,
@@ -21,6 +22,7 @@ import {
   learningSessions,
   sessionEvents,
   subjects,
+  consentStates,
   curricula,
   curriculumTopics,
   sessionSummaries,
@@ -43,6 +45,7 @@ import type {
   MonthlyReportSummary,
   ProgressHistory,
   SessionMetadata,
+  ConsentStatus,
   TopicProgress,
 } from '@eduagent/schemas';
 import { getOverallProgress, getTopicProgressBatch } from './progress';
@@ -551,7 +554,7 @@ export async function getChildrenForParent(
   // R-03: Batch queries to avoid N+1 per child profile.
   // Fetch all child profiles in a single query instead of one per loop iteration.
   const allChildProfiles = await db.query.profiles.findMany({
-    where: inArray(profiles.id, childProfileIds),
+    where: and(inArray(profiles.id, childProfileIds), isNull(profiles.archivedAt)),
   });
   const profilesById = new Map(allChildProfiles.map((p) => [p.id, p]));
 
@@ -652,6 +655,22 @@ export async function getChildrenForParent(
   const xpByProfile = new Map(
     xpResults.map((x) => [x.profileId, x.totalXp ?? 0])
   );
+  const allConsentStates = await db.query.consentStates.findMany({
+    where: inArray(consentStates.profileId, childProfileIds),
+    orderBy: desc(consentStates.requestedAt),
+  });
+  const consentByProfile = new Map<
+    string,
+    { status: ConsentStatus; respondedAt: Date | null }
+  >();
+  for (const state of allConsentStates) {
+    if (!consentByProfile.has(state.profileId)) {
+      consentByProfile.set(state.profileId, {
+        status: state.status,
+        respondedAt: state.respondedAt ?? null,
+      });
+    }
+  }
 
   // Pre-compute per-child display inputs (first pass) so that the
   // progress-summary fan-out can run in parallel without needing the
@@ -667,6 +686,8 @@ export async function getChildrenForParent(
     progress: (typeof progressResults)[number];
     guidedMetrics: (typeof guidedMetricsResults)[number];
     rawInputMap: Map<string, string | null>;
+    consentStatus: ConsentStatus | null;
+    respondedAt: string | null;
   }
 
   const prepared: PreparedChild[] = [];
@@ -762,6 +783,10 @@ export async function getChildrenForParent(
       progress,
       guidedMetrics,
       rawInputMap,
+      consentStatus: consentByProfile.get(childProfileId)?.status ?? null,
+      respondedAt:
+        consentByProfile.get(childProfileId)?.respondedAt?.toISOString() ??
+        null,
     });
   }
 
@@ -804,6 +829,8 @@ export async function getChildrenForParent(
     return {
       profileId: p.childProfileId,
       displayName: p.displayName,
+      consentStatus: p.consentStatus,
+      respondedAt: p.respondedAt,
       summary,
       sessionsThisWeek: p.sessionsThisWeek,
       sessionsLastWeek: p.sessionsLastWeek,
@@ -854,9 +881,13 @@ export async function getChildDetail(
 
   // Step 1: Get the child's profile — 1 query
   const profile = await db.query.profiles.findFirst({
-    where: eq(profiles.id, childProfileId),
+    where: and(eq(profiles.id, childProfileId), isNull(profiles.archivedAt)),
   });
   if (!profile) return null;
+  const consentState = await db.query.consentStates.findFirst({
+    where: eq(consentStates.profileId, childProfileId),
+    orderBy: desc(consentStates.requestedAt),
+  });
 
   // Step 2: Get the child's subjects — 1 query
   const childSubjects = await db.query.subjects.findMany({
@@ -998,6 +1029,8 @@ export async function getChildDetail(
   return {
     profileId: childProfileId,
     displayName: profile.displayName,
+    consentStatus: consentState?.status ?? null,
+    respondedAt: consentState?.respondedAt?.toISOString() ?? null,
     summary,
     sessionsThisWeek,
     sessionsLastWeek,
@@ -1270,6 +1303,11 @@ export async function getChildSessions(
   // [EP15-I5] ForbiddenError → 403. Empty array now means "parent has
   // access and the child has no sessions", not "access denied".
   await assertParentAccess(db, parentProfileId, childProfileId);
+  const activeProfile = await db.query.profiles.findFirst({
+    where: and(eq(profiles.id, childProfileId), isNull(profiles.archivedAt)),
+    columns: { id: true },
+  });
+  if (!activeProfile) return [];
   return getProfileSessions(db, childProfileId);
 }
 
@@ -1300,8 +1338,11 @@ export async function getChildSessionDetail(
   const metadata = getSessionMetadata(session.metadata);
   const homeworkSummary = metadata.homeworkSummary ?? null;
 
-  // [BUG-526] Fetch highlight + structured subject/topic names in parallel
-  const [summary, subjectRow, topicRow] = await Promise.all([
+  // [BUG-526] Fetch highlight + structured subject/topic names + drill scores
+  // in parallel. Drill rows mirror the sparse query pattern in
+  // getProfileSessions: filter by IS NOT NULL so the per-event ai_response
+  // count stays bounded.
+  const [summary, subjectRow, topicRow, drillRows] = await Promise.all([
     db.query.sessionSummaries.findFirst({
       where: eq(sessionSummaries.sessionId, sessionId),
       columns: {
@@ -1321,7 +1362,32 @@ export async function getChildSessionDetail(
           columns: { title: true },
         })
       : Promise.resolve(null),
+    db
+      .select({
+        drillCorrect: sessionEvents.drillCorrect,
+        drillTotal: sessionEvents.drillTotal,
+        createdAt: sessionEvents.createdAt,
+      })
+      .from(sessionEvents)
+      .where(
+        and(
+          eq(sessionEvents.sessionId, sessionId),
+          eq(sessionEvents.eventType, 'ai_response'),
+          isNotNull(sessionEvents.drillTotal)
+        )
+      )
+      .orderBy(asc(sessionEvents.createdAt)),
   ]);
+
+  const drills: ChildSessionDrillScore[] = [];
+  for (const row of drillRows) {
+    if (row.drillCorrect == null || row.drillTotal == null) continue;
+    drills.push({
+      correct: row.drillCorrect,
+      total: row.drillTotal,
+      createdAt: row.createdAt.toISOString(),
+    });
+  }
 
   return {
     sessionId: session.id,
@@ -1346,7 +1412,7 @@ export async function getChildSessionDetail(
     narrative: summary?.narrative ?? null,
     conversationPrompt: summary?.conversationPrompt ?? null,
     engagementSignal: parseEngagementSignal(summary?.engagementSignal),
-    drills: [],
+    drills,
   };
 }
 

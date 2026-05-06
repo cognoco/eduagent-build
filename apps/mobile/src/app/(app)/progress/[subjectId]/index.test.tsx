@@ -73,6 +73,14 @@ jest.mock('react-i18next', () => ({
           'A light review would help keep this fresh.',
         'progress.subject.retentionWeak':
           'This subject would benefit from some extra attention.',
+        'progress.register.adult.retentionStrong': 'Still remembered.',
+        'progress.register.adult.retentionFading':
+          'Getting fuzzy — a quick review will help.',
+        'progress.register.adult.retentionWeak': 'Needs a quick refresh.',
+        'progress.register.child.retentionStrong':
+          'What came back to you this week.',
+        'progress.register.child.retentionFading': 'Worth a quick refresh.',
+        'progress.register.child.retentionWeak': 'Worth coming back to.',
         'progress.subject.openShelf': 'Open shelf',
         'progress.subject.pastConversations': 'Past conversations',
         'progress.subject.resume': 'Resume',
@@ -110,6 +118,10 @@ const mockLocalSearchParams = jest.fn(() => ({ subjectId: 's1' }));
 jest.mock('expo-router', () => ({
   useRouter: () => ({ back: jest.fn(), replace: mockReplace, push: mockPush }),
   useLocalSearchParams: () => mockLocalSearchParams(),
+}));
+
+jest.mock('../../../../hooks/use-active-profile-role', () => ({ // gc1-allow: subject progress screen varies retention copy by role; mocking the role hook pins the register for deterministic assertions.
+  useActiveProfileRole: () => 'owner',
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -728,22 +740,22 @@ describe('ProgressSubjectScreen', () => {
 
   // ── Retention data (legacy progress) ────────────────────────────────────
   describe('retention data present', () => {
-    it('shows "Knowledge feels stable" for strong retention', () => {
+    it('shows adult copy for strong retention', () => {
       mockHooks({ subjectProgressData: { retentionStatus: 'strong' } });
       render(<ProgressSubjectScreen />);
-      screen.getByText('Knowledge feels stable right now.');
+      screen.getByText('Still remembered.');
     });
 
     it('shows review suggestion for fading retention', () => {
       mockHooks({ subjectProgressData: { retentionStatus: 'fading' } });
       render(<ProgressSubjectScreen />);
-      screen.getByText('A light review would help keep this fresh.');
+      screen.getByText('Getting fuzzy — a quick review will help.');
     });
 
     it('shows extra attention message for weak retention', () => {
       mockHooks({ subjectProgressData: { retentionStatus: 'weak' } });
       render(<ProgressSubjectScreen />);
-      screen.getByText('This subject would benefit from some extra attention.');
+      screen.getByText('Needs a quick refresh.');
     });
   });
 });

@@ -76,6 +76,58 @@ type BillingRouteEnv = {
   };
 };
 
+function getTimeZoneOffsetMs(instant: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).formatToParts(instant);
+  const values = Object.fromEntries(
+    parts
+      .filter((part) => part.type !== 'literal')
+      .map((part) => [part.type, part.value])
+  );
+  const localAsUtc = Date.UTC(
+    Number(values.year),
+    Number(values.month) - 1,
+    Number(values.day),
+    Number(values.hour),
+    Number(values.minute),
+    Number(values.second)
+  );
+  return localAsUtc - instant.getTime();
+}
+
+function getStartOfTodayInTimeZone(now: Date, timeZone: string): Date {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(now);
+  const values = Object.fromEntries(
+    parts
+      .filter((part) => part.type !== 'literal')
+      .map((part) => [part.type, part.value])
+  );
+  const localMidnightAsUtc = Date.UTC(
+    Number(values.year),
+    Number(values.month) - 1,
+    Number(values.day)
+  );
+  let start = new Date(
+    localMidnightAsUtc -
+      getTimeZoneOffsetMs(new Date(localMidnightAsUtc), timeZone)
+  );
+  start = new Date(localMidnightAsUtc - getTimeZoneOffsetMs(start, timeZone));
+  return start;
+}
+
 /**
  * Maps a tier + interval to the corresponding Stripe price ID from env bindings.
  */
@@ -401,8 +453,6 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       usedToday,
     });
     const warningLevel = getWarningLevel(usedThisMonth, monthlyLimit);
-    const dailyRemainingQuestions =
-      dailyLimit !== null ? Math.max(0, dailyLimit - usedToday) : null;
     const activeProfileId = c.get('profileId');
     const activeProfileMeta = c.get('profileMeta');
     const cycleResetAt = quota?.cycleResetAt ?? new Date().toISOString();
@@ -412,30 +462,47 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       new Date(
         Date.UTC(resetDate.getUTCFullYear(), resetDate.getUTCMonth() - 1, 1)
       ).toISOString();
+    // Day start in account timezone (defaults to UTC). Used to scope today's
+    // per-profile usage so non-owner viewers don't see family-wide aggregates.
+    const dayStartAt = (() => {
+      try {
+        return getStartOfTodayInTimeZone(
+          new Date(),
+          account.timezone ?? 'UTC'
+        ).toISOString();
+      } catch {
+        const now = new Date();
+        return new Date(
+          Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+        ).toISOString();
+      }
+    })();
     const usageBreakdown = activeProfileId
       ? await getUsageBreakdownForProfile(db, {
           subscriptionId: subscription.id,
           activeProfileId,
           monthlyLimit,
           cycleStartAt,
+          dayStartAt,
         })
       : null;
     const visibleUsedThisMonth =
       usageBreakdown && !usageBreakdown.isOwnerBreakdownViewer
-        ? usageBreakdown.by_profile[0]?.used ?? 0
+        ? usageBreakdown.selfUsedThisMonth ?? 0
         : usedThisMonth;
-    const visibleRemaining = usageBreakdown?.isOwnerBreakdownViewer
-      ? remaining
-      : calculateRemainingQuestions({
-          monthlyLimit,
-          usedThisMonth: visibleUsedThisMonth,
-          topUpCreditsRemaining,
-          dailyLimit,
-          usedToday,
-        });
+    const visibleRemaining = remaining;
     const visibleWarningLevel = usageBreakdown?.isOwnerBreakdownViewer
       ? warningLevel
       : getWarningLevel(visibleUsedThisMonth, monthlyLimit);
+    // Non-owner viewers must see only their own daily usage; the
+    // subscription-level `usedToday` is a family aggregate that would let a
+    // child infer siblings' activity. Owners and non-family accounts see raw.
+    const visibleUsedToday =
+      usageBreakdown && !usageBreakdown.isOwnerBreakdownViewer
+        ? usageBreakdown.selfUsedToday ?? 0
+        : usedToday;
+    const visibleDailyRemainingQuestions =
+      dailyLimit !== null ? Math.max(0, dailyLimit - visibleUsedToday) : null;
     const labels = buildUsageDateLabels({
       resetsAt: cycleResetAt,
       renewsAt: subscription.currentPeriodEnd,
@@ -453,13 +520,13 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
           warningLevel: visibleWarningLevel,
           cycleResetAt,
           dailyLimit,
-          usedToday,
-          dailyRemainingQuestions,
+          usedToday: visibleUsedToday,
+          dailyRemainingQuestions: visibleDailyRemainingQuestions,
           ...(usageBreakdown
             ? {
-                by_profile: usageBreakdown.by_profile,
-                family_aggregate: usageBreakdown.family_aggregate,
-                per_profile_available_since: getUsageEventsAvailableSince(),
+                byProfile: usageBreakdown.byProfile,
+                familyAggregate: usageBreakdown.familyAggregate,
+                perProfileAvailableSince: getUsageEventsAvailableSince(),
                 ...labels,
               }
             : labels),

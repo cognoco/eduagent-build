@@ -116,6 +116,12 @@
       "emptySubjectsTitle": "Twoje przedmioty pojawią się tutaj",
       "emptySubjectsMessage": "Zacznij jeden teraz albo użyj pomocy w zadaniach, gdy jej potrzebujesz.",
       "addSubject": "Dodaj przedmiot",
+      "quota": {
+        "line": "{{questionsLeftToday}} questions left today · {{questionsLeftMonth}} left this month",
+        "lineDailyOnly": "{{questionsLeftToday}} questions left today",
+        "lineMonthlyOnly": "{{questionsLeftMonth}} questions left this month",
+        "lineUnlimited": "Plenty of questions today"
+      },
       "intentActions": {
         "homework": {
           "title": "Pomoc w zadaniach",
@@ -139,6 +145,12 @@
       "learnSomething": "Naucz się czegoś",
       "dashboardError": "Nie mogliśmy załadować pulpitu",
       "reviewHealth": "Sprawdź stan"
+    },
+    "notices": {
+      "consentArchivedTitle": "{{name}}'s account was archived",
+      "consentArchivedBody": "Data is retained for 30 days, then deleted.",
+      "consentDeletedTitle": "{{name}}'s account was deleted",
+      "consentDeletedBody": "The withdrawal grace period has ended."
     }
   },
   "dashboard": {
@@ -167,11 +179,22 @@
     "demoAlertMessage": "Połącz konto swojego dziecka, aby zobaczyć prawdziwe dane."
   },
   "family": {
-    "orientationCueBody": "Children, their progress, and family settings live here.",
-    "orientationCueDismiss": "Got it",
-    "orientationCueTitle": "This is your family hub",
-    "subtitle": "Everyone you're learning alongside.",
-    "title": "Family"
+    "orientationCueBody": "Dzieci, ich postępy i ustawienia rodzinne znajdziesz tutaj.",
+    "orientationCueDismiss": "Rozumiem",
+    "orientationCueTitle": "To jest Twoje centrum rodziny",
+    "subtitle": "Wszyscy, z którymi się uczysz.",
+    "title": "Rodzina",
+    "withdrawal": {
+      "bannerTitleSingle": "{{name}}'s account closes in {{days}} {{daysWord}}",
+      "bannerTitleMulti": "{{count}} accounts closing soon",
+      "bannerCta": "Reverse",
+      "bannerCtaShort": "Undo",
+      "daysOne": "day",
+      "daysOther": "days",
+      "restoreErrorTitle": "Couldn't reverse withdrawal",
+      "restoreErrorBody": "Try again in a moment.",
+      "restoreSuccessToast": "Withdrawal reversed for {{name}}"
+    }
   },
   "more": {
     "screenTitle": "Więcej",
@@ -213,7 +236,10 @@
       "upgradeRequiredMessage": "Dodawanie profili dzieci wymaga subskrypcji Family lub Pro.",
       "viewPlans": "Zobacz plany",
       "profileLimitTitle": "Osiągnięto limit profili",
-      "profileLimitMessage": "Twój plan {{plan}} obsługuje do {{max}} profili."
+      "profileLimitMessage": "Twój plan {{plan}} obsługuje do {{max}} profili.",
+      "breakdownSharingTitle": "Share usage breakdown with family",
+      "breakdownSharingDescription": "Let everyone in your family see how each profile uses the family pool. Children only see the breakdown when this is on.",
+      "breakdownSharingError": "Couldn't update setting. Try again."
     },
     "celebrations": {
       "sectionHeader": "Twoje celebracje",
@@ -271,7 +297,18 @@
       "pl": "Polski",
       "pt": "Portugalski"
     },
-    "appVersion": "MentoMate v1.0.0"
+    "appVersion": "MentoMate v1.0.0",
+    "privacy": {
+      "sectionHeader": "Privacy",
+      "withdrawalArchiveTitle": "When I withdraw consent for a child",
+      "withdrawalArchiveAuto": "Automatic",
+      "withdrawalArchiveAutoDescription": "Under-13 accounts are deleted at grace expiry. 13+ accounts are archived for 30 days, then deleted.",
+      "withdrawalArchiveAlways": "Always archive (30 days)",
+      "withdrawalArchiveAlwaysDescription": "13+ accounts only. Under-13 always deletes immediately for privacy compliance.",
+      "withdrawalArchiveNever": "Never archive - delete immediately",
+      "withdrawalArchiveNeverDescription": "Delete at grace expiry instead of keeping a 30-day archive.",
+      "withdrawalArchiveError": "Couldn't update setting. Try again."
+    }
   },
   "session": {
     "mentorMemory": {
@@ -938,17 +975,17 @@
     "openingMessage": "Zobaczmy, czego się do tej pory nauczyłeś(-aś). Zadam kilka pytań — po prostu postaraj się jak najlepiej, a ja pomogę uzupełnić wszelkie luki.",
     "passedMessage": "Masz solidne pojęcie o większości tego materiału — {{mastery}}% opanowania! Obszary do powtórki pojawią się w Twojej Bibliotece.",
     "missingParams": "Nie można rozpocząć tej oceny — brakuje wymaganych informacji.",
-    "pickerTitle": "Pick a topic to check",
-    "pickerSubtitle": "You've studied these recently - pick one to prove what stuck.",
-    "pickerLoadError": "Could not load topics ready for assessment.",
-    "pickerLoading": "Loading topics...",
-    "pickerEmptyTitle": "You haven't studied any topics recently",
-    "pickerEmptyBody": "Start a session first, then come back to check what stuck.",
-    "pickerBrowseTopics": "Browse topics",
-    "pickerStartForTopic": "Start assessment for {{title}}",
-    "studiedToday": "Studied today",
-    "studiedYesterday": "Studied yesterday",
-    "studiedDaysAgo": "Studied {{count}} days ago"
+    "pickerTitle": "Wybierz temat do sprawdzenia",
+    "pickerSubtitle": "Ostatnio uczyłeś się tych tematów – wybierz jeden, aby sprawdzić, co zapamiętałeś.",
+    "pickerLoadError": "Nie udało się załadować tematów do sprawdzenia.",
+    "pickerLoading": "Ładowanie tematów...",
+    "pickerEmptyTitle": "Ostatnio nie uczyłeś się żadnych tematów",
+    "pickerEmptyBody": "Najpierw rozpocznij sesję, potem wróć, aby sprawdzić, co zapamiętałeś.",
+    "pickerBrowseTopics": "Przeglądaj tematy",
+    "pickerStartForTopic": "Rozpocznij sprawdzanie dla {{title}}",
+    "studiedToday": "Uczono się dzisiaj",
+    "studiedYesterday": "Uczono się wczoraj",
+    "studiedDaysAgo": "Uczono się {{count}} dni temu"
   },
   "homework": {
     "permissionTitle": "Wymagany dostęp do aparatu",
@@ -1036,6 +1073,32 @@
       "masteredTopics": "Opanowałeś(-aś) {{count}} tematów",
       "masteredTopicsSubtitle": "Twoje postępy wciąż się kumulują.",
       "masteredTopicsAndWords": "I znasz {{words}} słów we wszystkich swoich przedmiotach."
+    },
+    "register": {
+      "child": {
+        "weekTitle": "Your week",
+        "monthTitle": "Your month",
+        "growthTitle": "What you learned",
+        "growthSubtitle": "Your weekly wins",
+        "masteredTopicsHero": "You learned {{count}} topics. Steady wins.",
+        "retentionStrong": "What came back to you this week.",
+        "retentionFading": "Worth a quick refresh.",
+        "retentionWeak": "Worth coming back to.",
+        "growthPrimaryLegend": "Topics learned",
+        "growthSecondaryLegend": "Words added"
+      },
+      "adult": {
+        "weekTitle": "Weekly report",
+        "monthTitle": "Monthly report",
+        "growthTitle": "Your growth",
+        "growthSubtitle": "Weekly changes in topics mastered and vocabulary",
+        "masteredTopicsHero": "You've mastered {{count}} topics. Your progress keeps stacking up.",
+        "retentionStrong": "Still remembered.",
+        "retentionFading": "Getting fuzzy — a quick review will help.",
+        "retentionWeak": "Needs a quick refresh.",
+        "growthPrimaryLegend": "Topics mastered",
+        "growthSecondaryLegend": "Vocabulary growth"
+      }
     },
     "newLearner": {
       "title": "Ukończyłeś(-aś) {{count}} sesję. Tak trzymaj!",
@@ -1183,6 +1246,28 @@
       "empty": "Brak rozmów",
       "untitledTopic": "Temat bez tytułu",
       "openSessionFrom": "Otwórz sesję z {{date}}"
+    },
+    "retention": {
+      "strong": {
+        "label": "Wciąż pamiętasz"
+      },
+      "fading": {
+        "label": "Zaczyna się zacierać"
+      },
+      "weak": {
+        "label": "Wymaga szybkiej powtórki"
+      },
+      "forgotten": {
+        "label": "Wymaga nowego podejścia"
+      }
+    },
+    "growthChart": {
+      "a11y": {
+        "topicsLearned": "poznane tematy",
+        "topicsMastered": "opanowane tematy",
+        "wordsAdded": "dodane słowa",
+        "vocabularyGrowth": "wzrost słownictwa"
+      }
     }
   },
   "onboarding": {
@@ -1493,7 +1578,7 @@
       "withdrawing": "Wycofywanie…",
       "withdrawConsentConfirmTitle": "Wycofać zgodę?",
       "thisChild": "to dziecko",
-      "withdrawConsentBody": "Wycofanie zgody zatrzyma wszystkie sesje nauki dla tego dziecka i usunie jego dane.",
+      "withdrawConsentBody": "{{childName}}'s account and learning data will be deleted after a 7-day grace period. (For under-13 accounts, deletion is immediate at grace expiry to align with privacy law.)",
       "confirmWithdrawConsent": "Potwierdź — wycofaj zgodę",
       "withdraw": "Wycofaj"
     },
@@ -1658,7 +1743,7 @@
       "statusUnknown": "Nieznany",
       "understanding": "Zrozumienie",
       "reviewStatus": "Status powtórki",
-      "recentDrills": "Recent drills",
+      "recentDrills": "Ostatnie ćwiczenia",
       "sessionHistory": "Historia sesji",
       "noSessionsYet": "Brak jeszcze sesji dla tego tematu",
       "timeOnApp": "{{duration}} w aplikacji",
@@ -1793,8 +1878,8 @@
     },
     "home": "Główna",
     "homeLabel": "Główna",
-    "family": "Family",
-    "familyLabel": "Family tab",
+    "family": "Rodzina",
+    "familyLabel": "Karta Rodzina",
     "library": "Biblioteka",
     "libraryLabel": "Biblioteka",
     "progress": "Postępy",

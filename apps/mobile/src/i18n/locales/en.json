@@ -116,6 +116,12 @@
       "emptySubjectsTitle": "Your subjects will show up here",
       "emptySubjectsMessage": "Start one now, or just use homework help when you need it.",
       "addSubject": "Add a subject",
+      "quota": {
+        "line": "{{questionsLeftToday}} questions left today · {{questionsLeftMonth}} left this month",
+        "lineDailyOnly": "{{questionsLeftToday}} questions left today",
+        "lineMonthlyOnly": "{{questionsLeftMonth}} questions left this month",
+        "lineUnlimited": "Plenty of questions today"
+      },
       "intentActions": {
         "homework": {
           "title": "Homework help",
@@ -139,6 +145,12 @@
       "learnSomething": "Learn something",
       "dashboardError": "We couldn't load the dashboard",
       "reviewHealth": "Review health"
+    },
+    "notices": {
+      "consentArchivedTitle": "{{name}}'s account was archived",
+      "consentArchivedBody": "Data is retained for 30 days, then deleted.",
+      "consentDeletedTitle": "{{name}}'s account was deleted",
+      "consentDeletedBody": "The withdrawal grace period has ended."
     }
   },
   "dashboard": {
@@ -171,7 +183,18 @@
     "orientationCueDismiss": "Got it",
     "orientationCueTitle": "This is your family hub",
     "subtitle": "Everyone you're learning alongside.",
-    "title": "Family"
+    "title": "Family",
+    "withdrawal": {
+      "bannerTitleSingle": "{{name}}'s account closes in {{days}} {{daysWord}}",
+      "bannerTitleMulti": "{{count}} accounts closing soon",
+      "bannerCta": "Reverse",
+      "bannerCtaShort": "Undo",
+      "daysOne": "day",
+      "daysOther": "days",
+      "restoreErrorTitle": "Couldn't reverse withdrawal",
+      "restoreErrorBody": "Try again in a moment.",
+      "restoreSuccessToast": "Withdrawal reversed for {{name}}"
+    }
   },
   "more": {
     "screenTitle": "More",
@@ -213,7 +236,10 @@
       "upgradeRequiredMessage": "Adding child profiles requires a Family or Pro subscription.",
       "viewPlans": "View plans",
       "profileLimitTitle": "Profile limit reached",
-      "profileLimitMessage": "Your {{plan}} plan supports up to {{max}} profiles."
+      "profileLimitMessage": "Your {{plan}} plan supports up to {{max}} profiles.",
+      "breakdownSharingTitle": "Share usage breakdown with family",
+      "breakdownSharingDescription": "Let everyone in your family see how each profile uses the family pool. Children only see the breakdown when this is on.",
+      "breakdownSharingError": "Couldn't update setting. Try again."
     },
     "celebrations": {
       "sectionHeader": "Your celebrations",
@@ -229,6 +255,17 @@
       "pushTitle": "Push notifications",
       "weeklyDigestTitle": "Weekly progress digest",
       "updateErrorTitle": "Could not update notification settings"
+    },
+    "privacy": {
+      "sectionHeader": "Privacy",
+      "withdrawalArchiveTitle": "When I withdraw consent for a child",
+      "withdrawalArchiveAuto": "Automatic",
+      "withdrawalArchiveAutoDescription": "Under-13 accounts are deleted at grace expiry. 13+ accounts are archived for 30 days, then deleted.",
+      "withdrawalArchiveAlways": "Always archive (30 days)",
+      "withdrawalArchiveAlwaysDescription": "13+ accounts only. Under-13 always deletes immediately for privacy compliance.",
+      "withdrawalArchiveNever": "Never archive - delete immediately",
+      "withdrawalArchiveNeverDescription": "Delete at grace expiry instead of keeping a 30-day archive.",
+      "withdrawalArchiveError": "Couldn't update setting. Try again."
     },
     "account": {
       "sectionHeader": "Account",
@@ -1037,6 +1074,32 @@
       "masteredTopicsSubtitle": "Your progress keeps stacking up.",
       "masteredTopicsAndWords": "And you know {{words}} words across your subjects."
     },
+    "register": {
+      "child": {
+        "weekTitle": "Your week",
+        "monthTitle": "Your month",
+        "growthTitle": "What you learned",
+        "growthSubtitle": "Your weekly wins",
+        "masteredTopicsHero": "You learned {{count}} topics. Steady wins.",
+        "retentionStrong": "What came back to you this week.",
+        "retentionFading": "Worth a quick refresh.",
+        "retentionWeak": "Worth coming back to.",
+        "growthPrimaryLegend": "Topics learned",
+        "growthSecondaryLegend": "Words added"
+      },
+      "adult": {
+        "weekTitle": "Weekly report",
+        "monthTitle": "Monthly report",
+        "growthTitle": "Your growth",
+        "growthSubtitle": "Weekly changes in topics mastered and vocabulary",
+        "masteredTopicsHero": "You've mastered {{count}} topics. Your progress keeps stacking up.",
+        "retentionStrong": "Still remembered.",
+        "retentionFading": "Getting fuzzy — a quick review will help.",
+        "retentionWeak": "Needs a quick refresh.",
+        "growthPrimaryLegend": "Topics mastered",
+        "growthSecondaryLegend": "Vocabulary growth"
+      }
+    },
     "newLearner": {
       "title": "You've completed {{count}} session. Keep going!",
       "title_other": "You've completed {{count}} sessions. Keep going!",
@@ -1140,12 +1203,12 @@
       "phrasesProgress": "{{mastered}}/{{target}} phrases",
       "upNext": "Up next: {{level}} — {{title}}",
       "milestoneNoData": "Complete a session to start tracking your milestone progress.",
-      "retentionTitle": "Current retention",
-      "retentionLoadError": "We couldn't load retention data right now.",
-      "retryRetention": "Retry loading retention",
-      "retentionStrong": "Knowledge feels stable right now.",
-      "retentionFading": "A light review would help keep this fresh.",
-      "retentionWeak": "This subject would benefit from some extra attention.",
+      "retentionTitle": "Memory check",
+      "retentionLoadError": "We couldn't load what needs review right now.",
+      "retryRetention": "Retry loading review status",
+      "retentionStrong": "Still remembered.",
+      "retentionFading": "Getting fuzzy — a quick review will help.",
+      "retentionWeak": "Needs a quick refresh.",
       "openShelf": "Open shelf",
       "resume": "Resume",
       "chooseNext": "Choose next",
@@ -1183,6 +1246,28 @@
       "empty": "No conversations yet",
       "untitledTopic": "Untitled topic",
       "openSessionFrom": "Open session from {{date}}"
+    },
+    "retention": {
+      "strong": {
+        "label": "Still remembered"
+      },
+      "fading": {
+        "label": "Getting fuzzy"
+      },
+      "weak": {
+        "label": "Needs a quick refresh"
+      },
+      "forgotten": {
+        "label": "Needs a fresh pass"
+      }
+    },
+    "growthChart": {
+      "a11y": {
+        "topicsLearned": "topics learned",
+        "topicsMastered": "topics mastered",
+        "wordsAdded": "words added",
+        "vocabularyGrowth": "vocabulary growth"
+      }
     }
   },
   "onboarding": {
@@ -1493,7 +1578,7 @@
       "withdrawing": "Withdrawing…",
       "withdrawConsentConfirmTitle": "Withdraw consent?",
       "thisChild": "this child",
-      "withdrawConsentBody": "Withdrawing consent will stop all learning sessions for this child and delete their data.",
+      "withdrawConsentBody": "{{childName}}'s account and learning data will be deleted after a 7-day grace period. (For under-13 accounts, deletion is immediate at grace expiry to align with privacy law.)",
       "confirmWithdrawConsent": "Confirm — withdraw consent",
       "withdraw": "Withdraw"
     },

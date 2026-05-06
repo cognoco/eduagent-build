@@ -4,6 +4,7 @@ const mockReplace = jest.fn();
 const mockBack = jest.fn();
 const mockCanGoBack = jest.fn(() => false);
 let mockSearchParams: Record<string, string | undefined> = {};
+const mockUseActiveProfileRole = jest.fn();
 
 jest.mock(
   'react-i18next',
@@ -38,6 +39,10 @@ jest.mock('../../hooks/use-dashboard', () => ({
   }),
 }));
 
+jest.mock('../../hooks/use-active-profile-role', () => ({ // gc1-allow: Family route redirect depends on active role; mocking the hook isolates route-guard behavior from auth state.
+  useActiveProfileRole: () => mockUseActiveProfileRole(),
+}));
+
 jest.mock('../../components/coaching', () => ({
   ParentDashboardSummary: () => null,
 }));
@@ -49,6 +54,13 @@ jest.mock('../../components/family/FamilyOrientationCue', () => ({
   },
 }));
 
+jest.mock('../../components/family/WithdrawalCountdownBanner', () => ({ // gc1-allow: FamilyScreen only verifies the banner slot is present; banner behavior is covered in its own focused test.
+  WithdrawalCountdownBanner: () => {
+    const { View } = require('react-native');
+    return <View testID="withdrawal-countdown-banner" />;
+  },
+}));
+
 const FamilyScreen = require('./family').default;
 
 describe('FamilyScreen', () => {
@@ -56,6 +68,16 @@ describe('FamilyScreen', () => {
     jest.clearAllMocks();
     mockCanGoBack.mockReturnValue(false);
     mockSearchParams = {};
+    mockUseActiveProfileRole.mockReturnValue('owner');
+  });
+
+  it('redirects child role away from Family deep links', () => {
+    mockUseActiveProfileRole.mockReturnValue('child');
+
+    render(<FamilyScreen />);
+
+    expect(mockReplace).toHaveBeenCalledWith('/');
+    expect(screen.queryByTestId('family-back')).toBeNull();
   });
 
   it('back button uses neutral "Back" accessibility label', () => {
@@ -95,5 +117,11 @@ describe('FamilyScreen', () => {
     fireEvent.press(screen.getByTestId('family-back'));
     expect(mockBack).toHaveBeenCalled();
     expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('renders WithdrawalCountdownBanner', () => {
+    render(<FamilyScreen />);
+
+    expect(screen.getByTestId('withdrawal-countdown-banner')).toBeTruthy();
   });
 });

@@ -20,13 +20,14 @@ import {
 const mockBack = jest.fn();
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
+const mockUseActiveProfileRole = jest.fn();
 
 // [F-029] Mock platformAlert to spy on it via Alert.alert, so existing
 // test assertions continue working after the Alert → platformAlert migration.
 const mockPlatformAlert = jest.fn((...args: Parameters<typeof Alert.alert>) =>
   Alert.alert(...args)
 );
-jest.mock('../../lib/platform-alert', () => ({
+jest.mock('../../lib/platform-alert', () => ({ // gc1-allow: platformAlert is the display side-effect boundary; test spies on alert wiring without invoking native UI.
   platformAlert: (...args: unknown[]) =>
     mockPlatformAlert(...(args as Parameters<typeof Alert.alert>)),
 }));
@@ -74,6 +75,10 @@ jest.mock('../../lib/profile', () => ({
   useProfile: () => ({
     activeProfile: mockActiveProfile,
   }),
+}));
+
+jest.mock('../../hooks/use-active-profile-role', () => ({ // gc1-allow: Subscription route gates child profiles by active role; mocking keeps these tests focused on route behavior.
+  useActiveProfileRole: () => mockUseActiveProfileRole(),
 }));
 
 jest.mock('../../lib/analytics', () => ({
@@ -346,6 +351,7 @@ describe('SubscriptionScreen', () => {
       displayName: 'Alex',
       isOwner: true,
     };
+    mockUseActiveProfileRole.mockReturnValue('owner');
     jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     mockPlatformAlert.mockClear();
     jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
@@ -418,6 +424,25 @@ describe('SubscriptionScreen', () => {
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
     screen.getByTestId('subscription-loading');
+  });
+
+  it('redirects child role away from subscription detail', () => {
+    mockUseActiveProfileRole.mockReturnValue('child');
+
+    render(<SubscriptionScreen />, {
+      wrapper: createWrapper({ seedCache: true }),
+    });
+
+    expect(mockReplace).toHaveBeenCalledWith('/');
+    expect(screen.queryByTestId('subscription-screen')).toBeNull();
+  });
+
+  it('renders subscription content for owner role', () => {
+    render(<SubscriptionScreen />, {
+      wrapper: createWrapper({ seedCache: true }),
+    });
+
+    screen.getByTestId('subscription-screen');
   });
 
   it('shows loading indicator while offerings load', () => {

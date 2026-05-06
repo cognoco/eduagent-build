@@ -36,15 +36,16 @@ export function getParentRetentionInfo(
 
   switch (retentionStatus) {
     case 'strong':
-      return { label: 'Remembering well', colorKey: 'retentionStrong' };
+      return { label: 'Still remembered', colorKey: 'retentionStrong' };
     case 'fading':
       return {
         label: 'A few things to refresh',
         colorKey: 'retentionFading',
       };
     case 'weak':
+      return { label: 'Needs a quick refresh', colorKey: 'retentionWeak' };
     case 'forgotten':
-      return { label: 'Needs a review', colorKey: 'retentionWeak' };
+      return { label: 'Needs a fresh pass', colorKey: 'retentionWeak' };
     default:
       return null;
   }
@@ -75,7 +76,7 @@ export const PARENT_METRIC_TOOLTIPS: Record<string, ParentMetricTooltip> = {
     body: 'How well your child understands this topic, based on their answers and conversations with the mentor.',
   },
   'review-status': {
-    title: 'Review status',
+    title: 'Memory check',
     body: 'Whether your child still remembers what they learned. Based on spaced review, so topics come back at increasing intervals.',
   },
   milestone: {

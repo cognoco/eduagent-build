@@ -1,4 +1,10 @@
-import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseMutationResult,
+  type UseQueryResult,
+} from '@tanstack/react-query';
 import type {
   DashboardChild,
   DashboardData,
@@ -84,6 +90,31 @@ export function useDashboard(): UseQueryResult<DashboardData> {
     refetchInterval: 5 * 60_000,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
+  });
+}
+
+export function useAckNotice(): UseMutationResult<
+  { seen: true },
+  Error,
+  { id: string }
+> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+  const { activeProfile } = useProfile();
+
+  return useMutation({
+    mutationFn: async ({ id }: { id: string }) => {
+      const res = await client.notices[':id'].seen.$post({
+        param: { id },
+      });
+      await assertOk(res);
+      return (await res.json()) as { seen: true };
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ['dashboard', activeProfile?.id],
+      });
+    },
   });
 }
 

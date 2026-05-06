@@ -57,6 +57,10 @@ export function getStepDatabase(): Database {
 // ---------------------------------------------------------------------------
 
 let _voyageApiKey: string | undefined;
+let _memoryFactsDedupEnabled: string | undefined;
+let _memoryFactsDedupThreshold: string | undefined;
+let _maxDedupLlmCallsPerSession: string | undefined;
+let _memoryFactsDedupRolloutPct: string | undefined;
 
 /** Called by Inngest middleware to inject the VOYAGE_API_KEY binding. */
 export function setVoyageApiKey(key: string): void {
@@ -66,6 +70,47 @@ export function setVoyageApiKey(key: string): void {
 /** Reset the injected key — for test cleanup only. */
 export function resetVoyageApiKey(): void {
   _voyageApiKey = undefined;
+}
+
+export function setMemoryFactsDedupConfig(config: {
+  enabled?: string;
+  threshold?: string;
+  maxLlmCalls?: string;
+  rolloutPct?: string;
+}): void {
+  _memoryFactsDedupEnabled = config.enabled;
+  _memoryFactsDedupThreshold = config.threshold;
+  _maxDedupLlmCallsPerSession = config.maxLlmCalls;
+  _memoryFactsDedupRolloutPct = config.rolloutPct;
+}
+
+export function getStepMemoryFactsDedupConfig(): {
+  enabled: string;
+  threshold: number;
+  maxLlmCalls: number;
+  rolloutPct: number;
+} {
+  return {
+    enabled:
+      _memoryFactsDedupEnabled ??
+      process.env['MEMORY_FACTS_DEDUP_ENABLED'] ??
+      'false',
+    threshold: Number(
+      _memoryFactsDedupThreshold ??
+        process.env['MEMORY_FACTS_DEDUP_THRESHOLD'] ??
+        '0.15'
+    ),
+    maxLlmCalls: Number(
+      _maxDedupLlmCallsPerSession ??
+        process.env['MAX_DEDUP_LLM_CALLS_PER_SESSION'] ??
+        '10'
+    ),
+    rolloutPct: Number(
+      _memoryFactsDedupRolloutPct ??
+        process.env['MEMORY_FACTS_DEDUP_ROLLOUT_PCT'] ??
+        '0'
+    ),
+  };
 }
 
 /**

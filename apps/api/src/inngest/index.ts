@@ -1,6 +1,7 @@
 import { inngest } from './client';
 import { consentReminder } from './functions/consent-reminders';
 import { consentRevocation } from './functions/consent-revocation';
+import { archiveCleanup } from './functions/archive-cleanup';
 import { scheduledDeletion } from './functions/account-deletion';
 import { sessionCompleted } from './functions/session-completed';
 import { sessionStaleCleanup } from './functions/session-stale-cleanup';
@@ -74,6 +75,7 @@ export {
   feedbackDeliveryFailed,
   consentReminder,
   consentRevocation,
+  archiveCleanup,
   scheduledDeletion,
   sessionCompleted,
   sessionStaleCleanup,
@@ -127,6 +129,7 @@ export const functions = [
   feedbackDeliveryFailed,
   consentReminder,
   consentRevocation,
+  archiveCleanup,
   scheduledDeletion,
   sessionCompleted,
   sessionStaleCleanup,
