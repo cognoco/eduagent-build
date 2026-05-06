@@ -2,9 +2,15 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Embed every memory fact at write time and replace recency-only mentor memory injection with relevance-weighted retrieval, gated behind `MEMORY_FACTS_RELEVANCE_RETRIEVAL`.
+> **Commits are coordinator-only.** Per CLAUDE.md and `feedback_agents_commit_push.md`, subagents NEVER run `git add`/`git commit`/`git push`. After each task's verification command passes, the subagent reports the list of changed files; the coordinator stages and commits via `/commit`. The "Files to stage on commit" line at the end of each task is the hand-off, not an instruction to the subagent.
 
-**Architecture:** Each fact written via `writeMemoryFactsForAnalysis` gets a Voyage `voyage-3.5` 1024-dim embedding stored on the row. A best-effort embed step never blocks the write — failures fall back to a `memory-facts-embed-backfill` Inngest cron. A new `getRelevantMemories(profileId, queryText, k)` service performs two-stage retrieval (pgvector `<=>` cosine + app-side recency blend) through `createScopedRepository(profileId)` with consent gating. Existing `buildMemoryBlock` callers swap the recency snapshot for the relevance snapshot under the new flag, with recency-only fallback whenever the candidate set is incomplete.
+**Goal:** Embed every memory fact (best-effort, post-commit) and replace recency-only mentor memory injection with relevance-weighted retrieval, gated behind `MEMORY_FACTS_RELEVANCE_RETRIEVAL`.
+
+**Architecture:** Each new or text-changed fact written via `writeMemoryFactsForAnalysis` is embedded *outside* the `applyAnalysis` transaction by a follow-up Inngest step. Voyage failure never blocks the write — rows persist with `embedding=null` and the `memory-facts-embed-backfill` Inngest cron picks them up. **Critically, embedding is NOT recomputed for unchanged facts**: `replaceActiveMemoryFactsForProfile` does a wholesale wipe-and-rewrite (Phase 1 design at `apps/api/src/services/memory/memory-facts.ts:212-224`), so the writer captures `(text_normalized → embedding)` from the existing rows before deletion and restores it on the rewritten rows whose `text_normalized` matches. Only genuinely new or text-changed rows arrive at Voyage. A new `getRelevantMemories(profileId, queryText | queryVector, k)` service performs two-stage retrieval (pgvector `<=>` cosine + app-side recency blend) through `createScopedRepository(profileId)` with consent gating, accepting a precomputed query vector to avoid duplicate Voyage calls per turn (see Task 9 — the existing `services/memory.ts:retrieveRelevantMemory` already embeds the same `userMessage` for similar-topic retrieval). Existing `buildMemoryBlock` callers swap the recency snapshot for the relevance snapshot under the new flag, with recency-only fallback whenever stage-1 returns < k candidates.
+
+**Cost accounting (corrects spec § "LLM Call Cost per session-completed"):** The spec's table only counts write-side embeddings. The retrieval path adds **+M Voyage embeddings per session**, where M = number of user turns. Mitigation: share the per-turn `userMessage` embedding between `retrieveRelevantMemory` (already in `session-exchange.ts:380`) and the new `getRelevantMemories` so the cost is `M`, not `2M`. Update the spec's cost table when this plan ships.
+
+**Existing prior art (NOT re-implemented here):** `apps/api/src/services/memory.ts:46` already exposes `retrieveRelevantMemory(db, profileId, currentMessage, voyageApiKey)` — a query-embedding + pgvector retrieval against `sessionEmbeddings` (returns similar past topic IDs, Story 3.10). It is **distinct** from this plan's `getRelevantMemories` (returns a memory snapshot of struggles/strengths/interests by relevance against `memory_facts`). Both fire on the same exchange. Task 9 plumbs a single shared `userMessageEmbedding` through the call chain so we don't pay Voyage twice for the same input. The two helpers stay separate; this plan does not refactor them into one.
 
 **Tech Stack:** Drizzle ORM, pgvector with HNSW, Voyage AI `voyage-3.5`, Hono, Inngest, Zod, Jest, Wrangler/Doppler.
 
@@ -22,29 +28,34 @@
 ## File Structure
 
 **Create:**
-- `apps/api/src/services/memory/embed-fact.ts` — pure helper that turns a fact row into the Voyage input string + calls `generateEmbedding`. Co-located with other memory helpers.
-- `apps/api/src/services/memory/embed-fact.test.ts` — unit tests for the helper.
-- `apps/api/src/services/memory/relevance.ts` — `getRelevantMemories(profileId, queryText, k, options)` service.
-- `apps/api/src/services/memory/relevance.test.ts` — unit tests for consent gate, fallback, and blend math.
-- `apps/api/src/inngest/functions/memory-facts-embed-backfill.ts` — hourly cron that picks up `embedding IS NULL` rows in batches.
+- `apps/api/src/services/memory/embed-fact.ts` — pure helper that turns a fact row into the Voyage input string + calls `generateEmbedding`. Also exports `makeEmbedderFromEnv(apiKey?)` used by both the post-commit embed step (Task 3) and the prompt-build retrieval (Task 9). Co-located with other memory helpers.
+- `apps/api/src/services/memory/embed-fact.test.ts` — unit tests for `embedFactText` and `makeEmbedderFromEnv`.
+- `apps/api/src/services/memory/relevance.ts` — `getRelevantMemories(profileId, queryText | queryVector, k, options)` service.
+- `apps/api/src/services/memory/relevance.test.ts` — unit tests for consent gate, fallback, blend math, and precomputed-vector pass-through.
+- `apps/api/src/inngest/functions/memory-facts-embed-backfill.ts` — hourly cron that picks up `embedding IS NULL` rows in batches with a single batched `UPDATE … FROM (VALUES …)` per batch.
 - `apps/api/src/inngest/functions/memory-facts-embed-backfill.test.ts` — unit tests for batching + error handling.
-- `tests/integration/memory-facts-embed-on-write.integration.test.ts` — verifies `applyAnalysis` writes embeddings on success and persists facts with `embedding=null` on Voyage failure.
-- `tests/integration/memory-facts-relevance-retrieval.integration.test.ts` — end-to-end: seed facts with embeddings, query, assert ordering and consent gating.
+- `tests/integration/memory-facts-embed-on-write.integration.test.ts` — verifies the post-commit embed step embeds **only new/changed** facts (cost regression guard) and persists facts with `embedding=null` on Voyage failure.
+- `tests/integration/memory-facts-relevance-retrieval.integration.test.ts` — end-to-end: seed facts with embeddings, query, assert ordering, consent gating, and that suppressed-category rows do not displace active rows.
 - `apps/api/eval-llm/flows/memory-relevance-ab.flow.ts` — A/B harness flow producing recency vs. relevance prompt snapshots for the same fixture session.
+- `apps/api/eval-llm/fixtures/memory-relevance/*.ts` — three fixture profiles (`profile-fractions-heavy`, `profile-mixed-subjects`, `profile-language`) with ≥30 facts each, distributed across categories and ≥6 months of `observedAt` (see Task 11).
 
 **Modify:**
-- `packages/database/src/schema/_pgvector.ts` — extend with a nullable variant of `vector` so `embedding` column type is correctly inferred as `number[] | null`. Spec mandates a single shared customType (Data Model footnote on line 141).
-- `packages/database/src/schema/memory-facts.ts` — switch `embedding` to the nullable variant; add the type-level optionality.
-- `packages/database/src/repository.ts` — add `memoryFacts.findRelevant(queryEmbedding, k, extraWhere?)` method that runs the stage-1 SQL with `<=>` and `K' = 4·k` over-fetch.
-- `apps/api/src/services/memory/memory-facts.ts` — `writeMemoryFactsForAnalysis` accepts an optional `embedFn` injection so tests can stub Voyage; calls it best-effort per row.
-- `apps/api/src/services/learner-profile.ts:1285,1388` — pass an embedder into `writeMemoryFactsForAnalysis` derived from the env Voyage API key (see Task 3 detail).
-- `apps/api/src/inngest/functions/session-completed.ts` — pass the Voyage API key via `getStepVoyageApiKey()` into `applyAnalysis` so the writer can embed facts.
+- `packages/database/src/schema/_pgvector.ts` — extend with a `vectorNullable` variant whose TS data type is `number[] | null`. **No SQL DDL change** — the column at `packages/database/src/schema/memory-facts.ts:40` already declares `vector('embedding')` *without* `.notNull()`, so the column is already nullable in PostgreSQL (migration `0057_memory_facts.sql` shipped that shape). This task is purely a TypeScript-inference fix so consumers see `number[] | null`.
+- `packages/database/src/schema/memory-facts.ts` — switch `embedding` to the nullable variant for inference purposes only.
+- `packages/database/src/repository.ts` — add `memoryFacts.findRelevant(queryEmbedding, k, extraWhere?)` method that runs the stage-1 SQL with `<=>` and `K' = 4·k` over-fetch. The default WHERE excludes `category = 'suppressed'` (so suppressed rows never eat the K' budget); callers needing the suppressed set explicitly pass `extraWhere`.
+- `apps/api/src/services/memory/memory-facts.ts` — `replaceActiveMemoryFactsForProfile` captures `(text_normalized → embedding)` from existing rows before delete and restores onto rewritten rows whose `text_normalized` matches. New/changed rows ship with `embedding=null` (Voyage is NOT called from this function).
+- `apps/api/src/services/learner-profile.ts:1285,1388` — no signature change. The embed step is hoisted out of the transaction and lives in the caller (Inngest function), so `applyAnalysis` does not take an embedder.
+- `apps/api/src/inngest/functions/session-completed.ts` — after `applyAnalysis` returns successfully, run a **separate** `step.run('embed-new-facts', …)` that selects rows with `embedding IS NULL AND profile_id = $profileId` (recently inserted by the just-finished `applyAnalysis`) and embeds them with its own retry budget. This step's failure does not roll back the analysis.
 - `apps/api/src/inngest/index.ts` — register `memoryFactsEmbedBackfill`.
 - `apps/api/src/config.ts:66` — add `MEMORY_FACTS_RELEVANCE_RETRIEVAL` enum flag and helper.
 - `apps/api/src/config.test.ts:249` — extend tests to cover the new flag default + parse.
-- `apps/api/src/routes/sessions.ts:205,345,423,692` — thread a `memoryFactsRelevanceEnabled` boolean through to `session-exchange` options.
-- `apps/api/src/services/session/session-exchange.ts:836-894` — when `memoryFactsRelevanceEnabled`, call `getRelevantMemories` to derive `interests/strengths/struggles/communicationNotes` for the memory block; fall back to the recency snapshot otherwise.
+- `apps/api/src/routes/sessions.ts:205,345,423,692` — thread a `memoryFactsRelevanceEnabled` boolean through to `session-exchange` options. Read Voyage key via the typed config accessor (G4), not raw `c.env.VOYAGE_API_KEY`.
+- `apps/api/src/services/session/session-exchange.ts:836-894` — when `memoryFactsRelevanceEnabled`, compute `userMessageEmbedding` ONCE (per turn), pass it into both `retrieveRelevantMemory` (existing) and `getRelevantMemories` (new) so we hit Voyage once per user turn, not twice. Fall back to recency snapshot when the relevance flag is off.
 - `apps/api/eval-llm/scenarios.ts` (or equivalent registry) — register the new A/B flow.
+
+**Existing prior art to reuse, NOT to duplicate:**
+- `apps/api/src/services/memory.ts:46` — `retrieveRelevantMemory` (Story 3.10) — different table (`sessionEmbeddings`), different return shape (topic IDs). Stays as-is. Task 9 just shares the query embedding.
+- `findSimilarTopics` in `@eduagent/database` — proven two-stage pgvector retrieval pattern. Mirror its SQL shape in `findRelevant` rather than inventing.
 
 **Untouched (explicitly):**
 - `packages/database/src/schema/embeddings.ts` (separate `sessionEmbeddings` use case).
@@ -54,6 +65,8 @@
 ---
 
 ## Task 1: Add nullable variant to the pgvector customType
+
+**Scope:** TypeScript-inference fix only. The `embedding` column at `packages/database/src/schema/memory-facts.ts:40` already declares `vector('embedding')` *without* `.notNull()`, and migration `0057_memory_facts.sql` already created the column as nullable. Nothing in PostgreSQL changes. We are fixing the inferred TS row type from `number[]` to `number[] | null` so consumers (`replaceActiveMemoryFactsForProfile`, `findRelevant`) compile cleanly.
 
 **Files:**
 - Modify: `packages/database/src/schema/_pgvector.ts`
@@ -147,16 +160,14 @@ embedding: vectorNullable('embedding'),
 Run: `pnpm exec jest packages/database/src/schema/_pgvector.test.ts && pnpm exec nx run database:typecheck`
 Expected: PASS. The inferred row type for `memoryFacts` should now have `embedding: number[] | null`.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: Hand off to coordinator for commit**
 
-```bash
-git add packages/database/src/schema/_pgvector.ts \
-        packages/database/src/schema/_pgvector.test.ts \
-        packages/database/src/schema/memory-facts.ts
-git commit  # use /commit skill
-```
+Files to stage on commit (coordinator runs `/commit`):
+- `packages/database/src/schema/_pgvector.ts`
+- `packages/database/src/schema/_pgvector.test.ts`
+- `packages/database/src/schema/memory-facts.ts`
 
-Commit message: `feat(memory): add vectorNullable variant for memory_facts.embedding column`.
+Suggested commit message: `feat(memory): add vectorNullable variant for memory_facts.embedding column`.
 
 ---
 
@@ -214,12 +225,15 @@ Expected: FAIL with module not found.
 ```ts
 // apps/api/src/services/memory/embed-fact.ts
 import type { EmbeddingResult } from '../embeddings';
+import { generateEmbedding } from '../embeddings';
 
 export type EmbeddingFn = (text: string) => Promise<EmbeddingResult>;
 
 export type EmbedFactOutcome =
   | { ok: true; vector: number[] }
   | { ok: false; reason: string };
+
+export type FactEmbedder = (text: string) => Promise<EmbedFactOutcome>;
 
 export async function embedFactText(
   text: string,
@@ -238,106 +252,141 @@ export async function embedFactText(
     };
   }
 }
+
+/**
+ * Build a FactEmbedder from a Voyage API key. Used by both:
+ *  - the post-commit embed step in `session-completed.ts` (Task 3)
+ *  - the prompt-build retrieval helper in `session-exchange.ts` (Task 9)
+ * Returns a `{ ok: false, reason: 'no_voyage_key' }` outcome when the key
+ * is undefined so callers don't have to special-case dev environments.
+ */
+export const makeEmbedderFromEnv = (apiKey?: string): FactEmbedder =>
+  async (text) => {
+    if (!apiKey) return { ok: false, reason: 'no_voyage_key' };
+    return embedFactText(text, (t) => generateEmbedding(t, apiKey));
+  };
 ```
+
+Add a 4th unit test asserting `makeEmbedderFromEnv(undefined)('text')` resolves to `{ ok: false, reason: 'no_voyage_key' }` without making a network call.
 
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `cd apps/api && pnpm exec jest src/services/memory/embed-fact.test.ts`
-Expected: PASS (3 tests).
+Expected: PASS (4 tests).
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Hand off to coordinator for commit**
 
-```bash
-git add apps/api/src/services/memory/embed-fact.ts \
-        apps/api/src/services/memory/embed-fact.test.ts
-git commit  # /commit
-```
+Files to stage on commit:
+- `apps/api/src/services/memory/embed-fact.ts`
+- `apps/api/src/services/memory/embed-fact.test.ts`
 
-Commit message: `feat(memory): add embedFactText helper for Phase 2 embedding-on-write`.
+Suggested commit message: `feat(memory): add embedFactText + makeEmbedderFromEnv helpers for Phase 2`.
 
 ---
 
-## Task 3: Wire embedding-on-write into `writeMemoryFactsForAnalysis`
+## Task 3: Embed-on-write outside the transaction (preserve existing embeddings on rewrite)
 
-**Goal:** When `applyAnalysis` writes facts, each new row gets an `embedding` set on the same insert (best-effort). Voyage failure does NOT throw — the fact persists with `embedding=null` and the backfill cron picks it up.
+**Goal:** Two coupled architecture moves, both deploy-blocking:
+1. **Preserve embeddings across wholesale rewrites.** `replaceActiveMemoryFactsForProfile` (`apps/api/src/services/memory/memory-facts.ts:207-225`) deletes all active rows and reinserts them every session-end. Without preservation we'd pay Voyage for every active fact every session — a 50-fact profile = 50 Voyage calls per session, violating spec § "LLM Call Cost" line 307. Capture `(text_normalized → embedding)` from existing rows BEFORE deleting and restore the embedding onto rewritten rows whose `text_normalized` matches. Genuinely new or changed rows ship with `embedding=null` and are embedded by step (2).
+2. **Move Voyage calls out of the transaction.** `applyAnalysis` (`apps/api/src/services/learner-profile.ts:1251`) opens a tx with `SELECT … FOR UPDATE`. Calling Voyage inside that tx holds the row lock open across N HTTP calls (100-500 ms each) and on Inngest retry the *whole* tx replays — re-paying for facts already embedded. Run the embedder in a **separate** post-commit `step.run('embed-new-facts', …)` in `session-completed.ts`, scoped to rows where `embedding IS NULL AND profile_id = $profileId AND createdAt > $sessionStart`. Failure of this step does not roll back the analysis; backfill cron is the safety net.
 
 **Files:**
 - Modify: `apps/api/src/services/memory/memory-facts.ts:207-249`
+- Modify: `apps/api/src/inngest/functions/session-completed.ts` (post-commit step)
 - Test: `apps/api/src/services/memory/memory-facts.test.ts`
 
-- [ ] **Step 1: Write the failing tests**
+- [ ] **Step 1: Write the failing tests for embedding preservation**
 
 Add to `apps/api/src/services/memory/memory-facts.test.ts`:
 
 ```ts
-describe('writeMemoryFactsForAnalysis with embedder', () => {
-  it('embeds each new fact when an embedder is provided', async () => {
-    const embedder = jest.fn().mockResolvedValue({ ok: true, vector: new Array(1024).fill(0.1) });
-    // build a stub MemoryFactsWriter capturing inserts
-    const inserted: Array<Record<string, unknown>> = [];
-    const writer = makeWriterStub(inserted);
-    await writeMemoryFactsForAnalysis(
+describe('replaceActiveMemoryFactsForProfile — embedding preservation', () => {
+  it('copies existing embedding onto rewritten row with same text_normalized', async () => {
+    // Seed an existing row with a known embedding.
+    const existingEmbedding = new Array(1024).fill(0.5);
+    const writer = makeWriterStub({
+      existingActiveRows: [
+        { textNormalized: 'fractions', text: 'Fractions', category: 'struggle', embedding: existingEmbedding },
+      ],
+    });
+    await replaceActiveMemoryFactsForProfile(
       writer,
       'profile-1',
-      makeMergedState({ strengths: [{ subject: 'Math', topics: ['fractions'], confidence: 'high' }] }),
-      { embed: embedder }
+      makeProjectionWithStruggle('Fractions')
     );
-    expect(embedder).toHaveBeenCalledTimes(1);
-    expect(inserted[0]?.embedding).toEqual(expect.any(Array));
+    const inserted = writer.lastInsert();
+    expect(inserted).toHaveLength(1);
+    expect(inserted[0].embedding).toEqual(existingEmbedding);
   });
 
-  it('persists fact with embedding=null when embedder rejects', async () => {
-    const embedder = jest.fn().mockResolvedValue({ ok: false, reason: 'voyage 500' });
-    const inserted: Array<Record<string, unknown>> = [];
-    const writer = makeWriterStub(inserted);
-    await writeMemoryFactsForAnalysis(
+  it('inserts embedding=null for a row whose text_normalized has no prior match', async () => {
+    const writer = makeWriterStub({ existingActiveRows: [] });
+    await replaceActiveMemoryFactsForProfile(
       writer,
       'profile-1',
-      makeMergedState({ struggles: [{ topic: 'long division', confidence: 'medium', attempts: 2, lastSeen: new Date().toISOString() }] }),
-      { embed: embedder }
+      makeProjectionWithStruggle('Long division')
     );
-    expect(inserted[0]?.embedding).toBeNull();
+    expect(writer.lastInsert()[0].embedding).toBeNull();
   });
 
-  it('skips embedding entirely when no embedder is provided (Phase 1 parity)', async () => {
-    const inserted: Array<Record<string, unknown>> = [];
-    const writer = makeWriterStub(inserted);
-    await writeMemoryFactsForAnalysis(
+  it('drops embedding when text_normalized changes (treats as new content)', async () => {
+    const oldEmbedding = new Array(1024).fill(0.7);
+    const writer = makeWriterStub({
+      existingActiveRows: [
+        { textNormalized: 'fractions', text: 'Fractions', category: 'struggle', embedding: oldEmbedding },
+      ],
+    });
+    await replaceActiveMemoryFactsForProfile(
       writer,
       'profile-1',
-      makeMergedState({ communicationNotes: ['short answers preferred'] })
+      makeProjectionWithStruggle('Mixed numbers') // different normalized text
     );
-    expect(inserted[0]?.embedding).toBeUndefined();
+    expect(writer.lastInsert()[0].embedding).toBeNull();
   });
 });
 ```
 
-(The helpers `makeWriterStub` and `makeMergedState` live in the test file. Use the existing in-memory writer if one exists; otherwise build a minimal mock that captures the `.insert(...).values(...)` argument. Do **not** import `jest.mock` of internal modules — per CLAUDE.md.)
+The stub helper must capture both reads (existing rows) and inserts. Use the existing fake-DB pattern in this file; do NOT `jest.mock` the database module.
 
 - [ ] **Step 2: Run tests to verify failure**
 
-Run: `cd apps/api && pnpm exec jest src/services/memory/memory-facts.test.ts -t "with embedder"`
-Expected: FAIL — `writeMemoryFactsForAnalysis` does not accept an `embed` option yet.
+Run: `cd apps/api && pnpm exec jest src/services/memory/memory-facts.test.ts -t "embedding preservation"`
+Expected: FAIL — preservation logic does not exist yet.
 
-- [ ] **Step 3: Add the embedder option**
+- [ ] **Step 3: Implement preservation in `replaceActiveMemoryFactsForProfile`**
 
-Edit `apps/api/src/services/memory/memory-facts.ts`:
+Edit `apps/api/src/services/memory/memory-facts.ts`. The writer interface must gain a SELECT capability so we can read embeddings before deleting. The transaction object already supports `select`; widen `MemoryFactsWriter` to include it:
 
 ```ts
-import type { EmbedFactOutcome } from './embed-fact';
-
-export type FactEmbedder = (text: string) => Promise<EmbedFactOutcome>;
-
-export interface WriteMemoryFactsOptions {
-  embed?: FactEmbedder;
-}
+type MemoryFactsWriter = Pick<Database, 'delete' | 'insert' | 'update' | 'select'>;
 
 export async function replaceActiveMemoryFactsForProfile(
   db: MemoryFactsWriter,
   profileId: string,
-  projection: MemoryProjection,
-  options?: WriteMemoryFactsOptions
+  projection: MemoryProjection
 ): Promise<void> {
+  // 1. Snapshot existing (text_normalized → embedding) for this profile's active rows.
+  const existing = await db
+    .select({
+      textNormalized: memoryFacts.textNormalized,
+      category: memoryFacts.category,
+      embedding: memoryFacts.embedding,
+    })
+    .from(memoryFacts)
+    .where(
+      and(
+        eq(memoryFacts.profileId, profileId),
+        sql`${memoryFacts.supersededBy} IS NULL`
+      )
+    );
+
+  const embeddingByKey = new Map<string, number[] | null>();
+  for (const row of existing) {
+    // Compose key with category to avoid cross-category collisions on identical text.
+    embeddingByKey.set(`${row.category}::${row.textNormalized}`, row.embedding ?? null);
+  }
+
+  // 2. Delete + rebuild as before.
   await db
     .delete(memoryFacts)
     .where(
@@ -350,154 +399,192 @@ export async function replaceActiveMemoryFactsForProfile(
   const rows = buildMemoryFactRowsFromProjection(profileId, projection);
   if (rows.length === 0) return;
 
-  if (options?.embed) {
-    for (const row of rows) {
-      const result = await options.embed(row.text);
-      // best-effort: null on failure, picked up by backfill cron
-      (row as { embedding?: number[] | null }).embedding = result.ok ? result.vector : null;
-    }
+  // 3. Restore embeddings where text_normalized matches; otherwise null.
+  for (const row of rows) {
+    const key = `${row.category}::${row.textNormalized}`;
+    const restored = embeddingByKey.get(key);
+    (row as { embedding?: number[] | null }).embedding =
+      restored !== undefined ? restored : null;
   }
 
   await db.insert(memoryFacts).values(rows);
 }
-
-export async function writeMemoryFactsForAnalysis(
-  db: MemoryFactsWriter,
-  profileId: string,
-  mergedState: Parameters<typeof buildProjectionFromMergedState>[0],
-  options?: WriteMemoryFactsOptions
-): Promise<void> {
-  await replaceActiveMemoryFactsForProfile(
-    db,
-    profileId,
-    buildProjectionFromMergedState(mergedState),
-    options
-  );
-  await db
-    .update(learningProfiles)
-    .set({ memoryFactsBackfilledAt: new Date() })
-    .where(eq(learningProfiles.profileId, profileId));
-}
-
-export async function writeMemoryFactsForDeletion(
-  db: MemoryFactsWriter,
-  profileId: string,
-  mergedState: Parameters<typeof buildProjectionFromMergedState>[0],
-  options?: WriteMemoryFactsOptions
-): Promise<void> {
-  await writeMemoryFactsForAnalysis(db, profileId, mergedState, options);
-}
 ```
 
-- [ ] **Step 4: Run tests to verify pass**
+`writeMemoryFactsForAnalysis` and `writeMemoryFactsForDeletion` keep their existing signatures — **no embedder option is added.** Voyage is called outside this module.
 
-Run: `cd apps/api && pnpm exec jest src/services/memory/memory-facts.test.ts`
-Expected: PASS (existing tests + 3 new).
+- [ ] **Step 4: Run tests + typecheck**
 
-- [ ] **Step 5: Pass embedder from `applyAnalysis`**
+```
+cd apps/api && pnpm exec jest src/services/memory/memory-facts.test.ts
+pnpm exec nx run api:typecheck
+```
 
-Edit `apps/api/src/services/learner-profile.ts:1285` and `:1388` to thread an optional embedder:
+Expected: PASS — preservation tests + existing tests all green.
+
+- [ ] **Step 5: Add the post-commit embed step in `session-completed.ts`**
+
+Locate the `step.run('apply-analysis', ...)` block (around `apps/api/src/inngest/functions/session-completed.ts:1153` per the plan's earlier reference — verify line by reading the file). Immediately after that step returns, add a new sibling step:
 
 ```ts
-// new optional param at end of applyAnalysis signature
-options?: { embed?: FactEmbedder }
-// ...
-await writeMemoryFactsForAnalysis(tx, profileId, mergedState, options);
+await step.run('embed-new-memory-facts', async () => {
+  const apiKey = getStepVoyageApiKey();
+  if (!apiKey) {
+    return { status: 'skipped', reason: 'no_voyage_key' };
+  }
+  const db = getStepDatabase();
+  const embedder = makeEmbedderFromEnv(apiKey);
+
+  // Rows newly inserted by applyAnalysis have embedding=null and were
+  // created during this invocation. Scope by profileId only — the cron
+  // is the catch-all if any are missed here.
+  const rows = await db
+    .select({ id: memoryFacts.id, text: memoryFacts.text })
+    .from(memoryFacts)
+    .where(
+      and(
+        eq(memoryFacts.profileId, profileId),
+        isNull(memoryFacts.embedding),
+        sql`${memoryFacts.supersededBy} IS NULL`
+      )
+    )
+    .limit(50); // hard cap per session — cron picks up overflow
+
+  let embedded = 0;
+  let failed = 0;
+  for (const row of rows) {
+    const result = await embedder(row.text);
+    if (!result.ok) {
+      failed += 1;
+      logger.warn('[memory_facts] embed-on-write failed', {
+        event: 'memory_facts.embed_on_write.failed',
+        profileId,
+        reason: result.reason,
+      });
+      continue;
+    }
+    await db
+      .update(memoryFacts)
+      .set({ embedding: result.vector, updatedAt: new Date() })
+      .where(eq(memoryFacts.id, row.id));
+    embedded += 1;
+  }
+  return { embedded, failed, scanned: rows.length };
+});
 ```
 
-Same change to the deletion path. The deletion path (`buildDeleteMemoryItemUpdates` callsite) does NOT need an embedder — deletes do not insert new fact rows. **Verify** by reading `learner-profile.ts:1380-1395` before adding the option there. If deletion only removes rows, omit the option from that call entirely.
+Imports: `makeEmbedderFromEnv` from `services/memory/embed-fact`, `memoryFacts` from `@eduagent/database`, `isNull`/`and`/`eq`/`sql` from `drizzle-orm`. Also emit a paired `memory_facts.embed_on_write.attempted` counter (see Task 12) so success-rate SLO has a denominator.
 
-- [ ] **Step 6: Pass Voyage key from session-completed Inngest function**
+This step has its own retry budget. If Voyage 502s, only this step retries — `applyAnalysis` is already committed. Cron picks up any rows still null after this step gives up.
 
-In `apps/api/src/inngest/functions/session-completed.ts:1153`, inside the `applyAnalysis` step:
+- [ ] **Step 6: Add a unit test for the post-commit embed step (no internal mocks)**
 
-```ts
-const voyageApiKey = getStepVoyageApiKey();
-const embed: FactEmbedder = async (text: string) => {
-  if (!voyageApiKey) return { ok: false, reason: 'no_voyage_key' };
-  return embedFactText(text, (t) => generateEmbedding(t, voyageApiKey));
-};
-const analysisResult = await applyAnalysis(
-  db, profileId, analysis, subjectName, source, subjectId, { embed }
-);
-```
-
-Imports: add `embedFactText`, `FactEmbedder` from `services/memory/embed-fact` and `services/memory/memory-facts`; `generateEmbedding` already imported via `services/embeddings`.
-
-If `getStepVoyageApiKey()` returns `undefined` in dev, the `no_voyage_key` outcome means new facts persist with `embedding=null` — same behavior as a Voyage outage; backfill cron will pick them up if/when the key is configured.
+In `apps/api/src/inngest/functions/session-completed.test.ts`, add a test that runs the `'embed-new-memory-facts'` step against a real-ish DB stub: seed two rows with `embedding=null`, run the step with a fake-Voyage embedder (HTTP-level fake or pure-fn embedder injected via test harness, NOT a `jest.mock` of the embeddings module), assert both rows now have `embedding=[…]`. If the existing harness can't run individual `step.run` callbacks, extract the callback into an exported function `embedNewFactsForProfile(db, profileId, embedder)` and unit-test that.
 
 - [ ] **Step 7: Run unit + integration tests**
 
 ```
-cd apps/api && pnpm exec jest src/services/memory/ src/services/learner-profile.test.ts src/inngest/functions/session-completed.test.ts
+cd apps/api && pnpm exec jest src/services/memory/ src/inngest/functions/session-completed.test.ts
 ```
 
-Expected: PASS. The session-completed test does NOT verify Voyage was called (no internal mocks); it verifies the embedder option was wired without breaking existing behavior.
+Expected: PASS. Verify the `applyAnalysis` step does NOT call Voyage by re-reading `learner-profile.ts:1251-1290` — that path no longer references any embedder.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 8: Hand off to coordinator for commit**
 
-Commit message: `feat(memory): embed facts on write best-effort, persist null on Voyage failure`.
+Files to stage on commit:
+- `apps/api/src/services/memory/memory-facts.ts`
+- `apps/api/src/services/memory/memory-facts.test.ts`
+- `apps/api/src/inngest/functions/session-completed.ts`
+- `apps/api/src/inngest/functions/session-completed.test.ts` (if extended)
+
+Suggested commit message: `feat(memory): preserve embeddings across rewrites; embed new facts post-commit (Phase 2)`.
 
 ---
 
-## Task 4: Integration test — embed-on-write happy path and outage path
+## Task 4: Integration test — embed-on-write happy path, outage, and cost regression guard
 
 **Files:**
 - Create: `tests/integration/memory-facts-embed-on-write.integration.test.ts`
 
-This is the high-level deploy-blocking guarantee. It must use the real DB and a fake Voyage (HTTP-level fake, not a `jest.mock` of internal code — see CLAUDE.md "No internal mocks in integration tests").
+This is the high-level deploy-blocking guarantee. It must use the real DB and a fake Voyage (HTTP-level fake, not a `jest.mock` of internal code — see CLAUDE.md "No internal mocks in integration tests"). The test exercises both `applyAnalysis` (commits with `embedding=null`) and the post-commit `embed-new-memory-facts` step from Task 3.
 
 - [ ] **Step 1: Write the test**
 
-Use the integration helpers under `tests/integration/helpers/` (already present per `git status`). Pattern after `tests/integration/memory-facts-dual-write.integration.test.ts`.
+Use the integration helpers under `tests/integration/helpers/`. Pattern after `tests/integration/memory-facts-dual-write.integration.test.ts`.
 
 ```ts
 // tests/integration/memory-facts-embed-on-write.integration.test.ts
 import { setupTestDb, seedProfile } from './helpers';
 import { applyAnalysis } from '../../apps/api/src/services/learner-profile';
+import { embedNewFactsForProfile } from '../../apps/api/src/inngest/functions/session-completed'; // exported per Task 3 step 6
 import { memoryFacts } from '@eduagent/database';
 import { eq, and, isNull, isNotNull } from 'drizzle-orm';
 
 describe('memory_facts embed-on-write', () => {
-  // Use msw or a tiny fetch override to fake Voyage at the HTTP boundary.
-  // Voyage is a TRUE external — fakeing the HTTP response is allowed.
+  // Voyage is a TRUE external — HTTP-level fake is allowed.
 
-  it('writes embeddings for newly extracted facts', async () => {
+  it('writes embedding=null in tx, post-commit step fills embeddings', async () => {
     const { db, profileId } = await setupTestDb();
     const fakeVoyage = mockVoyageReturning(new Array(1024).fill(0.05));
-    await applyAnalysis(
-      db, profileId, /* analysis */ stubAnalysis(['fractions']), 'Math', 'inferred', null,
-      { embed: fakeVoyage.embedFn }
-    );
-    const rows = await db.select().from(memoryFacts).where(eq(memoryFacts.profileId, profileId));
-    expect(rows.length).toBeGreaterThan(0);
-    expect(rows.every((r) => r.embedding !== null)).toBe(true);
+
+    await applyAnalysis(db, profileId, stubAnalysis(['fractions']), 'Math', 'inferred', null);
+    const rowsAfterTx = await db.select().from(memoryFacts).where(eq(memoryFacts.profileId, profileId));
+    expect(rowsAfterTx.length).toBeGreaterThan(0);
+    expect(rowsAfterTx.every((r) => r.embedding === null)).toBe(true);
+
+    await embedNewFactsForProfile(db, profileId, fakeVoyage.embedder);
+    const rowsAfterEmbed = await db.select().from(memoryFacts).where(eq(memoryFacts.profileId, profileId));
+    expect(rowsAfterEmbed.every((r) => r.embedding !== null)).toBe(true);
   });
 
-  it('persists fact with embedding=null when Voyage 500s', async () => {
+  it('persists fact with embedding=null when Voyage 500s — cron picks up later', async () => {
     const { db, profileId } = await setupTestDb();
     const fakeVoyage = mockVoyageThrowing();
-    await applyAnalysis(
-      db, profileId, stubAnalysis(['fractions']), 'Math', 'inferred', null,
-      { embed: fakeVoyage.embedFn }
-    );
-    const rows = await db.select().from(memoryFacts).where(
+    await applyAnalysis(db, profileId, stubAnalysis(['fractions']), 'Math', 'inferred', null);
+    await embedNewFactsForProfile(db, profileId, fakeVoyage.embedder); // does not throw
+
+    const stillNull = await db.select().from(memoryFacts).where(
       and(eq(memoryFacts.profileId, profileId), isNull(memoryFacts.embedding))
     );
-    expect(rows.length).toBeGreaterThan(0);
+    expect(stillNull.length).toBeGreaterThan(0);
   });
 
-  it('does not double-embed on retry — embeddings are idempotent per write', async () => {
+  it('COST REGRESSION: re-running applyAnalysis with same content does NOT re-embed', async () => {
+    // This test guards spec § "LLM Call Cost" line 307. Without embedding
+    // preservation in replaceActiveMemoryFactsForProfile, every session-end
+    // re-embeds every active fact (50 facts → 50 Voyage calls every session).
     const { db, profileId } = await setupTestDb();
     const fakeVoyage = mockVoyageReturning(new Array(1024).fill(0.1));
-    await applyAnalysis(db, profileId, stubAnalysis(['fractions']), 'Math', 'inferred', null, { embed: fakeVoyage.embedFn });
-    await applyAnalysis(db, profileId, stubAnalysis(['fractions']), 'Math', 'inferred', null, { embed: fakeVoyage.embedFn });
+
+    // First run: 1 new fact, 1 embed call.
+    await applyAnalysis(db, profileId, stubAnalysis(['fractions']), 'Math', 'inferred', null);
+    await embedNewFactsForProfile(db, profileId, fakeVoyage.embedder);
+    const callsAfterFirst = fakeVoyage.calls.length;
+    expect(callsAfterFirst).toBe(1);
+
+    // Second run: identical content. Active set is wiped + rewritten by
+    // replaceActiveMemoryFactsForProfile, but embeddings must be preserved.
+    await applyAnalysis(db, profileId, stubAnalysis(['fractions']), 'Math', 'inferred', null);
+    await embedNewFactsForProfile(db, profileId, fakeVoyage.embedder);
+    expect(fakeVoyage.calls.length).toBe(callsAfterFirst); // ZERO new calls
     const rows = await db.select().from(memoryFacts).where(
       and(eq(memoryFacts.profileId, profileId), isNotNull(memoryFacts.embedding))
     );
-    // active set is 1 (replaceActiveMemoryFactsForProfile clears + reinserts);
-    // verify embedding is set, not duplicated
     expect(rows.length).toBe(1);
+  });
+
+  it('embeds genuinely new facts on subsequent run, leaves existing embeddings intact', async () => {
+    const { db, profileId } = await setupTestDb();
+    const fakeVoyage = mockVoyageReturning(new Array(1024).fill(0.1));
+
+    await applyAnalysis(db, profileId, stubAnalysis(['fractions']), 'Math', 'inferred', null);
+    await embedNewFactsForProfile(db, profileId, fakeVoyage.embedder);
+    expect(fakeVoyage.calls.length).toBe(1);
+
+    // Second analysis adds 'long division' as a new struggle.
+    await applyAnalysis(db, profileId, stubAnalysis(['fractions', 'long division']), 'Math', 'inferred', null);
+    await embedNewFactsForProfile(db, profileId, fakeVoyage.embedder);
+    expect(fakeVoyage.calls.length).toBe(2); // exactly one additional embed
   });
 });
 ```
@@ -508,17 +595,22 @@ describe('memory_facts embed-on-write', () => {
 pnpm exec jest tests/integration/memory-facts-embed-on-write.integration.test.ts --runInBand
 ```
 
-Expected: PASS (3 tests).
+Expected: PASS (4 tests). The third test is the deploy-blocking cost regression guard.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 3: Hand off to coordinator for commit**
 
-Commit message: `test(memory): integration coverage for embed-on-write happy path and Voyage outage`.
+Files to stage:
+- `tests/integration/memory-facts-embed-on-write.integration.test.ts`
+
+Suggested commit message: `test(memory): integration coverage for embed-on-write incl. cost regression guard`.
 
 ---
 
 ## Task 5: Embed-backfill Inngest cron
 
-**Goal:** Hourly cron picks up rows with `embedding IS NULL`, batches 100 at a time, embeds, updates. Self-throttling (sequential per row inside batch). Alert when backlog > 1000 rows.
+**Goal:** Hourly cron picks up rows with `embedding IS NULL`, batches 100 at a time, embeds, then commits the batch via a single batched `UPDATE … FROM (VALUES …)` (one round-trip per batch, not 100). Self-throttling at the Voyage call site. Alert when backlog > 1000 rows.
+
+**Prior art to mirror:** `apps/api/src/inngest/functions/memory-facts-backfill.ts` is the existing JSONB-to-`memory_facts` backfill cron registered alongside other Inngest functions. Follow its `step.run` shape, logger pattern, and registration site exactly. Read it before implementing — do not re-invent the batching skeleton. Also reference `apps/api/src/inngest/helpers.ts` to confirm `getStepDatabase()` and `getStepVoyageApiKey()` signatures (cite the lines in code comments rather than guessing).
 
 **Files:**
 - Create: `apps/api/src/inngest/functions/memory-facts-embed-backfill.ts`
@@ -619,7 +711,8 @@ export const memoryFactsEmbedBackfill = inngest.createFunction(
           .where(isNull(memoryFacts.embedding))
           .limit(BATCH_SIZE);
 
-        let embedded = 0;
+        // Embed sequentially (Voyage rate-limits) but commit in ONE statement.
+        const updates: Array<{ id: string; vector: number[] }> = [];
         let failed = 0;
         for (const row of rows) {
           const result = await embedFactText(row.text, (t) => generateEmbedding(t, apiKey));
@@ -627,13 +720,29 @@ export const memoryFactsEmbedBackfill = inngest.createFunction(
             failed += 1;
             continue;
           }
-          await db
-            .update(memoryFacts)
-            .set({ embedding: result.vector, updatedAt: new Date() })
-            .where(eq(memoryFacts.id, row.id));
-          embedded += 1;
+          updates.push({ id: row.id, vector: result.vector });
         }
-        return { embedded, failed, scanned: rows.length };
+
+        if (updates.length > 0) {
+          // Single batched UPDATE: one round-trip instead of N.
+          // UPDATE memory_facts SET embedding = data.embedding, updated_at = now()
+          // FROM (VALUES (id1, vec1), (id2, vec2), ...) AS data(id, embedding)
+          // WHERE memory_facts.id = data.id
+          const valuesSql = sql.join(
+            updates.map(
+              (u) => sql`(${u.id}::uuid, ${`[${u.vector.join(',')}]`}::vector)`
+            ),
+            sql`, `
+          );
+          await db.execute(sql`
+            UPDATE memory_facts
+            SET embedding = data.embedding, updated_at = now()
+            FROM (VALUES ${valuesSql}) AS data(id, embedding)
+            WHERE memory_facts.id = data.id
+          `);
+        }
+
+        return { embedded: updates.length, failed, scanned: rows.length };
       });
 
       totalEmbedded += batch.embedded;
@@ -675,15 +784,22 @@ cd apps/api && pnpm exec jest src/inngest/functions/memory-facts-embed-backfill.
 
 Expected: PASS (3 tests).
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: Hand off to coordinator for commit**
 
-Commit message: `feat(memory): hourly Inngest cron embeds memory_facts rows with embedding IS NULL`.
+Files to stage:
+- `apps/api/src/inngest/functions/memory-facts-embed-backfill.ts`
+- `apps/api/src/inngest/functions/memory-facts-embed-backfill.test.ts`
+- `apps/api/src/inngest/index.ts`
+
+Suggested commit message: `feat(memory): hourly Inngest cron embeds memory_facts rows with embedding IS NULL`.
 
 ---
 
 ## Task 6: Repository helper — two-stage retrieval SQL
 
 **Goal:** Add `memoryFacts.findRelevant(queryEmbedding, k, extraWhere?)` to `createScopedRepository(profileId)`. SQL fetches top `K' = 4·k` candidates by `<=>` cosine distance against the partial HNSW index. Returns rows + distance.
+
+**Default-excludes `category = 'suppressed'`.** Suppressed rows exist in the table because the user told us to forget them; they must never eat the K' budget for prompt injection. Future callers (Phase 3 dedup) needing the suppressed set explicitly pass `extraWhere`. This mirrors the rationale of `findManyActive` filtering on `supersededBy IS NULL` — exclude-by-default what no read path should surface.
 
 **Files:**
 - Modify: `packages/database/src/repository.ts:374-397`
@@ -723,11 +839,15 @@ async findRelevant(queryEmbedding: number[], k: number, extraWhere?: SQL) {
   if (queryEmbedding.length === 0) return [];
   const overFetch = Math.max(k * 4, k);
   const queryLiteral = sql`${`[${queryEmbedding.join(',')}]`}::vector`;
+  // Default exclusions: superseded rows AND suppressed category. Callers wanting
+  // to include either explicitly pass extraWhere overriding the category clause.
+  const defaultFilters = and(
+    sql`${memoryFacts.supersededBy} IS NULL`,
+    sql`${memoryFacts.category} <> 'suppressed'`
+  );
   const baseWhere = scopedWhere(
     memoryFacts,
-    extraWhere
-      ? and(sql`${memoryFacts.supersededBy} IS NULL`, extraWhere)
-      : sql`${memoryFacts.supersededBy} IS NULL`
+    extraWhere ? and(defaultFilters, extraWhere) : defaultFilters
   );
   return db
     .select({
@@ -751,6 +871,8 @@ async findRelevant(queryEmbedding: number[], k: number, extraWhere?: SQL) {
 },
 ```
 
+**Spec § Phase 2 acceptance line 260 / 382 (`embedding IS NULL` fallback trigger).** The SQL above filters `embedding IS NOT NULL`, so unembedded rows never reach stage 2. The spec's "fall back when any candidate has `embedding IS NULL`" is therefore satisfied implicitly — fewer rows return, and the `< k` trigger fires. The plan implements only the `< k` branch in `getRelevantMemories` (Task 7). Update the spec text in the same PR to remove the impossible-to-trip `IS NULL` clause.
+
 The partial HNSW index (`memory_facts_embedding_hnsw_idx WHERE superseded_by IS NULL`) already enforces both filters at the index level; the explicit `superseded_by IS NULL` keeps the planner correct when HNSW is bypassed (low row counts, dev). The `embedding IS NOT NULL` clause is required because a partial HNSW index does not cover NULL rows and the planner may otherwise consider them.
 
 - [ ] **Step 4: Verify test pass + typecheck**
@@ -762,15 +884,23 @@ pnpm exec nx run database:typecheck
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Hand off to coordinator for commit**
 
-Commit message: `feat(memory): scoped repo helper memoryFacts.findRelevant for two-stage retrieval`.
+Files to stage:
+- `packages/database/src/repository.ts`
+- `packages/database/src/repository.test.ts`
+
+Suggested commit message: `feat(memory): scoped repo helper memoryFacts.findRelevant for two-stage retrieval`.
 
 ---
 
 ## Task 7: `getRelevantMemories` service with consent gate, blend, and fallback
 
-**Goal:** Top-level retrieval entry point used by prompt builders. Must be wrapped in `createScopedRepository(profileId)`, gate on consent flags, blend relevance + recency, and fall back to recency-only when the candidate set is incomplete.
+**Goal:** Top-level retrieval entry point used by prompt builders. Must be wrapped in `createScopedRepository(profileId)`, gate on consent flags, blend relevance + recency, and fall back to recency-only when stage 1 returns < k candidates.
+
+**Default weights are RELEVANCE-DOMINANT (`relevance=0.85, recency=0.15, halflife=180`).** Spec § Problem (line 13) states the explicit goal: *"When a learner returns to fractions after three months, the mentor sees what was noted last week — which may be about something entirely different."* — i.e., we WANT old-but-relevant facts to win over recent-loose facts. The previously-proposed `0.7/0.3, halflife=90` defaults invert this: a 1-day-old fact at distance 0.40 (loose) scores 0.857 vs. a 180-day-old fact at distance 0.05 (tight) scoring 0.724 — recent-loose wins, defeating the spec's goal. The `0.85/0.15, halflife=180` defaults flip that: tight-old wins by ~0.07. A/B harness (Task 11) tunes from there. Caller can still override via `weights` option for experiments.
+
+**Accepts a precomputed `queryVector` to share Voyage embeddings across the call chain.** `session-exchange` already embeds `userMessage` for `retrieveRelevantMemory` (`apps/api/src/services/memory.ts:46`). Forcing a second Voyage call here would double per-turn cost. The signature accepts EITHER `queryText` (and embeds internally) OR a precomputed `queryVector` (used as-is).
 
 **Files:**
 - Create: `apps/api/src/services/memory/relevance.ts`
@@ -818,12 +948,12 @@ describe('getRelevantMemories', () => {
     expect(result.source).toBe('recency_fallback');
   });
 
-  it('blends relevance and recency scores (default weights 0.7 / 0.3, halflife 90d)', async () => {
+  it('blends relevance and recency, OLD-tight beats RECENT-loose under defaults', async () => {
+    // This test enforces the spec § Problem goal (line 13): old-but-relevant
+    // must win over recent-loose. Defaults: relevance=0.85, recency=0.15, halflife=180.
     const now = new Date('2026-05-05T00:00:00Z');
     const candidates = [
-      // very relevant but old (180 days)
-      makeRelevantRow({ distance: 0.05, observedAt: addDays(now, -180), text: 'old-relevant' }),
-      // less relevant but recent (1 day)
+      makeRelevantRow({ distance: 0.05, observedAt: addDays(now, -180), text: 'old-tight' }),
       makeRelevantRow({ distance: 0.40, observedAt: addDays(now, -1),   text: 'recent-loose' }),
     ];
     const scoped = stubScopedReturning({ relevant: candidates, active: [] });
@@ -831,9 +961,18 @@ describe('getRelevantMemories', () => {
       profileId: 'p1', queryText: 'fractions', k: 1,
       profile: grantedProfile(), scoped, embedder: stubEmbedderOk(), now,
     });
-    // old-relevant: (1 - 0.05/2)*0.7 + exp(-180/90)*0.3 ≈ 0.683 + 0.041 = 0.724
-    // recent-loose: (1 - 0.40/2)*0.7 + exp(-1/90)*0.3   ≈ 0.560 + 0.297 = 0.857
-    expect(result.topRendered).toEqual(['recent-loose']);
+    // old-tight:    (1 - 0.05/2)*0.85 + exp(-180/180)*0.15 ≈ 0.829 + 0.055 = 0.884
+    // recent-loose: (1 - 0.40/2)*0.85 + exp(-1/180)*0.15   ≈ 0.680 + 0.149 = 0.829
+    expect(result.topRendered).toEqual(['old-tight']);
+  });
+
+  it('uses the precomputed queryVector when provided (no embedder call)', async () => {
+    const embedder = jest.fn();
+    await getRelevantMemories({
+      profileId: 'p1', queryVector: new Array(1024).fill(0.1), k: 5,
+      profile: grantedProfile(), scoped: stubScoped(), embedder, now: new Date(),
+    });
+    expect(embedder).not.toHaveBeenCalled();
   });
 
   it('respects custom weights when caller overrides', async () => { /* set w_recency=0 → pure relevance ordering */ });
@@ -852,25 +991,22 @@ Expected: FAIL — module not found.
 ```ts
 // apps/api/src/services/memory/relevance.ts
 import type { ScopedRepository } from '@eduagent/database';
-import type { FactEmbedder } from './memory-facts';
-import { emptyMemorySnapshot, type MemorySnapshot } from './memory-facts';
-import {
-  reconstructStrengthFromRow,
-  reconstructStruggleFromRow,
-  reconstructInterestFromRow,
-} from './memory-facts'; // export these from memory-facts.ts as part of this task
+import type { FactEmbedder } from './embed-fact';
+import { emptyMemorySnapshot, type MemorySnapshot, readMemorySnapshotFromFacts } from './memory-facts';
 
 export interface RelevanceWeights {
   relevance: number;
   recency: number;
-  /** halflife in days; default 90 */
+  /** halflife in days; default 180 (deliberately long — see Task 7 header) */
   halflifeDays: number;
 }
 
+/** Defaults flipped relevance-dominant to satisfy spec § Problem line 13.
+ *  Tune via A/B harness (Task 11) before flag flip. */
 export const DEFAULT_WEIGHTS: RelevanceWeights = {
-  relevance: 0.7,
-  recency: 0.3,
-  halflifeDays: 90,
+  relevance: 0.85,
+  recency: 0.15,
+  halflifeDays: 180,
 };
 
 export interface RelevanceResult {
@@ -881,7 +1017,9 @@ export interface RelevanceResult {
 
 export interface GetRelevantMemoriesArgs {
   profileId: string;
-  queryText: string;
+  /** Provide one of queryText OR queryVector. queryVector skips Voyage. */
+  queryText?: string;
+  queryVector?: number[];
   k: number;
   profile: {
     memoryConsentStatus?: string | null;
@@ -889,7 +1027,8 @@ export interface GetRelevantMemoriesArgs {
     memoryInjectionEnabled?: boolean;
   } | null;
   scoped: ScopedRepository;
-  embedder: FactEmbedder;
+  /** Required when queryText is provided; ignored when queryVector is set. */
+  embedder?: FactEmbedder;
   weights?: Partial<RelevanceWeights>;
   now?: Date;
 }
@@ -897,7 +1036,7 @@ export interface GetRelevantMemoriesArgs {
 export async function getRelevantMemories(
   args: GetRelevantMemoriesArgs
 ): Promise<RelevanceResult> {
-  const { profileId, queryText, k, profile, scoped, embedder, weights, now } = args;
+  const { profileId, queryText, queryVector, k, profile, scoped, embedder, weights, now } = args;
   const w: RelevanceWeights = { ...DEFAULT_WEIGHTS, ...(weights ?? {}) };
   const t = now ?? new Date();
 
@@ -908,15 +1047,25 @@ export async function getRelevantMemories(
     return { snapshot: emptyMemorySnapshot(), source: 'consent_gate' };
   }
 
-  // Stage 0: embed the query.
-  const queryEmb = await embedder(queryText);
-  if (!queryEmb.ok) {
-    const fallback = await readMemorySnapshotFromFacts(scoped, profile);
-    return { snapshot: fallback, source: 'recency_fallback' };
+  // Stage 0: obtain query vector — skip Voyage if precomputed.
+  let vector: number[];
+  if (queryVector) {
+    vector = queryVector;
+  } else {
+    if (!queryText || !embedder) {
+      const fallback = await readMemorySnapshotFromFacts(scoped, profile);
+      return { snapshot: fallback, source: 'recency_fallback' };
+    }
+    const queryEmb = await embedder(queryText);
+    if (!queryEmb.ok) {
+      const fallback = await readMemorySnapshotFromFacts(scoped, profile);
+      return { snapshot: fallback, source: 'recency_fallback' };
+    }
+    vector = queryEmb.vector;
   }
 
-  // Stage 1: top-K' candidates from SQL.
-  const candidates = await scoped.memoryFacts.findRelevant(queryEmb.vector, k);
+  // Stage 1: top-K' candidates from SQL (suppressed category excluded by default).
+  const candidates = await scoped.memoryFacts.findRelevant(vector, k);
   if (candidates.length < k) {
     const fallback = await readMemorySnapshotFromFacts(scoped, profile);
     return { snapshot: fallback, source: 'recency_fallback' };
@@ -954,9 +1103,14 @@ pnpm exec nx run api:lint
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Hand off to coordinator for commit**
 
-Commit message: `feat(memory): getRelevantMemories with two-stage retrieval, consent gate, recency fallback`.
+Files to stage:
+- `apps/api/src/services/memory/relevance.ts`
+- `apps/api/src/services/memory/relevance.test.ts`
+- `apps/api/src/services/memory/memory-facts.ts` (if reconstruct helpers were exported)
+
+Suggested commit message: `feat(memory): getRelevantMemories with two-stage retrieval, consent gate, recency fallback`.
 
 ---
 
@@ -1013,19 +1167,27 @@ export function isMemoryFactsRelevanceEnabled(value: string | undefined): boolea
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Hand off to coordinator for commit**
 
-Commit message: `feat(config): add MEMORY_FACTS_RELEVANCE_RETRIEVAL flag (default off)`.
+Files to stage:
+- `apps/api/src/config.ts`
+- `apps/api/src/config.test.ts`
+
+Suggested commit message: `feat(config): add MEMORY_FACTS_RELEVANCE_RETRIEVAL flag (default off)`.
 
 ---
 
-## Task 9: Wire relevance retrieval into prompt builders
+## Task 9: Wire relevance retrieval into prompt builders, sharing the per-turn query embedding
 
-**Goal:** When the flag is on AND `memoryFactsReadEnabled` is on (relevance depends on the read path), tutor / quiz / coaching prompts pull memory via `getRelevantMemories(profileId, queryText, k)`. Recency stays as the off-flag path.
+**Goal:** When the flag is on AND `memoryFactsReadEnabled` is on, tutor / quiz / coaching prompts pull memory via `getRelevantMemories(...)`. The *same* `userMessage` embedding is shared with `retrieveRelevantMemory` (existing helper at `services/memory.ts:46`) so we make exactly ONE Voyage call per user turn, not two.
+
+**Cost note:** The spec § "LLM Call Cost per session-completed" table only counted write-side embeddings. Update that table in this PR to include `+M` Voyage calls per session, where M = number of user turns (one per turn after the sharing optimization here lands; would have been `2M` without it).
 
 **Files:**
-- Modify: `apps/api/src/routes/sessions.ts:205,345,423,692` (env read + threading)
+- Modify: `apps/api/src/routes/sessions.ts:205,345,423,692` (env read via typed config + threading)
 - Modify: `apps/api/src/services/session/session-exchange.ts:291,836-894,1239,1343`
+- Modify: `apps/api/src/services/memory.ts:46` — accept an optional precomputed `queryVector` to skip the duplicate Voyage call (mirrors Task 7's signature).
+- Modify: `docs/specs/2026-05-05-memory-architecture-upgrade.md` § "LLM Call Cost per session-completed" — add the per-turn retrieval cost.
 
 - [ ] **Step 1: Choose the `queryText` for retrieval**
 
@@ -1036,18 +1198,19 @@ The retrieval needs a *query string* per call site. Use:
 
 Document this in a comment at the call site.
 
-- [ ] **Step 2: Add the threading**
+- [ ] **Step 2: Add the threading (typed config, not raw `c.env`)**
 
-In `sessions.ts:205`:
+In `sessions.ts:205`, use the typed config accessor (CLAUDE.md G4 rule: "use the typed config object instead of raw `process.env` reads"). Verify the project's helper name by reading `apps/api/src/config.ts` and one neighbouring route file that already reads Voyage config — copy that pattern. Pseudocode:
 
 ```ts
-const memoryFactsReadEnabled = isMemoryFactsReadEnabled(c.env.MEMORY_FACTS_READ_ENABLED);
+const env = getTypedEnv(c); // whatever the project's accessor is — DO NOT invent a name
+const memoryFactsReadEnabled = isMemoryFactsReadEnabled(env.MEMORY_FACTS_READ_ENABLED);
 const memoryFactsRelevanceEnabled =
   memoryFactsReadEnabled &&
-  isMemoryFactsRelevanceEnabled(c.env.MEMORY_FACTS_RELEVANCE_RETRIEVAL);
+  isMemoryFactsRelevanceEnabled(env.MEMORY_FACTS_RELEVANCE_RETRIEVAL);
 ```
 
-Pass `memoryFactsRelevanceEnabled` through the same options chain as `memoryFactsReadEnabled` to `session-exchange`.
+Pass `memoryFactsRelevanceEnabled` through the same options chain as `memoryFactsReadEnabled` to `session-exchange`. The Voyage key is read inside `session-exchange` (it already pulls `options?.voyageApiKey` for `retrieveRelevantMemory` at line 380) — no new threading required.
 
 In `session-exchange.ts`, add the option:
 
@@ -1055,26 +1218,53 @@ In `session-exchange.ts`, add the option:
 options?: {
   memoryFactsReadEnabled?: boolean;
   memoryFactsRelevanceEnabled?: boolean;
+  voyageApiKey?: string; // already exists for retrieveRelevantMemory
 }
 ```
 
-- [ ] **Step 3: Switch the snapshot derivation**
+- [ ] **Step 3: Compute `userMessageEmbedding` once and share it**
+
+`session-exchange.ts:380` already calls `retrieveRelevantMemory(db, profileId, userMessage, options?.voyageApiKey)` — that call internally embeds `userMessage`. To avoid a second Voyage call when relevance retrieval is also on, hoist the embedding out:
+
+```ts
+import { generateEmbedding } from '../embeddings';
+import { makeEmbedderFromEnv } from '../memory/embed-fact';
+import { getRelevantMemories } from '../memory/relevance';
+
+// Compute once per user turn. Skip if no key (dev) — both downstream
+// helpers handle the empty-vector / fallback case.
+let userMessageVector: number[] | undefined;
+if (options?.voyageApiKey && (options.memoryFactsRelevanceEnabled || /* existing similar-topics path */ true)) {
+  try {
+    const emb = await generateEmbedding(userMessage, options.voyageApiKey);
+    userMessageVector = emb.vector;
+  } catch (err) {
+    logger.warn('[session-exchange] userMessage embedding failed; downstream paths will fall back', {
+      event: 'session_exchange.user_msg_embedding.failed',
+      reason: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+```
+
+Pass `userMessageVector` into BOTH:
+- `retrieveRelevantMemory(db, profileId, userMessage, options?.voyageApiKey, /* limit */ undefined, userMessageVector)` — extend that helper's signature in `services/memory.ts:46` to accept and prefer a precomputed vector.
+- `getRelevantMemories({ ..., queryVector: userMessageVector, embedder: undefined })` (Task 7's signature accepts `queryVector` and skips Voyage when set).
 
 Replace the conditional at `session-exchange.ts:836`:
 
 ```ts
-const queryText = `${topic?.title ?? subject?.name ?? 'general'} — ${lastUserUtterance ?? ''}`.trim();
-
 const memorySnapshot = !learningProfile
   ? null
   : options?.memoryFactsRelevanceEnabled
   ? (await getRelevantMemories({
       profileId,
-      queryText,
+      queryVector: userMessageVector, // shared embedding
+      queryText: userMessage,          // fallback if vector is undefined
       k: 8, // matches the existing recency cap; tune in eval review
       profile: learningProfile,
       scoped: createScopedRepository(db, profileId),
-      embedder: makeEmbedderFromEnv(c.env.VOYAGE_API_KEY),
+      embedder: makeEmbedderFromEnv(options.voyageApiKey),
     })).snapshot
   : options?.memoryFactsReadEnabled
   ? await readMemorySnapshotFromFacts(
@@ -1084,48 +1274,32 @@ const memorySnapshot = !learningProfile
   : null;
 ```
 
-Where `makeEmbedderFromEnv` is a one-line helper in `services/memory/embed-fact.ts`:
+`makeEmbedderFromEnv` was added in Task 2 step 3 — do not add it here.
 
-```ts
-import { generateEmbedding } from '../embeddings';
-export const makeEmbedderFromEnv = (apiKey?: string): FactEmbedder =>
-  async (text) => {
-    if (!apiKey) return { ok: false, reason: 'no_voyage_key' };
-    return embedFactText(text, (t) => generateEmbedding(t, apiKey));
-  };
-```
+- [ ] **Step 4: Verify wiring via integration test, NOT module spies**
 
-(Add `makeEmbedderFromEnv` to `embed-fact.ts` alongside its tests in Task 2 if not already added — go back and add the case if missed. **Verify** by re-reading `embed-fact.ts` before proceeding.)
-
-- [ ] **Step 4: Add a unit test for the wiring**
-
-In `apps/api/src/services/session/session-exchange.test.ts` (or the focused builder test if exists):
-
-```ts
-it('uses relevance retrieval when memoryFactsRelevanceEnabled=true', async () => {
-  const spy = jest.spyOn(relevanceModule, 'getRelevantMemories'); // module spy on OWN module — allowed by CLAUDE.md "no internal mocks" since this is the module under test, not a dependency
-  await runExchange({ memoryFactsReadEnabled: true, memoryFactsRelevanceEnabled: true });
-  expect(spy).toHaveBeenCalledTimes(1);
-});
-
-it('falls through to readMemorySnapshotFromFacts when relevance flag off but read flag on', async () => { /* opposite assertion */ });
-```
-
-Actually — per CLAUDE.md `feedback_testing_no_mocks.md`, prefer the integration test in Task 10 over a `jest.spyOn` here. **Delete this step** if it conflicts; the integration test gives the same coverage without internal mocks.
+The wiring is verified end-to-end by Task 10's integration tests (consent gate, ordering, fallback). Per CLAUDE.md `feedback_testing_no_mocks.md`, do NOT add a `jest.spyOn` on the relevance module — it gives the same coverage but violates the no-internal-mocks rule. If a focused unit test is needed, add one that asserts the OUTPUT (rendered memory block contains expected facts) rather than the call count of an internal helper.
 
 - [ ] **Step 5: Run lint + typecheck + tests**
 
 ```
 pnpm exec nx run api:typecheck
 pnpm exec nx run api:lint
-cd apps/api && pnpm exec jest src/services/session/session-exchange
+cd apps/api && pnpm exec jest src/services/session/session-exchange src/services/memory.test.ts
 ```
 
-Expected: PASS.
+Expected: PASS. Confirm `services/memory.test.ts` still passes after extending `retrieveRelevantMemory` to accept a precomputed vector.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: Hand off to coordinator for commit**
 
-Commit message: `feat(memory): wire getRelevantMemories into tutor exchange behind MEMORY_FACTS_RELEVANCE_RETRIEVAL`.
+Files to stage:
+- `apps/api/src/routes/sessions.ts`
+- `apps/api/src/services/session/session-exchange.ts`
+- `apps/api/src/services/memory.ts`
+- `apps/api/src/services/memory.test.ts`
+- `docs/specs/2026-05-05-memory-architecture-upgrade.md` (cost-table update)
+
+Suggested commit message: `feat(memory): wire getRelevantMemories into tutor exchange, share per-turn query embedding`.
 
 ---
 
@@ -1184,6 +1358,22 @@ describe('memory facts relevance retrieval', () => {
   it('does not return superseded rows (Phase 3 forward-compat)', async () => {
     /* insert a row with supersededBy set, assert it never appears */
   });
+
+  it('does not return suppressed-category rows even at high relevance', async () => {
+    // Category=suppressed exists because the user told us to forget the fact.
+    // findRelevant must filter these by default so they never eat the K' budget.
+    const { db, profileId } = await setupTestDb();
+    await seedFact(db, profileId, { text: 'recent-active', category: 'struggle', embedding: closeTo(QUERY_EMB, 0.30), observedAt: daysAgo(1) });
+    await seedFact(db, profileId, { text: 'tight-suppressed', category: 'suppressed', embedding: closeTo(QUERY_EMB, 0.05), observedAt: daysAgo(1) });
+    const result = await getRelevantMemories({
+      profileId, queryText: 'fractions', k: 1,
+      profile: grantedProfile(),
+      scoped: createScopedRepository(db, profileId),
+      embedder: async () => ({ ok: true, vector: QUERY_EMB }),
+    });
+    expect(rendered(result.snapshot)).toContain('recent-active');
+    expect(rendered(result.snapshot)).not.toContain('tight-suppressed');
+  });
 });
 ```
 
@@ -1193,11 +1383,14 @@ describe('memory facts relevance retrieval', () => {
 pnpm exec jest tests/integration/memory-facts-relevance-retrieval.integration.test.ts --runInBand
 ```
 
-Expected: PASS (5 tests).
+Expected: PASS (6 tests).
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 3: Hand off to coordinator for commit**
 
-Commit message: `test(memory): integration coverage for relevance retrieval ordering, scope, consent, fallback`.
+Files to stage:
+- `tests/integration/memory-facts-relevance-retrieval.integration.test.ts`
+
+Suggested commit message: `test(memory): integration coverage for relevance retrieval ordering, scope, consent, fallback, suppressed-exclusion`.
 
 ---
 
@@ -1231,7 +1424,15 @@ export const memoryRelevanceAbFlow: EvalLlmFlow = {
 };
 ```
 
-The fixtures must have ≥30 stored facts each (mix of struggles / strengths / interests / communication notes spanning ≥6 months) for the relevance vs. recency contrast to be visible.
+The fixtures must have ≥30 stored facts each (mix of struggles / strengths / interests / communication notes spanning ≥6 months) for the relevance vs. recency contrast to be visible. Add a deterministic seeder under `apps/api/eval-llm/fixtures/memory-relevance/`:
+
+| Fixture name | Facts | Distribution | observedAt span |
+|---|---|---|---|
+| `profile-fractions-heavy` | 35 | 20 struggles (15 fractions-related), 8 strengths, 5 interests, 2 communication notes | 0-12 months |
+| `profile-mixed-subjects` | 32 | even spread across math / language / science | 0-9 months |
+| `profile-language` | 30 | 18 vocab/grammar struggles, 8 strengths, 4 interests | 0-8 months |
+
+The seeder should use deterministic UUIDs (e.g., `uuid v5` from a fixture-name salt) so re-runs produce stable IDs and the snapshot diff is meaningful. Assert in a smoke unit test that seeding twice produces byte-identical row counts and IDs.
 
 - [ ] **Step 3: Register + run snapshot mode**
 
@@ -1241,9 +1442,14 @@ pnpm eval:llm --flow memory-relevance-ab
 
 Expected: snapshot files written. Manual review by the human; not a CI gate.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 4: Hand off to coordinator for commit**
 
-Commit message: `feat(eval-llm): A/B snapshot flow for recency vs. relevance memory injection`.
+Files to stage:
+- `apps/api/eval-llm/flows/memory-relevance-ab.flow.ts`
+- `apps/api/eval-llm/scenarios.ts`
+- `apps/api/eval-llm/fixtures/memory-relevance/*.ts`
+
+Suggested commit message: `feat(eval-llm): A/B snapshot flow + fixtures for recency vs. relevance memory injection`.
 
 ---
 
@@ -1253,34 +1459,41 @@ Commit message: `feat(eval-llm): A/B snapshot flow for recency vs. relevance mem
 - Phase 2 embedding success rate ≥99% rolling 7d
 - Backlog of `embedding IS NULL` older than 24h: 0 (warn at 100, page at 1000)
 
-The cron in Task 5 already emits `memory_facts.embed_backfill.complete` and `…backlog_alert`. Add per-write telemetry on `applyAnalysis`.
+The cron in Task 5 already emits `memory_facts.embed_backfill.complete` and `…backlog_alert`. The post-commit embed step in Task 3 already emits `memory_facts.embed_on_write.failed`. This task adds the **paired attempt counter** so the success-rate SLO has a queryable denominator: success_rate = `(attempted - failed) / attempted`. Without the attempted counter you can compute *failed counts* but not a *rate*.
+
+Per CLAUDE.md "Silent recovery without escalation is banned": every fallback path must emit a queryable metric. The attempt counter is the queryable denominator that turns the existing failed-event into an SLO.
 
 **Files:**
-- Modify: `apps/api/src/services/memory/memory-facts.ts` — emit `memory_facts.embed_on_write.failed` when the embedder returns `ok:false`.
+- Modify: `apps/api/src/inngest/functions/session-completed.ts` — emit `memory_facts.embed_on_write.attempted` once per row processed inside the `embed-new-memory-facts` step (success OR failure).
+- Modify: `apps/api/src/inngest/functions/memory-facts-embed-backfill.ts` — emit `memory_facts.embed_backfill.row_attempted` once per row processed.
 
-- [ ] **Step 1: Test**
+- [ ] **Step 1: Tests**
 
 ```ts
-it('emits memory_facts.embed_on_write.failed when embedder rejects', async () => {
+it('emits one memory_facts.embed_on_write.attempted per row, regardless of outcome', async () => {
+  // 2 rows, 1 succeeds, 1 fails → 2 attempted events, 1 failed event
   const logger = makeLoggerSpy();
-  await replaceActiveMemoryFactsForProfile(writer, 'p1', proj, {
-    embed: async () => ({ ok: false, reason: 'voyage 500' }),
-    logger,
-  });
-  expect(logger.entries).toContainEqual(expect.objectContaining({
-    event: 'memory_facts.embed_on_write.failed',
-    reason: 'voyage 500',
-  }));
+  await embedNewFactsForProfile(db, 'p1', mixedOutcomeEmbedder(), { logger });
+  const attempts = logger.entries.filter((e) => e.event === 'memory_facts.embed_on_write.attempted');
+  const failures = logger.entries.filter((e) => e.event === 'memory_facts.embed_on_write.failed');
+  expect(attempts).toHaveLength(2);
+  expect(failures).toHaveLength(1);
 });
 ```
 
 - [ ] **Step 2: Implement**
 
-Extend `WriteMemoryFactsOptions` with an optional `logger?: { warn: (msg: string, ctx: object) => void }`. Default to the module-level logger when absent. Emit the event with `{ profileId, category, reason }` (no fact text — privacy parity with retention spec; spec line 278).
+In each call site, emit a structured info-level log immediately before invoking the embedder. Payload: `{ profileId, category, source: 'embed_on_write' | 'embed_backfill' }`. **No fact text** — privacy parity with retention spec line 278. Document the queryable surface in the plan (Cloudflare Workers Logs query / Sentry tag) so the SLO dashboard can be wired.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 3: Hand off to coordinator for commit**
 
-Commit message: `feat(memory): structured telemetry for embed-on-write failures (no fact text in payload)`.
+Files to stage:
+- `apps/api/src/inngest/functions/session-completed.ts`
+- `apps/api/src/inngest/functions/session-completed.test.ts`
+- `apps/api/src/inngest/functions/memory-facts-embed-backfill.ts`
+- `apps/api/src/inngest/functions/memory-facts-embed-backfill.test.ts`
+
+Suggested commit message: `feat(memory): paired attempted/failed telemetry for embed-on-write SLO denominator`.
 
 ---
 
@@ -1288,9 +1501,11 @@ Commit message: `feat(memory): structured telemetry for embed-on-write failures 
 
 The spec § Phase 2 acceptance criteria has 7 items. Walk through each, run the relevant verification, paste the output into the PR description.
 
-- [ ] **Embedding written within 30s of `applyAnalysis` for ≥99% of new facts.**
+- [ ] **Embedding written within 30s of `applyAnalysis` for ≥99% of NEW or text-changed facts.**
 
-Verification: integration test in Task 4 + `memory_facts.embed_on_write.failed` log query on staging for 24h after first deploy. Manually inspect log volume.
+Verification: integration tests in Task 4 (incl. cost regression guard — same content does NOT re-embed) + `memory_facts.embed_on_write.attempted` and `.failed` log queries on staging for 24h after first deploy. Compute success rate = `(attempted - failed) / attempted`. Manually inspect log volume to confirm the post-commit step is firing as expected after `applyAnalysis` events.
+
+Note: the "30s" SLO from spec § Phase 2 line 380 is a target, not a hard constraint. Embedding now happens in a sibling Inngest step rather than inside the analysis transaction; under normal Voyage latency it completes within seconds, but Inngest retry delay can push it to minutes. Update the spec wording to "embedding written within the same `session-completed` invocation for ≥99%" if 30s proves too tight in practice.
 
 - [ ] **Backfill cron picks up `embedding IS NULL` rows hourly; backlog stays under 1000.**
 
@@ -1308,17 +1523,24 @@ Verification: integration tests from Task 10 (cross-profile break + consent-gate
 
 Verification: Task 11 snapshots reviewed by user. **Block the flag flip on this** — do not enable `MEMORY_FACTS_RELEVANCE_RETRIEVAL=true` in any environment until the user has explicitly approved the A/B snapshots.
 
+- [ ] **Defaults satisfy spec § Problem goal: old-but-relevant beats recent-loose.**
+
+Verification: at least 3 of the A/B fixture profiles in Task 11 must show an old-but-relevant fact ranked above a recent-loose fact in the relevance snapshot. If they don't, tune `relevance` upward or `halflifeDays` shorter and re-run before flipping the flag. Defaults at plan-time are `relevance=0.85, recency=0.15, halflife=180`.
+
 - [ ] **Recency-only retrieval still works when the flag is off (rollback path).**
 
 Verification: existing `readMemorySnapshotFromFacts` integration test still green (it covers the `memoryFactsRelevanceEnabled=false` path because that path was unchanged).
 
-- [ ] **No additional LLM completion calls per session.**
+- [ ] **No additional LLM completion calls per session; query-side Voyage cost is M not 2M.**
 
-Verification: code review — confirm Phase 2 only adds Voyage (embedding) calls, never an Anthropic / OpenAI completion call. Spec § LLM Call Cost line 307 sets the budget.
+Verification: code review — confirm Phase 2 only adds Voyage (embedding) calls, never an Anthropic / OpenAI completion call. Confirm `userMessage` is embedded ONCE per turn and the vector is shared between `retrieveRelevantMemory` and `getRelevantMemories` (Task 9 step 3). The spec cost-table update in Task 9 should reflect: write-side `+N` (new/changed facts only), query-side `+M` (one per user turn). Spec § "LLM Call Cost per session-completed" line 307 must be updated in this PR.
 
 - [ ] **Step 1: Open the PR with the checklist filled in**
 
-Use `/commit` for each commit per CLAUDE.md (already enforced); aggregate the work into a single PR. Do NOT flip the flag in the PR.
+Coordinator uses `/commit` for each commit per CLAUDE.md; aggregate the work into a single PR. Do NOT flip the flag in the PR. Include in the PR description:
+- The cost-table update to `docs/specs/2026-05-05-memory-architecture-upgrade.md` (write-side `+N` new/changed only; query-side `+M` per user turn).
+- The spec § Phase 2 acceptance line 260 / 382 cleanup (remove the unreachable `IS NULL` fallback clause — see Task 6 footnote).
+- Confirmation that the existing `services/memory.ts:retrieveRelevantMemory` (Story 3.10) is unchanged in semantics, only extended to accept a precomputed query vector.
 
 - [ ] **Step 2: Stage rollout**
 
@@ -1345,19 +1567,29 @@ Track these for Phase 3 or follow-up:
 ## Self-Review
 
 **Spec coverage walk-through:**
-- Spec § Phase 2.1 (Embedding on write) → Tasks 2, 3, 4 ✓
-- Spec § Phase 2.2 (Backfill cron) → Task 5 ✓
-- Spec § Phase 2.3 (`getRelevantMemories` two-stage retrieval) → Tasks 6, 7, 10 ✓
-- Spec § Phase 2.4 (A/B harness) → Task 11 ✓
+- Spec § Phase 2.1 (Embedding on write) → Tasks 2, 3, 4 ✓ (post-commit, with embedding preservation across rewrites)
+- Spec § Phase 2.2 (Backfill cron) → Task 5 ✓ (batched UPDATE per batch, mirrors prior `memory-facts-backfill` shape)
+- Spec § Phase 2.3 (`getRelevantMemories` two-stage retrieval) → Tasks 6, 7, 10 ✓ (suppressed-category excluded by default; precomputed-vector pass-through)
+- Spec § Phase 2.4 (A/B harness) → Task 11 ✓ (with deterministic fixture seeder)
 - Spec § Phase 2.5 (Feature flag) → Task 8 ✓
-- Spec § Phase 2 acceptance criteria → Task 13 ✓
-- Spec § SLO thresholds → Tasks 5, 12, 13 ✓
+- Spec § Phase 2 acceptance criteria → Task 13 ✓ (incl. defaults-validation gate)
+- Spec § SLO thresholds → Tasks 5, 12, 13 ✓ (paired attempted/failed counters give the SLO denominator)
+
+**Deviations from spec text (resolved in PR):**
+- Spec line 90, 259 weight defaults `0.7 / 0.3, halflife=90` are FLIPPED to `0.85 / 0.15, halflife=180` in this plan because the original defaults defeat the spec § Problem goal. Update the spec table when this lands.
+- Spec line 260 / 382 "fall back when any candidate has `embedding IS NULL`" is unreachable given the SQL filter at Task 6. Remove the `IS NULL` clause from the spec acceptance text.
+- Spec § "LLM Call Cost per session-completed" (line 307) only counted write-side embeddings. Add `+M` query-side per session (one per user turn, after the per-turn embedding-share optimization in Task 9 step 3).
+- Spec § Phase 2 acceptance line 380 "embedding written within 30s of `applyAnalysis`" — embedding now happens in a sibling step, so the assertion is "within the same `session-completed` invocation" rather than 30 seconds.
 
 **Type consistency:**
-- `FactEmbedder` defined once in `memory-facts.ts`, used by `embed-fact.ts`, `relevance.ts`, `session-exchange.ts`, and the cron — single source of truth.
-- `EmbedFactOutcome` shape (`{ok:true, vector} | {ok:false, reason}`) is used identically across writer, retrieval, and backfill.
-- `RelevanceWeights` defaults match the spec (line 90, 259).
+- `FactEmbedder` and `EmbedFactOutcome` defined once in `embed-fact.ts`, used by `relevance.ts`, `session-completed.ts`, `session-exchange.ts`, and the cron — single source of truth.
+- `RelevanceWeights` defaults are deliberately stricter than spec; tunable via the `weights` option for A/B.
 - `K' = 4·k` over-fetch matches spec line 86.
-- Halflife default `90` and weights `0.7 / 0.3` match spec line 90.
+
+**Architecture deltas vs. earlier draft of this plan (called out for reviewers):**
+- Embedding moved out of the `applyAnalysis` transaction — a separate `step.run('embed-new-memory-facts', …)` runs post-commit. Avoids holding `SELECT FOR UPDATE` across N Voyage HTTP calls.
+- `replaceActiveMemoryFactsForProfile` snapshots `(category, text_normalized) → embedding` before delete and restores onto rewritten rows whose `text_normalized` matches. Without this, every session-end re-embeds every active fact.
+- `getRelevantMemories` accepts an optional `queryVector`; `session-exchange` computes the per-turn embedding once and shares it with the existing `retrieveRelevantMemory` to avoid double Voyage cost.
+- `findRelevant` excludes `category = 'suppressed'` by default so suppressed rows don't eat the K' budget.
 
 **Placeholder scan:** None — every step has an exact path, exact code, or an exact verification command. Two callouts ("verify by reading X") are explicit instructions to read existing code, not placeholders.
