@@ -257,6 +257,7 @@ async function main(): Promise<void> {
         started_at
       FROM learning_sessions
       WHERE subject_id IN (SELECT subject_id FROM cohort)
+        AND session_type = 'curriculum'
       ORDER BY subject_id, started_at ASC
     ),
     first_ai AS (

@@ -22,6 +22,19 @@ Complete trace of every learning path in EduAgent, from the learner's first tap 
 
 ---
 
+## Status legend
+
+Each path below describes shipped, prod-active behavior unless tagged. Tags used inline:
+
+- **prod-active** — running for real users in production today.
+- **flag-gated (dev/staging only)** — code shipped, but a `FEATURE_FLAGS.*` value defaults off in production. Most common case: `ONBOARDING_FAST_PATH` defaults off in prod, on in dev/staging.
+- **prompt-only** — implemented as an LLM prompt rule with no UI/route surface (e.g., the teach-first opener, the chatty fun-fact opener).
+- **data-only** — backend computes/persists it, but no UI consumes it yet (e.g., `topicOrder`, `daysSinceLastReview`).
+
+Where the actual prod-experience differs from the "intended" pedagogy described in a path, the gap is called out inline and cross-referenced to the relevant section of `docs/plans/app evolution plan/2026-05-06-learning-product-evolution-audit.md`.
+
+---
+
 ## Overview: Tutoring Session Paths
 
 | Path | Entry Point (current IA) | Session Type (DB) | UI Mode | Summary |
@@ -43,6 +56,101 @@ Complete trace of every learning path in EduAgent, from the learner's first tap 
 Additionally, two **verification overlays** can activate within any tutoring session:
 - **Devil's Advocate** (`evaluate`) — AI presents a flawed explanation; learner finds the error
 - **Feynman Technique** (`teach_back`) — learner explains the concept to a "clueless" AI
+
+---
+
+## Path 0: New-Subject Onboarding (the wall before Path 2)
+
+### Who hits it
+Every learner the first time they create a subject. "Start Learning" on a fresh subject does not skip this — it is the only way to reach Path 2 the first time, and it is the path the audit doc (`docs/plans/app evolution plan/2026-05-06-learning-product-evolution-audit.md`) is primarily redesigning.
+
+### Status (2026-05-06)
+Two parallel routes through the same screens exist in code. **Production today follows the long path** because `FEATURE_FLAGS.ONBOARDING_FAST_PATH` defaults off in prod (audit Section A). Dev/staging follow the short path.
+
+### Flow
+
+```
+Home / Library / Chat
+  └─ Tap "Add subject" or type a free-form prompt into Ask Anything
+      └─ /create-subject
+          │
+          ├─ Subject classification (CFLF) runs:
+          │   ├─ direct_match           → silently creates, no confirmation card
+          │   ├─ resolved (1 suggestion)→ "We'll start with X — Accept / Edit"
+          │   ├─ resolved (n>1)         → suggestion list with chips
+          │   └─ no-match               → "Want to create a new subject?"
+          │
+          ├─ Subject structure decided server-side (subject-classify.ts → subject.ts):
+          │   ├─ broad         → bookSuggestions only; learner picks a book in /pick-book
+          │   ├─ narrow        → topics generated synchronously (one default book wraps them)
+          │   └─ focused_book  → book stub created with topicsGenerated=false; topics deferred
+          │
+          ├─ Topic-grain learner intent ("how are chemical reactions created") is NOT
+          │   propagated past this point. SubjectResolveResult has name/focus/focusDescription
+          │   but no topicHint field. (audit Section J — Slice 1 PR 5i)
+          │
+          └─ Routes by branch:
+              ├─ broad                  → /pick-book/[subjectId] → /onboarding/interview
+              ├─ narrow / focused_book  → /onboarding/interview
+              └─ language subject       → /onboarding/language-setup → /onboarding/interview
+
+/onboarding/interview (4-turn LLM-driven)
+  ├─ Interview turns persist in `onboarding_drafts.exchangeHistory`
+  │   (NOT learning_sessions — see audit Section A re: not yet merged)
+  │
+  ├─ Signal extraction runs post-hoc on the in-process exchange list:
+  │   goals / experienceLevel / currentKnowledge / interests /
+  │   interestContext / analogyFraming / paceHint
+  │
+  ├─ When `interests` is extracted AND production routing:
+  │   └─ /onboarding/interests-context (each interest classified as
+  │      free-time / school / both; default both for untouched)
+  │
+  ├─ Production routing (FAST_PATH=false):
+  │   /onboarding/analogy-preference → accommodations → curriculum-review
+  │   └─ POST /subjects/:subjectId/sessions/first-curriculum
+  │
+  └─ Fast-path routing (FAST_PATH=true, dev/staging only):
+      └─ POST /subjects/:subjectId/sessions/first-curriculum
+         (skips interests-context, analogy-preference, accommodations, curriculum-review)
+
+POST /subjects/:subjectId/sessions/first-curriculum (the 25s wall)
+  ├─ Polls up to FIRST_CURRICULUM_SESSION_WAIT_MS = 25,000ms for BOTH:
+  │     1. first materialized topic in `curriculum_topics` for this subject
+  │     2. extractedSignals committed to `onboarding_drafts`
+  │
+  ├─ If both arrive in time → creates `learning_sessions` row, returns sessionId
+  │   (metadata: `onboardingFastPath.extractedSignals`)
+  ├─ If signals timeout but topic ready → session created without signals
+  └─ If topic timeout (broad/focused_book and the materialization Inngest job hasn't
+       fired yet) → returns an error and the learner sees a "still preparing" state.
+       This is the gap audit Section A's "pre-warm" PR (5d) closes.
+
+→ Path 2 (Guided Learning) opens at sessionId
+```
+
+### Status entry summary
+
+| Item | Status |
+|---|---|
+| Interview screen + 4-turn flow | shipped, prod-active |
+| `analogy-preference`, `interests-context`, `accommodations`, `curriculum-review` screens | shipped, prod-active (FAST_PATH off) |
+| Fast-path bypass (skips four preference screens) | shipped, **flag-gated (dev/staging only)** |
+| Teach-first first-turn rule | **prompt-only** (shipped TF-1..TF-8, but masked by chatty fun-fact opener — see "First-Turn AI Opener" below) |
+| `startFirstCurriculumSession` 25s polling | shipped, prod-active |
+| Curriculum pre-warm on subject create | **not shipped** (audit Section A — Slice 1 PR 5d) |
+| Topic-grain intent matching | **not shipped** (audit Section J — Slice 1 PR 5i) |
+| Removal of preference screens | **not shipped** (audit Section D — Slice 1 PR 5h) |
+
+### What gets recorded
+
+| When | What | Where |
+|---|---|---|
+| Subject create | rawInput, resolvedName, focus, focusDescription, structureType | `subjects` |
+| Each interview turn | LLM exchange (not message events) | `onboarding_drafts.exchangeHistory` |
+| Signal extraction | goals/experienceLevel/etc. | `onboarding_drafts.extractedSignals` |
+| First-curriculum session create | sessionId, optional bookId, fastPath flag | `learning_sessions`; `metadata.onboardingFastPath.extractedSignals` |
+| Curriculum materialization (broad/focused_book) | books, topics | `curriculum_books`, `curriculum_topics` (deferred from subject create) |
 
 ---
 
@@ -68,9 +176,18 @@ Home Screen (LearnerScreen)
                   │       └─ 0 matches → "Want to create a new subject?"
                   │           └─ Navigate to Create Subject (returnTo=chat)
                   │
-                  ├─ AI responds using the subject's pedagogy:
-                  │   ├─ Socratic (math/science): escalation ladder rungs 1→5
-                  │   └─ Four Strands (languages): direct instruction, rotating strands
+                  ├─ AI responds.
+                  │   ├─ FIRST AI response (exchangeCount === 0) for non-language /
+                  │   │   non-recitation learning sessions opens with the chatty
+                  │   │   "fun fact" opener (`exchange-prompts.ts:455-468`,
+                  │   │   unconditional, prompt-only). This contradicts both the
+                  │   │   teach-first rule and the per-subject pedagogy below.
+                  │   │   See "First-Turn AI Opener" cross-cutting note + audit
+                  │   │   Section F + Slice 1 PR 5b.
+                  │   │
+                  │   └─ Subsequent AI responses use the subject's pedagogy:
+                  │       ├─ Socratic (math/science): escalation ladder rungs 1→5
+                  │       └─ Four Strands (languages): direct instruction, rotating strands
                   │
                   ├─ Learner and AI exchange messages...
                   │   ├─ Quick chips available: "Give me a hint", "Show an example", etc.
@@ -530,6 +647,59 @@ During any tutoring session...
 ```
 
 Bookmarks do not change session pedagogy or recording — they are a per-message side index for the learner.
+
+---
+
+## First-Turn AI Opener (All Learning-Type Sessions)
+
+Status: **prompt-only**, prod-active, **conflicts with the teach-first rule** that also ships in the same prompt files.
+
+For every tutoring session whose `sessionType === 'learning'` and whose `uiMode` is neither language (`four_strands` pedagogy) nor `recitation`, the first AI response (`exchangeCount === 0`) is opened with an unconditional "fun fact" instruction in the prompt:
+
+> "Open with a surprising or fun fact about it to spark curiosity, then invite them into the conversation..."
+
+Source: `apps/api/src/services/exchange-prompts.ts` lines 455–468. No flag gates this. It applies to Path 1 (Freeform), Path 2 (Guided), Path 4 (Practice), and Path 5 (Relearn). Path 3 (Homework) is exempt because `sessionType === 'homework'`. Path 6 (Recitation) is exempt by `!isRecitation`. Language subjects are exempt by `!isLanguageMode`.
+
+Why it matters here: the audit doc and the teach-first prompt rule (TF-1..TF-8, Epic 12.2) both ask the first AI message to teach one concrete idea and ask one focused learner action. The fun-fact opener fights with both — the model ends up doing fun fact + teach + ask, which is three things instead of one teach + one action. **Audit Section F + Slice 1 PR 5b remove this opener** as part of locking in the first-turn rule.
+
+Until 5b ships, the path-by-path "AI responds using the subject's pedagogy" descriptions below describe the steady state from exchange #2 onward. Exchange #1 is the fun-fact opener.
+
+---
+
+## Next-Topic Recap Card (All Tutoring Paths)
+
+Status: **shipped, prod-active.** Applies to Freeform, Guided, Homework, Practice, Relearn, and Recitation summary screens.
+
+After every tutoring session ends and the learner reaches Session Summary, the API generates a "next topic" recap and the mobile client renders it on the summary screen as `session-next-topic-card`.
+
+```
+Session ends
+  └─ Inngest post-session pipeline runs
+      └─ session-recap.ts (lines 33–34, 79, 107–125, 387–388) generates:
+          ├─ nextTopicId
+          ├─ nextTopicTitle
+          └─ nextTopicReason   (one-line "why this topic next" copy)
+              │
+              └─ Persists onto sessionSummary; schema fields at
+                 packages/schemas/src/sessions.ts lines 426–428
+
+Session Summary screen (apps/mobile/src/app/(app)/session-summary/[sessionId].tsx
+  lines 1034–1074)
+  └─ Renders `session-next-topic-card` with title, reason,
+     and "Continue learning" CTA
+      └─ CTA opens a guided session at nextTopicId
+
+Next session opens
+  └─ session-context-builders.ts:324 feeds nextTopicReason back into
+     the new session's system prompt so the AI opens with continuity
+```
+
+What is **not yet wired** (audit Section E):
+
+- `topicOrder` — the ordered topic id list for the subject — is in the API response (`packages/schemas/src/subjects.ts:333`) but the mobile recap card does not render it as an ordered preview ("present tense → irregulars → sentence practice → mixed recall"). Slice 2 wires this up.
+- The "next time we'll start with X" home-screen teaser at second-session open does not exist (no payload field, no component). Slice 2 adds it.
+
+The recap is independent of filing — it appears on the summary screen for filed and unfiled sessions alike. For freeform and homework paths the filing prompt comes first; on "No thanks" the summary screen (with the recap card) renders.
 
 ---
 

@@ -1,8 +1,8 @@
 # Learning Product Evolution Audit
 
-**Date:** 2026-05-06  
-**Status:** Draft planning audit  
-**Branch:** `ux/emotional-retention-language`  
+**Date:** 2026-05-06
+**Status:** Draft planning audit
+**Branch:** `ux/emotional-retention-language`
 **Purpose:** Capture what is already in place, what needs changing, and how substantial each change is for the product direction discussed in the UX walkthrough.
 
 ---
@@ -422,6 +422,29 @@ Do not bundle with onboarding. Slice 4 only.
 - The conversation-milestone / CEFR / streak / subject-mastery facets of "proof" are already delivered via milestones; the remaining gap is artefact production (essays, projects, portfolios).
 - Keep the artefact side as long-term strategy.
 
+### J. Match First Topic To Learner Intent
+
+**Today (verified)**
+- The "first curriculum session" entry — the only path used directly after onboarding — strips topic-grain intent before it leaves the mobile client. `firstCurriculumSessionStartSchema` (`packages/schemas/src/sessions.ts` lines 248–251) is `sessionStartSchema.omit({ subjectId: true, topicId: true, metadata: true, rawInput: true }).extend({ bookId: z.string().uuid().optional() })`. The route at `apps/api/src/routes/sessions.ts:127-175` accepts only `bookId`, no `topicId`.
+- Server-side, `findFirstAvailableTopicId` (`apps/api/src/services/session/session-crud.ts:249`) picks the first topic by `sortOrder`. There is no matcher between the learner's original `rawInput` (e.g., "how are chemical reactions created") and the materialized topic list. Whatever sits at `sortOrder=1` is the first turn's topic, regardless of intent.
+- `SubjectResolveResult` (`packages/schemas/src/subjects.ts` lines 95–106) carries `name`, `focus`, `focusDescription` — no `topicHint`. The classifier knows the learner's free-form intent at create time but never propagates a topic-grain hint forward.
+- Every other tutoring entry preserves topic intent: Guided Learning starts from a tapped topic row; Practice/Review starts from Topic Detail; Retention Relearn starts from a fading topic; Homework sets topic via filing post-hoc; Recitation is topic-agnostic by design. Only the first-curriculum path loses the signal.
+- **Adjacent data-layer anomaly worth flagging:** Retention Relearn does not flow through the canonical `startSession` service. `apps/api/src/services/retention-data.ts:858-873` inserts directly into `learning_sessions` with `metadata: { effectiveMode: 'relearn' }`. Any topic-routing/intent-matching logic added to `startSession` will silently miss this code path unless explicitly extended. Not a topic-matching issue per se, but the next person who edits session-start logic needs to know.
+
+**Desired**
+- When a learner creates a subject with a topic-grain prompt ("how are chemical reactions created", "verb conjugation in Italian", "the Battle of Hastings"), the first turn lands on a topic that matches that prompt — not on whichever topic ended up first by sort order.
+- Ambiguous / non-topic-grain inputs ("Chemistry", "Italian", "History") still land on the curriculum's intended starting point. The behavior change is for the topic-grain case.
+
+**Change size:** **M**
+
+**Why moderate**
+- Net-new work: (a) add an optional `topicHint` field to `SubjectResolveResult` (and to the `create-subject` mutation payload that flows into curriculum materialization); (b) extend `firstCurriculumSessionStartSchema` to accept an optional `topicId` OR `topicHint`; (c) replace `findFirstAvailableTopicId` with an intent-aware matcher that scores materialized topics against the original `rawInput` (cheap LLM call or embedding similarity, both already in the stack); (d) fall back to the existing `sortOrder` pick if no match clears a confidence floor.
+- Eval surface is small: snapshot the topic chosen for ~10 representative `rawInput` strings against a known curriculum and assert the expected match. Fits naturally in `apps/api/eval-llm/`.
+- The relearn direct insert (above) is not a blocker for this slice — it does not consume `findFirstAvailableTopicId` — but it should be called out in the implementation PR description.
+
+**Recommendation**
+Bundle into Slice 1 as PR 5i (parallel-safe with Wave 2). "First turn lands on the right topic" is part of the same product promise as "first turn teaches" — without it, a learner who typed "chemical reactions" gets taught about something else first, undoing the teach-first win.
+
 ---
 
 ## What Should Not Be Redone
@@ -454,10 +477,11 @@ This slice ships as a milestone of small PRs, not one large PR. Each PR is indep
 | 5e | Bypass analogy/interests/accommodations/curriculum-review | mobile routing | M | 5b (prompt rule must hold before bypass) | 5c |
 | 5f | E2E: create-subject → first active prompt, language + non-language | Maestro/Playwright | M | all of 5a-5e | — |
 | 5h | **Delete** old onboarding screens (`interview.tsx`, `analogy-preference.tsx`, `interests-context.tsx`, `accommodations.tsx`, `curriculum-review.tsx`) + i18n key sweep + E2E updates + accommodations data audit verification | mobile routing, i18n, E2E | M | 5f (E2E green proves the new flow works without the old screens) | — |
+| 5i | Match first topic to learner `rawInput` (Section J): add `topicHint` to `SubjectResolveResult`; extend `firstCurriculumSessionStartSchema` with optional `topicId`/`topicHint`; replace `findFirstAvailableTopicId` sort-order pick with an intent-aware matcher (LLM or embedding similarity) and fall back to `sortOrder` when no match clears a confidence floor; eval-harness snapshot for the matcher | `packages/schemas/src/subjects.ts`, `packages/schemas/src/sessions.ts`, `apps/api/src/services/subject-classify.ts`, `apps/api/src/services/session/session-crud.ts`, `apps/api/eval-llm/` | M | 5d (pre-warm — the matcher needs materialized topics to score against) | 5c, 5e |
 
 **Wave plan**
 - **Wave 1 (parallel):** 5a, 5b, 5d, 5g.
-- **Wave 2 (parallel):** 5c, 5e.
+- **Wave 2 (parallel):** 5c, 5e, 5i.
 - **Wave 3:** 5f.
 - **Wave 4:** 5h. **Deadline: ≤ 14 days after Wave 3 ships.** Owner: TBD (assign before Wave 1 begins). If 5h has not landed by deadline, Slice 1 is incomplete regardless of how 5a-5f feel in staging — see acceptance criteria below.
 
@@ -671,4 +695,3 @@ Until a real baseline exists, the criterion shifts from quantitative-only to a t
 ### Diagnostic script
 
 `scripts/diagnose-t2fp.ts` is a one-off diagnostic that probes language_code distribution, event_type histogram, and a sample of cohort rows with raw timestamps + computed gap. Re-run when the next baseline produces unexpected numbers; faster than re-investigating from scratch.
-
