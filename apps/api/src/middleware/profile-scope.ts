@@ -35,6 +35,7 @@ export interface ProfileMeta {
     | 'WITHDRAWN'
     | null;
   hasPremiumLlm: boolean;
+  conversationLanguage?: string | null;
   // [SEC-2 / BUG-718] Server-derived flag indicating whether the resolved
   // X-Profile-Id is the owner profile for the authenticated account.
   // assertNotProxyMode reads this instead of trusting the client-supplied
@@ -115,6 +116,7 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
               location: owner.location,
               consentStatus: owner.consentStatus,
               hasPremiumLlm: owner.hasPremiumLlm ?? false,
+              conversationLanguage: owner.conversationLanguage,
               // The auto-resolve path always returns the owner profile.
               isOwner: true,
             });
@@ -163,6 +165,7 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
       location: profile.location,
       consentStatus: profile.consentStatus,
       hasPremiumLlm: profile.hasPremiumLlm ?? false,
+      conversationLanguage: profile.conversationLanguage,
       isOwner: profile.isOwner,
     });
     await next();

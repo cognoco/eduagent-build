@@ -49,6 +49,7 @@ import { readSubscriptionStatus } from '../services/kv';
 import { apiError, notFound } from '../errors';
 import { BRAND_COLOR_PRIMARY } from '../services/brand';
 import { createLogger } from '../services/logger';
+import type { ProfileMeta } from '../middleware/profile-scope';
 
 const logger = createLogger();
 
@@ -71,6 +72,7 @@ type BillingRouteEnv = {
     db: Database;
     account: Account;
     profileId: string | undefined;
+    profileMeta: ProfileMeta | undefined;
   };
 };
 
@@ -402,11 +404,13 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     const dailyRemainingQuestions =
       dailyLimit !== null ? Math.max(0, dailyLimit - usedToday) : null;
     const activeProfileId = c.get('profileId');
+    const activeProfileMeta = c.get('profileMeta');
     const cycleResetAt = quota?.cycleResetAt ?? new Date().toISOString();
+    const resetDate = new Date(cycleResetAt);
     const cycleStartAt =
       subscription.currentPeriodStart ??
       new Date(
-        new Date(cycleResetAt).getTime() - 31 * 24 * 60 * 60 * 1000
+        Date.UTC(resetDate.getUTCFullYear(), resetDate.getUTCMonth() - 1, 1)
       ).toISOString();
     const usageBreakdown = activeProfileId
       ? await getUsageBreakdownForProfile(db, {
@@ -436,6 +440,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       resetsAt: cycleResetAt,
       renewsAt: subscription.currentPeriodEnd,
       timezone: account.timezone,
+      locale: activeProfileMeta?.conversationLanguage,
     });
 
     return c.json(

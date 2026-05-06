@@ -1647,6 +1647,7 @@
       "statusUnknown": "Unknown",
       "understanding": "Understanding",
       "reviewStatus": "Review status",
+      "recentDrills": "Recent drills",
       "sessionHistory": "Session History",
       "noSessionsYet": "No sessions for this topic yet",
       "timeOnApp": "{{duration}} on app",

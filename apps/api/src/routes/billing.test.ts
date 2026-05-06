@@ -15,12 +15,23 @@ const mockDbInsert = jest.fn().mockReturnValue({
     }),
   }),
 });
+const mockProfileFindFirst = jest.fn().mockResolvedValue(undefined);
+const mockConsentStateFindFirst = jest.fn().mockResolvedValue(undefined);
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
 
 const mockDatabaseModule = createDatabaseModuleMock({
+  includeActual: true,
   db: {
     insert: (...args: unknown[]) => mockDbInsert(...args),
+    query: {
+      profiles: {
+        findFirst: (...args: unknown[]) => mockProfileFindFirst(...args),
+      },
+      consentStates: {
+        findFirst: (...args: unknown[]) => mockConsentStateFindFirst(...args),
+      },
+    },
   },
   exports: {
     byokWaitlist: { email: 'email' },
@@ -206,6 +217,8 @@ beforeEach(() => {
   mockRemoveProfileFromSubscription.mockResolvedValue(null);
   mockGetFamilyPoolStatus.mockResolvedValue(null);
   mockGetUsageBreakdownForProfile.mockResolvedValue(null);
+  mockProfileFindFirst.mockResolvedValue(undefined);
+  mockConsentStateFindFirst.mockResolvedValue(undefined);
 });
 
 describe('billing routes', () => {
@@ -578,6 +591,54 @@ describe('billing routes', () => {
       expect(body.usage.usedThisMonth).toBe(450);
       expect(body.usage.remainingQuestions).toBe(50);
       expect(body.usage.warningLevel).toBe('soft');
+    });
+
+    it('returns child-visible usage from their profile breakdown', async () => {
+      const childProfileId = '550e8400-e29b-41d4-a716-446655440000';
+      mockProfileFindFirst.mockResolvedValue({
+        id: childProfileId,
+        accountId: 'test-account-id',
+        displayName: 'Child',
+        avatarUrl: null,
+        birthYear: 2012,
+        location: 'EU',
+        isOwner: false,
+        hasPremiumLlm: false,
+        conversationLanguage: 'nb',
+        pronouns: null,
+        createdAt: new Date('2025-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2025-01-01T00:00:00.000Z'),
+      });
+      mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
+      mockGetQuotaPool.mockResolvedValue(mockQuotaPool({ usedThisMonth: 450 }));
+      mockGetUsageBreakdownForProfile.mockResolvedValue({
+        by_profile: [
+          {
+            profile_id: childProfileId,
+            name: 'Child',
+            used: 12,
+            is_self: true,
+          },
+        ],
+        family_aggregate: { used: 450, limit: 500 },
+        isOwnerBreakdownViewer: false,
+      });
+
+      const res = await app.request(
+        '/v1/usage',
+        { headers: { ...AUTH_HEADERS, 'X-Profile-Id': childProfileId } },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.usage.usedThisMonth).toBe(12);
+      expect(body.usage.remainingQuestions).toBe(488);
+      expect(body.usage.family_aggregate).toEqual({ used: 450, limit: 500 });
+      expect(mockBuildUsageDateLabels).toHaveBeenCalledWith(
+        expect.objectContaining({ locale: 'nb' })
+      );
     });
 
     it('returns 401 without auth header', async () => {

@@ -470,6 +470,36 @@ describe('Integration: assessment routes', () => {
     expect(body.message).toBe('Assessment not found');
   });
 
+  it('rejects declining a refresh for an in-progress assessment', async () => {
+    const profile = await createOwnerProfile();
+    const subject = await seedSubject(profile.id, 'Biology');
+    const curriculum = await seedCurriculum({
+      subjectId: subject.id,
+      topics: [{ title: 'Photosynthesis', sortOrder: 0 }],
+    });
+    const assessmentId = await seedAssessmentRecord({
+      profileId: profile.id,
+      subjectId: subject.id,
+      topicId: curriculum.topicIds[0]!,
+    });
+
+    const res = await app.request(
+      `/v1/assessments/${assessmentId}/decline-refresh`,
+      {
+        method: 'PATCH',
+        headers: buildAuthHeaders(
+          { sub: ASSESSMENTS_USER.userId, email: ASSESSMENTS_USER.email },
+          profile.id
+        ),
+      },
+      TEST_ENV
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.message).toBe('Assessment is not in a terminal state');
+  });
+
   it('returns 200 for a session quick check using the real session lookup', async () => {
     const profile = await createOwnerProfile();
     const subject = await seedSubject(profile.id, 'Biology');

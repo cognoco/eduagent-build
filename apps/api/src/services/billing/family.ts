@@ -144,19 +144,20 @@ export function getUsageEventsAvailableSince(): string {
 
 function formatDateLabel(
   dateIso: string | null,
-  timezone: string | null | undefined
+  timezone: string | null | undefined,
+  locale = 'en-US'
 ): string | null {
   if (!dateIso) return null;
   const timeZone = timezone ?? 'UTC';
   try {
-    return new Intl.DateTimeFormat('en-US', {
+    return new Intl.DateTimeFormat(locale, {
       timeZone,
       year: 'numeric',
       month: 'long',
       day: 'numeric',
     }).format(new Date(dateIso));
   } catch {
-    return new Intl.DateTimeFormat('en-US', {
+    return new Intl.DateTimeFormat(locale, {
       timeZone: 'UTC',
       year: 'numeric',
       month: 'long',
@@ -169,6 +170,7 @@ export function buildUsageDateLabels(input: {
   resetsAt: string;
   renewsAt: string | null;
   timezone?: string | null;
+  locale?: string | null;
 }): {
   resets_at: string;
   renews_at: string | null;
@@ -178,8 +180,17 @@ export function buildUsageDateLabels(input: {
   return {
     resets_at: input.resetsAt,
     renews_at: input.renewsAt,
-    resets_at_label: formatDateLabel(input.resetsAt, input.timezone) ?? '',
-    renews_at_label: formatDateLabel(input.renewsAt, input.timezone),
+    resets_at_label:
+      formatDateLabel(
+        input.resetsAt,
+        input.timezone,
+        input.locale ?? undefined
+      ) ?? '',
+    renews_at_label: formatDateLabel(
+      input.renewsAt,
+      input.timezone,
+      input.locale ?? undefined
+    ),
   };
 }
 

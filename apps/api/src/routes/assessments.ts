@@ -104,7 +104,14 @@ export const assessmentRoutes = new Hono<RouteEnv>()
 
       const answerCount = countLearnerAnswers(updatedHistory);
       const capReached = answerCount >= MAX_ASSESSMENT_EXCHANGES;
-      const newStatus = evaluation.passed
+      const shouldContinueDepth =
+        evaluation.passed &&
+        evaluation.shouldEscalateDepth &&
+        evaluation.nextDepth &&
+        !capReached;
+      const newStatus = shouldContinueDepth
+        ? 'in_progress'
+        : evaluation.passed
         ? 'passed'
         : evaluation.masteryScore >= 0.6 &&
           (capReached ||
@@ -180,6 +187,17 @@ export const assessmentRoutes = new Hono<RouteEnv>()
 
     const assessment = await getAssessment(db, profileId, assessmentId);
     if (!assessment) return notFound(c, 'Assessment not found');
+    if (
+      !['passed', 'borderline', 'failed_exhausted'].includes(assessment.status)
+    ) {
+      return c.json(
+        {
+          code: 'BAD_REQUEST',
+          message: 'Assessment is not in a terminal state',
+        },
+        400
+      );
+    }
 
     logger.info('[assessments] learner declined assessment refresher', {
       event: 'assessment.refresh_declined',
