@@ -440,7 +440,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       : null;
     const visibleUsedThisMonth =
       usageBreakdown && !usageBreakdown.isOwnerBreakdownViewer
-        ? usageBreakdown.byProfile[0]?.used ?? 0
+        ? usageBreakdown.selfUsedThisMonth ?? 0
         : usedThisMonth;
     const visibleRemaining = remaining;
     const visibleWarningLevel = usageBreakdown?.isOwnerBreakdownViewer

@@ -612,18 +612,11 @@ describe('billing routes', () => {
       mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
       mockGetQuotaPool.mockResolvedValue(mockQuotaPool({ usedThisMonth: 450 }));
       mockGetUsageBreakdownForProfile.mockResolvedValue({
-        byProfile: [
-          {
-            profile_id: childProfileId,
-            name: 'Child',
-            used: 12,
-            usedToday: 3,
-            is_self: true,
-          },
-        ],
-        familyAggregate: { used: 450, limit: 500 },
+        byProfile: [],
+        familyAggregate: null,
         isOwnerBreakdownViewer: false,
         selfUsedToday: 3,
+        selfUsedThisMonth: 12,
       });
 
       const res = await app.request(
@@ -638,9 +631,10 @@ describe('billing routes', () => {
       expect(body.usage.usedThisMonth).toBe(12);
       // Non-owner viewers see the family pool's actual remaining (50 = 500-450),
       // NOT a per-child extrapolation (would be 488 = 500-12). Their personal
-      // contribution shows in usedThisMonth + byProfile + familyAggregate.
+      // contribution shows in usedThisMonth, without a per-profile breakdown.
       expect(body.usage.remainingQuestions).toBe(50);
-      expect(body.usage.familyAggregate).toEqual({ used: 450, limit: 500 });
+      expect(body.usage.byProfile).toEqual([]);
+      expect(body.usage.familyAggregate).toBeNull();
       // usedToday must be the viewer's own daily count, not the family
       // aggregate — preventing children from inferring siblings' activity.
       expect(body.usage.usedToday).toBe(3);

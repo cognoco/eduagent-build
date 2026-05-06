@@ -143,6 +143,7 @@ export interface UsageBreakdown {
    * subscription-level aggregate is shown instead).
    */
   selfUsedToday: number | null;
+  selfUsedThisMonth: number | null;
 }
 
 const USAGE_EVENTS_AVAILABLE_SINCE = '2026-05-06T00:00:00.000Z';
@@ -251,6 +252,7 @@ export async function getUsageBreakdownForProfile(
       familyAggregate: null,
       isOwnerBreakdownViewer: false,
       selfUsedToday: null,
+      selfUsedThisMonth: null,
     };
   }
 
@@ -270,6 +272,10 @@ export async function getUsageBreakdownForProfile(
         select 1 from ${familyLinks}
         where ${familyLinks.parentProfileId} = ${profiles.id}
       )`,
+      isChild: sql<boolean>`exists (
+        select 1 from ${familyLinks}
+        where ${familyLinks.childProfileId} = ${profiles.id}
+      )`,
     })
     .from(profiles)
     .where(
@@ -286,6 +292,7 @@ export async function getUsageBreakdownForProfile(
       familyAggregate: null,
       isOwnerBreakdownViewer: false,
       selfUsedToday: null,
+      selfUsedThisMonth: null,
     };
   }
 
@@ -318,9 +325,11 @@ export async function getUsageBreakdownForProfile(
       : false;
   const isOwnerBreakdownViewer =
     (viewer.isOwner && viewer.hasChildLink) ||
-    (sharingEnabled && viewer.hasChildLink);
+    (sharingEnabled && viewer.familyOwnerProfileId != null);
   const visibleRows = isOwnerBreakdownViewer
     ? profileRows
+    : viewer.isChild
+    ? []
     : profileRows.filter((row) => row.profileId === input.activeProfileId);
   const familyUsed = profileRows.reduce((sum, row) => sum + row.used, 0);
   const selfRow = profileRows.find(
@@ -340,6 +349,7 @@ export async function getUsageBreakdownForProfile(
       : null,
     isOwnerBreakdownViewer,
     selfUsedToday: isOwnerBreakdownViewer ? null : selfRow?.usedToday ?? 0,
+    selfUsedThisMonth: isOwnerBreakdownViewer ? null : selfRow?.used ?? 0,
   };
 }
 
