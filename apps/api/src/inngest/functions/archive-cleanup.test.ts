@@ -1,7 +1,6 @@
 const mockInngestSend = jest.fn().mockResolvedValue(undefined);
 
-jest.mock('../client', () => {
-  // gc1-allow: keeps the real Inngest function wrapper while stubbing dispatch side effects
+jest.mock('../client', () => { // gc1-allow: keeps the real Inngest function wrapper while stubbing dispatch side effects
   const realInngest = jest.requireActual('inngest').Inngest;
   const realInstance = new realInngest({ id: 'eduagent-test' });
   return {
@@ -14,16 +13,14 @@ jest.mock('../client', () => {
 
 const mockGetConsentStatus = jest.fn();
 const mockGetProfileForConsentRevocation = jest.fn();
-jest.mock('../../services/consent', () => ({
-  // gc1-allow: isolates archive cleanup guards from consent service DB access
+jest.mock('../../services/consent', () => ({ // gc1-allow: isolates archive cleanup guards from consent service DB access
   getConsentStatus: (...args: unknown[]) => mockGetConsentStatus(...args),
   getProfileForConsentRevocation: (...args: unknown[]) =>
     mockGetProfileForConsentRevocation(...args),
 }));
 
 const mockDeleteProfile = jest.fn().mockResolvedValue(undefined);
-jest.mock('../../services/deletion', () => ({
-  // gc1-allow: prevents destructive profile deletion while asserting the handler boundary
+jest.mock('../../services/deletion', () => ({ // gc1-allow: prevents destructive profile deletion while asserting the handler boundary
   deleteProfile: (...args: unknown[]) => mockDeleteProfile(...args),
 }));
 
