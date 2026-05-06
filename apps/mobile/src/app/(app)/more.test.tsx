@@ -105,12 +105,17 @@ const mockNotifData = {
 
 const mockLearningModeMutate = jest.fn();
 const mockCelebrationLevelMutate = jest.fn();
+const mockWithdrawalArchivePreferenceMutate = jest.fn();
 let mockLearningMode: string | undefined = 'serious';
 let mockLearningModeLoading = false;
 let mockLearningModePending = false;
 let mockCelebrationLevel: 'all' | 'big_only' | 'off' | undefined = 'all';
 let mockCelebrationLevelLoading = false;
 let mockCelebrationLevelPending = false;
+let mockWithdrawalArchivePreference: 'auto' | 'always' | 'never' | undefined =
+  'auto';
+let mockWithdrawalArchivePreferenceLoading = false;
+let mockWithdrawalArchivePreferencePending = false;
 
 jest.mock('../../hooks/use-settings', () => ({
   useNotificationSettings: () => ({
@@ -136,6 +141,14 @@ jest.mock('../../hooks/use-settings', () => ({
   useUpdateCelebrationLevel: () => ({
     mutate: mockCelebrationLevelMutate,
     isPending: mockCelebrationLevelPending,
+  }),
+  useWithdrawalArchivePreference: () => ({
+    data: mockWithdrawalArchivePreference,
+    isLoading: mockWithdrawalArchivePreferenceLoading,
+  }),
+  useUpdateWithdrawalArchivePreference: () => ({
+    mutate: mockWithdrawalArchivePreferenceMutate,
+    isPending: mockWithdrawalArchivePreferencePending,
   }),
 }));
 
@@ -182,6 +195,9 @@ describe('MoreScreen — Learning Mode', () => {
     mockCelebrationLevel = 'all';
     mockCelebrationLevelLoading = false;
     mockCelebrationLevelPending = false;
+    mockWithdrawalArchivePreference = 'auto';
+    mockWithdrawalArchivePreferenceLoading = false;
+    mockWithdrawalArchivePreferencePending = false;
   });
 
   it('renders the Learning Mode section header', () => {
@@ -472,6 +488,42 @@ describe('MoreScreen — Learning Mode', () => {
 
     expect(mockCelebrationLevelMutate).toHaveBeenCalledWith(
       'big_only',
+      expect.objectContaining({ onError: expect.any(Function) })
+    );
+  });
+
+  it('shows withdrawal archive options only for the owner profile', () => {
+    const ownerRender = render(<MoreScreen />, { wrapper: createWrapper() });
+
+    screen.getByTestId('more-withdrawal-archive-auto');
+    screen.getByTestId('more-withdrawal-archive-always');
+    screen.getByTestId('more-withdrawal-archive-never');
+    ownerRender.unmount();
+
+    mockActiveProfile = {
+      id: 'child-1',
+      displayName: 'Mia',
+      isOwner: false,
+    };
+    mockProfiles = [mockActiveProfile];
+
+    const { unmount } = render(<MoreScreen />, { wrapper: createWrapper() });
+
+    expect(screen.queryByTestId('more-withdrawal-archive-auto')).toBeNull();
+    expect(screen.queryByTestId('more-withdrawal-archive-always')).toBeNull();
+    expect(screen.queryByTestId('more-withdrawal-archive-never')).toBeNull();
+    unmount();
+  });
+
+  it('updates withdrawal archive preference when selecting always archive', () => {
+    mockWithdrawalArchivePreference = 'auto';
+
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    fireEvent.press(screen.getByTestId('more-withdrawal-archive-always'));
+
+    expect(mockWithdrawalArchivePreferenceMutate).toHaveBeenCalledWith(
+      'always',
       expect.objectContaining({ onError: expect.any(Function) })
     );
   });
