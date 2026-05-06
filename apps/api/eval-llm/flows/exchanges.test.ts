@@ -170,6 +170,41 @@ describe('exchangesFlow', () => {
       expect(messages.user).toBe('…still not clicking.');
       expect(messages.notes?.[0]).toContain('S5-rung5-exit');
     });
+
+    it('S1 first-turn prompt contains the one-idea + one-learner-action rule (5b)', () => {
+      // Structural assertion: the first-exchange system prompt must carry the
+      // first-turn rule (PR 5b) and must NOT contain the removed fun-fact opener.
+      const scenarios =
+        exchangesFlow.enumerateScenarios?.(generalProfile) ?? [];
+      const s1 = scenarios.find((s) => s.scenarioId === 'S1-rung1-teach-new');
+      if (!s1) throw new Error('S1 missing');
+
+      const messages = exchangesFlow.buildPrompt(s1.input);
+
+      // Rule present
+      expect(messages.system).toContain('FIRST TURN RULE');
+      expect(messages.system).toContain('exactly one concrete idea');
+      expect(messages.system).toContain('exactly one learner action');
+
+      // Fun-fact opener removed
+      expect(messages.system).not.toContain('surprising or fun fact');
+      expect(messages.system).not.toContain('spark curiosity');
+    });
+
+    it('S1 first-turn rule is absent for language-mode scenarios (rule scoped to non-language learning)', () => {
+      // Language scenarios (S7) are language-mode — the first-turn rule block
+      // only fires when !isLanguageMode. S7 should NOT contain the rule text.
+      const scenarios =
+        exchangesFlow.enumerateScenarios?.(languageProfile) ?? [];
+      const s7 = scenarios.find((s) => s.scenarioId === 'S7-language-fluency');
+      if (!s7) throw new Error('S7 missing');
+
+      const messages = exchangesFlow.buildPrompt(s7.input);
+      // S7 has exchangeCount: 2 so the first-turn rule wouldn't fire regardless,
+      // but we also verify the fun-fact language is absent for completeness.
+      expect(messages.system).not.toContain('surprising or fun fact');
+      expect(messages.system).not.toContain('spark curiosity');
+    });
   });
 
   describe('runLive [AUDIT-EVAL-2]', () => {

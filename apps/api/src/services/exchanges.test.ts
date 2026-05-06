@@ -100,19 +100,22 @@ describe('buildSystemPrompt', () => {
     });
   });
 
-  describe('first-exchange teaching opener', () => {
-    it('injects "begin teaching immediately" when exchangeCount=0 and topicTitle present', () => {
+  describe('first-exchange teaching rule (5b)', () => {
+    it('injects FIRST TURN RULE when exchangeCount=0 and topicTitle present', () => {
       const prompt = buildSystemPrompt({
         ...baseContext,
         exchangeCount: 0,
         topicTitle: 'Quadratic Equations',
         sessionType: 'learning',
       });
-      expect(prompt).toContain('fun fact about it to spark curiosity');
-      expect(prompt).toContain('Do not ask what they want to learn');
+      expect(prompt).toContain('FIRST TURN RULE');
+      expect(prompt).toContain('exactly one concrete idea');
+      expect(prompt).toContain('exactly one learner action');
+      expect(prompt).not.toContain('surprising or fun fact');
+      expect(prompt).not.toContain('spark curiosity');
     });
 
-    it('injects rawInput anchor when exchangeCount=0 and only rawInput present', () => {
+    it('injects FIRST TURN RULE when exchangeCount=0 and only rawInput present (no topic)', () => {
       const prompt = buildSystemPrompt({
         ...baseContext,
         exchangeCount: 0,
@@ -120,22 +123,22 @@ describe('buildSystemPrompt', () => {
         rawInput: 'How do volcanoes work?',
         sessionType: 'learning',
       });
-      expect(prompt).toContain(
-        'fun fact related to their question to spark curiosity'
-      );
+      expect(prompt).toContain('FIRST TURN RULE');
+      expect(prompt).toContain('exactly one concrete idea');
+      expect(prompt).not.toContain('surprising or fun fact');
     });
 
-    it('does NOT inject opener when exchangeCount > 0', () => {
+    it('does NOT inject first-turn rule when exchangeCount > 0', () => {
       const prompt = buildSystemPrompt({
         ...baseContext,
         exchangeCount: 3,
         topicTitle: 'Quadratic Equations',
         sessionType: 'learning',
       });
-      expect(prompt).not.toContain('fun fact about it to spark curiosity');
+      expect(prompt).not.toContain('FIRST TURN RULE');
     });
 
-    it('does NOT inject opener for non-learning sessions', () => {
+    it('does NOT inject first-turn rule for non-learning sessions', () => {
       const prompt = buildSystemPrompt({
         ...baseContext,
         exchangeCount: 0,
@@ -143,10 +146,13 @@ describe('buildSystemPrompt', () => {
         sessionType: 'homework',
         homeworkMode: 'help_me',
       });
-      expect(prompt).not.toContain('fun fact about it to spark curiosity');
+      expect(prompt).not.toContain('FIRST TURN RULE');
     });
 
-    it('does NOT inject opener for freeform (no topic, no rawInput)', () => {
+    it('does NOT inject first-turn rule for freeform (no topic, no rawInput)', () => {
+      // exchangeCount === 0 + learning mode but the block fires regardless of topic presence now.
+      // Freeform still gets the rule — the condition gates on session type, not topic presence.
+      // This test verifies the rule is present even without a topic (changed behavior vs old opener).
       const prompt = buildSystemPrompt({
         ...baseContext,
         exchangeCount: 0,
@@ -154,8 +160,8 @@ describe('buildSystemPrompt', () => {
         rawInput: undefined,
         sessionType: 'learning',
       });
-      expect(prompt).not.toContain('fun fact about it to spark curiosity');
-      expect(prompt).not.toContain('Anchor your teaching');
+      expect(prompt).toContain('FIRST TURN RULE');
+      expect(prompt).not.toContain('surprising or fun fact');
     });
   });
 

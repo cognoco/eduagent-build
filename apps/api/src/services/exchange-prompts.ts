@@ -445,27 +445,20 @@ export function buildSystemPrompt(context: ExchangeContext): string {
     );
   }
 
-  // First-exchange teaching opener — tell the LLM to start teaching, not ask
+  // First-exchange teaching rule — teach one concrete idea, end with one learner action
   if (
     !isRecitation &&
     context.exchangeCount === 0 &&
     context.sessionType === 'learning' &&
     !isLanguageMode
   ) {
-    if (safeTopicTitle) {
-      sections.push(
-        'The learner chose this topic. Open with a surprising or fun fact about it to spark curiosity, ' +
-          'then invite them into the conversation (e.g. "Have you heard about…?" or "What do you already know about…?"). ' +
-          'Do not ask what they want to learn — they already told you by choosing the topic. ' +
-          'If prior session history exists for this topic, pick up where the previous session left off instead of repeating the fun-fact opener.'
-      );
-    } else if (context.rawInput) {
-      sections.push(
-        'The learner expressed interest in the above topic. ' +
-          'Open with a surprising or fun fact related to their question to spark curiosity, ' +
-          'then anchor your teaching to their stated intent and begin immediately.'
-      );
-    }
+    sections.push(
+      'FIRST TURN RULE: Your first response must teach exactly one concrete idea AND end with exactly one learner action ' +
+        '(a question to answer, a problem to solve, or an explanation to give back). ' +
+        'Do not open with a fun fact, a curiosity hook, or a chatty invitation before teaching. ' +
+        'Start teaching immediately. ' +
+        'Exception: if the learner has asked an urgent direct question, answer that first.'
+    );
   }
 
   // Recitation mode — overrides teaching/escalation behaviour
