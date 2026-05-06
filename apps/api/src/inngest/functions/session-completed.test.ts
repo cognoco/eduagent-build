@@ -6,6 +6,7 @@ import {
   createDatabaseModuleMock,
   createTransactionalMockDb,
 } from '../../test-utils/database-module';
+import { PgDialect } from 'drizzle-orm/pg-core';
 
 const col = (name: string) => ({ name });
 const chainable = () => ({
@@ -2142,35 +2143,24 @@ describe('embedNewFactsForProfile', () => {
     expect(result.embedded).toBe(1);
     expect(result.failed).toBe(0);
 
-    // The WHERE condition must have been called — no missing guard.
+    // The WHERE condition must have been captured — no missing guard.
     expect(capturedWhereArg).toHaveLength(1);
 
-    // Verify the WHERE condition contains an IS NULL SQL fragment.
-    // drizzle-orm's `and()` wraps conditions; drilling into getSQL().queryChunks
-    // reveals the SQL text. A missing isNull guard would produce only eq() conditions.
-    const whereCondition = capturedWhereArg[0] as {
-      getSQL?: () => { queryChunks: unknown[] };
-    };
+    // Verify the WHERE condition serialises to SQL that contains IS NULL.
+    // This proves the idempotency guard: a concurrent second writer whose UPDATE
+    // fires after the first has already set embedding will be a no-op (0 rows
+    // matched) rather than overwriting the vector.
+    //
+    // PgDialect.sqlToQuery converts the drizzle condition to a SQL string with
+    // positional params, e.g. "($1 = $2 and $3 = $4 and $5 is null)".
+    const dialect = new PgDialect();
+    const whereCondition = capturedWhereArg[0] as { getSQL: () => unknown };
     expect(typeof whereCondition?.getSQL).toBe('function');
 
-    // Recursively collect all SQL string fragments from the condition tree.
-    function collectSqlStrings(node: unknown): string[] {
-      if (typeof node === 'string') return [node];
-      if (Array.isArray(node)) return node.flatMap(collectSqlStrings);
-      if (node && typeof node === 'object' && 'getSQL' in node) {
-        const sql = (
-          node as { getSQL: () => { queryChunks: unknown[] } }
-        ).getSQL();
-        return collectSqlStrings(sql.queryChunks);
-      }
-      return [];
-    }
-
-    const sqlFragments = collectSqlStrings(whereCondition);
-    const joinedSql = sqlFragments.join('');
+    const { sql: sqlString } = dialect.sqlToQuery(whereCondition.getSQL());
     // The IS NULL guard must appear — if it were absent, a concurrent second
     // writer would overwrite an already-set embedding vector.
-    expect(joinedSql).toMatch(/is null/i);
+    expect(sqlString).toMatch(/is null/i);
   });
 
   it('[I3] embedder is not called when all rows already have embeddings (SELECT isNull filter)', async () => {
