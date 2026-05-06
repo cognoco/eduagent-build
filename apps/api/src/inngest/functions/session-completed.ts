@@ -42,13 +42,15 @@ import { generateAndStoreLlmSummary } from '../../services/session-llm-summary';
 import {
   curriculumTopics,
   learningSessions,
+  memoryFacts,
   profiles,
   retentionCards,
   sessionEvents,
   sessionSummaries,
   subjects,
+  type Database,
 } from '@eduagent/database';
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { cefrLevelSchema, verificationTypeSchema } from '@eduagent/schemas';
 import {
   analyzeSessionTranscript,
@@ -57,8 +59,72 @@ import {
   type StruggleNotification,
 } from '../../services/learner-profile';
 import { sendStruggleNotification } from '../../services/notifications';
+import {
+  makeEmbedderFromEnv,
+  type FactEmbedder,
+} from '../../services/memory/embed-fact';
 
 const logger = createLogger();
+
+export async function embedNewFactsForProfile(
+  db: Database,
+  profileId: string,
+  embedder: FactEmbedder,
+  options?: { limit?: number }
+): Promise<{ embedded: number; failed: number; scanned: number }> {
+  const rows = await db
+    .select({
+      id: memoryFacts.id,
+      text: memoryFacts.text,
+      category: memoryFacts.category,
+    })
+    .from(memoryFacts)
+    .where(
+      and(
+        eq(memoryFacts.profileId, profileId),
+        isNull(memoryFacts.embedding),
+        sql`${memoryFacts.supersededBy} IS NULL`
+      )
+    )
+    .limit(options?.limit ?? 50);
+
+  let embedded = 0;
+  let failed = 0;
+  for (const row of rows) {
+    logger.info('[memory_facts] embed-on-write attempted', {
+      event: 'memory_facts.embed_on_write.attempted',
+      profileId,
+      category: row.category,
+      source: 'embed_on_write',
+    });
+
+    const result = await embedder(row.text);
+    if (!result.ok) {
+      failed += 1;
+      logger.warn('[memory_facts] embed-on-write failed', {
+        event: 'memory_facts.embed_on_write.failed',
+        profileId,
+        category: row.category,
+        reason: result.reason,
+      });
+      continue;
+    }
+
+    await db
+      .update(memoryFacts)
+      .set({ embedding: result.vector, updatedAt: new Date() })
+      .where(
+        and(
+          eq(memoryFacts.id, row.id),
+          eq(memoryFacts.profileId, profileId),
+          isNull(memoryFacts.embedding)
+        )
+      );
+    embedded += 1;
+  }
+
+  return { embedded, failed, scanned: rows.length };
+}
 
 // ---------------------------------------------------------------------------
 // Step error isolation — two tiers:
@@ -1166,6 +1232,32 @@ export const sessionCompleted = inngest.createFunction(
       }
     );
     outcomes.push(analyzeOutcome);
+
+    outcomes.push(
+      await step.run('embed-new-memory-facts', async () =>
+        runIsolated('embed-new-memory-facts', profileId, async () => {
+          let apiKey: string | undefined;
+          try {
+            apiKey = getStepVoyageApiKey();
+          } catch {
+            logger.warn('[memory_facts] embed-on-write skipped', {
+              event: 'memory_facts.embed_on_write.skipped',
+              profileId,
+              reason: 'no_voyage_key',
+            });
+            return;
+          }
+
+          const db = getStepDatabase();
+          await embedNewFactsForProfile(
+            db,
+            profileId,
+            makeEmbedderFromEnv(apiKey),
+            { limit: 50 }
+          );
+        })
+      )
+    );
 
     // Step 3b: FR247.6 — Send struggle push notifications to parent
     const pendingStruggleNotifications = analyzeOutcome.notifications ?? [];

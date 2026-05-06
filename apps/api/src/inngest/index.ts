@@ -67,6 +67,7 @@ import {
   transcriptPurgeHandler,
 } from './functions/transcript-purge-cron';
 import { memoryFactsBackfill } from './functions/memory-facts-backfill';
+import { memoryFactsEmbedBackfill } from './functions/memory-facts-embed-backfill';
 
 export {
   inngest,
@@ -118,6 +119,7 @@ export {
   transcriptPurgeCron,
   transcriptPurgeHandler,
   memoryFactsBackfill,
+  memoryFactsEmbedBackfill,
 };
 
 // All Inngest functions to register with the serve handler
@@ -171,4 +173,5 @@ export const functions = [
   transcriptPurgeCron,
   transcriptPurgeHandler,
   memoryFactsBackfill,
+  memoryFactsEmbedBackfill,
 ];

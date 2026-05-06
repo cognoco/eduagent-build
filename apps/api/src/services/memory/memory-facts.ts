@@ -226,6 +226,18 @@ export function buildProjectionFromMergedState(profile: {
   };
 }
 
+/**
+ * Atomicity: every caller passes a Drizzle transaction object (`tx`) opened by
+ * `db.transaction(async (tx) => { ... })` in the outer function: either
+ * `applyAnalysis` (learner-profile.ts:1224) or `deleteMemoryItem` /
+ * `unsuppressInference` (learner-profile.ts:1334, 1383). Each outer transaction
+ * also issues `SELECT ... FOR UPDATE` on the `learning_profiles` row before
+ * reaching this function, which serializes concurrent callers for the same
+ * profileId. The three statements below (SELECT existing, DELETE, INSERT) are
+ * therefore already inside a genuine Postgres BEGIN/COMMIT via
+ * `neon-serverless` (WebSocket driver). No additional batch or lock is needed
+ * here.
+ */
 export async function replaceActiveMemoryFactsForProfile(
   db: MemoryFactsWriter,
   profileId: string,

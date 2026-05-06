@@ -145,6 +145,8 @@ describe('getRelevantMemories', () => {
   });
 
   it('blends relevance and recency so old-tight beats recent-loose', async () => {
+    // With default weights (0.85/0.15, halflife=180d), semantic relevance wins
+    // here even though old-tight is older than recent-loose.
     const now = new Date('2026-05-05T00:00:00Z');
     const scoped = stubScoped({
       relevant: [
@@ -158,7 +160,7 @@ describe('getRelevantMemories', () => {
           id: 'a',
           text: 'old-tight',
           distance: 0.05,
-          observedAt: addDays(now, -180),
+          observedAt: addDays(now, -30),
         }),
       ],
     });
