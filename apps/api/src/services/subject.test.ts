@@ -17,10 +17,17 @@ import {
   getSubject,
   updateSubject,
   archiveInactiveSubjects,
+  createSubjectWithStructure,
 } from './subject';
+import { inngest } from '../inngest/client';
+import * as sentry from './sentry';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
 const profileId = 'test-profile-id';
+const uuidProfileId = '550e8400-e29b-41d4-a716-446655440010';
+const uuidSubjectId = '550e8400-e29b-41d4-a716-446655440011';
+const uuidBookId = '550e8400-e29b-41d4-a716-446655440012';
+const uuidExistingBookId = '550e8400-e29b-41d4-a716-446655440013';
 
 function mockSubjectRow(
   overrides?: Partial<{
@@ -38,8 +45,42 @@ function mockSubjectRow(
     name: overrides?.name ?? 'Mathematics',
     rawInput: overrides?.rawInput ?? null,
     status: overrides?.status ?? 'active',
+    pedagogyMode: 'socratic' as const,
+    languageCode: null,
     createdAt: NOW,
     updatedAt: overrides?.updatedAt ?? NOW,
+  };
+}
+
+function mockCurriculumRow() {
+  return {
+    id: '550e8400-e29b-41d4-a716-446655440014',
+    subjectId: uuidSubjectId,
+    version: 1,
+    createdAt: NOW,
+    updatedAt: NOW,
+  };
+}
+
+function mockBookRow(
+  overrides?: Partial<{
+    id: string;
+    subjectId: string;
+    title: string;
+    description: string | null;
+    topicsGenerated: boolean;
+  }>
+) {
+  return {
+    id: overrides?.id ?? uuidBookId,
+    subjectId: overrides?.subjectId ?? uuidSubjectId,
+    title: overrides?.title ?? 'Tea',
+    description: overrides?.description ?? null,
+    emoji: null,
+    sortOrder: 1,
+    topicsGenerated: overrides?.topicsGenerated ?? false,
+    createdAt: NOW,
+    updatedAt: NOW,
   };
 }
 
@@ -191,6 +232,163 @@ describe('createSubject', () => {
     const result = await createSubject(db, profileId, { name: 'Mathematics' });
 
     expect(result.rawInput).toBeNull();
+  });
+});
+
+describe('createSubjectWithStructure focused_book prewarm', () => {
+  let sendSpy: jest.SpiedFunction<typeof inngest.send>;
+  let captureSpy: jest.SpiedFunction<typeof sentry.captureException>;
+
+  function createFocusedBookDb(options?: {
+    subjectRow?: ReturnType<typeof mockSubjectRow>;
+    existingBook?: ReturnType<typeof mockBookRow> | null;
+    insertedBook?: ReturnType<typeof mockBookRow>;
+  }): Database {
+    const subjectRow =
+      options?.subjectRow ??
+      mockSubjectRow({
+        id: uuidSubjectId,
+        profileId: uuidProfileId,
+        name: 'Botany',
+        rawInput: 'tea',
+      });
+    const insertedBook = options?.insertedBook ?? mockBookRow();
+
+    const db = {
+      query: {
+        curricula: {
+          findFirst: jest.fn().mockResolvedValue(mockCurriculumRow()),
+        },
+        curriculumBooks: {
+          findFirst: jest.fn().mockResolvedValue(options?.existingBook ?? null),
+        },
+      },
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValue([{ maxOrder: 0 }]),
+      }),
+      insert: jest.fn((_table: unknown) => ({
+        values: jest.fn((values: Record<string, unknown>) => ({
+          returning: jest
+            .fn()
+            .mockResolvedValue(
+              'title' in values ? [insertedBook] : [subjectRow]
+            ),
+          onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
+        })),
+      })),
+    };
+
+    return db as unknown as Database;
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    sendSpy = jest.spyOn(inngest, 'send').mockResolvedValue(undefined);
+    captureSpy = jest
+      .spyOn(sentry, 'captureException')
+      .mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    sendSpy.mockRestore();
+    captureSpy.mockRestore();
+  });
+
+  it('fires curriculum prewarm when a new focused book is created', async () => {
+    setupScopedRepo({ findManyResult: [] });
+    const db = createFocusedBookDb();
+
+    const result = await createSubjectWithStructure(db, uuidProfileId, {
+      name: 'Botany',
+      rawInput: 'tea',
+    });
+
+    expect(result.bookId).toBe(uuidBookId);
+    expect(sendSpy).toHaveBeenCalledWith({
+      name: 'app/subject.curriculum-prewarm-requested',
+      data: {
+        version: 1,
+        subjectId: uuidSubjectId,
+        profileId: uuidProfileId,
+        bookId: uuidBookId,
+        timestamp: expect.any(String),
+      },
+    });
+  });
+
+  it('fires curriculum prewarm for an existing focused book with no topics', async () => {
+    const subjectRow = mockSubjectRow({
+      id: uuidSubjectId,
+      profileId: uuidProfileId,
+      name: 'Botany',
+    });
+    setupScopedRepo({ findManyResult: [subjectRow] });
+    const db = createFocusedBookDb({
+      subjectRow,
+      existingBook: mockBookRow({ id: uuidExistingBookId }),
+    });
+
+    const result = await createSubjectWithStructure(db, uuidProfileId, {
+      name: 'Botany',
+      focus: 'Tea',
+    });
+
+    expect(result.bookId).toBe(uuidExistingBookId);
+    expect(sendSpy).toHaveBeenCalledWith({
+      name: 'app/subject.curriculum-prewarm-requested',
+      data: expect.objectContaining({
+        version: 1,
+        subjectId: uuidSubjectId,
+        profileId: uuidProfileId,
+        bookId: uuidExistingBookId,
+      }),
+    });
+  });
+
+  it('does not fire curriculum prewarm for an existing book that already has topics', async () => {
+    const subjectRow = mockSubjectRow({
+      id: uuidSubjectId,
+      profileId: uuidProfileId,
+      name: 'Botany',
+    });
+    setupScopedRepo({ findManyResult: [subjectRow] });
+    const db = createFocusedBookDb({
+      subjectRow,
+      existingBook: mockBookRow({
+        id: uuidExistingBookId,
+        topicsGenerated: true,
+      }),
+    });
+
+    await createSubjectWithStructure(db, uuidProfileId, {
+      name: 'Botany',
+      focus: 'Tea',
+    });
+
+    expect(sendSpy).not.toHaveBeenCalled();
+  });
+
+  it('returns the subject when prewarm dispatch fails and captures the exception', async () => {
+    setupScopedRepo({ findManyResult: [] });
+    const db = createFocusedBookDb();
+    const dispatchError = new Error('inngest unavailable');
+    sendSpy.mockRejectedValueOnce(dispatchError);
+
+    const result = await createSubjectWithStructure(db, uuidProfileId, {
+      name: 'Botany',
+      rawInput: 'tea',
+    });
+
+    expect(result.bookId).toBe(uuidBookId);
+    expect(captureSpy).toHaveBeenCalledWith(dispatchError, {
+      profileId: uuidProfileId,
+      extra: {
+        subjectId: uuidSubjectId,
+        bookId: uuidBookId,
+        phase: 'subject_prewarm_dispatch',
+      },
+    });
   });
 });
 

@@ -12,8 +12,28 @@ import {
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
-import { SubjectNotFoundError } from '@eduagent/schemas';
+import {
+  SubjectNotFoundError,
+  subjectCurriculumPrewarmRequestedEventSchema,
+} from '@eduagent/schemas';
+import type {
+  LanguageSetupInput,
+  SubjectCreateInput,
+  SubjectUpdateInput,
+  Subject,
+  SubjectStructureType,
+} from '@eduagent/schemas';
+import { inngest } from '../inngest/client';
+import { ensureCurriculum, persistNarrowTopics } from './curriculum';
+import { detectLanguageSubject } from './language-detect';
+import {
+  generateLanguageCurriculum,
+  regenerateLanguageCurriculum,
+} from './language-curriculum';
+import { createLogger } from './logger';
 import { getProfileAge } from './profile';
+import { setNativeLanguage } from './retention-data';
+import { captureException } from './sentry';
 
 /**
  * [BUG-SUBJ-LANG] Thrown when `configureLanguageSubject` is called on a
@@ -29,23 +49,8 @@ export class SubjectNotLanguageLearningError extends Error {
     this.name = 'SubjectNotLanguageLearningError';
   }
 }
-import { createLogger } from './logger';
 
 const logger = createLogger();
-import type {
-  LanguageSetupInput,
-  SubjectCreateInput,
-  SubjectUpdateInput,
-  Subject,
-  SubjectStructureType,
-} from '@eduagent/schemas';
-import { ensureCurriculum, persistNarrowTopics } from './curriculum';
-import { detectLanguageSubject } from './language-detect';
-import {
-  generateLanguageCurriculum,
-  regenerateLanguageCurriculum,
-} from './language-curriculum';
-import { setNativeLanguage } from './retention-data';
 
 // ---------------------------------------------------------------------------
 // Mapper — Drizzle Date → API ISO string
@@ -63,6 +68,34 @@ function mapSubjectRow(row: typeof subjects.$inferSelect): Subject {
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
+}
+
+async function dispatchCurriculumPrewarm(args: {
+  subjectId: string;
+  profileId: string;
+  bookId: string;
+}): Promise<void> {
+  const data = subjectCurriculumPrewarmRequestedEventSchema.parse({
+    version: 1,
+    ...args,
+    timestamp: new Date().toISOString(),
+  });
+
+  try {
+    await inngest.send({
+      name: 'app/subject.curriculum-prewarm-requested',
+      data,
+    });
+  } catch (err) {
+    captureException(err, {
+      profileId: args.profileId,
+      extra: {
+        subjectId: args.subjectId,
+        bookId: args.bookId,
+        phase: 'subject_prewarm_dispatch',
+      },
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -180,6 +213,13 @@ export async function createSubjectWithStructure(
       ),
     });
     if (existingBook) {
+      if (!existingBook.topicsGenerated) {
+        await dispatchCurriculumPrewarm({
+          subjectId: targetSubject.id,
+          profileId,
+          bookId: existingBook.id,
+        });
+      }
       return {
         subject: targetSubject,
         structureType: 'focused_book' as SubjectStructureType,
@@ -212,6 +252,11 @@ export async function createSubjectWithStructure(
 
     if (!bookRow)
       throw new Error('Insert curriculum book did not return a row');
+    await dispatchCurriculumPrewarm({
+      subjectId: targetSubject.id,
+      profileId,
+      bookId: bookRow.id,
+    });
     return {
       subject: targetSubject,
       structureType: 'focused_book',

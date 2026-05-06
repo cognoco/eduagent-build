@@ -937,6 +937,16 @@ export async function persistCurriculum(
 
   // Book-scoped path: generate topics for a specific book within the subject
   if (bookId && bookTitle) {
+    const existingBook = await db.query.curriculumBooks.findFirst({
+      where: and(
+        eq(curriculumBooks.id, bookId),
+        eq(curriculumBooks.subjectId, subjectId)
+      ),
+    });
+    if (existingBook?.topicsGenerated) {
+      return;
+    }
+
     const { generateBookTopics } = await import('./book-generation');
     const learnerAge = await getProfileAge(db, profileId);
     const priorKnowledge = signals.currentKnowledge ?? summary;
@@ -946,6 +956,16 @@ export async function persistCurriculum(
       learnerAge,
       priorKnowledge
     );
+
+    const refreshedBook = await db.query.curriculumBooks.findFirst({
+      where: and(
+        eq(curriculumBooks.id, bookId),
+        eq(curriculumBooks.subjectId, subjectId)
+      ),
+    });
+    if (refreshedBook?.topicsGenerated) {
+      return;
+    }
 
     const curriculum = await ensureCurriculum(db, subjectId);
 

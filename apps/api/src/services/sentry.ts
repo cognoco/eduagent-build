@@ -45,11 +45,13 @@ export function captureException(err: unknown, context?: ErrorContext): void {
 export function addBreadcrumb(
   message: string,
   category?: string,
-  level?: Sentry.SeverityLevel
+  level?: Sentry.SeverityLevel,
+  data?: Record<string, unknown>
 ): void {
   Sentry.addBreadcrumb({
     message,
     category,
     level: level ?? 'info',
+    ...(data ? { data } : {}),
   });
 }
