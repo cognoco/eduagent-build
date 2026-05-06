@@ -25,25 +25,25 @@ const CONFIG: Record<
   }
 > = {
   strong: {
-    label: 'Strong',
+    label: 'Still remembered',
     icon: 'leaf',
     colorKey: 'retentionStrong',
     textColor: 'text-retention-strong',
   },
   fading: {
-    label: 'Fading',
+    label: 'Getting fuzzy',
     icon: 'flame',
     colorKey: 'retentionFading',
     textColor: 'text-retention-fading',
   },
   weak: {
-    label: 'Weak',
+    label: 'Needs a quick refresh',
     icon: 'sparkles',
     colorKey: 'retentionWeak',
     textColor: 'text-retention-weak',
   },
   forgotten: {
-    label: 'Forgotten',
+    label: 'Needs a fresh pass',
     icon: 'leaf-outline',
     colorKey: 'retentionForgotten',
     textColor: 'text-retention-forgotten',

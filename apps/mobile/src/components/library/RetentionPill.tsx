@@ -9,10 +9,10 @@ interface RetentionPillProps {
 }
 
 const STATUS_LABEL: Record<RetentionStatus, string> = {
-  strong: 'Strong',
-  fading: 'Fading',
-  weak: 'Weak',
-  forgotten: 'Forgotten',
+  strong: 'Still remembered',
+  fading: 'Getting fuzzy',
+  weak: 'Needs a quick refresh',
+  forgotten: 'Needs a fresh pass',
 };
 
 export function RetentionPill({
@@ -42,7 +42,7 @@ export function RetentionPill({
   return (
     <View
       testID={testID}
-      accessibilityLabel={`Retention: ${STATUS_LABEL[status]}`}
+      accessibilityLabel={`Memory check: ${STATUS_LABEL[status]}`}
       style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
     >
       <View
