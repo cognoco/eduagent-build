@@ -156,7 +156,17 @@ describe('Integration: assessment routes', () => {
       profileId: profile.id,
       subjectId: subject.id,
       topicId,
+      verificationDepth: 'transfer',
     });
+    mockChat.mockResolvedValueOnce(
+      JSON.stringify({
+        feedback: 'Good reasoning!',
+        passed: true,
+        shouldEscalateDepth: false,
+        rawScore: 0.9,
+        qualityRating: 4,
+      })
+    );
 
     const getRes = await app.request(
       `/v1/assessments/${assessmentId}`,
@@ -197,7 +207,7 @@ describe('Integration: assessment routes', () => {
       feedback: 'Good reasoning!',
       passed: true,
       shouldEscalateDepth: false,
-      masteryScore: 0.45,
+      masteryScore: 0.9,
       qualityRating: 4,
     });
 
@@ -207,7 +217,7 @@ describe('Integration: assessment routes', () => {
     });
 
     expect(updated?.status).toBe('passed');
-    expect(Number(updated?.masteryScore)).toBe(0.45);
+    expect(Number(updated?.masteryScore)).toBe(0.9);
     expect(updated?.qualityRating).toBe(4);
     expect(updated?.exchangeHistory).toEqual([
       {
@@ -234,7 +244,17 @@ describe('Integration: assessment routes', () => {
       profileId: profile.id,
       subjectId: subject.id,
       topicId,
+      verificationDepth: 'transfer',
     });
+    mockChat.mockResolvedValueOnce(
+      JSON.stringify({
+        feedback: 'Good reasoning!',
+        passed: true,
+        shouldEscalateDepth: false,
+        rawScore: 0.9,
+        qualityRating: 4,
+      })
+    );
 
     const res = await app.request(
       `/v1/assessments/${assessmentId}/answer`,
@@ -271,7 +291,7 @@ describe('Integration: assessment routes', () => {
     expect(card?.lastReviewedAt).not.toBeNull();
     expect(card?.nextReviewAt).not.toBeNull();
     expect(xp).not.toBeUndefined();
-    expect(xp?.amount).toBe(45);
+    expect(xp?.amount).toBe(180);
     expect(xp?.status).toBe('verified');
   });
 

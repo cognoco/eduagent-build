@@ -20,6 +20,7 @@ import {
   updateAssessment,
   loadTopicTitle,
   MAX_ASSESSMENT_EXCHANGES,
+  evaluateQuickCheckAnswer,
 } from '../services/assessments';
 import { mapEvaluateQualityToSm2 } from '../services/evaluate';
 import { updateRetentionFromSession } from '../services/retention-data';
@@ -247,7 +248,7 @@ export const assessmentRoutes = new Hono<RouteEnv>()
         ? await loadTopicTitle(db, session.topicId, profileId)
         : 'General';
 
-      const evaluation = await evaluateAssessmentAnswer(
+      const evaluation = await evaluateQuickCheckAnswer(
         {
           topicTitle,
           topicDescription: '',

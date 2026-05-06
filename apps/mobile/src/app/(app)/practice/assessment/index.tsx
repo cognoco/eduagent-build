@@ -65,7 +65,10 @@ export default function AssessmentScreen() {
           setAssessmentId(currentAssessmentId);
         }
 
-        const result = await submitAnswer.mutateAsync({ answer: text });
+        const result = await submitAnswer.mutateAsync({
+          assessmentId: currentAssessmentId,
+          answer: text,
+        });
         const evaluation = result.evaluation;
         const feedback = evaluation.feedback;
         const terminalStatus = result.status !== 'in_progress';

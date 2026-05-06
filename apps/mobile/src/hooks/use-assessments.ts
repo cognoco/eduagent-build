@@ -94,20 +94,29 @@ export function useAssessmentEligibleTopics(): UseQueryResult<
   });
 }
 
+interface SubmitAnswerInput {
+  answer: string;
+  assessmentId?: string;
+}
+
 export function useSubmitAnswer(assessmentId: string) {
   const client = useApiClient();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: {
-      answer: string;
-    }): Promise<{
+    mutationFn: async (
+      input: SubmitAnswerInput
+    ): Promise<{
       evaluation: AssessmentEvaluation;
       status: AssessmentStatus;
     }> => {
+      const targetAssessmentId = input.assessmentId ?? assessmentId;
+      if (!targetAssessmentId) {
+        throw new Error('Assessment id is required to submit an answer.');
+      }
       const res = await client.assessments[':assessmentId'].answer.$post({
-        param: { assessmentId },
-        json: input,
+        param: { assessmentId: targetAssessmentId },
+        json: { answer: input.answer },
       });
       await assertOk(res);
       return (await res.json()) as {
@@ -115,9 +124,10 @@ export function useSubmitAnswer(assessmentId: string) {
         status: AssessmentStatus;
       };
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      const targetAssessmentId = variables.assessmentId ?? assessmentId;
       void queryClient.invalidateQueries({
-        queryKey: ['assessment', assessmentId],
+        queryKey: ['assessment', targetAssessmentId],
       });
       void queryClient.invalidateQueries({ queryKey: ['progress'] });
     },

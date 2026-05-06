@@ -1,4 +1,5 @@
 import { useDashboard } from './use-dashboard';
+import { useActiveProfileRole } from './use-active-profile-role';
 
 export interface FamilyPresence {
   hasFamily: boolean;
@@ -7,6 +8,10 @@ export interface FamilyPresence {
 
 export function useFamilyPresence(): FamilyPresence {
   const { data, isLoading } = useDashboard();
-  const hasFamily = (data?.children?.length ?? 0) > 0;
+  const activeRole = useActiveProfileRole();
+  const hasFamily =
+    activeRole === 'owner' &&
+    data?.demoMode === false &&
+    (data.children?.length ?? 0) > 0;
   return { hasFamily, isLoading };
 }
