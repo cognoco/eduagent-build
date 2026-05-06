@@ -27,7 +27,15 @@ export type MemorySnapshot = {
   interestTimestamps: Record<string, string>;
 };
 
-type MemoryFactsWriter = Pick<Database, 'delete' | 'insert' | 'update'>;
+type MemoryFactsWriter = Pick<
+  Database,
+  'delete' | 'insert' | 'select' | 'update'
+>;
+
+export type MemoryFactSnapshotRow = Pick<
+  typeof memoryFacts.$inferSelect,
+  'category' | 'confidence' | 'metadata' | 'observedAt' | 'text'
+>;
 
 export function emptyMemorySnapshot(): MemorySnapshot {
   return {
@@ -148,41 +156,46 @@ export async function readMemorySnapshotFromFacts(
   const rows = await scoped.memoryFacts.findManyActive();
   const snapshot = emptyMemorySnapshot();
 
-  for (const row of rows) {
-    const metadata = metadataRecord(row.metadata);
-    switch (row.category) {
-      case 'strength': {
-        const entry = reconstructStrength(row.text, metadata, row.confidence);
-        if (entry) snapshot.strengths.push(entry);
-        break;
-      }
-      case 'struggle': {
-        const entry = reconstructStruggle(
-          row.text,
-          metadata,
-          row.confidence,
-          row.observedAt
-        );
-        if (entry) snapshot.struggles.push(entry);
-        break;
-      }
-      case 'interest': {
-        const entry = reconstructInterest(row.text, metadata);
-        snapshot.interests.push(entry);
-        snapshot.interestTimestamps[entry.label.toLowerCase()] =
-          row.observedAt.toISOString();
-        break;
-      }
-      case 'communication_note':
-        snapshot.communicationNotes.push(row.text);
-        break;
-      case 'suppressed':
-        snapshot.suppressedInferences.push(row.text);
-        break;
-    }
-  }
+  for (const row of rows) appendMemoryFactToSnapshot(snapshot, row);
 
   return snapshot;
+}
+
+export function appendMemoryFactToSnapshot(
+  snapshot: MemorySnapshot,
+  row: MemoryFactSnapshotRow
+): void {
+  const metadata = metadataRecord(row.metadata);
+  switch (row.category) {
+    case 'strength': {
+      const entry = reconstructStrength(row.text, metadata, row.confidence);
+      if (entry) snapshot.strengths.push(entry);
+      break;
+    }
+    case 'struggle': {
+      const entry = reconstructStruggle(
+        row.text,
+        metadata,
+        row.confidence,
+        row.observedAt
+      );
+      if (entry) snapshot.struggles.push(entry);
+      break;
+    }
+    case 'interest': {
+      const entry = reconstructInterest(row.text, metadata);
+      snapshot.interests.push(entry);
+      snapshot.interestTimestamps[entry.label.toLowerCase()] =
+        row.observedAt.toISOString();
+      break;
+    }
+    case 'communication_note':
+      snapshot.communicationNotes.push(row.text);
+      break;
+    case 'suppressed':
+      snapshot.suppressedInferences.push(row.text);
+      break;
+  }
 }
 
 export function buildProjectionFromMergedState(profile: {
@@ -218,6 +231,27 @@ export async function replaceActiveMemoryFactsForProfile(
   profileId: string,
   projection: MemoryProjection
 ): Promise<void> {
+  const existing = await db
+    .select({
+      category: memoryFacts.category,
+      textNormalized: memoryFacts.textNormalized,
+      embedding: memoryFacts.embedding,
+    })
+    .from(memoryFacts)
+    .where(
+      and(
+        eq(memoryFacts.profileId, profileId),
+        sql`${memoryFacts.supersededBy} IS NULL`
+      )
+    );
+  const embeddingByKey = new Map<string, number[] | null>();
+  for (const row of existing) {
+    embeddingByKey.set(
+      `${row.category}::${row.textNormalized}`,
+      row.embedding ?? null
+    );
+  }
+
   await db
     .delete(memoryFacts)
     .where(
@@ -229,6 +263,10 @@ export async function replaceActiveMemoryFactsForProfile(
 
   const rows = buildMemoryFactRowsFromProjection(profileId, projection);
   if (rows.length > 0) {
+    for (const row of rows) {
+      const key = `${row.category}::${row.textNormalized}`;
+      row.embedding = embeddingByKey.get(key) ?? null;
+    }
     await db.insert(memoryFacts).values(rows);
   }
 }
