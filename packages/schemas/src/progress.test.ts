@@ -1,4 +1,5 @@
 import {
+  childSessionSchema,
   streakCardSchema,
   insightCardSchema,
   reviewDueCardSchema,
@@ -150,5 +151,40 @@ describe('CoachingCard schemas', () => {
         '2025-12-31T23:59:59.999Z'
       );
     });
+  });
+});
+
+describe('childSessionSchema', () => {
+  it('preserves fluency drill scores in child session responses', () => {
+    const session = {
+      sessionId: TEST_UUID,
+      subjectId: TEST_UUID,
+      subjectName: 'Spanish',
+      topicId: TEST_UUID,
+      topicTitle: 'Present tense',
+      sessionType: 'learning',
+      startedAt: '2025-01-01T00:00:00.000Z',
+      endedAt: null,
+      exchangeCount: 4,
+      escalationRung: 2,
+      durationSeconds: 300,
+      wallClockSeconds: 360,
+      displayTitle: 'Spanish practice',
+      displaySummary: null,
+      homeworkSummary: null,
+      highlight: 'Strong recall',
+      narrative: null,
+      conversationPrompt: null,
+      engagementSignal: 'focused',
+      drills: [
+        {
+          correct: 4,
+          total: 5,
+          createdAt: '2025-01-01T00:05:00.000Z',
+        },
+      ],
+    };
+
+    expect(childSessionSchema.parse(session).drills).toEqual(session.drills);
   });
 });
