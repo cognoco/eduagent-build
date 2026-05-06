@@ -51,10 +51,10 @@ export async function listPendingNotices(
 
   return rows.flatMap((row) => {
     if (row.type !== 'consent_deleted' && row.type !== 'consent_archived') {
-      logger.warn(
-        { noticeId: row.id, type: row.type },
-        'pending_notices.type unknown — row skipped'
-      );
+      logger.warn('pending_notices.type unknown — row skipped', {
+        noticeId: row.id,
+        type: row.type,
+      });
       return [];
     }
     const knownType: PendingNoticeType = row.type;
