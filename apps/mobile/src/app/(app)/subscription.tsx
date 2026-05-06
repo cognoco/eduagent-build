@@ -30,6 +30,7 @@ import { assertOk } from '../../lib/assert-ok';
 
 import { UsageMeter } from '../../components/common';
 import { TrackedView } from '../../components/common/TrackedView';
+import { ParentOnly } from '../../components/_internal/ParentOnly';
 import {
   useSubscription,
   useUsage,
@@ -593,6 +594,14 @@ function ChildPaywall(): React.ReactElement {
 // ---------------------------------------------------------------------------
 
 export default function SubscriptionScreen() {
+  return (
+    <ParentOnly>
+      <SubscriptionContent />
+    </ParentOnly>
+  );
+}
+
+function SubscriptionContent(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useThemeColors();

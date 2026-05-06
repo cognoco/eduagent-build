@@ -13,6 +13,7 @@ import { goBackOrReplace } from '../../lib/navigation';
 import { platformAlert } from '../../lib/platform-alert';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ParentDashboardSummary } from '../../components/coaching';
+import { ParentOnly } from '../../components/_internal/ParentOnly';
 import { FamilyOrientationCue } from '../../components/family/FamilyOrientationCue';
 import { WithdrawalCountdownBanner } from '../../components/family/WithdrawalCountdownBanner';
 import type { RetentionStatus } from '../../components/progress';
@@ -106,6 +107,14 @@ function renderChildCards(
 }
 
 export default function FamilyScreen() {
+  return (
+    <ParentOnly>
+      <FamilyContent />
+    </ParentOnly>
+  );
+}
+
+function FamilyContent(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();

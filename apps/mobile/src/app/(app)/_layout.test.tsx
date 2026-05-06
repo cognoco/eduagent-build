@@ -784,6 +784,16 @@ describe('computeVisibleTabs', () => {
     const tabs = computeVisibleTabs(true);
     expect(tabs.has('family')).toBe(true);
   });
+
+  it('does not include family for child role even when linked children are present', () => {
+    const tabs = computeVisibleTabs(true, 'child');
+    expect(tabs.has('family')).toBe(false);
+  });
+
+  it('does not include family while impersonating a child', () => {
+    const tabs = computeVisibleTabs(true, 'impersonated-child');
+    expect(tabs.has('family')).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------

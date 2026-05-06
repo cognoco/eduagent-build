@@ -20,6 +20,7 @@ import {
 const mockBack = jest.fn();
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
+const mockUseActiveProfileRole = jest.fn();
 
 // [F-029] Mock platformAlert to spy on it via Alert.alert, so existing
 // test assertions continue working after the Alert → platformAlert migration.
@@ -74,6 +75,10 @@ jest.mock('../../lib/profile', () => ({
   useProfile: () => ({
     activeProfile: mockActiveProfile,
   }),
+}));
+
+jest.mock('../../hooks/use-active-profile-role', () => ({
+  useActiveProfileRole: () => mockUseActiveProfileRole(),
 }));
 
 jest.mock('../../lib/analytics', () => ({
@@ -346,6 +351,7 @@ describe('SubscriptionScreen', () => {
       displayName: 'Alex',
       isOwner: true,
     };
+    mockUseActiveProfileRole.mockReturnValue('owner');
     jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     mockPlatformAlert.mockClear();
     jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
@@ -418,6 +424,25 @@ describe('SubscriptionScreen', () => {
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
     screen.getByTestId('subscription-loading');
+  });
+
+  it('redirects child role away from subscription detail', () => {
+    mockUseActiveProfileRole.mockReturnValue('child');
+
+    render(<SubscriptionScreen />, {
+      wrapper: createWrapper({ seedCache: true }),
+    });
+
+    expect(mockReplace).toHaveBeenCalledWith('/');
+    expect(screen.queryByTestId('subscription-screen')).toBeNull();
+  });
+
+  it('renders subscription content for owner role', () => {
+    render(<SubscriptionScreen />, {
+      wrapper: createWrapper({ seedCache: true }),
+    });
+
+    screen.getByTestId('subscription-screen');
   });
 
   it('shows loading indicator while offerings load', () => {

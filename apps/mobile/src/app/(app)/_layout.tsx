@@ -58,9 +58,12 @@ const BASE_VISIBLE_TABS: ReadonlySet<string> = new Set([
   'more',
 ]);
 
-export function computeVisibleTabs(hasFamily: boolean): Set<string> {
+export function computeVisibleTabs(
+  hasFamily: boolean,
+  role: ActiveProfileRole | null = 'owner'
+): Set<string> {
   const next = new Set<string>(BASE_VISIBLE_TABS);
-  if (hasFamily) next.add('family');
+  if (hasFamily && role === 'owner') next.add('family');
   return next;
 }
 
@@ -1277,9 +1280,10 @@ export default function AppLayout() {
   useMentorLanguageSync();
   const { isParentProxy, childProfile, parentProfile } = useParentProxy();
   const { hasFamily } = useFamilyPresence();
+  const role = useActiveProfileRole();
   const visibleTabs = React.useMemo(
-    () => computeVisibleTabs(hasFamily),
-    [hasFamily]
+    () => computeVisibleTabs(hasFamily, role),
+    [hasFamily, role]
   );
 
   // Sync Clerk auth state with RevenueCat identity (runs on auth change)
@@ -1371,7 +1375,6 @@ export default function AppLayout() {
   // a child and lands here) AND for impersonated-child sessions (where the
   // user is actually the parent and would see "Your parent said yes" while
   // operating their own account).
-  const role = useActiveProfileRole();
   const [showPostApproval, dismissPostApproval] = usePostApprovalLanding(
     activeProfile?.id,
     activeProfile?.consentStatus,

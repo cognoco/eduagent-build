@@ -4,6 +4,7 @@ const mockReplace = jest.fn();
 const mockBack = jest.fn();
 const mockCanGoBack = jest.fn(() => false);
 let mockSearchParams: Record<string, string | undefined> = {};
+const mockUseActiveProfileRole = jest.fn();
 
 jest.mock(
   'react-i18next',
@@ -38,6 +39,10 @@ jest.mock('../../hooks/use-dashboard', () => ({
   }),
 }));
 
+jest.mock('../../hooks/use-active-profile-role', () => ({
+  useActiveProfileRole: () => mockUseActiveProfileRole(),
+}));
+
 jest.mock('../../components/coaching', () => ({
   ParentDashboardSummary: () => null,
 }));
@@ -63,6 +68,16 @@ describe('FamilyScreen', () => {
     jest.clearAllMocks();
     mockCanGoBack.mockReturnValue(false);
     mockSearchParams = {};
+    mockUseActiveProfileRole.mockReturnValue('owner');
+  });
+
+  it('redirects child role away from Family deep links', () => {
+    mockUseActiveProfileRole.mockReturnValue('child');
+
+    render(<FamilyScreen />);
+
+    expect(mockReplace).toHaveBeenCalledWith('/');
+    expect(screen.queryByTestId('family-back')).toBeNull();
   });
 
   it('back button uses neutral "Back" accessibility label', () => {
