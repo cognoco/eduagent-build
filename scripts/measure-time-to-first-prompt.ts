@@ -40,6 +40,17 @@ export const MIN_COHORT_FOR_P50 = 10;
 /** Below this, p75/p90 report null. */
 export const MIN_COHORT_FOR_P75_P90 = 20;
 
+/**
+ * Data-quality floor. Rows whose first-AI gap is below this (including
+ * negatives from clock-skewed seed fixtures) are bucketed as `belowMinReply`,
+ * not `reachedWithinCap`. Empirical reason: staging seed fixtures backdate
+ * `session_started_at` by 1 day and E2E test runs hit mock LLMs in <1s; both
+ * dominate percentiles otherwise. 5s is a defensible floor — no real human
+ * onboarding (interview turn + curriculum gen + first-session boot) finishes
+ * faster than that.
+ */
+export const MIN_HUMAN_REPLY_SECONDS = 5;
+
 export interface RawRow {
   subjectId: string;
   profileId: string;
@@ -65,6 +76,7 @@ export interface ResultBundle {
   buckets: {
     reachedWithinCap: number;
     delayedStart: number; // first AI reply > REACHED_CAP_SECONDS after subject create
+    belowMinReply: number; // first AI reply < MIN_HUMAN_REPLY_SECONDS (incl. negative); seed/E2E artifact
     noAiAfterSessionStart: number; // session started, no ai_response observed
     noSession: number; // subject created, no learning_session ever
   };
@@ -106,6 +118,7 @@ export function aggregate(rows: ReadonlyArray<RawRow>): ResultBundle {
     buckets: {
       reachedWithinCap: 0,
       delayedStart: 0,
+      belowMinReply: 0,
       noAiAfterSessionStart: 0,
       noSession: 0,
     },
@@ -119,6 +132,7 @@ export function aggregate(rows: ReadonlyArray<RawRow>): ResultBundle {
   const buckets = {
     reachedWithinCap: [] as RawRow[],
     delayedStart: 0,
+    belowMinReply: 0,
     noAiAfterSessionStart: 0,
     noSession: 0,
   };
@@ -137,7 +151,15 @@ export function aggregate(rows: ReadonlyArray<RawRow>): ResultBundle {
       buckets.noAiAfterSessionStart += 1;
       continue;
     }
-    if (secondsFor(r) > REACHED_CAP_SECONDS) {
+    const gap = secondsFor(r);
+    if (gap < MIN_HUMAN_REPLY_SECONDS) {
+      // Negatives + sub-floor positives both go here. Negatives mean
+      // session/ai timestamps predate subject creation (clock-skewed
+      // seed fixtures); sub-floor positives are E2E mock-LLM runs.
+      buckets.belowMinReply += 1;
+      continue;
+    }
+    if (gap > REACHED_CAP_SECONDS) {
       buckets.delayedStart += 1;
       continue;
     }
@@ -161,6 +183,7 @@ export function aggregate(rows: ReadonlyArray<RawRow>): ResultBundle {
     buckets: {
       reachedWithinCap: buckets.reachedWithinCap.length,
       delayedStart: buckets.delayedStart,
+      belowMinReply: buckets.belowMinReply,
       noAiAfterSessionStart: buckets.noAiAfterSessionStart,
       noSession: buckets.noSession,
     },

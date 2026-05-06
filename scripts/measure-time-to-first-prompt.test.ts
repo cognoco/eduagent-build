@@ -3,6 +3,7 @@ import {
   aggregate,
   REACHED_CAP_SECONDS,
   MIN_COHORT_FOR_P50,
+  MIN_HUMAN_REPLY_SECONDS,
   type RawRow,
 } from './measure-time-to-first-prompt';
 
@@ -87,6 +88,37 @@ describe('aggregate', () => {
     expect(result.buckets.delayedStart).toBe(1);
     expect(result.buckets.noAiAfterSessionStart).toBe(1);
     expect(result.buckets.noSession).toBe(1);
+    expect(result.buckets.belowMinReply).toBe(0);
+  });
+
+  it('buckets sub-floor and negative-gap rows as belowMinReply (data-quality floor)', () => {
+    // Empirical finding from staging: seeded fixtures backdated session_started_at
+    // by exactly 1 day relative to subject created_at, and E2E test runs hit a
+    // mock LLM in <1s. Both pollute percentiles. MIN_HUMAN_REPLY_SECONDS bucket
+    // separates them from genuine onboarding rows.
+    const result = aggregate([
+      // negative gap — session timestamp predates subject creation (clock skew/seed)
+      row({
+        isLanguage: false,
+        sessionStartSeconds: -86400,
+        aiResponseSeconds: -86399,
+      }),
+      // sub-floor positive — sub-second AI reply (E2E mock)
+      row({
+        isLanguage: false,
+        sessionStartSeconds: 0,
+        aiResponseSeconds: MIN_HUMAN_REPLY_SECONDS - 1,
+      }),
+      // exactly at floor — counts as reachedWithinCap (boundary inclusive on the high side)
+      row({
+        isLanguage: false,
+        sessionStartSeconds: 1,
+        aiResponseSeconds: MIN_HUMAN_REPLY_SECONDS,
+      }),
+    ]);
+    expect(result.buckets.belowMinReply).toBe(2);
+    expect(result.buckets.reachedWithinCap).toBe(1);
+    expect(result.reachedFirstPrompt).toBe(1);
   });
 
   it('splits language vs non-language cohorts (only reachedWithinCap rows)', () => {
