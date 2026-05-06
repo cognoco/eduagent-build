@@ -41,17 +41,42 @@ export type TopUpRequest = z.infer<typeof topUpRequestSchema>;
 export const byokWaitlistSchema = z.object({});
 export type ByokWaitlistInput = z.infer<typeof byokWaitlistSchema>;
 
-export const usageSchema = z.object({
-  monthlyLimit: z.number().int(),
-  usedThisMonth: z.number().int(),
-  remainingQuestions: z.number().int(),
-  topUpCreditsRemaining: z.number().int(),
-  warningLevel: z.enum(['none', 'soft', 'hard', 'exceeded']),
-  cycleResetAt: z.string().datetime(),
-  dailyLimit: z.number().int().nullable(),
-  usedToday: z.number().int(),
-  dailyRemainingQuestions: z.number().int().nullable(),
+export const usageProfileBreakdownRowSchema = z.object({
+  profile_id: z.string().uuid(),
+  name: z.string(),
+  used: z.number().int(),
+  is_self: z.boolean(),
 });
+export type UsageProfileBreakdownRow = z.infer<
+  typeof usageProfileBreakdownRowSchema
+>;
+
+export const usageFamilyAggregateSchema = z.object({
+  used: z.number().int(),
+  limit: z.number().int(),
+});
+export type UsageFamilyAggregate = z.infer<typeof usageFamilyAggregateSchema>;
+
+export const usageSchema = z
+  .object({
+    monthlyLimit: z.number().int(),
+    usedThisMonth: z.number().int(),
+    remainingQuestions: z.number().int(),
+    topUpCreditsRemaining: z.number().int(),
+    warningLevel: z.enum(['none', 'soft', 'hard', 'exceeded']),
+    cycleResetAt: z.string().datetime(),
+    dailyLimit: z.number().int().nullable(),
+    usedToday: z.number().int(),
+    dailyRemainingQuestions: z.number().int().nullable(),
+    by_profile: z.array(usageProfileBreakdownRowSchema).optional(),
+    family_aggregate: usageFamilyAggregateSchema.nullable().optional(),
+    resets_at: z.string().datetime().optional(),
+    renews_at: z.string().datetime().nullable().optional(),
+    resets_at_label: z.string().optional(),
+    renews_at_label: z.string().nullable().optional(),
+    per_profile_available_since: z.string().datetime().optional(),
+  })
+  .passthrough();
 export type Usage = z.infer<typeof usageSchema>;
 
 export const checkoutResponseSchema = z.object({

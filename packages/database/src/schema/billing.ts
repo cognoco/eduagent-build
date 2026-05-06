@@ -10,7 +10,7 @@ import {
   check,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
-import { accounts } from './profiles';
+import { accounts, profiles } from './profiles';
 import { generateUUIDv7 } from '../utils/uuid';
 
 export const subscriptionStatusEnum = pgEnum('subscription_status', [
@@ -86,6 +86,35 @@ export const quotaPools = pgTable(
     check(
       'quota_pools_used_this_month_non_negative',
       sql`${table.usedThisMonth} >= 0`
+    ),
+  ]
+);
+
+export const usageEvents = pgTable(
+  'usage_events',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .$defaultFn(() => generateUUIDv7()),
+    subscriptionId: uuid('subscription_id')
+      .notNull()
+      .references(() => subscriptions.id, { onDelete: 'cascade' }),
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    occurredAt: timestamp('occurred_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    delta: integer('delta').notNull().default(1),
+  },
+  (table) => [
+    index('usage_events_subscription_occurred_idx').on(
+      table.subscriptionId,
+      table.occurredAt
+    ),
+    index('usage_events_profile_occurred_idx').on(
+      table.profileId,
+      table.occurredAt
     ),
   ]
 );
