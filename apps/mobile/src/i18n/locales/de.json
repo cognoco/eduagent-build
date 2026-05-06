@@ -1246,6 +1246,28 @@
       "empty": "Noch keine Gespräche",
       "untitledTopic": "Unbenanntes Thema",
       "openSessionFrom": "Sitzung von {{date}} öffnen"
+    },
+    "retention": {
+      "strong": {
+        "label": "Noch behalten"
+      },
+      "fading": {
+        "label": "Wird unsicher"
+      },
+      "weak": {
+        "label": "Braucht eine kurze Auffrischung"
+      },
+      "forgotten": {
+        "label": "Braucht einen neuen Durchgang"
+      }
+    },
+    "growthChart": {
+      "a11y": {
+        "topicsLearned": "gelernte Themen",
+        "topicsMastered": "gemeisterte Themen",
+        "wordsAdded": "hinzugefügte Wörter",
+        "vocabularyGrowth": "Wortschatzwachstum"
+      }
     }
   },
   "onboarding": {

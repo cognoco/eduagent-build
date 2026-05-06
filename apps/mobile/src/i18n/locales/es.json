@@ -1246,6 +1246,28 @@
       "empty": "Aún no hay conversaciones",
       "untitledTopic": "Tema sin título",
       "openSessionFrom": "Abrir sesión del {{date}}"
+    },
+    "retention": {
+      "strong": {
+        "label": "Aún recordado"
+      },
+      "fading": {
+        "label": "Se está volviendo borroso"
+      },
+      "weak": {
+        "label": "Necesita un repaso rápido"
+      },
+      "forgotten": {
+        "label": "Necesita una nueva pasada"
+      }
+    },
+    "growthChart": {
+      "a11y": {
+        "topicsLearned": "temas aprendidos",
+        "topicsMastered": "temas dominados",
+        "wordsAdded": "palabras añadidas",
+        "vocabularyGrowth": "crecimiento de vocabulario"
+      }
     }
   },
   "onboarding": {

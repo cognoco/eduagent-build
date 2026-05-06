@@ -1246,6 +1246,28 @@
       "empty": "会話はまだありません",
       "untitledTopic": "無題のトピック",
       "openSessionFrom": "{{date}} のセッションを開く"
+    },
+    "retention": {
+      "strong": {
+        "label": "まだ覚えています"
+      },
+      "fading": {
+        "label": "少しあいまいです"
+      },
+      "weak": {
+        "label": "短い復習が必要です"
+      },
+      "forgotten": {
+        "label": "もう一度取り組みましょう"
+      }
+    },
+    "growthChart": {
+      "a11y": {
+        "topicsLearned": "学習したトピック",
+        "topicsMastered": "習得したトピック",
+        "wordsAdded": "追加された単語",
+        "vocabularyGrowth": "語彙の成長"
+      }
     }
   },
   "onboarding": {
