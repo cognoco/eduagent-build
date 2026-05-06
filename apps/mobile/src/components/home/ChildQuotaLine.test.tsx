@@ -9,7 +9,7 @@ jest.mock(
   () => require('../../test-utils/mock-i18n').i18nMock
 );
 
-jest.mock('../../hooks/use-subscription', () => ({
+jest.mock('../../hooks/use-subscription', () => ({ // gc1-allow: ChildQuotaLine renders quota data; mocking the quota hook keeps the test focused on rendering logic without hitting real network calls.
   useUsage: () => mockUseUsage(),
 }));
 

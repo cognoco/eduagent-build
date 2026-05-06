@@ -91,4 +91,23 @@ describe('useMentorLanguageSync', () => {
 
     await waitFor(() => expect(mockMutate).not.toHaveBeenCalled());
   });
+
+  it('deduplicates repeated languageChanged events for the same language', async () => {
+    // lastSyncedRef guard: the second languageChanged event for the same
+    // language must be a no-op — mutate should be called exactly once even
+    // if the event fires twice.
+    await i18next.changeLanguage('nb');
+
+    renderHook(() => useMentorLanguageSync());
+
+    // First sync fires immediately on mount (language !== profile.conversationLanguage).
+    await waitFor(() => expect(mockMutate).toHaveBeenCalledTimes(1));
+
+    // Fire the same language again — lastSyncedRef is already 'nb', so no
+    // second call should happen.
+    await i18next.changeLanguage('nb');
+
+    // Give any async effects a chance to settle.
+    await waitFor(() => expect(mockMutate).toHaveBeenCalledTimes(1));
+  });
 });

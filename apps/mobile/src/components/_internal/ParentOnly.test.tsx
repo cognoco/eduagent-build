@@ -10,7 +10,7 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockReplace }),
 }));
 
-jest.mock('../../hooks/use-active-profile-role', () => ({
+jest.mock('../../hooks/use-active-profile-role', () => ({ // gc1-allow: ParentOnly's purpose is to test role-based branching; mocking the role hook is the unit boundary.
   useActiveProfileRole: () => mockUseRole(),
 }));
 
