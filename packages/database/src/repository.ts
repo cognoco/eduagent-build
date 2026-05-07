@@ -4,7 +4,10 @@ import {
   asc,
   desc,
   gt,
+  gte,
   ilike,
+  inArray,
+  isNotNull,
   lte,
   or,
   sql,
@@ -98,8 +101,18 @@ export function createScopedRepository(db: Database, profileId: string) {
         });
       },
       /**
-       * Return every non-null topicId this profile has a learning session
-       * for. Matches the behavior previously inlined in resolveNextTopic.
+       * Return topicIds this profile has *meaningfully completed* in a
+       * learning session. Used by `resolveNextTopic` to skip topics the
+       * learner has already worked through.
+       *
+       * Filters:
+       * - `status IN ('completed','auto_closed')` — terminal states only.
+       *   Active/paused sessions don't count: a learner mid-session or
+       *   paused for later hasn't finished the topic.
+       * - `exchange_count >= 3` — matches the recap-firing threshold in
+       *   `session-recap.ts`. Below this, the session was too short to
+       *   represent meaningful work; counting it would lock the learner
+       *   out of topics they only briefly touched.
        */
       async listCompletedTopicIds(): Promise<string[]> {
         const rows = await db
@@ -108,7 +121,9 @@ export function createScopedRepository(db: Database, profileId: string) {
           .where(
             and(
               eq(learningSessions.profileId, profileId),
-              sql`${learningSessions.topicId} IS NOT NULL`
+              sql`${learningSessions.topicId} IS NOT NULL`,
+              inArray(learningSessions.status, ['completed', 'auto_closed']),
+              gte(learningSessions.exchangeCount, 3)
             )
           );
         return rows
@@ -162,14 +177,33 @@ export function createScopedRepository(db: Database, profileId: string) {
         });
       },
       /**
-       * Return every topicId this profile has ever retained a card for.
+       * Return topicIds where this profile has demonstrated retention
+       * progress — either repetitions advanced past the seed value, or a
+       * recall has been logged. Used by `resolveNextTopic` to skip topics
+       * the learner already retains.
+       *
+       * Filters out fresh cards (`repetitions = 0` AND `last_reviewed_at
+       * IS NULL`). `ensureRetentionCard` creates a row on first probe
+       * extract or first recall attempt, so the bare existence of a row
+       * means "encountered", not "retained". Counting encountered topics
+       * as completed locked learners out of suggestions for any topic
+       * they had merely seen once.
+       *
        * Ordering is unspecified; caller is responsible for dedup/Set usage.
        */
       async listCompletedTopicIds(): Promise<string[]> {
         const rows = await db
           .select({ topicId: retentionCards.topicId })
           .from(retentionCards)
-          .where(eq(retentionCards.profileId, profileId));
+          .where(
+            and(
+              eq(retentionCards.profileId, profileId),
+              or(
+                gt(retentionCards.repetitions, 0),
+                isNotNull(retentionCards.lastReviewedAt)
+              )
+            )
+          );
         return rows
           .map((row) => row.topicId)
           .filter((id): id is string => typeof id === 'string');

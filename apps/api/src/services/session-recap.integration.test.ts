@@ -15,6 +15,8 @@ import {
   curricula,
   curriculumBooks,
   curriculumTopics,
+  learningSessions,
+  retentionCards,
   createDatabase,
   createScopedRepository,
 } from '@eduagent/database';
@@ -187,5 +189,141 @@ describe('session-recap profile scoping (integration)', () => {
     ]);
     expect(ownMatch).not.toBeNull();
     expect(ownMatch!.id).toBe(a.topicIds[0]);
+  });
+});
+
+describe('session-recap completion gating (integration)', () => {
+  // The previous semantics treated *any* learning_session row with a non-null
+  // topicId as "completed", and any retention_cards row at all as "retained".
+  // Both are too aggressive: a 30-second exploratory session and a fresh probe
+  // card both create rows but represent zero learning. The filter below locks
+  // in the corrected boundaries so a regression to touch-equals-done cannot
+  // ship silently.
+
+  it('touch session (active, low exchange count) does not lock the topic out of suggestions', async () => {
+    const a = await seedProfileWithCurriculum(0, [
+      'Cells',
+      'Mitosis',
+      'Meiosis',
+    ]);
+    const db = createIntegrationDb();
+
+    await db.insert(learningSessions).values({
+      profileId: a.profileId,
+      subjectId: a.subjectId,
+      topicId: a.topicIds[1]!,
+      status: 'active',
+      exchangeCount: 1,
+    });
+
+    const repo = createScopedRepository(db, a.profileId);
+    const next = await resolveNextTopic(repo, a.topicIds[0]!);
+    expect(next).not.toBeNull();
+    expect(next!.id).toBe(a.topicIds[1]);
+  });
+
+  it('completed session above the exchange threshold excludes the topic', async () => {
+    const a = await seedProfileWithCurriculum(0, [
+      'Cells',
+      'Mitosis',
+      'Meiosis',
+    ]);
+    const db = createIntegrationDb();
+
+    await db.insert(learningSessions).values({
+      profileId: a.profileId,
+      subjectId: a.subjectId,
+      topicId: a.topicIds[1]!,
+      status: 'completed',
+      exchangeCount: 5,
+    });
+
+    const repo = createScopedRepository(db, a.profileId);
+    const next = await resolveNextTopic(repo, a.topicIds[0]!);
+    expect(next).not.toBeNull();
+    expect(next!.id).toBe(a.topicIds[2]);
+  });
+
+  it('paused session does not exclude the topic — learner has not finished', async () => {
+    const a = await seedProfileWithCurriculum(0, [
+      'Cells',
+      'Mitosis',
+      'Meiosis',
+    ]);
+    const db = createIntegrationDb();
+
+    await db.insert(learningSessions).values({
+      profileId: a.profileId,
+      subjectId: a.subjectId,
+      topicId: a.topicIds[1]!,
+      status: 'paused',
+      exchangeCount: 8,
+    });
+
+    const repo = createScopedRepository(db, a.profileId);
+    const next = await resolveNextTopic(repo, a.topicIds[0]!);
+    expect(next).not.toBeNull();
+    expect(next!.id).toBe(a.topicIds[1]);
+  });
+
+  it('fresh retention card (repetitions=0, no review) does not lock the topic out', async () => {
+    const a = await seedProfileWithCurriculum(0, [
+      'Cells',
+      'Mitosis',
+      'Meiosis',
+    ]);
+    const db = createIntegrationDb();
+
+    await db.insert(retentionCards).values({
+      profileId: a.profileId,
+      topicId: a.topicIds[1]!,
+      repetitions: 0,
+    });
+
+    const repo = createScopedRepository(db, a.profileId);
+    const next = await resolveNextTopic(repo, a.topicIds[0]!);
+    expect(next).not.toBeNull();
+    expect(next!.id).toBe(a.topicIds[1]);
+  });
+
+  it('retention card with repetitions > 0 excludes the topic', async () => {
+    const a = await seedProfileWithCurriculum(0, [
+      'Cells',
+      'Mitosis',
+      'Meiosis',
+    ]);
+    const db = createIntegrationDb();
+
+    await db.insert(retentionCards).values({
+      profileId: a.profileId,
+      topicId: a.topicIds[1]!,
+      repetitions: 2,
+    });
+
+    const repo = createScopedRepository(db, a.profileId);
+    const next = await resolveNextTopic(repo, a.topicIds[0]!);
+    expect(next).not.toBeNull();
+    expect(next!.id).toBe(a.topicIds[2]);
+  });
+
+  it('retention card with lastReviewedAt set excludes the topic', async () => {
+    const a = await seedProfileWithCurriculum(0, [
+      'Cells',
+      'Mitosis',
+      'Meiosis',
+    ]);
+    const db = createIntegrationDb();
+
+    await db.insert(retentionCards).values({
+      profileId: a.profileId,
+      topicId: a.topicIds[1]!,
+      repetitions: 0,
+      lastReviewedAt: new Date(),
+    });
+
+    const repo = createScopedRepository(db, a.profileId);
+    const next = await resolveNextTopic(repo, a.topicIds[0]!);
+    expect(next).not.toBeNull();
+    expect(next!.id).toBe(a.topicIds[2]);
   });
 });
