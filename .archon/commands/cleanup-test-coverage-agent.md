@@ -43,7 +43,7 @@ For each new/modified source file, find corresponding test file:
 
 ```bash
 # Find test files
-find src -name "*.test.ts" -o -name "*.spec.ts" | head -20
+fd '\.(test|spec)\.ts$' src | head -20
 ```
 
 **PHASE_1_CHECKPOINT:**
@@ -86,7 +86,7 @@ For existing tests, check:
 
 ```bash
 # Find test patterns in codebase
-grep -r "describe\|it\|test\(" src/ --include="*.test.ts" | head -20
+rg "(describe|it|test)\(" src/ -g '*.test.ts' | head -20
 ```
 
 **PHASE_2_CHECKPOINT:**

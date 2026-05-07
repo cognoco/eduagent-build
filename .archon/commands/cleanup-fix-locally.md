@@ -158,8 +158,11 @@ git status --porcelain  # verify nothing scratch/review/PR-body is staged
 
 **IMPORTANT: Do NOT use `--no-verify`.** Let pre-commit hooks run.
 
+Write the commit message to a file, then commit:
+
 ```bash
-git commit -m "fix: Address review findings (CRITICAL/HIGH)
+cat > "$ARTIFACTS_DIR/commit-msg.txt" <<'CMSG'
+fix: Address review findings (CRITICAL/HIGH)
 
 Fixes applied:
 - {brief list of fixes}
@@ -170,9 +173,9 @@ Tests added:
 Skipped (see review artifacts):
 - {brief list of unfixable if any}
 
-Review artifacts: \$ARTIFACTS_DIR/review/
-
-Co-Authored-By: Claude <noreply@anthropic.com>"
+Co-Authored-By: Claude <noreply@anthropic.com>
+CMSG
+git commit -F "$ARTIFACTS_DIR/commit-msg.txt"
 ```
 
 If the pre-commit hook fails:

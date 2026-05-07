@@ -93,7 +93,7 @@ For each issue found, search codebase for correct patterns:
 
 ```bash
 # Find similar patterns in codebase
-grep -r "pattern" src/ --include="*.ts" | head -5
+rg "pattern" src/ -g '*.{ts,tsx}' | head -5
 ```
 
 ### 2.5 Check for Primitive Duplication
@@ -104,7 +104,7 @@ For each new interface, class, type alias, or utility module introduced in the d
 
 ```bash
 # Replace {Name} with the new abstraction's name
-grep -r "interface {Name}\|class {Name}\|type {Name}" packages/ --include="*.ts" | head -10
+rg "(interface|class|type) {Name}" packages/ -g '*.{ts,tsx}' | head -10
 ```
 
 2. Flag if the new abstraction duplicates or closely overlaps an existing one.

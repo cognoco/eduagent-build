@@ -111,14 +111,14 @@ If any fixes were needed during validation:
 ```bash
 git add -A
 git diff --cached --stat
-git commit -m "$(cat <<'EOF'
+cat > "$ARTIFACTS_DIR/commit-msg.txt" <<'CMSG'
 fix: address validation failures in cleanup PR
 
 Post-implementation validation fixes.
 
 Co-Authored-By: Claude <noreply@anthropic.com>
-EOF
-)"
+CMSG
+git commit -F "$ARTIFACTS_DIR/commit-msg.txt"
 ```
 
 ---

@@ -68,8 +68,8 @@ For each changed file, try to find:
 - Are there barrel exports (`index.ts`) that still re-export deleted items?
 
 ```bash
-# For each deleted export, grep for consumers
-grep -r "deletedExportName" --include="*.ts" --include="*.tsx" .
+# For each deleted export, search for consumers
+rg "deletedExportName" . -g '*.{ts,tsx}'
 ```
 
 ### 2.2 CLAUDE.md Rule Violations
@@ -94,7 +94,7 @@ place, was it fixed in ALL sibling locations? Check:
 
 ```bash
 # If something was renamed, are there stale references?
-grep -r "oldName" --include="*.ts" --include="*.tsx" .
+rg "oldName" . -g '*.{ts,tsx}'
 ```
 
 ### 2.5 Documentation Drift
