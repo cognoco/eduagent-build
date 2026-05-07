@@ -36,12 +36,15 @@ git diff "${base}...HEAD" \
 mkdir -p "${artifacts_dir}/review"
 
 if command -v fd &>/dev/null; then
-    stale="$(fd -t d -d 1 'pr-' "${artifacts_dir}/../reviews" --changed-before 7d 2>/dev/null || true)"
-    if [[ -n "$stale" ]]; then
+    stale=()
+    while IFS= read -r -d '' dir; do
+        stale+=("$dir")
+    done < <(fd -t d -d 1 'pr-' "${artifacts_dir}/../reviews" --changed-before 7d -0 2>/dev/null || true)
+    if (( ${#stale[@]} > 0 )); then
         echo ""
         echo "=== Cleaning stale review dirs ==="
-        echo "$stale" | xargs rm -rf
-        echo "Removed: ${stale}"
+        printf 'Removed: %s\n' "${stale[@]}"
+        rm -rf -- "${stale[@]}"
     fi
 fi
 
