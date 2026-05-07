@@ -171,6 +171,13 @@ function getPackagePeriodLabel(pkg: PurchasesPackage): string {
   return PACKAGE_PERIOD_LABEL[pkg.packageType] ?? pkg.identifier;
 }
 
+function isTopUpPackage(pkg: PurchasesPackage): boolean {
+  return (
+    pkg.packageType === PACKAGE_TYPE.CUSTOM &&
+    pkg.product.identifier.includes('topup')
+  );
+}
+
 /**
  * Checks whether a RevenueCat error represents a user-initiated cancellation.
  * User cancellations are not real errors — the user simply dismissed the
@@ -964,10 +971,8 @@ function SubscriptionContent(): React.ReactElement {
     // Find the top-up package from offerings
     // RevenueCat consumables can be in a separate offering or as a non-subscription package
     const topUpOffering = offerings.all?.['top_up'] ?? offerings.current;
-    const topUpPkg = topUpOffering?.availablePackages.find(
-      (p) =>
-        p.packageType === PACKAGE_TYPE.CUSTOM &&
-        p.product.identifier.includes('topup')
+    const topUpPkg = topUpOffering?.availablePackages.find((p) =>
+      isTopUpPackage(p)
     );
 
     if (!topUpPkg) {
@@ -1186,6 +1191,9 @@ function SubscriptionContent(): React.ReactElement {
   // Get the current offering's available packages
   const currentOffering: PurchasesOffering | null = offerings?.current ?? null;
   const availablePackages = currentOffering?.availablePackages ?? [];
+  const subscriptionPackages = availablePackages.filter(
+    (pkg) => !isTopUpPackage(pkg)
+  );
 
   return (
     <View
@@ -1348,7 +1356,7 @@ function SubscriptionContent(): React.ReactElement {
                   // Background retry if offerings failed to load — the user
                   // is now looking at the Plans section; a fresh fetch can
                   // swap in real packages without a second button press.
-                  if (availablePackages.length === 0 && !offeringsLoading) {
+                  if (subscriptionPackages.length === 0 && !offeringsLoading) {
                     void refetchOfferings();
                   }
                 }}
@@ -1547,7 +1555,7 @@ function SubscriptionContent(): React.ReactElement {
           )}
 
           {/* RevenueCat Offerings — available packages */}
-          {availablePackages.length > 0 && (
+          {subscriptionPackages.length > 0 && (
             <View
               testID="offerings-section"
               onLayout={(e) => {
@@ -1557,7 +1565,7 @@ function SubscriptionContent(): React.ReactElement {
               <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6">
                 Plans
               </Text>
-              {availablePackages.map((pkg) => {
+              {subscriptionPackages.map((pkg) => {
                 // Check if this package matches the user's active entitlement
                 const isCurrentPlan =
                   hasActiveSubscription &&
@@ -1566,7 +1574,7 @@ function SubscriptionContent(): React.ReactElement {
                   ) === true;
                 return (
                   <PackageOption
-                    key={pkg.identifier}
+                    key={`${pkg.identifier}-${pkg.product.identifier}`}
                     pkg={pkg}
                     isCurrentPlan={isCurrentPlan}
                     onSelect={handlePurchase}
@@ -1593,7 +1601,7 @@ function SubscriptionContent(): React.ReactElement {
           )}
 
           {/* No offerings fallback — show static tier comparison when RevenueCat is unavailable */}
-          {availablePackages.length === 0 && !offeringsLoading && (
+          {subscriptionPackages.length === 0 && !offeringsLoading && (
             <View
               testID="no-offerings"
               onLayout={(e) => {

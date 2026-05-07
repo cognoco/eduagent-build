@@ -1733,6 +1733,20 @@ describe('SubscriptionScreen', () => {
       screen.getByText('Buy 500 credits');
     });
 
+    it('does not render consumable top-up packages as subscription plans', async () => {
+      setupPaidTierWithTopUp();
+
+      render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+      await waitFor(() => {
+        screen.getByTestId('offerings-section');
+      });
+
+      expect(screen.getAllByTestId('package-option-$rc_monthly')).toHaveLength(
+        1
+      );
+    });
+
     it('shows graceful error when no topup package is in offerings', async () => {
       mockFetch.setRoute(
         '/subscription',
