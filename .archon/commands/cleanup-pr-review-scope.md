@@ -25,7 +25,7 @@ The cleanup workflow's `extract` step writes `work-order.md` to `$ARTIFACTS_DIR/
 
 ```bash
 ls $ARTIFACTS_DIR/work-order.md
-PR_ID=$(grep -oE 'PR-[0-9]+' $ARTIFACTS_DIR/work-order.md | head -1)
+PR_ID=$(rg -oP 'PR-\d+' $ARTIFACTS_DIR/work-order.md | head -1)
 echo "Work Order: $PR_ID"
 ```
 
@@ -123,7 +123,7 @@ For each new abstraction found, note it in the scope manifest under "Review Focu
 
 ```bash
 # Quick scan for new abstractions in diff
-git diff origin/main...HEAD | grep "^+" | sed 's/^+//' | grep -E "(^interface |^export interface |^type |^abstract class |^export class )" | head -20
+git diff origin/main...HEAD | rg '^\+' | rg '(export )?(interface |type |abstract class )' | head -20
 ```
 
 **PHASE_3_CHECKPOINT:**
@@ -168,7 +168,7 @@ mkdir -p $ARTIFACTS_DIR/review
 
 ```bash
 # Remove review directories older than 7 days
-find "$ARTIFACTS_DIR/../reviews" -maxdepth 1 -name 'pr-*' -type d -mtime +7 -exec rm -rf {} + 2>/dev/null || true
+fd -t d -d 1 'pr-' "$ARTIFACTS_DIR/../reviews" --changed-before 7d -x rm -rf {} 2>/dev/null || true
 ```
 
 ### 4.3 Create Scope Manifest

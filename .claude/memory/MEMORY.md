@@ -43,6 +43,7 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 ## Workflow Preferences
 
 - Commit early + push after every commit. Never batch large changes.
+- [project_archon_spike_merge_rule.md](project_archon_spike_merge_rule.md) — During the Archon spike, `.archon/`-only changes can be direct-merged to main. Verify delta is `.archon/`-only first.
 - [feedback_never_switch_branch.md](feedback_never_switch_branch.md) — NEVER switch branches unless user explicitly asks.
 - [feedback_parallel_agents.md](feedback_parallel_agents.md) — Parallel agents in same tree, no worktrees. Coordinator commits sequentially.
 - [feedback_fast_iteration.md](feedback_fast_iteration.md) — 60-min feedback loops unacceptable. CI gates, but optimize speed.

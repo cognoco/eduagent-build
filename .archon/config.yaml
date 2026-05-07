@@ -14,3 +14,11 @@ worktree:
   baseBranch: main
   copyFiles:
     - .dev.vars
+
+# PATH for non-interactive bash nodes is set defensively at script
+# invocation time by `.archon/scripts/_env.sh`, which every script in
+# .archon/scripts/ sources. We deliberately do NOT use the project-level
+# `env:` block here because Archon does not expand $HOME / $VAR in YAML
+# values, so anything we wrote here would be hardcoded to one developer's
+# machine. If pnpm is installed somewhere unusual, set PNPM_HOME before
+# launching Archon and `_env.sh` will honor it.
