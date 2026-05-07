@@ -177,7 +177,19 @@ describe('AccordionTopicList', () => {
 
     fireEvent.press(screen.getByTestId('accordion-topic-topic-1'));
 
-    expect(mockPush).toHaveBeenCalledWith(
+    // Cross-tab push must push the parent chain so router.back() lands on
+    // the child detail screen, not the Tabs first-route (Home). See
+    // CLAUDE.md → "Cross-tab / cross-stack `router.push` calls must push
+    // the full ancestor chain, not just the leaf."
+    expect(mockPush).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        pathname: '/(app)/child/[profileId]',
+        params: expect.objectContaining({ profileId: 'child-1' }),
+      })
+    );
+    expect(mockPush).toHaveBeenNthCalledWith(
+      2,
       expect.objectContaining({
         pathname: '/(app)/child/[profileId]/topic/[topicId]',
         params: expect.objectContaining({

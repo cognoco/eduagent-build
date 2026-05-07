@@ -90,6 +90,16 @@ export function AccordionTopicList({
             key={topic.topicId}
             onPress={(event) => {
               event?.stopPropagation?.();
+              // Push the child-profile parent first so the destination stack
+              // synthesises 2-deep (child > topic) on cross-tab pushes —
+              // without this, back from the topic leaf falls through to the
+              // Tabs first-route (Home). See CLAUDE.md → "Cross-tab /
+              // cross-stack `router.push` calls must push the full ancestor
+              // chain, not just the leaf."
+              router.push({
+                pathname: '/(app)/child/[profileId]',
+                params: { profileId: childProfileId },
+              } as never);
               router.push({
                 pathname: '/(app)/child/[profileId]/topic/[topicId]',
                 params: {
