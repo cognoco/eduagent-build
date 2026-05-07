@@ -1,4 +1,4 @@
-name: execute-cleanup-pr
+name: execute-cleanup-pr-claude
 description: |
   Execute a cleanup-plan.md work package by PR number.
   Usage: archon workflow run execute-cleanup-pr --branch cleanup-pr-XX "PR-16"
@@ -25,9 +25,9 @@ description: |
 
   NOT for: Non-cleanup work, feature development, or PRs not in cleanup-plan.md.
 
-provider: codex
-model: gpt-5.5
-modelReasoningEffort: high
+provider: claude
+model: opus
+modelReasoningEffort: xhigh
 
 worktree:
   enabled: true
@@ -110,8 +110,8 @@ nodes:
   - id: adversarial-review
     command: cleanup-adversarial-review
     depends_on: [review-scope]
-    provider: claude
-    model: claude-opus-4-6
+    provider: codex
+    model: gpt-5.5
     modelReasoningEffort: high
     context: fresh
 
@@ -143,8 +143,9 @@ nodes:
     command: cleanup-create-pr
     depends_on: [push]
     context: fresh
-    provider: claude
-    model: sonnet
+    provider: codex
+    model: gpt-5.5
+    modelReasoningEffort: medium
 
   # PHASE 7: POST REVIEW COMMENTS (PR now exists)
   # Posts the consolidated review + fix report as PR comments,
@@ -162,3 +163,4 @@ nodes:
     context: fresh
     provider: codex
     model: gpt-5.5
+    modelReasoningEffort: medium
