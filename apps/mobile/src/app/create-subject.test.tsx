@@ -70,6 +70,7 @@ let mockSearchParams: Record<string, string> = {};
 
 let mockCanGoBackValue = true;
 const mockCanGoBack = jest.fn(() => mockCanGoBackValue);
+let activeQueryClient: QueryClient | null = null;
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
@@ -92,10 +93,13 @@ jest.mock('../lib/theme', () => ({
   }),
 }));
 
-jest.mock('../lib/format-api-error', () => ({
-  formatApiError: (error: unknown) =>
-    error instanceof Error ? error.message : 'Something went wrong',
-}));
+jest.mock(
+  '../lib/format-api-error',
+  /* gc1-allow: error formatting */ () => ({
+    formatApiError: (error: unknown) =>
+      error instanceof Error ? error.message : 'Something went wrong',
+  })
+);
 
 // NOT an API hook — keep as-is.
 jest.mock('../hooks/use-keyboard-scroll', () => ({
@@ -110,6 +114,7 @@ function createWrapper() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
+  activeQueryClient = queryClient;
   return function Wrapper({ children }: { children: React.ReactNode }) {
     return (
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
@@ -193,6 +198,11 @@ describe('CreateSubjectScreen', () => {
     );
     mockFetch.setRoute('/subjects', defaultSubjectsHandler);
     Wrapper = createWrapper();
+  });
+
+  afterEach(() => {
+    activeQueryClient?.clear();
+    activeQueryClient = null;
   });
 
   it('renders starter chips and fills the input on tap', () => {

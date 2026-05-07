@@ -20,37 +20,55 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-jest.mock('../../../../lib/platform-alert', () => ({
-  platformAlert: jest.fn(),
-}));
+jest.mock(
+  '../../../../lib/platform-alert',
+  /* gc1-allow: alert boundary */ () => ({
+    platformAlert: jest.fn(),
+  })
+);
 
-jest.mock('../../../../lib/navigation', () => ({
-  goBackOrReplace: jest.fn(),
-}));
+jest.mock(
+  '../../../../lib/navigation',
+  /* gc1-allow: navigation boundary */ () => ({
+    goBackOrReplace: jest.fn(),
+  })
+);
 
-jest.mock('../../../../lib/api-client', () => ({
-  useApiClient: () => ({
-    learnerProfile: {},
-  }),
-}));
+jest.mock(
+  '../../../../lib/api-client',
+  /* gc1-allow: RPC client boundary */ () => ({
+    useApiClient: () => ({
+      learnerProfile: {},
+    }),
+  })
+);
 
-jest.mock('../../../../lib/profile', () => ({
-  useProfile: () => ({
-    profiles: [{ id: 'child-001' }],
-  }),
-}));
+jest.mock(
+  '../../../../lib/profile',
+  /* gc1-allow: profile context */ () => ({
+    useProfile: () => ({
+      profiles: [{ id: 'child-001' }],
+    }),
+  })
+);
 
-jest.mock('../../../../components/tell-mentor-input', () => ({
-  TellMentorInput: () => null,
-}));
+jest.mock(
+  '../../../../components/tell-mentor-input',
+  /* gc1-allow: child component */ () => ({
+    TellMentorInput: () => null,
+  })
+);
 
 const mockUseChildDetail = jest.fn();
 const mockUseChildMemory = jest.fn();
 
-jest.mock('../../../../hooks/use-dashboard', () => ({
-  useChildDetail: (...args: unknown[]) => mockUseChildDetail(...args),
-  useChildMemory: (...args: unknown[]) => mockUseChildMemory(...args),
-}));
+jest.mock(
+  '../../../../hooks/use-dashboard',
+  /* gc1-allow: dashboard query state */ () => ({
+    useChildDetail: (...args: unknown[]) => mockUseChildDetail(...args),
+    useChildMemory: (...args: unknown[]) => mockUseChildMemory(...args),
+  })
+);
 
 const mockUseChildLearnerProfile = jest.fn();
 const mockUseDeleteAllMemory = jest.fn();
@@ -61,30 +79,37 @@ const mockUseToggleMemoryCollection = jest.fn();
 const mockUseToggleMemoryInjection = jest.fn();
 const mockUseUnsuppressInference = jest.fn();
 
-jest.mock('../../../../hooks/use-learner-profile', () => ({
-  useChildLearnerProfile: (...args: unknown[]) =>
-    mockUseChildLearnerProfile(...args),
-  useDeleteAllMemory: (...args: unknown[]) => mockUseDeleteAllMemory(...args),
-  useDeleteMemoryItem: (...args: unknown[]) => mockUseDeleteMemoryItem(...args),
-  useGrantMemoryConsent: (...args: unknown[]) =>
-    mockUseGrantMemoryConsent(...args),
-  useTellMentor: (...args: unknown[]) => mockUseTellMentor(...args),
-  useToggleMemoryCollection: (...args: unknown[]) =>
-    mockUseToggleMemoryCollection(...args),
-  useToggleMemoryInjection: (...args: unknown[]) =>
-    mockUseToggleMemoryInjection(...args),
-  useUnsuppressInference: (...args: unknown[]) =>
-    mockUseUnsuppressInference(...args),
-}));
+jest.mock(
+  '../../../../hooks/use-learner-profile',
+  /* gc1-allow: learner mutations */ () => ({
+    useChildLearnerProfile: (...args: unknown[]) =>
+      mockUseChildLearnerProfile(...args),
+    useDeleteAllMemory: (...args: unknown[]) => mockUseDeleteAllMemory(...args),
+    useDeleteMemoryItem: (...args: unknown[]) =>
+      mockUseDeleteMemoryItem(...args),
+    useGrantMemoryConsent: (...args: unknown[]) =>
+      mockUseGrantMemoryConsent(...args),
+    useTellMentor: (...args: unknown[]) => mockUseTellMentor(...args),
+    useToggleMemoryCollection: (...args: unknown[]) =>
+      mockUseToggleMemoryCollection(...args),
+    useToggleMemoryInjection: (...args: unknown[]) =>
+      mockUseToggleMemoryInjection(...args),
+    useUnsuppressInference: (...args: unknown[]) =>
+      mockUseUnsuppressInference(...args),
+  })
+);
 
 const mockUpdateInterestsContextMutateAsync = jest.fn();
 
-jest.mock('../../../../hooks/use-onboarding-dimensions', () => ({
-  useUpdateInterestsContext: () => ({
-    mutateAsync: mockUpdateInterestsContextMutateAsync,
-    isPending: false,
-  }),
-}));
+jest.mock(
+  '../../../../hooks/use-onboarding-dimensions',
+  /* gc1-allow: interest mutation */ () => ({
+    useUpdateInterestsContext: () => ({
+      mutateAsync: mockUpdateInterestsContextMutateAsync,
+      isPending: false,
+    }),
+  })
+);
 
 const ChildMentorMemoryScreen = require('./mentor-memory').default;
 

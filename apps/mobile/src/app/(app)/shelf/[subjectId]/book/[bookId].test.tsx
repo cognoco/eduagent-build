@@ -74,12 +74,15 @@ jest.mock('../../../../../hooks/use-progress', () => ({
   useLearningResumeTarget: () => mockUseLearningResumeTarget(),
 }));
 
-jest.mock('../../../../../hooks/use-sessions', () => ({
-  useStartFirstCurriculumSession: () => ({
-    mutateAsync: mockStartFirstCurriculumMutateAsync,
-    isPending: false,
-  }),
-}));
+jest.mock(
+  '../../../../../hooks/use-sessions',
+  /* gc1-allow: session mutation state */ () => ({
+    useStartFirstCurriculumSession: () => ({
+      mutateAsync: mockStartFirstCurriculumMutateAsync,
+      isPending: false,
+    }),
+  })
+);
 
 jest.mock('../../../../../hooks/use-subjects', () => ({
   useSubjects: () => ({

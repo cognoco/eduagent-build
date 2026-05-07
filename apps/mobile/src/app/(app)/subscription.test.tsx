@@ -27,11 +27,13 @@ const mockUseActiveProfileRole = jest.fn();
 const mockPlatformAlert = jest.fn((...args: Parameters<typeof Alert.alert>) =>
   Alert.alert(...args)
 );
-jest.mock('../../lib/platform-alert', () => ({
-  // gc1-allow: platformAlert is the display side-effect boundary; test spies on alert wiring without invoking native UI.
-  platformAlert: (...args: unknown[]) =>
-    mockPlatformAlert(...(args as Parameters<typeof Alert.alert>)),
-}));
+jest.mock(
+  '../../lib/platform-alert',
+  /* gc1-allow: alert boundary */ () => ({
+    platformAlert: (...args: unknown[]) =>
+      mockPlatformAlert(...(args as Parameters<typeof Alert.alert>)),
+  })
+);
 
 // Resolves t('common.ok') → 'OK' (from en.json) so existing assertions on the
 // rendered button label keep matching after the alert sweep.
@@ -78,10 +80,12 @@ jest.mock('../../lib/profile', () => ({
   }),
 }));
 
-jest.mock('../../hooks/use-active-profile-role', () => ({
-  // gc1-allow: Subscription route gates child profiles by active role; mocking keeps these tests focused on route behavior.
-  useActiveProfileRole: () => mockUseActiveProfileRole(),
-}));
+jest.mock(
+  '../../hooks/use-active-profile-role',
+  /* gc1-allow: active role */ () => ({
+    useActiveProfileRole: () => mockUseActiveProfileRole(),
+  })
+);
 
 jest.mock('../../lib/analytics', () => ({
   track: jest.fn(),
