@@ -17,6 +17,7 @@ import { formatApiError } from '../../lib/format-api-error';
 import { Sentry } from '../../lib/sentry';
 import {
   CollapsibleMemorySection,
+  InterestContextRow,
   MemoryRow,
   MemorySection,
   getLearningStyleRows,
@@ -39,24 +40,6 @@ import { MemoryConsentPrompt } from '../../components/memory-consent-prompt';
 import { useParentProxy } from '../../hooks/use-parent-proxy';
 import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
 import { useUpdateInterestsContext } from '../../hooks/use-onboarding-dimensions';
-
-const INTEREST_CONTEXT_OPTIONS: Array<{
-  value: InterestContext;
-  labelKey: string;
-}> = [
-  {
-    value: 'school',
-    labelKey: 'session.mentorMemory.interestContext.school',
-  },
-  {
-    value: 'free_time',
-    labelKey: 'session.mentorMemory.interestContext.freeTime',
-  },
-  {
-    value: 'both',
-    labelKey: 'session.mentorMemory.interestContext.both',
-  },
-];
 
 export default function MentorMemoryScreen() {
   const { t } = useTranslation();
@@ -218,6 +201,7 @@ export default function MentorMemoryScreen() {
         Sentry.captureException(err, {
           tags: { surface: 'mentor-memory', action: 'update_interest_context' },
         });
+        throw err;
       }
     },
     [profile?.interests, t, updateInterestsContext]
@@ -486,31 +470,29 @@ export default function MentorMemoryScreen() {
           )}
         </MemorySection>
 
-        <MemorySection title={t('session.mentorMemory.sections.interests')}>
-          {(profile?.interests ?? []).length > 0 ? (
-            // [BUG-815] Use the same `?? []` guard inside the map call so
-            // the lookup is safe even when profile is undefined or interests
-            // is null (legacy profile rows). The outer length-check already
-            // routes empty arrays to "Nothing saved yet."
-            (profile?.interests ?? []).map((interest) => {
-              // BKT-C.2 — interests are now InterestEntry { label, context };
-              // read .label for display and keying. Context-aware rendering
-              // (school vs free-time chips) lands in the mobile context-picker
-              // commit.
+        {(profile?.interests ?? []).length > 0 ? (
+          <MemorySection
+            title={t('session.mentorMemory.sections.interests')}
+            description={t(
+              'session.mentorMemory.sections.interestsContextHint'
+            )}
+            testID="mentor-memory-interests-section"
+          >
+            {(profile?.interests ?? []).map((interest) => {
               const label = interest.label;
-              // [BUG-471] Surface timestamp if available
               const ts = profile?.interestTimestamps?.[label];
               const detail = ts
                 ? t('session.mentorMemory.noticed', {
                     date: formatRelativeDate(ts),
                   })
                 : undefined;
-              const context = interest.context;
               return (
-                <MemoryRow
+                <InterestContextRow
                   key={label}
-                  label={label}
+                  interest={interest}
                   detail={detail}
+                  disabled={updateInterestsContext.isPending}
+                  onContextChange={handleInterestContextChange}
                   onRemove={async () => {
                     try {
                       await deleteItem.mutateAsync({
@@ -531,50 +513,11 @@ export default function MentorMemoryScreen() {
                       });
                     }
                   }}
-                >
-                  <View className="flex-row flex-wrap gap-2">
-                    {INTEREST_CONTEXT_OPTIONS.map((option) => {
-                      const selected = option.value === context;
-                      return (
-                        <Pressable
-                          key={option.value}
-                          onPress={() =>
-                            void handleInterestContextChange(
-                              label,
-                              option.value
-                            )
-                          }
-                          disabled={updateInterestsContext.isPending}
-                          className={`rounded-full px-3 py-1.5 ${
-                            selected ? 'bg-primary' : 'bg-surface-elevated'
-                          }`}
-                          accessibilityRole="button"
-                          accessibilityState={{
-                            selected,
-                            disabled: updateInterestsContext.isPending,
-                          }}
-                          testID={`interest-context-${label}-${option.value}`}
-                        >
-                          <Text
-                            className={`text-caption font-semibold ${
-                              selected
-                                ? 'text-text-inverse'
-                                : 'text-text-secondary'
-                            }`}
-                          >
-                            {t(option.labelKey)}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                </MemoryRow>
+                />
               );
-            })
-          ) : (
-            <MemoryRow label={t('session.mentorMemory.nothingSaved')} />
-          )}
-        </MemorySection>
+            })}
+          </MemorySection>
+        ) : null}
 
         <MemorySection title={t('session.mentorMemory.sections.strengths')}>
           {(profile?.strengths ?? []).length > 0 ? (

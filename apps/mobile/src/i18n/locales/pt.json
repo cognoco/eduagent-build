@@ -357,6 +357,7 @@
         "tellMentor": "Diga ao Seu Mentor",
         "learningStyle": "Estilo de Aprendizagem",
         "interests": "Interesses",
+        "interestsContextHint": "Escolha onde cada interesse se encaixa para que os exemplos combinem com o momento.",
         "strengths": "Pontos Fortes",
         "struggles": "Coisas em que Você Está Melhorando",
         "communicationNotes": "Notas de Comunicação",
@@ -1388,6 +1389,14 @@
         "school": {
           "label": "Escola / Universidade",
           "hint": "Alinharemos os exemplos com trabalhos acadêmicos e preparação para exames."
+        },
+        "free_time": {
+          "label": "Tempo livre",
+          "hint": "Vamos usar isso para hobbies, jogos e exemplos fora da aula."
+        },
+        "both": {
+          "label": "Ambos",
+          "hint": "Vamos usar isso para exemplos da escola e do tempo livre."
         },
         "work": {
           "label": "Trabalho / Carreira",

@@ -1,7 +1,11 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { createRoutedMockFetch } from '../../test-utils/mock-api-routes';
+import {
+  createRoutedMockFetch,
+  extractJsonBody,
+  fetchCallsMatching,
+} from '../../test-utils/mock-api-routes';
 
 // [BUG-815] Regression test: when a legacy profile row has `interests`
 // undefined or null, the Interests section renders the empty placeholder
@@ -17,6 +21,7 @@ const mockProfileBase = {
   interestTimestamps: {},
   // Mentor-memory consent on so the screen renders the data sections.
   memoryConsentGranted: true,
+  memoryConsentStatus: 'granted',
   memoryInjectionEnabled: true,
 };
 
@@ -64,6 +69,7 @@ const mockFetch = createRoutedMockFetch({
     message: 'Saved',
     fieldsUpdated: [],
   }),
+  'onboarding/interests/context': () => ({ success: true }),
   'learner-profile': () => ({ profile: mockProfileData }),
 });
 
@@ -153,7 +159,7 @@ describe('MentorMemoryScreen — interests null guard', () => {
     mockProfileData = {
       ...mockProfileBase,
       interests: [
-        { label: 'Football', context: 'free-time' },
+        { label: 'Football', context: 'free_time' },
         { label: 'Astronomy', context: 'school' },
       ],
     };
@@ -161,6 +167,78 @@ describe('MentorMemoryScreen — interests null guard', () => {
     render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
     await screen.findByText('Football');
     await screen.findByText('Astronomy');
+  });
+
+  it('renders context controls for interests', async () => {
+    mockProfileData = {
+      ...mockProfileBase,
+      interests: [{ label: 'Football', context: 'free_time' }],
+    };
+
+    render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
+
+    await screen.findByTestId('mentor-memory-interests-section');
+    expect(
+      screen.getByTestId('interest-context-Football-free_time').props
+        .accessibilityState?.selected
+    ).toBe(true);
+  });
+
+  it('tapping a context writes the full interests array', async () => {
+    mockProfileData = {
+      ...mockProfileBase,
+      interests: [
+        { label: 'Football', context: 'free_time' },
+        { label: 'Astronomy', context: 'school' },
+      ],
+    };
+
+    render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
+
+    const bothOption = await screen.findByTestId(
+      'interest-context-Football-both'
+    );
+    await act(async () => {
+      fireEvent.press(bothOption);
+    });
+
+    const calls = fetchCallsMatching(mockFetch, 'onboarding/interests/context');
+    expect(calls).toHaveLength(1);
+    expect(extractJsonBody(calls[0]?.init)).toEqual({
+      interests: [
+        { label: 'Football', context: 'both' },
+        { label: 'Astronomy', context: 'school' },
+      ],
+    });
+  });
+
+  it('shows the tapped context optimistically', async () => {
+    mockProfileData = {
+      ...mockProfileBase,
+      interests: [{ label: 'Football', context: 'free_time' }],
+    };
+
+    render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
+
+    const bothOption = await screen.findByTestId(
+      'interest-context-Football-both'
+    );
+    await act(async () => {
+      fireEvent.press(bothOption);
+    });
+
+    expect(
+      screen.getByTestId('interest-context-Football-both').props
+        .accessibilityState?.selected
+    ).toBe(true);
+  });
+
+  it('hides the interests section when there are no interests', () => {
+    mockProfileData = { ...mockProfileBase, interests: [] };
+
+    render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
+
+    expect(screen.queryByTestId('mentor-memory-interests-section')).toBeNull();
   });
 });
 

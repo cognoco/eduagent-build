@@ -357,6 +357,7 @@
         "tellMentor": "Fortell mentoren din",
         "learningStyle": "Læringsstil",
         "interests": "Interesser",
+        "interestsContextHint": "Velg hvor hver interesse hører hjemme, slik at eksemplene passer øyeblikket.",
         "strengths": "Styrker",
         "struggles": "Ting du blir bedre på",
         "communicationNotes": "Kommunikasjonsnotater",
@@ -1388,6 +1389,14 @@
         "school": {
           "label": "Skole / Universitet",
           "hint": "Vi vil tilpasse eksempler til akademisk arbeid og eksamensforberedelser."
+        },
+        "free_time": {
+          "label": "Fritid",
+          "hint": "Vi bruker det til hobbyer, spill og eksempler utenfor timene."
+        },
+        "both": {
+          "label": "Begge",
+          "hint": "Vi bruker det til både skole- og fritidseksempler."
         },
         "work": {
           "label": "Jobb / Karriere",

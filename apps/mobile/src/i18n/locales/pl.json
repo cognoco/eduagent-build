@@ -357,6 +357,7 @@
         "tellMentor": "Powiedz swojemu mentorowi",
         "learningStyle": "Styl nauki",
         "interests": "Zainteresowania",
+        "interestsContextHint": "Wybierz, gdzie pasuje każde zainteresowanie, aby przykłady trafiały w moment.",
         "strengths": "Mocne strony",
         "struggles": "Rzeczy, w których się poprawiasz",
         "communicationNotes": "Notatki dotyczące komunikacji",
@@ -1388,6 +1389,14 @@
         "school": {
           "label": "Szkoła / Uniwersytet",
           "hint": "Dostosujemy przykłady do pracy akademickiej i przygotowania do egzaminów."
+        },
+        "free_time": {
+          "label": "Czas wolny",
+          "hint": "Użyjemy tego do hobby, gier i przykładów poza lekcjami."
+        },
+        "both": {
+          "label": "Oba",
+          "hint": "Użyjemy tego do przykładów szkolnych i poza szkołą."
         },
         "work": {
           "label": "Praca / Kariera",

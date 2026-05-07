@@ -357,6 +357,7 @@
         "tellMentor": "メンターに伝える",
         "learningStyle": "学習スタイル",
         "interests": "興味",
+        "interestsContextHint": "それぞれの興味がどこに当てはまるか選ぶと、その場に合った例になります。",
         "strengths": "得意なこと",
         "struggles": "改善中のこと",
         "communicationNotes": "コミュニケーションメモ",
@@ -1388,6 +1389,14 @@
         "school": {
           "label": "学校 / 大学",
           "hint": "学業や試験準備に合わせた例を提示します。"
+        },
+        "free_time": {
+          "label": "自由時間",
+          "hint": "授業外の趣味、ゲーム、例に使います。"
+        },
+        "both": {
+          "label": "両方",
+          "hint": "学校と自由時間の両方の例に使います。"
         },
         "work": {
           "label": "仕事 / キャリア",

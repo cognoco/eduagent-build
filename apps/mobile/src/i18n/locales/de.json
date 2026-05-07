@@ -357,6 +357,7 @@
         "tellMentor": "Sag es deinem Mentor",
         "learningStyle": "Lernstil",
         "interests": "Interessen",
+        "interestsContextHint": "Wähle, wohin jedes Interesse gehört, damit Beispiele zum Moment passen.",
         "strengths": "Stärken",
         "struggles": "Dinge, in denen du dich verbesserst",
         "communicationNotes": "Kommunikationsnotizen",
@@ -1388,6 +1389,14 @@
         "school": {
           "label": "Schule / Universität",
           "hint": "Wir richten Beispiele auf akademische Arbeit und Prüfungsvorbereitung aus."
+        },
+        "free_time": {
+          "label": "Freizeit",
+          "hint": "Wir nutzen es für Hobbys, Spiele und Beispiele außerhalb des Unterrichts."
+        },
+        "both": {
+          "label": "Beides",
+          "hint": "Wir nutzen es für Beispiele in der Schule und in der Freizeit."
         },
         "work": {
           "label": "Arbeit / Karriere",
