@@ -1,7 +1,7 @@
 # Slice 1 PR 5c — Default `ONBOARDING_FAST_PATH` On In Production
 
 **Date:** 2026-05-06
-**Status:** Draft plan, ready to implement
+**Status:** Shipped
 **Branch:** `app-ev` (next on top of 5a/5b/5g)
 **Parent plan:** `2026-05-06-learning-product-evolution-audit.md` § A and Slice 1 row 5c
 **Wave:** Wave 2 (parallel-safe with 5e, 5i)

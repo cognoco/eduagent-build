@@ -1,7 +1,7 @@
 # Slice 1 PR 5d — Pre-warm Curriculum On Subject Creation
 
 **Date:** 2026-05-06
-**Status:** Draft plan, ready to implement
+**Status:** Shipped
 **Branch:** `ux/emotional-retention-language` (or sub-branch off it)
 **Parent plan:** `2026-05-06-learning-product-evolution-audit.md` § A and Slice 1 row 5d
 **Wave:** Wave 1 (parallel-safe with 5a, 5b, 5g)

@@ -1,7 +1,7 @@
 # Slice 1 PR 5e — Bypass Preference Screens In Onboarding Routing
 
 **Date:** 2026-05-06
-**Status:** Draft plan, ready to implement
+**Status:** Shipped
 **Branch:** `app-ev` (next on top of 5a/5b/5g/5c)
 **Parent plan:** `2026-05-06-learning-product-evolution-audit.md` § D and Slice 1 row 5e
 **Wave:** Wave 2 — **sequential after 5c**. 5c's runtime flag flip is the precondition for 5e's tightened assertion to be meaningful; 5c also lists `interview.test.tsx` in its file set (though its step 4 concludes no change is needed there), so sequencing avoids any merge-time ambiguity. Parallel-safe with 5i.

@@ -1,7 +1,7 @@
 # Slice 1 PR 5i — Match First Topic To Learner Intent
 
 **Date:** 2026-05-06
-**Status:** Draft plan, ready to implement (revised after adversarial review — collapsed onto existing infra)
+**Status:** Shipped (revised after adversarial review — collapsed onto existing infra)
 **Branch:** `app-ev` (next on top of 5a/5b/5g)
 **Parent plan:** `2026-05-06-learning-product-evolution-audit.md` § J and Slice 1 row 5i
 **Wave:** Wave 2 (parallel-safe with 5c, 5e)

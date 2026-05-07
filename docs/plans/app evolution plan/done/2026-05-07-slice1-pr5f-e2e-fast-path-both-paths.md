@@ -1,7 +1,7 @@
 # Slice 1 PR 5f — E2E Coverage For Create-Subject → First Active Prompt (Language + Non-Language)
 
 **Date:** 2026-05-07
-**Status:** Draft plan, ready to implement
+**Status:** Shipped
 **Branch:** `app-ev` (next on top of merged Slice 1 Wave 1/2)
 **Parent plan:** `2026-05-06-learning-product-evolution-audit.md` § "Recommended Sequencing" / Slice 1 row 5f
 **Wave:** Wave 3 — gates Wave 4 (5h deletion). Tests-only PR.

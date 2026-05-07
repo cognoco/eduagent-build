@@ -1,7 +1,7 @@
 # Slice 1 PR 5h — Delete Legacy Onboarding Preference Screens + Remove FAST_PATH Flag
 
 **Date:** 2026-05-07
-**Status:** Draft plan, ready to implement
+**Status:** Shipped
 **Branch:** `app-ev`
 **Parent plan:** `2026-05-06-learning-product-evolution-audit.md` § D, Slice 1 row 5h, AND 2026-05-07 conversation that:
 - Kept `interview.tsx` in scope but **deferred its deletion to Slice 1.5c** (after the topic-probe replacement ships).

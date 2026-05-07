@@ -1,7 +1,7 @@
 # Slice 1 PR 5j — Lift Per-Interest Context Override Into Mentor-Memory
 
 **Date:** 2026-05-07
-**Status:** Draft plan, ready to implement
+**Status:** Shipped
 **Branch:** `app-ev`
 **Parent plan:** `2026-05-06-learning-product-evolution-audit.md` § D + 2026-05-07 conversation deciding to keep the override but consolidate it into mentor-memory.
 **Wave:** Wave 4 — sequential prerequisite for 5h's interests-context deletion. Parallel-safe with 5h's preference-screen deletions for the other four files.
