@@ -73,18 +73,12 @@ export default function PracticeScreen(): React.ReactElement {
   const quizSubtitle = statsError
     ? 'Could not load quiz stats'
     : bestPct
-    ? [
-        bestPct,
-        `Played: ${totalRoundsPlayed}`,
-        totalXp > 0 ? `${totalXp} XP` : null,
-      ]
+    ? [bestPct, `Played: ${totalRoundsPlayed}`, `${totalXp} XP`]
         .filter(Boolean)
         .join(' · ')
     : totalRoundsPlayed > 0
-    ? [`Played: ${totalRoundsPlayed}`, totalXp > 0 ? `${totalXp} XP` : null]
-        .filter(Boolean)
-        .join(' · ')
-    : 'Test yourself with multiple choice questions';
+    ? [`Played: ${totalRoundsPlayed}`, `${totalXp} XP`].join(' · ')
+    : `Test yourself with multiple choice questions · ${totalXp} XP`;
   const assessmentCount = assessmentTopics?.length ?? 0;
   const assessmentSubtitle = assessmentTopicsError
     ? 'Could not load assessment topics'

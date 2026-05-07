@@ -1,5 +1,4 @@
 const mockFindSubscriptionById = jest.fn();
-const mockGetFamilyPoolBreakdownSharing = jest.fn();
 
 jest.mock('@eduagent/database', () => {
   const actual = jest.requireActual('@eduagent/database');
@@ -10,13 +9,9 @@ jest.mock('@eduagent/database', () => {
   };
 });
 
-jest.mock('../settings', () => ({ // gc1-allow: stubs getFamilyPoolBreakdownSharing — real settings module hits DB, not exercisable without full integration test setup
-  getFamilyPoolBreakdownSharing: (...args: unknown[]) =>
-    mockGetFamilyPoolBreakdownSharing(...args),
-}));
-
 import type { Database } from '@eduagent/database';
 
+import * as settingsService from '../settings';
 import { getUsageBreakdownForProfile } from './family';
 
 function createUsageBreakdownDb(input: {
@@ -35,15 +30,39 @@ function createUsageBreakdownDb(input: {
     usedToday: number;
   }>;
 }): Database {
+  const selectLimit = (rows: unknown[]) => ({
+    from: jest.fn().mockReturnValue({
+      where: jest.fn().mockReturnValue({
+        limit: jest.fn().mockResolvedValue(rows),
+      }),
+    }),
+  });
+
   const select = jest
     .fn()
-    .mockReturnValueOnce({
-      from: jest.fn().mockReturnValue({
-        where: jest.fn().mockReturnValue({
-          limit: jest.fn().mockResolvedValue([input.viewer]),
-        }),
-      }),
-    })
+    .mockReturnValueOnce(
+      selectLimit([
+        {
+          id: input.viewer.id,
+          displayName: input.viewer.displayName,
+          isOwner: input.viewer.isOwner,
+          accountId: 'account-1',
+        },
+      ])
+    )
+    .mockReturnValueOnce(
+      selectLimit(
+        input.viewer.familyOwnerProfileId
+          ? [{ id: input.viewer.familyOwnerProfileId }]
+          : []
+      )
+    )
+    .mockReturnValueOnce(
+      selectLimit(input.viewer.hasChildLink ? [{ id: 'parent-link-1' }] : [])
+    )
+    .mockReturnValueOnce(
+      selectLimit(input.viewer.isChild ? [{ id: 'child-link-1' }] : [])
+    )
     .mockReturnValueOnce({
       from: jest.fn().mockReturnValue({
         leftJoin: jest.fn().mockReturnValue({
@@ -58,16 +77,27 @@ function createUsageBreakdownDb(input: {
 }
 
 describe('getUsageBreakdownForProfile family-pool sharing', () => {
+  let sharingSpy: jest.SpiedFunction<
+    typeof settingsService.getFamilyPoolBreakdownSharing
+  >;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    sharingSpy = jest
+      .spyOn(settingsService, 'getFamilyPoolBreakdownSharing')
+      .mockResolvedValue(false);
     mockFindSubscriptionById.mockResolvedValue({
       id: 'sub-1',
       accountId: 'account-1',
     });
   });
 
+  afterEach(() => {
+    sharingSpy.mockRestore();
+  });
+
   it('shows the full breakdown to a non-owner adult when the owner shares it', async () => {
-    mockGetFamilyPoolBreakdownSharing.mockResolvedValue(true);
+    sharingSpy.mockResolvedValue(true);
     const db = createUsageBreakdownDb({
       viewer: {
         id: 'coparent-1',
@@ -107,7 +137,7 @@ describe('getUsageBreakdownForProfile family-pool sharing', () => {
   });
 
   it('hides breakdown from child viewers when owner sharing is disabled', async () => {
-    mockGetFamilyPoolBreakdownSharing.mockResolvedValue(false);
+    sharingSpy.mockResolvedValue(false);
     const db = createUsageBreakdownDb({
       viewer: {
         id: 'child-1',
@@ -139,7 +169,7 @@ describe('getUsageBreakdownForProfile family-pool sharing', () => {
   });
 
   it('hides breakdown from child viewers even when owner sharing is enabled', async () => {
-    mockGetFamilyPoolBreakdownSharing.mockResolvedValue(true);
+    sharingSpy.mockResolvedValue(true);
     const db = createUsageBreakdownDb({
       viewer: {
         id: 'child-1',
@@ -175,7 +205,7 @@ describe('getUsageBreakdownForProfile family-pool sharing', () => {
   });
 
   it('keeps non-owner adult viewers scoped to their own row when owner sharing is disabled', async () => {
-    mockGetFamilyPoolBreakdownSharing.mockResolvedValue(false);
+    sharingSpy.mockResolvedValue(false);
     const db = createUsageBreakdownDb({
       viewer: {
         id: 'coparent-1',
@@ -211,5 +241,36 @@ describe('getUsageBreakdownForProfile family-pool sharing', () => {
     expect(result.familyAggregate).toBeNull();
     expect(result.selfUsedToday).toBe(2);
     expect(result.selfUsedThisMonth).toBe(5);
+  });
+
+  it('does not share the full breakdown with unrelated adult profiles', async () => {
+    sharingSpy.mockResolvedValue(true);
+    const db = createUsageBreakdownDb({
+      viewer: {
+        id: 'adult-1',
+        displayName: 'Adult',
+        isOwner: false,
+        familyOwnerProfileId: 'owner-1',
+        hasChildLink: false,
+        isChild: false,
+      },
+      profileRows: [
+        { profileId: 'owner-1', name: 'Owner', used: 10, usedToday: 1 },
+        { profileId: 'adult-1', name: 'Adult', used: 5, usedToday: 2 },
+        { profileId: 'child-1', name: 'Child', used: 7, usedToday: 3 },
+      ],
+    });
+
+    const result = await getUsageBreakdownForProfile(db, {
+      subscriptionId: 'sub-1',
+      activeProfileId: 'adult-1',
+      monthlyLimit: 100,
+      cycleStartAt: '2026-05-01T00:00:00.000Z',
+      dayStartAt: '2026-05-06T00:00:00.000Z',
+    });
+
+    expect(result.isOwnerBreakdownViewer).toBe(false);
+    expect(result.byProfile.map((row) => row.profile_id)).toEqual(['adult-1']);
+    expect(result.familyAggregate).toBeNull();
   });
 });

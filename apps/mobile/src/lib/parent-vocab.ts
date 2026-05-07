@@ -71,6 +71,22 @@ export const PARENT_METRIC_TOOLTIPS: Record<string, ParentMetricTooltip> = {
     title: 'Sessions this week',
     body: 'The number of learning conversations your child had with the mentor this week.',
   },
+  'engagement-trend': {
+    title: 'Engagement trend',
+    body: 'Whether your child is using the mentor more, less, or about the same compared with recent activity.',
+  },
+  'exchange-delta': {
+    title: 'Exchanges this week',
+    body: 'How many message turns happened this week compared with last week. It is a lightweight signal for learning activity.',
+  },
+  'guided-ratio': {
+    title: 'Guided practice',
+    body: 'The share of mentor replies where your child needed a worked example or stronger guidance instead of light prompting.',
+  },
+  'streak-xp': {
+    title: 'Streak and XP',
+    body: 'Motivation signals from regular practice and completed learning work. They are not grades.',
+  },
   understanding: {
     title: 'Understanding',
     body: 'How well your child understands this topic, based on their answers and conversations with the mentor.',

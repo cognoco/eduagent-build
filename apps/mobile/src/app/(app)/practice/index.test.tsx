@@ -157,4 +157,10 @@ describe('PracticeScreen', () => {
     fireEvent.press(screen.getByTestId('review-empty-browse'));
     expect(mockPush).toHaveBeenCalledWith('/(app)/library');
   });
+
+  it('shows quiz XP even before any XP is earned', () => {
+    render(<PracticeScreen />);
+
+    screen.getByText('Test yourself with multiple choice questions · 0 XP');
+  });
 });

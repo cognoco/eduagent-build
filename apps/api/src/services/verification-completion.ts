@@ -186,12 +186,8 @@ export async function processEvaluateCompletion(
 export async function processTeachBackCompletion(
   db: Database,
   profileId: string,
-  sessionId: string,
-  topicId: string
+  sessionId: string
 ): Promise<number | undefined> {
-  // Suppress unused parameter warning — topicId reserved for future use
-  void topicId;
-
   // Find the last ai_response event for this session
   const events = await db
     .select()

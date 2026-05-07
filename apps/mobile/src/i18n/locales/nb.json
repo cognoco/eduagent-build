@@ -124,11 +124,11 @@
       },
       "intentActions": {
         "homework": {
-          "title": "Leksehjelp",
+          "title": "Hjelp med en oppgave",
           "subtitle": "Ta et bilde eller skriv inn oppgaven"
         },
         "practice": {
-          "title": "Øv til en prøve",
+          "title": "Test deg selv",
           "subtitle": "Repeter det som begynner å glippe, eller test deg selv"
         },
         "studyNew": {
@@ -384,6 +384,11 @@
         "enableFailed": "Kunne ikke aktivere minnet",
         "deleteFailed": "Kunne ikke slette element",
         "restoreFailed": "Kunne ikke gjenopprette element"
+      },
+      "interestContext": {
+        "school": "Skole",
+        "freeTime": "Fritid",
+        "both": "Begge"
       }
     },
     "accessories": {
@@ -532,7 +537,9 @@
       "vocabBasicsTitle": "{{language}} grunnleggende",
       "vocabPersonalisedTitle": "Vokabular: {{language}}",
       "vocabStarterSubtitle": "Standard startord – registrer {{threshold}} av dine egne for å låse opp personlige runder",
-      "vocabPlayedSubtitleDefault": "Øv på nye ord og uttrykk"
+      "vocabPlayedSubtitleDefault": "Øv på nye ord og uttrykk",
+      "challengeExplainerTitle": "Utfordringsrunder",
+      "challengeExplainerBody": "Når du er i flyt, kan mentoren gjøre neste runde vanskeligere."
     },
     "launch": {
       "loadingShuffling": "Stokker spørsmål ...",
@@ -847,7 +854,11 @@
     "acceptSuggestionLabel": "Godta forslag",
     "editSuggestionLabel": "Rediger forslag",
     "startLearning": "Start læring",
-    "validationHint": "Skriv inn et emnenavn for å komme i gang"
+    "validationHint": "Skriv inn et emnenavn for å komme i gang",
+    "weWillStartWith": "Vi starter med {{subject}}.",
+    "start": "Start",
+    "changeSubject": "Endre",
+    "changeSubjectLabel": "Endre emne"
   },
   "vocabulary": {
     "fallbackTitle": "Vokabular",
@@ -985,7 +996,8 @@
     "pickerStartForTopic": "Start vurdering for {{title}}",
     "studiedToday": "Studert i dag",
     "studiedYesterday": "Studert i går",
-    "studiedDaysAgo": "Studert for {{count}} dager siden"
+    "studiedDaysAgo": "Studert for {{count}} dager siden",
+    "topicPassedNote": "Bra jobbet - dette emnet er markert som bestått, og svake punkter kommer tilbake i repetisjon når de trenger oppmerksomhet."
   },
   "homework": {
     "permissionTitle": "Kameratilgang nødvendig",
@@ -1168,7 +1180,9 @@
       "retryLabel": "Prøv å laste lagrede bokmerker på nytt",
       "emptyTitle": "Ingenting lagret ennå",
       "emptySubtitle": "Bokmerk sider under økter for å finne dem her.",
-      "goToLibrary": "Gå til bibliotek"
+      "goToLibrary": "Gå til bibliotek",
+      "subjectPageTitle": "Lagret i dette faget",
+      "subjectSubtitle": "Bare bokmerker fra dette faget vises."
     },
     "subject": {
       "noSubjectTitle": "Ingen emne valgt",
@@ -1307,6 +1321,8 @@
     },
     "languageSetup": {
       "title": "Språkoppsett",
+      "calibrationTitle": "Rask sjekk",
+      "calibrationSubtitle": "Hvilket språk snakker du hjemme? Et trykk, så starter vi.",
       "subtitle": "Vi vil bytte dette emnet til en språkfokusert sti med direkte mentoring, vokabularsporing og taleøvelser.",
       "learningHint": "Ser ut som du lærer {{language}}!",
       "approachHint": "Vi vil bruke en språkfokusert tilnærming bygget rundt vokabular, flyt, input og output-øvelser.",
@@ -1647,7 +1663,12 @@
       "whatSeemsWrongDescription": "Beskriv korreksjonen, og mentoren vil ta den i betraktning",
       "correctionNoted": "Korreksjon notert",
       "couldNotSaveCorrection": "Kunne ikke lagre korreksjon",
-      "submit": "Send inn"
+      "submit": "Send inn",
+      "confidence": {
+        "low": "Tidlig signal",
+        "medium": "Gjentatt mønster",
+        "high": "Sterkt signal"
+      }
     },
     "reports": {
       "title": "Rapporter",
@@ -1889,6 +1910,19 @@
   },
   "coaching": {
     "parentDashboard": {
+      "consent": {
+        "accessibilityLabel": "Consent status: {{status}}",
+        "consented": "Consent active",
+        "parentalConsentRequested": "Waiting for parent approval",
+        "pending": "Consent pending",
+        "redactedMessage": "Learning metrics are hidden until consent is active.",
+        "withdrawn": "Consent withdrawn"
+      },
+      "engagementTrend": {
+        "declining": "Engagement declining",
+        "increasing": "Engagement increasing",
+        "stable": "Engagement stable"
+      },
       "reviewHealth": "Gjennomgå helse",
       "retentionTrend": {
         "improving": "Forbedres",

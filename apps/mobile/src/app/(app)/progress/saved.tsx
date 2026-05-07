@@ -7,7 +7,7 @@ import {
   View,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Markdown from 'react-native-markdown-display';
 import type { Bookmark } from '@eduagent/schemas';
@@ -107,8 +107,12 @@ function BookmarkRow({
 export default function SavedBookmarksScreen() {
   const { t } = useTranslation();
   const router = useRouter();
+  const params = useLocalSearchParams<{ subjectId?: string }>();
+  const subjectId = Array.isArray(params.subjectId)
+    ? params.subjectId[0]
+    : params.subjectId;
   const { isParentProxy } = useParentProxy();
-  const bookmarksQuery = useBookmarks();
+  const bookmarksQuery = useBookmarks({ subjectId });
   const deleteBookmark = useDeleteBookmark();
 
   const bookmarks = useMemo(
@@ -155,9 +159,16 @@ export default function SavedBookmarksScreen() {
           <Ionicons name="arrow-back" size={24} className="text-text-primary" />
         </Pressable>
         <Text className="text-h2 font-bold text-text-primary ml-3">
-          {t('progress.saved.pageTitle')}
+          {subjectId
+            ? t('progress.saved.subjectPageTitle')
+            : t('progress.saved.pageTitle')}
         </Text>
       </View>
+      {subjectId ? (
+        <Text className="px-4 pb-2 text-body-sm text-text-secondary">
+          {t('progress.saved.subjectSubtitle')}
+        </Text>
+      ) : null}
 
       <FlatList
         data={bookmarks}

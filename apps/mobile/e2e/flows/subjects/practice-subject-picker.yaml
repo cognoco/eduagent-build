@@ -1,6 +1,6 @@
 # Flow: Practice Subject Picker — Entry via redesigned home action button
 # Validates: tapping "home-action-practice" navigates to the Practice screen.
-# The old AdaptiveEntryCard "Practice for a test" footer action and bottom-sheet
+# The old adaptive practice footer action and bottom-sheet
 # subject picker (practice-subject-picker) were removed in the home-screen
 # redesign. The Practice hub is now a standalone screen at /(app)/practice.
 #

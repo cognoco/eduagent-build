@@ -81,6 +81,7 @@ import {
   loadPriorSessionMeta,
 } from './session-context-builders';
 import { projectAiResponseContent } from '../llm/project-response';
+import { isSubstantiveCalibrationAnswer } from './review-calibration';
 
 const BANNED_FILLER_OPENERS = [
   "i'm so proud",
@@ -226,6 +227,133 @@ async function applyContinuationScore(
   delete nextMetadata['continuationOpenerStartedExchange'];
   nextMetadata['continuationDepth'] = mapRetrievalScoreToDepth(retrievalScore);
   await updateSessionMetadata(db, profileId, sessionId, nextMetadata);
+}
+
+const MAX_REVIEW_CALIBRATION_ATTEMPTS = 2;
+
+interface ReviewCalibrationDispatchPayload {
+  profileId: string;
+  sessionId: string;
+  topicId: string;
+  learnerMessage: string;
+  topicTitle: string;
+  timestamp: string;
+}
+
+async function maybeDispatchReviewCalibration(
+  db: Database,
+  profileId: string,
+  session: {
+    id: string;
+    topicId: string | null;
+  },
+  effectiveMode: string | undefined,
+  conversationLanguage: ConversationLanguage | undefined,
+  learnerMessageText: string,
+  topicTitle: string | undefined
+): Promise<void> {
+  if (effectiveMode !== 'review' && effectiveMode !== 'practice') return;
+  const topicId = session.topicId;
+  if (!topicId || !topicTitle) return;
+
+  const isSubstantive = isSubstantiveCalibrationAnswer(
+    learnerMessageText,
+    conversationLanguage
+  );
+
+  const payload = await db.transaction<ReviewCalibrationDispatchPayload | null>(
+    async (tx) => {
+      const [row] = await tx
+        .select({ metadata: learningSessions.metadata })
+        .from(learningSessions)
+        .where(
+          and(
+            eq(learningSessions.id, session.id),
+            eq(learningSessions.profileId, profileId)
+          )
+        )
+        .for('update')
+        .limit(1);
+
+      if (!row) return null;
+      const metadata = (row.metadata ?? {}) as Record<string, unknown>;
+      if (metadata['reviewCalibrationFiredAt'] != null) return null;
+
+      const priorAttempts =
+        typeof metadata['reviewCalibrationAttempts'] === 'number'
+          ? metadata['reviewCalibrationAttempts']
+          : 0;
+      const nextAttempts = priorAttempts + 1;
+      const nextMetadata: Record<string, unknown> = {
+        ...metadata,
+        reviewCalibrationAttempts: nextAttempts,
+      };
+
+      if (!isSubstantive) {
+        if (nextAttempts >= MAX_REVIEW_CALIBRATION_ATTEMPTS) {
+          nextMetadata['reviewCalibrationFiredAt'] = new Date().toISOString();
+        }
+
+        await tx
+          .update(learningSessions)
+          .set({ metadata: nextMetadata, updatedAt: new Date() })
+          .where(
+            and(
+              eq(learningSessions.id, session.id),
+              eq(learningSessions.profileId, profileId)
+            )
+          );
+        return null;
+      }
+
+      const timestamp = new Date().toISOString();
+      nextMetadata['reviewCalibrationFiredAt'] = timestamp;
+
+      await tx
+        .update(learningSessions)
+        .set({ metadata: nextMetadata, updatedAt: new Date() })
+        .where(
+          and(
+            eq(learningSessions.id, session.id),
+            eq(learningSessions.profileId, profileId)
+          )
+        );
+
+      return {
+        profileId,
+        sessionId: session.id,
+        topicId,
+        learnerMessage: learnerMessageText,
+        topicTitle,
+        timestamp,
+      };
+    }
+  );
+
+  if (!payload) return;
+
+  try {
+    await inngest.send({
+      name: 'app/review.calibration.requested',
+      data: payload,
+    });
+  } catch (err) {
+    logger.warn('[session-exchange] review calibration dispatch failed', {
+      event: 'review_calibration.dispatch_failed',
+      profileId,
+      sessionId: session.id,
+      topicId: session.topicId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    captureException(err, {
+      profileId,
+      extra: {
+        site: 'maybeDispatchReviewCalibration',
+        sessionId: session.id,
+        topicId: session.topicId,
+      },
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1453,6 +1581,16 @@ export async function processMessage(
       homeworkMode: input.homeworkMode,
     });
 
+  await maybeDispatchReviewCalibration(
+    db,
+    profileId,
+    { id: session.id, topicId: session.topicId },
+    context.effectiveMode,
+    context.conversationLanguage,
+    input.message,
+    context.topicTitle
+  );
+
   const imageData: ImageData | undefined =
     input.imageBase64 && input.imageMimeType
       ? { base64: input.imageBase64, mimeType: input.imageMimeType }
@@ -1571,6 +1709,16 @@ export async function streamMessage(
       ...options,
       homeworkMode: input.homeworkMode,
     });
+
+  await maybeDispatchReviewCalibration(
+    db,
+    profileId,
+    { id: session.id, topicId: session.topicId },
+    context.effectiveMode,
+    context.conversationLanguage,
+    input.message,
+    context.topicTitle
+  );
 
   // Compute time-to-answer before streaming begins
   const timeToAnswerMs = lastAiResponseAt

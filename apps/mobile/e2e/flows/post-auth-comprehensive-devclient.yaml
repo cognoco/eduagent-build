@@ -86,7 +86,7 @@ tags:
 
 # The coaching card should be visible (AdaptiveEntryCard for teen persona)
 - assertVisible:
-    text: "Homework help"
+    text: "Help with an assignment"
     optional: true
 
 - assertVisible:

@@ -8,6 +8,7 @@ import {
 import { getEscalationPromptGuidance } from './escalation';
 import { getEvaluateRungDescription } from './evaluate';
 import { buildFourStrandsPrompt } from './language-prompts';
+import type { EscalationRung } from './llm';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
 import type { ExchangeContext } from './exchanges';
 
@@ -205,6 +206,10 @@ export function getLearningModeGuidance(mode: LearningMode): string {
   );
 }
 
+function clampEvaluateRung(rung: EscalationRung): 1 | 2 | 3 | 4 {
+  return Math.min(4, Math.max(1, rung)) as 1 | 2 | 3 | 4;
+}
+
 function getExchangeEnvelopeInstruction(context: {
   isRecitation: boolean;
   isLanguageMode: boolean;
@@ -268,6 +273,13 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   const sections: string[] = [];
   const isLanguageMode = context.pedagogyMode === 'four_strands';
   const isRecitation = context.effectiveMode === 'recitation';
+  const isReviewMode =
+    context.effectiveMode === 'review' || context.effectiveMode === 'practice';
+  const isFirstLearnerVisibleTurn =
+    context.exchangeCount === 0 &&
+    !context.exchangeHistory.some(
+      (entry) => entry.role === 'user' || entry.role === 'assistant'
+    );
 
   // [PROMPT-INJECT-4] Sanitize every free-text field that comes from the
   // profile, curriculum tables, or teaching preferences before interpolation.
@@ -445,27 +457,21 @@ export function buildSystemPrompt(context: ExchangeContext): string {
     );
   }
 
-  // First-exchange teaching opener — tell the LLM to start teaching, not ask
+  // First-exchange teaching rule — teach one concrete idea, end with one learner action
   if (
     !isRecitation &&
-    context.exchangeCount === 0 &&
+    !isReviewMode &&
+    isFirstLearnerVisibleTurn &&
     context.sessionType === 'learning' &&
     !isLanguageMode
   ) {
-    if (safeTopicTitle) {
-      sections.push(
-        'The learner chose this topic. Open with a surprising or fun fact about it to spark curiosity, ' +
-          'then invite them into the conversation (e.g. "Have you heard about…?" or "What do you already know about…?"). ' +
-          'Do not ask what they want to learn — they already told you by choosing the topic. ' +
-          'If prior session history exists for this topic, pick up where the previous session left off instead of repeating the fun-fact opener.'
-      );
-    } else if (context.rawInput) {
-      sections.push(
-        'The learner expressed interest in the above topic. ' +
-          'Open with a surprising or fun fact related to their question to spark curiosity, ' +
-          'then anchor your teaching to their stated intent and begin immediately.'
-      );
-    }
+    sections.push(
+      'FIRST TURN RULE: Your first response must teach exactly one concrete idea AND end with exactly one learner action ' +
+        '(a question to answer, a problem to solve, or an explanation to give back). ' +
+        'Do not open with a fun fact, a curiosity hook, or a chatty invitation before teaching. ' +
+        'Start teaching immediately. ' +
+        'Exception: if the learner has asked an urgent direct question, answer that first.'
+    );
   }
 
   // Recitation mode — overrides teaching/escalation behaviour
@@ -485,6 +491,20 @@ export function buildSystemPrompt(context: ExchangeContext): string {
         '4. Offer to let them try again or move on.\n\n' +
         'Keep feedback encouraging. Use "not yet" framing for missed parts.\n' +
         'If you do not recognise the text, say so honestly and base feedback only on clarity and delivery.'
+    );
+  }
+
+  if (
+    isReviewMode &&
+    isFirstLearnerVisibleTurn &&
+    safeTopicTitle &&
+    !isLanguageMode
+  ) {
+    sections.push(
+      'Session type: REVIEW (calibrated relearning)\n' +
+        'TRANSITION PHRASE: Begin with a brief one-line handoff that tells the learner this is a review check, not a fresh lesson.\n' +
+        `CALIBRATION QUESTION: The UI may already have presented an opening question about <topic_title>${safeTopicTitle}</topic_title>. If the learner's latest message answers that question, do NOT ask it again — respond to what they remembered and use any gaps to guide the next teaching step.\n` +
+        'If the learner has not answered a calibration question yet, ask exactly one open question inviting them to say what they remember in their own words. Do NOT introduce new content before that answer.'
     );
   }
 
@@ -687,11 +707,20 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   // assessment block in free-text, which contradicts the envelope contract
   // (CLAUDE.md → "LLM Response Envelope"). Migrate to a dedicated envelope
   // signal (e.g. `signals.evaluate_assessment`) and parse via parseEnvelope.
+  // Note (2026-05-06): includes a TRANSITION PHRASE block added for the
+  // learning-path-clarity-pass spec; migrate it with the rest of this section.
   if (context.verificationType === 'evaluate') {
-    const rung = context.evaluateDifficultyRung ?? 1;
+    const rung =
+      context.evaluateDifficultyRung ??
+      clampEvaluateRung(context.escalationRung);
     const rungDescription = getEvaluateRungDescription(rung);
     sections.push(
       "Session type: THINK DEEPER (Devil's Advocate)\n" +
+        'TRANSITION PHRASE: Begin your reply with a brief one-line handoff that signals the mode shift to the learner. Examples (vary; do not repeat verbatim across sessions):\n' +
+        '- "Quick check — let me try to trip you up."\n' +
+        '- "Let\'s see if you can spot the catch in this..."\n' +
+        '- "Here\'s a thought — tell me if you see the flaw."\n' +
+        'After the transition phrase, on the same conversational turn:\n' +
         'Present a plausibly flawed explanation of the topic.\n' +
         'The student must identify and explain the specific error.\n' +
         `Difficulty rung ${rung}/4: ${rungDescription}\n` +
@@ -708,9 +737,16 @@ export function buildSystemPrompt(context: ExchangeContext): string {
   // assessment block must be migrated to an envelope signal (e.g.
   // `signals.teach_back_assessment`). Until then, the caller must parse
   // the raw response text for the trailing JSON block.
+  // Note (2026-05-06): includes a TRANSITION PHRASE block added for the
+  // learning-path-clarity-pass spec; migrate it with the rest of this section.
   if (context.verificationType === 'teach_back') {
     sections.push(
       'Session type: TEACH BACK (Feynman Technique)\n' +
+        'TRANSITION PHRASE: Begin your reply with a brief one-line handoff that signals the mode shift to the learner. Examples (vary; do not repeat verbatim across sessions):\n' +
+        '- "Want to try something? Teach it to me like I have never seen it."\n' +
+        '- "Let\'s flip roles for a minute — you teach, I listen."\n' +
+        '- "Quick Feynman check: explain it to me from scratch."\n' +
+        'After the transition phrase, on the same conversational turn:\n' +
         'You are a curious but clueless student who wants to learn about the topic.\n' +
         'The learner is the teacher — they must explain the concept to you.\n' +
         'Ask naive follow-up questions. Probe for gaps in the explanation.\n' +

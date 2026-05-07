@@ -226,6 +226,8 @@ export const sessionMetadataSchema = z
     continuationOpenerActive: z.boolean().optional(),
     continuationOpenerStartedExchange: z.number().int().min(0).optional(),
     continuationDepth: z.enum(['low', 'mid', 'high']).optional(),
+    reviewCalibrationAttempts: z.number().int().min(0).optional(),
+    reviewCalibrationFiredAt: z.string().datetime().optional(),
   })
   .strip();
 export type SessionMetadata = z.infer<typeof sessionMetadataSchema>;

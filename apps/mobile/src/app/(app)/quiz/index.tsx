@@ -225,6 +225,17 @@ export default function QuizIndexScreen(): React.ReactElement {
         </View>
       ) : (
         <View className="gap-4">
+          <View
+            className="rounded-card bg-surface-elevated px-4 py-3"
+            testID="quiz-challenge-explainer"
+          >
+            <Text className="text-body-sm font-semibold text-text-primary">
+              {t('quiz.index.challengeExplainerTitle')}
+            </Text>
+            <Text className="mt-1 text-body-sm text-text-secondary">
+              {t('quiz.index.challengeExplainerBody')}
+            </Text>
+          </View>
           <IntentCard
             title={t('quiz.index.capitalsTitle')}
             subtitle={capitalsSubtitle}

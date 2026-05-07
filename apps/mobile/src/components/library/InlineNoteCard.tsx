@@ -12,6 +12,7 @@ interface InlineNoteCardProps {
   updatedAt: string;
   defaultExpanded?: boolean;
   onLongPress?: (noteId: string) => void;
+  onSourcePress?: () => void;
   testID?: string;
 }
 
@@ -23,6 +24,7 @@ export function InlineNoteCard({
   updatedAt: _updatedAt,
   defaultExpanded = false,
   onLongPress,
+  onSourcePress,
   testID,
 }: InlineNoteCardProps): React.ReactElement {
   const [expanded, setExpanded] = useState(defaultExpanded);
@@ -61,17 +63,37 @@ export function InlineNoteCard({
           marginBottom: 4,
         }}
       >
-        <Text
-          style={{
-            fontSize: 12,
-            color: themeColors.textSecondary,
-            flex: 1,
-            marginEnd: 8,
-          }}
-          numberOfLines={1}
-        >
-          {sourceLine}
-        </Text>
+        {onSourcePress ? (
+          <Pressable
+            onPress={onSourcePress}
+            accessibilityRole="link"
+            accessibilityLabel={`Open source session for ${topicTitle}`}
+            testID={`${cardTestID}-source`}
+            style={{ flex: 1, marginEnd: 8 }}
+          >
+            <Text
+              style={{
+                fontSize: 12,
+                color: themeColors.accent,
+              }}
+              numberOfLines={1}
+            >
+              {sourceLine}
+            </Text>
+          </Pressable>
+        ) : (
+          <Text
+            style={{
+              fontSize: 12,
+              color: themeColors.textSecondary,
+              flex: 1,
+              marginEnd: 8,
+            }}
+            numberOfLines={1}
+          >
+            {sourceLine}
+          </Text>
+        )}
         <Ionicons
           name={expanded ? 'chevron-up' : 'chevron-down'}
           size={14}

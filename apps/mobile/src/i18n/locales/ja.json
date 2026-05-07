@@ -124,11 +124,11 @@
       },
       "intentActions": {
         "homework": {
-          "title": "宿題ヘルプ",
+          "title": "課題のヘルプ",
           "subtitle": "写真を撮るか、問題を入力"
         },
         "practice": {
-          "title": "テストに向けて練習",
+          "title": "力試し",
           "subtitle": "忘れかけている内容を復習したり、自分をテスト"
         },
         "studyNew": {
@@ -384,6 +384,11 @@
         "enableFailed": "記憶を有効にできませんでした",
         "deleteFailed": "項目を削除できませんでした",
         "restoreFailed": "項目を復元できませんでした"
+      },
+      "interestContext": {
+        "school": "学校",
+        "freeTime": "自由時間",
+        "both": "両方"
       }
     },
     "accessories": {
@@ -532,7 +537,9 @@
       "vocabBasicsTitle": "{{language}}の基礎",
       "vocabPersonalisedTitle": "語彙：{{language}}",
       "vocabStarterSubtitle": "標準の単語を収録 — {{threshold}}個の自分の単語を記録して、パーソナライズされたラウンドをアンロックしましょう",
-      "vocabPlayedSubtitleDefault": "新しい単語やフレーズを練習しましょう"
+      "vocabPlayedSubtitleDefault": "新しい単語やフレーズを練習しましょう",
+      "challengeExplainerTitle": "チャレンジラウンド",
+      "challengeExplainerBody": "調子がよいときは、メンターが次のラウンドを少し難しくすることがあります。"
     },
     "launch": {
       "loadingShuffling": "問題をシャッフル中...",
@@ -847,7 +854,11 @@
     "acceptSuggestionLabel": "提案を承認",
     "editSuggestionLabel": "提案を編集",
     "startLearning": "学習を開始",
-    "validationHint": "開始するには科目名を入力してください"
+    "validationHint": "開始するには科目名を入力してください",
+    "weWillStartWith": "{{subject}}から始めましょう。",
+    "start": "開始",
+    "changeSubject": "変更",
+    "changeSubjectLabel": "科目を変更"
   },
   "vocabulary": {
     "fallbackTitle": "語彙",
@@ -985,7 +996,8 @@
     "pickerStartForTopic": "{{title}} の確認を開始",
     "studiedToday": "今日学習",
     "studiedYesterday": "昨日学習",
-    "studiedDaysAgo": "{{count}}日前に学習"
+    "studiedDaysAgo": "{{count}}日前に学習",
+    "topicPassedNote": "よくできました。このトピックは合格として記録され、弱いところは必要なタイミングで復習に戻ってきます。"
   },
   "homework": {
     "permissionTitle": "カメラへのアクセスが必要です",
@@ -1168,7 +1180,9 @@
       "retryLabel": "保存したブックマークの読み込みを再試行",
       "emptyTitle": "まだ何も保存されていません",
       "emptySubtitle": "セッション中にページをブックマークすると、ここに表示されます。",
-      "goToLibrary": "ライブラリへ"
+      "goToLibrary": "ライブラリへ",
+      "subjectPageTitle": "この科目で保存済み",
+      "subjectSubtitle": "この科目のブックマークだけを表示しています。"
     },
     "subject": {
       "noSubjectTitle": "科目が選択されていません",
@@ -1307,6 +1321,8 @@
     },
     "languageSetup": {
       "title": "言語設定",
+      "calibrationTitle": "クイック確認",
+      "calibrationSubtitle": "自宅ではどの言語を話しますか？ワンタップで始めましょう。",
       "subtitle": "この科目を、直接指導、語彙追跡、スピーキング練習を備えた言語特化パスに切り替えます。",
       "learningHint": "{{language}}を学んでいるようですね！",
       "approachHint": "語彙、流暢さ、インプット、アウトプット練習を中心とした言語特化アプローチを使用します。",
@@ -1647,7 +1663,12 @@
       "whatSeemsWrongDescription": "訂正内容を説明してください。メンターがそれを考慮します",
       "correctionNoted": "訂正を記録しました",
       "couldNotSaveCorrection": "訂正を保存できませんでした",
-      "submit": "送信"
+      "submit": "送信",
+      "confidence": {
+        "low": "初期のサイン",
+        "medium": "繰り返し見られる傾向",
+        "high": "強いサイン"
+      }
     },
     "reports": {
       "title": "レポート",
@@ -1889,6 +1910,19 @@
   },
   "coaching": {
     "parentDashboard": {
+      "consent": {
+        "accessibilityLabel": "Consent status: {{status}}",
+        "consented": "Consent active",
+        "parentalConsentRequested": "Waiting for parent approval",
+        "pending": "Consent pending",
+        "redactedMessage": "Learning metrics are hidden until consent is active.",
+        "withdrawn": "Consent withdrawn"
+      },
+      "engagementTrend": {
+        "declining": "Engagement declining",
+        "increasing": "Engagement increasing",
+        "stable": "Engagement stable"
+      },
       "reviewHealth": "健康状態を確認",
       "retentionTrend": {
         "improving": "改善中",

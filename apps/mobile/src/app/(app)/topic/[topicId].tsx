@@ -212,7 +212,7 @@ export default function TopicDetailScreen() {
       return () =>
         router.push({
           pathname: '/(app)/session',
-          params: { mode: 'practice', subjectId, topicId, topicName },
+          params: { mode: 'review', subjectId, topicId, topicName },
         } as never);
     }
 
@@ -499,17 +499,25 @@ export default function TopicDetailScreen() {
                   </View>
                 </ShimmerSkeleton>
               ) : notesData && notesData.notes.length > 0 ? (
-                notesData.notes.map((note) => (
-                  <InlineNoteCard
-                    key={note.id}
-                    noteId={note.id}
-                    topicTitle={topicProgress.title}
-                    content={note.content}
-                    sourceLine={formatSourceLine(note)}
-                    updatedAt={note.updatedAt}
-                    onLongPress={handleNoteLongPress}
-                  />
-                ))
+                notesData.notes.map((note) => {
+                  const sourceSessionId = note.sessionId;
+                  return (
+                    <InlineNoteCard
+                      key={note.id}
+                      noteId={note.id}
+                      topicTitle={topicProgress.title}
+                      content={note.content}
+                      sourceLine={formatSourceLine(note)}
+                      updatedAt={note.updatedAt}
+                      onLongPress={handleNoteLongPress}
+                      onSourcePress={
+                        sourceSessionId
+                          ? () => handleSessionPress(sourceSessionId)
+                          : undefined
+                      }
+                    />
+                  );
+                })
               ) : null}
 
               {/* Note input (new or edit) */}

@@ -73,10 +73,11 @@ export function createInitialRetentionState(topicId: string): RetentionState {
  */
 export function processRecallResult(
   state: RetentionState,
-  quality: number
+  quality: number,
+  reviewedAtIso = new Date().toISOString()
 ): RecallTestResult {
   const clampedQuality = Math.max(0, Math.min(5, Math.round(quality)));
-  const now = new Date().toISOString();
+  const now = reviewedAtIso;
 
   const sm2Result = sm2({
     quality: clampedQuality,

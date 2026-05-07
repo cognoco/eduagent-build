@@ -6,12 +6,18 @@ import {
 } from './session-types';
 
 describe('getConversationStage', () => {
-  it('returns teaching for practice mode regardless of other inputs', () => {
-    expect(getConversationStage(0, false, 'practice')).toBe('teaching');
-  });
-
   it('returns teaching for review mode', () => {
     expect(getConversationStage(0, false, 'review')).toBe('teaching');
+  });
+
+  it('treats the legacy practice mode literal as teaching (back-compat with sessionModeConfig)', () => {
+    // practice was renamed to review (spec 2026-05-06). Persisted/deep-linked
+    // sessions with the old literal must still hit the teaching path so they
+    // don't render warmup UI. Mirrors `normalizeModeForConfig` in
+    // sessionModeConfig.ts — both files normalize in the same direction.
+    expect(getConversationStage(0, false, 'practice' as never)).toBe(
+      'teaching'
+    );
   });
 
   it('returns teaching for relearn mode', () => {

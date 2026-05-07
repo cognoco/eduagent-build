@@ -288,10 +288,13 @@ export function getConversationStage(
   hasSubject: boolean,
   effectiveMode: string
 ): ConversationStage {
-  // Practice, review, relearn, and homework already present assessable content
+  // Review, relearn, and homework already present assessable content
   // on the first AI response. Skip warmup stages.
+  // 'practice' is the legacy alias for 'review' (renamed 2026-05-06) — kept here
+  // so persisted/deep-linked sessions with the old literal stay on the teaching
+  // path, matching `normalizeModeForConfig` in sessionModeConfig.ts.
   if (
-    ['practice', 'review', 'relearn', 'homework', 'recitation'].includes(
+    ['review', 'practice', 'relearn', 'homework', 'recitation'].includes(
       effectiveMode
     )
   ) {

@@ -178,7 +178,7 @@ export default function ChildDetailScreen() {
         t('parentView.index.couldNotWithdrawConsent')
       );
     }
-  }, [revokeConsent]);
+  }, [revokeConsent, t]);
 
   const handleCancelDeletion = useCallback(async () => {
     try {
@@ -189,7 +189,7 @@ export default function ChildDetailScreen() {
         t('parentView.index.couldNotCancelDeletion')
       );
     }
-  }, [restoreConsent]);
+  }, [restoreConsent, t]);
 
   const handleAccommodationChange = useCallback(
     (mode: AccommodationMode) => {
@@ -207,17 +207,8 @@ export default function ChildDetailScreen() {
         }
       );
     },
-    [profileId, learnerProfile?.accommodationMode, updateAccommodation]
+    [profileId, learnerProfile?.accommodationMode, updateAccommodation, t]
   );
-
-  const showHowItsWorking = (() => {
-    const mode = learnerProfile?.accommodationMode;
-    const updatedAt = learnerProfile?.updatedAt;
-    if (!mode || mode === 'none' || !updatedAt) return false;
-    const daysSinceUpdate =
-      (Date.now() - new Date(updatedAt).getTime()) / (1000 * 60 * 60 * 24);
-    return daysSinceUpdate > 7;
-  })();
 
   if (!profileId) {
     return (
@@ -695,21 +686,6 @@ export default function ChildDetailScreen() {
             name: child?.displayName ?? t('parentView.index.yourChild'),
           })}
         </Text>
-        {showHowItsWorking && (
-          // Non-interactive status badge — analytics detail screen is not yet
-          // built. Using View (not Pressable) prevents a silent dead-end tap.
-          // Replace with Pressable + onPress once the detail screen exists.
-          <View
-            className="flex-row items-center gap-2 self-start bg-surface rounded-full px-3 py-1.5 mb-4"
-            testID="accommodation-how-working"
-          >
-            <Ionicons name="analytics-outline" size={14} color="#6b7280" />
-            <Text className="text-caption text-text-secondary">
-              {t('parentView.index.howItsWorking')}
-            </Text>
-          </View>
-        )}
-
         {/* UX-DE-L11: surface consent-query errors */}
         {isConsentError && (
           <View className="mt-8 mb-4 bg-surface rounded-card px-4 py-3.5">

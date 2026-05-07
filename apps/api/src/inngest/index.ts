@@ -70,6 +70,7 @@ import {
 } from './functions/transcript-purge-cron';
 import { memoryFactsBackfill } from './functions/memory-facts-backfill';
 import { memoryFactsEmbedBackfill } from './functions/memory-facts-embed-backfill';
+import { reviewCalibrationGrade } from './functions/review-calibration-grade';
 
 export {
   inngest,
@@ -124,6 +125,7 @@ export {
   transcriptPurgeHandler,
   memoryFactsBackfill,
   memoryFactsEmbedBackfill,
+  reviewCalibrationGrade,
 };
 
 // All Inngest functions to register with the serve handler
@@ -180,4 +182,5 @@ export const functions = [
   transcriptPurgeHandler,
   memoryFactsBackfill,
   memoryFactsEmbedBackfill,
+  reviewCalibrationGrade,
 ];

@@ -80,7 +80,7 @@ function mapRetentionCardRow(
   };
 }
 
-function rowToRetentionState(
+export function rowToRetentionState(
   row: typeof retentionCards.$inferSelect
 ): RetentionState {
   return {

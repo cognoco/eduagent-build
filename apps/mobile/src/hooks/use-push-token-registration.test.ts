@@ -32,7 +32,7 @@ describe('usePushTokenRegistration', () => {
   });
 
   it('requests permissions and registers push token', async () => {
-    renderHook(() => usePushTokenRegistration());
+    const { result } = renderHook(() => usePushTokenRegistration(true));
 
     await waitFor(() => {
       expect(Notifications.getPermissionsAsync).toHaveBeenCalled();
@@ -49,30 +49,43 @@ describe('usePushTokenRegistration', () => {
         'ExponentPushToken[mock-token]'
       );
     });
+
+    await waitFor(() => {
+      expect(result.current.status).toBe('registered');
+    });
   });
 
   it('does not request permission or register when not already granted', async () => {
-    (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValueOnce({
+    (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValue({
       status: 'undetermined',
     });
 
-    renderHook(() => usePushTokenRegistration());
+    const { result } = renderHook(() => usePushTokenRegistration(true));
 
-    await new Promise((r) => setTimeout(r, 50));
+    await waitFor(() => {
+      expect(result.current).toEqual({
+        status: 'failed',
+        reason: 'permission_denied',
+      });
+    });
 
     expect(Notifications.requestPermissionsAsync).not.toHaveBeenCalled();
     expect(mockMutateAsync).not.toHaveBeenCalled();
   });
 
   it('does not register when permission is denied', async () => {
-    (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValueOnce({
+    (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValue({
       status: 'denied',
     });
 
-    renderHook(() => usePushTokenRegistration());
+    const { result } = renderHook(() => usePushTokenRegistration(true));
 
-    // Give time for the async effect to complete
-    await new Promise((r) => setTimeout(r, 50));
+    await waitFor(() => {
+      expect(result.current).toEqual({
+        status: 'failed',
+        reason: 'permission_denied',
+      });
+    });
 
     expect(Notifications.requestPermissionsAsync).not.toHaveBeenCalled();
     expect(mockMutateAsync).not.toHaveBeenCalled();
@@ -105,14 +118,18 @@ describe('usePushTokenRegistration', () => {
   });
 
   it('does not crash on registration error', async () => {
-    (Notifications.getExpoPushTokenAsync as jest.Mock).mockRejectedValueOnce(
+    (Notifications.getExpoPushTokenAsync as jest.Mock).mockRejectedValue(
       new Error('Token fetch failed')
     );
 
-    // Should not throw
-    renderHook(() => usePushTokenRegistration());
+    const { result } = renderHook(() => usePushTokenRegistration(true));
 
-    await new Promise((r) => setTimeout(r, 50));
+    await waitFor(() => {
+      expect(result.current).toEqual({
+        status: 'failed',
+        reason: 'expo_token_unavailable',
+      });
+    });
 
     expect(mockMutateAsync).not.toHaveBeenCalled();
   });

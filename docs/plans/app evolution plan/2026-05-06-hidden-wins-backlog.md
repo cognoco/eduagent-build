@@ -32,29 +32,36 @@ Pick items by ratio: high "why matters" + low size = ship. Don't bundle items in
 
 ## Parent / Family / Child Surfaces
 
-### P0 — Consent state invisible on family overview
+### P0 — Decide visibility rule for non-active consent states (precondition for badge)
 
-- **What's there:** `dashboard.ts` lines 832–833 return `consentStatus` and `respondedAt` per child on `/dashboard`.
-- **Decision needed:** Add a consent badge (or color/state) to the family-summary child card. A withdrawn-consent or pending-consent child currently looks identical to a healthy one until the parent drills in.
+- **What's there:** `apps/api/src/services/dashboard.ts:832` returns `consentStatus` alongside `exchangesThisWeek`, `engagementTrend`, `currentStreak`, `totalXp` for every child in the same payload — no gating on consent state. Memory note `project_parent_visibility_spec.md` flags an unimplemented parent-privacy/RLS spec.
+- **Decision needed:** When a child's consent is `withdrawn` or `pending`, what does the parent see? Options: (a) block the row entirely, (b) coarsen — show name + status only, no metrics, (c) show full data with a banner. This is a data-visibility rule, not a UI badge.
+- **If yes, size:** XS (decision + spec) → drives implementation size of the gating itself
+- **Why it matters:** A badge on top of unrestricted data is theatre. The badge below is downstream of this decision.
+
+### P1 — Consent badge on family-summary card (downstream of the visibility rule above)
+
+- **What's there:** Same field as above. Currently a withdrawn-consent or pending-consent child looks identical to a healthy one on the family card.
+- **Decision needed:** Once the visibility rule is set, render its outcome — badge / color / status pill / hidden row.
 - **If yes, size:** S
-- **Why it matters:** Privacy-adjacent. A parent should not have to drill into a profile to discover their child's consent isn't active.
+- **Why it matters:** Whatever the visibility rule is, the parent should see it on the card without drilling in.
 
 ### P1 — Engagement trend not rendered
 
-- **What's there:** `engagementTrend: 'increasing' | 'stable' | 'declining'` is computed in `dashboard.ts` (~lines 848–858), typed all the way through to `ParentDashboardSummary.tsx` and `family.tsx`. No render path.
+- **What's there:** `engagementTrend: 'increasing' | 'stable' | 'declining'` is computed in `apps/api/src/services/dashboard.ts:502`, typed through to `ParentDashboardSummary.tsx:37` and `family.tsx:78`. No render path.
 - **Decision needed:** Add a trend chip on the family summary card.
 - **If yes, size:** XS
 - **Why it matters:** Single most parent-meaningful signal we already compute — answers "is my kid still engaged."
 
 ### P1 — Exchange-count week-over-week deltas hidden
 
-- **What's there:** `exchangesThisWeek` / `exchangesLastWeek` computed (`dashboard.ts` lines 737–762, returned at line 839–840). No mobile component reads them.
+- **What's there:** `exchangesThisWeek` / `exchangesLastWeek` computed at `apps/api/src/services/dashboard.ts:737-762`, returned at lines 839-840. No mobile component reads them.
 - **Decision needed:** Render as "+N this week" or sparkline on the family summary card.
 - **If yes, size:** XS
 
 ### P1 — Guided-vs-immediate ratio computed, never shown
 
-- **What's there:** `guidedVsImmediateRatio` via `calculateGuidedRatio` (`dashboard.ts` line 848).
+- **What's there:** `guidedVsImmediateRatio` via `calculateGuidedRatio` (`apps/api/src/services/dashboard.ts:848`).
 - **Decision needed:** Surface as "X% guided this week" or skip — depends on whether the metric is parent-meaningful. Possibly belongs behind an info tooltip rather than a primary metric.
 - **If yes, size:** XS
 
@@ -80,15 +87,18 @@ Pick items by ratio: high "why matters" + low size = ship. Don't bundle items in
 ### P2 — `SamplePreview` blur with no upgrade action
 
 - **What's there:** `apps/mobile/src/components/parent/SamplePreview.tsx` blurs child content with an "unlock" message but has no `onPress` or upgrade link. Used in `ParentDashboardSummary.tsx` line 285 and `child/[profileId]/index.tsx` line 425.
-- **Decision needed:** Wire to subscription upsell, OR remove the blur (cosmetic-only blur is worse than no blur).
-- **If yes, size:** S (wire) / XS (remove)
+- **Prerequisite:** Identify what triggers the blur today — tier gate (Free can't see)? Consent gate? Pre-launch placeholder? "Remove the blur" is a regression if there's an actual gating intent the blur enforces.
+- **Decision needed:** After identifying the trigger — wire to subscription upsell (if tier gate), OR remove the blur (if pre-launch placeholder), OR replace with an explicit denial state (if consent gate).
+- **If yes, size:** S (wire) / XS (remove) / S (replace), depending on which trigger is real.
 
-### P2 — `removeProfileFromSubscription` permanently throws
+### P2 — Remove-from-family-plan UX missing (function exists with intentional throw)
 
-- **What's there:** `apps/api/src/services/billing/family.ts` lines 426–459 implement the function but always throw `ProfileRemovalNotImplementedError`. No mobile UI for removing a child once added to a family plan.
-- **Decision needed:** Implement, or document it as intentional and remove the misleading function shell. (Once a child is on the plan there is no exit; this will become a support escalation source after launch.)
-- **If yes, size:** M (implement: API + mobile UI + RevenueCat sync) / XS (remove)
-- **Why it matters:** Pre-launch is the cheapest time to fix this. Post-launch, support tickets.
+- **What's there:** `apps/api/src/services/billing/family.ts:414-462` — `ProfileRemovalNotImplementedError` + `removeProfileFromSubscription`, which throws by design. The function header documents this: *"Cross-account detachment is intentionally disabled until the backend has a verifiable invite/claim flow for the destination account."* The throw is a security guard against trusting a caller-supplied `newAccountId`. No mobile UI for removing a child once added to a family plan.
+- **Decision needed:** Two distinct paths, ranked together with the family-link/invite item below:
+  - (a) Ship **same-account removal** now (parent removes their own non-owner profile from the family plan — possible without the invite/claim flow). Size: M (API + mobile UI + RevenueCat sync).
+  - (b) Wait for the cross-account invite/claim flow (separately P3, line 99-103 below) and then enable cross-account detachment.
+- **Do NOT:** Remove the function shell. The throw is a security property, not a misleading stub.
+- **Why it matters:** Pre-launch is the cheapest time to fix the same-account path. Once a child is on the plan there is no exit; this will become a support escalation source after launch.
 
 ### P2 — Family / Pro tier upsell hidden from Free/Plus
 
@@ -120,9 +130,19 @@ Pick items by ratio: high "why matters" + low size = ship. Don't bundle items in
 
 ### P1 — Search results drilled down to subject only (biggest single library win)
 
-- **What's there:** `librarySearchResultSchema` returns four arrays: `subjects`, `books`, `topics`, `notes` (with `contentSnippet`). `library.tsx` lines 249–256 collapses every hit to `Set<subjectId>` and discards the rest.
+- **What's there:** `librarySearchResultSchema` returns four arrays: `subjects`, `books`, `topics`, `notes` (with `contentSnippet`). `apps/mobile/src/app/(app)/library.tsx:249-256` collapses every hit to `Set<subjectId>` and discards the rest.
 - **Decision needed:** Render typed result rows (matched topic, matched note snippet, matched book) under the search bar with tap targets that navigate directly to the match.
-- **If yes, size:** M
+- **Failure modes to spec before sizing:**
+
+  | State | Trigger | User sees | Recovery |
+  |---|---|---|---|
+  | Stale FK — note's session deleted | Tap note result, source session gone | ? | ? |
+  | Stale FK — book archived | Tap book result, book in archive | ? | ? |
+  | Stale FK — topic reassigned | Tap topic result, topic moved books | ? | ? |
+  | Empty result, valid query | Server returns `{subjects:[],books:[],topics:[],notes:[]}` | ? | ? |
+
+  Note→topic→book→subject is a 3-hop FK chain; any link can be stale. Fill the table before sizing.
+- **If yes, size:** M (with the table done).
 - **Why it matters:** Search currently feels broken even when the API works perfectly. Highest single library wire-up win.
 
 ### P1 — Bookmarks per-subject filter unused
@@ -145,10 +165,10 @@ Pick items by ratio: high "why matters" + low size = ship. Don't bundle items in
 
 ### P3 — `library-filters.ts` dead exports
 
-- **What's there:** Tab/sort/filter helpers (`filterShelves`, `sortShelves`, `filterBooks`, `filterTopics`, etc.) are entirely unused since v3 shipped. Only `EnrichedBook` is consumed externally.
-- **Decision needed:** Either (a) wire the helpers to the new v3 search/filter (would naturally support the search drill-through above), OR (b) delete them and keep only `EnrichedBook`.
-- **If yes, size:** S (delete) / M (wire to v3)
-- **Why it matters:** ~250 lines of code with one-line live usage. Either wire or delete; not both options should sit at zero.
+- **What's there:** Tab/sort/filter helpers (`filterShelves`, `sortShelves`, `filterBooks`, `filterTopics`, etc.) are entirely unused since v3 shipped. Only `EnrichedBook` is consumed externally (in `apps/mobile/src/hooks/use-all-books.ts`).
+- **Decision needed:** Realistically just one option — delete them and keep only `EnrichedBook`. The "wire to v3" alternative is mis-sized: the helpers operate on local `Subject[]` (v2 client-filter shape); v3 is server-side via `librarySearchResultSchema` (flattened `subjects`/`books`/`topics`/`notes` arrays). Data shapes don't align — "wiring" is a rebuild, not a refactor.
+- **If yes, size:** S (delete). The "wire to v3" path is L if anyone wants to revive it; do not size as M.
+- **Why it matters:** ~250 lines of code with one-line live usage. Delete unless someone produces a concrete use case the v3 search endpoint can't already serve.
 
 ---
 
@@ -178,9 +198,10 @@ Pick items by ratio: high "why matters" + low size = ship. Don't bundle items in
 
 ### P1 — `interestContext` not rendered (the schema literally says "lands in mobile context-picker commit")
 
-- **What's there:** `interestEntrySchema` line 33 stores `interestContext: 'free_time' | 'school' | 'both'`. Consumed by 6 places in API prompts. `mentor-memory.tsx` line 457 displays only `interest.label`, not `.context`. Schema comment on line 51: *"lands in mobile context-picker commit"* — that commit hasn't happened.
-- **Decision needed:** Wire the context picker on mentor-memory + render the context badge alongside each interest.
-- **If yes, size:** S
+- **What's there:** `interestEntrySchema` line 33 stores `interestContext: 'free_time' | 'school' | 'both'`. Consumed by 6 places in API prompts. `apps/mobile/src/app/(app)/mentor-memory.tsx:457` displays only `interest.label`, not `.context`. Schema comment on line 51: *"lands in mobile context-picker commit"* — that commit hasn't happened. Per memory `project_onboarding_new_dimensions.md` this is a tracked unfinished migration, not net-new work.
+- **Prerequisite:** Audit the 6 prompt-consumer sites to confirm they tolerate `interestContext === undefined` cleanly. Existing users have no value set; if any prompt site assumes a present value the picker rollout regresses prompt quality silently. Backfill default ("both"?) if needed before the picker ships.
+- **Decision needed:** After the audit — wire the context picker on mentor-memory + render the context badge alongside each interest.
+- **If yes, size:** S (picker + badge), assuming audit finds the consumers are null-safe; +XS if backfill is needed.
 - **Why it matters:** API already personalizes prompts based on this field; the user has no way to set or correct it.
 
 ### P2 — `memory_facts` `confidence` not surfaced
@@ -200,25 +221,36 @@ Pick items by ratio: high "why matters" + low size = ship. Don't bundle items in
 
 ## Notifications
 
-### P0 — Push registration failures invisible
+### P0 — Push registration failures invisible (spec failure modes before sizing)
 
-- **What's there:** `use-push-token-registration.ts` lines 48–52 silently swallow registration errors via `Sentry.captureException`. No user-visible state.
-- **Decision needed:** Surface a soft in-app indicator when push registration fails (e.g., recall nudges won't arrive). Even a one-line Settings note ("Notifications: not connected — tap to retry") closes the gap.
-- **If yes, size:** S
-- **Why it matters:** This is the single highest source of "the app stopped pinging me" complaints in any push-dependent product. Diagnostic gap.
+- **What's there:** `apps/mobile/src/hooks/use-push-token-registration.ts:24-54` — single `try/catch` collapses all failure causes into one `Sentry.captureException` call. No user-visible state, no error-type discrimination.
+- **Decision needed:** Spec a Failure Modes table first. The four causes need different recoveries:
+
+  | Cause | Trigger | Recovery |
+  |---|---|---|
+  | OS permission denied | `Notifications.getPermissionsAsync()` ≠ granted | Re-prompt or deep-link to OS Settings |
+  | Expo push token endpoint unreachable | `getExpoPushTokenAsync` throws | Retry with backoff |
+  | Our `/push-token` mutation 5xx | `registerPushToken.mutateAsync` throws | Retry; flag server-side |
+  | Emulator / unsupported device | No push capability | Suppress entirely — never surface |
+
+  Then design: probably an in-app indicator + tap action, but the action depends on cause (retry button can't fix OS-permission-denied).
+- **If yes, size:** S (with the Failure Modes table done; do not size before).
+- **Why it matters:** A "tap to retry" UI that retries OS-permission failures degrades trust. Per `CLAUDE.md` "Spec failure modes before coding."
 
 ### P3 — `streak_warning` notification type with no sender
 
 - **What's there:** `notifications.ts` lines 29–49 declare `streak_warning` in the `NotificationPayload.type` union. No Inngest function fires it. Streak data is fetched and rendered, but nobody pushes a warning.
 - **Decision needed:** Either (a) build the cron + sender ("Your streak is about to break"), OR (b) remove `streak_warning` from the type union.
 - **If yes, size:** S (build cron + push) / XS (remove)
+- **Status:** Addressed for new app code by removing `streak_warning` from `NotificationPayload.type`. The database enum still contains the historical value until a migration is worth carrying; no code path can newly send it through the typed notification service.
 
-### P3 — `struggle_noticed` / `struggle_flagged` / `struggle_resolved` types with no senders
+### P3 — `struggle_noticed` / `struggle_flagged` / `struggle_resolved` — needs a real spec before "build" is sized
 
 - **What's there:** Three notification types in the union. `learningProfile.struggles` is written to. No notification pipeline reads from it.
-- **Decision needed:** Either (a) build the struggle-detection → parent-notification pipeline, OR (b) remove all three types.
-- **If yes, size:** M (build) / XS (remove)
-- **Why it matters:** This is a parent-facing trust feature ("we'll tell you when your kid is stuck"). High value if built; misleading dead code if not.
+- **Decision needed:** Two options, but **(a) is not actually a sized option until prerequisites land**:
+  - (a) Build the struggle-detection → parent-notification pipeline. Prerequisites before sizing: (1) Failure Modes table including false-positive handling and parent-correction path, (2) child-consent gating per `project_parent_visibility_spec.md` — does the child consent to parent receiving struggle alerts?, (3) eval scenario set in `apps/api/eval-llm/` covering the threshold tuning. Without these, "M (build)" is a false estimate — the cron + push is the easy part; threshold tuning and false-positive QA are the hard parts.
+  - (b) Remove all three types now. Size: XS.
+- **Why it matters:** Parent-facing AI inference about child learning difficulty is a high-stakes category — false positives ("Alex is struggling with fractions" when they aren't) damage trust permanently, worse than the missed-notification harm. Don't ship as a backlog "M build" item.
 
 ### P2 — Email channel used only for consent
 
@@ -251,14 +283,15 @@ Items skipped from the dead-code PR because each carries a small product questio
 
 | Tier | Item | Size | Surface |
 |---|---|---|---|
-| P0 | Consent badge on family summary | S | Parent |
-| P0 | Push registration failure visibility | S | Notifications |
+| P0 | Consent visibility rule (precondition) | XS spec | Parent |
+| P0 | Push registration failure visibility | S (after FM table) | Notifications |
+| P1 | Consent badge on family summary | S | Parent |
 | P1 | Engagement trend chip | XS | Parent |
 | P1 | Exchange-count weekly delta | XS | Parent |
 | P1 | Guided ratio chip / tooltip | XS | Parent |
 | P1 | Streak/XP on family summary | XS | Parent |
 | P1 | `MetricInfoDot` on family summary | XS | Parent |
-| P1 | Search drill-through | M | Library |
+| P1 | Search drill-through | M (after FM table) | Library |
 | P1 | Per-subject bookmarks | XS | Library |
 | P1 | Note → session tap target | XS | Library |
 | P1 | Mastery celebration on `passed` | XS | Practice |
@@ -282,8 +315,15 @@ Items skipped from the dead-code PR because each carries a small product questio
 | P3 | Deprecated note DELETE route | S | API cleanup |
 | P3 | `processTeachBackCompletion` arg | S / XS | API cleanup |
 
-**Suggested first wave (cheap, high-value):** the 5 P1 XS items in Parent (engagement trend, exchange delta, guided ratio, streak/XP, MetricInfoDot) bundle naturally into one PR — same screen, same data, same component. Estimated size: S total.
+**Sequencing note** — the doc's "How to Use This Doc" section says *"Don't bundle items into 'redesigns' — each one is independent."* That rule applies here. Earlier drafts of this section bundled 5 family-summary chips into one PR; that's a redesign in disguise (5 visual additions, 5 type-extension diffs in one design QA cycle on a small phone — Galaxy S10e per user device profile). Don't do that.
 
-**Second wave:** the 3 P1 XS items in Library (per-subject bookmarks, note→session tap target, mastery celebration). Same shape — XS individually, S bundled.
+**Phase 1-2 status:** Phase 1 type-plumbing prep and Phase 2 P0 prerequisite decisions are captured in `docs/specs/2026-05-06-hidden-wins-phase-1-2-prereqs.md`. The consent decision is **coarsened visibility**: keep the child row visible, but redact learning metrics server-side for `PENDING`, `PARENTAL_CONSENT_REQUESTED`, and `WITHDRAWN` states. Push registration UI remains blocked until the registration hook exposes classified failure states.
 
-**Then:** P0 items (consent badge, push failure visibility), then the M items (search drill-through, interestContext picker).
+**Suggested order (independent PRs, not bundles):**
+
+1. **Type-plumbing prep PR** (no UI): extend `family.tsx`'s local type to declare `currentStreak` / `longestStreak` / `totalXp` so subsequent UI PRs are surgical. XS.
+2. **P0 prerequisites first** — consent visibility rule decision (XS spec) and push failure modes table (XS spec). These unblock real sizing of their UI items.
+3. **P1 XS chips on family summary, one PR per chip** — engagement trend, exchange delta, guided ratio, streak/XP, MetricInfoDot tooltips. Five separate PRs. Each is cheap to revert if S10e layout breaks.
+4. **P1 XS Library items, one PR each** — per-subject bookmarks, note→session tap target. (Mastery celebration on `passed` is in *Practice*, not Library — sequence it independently.)
+5. **P0 UI items** — consent badge (after rule from step 2), push registration indicator (after Failure Modes table from step 2).
+6. **P1 M items** — search drill-through (after FM table is filled), `interestContext` picker (after the 6-consumer audit).

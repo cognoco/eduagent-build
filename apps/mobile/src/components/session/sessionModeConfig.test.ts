@@ -7,7 +7,7 @@ import {
 } from './sessionModeConfig';
 
 describe('getOpeningMessage', () => {
-  const modes = ['homework', 'learning', 'practice', 'freeform'];
+  const modes = ['homework', 'learning', 'review', 'freeform'];
 
   it('uses recap-specific opening copy for relearn sessions', () => {
     const msg = getOpeningMessage(
@@ -109,11 +109,37 @@ describe('getOpeningMessage', () => {
     });
   });
 
+  describe('deprecated practice mode compatibility', () => {
+    it('maps practice config reads to review config for persisted sessions', () => {
+      expect(getModeConfig('practice')).toBe(getModeConfig('review'));
+    });
+
+    it('maps practice opening copy to review opening copy for persisted sessions', () => {
+      expect(getOpeningMessage('practice', 5)).toBe(
+        getOpeningMessage('review', 5)
+      );
+    });
+  });
+
   describe('topic-aware opening (topicName provided)', () => {
     it('includes topic name for first session', () => {
       const msg = getOpeningMessage('learning', 0, undefined, 'The Nile River');
       expect(msg).toContain('The Nile River');
       expect(msg).toContain("I'll explain the key ideas");
+    });
+
+    it('uses a calibration opener for review sessions with a topic', () => {
+      const msg = getOpeningMessage('review', 0, undefined, 'The Nile River');
+      expect(msg).toBe(
+        'Let\'s review "The Nile River". What do you remember about it in your own words?'
+      );
+    });
+
+    it('uses the review calibration opener for legacy practice sessions with a topic', () => {
+      const msg = getOpeningMessage('practice', 0, undefined, 'The Nile River');
+      expect(msg).toBe(
+        getOpeningMessage('review', 0, undefined, 'The Nile River')
+      );
     });
 
     it('includes topic name for early session', () => {

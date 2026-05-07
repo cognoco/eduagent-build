@@ -50,10 +50,10 @@ tags:
     text: "HW"
     optional: true
 
-# 3b. Fallback — if the teen persona AdaptiveEntryCard is showing,
-#     the "Homework help" action navigates to the camera screen too.
+# 3b. Fallback — if the home homework action is showing, it navigates to the
+#     camera screen too.
 - tapOn:
-    text: "Homework help"
+    id: "home-action-homework"
     optional: true
 
 # ──────────────────────────────────────────────────

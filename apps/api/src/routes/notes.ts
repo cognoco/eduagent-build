@@ -22,7 +22,6 @@ import {
   getNotesForTopic,
   createNote,
   updateNote,
-  deleteNote,
   deleteNoteById,
   getTopicIdsWithNotes,
 } from '../services/notes';
@@ -170,6 +169,34 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
       }
     }
   )
+  // DELETE /subjects/:subjectId/topics/:topicId/note
+  // Back-compat endpoint for older mobile builds that delete the latest note
+  // through the legacy single-note URL.
+  .delete(
+    '/subjects/:subjectId/topics/:topicId/note',
+    zValidator('param', topicParamSchema),
+    async (c) => {
+      // [BUG-973 / CCR-PR145-C-1] Block writes from proxy sessions.
+      assertNotProxyMode(c);
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { subjectId, topicId } = c.req.valid('param');
+
+      try {
+        const note = await getNote(db, profileId, subjectId, topicId);
+        if (!note) return notFound(c, 'Note not found');
+
+        const deleted = await deleteNoteById(db, profileId, note.id);
+        if (!deleted) return notFound(c, 'Note not found');
+        return c.body(null, 204);
+      } catch (error) {
+        if (error instanceof NotFoundError) {
+          return notFound(c, error.message);
+        }
+        throw error;
+      }
+    }
+  )
   // DELETE /notes/:noteId
   .delete(
     '/notes/:noteId',
@@ -184,33 +211,6 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
       const deleted = await deleteNoteById(db, profileId, noteId);
       if (!deleted) return notFound(c, 'Note not found');
       return c.body(null, 204);
-    }
-  )
-  // DELETE /subjects/:subjectId/topics/:topicId/note
-  // @deprecated — old composite-key delete; superseded by DELETE /notes/:noteId.
-  // Kept for backwards compatibility with older mobile versions.
-  .delete(
-    '/subjects/:subjectId/topics/:topicId/note',
-    zValidator('param', topicParamSchema),
-    async (c) => {
-      // [BUG-973 / CCR-PR145-C-1] Block writes from proxy sessions.
-      assertNotProxyMode(c);
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
-      const { subjectId, topicId } = c.req.valid('param');
-
-      try {
-        const deleted = await deleteNote(db, profileId, subjectId, topicId);
-        if (!deleted) {
-          return notFound(c, 'Note not found');
-        }
-        return c.body(null, 204);
-      } catch (error) {
-        if (error instanceof NotFoundError) {
-          return notFound(c, error.message);
-        }
-        throw error;
-      }
     }
   )
   // GET /subjects/:subjectId/topics/:topicId/sessions

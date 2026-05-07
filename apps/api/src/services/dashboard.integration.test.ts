@@ -3,6 +3,7 @@ import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   accounts,
   assessments,
+  consentStates,
   createDatabase,
   curricula,
   curriculumBooks,
@@ -365,6 +366,19 @@ async function seedXpLedgerEntry(input: {
     topicId: input.topicId,
     amount: input.amount,
     status: input.status ?? 'verified',
+  });
+}
+
+async function seedConsentState(input: {
+  profileId: string;
+  status: 'PENDING' | 'PARENTAL_CONSENT_REQUESTED' | 'CONSENTED' | 'WITHDRAWN';
+  respondedAt?: Date | null;
+}): Promise<void> {
+  await db.insert(consentStates).values({
+    profileId: input.profileId,
+    consentType: 'GDPR',
+    status: input.status,
+    respondedAt: input.respondedAt ?? null,
   });
 }
 
@@ -787,6 +801,82 @@ describe('dashboard service integration', () => {
         weeklyDeltaTopicsExplored: 2,
       })
     );
+  });
+
+  it('redacts learning metrics for children without active consent', async () => {
+    const { profileId: parentProfileId } = await seedProfile({
+      displayName: 'Parent',
+      birthYear: 1985,
+    });
+    const { profileId: childProfileId } = await seedProfile({
+      displayName: 'Pending Learner',
+      birthYear: 2012,
+    });
+    await seedFamilyLink(parentProfileId, childProfileId);
+    await seedConsentState({
+      profileId: childProfileId,
+      status: 'PARENTAL_CONSENT_REQUESTED',
+    });
+
+    const subjectId = await seedSubject({
+      profileId: childProfileId,
+      name: 'Private Science',
+    });
+    await seedSession({
+      profileId: childProfileId,
+      subjectId,
+      startedAt: subtractDays(getStableMidWeekNow(), 1),
+      exchangeCount: 8,
+      durationSeconds: 600,
+      wallClockSeconds: 660,
+    });
+    await seedStreak({
+      profileId: childProfileId,
+      currentStreak: 5,
+      longestStreak: 7,
+    });
+
+    const children = await getChildrenForParent(db, parentProfileId);
+
+    expect(children).toHaveLength(1);
+    expect(children[0]).toEqual(
+      expect.objectContaining({
+        profileId: childProfileId,
+        displayName: 'Pending Learner',
+        consentStatus: 'PARENTAL_CONSENT_REQUESTED',
+        sessionsThisWeek: 0,
+        exchangesThisWeek: 0,
+        totalTimeThisWeek: 0,
+        currentStreak: 0,
+        longestStreak: 0,
+        totalXp: 0,
+        trend: 'stable',
+        subjects: [],
+        progress: null,
+      })
+    );
+    expect(children[0]!.summary).toContain('waiting for parent approval');
+  });
+
+  it('blocks child drill-down data when consent is not active', async () => {
+    const { profileId: parentProfileId } = await seedProfile({
+      displayName: 'Parent',
+      birthYear: 1985,
+    });
+    const { profileId: childProfileId } = await seedProfile({
+      displayName: 'Withdrawn Learner',
+      birthYear: 2012,
+    });
+    await seedFamilyLink(parentProfileId, childProfileId);
+    await seedConsentState({
+      profileId: childProfileId,
+      status: 'WITHDRAWN',
+      respondedAt: new Date(),
+    });
+
+    await expect(
+      getChildSessions(db, parentProfileId, childProfileId)
+    ).rejects.toBeInstanceOf(ForbiddenError);
   });
 
   it('returns child detail for linked parents and rejects unlinked access', async () => {

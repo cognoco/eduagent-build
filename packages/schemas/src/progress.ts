@@ -785,8 +785,7 @@ export type ChildSessionDetailResponse = z.infer<
   typeof childSessionDetailResponseSchema
 >;
 
-// Curated memory view schema — mirrors CuratedMemoryView interface in
-// services/curated-memory.ts.
+// Curated memory view schema — shared contract for API and mobile memory UI.
 export const memoryCategoryKeySchema = z.enum([
   'struggles',
   'interests',
@@ -800,6 +799,7 @@ export const curatedMemoryItemSchema = z.object({
   category: memoryCategoryKeySchema,
   value: z.string(),
   statement: z.string(),
+  confidence: z.enum(['low', 'medium', 'high']).optional(),
 });
 export type CuratedMemoryItem = z.infer<typeof curatedMemoryItemSchema>;
 

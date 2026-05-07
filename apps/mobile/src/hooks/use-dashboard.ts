@@ -6,6 +6,7 @@ import {
   type UseQueryResult,
 } from '@tanstack/react-query';
 import type {
+  CuratedMemoryView,
   DashboardChild,
   DashboardData,
   TopicProgress,
@@ -264,7 +265,7 @@ export function useChildMemory(childProfileId: string | undefined) {
         );
         await assertOk(res);
         const data = await res.json();
-        return data.memory;
+        return data.memory as CuratedMemoryView;
       } finally {
         cleanup();
       }

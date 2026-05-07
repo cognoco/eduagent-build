@@ -15,9 +15,9 @@
 #     - home-subject-card-${subjectId}  -> individual subject card
 #     - home-add-subject-tile           -> "New subject" tile appended to carousel
 #     - home-ask-anything               -> "Ask anything" text input / bar
-#     - home-action-study-new           -> action chip: Study something new
-#     - home-action-homework            -> action chip: Homework help
-#     - home-action-practice            -> action chip: Practice
+#     - home-action-study-new           -> action chip: Learn something new
+#     - home-action-homework            -> action chip: Help with an assignment
+#     - home-action-practice            -> action chip: Test yourself
 #   CoachBand (components/home/CoachBand.tsx):
 #     - home-coach-band                 -> coach band container
 #     - home-coach-band-continue        -> Continue button (when resumable session)

@@ -124,11 +124,11 @@
       },
       "intentActions": {
         "homework": {
-          "title": "Hausaufgabenhilfe",
+          "title": "Hilfe bei einer Aufgabe",
           "subtitle": "Mach ein Foto oder tippe die Aufgabe ein"
         },
         "practice": {
-          "title": "Für einen Test üben",
+          "title": "Teste dich selbst",
           "subtitle": "Wiederhole, was verblasst, oder teste dich selbst"
         },
         "studyNew": {
@@ -384,6 +384,11 @@
         "enableFailed": "Gedächtnis konnte nicht aktiviert werden",
         "deleteFailed": "Element konnte nicht gelöscht werden",
         "restoreFailed": "Wiederherstellen fehlgeschlagen"
+      },
+      "interestContext": {
+        "school": "Schule",
+        "freeTime": "Freizeit",
+        "both": "Beides"
       }
     },
     "accessories": {
@@ -532,7 +537,9 @@
       "vocabBasicsTitle": "{{language}}-Grundlagen",
       "vocabPersonalisedTitle": "Vokabeln: {{language}}",
       "vocabStarterSubtitle": "Standard-Startwörter – zeichne {{threshold}} deiner eigenen auf, um personalisierte Runden freizuschalten",
-      "vocabPlayedSubtitleDefault": "Übe neue Wörter und Sätze"
+      "vocabPlayedSubtitleDefault": "Übe neue Wörter und Sätze",
+      "challengeExplainerTitle": "Herausforderungsrunden",
+      "challengeExplainerBody": "Wenn du einen guten Lauf hast, kann der Mentor die nächste Runde schwieriger machen."
     },
     "launch": {
       "loadingShuffling": "Fragen werden gemischt...",
@@ -847,7 +854,11 @@
     "acceptSuggestionLabel": "Vorschlag akzeptieren",
     "editSuggestionLabel": "Vorschlag bearbeiten",
     "startLearning": "Lernen starten",
-    "validationHint": "Gib einen Fachnamen ein, um zu beginnen"
+    "validationHint": "Gib einen Fachnamen ein, um zu beginnen",
+    "weWillStartWith": "Wir beginnen mit {{subject}}.",
+    "start": "Starten",
+    "changeSubject": "Ändern",
+    "changeSubjectLabel": "Fach ändern"
   },
   "vocabulary": {
     "fallbackTitle": "Vokabeln",
@@ -985,7 +996,8 @@
     "pickerStartForTopic": "Überprüfung für {{title}} starten",
     "studiedToday": "Heute gelernt",
     "studiedYesterday": "Gestern gelernt",
-    "studiedDaysAgo": "Vor {{count}} Tagen gelernt"
+    "studiedDaysAgo": "Vor {{count}} Tagen gelernt",
+    "topicPassedNote": "Gut gemacht - dieses Thema ist als bestanden markiert, und Schwachstellen kommen in der Wiederholung zurück, wenn sie Aufmerksamkeit brauchen."
   },
   "homework": {
     "permissionTitle": "Kamerazugriff benötigt",
@@ -1168,7 +1180,9 @@
       "retryLabel": "Gespeicherte Lesezeichen erneut laden",
       "emptyTitle": "Noch nichts gespeichert",
       "emptySubtitle": "Setze während der Sitzungen Lesezeichen, um sie hier zu finden.",
-      "goToLibrary": "Zur Bibliothek"
+      "goToLibrary": "Zur Bibliothek",
+      "subjectPageTitle": "In diesem Fach gespeichert",
+      "subjectSubtitle": "Es werden nur Lesezeichen aus diesem Fach angezeigt."
     },
     "subject": {
       "noSubjectTitle": "Kein Fach ausgewählt",
@@ -1307,6 +1321,8 @@
     },
     "languageSetup": {
       "title": "Spracheinrichtung",
+      "calibrationTitle": "Kurze Prüfung",
+      "calibrationSubtitle": "Welche Sprache sprichst du zu Hause? Ein Tipp, dann legen wir los.",
       "subtitle": "Wir werden dieses Fach in einen sprachfokussierten Pfad mit direktem Unterricht, Vokabelverfolgung und Sprechübungen umwandeln.",
       "learningHint": "Sieht so aus, als ob du {{language}} lernst!",
       "approachHint": "Wir werden einen sprachfokussierten Ansatz verwenden, der auf Vokabular, Sprachfluss, Input- und Output-Übungen basiert.",
@@ -1647,7 +1663,12 @@
       "whatSeemsWrongDescription": "Beschreibe die Korrektur und der Mentor wird sie berücksichtigen",
       "correctionNoted": "Korrektur vermerkt",
       "couldNotSaveCorrection": "Korrektur konnte nicht gespeichert werden",
-      "submit": "Senden"
+      "submit": "Senden",
+      "confidence": {
+        "low": "Frühes Signal",
+        "medium": "Wiederholtes Muster",
+        "high": "Starkes Signal"
+      }
     },
     "reports": {
       "title": "Berichte",
@@ -1889,6 +1910,19 @@
   },
   "coaching": {
     "parentDashboard": {
+      "consent": {
+        "accessibilityLabel": "Consent status: {{status}}",
+        "consented": "Consent active",
+        "parentalConsentRequested": "Waiting for parent approval",
+        "pending": "Consent pending",
+        "redactedMessage": "Learning metrics are hidden until consent is active.",
+        "withdrawn": "Consent withdrawn"
+      },
+      "engagementTrend": {
+        "declining": "Engagement declining",
+        "increasing": "Engagement increasing",
+        "stable": "Engagement stable"
+      },
       "reviewHealth": "Gesundheit überprüfen",
       "retentionTrend": {
         "improving": "Verbessert sich",

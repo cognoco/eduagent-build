@@ -20,6 +20,9 @@ const translations: Record<string, string> = {
   'common.goBack': 'Go Back',
   'common.goHome': 'Go Home',
   'onboarding.languageSetup.title': 'Language setup',
+  'onboarding.languageSetup.calibrationTitle': 'Quick check',
+  'onboarding.languageSetup.calibrationSubtitle':
+    'Which language do you speak at home? One tap, then we start.',
   'onboarding.languageSetup.subtitle':
     "We'll switch this subject into a language-focused path with direct teaching, vocabulary tracking, and speaking practice.",
   'onboarding.languageSetup.learningHint':
@@ -71,6 +74,11 @@ const mockStartFirstCurriculumMutateAsync = jest.fn();
 const mockGoBackOrReplace = jest.fn();
 let mockIsPending = false;
 let mockSubjectId: string | undefined = 'test-id';
+let mockReturnTo: string | undefined = undefined;
+
+jest.mock('expo-localization', () => ({
+  getLocales: () => [{ languageTag: 'nb-NO', languageCode: 'nb' }],
+}));
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
@@ -85,6 +93,7 @@ jest.mock('expo-router', () => ({
     subjectName: 'Spanish',
     step: '2',
     totalSteps: '4',
+    returnTo: mockReturnTo,
   }),
 }));
 
@@ -136,6 +145,7 @@ describe('LanguageSetup', () => {
     jest.clearAllMocks();
     mockSubjectId = 'test-id';
     mockIsPending = false;
+    mockReturnTo = undefined;
     mockMutateAsync.mockResolvedValue({ subject: { id: 'test-id' } });
     mockStartFirstCurriculumMutateAsync.mockResolvedValue({
       session: {
@@ -146,10 +156,12 @@ describe('LanguageSetup', () => {
     FEATURE_FLAGS.ONBOARDING_FAST_PATH = false;
   });
 
-  it('renders the onboarding step indicator', () => {
+  it('renders the calibration title (no step indicator)', () => {
     render(<LanguageSetup />);
 
-    screen.getByText('Step 2 of 4');
+    screen.getByTestId('language-setup-calibration-title');
+    screen.getByText('Quick check');
+    expect(screen.queryByText(/Step \d+ of \d+/)).toBeNull();
   });
 
   it('renders language confirmation card', () => {
@@ -258,6 +270,47 @@ describe('LanguageSetup', () => {
     expect(screen.queryByText(/^Continue$/i)).toBeNull();
   });
 
+  it('pre-selects native language from device locale (nb-NO → nb)', () => {
+    render(<LanguageSetup />);
+
+    // The Norwegian option should be selected by default (device locale is nb-NO)
+    const nbButton = screen.getByTestId('native-language-nb');
+    expect(nbButton.props.accessibilityState?.selected).toBe(true);
+    // English should NOT be selected
+    const enButton = screen.getByTestId('native-language-en');
+    expect(enButton.props.accessibilityState?.selected).toBe(false);
+  });
+
+  it('routes back to More when returnTo=settings and Back is pressed', () => {
+    mockReturnTo = 'settings';
+    render(<LanguageSetup />);
+
+    fireEvent.press(screen.getByTestId('language-setup-back'));
+    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+      expect.anything(),
+      '/(app)/more'
+    );
+    expect(mockGoBackOrReplace).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ pathname: '/(app)/onboarding/interview' })
+    );
+  });
+
+  it('routes back to More after successful save when returnTo=settings', async () => {
+    mockReturnTo = 'settings';
+    render(<LanguageSetup />);
+
+    fireEvent.press(screen.getByTestId('language-setup-continue'));
+
+    await waitFor(() => {
+      expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+        expect.anything(),
+        '/(app)/more'
+      );
+    });
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
   it('[BUG-692-FOLLOWUP] router.replace does not fire when user presses Back during configureLanguageSubject', async () => {
     // Arrange: deferred mutation — stays pending until we resolve it.
     let resolveMutation!: (value: { subject: { id: string } }) => void;
@@ -289,5 +342,35 @@ describe('LanguageSetup', () => {
       expect.anything(),
       expect.objectContaining({ pathname: '/(app)/onboarding/interview' })
     );
+  });
+
+  it('[BUG-692-FOLLOWUP] fast path does not route to session when user presses Back during session creation', async () => {
+    FEATURE_FLAGS.ONBOARDING_FAST_PATH = true;
+    mockMutateAsync.mockResolvedValue({ subject: { id: 'test-id' } });
+
+    let resolveSession!: (value: {
+      session: { id: string; topicId: string };
+    }) => void;
+    mockStartFirstCurriculumMutateAsync.mockReturnValue(
+      new Promise<{ session: { id: string; topicId: string } }>((resolve) => {
+        resolveSession = resolve;
+      })
+    );
+
+    render(<LanguageSetup />);
+
+    fireEvent.press(screen.getByTestId('language-setup-continue'));
+
+    await waitFor(() => {
+      expect(mockStartFirstCurriculumMutateAsync).toHaveBeenCalled();
+    });
+
+    fireEvent.press(screen.getByTestId('language-setup-back'));
+    resolveSession({ session: { id: 'session-1', topicId: 'topic-1' } });
+
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(mockGoBackOrReplace).toHaveBeenCalledTimes(1);
   });
 });

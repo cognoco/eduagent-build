@@ -124,37 +124,6 @@ export function useNoteTopicIds(): UseQueryResult<{ topicIds: string[] }> {
 }
 
 // ---------------------------------------------------------------------------
-// useDeleteNote — delete a note for a topic (deprecated — old composite-key)
-// ---------------------------------------------------------------------------
-
-export function useDeleteNote(
-  subjectId: string | undefined,
-  bookId: string | undefined
-): UseMutationResult<void, Error, string> {
-  const client = useApiClient();
-  const { activeProfile } = useProfile();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (topicId: string) => {
-      if (!subjectId || !topicId)
-        throw new Error('subjectId and topicId are required');
-      const res = await client.subjects[':subjectId'].topics[
-        ':topicId'
-      ].note.$delete({
-        param: { subjectId, topicId },
-      });
-      await assertOk(res);
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: ['book-notes', subjectId, bookId, activeProfile?.id],
-      });
-    },
-  });
-}
-
-// ---------------------------------------------------------------------------
 // Multi-note CRUD hooks (Library v3)
 // ---------------------------------------------------------------------------
 

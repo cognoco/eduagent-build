@@ -467,12 +467,7 @@ export const sessionCompleted = inngest.createFunction(
                 topicId
               );
             } else {
-              return processTeachBackCompletion(
-                db,
-                profileId,
-                sessionId,
-                topicId
-              );
+              return processTeachBackCompletion(db, profileId, sessionId);
             }
           }
         );

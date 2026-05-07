@@ -808,15 +808,15 @@ describe('SessionScreen homework flow', () => {
     });
   });
 
-  it('does not auto-resume when entering a topic in practice/review mode', async () => {
+  it('does not auto-resume when entering a topic in review mode', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
-      mode: 'practice',
+      mode: 'review',
       subjectId: 'subject-1',
       subjectName: 'Geography',
       topicId: 'topic-1',
       topicName: 'Continents',
     });
-    // Even if the topic has an active session, practice mode should NOT resume it
+    // Even if the topic has an active session, review mode should NOT resume it.
     mockFetch.setRoute('/progress/topic', {
       sessionId: 'session-shouldnt-resume',
     });

@@ -124,11 +124,11 @@
       },
       "intentActions": {
         "homework": {
-          "title": "Homework help",
+          "title": "Help with an assignment",
           "subtitle": "Take a photo or type the problem"
         },
         "practice": {
-          "title": "Practice for a test",
+          "title": "Test yourself",
           "subtitle": "Review what is fading or quiz yourself"
         },
         "studyNew": {
@@ -363,6 +363,11 @@
         "hiddenItems": "Hidden Items",
         "privacy": "Privacy"
       },
+      "interestContext": {
+        "school": "School",
+        "freeTime": "Free time",
+        "both": "Both"
+      },
       "empty": {
         "title": "Your mentor is getting to know you",
         "message": "As you study, your mentor will learn about your interests, strengths, and how you like to learn. Everything will appear here over time."
@@ -523,6 +528,8 @@
       "retryLabel": "Retry loading quiz data",
       "capitalsTitle": "Capitals",
       "capitalsDefaultSubtitle": "Test yourself on world capitals",
+      "challengeExplainerTitle": "Challenge rounds",
+      "challengeExplainerBody": "When you're on a roll, the mentor may make the next round harder.",
       "guessWhoTitle": "Guess Who",
       "guessWhoDefaultSubtitle": "Name the famous person from clues",
       "vocabLockedTitle": "Vocabulary",
@@ -847,7 +854,11 @@
     "acceptSuggestionLabel": "Accept suggestion",
     "editSuggestionLabel": "Edit suggestion",
     "startLearning": "Start Learning",
-    "validationHint": "Enter a subject name to get started"
+    "validationHint": "Enter a subject name to get started",
+    "weWillStartWith": "We'll start with {{subject}}.",
+    "start": "Start",
+    "changeSubject": "Change",
+    "changeSubjectLabel": "Change subject"
   },
   "vocabulary": {
     "fallbackTitle": "Vocabulary",
@@ -985,7 +996,8 @@
     "pickerStartForTopic": "Start assessment for {{title}}",
     "studiedToday": "Studied today",
     "studiedYesterday": "Studied yesterday",
-    "studiedDaysAgo": "Studied {{count}} days ago"
+    "studiedDaysAgo": "Studied {{count}} days ago",
+    "topicPassedNote": "Nice work - this topic is marked as passed, and weak spots will come back through review when they need attention."
   },
   "homework": {
     "permissionTitle": "Camera Access Needed",
@@ -1151,6 +1163,8 @@
     "saved": {
       "title": "Saved",
       "pageTitle": "Saved",
+      "subjectPageTitle": "Saved in this subject",
+      "subjectSubtitle": "Only bookmarks from this subject are shown.",
       "viewLabel": "View saved explanations",
       "bookmarkLabel": "Saved bookmark from {{subject}}",
       "removeBookmark": "Remove bookmark",
@@ -1307,6 +1321,8 @@
     },
     "languageSetup": {
       "title": "Language setup",
+      "calibrationTitle": "Quick check",
+      "calibrationSubtitle": "Which language do you speak at home? One tap, then we start.",
       "subtitle": "We'll switch this subject into a language-focused path with direct instruction, vocabulary tracking, and speaking practice.",
       "learningHint": "Looks like you're learning {{language}}!",
       "approachHint": "We'll use a language-focused approach built around vocabulary, fluency, input, and output practice.",
@@ -1638,6 +1654,11 @@
       "useWhatMentorKnows": "Use what the mentor knows",
       "useWhatMentorKnowsDescription": "Let the mentor personalise sessions using what it has learned",
       "noObservationsYet": "No observations yet",
+      "confidence": {
+        "low": "Early signal",
+        "medium": "Repeated pattern",
+        "high": "Strong signal"
+      },
       "bringBack": "Bring back",
       "privacy": "Privacy",
       "exportMemorySummary": "Export memory summary",
@@ -1889,6 +1910,19 @@
   },
   "coaching": {
     "parentDashboard": {
+      "consent": {
+        "accessibilityLabel": "Consent status: {{status}}",
+        "consented": "Consent active",
+        "parentalConsentRequested": "Waiting for parent approval",
+        "pending": "Consent pending",
+        "redactedMessage": "Learning metrics are hidden until consent is active.",
+        "withdrawn": "Consent withdrawn"
+      },
+      "engagementTrend": {
+        "declining": "Engagement declining",
+        "increasing": "Engagement increasing",
+        "stable": "Engagement stable"
+      },
       "reviewHealth": "Review health",
       "retentionTrend": {
         "improving": "Improving",

@@ -103,6 +103,7 @@ jest.mock('../../../../../lib/format-api-error', () => ({
 jest.mock('../../../../../components/common', () => ({
   BookPageFlipAnimation: () => null,
   MagicPenAnimation: () => null,
+  CelebrationAnimation: () => null,
 }));
 
 function makeTopic(overrides: Partial<any> = {}) {

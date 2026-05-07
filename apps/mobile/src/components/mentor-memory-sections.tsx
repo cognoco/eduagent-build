@@ -146,6 +146,7 @@ export function MemoryRow({
   progressLabel,
   progressValue,
   onRemove,
+  children,
   actionLabel = 'Remove',
 }: {
   label: string;
@@ -154,6 +155,7 @@ export function MemoryRow({
   progressLabel?: string;
   progressValue?: number;
   onRemove?: () => void;
+  children?: ReactNode;
   actionLabel?: string;
 }) {
   const clampedProgress =
@@ -200,6 +202,7 @@ export function MemoryRow({
           </View>
         </View>
       ) : null}
+      {children ? <View className="mt-3">{children}</View> : null}
     </View>
   );
 }

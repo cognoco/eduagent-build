@@ -1,5 +1,5 @@
 # Flow: Homework Entry via AdaptiveEntryCard — Navigate from coaching card to homework
-# Validates: teen persona taps "Homework help" on the coaching card, camera screen
+# Validates: teen persona taps the homework action, camera screen
 # appears (or permission screen), falls back to manual text input, sends problem
 # to AI, and receives a real Gemini response.
 # Tags: nightly, homework
@@ -16,8 +16,7 @@
 #     close-button, manual-input, manual-continue-button)
 #   - apps/mobile/src/components/session/ChatShell.tsx (chat-input, send-button)
 #
-# NOTE: The AdaptiveEntryCard's primary action (coaching-card-primary) is
-# "Homework help" for the teen persona. Tapping it navigates to the camera screen.
+# NOTE: The home homework action navigates to the camera screen.
 # On emulator, the camera is unreliable — we skip to manual text input.
 appId: com.mentomate.app
 tags:

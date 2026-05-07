@@ -206,9 +206,9 @@ describe('LearnerScreen', () => {
 
     await waitFor(() => {
       screen.getByText('What do you need right now?');
-      screen.getByText('Homework help');
+      screen.getByText('Help with an assignment');
       screen.getByText('Take a photo or type the problem');
-      screen.getByText('Practice for a test');
+      screen.getByText('Test yourself');
       screen.getByText('Review what is fading or quiz yourself');
       screen.getByText('Learn something new');
       screen.getByTestId('home-empty-subjects');

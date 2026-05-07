@@ -30,7 +30,6 @@ export interface NotificationPayload {
     | 'review_reminder'
     | 'daily_reminder'
     | 'trial_expiry'
-    | 'streak_warning'
     | 'consent_request'
     | 'consent_reminder'
     | 'consent_warning'

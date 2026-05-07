@@ -331,8 +331,7 @@ function getConfidenceCopy(birthYear: number | null): {
     label: 'Is this right? Tap to ask',
     accessibilityLabel:
       'Stuck on this answer? Tap to get it explained differently or work through it together.',
-    retryMessage:
-      "I'm not sure I get this — can you explain it differently?",
+    retryMessage: "I'm not sure I get this — can you explain it differently?",
   };
 }
 
@@ -609,8 +608,8 @@ function SessionScreenInner() {
   // into the route params via setParams — that triggers the existing transcript
   // hydration path the same way the home-screen Continue card does, so chat
   // history loads everywhere instead of dropping the learner into a blank chat.
-  // Scoped to learning mode only: review/practice/homework/freeform intentionally
-  // start fresh.
+  // Scoped to learning mode only: review/homework/freeform intentionally start
+  // fresh.
   const shouldLookupActiveSession =
     effectiveMode === 'learning' && !!topicId && !routeSessionId;
   const activeSessionLookup = useActiveSessionForTopic(

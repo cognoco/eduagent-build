@@ -1,3 +1,18 @@
+/**
+ * Session-depth evaluation gates the filing prompt for unscoped sessions.
+ *
+ * The "Add to library?" modal in the mobile session footer
+ * (apps/mobile/src/components/session/SessionFooter.tsx) appears ONLY when:
+ *   1. Session mode is 'freeform' or 'homework' (scoped sessions are
+ *      implicitly filed by their topic linkage), AND
+ *   2. This evaluator returns `meaningful: true` for the session transcript.
+ *
+ * Opt-in default ("No thanks" leaves the session unfiled) is intentional.
+ *
+ * If you change this evaluator's thresholds, also update the spec:
+ * docs/specs/2026-05-06-learning-path-clarity-pass.md (Q4).
+ */
+
 import { z } from 'zod';
 import {
   detectedTopicSchema,
@@ -62,7 +77,7 @@ function parseDepthResponse(
     captureException(new Error('session-depth: no JSON object found'), {
       extra: {
         context: 'parseDepthResponse',
-        rawSlice: raw.slice(0, 500),
+        rawLength: raw.length,
       },
     });
     return null;
@@ -74,7 +89,7 @@ function parseDepthResponse(
       captureException(new Error('session-depth: schema validation failed'), {
         extra: {
           context: 'parseDepthResponse',
-          rawSlice: raw.slice(0, 500),
+          rawLength: raw.length,
           validationError: result.error.message,
         },
       });
@@ -85,7 +100,7 @@ function parseDepthResponse(
     captureException(err, {
       extra: {
         context: 'parseDepthResponse',
-        rawSlice: raw.slice(0, 500),
+        rawLength: raw.length,
       },
     });
     return null;
@@ -168,7 +183,7 @@ async function evaluateWithLlm(
       };
     }
     logger.warn('[session-depth] unparseable depth response', {
-      raw: raw.slice(0, 200),
+      rawLength: raw.length,
     });
   } catch (error) {
     logger.warn('[session-depth] depth gate failed', {
