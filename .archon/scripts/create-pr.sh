@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# shellcheck source=./_env.sh
+source "$(dirname "${BASH_SOURCE[0]}")/_env.sh"
 
 body_file="${1:?Usage: create-pr.sh <body-file> <title>}"
 title="${2:?Usage: create-pr.sh <body-file> <title>}"
@@ -15,7 +17,10 @@ if [[ "$existing" != "[]" ]] && [[ "$(echo "$existing" | jq length)" -gt 0 ]]; t
     echo "PR already exists: #${pr_number} — ${pr_url}"
 else
     pr_url="$(gh pr create --draft --base "$base" --title "$title" --body-file "$body_file")"
-    pr_number="$(gh pr view --json number -q .number)"
+    # gh pr create returns the PR URL with the number as the final path
+    # segment (e.g. https://github.com/owner/repo/pull/123). Extract the
+    # number from the URL instead of round-tripping `gh pr view`.
+    pr_number="$(basename "$pr_url")"
     echo "Created PR #${pr_number}: ${pr_url}"
 fi
 

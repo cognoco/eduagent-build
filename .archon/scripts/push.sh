@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# shellcheck source=./_env.sh
+source "$(dirname "${BASH_SOURCE[0]}")/_env.sh"
 
 branch="$(git branch --show-current)"
 base="${BASE_BRANCH:-main}"

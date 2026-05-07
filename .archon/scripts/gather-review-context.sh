@@ -1,5 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# shellcheck source=./_env.sh
+source "$(dirname "${BASH_SOURCE[0]}")/_env.sh"
+
+# rg is required (used below for PR-id extraction and diff scanning).
+# fd is optional and gated separately with `command -v fd`.
+if ! command -v rg &>/dev/null; then
+    echo "ERROR: ripgrep (rg) is required but not found in PATH." >&2
+    echo "Install via: brew install ripgrep   # macOS" >&2
+    echo "         or: apt install ripgrep    # Debian/Ubuntu" >&2
+    exit 1
+fi
 
 artifacts_dir="${ARTIFACTS_DIR:-.}"
 base="${BASE_BRANCH:-origin/main}"
