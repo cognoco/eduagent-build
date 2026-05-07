@@ -92,6 +92,11 @@ jest.mock('../lib/theme', () => ({
   }),
 }));
 
+jest.mock('../lib/format-api-error', () => ({
+  formatApiError: (error: unknown) =>
+    error instanceof Error ? error.message : 'Something went wrong',
+}));
+
 // NOT an API hook — keep as-is.
 jest.mock('../hooks/use-keyboard-scroll', () => ({
   useKeyboardScroll: () => ({

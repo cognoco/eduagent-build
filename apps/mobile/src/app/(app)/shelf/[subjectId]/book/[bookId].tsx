@@ -782,6 +782,8 @@ export default function BookScreen() {
   );
 
   const handleBuildLearningPath = useCallback(async () => {
+    if (startFirstCurriculumSession.isPending) return;
+
     if (resumeTargetQuery.data) {
       pushLearningResumeTarget(router, resumeTargetQuery.data);
       return;
@@ -820,6 +822,7 @@ export default function BookScreen() {
     router,
     sessionCount,
     startFirstCurriculumSession,
+    startFirstCurriculumSession.isPending,
     subjectId,
   ]);
 
@@ -1425,6 +1428,7 @@ export default function BookScreen() {
             </Text>
             <Pressable
               onPress={handleBuildLearningPath}
+              disabled={startFirstCurriculumSession.isPending}
               className="min-h-[48px] self-center items-center justify-center rounded-button bg-primary px-5 py-3"
               testID="topics-empty-build"
               accessibilityRole="button"
@@ -1449,6 +1453,7 @@ export default function BookScreen() {
               </Text>
               <Pressable
                 onPress={handleBuildLearningPath}
+                disabled={startFirstCurriculumSession.isPending}
                 className="min-h-[44px] items-center justify-center rounded-button bg-primary px-5 py-3"
                 testID="book-thin-path-build"
                 accessibilityRole="button"
@@ -1766,6 +1771,7 @@ export default function BookScreen() {
                 {!hasCurriculum ? (
                   <Pressable
                     onPress={handleBuildLearningPath}
+                    disabled={startFirstCurriculumSession.isPending}
                     className="mt-2 items-center py-2"
                     testID="book-build-path-link"
                     accessibilityRole="button"

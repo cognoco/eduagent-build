@@ -104,6 +104,8 @@ export default function LanguageSetup() {
   const startFirstCurriculumSession = useStartFirstCurriculumSession(
     subjectId ?? ''
   );
+  const isContinuing =
+    configureLanguageSubject.isPending || startFirstCurriculumSession.isPending;
   const colors = useThemeColors(); // [BUG-118]
   const [nativeLanguage, setNativeLanguage] = useState<string>(() =>
     getDeviceNativeLanguage()
@@ -355,11 +357,11 @@ export default function LanguageSetup() {
 
         <Pressable
           onPress={() => void handleContinue()}
-          disabled={configureLanguageSubject.isPending}
+          disabled={isContinuing}
           className="bg-primary rounded-button py-3.5 items-center mt-8"
           testID="language-setup-continue"
         >
-          {configureLanguageSubject.isPending ? (
+          {isContinuing ? (
             <ActivityIndicator color={colors.textInverse} />
           ) : (
             <Text className="text-text-inverse text-body font-semibold">

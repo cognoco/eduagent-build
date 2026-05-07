@@ -446,6 +446,37 @@ async function maybeDispatchTopicProbeExtraction(
       data: payload,
     });
   } catch (err) {
+    await db.transaction(async (tx) => {
+      const [row] = await tx
+        .select({ metadata: learningSessions.metadata })
+        .from(learningSessions)
+        .where(
+          and(
+            eq(learningSessions.id, session.id),
+            eq(learningSessions.profileId, profileId)
+          )
+        )
+        .for('update')
+        .limit(1);
+
+      const metadata = (row?.metadata ?? {}) as Record<string, unknown>;
+      if (metadata['topicProbeFiredAt'] !== payload.timestamp) return;
+      const nextMetadata = { ...metadata };
+      delete nextMetadata['topicProbeFiredAt'];
+      nextMetadata['topicProbeExtractionStatus'] = 'failed';
+      await tx
+        .update(learningSessions)
+        .set({
+          metadata: nextMetadata,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(learningSessions.id, session.id),
+            eq(learningSessions.profileId, profileId)
+          )
+        );
+    });
     logger.warn('[session-exchange] topic probe extraction dispatch failed', {
       event: 'topic_probe.dispatch_failed',
       profileId,
@@ -1744,20 +1775,6 @@ export async function processMessage(
     input.message,
     context.topicTitle
   );
-  await maybeDispatchTopicProbeExtraction(
-    db,
-    profileId,
-    {
-      id: session.id,
-      subjectId: session.subjectId,
-      topicId: session.topicId,
-    },
-    context.effectiveMode,
-    context.conversationLanguage,
-    input.message,
-    context.topicTitle,
-    context.isFirstEncounter === true
-  );
 
   const imageData: ImageData | undefined =
     input.imageBase64 && input.imageMimeType
@@ -1824,6 +1841,22 @@ export async function processMessage(
   );
 
   await applyContinuationScore(db, profileId, sessionId, result.retrievalScore);
+  if (persisted.persistedUserMessage) {
+    await maybeDispatchTopicProbeExtraction(
+      db,
+      profileId,
+      {
+        id: session.id,
+        subjectId: session.subjectId,
+        topicId: session.topicId,
+      },
+      context.effectiveMode,
+      context.conversationLanguage,
+      input.message,
+      context.topicTitle,
+      context.isFirstEncounter === true
+    );
+  }
 
   return {
     response: result.response,
@@ -1886,20 +1919,6 @@ export async function streamMessage(
     context.conversationLanguage,
     input.message,
     context.topicTitle
-  );
-  await maybeDispatchTopicProbeExtraction(
-    db,
-    profileId,
-    {
-      id: session.id,
-      subjectId: session.subjectId,
-      topicId: session.topicId,
-    },
-    context.effectiveMode,
-    context.conversationLanguage,
-    input.message,
-    context.topicTitle,
-    context.isFirstEncounter === true
   );
 
   // Compute time-to-answer before streaming begins
@@ -2049,6 +2068,22 @@ export async function streamMessage(
         sessionId,
         parsed.retrievalScore
       );
+      if (persisted.persistedUserMessage) {
+        await maybeDispatchTopicProbeExtraction(
+          db,
+          profileId,
+          {
+            id: session.id,
+            subjectId: session.subjectId,
+            topicId: session.topicId,
+          },
+          context.effectiveMode,
+          context.conversationLanguage,
+          input.message,
+          context.topicTitle,
+          context.isFirstEncounter === true
+        );
+      }
       return {
         exchangeCount: persisted.exchangeCount,
         escalationRung: effectiveRung,
