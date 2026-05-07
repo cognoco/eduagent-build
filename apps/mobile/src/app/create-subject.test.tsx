@@ -112,7 +112,10 @@ jest.mock('../hooks/use-keyboard-scroll', () => ({
 
 function createWrapper() {
   const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0 },
+      mutations: { retry: false, gcTime: 0 },
+    },
   });
   activeQueryClient = queryClient;
   return function Wrapper({ children }: { children: React.ReactNode }) {
@@ -1256,18 +1259,12 @@ describe('CreateSubjectScreen — keyboard avoiding behavior', () => {
     // Restore routes to defaults so per-test overrides don't leak between suites.
     mockFetch.setRoute('/subjects/resolve', defaultResolveHandler);
     mockFetch.setRoute('/subjects', defaultSubjectsHandler);
-    Wrapper = (() => {
-      const queryClient = new QueryClient({
-        defaultOptions: { queries: { retry: false, gcTime: 0 } },
-      });
-      return function W({ children }: { children: React.ReactNode }) {
-        return (
-          <QueryClientProvider client={queryClient}>
-            {children}
-          </QueryClientProvider>
-        );
-      };
-    })();
+    Wrapper = createWrapper();
+  });
+
+  afterEach(() => {
+    activeQueryClient?.clear();
+    activeQueryClient = null;
   });
 
   it('uses platform-correct KeyboardAvoidingView behavior (ios → padding)', () => {
