@@ -314,7 +314,7 @@ async function loadLatestCompletedDraftSignals(
   profileId: string,
   subjectId: string
 ): Promise<ExtractedInterviewSignals | undefined> {
-  const [row] = await db
+  const rows = await db
     .select({ metadata: learningSessions.metadata })
     .from(learningSessions)
     .where(
@@ -324,15 +324,25 @@ async function loadLatestCompletedDraftSignals(
       )
     )
     .orderBy(desc(learningSessions.updatedAt), desc(learningSessions.id))
-    .limit(1);
-  const parsed = extractedInterviewSignalsSchema.safeParse(
-    row?.metadata &&
+    .limit(10);
+
+  for (const row of rows) {
+    const metadata =
+      row.metadata &&
       typeof row.metadata === 'object' &&
       !Array.isArray(row.metadata)
-      ? (row.metadata as Record<string, unknown>)['extractedSignals']
-      : undefined
-  );
-  return parsed.success ? parsed.data : undefined;
+        ? (row.metadata as Record<string, unknown>)
+        : undefined;
+    if (metadata?.['topicProbeExtractionStatus'] !== 'completed') {
+      continue;
+    }
+    const parsed = extractedInterviewSignalsSchema.safeParse(
+      metadata['extractedSignals']
+    );
+    if (parsed.success) return parsed.data;
+  }
+
+  return undefined;
 }
 
 async function findFirstAvailableTopicId(

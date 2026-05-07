@@ -75,7 +75,7 @@ export function inferPaceHint(exchangeHistory: ExchangeEntry[]): PaceHint {
   return { density: 'medium', chunkSize: 'medium' };
 }
 
-function defaultExtractedSignals(
+export function defaultExtractedSignals(
   history: ExchangeEntry[]
 ): ExtractedInterviewSignals {
   return {

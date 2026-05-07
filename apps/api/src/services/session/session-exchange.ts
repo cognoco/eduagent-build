@@ -241,6 +241,7 @@ interface ReviewCalibrationDispatchPayload {
 }
 
 interface TopicProbeDispatchPayload {
+  version: 1;
   profileId: string;
   sessionId: string;
   subjectId: string;
@@ -427,6 +428,7 @@ async function maybeDispatchTopicProbeExtraction(
         );
 
       return {
+        version: 1,
         profileId,
         sessionId: session.id,
         subjectId: session.subjectId,
@@ -748,7 +750,8 @@ export async function prepareExchangeContext(
         and(
           eq(learningSessions.profileId, profileId),
           eq(learningSessions.subjectId, session.subjectId),
-          ne(learningSessions.id, sessionId)
+          ne(learningSessions.id, sessionId),
+          gte(learningSessions.exchangeCount, 1)
         )
       )
       .limit(1),

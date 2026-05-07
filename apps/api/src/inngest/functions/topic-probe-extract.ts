@@ -1,10 +1,12 @@
 import { and, asc, eq } from 'drizzle-orm';
 
 import {
+  curriculumBooks,
   curriculumTopics,
   learningSessions,
   retentionCards,
   sessionEvents,
+  subjects,
   type Database,
 } from '@eduagent/database';
 import {
@@ -16,7 +18,10 @@ import {
 
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
-import { extractSignalsFromExchangeHistory } from '../../services/session/topic-probe-extraction';
+import {
+  defaultExtractedSignals,
+  extractSignalsFromExchangeHistory,
+} from '../../services/session/topic-probe-extraction';
 import {
   ensureRetentionCard,
   evaluateRecallQuality,
@@ -178,7 +183,23 @@ export async function handleTopicProbeExtract({
   const extractedSignals = await step.run('extract-signals', () =>
     extractSignalsFromExchangeHistory(history)
   );
-  const parsedSignals = extractedInterviewSignalsSchema.parse(extractedSignals);
+  const parsedSignalsResult =
+    extractedInterviewSignalsSchema.safeParse(extractedSignals);
+  const parsedSignals = parsedSignalsResult.success
+    ? parsedSignalsResult.data
+    : defaultExtractedSignals(history);
+  if (!parsedSignalsResult.success) {
+    logger.warn('[topic-probe-extract] extracted signals failed validation', {
+      event: 'topic_probe.extract_invalid_signals',
+      profileId: payload.profileId,
+      sessionId: payload.sessionId,
+      topicId: payload.topicId,
+      issues: parsedSignalsResult.error.issues.map((issue) => ({
+        path: issue.path.join('.'),
+        message: issue.message,
+      })),
+    });
+  }
 
   const priorKnowledgeQuality = await step.run(
     'seed-retention-card',
@@ -187,7 +208,17 @@ export async function handleTopicProbeExtract({
       const [topic] = await db
         .select({ id: curriculumTopics.id })
         .from(curriculumTopics)
-        .where(eq(curriculumTopics.id, payload.topicId))
+        .innerJoin(
+          curriculumBooks,
+          eq(curriculumBooks.id, curriculumTopics.bookId)
+        )
+        .innerJoin(subjects, eq(subjects.id, curriculumBooks.subjectId))
+        .where(
+          and(
+            eq(curriculumTopics.id, payload.topicId),
+            eq(subjects.profileId, payload.profileId)
+          )
+        )
         .limit(1);
       if (!topic) return null;
       return seedRetentionCard({
@@ -276,32 +307,53 @@ export const topicProbeExtract = inngest.createFunction(
         },
       });
 
-      const db = getStepDatabase();
-      const [fresh] = await db
-        .select({ metadata: learningSessions.metadata })
-        .from(learningSessions)
-        .where(
-          and(
-            eq(learningSessions.id, payload.sessionId),
-            eq(learningSessions.profileId, payload.profileId)
+      try {
+        const db = getStepDatabase();
+        const [fresh] = await db
+          .select({ metadata: learningSessions.metadata })
+          .from(learningSessions)
+          .where(
+            and(
+              eq(learningSessions.id, payload.sessionId),
+              eq(learningSessions.profileId, payload.profileId)
+            )
           )
-        )
-        .limit(1);
-      await db
-        .update(learningSessions)
-        .set({
-          metadata: {
-            ...((fresh?.metadata as Record<string, unknown> | null) ?? {}),
-            topicProbeExtractionStatus: 'failed',
+          .limit(1);
+        await db
+          .update(learningSessions)
+          .set({
+            metadata: {
+              ...((fresh?.metadata as Record<string, unknown> | null) ?? {}),
+              topicProbeExtractionStatus: 'failed',
+            },
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(learningSessions.id, payload.sessionId),
+              eq(learningSessions.profileId, payload.profileId)
+            )
+          );
+      } catch (cleanupError) {
+        logger.error('[topic-probe-extract] failure cleanup failed', {
+          event: 'topic_probe.failure_cleanup_failed',
+          profileId: payload.profileId,
+          sessionId: payload.sessionId,
+          topicId: payload.topicId,
+          error:
+            cleanupError instanceof Error
+              ? cleanupError.message
+              : String(cleanupError),
+        });
+        captureException(cleanupError, {
+          profileId: payload.profileId,
+          extra: {
+            site: 'topicProbeExtract.onFailure.cleanup',
+            sessionId: payload.sessionId,
+            topicId: payload.topicId,
           },
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(learningSessions.id, payload.sessionId),
-            eq(learningSessions.profileId, payload.profileId)
-          )
-        );
+        });
+      }
     },
   },
   { event: 'app/topic-probe.requested' },

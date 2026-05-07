@@ -85,6 +85,7 @@ export type ReviewCalibrationRequestedEvent = z.infer<
 >;
 
 export const topicProbeRequestedEventSchema = z.object({
+  version: z.literal(1),
   profileId: z.string().uuid(),
   sessionId: z.string().uuid(),
   subjectId: z.string().uuid(),
