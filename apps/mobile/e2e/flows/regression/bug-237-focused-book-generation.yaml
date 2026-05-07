@@ -57,17 +57,17 @@ tags:
 - tapOn:
     id: "subject-suggestion-option-0"
 
-# 6. Should navigate to interview (focused book path), NOT library shelf
+# 6. Should navigate to the first curriculum session (focused book path), NOT library shelf
 # If it navigates to library with 8 books, the bug has regressed.
 - extendedWaitUntil:
     visible:
-      id: "interview-screen"
+      id: "chat-input"
     timeout: 15000
-- takeScreenshot: bug237-step3-interview-focused-book
+- takeScreenshot: bug237-step3-session-focused-book
 
 # 7. Verify we did NOT end up at library shelf with many books.
 #    shelf-book-list is removed; assert shelf-screen is NOT visible at this point
-#    (the interview screen for the focused book should be active, not a shelf).
+#    (the first session for the focused book should be active, not a shelf).
 - assertNotVisible:
     id: "shelf-screen"
     optional: true

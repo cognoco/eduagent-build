@@ -4,23 +4,6 @@ import {
   celebrationReasonSchema,
   pendingCelebrationSchema,
 } from './progress.ts';
-import { persistFailureCodeSchema } from './errors.ts';
-
-// Interview schemas
-
-export const interviewMessageSchema = z.object({
-  message: z.string().min(1).max(5000),
-});
-export type InterviewMessageInput = z.infer<typeof interviewMessageSchema>;
-
-export const draftStatusSchema = z.enum([
-  'in_progress',
-  'completing',
-  'completed',
-  'failed',
-  'expired',
-]);
-export type DraftStatus = z.infer<typeof draftStatusSchema>;
 
 export const orphanReasonSchema = z.enum([
   'llm_stream_error',
@@ -39,8 +22,8 @@ export const exchangeEntrySchema = z.object({
 export type ExchangeEntry = z.infer<typeof exchangeEntrySchema>;
 
 // Interest context — narrow the meaning of an extracted interest to school
-// vs free-time vs both. The interview prompt infers this when the transcript
-// makes the register obvious; ambiguous interests default to 'both'.
+// vs free-time vs both. Signal extraction infers this when the transcript makes
+// the register obvious; ambiguous interests default to 'both'.
 export const interestContextValueSchema = z.enum([
   'school',
   'free_time',
@@ -63,7 +46,7 @@ export const paceHintSchema = z.object({
 });
 export type PaceHint = z.infer<typeof paceHintSchema>;
 
-// Extracted signals — structured data parsed from a completed interview.
+// Extracted signals — structured data parsed from early learner transcripts.
 // `interests` and the fast-path fields (`interestContext`, `analogyFraming`,
 // `paceHint`) are all optional: short or off-topic interviews may yield
 // empty extraction, and consumers MUST tolerate missing fields by applying
@@ -81,53 +64,6 @@ export const extractedInterviewSignalsSchema = z.object({
 export type ExtractedInterviewSignals = z.infer<
   typeof extractedInterviewSignalsSchema
 >;
-
-export const interviewStateSchema = z.object({
-  draftId: z.string().uuid(),
-  status: draftStatusSchema,
-  exchangeCount: z.number().int(),
-  subjectName: z.string(),
-  resumeSummary: z.string().nullable().optional(),
-  exchangeHistory: z.array(exchangeEntrySchema).optional(),
-  expiresAt: z.string().datetime().nullable().optional(),
-  failureCode: persistFailureCodeSchema.nullable().optional(),
-  extractedSignals: extractedInterviewSignalsSchema.optional(),
-});
-export type InterviewState = z.infer<typeof interviewStateSchema>;
-
-// Interview context — input for processing interview exchanges
-
-export const interviewContextSchema = z.object({
-  subjectName: z.string(),
-  exchangeHistory: z.array(exchangeEntrySchema),
-  bookTitle: z.string().optional(),
-});
-export type InterviewContext = z.infer<typeof interviewContextSchema>;
-
-// Interview result — response from a single interview exchange
-
-export const interviewResultSchema = z.object({
-  response: z.string(),
-  isComplete: z.boolean(),
-  extractedSignals: extractedInterviewSignalsSchema.optional(),
-});
-export type InterviewResult = z.infer<typeof interviewResultSchema>;
-
-// Onboarding draft — persisted interview state
-
-export const onboardingDraftSchema = z.object({
-  id: z.string().uuid(),
-  profileId: z.string().uuid(),
-  subjectId: z.string().uuid(),
-  exchangeHistory: z.array(exchangeEntrySchema),
-  extractedSignals: z.record(z.string(), z.unknown()),
-  status: draftStatusSchema,
-  failureCode: persistFailureCodeSchema.nullable().default(null),
-  expiresAt: z.string().datetime().nullable(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
-});
-export type OnboardingDraft = z.infer<typeof onboardingDraftSchema>;
 
 // Engagement signal — parent-facing session recap classification
 // Canonical source for all engagement signal values used by API (session-highlights)
@@ -210,12 +146,20 @@ export const sessionMetadataSchema = z
     inputMode: inputModeSchema.optional(),
     homework: homeworkSessionMetadataSchema.optional(),
     homeworkSummary: homeworkSummarySchema.optional(),
-    /** Fast onboarding handoff hints extracted from the interview. */
+    /** Fast onboarding handoff hints extracted before the first session. */
     onboardingFastPath: z
       .object({
         extractedSignals: extractedInterviewSignalsSchema.optional(),
       })
       .optional(),
+    /** Topic-probe signals extracted asynchronously from early session turns. */
+    extractedSignals: extractedInterviewSignalsSchema.optional(),
+    topicProbeFiredAt: z.string().datetime().optional(),
+    topicProbeExtractedAt: z.string().datetime().optional(),
+    topicProbeExtractionStatus: z
+      .enum(['pending', 'completed', 'failed'])
+      .optional(),
+    topicProbePriorKnowledgeQuality: z.number().int().min(0).max(5).optional(),
     /** F-10: UI mode stored at session creation so pipeline can distinguish
      *  practice/review from regular learning without a schema migration. */
     effectiveMode: z.string().optional(),

@@ -240,6 +240,16 @@ interface ReviewCalibrationDispatchPayload {
   timestamp: string;
 }
 
+interface TopicProbeDispatchPayload {
+  profileId: string;
+  sessionId: string;
+  subjectId: string;
+  topicId: string;
+  learnerMessage: string;
+  topicTitle: string;
+  timestamp: string;
+}
+
 async function maybeDispatchReviewCalibration(
   db: Database,
   profileId: string,
@@ -349,6 +359,104 @@ async function maybeDispatchReviewCalibration(
       profileId,
       extra: {
         site: 'maybeDispatchReviewCalibration',
+        sessionId: session.id,
+        topicId: session.topicId,
+      },
+    });
+  }
+}
+
+async function maybeDispatchTopicProbeExtraction(
+  db: Database,
+  profileId: string,
+  session: {
+    id: string;
+    subjectId: string;
+    topicId: string | null;
+  },
+  effectiveMode: string | undefined,
+  conversationLanguage: ConversationLanguage | undefined,
+  learnerMessageText: string,
+  topicTitle: string | undefined,
+  isFirstEncounter: boolean
+): Promise<void> {
+  if (effectiveMode !== 'learning') return;
+  if (!isFirstEncounter) return;
+  const topicId = session.topicId;
+  if (!topicId || !topicTitle) return;
+  if (
+    !isSubstantiveCalibrationAnswer(learnerMessageText, conversationLanguage)
+  ) {
+    return;
+  }
+
+  const payload = await db.transaction<TopicProbeDispatchPayload | null>(
+    async (tx) => {
+      const [row] = await tx
+        .select({ metadata: learningSessions.metadata })
+        .from(learningSessions)
+        .where(
+          and(
+            eq(learningSessions.id, session.id),
+            eq(learningSessions.profileId, profileId)
+          )
+        )
+        .for('update')
+        .limit(1);
+
+      if (!row) return null;
+      const metadata = (row.metadata ?? {}) as Record<string, unknown>;
+      if (metadata['topicProbeFiredAt'] != null) return null;
+
+      const timestamp = new Date().toISOString();
+      await tx
+        .update(learningSessions)
+        .set({
+          metadata: {
+            ...metadata,
+            topicProbeFiredAt: timestamp,
+            topicProbeExtractionStatus: 'pending',
+          },
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(learningSessions.id, session.id),
+            eq(learningSessions.profileId, profileId)
+          )
+        );
+
+      return {
+        profileId,
+        sessionId: session.id,
+        subjectId: session.subjectId,
+        topicId,
+        learnerMessage: learnerMessageText,
+        topicTitle,
+        timestamp,
+      };
+    }
+  );
+
+  if (!payload) return;
+
+  try {
+    await inngest.send({
+      name: 'app/topic-probe.requested',
+      data: payload,
+    });
+  } catch (err) {
+    logger.warn('[session-exchange] topic probe extraction dispatch failed', {
+      event: 'topic_probe.dispatch_failed',
+      profileId,
+      sessionId: session.id,
+      topicId: session.topicId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    captureException(err, {
+      profileId,
+      extra: {
+        site: 'maybeDispatchTopicProbeExtraction',
         sessionId: session.id,
         topicId: session.topicId,
       },
@@ -1037,6 +1145,19 @@ export async function prepareExchangeContext(
         ]
       : undefined
   );
+  const extractedSignals = extractedInterviewSignalsSchema.safeParse(
+    sessionMetadata?.extractedSignals
+  );
+  const extractedSignalsToReflect = extractedSignals.success
+    ? {
+        goals:
+          extractedSignals.data.goals.length > 0
+            ? extractedSignals.data.goals.join('; ')
+            : undefined,
+        currentKnowledge: extractedSignals.data.currentKnowledge || undefined,
+        interests: extractedSignals.data.interests,
+      }
+    : null;
   const resumeFromSessionId =
     typeof sessionMetadata?.resumeFromSessionId === 'string'
       ? sessionMetadata.resumeFromSessionId
@@ -1320,7 +1441,7 @@ export async function prepareExchangeContext(
       : undefined,
     isFirstEncounter,
     isFirstSessionOfSubject,
-    extractedSignalsToReflect: null,
+    extractedSignalsToReflect,
     // B.3: Consecutive correct-answer streak at the current escalation rung.
     // Used by the prompt to trigger adaptive escalation when streak >= 4.
     correctStreak: computeCorrectStreak(events, effectiveRung),
@@ -1623,6 +1744,20 @@ export async function processMessage(
     input.message,
     context.topicTitle
   );
+  await maybeDispatchTopicProbeExtraction(
+    db,
+    profileId,
+    {
+      id: session.id,
+      subjectId: session.subjectId,
+      topicId: session.topicId,
+    },
+    context.effectiveMode,
+    context.conversationLanguage,
+    input.message,
+    context.topicTitle,
+    context.isFirstEncounter === true
+  );
 
   const imageData: ImageData | undefined =
     input.imageBase64 && input.imageMimeType
@@ -1751,6 +1886,20 @@ export async function streamMessage(
     context.conversationLanguage,
     input.message,
     context.topicTitle
+  );
+  await maybeDispatchTopicProbeExtraction(
+    db,
+    profileId,
+    {
+      id: session.id,
+      subjectId: session.subjectId,
+      topicId: session.topicId,
+    },
+    context.effectiveMode,
+    context.conversationLanguage,
+    input.message,
+    context.topicTitle,
+    context.isFirstEncounter === true
   );
 
   // Compute time-to-answer before streaming begins

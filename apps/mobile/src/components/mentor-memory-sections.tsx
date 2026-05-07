@@ -225,6 +225,12 @@ const INTEREST_CONTEXT_OPTIONS: InterestContext[] = [
   'both',
 ];
 
+const INTEREST_CONTEXT_LABEL_KEYS: Record<InterestContext, string> = {
+  school: 'session.mentorMemory.interestContext.school',
+  free_time: 'session.mentorMemory.interestContext.freeTime',
+  both: 'session.mentorMemory.interestContext.both',
+};
+
 export function InterestContextRow({
   interest,
   detail,
@@ -282,7 +288,7 @@ export function InterestContextRow({
                   selected ? 'text-text-inverse' : 'text-text-secondary'
                 }`}
               >
-                {t(`onboarding.interestsContext.contexts.${context}.label`)}
+                {t(INTEREST_CONTEXT_LABEL_KEYS[context])}
               </Text>
             </Pressable>
           );

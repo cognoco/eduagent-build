@@ -29,6 +29,13 @@ const mockFetch = createRoutedMockFetch({
     suggestions: [],
     displayMessage: '',
   },
+  '/sessions/first-curriculum': {
+    session: {
+      id: 'session-first',
+      subjectId: 'subject-1',
+      topicId: 'topic-first',
+    },
+  },
   '/subjects': { subjects: [] },
 });
 
@@ -153,6 +160,14 @@ const defaultResolveHandler = {
   displayMessage: '',
 };
 
+const defaultFirstCurriculumHandler = {
+  session: {
+    id: 'session-first',
+    subjectId: 'subject-1',
+    topicId: 'topic-first',
+  },
+};
+
 describe('CreateSubjectScreen', () => {
   let Wrapper: React.ComponentType<{ children: React.ReactNode }>;
 
@@ -167,6 +182,10 @@ describe('CreateSubjectScreen', () => {
     mockCanGoBackValue = true;
     // Restore routes to defaults so per-test setRoute overrides don't leak.
     mockFetch.setRoute('/subjects/resolve', defaultResolveHandler);
+    mockFetch.setRoute(
+      '/sessions/first-curriculum',
+      defaultFirstCurriculumHandler
+    );
     mockFetch.setRoute('/subjects', defaultSubjectsHandler);
     Wrapper = createWrapper();
   });
@@ -290,12 +309,13 @@ describe('CreateSubjectScreen', () => {
     });
 
     expect(mockReplace).toHaveBeenCalledWith({
-      pathname: '/(app)/onboarding/interview',
+      pathname: '/(app)/session',
       params: {
+        mode: 'learning',
         subjectId: 'subject-1',
         subjectName: 'leaf cutter ants',
-        step: '1',
-        totalSteps: '4',
+        sessionId: 'session-first',
+        topicId: 'topic-first',
       },
     });
   });
@@ -388,16 +408,15 @@ describe('CreateSubjectScreen', () => {
       });
     });
 
-    // Should navigate to interview with the focused book
+    // Should start the first session with the focused book.
     expect(mockReplace).toHaveBeenCalledWith({
-      pathname: '/(app)/onboarding/interview',
+      pathname: '/(app)/session',
       params: {
+        mode: 'learning',
         subjectId: 'subject-wh',
         subjectName: 'World History',
-        bookId: 'book-easter',
-        bookTitle: 'Easter',
-        step: '1',
-        totalSteps: '4',
+        sessionId: 'session-first',
+        topicId: 'topic-first',
       },
     });
   });
@@ -576,16 +595,15 @@ describe('CreateSubjectScreen', () => {
       });
     });
 
-    // Should navigate to interview (focused_book path), not library
+    // Should start the first session (focused_book path), not library.
     expect(mockReplace).toHaveBeenCalledWith({
-      pathname: '/(app)/onboarding/interview',
+      pathname: '/(app)/session',
       params: {
+        mode: 'learning',
         subjectId: 'subject-botany',
         subjectName: 'Botany',
-        bookId: 'book-tea',
-        bookTitle: 'tea',
-        step: '1',
-        totalSteps: '4',
+        sessionId: 'session-first',
+        topicId: 'topic-first',
       },
     });
   });
@@ -970,11 +988,10 @@ describe('CreateSubjectScreen', () => {
     // Only the cancel-triggered replace should have been called once (not twice)
     const replaceCalls = mockReplace.mock.calls;
     // All replace calls should be from the cancel handler, not from the mutation result
-    // (The cancel replaces to home/library, not to onboarding/interview)
+    // (The cancel replaces to home/library, not to the first session)
     const hasOnboardingNav = replaceCalls.some(
       (call) =>
-        typeof call[0] === 'object' &&
-        call[0]?.pathname === '/(app)/onboarding/interview'
+        typeof call[0] === 'object' && call[0]?.pathname === '/(app)/session'
     );
     expect(hasOnboardingNav).toBe(false);
   });
@@ -1139,12 +1156,13 @@ describe('CreateSubjectScreen', () => {
 
     await waitFor(() => {
       expect(mockReplace).toHaveBeenCalledWith({
-        pathname: '/(app)/onboarding/interview',
+        pathname: '/(app)/session',
         params: {
+          mode: 'learning',
           subjectId: 'subject-italian',
           subjectName: 'Italian',
-          step: '1',
-          totalSteps: '4',
+          sessionId: 'session-first',
+          topicId: 'topic-first',
         },
       });
     });

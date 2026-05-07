@@ -43,7 +43,6 @@ export function useRestoreConsent(): UseMutationResult<
             'sessions',
             'session-summary',
             'curriculum',
-            'interview',
             'assessment',
             'streaks',
             'xp',

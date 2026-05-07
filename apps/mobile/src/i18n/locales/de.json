@@ -45,7 +45,7 @@
     "exchangeLimitExceeded": "Sitzungslimit erreicht. Starte eine neue Sitzung, um weiterzumachen.",
     "subjectInactive": "Dieses Fach ist gerade pausiert. Du kannst es in deiner Fächerliste fortsetzen.",
     "notLanguageLearning": "Dieses Fach ist nicht für das Sprachenlernen eingerichtet. Probiere stattdessen den Standard-Lernpfad.",
-    "curriculumNotFound": "Wir haben deinen Lernpfad noch nicht eingerichtet. Geh zurück und starte zuerst das Interview.",
+    "curriculumNotFound": "Wir haben deinen Lernpfad noch nicht eingerichtet. Geh zurück und versuche es erneut.",
     "topicNotFound": "Dieses Thema ist im Moment nicht verfügbar. Versuche, ein anderes auszuwählen.",
     "draftNotFound": "Dein Fortschritt ging verloren. Bitte beginne von vorne.",
     "profileNotFound": "Wir hatten Probleme beim Laden deines Profils. Bitte melde dich ab und wieder an.",
@@ -79,7 +79,7 @@
   "friendlyErrors": {
     "notLanguageLearning": "Dieses Fach ist nicht für das Sprachenlernen eingerichtet. Probiere stattdessen den Standard-Lernpfad.",
     "subjectPaused": "Dieses Fach ist gerade pausiert. Du kannst es in deiner Fächerliste fortsetzen.",
-    "curriculumNotFound": "Wir haben deinen Lernpfad noch nicht eingerichtet. Geh zurück und starte zuerst das Interview.",
+    "curriculumNotFound": "Wir haben deinen Lernpfad noch nicht eingerichtet. Geh zurück und versuche es erneut.",
     "topicNotFound": "Dieses Thema ist im Moment nicht verfügbar. Versuche, ein anderes auszuwählen.",
     "draftNotFound": "Dein Fortschritt ging verloren. Bitte beginne von vorne.",
     "profileNotFound": "Wir hatten Probleme beim Laden deines Profils. Bitte melde dich ab und wieder an.",
@@ -1360,156 +1360,6 @@
       "saveErrorMessage": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
       "somethingElse": "Etwas anderes",
       "customPlaceholder": "z.B. they/them"
-    },
-    "accommodations": {
-      "title": "Gibt es Lernanpassungen?",
-      "subtitle": "Wir passen die Lektionen an deine Lernweise an (optional).",
-      "skipForNow": "Vorerst überspringen",
-      "loadErrorTitle": "Anpassungen konnten nicht geladen werden",
-      "loadErrorMessage": "Überprüfe deine Verbindung und versuche es erneut.",
-      "saveErrorTitle": "Anpassungen konnten nicht gespeichert werden",
-      "saveErrorMessage": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
-      "noSubjectTitle": "Kein Fach ausgewählt",
-      "noSubjectMessage": "Bitte wähle ein Fach aus der Bibliothek, bevor du Anpassungen einrichtest",
-      "openLibrary": "Bibliothek öffnen"
-    },
-    "analogyPreference": {
-      "title": "Wie magst du Erklärungen?",
-      "subtitle": "Wähle einen Analogie-Stil (optional). Du kannst dies später jederzeit in den Facheinstellungen ändern.",
-      "skipForNow": "Vorerst überspringen",
-      "skipLabel": "Analogie-Präferenz überspringen",
-      "saveErrorTitle": "Präferenz konnte nicht gespeichert werden"
-    },
-    "interestsContext": {
-      "title": "In welchem Kontext lernst du das?",
-      "subtitle": "Hilft uns, Beispiele und Übungen anzupassen (optional).",
-      "skipForNow": "Vorerst überspringen",
-      "saveErrorTitle": "Interessenkontext konnte nicht gespeichert werden",
-      "contexts": {
-        "school": {
-          "label": "Schule / Universität",
-          "hint": "Wir richten Beispiele auf akademische Arbeit und Prüfungsvorbereitung aus."
-        },
-        "free_time": {
-          "label": "Freizeit",
-          "hint": "Wir nutzen es für Hobbys, Spiele und Beispiele außerhalb des Unterrichts."
-        },
-        "both": {
-          "label": "Beides",
-          "hint": "Wir nutzen es für Beispiele in der Schule und in der Freizeit."
-        },
-        "work": {
-          "label": "Arbeit / Karriere",
-          "hint": "Wir konzentrieren uns auf professionelle, praktische Anwendung."
-        },
-        "personal": {
-          "label": "Persönliches Interesse",
-          "hint": "Wir halten es explorativ und neugiergetrieben."
-        },
-        "other": {
-          "label": "Andere",
-          "hint": "Wir halten es flexibel und allgemein."
-        }
-      },
-      "saveErrorMessage": "Deine Interessen konnten nicht gespeichert werden – bitte versuche es erneut",
-      "skipAll": "Überspringen"
-    },
-    "interview": {
-      "title": "{{target}} einrichten",
-      "newSubject": "dein Fach",
-      "openingWithTarget": "Hi! Ich bin dein Lernbegleiter. Zuerst muss ich ein wenig über dich und {{target}} erfahren, damit ich auf dem richtigen Niveau helfen kann, statt zu raten. Was weißt du schon? Eine grobe Antwort reicht völlig.",
-      "openingGeneric": "Hi! Ich bin dein Lernbegleiter. Zuerst muss ich ein wenig über dich erfahren, damit ich auf dem richtigen Niveau helfen kann, statt zu raten. Was weißt du schon? Eine grobe Antwort reicht völlig.",
-      "explainerTitle": "Warum frage ich zuerst?",
-      "explainerBody": "Deine Antworten helfen mir, den richtigen Startpunkt zu wählen. Nach dieser kurzen Einrichtung kann ich so erklären, üben und helfen, wie es zu dir passt.",
-      "missingSubject": "Kein Fach ausgewählt. Bitte gehe zurück und versuche es erneut.",
-      "sessionCreationStuck": "Sitzung dauert länger als erwartet. Bitte gehe zurück und versuche es erneut.",
-      "settingUp": "Deine Sitzung wird eingerichtet...",
-      "completionTitle": "Bewertung abgeschlossen!",
-      "completionBody": "Wir haben genug gesammelt, um deinen personalisierten Lehrplan zu erstellen.",
-      "letsGo": "Los geht's",
-      "streamError": "Etwas ist schiefgelaufen. Versuche es erneut.",
-      "forceCompleteTimeout": "Arbeite noch daran... tippe, um fortzufahren.",
-      "skip": "Überspringen",
-      "skipThisQuestion": "Diese Frage überspringen",
-      "skipAndFinish": "Überspringen und beenden",
-      "expiredTitle": "Sitzung abgelaufen",
-      "expiredBody": "Deine Bewertungssitzung ist abgelaufen. Bitte starte neu.",
-      "restartButton": "Bewertung neu starten",
-      "doneButton": "Fertig",
-      "saveErrorTitle": "Antwort konnte nicht gespeichert werden",
-      "sessionErrorTitle": "Sitzungsfehler",
-      "completionErrorTitle": "Sitzung konnte nicht abgeschlossen werden",
-      "restartErrorTitle": "Neustart fehlgeschlagen",
-      "skipErrorTitle": "Überspringen fehlgeschlagen",
-      "startLearning": "Lernen starten",
-      "streamErrorTitle": "Etwas ist schiefgelaufen",
-      "tryAgainLabel": "Erneut versuchen",
-      "settingUpCurriculum": "Dein Lehrplan wird eingerichtet...",
-      "skipButtonProminent": "Interview überspringen",
-      "skipButton": "Überspringen"
-    },
-    "curriculumReview": {
-      "title": "Dein Lehrplan",
-      "suggestChanges": "Änderungen vorschlagen",
-      "loadingTimeout": {
-        "title": "Lädt noch...",
-        "body": "Das Laden deines Lehrplans dauert länger als erwartet. Überprüfe deine Verbindung und versuche es erneut."
-      },
-      "loadingCurriculum": "Lehrplan wird geladen...",
-      "loadError": {
-        "title": "Lehrplan konnte nicht geladen werden",
-        "body": "Überprüfe deine Verbindung und versuche es erneut."
-      },
-      "generating": {
-        "title": "Dein Lehrplan wird erstellt...",
-        "body": "Das dauert normalerweise etwa 10–20 Sekunden."
-      },
-      "noCurriculum": {
-        "title": "Noch kein Lehrplan",
-        "message": "Schließe das Bewertungsinterview ab, um deinen Lernpfad zu erstellen."
-      },
-      "versionInfo": "Version {{version}} – {{count}} Themen",
-      "whyOrderLabel": "Warum ist {{title}} in dieser Reihenfolge",
-      "whyOrder": "Warum diese Reihenfolge?",
-      "explaining": "Wird erklärt...",
-      "skipTopicTitle": "Dieses Thema überspringen?",
-      "skipTopicBody": "Du kannst es später jederzeit zurückholen.",
-      "skipAction": "Überspringen",
-      "skipErrorTitle": "Thema konnte nicht übersprungen werden",
-      "restoreErrorTitle": "Thema konnte nicht wiederhergestellt werden",
-      "restoreLabel": "{{title}} wiederherstellen",
-      "restore": "Wiederherstellen",
-      "addTopic": "Thema hinzufügen",
-      "placementCheck": {
-        "mostSkipped": "Du hast den größten Teil dieses Lehrplans übersprungen",
-        "hint": "Möchtest du einen schnelleren Weg? Du kannst einen Einstufungstest machen, mit den verbleibenden fortgeschrittenen Themen fortfahren oder zu einem anderen Fach wechseln.",
-        "takePlacement": "Einstufungstest machen",
-        "continueAdvanced": "Mit fortgeschrittenen Themen fortfahren",
-        "chooseDifferent": "Ein anderes Fach wählen"
-      },
-      "startLearning": "Lernen starten: {{title}}",
-      "exploreFirst": "Zuerst erkunden",
-      "continueToHome": "Zur Startseite",
-      "challengeModal": {
-        "title": "Ändere deine Themen",
-        "body": "Sag uns, was du ändern würdest, und wir erstellen deinen Lernpfad neu.",
-        "placeholder": "z.B. Ich kenne die Grundlagen bereits, überspringe die Einführungsthemen...",
-        "regenerate": "Neu erstellen"
-      },
-      "addTopicModal": {
-        "title": "Thema hinzufügen",
-        "body": "Füge etwas hinzu, das der generierte Lehrplan übersehen hat. Wir schlagen zuerst einen klaren Titel vor, den du dann vor dem Speichern bearbeiten kannst.",
-        "topicLabel": "Thema",
-        "topicPlaceholder": "z.B. Trigonometrie, Die Französische Revolution",
-        "descriptionLabel": "Beschreibung",
-        "descriptionPlaceholder": "Kurze Beschreibung",
-        "minutesLabel": "Geschätzte Minuten",
-        "minutesPlaceholder": "30",
-        "addTopic": "Thema hinzufügen",
-        "preview": "Vorschau"
-      },
-      "addTopicValidationError": "Füge einen Titel, eine Beschreibung und geschätzte Minuten hinzu.",
-      "updateFailedTitle": "Lehrplan-Update fehlgeschlagen"
     }
   },
   "parentView": {
@@ -1807,21 +1657,6 @@
       "openChildProfile": "{{name}}s Profil öffnen",
       "reportGoneTitle": "Dieser Bericht ist nicht mehr verfügbar",
       "reportGoneBody": "Er wurde möglicherweise archiviert oder entfernt. Alle deine anderen Berichte sind noch sicher."
-    }
-  },
-  "interview": {
-    "completing": {
-      "initial": "Deine Sitzung wird abgeschlossen...",
-      "almost": "Fast geschafft...",
-      "softFallback": "Arbeite noch daran..."
-    },
-    "failed": {
-      "extractSignalsFailed": "Wir hatten Probleme beim Lesen deiner Sitzung. Dein Fortschritt ist sicher.",
-      "topicResolutionFailed": "Wir konnten deine Sitzung keinem Thema zuordnen. Du kannst es unten erneut versuchen.",
-      "unknown": "Beim Abschluss deiner Sitzung ist etwas schiefgelaufen. Du kannst es unten erneut versuchen.",
-      "retryError": "Wiederholung fehlgeschlagen. Bitte versuche es erneut.",
-      "tryAgain": "Erneut versuchen",
-      "retrying": "Wird wiederholt..."
     }
   },
   "tabs": {

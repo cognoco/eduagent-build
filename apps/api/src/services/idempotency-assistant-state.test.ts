@@ -7,7 +7,6 @@ import {
   subjects,
   learningSessions,
   sessionEvents,
-  onboardingDrafts,
   generateUUIDv7,
 } from '@eduagent/database';
 import { like } from 'drizzle-orm';
@@ -203,82 +202,5 @@ describeIf('lookupAssistantTurnState (integration)', () => {
 
     expect(result.assistantTurnReady).toBe(true);
     expect(result.latestExchangeId).toBe(aiEvent!.id);
-  });
-
-  it('interview flow: no matching draft returns safe default', async () => {
-    const { profile } = await seedAccountAndProfile('i-no-draft');
-
-    const result = await lookupAssistantTurnState({
-      db,
-      profileId: profile.id,
-      flow: 'interview',
-      key: 'nonexistent-client-id',
-    });
-
-    expect(result).toEqual({
-      assistantTurnReady: false,
-      latestExchangeId: null,
-    });
-  });
-
-  it('interview flow: draft has user entry with matching client_id but no assistant after returns not ready', async () => {
-    const { profile } = await seedAccountAndProfile('i-no-asst');
-    const subject = await seedSubject(profile.id);
-    const clientId = `client-${RUN_ID}-i-no-asst`;
-
-    await db.insert(onboardingDrafts).values({
-      profileId: profile.id,
-      subjectId: subject.id,
-      exchangeHistory: [
-        {
-          role: 'user',
-          content: 'Tell me about yourself',
-          client_id: clientId,
-        },
-      ],
-    });
-
-    const result = await lookupAssistantTurnState({
-      db,
-      profileId: profile.id,
-      flow: 'interview',
-      key: clientId,
-    });
-
-    expect(result).toEqual({
-      assistantTurnReady: false,
-      latestExchangeId: null,
-    });
-  });
-
-  it('interview flow: draft has user entry with matching client_id followed by assistant returns ready', async () => {
-    const { profile } = await seedAccountAndProfile('i-with-asst');
-    const subject = await seedSubject(profile.id);
-    const clientId = `client-${RUN_ID}-i-with-asst`;
-
-    await db.insert(onboardingDrafts).values({
-      profileId: profile.id,
-      subjectId: subject.id,
-      exchangeHistory: [
-        {
-          role: 'user',
-          content: 'Tell me about yourself',
-          client_id: clientId,
-        },
-        { role: 'assistant', content: 'Sure, I am your tutor!' },
-      ],
-    });
-
-    const result = await lookupAssistantTurnState({
-      db,
-      profileId: profile.id,
-      flow: 'interview',
-      key: clientId,
-    });
-
-    expect(result).toEqual({
-      assistantTurnReady: true,
-      latestExchangeId: null,
-    });
   });
 });

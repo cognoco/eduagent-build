@@ -95,11 +95,10 @@ tags:
 - tapOn:
     id: "home-subject-card-${ACTIVE_SUBJECT_ID}"
 
-# 12. Wait for curriculum review screen (navigated from home tap).
-#     home.tsx navigates to /(learner)/onboarding/curriculum-review.
+# 12. Wait for the subject progress screen (navigated from home tap).
 - extendedWaitUntil:
     visible:
-      id: "curriculum-back"
+      id: "progress-subject-back"
     timeout: 10000
 
 # 14. Navigate back to home screen (Android hardware Back key)

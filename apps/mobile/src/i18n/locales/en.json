@@ -45,7 +45,7 @@
     "exchangeLimitExceeded": "Session limit reached. Start a new session to keep going.",
     "subjectInactive": "This subject is on pause right now. You can resume it from your subjects list.",
     "notLanguageLearning": "This subject isn't set up for language learning. Try the standard learning path instead.",
-    "curriculumNotFound": "We haven't set up your learning path yet. Go back and start the interview first.",
+    "curriculumNotFound": "We haven't set up your learning path yet. Go back and try again.",
     "topicNotFound": "That topic isn't available right now. Try picking a different one.",
     "draftNotFound": "Your progress was lost. Please start again.",
     "profileNotFound": "We had trouble loading your profile. Please sign out and back in.",
@@ -79,7 +79,7 @@
   "friendlyErrors": {
     "notLanguageLearning": "This subject isn't set up for language learning. Try the standard learning path instead.",
     "subjectPaused": "This subject is on pause right now. You can resume it from your subjects list.",
-    "curriculumNotFound": "We haven't set up your learning path yet. Go back and start the interview first.",
+    "curriculumNotFound": "We haven't set up your learning path yet. Go back and try again.",
     "topicNotFound": "That topic isn't available right now. Try picking a different one.",
     "draftNotFound": "Your progress was lost. Please start again.",
     "profileNotFound": "We had trouble loading your profile. Please sign out and back in.",
@@ -1360,156 +1360,6 @@
       "saveErrorMessage": "Something went wrong. Please try again.",
       "somethingElse": "Something else",
       "customPlaceholder": "e.g. they/them"
-    },
-    "accommodations": {
-      "title": "Any learning accommodations?",
-      "subtitle": "We'll adapt lessons to fit how you learn best (optional).",
-      "skipForNow": "Skip for now",
-      "loadErrorTitle": "Could not load accommodations",
-      "loadErrorMessage": "Check your connection and try again.",
-      "saveErrorTitle": "Could not save accommodations",
-      "saveErrorMessage": "Something went wrong. Please try again.",
-      "noSubjectTitle": "No subject selected",
-      "noSubjectMessage": "Please pick a subject from the library before setting up accommodations",
-      "openLibrary": "Open library"
-    },
-    "analogyPreference": {
-      "title": "How do you like things explained?",
-      "subtitle": "Pick an analogy style (optional). You can always change this later in subject settings.",
-      "skipForNow": "Skip for now",
-      "skipLabel": "Skip analogy preference",
-      "saveErrorTitle": "Could not save preference"
-    },
-    "interestsContext": {
-      "title": "What's the context for learning this?",
-      "subtitle": "Helps us tailor examples and exercises (optional).",
-      "skipForNow": "Skip for now",
-      "saveErrorTitle": "Could not save interests context",
-      "contexts": {
-        "school": {
-          "label": "School / University",
-          "hint": "We'll align examples with academic work and exam prep."
-        },
-        "free_time": {
-          "label": "Free time",
-          "hint": "We'll use it for hobbies, games, and examples outside class."
-        },
-        "both": {
-          "label": "Both",
-          "hint": "We'll use it for both school and free-time examples."
-        },
-        "work": {
-          "label": "Work / Career",
-          "hint": "We'll focus on professional, practical application."
-        },
-        "personal": {
-          "label": "Personal interest",
-          "hint": "We'll keep it exploratory and curiosity-driven."
-        },
-        "other": {
-          "label": "Other",
-          "hint": "We'll keep it flexible and general."
-        }
-      },
-      "saveErrorMessage": "Could not save your interests — please try again",
-      "skipAll": "Skip"
-    },
-    "interview": {
-      "title": "Set up {{target}}",
-      "newSubject": "your subject",
-      "openingWithTarget": "Hi! I'm your learning mate. First I need to learn a little about you and {{target}}, so I can mentor at the right level instead of guessing. What do you already know? A rough answer is perfect.",
-      "openingGeneric": "Hi! I'm your learning mate. First I need to learn a little about you, so I can mentor at the right level instead of guessing. What do you already know? A rough answer is perfect.",
-      "explainerTitle": "Why am I asking first?",
-      "explainerBody": "Your answers help me choose the right starting point. After this quick setup, I can teach, quiz, and explain in a way that fits you.",
-      "missingSubject": "No subject selected. Please go back and try again.",
-      "sessionCreationStuck": "Session is taking longer than expected. Please go back and try again.",
-      "settingUp": "Setting up your session…",
-      "completionTitle": "Assessment complete!",
-      "completionBody": "We've gathered enough to build your personalised curriculum.",
-      "letsGo": "Let's go",
-      "streamError": "Something went wrong. Try again.",
-      "forceCompleteTimeout": "Still working on it… tap to continue.",
-      "skip": "Skip",
-      "skipThisQuestion": "Skip this question",
-      "skipAndFinish": "Skip and finish",
-      "expiredTitle": "Session expired",
-      "expiredBody": "Your assessment session has expired. Please restart.",
-      "restartButton": "Restart assessment",
-      "doneButton": "Done",
-      "saveErrorTitle": "Could not save response",
-      "sessionErrorTitle": "Session error",
-      "completionErrorTitle": "Could not complete session",
-      "restartErrorTitle": "Could not restart",
-      "skipErrorTitle": "Could not skip",
-      "startLearning": "Start learning",
-      "streamErrorTitle": "Something went wrong",
-      "tryAgainLabel": "Try again",
-      "settingUpCurriculum": "Setting up your curriculum…",
-      "skipButtonProminent": "Skip the interview",
-      "skipButton": "Skip"
-    },
-    "curriculumReview": {
-      "title": "Your Curriculum",
-      "suggestChanges": "Suggest changes",
-      "loadingTimeout": {
-        "title": "Still loading…",
-        "body": "Loading your curriculum is taking longer than expected. Check your connection and try again."
-      },
-      "loadingCurriculum": "Loading curriculum...",
-      "loadError": {
-        "title": "Couldn't load curriculum",
-        "body": "Check your connection and try again."
-      },
-      "generating": {
-        "title": "Building your curriculum…",
-        "body": "This usually takes about 10–20 seconds."
-      },
-      "noCurriculum": {
-        "title": "No curriculum yet",
-        "message": "Complete the assessment interview to generate your learning path."
-      },
-      "versionInfo": "Version {{version}} — {{count}} topics",
-      "whyOrderLabel": "Why is {{title}} in this order",
-      "whyOrder": "Why this order?",
-      "explaining": "Explaining...",
-      "skipTopicTitle": "Skip this topic?",
-      "skipTopicBody": "You can always bring it back later.",
-      "skipAction": "Skip",
-      "skipErrorTitle": "Could not skip topic",
-      "restoreErrorTitle": "Could not restore topic",
-      "restoreLabel": "Restore {{title}}",
-      "restore": "Restore",
-      "addTopic": "Add topic",
-      "placementCheck": {
-        "mostSkipped": "You skipped most of this curriculum",
-        "hint": "Want a faster path? You can take a placement check, continue with the remaining advanced topics, or switch to a different subject.",
-        "takePlacement": "Take placement check",
-        "continueAdvanced": "Continue with advanced topics",
-        "chooseDifferent": "Choose a different subject"
-      },
-      "startLearning": "Start learning: {{title}}",
-      "exploreFirst": "Explore first",
-      "continueToHome": "Continue to home",
-      "challengeModal": {
-        "title": "Change your topics",
-        "body": "Tell us what you'd change and we'll regenerate your learning path.",
-        "placeholder": "e.g. I already know the basics, skip intro topics...",
-        "regenerate": "Regenerate"
-      },
-      "addTopicModal": {
-        "title": "Add a topic",
-        "body": "Add something the generated curriculum missed. We'll suggest a clean title first, then you can edit before saving.",
-        "topicLabel": "Topic",
-        "topicPlaceholder": "e.g. Trigonometry, The French Revolution",
-        "descriptionLabel": "Description",
-        "descriptionPlaceholder": "Short description",
-        "minutesLabel": "Estimated minutes",
-        "minutesPlaceholder": "30",
-        "addTopic": "Add topic",
-        "preview": "Preview"
-      },
-      "addTopicValidationError": "Add a title, description, and estimated minutes.",
-      "updateFailedTitle": "Curriculum update failed"
     }
   },
   "parentView": {
@@ -1807,21 +1657,6 @@
       "openChildProfile": "Open {{name}}'s profile",
       "reportGoneTitle": "This report is no longer available",
       "reportGoneBody": "It may have been archived or removed. All your other reports are still safe."
-    }
-  },
-  "interview": {
-    "completing": {
-      "initial": "Wrapping up your session…",
-      "almost": "Almost there…",
-      "softFallback": "Still working on it…"
-    },
-    "failed": {
-      "extractSignalsFailed": "We had trouble reading your session. Your progress is safe.",
-      "topicResolutionFailed": "We couldn't file your session to a topic. You can retry below.",
-      "unknown": "Something went wrong finishing your session. You can retry below.",
-      "retryError": "Couldn't retry. Please try again.",
-      "tryAgain": "Try Again",
-      "retrying": "Retrying…"
     }
   },
   "tabs": {

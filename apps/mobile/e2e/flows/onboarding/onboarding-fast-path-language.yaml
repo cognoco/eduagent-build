@@ -1,7 +1,6 @@
 # Flow: Subject onboarding fast path (language)
-# Validates: create language subject -> interview -> language setup -> first
-# learning session without the legacy preference gates when ONBOARDING_FAST_PATH
-# is enabled in the build.
+# Validates: create language subject -> language setup -> first learning session
+# without legacy preference gates.
 appId: com.mentomate.app
 tags:
   - onboarding
@@ -56,55 +55,6 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: "chat-input"
-    timeout: 30000
-
-- tapOn:
-    id: "chat-input"
-- inputText: "I want to learn everyday Italian for travel."
-- pressKey: Enter
-
-- extendedWaitUntil:
-    visible:
-      id: "chat-input"
-    timeout: 30000
-
-- tapOn:
-    id: "chat-input"
-- inputText: "I only know ciao and grazie."
-- pressKey: Enter
-
-- extendedWaitUntil:
-    visible:
-      id: "chat-input"
-    timeout: 30000
-
-- tapOn:
-    id: "chat-input"
-- inputText: "Short practice in small steps is best."
-- pressKey: Enter
-
-- extendedWaitUntil:
-    visible:
-      id: "view-curriculum-button"
-    timeout: 30000
-
-- assertNotVisible:
-    id: "interests-context-continue"
-- assertNotVisible:
-    id: "analogy-preference-title"
-- assertNotVisible:
-    id: "accommodation-continue"
-- assertNotVisible:
-    id: "curriculum-loading"
-- assertNotVisible:
-    id: "continue-advanced-button"
-
-- tapOn:
-    id: "view-curriculum-button"
-
-- extendedWaitUntil:
-    visible:
       id: "language-setup-continue"
     timeout: 30000
 
@@ -112,17 +62,6 @@ tags:
 # colocated language-setup unit test.
 - assertVisible:
     id: "native-language-selected-en"
-
-- assertNotVisible:
-    id: "interests-context-continue"
-- assertNotVisible:
-    id: "analogy-preference-title"
-- assertNotVisible:
-    id: "accommodation-continue"
-- assertNotVisible:
-    id: "curriculum-loading"
-- assertNotVisible:
-    id: "continue-advanced-button"
 
 - tapOn:
     id: "language-setup-continue"
@@ -141,14 +80,3 @@ tags:
     visible:
       text: "~.*\\?"
     timeout: 30000
-
-- assertNotVisible:
-    id: "interests-context-continue"
-- assertNotVisible:
-    id: "analogy-preference-title"
-- assertNotVisible:
-    id: "accommodation-continue"
-- assertNotVisible:
-    id: "curriculum-loading"
-- assertNotVisible:
-    id: "continue-advanced-button"

@@ -47,7 +47,6 @@ const QUOTA_DETAILS = {
  *   - create-profile.tsx — profile creation fallback
  *   - delete-account.tsx — account deletion / cancel fallback
  *   - create-subject.tsx — subject creation fallback
- *   - (app)/onboarding/curriculum-review.tsx — curriculum challenge error
  *   - (app)/topic/recall-test.tsx — recall test error
  *   - (app)/subscription.tsx — generic purchase error fallback
  *   - hooks/use-homework-ocr.ts — OCR catch fallback

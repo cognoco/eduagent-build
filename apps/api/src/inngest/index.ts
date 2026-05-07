@@ -55,7 +55,6 @@ import {
 } from './functions/monthly-report-cron';
 import { feedbackDeliveryFailed } from './functions/feedback-delivery-failed';
 import { orphanPersistFailed } from './functions/orphan-persist-failed';
-import { interviewPersistCurriculum } from './functions/interview-persist-curriculum';
 import { subjectPrewarmCurriculum } from './functions/subject-prewarm-curriculum';
 import { notificationSuppressedObserve } from './functions/notification-suppressed-observe';
 import {
@@ -71,6 +70,7 @@ import {
 import { memoryFactsBackfill } from './functions/memory-facts-backfill';
 import { memoryFactsEmbedBackfill } from './functions/memory-facts-embed-backfill';
 import { reviewCalibrationGrade } from './functions/review-calibration-grade';
+import { topicProbeExtract } from './functions/topic-probe-extract';
 
 export {
   inngest,
@@ -114,7 +114,6 @@ export {
   askSilentClassify,
   askSilentClassifyOnFailure,
   orphanPersistFailed,
-  interviewPersistCurriculum,
   subjectPrewarmCurriculum,
   notificationSuppressedObserve,
   sessionSummaryCreate,
@@ -126,6 +125,7 @@ export {
   memoryFactsBackfill,
   memoryFactsEmbedBackfill,
   reviewCalibrationGrade,
+  topicProbeExtract,
 };
 
 // All Inngest functions to register with the serve handler
@@ -171,7 +171,6 @@ export const functions = [
   askSilentClassify,
   askSilentClassifyOnFailure,
   orphanPersistFailed,
-  interviewPersistCurriculum,
   subjectPrewarmCurriculum,
   notificationSuppressedObserve,
   sessionSummaryCreate,
@@ -183,4 +182,5 @@ export const functions = [
   memoryFactsBackfill,
   memoryFactsEmbedBackfill,
   reviewCalibrationGrade,
+  topicProbeExtract,
 ];

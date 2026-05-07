@@ -8,7 +8,6 @@ import {
   learningSessions,
   sessionEvents,
   sessionSummaries,
-  onboardingDrafts,
   subjects,
   curricula,
   curriculumTopics,
@@ -315,16 +314,23 @@ async function loadLatestCompletedDraftSignals(
   profileId: string,
   subjectId: string
 ): Promise<ExtractedInterviewSignals | undefined> {
-  const repo = createScopedRepository(db, profileId);
-  const row = await repo.onboardingDrafts.findFirst(
-    eq(onboardingDrafts.subjectId, subjectId),
-    desc(onboardingDrafts.updatedAt)
-  );
-  if (row?.status !== 'completed') {
-    return undefined;
-  }
+  const [row] = await db
+    .select({ metadata: learningSessions.metadata })
+    .from(learningSessions)
+    .where(
+      and(
+        eq(learningSessions.profileId, profileId),
+        eq(learningSessions.subjectId, subjectId)
+      )
+    )
+    .orderBy(desc(learningSessions.updatedAt), desc(learningSessions.id))
+    .limit(1);
   const parsed = extractedInterviewSignalsSchema.safeParse(
-    row.extractedSignals
+    row?.metadata &&
+      typeof row.metadata === 'object' &&
+      !Array.isArray(row.metadata)
+      ? (row.metadata as Record<string, unknown>)['extractedSignals']
+      : undefined
   );
   return parsed.success ? parsed.data : undefined;
 }
@@ -711,7 +717,7 @@ export async function startFirstCurriculumSession(
       ),
     ]);
 
-    if (topicId && extractedSignals) {
+    if (topicId) {
       const topicAvailableMs = Date.now() - startedAt;
       const structureType =
         await sessionCrudDependencies.loadSubjectStructureType(
@@ -755,7 +761,10 @@ export async function startFirstCurriculumSession(
         verificationType: input.verificationType,
         metadata: {
           inputMode: input.inputMode ?? 'text',
-          onboardingFastPath: { extractedSignals },
+          effectiveMode: 'learning',
+          ...(extractedSignals
+            ? { onboardingFastPath: { extractedSignals } }
+            : {}),
         },
       });
     }

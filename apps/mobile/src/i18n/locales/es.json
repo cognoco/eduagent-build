@@ -45,7 +45,7 @@
     "exchangeLimitExceeded": "Límite de sesión alcanzado. Inicia una nueva sesión para continuar.",
     "subjectInactive": "Esta materia está en pausa. Puedes reanudarla desde tu lista de materias.",
     "notLanguageLearning": "Esta materia no está configurada para el aprendizaje de idiomas. Prueba la ruta de aprendizaje estándar.",
-    "curriculumNotFound": "Aún no hemos configurado tu ruta de aprendizaje. Vuelve atrás y comienza la entrevista primero.",
+    "curriculumNotFound": "Aún no hemos configurado tu ruta de aprendizaje. Vuelve atrás e inténtalo de nuevo.",
     "topicNotFound": "Ese tema no está disponible en este momento. Intenta elegir uno diferente.",
     "draftNotFound": "Se perdió tu progreso. Por favor, empieza de nuevo.",
     "profileNotFound": "Tuvimos problemas para cargar tu perfil. Cierra sesión y vuelve a iniciarla.",
@@ -79,7 +79,7 @@
   "friendlyErrors": {
     "notLanguageLearning": "Esta materia no está configurada para el aprendizaje de idiomas. Prueba la ruta de aprendizaje estándar.",
     "subjectPaused": "Esta materia está en pausa. Puedes reanudarla desde tu lista de materias.",
-    "curriculumNotFound": "Aún no hemos configurado tu ruta de aprendizaje. Vuelve atrás y comienza la entrevista primero.",
+    "curriculumNotFound": "Aún no hemos configurado tu ruta de aprendizaje. Vuelve atrás e inténtalo de nuevo.",
     "topicNotFound": "Ese tema no está disponible en este momento. Intenta elegir uno diferente.",
     "draftNotFound": "Se perdió tu progreso. Por favor, empieza de nuevo.",
     "profileNotFound": "Tuvimos problemas para cargar tu perfil. Cierra sesión y vuelve a iniciarla.",
@@ -1360,156 +1360,6 @@
       "saveErrorMessage": "Algo salió mal. Inténtalo de nuevo.",
       "somethingElse": "Otro",
       "customPlaceholder": "p. ej., elle/elles"
-    },
-    "accommodations": {
-      "title": "¿Alguna adaptación de aprendizaje?",
-      "subtitle": "Adaptaremos las lecciones para que se ajusten a cómo aprendes mejor (opcional).",
-      "skipForNow": "Omitir por ahora",
-      "loadErrorTitle": "No se pudieron cargar las adaptaciones",
-      "loadErrorMessage": "Revisa tu conexión e inténtalo de nuevo.",
-      "saveErrorTitle": "No se pudieron guardar las adaptaciones",
-      "saveErrorMessage": "Algo salió mal. Inténtalo de nuevo.",
-      "noSubjectTitle": "No se seleccionó ninguna materia",
-      "noSubjectMessage": "Elige una materia de la biblioteca antes de configurar las adaptaciones",
-      "openLibrary": "Abrir biblioteca"
-    },
-    "analogyPreference": {
-      "title": "¿Cómo te gusta que te expliquen las cosas?",
-      "subtitle": "Elige un estilo de analogía (opcional). Siempre puedes cambiar esto más tarde en los ajustes de la materia.",
-      "skipForNow": "Omitir por ahora",
-      "skipLabel": "Omitir preferencia de analogía",
-      "saveErrorTitle": "No se pudo guardar la preferencia"
-    },
-    "interestsContext": {
-      "title": "¿Cuál es el contexto para aprender esto?",
-      "subtitle": "Nos ayuda a personalizar ejemplos y ejercicios (opcional).",
-      "skipForNow": "Omitir por ahora",
-      "saveErrorTitle": "No se pudo guardar el contexto de intereses",
-      "contexts": {
-        "school": {
-          "label": "Escuela / Universidad",
-          "hint": "Alinearemos los ejemplos con el trabajo académico y la preparación de exámenes."
-        },
-        "free_time": {
-          "label": "Tiempo libre",
-          "hint": "Lo usaremos para aficiones, juegos y ejemplos fuera de clase."
-        },
-        "both": {
-          "label": "Ambos",
-          "hint": "Lo usaremos para ejemplos de clase y de tiempo libre."
-        },
-        "work": {
-          "label": "Trabajo / Carrera",
-          "hint": "Nos centraremos en la aplicación profesional y práctica."
-        },
-        "personal": {
-          "label": "Interés personal",
-          "hint": "Lo mantendremos exploratorio y impulsado por la curiosidad."
-        },
-        "other": {
-          "label": "Otro",
-          "hint": "Lo mantendremos flexible y general."
-        }
-      },
-      "saveErrorMessage": "No se pudieron guardar tus intereses — inténtalo de nuevo",
-      "skipAll": "Omitir"
-    },
-    "interview": {
-      "title": "Configurar {{target}}",
-      "newSubject": "tu materia",
-      "openingWithTarget": "¡Hola! Soy tu compañero de aprendizaje. Primero necesito conocer un poco sobre ti y {{target}}, para ayudarte en el nivel correcto en vez de adivinar. ¿Qué sabes ya? Una respuesta aproximada está perfecta.",
-      "openingGeneric": "¡Hola! Soy tu compañero de aprendizaje. Primero necesito conocer un poco sobre ti, para ayudarte en el nivel correcto en vez de adivinar. ¿Qué sabes ya? Una respuesta aproximada está perfecta.",
-      "explainerTitle": "¿Por qué pregunto primero?",
-      "explainerBody": "Tus respuestas me ayudan a elegir el punto de partida correcto. Después de esta configuración rápida, podré enseñar, preguntar y explicar de una forma que encaje contigo.",
-      "missingSubject": "No se seleccionó ninguna materia. Vuelve e inténtalo de nuevo.",
-      "sessionCreationStuck": "La sesión está tardando más de lo esperado. Vuelve e inténtalo de nuevo.",
-      "settingUp": "Configurando tu sesión…",
-      "completionTitle": "¡Evaluación completa!",
-      "completionBody": "Hemos reunido suficiente para construir tu plan de estudios personalizado.",
-      "letsGo": "¡Vamos!",
-      "streamError": "Algo salió mal. Inténtalo de nuevo.",
-      "forceCompleteTimeout": "Todavía trabajando en ello… toca para continuar.",
-      "skip": "Omitir",
-      "skipThisQuestion": "Omitir esta pregunta",
-      "skipAndFinish": "Omitir y finalizar",
-      "expiredTitle": "Sesión expirada",
-      "expiredBody": "Tu sesión de evaluación ha expirado. Por favor, reinicia.",
-      "restartButton": "Reiniciar evaluación",
-      "doneButton": "Hecho",
-      "saveErrorTitle": "No se pudo guardar la respuesta",
-      "sessionErrorTitle": "Error de sesión",
-      "completionErrorTitle": "No se pudo completar la sesión",
-      "restartErrorTitle": "No se pudo reiniciar",
-      "skipErrorTitle": "No se pudo omitir",
-      "startLearning": "Empezar a aprender",
-      "streamErrorTitle": "Algo salió mal",
-      "tryAgainLabel": "Intentar de nuevo",
-      "settingUpCurriculum": "Configurando tu plan de estudios…",
-      "skipButtonProminent": "Omitir la entrevista",
-      "skipButton": "Omitir"
-    },
-    "curriculumReview": {
-      "title": "Tu Plan de Estudios",
-      "suggestChanges": "Sugerir cambios",
-      "loadingTimeout": {
-        "title": "Todavía cargando…",
-        "body": "La carga de tu plan de estudios está tardando más de lo esperado. Revisa tu conexión e inténtalo de nuevo."
-      },
-      "loadingCurriculum": "Cargando plan de estudios...",
-      "loadError": {
-        "title": "No se pudo cargar el plan de estudios",
-        "body": "Revisa tu conexión e inténtalo de nuevo."
-      },
-      "generating": {
-        "title": "Construyendo tu plan de estudios…",
-        "body": "Esto suele tardar unos 10–20 segundos."
-      },
-      "noCurriculum": {
-        "title": "Aún no hay plan de estudios",
-        "message": "Completa la entrevista de evaluación para generar tu ruta de aprendizaje."
-      },
-      "versionInfo": "Versión {{version}} — {{count}} temas",
-      "whyOrderLabel": "Por qué {{title}} está en este orden",
-      "whyOrder": "¿Por qué este orden?",
-      "explaining": "Explicando...",
-      "skipTopicTitle": "¿Omitir este tema?",
-      "skipTopicBody": "Siempre puedes traerlo de vuelta más tarde.",
-      "skipAction": "Omitir",
-      "skipErrorTitle": "No se pudo omitir el tema",
-      "restoreErrorTitle": "No se pudo restaurar el tema",
-      "restoreLabel": "Restaurar {{title}}",
-      "restore": "Restaurar",
-      "addTopic": "Añadir tema",
-      "placementCheck": {
-        "mostSkipped": "Omitiste la mayor parte de este plan de estudios",
-        "hint": "¿Quieres una ruta más rápida? Puedes hacer una prueba de nivel, continuar con los temas avanzados restantes o cambiar a una materia diferente.",
-        "takePlacement": "Hacer prueba de nivel",
-        "continueAdvanced": "Continuar con temas avanzados",
-        "chooseDifferent": "Elegir una materia diferente"
-      },
-      "startLearning": "Empezar a aprender: {{title}}",
-      "exploreFirst": "Explorar primero",
-      "continueToHome": "Continuar a inicio",
-      "challengeModal": {
-        "title": "Cambia tus temas",
-        "body": "Dinos qué cambiarías y regeneraremos tu ruta de aprendizaje.",
-        "placeholder": "p. ej., ya sé lo básico, omite los temas de introducción...",
-        "regenerate": "Regenerar"
-      },
-      "addTopicModal": {
-        "title": "Añadir un tema",
-        "body": "Añade algo que el plan de estudios generado omitió. Sugeriremos un título claro primero, luego puedes editar antes de guardar.",
-        "topicLabel": "Tema",
-        "topicPlaceholder": "p. ej., Trigonometría, La Revolución Francesa",
-        "descriptionLabel": "Descripción",
-        "descriptionPlaceholder": "Descripción breve",
-        "minutesLabel": "Minutos estimados",
-        "minutesPlaceholder": "30",
-        "addTopic": "Añadir tema",
-        "preview": "Vista previa"
-      },
-      "addTopicValidationError": "Añade un título, descripción y minutos estimados.",
-      "updateFailedTitle": "Falló la actualización del plan de estudios"
     }
   },
   "parentView": {
@@ -1807,21 +1657,6 @@
       "openChildProfile": "Abrir el perfil de {{name}}",
       "reportGoneTitle": "Este informe ya no está disponible",
       "reportGoneBody": "Puede haber sido archivado o eliminado. Todos tus otros informes siguen a salvo."
-    }
-  },
-  "interview": {
-    "completing": {
-      "initial": "Finalizando tu sesión…",
-      "almost": "Casi listo…",
-      "softFallback": "Todavía trabajando en ello…"
-    },
-    "failed": {
-      "extractSignalsFailed": "Tuvimos problemas para leer tu sesión. Tu progreso está a salvo.",
-      "topicResolutionFailed": "No pudimos archivar tu sesión en un tema. Puedes reintentarlo a continuación.",
-      "unknown": "Algo salió mal al finalizar tu sesión. Puedes reintentarlo a continuación.",
-      "retryError": "No se pudo reintentar. Inténtalo de nuevo.",
-      "tryAgain": "Intentar de nuevo",
-      "retrying": "Reintentando…"
     }
   },
   "tabs": {

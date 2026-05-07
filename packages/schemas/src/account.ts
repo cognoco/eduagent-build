@@ -52,7 +52,6 @@ export const dataExportSchema = z.object({
     .optional(),
   learningModes: z.array(z.record(z.string(), z.unknown())).optional(),
   teachingPreferences: z.array(z.record(z.string(), z.unknown())).optional(),
-  onboardingDrafts: z.array(z.record(z.string(), z.unknown())).optional(),
   parkingLotItems: z.array(z.record(z.string(), z.unknown())).optional(),
   sessionEmbeddings: z.array(z.record(z.string(), z.unknown())).optional(),
   subscriptions: z.array(z.record(z.string(), z.unknown())).optional(),

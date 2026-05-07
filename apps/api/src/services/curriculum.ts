@@ -6,7 +6,6 @@ import {
   curriculumAdaptations,
   topicConnections,
   subjects,
-  onboardingDrafts,
   learningSessions,
   retentionCards,
   createScopedRepository,
@@ -1276,21 +1275,35 @@ export async function challengeCurriculum(
     return result;
   }
 
-  // Read onboarding context and generate topics BEFORE touching existing data.
+  // Read topic-probe context and generate topics BEFORE touching existing data.
   // If the LLM call fails, the old curriculum is preserved.
-  const latestDraft = await db.query.onboardingDrafts.findFirst({
-    where: and(
-      eq(onboardingDrafts.profileId, profileId),
-      eq(onboardingDrafts.subjectId, subjectId)
-    ),
-    orderBy: desc(onboardingDrafts.updatedAt),
-  });
+  const [latestSession] = await db
+    .select({
+      metadata: learningSessions.metadata,
+      rawInput: learningSessions.rawInput,
+    })
+    .from(learningSessions)
+    .where(
+      and(
+        eq(learningSessions.profileId, profileId),
+        eq(learningSessions.subjectId, subjectId)
+      )
+    )
+    .orderBy(desc(learningSessions.updatedAt), desc(learningSessions.id))
+    .limit(1);
+
+  const sessionMetadata =
+    latestSession?.metadata &&
+    typeof latestSession.metadata === 'object' &&
+    !Array.isArray(latestSession.metadata)
+      ? (latestSession.metadata as Record<string, unknown>)
+      : {};
 
   const extractedSignals =
-    latestDraft?.extractedSignals &&
-    typeof latestDraft.extractedSignals === 'object' &&
-    !Array.isArray(latestDraft.extractedSignals)
-      ? (latestDraft.extractedSignals as {
+    sessionMetadata['extractedSignals'] &&
+    typeof sessionMetadata['extractedSignals'] === 'object' &&
+    !Array.isArray(sessionMetadata['extractedSignals'])
+      ? (sessionMetadata['extractedSignals'] as {
           goals?: unknown;
           experienceLevel?: unknown;
           currentKnowledge?: unknown;
@@ -1306,12 +1319,7 @@ export async function challengeCurriculum(
     extractedSignals.experienceLevel.trim().length > 0
       ? extractedSignals.experienceLevel.trim()
       : 'beginner';
-  const draftConversation = Array.isArray(latestDraft?.exchangeHistory)
-    ? latestDraft.exchangeHistory
-        .map((exchange) => String(exchange?.content ?? '').trim())
-        .filter((content) => content.length > 0)
-        .join('\n')
-    : '';
+  const draftConversation = latestSession?.rawInput?.trim() ?? '';
   const currentKnowledge =
     typeof extractedSignals.currentKnowledge === 'string' &&
     extractedSignals.currentKnowledge.trim().length > 0

@@ -84,10 +84,6 @@ const LLM_ROUTE_PATTERNS_ANY_METHOD = [
 // Routes that consume LLM exchanges only on POST. Quiz round generation and
 // dictation are billable on POST; their GET counterparts (history, stats,
 // completion) are DB-only and must NOT decrement quota.
-//
-// Onboarding interview is intentionally unmetered. It has its own server-side
-// hard cap (4 user exchanges) and should not burn the learner's tutoring
-// quota before regular learning even starts.
 const LLM_ROUTE_PATTERNS_POST_ONLY = [
   /\/quiz\/rounds\/?$/,
   /\/quiz\/rounds\/prefetch\/?$/,

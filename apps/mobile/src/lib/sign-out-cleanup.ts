@@ -158,7 +158,7 @@ export const REGISTRY_EXCEPTIONS: ReadonlyArray<{
  */
 export const SIGNOUT_CLEANUP_TIMEOUT_MS = 3_000;
 
-const OUTBOX_FLOWS = ['session', 'interview'] as const;
+const OUTBOX_FLOWS = ['session'] as const;
 
 export async function clearProfileSecureStorageOnSignOut(
   profileIds: ReadonlyArray<string>

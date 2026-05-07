@@ -22,7 +22,6 @@ import {
   notificationPreferences,
   learningModes,
   teachingPreferences,
-  onboardingDrafts,
   parkingLotItems,
   needsDeepeningTopics,
   familyLinks,
@@ -180,13 +179,6 @@ export async function generateExport(
         })
       : [];
 
-  const onboardingDraftRows =
-    profileIds.length > 0
-      ? await db.query.onboardingDrafts.findMany({
-          where: inArray(onboardingDrafts.profileId, profileIds),
-        })
-      : [];
-
   const parkingLotRows =
     profileIds.length > 0
       ? await db.query.parkingLotItems.findMany({
@@ -308,7 +300,6 @@ export async function generateExport(
     notificationPreferences: notificationPrefRows as Record<string, unknown>[],
     learningModes: learningModeRows as Record<string, unknown>[],
     teachingPreferences: teachingPrefRows as Record<string, unknown>[],
-    onboardingDrafts: onboardingDraftRows as Record<string, unknown>[],
     parkingLotItems: parkingLotRows as Record<string, unknown>[],
     sessionEmbeddings: sessionEmbeddingRows as Record<string, unknown>[],
     subscriptions: subscriptionRows as Record<string, unknown>[],

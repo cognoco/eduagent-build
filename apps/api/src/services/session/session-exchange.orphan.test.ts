@@ -1,10 +1,5 @@
 import { persistUserMessageOnly } from './persist-user-message-only';
-import { appendOrphanInterviewTurn } from '../interview/append-orphan-interview-turn';
-import {
-  BadRequestError,
-  ForbiddenError,
-  NotFoundError,
-} from '@eduagent/schemas';
+import { BadRequestError, ForbiddenError } from '@eduagent/schemas';
 import {
   LlmStreamError,
   LlmEnvelopeError,
@@ -64,40 +59,6 @@ describe('orphan persistence — unit/boundary tests [INTERACTION-DUR-L2]', () =
       };
       await expect(
         persistUserMessageOnly(mockDb, 'p', 's', 'msg', {
-          clientId: '',
-          orphanReason: 'llm_stream_error',
-        })
-      ).rejects.toBeInstanceOf(BadRequestError);
-    });
-  });
-
-  describe('appendOrphanInterviewTurn security regression', () => {
-    it('throws NotFoundError when draft belongs to another profile', async () => {
-      const updateChain = {
-        set: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        returning: jest.fn().mockResolvedValue([]),
-      };
-      const mockDb: any = {
-        query: {
-          onboardingDrafts: {
-            findFirst: jest.fn().mockResolvedValue(undefined),
-          },
-        },
-        update: jest.fn().mockReturnValue(updateChain),
-      };
-      await expect(
-        appendOrphanInterviewTurn(mockDb, 'attacker', 'draft-victim', 'msg', {
-          clientId: 'c-1',
-          orphanReason: 'llm_stream_error',
-        })
-      ).rejects.toBeInstanceOf(NotFoundError);
-    });
-
-    it('throws BadRequestError when clientId is missing', async () => {
-      const mockDb: any = { update: jest.fn() };
-      await expect(
-        appendOrphanInterviewTurn(mockDb, 'p', 'd', 'msg', {
           clientId: '',
           orphanReason: 'llm_stream_error',
         })
