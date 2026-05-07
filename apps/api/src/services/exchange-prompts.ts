@@ -264,6 +264,25 @@ function getExchangeEnvelopeInstruction(context: {
   );
 }
 
+function serializeSignalsToReflect(
+  signals: ExchangeContext['extractedSignalsToReflect']
+): string | null {
+  if (!signals) return null;
+
+  const compact = {
+    ...(signals.goals ? { goals: signals.goals } : {}),
+    ...(signals.currentKnowledge
+      ? { currentKnowledge: signals.currentKnowledge }
+      : {}),
+    ...(signals.interests?.length
+      ? { interests: signals.interests.slice(0, 5) }
+      : {}),
+  };
+
+  if (Object.keys(compact).length === 0) return null;
+  return escapeXml(JSON.stringify(compact).slice(0, 1000));
+}
+
 // ---------------------------------------------------------------------------
 // System prompt assembly
 // ---------------------------------------------------------------------------
@@ -280,6 +299,25 @@ export function buildSystemPrompt(context: ExchangeContext): string {
     !context.exchangeHistory.some(
       (entry) => entry.role === 'user' || entry.role === 'assistant'
     );
+  const exchangeCount = context.exchangeCount ?? Number.POSITIVE_INFINITY;
+  const isFirstEncounterTopic =
+    context.isFirstEncounter === true &&
+    exchangeCount < 4 &&
+    !isLanguageMode &&
+    !isRecitation &&
+    !isReviewMode;
+  const isSubjectOpenerTurn =
+    context.isFirstSessionOfSubject === true &&
+    context.exchangeCount === 0 &&
+    !isLanguageMode &&
+    !isRecitation &&
+    !isReviewMode &&
+    context.sessionType === 'learning';
+  const isFirstEncounterTopicTurn =
+    isFirstEncounterTopic && !isSubjectOpenerTurn;
+  const signalsToReflect = serializeSignalsToReflect(
+    context.extractedSignalsToReflect
+  );
 
   // [PROMPT-INJECT-4] Sanitize every free-text field that comes from the
   // profile, curriculum tables, or teaching preferences before interpolation.
@@ -457,7 +495,7 @@ export function buildSystemPrompt(context: ExchangeContext): string {
     );
   }
 
-  // First-exchange teaching rule — teach one concrete idea, end with one learner action
+  // First-exchange teaching rule — teach one concrete idea, then either probe or ask for action
   if (
     !isRecitation &&
     !isReviewMode &&
@@ -465,12 +503,48 @@ export function buildSystemPrompt(context: ExchangeContext): string {
     context.sessionType === 'learning' &&
     !isLanguageMode
   ) {
+    if (isSubjectOpenerTurn) {
+      sections.push(
+        'SUBJECT OPENER: Before any teaching, open with one casual question:\n' +
+          `"Quick - before I dive in: what brought you to ${safeSubjectName}? Anything specific you want to be able to do?"\n` +
+          'Keep it conversational, not formal. Only fire on the very first turn of the very first session of the subject - never repeat. After their answer, follow the FIRST-ENCOUNTER TOPIC RULE on subsequent turns.'
+      );
+    } else if (context.isFirstEncounter === true) {
+      sections.push(
+        'FIRST TURN RULE: Your first response must teach exactly one concrete idea AND end with exactly one focused follow-up question about prior knowledge, a knowledge gap, or what the learner wants to do with this topic. ' +
+          'The final sentence must be that follow-up question. ' +
+          'Do not end this first response with a problem to solve or an explanation to give back. ' +
+          'Do not open with a fun fact, a curiosity hook, or a chatty invitation before teaching. ' +
+          'Start teaching immediately. ' +
+          'Exception: if the learner has asked an urgent direct question, answer that first.'
+      );
+    } else {
+      sections.push(
+        'FIRST TURN RULE: Your first response must teach exactly one concrete idea AND end with exactly one learner action ' +
+          '(a question to answer, a problem to solve, or an explanation to give back). ' +
+          'The final sentence must be that learner action; do not stop after the explanation. ' +
+          'Do not open with a fun fact, a curiosity hook, or a chatty invitation before teaching. ' +
+          'Start teaching immediately. ' +
+          'Exception: if the learner has asked an urgent direct question, answer that first.'
+      );
+    }
+  }
+
+  if (isFirstEncounterTopicTurn) {
     sections.push(
-      'FIRST TURN RULE: Your first response must teach exactly one concrete idea AND end with exactly one learner action ' +
-        '(a question to answer, a problem to solve, or an explanation to give back). ' +
-        'Do not open with a fun fact, a curiosity hook, or a chatty invitation before teaching. ' +
-        'Start teaching immediately. ' +
-        'Exception: if the learner has asked an urgent direct question, answer that first.'
+      'FIRST-ENCOUNTER TOPIC RULE: For the first 3-4 turns on a topic the learner has not seen before, weave one teaching nugget AND one focused follow-up question into each reply. ' +
+        'The follow-up should react to what the learner just said: confirm, correct, or add one new piece of info, then ask about a knowledge gap or goal you spotted. ' +
+        'Track what they know, what they do not know, and what they want to do with it. ' +
+        'Switch to normal teaching once you have enough signal - by turn 4 at latest. ' +
+        'NEVER frame this as an interview, intake, or assessment. Just be a curious tutor.'
+    );
+  }
+
+  if (signalsToReflect && exchangeCount > 0) {
+    sections.push(
+      'SIGNAL REFLECTION: The previous turn extracted these signals from the learner:\n' +
+        `<learner_signals>${signalsToReflect}</learner_signals>\n` +
+        'Reference one of them naturally in your reply, for example: "You mentioned you have already played with chemistry sets - let\'s pick up from there." Do not list signals robotically; weave one in.'
     );
   }
 

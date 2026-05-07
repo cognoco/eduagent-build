@@ -22,8 +22,11 @@ function ageYearsToBracket(ageYears: number): 'adolescent' | 'adult' {
   return 'adult';
 }
 
-function toInterests(labels: string[]): Interest[] {
-  return labels.map((label) => ({ label, context: 'free_time' as const }));
+function toInterests(interests: EvalProfile['interests']): Interest[] {
+  return interests.map((interest) => ({
+    label: interest.label,
+    context: interest.context,
+  }));
 }
 
 export const capitalsFlow: FlowDefinition<CapitalsBuilderInput> = {

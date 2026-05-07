@@ -558,6 +558,8 @@ export async function prepareExchangeContext(
     topicRows,
     profileRows,
     retentionRows,
+    priorTopicSessionRows,
+    priorSubjectSessionRows,
     events,
     memory,
     metadataRows,
@@ -586,6 +588,31 @@ export async function prepareExchangeContext(
           )
           .limit(1)
       : Promise.resolve([]),
+    session.topicId
+      ? db
+          .select({ id: learningSessions.id })
+          .from(learningSessions)
+          .where(
+            and(
+              eq(learningSessions.profileId, profileId),
+              eq(learningSessions.topicId, session.topicId),
+              ne(learningSessions.id, sessionId),
+              gte(learningSessions.exchangeCount, 1)
+            )
+          )
+          .limit(1)
+      : Promise.resolve([]),
+    db
+      .select({ id: learningSessions.id })
+      .from(learningSessions)
+      .where(
+        and(
+          eq(learningSessions.profileId, profileId),
+          eq(learningSessions.subjectId, session.subjectId),
+          ne(learningSessions.id, sessionId)
+        )
+      )
+      .limit(1),
     db.query.sessionEvents.findMany({
       where: and(
         eq(sessionEvents.sessionId, sessionId),
@@ -680,6 +707,9 @@ export async function prepareExchangeContext(
 
   const topic = topicRows[0];
   const [profile] = profileRows;
+  const isFirstEncounter =
+    Boolean(session.topicId) && priorTopicSessionRows.length === 0;
+  const isFirstSessionOfSubject = priorSubjectSessionRows.length === 0;
   if (!profile) {
     logger.warn(
       '[processExchange] Profile not found — birthYear will be null, LLM defaults to adult tone',
@@ -1288,6 +1318,9 @@ export async function prepareExchangeContext(
     onboardingSignals: onboardingSignals.success
       ? onboardingSignals.data
       : undefined,
+    isFirstEncounter,
+    isFirstSessionOfSubject,
+    extractedSignalsToReflect: null,
     // B.3: Consecutive correct-answer streak at the current escalation rung.
     // Used by the prompt to trigger adaptive escalation when streak >= 4.
     correctStreak: computeCorrectStreak(events, effectiveRung),
