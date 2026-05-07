@@ -3,9 +3,11 @@ import { AccordionTopicList } from './AccordionTopicList';
 
 const mockPush = jest.fn();
 const mockUseChildSubjectTopics = jest.fn();
+let mockSegments: string[] = [];
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
+  useSegments: () => mockSegments,
 }));
 
 jest.mock('../../hooks/use-dashboard', () => ({
@@ -26,6 +28,7 @@ jest.mock('./RetentionSignal', () => {
 describe('AccordionTopicList', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSegments = [];
     mockUseChildSubjectTopics.mockReturnValue({
       data: [],
       isLoading: false,
@@ -178,9 +181,8 @@ describe('AccordionTopicList', () => {
     fireEvent.press(screen.getByTestId('accordion-topic-topic-1'));
 
     // Cross-tab push must push the parent chain so router.back() lands on
-    // the child detail screen, not the Tabs first-route (Home). See
-    // CLAUDE.md → "Cross-tab / cross-stack `router.push` calls must push
-    // the full ancestor chain, not just the leaf."
+    // the child detail screen, not the Tabs first-route (Home).
+    expect(mockPush).toHaveBeenCalledTimes(2);
     expect(mockPush).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
@@ -198,6 +200,55 @@ describe('AccordionTopicList', () => {
           subjectName: 'Mathematics',
           topicId: 'topic-1',
           totalSessions: '3',
+        }),
+      })
+    );
+  });
+
+  it('skips the parent push when already on the child profile stack', () => {
+    // Regression guard: AccordionTopicList currently only renders inside
+    // child/[profileId]/index.tsx. An unconditional parent push would
+    // duplicate the parent in the stack (child → child → topic). Match the
+    // segments shape Expo Router exposes for /(app)/child/[profileId].
+    mockSegments = ['(app)', 'child', '[profileId]'];
+    mockUseChildSubjectTopics.mockReturnValue({
+      data: [
+        {
+          topicId: 'topic-1',
+          title: 'Fractions',
+          description: 'Desc',
+          completionStatus: 'in_progress',
+          retentionStatus: null,
+          struggleStatus: 'normal',
+          masteryScore: 0.4,
+          summaryExcerpt: null,
+          xpStatus: 'pending',
+          totalSessions: 3,
+        },
+      ],
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(
+      <AccordionTopicList
+        childProfileId="child-1"
+        subjectId="subject-1"
+        subjectName="Mathematics"
+        expanded
+      />
+    );
+
+    fireEvent.press(screen.getByTestId('accordion-topic-topic-1'));
+
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(mockPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/(app)/child/[profileId]/topic/[topicId]',
+        params: expect.objectContaining({
+          profileId: 'child-1',
+          topicId: 'topic-1',
         }),
       })
     );

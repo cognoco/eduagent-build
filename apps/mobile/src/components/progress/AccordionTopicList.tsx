@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useRouter, useSegments } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 import type { TopicProgress } from '@eduagent/schemas';
 import { useChildSubjectTopics } from '../../hooks/use-dashboard';
@@ -47,6 +47,7 @@ export function AccordionTopicList({
   expanded,
 }: AccordionTopicListProps): React.ReactElement | null {
   const router = useRouter();
+  const segments = useSegments();
   const {
     data: topics,
     isLoading,
@@ -90,16 +91,15 @@ export function AccordionTopicList({
             key={topic.topicId}
             onPress={(event) => {
               event?.stopPropagation?.();
-              // Push the child-profile parent first so the destination stack
-              // synthesises 2-deep (child > topic) on cross-tab pushes —
-              // without this, back from the topic leaf falls through to the
-              // Tabs first-route (Home). See CLAUDE.md → "Cross-tab /
-              // cross-stack `router.push` calls must push the full ancestor
-              // chain, not just the leaf."
-              router.push({
-                pathname: '/(app)/child/[profileId]',
-                params: { profileId: childProfileId },
-              } as never);
+              // Cross-stack pushes need parent first so back() doesn't fall through to Tabs root (CLAUDE.md: ancestor-chain rule); skip when already on the child stack to avoid duplicating the parent route.
+              const alreadyOnChildProfile =
+                segments.includes('child') && segments.includes('[profileId]');
+              if (!alreadyOnChildProfile) {
+                router.push({
+                  pathname: '/(app)/child/[profileId]',
+                  params: { profileId: childProfileId },
+                } as never);
+              }
               router.push({
                 pathname: '/(app)/child/[profileId]/topic/[topicId]',
                 params: {
