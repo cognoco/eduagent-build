@@ -50,7 +50,6 @@ export type ParseEnvelopeResult = ParseEnvelopeSuccess | ParseEnvelopeFailure;
  * envelope-consuming flow lands; never pass a free-form string.
  */
 export type EnvelopeSurface =
-  | 'interview'
   | 'exchange.session'
   | 'exchange.silent_classify'
   | 'filing'

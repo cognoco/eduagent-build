@@ -2,7 +2,7 @@ import { supportMessages, type Database } from '@eduagent/database';
 
 export interface OutboxSpilloverEntry {
   id: string;
-  flow: 'session' | 'interview';
+  flow: 'session';
   surfaceKey: string;
   content: string;
   attempts: number;

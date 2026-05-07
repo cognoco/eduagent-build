@@ -84,10 +84,6 @@ const envSchema = z.object({
     .max(100)
     .default(0),
 
-  // Subject onboarding fast path (spec 2026-05-05). Build-time-ish env flag:
-  // backend default remains false unless Doppler sets it for dev/staging.
-  ONBOARDING_FAST_PATH: z.enum(['true', 'false']).default('false'),
-
   // Topic intent matcher for first curriculum sessions. Keep dark by default
   // for first deploy; flip through Doppler after staging soak.
   MATCHER_ENABLED: z.enum(['true', 'false']).default('false'),
@@ -127,12 +123,6 @@ export function isProfileInDedupRollout(
     hash = Math.imul(hash, 0x01000193);
   }
   return (hash >>> 0) % 100 < pct;
-}
-
-export function isOnboardingFastPathEnabled(
-  value: string | undefined
-): boolean {
-  return value === 'true';
 }
 
 export function isTopicIntentMatcherEnabled(
