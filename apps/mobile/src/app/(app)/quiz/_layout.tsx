@@ -38,6 +38,10 @@ const INITIAL_STATE: QuizFlowState = {
   completionResult: null,
 };
 
+export const unstable_settings = {
+  initialRouteName: 'index',
+};
+
 export function useQuizFlow(): QuizFlowContextType {
   const context = useContext(QuizFlowContext);
   if (!context) {
