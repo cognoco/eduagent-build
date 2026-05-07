@@ -1581,6 +1581,11 @@
       "howItsWorking": "Hvordan det fungerer",
       "consentSettingsCouldNotLoad": "Samtykkeinnstillinger kunne ikke lastes",
       "retryConsentSettings": "Prøv igjen",
+      "consentRestrictedTitle": "Samtykke må være på plass før fremgang vises",
+      "consentRestrictedPendingBody": "{{name}}s læringsdetaljer er skjult til samtykket er aktivt. Sjekk igjen etter at samtykket er fullført.",
+      "consentRestrictedRequestedBody": "Samtykkeforespørselen for {{name}} venter allerede på godkjenning. Når den er godkjent, vises fremgangen her automatisk.",
+      "consentRestrictedWithdrawnBody": "{{name}}s læringsdetaljer er skjult fordi samtykket ble trukket tilbake. Gjenopprett samtykket for å holde kontoen aktiv i nådeperioden.",
+      "checkConsentStatus": "Sjekk samtykkestatus",
       "accountTitle": "Konto – {{name}}",
       "accountTitleFallback": "Konto",
       "deletionPending": "Sletting planlagt",
@@ -1911,12 +1916,18 @@
   "coaching": {
     "parentDashboard": {
       "consent": {
-        "accessibilityLabel": "Consent status: {{status}}",
-        "consented": "Consent active",
-        "parentalConsentRequested": "Waiting for parent approval",
-        "pending": "Consent pending",
-        "redactedMessage": "Learning metrics are hidden until consent is active.",
-        "withdrawn": "Consent withdrawn"
+        "accessibilityLabel": "Samtykkestatus: {{status}}",
+        "checkStatusAction": "Sjekk samtykkestatus",
+        "consented": "Samtykke aktivt",
+        "metricsHiddenTitle": "Fremgang er skjult for nå",
+        "parentalConsentRequested": "Venter på foreldregodkjenning",
+        "parentalConsentRequestedMessage": "Vi har sendt samtykkeforespørselen. {{name}}s læringsdetaljer vises her så snart samtykket er aktivt.",
+        "pending": "Samtykke venter",
+        "pendingMessage": "{{name}} trenger aktivt samtykke før læringsfremgang kan vises.",
+        "redactedMessage": "Læringsmålinger er skjult til samtykket er aktivt.",
+        "restoreAction": "Gjenopprett samtykke",
+        "withdrawnMessage": "{{name}}s læringsdetaljer er skjult fordi samtykket ble trukket tilbake.",
+        "withdrawn": "Samtykke trukket tilbake"
       },
       "engagementTrend": {
         "declining": "Engagement declining",

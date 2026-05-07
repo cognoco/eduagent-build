@@ -332,7 +332,14 @@ export default function LanguageSetup() {
                   accessibilityState={{ selected }}
                   testID={`native-language-${option.code}`}
                 >
-                  <Text className="text-body font-semibold text-text-primary">
+                  <Text
+                    className="text-body font-semibold text-text-primary"
+                    testID={
+                      selected
+                        ? `native-language-selected-${option.code}`
+                        : undefined
+                    }
+                  >
                     {option.label}
                   </Text>
                 </Pressable>

@@ -276,9 +276,11 @@ describe('LanguageSetup', () => {
     // The Norwegian option should be selected by default (device locale is nb-NO)
     const nbButton = screen.getByTestId('native-language-nb');
     expect(nbButton.props.accessibilityState?.selected).toBe(true);
+    screen.getByTestId('native-language-selected-nb');
     // English should NOT be selected
     const enButton = screen.getByTestId('native-language-en');
     expect(enButton.props.accessibilityState?.selected).toBe(false);
+    expect(screen.queryByTestId('native-language-selected-en')).toBeNull();
   });
 
   it('routes back to More when returnTo=settings and Back is pressed', () => {

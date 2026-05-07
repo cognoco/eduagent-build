@@ -154,8 +154,21 @@ describe('ChatShell', () => {
   it('hides the input mode toggle by default [BUG-887]', () => {
     renderChatShell();
     expect(screen.queryByTestId('input-mode-toggle')).toBeNull();
+    screen.getByTestId('message-bubble-assistant-0');
     screen.getByTestId('chat-input');
     screen.getByTestId('send-button');
+  });
+
+  it('tags rendered messages by role and visible index for E2E assertions', () => {
+    renderChatShell({
+      messages: [
+        { id: 'ai-1', role: 'assistant', content: 'What should we try?' },
+        { id: 'user-1', role: 'user', content: 'A short answer.' },
+      ],
+    });
+
+    screen.getByTestId('message-bubble-assistant-0');
+    screen.getByTestId('message-bubble-user-1');
   });
 
   it('shows the input mode toggle when hideInputModeToggle is false [BUG-887]', () => {

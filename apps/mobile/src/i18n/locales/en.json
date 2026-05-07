@@ -546,7 +546,7 @@
       "loadingPicking": "Picking a theme...",
       "loadingAlmost": "Almost ready...",
       "challengeTitle": "Challenge round",
-      "challengeBody": "You're on a streak. This one is harder.",
+      "challengeBody": "Your mentor's making this harder — you've been crushing it.",
       "challengeStart": "Start",
       "challengeLabel": "Challenge round. This round is harder than usual.",
       "challengeStartLabel": "Start challenge round",
@@ -1581,6 +1581,11 @@
       "howItsWorking": "How it's working",
       "consentSettingsCouldNotLoad": "Consent settings could not load",
       "retryConsentSettings": "Retry",
+      "consentRestrictedTitle": "Consent needed before progress is shown",
+      "consentRestrictedPendingBody": "{{name}}'s learning details are hidden until consent is active. Check again after consent is completed.",
+      "consentRestrictedRequestedBody": "The consent request for {{name}} is already waiting for approval. Once it is approved, progress appears here automatically.",
+      "consentRestrictedWithdrawnBody": "{{name}}'s learning details are hidden because consent was withdrawn. Restore consent to keep the account active during the grace period.",
+      "checkConsentStatus": "Check consent status",
       "accountTitle": "Account — {{name}}",
       "accountTitleFallback": "Account",
       "deletionPending": "Deletion scheduled",
@@ -1912,10 +1917,16 @@
     "parentDashboard": {
       "consent": {
         "accessibilityLabel": "Consent status: {{status}}",
+        "checkStatusAction": "Check consent status",
         "consented": "Consent active",
+        "metricsHiddenTitle": "Progress is hidden for now",
         "parentalConsentRequested": "Waiting for parent approval",
+        "parentalConsentRequestedMessage": "We have sent the consent request. {{name}}'s learning details will appear here as soon as consent is active.",
         "pending": "Consent pending",
+        "pendingMessage": "{{name}} needs active consent before learning progress can be shown.",
         "redactedMessage": "Learning metrics are hidden until consent is active.",
+        "restoreAction": "Restore consent",
+        "withdrawnMessage": "{{name}}'s learning details are hidden because consent was withdrawn.",
         "withdrawn": "Consent withdrawn"
       },
       "engagementTrend": {

@@ -587,7 +587,8 @@ export function useRefreshProgressSnapshot(): UseMutationResult<
 }
 
 export function useChildInventory(
-  childProfileId: string | undefined
+  childProfileId: string | undefined,
+  options?: { enabled?: boolean }
 ): UseQueryResult<KnowledgeInventory | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -613,13 +614,17 @@ export function useChildInventory(
       }
     },
     enabled:
-      !!activeProfile && activeProfile.isOwner === true && !!childProfileId,
+      (options?.enabled ?? true) &&
+      !!activeProfile &&
+      activeProfile.isOwner === true &&
+      !!childProfileId,
   });
 }
 
 export function useChildProgressHistory(
   childProfileId: string | undefined,
-  query?: ProgressHistoryQuery
+  query?: ProgressHistoryQuery,
+  options?: { enabled?: boolean }
 ): UseQueryResult<ProgressHistory | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -650,7 +655,10 @@ export function useChildProgressHistory(
       }
     },
     enabled:
-      !!activeProfile && activeProfile.isOwner === true && !!childProfileId,
+      (options?.enabled ?? true) &&
+      !!activeProfile &&
+      activeProfile.isOwner === true &&
+      !!childProfileId,
   });
 }
 

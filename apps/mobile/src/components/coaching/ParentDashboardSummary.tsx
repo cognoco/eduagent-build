@@ -159,6 +159,35 @@ function consentStatusLabelKey(
   }
 }
 
+function consentStatusMessageKey(
+  status: ConsentStatus | null | undefined
+): string {
+  switch (status) {
+    case 'PENDING':
+      return 'coaching.parentDashboard.consent.pendingMessage';
+    case 'PARENTAL_CONSENT_REQUESTED':
+      return 'coaching.parentDashboard.consent.parentalConsentRequestedMessage';
+    case 'WITHDRAWN':
+      return 'coaching.parentDashboard.consent.withdrawnMessage';
+    default:
+      return 'coaching.parentDashboard.consent.redactedMessage';
+  }
+}
+
+function consentPrimaryLabelKey(
+  status: ConsentStatus | null | undefined
+): string {
+  switch (status) {
+    case 'WITHDRAWN':
+      return 'coaching.parentDashboard.consent.restoreAction';
+    case 'PENDING':
+    case 'PARENTAL_CONSENT_REQUESTED':
+      return 'coaching.parentDashboard.consent.checkStatusAction';
+    default:
+      return 'coaching.parentDashboard.viewDetails';
+  }
+}
+
 function engagementTrendLabelKey(
   trend: 'increasing' | 'stable' | 'declining'
 ): string {
@@ -208,6 +237,9 @@ export function ParentDashboardSummary({
     consentStatus != null && consentStatus !== 'CONSENTED';
   const consentLabelKey = consentStatusLabelKey(consentStatus);
   const consentLabel = consentLabelKey ? t(consentLabelKey) : '';
+  const primaryLabel = hasRestrictedConsent
+    ? t(consentPrimaryLabelKey(consentStatus))
+    : t('coaching.parentDashboard.viewDetails');
   const exchangeDelta = exchangesThisWeek - exchangesLastWeek;
   const guidedPercent = Math.round(guidedVsImmediateRatio * 100);
 
@@ -242,12 +274,17 @@ export function ParentDashboardSummary({
         </View>
       ) : null}
       {hasRestrictedConsent ? (
-        <Text
-          className="text-caption text-text-secondary"
+        <View
+          className="bg-background rounded-lg px-3 py-3"
           testID="consent-redacted-message"
         >
-          {t('coaching.parentDashboard.consent.redactedMessage')}
-        </Text>
+          <Text className="text-body-sm font-semibold text-text-primary">
+            {t('coaching.parentDashboard.consent.metricsHiddenTitle')}
+          </Text>
+          <Text className="text-caption text-text-secondary mt-1">
+            {t(consentStatusMessageKey(consentStatus), { name: childName })}
+          </Text>
+        </View>
       ) : null}
       {showFullSignals && !hasRestrictedConsent && (
         <View className="flex-row flex-wrap gap-2 mt-1.5">
@@ -442,7 +479,7 @@ export function ParentDashboardSummary({
     <BaseCoachingCard
       headline={childName}
       subtext={summary}
-      primaryLabel={t('coaching.parentDashboard.viewDetails')}
+      primaryLabel={primaryLabel}
       onPrimary={onDrillDown}
       metadata={metadata}
       isLoading={isLoading}

@@ -1581,6 +1581,11 @@
       "howItsWorking": "どのように機能しているか",
       "consentSettingsCouldNotLoad": "同意設定を読み込めませんでした",
       "retryConsentSettings": "再試行",
+      "consentRestrictedTitle": "進捗を表示するには同意が必要です",
+      "consentRestrictedPendingBody": "{{name}}の学習詳細は、同意が有効になるまで非表示です。同意が完了したら、もう一度確認してください。",
+      "consentRestrictedRequestedBody": "{{name}}の同意リクエストは承認待ちです。承認されると、進捗がここに自動的に表示されます。",
+      "consentRestrictedWithdrawnBody": "{{name}}の学習詳細は、同意が撤回されたため非表示です。猶予期間中にアカウントを有効に保つには、同意を復元してください。",
+      "checkConsentStatus": "同意ステータスを確認",
       "accountTitle": "アカウント — {{name}}",
       "accountTitleFallback": "アカウント",
       "deletionPending": "削除予定",
@@ -1911,12 +1916,18 @@
   "coaching": {
     "parentDashboard": {
       "consent": {
-        "accessibilityLabel": "Consent status: {{status}}",
-        "consented": "Consent active",
-        "parentalConsentRequested": "Waiting for parent approval",
-        "pending": "Consent pending",
-        "redactedMessage": "Learning metrics are hidden until consent is active.",
-        "withdrawn": "Consent withdrawn"
+        "accessibilityLabel": "同意ステータス: {{status}}",
+        "checkStatusAction": "同意ステータスを確認",
+        "consented": "同意は有効です",
+        "metricsHiddenTitle": "進捗は現在非表示です",
+        "parentalConsentRequested": "保護者の承認待ち",
+        "parentalConsentRequestedMessage": "同意リクエストを送信しました。同意が有効になると、{{name}}の学習詳細がここに表示されます。",
+        "pending": "同意待ち",
+        "pendingMessage": "{{name}}の学習進捗を表示するには、有効な同意が必要です。",
+        "redactedMessage": "学習指標は、同意が有効になるまで非表示です。",
+        "restoreAction": "同意を復元",
+        "withdrawnMessage": "{{name}}の学習詳細は、同意が撤回されたため非表示です。",
+        "withdrawn": "同意が撤回されました"
       },
       "engagementTrend": {
         "declining": "Engagement declining",

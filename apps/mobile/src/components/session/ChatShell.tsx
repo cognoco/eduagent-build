@@ -221,7 +221,7 @@ export function ChatShell({
   );
   const keyExtractor = useCallback((item: ChatMessage) => item.id, []);
   const renderMessageItem = useCallback(
-    ({ item: msg }: ListRenderItemInfo<ChatMessage>) => (
+    ({ item: msg, index }: ListRenderItemInfo<ChatMessage>) => (
       <View>
         {msg.imageUri && !failedImages.has(msg.id) && (
           <View className="self-end max-w-[85%] mb-1">
@@ -258,6 +258,7 @@ export function ChatShell({
           escalationRung={msg.escalationRung}
           verificationBadge={msg.verificationBadge}
           actions={renderMessageActions?.(msg)}
+          testID={`message-bubble-${msg.role}-${index}`}
         />
       </View>
     ),

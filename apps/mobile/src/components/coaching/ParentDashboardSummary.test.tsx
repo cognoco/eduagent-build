@@ -105,12 +105,28 @@ describe('ParentDashboardSummary', () => {
       screen.getByTestId('consent-status-badge');
       screen.getByText(expectedLabel);
       screen.getByTestId('consent-redacted-message');
+      screen.getByText('Progress is hidden for now');
       expect(screen.queryByTestId('engagement-trend-chip')).toBeNull();
       expect(screen.queryByTestId('exchange-delta-chip')).toBeNull();
       expect(screen.queryByTestId('guided-ratio-chip')).toBeNull();
       expect(screen.queryByTestId('streak-xp-chip')).toBeNull();
     }
   );
+
+  it('uses a consent-focused primary action for restricted consent', () => {
+    render(
+      <ParentDashboardSummary
+        {...defaultProps}
+        consentStatus="PARENTAL_CONSENT_REQUESTED"
+      />
+    );
+
+    screen.getByText('Check consent status');
+    fireEvent.press(
+      screen.getByTestId('dashboard-child-test-profile-123-primary')
+    );
+    expect(defaultProps.onDrillDown).toHaveBeenCalled();
+  });
 
   it('renders down trend correctly', () => {
     render(

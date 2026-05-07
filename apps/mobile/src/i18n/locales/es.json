@@ -1581,6 +1581,11 @@
       "howItsWorking": "Cómo está funcionando",
       "consentSettingsCouldNotLoad": "No se pudo cargar la configuración de consentimiento",
       "retryConsentSettings": "Reintentar",
+      "consentRestrictedTitle": "Se necesita consentimiento antes de mostrar el progreso",
+      "consentRestrictedPendingBody": "Los detalles de aprendizaje de {{name}} están ocultos hasta que el consentimiento esté activo. Vuelve a comprobarlo cuando se complete el consentimiento.",
+      "consentRestrictedRequestedBody": "La solicitud de consentimiento para {{name}} ya está esperando aprobación. Cuando se apruebe, el progreso aparecerá aquí automáticamente.",
+      "consentRestrictedWithdrawnBody": "Los detalles de aprendizaje de {{name}} están ocultos porque se retiró el consentimiento. Restablece el consentimiento para mantener la cuenta activa durante el período de gracia.",
+      "checkConsentStatus": "Comprobar estado del consentimiento",
       "accountTitle": "Cuenta — {{name}}",
       "accountTitleFallback": "Cuenta",
       "deletionPending": "Eliminación programada",
@@ -1911,12 +1916,18 @@
   "coaching": {
     "parentDashboard": {
       "consent": {
-        "accessibilityLabel": "Consent status: {{status}}",
-        "consented": "Consent active",
-        "parentalConsentRequested": "Waiting for parent approval",
-        "pending": "Consent pending",
-        "redactedMessage": "Learning metrics are hidden until consent is active.",
-        "withdrawn": "Consent withdrawn"
+        "accessibilityLabel": "Estado del consentimiento: {{status}}",
+        "checkStatusAction": "Comprobar estado del consentimiento",
+        "consented": "Consentimiento activo",
+        "metricsHiddenTitle": "El progreso está oculto por ahora",
+        "parentalConsentRequested": "Esperando aprobación de los padres",
+        "parentalConsentRequestedMessage": "Hemos enviado la solicitud de consentimiento. Los detalles de aprendizaje de {{name}} aparecerán aquí en cuanto el consentimiento esté activo.",
+        "pending": "Consentimiento pendiente",
+        "pendingMessage": "{{name}} necesita consentimiento activo antes de que se pueda mostrar el progreso de aprendizaje.",
+        "redactedMessage": "Las métricas de aprendizaje están ocultas hasta que el consentimiento esté activo.",
+        "restoreAction": "Restablecer consentimiento",
+        "withdrawnMessage": "Los detalles de aprendizaje de {{name}} están ocultos porque se retiró el consentimiento.",
+        "withdrawn": "Consentimiento retirado"
       },
       "engagementTrend": {
         "declining": "Engagement declining",

@@ -1,6 +1,7 @@
-# Flow: Subject onboarding fast path
-# Validates: create subject -> interview -> learning session without the four
-# legacy gating screens when ONBOARDING_FAST_PATH is enabled in the build.
+# Flow: Subject onboarding fast path (language)
+# Validates: create language subject -> interview -> language setup -> first
+# learning session without the legacy preference gates when ONBOARDING_FAST_PATH
+# is enabled in the build.
 appId: com.mentomate.app
 tags:
   - onboarding
@@ -26,7 +27,7 @@ tags:
 
 - tapOn:
     id: "create-subject-name"
-- inputText: "Photosynthesis fast path"
+- inputText: "Italian"
 - pressKey: back
 
 - extendedWaitUntil:
@@ -37,6 +38,22 @@ tags:
 - tapOn:
     id: "create-subject-submit"
 
+# Some resolver responses surface the lightweight confirmation card before
+# creation; direct language matches skip it and route straight to interview.
+- extendedWaitUntil:
+    visible:
+      id: "subject-confident-card"
+    timeout: 15000
+    optional: true
+
+- runFlow:
+    when:
+      visible:
+        id: "subject-confident-card"
+    commands:
+      - tapOn:
+          id: "subject-suggestion-accept"
+
 - extendedWaitUntil:
     visible:
       id: "chat-input"
@@ -44,7 +61,7 @@ tags:
 
 - tapOn:
     id: "chat-input"
-- inputText: "I want to learn the basics and I like football."
+- inputText: "I want to learn everyday Italian for travel."
 - pressKey: Enter
 
 - extendedWaitUntil:
@@ -54,7 +71,7 @@ tags:
 
 - tapOn:
     id: "chat-input"
-- inputText: "I know plants need sunlight but not much else."
+- inputText: "I only know ciao and grazie."
 - pressKey: Enter
 
 - extendedWaitUntil:
@@ -64,7 +81,7 @@ tags:
 
 - tapOn:
     id: "chat-input"
-- inputText: "Short examples are best."
+- inputText: "Short practice in small steps is best."
 - pressKey: Enter
 
 - extendedWaitUntil:
@@ -88,8 +105,32 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: "chat-input"
+      id: "language-setup-continue"
     timeout: 30000
+
+# E2E emulator images default to en-US; nb-NO preselection is covered by the
+# colocated language-setup unit test.
+- assertVisible:
+    id: "native-language-selected-en"
+
+- assertNotVisible:
+    id: "interests-context-continue"
+- assertNotVisible:
+    id: "analogy-preference-title"
+- assertNotVisible:
+    id: "accommodation-continue"
+- assertNotVisible:
+    id: "curriculum-loading"
+- assertNotVisible:
+    id: "continue-advanced-button"
+
+- tapOn:
+    id: "language-setup-continue"
+
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 45000
 
 - extendedWaitUntil:
     visible:

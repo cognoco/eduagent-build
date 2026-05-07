@@ -1581,6 +1581,11 @@
       "howItsWorking": "Wie es funktioniert",
       "consentSettingsCouldNotLoad": "Zustimmungseinstellungen konnten nicht geladen werden",
       "retryConsentSettings": "Wiederholen",
+      "consentRestrictedTitle": "Zustimmung erforderlich, bevor Fortschritt angezeigt wird",
+      "consentRestrictedPendingBody": "{{name}}s Lerndetails sind ausgeblendet, bis die Zustimmung aktiv ist. Prüfe erneut, nachdem die Zustimmung abgeschlossen wurde.",
+      "consentRestrictedRequestedBody": "Die Zustimmungsanfrage für {{name}} wartet bereits auf Genehmigung. Sobald sie genehmigt ist, erscheint der Fortschritt hier automatisch.",
+      "consentRestrictedWithdrawnBody": "{{name}}s Lerndetails sind ausgeblendet, weil die Zustimmung widerrufen wurde. Stelle die Zustimmung wieder her, um das Konto während der Kulanzfrist aktiv zu halten.",
+      "checkConsentStatus": "Zustimmungsstatus prüfen",
       "accountTitle": "Konto – {{name}}",
       "accountTitleFallback": "Konto",
       "deletionPending": "Löschung geplant",
@@ -1911,12 +1916,18 @@
   "coaching": {
     "parentDashboard": {
       "consent": {
-        "accessibilityLabel": "Consent status: {{status}}",
-        "consented": "Consent active",
-        "parentalConsentRequested": "Waiting for parent approval",
-        "pending": "Consent pending",
-        "redactedMessage": "Learning metrics are hidden until consent is active.",
-        "withdrawn": "Consent withdrawn"
+        "accessibilityLabel": "Zustimmungsstatus: {{status}}",
+        "checkStatusAction": "Zustimmungsstatus prüfen",
+        "consented": "Zustimmung aktiv",
+        "metricsHiddenTitle": "Fortschritt ist vorerst ausgeblendet",
+        "parentalConsentRequested": "Wartet auf Elterngenehmigung",
+        "parentalConsentRequestedMessage": "Wir haben die Zustimmungsanfrage gesendet. {{name}}s Lerndetails erscheinen hier, sobald die Zustimmung aktiv ist.",
+        "pending": "Zustimmung ausstehend",
+        "pendingMessage": "{{name}} benötigt eine aktive Zustimmung, bevor Lernfortschritt angezeigt werden kann.",
+        "redactedMessage": "Lernmetriken sind ausgeblendet, bis die Zustimmung aktiv ist.",
+        "restoreAction": "Zustimmung wiederherstellen",
+        "withdrawnMessage": "{{name}}s Lerndetails sind ausgeblendet, weil die Zustimmung widerrufen wurde.",
+        "withdrawn": "Zustimmung widerrufen"
       },
       "engagementTrend": {
         "declining": "Engagement declining",
