@@ -1,5 +1,6 @@
 import {
   extractedInterviewSignalsSchema,
+  firstCurriculumSessionStartSchema,
   sessionMessageSchema,
 } from './sessions.js';
 
@@ -43,6 +44,16 @@ describe('sessionMessageSchema', () => {
       imageMimeType: 'application/pdf',
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('firstCurriculumSessionStartSchema', () => {
+  it('accepts an explicit topicId override', () => {
+    const result = firstCurriculumSessionStartSchema.safeParse({
+      topicId: '00000000-0000-7000-8000-000000000001',
+      inputMode: 'text',
+    });
+    expect(result.success).toBe(true);
   });
 });
 

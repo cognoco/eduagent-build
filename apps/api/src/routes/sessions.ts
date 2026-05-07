@@ -68,6 +68,7 @@ import { generateRecallBridge } from '../services/recall-bridge';
 import { getProfileAgeBracket } from '../services/profile';
 import { markPersisted } from '../services/idempotency-marker';
 import {
+  isTopicIntentMatcherEnabled,
   isMemoryFactsReadEnabled,
   isMemoryFactsRelevanceEnabled,
 } from '../config';
@@ -89,6 +90,7 @@ type SessionRouteEnv = {
     DATABASE_URL: string;
     CLERK_JWKS_URL?: string;
     VOYAGE_API_KEY?: string;
+    MATCHER_ENABLED?: string;
     MEMORY_FACTS_READ_ENABLED?: string;
     MEMORY_FACTS_RELEVANCE_RETRIEVAL?: string;
     IDEMPOTENCY_KV?: KVNamespace;
@@ -142,7 +144,10 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           db,
           profileId,
           subjectId,
-          input
+          input,
+          {
+            matcherEnabled: isTopicIntentMatcherEnabled(c.env.MATCHER_ENABLED),
+          }
         );
         return c.json({ session }, 201);
       } catch (err) {

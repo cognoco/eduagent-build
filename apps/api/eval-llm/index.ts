@@ -34,6 +34,7 @@ import { exchangesFlow } from './flows/exchanges';
 import { interviewFlow } from './flows/interview';
 import { interviewSignalsFlow } from './flows/interview-signals';
 import { interviewOrphanFlow } from './flows/interview-orphan';
+import { topicIntentMatcherFlow } from './flows/topic-intent-matcher';
 import { probesFlow } from './flows/probes';
 import {
   listFlows,
@@ -83,6 +84,7 @@ const FLOWS: FlowDefinition[] = [
   interviewFlow as FlowDefinition,
   interviewSignalsFlow as FlowDefinition,
   interviewOrphanFlow as FlowDefinition,
+  topicIntentMatcherFlow as FlowDefinition,
   probesFlow as FlowDefinition,
 ];
 

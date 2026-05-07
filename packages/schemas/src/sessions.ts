@@ -247,6 +247,7 @@ export const firstCurriculumSessionStartSchema = sessionStartSchema
   .omit({ subjectId: true, topicId: true, metadata: true, rawInput: true })
   .extend({
     bookId: z.string().uuid().optional(),
+    topicId: z.string().uuid().optional(),
   });
 export type FirstCurriculumSessionStartInput = z.infer<
   typeof firstCurriculumSessionStartSchema
