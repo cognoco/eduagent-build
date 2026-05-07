@@ -6,6 +6,7 @@ import {
   useUsage,
   useFamilySubscription,
   useJoinByokWaitlist,
+  useRemoveFamilyProfile,
 } from './use-subscription';
 import {
   useCreateCheckout,
@@ -293,6 +294,79 @@ describe('useFamilySubscription', () => {
     });
 
     expect(result.current.data).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// useRemoveFamilyProfile
+// ---------------------------------------------------------------------------
+
+describe('useRemoveFamilyProfile', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    queryClient.clear();
+  });
+
+  it('calls POST /subscription/family/remove with profileId', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          message: 'Profile removed from family subscription',
+          removedProfileId: '550e8400-e29b-41d4-a716-446655440000',
+        }),
+        { status: 200 }
+      )
+    );
+
+    const { result } = renderHook(() => useRemoveFamilyProfile(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      result.current.mutate('550e8400-e29b-41d4-a716-446655440000');
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(mockFetch).toHaveBeenCalled();
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain('/subscription/family/remove');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual({
+      profileId: '550e8400-e29b-41d4-a716-446655440000',
+    });
+    expect(result.current.data?.removedProfileId).toBe(
+      '550e8400-e29b-41d4-a716-446655440000'
+    );
+  });
+
+  it('handles API error', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response('Forbidden', {
+        status: 403,
+        statusText: 'Forbidden',
+      })
+    );
+
+    const { result } = renderHook(() => useRemoveFamilyProfile(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      result.current.mutate('550e8400-e29b-41d4-a716-446655440000');
+    });
+
+    await waitFor(() => {
+      expect(result.current.isError).toBe(true);
+    });
+
+    expect(result.current.error).toBeInstanceOf(Error);
   });
 });
 

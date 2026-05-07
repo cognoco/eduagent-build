@@ -45,7 +45,7 @@
     "exchangeLimitExceeded": "セッションの上限に達しました。続けるには新しいセッションを開始してください。",
     "subjectInactive": "この科目は現在一時停止中です。科目リストから再開できます。",
     "notLanguageLearning": "この科目は言語学習用に設定されていません。標準の学習パスをお試しください。",
-    "curriculumNotFound": "学習パスがまだ設定されていません。戻って、まずインタビューを開始してください。",
+    "curriculumNotFound": "学習パスがまだ設定されていません。戻ってもう一度お試しください。",
     "topicNotFound": "そのトピックは現在利用できません。別のトピックを選んでみてください。",
     "draftNotFound": "進行状況が失われました。もう一度やり直してください。",
     "profileNotFound": "プロフィールの読み込み中に問題が発生しました。サインアウトしてから再度サインインしてください。",
@@ -79,7 +79,7 @@
   "friendlyErrors": {
     "notLanguageLearning": "この科目は言語学習用に設定されていません。標準の学習パスをお試しください。",
     "subjectPaused": "この科目は現在一時停止中です。科目リストから再開できます。",
-    "curriculumNotFound": "学習パスがまだ設定されていません。戻って、まずインタビューを開始してください。",
+    "curriculumNotFound": "学習パスがまだ設定されていません。戻ってもう一度お試しください。",
     "topicNotFound": "そのトピックは現在利用できません。別のトピックを選んでみてください。",
     "draftNotFound": "進行状況が失われました。もう一度やり直してください。",
     "profileNotFound": "プロフィールの読み込み中に問題が発生しました。サインアウトしてから再度サインインしてください。",
@@ -357,6 +357,7 @@
         "tellMentor": "メンターに伝える",
         "learningStyle": "学習スタイル",
         "interests": "興味",
+        "interestsContextHint": "それぞれの興味がどこに当てはまるか選ぶと、その場に合った例になります。",
         "strengths": "得意なこと",
         "struggles": "改善中のこと",
         "communicationNotes": "コミュニケーションメモ",
@@ -1359,148 +1360,6 @@
       "saveErrorMessage": "問題が発生しました。もう一度お試しください。",
       "somethingElse": "その他",
       "customPlaceholder": "例：they/them"
-    },
-    "accommodations": {
-      "title": "学習上のサポートは必要ですか？",
-      "subtitle": "あなたの学習方法に合わせてレッスンを調整します（任意）。",
-      "skipForNow": "今はスキップ",
-      "loadErrorTitle": "サポート情報を読み込めませんでした",
-      "loadErrorMessage": "接続を確認して、もう一度お試しください。",
-      "saveErrorTitle": "サポート情報を保存できませんでした",
-      "saveErrorMessage": "問題が発生しました。もう一度お試しください。",
-      "noSubjectTitle": "科目が選択されていません",
-      "noSubjectMessage": "サポートを設定する前に、ライブラリから科目を選んでください",
-      "openLibrary": "ライブラリを開く"
-    },
-    "analogyPreference": {
-      "title": "どのように説明されるのが好きですか？",
-      "subtitle": "アナロジーのスタイルを選んでください（任意）。これは後で科目の設定でいつでも変更できます。",
-      "skipForNow": "今はスキップ",
-      "skipLabel": "アナロジーの好みをスキップ",
-      "saveErrorTitle": "好みを保存できませんでした"
-    },
-    "interestsContext": {
-      "title": "これを学ぶ背景は何ですか？",
-      "subtitle": "例や演習を調整するのに役立ちます（任意）。",
-      "skipForNow": "今はスキップ",
-      "saveErrorTitle": "興味の背景を保存できませんでした",
-      "contexts": {
-        "school": {
-          "label": "学校 / 大学",
-          "hint": "学業や試験準備に合わせた例を提示します。"
-        },
-        "work": {
-          "label": "仕事 / キャリア",
-          "hint": "専門的で実践的な応用に焦点を当てます。"
-        },
-        "personal": {
-          "label": "個人的な興味",
-          "hint": "探求的で好奇心に基づいた内容にします。"
-        },
-        "other": {
-          "label": "その他",
-          "hint": "柔軟で一般的な内容にします。"
-        }
-      },
-      "saveErrorMessage": "興味を保存できませんでした — もう一度お試しください",
-      "skipAll": "スキップ"
-    },
-    "interview": {
-      "title": "{{target}}の準備",
-      "newSubject": "あなたの科目",
-      "openingWithTarget": "こんにちは！あなたの学習メイトです。まず、あなたと{{target}}について少し知りたいです。そうすれば、推測ではなく、ちょうどよいレベルでサポートできます。今知っていることを教えてください。ざっくりで大丈夫です。",
-      "openingGeneric": "こんにちは！あなたの学習メイトです。まず、あなたについて少し知りたいです。そうすれば、推測ではなく、ちょうどよいレベルでサポートできます。今知っていることを教えてください。ざっくりで大丈夫です。",
-      "explainerTitle": "なぜ最初に質問するの？",
-      "explainerBody": "あなたの答えで、ちょうどよい始め方を選べます。この短い準備のあと、あなたに合う説明や練習ができます。",
-      "missingSubject": "科目が選択されていません。戻って、もう一度お試しください。",
-      "sessionCreationStuck": "セッションの作成に想定より時間がかかっています。戻って、もう一度お試しください。",
-      "settingUp": "セッションを準備中…",
-      "completionTitle": "評価完了！",
-      "completionBody": "パーソナライズされたカリキュラムを作成するのに十分な情報を集めました。",
-      "letsGo": "始めましょう",
-      "streamError": "問題が発生しました。もう一度お試しください。",
-      "forceCompleteTimeout": "まだ作業中です…タップして続行。",
-      "skip": "スキップ",
-      "skipThisQuestion": "この質問をスキップ",
-      "skipAndFinish": "スキップして終了",
-      "expiredTitle": "セッションが期限切れです",
-      "expiredBody": "評価セッションが期限切れになりました。再開してください。",
-      "restartButton": "評価を再開",
-      "doneButton": "完了",
-      "saveErrorTitle": "回答を保存できませんでした",
-      "sessionErrorTitle": "セッションエラー",
-      "completionErrorTitle": "セッションを完了できませんでした",
-      "restartErrorTitle": "再開できませんでした",
-      "skipErrorTitle": "スキップできませんでした",
-      "startLearning": "学習を開始",
-      "streamErrorTitle": "問題が発生しました",
-      "tryAgainLabel": "再試行",
-      "settingUpCurriculum": "カリキュラムを準備中…",
-      "skipButtonProminent": "インタビューをスキップ",
-      "skipButton": "スキップ"
-    },
-    "curriculumReview": {
-      "title": "あなたのカリキュラム",
-      "suggestChanges": "変更を提案",
-      "loadingTimeout": {
-        "title": "まだ読み込み中…",
-        "body": "カリキュラムの読み込みに想定より時間がかかっています。接続を確認して、もう一度お試しください。"
-      },
-      "loadingCurriculum": "カリキュラムを読み込み中...",
-      "loadError": {
-        "title": "カリキュラムを読み込めませんでした",
-        "body": "接続を確認して、もう一度お試しください。"
-      },
-      "generating": {
-        "title": "カリキュラムを作成中…",
-        "body": "通常、10〜20秒かかります。"
-      },
-      "noCurriculum": {
-        "title": "まだカリキュラムがありません",
-        "message": "評価インタビューを完了して、学習パスを生成してください。"
-      },
-      "versionInfo": "バージョン {{version}} — {{count}}トピック",
-      "whyOrderLabel": "なぜ{{title}}はこの順序なのですか",
-      "whyOrder": "なぜこの順序？",
-      "explaining": "説明中...",
-      "skipTopicTitle": "このトピックをスキップしますか？",
-      "skipTopicBody": "後でいつでも元に戻せます。",
-      "skipAction": "スキップ",
-      "skipErrorTitle": "トピックをスキップできませんでした",
-      "restoreErrorTitle": "トピックを復元できませんでした",
-      "restoreLabel": "{{title}}を復元",
-      "restore": "復元",
-      "addTopic": "トピックを追加",
-      "placementCheck": {
-        "mostSkipped": "このカリキュラムのほとんどをスキップしました",
-        "hint": "より速いパスをご希望ですか？プレースメントチェックを受けるか、残りの上級トピックを続けるか、別の科目に切り替えることができます。",
-        "takePlacement": "プレースメントチェックを受ける",
-        "continueAdvanced": "上級トピックを続ける",
-        "chooseDifferent": "別の科目を選ぶ"
-      },
-      "startLearning": "学習を開始：{{title}}",
-      "exploreFirst": "まず探検する",
-      "continueToHome": "ホームへ進む",
-      "challengeModal": {
-        "title": "トピックを変更",
-        "body": "変更したい点を教えてください。学習パスを再生成します。",
-        "placeholder": "例：基礎はすでに知っているので、入門トピックはスキップしてください...",
-        "regenerate": "再生成"
-      },
-      "addTopicModal": {
-        "title": "トピックを追加",
-        "body": "生成されたカリキュラムにないものを追加してください。まずきれいなタイトルを提案し、保存する前に編集できます。",
-        "topicLabel": "トピック",
-        "topicPlaceholder": "例：三角法、フランス革命",
-        "descriptionLabel": "説明",
-        "descriptionPlaceholder": "短い説明",
-        "minutesLabel": "推定時間（分）",
-        "minutesPlaceholder": "30",
-        "addTopic": "トピックを追加",
-        "preview": "プレビュー"
-      },
-      "addTopicValidationError": "タイトル、説明、推定時間を追加してください。",
-      "updateFailedTitle": "カリキュラムの更新に失敗しました"
     }
   },
   "parentView": {
@@ -1581,6 +1440,11 @@
       "howItsWorking": "どのように機能しているか",
       "consentSettingsCouldNotLoad": "同意設定を読み込めませんでした",
       "retryConsentSettings": "再試行",
+      "consentRestrictedTitle": "進捗を表示するには同意が必要です",
+      "consentRestrictedPendingBody": "{{name}}の学習詳細は、同意が有効になるまで非表示です。同意が完了したら、もう一度確認してください。",
+      "consentRestrictedRequestedBody": "{{name}}の同意リクエストは承認待ちです。承認されると、進捗がここに自動的に表示されます。",
+      "consentRestrictedWithdrawnBody": "{{name}}の学習詳細は、同意が撤回されたため非表示です。猶予期間中にアカウントを有効に保つには、同意を復元してください。",
+      "checkConsentStatus": "同意ステータスを確認",
       "accountTitle": "アカウント — {{name}}",
       "accountTitleFallback": "アカウント",
       "deletionPending": "削除予定",
@@ -1795,21 +1659,6 @@
       "reportGoneBody": "アーカイブされたか、削除された可能性があります。他のすべてのレポートは安全です。"
     }
   },
-  "interview": {
-    "completing": {
-      "initial": "セッションを終了中…",
-      "almost": "もうすぐです…",
-      "softFallback": "まだ作業中です…"
-    },
-    "failed": {
-      "extractSignalsFailed": "セッションの読み取り中に問題が発生しました。あなたの進捗は安全です。",
-      "topicResolutionFailed": "セッションをトピックに整理できませんでした。以下で再試行できます。",
-      "unknown": "セッションの終了中に問題が発生しました。以下で再試行できます。",
-      "retryError": "再試行できませんでした。もう一度お試しください。",
-      "tryAgain": "再試行",
-      "retrying": "再試行中…"
-    }
-  },
   "tabs": {
     "profileSwitchedToast": {
       "title": "プロフィールが切り替わりました",
@@ -1911,12 +1760,18 @@
   "coaching": {
     "parentDashboard": {
       "consent": {
-        "accessibilityLabel": "Consent status: {{status}}",
-        "consented": "Consent active",
-        "parentalConsentRequested": "Waiting for parent approval",
-        "pending": "Consent pending",
-        "redactedMessage": "Learning metrics are hidden until consent is active.",
-        "withdrawn": "Consent withdrawn"
+        "accessibilityLabel": "同意ステータス: {{status}}",
+        "checkStatusAction": "同意ステータスを確認",
+        "consented": "同意は有効です",
+        "metricsHiddenTitle": "進捗は現在非表示です",
+        "parentalConsentRequested": "保護者の承認待ち",
+        "parentalConsentRequestedMessage": "同意リクエストを送信しました。同意が有効になると、{{name}}の学習詳細がここに表示されます。",
+        "pending": "同意待ち",
+        "pendingMessage": "{{name}}の学習進捗を表示するには、有効な同意が必要です。",
+        "redactedMessage": "学習指標は、同意が有効になるまで非表示です。",
+        "restoreAction": "同意を復元",
+        "withdrawnMessage": "{{name}}の学習詳細は、同意が撤回されたため非表示です。",
+        "withdrawn": "同意が撤回されました"
       },
       "engagementTrend": {
         "declining": "Engagement declining",

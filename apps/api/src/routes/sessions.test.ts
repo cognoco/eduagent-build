@@ -547,9 +547,7 @@ describe('session routes', () => {
 
       expect(res.status).toBe(201);
       const body = await res.json();
-      expect(body.session.topicId).toBe(
-        '770e8400-e29b-41d4-a716-446655440001'
-      );
+      expect(body.session.topicId).toBe('770e8400-e29b-41d4-a716-446655440001');
       expect(startFirstCurriculumSession).toHaveBeenCalledWith(
         expect.anything(),
         'test-profile-id',
@@ -557,7 +555,32 @@ describe('session routes', () => {
         expect.objectContaining({
           sessionType: 'learning',
           inputMode: 'text',
-        })
+        }),
+        { matcherEnabled: false }
+      );
+    });
+
+    it('passes the topic intent matcher flag when enabled', async () => {
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/sessions/first-curriculum`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ sessionType: 'learning', inputMode: 'text' }),
+        },
+        { ...TEST_ENV, MATCHER_ENABLED: 'true' }
+      );
+
+      expect(res.status).toBe(201);
+      expect(startFirstCurriculumSession).toHaveBeenLastCalledWith(
+        expect.anything(),
+        'test-profile-id',
+        SUBJECT_ID,
+        expect.objectContaining({
+          sessionType: 'learning',
+          inputMode: 'text',
+        }),
+        { matcherEnabled: true }
       );
     });
   });

@@ -21,7 +21,9 @@ import { Button } from '../components/common/Button';
 import { useKeyboardScroll } from '../hooks/use-keyboard-scroll';
 import { formatApiError } from '../lib/format-api-error';
 import { homeHrefForReturnTo, goBackOrReplace } from '../lib/navigation';
-import type { SubjectResolveResult } from '@eduagent/schemas';
+import { useApiClient } from '../lib/api-client';
+import { assertOk } from '../lib/assert-ok';
+import type { LearningSession, SubjectResolveResult } from '@eduagent/schemas';
 
 /** Strip markdown bold markers so `**Science**` renders as plain "Science". */
 function stripBold(text: string): string {
@@ -70,6 +72,7 @@ export default function CreateSubjectScreen() {
   const colors = useThemeColors();
   const createSubject = useCreateSubject();
   const resolveSubject = useResolveSubject();
+  const apiClient = useApiClient();
   const {
     data: existingSubjects,
     isError: existingSubjectsError,
@@ -93,6 +96,39 @@ export default function CreateSubjectScreen() {
   // before any router navigation and inside catch before showing alerts.
   const cancelledRef = useRef(false);
   const { scrollRef, onFieldLayout, onFieldFocus } = useKeyboardScroll();
+
+  const transitionToFirstSession = useCallback(
+    async (input: {
+      subjectId: string;
+      subjectName: string;
+      bookId?: string;
+    }) => {
+      const res = await apiClient.subjects[':subjectId'].sessions[
+        'first-curriculum'
+      ].$post({
+        param: { subjectId: input.subjectId },
+        json: {
+          ...(input.bookId ? { bookId: input.bookId } : {}),
+          sessionType: 'learning',
+          inputMode: 'text',
+        },
+      });
+      const okRes = await assertOk(res);
+      const data = (await okRes.json()) as { session: LearningSession };
+      if (cancelledRef.current) return;
+      router.replace({
+        pathname: '/(app)/session',
+        params: {
+          mode: 'learning',
+          subjectId: input.subjectId,
+          subjectName: input.subjectName,
+          sessionId: data.session.id,
+          topicId: data.session.topicId ?? undefined,
+        },
+      } as never);
+    },
+    [apiClient, router]
+  );
 
   // [M4] 30s timeout on resolve phase — show error + retry
   useEffect(() => {
@@ -164,17 +200,11 @@ export default function CreateSubjectScreen() {
         }
 
         if (result.structureType === 'focused_book' && result.bookId) {
-          router.replace({
-            pathname: '/(app)/onboarding/interview',
-            params: {
-              subjectId: result.subject.id,
-              subjectName: result.subject.name,
-              bookId: result.bookId,
-              bookTitle: result.bookTitle ?? focus,
-              step: '1',
-              totalSteps: '4',
-            },
-          } as never);
+          await transitionToFirstSession({
+            subjectId: result.subject.id,
+            subjectName: result.subject.name,
+            bookId: result.bookId,
+          });
           return;
         }
 
@@ -190,7 +220,7 @@ export default function CreateSubjectScreen() {
 
         if (result.subject.pedagogyMode === 'four_strands') {
           router.replace({
-            pathname: '/(app)/onboarding/interview',
+            pathname: '/(app)/onboarding/language-setup',
             params: {
               subjectId: result.subject.id,
               subjectName: result.subject.name,
@@ -201,21 +231,16 @@ export default function CreateSubjectScreen() {
                   }
                 : {}),
               step: '1',
-              totalSteps: '4',
+              totalSteps: '1',
             },
           } as never);
           return;
         }
 
-        router.replace({
-          pathname: '/(app)/onboarding/interview',
-          params: {
-            subjectId: result.subject.id,
-            subjectName: result.subject.name,
-            step: '1',
-            totalSteps: '4',
-          },
-        } as never);
+        await transitionToFirstSession({
+          subjectId: result.subject.id,
+          subjectName: result.subject.name,
+        });
       } catch (err: unknown) {
         // [BUG-692] Don't show error alert if user already navigated away.
         if (cancelledRef.current) return;
@@ -227,7 +252,14 @@ export default function CreateSubjectScreen() {
         setResolveState({ phase: 'idle' });
       }
     },
-    [createSubject, router, originalInput, returnTo, chatTopic]
+    [
+      createSubject,
+      router,
+      originalInput,
+      returnTo,
+      chatTopic,
+      transitionToFirstSession,
+    ]
   );
 
   const resolveInput = useCallback(

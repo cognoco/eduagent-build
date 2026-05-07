@@ -17,8 +17,6 @@ run_seeded "parent-with-children" "flows/account/profile-switching.yaml"
 
 # Onboarding (batch 1 failures + fixes)
 run_seeded "onboarding-complete" "flows/onboarding/create-subject.yaml"
-run_seeded "onboarding-complete" "flows/onboarding/analogy-preference-flow.yaml"
-run_seeded "onboarding-complete" "flows/onboarding/curriculum-review-flow.yaml"
 
 # Billing (batch 1 failures)
 run_seeded "trial-expired-child" "flows/billing/child-paywall.yaml"

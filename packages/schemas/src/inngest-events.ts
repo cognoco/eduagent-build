@@ -40,18 +40,6 @@ export const filingResolvedEventSchema = z.object({
 });
 export type FilingResolvedEvent = z.infer<typeof filingResolvedEventSchema>;
 
-export const interviewReadyToPersistEventSchema = z.object({
-  version: z.literal(1),
-  draftId: z.string().uuid(),
-  profileId: z.string().uuid(),
-  subjectId: z.string().uuid(),
-  subjectName: z.string().min(1),
-  bookId: z.string().uuid().optional(),
-});
-export type InterviewReadyToPersistEvent = z.infer<
-  typeof interviewReadyToPersistEventSchema
->;
-
 export const subjectCurriculumPrewarmRequestedEventSchema = z.object({
   version: z.literal(1),
   subjectId: z.string().uuid(),
@@ -94,4 +82,18 @@ export const reviewCalibrationRequestedEventSchema = z.object({
 });
 export type ReviewCalibrationRequestedEvent = z.infer<
   typeof reviewCalibrationRequestedEventSchema
+>;
+
+export const topicProbeRequestedEventSchema = z.object({
+  version: z.literal(1),
+  profileId: z.string().uuid(),
+  sessionId: z.string().uuid(),
+  subjectId: z.string().uuid(),
+  topicId: z.string().uuid(),
+  learnerMessage: z.string().min(1),
+  topicTitle: z.string().min(1),
+  timestamp: z.string().datetime(),
+});
+export type TopicProbeRequestedEvent = z.infer<
+  typeof topicProbeRequestedEventSchema
 >;

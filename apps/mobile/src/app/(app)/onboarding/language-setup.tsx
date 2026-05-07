@@ -16,7 +16,6 @@ import type { CefrLevel } from '@eduagent/schemas';
 import { useConfigureLanguageSubject } from '../../../hooks/use-subjects';
 import { useStartFirstCurriculumSession } from '../../../hooks/use-sessions';
 import { formatApiError } from '../../../lib/format-api-error';
-import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import { useThemeColors } from '../../../lib/theme';
 import { goBackOrReplace } from '../../../lib/navigation';
 
@@ -94,30 +93,20 @@ export default function LanguageSetup() {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const {
-    subjectId,
-    subjectName,
-    languageName,
-    languageCode,
-    step: stepParam,
-    totalSteps: totalStepsParam,
-    returnTo,
-  } = useLocalSearchParams<{
-    subjectId?: string;
-    subjectName?: string;
-    languageName?: string;
-    languageCode?: string;
-    step?: string;
-    totalSteps?: string;
-    returnTo?: string;
-  }>();
+  const { subjectId, subjectName, languageName, returnTo } =
+    useLocalSearchParams<{
+      subjectId?: string;
+      subjectName?: string;
+      languageName?: string;
+      returnTo?: string;
+    }>();
   const configureLanguageSubject = useConfigureLanguageSubject();
   const startFirstCurriculumSession = useStartFirstCurriculumSession(
     subjectId ?? ''
   );
+  const isContinuing =
+    configureLanguageSubject.isPending || startFirstCurriculumSession.isPending;
   const colors = useThemeColors(); // [BUG-118]
-  const step = Number(stepParam) || 2;
-  const totalSteps = Number(totalStepsParam) || 4;
   const [nativeLanguage, setNativeLanguage] = useState<string>(() =>
     getDeviceNativeLanguage()
   );
@@ -144,26 +133,8 @@ export default function LanguageSetup() {
       goBackOrReplace(router, '/(app)/more' as Href);
       return;
     }
-    goBackOrReplace(router, {
-      pathname: '/(app)/onboarding/interview',
-      params: {
-        subjectId: subjectId ?? '',
-        subjectName: subjectName ?? languageName ?? '',
-        languageCode: languageCode ?? '',
-        languageName: languageName ?? '',
-        step: '1',
-        totalSteps: String(totalSteps),
-      },
-    });
-  }, [
-    languageCode,
-    languageName,
-    returnTo,
-    router,
-    subjectId,
-    subjectName,
-    totalSteps,
-  ]);
+    goBackOrReplace(router, '/(app)/home' as Href);
+  }, [returnTo, router]);
 
   const handleContinue = async () => {
     if (!subjectId) return;
@@ -182,40 +153,26 @@ export default function LanguageSetup() {
         startingLevel,
       });
       // BUG-692-FOLLOWUP: User pressed Back while the mutation was in flight —
-      // don't navigate to accommodations from a screen the user has already left.
+      // don't navigate to session from a screen the user has already left.
       if (cancelledRef.current) return;
       // ACCOUNT-29: Settings re-entry saves and routes back to More.
       if (returnTo === 'settings') {
         goBackOrReplace(router, '/(app)/more' as Href);
         return;
       }
-      if (FEATURE_FLAGS.ONBOARDING_FAST_PATH) {
-        const result = await startFirstCurriculumSession.mutateAsync({
-          sessionType: 'learning',
-          inputMode: 'text',
-        });
-        if (cancelledRef.current) return;
-        router.replace({
-          pathname: '/(app)/session',
-          params: {
-            mode: 'learning',
-            subjectId,
-            sessionId: result.session.id,
-            topicId: result.session.topicId ?? undefined,
-            subjectName: subjectName ?? languageName ?? '',
-          },
-        } as never);
-        return;
-      }
+      const result = await startFirstCurriculumSession.mutateAsync({
+        sessionType: 'learning',
+        inputMode: 'text',
+      });
+      if (cancelledRef.current) return;
       router.replace({
-        pathname: '/(app)/onboarding/accommodations',
+        pathname: '/(app)/session',
         params: {
+          mode: 'learning',
           subjectId,
+          sessionId: result.session.id,
+          topicId: result.session.topicId ?? undefined,
           subjectName: subjectName ?? languageName ?? '',
-          languageCode: languageCode ?? '',
-          languageName: languageName ?? '',
-          step: String(Math.min(step + 1, totalSteps)),
-          totalSteps: String(totalSteps),
         },
       } as never);
     } catch (err: unknown) {
@@ -332,7 +289,14 @@ export default function LanguageSetup() {
                   accessibilityState={{ selected }}
                   testID={`native-language-${option.code}`}
                 >
-                  <Text className="text-body font-semibold text-text-primary">
+                  <Text
+                    className="text-body font-semibold text-text-primary"
+                    testID={
+                      selected
+                        ? `native-language-selected-${option.code}`
+                        : undefined
+                    }
+                  >
                     {option.label}
                   </Text>
                 </Pressable>
@@ -393,11 +357,11 @@ export default function LanguageSetup() {
 
         <Pressable
           onPress={() => void handleContinue()}
-          disabled={configureLanguageSubject.isPending}
+          disabled={isContinuing}
           className="bg-primary rounded-button py-3.5 items-center mt-8"
           testID="language-setup-continue"
         >
-          {configureLanguageSubject.isPending ? (
+          {isContinuing ? (
             <ActivityIndicator color={colors.textInverse} />
           ) : (
             <Text className="text-text-inverse text-body font-semibold">

@@ -29,6 +29,13 @@ const mockFetch = createRoutedMockFetch({
     suggestions: [],
     displayMessage: '',
   },
+  '/sessions/first-curriculum': {
+    session: {
+      id: 'session-first',
+      subjectId: 'subject-1',
+      topicId: 'topic-first',
+    },
+  },
   '/subjects': { subjects: [] },
 });
 
@@ -63,6 +70,7 @@ let mockSearchParams: Record<string, string> = {};
 
 let mockCanGoBackValue = true;
 const mockCanGoBack = jest.fn(() => mockCanGoBackValue);
+let activeQueryClient: QueryClient | null = null;
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
@@ -85,6 +93,14 @@ jest.mock('../lib/theme', () => ({
   }),
 }));
 
+jest.mock(
+  '../lib/format-api-error',
+  /* gc1-allow: error formatting */ () => ({
+    formatApiError: (error: unknown) =>
+      error instanceof Error ? error.message : 'Something went wrong',
+  })
+);
+
 // NOT an API hook — keep as-is.
 jest.mock('../hooks/use-keyboard-scroll', () => ({
   useKeyboardScroll: () => ({
@@ -96,8 +112,12 @@ jest.mock('../hooks/use-keyboard-scroll', () => ({
 
 function createWrapper() {
   const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0 },
+      mutations: { retry: false, gcTime: 0 },
+    },
   });
+  activeQueryClient = queryClient;
   return function Wrapper({ children }: { children: React.ReactNode }) {
     return (
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
@@ -153,6 +173,14 @@ const defaultResolveHandler = {
   displayMessage: '',
 };
 
+const defaultFirstCurriculumHandler = {
+  session: {
+    id: 'session-first',
+    subjectId: 'subject-1',
+    topicId: 'topic-first',
+  },
+};
+
 describe('CreateSubjectScreen', () => {
   let Wrapper: React.ComponentType<{ children: React.ReactNode }>;
 
@@ -167,8 +195,17 @@ describe('CreateSubjectScreen', () => {
     mockCanGoBackValue = true;
     // Restore routes to defaults so per-test setRoute overrides don't leak.
     mockFetch.setRoute('/subjects/resolve', defaultResolveHandler);
+    mockFetch.setRoute(
+      '/sessions/first-curriculum',
+      defaultFirstCurriculumHandler
+    );
     mockFetch.setRoute('/subjects', defaultSubjectsHandler);
     Wrapper = createWrapper();
+  });
+
+  afterEach(() => {
+    activeQueryClient?.clear();
+    activeQueryClient = null;
   });
 
   it('renders starter chips and fills the input on tap', () => {
@@ -290,12 +327,13 @@ describe('CreateSubjectScreen', () => {
     });
 
     expect(mockReplace).toHaveBeenCalledWith({
-      pathname: '/(app)/onboarding/interview',
+      pathname: '/(app)/session',
       params: {
+        mode: 'learning',
         subjectId: 'subject-1',
         subjectName: 'leaf cutter ants',
-        step: '1',
-        totalSteps: '4',
+        sessionId: 'session-first',
+        topicId: 'topic-first',
       },
     });
   });
@@ -388,16 +426,15 @@ describe('CreateSubjectScreen', () => {
       });
     });
 
-    // Should navigate to interview with the focused book
+    // Should start the first session with the focused book.
     expect(mockReplace).toHaveBeenCalledWith({
-      pathname: '/(app)/onboarding/interview',
+      pathname: '/(app)/session',
       params: {
+        mode: 'learning',
         subjectId: 'subject-wh',
         subjectName: 'World History',
-        bookId: 'book-easter',
-        bookTitle: 'Easter',
-        step: '1',
-        totalSteps: '4',
+        sessionId: 'session-first',
+        topicId: 'topic-first',
       },
     });
   });
@@ -576,16 +613,15 @@ describe('CreateSubjectScreen', () => {
       });
     });
 
-    // Should navigate to interview (focused_book path), not library
+    // Should start the first session (focused_book path), not library.
     expect(mockReplace).toHaveBeenCalledWith({
-      pathname: '/(app)/onboarding/interview',
+      pathname: '/(app)/session',
       params: {
+        mode: 'learning',
         subjectId: 'subject-botany',
         subjectName: 'Botany',
-        bookId: 'book-tea',
-        bookTitle: 'tea',
-        step: '1',
-        totalSteps: '4',
+        sessionId: 'session-first',
+        topicId: 'topic-first',
       },
     });
   });
@@ -970,11 +1006,10 @@ describe('CreateSubjectScreen', () => {
     // Only the cancel-triggered replace should have been called once (not twice)
     const replaceCalls = mockReplace.mock.calls;
     // All replace calls should be from the cancel handler, not from the mutation result
-    // (The cancel replaces to home/library, not to onboarding/interview)
+    // (The cancel replaces to home/library, not to the first session)
     const hasOnboardingNav = replaceCalls.some(
       (call) =>
-        typeof call[0] === 'object' &&
-        call[0]?.pathname === '/(app)/onboarding/interview'
+        typeof call[0] === 'object' && call[0]?.pathname === '/(app)/session'
     );
     expect(hasOnboardingNav).toBe(false);
   });
@@ -1139,12 +1174,13 @@ describe('CreateSubjectScreen', () => {
 
     await waitFor(() => {
       expect(mockReplace).toHaveBeenCalledWith({
-        pathname: '/(app)/onboarding/interview',
+        pathname: '/(app)/session',
         params: {
+          mode: 'learning',
           subjectId: 'subject-italian',
           subjectName: 'Italian',
-          step: '1',
-          totalSteps: '4',
+          sessionId: 'session-first',
+          topicId: 'topic-first',
         },
       });
     });
@@ -1223,18 +1259,12 @@ describe('CreateSubjectScreen — keyboard avoiding behavior', () => {
     // Restore routes to defaults so per-test overrides don't leak between suites.
     mockFetch.setRoute('/subjects/resolve', defaultResolveHandler);
     mockFetch.setRoute('/subjects', defaultSubjectsHandler);
-    Wrapper = (() => {
-      const queryClient = new QueryClient({
-        defaultOptions: { queries: { retry: false, gcTime: 0 } },
-      });
-      return function W({ children }: { children: React.ReactNode }) {
-        return (
-          <QueryClientProvider client={queryClient}>
-            {children}
-          </QueryClientProvider>
-        );
-      };
-    })();
+    Wrapper = createWrapper();
+  });
+
+  afterEach(() => {
+    activeQueryClient?.clear();
+    activeQueryClient = null;
   });
 
   it('uses platform-correct KeyboardAvoidingView behavior (ios → padding)', () => {

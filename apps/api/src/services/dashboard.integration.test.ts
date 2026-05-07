@@ -803,24 +803,104 @@ describe('dashboard service integration', () => {
     );
   });
 
-  it('redacts learning metrics for children without active consent', async () => {
+  it.each([
+    {
+      status: 'PENDING' as const,
+      summaryCopy: 'consent is pending',
+    },
+    {
+      status: 'PARENTAL_CONSENT_REQUESTED' as const,
+      summaryCopy: 'waiting for parent approval',
+    },
+    {
+      status: 'WITHDRAWN' as const,
+      summaryCopy: 'consent has been withdrawn',
+    },
+  ])(
+    'redacts dashboard learning metrics for $status consent',
+    async ({ status, summaryCopy }) => {
+      const { profileId: parentProfileId } = await seedProfile({
+        displayName: 'Parent',
+        birthYear: 1985,
+      });
+      const { profileId: childProfileId } = await seedProfile({
+        displayName: `${status} Learner`,
+        birthYear: 2012,
+      });
+      await seedFamilyLink(parentProfileId, childProfileId);
+      await seedConsentState({
+        profileId: childProfileId,
+        status,
+      });
+
+      const subjectId = await seedSubject({
+        profileId: childProfileId,
+        name: 'Private Science',
+      });
+      await seedSession({
+        profileId: childProfileId,
+        subjectId,
+        startedAt: subtractDays(getStableMidWeekNow(), 1),
+        exchangeCount: 8,
+        durationSeconds: 600,
+        wallClockSeconds: 660,
+      });
+      await seedStreak({
+        profileId: childProfileId,
+        currentStreak: 5,
+        longestStreak: 7,
+      });
+
+      const children = await getChildrenForParent(db, parentProfileId);
+      const detail = await getChildDetail(db, parentProfileId, childProfileId);
+
+      expect(children).toHaveLength(1);
+      for (const child of [children[0], detail]) {
+        expect(child).toEqual(
+          expect.objectContaining({
+            profileId: childProfileId,
+            displayName: `${status} Learner`,
+            consentStatus: status,
+            sessionsThisWeek: 0,
+            sessionsLastWeek: 0,
+            totalTimeThisWeek: 0,
+            totalTimeLastWeek: 0,
+            exchangesThisWeek: 0,
+            exchangesLastWeek: 0,
+            currentStreak: 0,
+            longestStreak: 0,
+            totalXp: 0,
+            trend: 'stable',
+            retentionTrend: 'stable',
+            guidedVsImmediateRatio: 0,
+            totalSessions: 0,
+            subjects: [],
+            progress: null,
+          })
+        );
+        expect(child!.summary).toContain(summaryCopy);
+      }
+    }
+  );
+
+  it('returns full dashboard learning metrics when consent is active', async () => {
     const { profileId: parentProfileId } = await seedProfile({
       displayName: 'Parent',
       birthYear: 1985,
     });
     const { profileId: childProfileId } = await seedProfile({
-      displayName: 'Pending Learner',
+      displayName: 'Active Learner',
       birthYear: 2012,
     });
     await seedFamilyLink(parentProfileId, childProfileId);
     await seedConsentState({
       profileId: childProfileId,
-      status: 'PARENTAL_CONSENT_REQUESTED',
+      status: 'CONSENTED',
     });
 
     const subjectId = await seedSubject({
       profileId: childProfileId,
-      name: 'Private Science',
+      name: 'Visible Science',
     });
     await seedSession({
       profileId: childProfileId,
@@ -842,20 +922,25 @@ describe('dashboard service integration', () => {
     expect(children[0]).toEqual(
       expect.objectContaining({
         profileId: childProfileId,
-        displayName: 'Pending Learner',
-        consentStatus: 'PARENTAL_CONSENT_REQUESTED',
-        sessionsThisWeek: 0,
-        exchangesThisWeek: 0,
-        totalTimeThisWeek: 0,
-        currentStreak: 0,
-        longestStreak: 0,
-        totalXp: 0,
-        trend: 'stable',
-        subjects: [],
-        progress: null,
+        displayName: 'Active Learner',
+        consentStatus: 'CONSENTED',
+        sessionsThisWeek: 1,
+        exchangesThisWeek: 8,
+        totalTimeThisWeek: 11,
+        currentStreak: 5,
+        longestStreak: 7,
+        trend: 'up',
+        subjects: [
+          expect.objectContaining({
+            subjectId,
+            name: 'Visible Science',
+          }),
+        ],
       })
     );
-    expect(children[0]!.summary).toContain('waiting for parent approval');
+    expect(children[0]!.summary).not.toContain(
+      'hidden until consent is active'
+    );
   });
 
   it('blocks child drill-down data when consent is not active', async () => {

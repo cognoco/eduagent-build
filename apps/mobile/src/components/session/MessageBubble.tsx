@@ -32,6 +32,7 @@ interface MessageBubbleProps {
   escalationRung?: number;
   verificationBadge?: VerificationBadge;
   actions?: React.ReactNode;
+  testID?: string;
 }
 
 function ThinkingDot({ delay }: { delay: number }): React.ReactElement {
@@ -271,6 +272,7 @@ export function MessageBubble({
   escalationRung,
   verificationBadge,
   actions,
+  testID,
 }: MessageBubbleProps): React.ReactElement {
   const isAI = role === 'assistant';
   const colors = useThemeColors();
@@ -319,6 +321,7 @@ export function MessageBubble({
 
   return (
     <Animated.View
+      testID={testID}
       entering={FadeInUp.duration(250)}
       className={`mb-3 max-w-[85%] ${isAI ? 'self-start' : 'self-end'}`}
     >

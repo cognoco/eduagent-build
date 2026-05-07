@@ -96,7 +96,7 @@ jest.mock('../services/profile', () => ({
   getProfileAgeBracket: jest.fn().mockResolvedValue('teen'),
 }));
 
-// Mock subject service for interview route coverage
+// Mock subject service for route coverage
 jest.mock('../services/subject', () => ({
   listSubjects: jest.fn().mockResolvedValue([]),
   getSubject: jest.fn().mockResolvedValue({
@@ -107,36 +107,6 @@ jest.mock('../services/subject', () => ({
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   }),
-}));
-
-// Mock interview service so interview routes can execute without touching
-// the real LLM / curriculum pipeline in middleware tests.
-jest.mock('../services/interview', () => ({
-  getBookTitle: jest.fn(),
-  processInterviewExchange: jest.fn().mockResolvedValue({
-    response: 'Tell me more about that.',
-    isComplete: false,
-  }),
-  streamInterviewExchange: jest.fn().mockResolvedValue({
-    stream: (async function* () {
-      yield 'Tell me';
-      yield ' more about that.';
-    })(),
-    onComplete: jest.fn().mockResolvedValue({
-      response: 'Tell me more about that.',
-      isComplete: false,
-    }),
-  }),
-  extractSignals: jest.fn(),
-  getOrCreateDraft: jest.fn().mockResolvedValue({
-    id: 'draft-1',
-    exchangeHistory: [],
-    extractedSignals: null,
-  }),
-  getDraftState: jest.fn(),
-  updateDraft: jest.fn().mockResolvedValue(undefined),
-  persistCurriculum: jest.fn().mockResolvedValue(undefined),
-  buildDraftResumeSummary: jest.fn().mockReturnValue(''),
 }));
 
 // ---------------------------------------------------------------------------
@@ -272,63 +242,6 @@ describe('metering middleware', () => {
     it('does not apply to GET /v1/subjects', async () => {
       await app.request('/v1/subjects', { headers: AUTH_HEADERS }, TEST_ENV);
 
-      expect(mockDecrementQuota).not.toHaveBeenCalled();
-    });
-
-    it('does not apply to POST /v1/subjects/:subjectId/interview', async () => {
-      mockEnsureFreeSubscription.mockResolvedValue(
-        mockSubscription({ tier: 'free' })
-      );
-      mockGetQuotaPool.mockResolvedValue(
-        mockQuota({
-          usedThisMonth: 100,
-          monthlyLimit: 100,
-          dailyLimit: 10,
-          usedToday: 10,
-        })
-      );
-
-      const res = await app.request(
-        `/v1/subjects/${SUBJECT_ID}/interview`,
-        {
-          method: 'POST',
-          headers: AUTH_HEADERS,
-          body: JSON.stringify({ message: 'I want to learn algebra' }),
-        },
-        TEST_ENV
-      );
-
-      expect(res.status).toBe(200);
-      expect(mockEnsureFreeSubscription).not.toHaveBeenCalled();
-      expect(mockDecrementQuota).not.toHaveBeenCalled();
-    });
-
-    it('does not apply to POST /v1/subjects/:subjectId/interview/stream', async () => {
-      mockEnsureFreeSubscription.mockResolvedValue(
-        mockSubscription({ tier: 'free' })
-      );
-      mockGetQuotaPool.mockResolvedValue(
-        mockQuota({
-          usedThisMonth: 100,
-          monthlyLimit: 100,
-          dailyLimit: 10,
-          usedToday: 10,
-        })
-      );
-
-      const res = await app.request(
-        `/v1/subjects/${SUBJECT_ID}/interview/stream`,
-        {
-          method: 'POST',
-          headers: AUTH_HEADERS,
-          body: JSON.stringify({ message: 'I want to learn algebra' }),
-        },
-        TEST_ENV
-      );
-
-      expect(res.status).toBe(200);
-      await res.text();
-      expect(mockEnsureFreeSubscription).not.toHaveBeenCalled();
       expect(mockDecrementQuota).not.toHaveBeenCalled();
     });
 

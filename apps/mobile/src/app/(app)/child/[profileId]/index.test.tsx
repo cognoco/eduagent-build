@@ -308,3 +308,79 @@ describe('ChildDetailScreen — accommodation guide', () => {
     expect(screen.queryByTestId('accommodation-guide-content')).toBeNull();
   });
 });
+
+describe('ChildDetailScreen — restricted consent', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setupDefaultMocks();
+  });
+
+  it('shows a consent-focused page instead of learning controls while consent is pending', () => {
+    mockUseChildDetail.mockReturnValue({
+      data: {
+        displayName: 'Emma',
+        summary:
+          'Emma: consent is pending. Learning metrics are hidden until consent is active.',
+        consentStatus: 'PENDING',
+        currentStreak: 0,
+        totalXp: 0,
+        progress: null,
+        subjects: [],
+      },
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+    mockUseChildConsentStatus.mockReturnValue({
+      data: { consentStatus: 'PENDING', respondedAt: null },
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(<ChildDetailScreen />);
+
+    screen.getByTestId('consent-required-panel');
+    screen.getByTestId('check-consent-status-button');
+    expect(screen.queryByTestId('accommodation-guide-toggle')).toBeNull();
+    expect(mockUseChildInventory).toHaveBeenCalledWith('child-001', {
+      enabled: false,
+    });
+  });
+
+  it('makes restore consent the single primary action for withdrawn consent', () => {
+    const mutateAsync = jest.fn();
+    mockUseRestoreConsent.mockReturnValue({
+      mutateAsync,
+      isPending: false,
+    });
+    mockUseChildDetail.mockReturnValue({
+      data: {
+        displayName: 'Emma',
+        summary:
+          'Emma: consent has been withdrawn. Learning metrics are hidden.',
+        consentStatus: 'WITHDRAWN',
+        currentStreak: 0,
+        totalXp: 0,
+        progress: null,
+        subjects: [],
+      },
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+    mockUseChildConsentStatus.mockReturnValue({
+      data: {
+        consentStatus: 'WITHDRAWN',
+        respondedAt: new Date().toISOString(),
+      },
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(<ChildDetailScreen />);
+
+    fireEvent.press(screen.getByTestId('cancel-deletion-button'));
+    expect(mutateAsync).toHaveBeenCalled();
+    expect(screen.queryByTestId('check-consent-status-button')).toBeNull();
+  });
+});

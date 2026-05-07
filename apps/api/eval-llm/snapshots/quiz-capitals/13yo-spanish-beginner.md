@@ -34,31 +34,19 @@
   ],
   "interests": [
     {
-      "label": {
-        "label": "horses",
-        "context": "free_time"
-      },
+      "label": "horses",
       "context": "free_time"
     },
     {
-      "label": {
-        "label": "showjumping",
-        "context": "free_time"
-      },
+      "label": "showjumping",
       "context": "free_time"
     },
     {
-      "label": {
-        "label": "eventing",
-        "context": "free_time"
-      },
+      "label": "eventing",
       "context": "free_time"
     },
     {
-      "label": {
-        "label": "nature photography",
-        "context": "free_time"
-      },
+      "label": "nature photography",
       "context": "free_time"
     }
   ],
@@ -78,7 +66,7 @@
 You are generating a multiple-choice capitals quiz for a 13-year-old learner.
 
 Activity: Capitals quiz
-Choose a capitals theme that relates to the learner's interests: [object Object], [object Object], [object Object]. For example, if they love dinosaurs, pick "Capitals of countries with famous dinosaur fossil sites". Be creative — make the theme vivid and specific to these interests.
+Choose a capitals theme that relates to the learner's interests: horses, showjumping, eventing. For example, if they love dinosaurs, pick "Capitals of countries with famous dinosaur fossil sites". Be creative — make the theme vivid and specific to these interests.
 Library context: The learner is currently studying: Spanish present tense verbs; Spanish family vocabulary; Spanish numbers 1-1000; Spain geography. Where possible, prefer capitals of countries relevant to these topics.
 Questions needed: exactly 6
 
@@ -113,5 +101,5 @@ Generate the quiz round.
 
 ## Builder notes
 
-- Fine-grained age: 13. Interests passed: [object Object], [object Object], [object Object], [object Object].
+- Fine-grained age: 13. Interests passed: horses, showjumping, eventing, nature photography.
 - Library topics passed: Spanish present tense verbs; Spanish family vocabulary; Spanish numbers 1-1000; Spain geography.

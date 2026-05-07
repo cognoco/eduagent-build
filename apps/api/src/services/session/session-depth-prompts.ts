@@ -2,7 +2,7 @@
 // Session-depth LLM prompts
 //
 // Extracted from session-depth.ts to follow the *-prompts.ts convention
-// used elsewhere (exchange-prompts.ts, interview-prompts.ts, quiz-prompts.ts).
+// used elsewhere (exchange-prompts.ts, topic-probe-extraction.ts, quiz-prompts.ts).
 // ---------------------------------------------------------------------------
 
 export const DEPTH_EVALUATION_PROMPT = `Given this tutor session transcript, decide whether it was a meaningful learning exchange.

@@ -1,6 +1,5 @@
 # Flow: Subject onboarding fast path
-# Validates: create subject -> interview -> learning session without the four
-# legacy gating screens when ONBOARDING_FAST_PATH is enabled in the build.
+# Validates: create subject -> learning session without legacy preference gates.
 appId: com.mentomate.app
 tags:
   - onboarding
@@ -42,62 +41,12 @@ tags:
       id: "chat-input"
     timeout: 30000
 
-- tapOn:
-    id: "chat-input"
-- inputText: "I want to learn the basics and I like football."
-- pressKey: Enter
+- extendedWaitUntil:
+    visible:
+      id: "message-bubble-assistant-0"
+    timeout: 30000
 
 - extendedWaitUntil:
     visible:
-      id: "chat-input"
+      text: "~.*\\?"
     timeout: 30000
-
-- tapOn:
-    id: "chat-input"
-- inputText: "I know plants need sunlight but not much else."
-- pressKey: Enter
-
-- extendedWaitUntil:
-    visible:
-      id: "chat-input"
-    timeout: 30000
-
-- tapOn:
-    id: "chat-input"
-- inputText: "Short examples are best."
-- pressKey: Enter
-
-- extendedWaitUntil:
-    visible:
-      id: "view-curriculum-button"
-    timeout: 30000
-
-- assertNotVisible:
-    id: "interests-context-continue"
-- assertNotVisible:
-    id: "analogy-preference-title"
-- assertNotVisible:
-    id: "accommodation-continue"
-- assertNotVisible:
-    id: "curriculum-loading"
-- assertNotVisible:
-    id: "continue-advanced-button"
-
-- tapOn:
-    id: "view-curriculum-button"
-
-- extendedWaitUntil:
-    visible:
-      id: "chat-input"
-    timeout: 30000
-
-- assertNotVisible:
-    id: "interests-context-continue"
-- assertNotVisible:
-    id: "analogy-preference-title"
-- assertNotVisible:
-    id: "accommodation-continue"
-- assertNotVisible:
-    id: "curriculum-loading"
-- assertNotVisible:
-    id: "continue-advanced-button"

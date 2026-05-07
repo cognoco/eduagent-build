@@ -13,9 +13,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { InterestContext } from '@eduagent/schemas';
 import { MemoryConsentPrompt } from '../../../../components/memory-consent-prompt';
 import {
   CollapsibleMemorySection,
+  InterestContextRow,
   MemoryRow,
   MemorySection,
 } from '../../../../components/mentor-memory-sections';
@@ -36,8 +38,10 @@ import {
   useUnsuppressInference,
 } from '../../../../hooks/use-learner-profile';
 import { assertOk } from '../../../../lib/assert-ok';
+import { formatRelativeDate } from '../../../../lib/format-relative-date';
 import { goBackOrReplace } from '../../../../lib/navigation';
 import { useApiClient } from '../../../../lib/api-client';
+import { useUpdateInterestsContext } from '../../../../hooks/use-onboarding-dimensions';
 
 function confidenceDetail(
   confidence: 'low' | 'medium' | 'high' | undefined,
@@ -65,6 +69,7 @@ export default function ChildMentorMemoryScreen() {
   const toggleInjection = useToggleMemoryInjection();
   const grantConsent = useGrantMemoryConsent();
   const unsuppress = useUnsuppressInference();
+  const updateInterestsContext = useUpdateInterestsContext();
   const [draft, setDraft] = useState('');
   const [correctionOpen, setCorrectionOpen] = useState(false);
   const [correctionText, setCorrectionText] = useState('');
@@ -193,6 +198,37 @@ export default function ChildMentorMemoryScreen() {
       })();
     },
     [childProfileId, toggleInjection, t]
+  );
+
+  const handleInterestContextChange = useCallback(
+    async (label: string, context: InterestContext) => {
+      if (!childProfileId || profile?.memoryConsentStatus !== 'granted') {
+        return;
+      }
+
+      const interests = profile?.interests ?? [];
+      try {
+        await updateInterestsContext.mutateAsync({
+          childProfileId,
+          interests: interests.map((interest) =>
+            interest.label === label ? { ...interest, context } : interest
+          ),
+        });
+      } catch (err) {
+        platformAlert(
+          t('parentView.mentorMemory.couldNotUpdateMemory'),
+          t('parentView.mentorMemory.pleaseTryAgain')
+        );
+        throw err;
+      }
+    },
+    [
+      childProfileId,
+      profile?.interests,
+      profile?.memoryConsentStatus,
+      t,
+      updateInterestsContext,
+    ]
   );
 
   const handleExport = useCallback(() => {
@@ -390,6 +426,47 @@ export default function ChildMentorMemoryScreen() {
             onSubmit={() => void handleTellMentor()}
           />
         </MemorySection>
+
+        {(profile?.interests ?? []).length > 0 ? (
+          <MemorySection
+            title={t('session.mentorMemory.sections.interests')}
+            description={t(
+              'session.mentorMemory.sections.interestsContextHint'
+            )}
+            testID="child-mentor-memory-interests-section"
+          >
+            {(profile?.interests ?? []).map((interest) => {
+              const label = interest.label;
+              const ts = profile?.interestTimestamps?.[label];
+              const detail = ts
+                ? t('session.mentorMemory.noticed', {
+                    date: formatRelativeDate(ts),
+                  })
+                : undefined;
+              return (
+                <InterestContextRow
+                  key={label}
+                  interest={interest}
+                  detail={detail}
+                  disabled={
+                    updateInterestsContext.isPending ||
+                    !childProfileId ||
+                    profile?.memoryConsentStatus !== 'granted'
+                  }
+                  onContextChange={handleInterestContextChange}
+                  onRemove={() =>
+                    void safeDelete({
+                      childProfileId,
+                      category: 'interests',
+                      value: label,
+                      suppress: true,
+                    })
+                  }
+                />
+              );
+            })}
+          </MemorySection>
+        ) : null}
 
         {/* Curated categories from memory endpoint */}
         {memory?.categories.map((cat) => (

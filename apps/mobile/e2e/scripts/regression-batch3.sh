@@ -53,10 +53,6 @@ run_seeded "consent-pending"        "flows/consent/consent-pending-gate.yaml"
 # Sign-up (manual-only)
 log_result "SKIP" "flows/onboarding/sign-up-flow.yaml" "(manual-only: requires Clerk email verification)"
 
-# LLM-dependent (re-test with fixes)
-run_seeded "onboarding-complete" "flows/onboarding/analogy-preference-flow.yaml"
-run_seeded "onboarding-complete" "flows/onboarding/curriculum-review-flow.yaml"
-
 echo ""
 echo "==========================================" | tee -a "$RESULTS_FILE"
 echo "BATCH 3 COMPLETE — $(date)" | tee -a "$RESULTS_FILE"

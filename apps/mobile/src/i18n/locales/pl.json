@@ -45,7 +45,7 @@
     "exchangeLimitExceeded": "Osiągnięto limit sesji. Rozpocznij nową sesję, aby kontynuować.",
     "subjectInactive": "Ten przedmiot jest obecnie wstrzymany. Możesz go wznowić z listy przedmiotów.",
     "notLanguageLearning": "Ten przedmiot nie jest skonfigurowany do nauki języków. Zamiast tego wypróbuj standardową ścieżkę nauki.",
-    "curriculumNotFound": "Nie skonfigurowaliśmy jeszcze Twojej ścieżki nauki. Wróć i najpierw rozpocznij rozmowę.",
+    "curriculumNotFound": "Nie skonfigurowaliśmy jeszcze Twojej ścieżki nauki. Wróć i spróbuj ponownie.",
     "topicNotFound": "Ten temat jest obecnie niedostępny. Spróbuj wybrać inny.",
     "draftNotFound": "Twoje postępy zostały utracone. Zacznij od nowa.",
     "profileNotFound": "Mieliśmy problem z załadowaniem Twojego profilu. Wyloguj się i zaloguj ponownie.",
@@ -79,7 +79,7 @@
   "friendlyErrors": {
     "notLanguageLearning": "Ten przedmiot nie jest skonfigurowany do nauki języków. Zamiast tego wypróbuj standardową ścieżkę nauki.",
     "subjectPaused": "Ten przedmiot jest obecnie wstrzymany. Możesz go wznowić z listy przedmiotów.",
-    "curriculumNotFound": "Nie skonfigurowaliśmy jeszcze Twojej ścieżki nauki. Wróć i najpierw rozpocznij rozmowę.",
+    "curriculumNotFound": "Nie skonfigurowaliśmy jeszcze Twojej ścieżki nauki. Wróć i spróbuj ponownie.",
     "topicNotFound": "Ten temat jest obecnie niedostępny. Spróbuj wybrać inny.",
     "draftNotFound": "Twoje postępy zostały utracone. Zacznij od nowa.",
     "profileNotFound": "Mieliśmy problem z załadowaniem Twojego profilu. Wyloguj się i zaloguj ponownie.",
@@ -357,6 +357,7 @@
         "tellMentor": "Powiedz swojemu mentorowi",
         "learningStyle": "Styl nauki",
         "interests": "Zainteresowania",
+        "interestsContextHint": "Wybierz, gdzie pasuje każde zainteresowanie, aby przykłady trafiały w moment.",
         "strengths": "Mocne strony",
         "struggles": "Rzeczy, w których się poprawiasz",
         "communicationNotes": "Notatki dotyczące komunikacji",
@@ -1359,148 +1360,6 @@
       "saveErrorMessage": "Coś poszło nie tak. Spróbuj ponownie.",
       "somethingElse": "Coś innego",
       "customPlaceholder": "np. ono/jego"
-    },
-    "accommodations": {
-      "title": "Jakieś dostosowania w nauce?",
-      "subtitle": "Dostosujemy lekcje do Twojego stylu nauki (opcjonalnie).",
-      "skipForNow": "Pomiń na razie",
-      "loadErrorTitle": "Nie można załadować dostosowań",
-      "loadErrorMessage": "Sprawdź połączenie i spróbuj ponownie.",
-      "saveErrorTitle": "Nie można zapisać dostosowań",
-      "saveErrorMessage": "Coś poszło nie tak. Spróbuj ponownie.",
-      "noSubjectTitle": "Nie wybrano przedmiotu",
-      "noSubjectMessage": "Wybierz przedmiot z biblioteki przed skonfigurowaniem dostosowań",
-      "openLibrary": "Otwórz bibliotekę"
-    },
-    "analogyPreference": {
-      "title": "Jak lubisz, gdy Ci się tłumaczy?",
-      "subtitle": "Wybierz styl analogii (opcjonalnie). Zawsze możesz to zmienić później w ustawieniach przedmiotu.",
-      "skipForNow": "Pomiń na razie",
-      "skipLabel": "Pomiń preferencje analogii",
-      "saveErrorTitle": "Nie można zapisać preferencji"
-    },
-    "interestsContext": {
-      "title": "Jaki jest kontekst nauki tego?",
-      "subtitle": "Pomaga nam to dostosować przykłady i ćwiczenia (opcjonalnie).",
-      "skipForNow": "Pomiń na razie",
-      "saveErrorTitle": "Nie można zapisać kontekstu zainteresowań",
-      "contexts": {
-        "school": {
-          "label": "Szkoła / Uniwersytet",
-          "hint": "Dostosujemy przykłady do pracy akademickiej i przygotowania do egzaminów."
-        },
-        "work": {
-          "label": "Praca / Kariera",
-          "hint": "Skupimy się na profesjonalnym, praktycznym zastosowaniu."
-        },
-        "personal": {
-          "label": "Zainteresowanie osobiste",
-          "hint": "Zachowamy charakter eksploracyjny i napędzany ciekawością."
-        },
-        "other": {
-          "label": "Inne",
-          "hint": "Zachowamy elastyczność i ogólność."
-        }
-      },
-      "saveErrorMessage": "Nie można zapisać Twoich zainteresowań — spróbuj ponownie",
-      "skipAll": "Pomiń"
-    },
-    "interview": {
-      "title": "Ustaw {{target}}",
-      "newSubject": "twój przedmiot",
-      "openingWithTarget": "Cześć! Jestem twoim towarzyszem nauki. Najpierw muszę dowiedzieć się trochę o tobie i {{target}}, żebym mógł pomagać na właściwym poziomie zamiast zgadywać. Co już wiesz? Wystarczy przybliżona odpowiedź.",
-      "openingGeneric": "Cześć! Jestem twoim towarzyszem nauki. Najpierw muszę dowiedzieć się trochę o tobie, żebym mógł pomagać na właściwym poziomie zamiast zgadywać. Co już wiesz? Wystarczy przybliżona odpowiedź.",
-      "explainerTitle": "Dlaczego najpierw pytam?",
-      "explainerBody": "Twoje odpowiedzi pomagają mi wybrać właściwy punkt startu. Po tej krótkiej konfiguracji mogę uczyć, pytać i wyjaśniać w sposób dopasowany do ciebie.",
-      "missingSubject": "Nie wybrano przedmiotu. Wróć i spróbuj ponownie.",
-      "sessionCreationStuck": "Tworzenie sesji trwa dłużej niż oczekiwano. Wróć i spróbuj ponownie.",
-      "settingUp": "Konfigurowanie Twojej sesji…",
-      "completionTitle": "Ocena zakończona!",
-      "completionBody": "Zebraliśmy wystarczająco dużo informacji, aby zbudować Twój spersonalizowany program nauczania.",
-      "letsGo": "Zaczynajmy",
-      "streamError": "Coś poszło nie tak. Spróbuj ponownie.",
-      "forceCompleteTimeout": "Nadal nad tym pracujemy… stuknij, aby kontynuować.",
-      "skip": "Pomiń",
-      "skipThisQuestion": "Pomiń to pytanie",
-      "skipAndFinish": "Pomiń i zakończ",
-      "expiredTitle": "Sesja wygasła",
-      "expiredBody": "Twoja sesja oceniająca wygasła. Uruchom ponownie.",
-      "restartButton": "Uruchom ponownie ocenę",
-      "doneButton": "Gotowe",
-      "saveErrorTitle": "Nie można zapisać odpowiedzi",
-      "sessionErrorTitle": "Błąd sesji",
-      "completionErrorTitle": "Nie można zakończyć sesji",
-      "restartErrorTitle": "Nie można uruchomić ponownie",
-      "skipErrorTitle": "Nie można pominąć",
-      "startLearning": "Rozpocznij naukę",
-      "streamErrorTitle": "Coś poszło nie tak",
-      "tryAgainLabel": "Spróbuj ponownie",
-      "settingUpCurriculum": "Konfigurowanie Twojego programu nauczania…",
-      "skipButtonProminent": "Pomiń rozmowę",
-      "skipButton": "Pomiń"
-    },
-    "curriculumReview": {
-      "title": "Twój program nauczania",
-      "suggestChanges": "Zaproponuj zmiany",
-      "loadingTimeout": {
-        "title": "Nadal ładuję…",
-        "body": "Ładowanie Twojego programu nauczania trwa dłużej niż oczekiwano. Sprawdź połączenie i spróbuj ponownie."
-      },
-      "loadingCurriculum": "Ładowanie programu nauczania...",
-      "loadError": {
-        "title": "Nie można załadować programu nauczania",
-        "body": "Sprawdź połączenie i spróbuj ponownie."
-      },
-      "generating": {
-        "title": "Budowanie Twojego programu nauczania…",
-        "body": "Zwykle zajmuje to około 10–20 sekund."
-      },
-      "noCurriculum": {
-        "title": "Brak jeszcze programu nauczania",
-        "message": "Ukończ rozmowę oceniającą, aby wygenerować swoją ścieżkę nauki."
-      },
-      "versionInfo": "Wersja {{version}} — {{count}} tematów",
-      "whyOrderLabel": "Dlaczego {{title}} jest w tej kolejności",
-      "whyOrder": "Dlaczego taka kolejność?",
-      "explaining": "Wyjaśnianie...",
-      "skipTopicTitle": "Pominąć ten temat?",
-      "skipTopicBody": "Zawsze możesz go przywrócić później.",
-      "skipAction": "Pomiń",
-      "skipErrorTitle": "Nie można pominąć tematu",
-      "restoreErrorTitle": "Nie można przywrócić tematu",
-      "restoreLabel": "Przywróć {{title}}",
-      "restore": "Przywróć",
-      "addTopic": "Dodaj temat",
-      "placementCheck": {
-        "mostSkipped": "Pominąłeś(-ęłaś) większość tego programu nauczania",
-        "hint": "Chcesz szybszej ścieżki? Możesz przystąpić do testu kwalifikacyjnego, kontynuować z pozostałymi zaawansowanymi tematami lub przełączyć się na inny przedmiot.",
-        "takePlacement": "Przystąp do testu kwalifikacyjnego",
-        "continueAdvanced": "Kontynuuj z zaawansowanymi tematami",
-        "chooseDifferent": "Wybierz inny przedmiot"
-      },
-      "startLearning": "Rozpocznij naukę: {{title}}",
-      "exploreFirst": "Najpierw eksploruj",
-      "continueToHome": "Kontynuuj do strony głównej",
-      "challengeModal": {
-        "title": "Zmień swoje tematy",
-        "body": "Powiedz nam, co byś zmienił(-a), a my wygenerujemy ponownie Twoją ścieżkę nauki.",
-        "placeholder": "np. znam już podstawy, pomiń tematy wprowadzające...",
-        "regenerate": "Wygeneruj ponownie"
-      },
-      "addTopicModal": {
-        "title": "Dodaj temat",
-        "body": "Dodaj coś, czego zabrakło w wygenerowanym programie nauczania. Najpierw zasugerujemy czysty tytuł, a następnie możesz go edytować przed zapisaniem.",
-        "topicLabel": "Temat",
-        "topicPlaceholder": "np. Trygonometria, Rewolucja Francuska",
-        "descriptionLabel": "Opis",
-        "descriptionPlaceholder": "Krótki opis",
-        "minutesLabel": "Szacowane minuty",
-        "minutesPlaceholder": "30",
-        "addTopic": "Dodaj temat",
-        "preview": "Podgląd"
-      },
-      "addTopicValidationError": "Dodaj tytuł, opis i szacowane minuty.",
-      "updateFailedTitle": "Aktualizacja programu nauczania nie powiodła się"
     }
   },
   "parentView": {
@@ -1581,6 +1440,11 @@
       "howItsWorking": "Jak to działa",
       "consentSettingsCouldNotLoad": "Nie można załadować ustawień zgody",
       "retryConsentSettings": "Ponów",
+      "consentRestrictedTitle": "Zgoda jest potrzebna, zanim pokażemy postępy",
+      "consentRestrictedPendingBody": "Szczegóły nauki {{name}} są ukryte, dopóki zgoda nie będzie aktywna. Sprawdź ponownie po zakończeniu procesu zgody.",
+      "consentRestrictedRequestedBody": "Prośba o zgodę dla {{name}} czeka już na zatwierdzenie. Po zatwierdzeniu postępy pojawią się tutaj automatycznie.",
+      "consentRestrictedWithdrawnBody": "Szczegóły nauki {{name}} są ukryte, ponieważ zgoda została wycofana. Przywróć zgodę, aby konto pozostało aktywne w okresie karencji.",
+      "checkConsentStatus": "Sprawdź status zgody",
       "accountTitle": "Konto — {{name}}",
       "accountTitleFallback": "Konto",
       "deletionPending": "Usunięcie zaplanowane",
@@ -1795,21 +1659,6 @@
       "reportGoneBody": "Mógł zostać zarchiwizowany lub usunięty. Wszystkie Twoje inne raporty są nadal bezpieczne."
     }
   },
-  "interview": {
-    "completing": {
-      "initial": "Kończenie Twojej sesji…",
-      "almost": "Prawie gotowe…",
-      "softFallback": "Nadal nad tym pracujemy…"
-    },
-    "failed": {
-      "extractSignalsFailed": "Mieliśmy problem z odczytaniem Twojej sesji. Twoje postępy są bezpieczne.",
-      "topicResolutionFailed": "Nie mogliśmy przypisać Twojej sesji do tematu. Możesz spróbować ponownie poniżej.",
-      "unknown": "Coś poszło nie tak podczas kończenia sesji. Możesz spróbować ponownie poniżej.",
-      "retryError": "Nie można ponowić próby. Spróbuj ponownie.",
-      "tryAgain": "Spróbuj ponownie",
-      "retrying": "Ponawianie…"
-    }
-  },
   "tabs": {
     "profileSwitchedToast": {
       "title": "Profil przełączony",
@@ -1911,12 +1760,18 @@
   "coaching": {
     "parentDashboard": {
       "consent": {
-        "accessibilityLabel": "Consent status: {{status}}",
-        "consented": "Consent active",
-        "parentalConsentRequested": "Waiting for parent approval",
-        "pending": "Consent pending",
-        "redactedMessage": "Learning metrics are hidden until consent is active.",
-        "withdrawn": "Consent withdrawn"
+        "accessibilityLabel": "Status zgody: {{status}}",
+        "checkStatusAction": "Sprawdź status zgody",
+        "consented": "Zgoda aktywna",
+        "metricsHiddenTitle": "Postępy są na razie ukryte",
+        "parentalConsentRequested": "Oczekiwanie na zgodę rodzica",
+        "parentalConsentRequestedMessage": "Wysłaliśmy prośbę o zgodę. Szczegóły nauki {{name}} pojawią się tutaj, gdy tylko zgoda będzie aktywna.",
+        "pending": "Zgoda oczekuje",
+        "pendingMessage": "{{name}} potrzebuje aktywnej zgody, zanim będzie można pokazać postępy w nauce.",
+        "redactedMessage": "Metryki nauki są ukryte, dopóki zgoda nie będzie aktywna.",
+        "restoreAction": "Przywróć zgodę",
+        "withdrawnMessage": "Szczegóły nauki {{name}} są ukryte, ponieważ zgoda została wycofana.",
+        "withdrawn": "Zgoda wycofana"
       },
       "engagementTrend": {
         "declining": "Engagement declining",

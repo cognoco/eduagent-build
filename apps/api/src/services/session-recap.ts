@@ -153,14 +153,31 @@ export async function resolveNextTopic(
   ]);
   const completedTopicIds = new Set([...retainedIds, ...sessionIds]);
 
-  const candidates = await repo.curriculumTopics.findLaterInBook(
+  // Primary: next non-completed topic later in the same book.
+  const sameBookCandidates = await repo.curriculumTopics.findLaterInBook(
     currentTopic.bookId,
     currentTopic.sortOrder,
     MAX_NEXT_TOPIC_CANDIDATES
   );
+  const sameBookHit = sameBookCandidates.find(
+    (candidate) => !completedTopicIds.has(candidate.id)
+  );
+  if (sameBookHit) return sameBookHit;
 
+  // Fallback: learner finished (or skipped over) the rest of this book.
+  // Continue with the earliest non-completed topic in the next book of
+  // the same subject. Without this fallback the recap silently drops the
+  // "Up next" card at every book boundary.
+  const nextBookCandidates =
+    await repo.curriculumTopics.findEarliestInLaterBooks(
+      currentTopic.subjectId,
+      currentTopic.bookSortOrder,
+      MAX_NEXT_TOPIC_CANDIDATES
+    );
   return (
-    candidates.find((candidate) => !completedTopicIds.has(candidate.id)) ?? null
+    nextBookCandidates.find(
+      (candidate) => !completedTopicIds.has(candidate.id)
+    ) ?? null
   );
 }
 

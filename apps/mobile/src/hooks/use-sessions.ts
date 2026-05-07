@@ -148,6 +148,7 @@ export function useStartFirstCurriculumSession(
   Error,
   {
     bookId?: string;
+    topicId?: string;
     sessionType?: SessionType;
     verificationType?: VerificationType;
     inputMode?: InputMode;
@@ -159,6 +160,7 @@ export function useStartFirstCurriculumSession(
   return useMutation({
     mutationFn: async (input: {
       bookId?: string;
+      topicId?: string;
       sessionType?: SessionType;
       verificationType?: VerificationType;
       inputMode?: InputMode;

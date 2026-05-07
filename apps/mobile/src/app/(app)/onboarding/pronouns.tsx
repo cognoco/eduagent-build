@@ -17,6 +17,7 @@ import { useTranslation } from 'react-i18next';
 import { PRONOUNS_PROMPT_MIN_AGE } from '@eduagent/schemas';
 import { OnboardingStepIndicator } from '../../../components/onboarding/OnboardingStepIndicator';
 import { useUpdatePronouns } from '../../../hooks/use-onboarding-dimensions';
+import { useStartFirstCurriculumSession } from '../../../hooks/use-sessions';
 import { useProfile } from '../../../lib/profile';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { getOnboardingStepLabels } from '../../../lib/onboarding-step-labels';
@@ -77,23 +78,40 @@ export default function PronounsScreen(): React.ReactElement {
     initialChoice === OTHER_KEY ? activeProfile?.pronouns ?? '' : ''
   );
   const updatePronouns = useUpdatePronouns();
+  const startFirstCurriculumSession = useStartFirstCurriculumSession(
+    subjectId ?? ''
+  );
 
   const navigateForward = useCallback(() => {
     if (returnTo === 'settings') {
       goBackOrReplace(router, '/(app)/more' as never);
       return;
     }
-    // Forward path in first-time onboarding: into the subject interview.
-    router.replace({
-      pathname: '/(app)/onboarding/interview',
-      params: {
-        subjectId: subjectId ?? '',
-        subjectName: subjectName ?? '',
-        step: String(Math.min(step + 1, totalSteps)),
-        totalSteps: String(totalSteps),
-      },
-    } as never);
-  }, [returnTo, router, subjectId, subjectName, step, totalSteps]);
+    if (!subjectId) {
+      goBackOrReplace(router, '/(app)/home' as const);
+      return;
+    }
+    startFirstCurriculumSession.mutate(
+      { sessionType: 'learning', inputMode: 'text' },
+      {
+        onSuccess: (result) => {
+          router.replace({
+            pathname: '/(app)/session',
+            params: {
+              mode: 'learning',
+              subjectId,
+              subjectName: subjectName ?? '',
+              sessionId: result.session.id,
+              topicId: result.session.topicId ?? undefined,
+            },
+          } as never);
+        },
+        onError: () => {
+          goBackOrReplace(router, '/(app)/home' as const);
+        },
+      }
+    );
+  }, [returnTo, router, subjectId, subjectName, startFirstCurriculumSession]);
 
   // Age-gate: learners below 13 never see the screen. Silently forward so
   // the back stack doesn't accumulate a useless entry.

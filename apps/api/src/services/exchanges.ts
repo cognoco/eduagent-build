@@ -187,6 +187,16 @@ export interface ExchangeContext {
   learnerName?: string;
   /** Interview-derived hints captured during fast-path onboarding. */
   onboardingSignals?: ExtractedInterviewSignals;
+  /** True when this profile has not previously completed an exchange on this topic. */
+  isFirstEncounter?: boolean;
+  /** True on the first session this profile has ever started for this subject. */
+  isFirstSessionOfSubject?: boolean;
+  /** Topic-probe signals extracted from the prior learner turn, when available. */
+  extractedSignalsToReflect?: {
+    goals?: string;
+    currentKnowledge?: string;
+    interests?: string[];
+  } | null;
 }
 
 /** Result of processing a single exchange */

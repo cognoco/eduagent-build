@@ -51,7 +51,14 @@ describe('createScopedRepository → curriculumTopics', () => {
   describe('findById', () => {
     it('returns the topic when the scoped chain resolves a row', async () => {
       const { chain, calls } = createRecordingChain([
-        { id: 't1', bookId: 'b1', sortOrder: 0, title: 'Photosynthesis' },
+        {
+          id: 't1',
+          bookId: 'b1',
+          sortOrder: 0,
+          title: 'Photosynthesis',
+          bookSortOrder: 0,
+          subjectId: 's1',
+        },
       ]);
       const repo = createScopedRepository(chain as never, profileId);
       const row = await repo.curriculumTopics.findById('t1');
@@ -60,6 +67,8 @@ describe('createScopedRepository → curriculumTopics', () => {
         bookId: 'b1',
         sortOrder: 0,
         title: 'Photosynthesis',
+        bookSortOrder: 0,
+        subjectId: 's1',
       });
       // Must include two innerJoins — books + subjects — so ownership is
       // enforced inside the query, not filtered post-hoc in JS.

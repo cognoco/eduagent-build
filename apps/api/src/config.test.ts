@@ -2,6 +2,7 @@ import {
   isMemoryFactsDedupEnabled,
   isMemoryFactsRelevanceEnabled,
   isProfileInDedupRollout,
+  isTopicIntentMatcherEnabled,
   validateEnv,
   validateProductionKeys,
 } from './config';
@@ -351,6 +352,22 @@ describe('validateEnv', () => {
     expect(isMemoryFactsDedupEnabled('false')).toBe(false);
     expect(isMemoryFactsDedupEnabled(undefined)).toBe(false);
     expect(isMemoryFactsDedupEnabled('yes')).toBe(false);
+  });
+
+  it('MATCHER_ENABLED defaults to "false" when unset', () => {
+    const env = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+    });
+    expect(env.MATCHER_ENABLED).toBe('false');
+    expect(isTopicIntentMatcherEnabled(env.MATCHER_ENABLED)).toBe(false);
+  });
+
+  it('isTopicIntentMatcherEnabled returns true only for "true"', () => {
+    expect(isTopicIntentMatcherEnabled('true')).toBe(true);
+    expect(isTopicIntentMatcherEnabled('false')).toBe(false);
+    expect(isTopicIntentMatcherEnabled(undefined)).toBe(false);
+    expect(isTopicIntentMatcherEnabled('yes')).toBe(false);
   });
 });
 

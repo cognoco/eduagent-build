@@ -1,6 +1,9 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import type {
+  InterestContext,
+  InterestEntry,
   LearningStyle,
   MemorySource,
   StruggleEntry,
@@ -76,15 +79,24 @@ export function getStruggleProgress(entry: StruggleEntry): {
 export function MemorySection({
   title,
   children,
+  description,
+  testID,
 }: {
   title: string;
   children: ReactNode;
+  description?: string;
+  testID?: string;
 }) {
   return (
-    <View className="mt-6">
+    <View className="mt-6" testID={testID}>
       <Text className="text-body-sm font-semibold text-text-primary opacity-70 uppercase tracking-wider mb-2">
         {title}
       </Text>
+      {description ? (
+        <Text className="text-body-sm text-text-secondary mb-3">
+          {description}
+        </Text>
+      ) : null}
       {children}
     </View>
   );
@@ -204,5 +216,84 @@ export function MemoryRow({
       ) : null}
       {children ? <View className="mt-3">{children}</View> : null}
     </View>
+  );
+}
+
+const INTEREST_CONTEXT_OPTIONS: InterestContext[] = [
+  'school',
+  'free_time',
+  'both',
+];
+
+const INTEREST_CONTEXT_LABEL_KEYS: Record<InterestContext, string> = {
+  school: 'session.mentorMemory.interestContext.school',
+  free_time: 'session.mentorMemory.interestContext.freeTime',
+  both: 'session.mentorMemory.interestContext.both',
+};
+
+export function InterestContextRow({
+  interest,
+  detail,
+  onRemove,
+  onContextChange,
+  disabled = false,
+}: {
+  interest: InterestEntry;
+  detail?: string;
+  onRemove?: () => void;
+  onContextChange: (label: string, context: InterestContext) => Promise<void>;
+  disabled?: boolean;
+}) {
+  const { t } = useTranslation();
+  const [selectedContext, setSelectedContext] = useState<InterestContext>(
+    interest.context
+  );
+
+  useEffect(() => {
+    setSelectedContext(interest.context);
+  }, [interest.context]);
+
+  const handlePress = (context: InterestContext) => {
+    if (disabled || context === selectedContext) return;
+
+    const previousContext = selectedContext;
+    setSelectedContext(context);
+    void onContextChange(interest.label, context).catch(() => {
+      setSelectedContext(previousContext);
+    });
+  };
+
+  return (
+    <MemoryRow label={interest.label} detail={detail} onRemove={onRemove}>
+      <View className="flex-row flex-wrap gap-2">
+        {INTEREST_CONTEXT_OPTIONS.map((context) => {
+          const selected = context === selectedContext;
+          return (
+            <Pressable
+              key={context}
+              onPress={() => handlePress(context)}
+              disabled={disabled}
+              className={`rounded-full px-3 py-1.5 ${
+                selected ? 'bg-primary' : 'bg-surface-elevated'
+              }`}
+              accessibilityRole="button"
+              accessibilityState={{
+                selected,
+                disabled,
+              }}
+              testID={`interest-context-${interest.label}-${context}`}
+            >
+              <Text
+                className={`text-caption font-semibold ${
+                  selected ? 'text-text-inverse' : 'text-text-secondary'
+                }`}
+              >
+                {t(INTEREST_CONTEXT_LABEL_KEYS[context])}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </MemoryRow>
   );
 }

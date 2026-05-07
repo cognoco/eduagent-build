@@ -3,7 +3,7 @@
 // Family member CRUD, pool status, cancellation cascade, profile limits
 // ---------------------------------------------------------------------------
 
-import { and, eq, gte, isNull, sql } from 'drizzle-orm';
+import { and, eq, gte, isNull, or, sql } from 'drizzle-orm';
 import {
   subscriptions,
   usageEvents,
@@ -69,7 +69,9 @@ export async function getProfileCountForSubscription(
   const result = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(profiles)
-    .where(eq(profiles.accountId, sub.accountId));
+    .where(
+      and(eq(profiles.accountId, sub.accountId), isNull(profiles.archivedAt))
+    );
 
   return result[0]?.count ?? 0;
 }
@@ -456,14 +458,15 @@ export class ProfileRemovalNotImplementedError extends Error {
 /**
  * Removes a profile from a family subscription.
  *
- * Cross-account detachment is intentionally disabled until the backend has a
- * verifiable invite/claim flow for the destination account.
+ * Same-account removal archives the non-owner profile so it no longer counts
+ * toward family plan seats. Cross-account detachment remains disabled until the
+ * backend has a verifiable invite/claim flow for the destination account.
  */
 export async function removeProfileFromSubscription(
   db: Database,
   subscriptionId: string,
   profileId: string,
-  newAccountId: string
+  newAccountId?: string
 ): Promise<{ removedProfileId: string } | null> {
   const sub = await findSubscriptionById(db, subscriptionId);
 
@@ -471,10 +474,17 @@ export async function removeProfileFromSubscription(
     return null;
   }
 
+  // Only multi-profile tiers may use the family removal path. Free/Plus
+  // accounts can still manage profiles through profile lifecycle flows.
+  if (sub.tier !== 'family' && sub.tier !== 'pro') {
+    return null;
+  }
+
   const profile = await db.query.profiles.findFirst({
     where: and(
       eq(profiles.id, profileId),
-      eq(profiles.accountId, sub.accountId)
+      eq(profiles.accountId, sub.accountId),
+      isNull(profiles.archivedAt)
     ),
   });
 
@@ -490,8 +500,40 @@ export async function removeProfileFromSubscription(
   // Cross-account profile detachment needs an invite/claim flow so the
   // destination account can be proven. Until that exists, reject the move
   // instead of trusting a caller-supplied account ID.
-  void newAccountId;
-  throw new ProfileRemovalNotImplementedError();
+  if (newAccountId != null && newAccountId !== sub.accountId) {
+    throw new ProfileRemovalNotImplementedError();
+  }
+
+  const [updated] = await db
+    .update(profiles)
+    .set({
+      archivedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(profiles.id, profile.id),
+        eq(profiles.accountId, sub.accountId),
+        eq(profiles.isOwner, false),
+        isNull(profiles.archivedAt)
+      )
+    )
+    .returning({ id: profiles.id });
+
+  if (!updated) {
+    return null;
+  }
+
+  await db
+    .delete(familyLinks)
+    .where(
+      or(
+        eq(familyLinks.childProfileId, profile.id),
+        eq(familyLinks.parentProfileId, profile.id)
+      )
+    );
+
+  return { removedProfileId: updated.id };
 }
 
 // ---------------------------------------------------------------------------

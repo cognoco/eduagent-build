@@ -245,7 +245,6 @@ export function ProfileProvider({
         'sessions',
         'curriculum',
         'assessment',
-        'interview',
         'consent-status',
         'dashboard',
         'streaks',

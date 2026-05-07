@@ -42,18 +42,18 @@ describe('message-outbox', () => {
   it('marks entries permanently failed after three attempts', async () => {
     await enqueue({
       profileId: 'profile-1',
-      flow: 'interview',
-      surfaceKey: 'subject-1',
+      flow: 'session',
+      surfaceKey: 'session-2',
       content: 'hello',
       id: 'entry-2',
     });
-    await beginAttempt('profile-1', 'interview', 'entry-2');
-    await beginAttempt('profile-1', 'interview', 'entry-2');
-    await beginAttempt('profile-1', 'interview', 'entry-2');
+    await beginAttempt('profile-1', 'session', 'entry-2');
+    await beginAttempt('profile-1', 'session', 'entry-2');
+    await beginAttempt('profile-1', 'session', 'entry-2');
 
     const failed = await recordFailure(
       'profile-1',
-      'interview',
+      'session',
       'entry-2',
       'timeout'
     );

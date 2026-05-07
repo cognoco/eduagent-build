@@ -39,7 +39,6 @@ import { consentWebRoutes } from './routes/consent-web';
 import { accountRoutes } from './routes/account';
 import { inngestRoute } from './routes/inngest';
 import { subjectRoutes } from './routes/subjects';
-import { interviewRoutes } from './routes/interview';
 import { onboardingRoutes } from './routes/onboarding';
 import { curriculumRoutes } from './routes/curriculum';
 import { bookRoutes } from './routes/books';
@@ -208,7 +207,6 @@ const routes = api
   .route('/', accountRoutes)
   .route('/', inngestRoute)
   .route('/', subjectRoutes)
-  .route('/', interviewRoutes)
   .route('/', onboardingRoutes)
   .route('/', curriculumRoutes)
   .route('/', bookRoutes)

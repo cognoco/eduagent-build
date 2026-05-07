@@ -44,7 +44,6 @@ const KNOWN_DRIFT = new Set([
   'library-tab',
   'home-screen',
   'learn-new-screen',
-  'interview-screen',
   'shelf-book-list',
   // Session summary
   'summary-score',

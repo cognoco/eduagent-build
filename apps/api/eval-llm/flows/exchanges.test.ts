@@ -18,16 +18,21 @@ describe('exchangesFlow', () => {
   }
 
   describe('enumerateScenarios', () => {
-    it('returns 8 scenario inputs for a general (non-language) profile', () => {
+    it('returns 13 scenario inputs for a general (non-language) profile', () => {
       const scenarios =
         exchangesFlow.enumerateScenarios?.(generalProfile) ?? [];
-      expect(scenarios).toHaveLength(8);
+      expect(scenarios).toHaveLength(13);
       expect(scenarios.map((s) => s.scenarioId)).not.toContain(
         'S7-language-fluency'
       );
       expect(scenarios.map((s) => s.scenarioId)).toEqual(
         expect.arrayContaining([
           'S1-rung1-teach-new',
+          'S10-first-encounter-topic-turn0',
+          'S11-first-encounter-topic-turn1',
+          'S12-first-encounter-topic-turn3',
+          'S13-first-session-subject-turn0',
+          'S14-returning-topic-turn0',
           'S2-rung2-revisit',
           'S3-rung3-evaluate',
           'S4-rung4-teach-back',
@@ -39,10 +44,10 @@ describe('exchangesFlow', () => {
       );
     });
 
-    it('returns 9 scenarios for a language-learning profile (includes S7 + S9)', () => {
+    it('returns 14 scenarios for a language-learning profile (includes S7 + S9)', () => {
       const scenarios =
         exchangesFlow.enumerateScenarios?.(languageProfile) ?? [];
-      expect(scenarios).toHaveLength(9);
+      expect(scenarios).toHaveLength(14);
       expect(scenarios.map((s) => s.scenarioId)).toContain(
         'S7-language-fluency'
       );
@@ -205,6 +210,40 @@ describe('exchangesFlow', () => {
       expect(messages.system).not.toContain('surprising or fun fact');
       expect(messages.system).not.toContain('spark curiosity');
     });
+
+    it('first-encounter scenarios carry probe rules and the returning-topic scenario keeps 5b', () => {
+      const scenarios =
+        exchangesFlow.enumerateScenarios?.(generalProfile) ?? [];
+      const firstEncounter = scenarios.find(
+        (s) => s.scenarioId === 'S10-first-encounter-topic-turn0'
+      );
+      const subjectOpener = scenarios.find(
+        (s) => s.scenarioId === 'S13-first-session-subject-turn0'
+      );
+      const returning = scenarios.find(
+        (s) => s.scenarioId === 'S14-returning-topic-turn0'
+      );
+      if (!firstEncounter || !subjectOpener || !returning) {
+        throw new Error('first-encounter eval scenarios missing');
+      }
+
+      const firstEncounterPrompt = exchangesFlow.buildPrompt(
+        firstEncounter.input
+      ).system;
+      const subjectOpenerPrompt = exchangesFlow.buildPrompt(
+        subjectOpener.input
+      ).system;
+      const returningPrompt = exchangesFlow.buildPrompt(returning.input).system;
+
+      expect(firstEncounterPrompt).toContain('FIRST-ENCOUNTER TOPIC RULE');
+      expect(firstEncounterPrompt).toContain(
+        'end with exactly one focused follow-up question'
+      );
+      expect(subjectOpenerPrompt).toContain('SUBJECT OPENER');
+      expect(subjectOpenerPrompt).not.toContain('FIRST-ENCOUNTER TOPIC RULE:');
+      expect(returningPrompt).toContain('exactly one learner action');
+      expect(returningPrompt).not.toContain('FIRST-ENCOUNTER TOPIC RULE');
+    });
   });
 
   describe('runLive [AUDIT-EVAL-2]', () => {
@@ -290,15 +329,15 @@ describe('exchangesFlow', () => {
       }
     });
 
-    it('throws when buildPrompt produces no user turn', async () => {
+    it('uses a synthetic user turn for first-turn scenarios and still rejects missing user messages', async () => {
       const scenarios =
         exchangesFlow.enumerateScenarios?.(generalProfile) ?? [];
       const s1 = scenarios.find((s) => s.scenarioId === 'S1-rung1-teach-new');
       if (!s1) throw new Error('S1 missing');
       const messages = exchangesFlow.buildPrompt(s1.input);
 
-      await expect(exchangesFlow.runLive?.(s1.input, messages)).rejects.toThrow(
-        /messages\.user is undefined/
+      expect(messages.user).toContain(
+        `Start a learning session about ${s1.input.context.topicTitle}`
       );
 
       await expect(

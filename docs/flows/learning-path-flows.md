@@ -90,41 +90,17 @@ Home / Library / Chat
           │   but no topicHint field. (audit Section J — Slice 1 PR 5i)
           │
           └─ Routes by branch:
-              ├─ broad                  → /pick-book/[subjectId] → /onboarding/interview
-              ├─ narrow / focused_book  → /onboarding/interview
-              └─ language subject       → /onboarding/language-setup → /onboarding/interview
+              ├─ broad                  → /pick-book/[subjectId]
+              ├─ narrow / focused_book  → first curriculum session
+              └─ language subject       → /onboarding/language-setup → first curriculum session
 
-/onboarding/interview (4-turn LLM-driven)
-  ├─ Interview turns persist in `onboarding_drafts.exchangeHistory`
-  │   (NOT learning_sessions — see audit Section A re: not yet merged)
-  │
-  ├─ Signal extraction runs post-hoc on the in-process exchange list:
-  │   goals / experienceLevel / currentKnowledge / interests /
-  │   interestContext / analogyFraming / paceHint
-  │
-  ├─ When `interests` is extracted AND production routing:
-  │   └─ /onboarding/interests-context (each interest classified as
-  │      free-time / school / both; default both for untouched)
-  │
-  ├─ Production routing (FAST_PATH=false):
-  │   /onboarding/analogy-preference → accommodations → curriculum-review
-  │   └─ POST /subjects/:subjectId/sessions/first-curriculum
-  │
-  └─ Fast-path routing (FAST_PATH=true, dev/staging only):
-      └─ POST /subjects/:subjectId/sessions/first-curriculum
-         (skips interests-context, analogy-preference, accommodations, curriculum-review)
-
-POST /subjects/:subjectId/sessions/first-curriculum (the 25s wall)
-  ├─ Polls up to FIRST_CURRICULUM_SESSION_WAIT_MS = 25,000ms for BOTH:
+POST /subjects/:subjectId/sessions/first-curriculum
+  ├─ Polls up to FIRST_CURRICULUM_SESSION_WAIT_MS = 25,000ms for:
   │     1. first materialized topic in `curriculum_topics` for this subject
-  │     2. extractedSignals committed to `onboarding_drafts`
   │
-  ├─ If both arrive in time → creates `learning_sessions` row, returns sessionId
-  │   (metadata: `onboardingFastPath.extractedSignals`)
-  ├─ If signals timeout but topic ready → session created without signals
+  ├─ If topic arrives in time → creates `learning_sessions` row, returns sessionId
   └─ If topic timeout (broad/focused_book and the materialization Inngest job hasn't
        fired yet) → returns an error and the learner sees a "still preparing" state.
-       This is the gap audit Section A's "pre-warm" PR (5d) closes.
 
 → Path 2 (Guided Learning) opens at sessionId
 ```
@@ -133,23 +109,22 @@ POST /subjects/:subjectId/sessions/first-curriculum (the 25s wall)
 
 | Item | Status |
 |---|---|
-| Interview screen + 4-turn flow | shipped, prod-active |
-| `analogy-preference`, `interests-context`, `accommodations`, `curriculum-review` screens | shipped, prod-active (FAST_PATH off) |
-| Fast-path bypass (skips four preference screens) | shipped, **flag-gated (dev/staging only)** |
+| Per-subject interview screen | removed in Slice 1.5 PR 1c |
+| `analogy-preference`, `interests-context`, `accommodations`, `curriculum-review` screens | removed from first-run onboarding |
 | Teach-first first-turn rule | **prompt-only** (shipped TF-1..TF-8, but masked by chatty fun-fact opener — see "First-Turn AI Opener" below) |
 | `startFirstCurriculumSession` 25s polling | shipped, prod-active |
-| Curriculum pre-warm on subject create | **not shipped** (audit Section A — Slice 1 PR 5d) |
+| Curriculum pre-warm on subject create | shipped |
 | Topic-grain intent matching | **not shipped** (audit Section J — Slice 1 PR 5i) |
-| Removal of preference screens | **not shipped** (audit Section D — Slice 1 PR 5h) |
+| Topic-probe signal extraction | async Inngest extraction from early `session_events` |
 
 ### What gets recorded
 
 | When | What | Where |
 |---|---|---|
 | Subject create | rawInput, resolvedName, focus, focusDescription, structureType | `subjects` |
-| Each interview turn | LLM exchange (not message events) | `onboarding_drafts.exchangeHistory` |
-| Signal extraction | goals/experienceLevel/etc. | `onboarding_drafts.extractedSignals` |
-| First-curriculum session create | sessionId, optional bookId, fastPath flag | `learning_sessions`; `metadata.onboardingFastPath.extractedSignals` |
+| Topic-probe turns | user/assistant message events | `session_events` |
+| Signal extraction | goals/experienceLevel/etc. | `learning_sessions.metadata.extractedSignals` |
+| First-curriculum session create | sessionId, optional bookId | `learning_sessions` |
 | Curriculum materialization (broad/focused_book) | books, topics | `curriculum_books`, `curriculum_topics` (deferred from subject create) |
 
 ---

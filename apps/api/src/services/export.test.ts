@@ -64,7 +64,6 @@ function createMockDb({
   notificationPreferences = [] as Record<string, unknown>[],
   learningModes = [] as Record<string, unknown>[],
   teachingPreferences = [] as Record<string, unknown>[],
-  onboardingDrafts = [] as Record<string, unknown>[],
   parkingLotItems = [] as Record<string, unknown>[],
   needsDeepeningTopics = [] as Record<string, unknown>[],
   familyLinks = [] as Record<string, unknown>[],
@@ -125,9 +124,6 @@ function createMockDb({
       },
       teachingPreferences: {
         findMany: jest.fn().mockResolvedValue(teachingPreferences),
-      },
-      onboardingDrafts: {
-        findMany: jest.fn().mockResolvedValue(onboardingDrafts),
       },
       parkingLotItems: {
         findMany: jest.fn().mockResolvedValue(parkingLotItems),
@@ -246,7 +242,6 @@ describe('generateExport', () => {
     const notifRow = { id: 'notif-1', profileId: 'p1' };
     const modeRow = { id: 'mode-1', profileId: 'p1' };
     const teachRow = { id: 'teach-1', profileId: 'p1' };
-    const draftRow = { id: 'draft-1', profileId: 'p1' };
     const parkingRow = { id: 'park-1', profileId: 'p1' };
 
     const db = createMockDb({
@@ -264,7 +259,6 @@ describe('generateExport', () => {
       notificationPreferences: [notifRow],
       learningModes: [modeRow],
       teachingPreferences: [teachRow],
-      onboardingDrafts: [draftRow],
       parkingLotItems: [parkingRow],
     });
 
@@ -283,7 +277,6 @@ describe('generateExport', () => {
     expect(result.notificationPreferences).toHaveLength(1);
     expect(result.learningModes).toHaveLength(1);
     expect(result.teachingPreferences).toHaveLength(1);
-    expect(result.onboardingDrafts).toHaveLength(1);
     expect(result.parkingLotItems).toHaveLength(1);
   });
 
@@ -353,7 +346,6 @@ describe('generateExport', () => {
     expect(result.notificationPreferences).toEqual([]);
     expect(result.learningModes).toEqual([]);
     expect(result.teachingPreferences).toEqual([]);
-    expect(result.onboardingDrafts).toEqual([]);
     expect(result.parkingLotItems).toEqual([]);
     expect(result.needsDeepeningTopics).toEqual([]);
     expect(result.familyLinks).toEqual([]);

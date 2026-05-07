@@ -39,6 +39,7 @@ import { useRetentionTopics } from '../../../../../hooks/use-retention';
 import { useStickyLoading } from '../../../../../hooks/use-sticky-loading';
 import { useCurriculum } from '../../../../../hooks/use-curriculum';
 import { useLearningResumeTarget } from '../../../../../hooks/use-progress';
+import { useStartFirstCurriculumSession } from '../../../../../hooks/use-sessions';
 
 import { formatApiError } from '../../../../../lib/format-api-error';
 import { formatRelativeDate } from '../../../../../lib/format-relative-date';
@@ -170,6 +171,7 @@ export default function BookScreen() {
   const sessionsQuery = useBookSessions(subjectId, bookId);
   const notesQuery = useBookNotes(subjectId, bookId);
   const generateMutation = useGenerateBookTopics(subjectId, bookId);
+  const startFirstCurriculumSession = useStartFirstCurriculumSession(subjectId);
   const curriculumQuery = useCurriculum(subjectId);
   const hasCurriculum = (curriculumQuery.data?.topics?.length ?? 0) > 0;
   const retentionTopicsQuery = useRetentionTopics(subjectId ?? '');
@@ -779,16 +781,50 @@ export default function BookScreen() {
     [router, subjectId]
   );
 
-  const handleBuildLearningPath = useCallback(() => {
-    router.push({
-      pathname: '/(app)/onboarding/interview',
-      params: {
-        subjectId,
+  const handleBuildLearningPath = useCallback(async () => {
+    if (startFirstCurriculumSession.isPending) return;
+
+    if (resumeTargetQuery.data) {
+      pushLearningResumeTarget(router, resumeTargetQuery.data);
+      return;
+    }
+
+    if (sessionCount > 0) {
+      handleStartLearning();
+      return;
+    }
+
+    try {
+      const result = await startFirstCurriculumSession.mutateAsync({
         bookId,
-        bookTitle: book?.title ?? '',
-      },
-    } as never);
-  }, [router, subjectId, bookId, book?.title]);
+        sessionType: 'learning',
+        inputMode: 'text',
+      });
+      router.push({
+        pathname: '/(app)/session',
+        params: {
+          mode: 'learning',
+          subjectId,
+          bookId,
+          sessionId: result.session.id,
+          topicId: result.session.topicId ?? undefined,
+          subjectName: book?.title ?? undefined,
+        },
+      } as never);
+    } catch (error) {
+      platformAlert('Could not start learning', formatApiError(error));
+    }
+  }, [
+    book?.title,
+    bookId,
+    handleStartLearning,
+    resumeTargetQuery.data,
+    router,
+    sessionCount,
+    startFirstCurriculumSession,
+    startFirstCurriculumSession.isPending,
+    subjectId,
+  ]);
 
   const handleStartReview = useCallback(() => {
     if (!reviewTopic) return;
@@ -1392,6 +1428,7 @@ export default function BookScreen() {
             </Text>
             <Pressable
               onPress={handleBuildLearningPath}
+              disabled={startFirstCurriculumSession.isPending}
               className="min-h-[48px] self-center items-center justify-center rounded-button bg-primary px-5 py-3"
               testID="topics-empty-build"
               accessibilityRole="button"
@@ -1416,6 +1453,7 @@ export default function BookScreen() {
               </Text>
               <Pressable
                 onPress={handleBuildLearningPath}
+                disabled={startFirstCurriculumSession.isPending}
                 className="min-h-[44px] items-center justify-center rounded-button bg-primary px-5 py-3"
                 testID="book-thin-path-build"
                 accessibilityRole="button"
@@ -1733,6 +1771,7 @@ export default function BookScreen() {
                 {!hasCurriculum ? (
                   <Pressable
                     onPress={handleBuildLearningPath}
+                    disabled={startFirstCurriculumSession.isPending}
                     className="mt-2 items-center py-2"
                     testID="book-build-path-link"
                     accessibilityRole="button"

@@ -19,8 +19,6 @@ const KNOWN_OFFENDERS = new Set<string>([
   // in src/inngest/functions/weekly-progress-push.integration.test.ts).
   'apps/api/src/services/session-summary.integration.test.ts',
   'apps/api/src/services/quiz/vocabulary.integration.test.ts',
-  // Mocks routeAndCall (the LLM provider HTTP boundary), not internal logic.
-  'apps/api/src/inngest/functions/interview-persist-curriculum.integration.test.ts',
 ]);
 
 function listIntegrationTests(): string[] {

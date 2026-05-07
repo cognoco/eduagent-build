@@ -36,6 +36,7 @@ import {
   useUsage,
   useFamilySubscription,
   useJoinByokWaitlist,
+  useRemoveFamilyProfile,
   fetchUsageData,
   type SubscriptionTier,
 } from '../../hooks/use-subscription';
@@ -168,6 +169,13 @@ const PACKAGE_PERIOD_LABEL: Partial<Record<PACKAGE_TYPE, string>> = {
 
 function getPackagePeriodLabel(pkg: PurchasesPackage): string {
   return PACKAGE_PERIOD_LABEL[pkg.packageType] ?? pkg.identifier;
+}
+
+function isTopUpPackage(pkg: PurchasesPackage): boolean {
+  return (
+    pkg.packageType === PACKAGE_TYPE.CUSTOM &&
+    pkg.product.identifier.includes('topup')
+  );
 }
 
 /**
@@ -626,10 +634,10 @@ function SubscriptionContent(): React.ReactElement {
     refetch: refetchUsage,
     isRefetching: usageRefetching,
   } = useUsage();
-  const { data: familySubscription } = useFamilySubscription(
-    subscription?.tier === 'family'
-  );
+  const { data: familySubscription, refetch: refetchFamilySubscription } =
+    useFamilySubscription(subscription?.tier === 'family');
   const byokWaitlist = useJoinByokWaitlist();
+  const removeFamilyProfile = useRemoveFamilyProfile();
   const linkedChildCount = activeProfile?.isOwner
     ? profiles.filter((profile) => profile.id !== activeProfile.id).length
     : 0;
@@ -963,10 +971,8 @@ function SubscriptionContent(): React.ReactElement {
     // Find the top-up package from offerings
     // RevenueCat consumables can be in a separate offering or as a non-subscription package
     const topUpOffering = offerings.all?.['top_up'] ?? offerings.current;
-    const topUpPkg = topUpOffering?.availablePackages.find(
-      (p) =>
-        p.packageType === PACKAGE_TYPE.CUSTOM &&
-        p.product.identifier.includes('topup')
+    const topUpPkg = topUpOffering?.availablePackages.find((p) =>
+      isTopUpPackage(p)
     );
 
     if (!topUpPkg) {
@@ -1096,6 +1102,50 @@ function SubscriptionContent(): React.ReactElement {
     }
   }, []);
 
+  const handleRemoveFamilyProfile = useCallback(
+    (profileId: string, displayName: string) => {
+      platformAlert(
+        'Remove from family?',
+        `${displayName}'s profile will be removed from this family plan and hidden from profile switching.`,
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: 'Remove',
+            style: 'destructive',
+            onPress: () => {
+              void (async () => {
+                try {
+                  await removeFamilyProfile.mutateAsync(profileId);
+                  await Promise.all([
+                    refetchSub(),
+                    refetchUsage(),
+                    refetchFamilySubscription(),
+                  ]);
+                  platformAlert(
+                    'Family updated',
+                    `${displayName} was removed from your family plan.`
+                  );
+                } catch {
+                  platformAlert(
+                    'Could not remove profile',
+                    'Please check your connection and try again.'
+                  );
+                }
+              })();
+            },
+          },
+        ]
+      );
+    },
+    [
+      refetchFamilySubscription,
+      refetchSub,
+      refetchUsage,
+      removeFamilyProfile,
+      t,
+    ]
+  );
+
   // ---------------------------------------------------------------------------
   // BYOK waitlist handler
   // ---------------------------------------------------------------------------
@@ -1141,6 +1191,9 @@ function SubscriptionContent(): React.ReactElement {
   // Get the current offering's available packages
   const currentOffering: PurchasesOffering | null = offerings?.current ?? null;
   const availablePackages = currentOffering?.availablePackages ?? [];
+  const subscriptionPackages = availablePackages.filter(
+    (pkg) => !isTopUpPackage(pkg)
+  );
 
   return (
     <View
@@ -1303,7 +1356,7 @@ function SubscriptionContent(): React.ReactElement {
                   // Background retry if offerings failed to load — the user
                   // is now looking at the Plans section; a fresh fetch can
                   // swap in real packages without a second button press.
-                  if (availablePackages.length === 0 && !offeringsLoading) {
+                  if (subscriptionPackages.length === 0 && !offeringsLoading) {
                     void refetchOfferings();
                   }
                 }}
@@ -1461,21 +1514,48 @@ function SubscriptionContent(): React.ReactElement {
                   {familySubscription.remainingQuestions} shared questions left
                   this cycle.
                 </Text>
-                <Text className="text-caption text-text-secondary mt-1">
-                  {familySubscription.members
-                    .map((member) =>
-                      member.isOwner
-                        ? `${member.displayName} (owner)`
-                        : member.displayName
-                    )
-                    .join(', ')}
-                </Text>
+                <View className="mt-3">
+                  {familySubscription.members.map((member) => (
+                    <View
+                      key={member.profileId}
+                      className="flex-row items-center justify-between py-1"
+                      testID={`family-member-${member.profileId}`}
+                    >
+                      <Text className="text-caption text-text-secondary">
+                        {member.isOwner
+                          ? `${member.displayName} (owner)`
+                          : member.displayName}
+                      </Text>
+                      {activeProfile?.isOwner === true && !member.isOwner ? (
+                        <Pressable
+                          onPress={() =>
+                            handleRemoveFamilyProfile(
+                              member.profileId,
+                              member.displayName
+                            )
+                          }
+                          disabled={removeFamilyProfile.isPending}
+                          className="min-h-[44px] justify-center px-2"
+                          accessibilityRole="button"
+                          accessibilityLabel={`Remove ${member.displayName} from family`}
+                          testID={`remove-family-member-${member.profileId}`}
+                        >
+                          <Text className="text-caption font-semibold text-danger">
+                            {removeFamilyProfile.isPending
+                              ? 'Removing...'
+                              : 'Remove'}
+                          </Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  ))}
+                </View>
               </View>
             </View>
           )}
 
           {/* RevenueCat Offerings — available packages */}
-          {availablePackages.length > 0 && (
+          {subscriptionPackages.length > 0 && (
             <View
               testID="offerings-section"
               onLayout={(e) => {
@@ -1485,7 +1565,7 @@ function SubscriptionContent(): React.ReactElement {
               <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6">
                 Plans
               </Text>
-              {availablePackages.map((pkg) => {
+              {subscriptionPackages.map((pkg) => {
                 // Check if this package matches the user's active entitlement
                 const isCurrentPlan =
                   hasActiveSubscription &&
@@ -1494,7 +1574,7 @@ function SubscriptionContent(): React.ReactElement {
                   ) === true;
                 return (
                   <PackageOption
-                    key={pkg.identifier}
+                    key={`${pkg.identifier}-${pkg.product.identifier}`}
                     pkg={pkg}
                     isCurrentPlan={isCurrentPlan}
                     onSelect={handlePurchase}
@@ -1521,7 +1601,7 @@ function SubscriptionContent(): React.ReactElement {
           )}
 
           {/* No offerings fallback — show static tier comparison when RevenueCat is unavailable */}
-          {availablePackages.length === 0 && !offeringsLoading && (
+          {subscriptionPackages.length === 0 && !offeringsLoading && (
             <View
               testID="no-offerings"
               onLayout={(e) => {

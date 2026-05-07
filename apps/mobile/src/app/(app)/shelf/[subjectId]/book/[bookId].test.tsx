@@ -43,6 +43,7 @@ const mockUseBookNotes = jest.fn();
 const mockUseRetentionTopics = jest.fn();
 const mockUseCurriculum = jest.fn();
 const mockUseLearningResumeTarget = jest.fn();
+const mockStartFirstCurriculumMutateAsync = jest.fn();
 
 jest.mock('../../../../../hooks/use-books', () => ({
   useBookWithTopics: () => mockUseBookWithTopics(),
@@ -72,6 +73,16 @@ jest.mock('../../../../../hooks/use-curriculum', () => ({
 jest.mock('../../../../../hooks/use-progress', () => ({
   useLearningResumeTarget: () => mockUseLearningResumeTarget(),
 }));
+
+jest.mock(
+  '../../../../../hooks/use-sessions',
+  /* gc1-allow: session mutation state */ () => ({
+    useStartFirstCurriculumSession: () => ({
+      mutateAsync: mockStartFirstCurriculumMutateAsync,
+      isPending: false,
+    }),
+  })
+);
 
 jest.mock('../../../../../hooks/use-subjects', () => ({
   useSubjects: () => ({
@@ -232,6 +243,9 @@ describe('BookScreen', () => {
     mockUseRetentionTopics.mockReturnValue(makeRetentionQuery());
     mockUseCurriculum.mockReturnValue({ data: null, isLoading: false });
     mockUseLearningResumeTarget.mockReturnValue({ data: null });
+    mockStartFirstCurriculumMutateAsync.mockResolvedValue({
+      session: { id: 'session-1', topicId: 'topic-1' },
+    });
   });
 
   it('renders the loading state', () => {
@@ -375,7 +389,7 @@ describe('BookScreen', () => {
     getByText('2 of 3 topics finished');
   });
 
-  it('offers to set up a fuller topic list when a book only has one starter topic', () => {
+  it('offers to set up a fuller topic list when a book only has one starter topic', async () => {
     mockUseBookWithTopics.mockReturnValue(
       makeBookQuery({
         data: {
@@ -402,13 +416,23 @@ describe('BookScreen', () => {
 
     fireEvent.press(getByTestId('book-thin-path-build'));
 
-    expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(app)/onboarding/interview',
-      params: {
-        subjectId: 'sub-1',
+    await waitFor(() => {
+      expect(mockStartFirstCurriculumMutateAsync).toHaveBeenCalledWith({
         bookId: 'book-1',
-        bookTitle: 'Introduction to Programming',
-      },
+        sessionType: 'learning',
+        inputMode: 'text',
+      });
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/session',
+        params: expect.objectContaining({
+          mode: 'learning',
+          subjectId: 'sub-1',
+          bookId: 'book-1',
+          sessionId: 'session-1',
+          topicId: 'topic-1',
+          subjectName: 'Introduction to Programming',
+        }),
+      });
     });
   });
 
@@ -607,7 +631,7 @@ describe('BookScreen', () => {
     expect(refetchSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('renders the empty topics state with a setup CTA', () => {
+  it('renders the empty topics state with a setup CTA', async () => {
     mockUseBookWithTopics.mockReturnValue(
       makeBookQuery({
         data: {
@@ -631,16 +655,26 @@ describe('BookScreen', () => {
     getByText('Set up this book');
 
     fireEvent.press(getByTestId('topics-empty-build'));
-    expect(mockPush).toHaveBeenCalledWith(
-      expect.objectContaining({
-        pathname: '/(app)/onboarding/interview',
-        params: expect.objectContaining({
-          subjectId: 'sub-1',
-          bookId: 'book-1',
-          bookTitle: 'Algebra',
-        }),
-      })
-    );
+    await waitFor(() => {
+      expect(mockStartFirstCurriculumMutateAsync).toHaveBeenCalledWith({
+        bookId: 'book-1',
+        sessionType: 'learning',
+        inputMode: 'text',
+      });
+      expect(mockPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/(app)/session',
+          params: expect.objectContaining({
+            mode: 'learning',
+            subjectId: 'sub-1',
+            bookId: 'book-1',
+            sessionId: 'session-1',
+            topicId: 'topic-1',
+            subjectName: 'Algebra',
+          }),
+        })
+      );
+    });
   });
 
   it('renders the all-sections fallback when every topic is skipped', () => {
@@ -842,20 +876,30 @@ describe('BookScreen', () => {
     getByText(truncated);
   });
 
-  it('shows and wires the build-learning-path link when no curriculum exists', () => {
+  it('shows and wires the build-learning-path link when no curriculum exists', async () => {
     const { getByTestId } = render(<BookScreen />);
 
     fireEvent.press(getByTestId('book-build-path-link'));
-    expect(mockPush).toHaveBeenCalledWith(
-      expect.objectContaining({
-        pathname: '/(app)/onboarding/interview',
-        params: expect.objectContaining({
-          subjectId: 'sub-1',
-          bookId: 'book-1',
-          bookTitle: 'Algebra',
-        }),
-      })
-    );
+    await waitFor(() => {
+      expect(mockStartFirstCurriculumMutateAsync).toHaveBeenCalledWith({
+        bookId: 'book-1',
+        sessionType: 'learning',
+        inputMode: 'text',
+      });
+      expect(mockPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/(app)/session',
+          params: expect.objectContaining({
+            mode: 'learning',
+            subjectId: 'sub-1',
+            bookId: 'book-1',
+            sessionId: 'session-1',
+            topicId: 'topic-1',
+            subjectName: 'Algebra',
+          }),
+        })
+      );
+    });
   });
 
   it('hides the build-learning-path link when curriculum already exists', () => {

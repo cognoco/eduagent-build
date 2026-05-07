@@ -49,8 +49,6 @@ run_s "parent-with-children" "flows/account/profile-switching.yaml"
 
 # Onboarding
 run_s "onboarding-complete" "flows/onboarding/create-profile-standalone.yaml"
-run_s "onboarding-complete" "flows/onboarding/analogy-preference-flow.yaml"
-run_s "onboarding-complete" "flows/onboarding/curriculum-review-flow.yaml"
 run_s "onboarding-complete" "flows/onboarding/create-subject.yaml"
 run_s "learning-active"     "flows/onboarding/view-curriculum.yaml"
 

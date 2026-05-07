@@ -240,6 +240,17 @@ interface ReviewCalibrationDispatchPayload {
   timestamp: string;
 }
 
+interface TopicProbeDispatchPayload {
+  version: 1;
+  profileId: string;
+  sessionId: string;
+  subjectId: string;
+  topicId: string;
+  learnerMessage: string;
+  topicTitle: string;
+  timestamp: string;
+}
+
 async function maybeDispatchReviewCalibration(
   db: Database,
   profileId: string,
@@ -349,6 +360,136 @@ async function maybeDispatchReviewCalibration(
       profileId,
       extra: {
         site: 'maybeDispatchReviewCalibration',
+        sessionId: session.id,
+        topicId: session.topicId,
+      },
+    });
+  }
+}
+
+async function maybeDispatchTopicProbeExtraction(
+  db: Database,
+  profileId: string,
+  session: {
+    id: string;
+    subjectId: string;
+    topicId: string | null;
+  },
+  effectiveMode: string | undefined,
+  conversationLanguage: ConversationLanguage | undefined,
+  learnerMessageText: string,
+  topicTitle: string | undefined,
+  isFirstEncounter: boolean
+): Promise<void> {
+  if (effectiveMode !== 'learning') return;
+  if (!isFirstEncounter) return;
+  const topicId = session.topicId;
+  if (!topicId || !topicTitle) return;
+  if (
+    !isSubstantiveCalibrationAnswer(learnerMessageText, conversationLanguage)
+  ) {
+    return;
+  }
+
+  const payload = await db.transaction<TopicProbeDispatchPayload | null>(
+    async (tx) => {
+      const [row] = await tx
+        .select({ metadata: learningSessions.metadata })
+        .from(learningSessions)
+        .where(
+          and(
+            eq(learningSessions.id, session.id),
+            eq(learningSessions.profileId, profileId)
+          )
+        )
+        .for('update')
+        .limit(1);
+
+      if (!row) return null;
+      const metadata = (row.metadata ?? {}) as Record<string, unknown>;
+      if (metadata['topicProbeFiredAt'] != null) return null;
+
+      const timestamp = new Date().toISOString();
+      await tx
+        .update(learningSessions)
+        .set({
+          metadata: {
+            ...metadata,
+            topicProbeFiredAt: timestamp,
+            topicProbeExtractionStatus: 'pending',
+          },
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(learningSessions.id, session.id),
+            eq(learningSessions.profileId, profileId)
+          )
+        );
+
+      return {
+        version: 1,
+        profileId,
+        sessionId: session.id,
+        subjectId: session.subjectId,
+        topicId,
+        learnerMessage: learnerMessageText,
+        topicTitle,
+        timestamp,
+      };
+    }
+  );
+
+  if (!payload) return;
+
+  try {
+    await inngest.send({
+      name: 'app/topic-probe.requested',
+      data: payload,
+    });
+  } catch (err) {
+    await db.transaction(async (tx) => {
+      const [row] = await tx
+        .select({ metadata: learningSessions.metadata })
+        .from(learningSessions)
+        .where(
+          and(
+            eq(learningSessions.id, session.id),
+            eq(learningSessions.profileId, profileId)
+          )
+        )
+        .for('update')
+        .limit(1);
+
+      const metadata = (row?.metadata ?? {}) as Record<string, unknown>;
+      if (metadata['topicProbeFiredAt'] !== payload.timestamp) return;
+      const nextMetadata = { ...metadata };
+      delete nextMetadata['topicProbeFiredAt'];
+      nextMetadata['topicProbeExtractionStatus'] = 'failed';
+      await tx
+        .update(learningSessions)
+        .set({
+          metadata: nextMetadata,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(learningSessions.id, session.id),
+            eq(learningSessions.profileId, profileId)
+          )
+        );
+    });
+    logger.warn('[session-exchange] topic probe extraction dispatch failed', {
+      event: 'topic_probe.dispatch_failed',
+      profileId,
+      sessionId: session.id,
+      topicId: session.topicId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    captureException(err, {
+      profileId,
+      extra: {
+        site: 'maybeDispatchTopicProbeExtraction',
         sessionId: session.id,
         topicId: session.topicId,
       },
@@ -558,6 +699,8 @@ export async function prepareExchangeContext(
     topicRows,
     profileRows,
     retentionRows,
+    priorTopicSessionRows,
+    priorSubjectSessionRows,
     events,
     memory,
     metadataRows,
@@ -586,6 +729,32 @@ export async function prepareExchangeContext(
           )
           .limit(1)
       : Promise.resolve([]),
+    session.topicId
+      ? db
+          .select({ id: learningSessions.id })
+          .from(learningSessions)
+          .where(
+            and(
+              eq(learningSessions.profileId, profileId),
+              eq(learningSessions.topicId, session.topicId),
+              ne(learningSessions.id, sessionId),
+              gte(learningSessions.exchangeCount, 1)
+            )
+          )
+          .limit(1)
+      : Promise.resolve([]),
+    db
+      .select({ id: learningSessions.id })
+      .from(learningSessions)
+      .where(
+        and(
+          eq(learningSessions.profileId, profileId),
+          eq(learningSessions.subjectId, session.subjectId),
+          ne(learningSessions.id, sessionId),
+          gte(learningSessions.exchangeCount, 1)
+        )
+      )
+      .limit(1),
     db.query.sessionEvents.findMany({
       where: and(
         eq(sessionEvents.sessionId, sessionId),
@@ -680,6 +849,9 @@ export async function prepareExchangeContext(
 
   const topic = topicRows[0];
   const [profile] = profileRows;
+  const isFirstEncounter =
+    Boolean(session.topicId) && priorTopicSessionRows.length === 0;
+  const isFirstSessionOfSubject = priorSubjectSessionRows.length === 0;
   if (!profile) {
     logger.warn(
       '[processExchange] Profile not found — birthYear will be null, LLM defaults to adult tone',
@@ -1007,6 +1179,19 @@ export async function prepareExchangeContext(
         ]
       : undefined
   );
+  const extractedSignals = extractedInterviewSignalsSchema.safeParse(
+    sessionMetadata?.extractedSignals
+  );
+  const extractedSignalsToReflect = extractedSignals.success
+    ? {
+        goals:
+          extractedSignals.data.goals.length > 0
+            ? extractedSignals.data.goals.join('; ')
+            : undefined,
+        currentKnowledge: extractedSignals.data.currentKnowledge || undefined,
+        interests: extractedSignals.data.interests,
+      }
+    : null;
   const resumeFromSessionId =
     typeof sessionMetadata?.resumeFromSessionId === 'string'
       ? sessionMetadata.resumeFromSessionId
@@ -1288,6 +1473,9 @@ export async function prepareExchangeContext(
     onboardingSignals: onboardingSignals.success
       ? onboardingSignals.data
       : undefined,
+    isFirstEncounter,
+    isFirstSessionOfSubject,
+    extractedSignalsToReflect,
     // B.3: Consecutive correct-answer streak at the current escalation rung.
     // Used by the prompt to trigger adaptive escalation when streak >= 4.
     correctStreak: computeCorrectStreak(events, effectiveRung),
@@ -1656,6 +1844,22 @@ export async function processMessage(
   );
 
   await applyContinuationScore(db, profileId, sessionId, result.retrievalScore);
+  if (persisted.persistedUserMessage) {
+    await maybeDispatchTopicProbeExtraction(
+      db,
+      profileId,
+      {
+        id: session.id,
+        subjectId: session.subjectId,
+        topicId: session.topicId,
+      },
+      context.effectiveMode,
+      context.conversationLanguage,
+      input.message,
+      context.topicTitle,
+      context.isFirstEncounter === true
+    );
+  }
 
   return {
     response: result.response,
@@ -1867,6 +2071,22 @@ export async function streamMessage(
         sessionId,
         parsed.retrievalScore
       );
+      if (persisted.persistedUserMessage) {
+        await maybeDispatchTopicProbeExtraction(
+          db,
+          profileId,
+          {
+            id: session.id,
+            subjectId: session.subjectId,
+            topicId: session.topicId,
+          },
+          context.effectiveMode,
+          context.conversationLanguage,
+          input.message,
+          context.topicTitle,
+          context.isFirstEncounter === true
+        );
+      }
       return {
         exchangeCount: persisted.exchangeCount,
         escalationRung: effectiveRung,

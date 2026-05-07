@@ -34,8 +34,6 @@ run_seeded "parent-with-children" "flows/account/profile-switching.yaml"
 
 # ─── GROUP 2: Onboarding flows ───
 run_seeded "onboarding-complete" "flows/onboarding/create-profile-standalone.yaml"
-run_seeded "onboarding-complete" "flows/onboarding/analogy-preference-flow.yaml"
-run_seeded "onboarding-complete" "flows/onboarding/curriculum-review-flow.yaml"
 run_seeded "onboarding-complete" "flows/onboarding/create-subject.yaml"
 run_seeded "learning-active"     "flows/onboarding/view-curriculum.yaml"
 

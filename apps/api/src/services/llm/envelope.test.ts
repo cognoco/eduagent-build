@@ -203,12 +203,12 @@ describe('parseEnvelope', () => {
 
   it('[BUG-847] emits llm.envelope.parse_failed on no_json_found, tagged with surface', () => {
     const { spy, entries } = captureLoggerWarns();
-    parseEnvelope('just prose, no JSON', 'interview');
+    parseEnvelope('just prose, no JSON', 'filing');
     const [entry] = entries();
     expect(entry?.message).toBe('llm.envelope.parse_failed');
     expect(entry?.context).toEqual(
       expect.objectContaining({
-        surface: 'interview',
+        surface: 'filing',
         reason: 'no_json_found',
         rawSnippet: 'just prose, no JSON',
       })
@@ -249,7 +249,7 @@ describe('parseEnvelope', () => {
 
   it('[BUG-847] does NOT emit telemetry on a successful parse', () => {
     const { spy, entries } = captureLoggerWarns();
-    parseEnvelope('{"reply": "all good"}', 'interview');
+    parseEnvelope('{"reply": "all good"}', 'filing');
     expect(entries()).toHaveLength(0);
     spy.mockRestore();
   });

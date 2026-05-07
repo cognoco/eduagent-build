@@ -14,7 +14,7 @@ const MAX_CONTENT_SIZE = 8_000;
 
 const outboxSpilloverEntrySchema = z.object({
   id: z.string().min(1).max(128),
-  flow: z.enum(['session', 'interview']),
+  flow: z.enum(['session']),
   surfaceKey: z.string().min(1).max(128),
   content: z.string().min(1).max(MAX_CONTENT_SIZE),
   attempts: z.number().int().nonnegative().max(100),

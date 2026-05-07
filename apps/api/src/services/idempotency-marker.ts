@@ -10,7 +10,7 @@ export const IDEMPOTENCY_TTL_SECONDS = 24 * 60 * 60;
 // 512-byte Cloudflare KV limit.
 export const MAX_IDEMPOTENCY_KEY_LENGTH = 256;
 
-export type IdempotencyFlow = 'session' | 'interview';
+export type IdempotencyFlow = 'session';
 
 export function buildIdempotencyCacheKey(
   profileId: string,

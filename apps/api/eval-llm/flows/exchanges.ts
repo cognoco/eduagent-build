@@ -59,14 +59,132 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
   {
     id: 'S1-rung1-teach-new',
     purpose:
-      'First-turn / new-topic branch (rung 1, exchangeCount 0, retention new)',
+      'First-turn returning-topic branch (rung 1, exchangeCount 0, retention new, normal learner action)',
     history: HISTORY_S1_RUNG1,
     contextOverrides: {
       escalationRung: 1,
       sessionType: 'learning',
       verificationType: 'standard',
       exchangeCount: 0,
+      isFirstEncounter: false,
+      isFirstSessionOfSubject: false,
       retentionStatus: { status: 'new' },
+    },
+    appliesTo: () => true,
+  },
+  {
+    id: 'S10-first-encounter-topic-turn0',
+    purpose:
+      'First-encounter topic turn 0 — teach exactly one idea, then ask a focused prior-knowledge probe',
+    history: [],
+    contextOverrides: {
+      escalationRung: 1,
+      sessionType: 'learning',
+      verificationType: 'standard',
+      exchangeCount: 0,
+      isFirstEncounter: true,
+      isFirstSessionOfSubject: false,
+      retentionStatus: { status: 'new' },
+    },
+    appliesTo: () => true,
+  },
+  {
+    id: 'S11-first-encounter-topic-turn1',
+    purpose:
+      'First-encounter topic turn 1 — react to the learner signal, teach one nugget, ask one follow-up',
+    history: [
+      {
+        role: 'assistant',
+        content:
+          'Plants make sugar from sunlight, water, and carbon dioxide. What part of that have you seen before?',
+      },
+      {
+        role: 'user',
+        content:
+          'I know plants need sun, but I do not know what carbon dioxide does.',
+      },
+    ],
+    contextOverrides: {
+      escalationRung: 1,
+      sessionType: 'learning',
+      verificationType: 'standard',
+      exchangeCount: 1,
+      isFirstEncounter: true,
+      isFirstSessionOfSubject: false,
+      retentionStatus: { status: 'new' },
+      extractedSignalsToReflect: {
+        currentKnowledge: 'knows plants need sunlight',
+      },
+    },
+    appliesTo: () => true,
+  },
+  {
+    id: 'S12-first-encounter-topic-turn3',
+    purpose:
+      'First-encounter topic turn 3 — final allowed probe turn before normal teaching resumes',
+    history: [
+      {
+        role: 'assistant',
+        content:
+          'Plants use carbon dioxide as one ingredient for sugar. What do you think the water is for?',
+      },
+      {
+        role: 'user',
+        content: 'Maybe water is food for the plant?',
+      },
+      {
+        role: 'assistant',
+        content:
+          'Close: water is an ingredient, not the finished food. What feels unclear about that split?',
+      },
+      {
+        role: 'user',
+        content: 'I mix up ingredients and energy.',
+      },
+    ],
+    contextOverrides: {
+      escalationRung: 1,
+      sessionType: 'learning',
+      verificationType: 'standard',
+      exchangeCount: 3,
+      isFirstEncounter: true,
+      isFirstSessionOfSubject: false,
+      retentionStatus: { status: 'new' },
+      extractedSignalsToReflect: {
+        currentKnowledge: 'mixes up ingredients and energy',
+      },
+    },
+    appliesTo: () => true,
+  },
+  {
+    id: 'S13-first-session-subject-turn0',
+    purpose:
+      'Very first subject session turn 0 — subject-level opener wins over topic probe',
+    history: [],
+    contextOverrides: {
+      escalationRung: 1,
+      sessionType: 'learning',
+      verificationType: 'standard',
+      exchangeCount: 0,
+      isFirstEncounter: true,
+      isFirstSessionOfSubject: true,
+      retentionStatus: { status: 'new' },
+    },
+    appliesTo: () => true,
+  },
+  {
+    id: 'S14-returning-topic-turn0',
+    purpose:
+      'Returning-topic first turn — regression guard for original 5b teach-plus-action rule',
+    history: [],
+    contextOverrides: {
+      escalationRung: 1,
+      sessionType: 'learning',
+      verificationType: 'standard',
+      exchangeCount: 0,
+      isFirstEncounter: false,
+      isFirstSessionOfSubject: false,
+      retentionStatus: { status: 'strong' },
     },
     appliesTo: () => true,
   },
@@ -310,6 +428,9 @@ function buildBaseContext(profile: EvalProfile): ExchangeContext {
       : undefined,
     learningMode: profile.learningMode,
     exchangeCount: 0,
+    isFirstEncounter: false,
+    isFirstSessionOfSubject: false,
+    extractedSignalsToReflect: null,
     inputMode: 'text',
     llmTier: 'standard',
   };
@@ -373,10 +494,17 @@ export const exchangesFlow: FlowDefinition<ExchangeScenarioInput> = {
     const lastUserTurn = [...input.context.exchangeHistory]
       .reverse()
       .find((t) => t.role === 'user');
+    const firstTurnUser =
+      input.context.exchangeCount === 0
+        ? input.context.rawInput ??
+          `Start a learning session about ${
+            input.context.topicTitle ?? input.context.subjectName
+          }.`
+        : undefined;
 
     return {
       system,
-      user: lastUserTurn?.content,
+      user: lastUserTurn?.content ?? firstTurnUser,
       notes: [
         `Scenario: ${input.scenarioId} — ${input.scenarioPurpose}`,
         `Rung: ${input.context.escalationRung}, sessionType: ${

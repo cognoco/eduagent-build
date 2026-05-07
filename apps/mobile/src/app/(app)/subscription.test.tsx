@@ -27,10 +27,13 @@ const mockUseActiveProfileRole = jest.fn();
 const mockPlatformAlert = jest.fn((...args: Parameters<typeof Alert.alert>) =>
   Alert.alert(...args)
 );
-jest.mock('../../lib/platform-alert', () => ({ // gc1-allow: platformAlert is the display side-effect boundary; test spies on alert wiring without invoking native UI.
-  platformAlert: (...args: unknown[]) =>
-    mockPlatformAlert(...(args as Parameters<typeof Alert.alert>)),
-}));
+jest.mock(
+  '../../lib/platform-alert',
+  /* gc1-allow: alert boundary */ () => ({
+    platformAlert: (...args: unknown[]) =>
+      mockPlatformAlert(...(args as Parameters<typeof Alert.alert>)),
+  })
+);
 
 // Resolves t('common.ok') → 'OK' (from en.json) so existing assertions on the
 // rendered button label keep matching after the alert sweep.
@@ -77,9 +80,12 @@ jest.mock('../../lib/profile', () => ({
   }),
 }));
 
-jest.mock('../../hooks/use-active-profile-role', () => ({ // gc1-allow: Subscription route gates child profiles by active role; mocking keeps these tests focused on route behavior.
-  useActiveProfileRole: () => mockUseActiveProfileRole(),
-}));
+jest.mock(
+  '../../hooks/use-active-profile-role',
+  /* gc1-allow: active role */ () => ({
+    useActiveProfileRole: () => mockUseActiveProfileRole(),
+  })
+);
 
 jest.mock('../../lib/analytics', () => ({
   track: jest.fn(),
@@ -357,6 +363,17 @@ describe('SubscriptionScreen', () => {
     jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
 
     // Default fetch routes (most-specific first to avoid prefix collisions)
+    mockFetch.setRoute(
+      '/subscription/family/remove',
+      () =>
+        new Response(
+          JSON.stringify({
+            message: 'Profile removed from family subscription',
+            removedProfileId: 'p2',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+    );
     mockFetch.setRoute(
       '/subscription/family',
       () =>
@@ -1399,7 +1416,89 @@ describe('SubscriptionScreen', () => {
     });
     screen.getByText('3 of 4 profiles connected');
     screen.getByText(/1200 shared questions left/i);
-    screen.getByText(/Parent \(owner\), Alex, Mia/);
+    screen.getByText('Parent (owner)');
+    screen.getByText('Alex');
+    screen.getByText('Mia');
+    screen.getByTestId('remove-family-member-p2');
+    screen.getByTestId('remove-family-member-p3');
+  });
+
+  it('removes a non-owner profile from the family pool after confirmation', async () => {
+    mockFetch.setRoute(
+      '/subscription',
+      () =>
+        new Response(
+          JSON.stringify({
+            subscription: {
+              ...DEFAULT_SUBSCRIPTION,
+              tier: 'family',
+              status: 'active',
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+    );
+    mockFetch.setRoute(
+      '/subscription/family',
+      () =>
+        new Response(
+          JSON.stringify({
+            family: {
+              tier: 'family',
+              monthlyLimit: 1500,
+              usedThisMonth: 300,
+              remainingQuestions: 1200,
+              profileCount: 2,
+              maxProfiles: 4,
+              members: [
+                { profileId: 'p1', displayName: 'Parent', isOwner: true },
+                { profileId: 'p2', displayName: 'Alex', isOwner: false },
+              ],
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+    );
+    mockFetch.setRoute(
+      '/subscription/family/remove',
+      () =>
+        new Response(
+          JSON.stringify({
+            message: 'Profile removed from family subscription',
+            removedProfileId: 'p2',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+    );
+
+    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      screen.getByTestId('remove-family-member-p2');
+    });
+    fireEvent.press(screen.getByTestId('remove-family-member-p2'));
+
+    const confirmButtons = (Alert.alert as jest.Mock).mock.calls[0]?.[2] as
+      | Array<{ text: string; onPress?: () => void }>
+      | undefined;
+    const removeButton = confirmButtons?.find(
+      (button) => button.text === 'Remove'
+    );
+    expect(removeButton).toBeDefined();
+
+    await act(async () => {
+      removeButton?.onPress?.();
+    });
+
+    await waitFor(() => {
+      expect(
+        fetchCallsMatching(mockFetch, '/subscription/family/remove').length
+      ).toBeGreaterThanOrEqual(1);
+    });
+    expect(Alert.alert).toHaveBeenCalledWith(
+      'Family updated',
+      'Alex was removed from your family plan.'
+    );
   });
 
   it('joins the BYOK waitlist using account email on success', async () => {
@@ -1636,6 +1735,20 @@ describe('SubscriptionScreen', () => {
         screen.getByTestId('top-up-section');
       });
       screen.getByText('Buy 500 credits');
+    });
+
+    it('does not render consumable top-up packages as subscription plans', async () => {
+      setupPaidTierWithTopUp();
+
+      render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+      await waitFor(() => {
+        screen.getByTestId('offerings-section');
+      });
+
+      expect(screen.getAllByTestId('package-option-$rc_monthly')).toHaveLength(
+        1
+      );
     });
 
     it('shows graceful error when no topup package is in offerings', async () => {

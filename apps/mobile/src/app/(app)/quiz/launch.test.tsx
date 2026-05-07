@@ -15,7 +15,8 @@ jest.mock('react-i18next', () => {
     'quiz.launch.loadingPicking': 'Picking a theme...',
     'quiz.launch.loadingAlmost': 'Almost ready...',
     'quiz.launch.challengeTitle': 'Challenge round',
-    'quiz.launch.challengeBody': "You're on a streak. This one is harder.",
+    'quiz.launch.challengeBody':
+      "Your mentor's making this harder — you've been crushing it.",
     'quiz.launch.challengeStart': 'Start',
     'quiz.launch.challengeLabel':
       'Challenge round. This round is harder than usual.',
@@ -175,6 +176,9 @@ describe('QuizLaunchScreen', () => {
     await waitFor(() => {
       screen.getByTestId('quiz-challenge-banner');
     });
+    screen.getByText(
+      "Your mentor's making this harder — you've been crushing it."
+    );
 
     expect(mockReplace).not.toHaveBeenCalled();
 

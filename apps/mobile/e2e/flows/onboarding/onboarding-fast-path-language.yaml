@@ -1,0 +1,82 @@
+# Flow: Subject onboarding fast path (language)
+# Validates: create language subject -> language setup -> first learning session
+# without legacy preference gates.
+appId: com.mentomate.app
+tags:
+  - onboarding
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "onboarding-complete"
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: "home-subject-carousel"
+    timeout: 15000
+
+- tapOn:
+    id: "home-action-study-new"
+
+- extendedWaitUntil:
+    visible:
+      id: "create-subject-name"
+    timeout: 10000
+
+- tapOn:
+    id: "create-subject-name"
+- inputText: "Italian"
+- pressKey: back
+
+- extendedWaitUntil:
+    visible:
+      id: "create-subject-submit"
+    timeout: 5000
+
+- tapOn:
+    id: "create-subject-submit"
+
+# Some resolver responses surface the lightweight confirmation card before
+# creation; direct language matches skip it and route straight to interview.
+- extendedWaitUntil:
+    visible:
+      id: "subject-confident-card"
+    timeout: 15000
+    optional: true
+
+- runFlow:
+    when:
+      visible:
+        id: "subject-confident-card"
+    commands:
+      - tapOn:
+          id: "subject-suggestion-accept"
+
+- extendedWaitUntil:
+    visible:
+      id: "language-setup-continue"
+    timeout: 30000
+
+# E2E emulator images default to en-US; nb-NO preselection is covered by the
+# colocated language-setup unit test.
+- assertVisible:
+    id: "native-language-selected-en"
+
+- tapOn:
+    id: "language-setup-continue"
+
+- extendedWaitUntil:
+    visible:
+      id: "chat-input"
+    timeout: 45000
+
+- extendedWaitUntil:
+    visible:
+      id: "message-bubble-assistant-0"
+    timeout: 30000
+
+- extendedWaitUntil:
+    visible:
+      text: "~.*\\?"
+    timeout: 30000

@@ -26,21 +26,11 @@ describe('onboarding/_layout.tsx', () => {
     render(<OnboardingLayout />);
 
     const names = capturedScreens.map((s) => s.name);
-    expect(names).toEqual(
-      expect.arrayContaining([
-        'pronouns',
-        'interview',
-        'interests-context',
-        'analogy-preference',
-        'curriculum-review',
-        'language-setup',
-      ])
-    );
+    expect(names).toEqual(['pronouns', 'language-setup']);
   });
 
-  // [BUG-797] Cross-tab deep pushes (e.g. push notification → /onboarding/interview)
-  // must land with `index` underneath so router.back() does not fall through to
-  // the Tabs first-route (Home).
+  // [BUG-797] Cross-tab deep pushes must land with `index` underneath so
+  // router.back() does not fall through to the Tabs first-route (Home).
   it('exports unstable_settings.initialRouteName = "index"', () => {
     expect(unstable_settings).toEqual({ initialRouteName: 'index' });
   });

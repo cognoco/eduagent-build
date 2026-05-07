@@ -24,17 +24,8 @@ interface SessionEntryMetadata {
   homeworkMode?: 'help_me' | 'check_answer';
 }
 
-interface InterviewEntryMetadata {
-  subjectId?: string;
-  bookId?: string;
-}
-
 function asSessionMetadata(entry: OutboxEntry): SessionEntryMetadata {
   return (entry.metadata ?? {}) as SessionEntryMetadata;
-}
-
-function asInterviewMetadata(entry: OutboxEntry): InterviewEntryMetadata {
-  return (entry.metadata ?? {}) as InterviewEntryMetadata;
 }
 
 export function OutboxDrainProvider({
@@ -58,7 +49,7 @@ export function OutboxDrainProvider({
     async (body: {
       entries: Array<{
         id: string;
-        flow: 'session' | 'interview';
+        flow: 'session';
         surfaceKey: string;
         content: string;
         attempts: number;
@@ -147,60 +138,6 @@ export function OutboxDrainProvider({
     [activeProfile?.id, buildHeaders]
   );
 
-  const replayInterviewEntry = React.useCallback(
-    async (entry: OutboxEntry) => {
-      if (!activeProfile?.id) return;
-      const metadata = asInterviewMetadata(entry);
-      if (!metadata.subjectId) {
-        await recordFailure(
-          activeProfile.id,
-          'interview',
-          entry.id,
-          'missing_subject_id'
-        );
-        return;
-      }
-
-      await beginAttempt(activeProfile.id, 'interview', entry.id);
-      const query = metadata.bookId ? `?bookId=${metadata.bookId}` : '';
-      const { events } = streamSSEViaXHR(
-        `${getApiUrl()}/v1/subjects/${
-          metadata.subjectId
-        }/interview/stream${query}`,
-        {
-          method: 'POST',
-          headers: await buildHeaders(entry.id),
-          body: JSON.stringify({ message: entry.content }),
-        }
-      );
-
-      let fallbackReason: string | null = null;
-      for await (const event of events) {
-        if (event.type === 'replay') {
-          await markConfirmed(activeProfile.id, 'interview', entry.id);
-          return;
-        }
-        if (event.type === 'fallback') {
-          fallbackReason = event.reason;
-        }
-        if (event.type === 'done') {
-          if (fallbackReason) {
-            await recordFailure(
-              activeProfile.id,
-              'interview',
-              entry.id,
-              fallbackReason
-            );
-            return;
-          }
-          await markConfirmed(activeProfile.id, 'interview', entry.id);
-          return;
-        }
-      }
-    },
-    [activeProfile?.id, buildHeaders]
-  );
-
   const runDrain = React.useCallback(async () => {
     if (!activeProfile?.id || runningRef.current) {
       return;
@@ -223,22 +160,6 @@ export function OutboxDrainProvider({
           });
         }
       });
-      await drain(activeProfile.id, 'interview', async (entry) => {
-        try {
-          await replayInterviewEntry(entry);
-        } catch (err) {
-          await recordFailure(
-            activeProfile.id,
-            'interview',
-            entry.id,
-            err instanceof Error ? err.message : 'replay_failed'
-          );
-          Sentry.captureException(err, {
-            tags: { feature: 'message_outbox', flow: 'interview' },
-          });
-        }
-      });
-
       await escalate(activeProfile.id, 'session', postToSupport).catch(
         (err) => {
           Sentry.captureException(err, {
@@ -250,26 +171,10 @@ export function OutboxDrainProvider({
           });
         }
       );
-      await escalate(activeProfile.id, 'interview', postToSupport).catch(
-        (err) => {
-          Sentry.captureException(err, {
-            tags: {
-              feature: 'message_outbox',
-              op: 'escalate',
-              flow: 'interview',
-            },
-          });
-        }
-      );
     } finally {
       runningRef.current = false;
     }
-  }, [
-    activeProfile?.id,
-    postToSupport,
-    replayInterviewEntry,
-    replaySessionEntry,
-  ]);
+  }, [activeProfile?.id, postToSupport, replaySessionEntry]);
 
   React.useEffect(() => {
     void runDrain();

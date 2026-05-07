@@ -128,16 +128,6 @@ jest.mock('../../../lib/navigation', () => ({
   goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
 }));
 
-jest.mock('../../../lib/feature-flags', () => ({
-  FEATURE_FLAGS: {
-    ONBOARDING_FAST_PATH: false,
-    COACH_BAND_ENABLED: true,
-    MIC_IN_PILL_ENABLED: true,
-    I18N_ENABLED: true,
-  },
-}));
-
-const { FEATURE_FLAGS } = require('../../../lib/feature-flags');
 const LanguageSetup = require('./language-setup').default;
 
 describe('LanguageSetup', () => {
@@ -153,7 +143,6 @@ describe('LanguageSetup', () => {
         topicId: 'topic-1',
       },
     });
-    FEATURE_FLAGS.ONBOARDING_FAST_PATH = false;
   });
 
   it('renders the calibration title (no step indicator)', () => {
@@ -180,23 +169,13 @@ describe('LanguageSetup', () => {
     screen.getByText(/No language subject selected/i);
   });
 
-  it('navigates back to interview with the full param shape', () => {
+  it('uses Home as the Back fallback outside settings re-entry', () => {
     render(<LanguageSetup />);
 
     fireEvent.press(screen.getByTestId('language-setup-back'));
     expect(mockGoBackOrReplace).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({
-        pathname: '/(app)/onboarding/interview',
-        params: {
-          subjectId: 'test-id',
-          subjectName: 'Spanish',
-          languageCode: 'es',
-          languageName: 'Spanish',
-          step: '1',
-          totalSteps: '4',
-        },
-      })
+      '/(app)/home'
     );
   });
 
@@ -214,29 +193,7 @@ describe('LanguageSetup', () => {
     expect(mockMutateAsync).not.toHaveBeenCalled();
   });
 
-  it('navigates to accommodations after successful submit', async () => {
-    render(<LanguageSetup />);
-
-    fireEvent.press(screen.getByTestId('language-setup-continue'));
-
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith({
-        pathname: '/(app)/onboarding/accommodations',
-        params: {
-          subjectId: 'test-id',
-          subjectName: 'Spanish',
-          languageCode: 'es',
-          languageName: 'Spanish',
-          step: '3',
-          totalSteps: '4',
-        },
-      });
-    });
-  });
-
-  it('routes to session when ONBOARDING_FAST_PATH is true', async () => {
-    FEATURE_FLAGS.ONBOARDING_FAST_PATH = true;
-
+  it('routes to session after successful submit', async () => {
     render(<LanguageSetup />);
 
     fireEvent.press(screen.getByTestId('language-setup-continue'));
@@ -253,11 +210,6 @@ describe('LanguageSetup', () => {
         },
       });
     });
-    expect(mockReplace).not.toHaveBeenCalledWith(
-      expect.objectContaining({
-        pathname: '/(app)/onboarding/accommodations',
-      })
-    );
   });
 
   it('disables Continue button and hides the label when pending', () => {
@@ -276,9 +228,11 @@ describe('LanguageSetup', () => {
     // The Norwegian option should be selected by default (device locale is nb-NO)
     const nbButton = screen.getByTestId('native-language-nb');
     expect(nbButton.props.accessibilityState?.selected).toBe(true);
+    screen.getByTestId('native-language-selected-nb');
     // English should NOT be selected
     const enButton = screen.getByTestId('native-language-en');
     expect(enButton.props.accessibilityState?.selected).toBe(false);
+    expect(screen.queryByTestId('native-language-selected-en')).toBeNull();
   });
 
   it('routes back to More when returnTo=settings and Back is pressed', () => {
@@ -292,7 +246,7 @@ describe('LanguageSetup', () => {
     );
     expect(mockGoBackOrReplace).not.toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ pathname: '/(app)/onboarding/interview' })
+      expect.objectContaining({ pathname: '/(app)/session' })
     );
   });
 
@@ -334,18 +288,17 @@ describe('LanguageSetup', () => {
     // Allow microtasks to drain.
     await new Promise((r) => setTimeout(r, 0));
 
-    // router.replace (navigation to accommodations) must NOT have been called —
+    // router.replace (navigation to session) must NOT have been called —
     // only the goBackOrReplace from Back should have fired.
     expect(mockReplace).not.toHaveBeenCalled();
     expect(mockGoBackOrReplace).toHaveBeenCalledTimes(1);
     expect(mockGoBackOrReplace).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ pathname: '/(app)/onboarding/interview' })
+      '/(app)/home'
     );
   });
 
-  it('[BUG-692-FOLLOWUP] fast path does not route to session when user presses Back during session creation', async () => {
-    FEATURE_FLAGS.ONBOARDING_FAST_PATH = true;
+  it('[BUG-692-FOLLOWUP] does not route to session when user presses Back during session creation', async () => {
     mockMutateAsync.mockResolvedValue({ subject: { id: 'test-id' } });
 
     let resolveSession!: (value: {

@@ -12,14 +12,12 @@ export function SamplePreview({
 }: SamplePreviewProps): React.ReactElement {
   return (
     <View
-      className="relative overflow-hidden rounded-card"
+      className="overflow-hidden rounded-card"
       testID="sample-preview-container"
     >
-      <View className="opacity-30" pointerEvents="none">
-        {children}
-      </View>
+      <View pointerEvents="none">{children}</View>
       <View
-        className="absolute inset-0 items-center justify-center bg-surface/60 rounded-card px-4"
+        className="border-t border-border bg-surface px-4 py-3"
         testID="sample-preview-overlay"
       >
         <Text className="text-body-sm text-text-secondary text-center">

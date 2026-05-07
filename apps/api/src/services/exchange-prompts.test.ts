@@ -97,3 +97,124 @@ describe('buildSystemPrompt — anti-fabrication block [BUG-937]', () => {
     expect(prompt).toContain('complete beginner');
   });
 });
+
+describe('buildSystemPrompt — first-encounter topic probe', () => {
+  it('uses the subject opener on the first turn of a never-seen subject', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        topicTitle: 'Photosynthesis',
+        exchangeCount: 0,
+        isFirstEncounter: true,
+        isFirstSessionOfSubject: true,
+      })
+    );
+
+    expect(prompt).toContain('SUBJECT OPENER');
+    expect(prompt).toContain('what brought you to Italian');
+    expect(prompt).not.toContain('FIRST-ENCOUNTER TOPIC RULE:');
+    expect(prompt).not.toContain('end with exactly one learner action');
+  });
+
+  it('uses teach-while-probe on the first turn of a new topic in a known subject', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        topicTitle: 'Photosynthesis',
+        exchangeCount: 0,
+        isFirstEncounter: true,
+        isFirstSessionOfSubject: false,
+      })
+    );
+
+    expect(prompt).toContain('FIRST-ENCOUNTER TOPIC RULE');
+    expect(prompt).toContain(
+      'one teaching nugget AND one focused follow-up question'
+    );
+    expect(prompt).toContain('end with exactly one focused follow-up question');
+    expect(prompt).not.toContain('end with exactly one learner action');
+    expect(prompt).toContain(
+      'NEVER frame this as an interview, intake, or assessment'
+    );
+  });
+
+  it('keeps the topic-probe block through exchange 3 and removes it on exchange 4', () => {
+    const turn3Prompt = buildSystemPrompt(
+      makeContext({
+        topicTitle: 'Photosynthesis',
+        exchangeCount: 3,
+        exchangeHistory: [
+          { role: 'user', content: 'I know plants need sun.' },
+          { role: 'assistant', content: 'Yes - sunlight matters.' },
+        ],
+        isFirstEncounter: true,
+      })
+    );
+    const turn4Prompt = buildSystemPrompt(
+      makeContext({
+        topicTitle: 'Photosynthesis',
+        exchangeCount: 4,
+        exchangeHistory: [
+          { role: 'user', content: 'I know plants need sun.' },
+          { role: 'assistant', content: 'Yes - sunlight matters.' },
+        ],
+        isFirstEncounter: true,
+      })
+    );
+
+    expect(turn3Prompt).toContain('FIRST-ENCOUNTER TOPIC RULE');
+    expect(turn4Prompt).not.toContain('FIRST-ENCOUNTER TOPIC RULE');
+  });
+
+  it('keeps the original first-turn action rule for returning topics', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        topicTitle: 'Photosynthesis',
+        exchangeCount: 0,
+        isFirstEncounter: false,
+        isFirstSessionOfSubject: false,
+      })
+    );
+
+    expect(prompt).toContain('end with exactly one learner action');
+    expect(prompt).not.toContain('FIRST-ENCOUNTER TOPIC RULE');
+    expect(prompt).not.toContain('SUBJECT OPENER');
+  });
+
+  it('does not add topic-probe blocks in language or review mode', () => {
+    const languagePrompt = buildSystemPrompt(
+      makeContext({
+        pedagogyMode: 'four_strands',
+        exchangeCount: 0,
+        isFirstEncounter: true,
+      })
+    );
+    const reviewPrompt = buildSystemPrompt(
+      makeContext({
+        effectiveMode: 'review',
+        topicTitle: 'Photosynthesis',
+        exchangeCount: 0,
+        isFirstEncounter: true,
+      })
+    );
+
+    expect(languagePrompt).not.toContain('FIRST-ENCOUNTER TOPIC RULE');
+    expect(languagePrompt).not.toContain('SUBJECT OPENER');
+    expect(reviewPrompt).not.toContain('FIRST-ENCOUNTER TOPIC RULE');
+    expect(reviewPrompt).not.toContain('SUBJECT OPENER');
+  });
+
+  it('reflects extracted signals only after a learner turn exists', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        exchangeCount: 2,
+        extractedSignalsToReflect: {
+          currentKnowledge: 'has already used chemistry sets',
+          interests: ['experiments'],
+        },
+      })
+    );
+
+    expect(prompt).toContain('SIGNAL REFLECTION');
+    expect(prompt).toContain('has already used chemistry sets');
+    expect(prompt).toContain('experiments');
+  });
+});

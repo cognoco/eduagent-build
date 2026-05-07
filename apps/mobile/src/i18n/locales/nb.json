@@ -45,7 +45,7 @@
     "exchangeLimitExceeded": "Øktgrensen er nådd. Start en ny økt for å fortsette.",
     "subjectInactive": "Dette emnet er satt på pause. Du kan gjenoppta det fra emnelisten din.",
     "notLanguageLearning": "Dette emnet er ikke satt opp for språklæring. Prøv den vanlige læringsstien i stedet.",
-    "curriculumNotFound": "Vi har ikke satt opp læringsstien din ennå. Gå tilbake og start intervjuet først.",
+    "curriculumNotFound": "Vi har ikke satt opp læringsstien din ennå. Gå tilbake og prøv igjen.",
     "topicNotFound": "Det emnet er ikke tilgjengelig akkurat nå. Prøv å velge et annet.",
     "draftNotFound": "Fremgangen din gikk tapt. Start på nytt.",
     "profileNotFound": "Vi hadde problemer med å laste profilen din. Logg ut og inn igjen.",
@@ -79,7 +79,7 @@
   "friendlyErrors": {
     "notLanguageLearning": "Dette emnet er ikke satt opp for språklæring. Prøv den vanlige læringsstien i stedet.",
     "subjectPaused": "Dette emnet er satt på pause. Du kan gjenoppta det fra emnelisten din.",
-    "curriculumNotFound": "Vi har ikke satt opp læringsstien din ennå. Gå tilbake og start intervjuet først.",
+    "curriculumNotFound": "Vi har ikke satt opp læringsstien din ennå. Gå tilbake og prøv igjen.",
     "topicNotFound": "Det emnet er ikke tilgjengelig akkurat nå. Prøv å velge et annet.",
     "draftNotFound": "Fremgangen din gikk tapt. Start på nytt.",
     "profileNotFound": "Vi hadde problemer med å laste profilen din. Logg ut og inn igjen.",
@@ -357,6 +357,7 @@
         "tellMentor": "Fortell mentoren din",
         "learningStyle": "Læringsstil",
         "interests": "Interesser",
+        "interestsContextHint": "Velg hvor hver interesse hører hjemme, slik at eksemplene passer øyeblikket.",
         "strengths": "Styrker",
         "struggles": "Ting du blir bedre på",
         "communicationNotes": "Kommunikasjonsnotater",
@@ -1359,148 +1360,6 @@
       "saveErrorMessage": "Noe gikk galt. Prøv igjen.",
       "somethingElse": "Noe annet",
       "customPlaceholder": "f.eks. de/dem"
-    },
-    "accommodations": {
-      "title": "Noen læringstilpasninger?",
-      "subtitle": "Vi vil tilpasse leksjonene for å passe hvordan du lærer best (valgfritt).",
-      "skipForNow": "Hopp over for nå",
-      "loadErrorTitle": "Kunne ikke laste tilpasninger",
-      "loadErrorMessage": "Sjekk tilkoblingen din og prøv igjen.",
-      "saveErrorTitle": "Kunne ikke lagre tilpasninger",
-      "saveErrorMessage": "Noe gikk galt. Prøv igjen.",
-      "noSubjectTitle": "Ingen emne valgt",
-      "noSubjectMessage": "Velg et emne fra biblioteket før du setter opp tilpasninger",
-      "openLibrary": "Åpne bibliotek"
-    },
-    "analogyPreference": {
-      "title": "Hvordan liker du at ting blir forklart?",
-      "subtitle": "Velg en analogistil (valgfritt). Du kan alltid endre dette senere i emneinnstillingene.",
-      "skipForNow": "Hopp over for nå",
-      "skipLabel": "Hopp over analogipreferanse",
-      "saveErrorTitle": "Kunne ikke lagre preferanse"
-    },
-    "interestsContext": {
-      "title": "Hva er konteksten for å lære dette?",
-      "subtitle": "Hjelper oss med å skreddersy eksempler og øvelser (valgfritt).",
-      "skipForNow": "Hopp over for nå",
-      "saveErrorTitle": "Kunne ikke lagre interessekontekst",
-      "contexts": {
-        "school": {
-          "label": "Skole / Universitet",
-          "hint": "Vi vil tilpasse eksempler til akademisk arbeid og eksamensforberedelser."
-        },
-        "work": {
-          "label": "Jobb / Karriere",
-          "hint": "Vi vil fokusere på profesjonell, praktisk anvendelse."
-        },
-        "personal": {
-          "label": "Personlig interesse",
-          "hint": "Vi vil holde det utforskende og nysgjerrighetsdrevet."
-        },
-        "other": {
-          "label": "Annet",
-          "hint": "Vi vil holde det fleksibelt og generelt."
-        }
-      },
-      "saveErrorMessage": "Kunne ikke lagre interessene dine – prøv igjen",
-      "skipAll": "Hopp over"
-    },
-    "interview": {
-      "title": "Sett opp {{target}}",
-      "newSubject": "faget ditt",
-      "openingWithTarget": "Hei! Jeg er læringskameraten din. Først må jeg lære litt om deg og {{target}}, så jeg kan veilede på riktig nivå i stedet for å gjette. Hva kan du allerede? Et grovt svar er helt fint.",
-      "openingGeneric": "Hei! Jeg er læringskameraten din. Først må jeg lære litt om deg, så jeg kan veilede på riktig nivå i stedet for å gjette. Hva kan du allerede? Et grovt svar er helt fint.",
-      "explainerTitle": "Hvorfor spør jeg først?",
-      "explainerBody": "Svarene dine hjelper meg å velge riktig startpunkt. Etter denne korte oppstarten kan jeg forklare, øve og hjelpe på en måte som passer deg.",
-      "missingSubject": "Ingen emne valgt. Gå tilbake og prøv igjen.",
-      "sessionCreationStuck": "Økten tar lengre tid enn forventet. Gå tilbake og prøv igjen.",
-      "settingUp": "Setter opp økten din ...",
-      "completionTitle": "Vurdering fullført!",
-      "completionBody": "Vi har samlet nok til å bygge din personlige læreplan.",
-      "letsGo": "La oss sette i gang",
-      "streamError": "Noe gikk galt. Prøv igjen.",
-      "forceCompleteTimeout": "Jobber fortsatt med det ... trykk for å fortsette.",
-      "skip": "Hopp over",
-      "skipThisQuestion": "Hopp over dette spørsmålet",
-      "skipAndFinish": "Hopp over og fullfør",
-      "expiredTitle": "Økten er utløpt",
-      "expiredBody": "Vurderingsøkten din har utløpt. Start på nytt.",
-      "restartButton": "Start vurdering på nytt",
-      "doneButton": "Ferdig",
-      "saveErrorTitle": "Kunne ikke lagre svar",
-      "sessionErrorTitle": "Øktfeil",
-      "completionErrorTitle": "Kunne ikke fullføre økten",
-      "restartErrorTitle": "Kunne ikke starte på nytt",
-      "skipErrorTitle": "Kunne ikke hoppe over",
-      "startLearning": "Start læring",
-      "streamErrorTitle": "Noe gikk galt",
-      "tryAgainLabel": "Prøv igjen",
-      "settingUpCurriculum": "Setter opp læreplanen din ...",
-      "skipButtonProminent": "Hopp over intervjuet",
-      "skipButton": "Hopp over"
-    },
-    "curriculumReview": {
-      "title": "Din læreplan",
-      "suggestChanges": "Foreslå endringer",
-      "loadingTimeout": {
-        "title": "Laster fortsatt ...",
-        "body": "Lasting av læreplanen din tar lengre tid enn forventet. Sjekk tilkoblingen din og prøv igjen."
-      },
-      "loadingCurriculum": "Laster læreplan ...",
-      "loadError": {
-        "title": "Kunne ikke laste læreplan",
-        "body": "Sjekk tilkoblingen din og prøv igjen."
-      },
-      "generating": {
-        "title": "Bygger læreplanen din ...",
-        "body": "Dette tar vanligvis omtrent 10–20 sekunder."
-      },
-      "noCurriculum": {
-        "title": "Ingen læreplan ennå",
-        "message": "Fullfør vurderingsintervjuet for å generere læringsstien din."
-      },
-      "versionInfo": "Versjon {{version}} – {{count}} temaer",
-      "whyOrderLabel": "Hvorfor er {{title}} i denne rekkefølgen",
-      "whyOrder": "Hvorfor denne rekkefølgen?",
-      "explaining": "Forklarer ...",
-      "skipTopicTitle": "Hoppe over dette temaet?",
-      "skipTopicBody": "Du kan alltid hente det tilbake senere.",
-      "skipAction": "Hopp over",
-      "skipErrorTitle": "Kunne ikke hoppe over tema",
-      "restoreErrorTitle": "Kunne ikke gjenopprette tema",
-      "restoreLabel": "Gjenopprett {{title}}",
-      "restore": "Gjenopprett",
-      "addTopic": "Legg til tema",
-      "placementCheck": {
-        "mostSkipped": "Du hoppet over det meste av denne læreplanen",
-        "hint": "Vil du ha en raskere vei? Du kan ta en plasseringstest, fortsette med de gjenværende avanserte temaene, eller bytte til et annet emne.",
-        "takePlacement": "Ta plasseringstest",
-        "continueAdvanced": "Fortsett med avanserte temaer",
-        "chooseDifferent": "Velg et annet emne"
-      },
-      "startLearning": "Start læring: {{title}}",
-      "exploreFirst": "Utforsk først",
-      "continueToHome": "Fortsett til Hjem",
-      "challengeModal": {
-        "title": "Endre temaene dine",
-        "body": "Fortell oss hva du vil endre, så regenererer vi læringsstien din.",
-        "placeholder": "f.eks. Jeg kan allerede det grunnleggende, hopp over introduksjonstemaer ...",
-        "regenerate": "Regenerer"
-      },
-      "addTopicModal": {
-        "title": "Legg til et tema",
-        "body": "Legg til noe den genererte læreplanen manglet. Vi vil foreslå en ren tittel først, så kan du redigere før du lagrer.",
-        "topicLabel": "Tema",
-        "topicPlaceholder": "f.eks. Trigonometri, Den franske revolusjonen",
-        "descriptionLabel": "Beskrivelse",
-        "descriptionPlaceholder": "Kort beskrivelse",
-        "minutesLabel": "Estimert antall minutter",
-        "minutesPlaceholder": "30",
-        "addTopic": "Legg til tema",
-        "preview": "Forhåndsvisning"
-      },
-      "addTopicValidationError": "Legg til en tittel, beskrivelse og estimert antall minutter.",
-      "updateFailedTitle": "Oppdatering av læreplan mislyktes"
     }
   },
   "parentView": {
@@ -1581,6 +1440,11 @@
       "howItsWorking": "Hvordan det fungerer",
       "consentSettingsCouldNotLoad": "Samtykkeinnstillinger kunne ikke lastes",
       "retryConsentSettings": "Prøv igjen",
+      "consentRestrictedTitle": "Samtykke må være på plass før fremgang vises",
+      "consentRestrictedPendingBody": "{{name}}s læringsdetaljer er skjult til samtykket er aktivt. Sjekk igjen etter at samtykket er fullført.",
+      "consentRestrictedRequestedBody": "Samtykkeforespørselen for {{name}} venter allerede på godkjenning. Når den er godkjent, vises fremgangen her automatisk.",
+      "consentRestrictedWithdrawnBody": "{{name}}s læringsdetaljer er skjult fordi samtykket ble trukket tilbake. Gjenopprett samtykket for å holde kontoen aktiv i nådeperioden.",
+      "checkConsentStatus": "Sjekk samtykkestatus",
       "accountTitle": "Konto – {{name}}",
       "accountTitleFallback": "Konto",
       "deletionPending": "Sletting planlagt",
@@ -1795,21 +1659,6 @@
       "reportGoneBody": "Den kan ha blitt arkivert eller fjernet. Alle de andre rapportene dine er fortsatt trygge."
     }
   },
-  "interview": {
-    "completing": {
-      "initial": "Avslutter økten din ...",
-      "almost": "Nesten der ...",
-      "softFallback": "Jobber fortsatt med det ..."
-    },
-    "failed": {
-      "extractSignalsFailed": "Vi hadde problemer med å lese økten din. Fremgangen din er trygg.",
-      "topicResolutionFailed": "Vi kunne ikke arkivere økten din til et tema. Du kan prøve igjen nedenfor.",
-      "unknown": "Noe gikk galt med å fullføre økten din. Du kan prøve igjen nedenfor.",
-      "retryError": "Kunne ikke prøve på nytt. Prøv igjen.",
-      "tryAgain": "Prøv igjen",
-      "retrying": "Prøver på nytt ..."
-    }
-  },
   "tabs": {
     "profileSwitchedToast": {
       "title": "Profil byttet",
@@ -1911,12 +1760,18 @@
   "coaching": {
     "parentDashboard": {
       "consent": {
-        "accessibilityLabel": "Consent status: {{status}}",
-        "consented": "Consent active",
-        "parentalConsentRequested": "Waiting for parent approval",
-        "pending": "Consent pending",
-        "redactedMessage": "Learning metrics are hidden until consent is active.",
-        "withdrawn": "Consent withdrawn"
+        "accessibilityLabel": "Samtykkestatus: {{status}}",
+        "checkStatusAction": "Sjekk samtykkestatus",
+        "consented": "Samtykke aktivt",
+        "metricsHiddenTitle": "Fremgang er skjult for nå",
+        "parentalConsentRequested": "Venter på foreldregodkjenning",
+        "parentalConsentRequestedMessage": "Vi har sendt samtykkeforespørselen. {{name}}s læringsdetaljer vises her så snart samtykket er aktivt.",
+        "pending": "Samtykke venter",
+        "pendingMessage": "{{name}} trenger aktivt samtykke før læringsfremgang kan vises.",
+        "redactedMessage": "Læringsmålinger er skjult til samtykket er aktivt.",
+        "restoreAction": "Gjenopprett samtykke",
+        "withdrawnMessage": "{{name}}s læringsdetaljer er skjult fordi samtykket ble trukket tilbake.",
+        "withdrawn": "Samtykke trukket tilbake"
       },
       "engagementTrend": {
         "declining": "Engagement declining",

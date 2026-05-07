@@ -93,6 +93,10 @@ function buildGrowthData(
   });
 }
 
+function isRestrictedConsentStatus(status: string | null | undefined): boolean {
+  return status != null && status !== 'CONSENTED';
+}
+
 export default function ChildDetailScreen() {
   const { t } = useTranslation();
   const router = useRouter();
@@ -117,21 +121,33 @@ export default function ChildDetailScreen() {
     isError,
     refetch,
   } = useChildDetail(profileId);
-  const { data: inventory } = useChildInventory(profileId);
-  const { data: history } = useChildProgressHistory(profileId, {
-    granularity: 'weekly',
+  const {
+    data: consentData,
+    isError: isConsentError,
+    refetch: refetchConsent,
+  } = useChildConsentStatus(profileId);
+  const effectiveConsentStatus =
+    consentData?.consentStatus ?? child?.consentStatus ?? null;
+  const hasRestrictedConsent = isRestrictedConsentStatus(
+    effectiveConsentStatus
+  );
+  const canLoadLearningSurfaces = child != null && !hasRestrictedConsent;
+  const { data: inventory } = useChildInventory(profileId, {
+    enabled: canLoadLearningSurfaces,
   });
+  const { data: history } = useChildProgressHistory(
+    profileId,
+    {
+      granularity: 'weekly',
+    },
+    { enabled: canLoadLearningSurfaces }
+  );
   const visibleSubjects = inventory?.subjects.filter(hasSubjectActivity) ?? [];
   const pendingCelebrations = usePendingCelebrations({
     profileId,
     viewer: 'parent',
   });
   const markCelebrationsSeen = useMarkCelebrationsSeen();
-  const {
-    data: consentData,
-    isError: isConsentError,
-    refetch: refetchConsent,
-  } = useChildConsentStatus(profileId);
   const { data: learnerProfile } = useChildLearnerProfile(profileId);
   const revokeConsent = useRevokeConsent(profileId);
   const restoreConsent = useRestoreConsent(profileId);
@@ -154,7 +170,7 @@ export default function ChildDetailScreen() {
     },
   });
 
-  const isWithdrawn = consentData?.consentStatus === 'WITHDRAWN';
+  const isWithdrawn = effectiveConsentStatus === 'WITHDRAWN';
   const daysRemaining =
     isWithdrawn && consentData
       ? getGracePeriodDaysRemaining(consentData.respondedAt)
@@ -298,6 +314,133 @@ export default function ChildDetailScreen() {
             {t('common.back')}
           </Text>
         </Pressable>
+      </View>
+    );
+  }
+
+  if (child && hasRestrictedConsent) {
+    const isRequested = effectiveConsentStatus === 'PARENTAL_CONSENT_REQUESTED';
+    const isPending = effectiveConsentStatus === 'PENDING';
+    const restrictedBodyKey = isWithdrawn
+      ? 'parentView.index.consentRestrictedWithdrawnBody'
+      : isRequested
+      ? 'parentView.index.consentRestrictedRequestedBody'
+      : 'parentView.index.consentRestrictedPendingBody';
+    const handleRefreshConsent = (): void => {
+      void refetch();
+      void refetchConsent();
+    };
+
+    return (
+      <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
+        <View className="px-5 pt-4 pb-2 flex-row items-center">
+          <Pressable
+            onPress={() => goBackOrReplace(router, FAMILY_HOME_PATH)}
+            className="me-3 py-2 pe-2"
+            accessibilityLabel={t('common.goBack')}
+            accessibilityRole="button"
+            testID="back-button"
+          >
+            <Text className="text-primary text-body font-semibold">
+              {'\u2190'}
+            </Text>
+          </Pressable>
+          <View className="flex-1">
+            <Text className="text-h2 font-bold text-text-primary">
+              {child.displayName}
+            </Text>
+            <Text className="text-body-sm text-text-secondary mt-0.5">
+              {child.summary}
+            </Text>
+          </View>
+        </View>
+
+        <ScrollView
+          className="flex-1 px-5"
+          contentContainerStyle={{ paddingBottom: 24 }}
+          testID="child-detail-scroll"
+        >
+          <View
+            className="bg-coaching-card rounded-card p-5 mt-4"
+            testID="consent-required-panel"
+          >
+            <Text className="text-h3 font-semibold text-text-primary">
+              {t('parentView.index.consentRestrictedTitle')}
+            </Text>
+            <Text className="text-body text-text-secondary mt-2">
+              {t(restrictedBodyKey, { name: child.displayName })}
+            </Text>
+            {isWithdrawn ? (
+              <View className="bg-danger/10 rounded-lg p-4 mt-4">
+                <Text className="text-body font-semibold text-danger mb-1">
+                  {t('parentView.index.deletionPending')}
+                </Text>
+                <Text className="text-body-sm text-text-secondary mb-3">
+                  {daysRemaining > 0
+                    ? t('parentView.index.deletionCountdown', {
+                        count: daysRemaining,
+                      })
+                    : t('parentView.index.deletionProcessing')}
+                </Text>
+                <Pressable
+                  onPress={
+                    daysRemaining > 0
+                      ? handleCancelDeletion
+                      : handleRefreshConsent
+                  }
+                  disabled={restoreConsent.isPending}
+                  className="bg-primary rounded-button py-3 items-center min-h-[48px] justify-center"
+                  accessibilityLabel={
+                    daysRemaining > 0
+                      ? t('parentView.index.cancelDeletion')
+                      : t('parentView.index.refreshStatus')
+                  }
+                  accessibilityRole="button"
+                  testID={
+                    daysRemaining > 0
+                      ? 'cancel-deletion-button'
+                      : 'refresh-grace-period-button'
+                  }
+                >
+                  <Text className="text-body font-semibold text-text-inverse">
+                    {restoreConsent.isPending
+                      ? t('parentView.index.cancelling')
+                      : daysRemaining > 0
+                      ? t('parentView.index.cancelDeletion')
+                      : t('parentView.index.refreshStatus')}
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
+            {(isPending || isRequested) && (
+              <Pressable
+                onPress={handleRefreshConsent}
+                className="bg-primary rounded-button py-3 items-center min-h-[48px] justify-center mt-5"
+                accessibilityLabel={t('parentView.index.checkConsentStatus')}
+                accessibilityRole="button"
+                testID="check-consent-status-button"
+              >
+                <Text className="text-body font-semibold text-text-inverse">
+                  {t('parentView.index.checkConsentStatus')}
+                </Text>
+              </Pressable>
+            )}
+            {isConsentError && (
+              <Pressable
+                onPress={() => void refetchConsent()}
+                className="self-start mt-4"
+                accessibilityRole="button"
+                accessibilityLabel={t('parentView.index.retryConsentSettings')}
+                testID="consent-retry"
+              >
+                <Text className="text-body text-primary font-semibold">
+                  {t('common.retry')}
+                </Text>
+              </Pressable>
+            )}
+          </View>
+        </ScrollView>
+        {CelebrationOverlay}
       </View>
     );
   }

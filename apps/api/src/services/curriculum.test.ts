@@ -157,6 +157,20 @@ function mockTopicRow(
   };
 }
 
+function mockLatestSessionSelect(
+  rows: Array<{ metadata: unknown; rawInput: string | null }> = []
+) {
+  return jest.fn().mockReturnValue({
+    from: jest.fn().mockReturnValue({
+      where: jest.fn().mockReturnValue({
+        orderBy: jest.fn().mockReturnValue({
+          limit: jest.fn().mockResolvedValue(rows),
+        }),
+      }),
+    }),
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Mock database with query API (for relational queries)
 // ---------------------------------------------------------------------------
@@ -166,16 +180,11 @@ function createMockDb({
   curriculumFindFirst = undefined as
     | ReturnType<typeof mockCurriculumRow>
     | undefined,
-  onboardingDraftFindFirst = undefined as
-    | {
-        extractedSignals?: Record<string, unknown>;
-        exchangeHistory?: Array<{ role: string; content: string }>;
-      }
-    | undefined,
   topicsFindMany = [] as ReturnType<typeof mockTopicRow>[],
   topicFindFirst = undefined as ReturnType<typeof mockTopicRow> | undefined,
   insertReturning = [] as unknown[],
   bookFindFirst = { id: BOOK_ID } as { id: string } | undefined,
+  latestSessions = [] as Array<{ metadata: unknown; rawInput: string | null }>,
 } = {}): Database {
   const db = {
     query: {
@@ -184,9 +193,6 @@ function createMockDb({
       },
       curricula: {
         findFirst: jest.fn().mockResolvedValue(curriculumFindFirst),
-      },
-      onboardingDrafts: {
-        findFirst: jest.fn().mockResolvedValue(onboardingDraftFindFirst),
       },
       curriculumTopics: {
         findMany: jest.fn().mockResolvedValue(topicsFindMany),
@@ -210,6 +216,7 @@ function createMockDb({
     delete: jest.fn().mockReturnValue({
       where: jest.fn().mockResolvedValue(undefined),
     }),
+    select: mockLatestSessionSelect(latestSessions),
     // Raw SQL execution used by batch CASE UPDATE [CR-2B.1]
     execute: jest.fn().mockResolvedValue(undefined),
     // transaction() executes the callback with the same mock as tx context
@@ -627,7 +634,6 @@ describe('challengeCurriculum', () => {
       query: {
         subjects: { findFirst: subjectFindFirst },
         curricula: { findFirst: curriculaFindFirst },
-        onboardingDrafts: { findFirst: jest.fn().mockResolvedValue(undefined) },
         curriculumTopics: { findMany: topicsFindMany },
         curriculumBooks: {
           findFirst: jest.fn().mockResolvedValue({ id: BOOK_ID }),
@@ -642,6 +648,7 @@ describe('challengeCurriculum', () => {
       delete: jest.fn().mockReturnValue({
         where: jest.fn().mockResolvedValue(undefined),
       }),
+      select: mockLatestSessionSelect(),
       transaction: jest
         .fn()
         .mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
@@ -676,17 +683,19 @@ describe('challengeCurriculum', () => {
     const db = createMockDb({
       subjectFindFirst: mockSubjectRow(),
       curriculumFindFirst: mockCurriculumRow(),
-      onboardingDraftFindFirst: {
-        extractedSignals: {
-          goals: ['ace exams'],
-          experienceLevel: 'advanced',
-          currentKnowledge: 'comfortable with derivatives',
+      latestSessions: [
+        {
+          metadata: {
+            extractedSignals: {
+              goals: ['ace exams'],
+              experienceLevel: 'advanced',
+              currentKnowledge: 'comfortable with derivatives',
+            },
+          },
+          rawInput:
+            'User: I want to skip the basics.\nAssistant: What have you already studied?',
         },
-        exchangeHistory: [
-          { role: 'user', content: 'I want to skip the basics.' },
-          { role: 'assistant', content: 'What have you already studied?' },
-        ],
-      },
+      ],
       insertReturning: [mockCurriculumRow({ id: 'curr-new', version: 1 })],
     });
 
@@ -1093,7 +1102,6 @@ describe('persistBookTopics', () => {
           findMany: topicsFindMany,
           findFirst: jest.fn().mockResolvedValue(null),
         },
-        onboardingDrafts: { findFirst: jest.fn().mockResolvedValue(undefined) },
       },
       update: jest.fn().mockReturnValue({
         set: jest.fn().mockReturnValue({
