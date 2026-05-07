@@ -1,9 +1,9 @@
-# Session-Recap "Up Next" Completion Gating — Touch ≠ Done Fix
+# Session-Recap "Up Next" — Completion Gating + Selection Coverage
 
 **Date:** 2026-05-07
-**Status:** Implemented on `app-ev2`, typecheck green, integration tests added
+**Status:** Implemented on `app-ev2`, typecheck green, unit tests green, integration tests added (need real DB to run)
 **Branch:** `app-ev2`
-**Size:** XS (~30 lines source + ~120 lines tests)
+**Size:** S (~80 lines source + ~220 lines tests)
 
 ---
 
@@ -58,30 +58,52 @@ Added a new `describe` block, `'session-recap completion gating (integration)'`,
 
 These lock the corrected boundaries in. A regression to touch-equals-done cannot ship silently — at least one of the touch/paused/fresh-card tests will fail.
 
-## What this does NOT fix
+## P2, P3, P4 also fixed in this PR
 
-The audit identified other holes in `resolveNextTopic` that were left in place:
+After P1 went in the user requested the deferred items also be addressed. P2, P3 and P4 are all small and converged into one PR.
 
-| ID | Issue | Status |
-|---|---|---|
-| P2 | End-of-book dead-end. `findLaterInBook` returns empty when the learner finishes the last topic in a book; the recap card silently disappears with no "you finished this book" feedback or fallback to the next book in the subject. | Deferred |
-| P3 | Skipped topics (`curriculum_topics.skipped = true`) still appear as candidates in `findLaterInBook`. Filtered at the shelf, not here. | Deferred |
-| P4 | Sort-order ties are nondeterministic (`gt(sortOrder, minSortOrder)` + `orderBy(asc(sortOrder))` with no id tie-break). | Deferred |
-| P5 | Practice/recall/homework sessions get curriculum-progression suggestions because the resolver doesn't know `sessionType`. | Deferred |
+### P2 — Cross-book fallback (was: end-of-book dead-end)
 
-These are minor compared to P1 (touch-equals-done). Recommend revisiting P2 and P3 in a single small follow-up; P4 and P5 only if observed in the wild.
+`resolveNextTopic` previously called `findLaterInBook` and returned its first non-completed survivor or null. When the learner finished the last topic in a book, the candidate list was empty and the recap "Up next" card silently vanished.
+
+Now there is a second-stage lookup. New repo method `findEarliestInLaterBooks(subjectId, currentBookSortOrder, limit)` returns topics in books whose `sort_order > currentBookSortOrder`, ordered by `(book.sort_order, topic.sort_order, topic.id)`. `resolveNextTopic` falls through to it when the same-book candidates are exhausted (filtered or actually empty). Returns null only when the learner has truly finished every later book in the subject.
+
+To support this, `findById` now also returns `bookSortOrder` and `subjectId` (joined from `curriculum_books`) — a strictly additive change. The single existing recording-mock test was updated to match.
+
+### P3 — Skipped filter (`findLaterInBook` and `findEarliestInLaterBooks`)
+
+Both methods now include `eq(curriculum_topics.skipped, false)` in their `WHERE` clause. A topic the learner explicitly skipped from the shelf no longer resurfaces as a recap suggestion.
+
+### P4 — Sort-order tie-break
+
+Both methods append `asc(curriculum_topics.id)` after `asc(curriculum_topics.sortOrder)` in their `orderBy`. Two topics sharing a sortOrder now have a deterministic ordering.
+
+## P5 — left intentionally alone
+
+P5 was "practice/recall sessions get curriculum-progression suggestions". The schema does not actually distinguish a practice session from a learning session at the row level: `learning_sessions.session_type` is `'learning' | 'homework' | 'interleaved'` (no `'practice'`/`'recall'`), and the practice/recall flow simply re-uses a learning session against a previously-touched topic. The cleanest available signal would be "is this session's `topicId` already in `completedTopicIds` *before* the recap runs", but that's a session-classification question disguised as a recap question, and switching to a different recommendation logic (e.g. next-due retention card) is a meaningful design change rather than a bug fix. Leaving the current behaviour: practice sessions of an old topic still get a forward-looking curriculum suggestion. Mildly off, never wrong.
 
 ## Verification
 
 - `pnpm exec nx run @eduagent/database:typecheck` — green
 - `pnpm exec nx run api:typecheck` — green
-- Unit tests not impacted (no test of `listCompletedTopicIds` existed prior).
+- `pnpm exec nx test @eduagent/database` — 15 suites, 163 tests, all passing (including updated `findById` shape test).
+- `pnpm exec nx test api --testPathPatterns 'session-recap\.test'` — 12 tests, all passing.
 - Integration tests added; require `DATABASE_URL` and run via `pnpm exec nx run api:test:integration` against a real DB. Not run in this session; pre-commit hook intentionally skips `*.integration.test.*`.
 
 ## Files changed
 
-- `packages/database/src/repository.ts` — three imports + two SQL filters + two updated docstrings
-- `apps/api/src/services/session-recap.integration.test.ts` — two added imports + one new `describe` block with six break tests
+- `packages/database/src/repository.ts`
+  - Three new imports (`gte`, `inArray`, `isNotNull`).
+  - Tightened both arms of `listCompletedTopicIds` (sessions: terminal status + ≥3 exchanges; retention: `repetitions > 0 OR last_reviewed_at IS NOT NULL`).
+  - `findLaterInBook` filters skipped topics and adds id tie-break.
+  - New `findEarliestInLaterBooks` method for the cross-book fallback.
+  - `findById` now returns `bookSortOrder` and `subjectId`.
+  - `CurriculumTopicRow` interface extended with the two new fields.
+- `packages/database/src/repository.curriculum-topics.test.ts` — updated the `findById` shape assertion for the two new fields.
+- `apps/api/src/services/session-recap.ts` — `resolveNextTopic` now falls through to `findEarliestInLaterBooks` after same-book candidates are exhausted.
+- `apps/api/src/services/session-recap.integration.test.ts`
+  - `'session-recap completion gating (integration)'` describe block — six break tests for P1.
+  - `'session-recap topic selection coverage (integration)'` describe block — three break tests for P2 (cross-book fallback, end-of-curriculum) and P3 (skipped filter).
 
 ## Decision log
 
