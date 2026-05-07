@@ -1,6 +1,8 @@
 import { useRouter } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
+
 import type { TopicProgress } from '@eduagent/schemas';
+
 import { useChildSubjectTopics } from '../../hooks/use-dashboard';
 import { RetentionSignal, type RetentionStatus } from './RetentionSignal';
 
@@ -90,6 +92,10 @@ export function AccordionTopicList({
             key={topic.topicId}
             onPress={(event) => {
               event?.stopPropagation?.();
+              router.push({
+                pathname: '/(app)/child/[profileId]',
+                params: { profileId: childProfileId },
+              } as never);
               router.push({
                 pathname: '/(app)/child/[profileId]/topic/[topicId]',
                 params: {
