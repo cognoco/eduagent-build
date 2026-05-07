@@ -57,16 +57,39 @@ pnpm exec nx run-many -t typecheck 2>&1 | tail -30
 
 ## Step 5: Commit
 
-**IMPORTANT: Do NOT use --no-verify.** Dependencies are installed. Let pre-commit hooks run.
+This step is the workflow's authorized commit point (CLAUDE.md exception for structured-workflow commits).
 
-Stage and commit the phase's changes:
+**IMPORTANT: Do NOT use `--no-verify`.** Dependencies are installed. Let pre-commit hooks run.
+
+### 5.1 Stage
 
 ```bash
 git add -A
 git diff --cached --stat
 ```
 
-Write a commit message file and commit with `-F`:
+### 5.2 Safety check — never commit secrets or scratch files
+
+Scan the staged set for files that must NEVER be committed. If any are present, unstage them before committing:
+
+```bash
+git diff --cached --name-only | \
+    grep -E '(^|/)(\.env(\.[^/]+)?|\.dev\.vars|credentials\.json|.*\.pem|.*\.key)$' || true
+```
+
+If anything matches, unstage with `git reset HEAD -- <file>` for each.
+
+For paths containing brackets (e.g. `apps/mobile/src/app/(app)/child/[profileId]/_layout.tsx`), the shell's glob expansion will mangle the path. Prefix with `:(literal)` to disable globbing:
+
+```bash
+git reset HEAD -- ':(literal)apps/mobile/src/app/(app)/child/[profileId]/_layout.tsx'
+```
+
+Also unstage anything that's clearly scratch or workflow output: `*.scratch.md`, `*.tmp.md`, `pr-body.md`, anything under `$ARTIFACTS_DIR`.
+
+### 5.3 Commit
+
+Write the commit message file and commit:
 
 ```bash
 cat > "$ARTIFACTS_DIR/commit-msg.txt" <<'CMSG'
@@ -80,11 +103,23 @@ CMSG
 git commit -F "$ARTIFACTS_DIR/commit-msg.txt"
 ```
 
-If the pre-commit hook fails:
-1. Read the error output carefully
-2. Fix the issue (lint error, type error, test failure). Do not fix by changing tests.
-3. Re-stage and retry the commit
-4. Do NOT bypass with --no-verify
+### 5.4 Hook failure recovery (max 2 attempts)
+
+If the pre-commit hook fails, follow this recipe — do NOT improvise:
+
+1. Read the hook output. Identify which check failed (lint-staged auto-fix, tsc, jest, commitlint).
+2. **lint-staged auto-fixed files** → the formatter or `eslint --fix` modified files in your staged set. Re-stage the same paths with `git add` and retry the commit. Do not write any code.
+3. **tsc / jest failed on files this phase did NOT change** → these are pre-existing failures unrelated to your work. Unstage them with `git reset HEAD -- <file>` (use `:(literal)` for bracket-named files) and retry. Note in the phase progress entry which files were excluded and why.
+4. **tsc / jest failed on files this phase changed** → the change is broken. Fix the code, re-stage, retry.
+5. After 2 failed attempts, stop and report the situation. Do NOT use `--no-verify`. Do NOT delete or weaken tests to make them pass.
+
+### 5.5 Report
+
+After the commit succeeds, output exactly one line so downstream nodes can parse it:
+
+```bash
+echo "Phase $N committed: $(git log -1 --format='%h %s')"
+```
 
 Then update progress tracking:
 

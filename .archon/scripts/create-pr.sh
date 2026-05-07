@@ -14,7 +14,7 @@ if [[ "$existing" != "[]" ]] && [[ "$(echo "$existing" | jq length)" -gt 0 ]]; t
     pr_url="$(echo "$existing" | jq -r '.[0].url')"
     echo "PR already exists: #${pr_number} — ${pr_url}"
 else
-    pr_url="$(gh pr create --draft --base "$base" --title "$title" --body-file "$body_file" 2>&1)"
+    pr_url="$(gh pr create --draft --base "$base" --title "$title" --body-file "$body_file")"
     pr_number="$(gh pr view --json number -q .number)"
     echo "Created PR #${pr_number}: ${pr_url}"
 fi
