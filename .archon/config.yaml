@@ -14,3 +14,18 @@ worktree:
   baseBranch: consistency2
   copyFiles:
     - .dev.vars
+
+# Per-project env vars injected into all workflow subprocesses
+# (Claude SDK and bash nodes — see Archon dag-executor.ts:1325).
+#
+# Why this exists: Archon runs bash nodes via `bash -c` (non-interactive),
+# so ~/.zshrc is NOT sourced and PATH inherits only what Archon's parent
+# process had at launch. Without this, install.sh fails with
+# "pnpm: command not found" because PNPM_HOME/PATH live in ~/.zshrc.
+#
+# LOCAL-ONLY: paths are hardcoded for this Mac. Archon does not expand
+# $HOME or $VAR in YAML values. Portability follow-up: replace with a
+# defensive PATH preamble in .archon/scripts/_env.sh that detects
+# common pnpm install dirs cross-platform.
+env:
+  PATH: /Users/vetinari/Library/pnpm:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
