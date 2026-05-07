@@ -11,6 +11,6 @@ assistants:
     additionalDirectories:
 
 worktree:
-  baseBranch: main
+  baseBranch: consistency2
   copyFiles:
     - .dev.vars
