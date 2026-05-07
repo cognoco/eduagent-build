@@ -1525,6 +1525,7 @@ function createFamilyMockDb({
   profileFindMany = [] as ReturnType<typeof mockProfileRow>[],
   selectResult = [] as unknown[],
   insertReturning = [] as unknown[],
+  updateReturning = [] as unknown[],
 }: {
   subscriptionFindFirst?: ReturnType<typeof mockSubscriptionRow>;
   quotaPoolFindFirst?: ReturnType<typeof mockQuotaPoolRow>;
@@ -1532,9 +1533,10 @@ function createFamilyMockDb({
   profileFindMany?: ReturnType<typeof mockProfileRow>[];
   selectResult?: unknown[];
   insertReturning?: unknown[];
+  updateReturning?: unknown[];
 } = {}): Database {
   const updateWhere = jest.fn().mockReturnValue({
-    returning: jest.fn().mockResolvedValue([]),
+    returning: jest.fn().mockResolvedValue(updateReturning),
   });
   const updateSet = jest.fn().mockReturnValue({ where: updateWhere });
 
@@ -1560,6 +1562,9 @@ function createFamilyMockDb({
       }),
     }),
     update: jest.fn().mockReturnValue({ set: updateSet }),
+    delete: jest.fn().mockReturnValue({
+      where: jest.fn().mockResolvedValue(undefined),
+    }),
     select: jest.fn().mockReturnValue({
       from: jest.fn().mockReturnValue({
         where: jest.fn().mockResolvedValue(selectResult),
@@ -1729,6 +1734,26 @@ describe('removeProfileFromSubscription', () => {
     expect(result).toBeNull();
   });
 
+  it('returns null for non-family tiers without archiving the profile', async () => {
+    const sub = mockSubscriptionRow({ tier: 'plus' });
+    const childProfile = mockProfileRow({ id: 'p-child', isOwner: false });
+    const db = createFamilyMockDb({
+      subscriptionFindFirst: sub,
+      profileFindFirst: childProfile,
+    });
+
+    const result = await removeProfileFromSubscription(
+      db,
+      subscriptionId,
+      'p-child'
+    );
+
+    expect(result).toBeNull();
+    expect(db.query.profiles.findFirst).not.toHaveBeenCalled();
+    expect(db.update).not.toHaveBeenCalled();
+    expect(db.delete).not.toHaveBeenCalled();
+  });
+
   it('returns null when profile not found in family', async () => {
     const sub = mockSubscriptionRow({ tier: 'family' });
     const db = createFamilyMockDb({
@@ -1764,7 +1789,28 @@ describe('removeProfileFromSubscription', () => {
     expect(result).toBeNull();
   });
 
-  it('rejects removing non-owner profile until a verified detach flow exists', async () => {
+  it('archives a same-account non-owner profile and removes family links', async () => {
+    const sub = mockSubscriptionRow({ tier: 'family' });
+    const childProfile = mockProfileRow({ id: 'p-child', isOwner: false });
+    const db = createFamilyMockDb({
+      subscriptionFindFirst: sub,
+      profileFindFirst: childProfile,
+      updateReturning: [{ id: 'p-child' }],
+    });
+
+    const result = await removeProfileFromSubscription(
+      db,
+      subscriptionId,
+      'p-child'
+    );
+
+    expect(result).toEqual({ removedProfileId: 'p-child' });
+    expect(db.update).toHaveBeenCalled();
+    expect(db.delete).toHaveBeenCalled();
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it('rejects cross-account removal until a verified detach flow exists', async () => {
     const sub = mockSubscriptionRow({ tier: 'family' });
     const childProfile = mockProfileRow({ id: 'p-child', isOwner: false });
     const db = createFamilyMockDb({
@@ -1779,7 +1825,7 @@ describe('removeProfileFromSubscription', () => {
     expect(db.insert).not.toHaveBeenCalled();
   });
 
-  it('throws ProfileRemovalNotImplementedError with correct name [4C.9]', async () => {
+  it('throws ProfileRemovalNotImplementedError for cross-account requests with correct name [4C.9]', async () => {
     const sub = mockSubscriptionRow({ tier: 'family' });
     const childProfile = mockProfileRow({ id: 'p-child', isOwner: false });
     const db = createFamilyMockDb({

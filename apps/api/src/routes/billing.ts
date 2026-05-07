@@ -5,7 +5,7 @@ import {
   topUpRequestSchema,
   byokWaitlistSchema,
   familyAddProfileSchema,
-  // familyRemoveProfileSchema, // disabled until invite/claim flow exists (CR-21)
+  familyRemoveProfileSchema,
   ERROR_CODES,
   subscriptionResponseSchema,
   checkoutResponseSchema,
@@ -16,6 +16,7 @@ import {
   subscriptionStatusResponseSchema,
   familyResponseSchema,
   familyAddResponseSchema,
+  familyRemoveResponseSchema,
   byokWaitlistResponseSchema,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
@@ -35,8 +36,8 @@ import {
   getUsageEventsAvailableSince,
   buildUsageDateLabels,
   addProfileToSubscription,
-  // removeProfileFromSubscription, // disabled until invite/claim flow exists (CR-21)
-  // ProfileRemovalNotImplementedError, // disabled until invite/claim flow exists (CR-21)
+  removeProfileFromSubscription,
+  ProfileRemovalNotImplementedError,
   getFamilyPoolStatus,
 } from '../services/billing';
 import {
@@ -688,58 +689,67 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     }
   )
 
-  // ---------------------------------------------------------------------------
-  // Family profile removal — disabled until invite/claim flow exists (CR-21)
-  // ---------------------------------------------------------------------------
-  // .post(
-  //   '/subscription/family/remove',
-  //   zValidator('json', familyRemoveProfileSchema),
-  //   async (c) => {
-  //     const { profileId, newAccountId } = c.req.valid('json');
-  //     const db = c.get('db');
-  //     const account = c.get('account');
-  //
-  //     const subscription = await getSubscriptionByAccountId(db, account.id);
-  //     if (!subscription) {
-  //       return notFound(c, 'No subscription found');
-  //     }
-  //
-  //     let result: { removedProfileId: string } | null;
-  //     try {
-  //       result = await removeProfileFromSubscription(
-  //         db,
-  //         subscription.id,
-  //         profileId,
-  //         newAccountId
-  //       );
-  //     } catch (err) {
-  //       if (err instanceof ProfileRemovalNotImplementedError) {
-  //         return apiError(
-  //           c,
-  //           422,
-  //           ERROR_CODES.NOT_IMPLEMENTED,
-  //           'Profile removal is not yet implemented. An invite/claim flow is required.'
-  //         );
-  //       }
-  //       throw err;
-  //     }
-  //
-  //     if (!result) {
-  //       return apiError(
-  //         c,
-  //         403,
-  //         ERROR_CODES.FORBIDDEN,
-  //         'Cannot remove profile. Profile not found, not in this family, or is the subscription owner.'
-  //       );
-  //     }
-  //
-  //     return c.json({
-  //       message:
-  //         'Profile removed from family subscription and downgraded to Free tier',
-  //       removedProfileId: result.removedProfileId,
-  //     });
-  //   }
-  // )
+  // Remove a same-account child profile from the family subscription.
+  // Cross-account detachment stays disabled until invite/claim exists.
+  .post(
+    '/subscription/family/remove',
+    zValidator('json', familyRemoveProfileSchema),
+    async (c) => {
+      const { profileId } = c.req.valid('json');
+      const db = c.get('db');
+      const account = c.get('account');
+      const activeProfileMeta = c.get('profileMeta');
+
+      if (activeProfileMeta?.isOwner !== true) {
+        return apiError(
+          c,
+          403,
+          ERROR_CODES.FORBIDDEN,
+          'Only the family owner can remove a profile from the family subscription.'
+        );
+      }
+
+      const subscription = await getSubscriptionByAccountId(db, account.id);
+      if (!subscription) {
+        return notFound(c, 'No subscription found');
+      }
+
+      let result: { removedProfileId: string } | null;
+      try {
+        result = await removeProfileFromSubscription(
+          db,
+          subscription.id,
+          profileId
+        );
+      } catch (err) {
+        if (err instanceof ProfileRemovalNotImplementedError) {
+          return apiError(
+            c,
+            422,
+            ERROR_CODES.NOT_IMPLEMENTED,
+            'Cross-account profile removal requires an invite/claim flow.'
+          );
+        }
+        throw err;
+      }
+
+      if (!result) {
+        return apiError(
+          c,
+          403,
+          ERROR_CODES.FORBIDDEN,
+          'Cannot remove profile. Profile not found, not in this family, or is the subscription owner.'
+        );
+      }
+
+      return c.json(
+        familyRemoveResponseSchema.parse({
+          message: 'Profile removed from family subscription',
+          removedProfileId: result.removedProfileId,
+        })
+      );
+    }
+  )
 
   // Join BYOK waitlist
   .post('/byok-waitlist', zValidator('json', byokWaitlistSchema), async (c) => {

@@ -65,6 +65,12 @@ const mockGetTopUpPriceCents = jest.fn().mockReturnValue(499);
 const mockListFamilyMembers = jest.fn();
 const mockAddProfileToSubscription = jest.fn();
 const mockRemoveProfileFromSubscription = jest.fn();
+class MockProfileRemovalNotImplementedError extends Error {
+  constructor() {
+    super('Profile removal requires an invite/claim flow');
+    this.name = 'ProfileRemovalNotImplementedError';
+  }
+}
 const mockGetFamilyPoolStatus = jest.fn();
 const mockGetUsageBreakdownForProfile = jest.fn();
 const mockGetUsageEventsAvailableSince = jest
@@ -95,6 +101,7 @@ jest.mock('../services/billing', () => ({
     mockAddProfileToSubscription(...args),
   removeProfileFromSubscription: (...args: unknown[]) =>
     mockRemoveProfileFromSubscription(...args),
+  ProfileRemovalNotImplementedError: MockProfileRemovalNotImplementedError,
   getFamilyPoolStatus: (...args: unknown[]) => mockGetFamilyPoolStatus(...args),
   getUsageBreakdownForProfile: (...args: unknown[]) =>
     mockGetUsageBreakdownForProfile(...args),
@@ -977,13 +984,36 @@ describe('billing routes', () => {
   });
 
   // -------------------------------------------------------------------------
-  // POST /v1/subscription/family/remove — DISABLED (CR-21)
-  // Route is commented out until the invite/claim flow exists.
-  // All requests return 404.
+  // POST /v1/subscription/family/remove
   // -------------------------------------------------------------------------
 
-  describe('POST /v1/subscription/family/remove (disabled — CR-21)', () => {
-    it('returns 404 because the route is not registered', async () => {
+  describe('POST /v1/subscription/family/remove', () => {
+    function mockOwnerProfile(): void {
+      mockProfileFindFirst.mockResolvedValue({
+        id: '550e8400-e29b-41d4-a716-446655440999',
+        accountId: 'test-account-id',
+        displayName: 'Parent',
+        avatarUrl: null,
+        birthYear: 1985,
+        location: 'EU',
+        isOwner: true,
+        hasPremiumLlm: false,
+        conversationLanguage: 'en',
+        pronouns: null,
+        createdAt: new Date('2025-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2025-01-01T00:00:00.000Z'),
+      });
+    }
+
+    it('removes a same-account non-owner profile from the family subscription', async () => {
+      mockOwnerProfile();
+      mockGetSubscriptionByAccountId.mockResolvedValue(
+        mockSubscription({ tier: 'family' })
+      );
+      mockRemoveProfileFromSubscription.mockResolvedValue({
+        removedProfileId: '550e8400-e29b-41d4-a716-446655440000',
+      });
+
       const res = await app.request(
         '/v1/subscription/family/remove',
         {
@@ -991,13 +1021,130 @@ describe('billing routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({
             profileId: '550e8400-e29b-41d4-a716-446655440000',
-            newAccountId: '660e8400-e29b-41d4-a716-446655440000',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockRemoveProfileFromSubscription).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-1',
+        '550e8400-e29b-41d4-a716-446655440000'
+      );
+      const body = await res.json();
+      expect(body).toEqual({
+        message: 'Profile removed from family subscription',
+        removedProfileId: '550e8400-e29b-41d4-a716-446655440000',
+      });
+    });
+
+    it('[BREAK] rejects non-owner active profiles', async () => {
+      mockProfileFindFirst.mockResolvedValue({
+        id: '550e8400-e29b-41d4-a716-446655440001',
+        accountId: 'test-account-id',
+        displayName: 'Child',
+        avatarUrl: null,
+        birthYear: 2012,
+        location: 'EU',
+        isOwner: false,
+        hasPremiumLlm: false,
+        conversationLanguage: 'en',
+        pronouns: null,
+        createdAt: new Date('2025-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2025-01-01T00:00:00.000Z'),
+      });
+
+      const res = await app.request(
+        '/v1/subscription/family/remove',
+        {
+          method: 'POST',
+          headers: {
+            ...AUTH_HEADERS,
+            'X-Profile-Id': '550e8400-e29b-41d4-a716-446655440001',
+          },
+          body: JSON.stringify({
+            profileId: '550e8400-e29b-41d4-a716-446655440000',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockRemoveProfileFromSubscription).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 when profile cannot be removed', async () => {
+      mockOwnerProfile();
+      mockGetSubscriptionByAccountId.mockResolvedValue(
+        mockSubscription({ tier: 'family' })
+      );
+      mockRemoveProfileFromSubscription.mockResolvedValue(null);
+
+      const res = await app.request(
+        '/v1/subscription/family/remove',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            profileId: '550e8400-e29b-41d4-a716-446655440000',
+          }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(403);
+    });
+
+    it('returns 404 when no subscription exists', async () => {
+      mockOwnerProfile();
+      mockGetSubscriptionByAccountId.mockResolvedValue(null);
+
+      const res = await app.request(
+        '/v1/subscription/family/remove',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            profileId: '550e8400-e29b-41d4-a716-446655440000',
           }),
         },
         TEST_ENV
       );
 
       expect(res.status).toBe(404);
+    });
+
+    it('returns 400 with invalid profileId', async () => {
+      mockOwnerProfile();
+
+      const res = await app.request(
+        '/v1/subscription/family/remove',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ profileId: 'not-a-uuid' }),
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 401 without auth header', async () => {
+      const res = await app.request(
+        '/v1/subscription/family/remove',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            profileId: '550e8400-e29b-41d4-a716-446655440000',
+          }),
+          headers: { 'Content-Type': 'application/json' },
+        },
+        TEST_ENV
+      );
+
+      expect(res.status).toBe(401);
     });
   });
 

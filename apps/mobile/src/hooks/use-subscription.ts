@@ -1,6 +1,7 @@
 import {
   useQuery,
   useMutation,
+  useQueryClient,
   type UseQueryResult,
   type UseMutationResult,
 } from '@tanstack/react-query';
@@ -30,6 +31,11 @@ export type WarningLevel = 'none' | 'soft' | 'hard' | 'exceeded';
 interface ByokWaitlistResult {
   message: string;
   email: string;
+}
+
+interface RemoveFamilyProfileResult {
+  message: string;
+  removedProfileId: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -181,6 +187,46 @@ export function useJoinByokWaitlist(): UseMutationResult<
       const res = await client['byok-waitlist'].$post({ json: {} });
       await assertOk(res);
       return (await res.json()) as ByokWaitlistResult;
+    },
+  });
+}
+
+export function useRemoveFamilyProfile(): UseMutationResult<
+  RemoveFamilyProfileResult,
+  Error,
+  string
+> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (profileId: string) => {
+      const familyClient = client.subscription.family as {
+        remove: {
+          $post: (input: { json: { profileId: string } }) => Promise<Response>;
+        };
+      };
+      const res = await familyClient.remove.$post({ json: { profileId } });
+      await assertOk(res);
+      return (await res.json()) as RemoveFamilyProfileResult;
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['profiles'] }),
+        queryClient.invalidateQueries({
+          queryKey: ['subscription-family', activeProfile?.id],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['subscription', activeProfile?.id],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['usage', activeProfile?.id],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['revenuecat', 'customerInfo'],
+        }),
+      ]);
     },
   });
 }

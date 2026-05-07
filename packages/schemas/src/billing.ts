@@ -104,7 +104,6 @@ export type FamilyAddProfileInput = z.infer<typeof familyAddProfileSchema>;
 
 export const familyRemoveProfileSchema = z.object({
   profileId: z.string().uuid(),
-  newAccountId: z.string().uuid(),
 });
 export type FamilyRemoveProfileInput = z.infer<
   typeof familyRemoveProfileSchema
@@ -176,6 +175,12 @@ export const familyAddResponseSchema = z.object({
   profileCount: z.number().int(),
 });
 export type FamilyAddResponse = z.infer<typeof familyAddResponseSchema>;
+
+export const familyRemoveResponseSchema = z.object({
+  message: z.string(),
+  removedProfileId: z.string().uuid(),
+});
+export type FamilyRemoveResponse = z.infer<typeof familyRemoveResponseSchema>;
 
 export const byokWaitlistResponseSchema = z.object({
   message: z.string(),

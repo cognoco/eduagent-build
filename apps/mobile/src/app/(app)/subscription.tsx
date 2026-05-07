@@ -36,6 +36,7 @@ import {
   useUsage,
   useFamilySubscription,
   useJoinByokWaitlist,
+  useRemoveFamilyProfile,
   fetchUsageData,
   type SubscriptionTier,
 } from '../../hooks/use-subscription';
@@ -626,10 +627,10 @@ function SubscriptionContent(): React.ReactElement {
     refetch: refetchUsage,
     isRefetching: usageRefetching,
   } = useUsage();
-  const { data: familySubscription } = useFamilySubscription(
-    subscription?.tier === 'family'
-  );
+  const { data: familySubscription, refetch: refetchFamilySubscription } =
+    useFamilySubscription(subscription?.tier === 'family');
   const byokWaitlist = useJoinByokWaitlist();
+  const removeFamilyProfile = useRemoveFamilyProfile();
   const linkedChildCount = activeProfile?.isOwner
     ? profiles.filter((profile) => profile.id !== activeProfile.id).length
     : 0;
@@ -1096,6 +1097,50 @@ function SubscriptionContent(): React.ReactElement {
     }
   }, []);
 
+  const handleRemoveFamilyProfile = useCallback(
+    (profileId: string, displayName: string) => {
+      platformAlert(
+        'Remove from family?',
+        `${displayName}'s profile will be removed from this family plan and hidden from profile switching.`,
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: 'Remove',
+            style: 'destructive',
+            onPress: () => {
+              void (async () => {
+                try {
+                  await removeFamilyProfile.mutateAsync(profileId);
+                  await Promise.all([
+                    refetchSub(),
+                    refetchUsage(),
+                    refetchFamilySubscription(),
+                  ]);
+                  platformAlert(
+                    'Family updated',
+                    `${displayName} was removed from your family plan.`
+                  );
+                } catch {
+                  platformAlert(
+                    'Could not remove profile',
+                    'Please check your connection and try again.'
+                  );
+                }
+              })();
+            },
+          },
+        ]
+      );
+    },
+    [
+      refetchFamilySubscription,
+      refetchSub,
+      refetchUsage,
+      removeFamilyProfile,
+      t,
+    ]
+  );
+
   // ---------------------------------------------------------------------------
   // BYOK waitlist handler
   // ---------------------------------------------------------------------------
@@ -1461,15 +1506,42 @@ function SubscriptionContent(): React.ReactElement {
                   {familySubscription.remainingQuestions} shared questions left
                   this cycle.
                 </Text>
-                <Text className="text-caption text-text-secondary mt-1">
-                  {familySubscription.members
-                    .map((member) =>
-                      member.isOwner
-                        ? `${member.displayName} (owner)`
-                        : member.displayName
-                    )
-                    .join(', ')}
-                </Text>
+                <View className="mt-3">
+                  {familySubscription.members.map((member) => (
+                    <View
+                      key={member.profileId}
+                      className="flex-row items-center justify-between py-1"
+                      testID={`family-member-${member.profileId}`}
+                    >
+                      <Text className="text-caption text-text-secondary">
+                        {member.isOwner
+                          ? `${member.displayName} (owner)`
+                          : member.displayName}
+                      </Text>
+                      {activeProfile?.isOwner === true && !member.isOwner ? (
+                        <Pressable
+                          onPress={() =>
+                            handleRemoveFamilyProfile(
+                              member.profileId,
+                              member.displayName
+                            )
+                          }
+                          disabled={removeFamilyProfile.isPending}
+                          className="min-h-[44px] justify-center px-2"
+                          accessibilityRole="button"
+                          accessibilityLabel={`Remove ${member.displayName} from family`}
+                          testID={`remove-family-member-${member.profileId}`}
+                        >
+                          <Text className="text-caption font-semibold text-danger">
+                            {removeFamilyProfile.isPending
+                              ? 'Removing...'
+                              : 'Remove'}
+                          </Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  ))}
+                </View>
               </View>
             </View>
           )}
