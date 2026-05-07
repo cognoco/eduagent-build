@@ -29,6 +29,10 @@ interface QuizFlowContextType extends QuizFlowState {
 
 const QuizFlowContext = createContext<QuizFlowContextType | null>(null);
 
+export const unstable_settings = {
+  initialRouteName: 'index',
+};
+
 const INITIAL_STATE: QuizFlowState = {
   activityType: null,
   subjectId: null,
