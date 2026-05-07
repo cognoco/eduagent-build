@@ -8,6 +8,10 @@ import type {
 import { useThemeColors } from '../../../lib/theme';
 import { useParentProxy } from '../../../hooks/use-parent-proxy';
 
+// CLAUDE.md: any nested layout with an index screen AND dynamic children must
+// export unstable_settings so cross-stack deep pushes land on index first.
+export const unstable_settings = { initialRouteName: 'index' };
+
 interface QuizFlowState {
   activityType: QuizActivityType | null;
   subjectId: string | null;
