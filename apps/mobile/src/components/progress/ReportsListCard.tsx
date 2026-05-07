@@ -18,6 +18,16 @@ function formatDateOnly(isoDate: string, options: Intl.DateTimeFormatOptions) {
   });
 }
 
+function pushChildProfileParent(
+  router: ReturnType<typeof useRouter>,
+  profileId: string
+): void {
+  router.push({
+    pathname: '/(app)/child/[profileId]',
+    params: { profileId },
+  } as never);
+}
+
 export function ReportsListCard({
   profileId,
   interactive = false,
@@ -44,12 +54,13 @@ export function ReportsListCard({
         </Text>
         {interactive ? (
           <Pressable
-            onPress={() =>
+            onPress={() => {
+              pushChildProfileParent(router, profileId);
               router.push({
                 pathname: '/(app)/child/[profileId]/reports',
                 params: { profileId },
-              } as never)
-            }
+              } as never);
+            }}
             accessibilityRole="button"
             accessibilityLabel={t('parentView.index.openMonthlyReports')}
             testID="child-reports-link"
@@ -94,13 +105,14 @@ export function ReportsListCard({
               interactive ? '' : ''
             }`}
             testID={`weekly-report-card-${report.id}`}
-            onPress={() =>
+            onPress={() => {
+              pushChildProfileParent(router, profileId);
               router.push({
                 pathname:
                   '/(app)/child/[profileId]/weekly-report/[weeklyReportId]',
                 params: { profileId, weeklyReportId: report.id },
-              } as never)
-            }
+              } as never);
+            }}
             accessibilityRole={interactive ? 'button' : undefined}
             accessibilityLabel={`${t(
               'parentView.reports.weekOf'
@@ -131,12 +143,13 @@ export function ReportsListCard({
             disabled={!interactive}
             className="bg-background rounded-card p-3 mt-3"
             testID={`report-card-${report.id}`}
-            onPress={() =>
+            onPress={() => {
+              pushChildProfileParent(router, profileId);
               router.push({
                 pathname: '/(app)/child/[profileId]/report/[reportId]',
                 params: { profileId, reportId: report.id },
-              } as never)
-            }
+              } as never);
+            }}
             accessibilityRole={interactive ? 'button' : undefined}
             accessibilityLabel={t('parentView.reports.openReport', {
               month: report.reportMonth,

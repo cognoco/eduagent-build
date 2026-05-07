@@ -25,6 +25,16 @@ function formatDuration(seconds: number | null): string {
   return `${mins} min`;
 }
 
+function pushChildProfileParent(
+  router: ReturnType<typeof useRouter>,
+  profileId: string
+): void {
+  router.push({
+    pathname: '/(app)/child/[profileId]',
+    params: { profileId },
+  } as never);
+}
+
 export function RecentSessionsList({
   profileId,
 }: ReportingComponentProps): React.ReactElement {
@@ -77,6 +87,7 @@ export function RecentSessionsList({
                 router.push(`/session-summary/${session.sessionId}` as never);
                 return;
               }
+              pushChildProfileParent(router, profileId);
               router.push({
                 pathname: '/(app)/child/[profileId]/session/[sessionId]',
                 params: {
