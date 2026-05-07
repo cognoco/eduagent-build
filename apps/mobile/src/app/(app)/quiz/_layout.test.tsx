@@ -1,6 +1,7 @@
 import React from 'react';
 import { render } from '@testing-library/react-native';
 import QuizLayout, { unstable_settings } from './_layout';
+import { ProfileContext } from '../../../lib/profile';
 
 interface StackProps {
   initialRouteName?: string;
@@ -21,14 +22,6 @@ jest.mock('expo-router', () => {
   };
 });
 
-jest.mock('../../../lib/theme', () => ({
-  useThemeColors: () => ({ background: '#000' }),
-}));
-
-jest.mock('../../../hooks/use-parent-proxy', () => ({
-  useParentProxy: () => ({ isParentProxy: false }),
-}));
-
 describe('quiz/_layout.tsx', () => {
   beforeEach(() => {
     capturedStackProps = null;
@@ -39,7 +32,21 @@ describe('quiz/_layout.tsx', () => {
   });
 
   it('sets initialRouteName="index" on the Stack', () => {
-    render(<QuizLayout />);
+    render(
+      <ProfileContext.Provider
+        value={{
+          profiles: [],
+          activeProfile: null,
+          switchProfile: async () => ({ success: true }),
+          isLoading: false,
+          profileLoadError: null,
+          profileWasRemoved: false,
+          acknowledgeProfileRemoval: () => undefined,
+        }}
+      >
+        <QuizLayout />
+      </ProfileContext.Provider>
+    );
     expect(capturedStackProps?.initialRouteName).toBe('index');
   });
 });
