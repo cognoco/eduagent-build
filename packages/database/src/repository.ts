@@ -618,6 +618,8 @@ export function createScopedRepository(db: Database, profileId: string) {
             bookId: curriculumTopics.bookId,
             sortOrder: curriculumTopics.sortOrder,
             title: curriculumTopics.title,
+            bookSortOrder: curriculumBooks.sortOrder,
+            subjectId: curriculumBooks.subjectId,
           })
           .from(curriculumTopics)
           .innerJoin(
@@ -640,6 +642,12 @@ export function createScopedRepository(db: Database, profileId: string) {
        * than `minSortOrder`, ordered ascending. Ownership enforced via the
        * books→subjects join chain. The limit is caller-supplied so product
        * policy (how many candidates is "enough") stays in the service layer.
+       *
+       * Skipped topics (`curriculum_topics.skipped = true`) are filtered
+       * out: a topic the learner explicitly skipped via the shelf must not
+       * resurface as a "next topic" suggestion. The id tie-break makes
+       * ordering deterministic when two topics share a sortOrder (rare but
+       * possible after manual curriculum edits).
        */
       async findLaterInBook(
         bookId: string,
@@ -658,10 +666,51 @@ export function createScopedRepository(db: Database, profileId: string) {
             and(
               eq(curriculumTopics.bookId, bookId),
               gt(curriculumTopics.sortOrder, minSortOrder),
+              eq(curriculumTopics.skipped, false),
               eq(subjects.profileId, profileId)
             )
           )
-          .orderBy(asc(curriculumTopics.sortOrder))
+          .orderBy(asc(curriculumTopics.sortOrder), asc(curriculumTopics.id))
+          .limit(limit);
+      },
+
+      /**
+       * Return up to `limit` topics in *other* books of the given subject —
+       * specifically books with `sort_order > currentBookSortOrder`, ordered
+       * ascending by (book.sortOrder, topic.sortOrder, topic.id). Used as a
+       * fallback when `findLaterInBook` is exhausted (learner finished the
+       * last topic in a book) so the recap can suggest the start of the
+       * next book instead of silently dropping the "Up next" card.
+       *
+       * Filters out skipped topics. Ownership enforced via the
+       * books→subjects join chain.
+       */
+      async findEarliestInLaterBooks(
+        subjectId: string,
+        currentBookSortOrder: number,
+        limit: number
+      ): Promise<Array<{ id: string; title: string }>> {
+        return db
+          .select({ id: curriculumTopics.id, title: curriculumTopics.title })
+          .from(curriculumTopics)
+          .innerJoin(
+            curriculumBooks,
+            eq(curriculumBooks.id, curriculumTopics.bookId)
+          )
+          .innerJoin(subjects, eq(subjects.id, curriculumBooks.subjectId))
+          .where(
+            and(
+              eq(curriculumBooks.subjectId, subjectId),
+              gt(curriculumBooks.sortOrder, currentBookSortOrder),
+              eq(curriculumTopics.skipped, false),
+              eq(subjects.profileId, profileId)
+            )
+          )
+          .orderBy(
+            asc(curriculumBooks.sortOrder),
+            asc(curriculumTopics.sortOrder),
+            asc(curriculumTopics.id)
+          )
           .limit(limit);
       },
 
@@ -1045,4 +1094,6 @@ export interface CurriculumTopicRow {
   bookId: string;
   sortOrder: number;
   title: string;
+  bookSortOrder: number;
+  subjectId: string;
 }
