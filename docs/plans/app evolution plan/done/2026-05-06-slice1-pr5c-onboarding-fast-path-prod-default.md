@@ -18,9 +18,9 @@ This PR turns the bypass on by default in production. It does **not** delete any
 ## Acceptance
 
 - `FEATURE_FLAGS.ONBOARDING_FAST_PATH` evaluates to `true` in production builds unless `EXPO_PUBLIC_ONBOARDING_FAST_PATH` is explicitly set to `'false'`.
-- Existing override semantics preserved: `EXPO_PUBLIC_ONBOARDING_FAST_PATH=true` forces on, `EXPO_PUBLIC_ONBOARDING_FAST_PATH=false` forces off, in any environment.
+- Override semantics: `EXPO_PUBLIC_ONBOARDING_FAST_PATH=false` forces off in any environment; `=true` is permitted but is a no-op against the new default.
 - No regressions for dev/staging — both still default on.
-- Unit test added or updated to assert the prod default.
+- Unit test added that **exercises the production branch** by forcing `process.env.NODE_ENV = 'production'` (otherwise Jest's `NODE_ENV='test'` makes the unset case `true` under both BEFORE and AFTER, and the test catches no regression).
 
 ---
 
@@ -44,7 +44,7 @@ Truth table today:
 | unset / other | `true` | **`false`** ← the production default this PR flips |
 | unset / other | `false` | `true` |
 
-Five files reference the flag:
+Mobile files referencing the flag:
 
 - `apps/mobile/src/lib/feature-flags.ts`
 - `apps/mobile/src/app/(app)/onboarding/language-setup.tsx`
@@ -52,7 +52,9 @@ Five files reference the flag:
 - `apps/mobile/src/app/(app)/onboarding/interview.tsx`
 - `apps/mobile/src/app/(app)/onboarding/interview.test.tsx`
 
-The flag is only consumed by the two onboarding screens; no other product surface gates on it. So a default flip cannot leak into unrelated code paths.
+The flag is only consumed by the two onboarding screens, so a default flip cannot leak into unrelated mobile code paths.
+
+**API-side note (independent surface).** `apps/api/src/config.ts:89` declares its own `ONBOARDING_FAST_PATH` env var and `:128` exports `isOnboardingFastPathEnabled(value)`. Verified this session: `isOnboardingFastPathEnabled` has **zero callers** anywhere in `apps/api/**` — it is dead code. Real server-side gating is per-session, via `metadata.onboardingFastPath` populated by the client at session creation (`services/session/session-crud.ts:361`, read by `services/session/session-exchange.ts:1002-1008`). The mobile flip is therefore independent of any server flag; no API change is required, and the unused helper is out of scope here (candidate for deletion in a later cleanup PR).
 
 ---
 
@@ -84,30 +86,36 @@ The flag is only consumed by the two onboarding screens; no other product surfac
 
 2. **Update the comment block** above the flag to reflect the new contract: "Defaults to true everywhere. Set `EXPO_PUBLIC_ONBOARDING_FAST_PATH=false` to disable in any environment. (Build-time only — Doppler config change takes effect on next OTA update or native build, not immediately on live users.)"
 
-3. **Add a test** (`feature-flags.test.ts` — create, does not exist). `FEATURE_FLAGS` is evaluated once at module load time, so each env-combination case must force a fresh module evaluation via `jest.resetModules()`. Pattern:
+3. **Add a test** (`feature-flags.test.ts` — create, does not exist). `FEATURE_FLAGS` is evaluated once at module load time, so each env-combination case must force a fresh module evaluation via `jest.resetModules()`. **Critically, at least one case must force `process.env.NODE_ENV = 'production'`** — Jest defaults to `NODE_ENV='test'`, under which the unset-var case evaluates to `true` for both the BEFORE and AFTER expressions, so a test that doesn't enter the production branch catches zero regressions if the `NODE_ENV !== 'production'` clause is reintroduced. Pattern:
 
    ```ts
    describe('FEATURE_FLAGS.ONBOARDING_FAST_PATH', () => {
-     const ORIG = process.env.EXPO_PUBLIC_ONBOARDING_FAST_PATH;
+     const ORIG_VAR = process.env.EXPO_PUBLIC_ONBOARDING_FAST_PATH;
+     const ORIG_NODE_ENV = process.env.NODE_ENV;
 
      afterEach(() => {
        jest.resetModules();
-       if (ORIG === undefined) {
+       if (ORIG_VAR === undefined) {
          delete process.env.EXPO_PUBLIC_ONBOARDING_FAST_PATH;
        } else {
-         process.env.EXPO_PUBLIC_ONBOARDING_FAST_PATH = ORIG;
+         process.env.EXPO_PUBLIC_ONBOARDING_FAST_PATH = ORIG_VAR;
        }
+       process.env.NODE_ENV = ORIG_NODE_ENV;
      });
 
-     it('defaults to true when env var is unset', () => {
+     // Regression guard: this is the case the PR exists to flip.
+     // Red under the BEFORE expression, green under the AFTER expression.
+     it('defaults to true in production builds when env var is unset', () => {
        delete process.env.EXPO_PUBLIC_ONBOARDING_FAST_PATH;
+       process.env.NODE_ENV = 'production';
        jest.resetModules();
        const { FEATURE_FLAGS } = require('./feature-flags') as typeof import('./feature-flags');
        expect(FEATURE_FLAGS.ONBOARDING_FAST_PATH).toBe(true);
      });
 
-     it('is false when env var is explicitly "false"', () => {
+     it('is false when env var is explicitly "false", even in production', () => {
        process.env.EXPO_PUBLIC_ONBOARDING_FAST_PATH = 'false';
+       process.env.NODE_ENV = 'production';
        jest.resetModules();
        const { FEATURE_FLAGS } = require('./feature-flags') as typeof import('./feature-flags');
        expect(FEATURE_FLAGS.ONBOARDING_FAST_PATH).toBe(false);
@@ -121,6 +129,8 @@ The flag is only consumed by the two onboarding screens; no other product surfac
      });
    });
    ```
+
+   **Verify the regression guard before committing**: temporarily revert step 1 (restore the `&& process.env.NODE_ENV !== 'production'` clause), re-run the suite, and confirm the "defaults to true in production builds" case fails. Then restore the AFTER expression and confirm it passes. This is the red-green check from `feedback_fix_verification_rules.md`.
 
 4. **Audit existing screen tests** — `interview.test.tsx` and `language-setup.test.tsx` both use `jest.mock('../../../lib/feature-flags', ...)` to replace the entire module with a plain mutable object, and reset `FEATURE_FLAGS.ONBOARDING_FAST_PATH = false` in `beforeEach` (interview.test.tsx:134, language-setup.test.tsx:156). Because the real module is never loaded by these test files, env-var changes have no effect on them — they are already correctly isolated. **No changes are needed to either test file.** Confirm with: `grep -n 'ONBOARDING_FAST_PATH' apps/mobile/src/app/\(app\)/onboarding/interview.test.tsx apps/mobile/src/app/\(app\)/onboarding/language-setup.test.tsx`
 
@@ -136,7 +146,9 @@ The flag is only consumed by the two onboarding screens; no other product surfac
 
 ## Verification
 
-- Confirm flag is referenced in exactly the listed files before committing: `grep -r 'ONBOARDING_FAST_PATH' apps/mobile/src --include='*.ts' --include='*.tsx' -l`
+- Confirm mobile flag references match the listed files before committing: `grep -r 'ONBOARDING_FAST_PATH' apps/mobile/src --include='*.ts' --include='*.tsx' -l`
+- Confirm repo-wide references are accounted for (mobile sources above + the dead `apps/api/src/config.ts` declaration + e2e flow + plan/spec docs): `grep -rn 'ONBOARDING_FAST_PATH' --include='*.ts' --include='*.tsx' --include='*.yaml'`
+- **Doppler `prd` config:** confirm `EXPO_PUBLIC_ONBOARDING_FAST_PATH` is **unset** (or absent). A stale `=false` from earlier kill-switch testing would silently neutralize this PR. If it exists, delete it before merging.
 - `cd apps/mobile && pnpm exec jest --findRelatedTests src/lib/feature-flags.ts --no-coverage`
 - `cd apps/mobile && pnpm exec jest --findRelatedTests src/app/(app)/onboarding/interview.tsx src/app/(app)/onboarding/language-setup.tsx --no-coverage`
 - `cd apps/mobile && pnpm exec tsc --noEmit`
@@ -148,14 +160,18 @@ The flag is only consumed by the two onboarding screens; no other product surfac
 
 | State | Trigger | User sees | Recovery |
 |---|---|---|---|
+| Subject creation (entry to fast path) fails | `createSubject` 4xx/5xx, network | Existing create-subject error UI (pre-fast-path; unchanged by this PR) | Retry from create-subject screen |
 | `language-setup.tsx` fast-path: `startFirstCurriculumSession.mutateAsync` fails | API error / quota / network | Error banner (`setError(formatApiError(err))`) + "Try Again" + "Cancel" buttons | Retry or cancel back to Home — no dead end |
 | `interview.tsx` fast-path: `transitionToSession` fails (non-language subject) | API error / network | Session-creation-stuck UI: "Setting up…" → 20s timeout → "Try Again" + "Go Back" | Retry or navigate Home |
 | User is mid-onboarding when OTA lands | OTA applies on next cold start, not mid-session | User finishes old bundle's flow normally | No action — OTA only activates on app reopen |
+| User who completed onboarding under old bundle adds a *second* subject under new bundle | Routing flips to fast path on the new subject's flow | Fast-path UX for the new subject | No cross-subject state leak: onboarding routing inputs (`subjectId`, `languageCode`, `extractedSignals`) are scoped per-subject; long-path screens wrote no global preference state the fast path reads |
 
 ## Risk and rollback
 
 - **Blast radius:** medium. Production users who previously walked the four-screen chain skip it after this lands. If 5e has not yet shipped routing simplification (likely — these can land in either order; both are Wave 2), the long-path code still exists but is unreachable from prod. That is the point.
-- **Rollback:** revert the constant change OR set `EXPO_PUBLIC_ONBOARDING_FAST_PATH='false'` in Doppler and publish an OTA update (`eas update`). The Doppler change alone is not sufficient — `EXPO_PUBLIC_*` variables are baked into the JS bundle at build/OTA time and do not affect live users until a new bundle is deployed. ETA ~5 min via OTA.
+- **Rollback:** two options.
+  1. **Code revert (preferred):** revert this PR's commit on `app-ev`, then OTA per the standard channel (see `feedback_ota_env_vars.md` — manual OTA must explicitly source target env vars; do not assume Doppler propagates by itself). ETA ~5 min once the revert lands.
+  2. **Env kill-switch:** set `EXPO_PUBLIC_ONBOARDING_FAST_PATH=false` in Doppler `prd`, then run `pnpm env:sync` followed by `eas update --branch production --message "kill-switch ONBOARDING_FAST_PATH"` (or the equivalent channel command in use at the time). The Doppler change alone is **not** sufficient — `EXPO_PUBLIC_*` variables are inlined into the JS bundle at OTA build time and only reach live users after the new bundle ships. Verify with a fresh install on a test device before declaring rollback complete.
 - **What this PR does NOT prove:** that the bypass UX is good. PR 5f's Wave 3 E2E covers that.
 
 ---
