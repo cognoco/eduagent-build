@@ -1,10 +1,11 @@
 export const FEATURE_FLAGS = {
   // Subject onboarding fast path (spec 2026-05-05). Build-time only:
-  // enabled for dev/staging unless explicitly disabled, false in production.
+  // defaults to true everywhere. Set EXPO_PUBLIC_ONBOARDING_FAST_PATH=false
+  // to disable in any environment. Doppler config changes require a new OTA
+  // update or native build before live users see them.
   ONBOARDING_FAST_PATH:
     process.env.EXPO_PUBLIC_ONBOARDING_FAST_PATH === 'true' ||
-    (process.env.EXPO_PUBLIC_ONBOARDING_FAST_PATH !== 'false' &&
-      process.env.NODE_ENV !== 'production'),
+    process.env.EXPO_PUBLIC_ONBOARDING_FAST_PATH !== 'false',
   COACH_BAND_ENABLED: true,
   MIC_IN_PILL_ENABLED: true,
   // Live multi-language pipeline (docs/_archive/plans/done/2026-05-03-llm-powered-i18n.md).

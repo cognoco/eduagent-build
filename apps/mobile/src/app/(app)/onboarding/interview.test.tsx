@@ -115,6 +115,13 @@ jest.mock('../../../lib/feature-flags', () => ({
 const { FEATURE_FLAGS } = require('../../../lib/feature-flags');
 const InterviewScreen = require('./interview').default;
 
+const bypassedPreferenceRoutes = [
+  '/(app)/onboarding/interests-context',
+  '/(app)/onboarding/analogy-preference',
+  '/(app)/onboarding/accommodations',
+  '/(app)/onboarding/curriculum-review',
+];
+
 describe('InterviewScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -217,11 +224,11 @@ describe('InterviewScreen', () => {
     await waitFor(() => {
       expect(mockStartSessionMutateAsync).toHaveBeenCalledTimes(1);
     });
-    expect(mockReplace).not.toHaveBeenCalledWith(
-      expect.objectContaining({
-        pathname: '/(app)/onboarding/interests-context',
-      })
-    );
+    expect(
+      mockReplace.mock.calls.filter(([route]) =>
+        bypassedPreferenceRoutes.includes(route?.pathname)
+      )
+    ).toEqual([]);
   });
 
   it('still routes to interests-context when ONBOARDING_FAST_PATH is false', async () => {
