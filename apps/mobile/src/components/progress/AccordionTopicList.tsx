@@ -90,7 +90,7 @@ export function AccordionTopicList({
             key={topic.topicId}
             onPress={(event) => {
               event?.stopPropagation?.();
-              router.push({
+              router.navigate({
                 pathname: '/(app)/child/[profileId]',
                 params: {
                   profileId: childProfileId,
@@ -112,7 +112,7 @@ export function AccordionTopicList({
                   subjectId,
                   subjectName,
                 },
-              } as never);
+              } as Href);
             }}
             className="flex-row items-center justify-between py-2"
             accessibilityRole="link"

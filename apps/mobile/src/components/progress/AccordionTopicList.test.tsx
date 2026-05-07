@@ -2,10 +2,11 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import { AccordionTopicList } from './AccordionTopicList';
 
 const mockPush = jest.fn();
+const mockNavigate = jest.fn();
 const mockUseChildSubjectTopics = jest.fn();
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: mockPush }),
+  useRouter: () => ({ navigate: mockNavigate, push: mockPush }),
 }));
 
 jest.mock('../../hooks/use-dashboard', () => ({
@@ -177,14 +178,13 @@ describe('AccordionTopicList', () => {
 
     fireEvent.press(screen.getByTestId('accordion-topic-topic-1'));
 
-    expect(mockPush).toHaveBeenNthCalledWith(1, {
+    expect(mockNavigate).toHaveBeenCalledWith({
       pathname: '/(app)/child/[profileId]',
       params: {
         profileId: 'child-1',
       },
     });
-    expect(mockPush).toHaveBeenNthCalledWith(
-      2,
+    expect(mockPush).toHaveBeenCalledWith(
       expect.objectContaining({
         pathname: '/(app)/child/[profileId]/topic/[topicId]',
         params: expect.objectContaining({
@@ -196,6 +196,12 @@ describe('AccordionTopicList', () => {
         }),
       })
     );
+    const navigateOrder = mockNavigate.mock.invocationCallOrder[0];
+    const pushOrder = mockPush.mock.invocationCallOrder[0];
+    if (navigateOrder == null || pushOrder == null) {
+      throw new Error('Expected navigate and push to be called');
+    }
+    expect(navigateOrder).toBeLessThan(pushOrder);
   });
 
   it('renders an empty state when no topics are available', () => {

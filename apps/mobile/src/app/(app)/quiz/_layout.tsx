@@ -113,6 +113,7 @@ export default function QuizLayout(): React.ReactElement {
   return (
     <QuizFlowProvider>
       <Stack
+        initialRouteName="index"
         screenOptions={{
           headerShown: false,
           animation: 'slide_from_right',
