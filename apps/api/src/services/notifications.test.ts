@@ -124,13 +124,13 @@ describe('sendPushNotification', () => {
       expect.objectContaining({
         method: 'POST',
         body: expect.stringContaining('ExponentPushToken[abc123]'),
-      })
+      }),
     );
     expect(mockLogNotification).toHaveBeenCalledWith(
       mockDb,
       'profile-1',
       'review_reminder',
-      'ticket-xyz'
+      'ticket-xyz',
     );
   });
 
@@ -268,7 +268,7 @@ describe('sendEmail', () => {
           Authorization: 'Bearer re_test_key',
         }),
         body: expect.stringContaining('parent@example.com'),
-      })
+      }),
     );
   });
 
@@ -316,7 +316,7 @@ describe('sendEmail', () => {
         headers: expect.objectContaining({
           'Idempotency-Key': 'consent-reminder:profile-1:evt-1:day-7',
         }),
-      })
+      }),
     );
   });
 
@@ -348,23 +348,36 @@ describe('sendEmail', () => {
 // The migration uses checkAndLogRateLimitInternal which serializes via a
 // pg_advisory_xact_lock so only the first concurrent caller proceeds.
 
+function dbWithFamilyLink(
+  parentProfileId: string | null,
+  consentStatus:
+    | 'PENDING'
+    | 'PARENTAL_CONSENT_REQUESTED'
+    | 'CONSENTED'
+    | 'WITHDRAWN'
+    | null = null,
+) {
+  const familyLinkRow = parentProfileId
+    ? { parentProfileId, childProfileId: 'child-1' }
+    : null;
+  const childProfileRow = { displayName: 'Emma' };
+  const consentStateRow =
+    consentStatus != null ? { status: consentStatus } : null;
+  return {
+    query: {
+      familyLinks: { findFirst: jest.fn().mockResolvedValue(familyLinkRow) },
+      profiles: { findFirst: jest.fn().mockResolvedValue(childProfileRow) },
+      consentStates: {
+        findFirst: jest.fn().mockResolvedValue(consentStateRow),
+      },
+    },
+  } as unknown as Database;
+}
+
 describe('[BUG-856] sendStruggleNotification rate-limit atomicity', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
-
-  function dbWithFamilyLink(parentProfileId: string | null) {
-    const familyLinkRow = parentProfileId
-      ? { parentProfileId, childProfileId: 'child-1' }
-      : null;
-    const childProfileRow = { displayName: 'Emma' };
-    return {
-      query: {
-        familyLinks: { findFirst: jest.fn().mockResolvedValue(familyLinkRow) },
-        profiles: { findFirst: jest.fn().mockResolvedValue(childProfileRow) },
-      },
-    } as unknown as Database;
-  }
 
   it('[BUG-856] returns dedup_24h and skips push when checkAndLogRateLimitInternal returns true', async () => {
     mockCheckAndLogRateLimitInternal.mockResolvedValue(true);
@@ -373,7 +386,7 @@ describe('[BUG-856] sendStruggleNotification rate-limit atomicity', () => {
     const result = await sendStruggleNotification(
       dbWithFamilyLink('parent-1'),
       'child-1',
-      { type: 'struggle_noticed', topic: 'Algebra', confidence: 0.7 }
+      { type: 'struggle_noticed', topic: 'Algebra', confidence: 0.7 },
     );
 
     expect(result).toEqual({ sent: false, reason: 'dedup_24h' });
@@ -381,7 +394,7 @@ describe('[BUG-856] sendStruggleNotification rate-limit atomicity', () => {
       expect.anything(),
       'parent-1',
       'struggle_noticed',
-      { hours: 24, maxCount: 1 }
+      { hours: 24, maxCount: 1 },
     );
     // Never reaches push send when rate-limited.
     expect(mockFetchFn).not.toHaveBeenCalled();
@@ -399,7 +412,7 @@ describe('[BUG-856] sendStruggleNotification rate-limit atomicity', () => {
     const result = await sendStruggleNotification(
       dbWithFamilyLink('parent-1'),
       'child-1',
-      { type: 'struggle_flagged', topic: 'Geometry', confidence: 0.95 }
+      { type: 'struggle_flagged', topic: 'Geometry', confidence: 0.95 },
     );
 
     expect(result).toEqual({ sent: true, ticketId: 'ticket-1' });
@@ -419,11 +432,88 @@ describe('[BUG-856] sendStruggleNotification rate-limit atomicity', () => {
         type: 'struggle_noticed',
         topic: 'X',
         confidence: 0.7,
-      }
+      },
     );
 
     expect(result).toEqual({ sent: false, reason: 'no_parent_link' });
     expect(mockCheckAndLogRateLimitInternal).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Privacy gate: child consent must be CONSENTED for struggle pushes
+// ---------------------------------------------------------------------------
+// Without this gate, "Mia is struggling with fractions" pushes fire to
+// parents of children who have WITHDRAWN, are PENDING, or have a
+// PARENTAL_CONSENT_REQUESTED state. That mirrors the dashboard's
+// hasRestrictedConsent rule and prevents a privacy regression.
+
+describe('sendStruggleNotification consent gate', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  for (const blockedStatus of [
+    'WITHDRAWN',
+    'PENDING',
+    'PARENTAL_CONSENT_REQUESTED',
+  ] as const) {
+    it(`returns consent_not_granted and skips push when consent is ${blockedStatus}`, async () => {
+      mockCheckAndLogRateLimitInternal.mockResolvedValue(false);
+      mockGetPushToken.mockResolvedValue('ExponentPushToken[abc]');
+
+      const result = await sendStruggleNotification(
+        dbWithFamilyLink('parent-1', blockedStatus),
+        'child-1',
+        { type: 'struggle_noticed', topic: 'Algebra', confidence: 0.7 },
+      );
+
+      expect(result).toEqual({ sent: false, reason: 'consent_not_granted' });
+      // Critical: rate-limit slot must NOT be reserved for blocked sends —
+      // otherwise a child who later consents would be incorrectly deduped.
+      expect(mockCheckAndLogRateLimitInternal).not.toHaveBeenCalled();
+      expect(mockFetchFn).not.toHaveBeenCalled();
+    });
+  }
+
+  it('proceeds when consent is CONSENTED', async () => {
+    mockCheckAndLogRateLimitInternal.mockResolvedValue(false);
+    mockGetPushToken.mockResolvedValue('ExponentPushToken[abc]');
+    mockGetDailyNotificationCount.mockResolvedValue(0);
+    mockFetchFn.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { id: 'ticket-1' } }),
+    });
+
+    const result = await sendStruggleNotification(
+      dbWithFamilyLink('parent-1', 'CONSENTED'),
+      'child-1',
+      { type: 'struggle_flagged', topic: 'Geometry', confidence: 0.95 },
+    );
+
+    expect(result).toEqual({ sent: true, ticketId: 'ticket-1' });
+    expect(mockCheckAndLogRateLimitInternal).toHaveBeenCalledTimes(1);
+  });
+
+  it('proceeds when no consent state row exists (presumed consent)', async () => {
+    // Matches dashboard behaviour: missing consent_states row = not
+    // restricted. Important for accounts created before the consent flow
+    // shipped or for solo learners without the flow ever triggered.
+    mockCheckAndLogRateLimitInternal.mockResolvedValue(false);
+    mockGetPushToken.mockResolvedValue('ExponentPushToken[abc]');
+    mockGetDailyNotificationCount.mockResolvedValue(0);
+    mockFetchFn.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { id: 'ticket-2' } }),
+    });
+
+    const result = await sendStruggleNotification(
+      dbWithFamilyLink('parent-1', null),
+      'child-1',
+      { type: 'struggle_resolved', topic: 'Fractions', confidence: 0.9 },
+    );
+
+    expect(result).toEqual({ sent: true, ticketId: 'ticket-2' });
   });
 });
 
@@ -473,7 +563,7 @@ describe('formatStruggleNotificationCopy', () => {
     const copy = formatStruggleNotificationCopy(
       'struggle_noticed',
       'fractions',
-      'Alex'
+      'Alex',
     );
     expect(copy.title).toBe('Learning update');
     expect(copy.body).toContain('Alex');
@@ -486,7 +576,7 @@ describe('formatStruggleNotificationCopy', () => {
     const copy = formatStruggleNotificationCopy(
       'struggle_flagged',
       'fractions',
-      'Alex'
+      'Alex',
     );
     expect(copy.title).toBe('Learning update');
     expect(copy.body).toContain('Alex');
@@ -498,7 +588,7 @@ describe('formatStruggleNotificationCopy', () => {
     const copy = formatStruggleNotificationCopy(
       'struggle_resolved',
       'fractions',
-      'Alex'
+      'Alex',
     );
     expect(copy.title).toContain('Great news');
     expect(copy.body).toContain('Alex');
@@ -510,7 +600,7 @@ describe('formatStruggleNotificationCopy', () => {
     const copy = formatStruggleNotificationCopy(
       'struggle_noticed',
       'fractions',
-      null
+      null,
     );
     expect(copy.body).toContain('Your child');
   });
@@ -561,7 +651,7 @@ describe('sendEmail structured logging', () => {
         .map((call) => call[0])
         .find(
           (arg): arg is string =>
-            typeof arg === 'string' && arg.includes('Resend API error')
+            typeof arg === 'string' && arg.includes('Resend API error'),
         );
       expect(typeof logArg).toBe('string');
       const parsed = JSON.parse(logArg!) as {
@@ -596,7 +686,7 @@ describe('sendEmail structured logging', () => {
         .map((call) => call[0])
         .find(
           (arg): arg is string =>
-            typeof arg === 'string' && arg.includes('Network error')
+            typeof arg === 'string' && arg.includes('Network error'),
         );
       expect(typeof logArg).toBe('string');
       const parsed = JSON.parse(logArg!) as { level: string; message: string };
