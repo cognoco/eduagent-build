@@ -13,7 +13,6 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ErrorFallback, TrackedView } from '../../../components/common';
-import { SamplePreview } from '../../../components/parent/SamplePreview';
 import {
   isNewLearner,
   sessionsUntilFullProgress,
@@ -562,27 +561,17 @@ export default function ProgressScreen(): React.ReactElement {
                 </View>
               ))
             ) : (
-              <SamplePreview
-                unlockMessage={getNextMilestoneLabel(
-                  inventory?.global.totalSessions ?? 0,
-                  t,
-                )}
+              <View
+                className="bg-surface rounded-card px-4 py-3"
+                testID="milestones-teaser"
               >
-                <View className="bg-surface rounded-card p-4 gap-3">
-                  {[1, 2, 3].map((i) => (
-                    <View
-                      key={i}
-                      className="flex-row items-center bg-background rounded-card p-3"
-                    >
-                      <View className="bg-border rounded-full w-8 h-8 me-3" />
-                      <View className="flex-1">
-                        <View className="bg-border rounded h-4 w-2/3 mb-1.5" />
-                        <View className="bg-border rounded h-3 w-1/4" />
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              </SamplePreview>
+                <Text className="text-caption text-text-secondary text-center">
+                  {getNextMilestoneLabel(
+                    inventory?.global.totalSessions ?? 0,
+                    t,
+                  )}
+                </Text>
+              </View>
             )}
 
             <Pressable

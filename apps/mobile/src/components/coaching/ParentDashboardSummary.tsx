@@ -12,7 +12,6 @@ import {
   isNewLearner,
   sessionsUntilFullProgress,
 } from '../../lib/progressive-disclosure';
-import { SamplePreview } from '../parent/SamplePreview';
 import { MetricInfoDot } from '../parent/MetricInfoDot';
 
 interface SubjectInfo {
@@ -456,22 +455,15 @@ export function ParentDashboardSummary({
         </View>
       ) : null}
       {!showFullSignals && !hasRestrictedConsent ? (
-        <View className="mt-2" testID="parent-dashboard-teaser">
-          <SamplePreview
-            unlockMessage={`After ${remaining} more ${
+        <View
+          className="mt-2 bg-background rounded-card px-4 py-3"
+          testID="parent-dashboard-teaser"
+        >
+          <Text className="text-caption text-text-secondary text-center">
+            {`After ${remaining} more ${
               remaining === 1 ? 'session' : 'sessions'
             }, you'll see ${childName}'s learning trends here.`}
-          >
-            <View className="flex-row items-end gap-3 h-16 px-2 pt-2">
-              {[40, 60, 35, 75, 50].map((height, i) => (
-                <View
-                  key={i}
-                  className="flex-1 rounded-t-full bg-primary"
-                  style={{ height }}
-                />
-              ))}
-            </View>
-          </SamplePreview>
+          </Text>
         </View>
       ) : null}
     </>
