@@ -177,7 +177,16 @@ describe('AccordionTopicList', () => {
 
     fireEvent.press(screen.getByTestId('accordion-topic-topic-1'));
 
-    expect(mockPush).toHaveBeenCalledWith(
+    expect(mockPush).toHaveBeenCalledTimes(2);
+    expect(mockPush).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        pathname: '/(app)/child/[profileId]',
+        params: expect.objectContaining({ profileId: 'child-1' }),
+      })
+    );
+    expect(mockPush).toHaveBeenNthCalledWith(
+      2,
       expect.objectContaining({
         pathname: '/(app)/child/[profileId]/topic/[topicId]',
         params: expect.objectContaining({
