@@ -39,7 +39,7 @@ CI on every cleanup PR. Treat them as non-negotiable.
    ```bash
    ./.archon/scripts/append-followup.sh \
        --from fix-locally \
-       --pr "$(cat $ARTIFACTS_DIR/.pr-number 2>/dev/null || echo "PR-pending")" \
+       --pr "$(grep -oE 'PR-[0-9]+' "$ARTIFACTS_DIR/work-order.md" | head -1)" \
        --severity P1 \
        --platform "$(grep -oE 'apps/(api|mobile)' <<< '<file path of fix>' | head -1 | sed 's|apps/api|API|;s|apps/mobile|Mobile-iOS|' || echo 'API')" \
        --title "Add test coverage for <fix-target>" \
