@@ -5,10 +5,12 @@ import { platformAlert } from '../lib/platform-alert';
 import { usePostSessionNotificationAsk } from './use-post-session-notification-ask';
 
 jest.mock('../lib/platform-alert', () => ({
+  // gc1-allow: native alert boundary.
   platformAlert: jest.fn(),
 }));
 
 jest.mock('../lib/secure-storage', () => ({
+  // gc1-allow: native persistence boundary.
   getItemAsync: jest.fn(),
   setItemAsync: jest.fn(),
   deleteItemAsync: jest.fn(),
@@ -16,6 +18,7 @@ jest.mock('../lib/secure-storage', () => ({
 }));
 
 jest.mock('../lib/sentry', () => ({
+  // gc1-allow: external telemetry boundary.
   Sentry: { addBreadcrumb: jest.fn(), captureException: jest.fn() },
 }));
 
