@@ -34,16 +34,18 @@ import {
   assertChildDashboardDataVisible,
 } from '../services/dashboard';
 import { listPendingNotices } from '../services/notices';
-import { getLearningProfile } from '../services/learner-profile';
 import {
   listWeeklyReportsForParentChild,
   getWeeklyReportForParentChild,
   markWeeklyReportViewed,
 } from '../services/weekly-report';
-import { buildCuratedMemoryViewForProfile } from '../services/curated-memory';
 import { assertParentAccess } from '../services/family-access';
 import { notFound } from '../errors';
 import { isMemoryFactsReadEnabled } from '../config';
+import {
+  getMemoryProjection,
+  toCuratedView,
+} from '../services/memory/projection';
 
 type DashboardRouteEnv = {
   Bindings: {
@@ -73,7 +75,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
         children,
         pendingNotices,
         demoMode: false,
-      })
+      }),
     );
   })
 
@@ -105,7 +107,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const inventory = await getChildInventory(
       db,
       parentProfileId,
-      childProfileId
+      childProfileId,
     );
     return c.json(childInventoryResponseSchema.parse({ inventory }));
   })
@@ -126,10 +128,10 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
         db,
         parentProfileId,
         childProfileId,
-        query
+        query,
       );
       return c.json(childProgressHistoryResponseSchema.parse({ history }));
-    }
+    },
   )
 
   // Get child's subject detail
@@ -146,7 +148,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       db,
       parentProfileId,
       childProfileId,
-      subjectId
+      subjectId,
     );
     return c.json(childSubjectTopicsResponseSchema.parse({ topics }));
   })
@@ -163,7 +165,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const sessions = await getChildSessions(
       db,
       parentProfileId,
-      childProfileId
+      childProfileId,
     );
     return c.json(childSessionsResponseSchema.parse({ sessions }));
   })
@@ -184,7 +186,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       db,
       parentProfileId,
       childProfileId,
-      sessionId
+      sessionId,
     );
     if (!session) {
       return notFound(c, 'Session not found');
@@ -200,9 +202,14 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
     await assertParentAccess(db, parentProfileId, childProfileId);
     await assertChildDashboardDataVisible(db, childProfileId);
-    const profile = await getLearningProfile(db, childProfileId);
 
-    if (!profile) {
+    const projection = await getMemoryProjection(db, childProfileId, {
+      memoryFactsReadEnabled: isMemoryFactsReadEnabled(
+        c.env.MEMORY_FACTS_READ_ENABLED,
+      ),
+    });
+
+    if (!projection) {
       // [F-PV-09] No profile = no consent. Both flags off.
       return c.json(
         childMemoryResponseSchema.parse({
@@ -216,21 +223,13 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
               accommodationMode: null,
             },
           },
-        })
+        }),
       );
     }
 
-    const memory = await buildCuratedMemoryViewForProfile(
-      db,
-      childProfileId,
-      profile,
-      {
-        memoryFactsReadEnabled: isMemoryFactsReadEnabled(
-          c.env.MEMORY_FACTS_READ_ENABLED
-        ),
-      }
+    return c.json(
+      childMemoryResponseSchema.parse({ memory: toCuratedView(projection) }),
     );
-    return c.json(childMemoryResponseSchema.parse({ memory }));
   })
 
   .get('/dashboard/children/:profileId/reports', async (c) => {
@@ -258,7 +257,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       db,
       parentProfileId,
       childProfileId,
-      reportId
+      reportId,
     );
     if (!report) {
       return notFound(c, 'Report not found');
@@ -292,7 +291,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     const reports = await listWeeklyReportsForParentChild(
       db,
       parentProfileId,
-      childProfileId
+      childProfileId,
     );
     return c.json(weeklyReportsResponseSchema.parse({ reports }));
   })
@@ -311,7 +310,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       db,
       parentProfileId,
       childProfileId,
-      reportId
+      reportId,
     );
     if (!report) {
       return notFound(c, 'Report not found');
@@ -335,10 +334,10 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
         db,
         parentProfileId,
         childProfileId,
-        reportId
+        reportId,
       );
       return c.json(reportViewedResponseSchema.parse({ viewed: true }));
-    }
+    },
   )
 
   // Get demo mode fixture data
@@ -399,6 +398,6 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
             totalXp: 280,
           },
         ],
-      })
+      }),
     );
   });
