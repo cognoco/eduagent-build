@@ -30,6 +30,7 @@ interface LibrarySearchResultsProps {
     subjectId: string,
     topicId: string | null,
   ) => void;
+  onClear: () => void;
   onRetry: () => void;
 }
 
@@ -288,6 +289,7 @@ export function LibrarySearchResults({
   onTopicPress,
   onNotePress,
   onSessionPress,
+  onClear,
   onRetry,
 }: LibrarySearchResultsProps): React.ReactElement {
   const { t } = useTranslation();
@@ -333,9 +335,10 @@ export function LibrarySearchResults({
     return (
       <View
         style={{ paddingHorizontal: 16, paddingVertical: 20 }}
-        testID="search-results-empty"
+        testID="library-search-empty"
       >
         <Text
+          testID="search-results-empty"
           style={{
             color: colors.textSecondary,
             fontSize: 14,
@@ -344,6 +347,30 @@ export function LibrarySearchResults({
         >
           {t('library.search.noResults', { query })}
         </Text>
+        <Pressable
+          testID="library-search-clear-results"
+          onPress={onClear}
+          accessibilityRole="button"
+          accessibilityLabel={t('library.search.clear')}
+          style={{
+            alignSelf: 'center',
+            backgroundColor: colors.surfaceElevated,
+            borderRadius: 8,
+            marginTop: 12,
+            paddingHorizontal: 16,
+            paddingVertical: 8,
+          }}
+        >
+          <Text
+            style={{
+              color: colors.textPrimary,
+              fontSize: 14,
+              fontWeight: '700',
+            }}
+          >
+            {t('library.search.clear')}
+          </Text>
+        </Pressable>
       </View>
     );
   }

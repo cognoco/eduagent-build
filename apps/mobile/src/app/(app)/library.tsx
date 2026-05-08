@@ -599,6 +599,7 @@ export default function LibraryScreen() {
                 onTopicPress={handleTopicPress}
                 onNotePress={handleNotePress}
                 onSessionPress={handleSessionPress}
+                onClear={() => setSearchQuery('')}
                 onRetry={() => void searchResult.refetch()}
               />
             )}

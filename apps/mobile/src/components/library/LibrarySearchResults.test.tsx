@@ -90,6 +90,7 @@ function renderResults(
     onTopicPress: jest.fn(),
     onNotePress: jest.fn(),
     onSessionPress: jest.fn(),
+    onClear: jest.fn(),
     onRetry: jest.fn(),
     ...overrides,
   };
@@ -180,7 +181,20 @@ describe('LibrarySearchResults', () => {
     });
 
     screen.getByTestId('search-results-empty');
+    screen.getByTestId('library-search-empty');
     screen.getByText('No results for "zzzz"');
+  });
+
+  it('clears search from the empty state', () => {
+    const onClear = jest.fn();
+    renderResults({
+      data: { subjects: [], books: [], topics: [], notes: [], sessions: [] },
+      enrichedSubjects: [],
+      onClear,
+    });
+
+    fireEvent.press(screen.getByTestId('library-search-clear-results'));
+    expect(onClear).toHaveBeenCalledTimes(1);
   });
 
   it('renders the error state and retries', () => {
