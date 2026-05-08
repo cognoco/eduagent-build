@@ -8,6 +8,10 @@ import type {
 import { useThemeColors } from '../../../lib/theme';
 import { useParentProxy } from '../../../hooks/use-parent-proxy';
 
+export const unstable_settings = {
+  initialRouteName: 'index',
+};
+
 interface QuizFlowState {
   activityType: QuizActivityType | null;
   subjectId: string | null;
