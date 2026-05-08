@@ -17,7 +17,9 @@ Read these files (they were written by the extract step):
 
 1. `$ARTIFACTS_DIR/work-order.md` — the full work order for this PR
 2. `$ARTIFACTS_DIR/progress.md` — which phases are done (may not exist on first iteration)
-3. `CLAUDE.md` — project conventions (CRITICAL — follow all rules)
+
+CLAUDE.md is already loaded into your system prompt — do not re-read it. Its
+project conventions are non-negotiable; follow every rule.
 
 From the work order, extract:
 - The list of phases with their descriptions
@@ -25,12 +27,59 @@ From the work order, extract:
 - Verification commands from the Notes column
 - Any resolved decisions referenced by ID (D-XXX)
 
-## Step 2: Select Next Phase
+## Step 2: Select Next Phase (with Circuit Breaker)
 
-Cross-reference `work-order.md` phases against `progress.md`.
-Pick the FIRST phase not yet marked COMPLETED.
+### 2.1 Load Attempt Counters
 
-**If ALL phases are complete** → skip to Step 6.
+Read (or initialize) `$ARTIFACTS_DIR/phase-attempts.json` — a `{ "<phase-id>": <count> }`
+map of consecutive-failure counters. Created lazily by this step on first run.
+
+```bash
+attempts_file="$ARTIFACTS_DIR/phase-attempts.json"
+if [[ ! -f "$attempts_file" ]]; then echo '{}' > "$attempts_file"; fi
+```
+
+### 2.2 Circuit Breaker — 3 Strikes
+
+Cross-reference `work-order.md` phases against `progress.md`. For each phase
+NOT yet marked COMPLETED, check `phase-attempts.json`:
+
+- If `attempts[phase_id] < 3` → eligible.
+- If `attempts[phase_id] >= 3` → **blocked**. Skip it. Append to
+  `$ARTIFACTS_DIR/blocked.md`:
+
+  ```
+  ## BLOCKED:<phase-id>
+  Date: <ISO>
+  Attempts: <count>
+  Last error: <one-line summary from this iteration's last failure, if known>
+  Cause: hit 3-strike circuit breaker — phase repeatedly failed verification across iterations.
+  Files-claimed (per work order): <list>
+  ```
+
+  Then file a P1 follow-up via the filer (don't block on its exit code):
+
+  ```bash
+  ./.archon/scripts/append-followup.sh \
+      --from cleanup-implement-phase \
+      --pr "$(rg -oP 'PR-\d+' "$ARTIFACTS_DIR/work-order.md" | head -1)" \
+      --severity P1 \
+      --platform "$(determine-from-files-claimed)" \
+      --title "BLOCKED phase <phase-id>: <short description>" \
+      --body "Cleanup PR phase failed verification 3 consecutive times. See blocked.md and progress.md for last-known error. Manual investigation required." \
+      || echo "Follow-up filer failed — capturing locally only."
+  ```
+
+### 2.3 Pick Next Phase
+
+Pick the FIRST phase that is (a) not COMPLETED in `progress.md` and (b) not BLOCKED.
+
+**Termination conditions:**
+- All phases COMPLETED → skip to Step 6 (emit `ALL_PHASES_COMPLETE`).
+- All non-completed phases BLOCKED → skip to Step 6 anyway. The summary node
+  will surface `blocked.md` so a human knows the work order didn't fully land.
+- Otherwise: increment `attempts[<picked-phase-id>]` in `phase-attempts.json` BEFORE
+  starting Step 3, so a crash mid-implement still counts as an attempt.
 
 ## Step 3: Implement the Phase
 
@@ -132,10 +181,30 @@ Commit: <short hash>
 ---
 ```
 
+### 5.6 Reset Attempt Counter
+
+The phase succeeded. Reset its entry in `phase-attempts.json` so a re-run of the
+workflow on a re-opened branch starts fresh:
+
+```bash
+jq --arg pid "<phase-id>" 'del(.[$pid])' "$ARTIFACTS_DIR/phase-attempts.json" \
+    > "$ARTIFACTS_DIR/phase-attempts.json.tmp" \
+    && mv "$ARTIFACTS_DIR/phase-attempts.json.tmp" "$ARTIFACTS_DIR/phase-attempts.json"
+```
+
 ## Step 6: Check Completion
 
-If ALL phases from the work order are now in progress.md as COMPLETED:
-- Output: <promise>ALL_PHASES_COMPLETE</promise>
+If ALL phases from the work order are now either:
+- COMPLETED in `progress.md`, OR
+- BLOCKED (recorded in `blocked.md` after 3 failed attempts)
 
-If phases remain, report which phase you just completed and end normally.
-The loop engine will start a fresh iteration for the next phase.
+…then output: <promise>ALL_PHASES_COMPLETE</promise>
+
+If unblocked, non-completed phases remain, report which phase you just completed
+(or which one is being deferred to the next iteration) and end normally. The
+loop engine will start a fresh iteration for the next phase.
+
+If the iteration ended without committing (e.g. validation failed at Step 4 after
+3 in-iteration attempts), DO NOT emit `ALL_PHASES_COMPLETE` — exit normally so
+the loop runs again. The attempt counter incremented in Step 2.3 ensures the
+3-strike breaker eventually triggers across iterations.

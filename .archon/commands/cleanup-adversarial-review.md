@@ -46,13 +46,11 @@ had gaps.
 gh pr diff $(cat $ARTIFACTS_DIR/.pr-number) 2>/dev/null || git diff origin/main...HEAD
 ```
 
-### 1.4 Read CLAUDE.md
+### 1.4 Codebase Rules
 
-```bash
-cat CLAUDE.md
-```
-
-These are the project's non-negotiable rules. Violations are CRITICAL findings.
+CLAUDE.md is already loaded into your system prompt — do not re-read it. Treat its
+non-negotiable rules and Code Quality Guards as CRITICAL: any violation in the diff
+is a CRITICAL finding.
 
 ---
 

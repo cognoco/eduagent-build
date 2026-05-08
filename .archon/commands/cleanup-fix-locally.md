@@ -28,6 +28,50 @@ Read the consolidated review artifact and implement all CRITICAL and HIGH priori
 
 ---
 
+## Constraints — Read Before Editing
+
+These rules exist because past fix-locally runs introduced regressions that broke
+CI on every cleanup PR. Treat them as non-negotiable.
+
+1. **No new test files.** If a HIGH finding requests a test that requires creating a
+   NEW `*.test.ts` / `*.test.tsx` file (rather than appending to an existing
+   sibling), DO NOT create it here. File the gap as a P1 follow-up via:
+   ```bash
+   ./.archon/scripts/append-followup.sh \
+       --from fix-locally \
+       --pr "$(cat $ARTIFACTS_DIR/.pr-number 2>/dev/null || echo "PR-pending")" \
+       --severity P1 \
+       --platform "$(grep -oE 'apps/(api|mobile)' <<< '<file path of fix>' | head -1 | sed 's|apps/api|API|;s|apps/mobile|Mobile-iOS|' || echo 'API')" \
+       --title "Add test coverage for <fix-target>" \
+       --body "Surfaced by cleanup PR. <details>"
+   ```
+   Reason: new test files routinely import siblings via `jest.mock('./...')`,
+   tripping the GC1 ratchet (see #2). Adding test coverage well to a brand-new
+   surface is a separate, higher-judgment task than shipping the bugfix.
+
+2. **No new internal `jest.mock('./...')` or `jest.mock('../...')`.** GC1 ratchet
+   in CI fails any PR that adds one. To stub a few named exports of an internal
+   module, use `jest.requireActual()` with targeted overrides. Canonical pattern:
+   `apps/api/src/inngest/functions/interview-persist-curriculum.integration.test.ts`.
+   External-boundary mocks (LLM via `routeAndCall`, push, email, Stripe, Clerk
+   JWKS) use bare specifiers and are unaffected. **Never** silence the ratchet
+   with `// gc1-allow:` here — fix-locally is the wrong place to grant that
+   exception; if it's truly justified, the human reviewer can grant it post-hoc.
+
+3. **Skip LOW-only findings.** A LOW finding gets fixed only if it is paired with
+   a HIGH on the same file/concern (the HIGH justifies touching the file). Standalone
+   LOW findings are deferred via `append-followup.sh` with `--severity P3` so the
+   PR diff stays tight. Note: stylistic CLAUDE.md compliance hits (e.g. comment
+   policy) commonly arrive as LOW — defer them.
+
+4. **Re-validate gate before committing.** After applying fixes (Phase 3), the
+   final check before the commit is to re-run the same validation logic that
+   would gate the PR — including the GC1 ratchet from
+   `.archon/commands/cleanup-validate.md` Phase 2.5. If it fails, treat the
+   regression as your bug and fix it; do NOT commit a known-broken state.
+
+---
+
 ## Phase 1: LOAD - Get Fix List
 
 (No need to identify or check out the PR branch — we are already on the worktree branch.)
@@ -89,9 +133,13 @@ Same process as CRITICAL.
 
 If the test-coverage agent identified missing tests for fixed code:
 
-1. **Create/update test file**
-2. **Add tests for the fix**
-3. **Verify tests pass**: project-appropriate test command on the affected file
+1. **Determine target file.** If a sibling test file already exists for the
+   module being fixed, append cases to it. If NO test file exists, do NOT create
+   one — defer per Constraint #1 above (file the gap via `append-followup.sh`).
+2. **Add tests for the fix** (only when appending to an existing file).
+3. **No internal `jest.mock('./...')`.** Per Constraint #2, use
+   `jest.requireActual()` with targeted overrides for any internal stubbing.
+4. **Verify tests pass**: project-appropriate test command on the affected file.
 
 ### 2.4 Handle Unfixable Issues
 
@@ -129,11 +177,39 @@ Run the project's test command. All tests must pass. If new tests fail, fix them
 
 Run the project's build command. Must succeed.
 
+### 3.5 CI-Parity Ratchet (GC1)
+
+This is the gate that catches regressions you may have introduced while applying
+review fixes. Mirrors the CI step in `.github/workflows/ci.yml` ("GC1 — no new
+internal jest.mock"); also documented in `.archon/commands/cleanup-validate.md`
+Phase 2.5.
+
+```bash
+BASE_REF="${BASE_REF:-main}"
+violations=$(git diff "origin/${BASE_REF}...HEAD" -- '*.test.ts' '*.test.tsx' \
+    | grep -E '^\+[^+]' \
+    | grep -E "jest\.mock\(['\"\`]\.\.?/" \
+    | grep -iv 'gc1-allow' \
+    || true)
+if [ -n "$violations" ]; then
+    echo "GC1 VIOLATION introduced by fix-locally:" >&2
+    echo "$violations" >&2
+    exit 1
+fi
+echo "GC1 ratchet: clean."
+```
+
+If this fails, the fix you applied is the bug. Rewrite using `jest.requireActual()`
+with targeted overrides, or remove the offending test entirely and file the
+coverage gap via `append-followup.sh`. NEVER commit a state where this fails;
+NEVER add `// gc1-allow:` to silence it.
+
 **PHASE_3_CHECKPOINT:**
 - [ ] Type check passes
 - [ ] Lint passes
 - [ ] All tests pass
 - [ ] Build succeeds
+- [ ] GC1 ratchet clean
 
 ---
 

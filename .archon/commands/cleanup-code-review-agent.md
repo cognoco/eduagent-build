@@ -41,13 +41,10 @@ git diff origin/main...HEAD
 
 (No GitHub PR exists yet; reviews run on the local worktree branch.)
 
-### 1.3 Read CLAUDE.md
+### 1.3 Codebase Rules
 
-```bash
-cat CLAUDE.md
-```
-
-Note all coding standards, patterns, and rules.
+CLAUDE.md is already loaded into your system prompt — do not re-read it.
+Reference its coding standards, patterns, and rules when assessing the diff.
 
 **PHASE_1_CHECKPOINT:**
 - [ ] Scope loaded
