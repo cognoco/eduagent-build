@@ -72,7 +72,6 @@ function renderChildCards(
     retentionTrend?: string;
     totalSessions?: number;
     currentStreak: number;
-    longestStreak: number;
     totalXp: number;
     consentStatus: string | null;
     subjects: { name: string; retentionStatus: string }[];
