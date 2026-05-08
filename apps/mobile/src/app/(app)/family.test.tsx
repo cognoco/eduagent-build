@@ -8,7 +8,7 @@ const mockUseActiveProfileRole = jest.fn();
 
 jest.mock(
   'react-i18next',
-  () => require('../../test-utils/mock-i18n').i18nMock
+  () => require('../../test-utils/mock-i18n').i18nMock,
 );
 
 jest.mock('expo-router', () => ({
@@ -39,7 +39,8 @@ jest.mock('../../hooks/use-dashboard', () => ({
   }),
 }));
 
-jest.mock('../../hooks/use-active-profile-role', () => ({ // gc1-allow: Family route redirect depends on active role; mocking the hook isolates route-guard behavior from auth state.
+jest.mock('../../hooks/use-active-profile-role', () => ({
+  // gc1-allow: Family route redirect depends on active role; mocking the hook isolates route-guard behavior from auth state.
   useActiveProfileRole: () => mockUseActiveProfileRole(),
 }));
 
@@ -54,7 +55,8 @@ jest.mock('../../components/family/FamilyOrientationCue', () => ({
   },
 }));
 
-jest.mock('../../components/family/WithdrawalCountdownBanner', () => ({ // gc1-allow: FamilyScreen only verifies the banner slot is present; banner behavior is covered in its own focused test.
+jest.mock('../../components/family/WithdrawalCountdownBanner', () => ({
+  // gc1-allow: FamilyScreen only verifies the banner slot is present; banner behavior is covered in its own focused test.
   WithdrawalCountdownBanner: () => {
     const { View } = require('react-native');
     return <View testID="withdrawal-countdown-banner" />;
@@ -77,13 +79,13 @@ describe('FamilyScreen', () => {
     render(<FamilyScreen />);
 
     expect(mockReplace).toHaveBeenCalledWith('/');
-    expect(screen.queryByTestId('family-back')).toBeNull();
+    expect(screen.queryByTestId('dashboard-back')).toBeNull();
   });
 
   it('back button uses neutral "Back" accessibility label', () => {
     render(<FamilyScreen />);
 
-    const back = screen.getByTestId('family-back');
+    const back = screen.getByTestId('dashboard-back');
     expect(back.props.accessibilityLabel).toBe('Back');
   });
 
@@ -91,7 +93,7 @@ describe('FamilyScreen', () => {
     mockSearchParams = { returnTo: 'home' };
     render(<FamilyScreen />);
 
-    fireEvent.press(screen.getByTestId('family-back'));
+    fireEvent.press(screen.getByTestId('dashboard-back'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
   });
 
@@ -99,14 +101,14 @@ describe('FamilyScreen', () => {
     mockSearchParams = { returnTo: 'more' };
     render(<FamilyScreen />);
 
-    fireEvent.press(screen.getByTestId('family-back'));
+    fireEvent.press(screen.getByTestId('dashboard-back'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)/more');
   });
 
   it('default fallback is /home when returnTo is missing', () => {
     render(<FamilyScreen />);
 
-    fireEvent.press(screen.getByTestId('family-back'));
+    fireEvent.press(screen.getByTestId('dashboard-back'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
   });
 
@@ -114,7 +116,7 @@ describe('FamilyScreen', () => {
     mockCanGoBack.mockReturnValue(true);
     render(<FamilyScreen />);
 
-    fireEvent.press(screen.getByTestId('family-back'));
+    fireEvent.press(screen.getByTestId('dashboard-back'));
     expect(mockBack).toHaveBeenCalled();
     expect(mockReplace).not.toHaveBeenCalled();
   });

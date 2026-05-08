@@ -112,6 +112,7 @@ jest.mock('../services/llm', () => ({
 
 import { app } from '../index';
 import { routeAndCall } from '../services/llm';
+import { UpstreamLlmError } from '../errors';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 
 const TEST_ENV = {
@@ -245,7 +246,7 @@ describe('Quiz routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ activityType: 'capitals' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -271,7 +272,7 @@ describe('Quiz routes', () => {
           headers: makeAuthHeaders(),
           body: JSON.stringify({ activityType: 'capitals' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(403);
@@ -285,7 +286,7 @@ describe('Quiz routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ activityType: 'invalid' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -299,7 +300,7 @@ describe('Quiz routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ activityType: 'vocabulary' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -316,13 +317,35 @@ describe('Quiz routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ activityType: 'capitals' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(402);
       const body = await res.json();
       expect(body.code).toBe('QUOTA_EXCEEDED');
       expect(routeAndCall).not.toHaveBeenCalled();
+    });
+
+    // [BUG-990] UpstreamLlmError from quiz generation must propagate as 502
+    // (UPSTREAM_ERROR) so clients know to retry, not show a generic 500 error.
+    it('returns 502 UPSTREAM_ERROR when LLM fails during quiz generation [BUG-990]', async () => {
+      (routeAndCall as jest.Mock).mockRejectedValueOnce(
+        new UpstreamLlmError('Quiz LLM returned invalid structured output'),
+      );
+
+      const res = await app.request(
+        '/v1/quiz/rounds',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ activityType: 'capitals' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(502);
+      const body = await res.json();
+      expect(body.code).toBe('UPSTREAM_ERROR');
     });
 
     it('generates a vocabulary round with a valid language subject', async () => {
@@ -444,7 +467,7 @@ describe('Quiz routes', () => {
             subjectId: '01933b3c-0000-7000-8000-000000000111',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -476,7 +499,7 @@ describe('Quiz routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ activityType: 'capitals' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -495,7 +518,7 @@ describe('Quiz routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ activityType: 'bogus' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -506,7 +529,7 @@ describe('Quiz routes', () => {
     it('generates a guess_who round with topic titles', async () => {
       // Mock the select().from().innerJoin()... chain used by getGuessWhoRoundContext
       const { profiles, topUpCredits } = jest.requireActual(
-        '@eduagent/database'
+        '@eduagent/database',
       ) as typeof import('@eduagent/database');
       const chainResult = [
         { title: 'Albert Einstein' },
@@ -598,7 +621,7 @@ describe('Quiz routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ activityType: 'guess_who' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -632,7 +655,7 @@ describe('Quiz routes', () => {
       const res = await app.request(
         '/v1/quiz/rounds/round-belonging-to-profile-b',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(404);
@@ -646,7 +669,7 @@ describe('Quiz routes', () => {
       const res = await app.request(
         '/v1/quiz/rounds/round-1',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -662,7 +685,7 @@ describe('Quiz routes', () => {
       const res = await app.request(
         '/v1/quiz/rounds/round-completed',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -692,7 +715,7 @@ describe('Quiz routes', () => {
       const res = await app.request(
         '/v1/quiz/rounds/round-1',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -713,7 +736,7 @@ describe('Quiz routes', () => {
       const completedRes = await app.request(
         '/v1/quiz/rounds/round-completed',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
       const completedBody = await completedRes.json();
       expect(completedBody.activityLabel).toBe('Capitals');
@@ -725,7 +748,7 @@ describe('Quiz routes', () => {
       const activeRes = await app.request(
         '/v1/quiz/rounds/round-1',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
       const activeBody = await activeRes.json();
       expect(activeBody.activityLabel).toBe('Capitals');
@@ -745,7 +768,7 @@ describe('Quiz routes', () => {
       const res = await app.request(
         '/v1/quiz/rounds/round-1',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -791,7 +814,7 @@ describe('Quiz routes', () => {
             ],
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -815,7 +838,7 @@ describe('Quiz routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ results: [] }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -843,7 +866,7 @@ describe('Quiz routes', () => {
             ],
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(404);
@@ -870,7 +893,7 @@ describe('Quiz routes', () => {
             ],
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(409);
@@ -905,7 +928,7 @@ describe('Quiz routes', () => {
             ],
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(409);
@@ -930,7 +953,7 @@ describe('Quiz routes', () => {
       const res = await app.request(
         '/v1/quiz/rounds/recent',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -951,7 +974,7 @@ describe('Quiz routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ activityType: 'capitals' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -969,7 +992,7 @@ describe('Quiz routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ activityType: 'not_a_real_activity' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -1012,7 +1035,7 @@ describe('Quiz routes', () => {
       const res = await app.request(
         '/v1/quiz/stats',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -1063,16 +1086,16 @@ describe('Quiz routes', () => {
       const res = await app.request(
         '/v1/quiz/stats',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
       const body = (await res.json()) as Array<Record<string, unknown>>;
       const itRow = body.find(
-        (r) => r.activityType === 'vocabulary' && r.languageCode === 'it'
+        (r) => r.activityType === 'vocabulary' && r.languageCode === 'it',
       );
       const esRow = body.find(
-        (r) => r.activityType === 'vocabulary' && r.languageCode === 'es'
+        (r) => r.activityType === 'vocabulary' && r.languageCode === 'es',
       );
       expect(itRow).toMatchObject({ roundsPlayed: 3, bestScore: 5 });
       expect(esRow).toMatchObject({ roundsPlayed: 1, bestScore: 4 });
@@ -1087,7 +1110,7 @@ describe('Quiz routes', () => {
         where: jest.fn().mockReturnValue(
           Object.assign(Promise.resolve([]), {
             groupBy: jest.fn().mockReturnValue(Promise.resolve([])),
-          })
+          }),
         ),
       };
       (mockDb as any).select = jest
@@ -1097,7 +1120,7 @@ describe('Quiz routes', () => {
       const res = await app.request(
         '/v1/quiz/stats',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);

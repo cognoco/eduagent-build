@@ -106,19 +106,19 @@ describe('summaryReconciliationCron', () => {
           createCount: 1,
           regenerateCount: 1,
           recapCount: 1,
-        })
+        }),
       );
       expect(step.sendEvent).toHaveBeenCalledWith(
         'fan-out-create-summaries',
         expect.arrayContaining([
           expect.objectContaining({ name: 'app/session.summary.create' }),
-        ])
+        ]),
       );
       expect(step.sendEvent).toHaveBeenCalledWith(
         'fan-out-regenerate-summaries',
         expect.arrayContaining([
           expect.objectContaining({ name: 'app/session.summary.regenerate' }),
-        ])
+        ]),
       );
       expect(step.sendEvent).toHaveBeenCalledWith(
         'fan-out-regenerate-recaps',
@@ -126,20 +126,21 @@ describe('summaryReconciliationCron', () => {
           expect.objectContaining({
             name: 'app/session.learner-recap.regenerate',
           }),
-        ])
+        ]),
       );
 
       const sentNames = (step.sendEvent as jest.Mock).mock.calls.flatMap(
         ([, payload]: [string, unknown]) =>
           Array.isArray(payload)
             ? payload.map((event) => (event as { name: string }).name)
-            : [(payload as { name: string }).name]
+            : [(payload as { name: string }).name],
       );
       expect(sentNames).not.toContain('app/session.completed');
       expect(sentNames).toEqual(
-        expect.arrayContaining(['app/summary.reconciliation.scanned'])
+        expect.arrayContaining(['app/summary.reconciliation.scanned']),
       );
-      expect(sentNames).not.toContain('app/summary.reconciliation.requeued');
+      // [BUG-994] When totalCount > 0, the requeued event IS emitted for SLO alerting.
+      expect(sentNames).toContain('app/summary.reconciliation.requeued');
     });
 
     it('still emits reconciliation metrics when every queue is empty', async () => {
@@ -154,14 +155,24 @@ describe('summaryReconciliationCron', () => {
           createCount: 0,
           regenerateCount: 0,
           recapCount: 0,
-        })
+        }),
       );
       expect(step.sendEvent).toHaveBeenCalledWith(
         'notify-summary-reconciliation-scanned',
         expect.objectContaining({
           name: 'app/summary.reconciliation.scanned',
           data: expect.objectContaining({ totalCount: 0 }),
-        })
+        }),
+      );
+      // [BUG-994] No requeued event when nothing was requeued (avoids alert noise).
+      const emptySentNames = (step.sendEvent as jest.Mock).mock.calls.flatMap(
+        ([, payload]: [string, unknown]) =>
+          Array.isArray(payload)
+            ? payload.map((e) => (e as { name: string }).name)
+            : [(payload as { name: string }).name],
+      );
+      expect(emptySentNames).not.toContain(
+        'app/summary.reconciliation.requeued',
       );
     });
   });
@@ -235,7 +246,7 @@ describe('summaryReconciliationCron', () => {
         const dates = extractDatesFromSql(andObj);
         // At least one Date in this WHERE must equal exactly sixHoursAgo
         const hasSixHourBound = dates.some(
-          (d) => d.getTime() === EXPECTED_UPPER_BOUND_MS
+          (d) => d.getTime() === EXPECTED_UPPER_BOUND_MS,
         );
         expect(hasSixHourBound).toBe(true);
       }

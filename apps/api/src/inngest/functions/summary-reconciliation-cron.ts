@@ -38,20 +38,20 @@ export const summaryReconciliationCron = inngest.createFunction(
             sessionSummaries,
             and(
               eq(sessionSummaries.sessionId, learningSessions.id),
-              eq(sessionSummaries.profileId, learningSessions.profileId)
-            )
+              eq(sessionSummaries.profileId, learningSessions.profileId),
+            ),
           )
           .where(
             and(
               isNotNull(learningSessions.endedAt),
               gte(learningSessions.endedAt, since),
               lt(learningSessions.endedAt, sixHoursAgo),
-              isNull(sessionSummaries.id)
-            )
+              isNull(sessionSummaries.id),
+            ),
           )
           .orderBy(asc(learningSessions.endedAt))
           .limit(CREATE_LIMIT);
-      }
+      },
     );
 
     const missingLlmSummaries = await step.run(
@@ -71,8 +71,8 @@ export const summaryReconciliationCron = inngest.createFunction(
             learningSessions,
             and(
               eq(learningSessions.id, sessionSummaries.sessionId),
-              eq(learningSessions.profileId, sessionSummaries.profileId)
-            )
+              eq(learningSessions.profileId, sessionSummaries.profileId),
+            ),
           )
           .where(
             and(
@@ -81,14 +81,14 @@ export const summaryReconciliationCron = inngest.createFunction(
               lt(learningSessions.endedAt, sixHoursAgo),
               or(
                 isNull(sessionSummaries.summaryGeneratedAt),
-                isNull(sessionSummaries.llmSummary)
+                isNull(sessionSummaries.llmSummary),
               ),
-              isNull(sessionSummaries.purgedAt)
-            )
+              isNull(sessionSummaries.purgedAt),
+            ),
           )
           .orderBy(asc(learningSessions.endedAt))
           .limit(REGENERATE_LIMIT);
-      }
+      },
     );
 
     const recapSince = new Date();
@@ -110,8 +110,8 @@ export const summaryReconciliationCron = inngest.createFunction(
             learningSessions,
             and(
               eq(learningSessions.id, sessionSummaries.sessionId),
-              eq(learningSessions.profileId, sessionSummaries.profileId)
-            )
+              eq(learningSessions.profileId, sessionSummaries.profileId),
+            ),
           )
           .where(
             and(
@@ -120,12 +120,12 @@ export const summaryReconciliationCron = inngest.createFunction(
               lt(learningSessions.endedAt, sixHoursAgo),
               isNotNull(sessionSummaries.summaryGeneratedAt),
               isNull(sessionSummaries.learnerRecap),
-              isNull(sessionSummaries.purgedAt)
-            )
+              isNull(sessionSummaries.purgedAt),
+            ),
           )
           .orderBy(asc(learningSessions.endedAt))
           .limit(RECAP_LIMIT);
-      }
+      },
     );
 
     const timestamp = new Date().toISOString();
@@ -140,7 +140,7 @@ export const summaryReconciliationCron = inngest.createFunction(
         missingSummaries.map((row) => ({
           name: 'app/session.summary.create' as const,
           data: { ...row, timestamp },
-        }))
+        })),
       );
     }
 
@@ -150,7 +150,7 @@ export const summaryReconciliationCron = inngest.createFunction(
         missingLlmSummaries.map((row) => ({
           name: 'app/session.summary.regenerate' as const,
           data: { ...row, timestamp },
-        }))
+        })),
       );
     }
 
@@ -160,7 +160,7 @@ export const summaryReconciliationCron = inngest.createFunction(
         missingRecaps.map((row) => ({
           name: 'app/session.learner-recap.regenerate' as const,
           data: { ...row, timestamp },
-        }))
+        })),
       );
     }
 
@@ -175,11 +175,26 @@ export const summaryReconciliationCron = inngest.createFunction(
       },
     });
 
+    // [BUG-994] Emit requeued count for SLO alerting (warn ≥1, page ≥10).
+    // Separate from `scanned` so alert rules can target this event exclusively.
+    if (totalCount > 0) {
+      await step.sendEvent('notify-summary-reconciliation-requeued', {
+        name: 'app/summary.reconciliation.requeued',
+        data: {
+          queryARequeued: missingSummaries.length,
+          queryBRequeued: missingLlmSummaries.length,
+          queryCRequeued: missingRecaps.length,
+          totalRequeued: totalCount,
+          timestamp,
+        },
+      });
+    }
+
     return {
       status: 'completed',
       createCount: missingSummaries.length,
       regenerateCount: missingLlmSummaries.length,
       recapCount: missingRecaps.length,
     };
-  }
+  },
 );
