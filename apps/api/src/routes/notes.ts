@@ -69,7 +69,7 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
         }
         throw error;
       }
-    }
+    },
   )
   // GET /subjects/:subjectId/topics/:topicId/note
   .get(
@@ -89,7 +89,7 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
         }
         throw error;
       }
-    }
+    },
   )
   // GET /notes/topic-ids — all topic IDs with notes for this profile
   .get('/notes/topic-ids', async (c) => {
@@ -115,7 +115,7 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
         if (error instanceof NotFoundError) return notFound(c, error.message);
         throw error;
       }
-    }
+    },
   )
   // POST /subjects/:subjectId/topics/:topicId/notes
   .post(
@@ -138,14 +138,14 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
           subjectId,
           topicId,
           content,
-          sessionId
+          sessionId,
         );
         return c.json(noteMutationResponseSchema.parse({ note }), 201);
       } catch (error) {
         if (error instanceof NotFoundError) return notFound(c, error.message);
         throw error;
       }
-    }
+    },
   )
   // PATCH /notes/:noteId
   .patch(
@@ -167,35 +167,7 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
         if (error instanceof NotFoundError) return notFound(c, error.message);
         throw error;
       }
-    }
-  )
-  // DELETE /subjects/:subjectId/topics/:topicId/note
-  // Back-compat endpoint for older mobile builds that delete the latest note
-  // through the legacy single-note URL.
-  .delete(
-    '/subjects/:subjectId/topics/:topicId/note',
-    zValidator('param', topicParamSchema),
-    async (c) => {
-      // [BUG-973 / CCR-PR145-C-1] Block writes from proxy sessions.
-      assertNotProxyMode(c);
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
-      const { subjectId, topicId } = c.req.valid('param');
-
-      try {
-        const note = await getNote(db, profileId, subjectId, topicId);
-        if (!note) return notFound(c, 'Note not found');
-
-        const deleted = await deleteNoteById(db, profileId, note.id);
-        if (!deleted) return notFound(c, 'Note not found');
-        return c.body(null, 204);
-      } catch (error) {
-        if (error instanceof NotFoundError) {
-          return notFound(c, error.message);
-        }
-        throw error;
-      }
-    }
+    },
   )
   // DELETE /notes/:noteId
   .delete(
@@ -211,7 +183,7 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
       const deleted = await deleteNoteById(db, profileId, noteId);
       if (!deleted) return notFound(c, 'Note not found');
       return c.body(null, 204);
-    }
+    },
   )
   // GET /subjects/:subjectId/topics/:topicId/sessions
   .get(
@@ -226,5 +198,5 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
 
       const sessions = await getTopicSessions(db, profileId, topicId);
       return c.json(topicSessionsResponseSchema.parse({ sessions }));
-    }
+    },
   );
