@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["generated_at", "pr_id", "source", "verdict", "findings"],
+  "properties": {
+    "generated_at": { "type": "string", "format": "date-time" },
+    "pr_id": { "type": "string" },
+    "source": {
+      "enum": ["code-review", "test-coverage", "adversarial", "synthesized"]
+    },
+    "verdict": { "enum": ["APPROVE", "REQUEST_CHANGES", "BLOCK"] },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "source", "severity", "category", "file", "summary"],
+        "properties": {
+          "id": { "type": "string" },
+          "source": { "enum": ["code-review", "test-coverage", "adversarial"] },
+          "severity": { "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"] },
+          "category": { "type": "string" },
+          "file": { "type": "string" },
+          "line": { "type": ["integer", "null"] },
+          "summary": { "type": "string" },
+          "evidence": { "type": "string" },
+          "suggested_fix": { "type": "string" },
+          "deferrable": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}

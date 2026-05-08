@@ -13,7 +13,7 @@ argument-hint: (none — reads from scope artifact)
 
 Analyze test coverage for the local worktree branch changes. Identify critical gaps, evaluate test quality, and ensure tests verify behavior (not implementation). Produce a structured artifact with findings and recommendations.
 
-**Output artifact**: `$ARTIFACTS_DIR/review/test-coverage-findings.md`
+**Output artifact**: `$ARTIFACTS_DIR/review/test-coverage-findings.json`
 
 ---
 
@@ -99,174 +99,101 @@ rg "(describe|it|test)\(" src/ -g '*.test.ts' | head -20
 
 ## Phase 3: GENERATE - Create Artifact
 
-Write to `$ARTIFACTS_DIR/review/test-coverage-findings.md`:
+Write to `$ARTIFACTS_DIR/review/test-coverage-findings.json`:
 
-```markdown
-# Test Coverage Findings: {Work Order PR-ID}
+The output must be valid JSON conforming to `.archon/schemas/findings.schema.json`.
 
-**Reviewer**: test-coverage-agent
-**Date**: {ISO timestamp}
-**Source Files**: {count}
-**Test Files**: {count}
-
----
-
-## Summary
-
-{2-3 sentence overview of test coverage quality}
-
-**Verdict**: {APPROVE | REQUEST_CHANGES | NEEDS_DISCUSSION}
-
----
-
-## Coverage Map
-
-| Source File | Test File | New Code Tested | Modified Code Tested |
-|-------------|-----------|-----------------|---------------------|
-| `src/x.ts` | `src/x.test.ts` | FULL/PARTIAL/NONE | FULL/PARTIAL/NONE |
-| `src/y.ts` | (missing) | N/A | N/A |
-| ... | ... | ... | ... |
-
----
-
-## Findings
-
-### Finding 1: {Descriptive Title}
-
-**Severity**: CRITICAL | HIGH | MEDIUM | LOW
-**Category**: missing-test | weak-test | implementation-coupled | missing-edge-case
-**Location**: `{file}:{line}` (source) / `{test-file}` (test)
-**Criticality Score**: {1-10}
-
-**Issue**:
-{Clear description of the coverage gap}
-
-**Untested Code**:
-```typescript
-// This code at {file}:{line} is not tested
-{untested code}
+```json
+{
+  "generated_at": "{ISO 8601 timestamp, e.g. 2026-05-08T14:32:00Z}",
+  "pr_id": "{Work Order PR-ID, e.g. PR-08}",
+  "source": "test-coverage",
+  "verdict": "APPROVE|REQUEST_CHANGES|BLOCK",
+  "findings": [
+    {
+      "id": "TC-1",
+      "source": "test-coverage",
+      "severity": "HIGH",
+      "category": "missing-test|weak-test|implementation-coupled|missing-edge-case",
+      "file": "apps/api/src/services/foo.ts",
+      "line": null,
+      "summary": "Short description of the coverage gap",
+      "evidence": "The function doX() at foo.ts:42 has no test. It handles the error path that returns 403. A future change here would be invisible to the test suite.",
+      "suggested_fix": "Add a test to foo.test.ts: describe('doX', () => { it('returns 403 when ...', ...) }). Pattern: see bar.test.ts:55-70.",
+      "deferrable": false
+    }
+  ]
+}
 ```
 
-**Why This Matters**:
-{Specific bugs or regressions this could miss:
-- "If {scenario}, users would see {bad outcome}"
-- "A future change to {X} could break {Y} without detection"}
+Verdict rules:
+- `BLOCK` if any finding has severity `CRITICAL`
+- `REQUEST_CHANGES` if any finding has severity `HIGH` (and none are CRITICAL)
+- `APPROVE` if all findings are MEDIUM or LOW
 
----
+`deferrable` is `true` for MEDIUM/LOW gaps that do not need to block merge.
 
-#### Test Suggestions
-
-| Option | Approach | Catches | Effort |
-|--------|----------|---------|--------|
-| A | {test approach} | {what it catches} | LOW/MED/HIGH |
-| B | {alternative} | {what it catches} | LOW/MED/HIGH |
-
-**Recommended**: Option {X}
-
-**Reasoning**:
-{Why this test approach:
-- Matches codebase test patterns
-- Tests behavior not implementation
-- Good cost/benefit ratio
-- Catches the most critical failures}
-
-**Recommended Test**:
-```typescript
-describe('{feature}', () => {
-  it('should {expected behavior}', () => {
-    // Arrange
-    {setup}
-
-    // Act
-    {action}
-
-    // Assert
-    {assertions}
-  });
-
-  it('should handle {edge case}', () => {
-    // Test edge case
-  });
-});
-```
-
-**Test Pattern Reference**:
-```typescript
-// SOURCE: {test-file}:{lines}
-// This is how similar functionality is tested
-{existing test from codebase}
-```
-
----
-
-### Finding 2: {Title}
-
-{Same structure...}
-
----
-
-## Test Quality Audit
-
-| Test | Tests Behavior | Resilient | Meaningful Assertions | Verdict |
-|------|---------------|-----------|----------------------|---------|
-| `it('should...')` | YES/NO | YES/NO | YES/NO | GOOD/NEEDS_WORK |
-| ... | ... | ... | ... | ... |
-
----
-
-## Statistics
-
-| Severity | Count | Criticality 8-10 | Criticality 5-7 | Criticality 1-4 |
-|----------|-------|------------------|-----------------|-----------------|
-| CRITICAL | {n} | {n} | - | - |
-| HIGH | {n} | {n} | {n} | - |
-| MEDIUM | {n} | - | {n} | {n} |
-| LOW | {n} | - | - | {n} |
-
----
-
-## Risk Assessment
-
-| Untested Area | Failure Mode | User Impact | Priority |
-|---------------|--------------|-------------|----------|
-| {code area} | {how it could fail} | {user sees} | CRITICAL/HIGH/MED |
-| ... | ... | ... | ... |
-
----
-
-## Patterns Referenced
-
-| Test File | Lines | Pattern |
-|-----------|-------|---------|
-| `src/x.test.ts` | 10-30 | {testing pattern description} |
-| ... | ... | ... |
-
----
-
-## Positive Observations
-
-{Good test coverage, well-written tests, proper mocking}
-
----
-
-## Metadata
-
-- **Agent**: test-coverage-agent (cleanup variant)
-- **Timestamp**: {ISO timestamp}
-- **Artifact**: `$ARTIFACTS_DIR/review/test-coverage-findings.md`
-```
+Use IDs `TC-1`, `TC-2`, … One entry per distinct gap. The `evidence` field should quote the untested code snippet and explain what failure mode it risks. The `suggested_fix` should include the test structure (describe/it skeleton) and reference a codebase test pattern.
 
 **PHASE_3_CHECKPOINT:**
-- [ ] Artifact file created
-- [ ] Coverage map complete
-- [ ] Each gap has criticality score
-- [ ] Test suggestions with example code
+- [ ] Artifact file created as valid JSON
+- [ ] All findings have id, severity, file, summary
+- [ ] evidence quotes the untested code
+- [ ] suggested_fix includes test structure and pattern reference
+- [ ] verdict matches highest severity
+
+---
+
+## Phase 4: VALIDATE - Check Artifact
+
+### 4.1 Verify JSON is Valid
+
+```bash
+cat $ARTIFACTS_DIR/review/test-coverage-findings.json | jq .
+```
+
+This must succeed without error. If jq reports a parse error, fix the JSON before proceeding.
+
+### 4.2 Check Required Fields
+
+```bash
+jq '{source,verdict,findings_count: (.findings | length)}' \
+    $ARTIFACTS_DIR/review/test-coverage-findings.json
+```
+
+Verify:
+- `source` is `"test-coverage"`
+- `verdict` is one of `APPROVE`, `REQUEST_CHANGES`, `BLOCK`
+- `findings` array is present (may be empty if coverage is adequate)
+
+**PHASE_4_CHECKPOINT:**
+- [ ] `jq .` succeeds — JSON is valid
+- [ ] Required fields present
+- [ ] No placeholder text remaining in string values
+
+---
+
+## Phase 5: OUTPUT - Human Summary
+
+Output a brief summary for the DAG log (human-readable text — NOT JSON):
+
+```
+## Test Coverage Review Complete
+
+**Verdict**: {APPROVE | REQUEST_CHANGES | BLOCK}
+**Findings**: {CRITICAL}C / {HIGH}H / {MEDIUM}M / {LOW}L
+
+{If REQUEST_CHANGES or BLOCK, list CRITICAL/HIGH gaps as bullet points with id and summary}
+
+Artifact: $ARTIFACTS_DIR/review/test-coverage-findings.json
+```
 
 ---
 
 ## Success Criteria
 
 - **COVERAGE_MAPPED**: Each source file mapped to tests
-- **GAPS_IDENTIFIED**: Missing tests found with criticality scores
+- **GAPS_IDENTIFIED**: Missing tests found and classified by severity
 - **QUALITY_EVALUATED**: Existing tests assessed
-- **TESTS_SUGGESTED**: Example test code provided for gaps
+- **ARTIFACT_CREATED**: JSON findings file written and valid
+- **VERDICT_SET**: Verdict reflects highest severity found

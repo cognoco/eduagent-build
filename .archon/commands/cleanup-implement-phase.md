@@ -17,6 +17,11 @@ Read these files (they were written by the extract step):
 
 1. `$ARTIFACTS_DIR/work-order.md` — the full work order for this PR
 2. `$ARTIFACTS_DIR/progress.md` — which phases are done (may not exist on first iteration)
+3. `$ARTIFACTS_DIR/patterns.md` — sibling-shape hints. Shows which claimed files have
+   existing test siblings (append to them) vs. which don't (do NOT create new test files).
+4. `$ARTIFACTS_DIR/rules-digest.md` — the subset of CLAUDE.md rules most relevant to
+   this PR's touched packages. CLAUDE.md is also in your system prompt; the digest
+   highlights what matters for THIS specific work order.
 
 CLAUDE.md is already loaded into your system prompt — do not re-read it. Its
 project conventions are non-negotiable; follow every rule.

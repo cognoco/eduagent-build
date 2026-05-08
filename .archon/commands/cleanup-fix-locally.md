@@ -89,23 +89,19 @@ The working tree should be clean (the implement loop committed its changes; the 
 ### 1.2 Read Consolidated Review
 
 ```bash
-cat $ARTIFACTS_DIR/review/consolidated-review.md
+cat $ARTIFACTS_DIR/review/findings.json
 ```
 
-Extract:
-- All CRITICAL issues with fixes
-- All HIGH issues with fixes
-- MEDIUM issues (for reporting)
-- LOW issues (for reporting)
+Parse the JSON. Extract all objects where `severity` is `"CRITICAL"` or `"HIGH"` — these are your fix targets. Objects where `deferrable: true` can be filed as follow-ups via `append-followup.sh` instead of fixed inline. Objects where `severity` is `"MEDIUM"` or `"LOW"` are for reporting only unless paired with a CRITICAL/HIGH on the same file.
 
 ### 1.3 Read Individual Artifacts for Details
 
-If consolidated doesn't have full fix code, read original artifacts:
+If `findings.json` doesn't have enough context for a specific fix, read the original per-agent artifacts:
 
 ```bash
-cat $ARTIFACTS_DIR/review/code-review-findings.md
-cat $ARTIFACTS_DIR/review/test-coverage-findings.md
-cat $ARTIFACTS_DIR/review/adversarial-findings.md
+cat $ARTIFACTS_DIR/review/code-review-findings.json
+cat $ARTIFACTS_DIR/review/test-coverage-findings.json
+cat $ARTIFACTS_DIR/review/adversarial-findings.json
 ```
 
 **PHASE_1_CHECKPOINT:**

@@ -15,7 +15,7 @@ You are reviewing a cleanup/refactoring PR for a production TypeScript monorepo.
 You are a different LLM from the one that wrote this code. That's intentional —
 the implementing agent has blind spots. Your job is to catch what it missed.
 
-**Output artifact**: `$ARTIFACTS_DIR/review/adversarial-findings.md`
+**Output artifact**: `$ARTIFACTS_DIR/review/adversarial-findings.json`
 
 ---
 
@@ -124,60 +124,77 @@ For each finding, assign severity:
 
 ## Phase 4: ARTIFACT
 
-Write to `$ARTIFACTS_DIR/review/adversarial-findings.md`:
+Write to `$ARTIFACTS_DIR/review/adversarial-findings.json`:
 
-```markdown
-# Adversarial Review Findings
+The output must be valid JSON conforming to `.archon/schemas/findings.schema.json`.
 
-**Reviewer**: Codex (adversarial)
-**PR**: #{pr-number}
-**Generated**: {YYYY-MM-DD HH:MM}
-
-## Summary
-
-| Severity | Count |
-|----------|-------|
-| CRITICAL | {N} |
-| HIGH | {N} |
-| MEDIUM | {N} |
-| LOW | {N} |
-
-**Verdict**: {PASS — no CRITICAL/HIGH | NEEDS FIXES — has CRITICAL/HIGH}
-
----
-
-## Findings
-
-### [{severity}] {title}
-
-**File**: `{path}:{line}`
-**Category**: {regression | rule-violation | test-gap | incomplete-sweep | type-safety | doc-drift}
-**Evidence**: {what you found — include grep output, file contents, specific line references}
-
-**Suggested fix**:
-{specific, actionable fix description}
-
----
-
-{Repeat for each finding}
-
-## What Passed
-
-{Brief note on what was done well — keep it to 2-3 sentences max.
-This section exists so the synthesizer knows what NOT to re-check.}
+```json
+{
+  "generated_at": "{ISO 8601 timestamp, e.g. 2026-05-08T14:32:00Z}",
+  "pr_id": "{Work Order PR-ID, e.g. PR-08}",
+  "source": "adversarial",
+  "verdict": "APPROVE|REQUEST_CHANGES|BLOCK",
+  "findings": [
+    {
+      "id": "ADV-1",
+      "source": "adversarial",
+      "severity": "CRITICAL",
+      "category": "regression|rule-violation|test-gap|incomplete-sweep|type-safety|doc-drift",
+      "file": "apps/api/src/routes/foo.ts",
+      "line": 88,
+      "summary": "Short description of the issue found by adversarial attack",
+      "evidence": "rg output or file content quote — include the specific line(s) showing the problem and why it constitutes a regression or rule violation",
+      "suggested_fix": "Specific, actionable fix description — what to change, where, and why it resolves the attack vector",
+      "deferrable": false
+    }
+  ]
+}
 ```
 
+Verdict rules:
+- `BLOCK` if any finding has severity `CRITICAL`
+- `REQUEST_CHANGES` if any finding has severity `HIGH` (and none are CRITICAL)
+- `APPROVE` if all findings are MEDIUM or LOW (or no findings)
+
+Use IDs `ADV-1`, `ADV-2`, … One entry per distinct finding. The `evidence` field must quote the actual grep output or code snippet — not paraphrase it. Set `deferrable: true` for MEDIUM/LOW findings that do not need to block merge.
+
+**PHASE_4_CHECKPOINT:**
+- [ ] Artifact file created as valid JSON
+- [ ] All findings have id, severity, file, summary
+- [ ] evidence quotes real grep/file output
+- [ ] verdict matches highest severity
+
 ---
 
-## Phase 5: OUTPUT
+## Phase 5: VALIDATE - Check Artifact
 
-```markdown
+```bash
+cat $ARTIFACTS_DIR/review/adversarial-findings.json | jq .
+```
+
+This must succeed without error. Also verify:
+
+```bash
+jq '{source,verdict,findings_count: (.findings | length)}' \
+    $ARTIFACTS_DIR/review/adversarial-findings.json
+```
+
+- `source` must be `"adversarial"`
+- `verdict` must be one of `APPROVE`, `REQUEST_CHANGES`, `BLOCK`
+
+---
+
+## Phase 6: OUTPUT
+
+Output a brief summary for the DAG log (human-readable text — NOT JSON):
+
+```
 ## Adversarial Review Complete
 
-**Verdict**: {PASS | NEEDS FIXES}
+**Verdict**: {APPROVE | REQUEST_CHANGES | BLOCK}
 **Findings**: {CRITICAL}C / {HIGH}H / {MEDIUM}M / {LOW}L
 
-{If NEEDS FIXES, list the CRITICAL/HIGH findings as bullet points}
+{If REQUEST_CHANGES or BLOCK, list CRITICAL/HIGH findings as bullet points with id and summary}
 
-Artifact: `$ARTIFACTS_DIR/review/adversarial-findings.md`
+Artifact: $ARTIFACTS_DIR/review/adversarial-findings.json
 ```
