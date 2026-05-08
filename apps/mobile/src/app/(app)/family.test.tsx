@@ -39,8 +39,7 @@ jest.mock('../../hooks/use-dashboard', () => ({
   }),
 }));
 
-jest.mock('../../hooks/use-active-profile-role', () => ({
-  // gc1-allow: route-role unit boundary.
+jest.mock('../../hooks/use-active-profile-role' /* gc1-allow */, () => ({
   useActiveProfileRole: () => mockUseActiveProfileRole(),
 }));
 
@@ -55,13 +54,15 @@ jest.mock('../../components/family/FamilyOrientationCue', () => ({
   },
 }));
 
-jest.mock('../../components/family/WithdrawalCountdownBanner', () => ({
-  // gc1-allow: banner slot unit boundary.
-  WithdrawalCountdownBanner: () => {
-    const { View } = require('react-native');
-    return <View testID="withdrawal-countdown-banner" />;
-  },
-}));
+jest.mock(
+  '../../components/family/WithdrawalCountdownBanner' /* gc1-allow */,
+  () => ({
+    WithdrawalCountdownBanner: () => {
+      const { View } = require('react-native');
+      return <View testID="withdrawal-countdown-banner" />;
+    },
+  }),
+);
 
 const FamilyScreen = require('./family').default;
 

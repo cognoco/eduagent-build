@@ -116,8 +116,7 @@ jest.mock('react-i18next', () => ({
 
 jest.mock('../../hooks/use-progress');
 const mockUseActiveProfileRole = jest.fn();
-jest.mock('../../hooks/use-active-profile-role', () => ({
-  // gc1-allow: register role-copy unit boundary.
+jest.mock('../../hooks/use-active-profile-role' /* gc1-allow */, () => ({
   useActiveProfileRole: () => mockUseActiveProfileRole(),
 }));
 jest.mock('../../lib/profile', () => ({
