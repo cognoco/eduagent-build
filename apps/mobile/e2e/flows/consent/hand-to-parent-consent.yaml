@@ -53,47 +53,13 @@ tags:
 # NAVIGATE TO CREATE PROFILE
 # ============================================================
 
-# 3. Wait for tabs to render (no profile yet)
-- extendedWaitUntil:
-    visible:
-      id: "tab-more"
-    timeout: 30000
-
-# 4. Navigate: More → Profile → Create profile
-- tapOn:
-    id: "tab-more"
-
-- extendedWaitUntil:
-    visible:
-      text: "More"
-    timeout: 10000
-
-- scrollUntilVisible:
-    element:
-      text: "Profile"
-    direction: DOWN
-    timeout: 10000
-
-- tapOn:
-    text: "Profile"
-
-- extendedWaitUntil:
-    visible:
-      text: "No profiles yet"
-    timeout: 10000
-
-- tapOn:
-    id: "profiles-create-first"
+# 3. Pre-profile accounts land on CreateProfileGate, not tabs.
+- runFlow:
+    file: ../_setup/open-create-profile-from-gate.yaml
 
 # ============================================================
 # PROFILE CREATION — trigger consent
 # ============================================================
-
-# 5. Wait for profile creation screen
-- extendedWaitUntil:
-    visible:
-      id: "create-profile-name"
-    timeout: 15000
 
 # 6. Enter display name
 - tapOn:

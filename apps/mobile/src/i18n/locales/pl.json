@@ -735,7 +735,16 @@
       "searching": "Wyszukiwanie…",
       "noResults": "Brak wyników dla „{{query}}”",
       "clear": "Wyczyść wyszukiwanie",
-      "placeholder": "Szukaj książek, tematów, notatek…"
+      "placeholder": "Szukaj książek, tematów, notatek…",
+      "error": "Wyszukiwanie jest chwilowo niedostępne.",
+      "freeform": "Tekst swobodny",
+      "sections": {
+        "subjects": "Przedmioty",
+        "books": "Książki",
+        "topics": "Tematy",
+        "notes": "Notatki",
+        "sessions": "Sesje"
+      }
     },
     "manage": {
       "button": "Zarządzaj",

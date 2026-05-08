@@ -223,11 +223,10 @@ Pick items by ratio: high "why matters" + low size = ship. Don't bundle items in
 
 ### P2 — Quiz "Challenge Mode" hidden from user
 
-**Status as of 2026-05-08: PARTIAL** — `quiz/launch.tsx:156-190`. Challenge Mode banner IS rendered when `difficultyBump = true` (server-driven). However, no explanatory text on the hub tells users when/why it activates, and no manual opt-in card exists on the quiz hub screen.
+**Status as of 2026-05-08: DONE (explainer)** — Hub explainer card shipped in commit `af79a85e` (2026-05-06). Manual opt-in card not built; intentional, per "quiet defaults / surface controls only when sought."
 
-- **What's there:** `quiz/launch.tsx` lines 59–76 has full Challenge Mode banner UI that fires when the server flips `difficultyBump = true`. Quiz hub has no card option to opt in.
-- **Decision needed:** Either (a) explain to the user when challenge mode triggers ("Mentor is making this harder — you've been crushing it"), OR (b) add a manual "challenge mode" card option.
-- **If yes, size:** XS (explain) / S (manual opt-in)
+- **What's there:** `quiz/launch.tsx` lines 156–190 renders the in-quiz banner when the server flips `difficultyBump = true` (trigger: 3 consecutive perfect rounds within 14 days, see `services/quiz/difficulty-bump.ts`). `quiz/index.tsx:228-238` renders an explainer card on the hub (testID `quiz-challenge-explainer`); copy shipped in all 7 locales (`quiz.index.challengeExplainerTitle/Body`).
+- **Outcome:** Option (a) — explainer — shipped. Option (b) — manual opt-in — deferred (no signal that users want the control).
 
 ### P3 — XP visible on Practice hub even at 0
 
@@ -363,9 +362,9 @@ Items skipped from the dead-code PR because each carries a small product questio
 | P2 | `SamplePreview` upgrade wire | S / XS | Parent | **TODO** (still no onPress) |
 | P2 | `removeProfileFromSubscription` | M / XS | Parent | **PARTIAL** (API throws; no mobile UI) |
 | P2 | Family/Pro upsell | S | Parent | **DONE** (gated by BUG-899, intentional) |
-| P2 | `post-session-suggestions` to parent | S | Parent | **TODO** |
+| P2 | `post-session-suggestions` to parent | S | Parent | **DEFERRED** (post-launch; part of broader "parent visibility into past/present/future" theme alongside parent-facing LLM insight) |
 | P2 | Book-completed celebration | S | Library | **DONE** |
-| P2 | Quiz Challenge Mode visibility | XS / S | Practice | **PARTIAL** (card shows, no hub context) |
+| P2 | Quiz Challenge Mode visibility | XS / S | Practice | **DONE** (explainer shipped 2026-05-06 `af79a85e`; manual opt-in deferred) |
 | P2 | `memory_facts.confidence` UI | S | Memory | **DONE** (parent view only) |
 | P2 | Mentor-memory data source consolidation | M | Memory | **PARTIAL** (two paths confirmed) |
 | P2 | Email channel for product notifications | M | Notifications | **PARTIAL** (infra ready; consent-only) |
@@ -374,7 +373,7 @@ Items skipped from the dead-code PR because each carries a small product questio
 | P3 | `library-filters.ts` wire-or-delete | XS | Library | **PARTIAL** (helpers gone, file+EnrichedBook remain) |
 | P3 | XP always visible on Practice hub | XS | Practice | **DONE** |
 | P3 | `streak_warning` build-or-remove | S / XS | Notifications | **DONE** (removed) |
-| P3 | `struggle_*` build-or-remove | M / XS | Notifications | **PARTIAL** (wired but no consent gate — P0 privacy risk) |
+| P3 | `struggle_*` build-or-remove | M / XS | Notifications | **DONE** (consent gate + 5 break tests shipped 2026-05-08 `2292b415`) |
 | P3 | Deprecated note DELETE route | S | API cleanup | **TODO** (kept as back-compat; remove before launch) |
 | P3 | `processTeachBackCompletion` arg | S / XS | API cleanup | **DONE** (arg removed) |
 
@@ -384,14 +383,16 @@ Items skipped from the dead-code PR because each carries a small product questio
 
 **Remaining open work (as of 2026-05-08):**
 
-1. **Struggle notification consent gate** (P0, XS) — `sendStruggleNotification` (`notifications.ts:480`) must check `consentStatus` on the child's profile and return early for `WITHDRAWN`/`PENDING`/`PARENTAL_CONSENT_REQUESTED` before it can be considered correctly shipped. This is a privacy gap, not a missing feature.
-2. **Search drill-through** (P1, M) — highest-value remaining item. Fill the Failure Modes table, then implement typed result rows.
+1. **Search drill-through** (P1, M) — highest-value remaining item. Failure Modes table now drafted in `docs/specs/2026-05-08-library-search-drill-through.md`; ready for sizing + typed result rows.
 2. **SamplePreview trigger identification** (P2) — determine gating intent before deciding wire vs. remove.
 3. **removeProfileFromSubscription same-account path** (P2, M) — pre-launch is the cheapest window.
-4. **Quiz Challenge Mode hub context** (P2, XS) — add explanation text on the quiz hub.
-5. **Mentor-memory data source consolidation** (P2, M) — pick one source before adding new features.
-6. **Email product notifications** (P2, M) — infrastructure ready; add weekly-progress and recall-nudge channels.
+4. **Mentor-memory data source consolidation** (P2, M) — pick one source before adding new features.
+5. **Email product notifications** (P2, M) — infrastructure ready; add weekly-progress and recall-nudge channels.
 7. **`library-filters.ts` final delete** (P3, XS) — inline `EnrichedBook` into `use-all-books.ts`, delete file.
 8. **Deprecated note DELETE route** (P3, S) — remove before launch.
+
+**Closed since this doc was written:**
+- Struggle notification consent gate (`2292b415`, 2026-05-08).
+- Quiz Challenge Mode hub explainer (`af79a85e`, 2026-05-06).
 9. **post-session-suggestions to parent** (P2, S) — decide exposure model first.
 10. **"How it's working" badge** (P2) — decide: build analytics screen (M) or remove placeholder (XS).

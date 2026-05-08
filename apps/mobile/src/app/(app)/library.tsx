@@ -35,6 +35,10 @@ import {
 } from '../../lib/retention-utils';
 import { ShelfRow } from '../../components/library/ShelfRow';
 import { LibrarySearchBar } from '../../components/library/LibrarySearchBar';
+import {
+  LibrarySearchResults,
+  type EnrichedSubjectResult,
+} from '../../components/library/LibrarySearchResults';
 import { useLibrarySearch } from '../../hooks/use-library-search';
 import { ShimmerSkeleton } from '../../components/common/ShimmerSkeleton';
 
@@ -178,6 +182,7 @@ export default function LibraryScreen() {
 
   const updateSubject = useUpdateSubject();
   const allBooksQuery = useAllBooks();
+  const allBooks = allBooksQuery.books;
 
   // [BUG-732 / PERF-2] Single aggregate /library/retention call
   const libraryRetentionQuery = useQuery({
@@ -221,14 +226,14 @@ export default function LibraryScreen() {
 
   // ---- Books grouped by subjectId -----------------------------------------
   const booksBySubjectId = useMemo(() => {
-    const map = new Map<string, typeof allBooksQuery.books>();
-    for (const b of allBooksQuery.books) {
+    const map = new Map<string, typeof allBooks>();
+    for (const b of allBooks) {
       const list = map.get(b.subjectId) ?? [];
       list.push(b);
       map.set(b.subjectId, list);
     }
     return map;
-  }, [allBooksQuery.books]);
+  }, [allBooks]);
 
   // ---- Total topic count for header subtitle ------------------------------
   // [BUG-971] Count ALL retention topics (including those with null bookId,
@@ -254,8 +259,34 @@ export default function LibraryScreen() {
     for (const b of searchResult.data.books) ids.add(b.subjectId);
     for (const t of searchResult.data.topics) ids.add(t.subjectId);
     for (const n of searchResult.data.notes) ids.add(n.subjectId);
+    for (const s of searchResult.data.sessions) ids.add(s.subjectId);
     return ids;
   }, [searchResult.data]);
+
+  const enrichedSubjectResults = useMemo<EnrichedSubjectResult[]>(() => {
+    if (!searchResult.data) return [];
+    return searchResult.data.subjects.map((s) => {
+      const subject = subjects.find((sub) => sub.id === s.id);
+      const retData = retentionDataBySubjectId.get(s.id);
+      const retentionStatus = computeShelfRetention(retData);
+      const books = booksBySubjectId.get(s.id) ?? [];
+      const progress = progressBySubjectId.get(s.id);
+      return {
+        id: s.id,
+        name: s.name,
+        bookCount: books.length,
+        topicProgress: `${progress?.topicsCompleted ?? 0}/${progress?.topicsTotal ?? 0}`,
+        retentionStatus,
+        isPaused: subject?.status !== 'active',
+      };
+    });
+  }, [
+    searchResult.data,
+    subjects,
+    retentionDataBySubjectId,
+    booksBySubjectId,
+    progressBySubjectId,
+  ]);
 
   // ---- Handlers -----------------------------------------------------------
 
@@ -264,6 +295,54 @@ export default function LibraryScreen() {
       router.push({
         pathname: '/(app)/shelf/[subjectId]',
         params: { subjectId },
+      } as never);
+    },
+    [router],
+  );
+
+  const handleBookPress = useCallback(
+    (subjectId: string, bookId: string) => {
+      router.push({
+        pathname: '/(app)/shelf/[subjectId]',
+        params: { subjectId },
+      } as never);
+      router.push({
+        pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
+        params: { subjectId, bookId },
+      } as never);
+    },
+    [router],
+  );
+
+  const handleTopicPress = useCallback(
+    (topicId: string) => {
+      router.push({
+        pathname: '/(app)/topic/[topicId]',
+        params: { topicId },
+      } as never);
+    },
+    [router],
+  );
+
+  const handleNotePress = useCallback(
+    (topicId: string) => {
+      router.push({
+        pathname: '/(app)/topic/[topicId]',
+        params: { topicId },
+      } as never);
+    },
+    [router],
+  );
+
+  const handleSessionPress = useCallback(
+    (sessionId: string, subjectId: string, topicId: string | null) => {
+      router.push({
+        pathname: '/session-summary/[sessionId]',
+        params: {
+          sessionId,
+          subjectId,
+          ...(topicId ? { topicId } : {}),
+        },
       } as never);
     },
     [router],
@@ -494,65 +573,66 @@ export default function LibraryScreen() {
             </View>
           )}
 
-        {/* Server search loading indicator */}
-        {isSearching && searchResult.isLoading && (
-          <View
-            className="flex-row items-center px-1 mb-2"
-            testID="library-search-server-loading"
-          >
-            <ActivityIndicator size="small" />
-            <Text className="text-body-sm text-text-secondary ms-2">
-              {t('library.search.searching')}
-            </Text>
-          </View>
+        {/* Search results (when query is active) */}
+        {isSearching && (
+          <>
+            {searchResult.isLoading && (
+              <View
+                className="flex-row items-center px-1 mb-2"
+                testID="library-search-server-loading"
+              >
+                <ActivityIndicator size="small" />
+                <Text className="text-body-sm text-text-secondary ms-2">
+                  {t('library.search.searching')}
+                </Text>
+              </View>
+            )}
+            {!searchResult.isLoading && (
+              <LibrarySearchResults
+                data={searchResult.data ?? undefined}
+                isLoading={searchResult.isLoading}
+                isError={searchResult.isError}
+                query={debouncedQuery}
+                enrichedSubjects={enrichedSubjectResults}
+                onSubjectPress={handleShelfPress}
+                onBookPress={handleBookPress}
+                onTopicPress={handleTopicPress}
+                onNotePress={handleNotePress}
+                onSessionPress={handleSessionPress}
+                onRetry={() => void searchResult.refetch()}
+              />
+            )}
+          </>
         )}
 
-        {/* No search results */}
-        {isSearching &&
-          visibleSubjects.length === 0 &&
-          !searchResult.isLoading && (
-            <View className="items-center py-10" testID="library-search-empty">
-              <Text className="text-body text-text-secondary text-center">
-                {t('library.search.noResults', { query: debouncedQuery })}
-              </Text>
-              <Pressable
-                onPress={() => handleSearchChange('')}
-                className="mt-3 px-4 py-2 rounded-button bg-surface-elevated"
-                testID="library-search-clear-results"
-              >
-                <Text className="text-body-sm font-semibold text-text-primary">
-                  {t('library.search.clear')}
-                </Text>
-              </Pressable>
-            </View>
-          )}
+        {/* Subject shelf list (hidden when searching) */}
+        {!isSearching && (
+          <View testID="shelves-list">
+            {visibleSubjects.map((subject) => {
+              const retData = retentionDataBySubjectId.get(subject.id);
+              const retentionStatus = computeShelfRetention(retData);
+              const books = booksBySubjectId.get(subject.id) ?? [];
+              const bookCount = books.length;
+              const progress = progressBySubjectId.get(subject.id);
+              const topicsTotal = progress?.topicsTotal ?? 0;
+              const topicsCompleted = progress?.topicsCompleted ?? 0;
+              const topicProgress = `${topicsCompleted}/${topicsTotal}`;
 
-        {/* Subject shelf list */}
-        <View testID="shelves-list">
-          {visibleSubjects.map((subject) => {
-            const retData = retentionDataBySubjectId.get(subject.id);
-            const retentionStatus = computeShelfRetention(retData);
-            const books = booksBySubjectId.get(subject.id) ?? [];
-            const bookCount = books.length;
-            const progress = progressBySubjectId.get(subject.id);
-            const topicsTotal = progress?.topicsTotal ?? 0;
-            const topicsCompleted = progress?.topicsCompleted ?? 0;
-            const topicProgress = `${topicsCompleted}/${topicsTotal}`;
-
-            return (
-              <ShelfRow
-                key={subject.id}
-                subjectId={subject.id}
-                name={subject.name}
-                bookCount={bookCount}
-                topicProgress={topicProgress}
-                retentionStatus={retentionStatus}
-                isPaused={subject.status !== 'active'}
-                onPress={handleShelfPress}
-              />
-            );
-          })}
-        </View>
+              return (
+                <ShelfRow
+                  key={subject.id}
+                  subjectId={subject.id}
+                  name={subject.name}
+                  bookCount={bookCount}
+                  topicProgress={topicProgress}
+                  retentionStatus={retentionStatus}
+                  isPaused={subject.status !== 'active'}
+                  onPress={handleShelfPress}
+                />
+              );
+            })}
+          </View>
+        )}
       </>
     );
   };

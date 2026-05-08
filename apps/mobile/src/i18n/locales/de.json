@@ -735,7 +735,16 @@
       "searching": "Sucht...",
       "noResults": "Keine Ergebnisse für „{{query}}“",
       "clear": "Suche löschen",
-      "placeholder": "Bücher, Themen, Notizen suchen..."
+      "placeholder": "Bücher, Themen, Notizen suchen...",
+      "error": "Suche ist gerade nicht verfügbar.",
+      "freeform": "Freitext",
+      "sections": {
+        "subjects": "Fächer",
+        "books": "Bücher",
+        "topics": "Themen",
+        "notes": "Notizen",
+        "sessions": "Sitzungen"
+      }
     },
     "manage": {
       "button": "Verwalten",

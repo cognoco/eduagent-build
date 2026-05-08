@@ -12,6 +12,7 @@ interface ShelfRowProps {
   retentionStatus: RetentionStatus | null;
   isPaused: boolean;
   onPress: (subjectId: string) => void;
+  testID?: string;
 }
 
 export function ShelfRow({
@@ -22,6 +23,7 @@ export function ShelfRow({
   retentionStatus,
   isPaused,
   onPress,
+  testID,
 }: ShelfRowProps): React.ReactElement {
   const { t } = useTranslation();
   const colors = useThemeColors();
@@ -42,7 +44,7 @@ export function ShelfRow({
     <View style={{ opacity: isPaused ? 0.65 : 1 }}>
       {/* Header row */}
       <Pressable
-        testID={`shelf-row-header-${subjectId}`}
+        testID={testID ?? `shelf-row-header-${subjectId}`}
         onPress={() => onPress(subjectId)}
         accessibilityRole="button"
         accessibilityLabel={t('library.row.shelfAccessibilityLabel', {

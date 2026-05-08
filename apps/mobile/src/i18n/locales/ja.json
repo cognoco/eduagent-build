@@ -735,7 +735,16 @@
       "searching": "検索中…",
       "noResults": "「{{query}}」の検索結果はありません",
       "clear": "検索をクリア",
-      "placeholder": "本、トピック、メモを検索…"
+      "placeholder": "本、トピック、メモを検索…",
+      "error": "検索は現在利用できません。",
+      "freeform": "自由記述",
+      "sections": {
+        "subjects": "科目",
+        "books": "本",
+        "topics": "トピック",
+        "notes": "メモ",
+        "sessions": "セッション"
+      }
     },
     "manage": {
       "button": "管理",

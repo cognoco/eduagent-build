@@ -1,0 +1,16 @@
+# Pre-profile accounts do not render tabs. They land on CreateProfileGate,
+# which pushes directly to /create-profile.
+appId: com.mentomate.app
+---
+- extendedWaitUntil:
+    visible:
+      id: "create-profile-gate"
+    timeout: 30000
+
+- tapOn:
+    id: "create-profile-cta"
+
+- extendedWaitUntil:
+    visible:
+      id: "create-profile-name"
+    timeout: 15000

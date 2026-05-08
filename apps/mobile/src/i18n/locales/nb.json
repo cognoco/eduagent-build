@@ -735,7 +735,16 @@
       "searching": "Søker ...",
       "noResults": "Ingen resultater for \"{{query}}\"",
       "clear": "Tøm søk",
-      "placeholder": "Søk i bøker, temaer, notater ..."
+      "placeholder": "Søk i bøker, temaer, notater ...",
+      "error": "Søk er ikke tilgjengelig akkurat nå.",
+      "freeform": "Fritekst",
+      "sections": {
+        "subjects": "Fag",
+        "books": "Bøker",
+        "topics": "Temaer",
+        "notes": "Notater",
+        "sessions": "Økter"
+      }
     },
     "manage": {
       "button": "Administrer",

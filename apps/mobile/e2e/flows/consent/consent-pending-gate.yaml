@@ -160,18 +160,18 @@ tags:
 
 # 21. Verify coaching preview content
 - assertVisible:
-    text: "How It Works"
+    text: "See how it works"
 
 - assertVisible:
-    text: "Ready for homework?"
+    text: "Homework help"
 
 - assertVisible:
-    text: "How your coach helps"
+    text: "How your mentor helps"
 
 # 22. Verify the preview footer disclaimer (at bottom of ScrollView — scroll to it)
 - scrollUntilVisible:
     element:
-      text: "This is a preview. Full access unlocks after parent approval."
+      text: "This is a preview — full access unlocks once your parent approves"
     direction: DOWN
     timeout: 5000
 

@@ -735,7 +735,16 @@
       "searching": "Buscando…",
       "noResults": "No hay resultados para \"{{query}}\"",
       "clear": "Limpiar búsqueda",
-      "placeholder": "Buscar libros, temas, notas…"
+      "placeholder": "Buscar libros, temas, notas…",
+      "error": "La búsqueda no está disponible en este momento.",
+      "freeform": "Texto libre",
+      "sections": {
+        "subjects": "Asignaturas",
+        "books": "Libros",
+        "topics": "Temas",
+        "notes": "Notas",
+        "sessions": "Sesiones"
+      }
     },
     "manage": {
       "button": "Gestionar",

@@ -735,7 +735,16 @@
       "searching": "Buscando…",
       "noResults": "Nenhum resultado para \"{{query}}\"",
       "clear": "Limpar busca",
-      "placeholder": "Buscar livros, tópicos, notas…"
+      "placeholder": "Buscar livros, tópicos, notas…",
+      "error": "A busca está indisponível no momento.",
+      "freeform": "Texto livre",
+      "sections": {
+        "subjects": "Matérias",
+        "books": "Livros",
+        "topics": "Tópicos",
+        "notes": "Notas",
+        "sessions": "Sessões"
+      }
     },
     "manage": {
       "button": "Gerenciar",

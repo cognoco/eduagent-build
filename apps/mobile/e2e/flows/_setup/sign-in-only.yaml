@@ -1,7 +1,7 @@
 # Minimal sign-in flow — no post-auth navigation recovery.
 #
 # Use this for edge-case flows where the post-auth screen is NOT the standard
-# learner-screen or family-scroll (e.g., 0-subjects redirect to
+# learner-screen or dashboard-scroll (e.g., 0-subjects redirect to
 # create-subject, consent-withdrawn gate, etc.).
 #
 # seed-and-run.sh handles everything before Maestro: seed, app launch,

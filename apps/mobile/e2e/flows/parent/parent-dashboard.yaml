@@ -19,13 +19,9 @@ tags:
       SEED_SCENARIO: "parent-with-children"
       API_URL: ${API_URL}
 
-# 2. Wait for parent dashboard
-# BUG-33 fix: parent persona routes to (parent)/dashboard with id: family-scroll,
-# NOT (learner)/home with id: learner-screen.
-- extendedWaitUntil:
-    visible:
-      id: "family-scroll"
-    timeout: 15000
+# 2. Parent owners land on ParentGateway; enter the Family dashboard.
+- runFlow:
+    file: ../_setup/open-family-dashboard.yaml
 
 # ── Visual integrity: parent tab bar ───────────────────────────────────
 - assertVisible:
@@ -34,13 +30,15 @@ tags:
     id: "tab-library"
 - assertVisible:
     id: "tab-more"
+- assertVisible:
+    id: "tab-family"
 
 # ── Visual integrity: dashboard heading ────────────────────────────────
-# Parent dashboard shows "Home" heading + "How your children are doing" subtitle.
+# Family dashboard shows the Family heading + hub subtitle.
 - assertVisible:
-    text: "Home"
+    text: "Family"
 - assertVisible:
-    text: "How your children are doing"
+    text: "Everyone you're learning alongside."
 
 # 3. Verify children list is visible — wait for API data to load
 - extendedWaitUntil:

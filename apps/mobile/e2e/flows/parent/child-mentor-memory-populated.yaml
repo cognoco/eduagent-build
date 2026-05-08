@@ -11,10 +11,8 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
 
-- extendedWaitUntil:
-    visible:
-      id: "family-scroll"
-    timeout: 15000
+- runFlow:
+    file: ../_setup/open-family-dashboard.yaml
 
 - tapOn:
     id: "dashboard-child-${CHILD_PROFILE_ID}-primary"

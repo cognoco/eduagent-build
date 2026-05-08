@@ -735,7 +735,16 @@
       "searching": "Searching…",
       "noResults": "No results for \"{{query}}\"",
       "clear": "Clear search",
-      "placeholder": "Search books, topics, notes…"
+      "placeholder": "Search books, topics, notes…",
+      "error": "Search is unavailable right now.",
+      "freeform": "Freeform",
+      "sections": {
+        "subjects": "Subjects",
+        "books": "Books",
+        "topics": "Topics",
+        "notes": "Notes",
+        "sessions": "Sessions"
+      }
     },
     "manage": {
       "button": "Manage",

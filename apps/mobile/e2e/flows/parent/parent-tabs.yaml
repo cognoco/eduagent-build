@@ -4,9 +4,10 @@
 # Tags: nightly, parent
 #
 # Journey: UX Journey 4 (Parent Oversight)
-# Tab bar (from (parent)/_layout.tsx):
-#   "Home"          → dashboard.tsx    (testID: family-scroll)
-#   "Library"       → library.tsx      (3-tab: Shelves/Books; testID: library-tab-shelves)
+# Tab bar:
+#   "Home"          → ParentGateway    (testID: parent-gateway)
+#   "Family"        → family.tsx       (testID: dashboard-scroll)
+#   "Library"       → library.tsx      (testID: shelves-list)
 #   "More"          → more.tsx         (testID: sign-out-button)
 appId: com.mentomate.app
 tags:
@@ -20,20 +21,32 @@ tags:
       SEED_SCENARIO: "parent-with-children"
       API_URL: ${API_URL}
 
-# 2. Wait for parent dashboard
-# BUG-33 fix: parent-with-children creates a PARENT owner profile. After sign-in,
-# the app routes directly to (parent)/dashboard — no switch-to-parent needed.
+# 2. Wait for parent Home gateway
 - extendedWaitUntil:
     visible:
-      id: "family-scroll"
+      id: "parent-gateway"
     timeout: 15000
 
-# 3. Verify "Home" heading on dashboard
+# 3. Verify Home gateway content
 - assertVisible:
-    text: "Home"
+    id: "gateway-check-progress"
 
-# 4. Screenshot: Home tab (dashboard)
+# 4. Screenshot: Home tab (gateway)
 - takeScreenshot: parent-tabs-01-home
+
+# ---------- Family tab ----------
+
+- tapOn: "Family Tab"
+
+- extendedWaitUntil:
+    visible:
+      id: "dashboard-scroll"
+    timeout: 15000
+
+- assertVisible:
+    text: "Family"
+
+- takeScreenshot: parent-tabs-02-family
 
 # ---------- Library tab ----------
 
@@ -48,7 +61,7 @@ tags:
     optional: true
 
 # 7. Screenshot: Library tab
-- takeScreenshot: parent-tabs-02-library
+- takeScreenshot: parent-tabs-03-library
 
 # ---------- More tab ----------
 
@@ -84,7 +97,7 @@ tags:
     optional: true
 
 # 14. Screenshot: More tab (settings)
-- takeScreenshot: parent-tabs-03-more
+- takeScreenshot: parent-tabs-04-more
 
 # ---------- Back to Home tab ----------
 
@@ -92,11 +105,11 @@ tags:
 #     Use accessibility label (not text) to avoid matching "Home" heading
 - tapOn: "Home Tab"
 
-# 16. Verify dashboard is visible again
+# 16. Verify Home gateway is visible again
 - extendedWaitUntil:
     visible:
-      id: "family-scroll"
+      id: "parent-gateway"
     timeout: 10000
 
 # 17. Final screenshot: back on Home tab
-- takeScreenshot: parent-tabs-04-back-to-home
+- takeScreenshot: parent-tabs-05-back-to-home
