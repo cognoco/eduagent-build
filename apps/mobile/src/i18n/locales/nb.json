@@ -2003,6 +2003,12 @@
       "topUpBody": "500 additional credits have been added!"
     }
   },
+  "sessionSummary": {
+    "mentorMemoryCue": {
+      "title": "Hva veilederen din vet om deg.",
+      "subtitle": "Trykk for å se eller endre."
+    }
+  },
   "sessionTranscript": {
     "archived": {
       "title": "Denne samtalen ble arkivert {{date}}.",

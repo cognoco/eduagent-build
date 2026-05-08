@@ -2003,6 +2003,12 @@
       "topUpBody": "500 additional credits have been added!"
     }
   },
+  "sessionSummary": {
+    "mentorMemoryCue": {
+      "title": "Co wie o Tobie Twój tutor.",
+      "subtitle": "Stuknij, aby sprawdzić lub zmienić."
+    }
+  },
   "sessionTranscript": {
     "archived": {
       "title": "Ta rozmowa została zarchiwizowana {{date}}.",

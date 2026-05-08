@@ -2003,6 +2003,12 @@
       "topUpBody": "500 additional credits have been added!"
     }
   },
+  "sessionSummary": {
+    "mentorMemoryCue": {
+      "title": "チューターがあなたについて知っていること。",
+      "subtitle": "タップして確認または変更。"
+    }
+  },
   "sessionTranscript": {
     "archived": {
       "title": "この会話は{{date}}にアーカイブされました。",

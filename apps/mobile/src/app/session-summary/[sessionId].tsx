@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../lib/theme';
 import { useProfile, personaFromBirthYear } from '../../lib/profile';
+import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
 import { useParentProxy } from '../../hooks/use-parent-proxy';
 import { useRatingPrompt } from '../../hooks/use-rating-prompt';
 import {
@@ -45,6 +46,7 @@ import {
   ErrorFallback,
 } from '../../components/common';
 import { FilingFailedBanner } from '../../components/session/FilingFailedBanner';
+import { MentorMemoryCue } from '../../components/session-summary/MentorMemoryCue';
 
 const SKIP_NUDGE_THRESHOLD = 3;
 const SKIP_WARNING_THRESHOLD = 5;
@@ -113,7 +115,8 @@ export default function SessionSummaryScreen() {
     transcript.data?.archived === false ? transcript.data : null;
   const { onSuccessfulRecall } = useRatingPrompt();
   const { activeProfile } = useProfile();
-  const { isParentProxy } = useParentProxy();
+  const { isParentProxy, childProfile } = useParentProxy();
+  const activeProfileRole = useActiveProfileRole();
   const persona = personaFromBirthYear(activeProfile?.birthYear);
   const recallBridge = useRecallBridge(sessionId ?? '');
   const depthEvaluation = useDepthEvaluation();
@@ -749,6 +752,18 @@ export default function SessionSummaryScreen() {
     }
   };
 
+  const handleOpenMentorMemory = (): void => {
+    if (activeProfileRole === 'impersonated-child' && childProfile?.id) {
+      router.push({
+        pathname: '/(app)/child/[profileId]/mentor-memory',
+        params: { profileId: childProfile.id },
+      } as never);
+      return;
+    }
+
+    router.push('/(app)/mentor-memory');
+  };
+
   // [BUG-805] Suppress the duration takeaway until we have a verified non-zero
   // wall-clock value. Math.max(1, ...) above masks missing data as "1 minute",
   // so without this guard the screen would briefly render "1 minute - great
@@ -801,6 +816,14 @@ export default function SessionSummaryScreen() {
     }
   });
   const effectiveSubjectId = subjectId ?? fallbackSession?.subjectId ?? null;
+  const completedSessionCount = progressInventory.data?.global.totalSessions;
+  const hasMentorMemorySignal =
+    completedSessionCount !== undefined && completedSessionCount >= 2;
+  const hasParentProxyMemoryAccess =
+    !isParentProxy ||
+    (childProfile?.consentStatus === 'CONSENTED' && !!childProfile.id);
+  const shouldShowMentorMemoryCue =
+    hasMentorMemorySignal && hasParentProxyMemoryAccess;
   const shouldShowBookmarkPrompt =
     exchanges >= 5 &&
     (sessionBookmarks.data?.length ?? 0) === 0 &&
@@ -1029,6 +1052,14 @@ export default function SessionSummaryScreen() {
               </View>
             ))}
           </View>
+        ) : null}
+
+        {shouldShowMentorMemoryCue ? (
+          <MentorMemoryCue
+            title={t('sessionSummary.mentorMemoryCue.title')}
+            subtitle={t('sessionSummary.mentorMemoryCue.subtitle')}
+            onPress={handleOpenMentorMemory}
+          />
         ) : null}
 
         {persisted?.nextTopicId && persisted?.nextTopicTitle ? (
