@@ -1,6 +1,6 @@
 {
-  "id": "ab55b18b-5535-4d21-a2be-b200aed3a395",
-  "prevId": "64f2d760-c538-4982-9b0a-983e696e0ec5",
+  "id": "9d0e1127-7a65-4295-9e67-c995d4f7e0f9",
+  "prevId": "ab55b18b-5535-4d21-a2be-b200aed3a395",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -4121,6 +4121,20 @@
         },
         "weekly_progress_push": {
           "name": "weekly_progress_push",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "weekly_progress_email": {
+          "name": "weekly_progress_email",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "monthly_progress_email": {
+          "name": "monthly_progress_email",
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,

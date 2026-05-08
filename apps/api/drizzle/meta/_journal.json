@@ -470,6 +470,13 @@
       "when": 1779000012000,
       "tag": "0066_enable_rls_pending_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1778247099027,
+      "tag": "0067_plain_spyke",
+      "breakpoints": true
     }
   ]
 }

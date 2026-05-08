@@ -45,6 +45,26 @@ const mockMonthlyReportDb = createTransactionalMockDb({
     profiles: {
       findFirst: jest.fn().mockResolvedValue(null),
     },
+    // Consent gate added by email digest channel spec (2026-05-08).
+    // Default: null row → no restriction (pre-consent-flow accounts, CONSENTED presumed).
+    consentStates: {
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
+    // Learning profile struggles: default empty (no watch-line).
+    learningProfiles: {
+      findFirst: jest.fn().mockResolvedValue({ struggles: [] }),
+    },
+    // Notification prefs for email channel gate.
+    notificationPreferences: {
+      findFirst: jest.fn().mockResolvedValue({
+        weeklyProgressEmail: false,
+        monthlyProgressEmail: false,
+      }),
+    },
+    // Parent email lookup.
+    accounts: {
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
   },
   selectDistinct: mockSelectDistinct,
   insert: mockInsert,
@@ -63,6 +83,24 @@ const mockDatabaseModule = createDatabaseModuleMock({
       childProfileId: col('childProfileId'),
       reportMonth: col('reportMonth'),
       reportData: col('reportData'),
+    },
+    consentStates: {
+      profileId: col('profileId'),
+      consentType: col('consentType'),
+      status: col('status'),
+      requestedAt: col('requestedAt'),
+    },
+    learningProfiles: {
+      profileId: col('profileId'),
+      struggles: col('struggles'),
+    },
+    notificationPreferences: {
+      profileId: col('profileId'),
+      monthlyProgressEmail: col('monthlyProgressEmail'),
+    },
+    accounts: {
+      id: col('id'),
+      email: col('email'),
     },
   },
 });
@@ -251,6 +289,22 @@ beforeEach(() => {
     mockMonthlyReportDb.query.familyLinks.findMany as jest.Mock
   ).mockResolvedValue([]);
   (mockMonthlyReportDb.query.profiles.findFirst as jest.Mock).mockResolvedValue(
+    null,
+  );
+  // Consent gate: null row = no restriction (pre-consent-flow / CONSENTED presumed).
+  (
+    mockMonthlyReportDb.query.consentStates.findFirst as jest.Mock
+  ).mockResolvedValue(null);
+  (
+    mockMonthlyReportDb.query.learningProfiles.findFirst as jest.Mock
+  ).mockResolvedValue({ struggles: [] });
+  (
+    mockMonthlyReportDb.query.notificationPreferences.findFirst as jest.Mock
+  ).mockResolvedValue({
+    weeklyProgressEmail: false,
+    monthlyProgressEmail: false,
+  });
+  (mockMonthlyReportDb.query.accounts.findFirst as jest.Mock).mockResolvedValue(
     null,
   );
   mockGetSnapshotsInRange.mockResolvedValue([]);

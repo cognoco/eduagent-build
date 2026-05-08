@@ -71,7 +71,7 @@ export const xpLedger = pgTable(
       .notNull()
       .default(false),
     reflectionAppliedBySessionId: uuid(
-      'reflection_applied_by_session_id'
+      'reflection_applied_by_session_id',
     ).references(() => learningSessions.id, { onDelete: 'set null' }),
   },
   (table) => [
@@ -85,9 +85,9 @@ export const xpLedger = pgTable(
     // applyReflectionMultiplier would non-deterministically pick a row.
     uniqueIndex('xp_ledger_profile_topic_unique').on(
       table.profileId,
-      table.topicId
+      table.topicId,
     ),
-  ]
+  ],
 );
 
 export const notificationPreferences = pgTable('notification_preferences', {
@@ -101,6 +101,12 @@ export const notificationPreferences = pgTable('notification_preferences', {
   reviewReminders: boolean('review_reminders').notNull().default(false),
   dailyReminders: boolean('daily_reminders').notNull().default(false),
   weeklyProgressPush: boolean('weekly_progress_push').notNull().default(true),
+  // Email channel flags (default true — matches push defaults; transactional, not marketing).
+  // Settings UI to opt out is a follow-up. Until then everyone with a known email gets the digest.
+  weeklyProgressEmail: boolean('weekly_progress_email').notNull().default(true),
+  monthlyProgressEmail: boolean('monthly_progress_email')
+    .notNull()
+    .default(true),
   pushEnabled: boolean('push_enabled').notNull().default(false),
   maxDailyPush: integer('max_daily_push').notNull().default(3),
   expoPushToken: text('expo_push_token'),
@@ -151,9 +157,9 @@ export const notificationLog = pgTable(
   (table) => [
     index('notification_log_profile_sent_idx').on(
       table.profileId,
-      table.sentAt
+      table.sentAt,
     ),
-  ]
+  ],
 );
 
 export const learningModes = pgTable('learning_modes', {

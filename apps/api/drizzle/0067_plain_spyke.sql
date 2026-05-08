@@ -1,0 +1,2 @@
+ALTER TABLE "notification_preferences" ADD COLUMN "weekly_progress_email" boolean DEFAULT true NOT NULL;--> statement-breakpoint
+ALTER TABLE "notification_preferences" ADD COLUMN "monthly_progress_email" boolean DEFAULT true NOT NULL;

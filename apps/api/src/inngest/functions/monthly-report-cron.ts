@@ -17,20 +17,29 @@
 // recommendations). When in doubt, scope by profileId at the leaf even
 // when scanning broadly.
 
-import { and, eq, gte, inArray, lte } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, lte } from 'drizzle-orm';
 import {
+  accounts,
+  consentStates,
+  learningProfiles,
   monthlyReports,
+  notificationPreferences,
   profiles,
   progressSnapshots,
 } from '@eduagent/database';
 import { inngest } from '../client';
-import { getStepDatabase } from '../helpers';
+import { getStepDatabase, getStepResendApiKey } from '../helpers';
 import {
   generateMonthlyReportData,
   generateReportHighlights,
 } from '../../services/monthly-report';
 import { getSnapshotsInRange } from '../../services/snapshot-aggregation';
-import { sendPushNotification } from '../../services/notifications';
+import {
+  sendPushNotification,
+  sendEmail,
+  formatMonthlyProgressEmail,
+  type ChildStruggleLine,
+} from '../../services/notifications';
 import { getRecentNotificationCount } from '../../services/settings';
 import { captureException } from '../../services/sentry';
 import { progressMetricsSchema } from '@eduagent/schemas';
@@ -53,13 +62,13 @@ function isoDate(date: Date): string {
 
 function monthRangeStart(date: Date, monthOffset = 0): Date {
   return new Date(
-    Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + monthOffset, 1)
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + monthOffset, 1),
   );
 }
 
 function monthRangeEnd(date: Date, monthOffset = 0): Date {
   return new Date(
-    Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + monthOffset + 1, 0)
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + monthOffset + 1, 0),
   );
 }
 
@@ -91,8 +100,8 @@ export const monthlyReportCron = inngest.createFunction(
           and(
             inArray(progressSnapshots.profileId, childIds),
             gte(progressSnapshots.snapshotDate, isoDate(lastMonthStart)),
-            lte(progressSnapshots.snapshotDate, isoDate(lastMonthEnd))
-          )
+            lte(progressSnapshots.snapshotDate, isoDate(lastMonthEnd)),
+          ),
         );
       const activeChildIds = new Set(rows.map((r) => r.childProfileId));
 
@@ -124,7 +133,7 @@ export const monthlyReportCron = inngest.createFunction(
           batch.map((pair) => ({
             name: 'app/monthly-report.generate' as const,
             data: pair,
-          }))
+          })),
         );
         queuedBatches += 1;
         queuedPairs += batch.length;
@@ -148,7 +157,7 @@ export const monthlyReportCron = inngest.createFunction(
       queuedBatches,
       failedBatches,
     };
-  }
+  },
 );
 
 export const monthlyReportGenerate = inngest.createFunction(
@@ -167,6 +176,21 @@ export const monthlyReportGenerate = inngest.createFunction(
     const reportResult = await step.run('generate-monthly-report', async () => {
       try {
         const db = getStepDatabase();
+
+        // Consent gate (parity with weekly-progress-push and sendStruggleNotification):
+        // skip child if their most-recent GDPR consent state is anything other than
+        // CONSENTED. Missing row = no restriction (pre-consent-flow accounts).
+        const consentState = await db.query.consentStates.findFirst({
+          where: and(
+            eq(consentStates.profileId, childId),
+            eq(consentStates.consentType, 'GDPR'),
+          ),
+          orderBy: desc(consentStates.requestedAt),
+        });
+        if (consentState != null && consentState.status !== 'CONSENTED') {
+          return { status: 'skipped' as const, reason: 'consent_not_granted' };
+        }
+
         const child = await db.query.profiles.findFirst({
           where: eq(profiles.id, childId),
           columns: { displayName: true },
@@ -187,17 +211,17 @@ export const monthlyReportGenerate = inngest.createFunction(
           db,
           childId,
           isoDate(currentWindowStart),
-          isoDate(lastMonthEnd)
+          isoDate(lastMonthEnd),
         );
         const previousSnapshots = await getSnapshotsInRange(
           db,
           childId,
           isoDate(previousWindowStart),
-          isoDate(previousMonthEnd)
+          isoDate(previousMonthEnd),
         );
 
         const thisMonthMetrics = safeParseMetrics(
-          currentSnapshots.at(-1)?.metrics
+          currentSnapshots.at(-1)?.metrics,
         );
         if (!thisMonthMetrics) {
           // Either no snapshot at all, or the snapshot row is from older
@@ -215,7 +239,7 @@ export const monthlyReportGenerate = inngest.createFunction(
                   context: 'monthly-report-generate',
                   reason: 'progress_metrics_shape_mismatch',
                 },
-              }
+              },
             );
             return {
               status: 'skipped' as const,
@@ -226,7 +250,7 @@ export const monthlyReportGenerate = inngest.createFunction(
         }
 
         const previousMetrics = safeParseMetrics(
-          previousSnapshots.at(-1)?.metrics
+          previousSnapshots.at(-1)?.metrics,
         );
 
         let reportData = generateMonthlyReportData(
@@ -236,7 +260,7 @@ export const monthlyReportGenerate = inngest.createFunction(
             year: 'numeric',
           }),
           thisMonthMetrics,
-          previousMetrics
+          previousMetrics,
         );
 
         const llmContent = await generateReportHighlights(reportData);
@@ -262,9 +286,35 @@ export const monthlyReportGenerate = inngest.createFunction(
           })
           .onConflictDoNothing();
 
+        // Read struggles for the watch-line (path A: topic names only).
+        // Malformed JSONB is caught and does not abort the report.
+        let struggleTopics: string[] = [];
+        try {
+          const learningProfile = await db.query.learningProfiles.findFirst({
+            where: eq(learningProfiles.profileId, childId),
+            columns: { struggles: true },
+          });
+          const rawStruggles = learningProfile?.struggles;
+          if (Array.isArray(rawStruggles)) {
+            struggleTopics = (rawStruggles as Array<{ topic?: string }>)
+              .map((s) => s.topic)
+              .filter((t): t is string => typeof t === 'string' && t.length > 0)
+              .slice(0, 2);
+          }
+        } catch (err) {
+          captureException(err, {
+            extra: {
+              childId,
+              context: 'monthly-report-generate-struggles',
+            },
+          });
+        }
+
         return {
           status: 'completed' as const,
           childDisplayName: child.displayName ?? 'Your child',
+          reportMonth: isoDate(lastMonthStart),
+          struggleTopics,
         };
       } catch (error) {
         captureException(error, {
@@ -285,14 +335,14 @@ export const monthlyReportGenerate = inngest.createFunction(
         status: reportResult.status,
         parentId,
         childId,
-        // Preserve skip reason for observability (child_missing, no_snapshot)
+        // Preserve skip reason for observability (child_missing, no_snapshot, consent_not_granted)
         ...(reportResult.status === 'skipped' && 'reason' in reportResult
           ? { reason: reportResult.reason }
           : {}),
       };
     }
 
-    // [J-6] Step 2: Send push notification in a separate step so that
+    // [J-6] Step 2: Send push notification + email in a separate step so that
     // a push failure only retries the push — not the LLM + DB insert above.
     //
     // [BUG-699-FOLLOWUP] 24h notification-log dedup — same shape as the
@@ -308,7 +358,7 @@ export const monthlyReportGenerate = inngest.createFunction(
         db,
         parentId,
         'monthly_report',
-        24
+        24,
       );
       if (recentCount > 0) {
         return { sent: false, reason: 'dedup_24h' };
@@ -319,9 +369,57 @@ export const monthlyReportGenerate = inngest.createFunction(
         body: 'Open the app to see what they learned this month.',
         type: 'monthly_report',
       });
+
+      // Email channel: send when monthly_progress_email = true AND parent has
+      // accounts.email. Resend idempotency-key dedupes within 24h so Inngest
+      // step retries are safe.
+      const prefs = await db.query.notificationPreferences.findFirst({
+        where: eq(notificationPreferences.profileId, parentId),
+        columns: { monthlyProgressEmail: true },
+      });
+      if (prefs?.monthlyProgressEmail) {
+        const parentProfile = await db.query.profiles.findFirst({
+          where: eq(profiles.id, parentId),
+          columns: { accountId: true },
+        });
+        const parentAccount = parentProfile?.accountId
+          ? await db.query.accounts.findFirst({
+              where: eq(accounts.id, parentProfile.accountId),
+              columns: { email: true },
+            })
+          : null;
+        const parentEmail = parentAccount?.email ?? null;
+
+        if (parentEmail) {
+          const struggleLines: ChildStruggleLine[] = [
+            {
+              childName: reportResult.childDisplayName,
+              topics: reportResult.struggleTopics,
+            },
+          ];
+          const summary = `${reportResult.childDisplayName}'s monthly report is ready. Open the app to see what they learned this month.`;
+          const emailPayload = formatMonthlyProgressEmail(
+            parentEmail,
+            summary,
+            struggleLines,
+          );
+          await sendEmail(emailPayload, {
+            resendApiKey: getStepResendApiKey(),
+            idempotencyKey: `monthly-${parentId}-${reportResult.reportMonth}`,
+          });
+        } else {
+          captureException(
+            new Error('Monthly digest email skipped: parent has no email'),
+            {
+              extra: { parentId, context: 'monthly-report-generate-email' },
+            },
+          );
+        }
+      }
+
       return { sent: true };
     });
 
     return { status: 'completed', parentId, childId };
-  }
+  },
 );

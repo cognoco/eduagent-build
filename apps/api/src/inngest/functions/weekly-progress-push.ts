@@ -17,18 +17,25 @@
 // recommendations). When in doubt, scope by profileId at the leaf even
 // when scanning broadly.
 
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import {
   accounts,
+  consentStates,
   familyLinks,
+  learningProfiles,
   notificationPreferences,
   profiles,
   weeklyReports,
 } from '@eduagent/database';
 import { inngest } from '../client';
-import { getStepDatabase } from '../helpers';
-import { sendPushNotification } from '../../services/notifications';
+import { getStepDatabase, getStepResendApiKey } from '../helpers';
+import {
+  sendPushNotification,
+  sendEmail,
+  formatWeeklyProgressEmail,
+  type ChildStruggleLine,
+} from '../../services/notifications';
 import { getRecentNotificationCount } from '../../services/settings';
 import {
   getLatestSnapshot,
@@ -105,7 +112,7 @@ export const weeklyProgressPushCron = inngest.createFunction(
       const prefs = await db.query.notificationPreferences.findMany({
         where: and(
           eq(notificationPreferences.pushEnabled, true),
-          eq(notificationPreferences.weeklyProgressPush, true)
+          eq(notificationPreferences.weeklyProgressPush, true),
         ),
         columns: { profileId: true },
       });
@@ -123,12 +130,12 @@ export const weeklyProgressPushCron = inngest.createFunction(
         .where(inArray(profiles.id, eligibleProfileIds));
 
       const timezoneByProfileId = new Map(
-        profileTimezones.map((r) => [r.profileId, r.timezone])
+        profileTimezones.map((r) => [r.profileId, r.timezone]),
       );
 
       // 3. Keep only parents whose local time is 09:00 right now. [FR239.1 UX-9]
       return eligibleProfileIds.filter((id) =>
-        isLocalHour9(timezoneByProfileId.get(id) ?? null, nowUtc)
+        isLocalHour9(timezoneByProfileId.get(id) ?? null, nowUtc),
       );
     });
 
@@ -156,7 +163,7 @@ export const weeklyProgressPushCron = inngest.createFunction(
           batch.map((parentId) => ({
             name: 'app/weekly-progress-push.generate' as const,
             data: { parentId },
-          }))
+          })),
         );
         queuedBatches += 1;
         queuedParents += batch.length;
@@ -180,7 +187,7 @@ export const weeklyProgressPushCron = inngest.createFunction(
       queuedBatches,
       failedBatches,
     };
-  }
+  },
 );
 
 export const weeklyProgressPushGenerate = inngest.createFunction(
@@ -220,7 +227,22 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
         const reportWeek = isoDate(weekStartDate);
 
         const childSummaries: string[] = [];
+        const struggleLines: ChildStruggleLine[] = [];
         for (const link of links) {
+          // Consent gate (parity with sendStruggleNotification and ParentDashboardSummary):
+          // skip children whose most-recent GDPR consent state is anything other than
+          // CONSENTED. Missing row = no restriction (pre-consent-flow accounts).
+          const consentState = await db.query.consentStates.findFirst({
+            where: and(
+              eq(consentStates.profileId, link.childProfileId),
+              eq(consentStates.consentType, 'GDPR'),
+            ),
+            orderBy: desc(consentStates.requestedAt),
+          });
+          if (consentState != null && consentState.status !== 'CONSENTED') {
+            continue;
+          }
+
           const latest = await getLatestSnapshot(db, link.childProfileId);
           if (!latest) continue;
 
@@ -228,8 +250,8 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
             db,
             link.childProfileId,
             isoDate(
-              subtractDays(new Date(`${latest.snapshotDate}T00:00:00Z`), 7)
-            )
+              subtractDays(new Date(`${latest.snapshotDate}T00:00:00Z`), 7),
+            ),
           );
 
           // [CR-2] Clamp: treat previous snapshot as null when the gap exceeds 14 days.
@@ -254,21 +276,21 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
             ? Math.max(
                 0,
                 latest.metrics.topicsMastered -
-                  cappedPrevious.metrics.topicsMastered
+                  cappedPrevious.metrics.topicsMastered,
               )
             : null;
           const vocabDelta = cappedPrevious
             ? Math.max(
                 0,
                 latest.metrics.vocabularyTotal -
-                  cappedPrevious.metrics.vocabularyTotal
+                  cappedPrevious.metrics.vocabularyTotal,
               )
             : null;
           const exploredDelta = cappedPrevious
             ? Math.max(
                 0,
                 sumTopicsExplored(latest.metrics) -
-                  sumTopicsExplored(cappedPrevious.metrics)
+                  sumTopicsExplored(cappedPrevious.metrics),
               )
             : null;
 
@@ -278,7 +300,7 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
             name,
             reportWeek,
             latest.metrics,
-            cappedPrevious?.metrics ?? null
+            cappedPrevious?.metrics ?? null,
           );
           await db
             .insert(weeklyReports)
@@ -295,24 +317,52 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
             (topicDelta === 0 && vocabDelta === 0 && exploredDelta === 0)
           ) {
             childSummaries.push(
-              `${name} took a quieter week and still kept ${latest.metrics.topicsMastered} topics.`
+              `${name} took a quieter week and still kept ${latest.metrics.topicsMastered} topics.`,
             );
-            continue;
+          } else {
+            const parts = [
+              topicDelta && topicDelta > 0 ? `+${topicDelta} topics` : null,
+              vocabDelta && vocabDelta > 0 ? `+${vocabDelta} words` : null,
+              exploredDelta && exploredDelta > 0
+                ? `+${exploredDelta} explored`
+                : null,
+            ].filter((value): value is string => !!value);
+
+            if (parts.length > 0) {
+              childSummaries.push(`${name}: ${parts.join(', ')}`);
+            }
           }
 
-          const parts = [
-            topicDelta && topicDelta > 0 ? `+${topicDelta} topics` : null,
-            vocabDelta && vocabDelta > 0 ? `+${vocabDelta} words` : null,
-            exploredDelta && exploredDelta > 0
-              ? `+${exploredDelta} explored`
-              : null,
-          ].filter((value): value is string => !!value);
-
-          if (parts.length > 0) {
-            childSummaries.push(`${name}: ${parts.join(', ')}`);
+          // Read current struggles for the watch-line (path A: topic names only).
+          // Malformed JSONB is skipped gracefully; digest still sends.
+          try {
+            const learningProfile = await db.query.learningProfiles.findFirst({
+              where: eq(learningProfiles.profileId, link.childProfileId),
+              columns: { struggles: true },
+            });
+            const rawStruggles = learningProfile?.struggles;
+            const topics = Array.isArray(rawStruggles)
+              ? (rawStruggles as Array<{ topic?: string }>)
+                  .map((s) => s.topic)
+                  .filter(
+                    (t): t is string => typeof t === 'string' && t.length > 0,
+                  )
+                  .slice(0, 2)
+              : [];
+            struggleLines.push({ childName: name, topics });
+          } catch (err) {
+            captureException(err, {
+              extra: {
+                childProfileId: link.childProfileId,
+                context: 'weekly-progress-push-struggles',
+              },
+            });
+            struggleLines.push({ childName: name, topics: [] });
           }
         }
 
+        // Consent gate: if ALL linked children were redacted, skip entirely —
+        // do not send an empty digest (push or email).
         if (childSummaries.length === 0) {
           return { status: 'skipped', reason: 'no_activity', parentId };
         }
@@ -327,7 +377,7 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
           db,
           parentId,
           'weekly_progress',
-          24
+          24,
         );
         if (recentCount > 0) {
           return { status: 'throttled', reason: 'dedup_24h', parentId };
@@ -339,6 +389,44 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
           body: childSummaries.join(' '),
           type: 'weekly_progress',
         });
+
+        // Email channel: send when weekly_progress_email = true AND parent has
+        // accounts.email. Resend idempotency-key dedupes within 24h window so
+        // Inngest step retries are safe.
+        const prefs = await db.query.notificationPreferences.findFirst({
+          where: eq(notificationPreferences.profileId, parentId),
+          columns: { weeklyProgressEmail: true },
+        });
+        if (prefs?.weeklyProgressEmail) {
+          const parentProfile = await db.query.profiles.findFirst({
+            where: eq(profiles.id, parentId),
+            columns: { accountId: true },
+          });
+          const parentAccount = parentProfile?.accountId
+            ? await db.query.accounts.findFirst({
+                where: eq(accounts.id, parentProfile.accountId),
+                columns: { email: true },
+              })
+            : null;
+          const parentEmail = parentAccount?.email ?? null;
+
+          if (parentEmail) {
+            const emailPayload = formatWeeklyProgressEmail(
+              parentEmail,
+              childSummaries,
+              struggleLines,
+            );
+            await sendEmail(emailPayload, {
+              resendApiKey: getStepResendApiKey(),
+              idempotencyKey: `weekly-${parentId}-${reportWeek}`,
+            });
+          } else {
+            captureException(
+              new Error('Weekly digest email skipped: parent has no email'),
+              { extra: { parentId, context: 'weekly-progress-push-email' } },
+            );
+          }
+        }
 
         return {
           status: result.sent ? 'completed' : 'throttled',
@@ -357,5 +445,5 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
         throw error;
       }
     });
-  }
+  },
 );
