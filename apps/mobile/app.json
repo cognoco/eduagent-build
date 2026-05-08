@@ -76,7 +76,7 @@
         "expo-image-picker",
         {
           "photosPermission": "MentoMate needs photo library access to import homework from your gallery.",
-          "microphonePermission": false
+          "microphonePermission": "MentoMate needs microphone access for voice-based learning."
         }
       ],
       "expo-notifications",

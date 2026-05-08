@@ -10,5 +10,5 @@ appId: com.mentomate.app
     visible:
       id: "learner-screen"
     timeout: 15000
-    # Parent scenarios land on family-scroll, not learner-screen
+    # Parent scenarios may land on ParentGateway or Family, not learner-screen.
     optional: true

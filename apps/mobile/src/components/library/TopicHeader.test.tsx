@@ -20,7 +20,7 @@ describe('TopicHeader', () => {
         chapter={null}
         retentionStatus={null}
         lastStudiedText="Last studied 3 days ago"
-      />
+      />,
     );
     screen.getByText('Photosynthesis');
   });
@@ -32,7 +32,7 @@ describe('TopicHeader', () => {
         chapter="Chapter 4: Plants"
         retentionStatus={null}
         lastStudiedText="Last studied 3 days ago"
-      />
+      />,
     );
     screen.getByText('Chapter 4: Plants');
   });
@@ -44,7 +44,7 @@ describe('TopicHeader', () => {
         chapter={null}
         retentionStatus={null}
         lastStudiedText="Last studied 3 days ago"
-      />
+      />,
     );
     expect(screen.queryByText('Chapter 4: Plants')).toBeNull();
   });
@@ -56,10 +56,23 @@ describe('TopicHeader', () => {
         chapter={null}
         retentionStatus="strong"
         lastStudiedText="Last studied 3 days ago"
-      />
+      />,
     );
     // RetentionPill renders the status label
     screen.getByText('Still remembered');
+  });
+
+  it('passes elapsed review days to RetentionPill', () => {
+    render(
+      <TopicHeader
+        name="Photosynthesis"
+        chapter={null}
+        retentionStatus="weak"
+        daysSinceLastReview={14}
+        lastStudiedText="Last studied 14 days ago"
+      />,
+    );
+    screen.getByText('Slipping after 14 days');
   });
 
   it('does not render RetentionPill when retentionStatus is null', () => {
@@ -69,7 +82,7 @@ describe('TopicHeader', () => {
         chapter={null}
         retentionStatus={null}
         lastStudiedText="Last studied 3 days ago"
-      />
+      />,
     );
     expect(screen.queryByText('Still remembered')).toBeNull();
     expect(screen.queryByText('Getting fuzzy')).toBeNull();
@@ -84,7 +97,7 @@ describe('TopicHeader', () => {
         chapter={null}
         retentionStatus={null}
         lastStudiedText="Last studied 3 days ago"
-      />
+      />,
     );
     screen.getByText('Last studied 3 days ago');
   });
@@ -96,7 +109,7 @@ describe('TopicHeader', () => {
         chapter="Chapter 2: Equations"
         retentionStatus="fading"
         lastStudiedText="Last studied yesterday"
-      />
+      />,
     );
     screen.getByText('Algebra');
     screen.getByText('Chapter 2: Equations');

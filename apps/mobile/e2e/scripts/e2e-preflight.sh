@@ -68,19 +68,19 @@ check_uiautomator_healthy() {
   # First free any stale Maestro driver that would hold the lock
   "$PREFLIGHT_ADB" shell am force-stop dev.mobile.maestro 2>/dev/null || true
   "$PREFLIGHT_ADB" shell am force-stop dev.mobile.maestro.test 2>/dev/null || true
-  if ! "$PREFLIGHT_ADB" shell uiautomator dump /sdcard/__preflight.xml >/dev/null 2>&1; then
+  if ! MSYS_NO_PATHCONV=1 "$PREFLIGHT_ADB" shell uiautomator dump /sdcard/__preflight.xml >/dev/null 2>&1; then
     _preflight_fail "uiautomator dump failed — UIAutomator lock likely stuck."
     _preflight_fail "  Fix: run 'adb reboot' and wait for boot completion."
     _preflight_fail "  Root cause: previous Maestro run was killed externally (use Ctrl+C next time)."
     return 1
   fi
-  out=$("$PREFLIGHT_ADB" exec-out "cat /sdcard/__preflight.xml" 2>/dev/null || echo "")
+  out=$(MSYS_NO_PATHCONV=1 "$PREFLIGHT_ADB" exec-out "cat /sdcard/__preflight.xml" 2>/dev/null || echo "")
   if [ -z "$out" ] || ! echo "$out" | grep -q "<hierarchy"; then
     _preflight_fail "uiautomator dump produced no hierarchy XML. Lock stuck or emulator unresponsive."
     _preflight_fail "  Fix: 'adb reboot' and retry."
     return 1
   fi
-  "$PREFLIGHT_ADB" shell rm -f /sdcard/__preflight.xml 2>/dev/null || true
+  MSYS_NO_PATHCONV=1 "$PREFLIGHT_ADB" shell rm -f /sdcard/__preflight.xml 2>/dev/null || true
   _preflight_ok "UIAutomator responding"
 }
 
@@ -118,12 +118,16 @@ check_metro_reachable() {
 #
 # Fresh proxy: <200ms. Degraded proxy: 5-15s. We fail at >${PREFLIGHT_PROXY_MAX_SECONDS}s.
 check_bundle_proxy_fast() {
+  # Skip if nothing is listening on the proxy port. On Windows, a refused TCP
+  # connection takes ~2.25s, which is indistinguishable from a slow proxy using
+  # a time-based check alone. No process on 8082 = no stale proxy = no problem.
+  if ! curl -s --max-time 1 "http://${PREFLIGHT_METRO_HOST}:${PREFLIGHT_PROXY_PORT}/" >/dev/null 2>&1; then
+    _preflight_ok "Bundle proxy on :${PREFLIGHT_PROXY_PORT} not running (skipped — not required)"
+    return 0
+  fi
   local url
   url="http://${PREFLIGHT_METRO_HOST}:${PREFLIGHT_PROXY_PORT}/apps/mobile/index.bundle?platform=android&dev=true&minify=false"
   local time_s
-  # --max-time guards against indefinite hang if proxy is truly dead. We request
-  # just the headers with -I would skip body, but Metro returns 405 on HEAD for
-  # bundles; so we must GET the body. Discard it to /dev/null.
   time_s=$(curl -s -o /dev/null -w "%{time_total}" --max-time 30 "$url" 2>/dev/null || echo "999")
   # Compare as floats via awk (bash can't do float arithmetic).
   local is_slow

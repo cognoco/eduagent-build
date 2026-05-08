@@ -60,14 +60,14 @@ describe('evaluateAssessmentSchema', () => {
       evaluateAssessmentSchema.parse({
         challengePassed: true,
         quality: 6,
-      })
+      }),
     ).toThrow();
 
     expect(() =>
       evaluateAssessmentSchema.parse({
         challengePassed: true,
         quality: -1,
-      })
+      }),
     ).toThrow();
   });
 });
@@ -84,6 +84,7 @@ describe('retentionCardSchema', () => {
     repetitions: 3,
     nextReviewAt: '2025-03-01T00:00:00.000Z',
     lastReviewedAt: '2025-02-23T00:00:00.000Z',
+    daysSinceLastReview: 6,
     xpStatus: 'verified' as const,
     failureCount: 0,
   };
@@ -113,10 +114,10 @@ describe('retentionCardSchema', () => {
 
   it('rejects evaluateDifficultyRung outside 1-4', () => {
     expect(() =>
-      retentionCardSchema.parse({ ...baseCard, evaluateDifficultyRung: 0 })
+      retentionCardSchema.parse({ ...baseCard, evaluateDifficultyRung: 0 }),
     ).toThrow();
     expect(() =>
-      retentionCardSchema.parse({ ...baseCard, evaluateDifficultyRung: 5 })
+      retentionCardSchema.parse({ ...baseCard, evaluateDifficultyRung: 5 }),
     ).toThrow();
   });
 });
@@ -205,7 +206,7 @@ describe('evaluateFailureActionSchema', () => {
       evaluateFailureActionSchema.parse({
         action: 'unknown',
         message: 'test',
-      })
+      }),
     ).toThrow();
   });
 });

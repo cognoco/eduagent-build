@@ -41,7 +41,6 @@ import {
 } from '../../../../lib/accommodation-options';
 import { getGracePeriodDaysRemaining } from '../../../../lib/consent-grace';
 import { FAMILY_HOME_PATH, goBackOrReplace } from '../../../../lib/navigation';
-import { SamplePreview } from '../../../../components/parent/SamplePreview';
 
 function SubjectSkeleton(): React.ReactNode {
   return (
@@ -70,7 +69,7 @@ function buildGrowthData(
         }>;
       }
     | null
-    | undefined
+    | undefined,
 ) {
   const points = history?.dataPoints ?? [];
 
@@ -80,13 +79,13 @@ function buildGrowthData(
       label: formatWeekLabel(point.date),
       value: Math.max(
         0,
-        point.topicsMastered - (previous?.topicsMastered ?? 0)
+        point.topicsMastered - (previous?.topicsMastered ?? 0),
       ),
       secondaryValue:
         point.vocabularyTotal > 0
           ? Math.max(
               0,
-              point.vocabularyTotal - (previous?.vocabularyTotal ?? 0)
+              point.vocabularyTotal - (previous?.vocabularyTotal ?? 0),
             )
           : undefined,
     };
@@ -113,7 +112,7 @@ export default function ChildDetailScreen() {
   // BUG-382: Client-side IDOR guard — only allow access to profiles owned by this account
   const isOwnedProfile = useMemo(
     () => profiles.some((p) => p.id === profileId),
-    [profiles, profileId]
+    [profiles, profileId],
   );
   const {
     data: child,
@@ -129,7 +128,7 @@ export default function ChildDetailScreen() {
   const effectiveConsentStatus =
     consentData?.consentStatus ?? child?.consentStatus ?? null;
   const hasRestrictedConsent = isRestrictedConsentStatus(
-    effectiveConsentStatus
+    effectiveConsentStatus,
   );
   const canLoadLearningSurfaces = child != null && !hasRestrictedConsent;
   const { data: inventory } = useChildInventory(profileId, {
@@ -140,7 +139,7 @@ export default function ChildDetailScreen() {
     {
       granularity: 'weekly',
     },
-    { enabled: canLoadLearningSurfaces }
+    { enabled: canLoadLearningSurfaces },
   );
   const visibleSubjects = inventory?.subjects.filter(hasSubjectActivity) ?? [];
   const pendingCelebrations = usePendingCelebrations({
@@ -164,7 +163,7 @@ export default function ChildDetailScreen() {
         .catch((err) => {
           console.warn(
             '[Celebrations] Failed to mark as seen, will retry on next visit:',
-            err
+            err,
           );
         });
     },
@@ -191,7 +190,7 @@ export default function ChildDetailScreen() {
     } catch {
       platformAlert(
         t('parentView.index.errorTitle'),
-        t('parentView.index.couldNotWithdrawConsent')
+        t('parentView.index.couldNotWithdrawConsent'),
       );
     }
   }, [revokeConsent, t]);
@@ -202,7 +201,7 @@ export default function ChildDetailScreen() {
     } catch {
       platformAlert(
         t('parentView.index.errorTitle'),
-        t('parentView.index.couldNotCancelDeletion')
+        t('parentView.index.couldNotCancelDeletion'),
       );
     }
   }, [restoreConsent, t]);
@@ -217,13 +216,13 @@ export default function ChildDetailScreen() {
           onError: () => {
             platformAlert(
               t('parentView.index.couldNotSaveSetting'),
-              t('parentView.index.pleaseTryAgain')
+              t('parentView.index.pleaseTryAgain'),
             );
           },
-        }
+        },
       );
     },
-    [profileId, learnerProfile?.accommodationMode, updateAccommodation, t]
+    [profileId, learnerProfile?.accommodationMode, updateAccommodation, t],
   );
 
   if (!profileId) {
@@ -324,8 +323,8 @@ export default function ChildDetailScreen() {
     const restrictedBodyKey = isWithdrawn
       ? 'parentView.index.consentRestrictedWithdrawnBody'
       : isRequested
-      ? 'parentView.index.consentRestrictedRequestedBody'
-      : 'parentView.index.consentRestrictedPendingBody';
+        ? 'parentView.index.consentRestrictedRequestedBody'
+        : 'parentView.index.consentRestrictedPendingBody';
     const handleRefreshConsent = (): void => {
       void refetch();
       void refetchConsent();
@@ -406,8 +405,8 @@ export default function ChildDetailScreen() {
                     {restoreConsent.isPending
                       ? t('parentView.index.cancelling')
                       : daysRemaining > 0
-                      ? t('parentView.index.cancelDeletion')
-                      : t('parentView.index.refreshStatus')}
+                        ? t('parentView.index.cancelDeletion')
+                        : t('parentView.index.refreshStatus')}
                   </Text>
                 </Pressable>
               </View>
@@ -556,22 +555,14 @@ export default function ChildDetailScreen() {
         {history ? (
           <View className="mt-4">
             {buildGrowthData(history).length < 2 ? (
-              <SamplePreview
-                unlockMessage={t('parentView.index.progressUnlockMessage')}
+              <View
+                className="bg-surface rounded-card px-4 py-3"
+                testID="growth-teaser"
               >
-                <View className="bg-surface rounded-card p-4">
-                  <View className="bg-border rounded h-4 w-1/3 mb-4" />
-                  <View className="flex-row items-end gap-3 h-20">
-                    {[30, 55, 40, 70, 45, 65, 50, 80].map((height, i) => (
-                      <View
-                        key={i}
-                        className="flex-1 rounded-t-full bg-primary"
-                        style={{ height }}
-                      />
-                    ))}
-                  </View>
-                </View>
-              </SamplePreview>
+                <Text className="text-caption text-text-secondary text-center">
+                  {t('parentView.index.progressUnlockMessage')}
+                </Text>
+              </View>
             ) : (
               <GrowthChart
                 title={t('parentView.index.recentGrowth')}
@@ -779,7 +770,7 @@ export default function ChildDetailScreen() {
                 >
                   <Text className="text-primary text-body-sm font-semibold">
                     {ACCOMMODATION_OPTIONS.find(
-                      (o) => o.mode === row.recommendation
+                      (o) => o.mode === row.recommendation,
                     )?.title ?? row.recommendation}
                   </Text>
                 </Pressable>
@@ -896,7 +887,7 @@ export default function ChildDetailScreen() {
                     onPress={() => void refetch()}
                     className="bg-surface rounded-lg py-3 items-center"
                     accessibilityLabel={t(
-                      'parentView.index.refreshDeletionStatus'
+                      'parentView.index.refreshDeletionStatus',
                     )}
                     accessibilityRole="button"
                     testID="refresh-grace-period-button"
@@ -963,7 +954,7 @@ export default function ChildDetailScreen() {
                 className="bg-danger rounded-button py-3 items-center min-h-[48px] justify-center"
                 accessibilityRole="button"
                 accessibilityLabel={t(
-                  'parentView.index.confirmWithdrawConsent'
+                  'parentView.index.confirmWithdrawConsent',
                 )}
                 testID="withdraw-consent-confirm"
               >

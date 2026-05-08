@@ -17,6 +17,7 @@ interface DetectedMilestone {
 
 const VOCABULARY_THRESHOLDS = [5, 10, 25, 50, 100, 250, 500, 1000];
 const TOPIC_THRESHOLDS = [1, 3, 5, 10, 25, 50];
+const BOOK_THRESHOLDS = [1, 3, 5, 10];
 const SESSION_THRESHOLDS = [1, 3, 5, 10, 25, 50, 100, 250];
 const STREAK_THRESHOLDS = [3, 7, 14, 30, 60, 100];
 const LEARNING_TIME_THRESHOLDS = [1, 5, 10, 25, 50, 100];
@@ -25,7 +26,7 @@ const TOPICS_EXPLORED_THRESHOLDS = [1, 3, 5, 10, 25];
 function crossed(
   previousValue: number,
   currentValue: number,
-  threshold: number
+  threshold: number,
 ): boolean {
   return previousValue < threshold && currentValue >= threshold;
 }
@@ -39,6 +40,7 @@ function defaultMetrics(): ProgressMetrics {
     topicsAttempted: 0,
     topicsMastered: 0,
     topicsInProgress: 0,
+    booksCompleted: 0,
     vocabularyTotal: 0,
     vocabularyMastered: 0,
     vocabularyLearning: 0,
@@ -55,7 +57,7 @@ function defaultMetrics(): ProgressMetrics {
 export function detectMilestones(
   profileId: string,
   previousMetrics: ProgressMetrics | null,
-  currentMetrics: ProgressMetrics
+  currentMetrics: ProgressMetrics,
 ): DetectedMilestone[] {
   const previous = previousMetrics ?? defaultMetrics();
   const detected: DetectedMilestone[] = [];
@@ -65,7 +67,7 @@ export function detectMilestones(
       crossed(
         previous.vocabularyTotal,
         currentMetrics.vocabularyTotal,
-        threshold
+        threshold,
       )
     ) {
       detected.push({
@@ -83,6 +85,18 @@ export function detectMilestones(
       detected.push({
         profileId,
         milestoneType: 'topic_mastered_count',
+        threshold,
+      });
+    }
+  }
+
+  for (const threshold of BOOK_THRESHOLDS) {
+    if (
+      crossed(previous.booksCompleted, currentMetrics.booksCompleted, threshold)
+    ) {
+      detected.push({
+        profileId,
+        milestoneType: 'book_completed',
         threshold,
       });
     }
@@ -127,7 +141,7 @@ export function detectMilestones(
   for (const subject of currentMetrics.subjects) {
     const previousSubject =
       previous.subjects.find(
-        (candidate) => candidate.subjectId === subject.subjectId
+        (candidate) => candidate.subjectId === subject.subjectId,
       ) ?? null;
     const previousExplored = previousSubject?.topicsExplored ?? 0;
 
@@ -136,7 +150,7 @@ export function detectMilestones(
       crossed(
         previousSubject?.topicsMastered ?? 0,
         subject.topicsMastered,
-        subject.topicsTotal
+        subject.topicsTotal,
       )
     ) {
       detected.push({
@@ -188,7 +202,7 @@ function mapMilestoneRow(row: typeof milestones.$inferSelect): MilestoneRecord {
 export async function storeMilestones(
   db: Database,
   profileId: string,
-  detected: DetectedMilestone[]
+  detected: DetectedMilestone[],
 ): Promise<MilestoneRecord[]> {
   const inserted: MilestoneRecord[] = [];
 

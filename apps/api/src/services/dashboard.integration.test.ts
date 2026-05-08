@@ -73,7 +73,7 @@ function buildSubjectMetrics(
   input: Partial<ProgressMetrics['subjects'][number]> & {
     subjectId: string;
     subjectName: string;
-  }
+  },
 ): ProgressMetrics['subjects'][number] {
   return {
     subjectId: input.subjectId,
@@ -93,7 +93,7 @@ function buildSubjectMetrics(
 }
 
 function buildProgressMetrics(
-  overrides: Partial<ProgressMetrics> = {}
+  overrides: Partial<ProgressMetrics> = {},
 ): ProgressMetrics {
   return {
     totalSessions: 0,
@@ -103,6 +103,10 @@ function buildProgressMetrics(
     topicsAttempted: 0,
     topicsMastered: 0,
     topicsInProgress: 0,
+    booksCompleted: 0,
+    weeklyDeltaTopicsMastered: null,
+    weeklyDeltaVocabularyTotal: null,
+    weeklyDeltaTopicsExplored: null,
     vocabularyTotal: 0,
     vocabularyMastered: 0,
     vocabularyLearning: 0,
@@ -146,7 +150,7 @@ async function seedProfile(input: {
 
 async function seedFamilyLink(
   parentProfileId: string,
-  childProfileId: string
+  childProfileId: string,
 ): Promise<void> {
   await db.insert(familyLinks).values({ parentProfileId, childProfileId });
 }
@@ -172,7 +176,7 @@ async function seedSubject(input: {
 
 async function seedCurriculum(
   subjectId: string,
-  topicTitles: string[]
+  topicTitles: string[],
 ): Promise<{ curriculumId: string; topicIds: string[] }> {
   const [curriculum] = await db
     .insert(curricula)
@@ -200,7 +204,7 @@ async function seedCurriculum(
         sortOrder: index,
         estimatedMinutes: 20,
         skipped: false,
-      }))
+      })),
     )
     .returning({ id: curriculumTopics.id });
 
@@ -450,7 +454,7 @@ describe('dashboard service integration', () => {
     const result = await countGuidedMetrics(
       db,
       profileId,
-      subtractDays(new Date(), 2)
+      subtractDays(new Date(), 2),
     );
 
     expect(result).toEqual({ guidedCount: 2, totalProblemCount: 3 });
@@ -529,7 +533,7 @@ describe('dashboard service integration', () => {
     const result = await countGuidedMetricsBatch(
       db,
       [childA, childB, childZero],
-      subtractDays(new Date(), 2)
+      subtractDays(new Date(), 2),
     );
 
     expect(result.get(childA)).toEqual({
@@ -682,7 +686,7 @@ describe('dashboard service integration', () => {
 
     const latestSnapshotDate = isoDate(now);
     const previousSnapshotDate = isoDate(
-      subtractDays(new Date(`${latestSnapshotDate}T00:00:00.000Z`), 7)
+      subtractDays(new Date(`${latestSnapshotDate}T00:00:00.000Z`), 7),
     );
 
     await seedProgressSnapshot({
@@ -780,7 +784,7 @@ describe('dashboard service integration', () => {
         longestStreak: 9,
         totalXp: 42,
         totalSessions: 3,
-      })
+      }),
     );
     expect(children[0]!.summary).toContain('Alex');
     expect(children[0]!.subjects).toEqual([
@@ -799,7 +803,7 @@ describe('dashboard service integration', () => {
         weeklyDeltaTopicsMastered: 2,
         weeklyDeltaVocabularyTotal: 6,
         weeklyDeltaTopicsExplored: 2,
-      })
+      }),
     );
   });
 
@@ -876,11 +880,11 @@ describe('dashboard service integration', () => {
             totalSessions: 0,
             subjects: [],
             progress: null,
-          })
+          }),
         );
         expect(child!.summary).toContain(summaryCopy);
       }
-    }
+    },
   );
 
   it('returns full dashboard learning metrics when consent is active', async () => {
@@ -936,10 +940,10 @@ describe('dashboard service integration', () => {
             name: 'Visible Science',
           }),
         ],
-      })
+      }),
     );
     expect(children[0]!.summary).not.toContain(
-      'hidden until consent is active'
+      'hidden until consent is active',
     );
   });
 
@@ -960,7 +964,7 @@ describe('dashboard service integration', () => {
     });
 
     await expect(
-      getChildSessions(db, parentProfileId, childProfileId)
+      getChildSessions(db, parentProfileId, childProfileId),
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 
@@ -999,11 +1003,11 @@ describe('dashboard service integration', () => {
         profileId: childProfileId,
         displayName: 'Learner',
         sessionsThisWeek: 1,
-      })
+      }),
     );
 
     await expect(
-      getChildDetail(db, strangerParentId, childProfileId)
+      getChildDetail(db, strangerParentId, childProfileId),
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 
@@ -1070,7 +1074,7 @@ describe('dashboard service integration', () => {
       db,
       parentProfileId,
       childProfileId,
-      subjectId
+      subjectId,
     );
 
     const plantCells = topics.find((topic) => topic.topicId === topicId1);
@@ -1085,7 +1089,7 @@ describe('dashboard service integration', () => {
         summaryExcerpt: 'Plant cells have a nucleus and a cell wall.',
         xpStatus: 'verified',
         totalSessions: 1,
-      })
+      }),
     );
     // Topics with 0 sessions are filtered out (parent only sees topics with activity)
     expect(animalCells).toBeUndefined();
@@ -1156,13 +1160,13 @@ describe('dashboard service integration', () => {
     const sessions = await getChildSessions(
       db,
       parentProfileId,
-      childProfileId
+      childProfileId,
     );
     const detail = await getChildSessionDetail(
       db,
       parentProfileId,
       childProfileId,
-      learningSessionId
+      learningSessionId,
     );
 
     expect(sessions).toHaveLength(2);
@@ -1173,7 +1177,7 @@ describe('dashboard service integration', () => {
         topicTitle: 'Equivalent fractions',
         highlight: 'Practiced equivalent fractions',
         engagementSignal: 'curious',
-      })
+      }),
     );
     expect(sessions[1]).toEqual(
       expect.objectContaining({
@@ -1183,7 +1187,7 @@ describe('dashboard service integration', () => {
         displayTitle: 'Math Homework',
         displaySummary: '5 problems, practiced linear equations.',
         narrative: null,
-      })
+      }),
     );
     expect(detail).toEqual(
       expect.objectContaining({
@@ -1195,7 +1199,7 @@ describe('dashboard service integration', () => {
           'They compared fraction sizes and corrected one shaky step with a hint.',
         conversationPrompt: 'Which fraction felt easiest to compare today?',
         engagementSignal: 'curious',
-      })
+      }),
     );
   });
 });

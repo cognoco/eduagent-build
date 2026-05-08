@@ -69,7 +69,7 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
         }
         throw error;
       }
-    }
+    },
   )
   // GET /subjects/:subjectId/topics/:topicId/note
   .get(
@@ -89,7 +89,7 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
         }
         throw error;
       }
-    }
+    },
   )
   // GET /notes/topic-ids — all topic IDs with notes for this profile
   .get('/notes/topic-ids', async (c) => {
@@ -115,7 +115,7 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
         if (error instanceof NotFoundError) return notFound(c, error.message);
         throw error;
       }
-    }
+    },
   )
   // POST /subjects/:subjectId/topics/:topicId/notes
   .post(
@@ -138,14 +138,14 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
           subjectId,
           topicId,
           content,
-          sessionId
+          sessionId,
         );
         return c.json(noteMutationResponseSchema.parse({ note }), 201);
       } catch (error) {
         if (error instanceof NotFoundError) return notFound(c, error.message);
         throw error;
       }
-    }
+    },
   )
   // PATCH /notes/:noteId
   .patch(
@@ -167,7 +167,7 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
         if (error instanceof NotFoundError) return notFound(c, error.message);
         throw error;
       }
-    }
+    },
   )
   // DELETE /subjects/:subjectId/topics/:topicId/note
   // Back-compat endpoint for older mobile builds that delete the latest note
@@ -195,7 +195,7 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
         }
         throw error;
       }
-    }
+    },
   )
   // DELETE /notes/:noteId
   .delete(
@@ -211,7 +211,7 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
       const deleted = await deleteNoteById(db, profileId, noteId);
       if (!deleted) return notFound(c, 'Note not found');
       return c.body(null, 204);
-    }
+    },
   )
   // GET /subjects/:subjectId/topics/:topicId/sessions
   .get(
@@ -226,5 +226,5 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
 
       const sessions = await getTopicSessions(db, profileId, topicId);
       return c.json(topicSessionsResponseSchema.parse({ sessions }));
-    }
+    },
   );

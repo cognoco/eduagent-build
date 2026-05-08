@@ -24,10 +24,8 @@ tags:
       SEED_SCENARIO: "parent-subject-no-retention"
 
 # 2. Wait for parent dashboard
-- extendedWaitUntil:
-    visible:
-      id: "family-scroll"
-    timeout: 15000
+- runFlow:
+    file: ../_setup/open-family-dashboard.yaml
 
 # 3. Tap primary action on the seeded child card
 - tapOn:

@@ -40,7 +40,7 @@ const UUID = {
 } as const;
 
 function makeSubject(
-  overrides: Partial<ProgressMetrics['subjects'][number]> = {}
+  overrides: Partial<ProgressMetrics['subjects'][number]> = {},
 ): ProgressMetrics['subjects'][number] {
   return {
     subjectId: UUID.subjectDefault,
@@ -61,7 +61,7 @@ function makeSubject(
 }
 
 function makeMetrics(
-  overrides: Partial<ProgressMetrics> = {}
+  overrides: Partial<ProgressMetrics> = {},
 ): ProgressMetrics {
   return {
     totalSessions: 0,
@@ -71,6 +71,10 @@ function makeMetrics(
     topicsAttempted: 0,
     topicsMastered: 0,
     topicsInProgress: 0,
+    booksCompleted: 0,
+    weeklyDeltaTopicsMastered: null,
+    weeklyDeltaVocabularyTotal: null,
+    weeklyDeltaTopicsExplored: null,
     vocabularyTotal: 0,
     vocabularyMastered: 0,
     vocabularyLearning: 0,
@@ -94,7 +98,7 @@ function makeMonthlyReportRow(
     reportData: MonthlyReportData;
     viewedAt: Date | null;
     createdAt: Date;
-  }> = {}
+  }> = {},
 ) {
   const defaultReportData: MonthlyReportData = {
     childName: 'Alice',
@@ -167,7 +171,7 @@ describe('generateMonthlyReportData — headline stat selection', () => {
       'Alice',
       'April 2026',
       thisMonth,
-      null
+      null,
     );
 
     expect(result.headlineStat.label).toBe('Words learned');
@@ -188,7 +192,7 @@ describe('generateMonthlyReportData — headline stat selection', () => {
       'Alice',
       'April 2026',
       thisMonth,
-      null
+      null,
     );
 
     expect(result.headlineStat.label).toBe('Topics explored');
@@ -208,7 +212,7 @@ describe('generateMonthlyReportData — headline stat selection', () => {
       'Alice',
       'April 2026',
       thisMonth,
-      null
+      null,
     );
 
     expect(result.headlineStat.label).toBe('Topics mastered');
@@ -222,7 +226,7 @@ describe('generateMonthlyReportData — headline stat selection', () => {
       'Alice',
       'April 2026',
       thisMonth,
-      null
+      null,
     );
 
     expect(result.headlineStat.label).toBe('Topics mastered');
@@ -242,7 +246,7 @@ describe('generateMonthlyReportData — first month (lastMonth null)', () => {
       'Bob',
       'April 2026',
       thisMonth,
-      null
+      null,
     );
 
     expect(result.headlineStat.comparison).toBe('in a first month');
@@ -255,7 +259,7 @@ describe('generateMonthlyReportData — first month (lastMonth null)', () => {
       'Bob',
       'April 2026',
       thisMonth,
-      null
+      null,
     );
 
     expect(result.headlineStat.comparison).toBe('in a first month');
@@ -272,7 +276,7 @@ describe('generateMonthlyReportData — first month (lastMonth null)', () => {
       'Bob',
       'April 2026',
       thisMonth,
-      null
+      null,
     );
 
     expect(result.headlineStat.comparison).toBe('in a first month');
@@ -285,7 +289,7 @@ describe('generateMonthlyReportData — first month (lastMonth null)', () => {
       'Bob',
       'April 2026',
       thisMonth,
-      null
+      null,
     );
 
     expect(result.lastMonth).toBeNull();
@@ -302,7 +306,7 @@ describe('generateMonthlyReportData — with lastMonth comparison', () => {
       'Alice',
       'April 2026',
       thisMonth,
-      lastMonth
+      lastMonth,
     );
 
     expect(result.headlineStat.label).toBe('Words learned');
@@ -318,7 +322,7 @@ describe('generateMonthlyReportData — with lastMonth comparison', () => {
       'Alice',
       'April 2026',
       thisMonth,
-      lastMonth
+      lastMonth,
     );
 
     expect(result.headlineStat.label).toBe('Topics mastered');
@@ -342,12 +346,12 @@ describe('generateMonthlyReportData — with lastMonth comparison', () => {
       'Alice',
       'April 2026',
       thisMonth,
-      lastMonth
+      lastMonth,
     );
 
     expect(result.headlineStat.label).toBe('Topics explored');
     expect(result.headlineStat.comparison).toBe(
-      'up from 3 total topics before this month'
+      'up from 3 total topics before this month',
     );
   });
 
@@ -372,7 +376,7 @@ describe('generateMonthlyReportData — with lastMonth comparison', () => {
       'Alice',
       'April 2026',
       thisMonth,
-      lastMonth
+      lastMonth,
     );
 
     expect(result.lastMonth).toMatchObject({
@@ -400,7 +404,7 @@ describe('generateMonthlyReportData — delta clamping', () => {
       'Alice',
       'April 2026',
       thisMonth,
-      lastMonth
+      lastMonth,
     );
 
     // vocab delta = max(0, 30-50) = 0, mastered delta = max(0, 3-5) = 0 → both 0
@@ -417,7 +421,7 @@ describe('generateMonthlyReportData — delta clamping', () => {
       'Alice',
       'April 2026',
       thisMonth,
-      lastMonth
+      lastMonth,
     );
 
     expect(result.thisMonth.totalSessions).toBe(0);
@@ -437,7 +441,7 @@ describe('generateMonthlyReportData — thisMonth computed deltas', () => {
       'Alice',
       'April 2026',
       thisMonth,
-      lastMonth
+      lastMonth,
     );
 
     expect(result.thisMonth.totalSessions).toBe(5);
@@ -451,7 +455,7 @@ describe('generateMonthlyReportData — thisMonth computed deltas', () => {
       'Alice',
       'April 2026',
       thisMonth,
-      lastMonth
+      lastMonth,
     );
 
     expect(result.thisMonth.totalActiveMinutes).toBe(150);
@@ -465,7 +469,7 @@ describe('generateMonthlyReportData — thisMonth computed deltas', () => {
       'Alice',
       'April 2026',
       thisMonth,
-      lastMonth
+      lastMonth,
     );
 
     // [EP15-I2 AR-6] vocabularyTotal is cumulative end-of-month
@@ -479,7 +483,7 @@ describe('generateMonthlyReportData — thisMonth computed deltas', () => {
       'Alice',
       'April 2026',
       thisMonth,
-      null
+      null,
     );
 
     expect(result.thisMonth.streakBest).toBe(14);
@@ -498,7 +502,7 @@ describe('generateMonthlyReportData — subject breakdowns', () => {
       'Alice',
       'April 2026',
       thisMonth,
-      null
+      null,
     );
 
     expect(result.subjects).toEqual([]);
@@ -522,7 +526,7 @@ describe('generateMonthlyReportData — subject breakdowns', () => {
       'Alice',
       'April 2026',
       thisMonth,
-      null
+      null,
     );
 
     expect(result.subjects).toHaveLength(1);
@@ -569,7 +573,7 @@ describe('generateMonthlyReportData — subject breakdowns', () => {
       'Alice',
       'April 2026',
       thisMonth,
-      lastMonth
+      lastMonth,
     );
 
     expect(result.subjects[0]).toMatchObject({
@@ -603,7 +607,7 @@ describe('generateMonthlyReportData — subject breakdowns', () => {
       'Alice',
       'April 2026',
       thisMonth,
-      lastMonth
+      lastMonth,
     );
 
     expect(result.subjects[0]).toMatchObject({
@@ -656,7 +660,7 @@ describe('generateMonthlyReportData — subject breakdowns', () => {
       'Alice',
       'April 2026',
       thisMonth,
-      lastMonth
+      lastMonth,
     );
 
     const math = result.subjects.find((s) => s.subjectName === 'Math');
@@ -687,7 +691,7 @@ describe('generateMonthlyReportData — subject trend', () => {
       'Alice',
       'April 2026',
       thisMonth,
-      lastMonth
+      lastMonth,
     );
 
     expect(result.subjects[0]?.trend).toBe('growing');
@@ -706,7 +710,7 @@ describe('generateMonthlyReportData — subject trend', () => {
       'Alice',
       'April 2026',
       thisMonth,
-      lastMonth
+      lastMonth,
     );
 
     expect(result.subjects[0]?.trend).toBe('stable');
@@ -721,7 +725,7 @@ describe('generateMonthlyReportData — subject trend', () => {
       'Alice',
       'April 2026',
       thisMonth,
-      null
+      null,
     );
 
     expect(result.subjects[0]?.trend).toBe('stable');
@@ -744,7 +748,7 @@ describe('generateMonthlyReportData — subject trend', () => {
       'Alice',
       'April 2026',
       thisMonth,
-      lastMonth
+      lastMonth,
     );
 
     // safeDelta clamps to 0 → trend is 'stable', not 'declining'
@@ -761,7 +765,7 @@ describe('generateMonthlyReportData — subject trend', () => {
       'Alice',
       'April 2026',
       thisMonth,
-      null
+      null,
     );
 
     // No lastMonth subject → delta = max(0, 45 - 0) = 45 → growing
@@ -779,7 +783,7 @@ describe('generateMonthlyReportData — metadata passthrough', () => {
       'Charlie',
       'March 2026',
       makeMetrics(),
-      null
+      null,
     );
 
     expect(result.childName).toBe('Charlie');
@@ -791,7 +795,7 @@ describe('generateMonthlyReportData — metadata passthrough', () => {
       'Alice',
       'April 2026',
       makeMetrics(),
-      null
+      null,
     );
 
     expect(result.highlights).toEqual([]);
@@ -1043,7 +1047,7 @@ describe('listMonthlyReportsForParentChild', () => {
     const result = await listMonthlyReportsForParentChild(
       db,
       UUID.parent,
-      UUID.child
+      UUID.child,
     );
 
     expect(result).toEqual([]);
@@ -1062,7 +1066,7 @@ describe('listMonthlyReportsForParentChild', () => {
     const result = await listMonthlyReportsForParentChild(
       db,
       UUID.parent,
-      UUID.child
+      UUID.child,
     );
 
     expect(result).toHaveLength(1);
@@ -1072,7 +1076,7 @@ describe('listMonthlyReportsForParentChild', () => {
       viewedAt: null,
     });
     expect(result[0]?.headlineStat).toEqual(
-      expect.objectContaining({ label: expect.any(String) })
+      expect.objectContaining({ label: expect.any(String) }),
     );
   });
 
@@ -1085,7 +1089,7 @@ describe('listMonthlyReportsForParentChild', () => {
     const result = await listMonthlyReportsForParentChild(
       db,
       UUID.parent,
-      UUID.child
+      UUID.child,
     );
 
     expect(result[0]?.viewedAt).toBe(viewedDate.toISOString());
@@ -1099,7 +1103,7 @@ describe('listMonthlyReportsForParentChild', () => {
     const result = await listMonthlyReportsForParentChild(
       db,
       UUID.parent,
-      UUID.child
+      UUID.child,
     );
 
     expect(result[0]?.headlineStat).toMatchObject({
@@ -1125,7 +1129,7 @@ describe('getMonthlyReportForParentChild', () => {
       db,
       UUID.parent,
       UUID.child,
-      UUID.report
+      UUID.report,
     );
 
     expect(result).toBeNull();
@@ -1147,7 +1151,7 @@ describe('getMonthlyReportForParentChild', () => {
       db,
       UUID.parent,
       UUID.child,
-      UUID.report
+      UUID.report,
     );
 
     expect(result).not.toBeNull();
@@ -1169,7 +1173,7 @@ describe('getMonthlyReportForParentChild', () => {
       db,
       UUID.parent,
       UUID.child,
-      UUID.report
+      UUID.report,
     );
 
     expect(result?.createdAt).toBe('2026-04-01T12:00:00.000Z');
@@ -1185,7 +1189,7 @@ describe('getMonthlyReportForParentChild', () => {
       db,
       UUID.parent,
       UUID.child,
-      UUID.report
+      UUID.report,
     );
 
     expect(result?.viewedAt).toBe(viewedDate.toISOString());
@@ -1205,7 +1209,7 @@ describe('markMonthlyReportViewed', () => {
     const db = createMockDb();
 
     await expect(
-      markMonthlyReportViewed(db, UUID.parent, UUID.child, UUID.report)
+      markMonthlyReportViewed(db, UUID.parent, UUID.child, UUID.report),
     ).resolves.toBeUndefined();
   });
 
@@ -1220,7 +1224,7 @@ describe('markMonthlyReportViewed', () => {
 
     expect(mockUpdate).toHaveBeenCalledTimes(1);
     expect(mockSet).toHaveBeenCalledWith(
-      expect.objectContaining({ viewedAt: expect.any(Date) })
+      expect.objectContaining({ viewedAt: expect.any(Date) }),
     );
     expect(mockWhere).toHaveBeenCalledTimes(1);
   });

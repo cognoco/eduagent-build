@@ -71,25 +71,51 @@ const SUBJECT_ID = 'a0000000-0000-4000-a000-000000000010';
 const BOOK_ID = 'a0000000-0000-4000-a000-000000000020';
 const TOPIC_ID = 'a0000000-0000-4000-a000-000000000030';
 const NOTE_ID = 'a0000000-0000-4000-a000-000000000040';
+const SESSION_ID = 'a0000000-0000-4000-a000-000000000050';
 
 const MOCK_RESULT = {
   subjects: [{ id: SUBJECT_ID, name: 'Mathematics' }],
-  books: [{ id: BOOK_ID, subjectId: SUBJECT_ID, title: 'Algebra Basics' }],
+  books: [
+    {
+      id: BOOK_ID,
+      subjectId: SUBJECT_ID,
+      subjectName: 'Mathematics',
+      title: 'Algebra Basics',
+    },
+  ],
   topics: [
     {
       id: TOPIC_ID,
       bookId: BOOK_ID,
+      bookTitle: 'Algebra Basics',
       subjectId: SUBJECT_ID,
+      subjectName: 'Mathematics',
       name: 'Linear Equations',
     },
   ],
   notes: [
     {
       id: NOTE_ID,
+      sessionId: SESSION_ID,
       topicId: TOPIC_ID,
+      topicName: 'Linear Equations',
       bookId: BOOK_ID,
       subjectId: SUBJECT_ID,
+      subjectName: 'Mathematics',
       contentSnippet: 'A linear equation has the form ax + b = 0',
+      createdAt: '2026-01-01T00:00:00.000Z',
+    },
+  ],
+  sessions: [
+    {
+      sessionId: SESSION_ID,
+      topicId: TOPIC_ID,
+      topicTitle: 'Linear Equations',
+      bookId: BOOK_ID,
+      subjectId: SUBJECT_ID,
+      subjectName: 'Mathematics',
+      snippet: 'We practiced algebra basics.',
+      occurredAt: '2026-01-01T00:00:00.000Z',
     },
   ],
 };
@@ -118,7 +144,7 @@ describe('GET /v1/library/search', () => {
     const res = await app.request(
       '/v1/library/search?q=algebra',
       { headers: AUTH_HEADERS },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -136,8 +162,10 @@ describe('GET /v1/library/search', () => {
     expect(body.notes).toHaveLength(1);
     expect(body.notes[0].id).toBe(NOTE_ID);
     expect(body.notes[0].contentSnippet).toBe(
-      'A linear equation has the form ax + b = 0'
+      'A linear equation has the form ax + b = 0',
     );
+    expect(body.sessions).toHaveLength(1);
+    expect(body.sessions[0].sessionId).toBe(SESSION_ID);
     // profileId comes from getProfile().id (mocked to 'test-profile-id'),
     // not the raw X-Profile-Id header value.
     // The db arg is verified by call position — not asserted on shape since
@@ -154,12 +182,13 @@ describe('GET /v1/library/search', () => {
       books: [],
       topics: [],
       notes: [],
+      sessions: [],
     });
 
     const res = await app.request(
       '/v1/library/search?q=zzz',
       { headers: AUTH_HEADERS },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -168,13 +197,14 @@ describe('GET /v1/library/search', () => {
     expect(body.books).toEqual([]);
     expect(body.topics).toEqual([]);
     expect(body.notes).toEqual([]);
+    expect(body.sessions).toEqual([]);
   });
 
   it('returns 400 when q query param is missing', async () => {
     const res = await app.request(
       '/v1/library/search',
       { headers: AUTH_HEADERS },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -185,7 +215,7 @@ describe('GET /v1/library/search', () => {
     const res = await app.request(
       '/v1/library/search?q=',
       { headers: AUTH_HEADERS },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -198,7 +228,7 @@ describe('GET /v1/library/search', () => {
       {
         headers: makeAuthHeaders(),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -209,7 +239,7 @@ describe('GET /v1/library/search', () => {
     const res = await app.request(
       '/v1/library/search?q=test',
       { headers: { 'Content-Type': 'application/json' } },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(401);

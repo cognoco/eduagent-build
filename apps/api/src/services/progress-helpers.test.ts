@@ -12,7 +12,11 @@ const mockDatabaseModule = createDatabaseModuleMock({
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 import { createScopedRepository, type Database } from '@eduagent/database';
-import { getActiveSubjectsByRecency } from './progress-helpers';
+import type { ProgressMetrics } from '@eduagent/schemas';
+import {
+  computeWeeklyDeltas,
+  getActiveSubjectsByRecency,
+} from './progress-helpers';
 
 const CHILD_PROFILE_ID = '01933b3c-0000-7000-8000-000000000042';
 
@@ -49,7 +53,7 @@ function makeMockDb(opts: {
       subjects: {
         findMany: jest.fn().mockResolvedValue(opts.subjects),
       },
-    })
+    }),
   );
 
   // db.select chain is used for the lastSession query.
@@ -59,6 +63,35 @@ function makeMockDb(opts: {
   const selectFn = jest.fn().mockReturnValue({ from: fromFn });
 
   return { select: selectFn } as unknown as Database;
+}
+
+function makeMetrics(
+  overrides: Partial<ProgressMetrics> = {},
+): ProgressMetrics {
+  return {
+    totalSessions: 0,
+    totalActiveMinutes: 0,
+    totalWallClockMinutes: 0,
+    totalExchanges: 0,
+    topicsAttempted: 0,
+    topicsMastered: 0,
+    topicsInProgress: 0,
+    booksCompleted: 0,
+    weeklyDeltaTopicsMastered: null,
+    weeklyDeltaVocabularyTotal: null,
+    weeklyDeltaTopicsExplored: null,
+    vocabularyTotal: 0,
+    vocabularyMastered: 0,
+    vocabularyLearning: 0,
+    vocabularyNew: 0,
+    retentionCardsDue: 0,
+    retentionCardsStrong: 0,
+    retentionCardsFading: 0,
+    currentStreak: 0,
+    longestStreak: 0,
+    subjects: [],
+    ...overrides,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -143,5 +176,117 @@ describe('getActiveSubjectsByRecency', () => {
       'Biology',
       'Zoology',
     ]);
+  });
+});
+
+describe('computeWeeklyDeltas', () => {
+  it('returns null deltas when there is no prior-week snapshot', () => {
+    expect(computeWeeklyDeltas(null, makeMetrics())).toEqual({
+      topicsMastered: null,
+      vocabularyTotal: null,
+      topicsExplored: null,
+    });
+  });
+
+  it('computes clamped weekly growth across global and subject metrics', () => {
+    const previous = makeMetrics({
+      topicsMastered: 2,
+      vocabularyTotal: 8,
+      subjects: [
+        {
+          subjectId: '01933b3c-0000-7000-8000-000000000101',
+          subjectName: 'Math',
+          pedagogyMode: 'socratic',
+          topicsAttempted: 1,
+          topicsMastered: 1,
+          topicsTotal: 3,
+          topicsExplored: 2,
+          vocabularyTotal: 8,
+          vocabularyMastered: 3,
+          sessionsCount: 1,
+          activeMinutes: 12,
+          wallClockMinutes: 14,
+          lastSessionAt: null,
+        },
+      ],
+    });
+    const current = makeMetrics({
+      topicsMastered: 5,
+      vocabularyTotal: 12,
+      subjects: [
+        {
+          subjectId: '01933b3c-0000-7000-8000-000000000101',
+          subjectName: 'Math',
+          pedagogyMode: 'socratic',
+          topicsAttempted: 4,
+          topicsMastered: 4,
+          topicsTotal: 5,
+          topicsExplored: 6,
+          vocabularyTotal: 12,
+          vocabularyMastered: 5,
+          sessionsCount: 4,
+          activeMinutes: 40,
+          wallClockMinutes: 44,
+          lastSessionAt: null,
+        },
+      ],
+    });
+
+    expect(computeWeeklyDeltas(previous, current)).toEqual({
+      topicsMastered: 3,
+      vocabularyTotal: 4,
+      topicsExplored: 4,
+    });
+  });
+
+  it('clamps negative deltas to zero for learner-facing display', () => {
+    const previous = makeMetrics({
+      topicsMastered: 5,
+      vocabularyTotal: 20,
+      subjects: [
+        {
+          subjectId: '01933b3c-0000-7000-8000-000000000101',
+          subjectName: 'Math',
+          pedagogyMode: 'socratic',
+          topicsAttempted: 5,
+          topicsMastered: 5,
+          topicsTotal: 5,
+          topicsExplored: 5,
+          vocabularyTotal: 20,
+          vocabularyMastered: 10,
+          sessionsCount: 5,
+          activeMinutes: 50,
+          wallClockMinutes: 55,
+          lastSessionAt: null,
+        },
+      ],
+    });
+    const current = makeMetrics({
+      topicsMastered: 4,
+      vocabularyTotal: 18,
+      subjects: [
+        {
+          subjectId: '01933b3c-0000-7000-8000-000000000101',
+          subjectName: 'Math',
+          pedagogyMode: 'socratic',
+          topicsAttempted: 4,
+          topicsMastered: 4,
+          topicsTotal: 5,
+          topicsExplored: 3,
+          vocabularyTotal: 18,
+          vocabularyMastered: 8,
+          sessionsCount: 5,
+          activeMinutes: 50,
+          wallClockMinutes: 55,
+          lastSessionAt: null,
+        },
+      ],
+    });
+
+    expect(computeWeeklyDeltas(previous, current)).toEqual({
+      topicsMastered: 0,
+      vocabularyTotal: 0,
+      topicsExplored: 0,
+    });
   });
 });

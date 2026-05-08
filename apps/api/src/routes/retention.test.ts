@@ -99,6 +99,7 @@ describe('retention routes', () => {
             repetitions: 3,
             nextReviewAt: '2026-02-22T10:00:00.000Z',
             lastReviewedAt: null,
+            daysSinceLastReview: null,
             xpStatus: 'pending',
             failureCount: 0,
             topicTitle: 'Limits',
@@ -111,7 +112,7 @@ describe('retention routes', () => {
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/retention`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -127,7 +128,7 @@ describe('retention routes', () => {
         {
           headers: makeAuthHeaders(),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -138,7 +139,7 @@ describe('retention routes', () => {
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/retention`,
         {},
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -150,7 +151,7 @@ describe('retention routes', () => {
       const res = await app.request(
         '/v1/topics/not-a-uuid/retention',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -176,6 +177,7 @@ describe('retention routes', () => {
                 repetitions: 3,
                 nextReviewAt: '2026-02-22T10:00:00.000Z',
                 lastReviewedAt: null,
+                daysSinceLastReview: null,
                 xpStatus: 'pending',
                 failureCount: 0,
                 evaluateDifficultyRung: null,
@@ -191,7 +193,7 @@ describe('retention routes', () => {
       const res = await app.request(
         '/v1/library/retention',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -202,7 +204,7 @@ describe('retention routes', () => {
       expect(getAllSubjectsRetention).toHaveBeenCalledTimes(1);
       // Second arg must be the profile ID — proves the route passes scope.
       expect((getAllSubjectsRetention as jest.Mock).mock.calls[0]?.[1]).toBe(
-        'test-profile-id'
+        'test-profile-id',
       );
     });
 
@@ -214,7 +216,7 @@ describe('retention routes', () => {
         {
           headers: makeAuthHeaders(),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -242,6 +244,7 @@ describe('retention routes', () => {
         repetitions: 3,
         nextReviewAt: '2026-02-22T10:00:00.000Z',
         lastReviewedAt: null,
+        daysSinceLastReview: null,
         xpStatus: 'pending',
         failureCount: 0,
       });
@@ -249,7 +252,7 @@ describe('retention routes', () => {
       const res = await app.request(
         `/v1/topics/${TOPIC_ID}/retention`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -265,7 +268,7 @@ describe('retention routes', () => {
       const res = await app.request(
         `/v1/topics/${TOPIC_ID}/retention`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -278,7 +281,7 @@ describe('retention routes', () => {
       const res = await app.request(
         `/v1/topics/${TOPIC_ID}/retention`,
         {},
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -310,7 +313,7 @@ describe('retention routes', () => {
               'Photosynthesis converts light energy into chemical energy.',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -343,7 +346,7 @@ describe('retention routes', () => {
             attemptMode: 'dont_remember',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -363,7 +366,7 @@ describe('retention routes', () => {
             answer: 'Some answer without topicId',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -380,7 +383,7 @@ describe('retention routes', () => {
             answer: '',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -397,7 +400,7 @@ describe('retention routes', () => {
           }),
           headers: { 'Content-Type': 'application/json' },
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -428,7 +431,7 @@ describe('retention routes', () => {
             method: 'different',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -450,7 +453,7 @@ describe('retention routes', () => {
             method: 'invalid_method',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -467,7 +470,7 @@ describe('retention routes', () => {
           }),
           headers: { 'Content-Type': 'application/json' },
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -488,7 +491,7 @@ describe('retention routes', () => {
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/needs-deepening`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -502,7 +505,7 @@ describe('retention routes', () => {
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/needs-deepening`,
         {},
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -523,7 +526,7 @@ describe('retention routes', () => {
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/teaching-preference`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -537,7 +540,7 @@ describe('retention routes', () => {
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/teaching-preference`,
         {},
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -565,7 +568,7 @@ describe('retention routes', () => {
             method: 'visual_diagrams',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -587,7 +590,7 @@ describe('retention routes', () => {
             method: 'invalid_method',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -604,7 +607,7 @@ describe('retention routes', () => {
             method: 'visual_diagrams',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -613,7 +616,7 @@ describe('retention routes', () => {
 
     it('returns 404 when the subject is not owned by the caller', async () => {
       (setTeachingPreference as jest.Mock).mockRejectedValueOnce(
-        new NotFoundError('Subject')
+        new NotFoundError('Subject'),
       );
 
       const res = await app.request(
@@ -626,7 +629,7 @@ describe('retention routes', () => {
             method: 'visual_diagrams',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(404);
@@ -643,7 +646,7 @@ describe('retention routes', () => {
           }),
           headers: { 'Content-Type': 'application/json' },
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -667,7 +670,7 @@ describe('retention routes', () => {
             analogyDomain: 'cooking',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -694,7 +697,7 @@ describe('retention routes', () => {
             analogyDomain: null,
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -718,7 +721,7 @@ describe('retention routes', () => {
           method: 'DELETE',
           headers: AUTH_HEADERS,
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -731,7 +734,7 @@ describe('retention routes', () => {
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/teaching-preference`,
         { method: 'DELETE' },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -751,7 +754,7 @@ describe('retention routes', () => {
       const res = await app.request(
         `/v1/retention/stability?subjectId=${SUBJECT_ID}`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -770,7 +773,7 @@ describe('retention routes', () => {
       const res = await app.request(
         '/v1/retention/stability',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -788,7 +791,7 @@ describe('retention routes', () => {
       const res = await app.request(
         '/v1/retention/stability?subjectId=not-a-uuid',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -798,10 +801,10 @@ describe('retention routes', () => {
     it('[BREAK] returns 400 on SQL-shaped subjectId payload', async () => {
       const res = await app.request(
         `/v1/retention/stability?subjectId=${encodeURIComponent(
-          "' OR 1=1 --"
+          "' OR 1=1 --",
         )}`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -812,7 +815,7 @@ describe('retention routes', () => {
       const res = await app.request(
         `/v1/retention/stability?subjectId=${SUBJECT_ID}`,
         {},
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);

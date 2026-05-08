@@ -32,10 +32,10 @@ tags:
       SEED_SCENARIO: "parent-with-children"
       API_URL: ${API_URL}
 
-# 2. Wait for parent dashboard
+# 2. Wait for parent gateway
 - extendedWaitUntil:
     visible:
-      id: "family-scroll"
+      id: "parent-gateway"
     timeout: 15000
 
 # 3. Switch to child profile ("Test Teen")

@@ -2,7 +2,7 @@ import { detectMilestones } from './milestone-detection';
 import type { ProgressMetrics } from '@eduagent/schemas';
 
 function makeMetrics(
-  overrides: Partial<ProgressMetrics> = {}
+  overrides: Partial<ProgressMetrics> = {},
 ): ProgressMetrics {
   return {
     totalSessions: 0,
@@ -12,6 +12,10 @@ function makeMetrics(
     topicsAttempted: 0,
     topicsMastered: 0,
     topicsInProgress: 0,
+    booksCompleted: 0,
+    weeklyDeltaTopicsMastered: null,
+    weeklyDeltaVocabularyTotal: null,
+    weeklyDeltaTopicsExplored: null,
     vocabularyTotal: 0,
     vocabularyMastered: 0,
     vocabularyLearning: 0,
@@ -39,7 +43,7 @@ describe('milestone thresholds (lowered)', () => {
       expect.objectContaining({
         milestoneType: 'session_count',
         threshold: 1,
-      })
+      }),
     );
   });
 
@@ -53,7 +57,7 @@ describe('milestone thresholds (lowered)', () => {
       expect.objectContaining({
         milestoneType: 'session_count',
         threshold: 3,
-      })
+      }),
     );
   });
 
@@ -67,8 +71,44 @@ describe('milestone thresholds (lowered)', () => {
       expect.objectContaining({
         milestoneType: 'topic_mastered_count',
         threshold: 1,
-      })
+      }),
     );
+  });
+
+  it('fires book_completed milestone at threshold 1', () => {
+    const previous = makeMetrics({ booksCompleted: 0 });
+    const current = makeMetrics({ booksCompleted: 1 });
+
+    const milestones = detectMilestones(profileId, previous, current);
+
+    expect(milestones).toContainEqual(
+      expect.objectContaining({
+        milestoneType: 'book_completed',
+        threshold: 1,
+      }),
+    );
+  });
+
+  it('does not fire book_completed when the completed book count is unchanged', () => {
+    const previous = makeMetrics({ booksCompleted: 1 });
+    const current = makeMetrics({ booksCompleted: 1 });
+
+    const milestones = detectMilestones(profileId, previous, current);
+
+    expect(
+      milestones.filter((m) => m.milestoneType === 'book_completed'),
+    ).toHaveLength(0);
+  });
+
+  it('does not fire book_completed when the completed book count decreases', () => {
+    const previous = makeMetrics({ booksCompleted: 1 });
+    const current = makeMetrics({ booksCompleted: 0 });
+
+    const milestones = detectMilestones(profileId, previous, current);
+
+    expect(
+      milestones.filter((m) => m.milestoneType === 'book_completed'),
+    ).toHaveLength(0);
   });
 
   it('fires streak_length milestone at threshold 3', () => {
@@ -81,7 +121,7 @@ describe('milestone thresholds (lowered)', () => {
       expect.objectContaining({
         milestoneType: 'streak_length',
         threshold: 3,
-      })
+      }),
     );
   });
 
@@ -95,7 +135,7 @@ describe('milestone thresholds (lowered)', () => {
       expect.objectContaining({
         milestoneType: 'vocabulary_count',
         threshold: 5,
-      })
+      }),
     );
   });
 
@@ -107,7 +147,7 @@ describe('milestone thresholds (lowered)', () => {
 
     // No session_count milestone at 9 — thresholds are 1,3,5,10,...
     expect(
-      milestones.filter((m) => m.milestoneType === 'session_count')
+      milestones.filter((m) => m.milestoneType === 'session_count'),
     ).toHaveLength(0);
   });
 
@@ -120,7 +160,7 @@ describe('milestone thresholds (lowered)', () => {
       expect.objectContaining({
         milestoneType: 'session_count',
         threshold: 1,
-      })
+      }),
     );
   });
 });

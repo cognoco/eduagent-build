@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../lib/theme';
 import { useProfile, personaFromBirthYear } from '../../lib/profile';
+import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
 import { useParentProxy } from '../../hooks/use-parent-proxy';
 import { useRatingPrompt } from '../../hooks/use-rating-prompt';
 import {
@@ -28,6 +29,7 @@ import {
 import { useSessionBookmarks } from '../../hooks/use-bookmarks';
 import { useDepthEvaluation } from '../../hooks/use-depth-evaluation';
 import { useProgressInventory } from '../../hooks/use-progress';
+import { usePostSessionNotificationAsk } from '../../hooks/use-post-session-notification-ask';
 import { goBackOrReplace } from '../../lib/navigation';
 import { platformAlert } from '../../lib/platform-alert';
 import { formatApiError } from '../../lib/format-api-error';
@@ -45,6 +47,7 @@ import {
   ErrorFallback,
 } from '../../components/common';
 import { FilingFailedBanner } from '../../components/session/FilingFailedBanner';
+import { MentorMemoryCue } from '../../components/session-summary/MentorMemoryCue';
 
 const SKIP_NUDGE_THRESHOLD = 3;
 const SKIP_WARNING_THRESHOLD = 5;
@@ -113,11 +116,21 @@ export default function SessionSummaryScreen() {
     transcript.data?.archived === false ? transcript.data : null;
   const { onSuccessfulRecall } = useRatingPrompt();
   const { activeProfile } = useProfile();
-  const { isParentProxy } = useParentProxy();
+  const { isParentProxy, childProfile } = useParentProxy();
+  const activeProfileRole = useActiveProfileRole();
   const persona = personaFromBirthYear(activeProfile?.birthYear);
   const recallBridge = useRecallBridge(sessionId ?? '');
   const depthEvaluation = useDepthEvaluation();
   const progressInventory = useProgressInventory();
+  // JIT notification permission ask — fires once after the user has
+  // completed at least one session (the post-value moment). Skipped in
+  // parent-proxy mode and dedup'd via SecureStore inside the hook.
+  // Must be called before any early returns to satisfy Rules of Hooks.
+  usePostSessionNotificationAsk(
+    activeProfile?.id,
+    (progressInventory.data?.global.totalSessions ?? 0) >= 1,
+    isParentProxy,
+  );
   const [recallQuestions, setRecallQuestions] = useState<string[] | null>(null);
 
   // BUG-449: when the user re-enters this screen from Library → Shelf → Book →
@@ -134,7 +147,7 @@ export default function SessionSummaryScreen() {
     trimmedExchangeCount === '' ? NaN : Number(trimmedExchangeCount);
   const exchangeCountForRecap = Number.isFinite(parsedExchangeCount)
     ? parsedExchangeCount
-    : liveTranscript?.session.exchangeCount ?? 0;
+    : (liveTranscript?.session.exchangeCount ?? 0);
   const persistedSummary = useSessionSummary(sessionId ?? '', {
     refetchInterval: (data) => {
       if (recapTimedOut || exchangeCountForRecap < 3) {
@@ -248,34 +261,34 @@ export default function SessionSummaryScreen() {
   }, [isPersistedSubmitted, sessionId, activeProfile?.id]);
 
   const showSubmittedView = submitted || isPersistedSubmitted;
-  const displayContent = submitted ? summaryText : persisted?.content ?? '';
+  const displayContent = submitted ? summaryText : (persisted?.content ?? '');
   const displayAiFeedback = submitted
     ? aiFeedback
-    : persisted?.aiFeedback ?? null;
+    : (persisted?.aiFeedback ?? null);
   const transcriptSessionType = liveTranscript?.session.sessionType;
   const sessionType: 'learning' | 'freeform' | 'homework' =
     sessionTypeParam === 'homework' || transcriptSessionType === 'homework'
       ? 'homework'
       : sessionTypeParam === 'freeform'
-      ? 'freeform'
-      : 'learning';
+        ? 'freeform'
+        : 'learning';
   const conversationLanguage = activeProfile?.conversationLanguage ?? 'en';
   const summaryPrompts = getReflectionStarters(
     sessionType,
-    conversationLanguage
+    conversationLanguage,
   );
   const recapHeader =
     sessionType === 'homework'
       ? 'What you practiced'
       : sessionType === 'freeform'
-      ? 'What you asked about'
-      : 'What you explored';
+        ? 'What you asked about'
+        : 'What you explored';
   const reflectionPlaceholder =
     sessionType === 'homework'
       ? 'What I practiced...'
       : sessionType === 'freeform'
-      ? 'What I found out...'
-      : 'In my own words...';
+        ? 'What I found out...'
+        : 'In my own words...';
   const baseXp = (submitted ? submittedXp?.baseXp : persisted?.baseXp) ?? null;
   const reflectionBonusXp =
     (submitted
@@ -291,7 +304,7 @@ export default function SessionSummaryScreen() {
   // the server count. Reuses the trimmed/parsed result from line 124-126.
   const exchanges = Number.isFinite(parsedExchangeCount)
     ? parsedExchangeCount
-    : fallbackSession?.exchangeCount ?? 0;
+    : (fallbackSession?.exchangeCount ?? 0);
   const rung = parseInt(escalationRung ?? '1', 10) || 1;
   // [BUG-801] Same fix for wallClockSeconds: parseInt('0') yields 0 which is
   // truthy-falsy in `||`. Use Number.isFinite to preserve a legitimate 0.
@@ -303,8 +316,8 @@ export default function SessionSummaryScreen() {
     Math.round(
       (Number.isFinite(parsedWallClockSeconds)
         ? parsedWallClockSeconds
-        : fallbackSession?.wallClockSeconds ?? 0) / 60
-    )
+        : (fallbackSession?.wallClockSeconds ?? 0)) / 60,
+    ),
   );
   const parsedMilestones = (() => {
     if (!milestones) {
@@ -318,7 +331,7 @@ export default function SessionSummaryScreen() {
       if (!Array.isArray(raw)) {
         Sentry.captureMessage(
           'session-summary milestone param parsed to non-array',
-          { level: 'warning', extra: { milestonesParam: milestones } }
+          { level: 'warning', extra: { milestonesParam: milestones } },
         );
         return fallbackSession?.milestonesReached ?? [];
       }
@@ -612,7 +625,7 @@ export default function SessionSummaryScreen() {
         canSubmit
           ? "You typed a reflection but haven't submitted it. Submit it now, discard it, or keep writing?"
           : 'Your reflection is too short to submit (it needs at least 10 characters). Discard it or keep writing?',
-        buttons
+        buttons,
       );
     });
 
@@ -698,7 +711,7 @@ export default function SessionSummaryScreen() {
                 })();
               },
             },
-          ]
+          ],
         );
         return;
       }
@@ -720,7 +733,7 @@ export default function SessionSummaryScreen() {
                 })();
               },
             },
-          ]
+          ],
         );
         return;
       }
@@ -749,6 +762,18 @@ export default function SessionSummaryScreen() {
     }
   };
 
+  const handleOpenMentorMemory = (): void => {
+    if (activeProfileRole === 'impersonated-child' && childProfile?.id) {
+      router.push({
+        pathname: '/(app)/child/[profileId]/mentor-memory',
+        params: { profileId: childProfile.id },
+      } as never);
+      return;
+    }
+
+    router.push('/(app)/mentor-memory');
+  };
+
   // [BUG-805] Suppress the duration takeaway until we have a verified non-zero
   // wall-clock value. Math.max(1, ...) above masks missing data as "1 minute",
   // so without this guard the screen would briefly render "1 minute - great
@@ -765,12 +790,12 @@ export default function SessionSummaryScreen() {
     takeaways.push(
       `${wallClockMinutes} minute${
         wallClockMinutes === 1 ? '' : 's'
-      } - great session!`
+      } - great session!`,
     );
   }
   if (exchanges > 0) {
     takeaways.push(
-      `You worked through ${exchanges} exchange${exchanges === 1 ? '' : 's'}`
+      `You worked through ${exchanges} exchange${exchanges === 1 ? '' : 's'}`,
     );
   }
   if (rung >= 3) {
@@ -801,6 +826,14 @@ export default function SessionSummaryScreen() {
     }
   });
   const effectiveSubjectId = subjectId ?? fallbackSession?.subjectId ?? null;
+  const completedSessionCount = progressInventory.data?.global.totalSessions;
+  const hasMentorMemorySignal =
+    completedSessionCount !== undefined && completedSessionCount >= 2;
+  const hasParentProxyMemoryAccess =
+    !isParentProxy ||
+    (childProfile?.consentStatus === 'CONSENTED' && !!childProfile.id);
+  const shouldShowMentorMemoryCue =
+    hasMentorMemorySignal && hasParentProxyMemoryAccess;
   const shouldShowBookmarkPrompt =
     exchanges >= 5 &&
     (sessionBookmarks.data?.length ?? 0) === 0 &&
@@ -1029,6 +1062,14 @@ export default function SessionSummaryScreen() {
               </View>
             ))}
           </View>
+        ) : null}
+
+        {shouldShowMentorMemoryCue ? (
+          <MentorMemoryCue
+            title={t('sessionSummary.mentorMemoryCue.title')}
+            subtitle={t('sessionSummary.mentorMemoryCue.subtitle')}
+            onPress={handleOpenMentorMemory}
+          />
         ) : null}
 
         {persisted?.nextTopicId && persisted?.nextTopicTitle ? (

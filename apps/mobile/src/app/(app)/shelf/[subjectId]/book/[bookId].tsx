@@ -67,7 +67,7 @@ import {
  * >30% fading+weak+forgotten → fading, else strong.
  */
 function computeBookRetentionStatus(
-  nextReviewAtValues: (string | null)[]
+  nextReviewAtValues: (string | null)[],
 ): RetentionStatus | null {
   if (nextReviewAtValues.length === 0) return null;
   const now = Date.now();
@@ -118,7 +118,7 @@ interface GroupedTopicChapter {
 }
 
 function groupTopicsByChapter(
-  topics: CurriculumTopic[]
+  topics: CurriculumTopic[],
 ): GroupedTopicChapter[] {
   const map = new Map<string, CurriculumTopic[]>();
   for (const t of topics) {
@@ -231,11 +231,11 @@ export default function BookScreen() {
   const book = bookQuery.data?.book ?? null;
   const topics = useMemo(
     () => bookQuery.data?.topics ?? [],
-    [bookQuery.data?.topics]
+    [bookQuery.data?.topics],
   );
   const activeTopics = useMemo(
     () => topics.filter((topic) => !topic.skipped),
-    [topics]
+    [topics],
   );
 
   const needsGeneration = book !== null && !book.topicsGenerated;
@@ -244,7 +244,7 @@ export default function BookScreen() {
   // generation completes faster than perception.
   const showGenerating = useStickyLoading(
     needsGeneration || generateMutation.isPending,
-    800
+    800,
   );
 
   useEffect(() => {
@@ -258,7 +258,7 @@ export default function BookScreen() {
     const slowTimer = setTimeout(() => setGenPhase('slow'), SLOW_THRESHOLD_MS);
     const timeoutTimer = setTimeout(
       () => setGenPhase('timed_out'),
-      TIMEOUT_THRESHOLD_MS
+      TIMEOUT_THRESHOLD_MS,
     );
 
     generateMutation.mutate(undefined, {
@@ -307,7 +307,7 @@ export default function BookScreen() {
     const slowTimer = setTimeout(() => setGenPhase('slow'), SLOW_THRESHOLD_MS);
     const timeoutTimer = setTimeout(
       () => setGenPhase('timed_out'),
-      TIMEOUT_THRESHOLD_MS
+      TIMEOUT_THRESHOLD_MS,
     );
     retryTimersRef.current = [slowTimer, timeoutTimer];
 
@@ -341,11 +341,11 @@ export default function BookScreen() {
   // --- Notes ---
   const notes = useMemo(
     () => notesQuery.data?.notes ?? [],
-    [notesQuery.data?.notes]
+    [notesQuery.data?.notes],
   );
   const noteTopicIds = useMemo(
     () => new Set(notes.map((n) => n.topicId)),
-    [notes]
+    [notes],
   );
   const topicTitleMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -355,9 +355,9 @@ export default function BookScreen() {
   const sortedNotes = useMemo(
     () =>
       [...notes].sort((a, b) =>
-        (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '')
+        (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''),
       ),
-    [notes]
+    [notes],
   );
 
   // --- Book-level retention status (derived from retention topics) ---
@@ -367,8 +367,18 @@ export default function BookScreen() {
     const studiedTopics = retentionTopics.filter((rt) => rt.repetitions > 0);
     if (studiedTopics.length === 0) return null;
     return computeBookRetentionStatus(
-      studiedTopics.map((rt) => rt.nextReviewAt)
+      studiedTopics.map((rt) => rt.nextReviewAt),
     );
+  }, [retentionTopicsQuery.data]);
+
+  const bookDaysSinceLastReview = useMemo((): number | null => {
+    const retentionTopics = retentionTopicsQuery.data?.topics ?? [];
+    const values = retentionTopics
+      .filter((rt) => rt.repetitions > 0)
+      .map((rt) => rt.daysSinceLastReview)
+      .filter((value): value is number => typeof value === 'number');
+    if (values.length === 0) return null;
+    return Math.max(...values);
   }, [retentionTopicsQuery.data]);
 
   // Topics that have been studied at least once (repetitions > 0)
@@ -384,7 +394,7 @@ export default function BookScreen() {
   // --- Sessions data ---
   const sessions = useMemo(
     () => sessionsQuery.data ?? [],
-    [sessionsQuery.data]
+    [sessionsQuery.data],
   );
   const sessionsError = sessionsQuery.isError;
   const retentionError = retentionTopicsQuery.isError;
@@ -394,7 +404,7 @@ export default function BookScreen() {
 
   const activeTopicIds = useMemo(
     () => new Set(activeTopics.map((topic) => topic.id)),
-    [activeTopics]
+    [activeTopics],
   );
 
   // --- New status-first state derivation ---
@@ -412,7 +422,7 @@ export default function BookScreen() {
     const candidates = [...sessions]
       .filter(
         (session) =>
-          !!session.topicId && inProgressTopicIds.has(session.topicId)
+          !!session.topicId && inProgressTopicIds.has(session.topicId),
       )
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
@@ -433,8 +443,8 @@ export default function BookScreen() {
       .filter((topicId) => topicId !== continueNowTopicId)
       .sort((a, b) =>
         (lastSessionByTopicId.get(b) ?? '').localeCompare(
-          lastSessionByTopicId.get(a) ?? ''
-        )
+          lastSessionByTopicId.get(a) ?? '',
+        ),
       );
   }, [sessions, inProgressTopicIds, continueNowTopicId]);
 
@@ -470,8 +480,8 @@ export default function BookScreen() {
       .sort(
         (a, b) =>
           (lastSessionByTopicId.get(b.id) ?? '').localeCompare(
-            lastSessionByTopicId.get(a.id) ?? ''
-          ) || a.sortOrder - b.sortOrder
+            lastSessionByTopicId.get(a.id) ?? '',
+          ) || a.sortOrder - b.sortOrder,
       );
   }, [activeTopics, topicStudiedIds, sessions]);
 
@@ -481,9 +491,9 @@ export default function BookScreen() {
         activeTopics,
         topicStudiedIds,
         inProgressTopicIds,
-        sessions
+        sessions,
       ),
-    [activeTopics, topicStudiedIds, inProgressTopicIds, sessions]
+    [activeTopics, topicStudiedIds, inProgressTopicIds, sessions],
   );
 
   // --- Chapter-first topic grouping ---
@@ -521,7 +531,7 @@ export default function BookScreen() {
       items.sort(
         (a, b) =>
           stateOrder[a.state] - stateOrder[b.state] ||
-          a.topic.sortOrder - b.topic.sortOrder
+          a.topic.sortOrder - b.topic.sortOrder,
       );
       return { chapter: group.chapter, items };
     });
@@ -538,7 +548,7 @@ export default function BookScreen() {
     () =>
       activeTopics.length > 0 &&
       activeTopics.every((topic) => topicStudiedIds.has(topic.id)),
-    [activeTopics, topicStudiedIds]
+    [activeTopics, topicStudiedIds],
   );
 
   useEffect(() => {
@@ -563,7 +573,7 @@ export default function BookScreen() {
 
   const visibleStartedTopicIds = useMemo(
     () => startedTopicIds.filter((topicId) => topicById.has(topicId)),
-    [startedTopicIds, topicById]
+    [startedTopicIds, topicById],
   );
 
   useEffect(() => {
@@ -583,7 +593,7 @@ export default function BookScreen() {
       .filter(
         (topic) =>
           topicStudiedIds.has(topic.topicId) &&
-          activeTopicIds.has(topic.topicId)
+          activeTopicIds.has(topic.topicId),
       )
       .sort((a, b) => {
         const aTime = a.nextReviewAt
@@ -623,13 +633,13 @@ export default function BookScreen() {
         },
       } as never);
     },
-    [router, subjectId, topicById]
+    [router, subjectId, topicById],
   );
 
   // --- Session list grouped by chapter ---
   const groupedSessions = useMemo(
     () => groupSessionsByChapter(sessions),
-    [sessions]
+    [sessions],
   );
   const showChapterDividers = sessionCount >= 4;
 
@@ -645,7 +655,7 @@ export default function BookScreen() {
         },
       } as never);
     },
-    [router, subjectId]
+    [router, subjectId],
   );
 
   const handleNoteSourcePress = useCallback(
@@ -659,7 +669,7 @@ export default function BookScreen() {
         },
       } as never);
     },
-    [router, subjectId]
+    [router, subjectId],
   );
 
   // --- Long-press: context menu for moving topic to a different book ---
@@ -676,7 +686,7 @@ export default function BookScreen() {
       if (otherBooks.length === 0) {
         platformAlert(
           session.topicTitle,
-          'This is the only book on this shelf — there is nowhere to move this topic.'
+          'This is the only book on this shelf — there is nowhere to move this topic.',
         );
         return;
       }
@@ -698,13 +708,13 @@ export default function BookScreen() {
               onSuccess: () => {
                 platformAlert(
                   'Moved',
-                  `"${session.topicTitle}" moved to ${targetBook.title}.`
+                  `"${session.topicTitle}" moved to ${targetBook.title}.`,
                 );
               },
               onError: (err) => {
                 platformAlert('Could not move topic', formatApiError(err));
               },
-            }
+            },
           );
         },
       }));
@@ -714,7 +724,7 @@ export default function BookScreen() {
         { text: 'Cancel', style: 'cancel' },
       ]);
     },
-    [subjectId, bookId, isReadOnly, allBooksQuery.data, moveTopic]
+    [subjectId, bookId, isReadOnly, allBooksQuery.data, moveTopic],
   );
 
   // --- Start learning: follow the status-first CTA priority ---
@@ -778,7 +788,7 @@ export default function BookScreen() {
         params: { mode: 'learning', subjectId, topicId, topicName: topicTitle },
       } as never);
     },
-    [router, subjectId]
+    [router, subjectId],
   );
 
   const handleBuildLearningPath = useCallback(async () => {
@@ -874,10 +884,10 @@ export default function BookScreen() {
           onError: (err) => {
             platformAlert('Could not save note', formatApiError(err));
           },
-        }
+        },
       );
     },
-    [selectedTopicId, createNote]
+    [selectedTopicId, createNote],
   );
 
   const handleNoteInputCancel = useCallback(() => {
@@ -895,10 +905,10 @@ export default function BookScreen() {
           onError: (err) => {
             platformAlert('Could not update note', formatApiError(err));
           },
-        }
+        },
       );
     },
-    [editingNote, updateNote]
+    [editingNote, updateNote],
   );
 
   const handleNoteEditCancel = useCallback(() => {
@@ -924,7 +934,7 @@ export default function BookScreen() {
         },
       });
     },
-    [notes, deleteNoteById]
+    [notes, deleteNoteById],
   );
 
   // --- Auto-start session when navigated with autoStart=true (M-12) ---
@@ -1244,6 +1254,7 @@ export default function BookScreen() {
             <View className="mt-2">
               <RetentionPill
                 status={bookRetentionStatus}
+                daysSinceLastReview={bookDaysSinceLastReview}
                 testID="book-retention-pill"
               />
             </View>
@@ -1257,7 +1268,7 @@ export default function BookScreen() {
                   style={{
                     width: `${Math.min(
                       100,
-                      (doneTopics.length / activeTopics.length) * 100
+                      (doneTopics.length / activeTopics.length) * 100,
                     )}%`,
                   }}
                 />

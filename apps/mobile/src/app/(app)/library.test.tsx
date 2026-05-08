@@ -9,13 +9,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 // apps/mobile/src/test-utils/mock-i18n.ts for the lookup behaviour.
 jest.mock(
   'react-i18next',
-  () => require('../../test-utils/mock-i18n').i18nMock
+  () => require('../../test-utils/mock-i18n').i18nMock,
 );
 
 const mockPush = jest.fn();
 const mockUseSubjects = jest.fn();
 const mockUseOverallProgress = jest.fn();
 const mockUseAllBooks = jest.fn();
+const mockUseLibrarySearch = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush, replace: jest.fn() }),
@@ -95,6 +96,10 @@ jest.mock('../../lib/theme', () => ({
     surfaceElevated: '#f9fafb',
     warning: '#f59e0b',
   }),
+  useSubjectTint: () => ({
+    solid: '#0f766e',
+    soft: 'rgba(15,118,110,0.14)',
+  }),
 }));
 
 jest.mock('../../lib/api-client', () => ({
@@ -111,11 +116,7 @@ jest.mock('../../lib/api-client', () => ({
 }));
 
 jest.mock('../../hooks/use-library-search', () => ({
-  useLibrarySearch: () => ({
-    data: null,
-    isLoading: false,
-    isError: false,
-  }),
+  useLibrarySearch: (...args: unknown[]) => mockUseLibrarySearch(...args),
 }));
 
 jest.mock('../../components/common/ShimmerSkeleton', () => ({
@@ -136,16 +137,18 @@ jest.mock('../../components/library/ShelfRow', () => ({
     subjectId,
     name,
     onPress,
+    testID,
   }: {
     subjectId: string;
     name: string;
     onPress: (id: string) => void;
+    testID?: string;
   }) => {
     const { View, Text, Pressable } = require('react-native');
     return (
       <View>
         <Pressable
-          testID={`shelf-row-header-${subjectId}`}
+          testID={testID ?? `shelf-row-header-${subjectId}`}
           onPress={() => onPress(subjectId)}
           accessibilityRole="button"
         >
@@ -213,11 +216,11 @@ function createWrapper() {
 
 function setLibraryRetention(
   queryClient: QueryClient,
-  payload: AggregateLibRetention | undefined
+  payload: AggregateLibRetention | undefined,
 ) {
   queryClient.setQueryData(
     ['library', 'retention', ACTIVE_PROFILE_ID],
-    payload
+    payload,
   );
 }
 
@@ -235,6 +238,12 @@ describe('LibraryScreen', () => {
     setLibraryRetention(testQueryClient, { subjects: [] });
     mockUseAllBooks.mockReturnValue({
       books: [],
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+    mockUseLibrarySearch.mockReturnValue({
+      data: null,
       isLoading: false,
       isError: false,
       refetch: jest.fn(),
@@ -267,7 +276,7 @@ describe('LibraryScreen', () => {
     });
 
     expect(() =>
-      render(<LibraryScreen />, { wrapper: TestWrapper })
+      render(<LibraryScreen />, { wrapper: TestWrapper }),
     ).not.toThrow();
   });
 
@@ -281,7 +290,7 @@ describe('LibraryScreen', () => {
       isLoading: false,
     });
     expect(() =>
-      render(<LibraryScreen />, { wrapper: TestWrapper })
+      render(<LibraryScreen />, { wrapper: TestWrapper }),
     ).not.toThrow();
   });
 
@@ -315,7 +324,7 @@ describe('LibraryScreen', () => {
     });
 
     expect(() =>
-      render(<LibraryScreen />, { wrapper: TestWrapper })
+      render(<LibraryScreen />, { wrapper: TestWrapper }),
     ).not.toThrow();
   });
 
@@ -345,7 +354,7 @@ describe('LibraryScreen', () => {
     });
 
     expect(() =>
-      render(<LibraryScreen />, { wrapper: TestWrapper })
+      render(<LibraryScreen />, { wrapper: TestWrapper }),
     ).not.toThrow();
   });
 
@@ -505,7 +514,7 @@ describe('LibraryScreen', () => {
       // the tree, but the Modal host component reports visible=false.
       // animationType="slide" uniquely identifies the manage-subjects modal.
       expect(
-        screen.UNSAFE_queryByProps({ visible: false, animationType: 'slide' })
+        screen.UNSAFE_queryByProps({ visible: false, animationType: 'slide' }),
       ).not.toBeNull();
     });
 
@@ -601,6 +610,163 @@ describe('LibraryScreen', () => {
 
       // Header should read just "1 subjects" with no trailing " · N topics".
       screen.getByText('1 subjects');
+    });
+  });
+
+  describe('search result navigation', () => {
+    const SEARCH_DATA = {
+      subjects: [{ id: 'sub-1', name: 'Biology' }],
+      books: [
+        {
+          id: 'book-1',
+          subjectId: 'sub-1',
+          subjectName: 'Biology',
+          title: 'Cell Biology',
+        },
+      ],
+      topics: [
+        {
+          id: 'top-1',
+          bookId: 'book-1',
+          bookTitle: 'Cell Biology',
+          subjectId: 'sub-1',
+          subjectName: 'Biology',
+          name: 'Mitosis',
+        },
+      ],
+      notes: [
+        {
+          id: 'note-1',
+          sessionId: 'sess-1',
+          topicId: 'top-1',
+          topicName: 'Mitosis',
+          bookId: 'book-1',
+          subjectId: 'sub-1',
+          subjectName: 'Biology',
+          contentSnippet: 'powerhouse of the cell',
+          createdAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+      sessions: [
+        {
+          sessionId: 'sess-1',
+          topicId: 'top-1',
+          topicTitle: 'Mitosis',
+          bookId: 'book-1',
+          subjectId: 'sub-1',
+          subjectName: 'Biology',
+          snippet: 'explored cells today',
+          occurredAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+    };
+
+    function renderSearching() {
+      mockUseSubjects.mockReturnValue({
+        data: [{ id: 'sub-1', name: 'Biology', status: 'active' }],
+        isLoading: false,
+        isError: false,
+      });
+      mockUseOverallProgress.mockReturnValue({
+        data: {
+          subjects: [
+            {
+              subjectId: 'sub-1',
+              topicsTotal: 5,
+              topicsCompleted: 2,
+              topicsVerified: 2,
+            },
+          ],
+        },
+        isLoading: false,
+        isError: false,
+      });
+      mockUseLibrarySearch.mockReturnValue({
+        data: SEARCH_DATA,
+        isLoading: false,
+        isError: false,
+        refetch: jest.fn(),
+      });
+      render(<LibraryScreen />, { wrapper: TestWrapper });
+      fireEvent.changeText(screen.getByTestId('library-search-input'), 'test');
+      act(() => {
+        jest.runOnlyPendingTimers();
+      });
+    }
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('subject row tap calls router.push to shelf', () => {
+      renderSearching();
+      fireEvent.press(screen.getByTestId('search-subject-row-sub-1'));
+      expect(mockPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/(app)/shelf/[subjectId]',
+          params: { subjectId: 'sub-1' },
+        }),
+      );
+    });
+
+    it('book row tap pushes shelf then book', () => {
+      renderSearching();
+      fireEvent.press(screen.getByTestId('book-row-book-1'));
+      expect(mockPush).toHaveBeenCalledTimes(2);
+      expect(mockPush).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          pathname: '/(app)/shelf/[subjectId]',
+          params: { subjectId: 'sub-1' },
+        }),
+      );
+      expect(mockPush).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
+          params: { subjectId: 'sub-1', bookId: 'book-1' },
+        }),
+      );
+    });
+
+    it('topic row tap pushes to topic screen', () => {
+      renderSearching();
+      fireEvent.press(screen.getByTestId('topic-row-top-1'));
+      expect(mockPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/(app)/topic/[topicId]',
+          params: { topicId: 'top-1' },
+        }),
+      );
+    });
+
+    it('note row tap pushes to parent topic', () => {
+      renderSearching();
+      fireEvent.press(screen.getByTestId('note-row-note-1'));
+      expect(mockPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/(app)/topic/[topicId]',
+          params: { topicId: 'top-1' },
+        }),
+      );
+    });
+
+    it('session row tap pushes to root session-summary route', () => {
+      renderSearching();
+      fireEvent.press(screen.getByTestId('session-row-sess-1'));
+      expect(mockPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/session-summary/[sessionId]',
+          params: expect.objectContaining({
+            sessionId: 'sess-1',
+            subjectId: 'sub-1',
+          }),
+        }),
+      );
     });
   });
 });

@@ -13,7 +13,7 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: "family-scroll"
+      id: "parent-gateway"
     timeout: 15000
 
 - runFlow:

@@ -735,7 +735,16 @@
       "searching": "検索中…",
       "noResults": "「{{query}}」の検索結果はありません",
       "clear": "検索をクリア",
-      "placeholder": "本、トピック、メモを検索…"
+      "placeholder": "本、トピック、メモを検索…",
+      "error": "検索は現在利用できません。",
+      "freeform": "自由記述",
+      "sections": {
+        "subjects": "科目",
+        "books": "本",
+        "topics": "トピック",
+        "notes": "メモ",
+        "sessions": "セッション"
+      }
     },
     "manage": {
       "button": "管理",
@@ -1137,6 +1146,14 @@
       "wordsLink": "{{count}}語 →",
       "vocabularyLink": "語彙 →"
     },
+    "weeklyDelta": {
+      "topicsMastered": "+{{count}} topic this week",
+      "topicsMastered_other": "+{{count}} topics this week",
+      "vocabularyTotal": "+{{count}} word this week",
+      "vocabularyTotal_other": "+{{count}} words this week",
+      "topicsExplored": "+{{count}} topic explored this week",
+      "topicsExplored_other": "+{{count}} topics explored this week"
+    },
     "growth": {
       "title": "あなたの成長",
       "subtitle": "習得したトピックと語彙の週ごとの変化",
@@ -1274,6 +1291,16 @@
       },
       "forgotten": {
         "label": "もう一度取り組みましょう"
+      },
+      "elapsed": {
+        "remembered_one": "Remembered after {{count}} day",
+        "remembered_other": "Remembered after {{count}} days",
+        "fading_one": "Getting fuzzy after {{count}} day",
+        "fading_other": "Getting fuzzy after {{count}} days",
+        "weak_one": "Slipping after {{count}} day",
+        "weak_other": "Slipping after {{count}} days",
+        "forgotten_one": "Last seen {{count}} day ago",
+        "forgotten_other": "Last seen {{count}} days ago"
       }
     },
     "growthChart": {
@@ -1437,7 +1464,6 @@
       "pickAccommodation": "サポートを選択",
       "active": "アクティブ",
       "accommodationTryIt": "試してみる",
-      "howItsWorking": "どのように機能しているか",
       "consentSettingsCouldNotLoad": "同意設定を読み込めませんでした",
       "retryConsentSettings": "再試行",
       "consentRestrictedTitle": "進捗を表示するには同意が必要です",
@@ -2001,6 +2027,18 @@
       "purchaseConfirmedBody": "Your subscription is being activated. It usually appears within a minute — pull down to refresh.",
       "topUpTitle": "Top-up",
       "topUpBody": "500 additional credits have been added!"
+    }
+  },
+  "sessionSummary": {
+    "mentorMemoryCue": {
+      "title": "チューターがあなたについて知っていること。",
+      "subtitle": "タップして確認または変更。"
+    },
+    "notificationPrimer": {
+      "title": "毎日のリマインダーを受け取りますか？",
+      "message": "ストリークを途切れさせないよう、優しいリマインダーをお送りします。設定からいつでも無効にできます。",
+      "allow": "許可する",
+      "notNow": "今はしない"
     }
   },
   "sessionTranscript": {

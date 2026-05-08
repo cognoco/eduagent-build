@@ -29,11 +29,9 @@ tags:
     env:
       SEED_SCENARIO: "parent-session-with-recap"
 
-# 2. Wait for parent dashboard
-- extendedWaitUntil:
-    visible:
-      id: "family-scroll"
-    timeout: 15000
+# 2. Parent owners land on ParentGateway; enter the Family dashboard.
+- runFlow:
+    file: ../_setup/open-family-dashboard.yaml
 
 # 3. Tap primary action on the seeded child card
 - tapOn:

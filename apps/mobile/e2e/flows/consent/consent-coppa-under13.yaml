@@ -45,43 +45,14 @@ tags:
     id: "sign-in-button"
 
 # ============================================================
-# NAVIGATE TO CREATE PROFILE (More → Profile → Create)
+# NAVIGATE TO CREATE PROFILE (pre-profile gate → Create)
 # ============================================================
-- extendedWaitUntil:
-    visible:
-      id: "tab-more"
-    timeout: 30000
-- tapOn:
-    id: "tab-more"
-
-- extendedWaitUntil:
-    visible:
-      text: "More"
-    timeout: 10000
-
-- scrollUntilVisible:
-    element:
-      text: "Profile"
-    direction: DOWN
-    timeout: 10000
-- tapOn:
-    text: "Profile"
-
-- extendedWaitUntil:
-    visible:
-      text: "No profiles yet"
-    timeout: 10000
-- tapOn:
-    id: "profiles-create-first"
+- runFlow:
+    file: ../_setup/open-create-profile-from-gate.yaml
 
 # ============================================================
 # PROFILE FORM — set age to 12 (born 2014), no location needed
 # ============================================================
-- extendedWaitUntil:
-    visible:
-      id: "create-profile-name"
-    timeout: 15000
-
 # Enter display name
 - tapOn:
     id: "create-profile-name"

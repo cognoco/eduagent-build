@@ -735,7 +735,16 @@
       "searching": "Buscando…",
       "noResults": "Nenhum resultado para \"{{query}}\"",
       "clear": "Limpar busca",
-      "placeholder": "Buscar livros, tópicos, notas…"
+      "placeholder": "Buscar livros, tópicos, notas…",
+      "error": "A busca está indisponível no momento.",
+      "freeform": "Texto livre",
+      "sections": {
+        "subjects": "Matérias",
+        "books": "Livros",
+        "topics": "Tópicos",
+        "notes": "Notas",
+        "sessions": "Sessões"
+      }
     },
     "manage": {
       "button": "Gerenciar",
@@ -1137,6 +1146,14 @@
       "wordsLink": "{{count}} palavras →",
       "vocabularyLink": "Vocabulário →"
     },
+    "weeklyDelta": {
+      "topicsMastered": "+{{count}} topic this week",
+      "topicsMastered_other": "+{{count}} topics this week",
+      "vocabularyTotal": "+{{count}} word this week",
+      "vocabularyTotal_other": "+{{count}} words this week",
+      "topicsExplored": "+{{count}} topic explored this week",
+      "topicsExplored_other": "+{{count}} topics explored this week"
+    },
     "growth": {
       "title": "Seu crescimento",
       "subtitle": "Mudanças semanais em tópicos dominados e vocabulário",
@@ -1274,6 +1291,16 @@
       },
       "forgotten": {
         "label": "Precisa de uma nova passagem"
+      },
+      "elapsed": {
+        "remembered_one": "Remembered after {{count}} day",
+        "remembered_other": "Remembered after {{count}} days",
+        "fading_one": "Getting fuzzy after {{count}} day",
+        "fading_other": "Getting fuzzy after {{count}} days",
+        "weak_one": "Slipping after {{count}} day",
+        "weak_other": "Slipping after {{count}} days",
+        "forgotten_one": "Last seen {{count}} day ago",
+        "forgotten_other": "Last seen {{count}} days ago"
       }
     },
     "growthChart": {
@@ -1437,7 +1464,6 @@
       "pickAccommodation": "Escolher uma acomodação",
       "active": "Ativo",
       "accommodationTryIt": "Experimente",
-      "howItsWorking": "Como está funcionando",
       "consentSettingsCouldNotLoad": "As configurações de consentimento não puderam ser carregadas",
       "retryConsentSettings": "Repetir",
       "consentRestrictedTitle": "Consentimento necessário antes de mostrar o progresso",
@@ -2001,6 +2027,18 @@
       "purchaseConfirmedBody": "Your subscription is being activated. It usually appears within a minute — pull down to refresh.",
       "topUpTitle": "Top-up",
       "topUpBody": "500 additional credits have been added!"
+    }
+  },
+  "sessionSummary": {
+    "mentorMemoryCue": {
+      "title": "O que o seu tutor sabe sobre você.",
+      "subtitle": "Toque para rever ou alterar."
+    },
+    "notificationPrimer": {
+      "title": "Quer um lembrete diário?",
+      "message": "Podemos enviar um lembrete gentil para você não perder sua sequência. Você pode desativar a qualquer momento nas Configurações.",
+      "allow": "Permitir",
+      "notNow": "Agora não"
     }
   },
   "sessionTranscript": {

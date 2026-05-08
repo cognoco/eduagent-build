@@ -28,13 +28,9 @@ tags:
       SEED_SCENARIO: "parent-with-children"
       API_URL: ${API_URL}
 
-# 2. Wait for parent dashboard
-# BUG-33 fix: parent-with-children creates a PARENT owner profile. After sign-in,
-# the app routes directly to (parent)/dashboard — no switch-to-parent needed.
-- extendedWaitUntil:
-    visible:
-      id: "family-scroll"
-    timeout: 15000
+# 2. Parent owners land on ParentGateway; enter the Family dashboard.
+- runFlow:
+    file: ../_setup/open-family-dashboard.yaml
 
 # 3. Verify a child summary card rendered.
 #    dashboard-child-${CHILD_PROFILE_ID} is the testID pattern from ParentDashboardSummary.
@@ -189,7 +185,7 @@ tags:
 - runFlow:
     when:
       visible:
-        id: "family-scroll"
+        id: "dashboard-scroll"
     file: ../_setup/switch-to-child.yaml
     env:
       CHILD_NAME: "Proxy Child"

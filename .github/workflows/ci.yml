@@ -124,6 +124,13 @@ jobs:
       # script-level test fails the run early instead of after lint+test+
       # typecheck+build has already burned several minutes.
 
+      # Forbid mobile-only deps in root package.json. Root + apps/mobile both
+      # declaring the same RN/Expo/NativeWind package creates parallel pnpm
+      # peer-dep contexts that silently break NativeWind className styling on
+      # native bundles. See .claude/memory/feedback_nativewind_root_pkg_split.md.
+      - name: Root package.json — no mobile-only deps
+        run: pnpm run check:root-deps
+
       # Fail fast on missing/typo'd t('key') calls — i18next renders unknown
       # keys as the literal key string at runtime, which typecheck and most
       # tests don't catch.

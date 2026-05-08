@@ -66,7 +66,7 @@ import { assertParentAccess } from './family-access';
 import {
   isoDate,
   subtractDays,
-  sumTopicsExplored,
+  computeWeeklyDeltas,
   getActiveSubjectsByRecency,
 } from './progress-helpers';
 
@@ -122,7 +122,7 @@ export function generateChildSummary(input: DashboardInput): string {
   // Problem stats
   if (input.totalProblemCount > 0) {
     parts.push(
-      `${input.totalProblemCount} problems, ${input.guidedCount} guided`
+      `${input.totalProblemCount} problems, ${input.guidedCount} guided`,
     );
   }
 
@@ -152,7 +152,7 @@ export function generateChildSummary(input: DashboardInput): string {
     // Active-learner cadence. Trend arrow + up/down/same framing.
     const trend = calculateTrend(
       input.sessionsThisWeek,
-      input.sessionsLastWeek
+      input.sessionsLastWeek,
     );
     const trendArrow =
       trend === 'up' ? '\u2191' : trend === 'down' ? '\u2193' : '\u2192';
@@ -160,13 +160,13 @@ export function generateChildSummary(input: DashboardInput): string {
       trend === 'up'
         ? `up from ${input.sessionsLastWeek}`
         : trend === 'down'
-        ? `down from ${input.sessionsLastWeek}`
-        : 'same as';
+          ? `down from ${input.sessionsLastWeek}`
+          : 'same as';
 
     parts.push(
       `${input.sessionsThisWeek} ${sw(
-        input.sessionsThisWeek
-      )} this week (${trendArrow} ${trendWord} last week)`
+        input.sessionsThisWeek,
+      )} this week (${trendArrow} ${trendWord} last week)`,
     );
   }
 
@@ -186,7 +186,7 @@ export function calculateRetentionTrend(
   subjectRetentionData: Array<{
     status: 'strong' | 'fading' | 'weak' | 'forgotten';
   }>,
-  totalSessions?: number
+  totalSessions?: number,
 ): 'improving' | 'declining' | 'stable' {
   if (
     subjectRetentionData.length === 0 ||
@@ -194,11 +194,11 @@ export function calculateRetentionTrend(
   )
     return 'stable';
   const strongCount = subjectRetentionData.filter(
-    (s) => s.status === 'strong'
+    (s) => s.status === 'strong',
   ).length;
   const weakCount = subjectRetentionData.filter(
     (s) =>
-      s.status === 'weak' || s.status === 'fading' || s.status === 'forgotten'
+      s.status === 'weak' || s.status === 'fading' || s.status === 'forgotten',
   ).length;
   if (strongCount > weakCount) return 'improving';
   if (strongCount < weakCount) return 'declining';
@@ -210,7 +210,7 @@ export function calculateRetentionTrend(
  */
 export function calculateTrend(
   current: number,
-  previous: number
+  previous: number,
 ): 'up' | 'down' | 'stable' {
   if (current > previous) return 'up';
   if (current < previous) return 'down';
@@ -229,14 +229,14 @@ export function calculateGuidedRatio(guided: number, total: number): number {
 }
 
 function isChildLearningDataVisible(
-  status: ConsentStatus | null | undefined
+  status: ConsentStatus | null | undefined,
 ): boolean {
   return status == null || status === 'CONSENTED';
 }
 
 function redactedConsentSummary(
   displayName: string,
-  status: ConsentStatus | null | undefined
+  status: ConsentStatus | null | undefined,
 ): string {
   switch (status) {
     case 'PENDING':
@@ -279,12 +279,12 @@ function redactDashboardChild(child: DashboardChild): DashboardChild {
 
 async function getLatestConsentStatus(
   db: Database,
-  childProfileId: string
+  childProfileId: string,
 ): Promise<ConsentStatus | null> {
   const consentState = await db.query.consentStates.findFirst({
     where: and(
       eq(consentStates.profileId, childProfileId),
-      eq(consentStates.consentType, 'GDPR')
+      eq(consentStates.consentType, 'GDPR'),
     ),
     orderBy: desc(consentStates.requestedAt),
     columns: { status: true },
@@ -295,12 +295,12 @@ async function getLatestConsentStatus(
 
 export async function assertChildDashboardDataVisible(
   db: Database,
-  childProfileId: string
+  childProfileId: string,
 ): Promise<void> {
   const status = await getLatestConsentStatus(db, childProfileId);
   if (!isChildLearningDataVisible(status)) {
     throw new ForbiddenError(
-      'Child learning data is hidden until consent is active.'
+      'Child learning data is hidden until consent is active.',
     );
   }
 }
@@ -320,7 +320,7 @@ export interface GuidedMetrics {
 export async function countGuidedMetrics(
   db: Database,
   childProfileId: string,
-  startDate: Date
+  startDate: Date,
 ): Promise<GuidedMetrics> {
   // BUG-731 [PERF-1]: previously loaded every ai_response event into JS to
   // count one JSONB field. Now aggregated in SQL: a single round-trip
@@ -340,8 +340,8 @@ export async function countGuidedMetrics(
       and(
         eq(sessionEvents.profileId, childProfileId),
         eq(sessionEvents.eventType, 'ai_response'),
-        gte(sessionEvents.createdAt, startDate)
-      )
+        gte(sessionEvents.createdAt, startDate),
+      ),
     );
 
   // drizzle returns aggregate counts as string from the pg driver. Coerce
@@ -368,7 +368,7 @@ export async function countGuidedMetrics(
 export async function countGuidedMetricsBatch(
   db: Database,
   childProfileIds: string[],
-  startDate: Date
+  startDate: Date,
 ): Promise<Map<string, GuidedMetrics>> {
   const result = new Map<string, GuidedMetrics>();
   for (const id of childProfileIds) {
@@ -387,8 +387,8 @@ export async function countGuidedMetricsBatch(
       and(
         inArray(sessionEvents.profileId, childProfileIds),
         eq(sessionEvents.eventType, 'ai_response'),
-        gte(sessionEvents.createdAt, startDate)
-      )
+        gte(sessionEvents.createdAt, startDate),
+      ),
     )
     .groupBy(sessionEvents.profileId);
 
@@ -424,7 +424,7 @@ function getSessionMetadata(metadata: unknown): SessionMetadata {
 
 function formatSessionDisplayTitle(
   sessionType: string,
-  homeworkSummary?: HomeworkSummary | null
+  homeworkSummary?: HomeworkSummary | null,
 ): string {
   if (homeworkSummary?.displayTitle) {
     return homeworkSummary.displayTitle;
@@ -459,7 +459,7 @@ export function sortSubjectsByActivityPriority<
     name: string;
     lastSessionAt?: string | null;
     topicsCompleted?: number;
-  }
+  },
 >(subjects: T[]): T[] {
   // Sort tiebreaks are deterministic because Array.prototype.sort is stable
   // (ES2019+). The comparator below intentionally returns 0 for unrelated
@@ -485,7 +485,7 @@ export function buildProgressGuidance(
   subjectNames: string[],
   sessionsThisWeek: number,
   previousSessions: number,
-  currentStreak?: number
+  currentStreak?: number,
 ): string | null {
   const primarySubject = subjectNames[0];
 
@@ -515,7 +515,7 @@ async function buildChildProgressSummary(
   sessionsLastWeek: number,
   totalTimeThisWeekMinutes: number,
   subjectNames: string[],
-  currentStreak?: number
+  currentStreak?: number,
 ): Promise<{ progress: DashboardChild['progress']; totalSessions: number }> {
   // [F-PV-07] Compute totalSessions live with the same filter as getChildSessions
   // (exchangeCount >= 1) instead of reading the stale snapshot value. This
@@ -532,8 +532,8 @@ async function buildChildProgressSummary(
           // SYNC: apps/mobile/src/lib/progressive-disclosure.ts
           //       apps/api/src/services/snapshot-aggregation.ts computeProgressMetrics()
           gte(learningSessions.exchangeCount, 1),
-          ne(learningSessions.status, 'active')
-        )
+          ne(learningSessions.status, 'active'),
+        ),
       ),
   ]);
   const liveSessionCount = liveCountRows[0]?.count ?? 0;
@@ -545,12 +545,13 @@ async function buildChildProgressSummary(
     db,
     childProfileId,
     isoDate(
-      subtractDays(new Date(`${latestSnapshot.snapshotDate}T00:00:00Z`), 7)
-    )
+      subtractDays(new Date(`${latestSnapshot.snapshotDate}T00:00:00Z`), 7),
+    ),
   );
 
   const previousMetrics = previousSnapshot?.metrics ?? null;
   const currentMetrics = latestSnapshot.metrics;
+  const weeklyDeltas = computeWeeklyDeltas(previousMetrics, currentMetrics);
 
   return {
     progress: {
@@ -558,39 +559,23 @@ async function buildChildProgressSummary(
       topicsMastered: currentMetrics.topicsMastered,
       vocabularyTotal: currentMetrics.vocabularyTotal,
       minutesThisWeek: totalTimeThisWeekMinutes,
-      weeklyDeltaTopicsMastered: previousMetrics
-        ? Math.max(
-            0,
-            currentMetrics.topicsMastered - previousMetrics.topicsMastered
-          )
-        : null,
-      weeklyDeltaVocabularyTotal: previousMetrics
-        ? Math.max(
-            0,
-            currentMetrics.vocabularyTotal - previousMetrics.vocabularyTotal
-          )
-        : null,
-      weeklyDeltaTopicsExplored: previousMetrics
-        ? Math.max(
-            0,
-            sumTopicsExplored(currentMetrics) -
-              sumTopicsExplored(previousMetrics)
-          )
-        : null,
+      weeklyDeltaTopicsMastered: weeklyDeltas.topicsMastered,
+      weeklyDeltaVocabularyTotal: weeklyDeltas.vocabularyTotal,
+      weeklyDeltaTopicsExplored: weeklyDeltas.topicsExplored,
       engagementTrend:
         liveSessionCount < MIN_TREND_SESSIONS
           ? 'stable'
           : sessionsThisWeek === 0
-          ? 'declining'
-          : sessionsThisWeek > sessionsLastWeek
-          ? 'increasing'
-          : 'stable',
+            ? 'declining'
+            : sessionsThisWeek > sessionsLastWeek
+              ? 'increasing'
+              : 'stable',
       guidance: buildProgressGuidance(
         childName,
         subjectNames,
         sessionsThisWeek,
         sessionsLastWeek,
-        currentStreak
+        currentStreak,
       ),
     },
     totalSessions: liveSessionCount,
@@ -606,7 +591,7 @@ async function buildChildProgressSummary(
  */
 export async function getChildrenForParent(
   db: Database,
-  parentProfileId: string
+  parentProfileId: string,
 ): Promise<DashboardChild[]> {
   // 1. Query familyLinks for this parent
   const links = await db.query.familyLinks.findMany({
@@ -634,7 +619,7 @@ export async function getChildrenForParent(
   const allChildProfiles = await db.query.profiles.findMany({
     where: and(
       inArray(profiles.id, childProfileIds),
-      isNull(profiles.archivedAt)
+      isNull(profiles.archivedAt),
     ),
   });
   const profilesById = new Map(allChildProfiles.map((p) => [p.id, p]));
@@ -649,7 +634,7 @@ export async function getChildrenForParent(
     where: and(
       inArray(learningSessions.profileId, childProfileIds),
       gte(learningSessions.startedAt, startOfLastWeek),
-      gte(learningSessions.exchangeCount, 1)
+      gte(learningSessions.exchangeCount, 1),
     ),
   });
   const sessionsByProfile = new Map<string, typeof allRecentSessions>();
@@ -683,12 +668,12 @@ export async function getChildrenForParent(
   // O(1) on this segment.
   const [progressResults, guidedMetricsByProfile] = await Promise.all([
     Promise.all(
-      validLinks.map((l) => getOverallProgress(db, l.childProfileId))
+      validLinks.map((l) => getOverallProgress(db, l.childProfileId)),
     ),
     countGuidedMetricsBatch(
       db,
       validLinks.map((l) => l.childProfileId),
-      startOfLastWeek
+      startOfLastWeek,
     ),
   ]);
   const guidedMetricsResults = validLinks.map(
@@ -696,7 +681,7 @@ export async function getChildrenForParent(
       guidedMetricsByProfile.get(l.childProfileId) ?? {
         guidedCount: 0,
         totalProblemCount: 0,
-      }
+      },
   );
 
   // Batch streaks + XP for all children (reuse childProfileIds from links)
@@ -731,10 +716,10 @@ export async function getChildrenForParent(
           longestStreak: decayed.longestStreak,
         },
       ];
-    })
+    }),
   );
   const xpByProfile = new Map(
-    xpResults.map((x) => [x.profileId, x.totalXp ?? 0])
+    xpResults.map((x) => [x.profileId, x.totalXp ?? 0]),
   );
   const allConsentStates = await db.query.consentStates.findMany({
     where: inArray(consentStates.profileId, childProfileIds),
@@ -788,10 +773,10 @@ export async function getChildrenForParent(
     const recentSessions = sessionsByProfile.get(childProfileId) ?? [];
 
     const sessionsThisWeek = recentSessions.filter(
-      (s) => s.startedAt >= startOfThisWeek
+      (s) => s.startedAt >= startOfThisWeek,
     ).length;
     const sessionsLastWeek = recentSessions.filter(
-      (s) => s.startedAt >= startOfLastWeek && s.startedAt < startOfThisWeek
+      (s) => s.startedAt >= startOfLastWeek && s.startedAt < startOfThisWeek,
     ).length;
 
     // Prefer wall-clock time with active-time fallback for legacy sessions.
@@ -802,7 +787,7 @@ export async function getChildrenForParent(
     }): number =>
       Math.min(
         session.wallClockSeconds ?? session.durationSeconds ?? 0,
-        MAX_SESSION_WALL_CLOCK_SECONDS
+        MAX_SESSION_WALL_CLOCK_SECONDS,
       );
 
     const totalTimeThisWeek = recentSessions
@@ -810,7 +795,7 @@ export async function getChildrenForParent(
       .reduce((sum, s) => sum + getDisplaySeconds(s), 0);
     const totalTimeLastWeek = recentSessions
       .filter(
-        (s) => s.startedAt >= startOfLastWeek && s.startedAt < startOfThisWeek
+        (s) => s.startedAt >= startOfLastWeek && s.startedAt < startOfThisWeek,
       )
       .reduce((sum, s) => sum + getDisplaySeconds(s), 0);
 
@@ -820,7 +805,7 @@ export async function getChildrenForParent(
       .reduce((sum, s) => sum + s.exchangeCount, 0);
     const exchangesLastWeek = recentSessions
       .filter(
-        (s) => s.startedAt >= startOfLastWeek && s.startedAt < startOfThisWeek
+        (s) => s.startedAt >= startOfLastWeek && s.startedAt < startOfThisWeek,
       )
       .reduce((sum, s) => sum + s.exchangeCount, 0);
 
@@ -858,7 +843,7 @@ export async function getChildrenForParent(
       // [BUG-913] Sort by activity so coaching nudges reference subjects
       // the child has actually practised. See sortSubjectsByActivityPriority.
       subjectNames: sortSubjectsByActivityPriority(progress.subjects).map(
-        (subject) => subject.name
+        (subject) => subject.name,
       ),
       dashboardInput,
       progress,
@@ -885,9 +870,9 @@ export async function getChildrenForParent(
         p.sessionsLastWeek,
         p.totalTimeThisWeekMinutes,
         p.subjectNames,
-        streaksByProfile.get(p.childProfileId)?.currentStreak ?? 0
-      )
-    )
+        streaksByProfile.get(p.childProfileId)?.currentStreak ?? 0,
+      ),
+    ),
   );
 
   const children: DashboardChild[] = prepared.map((p, i) => {
@@ -904,7 +889,7 @@ export async function getChildrenForParent(
     const trend = calculateTrend(p.sessionsThisWeek, p.sessionsLastWeek);
     const retentionTrend = calculateRetentionTrend(
       p.dashboardInput.subjectRetentionData,
-      totalSessions
+      totalSessions,
     );
 
     return redactDashboardChild({
@@ -928,7 +913,7 @@ export async function getChildrenForParent(
       })),
       guidedVsImmediateRatio: calculateGuidedRatio(
         p.guidedMetrics.guidedCount,
-        p.guidedMetrics.totalProblemCount
+        p.guidedMetrics.totalProblemCount,
       ),
       retentionTrend,
       totalSessions,
@@ -953,7 +938,7 @@ export async function getChildrenForParent(
 export async function getChildDetail(
   db: Database,
   parentProfileId: string,
-  childProfileId: string
+  childProfileId: string,
 ): Promise<DashboardChild | null> {
   // [EP15-I5] Throws ForbiddenError (→ 403) on access denial instead of
   // returning null. A null return here now means "parent has access but
@@ -975,7 +960,7 @@ export async function getChildDetail(
     where: eq(subjects.profileId, childProfileId),
   });
   const rawInputMap = new Map<string, string | null>(
-    childSubjects.map((s) => [s.id, s.rawInput ?? null])
+    childSubjects.map((s) => [s.id, s.rawInput ?? null]),
   );
 
   // Step 3: Get recent sessions (last 2 weeks, exchangeCount >= 1) — 1 query
@@ -988,16 +973,16 @@ export async function getChildDetail(
     where: and(
       eq(learningSessions.profileId, childProfileId),
       gte(learningSessions.startedAt, startOfLastWeek),
-      gte(learningSessions.exchangeCount, 1)
+      gte(learningSessions.exchangeCount, 1),
     ),
   });
 
   // Step 4: Compute derived session metrics
   const sessionsThisWeek = recentSessions.filter(
-    (s) => s.startedAt >= startOfThisWeek
+    (s) => s.startedAt >= startOfThisWeek,
   ).length;
   const sessionsLastWeek = recentSessions.filter(
-    (s) => s.startedAt >= startOfLastWeek && s.startedAt < startOfThisWeek
+    (s) => s.startedAt >= startOfLastWeek && s.startedAt < startOfThisWeek,
   ).length;
 
   // Cap per session to prevent abandoned sessions from inflating the total
@@ -1008,7 +993,7 @@ export async function getChildDetail(
   }): number =>
     Math.min(
       session.wallClockSeconds ?? session.durationSeconds ?? 0,
-      MAX_SESSION_WALL_CLOCK_SECONDS
+      MAX_SESSION_WALL_CLOCK_SECONDS,
     );
 
   const totalTimeThisWeek = recentSessions
@@ -1016,7 +1001,7 @@ export async function getChildDetail(
     .reduce((acc, s) => acc + getDisplaySeconds(s), 0);
   const totalTimeLastWeek = recentSessions
     .filter(
-      (s) => s.startedAt >= startOfLastWeek && s.startedAt < startOfThisWeek
+      (s) => s.startedAt >= startOfLastWeek && s.startedAt < startOfThisWeek,
     )
     .reduce((acc, s) => acc + getDisplaySeconds(s), 0);
 
@@ -1025,7 +1010,7 @@ export async function getChildDetail(
     .reduce((acc, s) => acc + s.exchangeCount, 0);
   const exchangesLastWeek = recentSessions
     .filter(
-      (s) => s.startedAt >= startOfLastWeek && s.startedAt < startOfThisWeek
+      (s) => s.startedAt >= startOfLastWeek && s.startedAt < startOfThisWeek,
     )
     .reduce((acc, s) => acc + s.exchangeCount, 0);
 
@@ -1056,7 +1041,7 @@ export async function getChildDetail(
   // ordered by lastSessionAt DESC so the most-recently-used subject is first.
   const activeSubjectsByRecency = await getActiveSubjectsByRecency(
     db,
-    childProfileId
+    childProfileId,
   );
   const subjectNames =
     activeSubjectsByRecency.length > 0
@@ -1074,7 +1059,7 @@ export async function getChildDetail(
       totalTimeThisWeekMinutes,
       subjectNames,
       // streakData.currentStreak is already decay-adjusted by the repo layer.
-      streakData?.currentStreak ?? 0
+      streakData?.currentStreak ?? 0,
     );
 
   // Step 7: Compute all derived fields using the same helpers as getChildrenForParent
@@ -1104,7 +1089,7 @@ export async function getChildDetail(
   const trend = calculateTrend(sessionsThisWeek, sessionsLastWeek);
   const retentionTrend = calculateRetentionTrend(
     subjectRetentionData,
-    totalSessions
+    totalSessions,
   );
 
   return redactDashboardChild({
@@ -1128,7 +1113,7 @@ export async function getChildDetail(
     })),
     guidedVsImmediateRatio: calculateGuidedRatio(
       guidedMetrics.guidedCount,
-      guidedMetrics.totalProblemCount
+      guidedMetrics.totalProblemCount,
     ),
     retentionTrend,
     totalSessions,
@@ -1147,7 +1132,7 @@ export async function getChildSubjectTopics(
   db: Database,
   parentProfileId: string,
   childProfileId: string,
-  subjectId: string
+  subjectId: string,
 ): Promise<TopicProgress[]> {
   // [EP15-I5] See assertParentAccess comment — ForbiddenError → 403.
   await assertParentAccess(db, parentProfileId, childProfileId);
@@ -1157,7 +1142,7 @@ export async function getChildSubjectTopics(
   const childSubject = await db.query.subjects.findFirst({
     where: and(
       eq(subjects.id, subjectId),
-      eq(subjects.profileId, childProfileId)
+      eq(subjects.profileId, childProfileId),
     ),
   });
   if (!childSubject) return [];
@@ -1187,8 +1172,8 @@ export async function getChildSubjectTopics(
               eq(learningSessions.profileId, childProfileId),
               eq(learningSessions.subjectId, subjectId),
               inArray(learningSessions.topicId, topicIds),
-              gte(learningSessions.exchangeCount, 1)
-            )
+              gte(learningSessions.exchangeCount, 1),
+            ),
           )
           .groupBy(learningSessions.topicId)
       : [];
@@ -1196,13 +1181,13 @@ export async function getChildSubjectTopics(
     topicSessionCounts
       .filter(
         (
-          row
+          row,
         ): row is {
           topicId: string;
           totalSessions: number;
-        } => typeof row.topicId === 'string'
+        } => typeof row.topicId === 'string',
       )
-      .map((row) => [row.topicId, row.totalSessions])
+      .map((row) => [row.topicId, row.totalSessions]),
   );
 
   // [F-PV-06] Batch all per-topic queries into ~6 inArray queries (constant
@@ -1264,13 +1249,13 @@ export interface ChildSession {
  */
 export async function getProfileSessions(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<ChildSession[]> {
   const scoped = createScopedRepository(db, profileId);
   const sessions = await scoped.sessions.findMany(
     gte(learningSessions.exchangeCount, 1),
     50,
-    desc(learningSessions.startedAt)
+    desc(learningSessions.startedAt),
   );
 
   if (sessions.length === 0) return [];
@@ -1323,14 +1308,14 @@ export async function getProfileSessions(
         and(
           inArray(sessionEvents.sessionId, sessionIds),
           eq(sessionEvents.eventType, 'ai_response'),
-          isNotNull(sessionEvents.drillTotal)
-        )
+          isNotNull(sessionEvents.drillTotal),
+        ),
       )
       .orderBy(asc(sessionEvents.createdAt)),
   ]);
 
   const summaryBySession = new Map(
-    summaries.map((summary) => [summary.sessionId, summary])
+    summaries.map((summary) => [summary.sessionId, summary]),
   );
   const subjectNameById = new Map(subjectRows.map((s) => [s.id, s.name]));
   const topicTitleById = new Map(topicRows.map((t) => [t.id, t.title]));
@@ -1357,7 +1342,7 @@ export async function getProfileSessions(
       subjectId: s.subjectId,
       subjectName: subjectNameById.get(s.subjectId) ?? null,
       topicId: s.topicId,
-      topicTitle: s.topicId ? topicTitleById.get(s.topicId) ?? null : null,
+      topicTitle: s.topicId ? (topicTitleById.get(s.topicId) ?? null) : null,
       sessionType: s.sessionType,
       startedAt: s.startedAt.toISOString(),
       endedAt: s.endedAt?.toISOString() ?? null,
@@ -1380,7 +1365,7 @@ export async function getProfileSessions(
 export async function getChildSessions(
   db: Database,
   parentProfileId: string,
-  childProfileId: string
+  childProfileId: string,
 ): Promise<ChildSession[]> {
   // [EP15-I5] ForbiddenError → 403. Empty array now means "parent has
   // access and the child has no sessions", not "access denied".
@@ -1395,7 +1380,7 @@ export async function getChildSessions(
 }
 
 function parseEngagementSignal(
-  raw: string | null | undefined
+  raw: string | null | undefined,
 ): EngagementSignal | null {
   if (!raw) return null;
   const parsed = engagementSignalSchema.safeParse(raw);
@@ -1406,7 +1391,7 @@ export async function getChildSessionDetail(
   db: Database,
   parentProfileId: string,
   childProfileId: string,
-  sessionId: string
+  sessionId: string,
 ): Promise<ChildSession | null> {
   await assertParentAccess(db, parentProfileId, childProfileId);
   await assertChildDashboardDataVisible(db, childProfileId);
@@ -1414,7 +1399,7 @@ export async function getChildSessionDetail(
   const session = await db.query.learningSessions.findFirst({
     where: and(
       eq(learningSessions.id, sessionId),
-      eq(learningSessions.profileId, childProfileId)
+      eq(learningSessions.profileId, childProfileId),
     ),
   });
   if (!session) return null;
@@ -1457,8 +1442,8 @@ export async function getChildSessionDetail(
         and(
           eq(sessionEvents.sessionId, sessionId),
           eq(sessionEvents.eventType, 'ai_response'),
-          isNotNull(sessionEvents.drillTotal)
-        )
+          isNotNull(sessionEvents.drillTotal),
+        ),
       )
       .orderBy(asc(sessionEvents.createdAt)),
   ]);
@@ -1488,7 +1473,7 @@ export async function getChildSessionDetail(
     wallClockSeconds: session.wallClockSeconds,
     displayTitle: formatSessionDisplayTitle(
       session.sessionType,
-      homeworkSummary
+      homeworkSummary,
     ),
     displaySummary: homeworkSummary?.summary ?? null,
     homeworkSummary,
@@ -1503,7 +1488,7 @@ export async function getChildSessionDetail(
 export async function getChildInventory(
   db: Database,
   parentProfileId: string,
-  childProfileId: string
+  childProfileId: string,
 ): Promise<KnowledgeInventory> {
   // [EP15-I5] Return type tightened from `| null`. Access denial now
   // throws (→ 403); the only remaining path is a valid inventory.
@@ -1520,7 +1505,7 @@ export async function getChildProgressHistory(
     from?: string;
     to?: string;
     granularity?: 'daily' | 'weekly';
-  }
+  },
 ): Promise<ProgressHistory> {
   // [EP15-I5] Return type tightened — access denial throws, not returns null.
   await assertParentAccess(db, parentProfileId, childProfileId);
@@ -1531,7 +1516,7 @@ export async function getChildProgressHistory(
 export async function getChildReports(
   db: Database,
   parentProfileId: string,
-  childProfileId: string
+  childProfileId: string,
 ): Promise<MonthlyReportSummary[]> {
   // [EP15-I5] Access denial throws (→ 403). Empty array now means "no
   // reports yet for this child" — semantically distinct from forbidden.
@@ -1544,7 +1529,7 @@ export async function getChildReportDetail(
   db: Database,
   parentProfileId: string,
   childProfileId: string,
-  reportId: string
+  reportId: string,
 ): Promise<MonthlyReportRecord | null> {
   // [EP15-I5] null now only means "access granted but report not found".
   await assertParentAccess(db, parentProfileId, childProfileId);
@@ -1553,7 +1538,7 @@ export async function getChildReportDetail(
     db,
     parentProfileId,
     childProfileId,
-    reportId
+    reportId,
   );
 }
 
@@ -1561,7 +1546,7 @@ export async function markChildReportViewed(
   db: Database,
   parentProfileId: string,
   childProfileId: string,
-  reportId: string
+  reportId: string,
 ): Promise<void> {
   // [EP15-I5] Previously silently returned on access denial, letting an
   // unauthorized POST pretend to succeed. Now throws → 403.

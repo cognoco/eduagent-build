@@ -735,7 +735,16 @@
       "searching": "Sucht...",
       "noResults": "Keine Ergebnisse für „{{query}}“",
       "clear": "Suche löschen",
-      "placeholder": "Bücher, Themen, Notizen suchen..."
+      "placeholder": "Bücher, Themen, Notizen suchen...",
+      "error": "Suche ist gerade nicht verfügbar.",
+      "freeform": "Freitext",
+      "sections": {
+        "subjects": "Fächer",
+        "books": "Bücher",
+        "topics": "Themen",
+        "notes": "Notizen",
+        "sessions": "Sitzungen"
+      }
     },
     "manage": {
       "button": "Verwalten",
@@ -1137,6 +1146,14 @@
       "wordsLink": "{{count}} Wörter →",
       "vocabularyLink": "Vokabeln →"
     },
+    "weeklyDelta": {
+      "topicsMastered": "+{{count}} topic this week",
+      "topicsMastered_other": "+{{count}} topics this week",
+      "vocabularyTotal": "+{{count}} word this week",
+      "vocabularyTotal_other": "+{{count}} words this week",
+      "topicsExplored": "+{{count}} topic explored this week",
+      "topicsExplored_other": "+{{count}} topics explored this week"
+    },
     "growth": {
       "title": "Dein Wachstum",
       "subtitle": "Wöchentliche Änderungen bei gemeisterten Themen und Vokabeln",
@@ -1274,6 +1291,16 @@
       },
       "forgotten": {
         "label": "Braucht einen neuen Durchgang"
+      },
+      "elapsed": {
+        "remembered_one": "Remembered after {{count}} day",
+        "remembered_other": "Remembered after {{count}} days",
+        "fading_one": "Getting fuzzy after {{count}} day",
+        "fading_other": "Getting fuzzy after {{count}} days",
+        "weak_one": "Slipping after {{count}} day",
+        "weak_other": "Slipping after {{count}} days",
+        "forgotten_one": "Last seen {{count}} day ago",
+        "forgotten_other": "Last seen {{count}} days ago"
       }
     },
     "growthChart": {
@@ -1437,7 +1464,6 @@
       "pickAccommodation": "Eine Anpassung wählen",
       "active": "Aktiv",
       "accommodationTryIt": "Ausprobieren",
-      "howItsWorking": "Wie es funktioniert",
       "consentSettingsCouldNotLoad": "Zustimmungseinstellungen konnten nicht geladen werden",
       "retryConsentSettings": "Wiederholen",
       "consentRestrictedTitle": "Zustimmung erforderlich, bevor Fortschritt angezeigt wird",
@@ -2001,6 +2027,18 @@
       "purchaseConfirmedBody": "Your subscription is being activated. It usually appears within a minute — pull down to refresh.",
       "topUpTitle": "Top-up",
       "topUpBody": "500 additional credits have been added!"
+    }
+  },
+  "sessionSummary": {
+    "mentorMemoryCue": {
+      "title": "Was dein Tutor über dich weiß.",
+      "subtitle": "Tippe, um es anzusehen oder zu ändern."
+    },
+    "notificationPrimer": {
+      "title": "Möchtest du eine tägliche Erinnerung?",
+      "message": "Wir können dir eine sanfte Erinnerung schicken, damit du deinen Streak nicht verlierst. Du kannst sie jederzeit in den Einstellungen deaktivieren.",
+      "allow": "Erlauben",
+      "notNow": "Nicht jetzt"
     }
   },
   "sessionTranscript": {

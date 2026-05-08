@@ -133,10 +133,6 @@ jest.mock('../../../../components/progress', () => ({
   hasSubjectActivity: () => false,
 }));
 
-jest.mock('../../../../components/parent/SamplePreview', () => ({
-  SamplePreview: ({ children }: { children: React.ReactNode }) => children,
-}));
-
 // ---------------------------------------------------------------------------
 // Module under test (required AFTER all mocks are set up)
 // ---------------------------------------------------------------------------
@@ -294,7 +290,7 @@ describe('ChildDetailScreen — accommodation guide', () => {
         childProfileId: 'child-001',
         accommodationMode: 'short-burst',
       }),
-      expect.any(Object)
+      expect.any(Object),
     );
   });
 

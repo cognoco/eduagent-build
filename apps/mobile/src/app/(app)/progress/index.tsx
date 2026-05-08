@@ -13,7 +13,6 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ErrorFallback, TrackedView } from '../../../components/common';
-import { SamplePreview } from '../../../components/parent/SamplePreview';
 import {
   isNewLearner,
   sessionsUntilFullProgress,
@@ -25,6 +24,7 @@ import {
   MonthlyReportCard,
   RecentSessionsList,
   ReportsListCard,
+  WeeklyDeltaChip,
   WeeklyReportCard,
 } from '../../../components/progress';
 import { useActiveProfileRole } from '../../../hooks/use-active-profile-role';
@@ -49,7 +49,7 @@ function heroCopy(
     totalSessions: number;
   },
   register: CopyRegister,
-  t: (key: string, opts?: Record<string, unknown>) => string
+  t: (key: string, opts?: Record<string, unknown>) => string,
 ): {
   title: string;
   subtitle: string;
@@ -128,7 +128,7 @@ function buildGrowthData(
           vocabularyTotal: number;
         }>;
       }
-    | undefined
+    | undefined,
 ) {
   const points = history?.dataPoints ?? [];
 
@@ -138,13 +138,13 @@ function buildGrowthData(
       label: formatWeekLabel(point.date),
       value: Math.max(
         0,
-        point.topicsMastered - (previous?.topicsMastered ?? 0)
+        point.topicsMastered - (previous?.topicsMastered ?? 0),
       ),
       secondaryValue:
         point.vocabularyTotal > 0
           ? Math.max(
               0,
-              point.vocabularyTotal - (previous?.vocabularyTotal ?? 0)
+              point.vocabularyTotal - (previous?.vocabularyTotal ?? 0),
             )
           : undefined,
     };
@@ -155,10 +155,10 @@ const MILESTONE_THRESHOLDS = [1, 3, 5, 10, 25, 50, 100];
 
 export function getNextMilestoneLabel(
   totalSessions: number,
-  t: (key: string, opts?: Record<string, unknown>) => string
+  t: (key: string, opts?: Record<string, unknown>) => string,
 ): string {
   const next = MILESTONE_THRESHOLDS.find(
-    (threshold) => threshold > totalSessions
+    (threshold) => threshold > totalSessions,
   );
   if (next === undefined) {
     return t('progress.milestones.allReached');
@@ -206,12 +206,12 @@ export default function ProgressScreen(): React.ReactElement {
       totalSessions: inventory?.global.totalSessions ?? 0,
     },
     register,
-    t
+    t,
   );
 
   const growthData = useMemo(
     () => buildGrowthData(historyQuery.data),
-    [historyQuery.data]
+    [historyQuery.data],
   );
 
   const handleRefresh = async () => {
@@ -270,7 +270,7 @@ export default function ProgressScreen(): React.ReactElement {
   const newLearner = !isEmpty && isNewLearner(inventory?.global.totalSessions);
   const remaining = sessionsUntilFullProgress(inventory?.global.totalSessions);
   const hasLanguageSubject = inventory?.subjects?.some(
-    (s) => s.pedagogyMode === 'four_strands'
+    (s) => s.pedagogyMode === 'four_strands',
   );
   const activeProfileHash = activeProfile
     ? hashProfileId(activeProfile.id)
@@ -335,7 +335,7 @@ export default function ProgressScreen(): React.ReactElement {
                   track('progress_empty_state_cta_tapped', {
                     profile_id_hash: hashProfileId(activeProfile.id),
                     account_age_bucket: bucketAccountAge(
-                      activeProfile.createdAt
+                      activeProfile.createdAt,
                     ),
                   });
                 }
@@ -400,7 +400,7 @@ export default function ProgressScreen(): React.ReactElement {
                           pre-F-045 snapshots; falsy-fallback shows activeMinutes. */}
                       {formatMinutes(
                         inventory.global.totalWallClockMinutes ||
-                          inventory.global.totalActiveMinutes
+                          inventory.global.totalActiveMinutes,
                       )}
                     </Text>
                   </View>
@@ -444,6 +444,22 @@ export default function ProgressScreen(): React.ReactElement {
                   ) : null}
                 </View>
               ) : null}
+              {inventory ? (
+                <View className="flex-row flex-wrap gap-2 mt-3">
+                  <WeeklyDeltaChip
+                    metric="topicsMastered"
+                    value={inventory.global.weeklyDeltaTopicsMastered}
+                  />
+                  <WeeklyDeltaChip
+                    metric="vocabularyTotal"
+                    value={inventory.global.weeklyDeltaVocabularyTotal}
+                  />
+                  <WeeklyDeltaChip
+                    metric="topicsExplored"
+                    value={inventory.global.weeklyDeltaTopicsExplored}
+                  />
+                </View>
+              ) : null}
             </View>
 
             <View className="mt-6">
@@ -459,10 +475,10 @@ export default function ProgressScreen(): React.ReactElement {
                   (inventory?.global.totalSessions ?? 0) >= 3
                     ? t('progress.growth.emptyFoundation')
                     : (inventory?.global.totalSessions ?? 0) > 0
-                    ? t('progress.growth.emptyInProgress', {
-                        count: inventory?.global.totalSessions ?? 0,
-                      })
-                    : t('progress.growth.emptyJustStarted')
+                      ? t('progress.growth.emptyInProgress', {
+                          count: inventory?.global.totalSessions ?? 0,
+                        })
+                      : t('progress.growth.emptyJustStarted')
                 }
               />
             </View>
@@ -545,27 +561,17 @@ export default function ProgressScreen(): React.ReactElement {
                 </View>
               ))
             ) : (
-              <SamplePreview
-                unlockMessage={getNextMilestoneLabel(
-                  inventory?.global.totalSessions ?? 0,
-                  t
-                )}
+              <View
+                className="bg-surface rounded-card px-4 py-3"
+                testID="milestones-teaser"
               >
-                <View className="bg-surface rounded-card p-4 gap-3">
-                  {[1, 2, 3].map((i) => (
-                    <View
-                      key={i}
-                      className="flex-row items-center bg-background rounded-card p-3"
-                    >
-                      <View className="bg-border rounded-full w-8 h-8 me-3" />
-                      <View className="flex-1">
-                        <View className="bg-border rounded h-4 w-2/3 mb-1.5" />
-                        <View className="bg-border rounded h-3 w-1/4" />
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              </SamplePreview>
+                <Text className="text-caption text-text-secondary text-center">
+                  {getNextMilestoneLabel(
+                    inventory?.global.totalSessions ?? 0,
+                    t,
+                  )}
+                </Text>
+              </View>
             )}
 
             <Pressable

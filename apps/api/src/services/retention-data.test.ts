@@ -69,6 +69,7 @@ import {
   evaluateRecallQuality,
   ensureRetentionCard,
   getProfileOverdueCount,
+  computeDaysSinceLastReview,
 } from './retention-data';
 
 const NOW = new Date('2026-02-15T10:00:00.000Z');
@@ -82,7 +83,7 @@ function mockRetentionCardRow(
     topicId: string;
     xpStatus: string;
     nextReviewAt: Date | null;
-  }>
+  }>,
 ) {
   return {
     id: 'card-1',
@@ -124,7 +125,7 @@ function createMockDb(options?: {
         findFirst: jest
           .fn()
           .mockResolvedValue(
-            options?.retentionCardFindFirstQuery ?? mockRetentionCardRow()
+            options?.retentionCardFindFirstQuery ?? mockRetentionCardRow(),
           ),
       },
       teachingPreferences: {
@@ -242,7 +243,16 @@ describe('getSubjectRetention', () => {
     expect(result.topics[0].topicId).toBe(topicId);
     expect(result.topics[0].easeFactor).toBe(2.5);
     expect(result.topics[0].intervalDays).toBe(7);
+    expect(result.topics[0].daysSinceLastReview).toEqual(expect.any(Number));
     expect(result.topics[0].topicTitle).toBe('Topic 1');
+  });
+
+  it('computes elapsed review days from lastReviewedAt', () => {
+    const result = computeDaysSinceLastReview(
+      new Date('2026-02-10T09:00:00.000Z'),
+      new Date('2026-02-15T10:00:00.000Z'),
+    );
+    expect(result).toBe(5);
   });
 
   it('counts overdue reviews', async () => {
@@ -278,6 +288,7 @@ describe('getTopicRetention', () => {
     expect(result).not.toBeNull();
     expect(result!.topicId).toBe(topicId);
     expect(result!.repetitions).toBe(3);
+    expect(result!.daysSinceLastReview).toEqual(expect.any(Number));
   });
 });
 
@@ -518,7 +529,7 @@ describe('processRecallTest', () => {
       'relearn_topic',
     ]);
     expect(getRetentionStatus).toHaveBeenCalledWith(
-      expect.objectContaining({ failureCount: 3 })
+      expect.objectContaining({ failureCount: 3 }),
     );
   });
 
@@ -658,7 +669,7 @@ describe('processRecallTest', () => {
       db,
       profileId,
       topicId,
-      'verified'
+      'verified',
     );
   });
 
@@ -693,7 +704,7 @@ describe('processRecallTest', () => {
       db,
       profileId,
       topicId,
-      'decayed'
+      'decayed',
     );
   });
 
@@ -742,7 +753,7 @@ describe('processRecallTest', () => {
           topicId,
           xpChange: 'verified',
         }),
-      })
+      }),
     );
   });
 
@@ -1094,7 +1105,7 @@ describe('setTeachingPreference', () => {
       db,
       profileId,
       subjectId,
-      'step_by_step'
+      'step_by_step',
     );
     expect(result).toEqual({
       subjectId,
@@ -1126,7 +1137,7 @@ describe('setTeachingPreference', () => {
       profileId,
       subjectId,
       'step_by_step',
-      'cooking'
+      'cooking',
     );
     expect(result).toEqual({
       subjectId,
@@ -1153,7 +1164,7 @@ describe('setTeachingPreference', () => {
       profileId,
       subjectId,
       'visual_diagrams',
-      null
+      null,
     );
     expect(result).toEqual({
       subjectId,
@@ -1181,7 +1192,7 @@ describe('setTeachingPreference', () => {
       db,
       profileId,
       subjectId,
-      'step_by_step'
+      'step_by_step',
       // analogyDomain not passed — .returning() reads back existing value atomically
     );
     expect(result).toEqual({
@@ -1197,7 +1208,7 @@ describe('setTeachingPreference', () => {
     const db = createMockDb();
 
     await expect(
-      setTeachingPreference(db, profileId, subjectId, 'step_by_step')
+      setTeachingPreference(db, profileId, subjectId, 'step_by_step'),
     ).rejects.toThrow('Subject not found');
 
     expect(db.insert).not.toHaveBeenCalled();
@@ -1278,7 +1289,7 @@ describe('setAnalogyDomain', () => {
     const db = createMockDb();
 
     await expect(
-      setAnalogyDomain(db, profileId, subjectId, 'sports')
+      setAnalogyDomain(db, profileId, subjectId, 'sports'),
     ).rejects.toThrow('Subject not found');
 
     expect(db.insert).not.toHaveBeenCalled();
@@ -1301,7 +1312,7 @@ describe('setNativeLanguage', () => {
     const db = createMockDb();
 
     await expect(
-      setNativeLanguage(db, profileId, subjectId, 'en')
+      setNativeLanguage(db, profileId, subjectId, 'en'),
     ).rejects.toThrow('Subject not found');
 
     expect(db.insert).not.toHaveBeenCalled();
@@ -1392,7 +1403,7 @@ describe('updateNeedsDeepeningProgress', () => {
         subjectId,
         consecutiveSuccessCount: 3,
         status: 'active',
-      })
+      }),
     );
   });
 
@@ -1485,7 +1496,7 @@ describe('updateRetentionFromSession', () => {
       profileId,
       topicId,
       4,
-      '2026-02-15T10:00:00.000Z'
+      '2026-02-15T10:00:00.000Z',
     );
 
     // SM-2 should NOT run — card was already updated after session started
@@ -1505,7 +1516,7 @@ describe('updateRetentionFromSession', () => {
       profileId,
       topicId,
       4,
-      '2026-02-15T10:00:00.000Z'
+      '2026-02-15T10:00:00.000Z',
     );
 
     // SM-2 should run — card was last updated before the session
@@ -1550,7 +1561,7 @@ describe('updateRetentionFromSession', () => {
       expect(db.update).toHaveBeenCalled();
       // Warning must have been emitted for the conflict
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Optimistic lock conflict')
+        expect.stringContaining('Optimistic lock conflict'),
       );
     } finally {
       warnSpy.mockRestore();
@@ -1624,7 +1635,7 @@ describe('evaluateRecallQuality', () => {
       id: 'gemini',
       async chat(
         _messages: ChatMessage[],
-        _config: ModelConfig
+        _config: ModelConfig,
       ): Promise<string> {
         return '4';
       },
@@ -1636,7 +1647,7 @@ describe('evaluateRecallQuality', () => {
 
     const result = await evaluateRecallQuality(
       'A thorough explanation of photosynthesis involving chlorophyll and light reactions',
-      'Photosynthesis'
+      'Photosynthesis',
     );
     expect(result).toBe(4);
   });
@@ -1671,7 +1682,7 @@ describe('evaluateRecallQuality', () => {
 
     const result = await evaluateRecallQuality(
       'Complete and perfect explanation of the topic',
-      'Topic'
+      'Topic',
     );
     expect(result).toBe(5);
   });
@@ -1786,7 +1797,7 @@ describe('evaluateRecallQuality', () => {
 
     const result = await evaluateRecallQuality(
       'Some answer about the topic',
-      'Topic'
+      'Topic',
     );
     expect(result).toBe(3);
   });

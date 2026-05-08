@@ -50,7 +50,7 @@ function noop() {
 }
 
 function formatLastStudiedText(
-  lastReviewedAt: string | null | undefined
+  lastReviewedAt: string | null | undefined,
 ): string {
   if (!lastReviewedAt) return 'Never studied';
   const date = new Date(lastReviewedAt);
@@ -80,7 +80,7 @@ function formatSessionDate(createdAt: string): string {
 
 function deriveStudyCTA(
   completionStatus: string | undefined,
-  retentionStatus: RetentionStatus
+  retentionStatus: RetentionStatus,
 ): { label: string; variant: 'primary' | 'outline' } {
   if (!completionStatus || completionStatus === 'not_started') {
     return { label: 'Start studying', variant: 'primary' };
@@ -118,7 +118,7 @@ export default function TopicDetailScreen() {
   // [F-009] Resolve subjectId when deep-linked with topicId only
   const needsResolve = !paramSubjectId && !!topicId;
   const { data: resolved, isLoading: resolveLoading } = useResolveTopicSubject(
-    needsResolve ? topicId : undefined
+    needsResolve ? topicId : undefined,
   );
   const subjectId = paramSubjectId || resolved?.subjectId;
 
@@ -147,22 +147,22 @@ export default function TopicDetailScreen() {
   // Library v3: notes and sessions
   const { data: notesData, isLoading: notesLoading } = useTopicNotes(
     subjectId,
-    topicId
+    topicId,
   );
   const { data: topicSessions, isLoading: sessionsLoading } = useTopicSessions(
     subjectId,
-    topicId
+    topicId,
   );
   const { mutate: createNote, isPending: creatingNote } = useCreateNote(
     subjectId,
-    undefined
+    undefined,
   );
   const { mutate: updateNote, isPending: updatingNote } = useUpdateNote();
   const { mutate: deleteNote } = useDeleteNoteById();
 
   // Note input state: null = hidden, 'new' = adding new note, string = editing note id
   const [noteInputMode, setNoteInputMode] = useState<null | 'new' | string>(
-    null
+    null,
   );
   const [editingNoteContent, setEditingNoteContent] = useState('');
 
@@ -186,7 +186,7 @@ export default function TopicDetailScreen() {
 
   const studyCTA = useMemo(
     () => deriveStudyCTA(topicProgress?.completionStatus, retentionStatus),
-    [topicProgress?.completionStatus, retentionStatus]
+    [topicProgress?.completionStatus, retentionStatus],
   );
 
   const handleStudyPress = useMemo(() => {
@@ -250,7 +250,7 @@ export default function TopicDetailScreen() {
     if (!topicId) return;
     createNote(
       { topicId, content },
-      { onSuccess: () => setNoteInputMode(null) }
+      { onSuccess: () => setNoteInputMode(null) },
     );
   };
 
@@ -258,7 +258,7 @@ export default function TopicDetailScreen() {
     if (typeof noteInputMode !== 'string' || noteInputMode === 'new') return;
     updateNote(
       { noteId: noteInputMode, content },
-      { onSuccess: () => setNoteInputMode(null) }
+      { onSuccess: () => setNoteInputMode(null) },
     );
   };
 
@@ -473,6 +473,7 @@ export default function TopicDetailScreen() {
               name={topicProgress.title}
               chapter={paramChapter ?? null}
               retentionStatus={topicProgress.retentionStatus ?? null}
+              daysSinceLastReview={topicProgress.daysSinceLastReview}
               lastStudiedText={lastStudiedText}
             />
 

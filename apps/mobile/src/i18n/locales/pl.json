@@ -735,7 +735,16 @@
       "searching": "Wyszukiwanie…",
       "noResults": "Brak wyników dla „{{query}}”",
       "clear": "Wyczyść wyszukiwanie",
-      "placeholder": "Szukaj książek, tematów, notatek…"
+      "placeholder": "Szukaj książek, tematów, notatek…",
+      "error": "Wyszukiwanie jest chwilowo niedostępne.",
+      "freeform": "Tekst swobodny",
+      "sections": {
+        "subjects": "Przedmioty",
+        "books": "Książki",
+        "topics": "Tematy",
+        "notes": "Notatki",
+        "sessions": "Sesje"
+      }
     },
     "manage": {
       "button": "Zarządzaj",
@@ -1137,6 +1146,14 @@
       "wordsLink": "{{count}} słów →",
       "vocabularyLink": "Słownictwo →"
     },
+    "weeklyDelta": {
+      "topicsMastered": "+{{count}} topic this week",
+      "topicsMastered_other": "+{{count}} topics this week",
+      "vocabularyTotal": "+{{count}} word this week",
+      "vocabularyTotal_other": "+{{count}} words this week",
+      "topicsExplored": "+{{count}} topic explored this week",
+      "topicsExplored_other": "+{{count}} topics explored this week"
+    },
     "growth": {
       "title": "Twój rozwój",
       "subtitle": "Tygodniowe zmiany w opanowanych tematach i słownictwie",
@@ -1274,6 +1291,16 @@
       },
       "forgotten": {
         "label": "Wymaga nowego podejścia"
+      },
+      "elapsed": {
+        "remembered_one": "Remembered after {{count}} day",
+        "remembered_other": "Remembered after {{count}} days",
+        "fading_one": "Getting fuzzy after {{count}} day",
+        "fading_other": "Getting fuzzy after {{count}} days",
+        "weak_one": "Slipping after {{count}} day",
+        "weak_other": "Slipping after {{count}} days",
+        "forgotten_one": "Last seen {{count}} day ago",
+        "forgotten_other": "Last seen {{count}} days ago"
       }
     },
     "growthChart": {
@@ -1437,7 +1464,6 @@
       "pickAccommodation": "Wybierz dostosowanie",
       "active": "Aktywny",
       "accommodationTryIt": "Wypróbuj",
-      "howItsWorking": "Jak to działa",
       "consentSettingsCouldNotLoad": "Nie można załadować ustawień zgody",
       "retryConsentSettings": "Ponów",
       "consentRestrictedTitle": "Zgoda jest potrzebna, zanim pokażemy postępy",
@@ -2001,6 +2027,18 @@
       "purchaseConfirmedBody": "Your subscription is being activated. It usually appears within a minute — pull down to refresh.",
       "topUpTitle": "Top-up",
       "topUpBody": "500 additional credits have been added!"
+    }
+  },
+  "sessionSummary": {
+    "mentorMemoryCue": {
+      "title": "Co wie o Tobie Twój tutor.",
+      "subtitle": "Stuknij, aby sprawdzić lub zmienić."
+    },
+    "notificationPrimer": {
+      "title": "Chcesz codzienne przypomnienie?",
+      "message": "Możemy wysłać Ci delikatne przypomnienie, żebyś nie stracił/a swojej serii. Możesz je wyłączyć w Ustawieniach w dowolnym momencie.",
+      "allow": "Zezwól",
+      "notNow": "Nie teraz"
     }
   },
   "sessionTranscript": {

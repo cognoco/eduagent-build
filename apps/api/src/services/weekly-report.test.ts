@@ -10,6 +10,10 @@ function metrics(over: Partial<ProgressMetrics>): ProgressMetrics {
     topicsAttempted: 0,
     topicsMastered: 0,
     topicsInProgress: 0,
+    booksCompleted: 0,
+    weeklyDeltaTopicsMastered: null,
+    weeklyDeltaVocabularyTotal: null,
+    weeklyDeltaTopicsExplored: null,
     vocabularyTotal: 0,
     vocabularyMastered: 0,
     vocabularyLearning: 0,
@@ -30,7 +34,7 @@ describe('generateWeeklyReportData', () => {
       'Emma',
       '2026-04-27',
       metrics({ topicsMastered: 5, vocabularyTotal: 12 }),
-      metrics({ topicsMastered: 2, vocabularyTotal: 8 })
+      metrics({ topicsMastered: 2, vocabularyTotal: 8 }),
     );
 
     // vocabularyDelta=4, topicsMasteredDelta=3 -> Words learned wins
@@ -47,7 +51,7 @@ describe('generateWeeklyReportData', () => {
       'Emma',
       '2026-04-27',
       metrics({}),
-      metrics({})
+      metrics({}),
     );
 
     expect(result.headlineStat.value).toBe(0);
@@ -62,7 +66,7 @@ describe('generateWeeklyReportData', () => {
       'Emma',
       '2026-04-27',
       metrics({}),
-      null
+      null,
     );
 
     expect(result.headlineStat.value).toBe(0);
@@ -77,7 +81,7 @@ describe('generateWeeklyReportData', () => {
       'Emma',
       '2026-04-27',
       metrics({ topicsMastered: 1 }),
-      metrics({ topicsMastered: 4, vocabularyTotal: 10 })
+      metrics({ topicsMastered: 4, vocabularyTotal: 10 }),
     );
 
     // safeDelta clamps at 0 — this week mastered 0 new (relative). The

@@ -735,7 +735,16 @@
       "searching": "Searching…",
       "noResults": "No results for \"{{query}}\"",
       "clear": "Clear search",
-      "placeholder": "Search books, topics, notes…"
+      "placeholder": "Search books, topics, notes…",
+      "error": "Search is unavailable right now.",
+      "freeform": "Freeform",
+      "sections": {
+        "subjects": "Subjects",
+        "books": "Books",
+        "topics": "Topics",
+        "notes": "Notes",
+        "sessions": "Sessions"
+      }
     },
     "manage": {
       "button": "Manage",
@@ -1137,6 +1146,14 @@
       "wordsLink": "{{count}} words →",
       "vocabularyLink": "Vocabulary →"
     },
+    "weeklyDelta": {
+      "topicsMastered": "+{{count}} topic this week",
+      "topicsMastered_other": "+{{count}} topics this week",
+      "vocabularyTotal": "+{{count}} word this week",
+      "vocabularyTotal_other": "+{{count}} words this week",
+      "topicsExplored": "+{{count}} topic explored this week",
+      "topicsExplored_other": "+{{count}} topics explored this week"
+    },
     "growth": {
       "title": "Your growth",
       "subtitle": "Weekly changes in topics mastered and vocabulary",
@@ -1274,6 +1291,16 @@
       },
       "forgotten": {
         "label": "Needs a fresh pass"
+      },
+      "elapsed": {
+        "remembered_one": "Remembered after {{count}} day",
+        "remembered_other": "Remembered after {{count}} days",
+        "fading_one": "Getting fuzzy after {{count}} day",
+        "fading_other": "Getting fuzzy after {{count}} days",
+        "weak_one": "Slipping after {{count}} day",
+        "weak_other": "Slipping after {{count}} days",
+        "forgotten_one": "Last seen {{count}} day ago",
+        "forgotten_other": "Last seen {{count}} days ago"
       }
     },
     "growthChart": {
@@ -1437,7 +1464,6 @@
       "pickAccommodation": "Pick an accommodation",
       "active": "Active",
       "accommodationTryIt": "Try it",
-      "howItsWorking": "How it's working",
       "consentSettingsCouldNotLoad": "Consent settings could not load",
       "retryConsentSettings": "Retry",
       "consentRestrictedTitle": "Consent needed before progress is shown",
@@ -2001,6 +2027,18 @@
       "purchaseConfirmedBody": "Your subscription is being activated. It usually appears within a minute — pull down to refresh.",
       "topUpTitle": "Top-up",
       "topUpBody": "500 additional credits have been added!"
+    }
+  },
+  "sessionSummary": {
+    "mentorMemoryCue": {
+      "title": "What your tutor knows about you.",
+      "subtitle": "Tap to review or change."
+    },
+    "notificationPrimer": {
+      "title": "Want a daily nudge?",
+      "message": "We can send a gentle reminder so you don't lose your streak. You can turn it off anytime in Settings.",
+      "allow": "Allow",
+      "notNow": "Not now"
     }
   },
   "sessionTranscript": {

@@ -4,7 +4,7 @@
 // Uses Expo Push API via fetch (CF Workers-compatible, no Node SDK needed).
 // ---------------------------------------------------------------------------
 
-import { eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import type { ConsentType } from '@eduagent/schemas';
 import {
   familyLinks,
@@ -95,7 +95,7 @@ export async function sendPushNotification(
   // [BUG-856] When the caller already reserved the rate-limit slot via
   // checkAndLogRateLimitInternal, set skipRateLimitLog to true so we do not
   // double-count this push toward the daily cap or per-type rate limit.
-  options?: { skipRateLimitLog?: boolean }
+  options?: { skipRateLimitLog?: boolean },
 ): Promise<NotificationResult> {
   // 1. Get push token
   const token = await getPushToken(db, payload.profileId);
@@ -160,7 +160,7 @@ export async function sendPushNotification(
  */
 export function formatReviewReminderBody(
   fadingTopicCount: number,
-  subjects: string[]
+  subjects: string[],
 ): string {
   const subjectList = subjects.join(' and ');
   return `Your ${subjectList} topics are fading \u2014 ${
@@ -187,7 +187,7 @@ export function formatRecallNudge(
   fadingCount: number,
   topTopicTitle: string,
   role: 'guardian' | 'self_learner',
-  childName?: string
+  childName?: string,
 ): { title: string; body: string } {
   if (role === 'guardian') {
     return {
@@ -264,7 +264,7 @@ const RESEND_API_URL = 'https://api.resend.com/emails';
  */
 export async function sendEmail(
   payload: EmailPayload,
-  options?: EmailOptions
+  options?: EmailOptions,
 ): Promise<EmailResult> {
   const apiKey = options?.resendApiKey;
   if (!apiKey) {
@@ -318,7 +318,7 @@ export function formatConsentRequestEmail(
   parentEmail: string,
   childName: string,
   consentType: ConsentType,
-  tokenUrl: string
+  tokenUrl: string,
 ): EmailPayload {
   return {
     to: parentEmail,
@@ -338,7 +338,7 @@ export function formatConsentReminderEmail(
   parentEmail: string,
   childName: string,
   daysRemaining: number,
-  tokenUrl: string
+  tokenUrl: string,
 ): EmailPayload {
   return {
     to: parentEmail,
@@ -369,7 +369,7 @@ export async function notifyParentToSubscribe(
   db: Database,
   childProfileId: string,
   emailOptions?: EmailOptions,
-  appUrl?: string
+  appUrl?: string,
 ): Promise<ParentSubscribeResult> {
   // 1. [BUG-856] Atomic rate-limit check — counts recent subscribe_request
   // notifications and reserves the rate-limit slot in a single transaction
@@ -379,7 +379,7 @@ export async function notifyParentToSubscribe(
     db,
     childProfileId,
     'subscribe_request',
-    { hours: SUBSCRIBE_RATE_LIMIT_HOURS, maxCount: 1 }
+    { hours: SUBSCRIBE_RATE_LIMIT_HOURS, maxCount: 1 },
   );
   if (rateLimited) {
     return { sent: false, rateLimited: true, reason: 'rate_limited' };
@@ -427,7 +427,7 @@ export async function notifyParentToSubscribe(
         }`,
         type: 'subscribe_request',
       },
-      emailOptions
+      emailOptions,
     );
   }
 
@@ -450,7 +450,7 @@ import type { StruggleNotification } from './learner-profile';
 export function formatStruggleNotificationCopy(
   type: 'struggle_noticed' | 'struggle_flagged' | 'struggle_resolved',
   topic: string,
-  childName: string | null
+  childName: string | null,
 ): { title: string; body: string } {
   const name = childName ?? 'Your child';
 
@@ -480,13 +480,38 @@ export function formatStruggleNotificationCopy(
 export async function sendStruggleNotification(
   db: Database,
   childProfileId: string,
-  notification: StruggleNotification
+  notification: StruggleNotification,
 ): Promise<NotificationResult> {
   const link = await db.query.familyLinks.findFirst({
     where: eq(familyLinks.childProfileId, childProfileId),
   });
   if (!link) {
     return { sent: false, reason: 'no_parent_link' };
+  }
+
+  // Privacy gate: only send when the child's most recent GDPR consent state
+  // is CONSENTED. PENDING / PARENTAL_CONSENT_REQUESTED / WITHDRAWN must
+  // suppress — a parent receiving "Mia is struggling with fractions" pushes
+  // for a child who has not consented (or has withdrawn) is a privacy
+  // violation. Mirrors the dashboard's consent visibility rule
+  // (`hasRestrictedConsent` in ParentDashboardSummary).
+  // Missing row = no restriction (consent presumed), per existing dashboard
+  // behaviour for accounts created before the consent flow shipped.
+  const consentState = await db.query.consentStates.findFirst({
+    where: and(
+      eq(consentStates.profileId, childProfileId),
+      eq(consentStates.consentType, 'GDPR'),
+    ),
+    orderBy: desc(consentStates.requestedAt),
+  });
+  if (consentState != null && consentState.status !== 'CONSENTED') {
+    logger.info('Struggle notification suppressed by consent', {
+      event: 'notification.struggle.consent_blocked',
+      childProfileId,
+      type: notification.type,
+      consentStatus: consentState.status,
+    });
+    return { sent: false, reason: 'consent_not_granted' };
   }
 
   // [CR-119.5]: Per-type dedup (intentionally NOT per-topic). A parent
@@ -504,7 +529,7 @@ export async function sendStruggleNotification(
     db,
     link.parentProfileId,
     notification.type,
-    { hours: 24, maxCount: 1 }
+    { hours: 24, maxCount: 1 },
   );
   if (rateLimited) {
     logger.info('Struggle notification deduped', {
@@ -525,7 +550,7 @@ export async function sendStruggleNotification(
   const copy = formatStruggleNotificationCopy(
     notification.type,
     notification.topic,
-    childName
+    childName,
   );
 
   return sendPushNotification(
@@ -539,6 +564,6 @@ export async function sendStruggleNotification(
     // [BUG-856] Slot already reserved by checkAndLogRateLimitInternal above
     // for the same (parentProfileId, type) bucket — skip the push log so we
     // do not record two rows for the same notification.
-    { skipRateLimitLog: true }
+    { skipRateLimitLog: true },
   );
 }

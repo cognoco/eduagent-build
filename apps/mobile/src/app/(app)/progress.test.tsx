@@ -93,6 +93,18 @@ jest.mock('react-i18next', () => ({
         const count = opts?.count as number;
         return `${count}-day streak`;
       }
+      if (key === 'progress.weeklyDelta.topicsMastered') {
+        const count = opts?.count as number;
+        return `+${count} topic${count === 1 ? '' : 's'} this week`;
+      }
+      if (key === 'progress.weeklyDelta.vocabularyTotal') {
+        const count = opts?.count as number;
+        return `+${count} word${count === 1 ? '' : 's'} this week`;
+      }
+      if (key === 'progress.weeklyDelta.topicsExplored') {
+        const count = opts?.count as number;
+        return `+${count} topic${count === 1 ? '' : 's'} explored this week`;
+      }
       // Common fallbacks
       if (key === 'common.tryAgain') return 'Try again';
       if (key === 'common.goBack') return 'Go Back';
@@ -104,7 +116,7 @@ jest.mock('react-i18next', () => ({
 
 jest.mock('../../hooks/use-progress');
 const mockUseActiveProfileRole = jest.fn();
-jest.mock('../../hooks/use-active-profile-role', () => ({ // gc1-allow: progress screen varies register copy by role; mocking the role hook isolates register-driven rendering from auth state.
+jest.mock('../../hooks/use-active-profile-role' /* gc1-allow */, () => ({
   useActiveProfileRole: () => mockUseActiveProfileRole(),
 }));
 jest.mock('../../lib/profile', () => ({
@@ -134,11 +146,26 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
 }));
 
-const baseGlobal = {
+const baseGlobal: {
+  topicsAttempted: number;
+  topicsMastered: number;
+  vocabularyTotal: number;
+  vocabularyMastered: number;
+  weeklyDeltaTopicsMastered: number | null;
+  weeklyDeltaVocabularyTotal: number | null;
+  weeklyDeltaTopicsExplored: number | null;
+  totalSessions: number;
+  totalActiveMinutes: number;
+  currentStreak: number;
+  longestStreak: number;
+} = {
   topicsAttempted: 0,
   topicsMastered: 0,
   vocabularyTotal: 0,
   vocabularyMastered: 0,
+  weeklyDeltaTopicsMastered: null,
+  weeklyDeltaVocabularyTotal: null,
+  weeklyDeltaTopicsExplored: null,
   totalSessions: 0,
   totalActiveMinutes: 0,
   currentStreak: 0,
@@ -175,7 +202,7 @@ function mockHooks(
     inventory?: { global: typeof baseGlobal; subjects: unknown[] } | undefined;
     isLoading?: boolean;
     isError?: boolean;
-  } = {}
+  } = {},
 ) {
   const { inventory, isLoading = false, isError = false } = overrides;
   (useProgressInventory as jest.Mock).mockReturnValue({
@@ -278,6 +305,75 @@ describe('ProgressScreen — progressive disclosure', () => {
     expect(screen.queryByTestId('progress-new-learner-teaser')).toBeNull();
     // heroCopy: topicsMastered < 20 && vocabularyTotal === 0 → "You're building your knowledge"
     screen.getByText("You're building your knowledge");
+  });
+
+  it('renders weekly delta chips when the learner has prior-week deltas', () => {
+    mockHooks({
+      inventory: {
+        global: {
+          ...baseGlobal,
+          totalSessions: 5,
+          topicsMastered: 4,
+          vocabularyTotal: 12,
+          weeklyDeltaTopicsMastered: 3,
+          weeklyDeltaVocabularyTotal: 12,
+          weeklyDeltaTopicsExplored: 2,
+        },
+        subjects: [fullSubject],
+      },
+    });
+
+    render(<ProgressScreen />);
+
+    screen.getByTestId('progress-weekly-delta-topicsMastered');
+    screen.getByText('+3 topics this week');
+    screen.getByTestId('progress-weekly-delta-vocabularyTotal');
+    screen.getByText('+12 words this week');
+    screen.getByTestId('progress-weekly-delta-topicsExplored');
+    screen.getByText('+2 topics explored this week');
+  });
+
+  it('hides weekly delta chips when no prior-week snapshot exists', () => {
+    mockHooks({
+      inventory: {
+        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
+        subjects: [fullSubject],
+      },
+    });
+
+    render(<ProgressScreen />);
+
+    expect(
+      screen.queryByTestId('progress-weekly-delta-topicsMastered'),
+    ).toBeNull();
+    expect(
+      screen.queryByTestId('progress-weekly-delta-vocabularyTotal'),
+    ).toBeNull();
+    expect(
+      screen.queryByTestId('progress-weekly-delta-topicsExplored'),
+    ).toBeNull();
+  });
+
+  it('renders zero weekly delta chips after a baseline exists', () => {
+    mockHooks({
+      inventory: {
+        global: {
+          ...baseGlobal,
+          totalSessions: 5,
+          topicsMastered: 3,
+          weeklyDeltaTopicsMastered: 0,
+          weeklyDeltaVocabularyTotal: 0,
+          weeklyDeltaTopicsExplored: 0,
+        },
+        subjects: [fullSubject],
+      },
+    });
+
+    render(<ProgressScreen />);
+
+    screen.getByText('+0 topics this week');
+    screen.getByText('+0 words this week');
+    screen.getByText('+0 topics explored this week');
   });
 
   it('shows teaser with "1 more session" when totalSessions is 3', () => {

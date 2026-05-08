@@ -20,17 +20,15 @@ tags:
       SEED_SCENARIO: "parent-multi-child"
       API_URL: ${API_URL}
 
-# 2. Wait for parent dashboard
-- extendedWaitUntil:
-    visible:
-      id: "family-scroll"
-    timeout: 15000
+# 2. Parent owners land on ParentGateway; enter the Family dashboard.
+- runFlow:
+    file: ../_setup/open-family-dashboard.yaml
 
 # ── Visual integrity: dashboard heading ────────────────────────────────
 - assertVisible:
-    text: "Home"
+    text: "Family"
 - assertVisible:
-    text: "How your children are doing"
+    text: "Everyone you're learning alongside."
 
 - takeScreenshot: multi-child-01-dashboard
 
@@ -86,7 +84,7 @@ tags:
 # Wait for dashboard to reload
 - extendedWaitUntil:
     visible:
-      id: "family-scroll"
+      id: "dashboard-scroll"
     timeout: 10000
 
 # ── Drill into Child 2 (Lucas) ────────────────────────────────────────
@@ -116,7 +114,7 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: "family-scroll"
+      id: "dashboard-scroll"
     timeout: 10000
 
 # ── Drill into Child 3 (Sofia — no sessions) ─────────────────────────
@@ -146,7 +144,7 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: "family-scroll"
+      id: "dashboard-scroll"
     timeout: 10000
 
 - takeScreenshot: multi-child-06-complete

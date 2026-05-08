@@ -12,7 +12,6 @@ import {
   isNewLearner,
   sessionsUntilFullProgress,
 } from '../../lib/progressive-disclosure';
-import { SamplePreview } from '../parent/SamplePreview';
 import { MetricInfoDot } from '../parent/MetricInfoDot';
 
 interface SubjectInfo {
@@ -116,12 +115,12 @@ const AGGREGATE_SIGNAL_CONFIG: Record<
 type AggregateSignal = keyof typeof AGGREGATE_SIGNAL_CONFIG;
 
 function deriveAggregateSignal(
-  subjects: SubjectInfo[]
+  subjects: SubjectInfo[],
 ): AggregateSignal | null {
   if (subjects.length === 0) return null;
 
   const hasWeakOrForgotten = subjects.some(
-    (s) => s.retentionStatus === 'weak' || s.retentionStatus === 'forgotten'
+    (s) => s.retentionStatus === 'weak' || s.retentionStatus === 'forgotten',
   );
   if (hasWeakOrForgotten) return 'falling-behind';
 
@@ -143,7 +142,7 @@ function sessionWord(n: number): string {
 }
 
 function consentStatusLabelKey(
-  status: ConsentStatus | null | undefined
+  status: ConsentStatus | null | undefined,
 ): string | null {
   switch (status) {
     case 'PENDING':
@@ -160,7 +159,7 @@ function consentStatusLabelKey(
 }
 
 function consentStatusMessageKey(
-  status: ConsentStatus | null | undefined
+  status: ConsentStatus | null | undefined,
 ): string {
   switch (status) {
     case 'PENDING':
@@ -175,7 +174,7 @@ function consentStatusMessageKey(
 }
 
 function consentPrimaryLabelKey(
-  status: ConsentStatus | null | undefined
+  status: ConsentStatus | null | undefined,
 ): string {
   switch (status) {
     case 'WITHDRAWN':
@@ -189,7 +188,7 @@ function consentPrimaryLabelKey(
 }
 
 function engagementTrendLabelKey(
-  trend: 'increasing' | 'stable' | 'declining'
+  trend: 'increasing' | 'stable' | 'declining',
 ): string {
   switch (trend) {
     case 'increasing':
@@ -244,11 +243,11 @@ export function ParentDashboardSummary({
   const guidedPercent = Math.round(guidedVsImmediateRatio * 100);
 
   const trendText = `${sessionsThisWeek} ${sessionWord(
-    sessionsThisWeek
+    sessionsThisWeek,
   )}, ${formatTime(totalTimeThisWeek)} this week (${TREND_ARROWS[trend]} ${
     TREND_LABELS[trend]
   } ${sessionsLastWeek} ${sessionWord(sessionsLastWeek)}, ${formatTime(
-    totalTimeLastWeek
+    totalTimeLastWeek,
   )} last week)`;
 
   const metadata = (
@@ -261,7 +260,7 @@ export function ParentDashboardSummary({
           testID="consent-status-badge"
           accessibilityLabel={t(
             'coaching.parentDashboard.consent.accessibilityLabel',
-            { status: consentLabel }
+            { status: consentLabel },
           )}
         >
           <Text
@@ -299,15 +298,17 @@ export function ParentDashboardSummary({
               <MetricInfoDot metricKey="engagement-trend" />
             </View>
           ) : null}
-          <View
-            className="flex-row items-center gap-1 bg-background rounded-full px-3 py-1.5"
-            testID="exchange-delta-chip"
-          >
-            <Text className="text-caption font-semibold text-text-primary">
-              {signedDelta(exchangeDelta)} exchanges
-            </Text>
-            <MetricInfoDot metricKey="exchange-delta" />
-          </View>
+          {exchangeDelta !== 0 ? (
+            <View
+              className="flex-row items-center gap-1 bg-background rounded-full px-3 py-1.5"
+              testID="exchange-delta-chip"
+            >
+              <Text className="text-caption font-semibold text-text-primary">
+                {signedDelta(exchangeDelta)} exchanges
+              </Text>
+              <MetricInfoDot metricKey="exchange-delta" />
+            </View>
+          ) : null}
           {guidedVsImmediateRatio > 0 ? (
             <View
               className="flex-row items-center gap-1 bg-background rounded-full px-3 py-1.5"
@@ -343,7 +344,7 @@ export function ParentDashboardSummary({
             className="flex-row items-center mt-1"
             testID="aggregate-signal"
             accessibilityLabel={`Overall status: ${t(
-              AGGREGATE_SIGNAL_CONFIG[aggregateSignal].labelKey
+              AGGREGATE_SIGNAL_CONFIG[aggregateSignal].labelKey,
             )}`}
           >
             <Ionicons
@@ -454,22 +455,15 @@ export function ParentDashboardSummary({
         </View>
       ) : null}
       {!showFullSignals && !hasRestrictedConsent ? (
-        <View className="mt-2" testID="parent-dashboard-teaser">
-          <SamplePreview
-            unlockMessage={`After ${remaining} more ${
+        <View
+          className="mt-2 bg-background rounded-card px-4 py-3"
+          testID="parent-dashboard-teaser"
+        >
+          <Text className="text-caption text-text-secondary text-center">
+            {`After ${remaining} more ${
               remaining === 1 ? 'session' : 'sessions'
             }, you'll see ${childName}'s learning trends here.`}
-          >
-            <View className="flex-row items-end gap-3 h-16 px-2 pt-2">
-              {[40, 60, 35, 75, 50].map((height, i) => (
-                <View
-                  key={i}
-                  className="flex-1 rounded-t-full bg-primary"
-                  style={{ height }}
-                />
-              ))}
-            </View>
-          </SamplePreview>
+          </Text>
         </View>
       ) : null}
     </>

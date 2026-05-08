@@ -72,7 +72,6 @@ function renderChildCards(
     retentionTrend?: string;
     totalSessions?: number;
     currentStreak: number;
-    longestStreak: number;
     totalXp: number;
     consentStatus: string | null;
     subjects: { name: string; retentionStatus: string }[];
@@ -86,7 +85,7 @@ function renderChildCards(
       guidance: string | null;
     } | null;
   }[],
-  onDrillDown: (profileId: string) => void
+  onDrillDown: (profileId: string) => void,
 ): React.ReactNode {
   return children.map((child) => (
     <ParentDashboardSummary
@@ -162,7 +161,7 @@ function FamilyContent(): React.ReactElement {
       platformAlert(
         t('dashboard.demoAlertTitle'),
         t('dashboard.demoAlertMessage'),
-        [{ text: t('common.done') }]
+        [{ text: t('common.done') }],
       );
       return;
     }
@@ -174,12 +173,15 @@ function FamilyContent(): React.ReactElement {
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
-      <View className="px-5 pt-4 pb-2">
+      {/* [BUG-999] zIndex:20 ensures this header wins over the ParentGateway
+          header (zIndex:10) that sits in the home-tab stack on web. Without it,
+          the Home header intercepts pointer events after a deep-drilldown back. */}
+      <View className="px-5 pt-4 pb-2" style={{ zIndex: 20 }}>
         <Pressable
           onPress={() => goBackOrReplace(router, backFallback)}
           className="mb-2 self-start"
           hitSlop={12}
-          testID="family-back"
+          testID="dashboard-back"
           accessibilityLabel={t('dashboard.backLabel')}
           accessibilityRole="button"
         >
@@ -195,7 +197,7 @@ function FamilyContent(): React.ReactElement {
       <ScrollView
         className="flex-1 px-5"
         contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
-        testID="family-scroll"
+        testID="dashboard-scroll"
         refreshControl={
           <RefreshControl
             refreshing={isRefetching}

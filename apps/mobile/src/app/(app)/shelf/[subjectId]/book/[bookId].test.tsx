@@ -9,7 +9,7 @@ jest.mock('react-native-safe-area-context', () => ({
 
 jest.mock(
   'react-i18next',
-  () => require('../../../../../test-utils/mock-i18n').i18nMock
+  () => require('../../../../../test-utils/mock-i18n').i18nMock,
 );
 
 const mockPush = jest.fn();
@@ -81,7 +81,7 @@ jest.mock(
       mutateAsync: mockStartFirstCurriculumMutateAsync,
       isPending: false,
     }),
-  })
+  }),
 );
 
 jest.mock('../../../../../hooks/use-subjects', () => ({
@@ -164,6 +164,7 @@ function makeRetentionTopic(overrides: Partial<any> = {}) {
     xpStatus: 'active',
     failureCount: 0,
     nextReviewAt: null,
+    daysSinceLastReview: null,
     ...overrides,
   };
 }
@@ -253,7 +254,7 @@ describe('BookScreen', () => {
       makeBookQuery({
         data: undefined,
         isLoading: true,
-      })
+      }),
     );
 
     const { getByTestId } = render(<BookScreen />);
@@ -268,7 +269,7 @@ describe('BookScreen', () => {
         data: undefined,
         isError: true,
         error: new Error('Server exploded'),
-      })
+      }),
     );
 
     const { getByTestId, getByText } = render(<BookScreen />);
@@ -293,7 +294,7 @@ describe('BookScreen', () => {
 
     getByTestId('book-missing-param');
     expect(
-      getByText('Missing book details. Please go back and try again.')
+      getByText('Missing book details. Please go back and try again.'),
     ).toBeTruthy();
   });
 
@@ -370,7 +371,7 @@ describe('BookScreen', () => {
             makeTopic({ id: 'topic-3', title: 'T3', sortOrder: 3 }),
           ],
         },
-      })
+      }),
     );
     mockUseRetentionTopics.mockReturnValue(
       makeRetentionQuery({
@@ -381,12 +382,33 @@ describe('BookScreen', () => {
           ],
           reviewDueCount: 0,
         },
-      })
+      }),
     );
 
     const { getByText } = render(<BookScreen />);
 
     getByText('2 of 3 topics finished');
+  });
+
+  it('shows elapsed retention days in the book header when available', () => {
+    mockUseRetentionTopics.mockReturnValue(
+      makeRetentionQuery({
+        data: {
+          topics: [
+            makeRetentionTopic({
+              topicId: 'topic-1',
+              nextReviewAt: '2099-01-01T00:00:00.000Z',
+              daysSinceLastReview: 9,
+            }),
+          ],
+          reviewDueCount: 0,
+        },
+      }),
+    );
+
+    const { getByText } = render(<BookScreen />);
+
+    getByText('Remembered after 9 days');
   });
 
   it('offers to set up a fuller topic list when a book only has one starter topic', async () => {
@@ -406,7 +428,7 @@ describe('BookScreen', () => {
             }),
           ],
         },
-      })
+      }),
     );
 
     const { getByTestId, getByText } = render(<BookScreen />);
@@ -446,7 +468,7 @@ describe('BookScreen', () => {
     mockUseBookWithTopics.mockReturnValue(
       makeBookQuery({
         data: { ...makeBookQuery().data, topics },
-      })
+      }),
     );
     mockUseBookSessions.mockReturnValue(
       makeSessionsQuery({
@@ -470,7 +492,7 @@ describe('BookScreen', () => {
             createdAt: '2026-04-24T09:00:00.000Z',
           }),
         ],
-      })
+      }),
     );
 
     const { getByTestId, queryByTestId, getByText } = render(<BookScreen />);
@@ -500,7 +522,7 @@ describe('BookScreen', () => {
         id: `topic-${index + 1}`,
         title: `Topic ${index + 1}`,
         sortOrder: index + 1,
-      })
+      }),
     );
     const sessions = topics.map((topic, index) =>
       makeSession({
@@ -508,11 +530,11 @@ describe('BookScreen', () => {
         topicId: topic.id,
         topicTitle: topic.title,
         createdAt: `2026-04-24T1${9 - index}:00:00.000Z`,
-      })
+      }),
     );
 
     mockUseBookWithTopics.mockReturnValue(
-      makeBookQuery({ data: { ...makeBookQuery().data, topics } })
+      makeBookQuery({ data: { ...makeBookQuery().data, topics } }),
     );
     mockUseBookSessions.mockReturnValue(makeSessionsQuery({ data: sessions }));
 
@@ -581,7 +603,7 @@ describe('BookScreen', () => {
         data: undefined,
         isError: true,
         refetch: refetchSpy,
-      })
+      }),
     );
     mockUseRetentionTopics.mockReturnValue(
       makeRetentionQuery({
@@ -589,7 +611,7 @@ describe('BookScreen', () => {
           topics: [makeRetentionTopic({ topicId: 'topic-1' })],
           reviewDueCount: 0,
         },
-      })
+      }),
     );
 
     const { getByTestId } = render(<BookScreen />);
@@ -610,14 +632,14 @@ describe('BookScreen', () => {
         data: [
           makeSession({ topicId: 'topic-1', topicTitle: 'Linear Equations' }),
         ],
-      })
+      }),
     );
     mockUseRetentionTopics.mockReturnValue(
       makeRetentionQuery({
         data: undefined,
         isError: true,
         refetch: refetchSpy,
-      })
+      }),
     );
 
     const { getByTestId } = render(<BookScreen />);
@@ -645,7 +667,7 @@ describe('BookScreen', () => {
           topics: [],
           completedTopicCount: 0,
         },
-      })
+      }),
     );
 
     const { getByTestId, getByText } = render(<BookScreen />);
@@ -672,7 +694,7 @@ describe('BookScreen', () => {
             topicId: 'topic-1',
             subjectName: 'Algebra',
           }),
-        })
+        }),
       );
     });
   });
@@ -687,7 +709,7 @@ describe('BookScreen', () => {
             makeTopic({ id: 'topic-2', skipped: true, sortOrder: 2 }),
           ],
         },
-      })
+      }),
     );
 
     const { getByTestId } = render(<BookScreen />);
@@ -708,7 +730,7 @@ describe('BookScreen', () => {
             createdAt: '2026-04-24T08:00:00.000Z',
           }),
         ],
-      })
+      }),
     );
 
     const { getByTestId } = render(<BookScreen />);
@@ -752,7 +774,7 @@ describe('BookScreen', () => {
             chapter: 'Chapter B',
           }),
         ],
-      })
+      }),
     );
 
     const { getByText, getByTestId } = render(<BookScreen />);
@@ -773,7 +795,7 @@ describe('BookScreen', () => {
     mockUseBookWithTopics.mockReturnValue(
       makeBookQuery({
         data: { ...makeBookQuery().data, topics },
-      })
+      }),
     );
     mockUseRetentionTopics.mockReturnValue(
       makeRetentionQuery({
@@ -790,7 +812,7 @@ describe('BookScreen', () => {
           ],
           reviewDueCount: 0,
         },
-      })
+      }),
     );
 
     const { getByTestId, queryByTestId } = render(<BookScreen />);
@@ -822,7 +844,7 @@ describe('BookScreen', () => {
           topics: [makeRetentionTopic({ topicId: 'topic-1' })],
           reviewDueCount: 0,
         },
-      })
+      }),
     );
 
     const { queryByTestId } = render(<BookScreen />);
@@ -836,7 +858,7 @@ describe('BookScreen', () => {
         data: [
           makeSession({ topicId: 'topic-1', topicTitle: 'Linear Equations' }),
         ],
-      })
+      }),
     );
 
     const { getByText, queryByTestId } = render(<BookScreen />);
@@ -852,7 +874,7 @@ describe('BookScreen', () => {
     mockUseBookSessions.mockReturnValue(
       makeSessionsQuery({
         data: [makeSession({ topicId: 'topic-1', topicTitle: longTitle })],
-      })
+      }),
     );
     mockUseBookWithTopics.mockReturnValue(
       makeBookQuery({
@@ -867,7 +889,7 @@ describe('BookScreen', () => {
             makeTopic({ id: 'topic-1', title: longTitle, sortOrder: 1 }),
           ],
         },
-      })
+      }),
     );
 
     const { getByText } = render(<BookScreen />);
@@ -897,7 +919,7 @@ describe('BookScreen', () => {
             topicId: 'topic-1',
             subjectName: 'Algebra',
           }),
-        })
+        }),
       );
     });
   });
@@ -961,7 +983,7 @@ describe('BookScreen', () => {
           topics: [],
           completedTopicCount: 0,
         },
-      })
+      }),
     );
 
     const { getByTestId, getByText } = render(<BookScreen />);
@@ -986,12 +1008,12 @@ describe('BookScreen', () => {
           topics: [],
           completedTopicCount: 0,
         },
-      })
+      }),
     );
     mockGenerateMutate.mockImplementation(
       (_input: unknown, callbacks: { onError: (error: Error) => void }) => {
         callbacks.onError(new Error('LLM service unavailable'));
-      }
+      },
     );
 
     render(<BookScreen />);
@@ -1001,7 +1023,7 @@ describe('BookScreen', () => {
         "Couldn't build this book",
         expect.any(String),
         expect.any(Array),
-        undefined
+        undefined,
       );
     });
   });
@@ -1020,13 +1042,13 @@ describe('BookScreen', () => {
           topics: [],
           completedTopicCount: 0,
         },
-      })
+      }),
     );
 
     mockGenerateMutate.mockImplementationOnce(
       (_input: unknown, callbacks: { onError: (error: Error) => void }) => {
         callbacks.onError(new Error('initial failure'));
-      }
+      },
     );
 
     const { getByTestId } = render(<BookScreen />);
@@ -1073,7 +1095,7 @@ describe('BookScreen', () => {
             createdAt: '2026-04-24T12:00:00.000Z',
           }),
         ],
-      })
+      }),
     );
 
     const { getByTestId, queryByTestId } = render(<BookScreen />);
@@ -1081,7 +1103,7 @@ describe('BookScreen', () => {
     expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
       expect.objectContaining({
         message: 'continueNowTopicId references missing topic',
-      })
+      }),
     );
     expect(queryByTestId('continue-now-row')).toBeNull();
     getByTestId('up-next-row-topic-1');

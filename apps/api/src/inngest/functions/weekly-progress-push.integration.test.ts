@@ -103,17 +103,17 @@ function localHour(timezone: string, now: Date): number {
       hour: 'numeric',
       hour12: false,
     }),
-    10
+    10,
   );
 }
 
 function findTimezoneForHour(targetHour: number, now: Date): string {
   const timezone = TIMEZONE_CANDIDATES.find(
-    (candidate) => localHour(candidate, now) === targetHour
+    (candidate) => localHour(candidate, now) === targetHour,
   );
   if (!timezone) {
     throw new Error(
-      `Could not find timezone matching local hour ${targetHour}`
+      `Could not find timezone matching local hour ${targetHour}`,
     );
   }
   return timezone;
@@ -122,11 +122,11 @@ function findTimezoneForHour(targetHour: number, now: Date): string {
 function findTimezoneNotHour(targetHour: number, now: Date, exclude: string) {
   const timezone = TIMEZONE_CANDIDATES.find(
     (candidate) =>
-      candidate !== exclude && localHour(candidate, now) !== targetHour
+      candidate !== exclude && localHour(candidate, now) !== targetHour,
   );
   if (!timezone) {
     throw new Error(
-      `Could not find timezone not matching local hour ${targetHour}`
+      `Could not find timezone not matching local hour ${targetHour}`,
     );
   }
   return timezone;
@@ -135,7 +135,7 @@ function findTimezoneNotHour(targetHour: number, now: Date, exclude: string) {
 function buildSubjectMetrics(
   subjectId: string,
   subjectName: string,
-  overrides: Partial<ProgressMetrics['subjects'][number]> = {}
+  overrides: Partial<ProgressMetrics['subjects'][number]> = {},
 ): ProgressMetrics['subjects'][number] {
   return {
     subjectId,
@@ -155,7 +155,7 @@ function buildSubjectMetrics(
 }
 
 function buildProgressMetrics(
-  overrides: Partial<ProgressMetrics> = {}
+  overrides: Partial<ProgressMetrics> = {},
 ): ProgressMetrics {
   return {
     totalSessions: 0,
@@ -165,6 +165,10 @@ function buildProgressMetrics(
     topicsAttempted: 0,
     topicsMastered: 0,
     topicsInProgress: 0,
+    booksCompleted: 0,
+    weeklyDeltaTopicsMastered: null,
+    weeklyDeltaVocabularyTotal: null,
+    weeklyDeltaTopicsExplored: null,
     vocabularyTotal: 0,
     vocabularyMastered: 0,
     vocabularyLearning: 0,
@@ -221,7 +225,7 @@ async function seedWeeklyPushPrefs(profileId: string): Promise<void> {
 
 async function seedFamilyLink(
   parentProfileId: string,
-  childProfileId: string
+  childProfileId: string,
 ): Promise<void> {
   await db.insert(familyLinks).values({ parentProfileId, childProfileId });
 }
@@ -246,14 +250,14 @@ function migrationStatements(path: string): string[] {
         .split(/\r?\n/)
         .filter((line) => !line.trim().startsWith('--'))
         .join('\n')
-        .trim()
+        .trim(),
     )
     .filter(Boolean);
 }
 
 async function ensureWeeklyReportsTable(): Promise<void> {
   const result = (await db.execute(
-    sql.raw("select to_regclass('public.weekly_reports') as relation_name")
+    sql.raw("select to_regclass('public.weekly_reports') as relation_name"),
   )) as {
     rows?: Array<{ relation_name?: string | null }>;
   };
@@ -312,7 +316,7 @@ beforeAll(async () => {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
     throw new Error(
-      'DATABASE_URL is not set for weekly progress push integration tests'
+      'DATABASE_URL is not set for weekly progress push integration tests',
     );
   }
 
@@ -334,7 +338,7 @@ beforeAll(async () => {
       });
       return new Response(
         JSON.stringify({ data: { id: 'ticket-integration', status: 'ok' } }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       );
     }
     return originalFetch(input, init);
@@ -386,7 +390,7 @@ describe('weekly progress push integration', () => {
           name: 'app/weekly-progress-push.generate',
           data: { parentId: queuedParentId },
         }),
-      ])
+      ]),
     );
     expect(step.sendEvent).not.toHaveBeenCalledWith(
       expect.any(String),
@@ -394,7 +398,7 @@ describe('weekly progress push integration', () => {
         expect.objectContaining({
           data: { parentId: skippedParentId },
         }),
-      ])
+      ]),
     );
   });
 
@@ -413,7 +417,7 @@ describe('weekly progress push integration', () => {
     const today = new Date();
     const latestSnapshotDate = isoDate(today);
     const previousSnapshotDate = isoDate(
-      subtractDays(new Date(`${latestSnapshotDate}T00:00:00.000Z`), 7)
+      subtractDays(new Date(`${latestSnapshotDate}T00:00:00.000Z`), 7),
     );
 
     await seedSnapshot({
@@ -460,16 +464,16 @@ describe('weekly progress push integration', () => {
         to: 'ExponentPushToken[integration]',
         title: 'Weekly learning progress',
         body: expect.stringContaining(
-          'Emma: +4 topics, +10 words, +2 explored'
+          'Emma: +4 topics, +10 words, +2 explored',
         ),
         data: { type: 'weekly_progress' },
-      })
+      }),
     );
 
     const storedReports = await db.query.weeklyReports.findMany({
       where: and(
         eq(weeklyReports.profileId, parentProfileId),
-        eq(weeklyReports.childProfileId, childProfileId)
+        eq(weeklyReports.childProfileId, childProfileId),
       ),
     });
 
@@ -479,13 +483,13 @@ describe('weekly progress push integration', () => {
         profileId: parentProfileId,
         childProfileId,
         reportWeek: weekStartIso(today),
-      })
+      }),
     );
     expect(storedReports[0]!.reportData).toEqual(
       expect.objectContaining({
         childName: 'Emma',
         weekStart: weekStartIso(today),
-      })
+      }),
     );
   });
 
@@ -526,7 +530,7 @@ describe('weekly progress push integration', () => {
     const today = new Date();
     const latestSnapshotDate = isoDate(today);
     const previousSnapshotDate = isoDate(
-      subtractDays(new Date(`${latestSnapshotDate}T00:00:00.000Z`), 7)
+      subtractDays(new Date(`${latestSnapshotDate}T00:00:00.000Z`), 7),
     );
 
     await seedSnapshot({
@@ -568,7 +572,7 @@ describe('weekly progress push integration', () => {
     const storedReports = await db.query.weeklyReports.findMany({
       where: and(
         eq(weeklyReports.profileId, parentProfileId),
-        eq(weeklyReports.childProfileId, childProfileId)
+        eq(weeklyReports.childProfileId, childProfileId),
       ),
     });
     expect(storedReports).toHaveLength(1);
@@ -595,7 +599,7 @@ describe('weekly progress push integration', () => {
     const today = new Date();
     const latestSnapshotDate = isoDate(today);
     const previousSnapshotDate = isoDate(
-      subtractDays(new Date(`${latestSnapshotDate}T00:00:00.000Z`), 7)
+      subtractDays(new Date(`${latestSnapshotDate}T00:00:00.000Z`), 7),
     );
 
     await seedSnapshot({

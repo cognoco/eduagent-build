@@ -1,11 +1,19 @@
 import { useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { CurriculumBook, BookProgressStatus } from '@eduagent/schemas';
-import type { EnrichedBook } from '../lib/library-filters';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
+
+export interface EnrichedBook {
+  book: CurriculumBook;
+  subjectId: string;
+  subjectName: string;
+  topicCount: number;
+  completedCount: number;
+  status: BookProgressStatus;
+}
 
 interface LibraryBooksResponse {
   subjects: Array<{
@@ -68,7 +76,7 @@ export function useAllBooks(): {
             (book.topicsGenerated
               ? 'IN_PROGRESS'
               : 'NOT_STARTED')) as BookProgressStatus,
-        }))
+        })),
     );
   }, [libraryBooksQuery.data]);
 

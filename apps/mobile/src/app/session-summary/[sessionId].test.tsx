@@ -148,6 +148,7 @@ let mockSessionSummaryData: {
   aiFeedback: string | null;
   status: 'pending' | 'submitted' | 'accepted' | 'skipped' | 'auto_closed';
 } | null = null;
+let mockTotalSessions = 0;
 
 // Per-test mutation result containers — default to success shapes; override
 // with setRoute() for tests that need rejections or custom shapes.
@@ -179,7 +180,7 @@ const mockFetch = createRoutedMockFetch({
       topicsMastered: 0,
       vocabularyTotal: 0,
       vocabularyMastered: 0,
-      totalSessions: 0,
+      totalSessions: mockTotalSessions,
       totalActiveMinutes: 0,
       totalWallClockMinutes: 0,
       currentStreak: 0,
@@ -304,6 +305,7 @@ describe('SessionSummaryScreen', () => {
     mockParams.topicId = undefined;
     mockTranscriptData = null;
     mockSessionSummaryData = null;
+    mockTotalSessions = 0;
     mockBack.mockClear();
     mockCanGoBack.mockReset();
     mockCanGoBack.mockReturnValue(false);
@@ -413,6 +415,86 @@ describe('SessionSummaryScreen', () => {
     screen.getByText('Your Words');
     screen.getByTestId('summary-input');
     screen.getByTestId('submit-summary-button');
+  });
+
+  describe('mentor-memory cue', () => {
+    it('renders after two sessions and routes owners to mentor memory', async () => {
+      mockTotalSessions = 2;
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      const cue = await screen.findByTestId(
+        'session-summary-mentor-memory-cue'
+      );
+      screen.getByText('What your tutor knows about you.');
+      screen.getByText('Tap to review or change.');
+
+      fireEvent.press(cue);
+
+      expect(mockPush).toHaveBeenCalledWith('/(app)/mentor-memory');
+    });
+
+    it('routes parent-proxy users to the child mentor-memory screen when consented', async () => {
+      mockTotalSessions = 2;
+      mockUseParentProxy.mockReturnValue({
+        isParentProxy: true,
+        childProfile: {
+          id: 'child-profile-id',
+          birthYear: 2012,
+          consentStatus: 'CONSENTED',
+        } as never,
+        parentProfile: { id: 'parent-1', isOwner: true } as never,
+      });
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      fireEvent.press(
+        await screen.findByTestId('session-summary-mentor-memory-cue')
+      );
+
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/child/[profileId]/mentor-memory',
+        params: { profileId: 'child-profile-id' },
+      });
+    });
+
+    it.each([0, 1])(
+      'hides the cue while the profile has only %i completed sessions',
+      async (totalSessions) => {
+        mockTotalSessions = totalSessions;
+
+        render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+        await waitFor(() => {
+          expect(screen.queryByTestId('session-takeaways')).not.toBeNull();
+        });
+        expect(
+          screen.queryByTestId('session-summary-mentor-memory-cue')
+        ).toBeNull();
+      }
+    );
+
+    it('hides the cue in parent-proxy mode without consent', async () => {
+      mockTotalSessions = 2;
+      mockUseParentProxy.mockReturnValue({
+        isParentProxy: true,
+        childProfile: {
+          id: 'child-profile-id',
+          birthYear: 2012,
+          consentStatus: 'PENDING',
+        } as never,
+        parentProfile: { id: 'parent-1', isOwner: true } as never,
+      });
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('session-takeaways')).not.toBeNull();
+      });
+      expect(
+        screen.queryByTestId('session-summary-mentor-memory-cue')
+      ).toBeNull();
+    });
   });
 
   it('disables submit when summary is too short', () => {

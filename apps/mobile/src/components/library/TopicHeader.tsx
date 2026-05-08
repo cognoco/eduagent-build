@@ -7,6 +7,7 @@ interface TopicHeaderProps {
   name: string;
   chapter: string | null;
   retentionStatus: RetentionStatus | null;
+  daysSinceLastReview?: number | null;
   lastStudiedText: string;
 }
 
@@ -14,6 +15,7 @@ export function TopicHeader({
   name,
   chapter,
   retentionStatus,
+  daysSinceLastReview,
   lastStudiedText,
 }: TopicHeaderProps) {
   const colors = useThemeColors();
@@ -51,7 +53,11 @@ export function TopicHeader({
 
       {retentionStatus != null ? (
         <View style={{ marginTop: 8 }}>
-          <RetentionPill status={retentionStatus} size="large" />
+          <RetentionPill
+            status={retentionStatus}
+            daysSinceLastReview={daysSinceLastReview}
+            size="large"
+          />
         </View>
       ) : null}
 
