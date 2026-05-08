@@ -2025,6 +2025,12 @@
     "mentorMemoryCue": {
       "title": "Co wie o Tobie Twój tutor.",
       "subtitle": "Stuknij, aby sprawdzić lub zmienić."
+    },
+    "notificationPrimer": {
+      "title": "Chcesz codzienne przypomnienie?",
+      "message": "Możemy wysłać Ci delikatne przypomnienie, żebyś nie stracił/a swojej serii. Możesz je wyłączyć w Ustawieniach w dowolnym momencie.",
+      "allow": "Zezwól",
+      "notNow": "Nie teraz"
     }
   },
   "sessionTranscript": {

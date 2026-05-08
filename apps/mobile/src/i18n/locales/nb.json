@@ -2025,6 +2025,12 @@
     "mentorMemoryCue": {
       "title": "Hva veilederen din vet om deg.",
       "subtitle": "Trykk for å se eller endre."
+    },
+    "notificationPrimer": {
+      "title": "Vil du ha en daglig påminnelse?",
+      "message": "Vi kan sende deg en forsiktig påminnelse så du ikke mister streaken din. Du kan slå den av når som helst i Innstillinger.",
+      "allow": "Tillat",
+      "notNow": "Ikke nå"
     }
   },
   "sessionTranscript": {

@@ -2025,6 +2025,12 @@
     "mentorMemoryCue": {
       "title": "Was dein Tutor über dich weiß.",
       "subtitle": "Tippe, um es anzusehen oder zu ändern."
+    },
+    "notificationPrimer": {
+      "title": "Möchtest du eine tägliche Erinnerung?",
+      "message": "Wir können dir eine sanfte Erinnerung schicken, damit du deinen Streak nicht verlierst. Du kannst sie jederzeit in den Einstellungen deaktivieren.",
+      "allow": "Erlauben",
+      "notNow": "Nicht jetzt"
     }
   },
   "sessionTranscript": {

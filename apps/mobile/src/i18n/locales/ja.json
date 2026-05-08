@@ -2025,6 +2025,12 @@
     "mentorMemoryCue": {
       "title": "チューターがあなたについて知っていること。",
       "subtitle": "タップして確認または変更。"
+    },
+    "notificationPrimer": {
+      "title": "毎日のリマインダーを受け取りますか？",
+      "message": "ストリークを途切れさせないよう、優しいリマインダーをお送りします。設定からいつでも無効にできます。",
+      "allow": "許可する",
+      "notNow": "今はしない"
     }
   },
   "sessionTranscript": {

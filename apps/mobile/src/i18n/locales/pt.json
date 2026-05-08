@@ -2025,6 +2025,12 @@
     "mentorMemoryCue": {
       "title": "O que o seu tutor sabe sobre você.",
       "subtitle": "Toque para rever ou alterar."
+    },
+    "notificationPrimer": {
+      "title": "Quer um lembrete diário?",
+      "message": "Podemos enviar um lembrete gentil para você não perder sua sequência. Você pode desativar a qualquer momento nas Configurações.",
+      "allow": "Permitir",
+      "notNow": "Agora não"
     }
   },
   "sessionTranscript": {

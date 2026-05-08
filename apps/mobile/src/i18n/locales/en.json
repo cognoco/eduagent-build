@@ -2025,6 +2025,12 @@
     "mentorMemoryCue": {
       "title": "What your tutor knows about you.",
       "subtitle": "Tap to review or change."
+    },
+    "notificationPrimer": {
+      "title": "Want a daily nudge?",
+      "message": "We can send a gentle reminder so you don't lose your streak. You can turn it off anytime in Settings.",
+      "allow": "Allow",
+      "notNow": "Not now"
     }
   },
   "sessionTranscript": {
