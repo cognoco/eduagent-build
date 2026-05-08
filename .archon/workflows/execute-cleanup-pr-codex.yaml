@@ -38,7 +38,7 @@ nodes:
   # tagged archon-<workflow>. Zero tokens — pure shell script.
 
   - id: init-tracing
-    bash: ./.archon/scripts/init-tracing.sh "$ARGUMENTS"
+    bash: ./.archon/scripts/init-tracing.sh --workflow execute-cleanup-pr-codex "$ARGUMENTS"
 
   # PHASE 1: EXTRACT — Parse cleanup-plan.md for this PR
   
@@ -46,6 +46,9 @@ nodes:
     command: cleanup-extract-pr
     depends_on: [init-tracing]
     context: fresh
+    provider: codex
+    model: gpt-5.5
+    modelReasoningEffort: medium
 
   # PHASE 1b: INSTALL — Dependencies in worktree
   # Worktrees are bare checkouts. Install before implement so
@@ -76,6 +79,9 @@ nodes:
     command: cleanup-validate
     depends_on: [implement]
     context: fresh
+    provider: codex
+    model: gpt-5.5
+    modelReasoningEffort: medium
 
   # PHASE 4: PARALLEL REVIEW (on local worktree branch — no PR yet)
   # The review commands are project-local overrides that use
@@ -85,22 +91,25 @@ nodes:
     command: cleanup-pr-review-scope
     depends_on: [validate]
     context: fresh
-    provider: claude
-    model: sonnet
+    provider: codex
+    model: gpt-5.5
+    modelReasoningEffort: medium
 
   - id: code-review
     command: cleanup-code-review-agent
     depends_on: [review-scope]
     context: fresh
-    provider: claude
-    model: sonnet
+    provider: codex
+    model: gpt-5.5
+    modelReasoningEffort: medium
 
   - id: test-coverage
     command: cleanup-test-coverage-agent
     depends_on: [review-scope]
     context: fresh
-    provider: claude
-    model: sonnet
+    provider: codex
+    model: gpt-5.5
+    modelReasoningEffort: medium
 
   # Adversarial review by a different LLM (Codex / GPT).
   # cleanup-adversarial-review already supports the local-diff fallback
@@ -125,11 +134,17 @@ nodes:
     depends_on: [code-review, test-coverage, adversarial-review]
     trigger_rule: one_success
     context: fresh
+    provider: codex
+    model: gpt-5.5
+    modelReasoningEffort: medium
 
   - id: fix-locally
     command: cleanup-fix-locally
     depends_on: [synthesize]
     context: fresh
+    provider: codex
+    model: gpt-5.5
+    modelReasoningEffort: high
 
   # PHASE 6: PUSH + CREATE PR
   # Single push covers both the implement-loop commits and the
@@ -143,8 +158,9 @@ nodes:
     command: cleanup-create-pr
     depends_on: [push]
     context: fresh
-    provider: claude
-    model: sonnet
+    provider: codex
+    model: gpt-5.5
+    modelReasoningEffort: medium
 
   # PHASE 7: POST REVIEW COMMENTS (PR now exists)
   # Posts the consolidated review + fix report as PR comments,
@@ -162,3 +178,4 @@ nodes:
     context: fresh
     provider: codex
     model: gpt-5.5
+    modelReasoningEffort: medium

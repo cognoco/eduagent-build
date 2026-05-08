@@ -26,8 +26,10 @@ description: |
   NOT for: Non-cleanup work, feature development, or PRs not in cleanup-plan.md.
 
 provider: claude
-model: opus
-modelReasoningEffort: xhigh
+model: claude-opus-4-6
+# Workflow-level default. Per-node overrides below pin cheaper models on
+# pure-parsing / pure-aggregation nodes; opus is reserved for nodes that need
+# judgment (implement, fix-locally) and the adversarial cross-LLM pass.
 
 worktree:
   enabled: true
@@ -38,7 +40,7 @@ nodes:
   # tagged archon-<workflow>. Zero tokens — pure shell script.
 
   - id: init-tracing
-    bash: ./.archon/scripts/init-tracing.sh "$ARGUMENTS"
+    bash: ./.archon/scripts/init-tracing.sh --workflow execute-cleanup-pr-claude "$ARGUMENTS"
 
   # PHASE 1: EXTRACT — Parse cleanup-plan.md for this PR
   
@@ -46,6 +48,9 @@ nodes:
     command: cleanup-extract-pr
     depends_on: [init-tracing]
     context: fresh
+    provider: claude
+    model: sonnet
+    modelReasoningEffort: medium
 
   # PHASE 1b: INSTALL — Dependencies in worktree
   # Worktrees are bare checkouts. Install before implement so
@@ -62,6 +67,9 @@ nodes:
     depends_on: [install]
     context: fresh
     idle_timeout: 600000
+    provider: claude
+    model: claude-opus-4-6
+    modelReasoningEffort: high
     loop:
       prompt: |
         Read and execute the instructions in `.archon/commands/cleanup-implement-phase.md`.
@@ -76,6 +84,9 @@ nodes:
     command: cleanup-validate
     depends_on: [implement]
     context: fresh
+    provider: claude
+    model: sonnet
+    modelReasoningEffort: low
 
   # PHASE 4: PARALLEL REVIEW (on local worktree branch — no PR yet)
   # The review commands are project-local overrides that use
@@ -87,6 +98,7 @@ nodes:
     context: fresh
     provider: claude
     model: sonnet
+    modelReasoningEffort: medium
 
   - id: code-review
     command: cleanup-code-review-agent
@@ -94,6 +106,7 @@ nodes:
     context: fresh
     provider: claude
     model: sonnet
+    modelReasoningEffort: medium
 
   - id: test-coverage
     command: cleanup-test-coverage-agent
@@ -101,6 +114,7 @@ nodes:
     context: fresh
     provider: claude
     model: sonnet
+    modelReasoningEffort: medium
 
   # Adversarial review by a different LLM (Codex / GPT).
   # cleanup-adversarial-review already supports the local-diff fallback
@@ -125,11 +139,17 @@ nodes:
     depends_on: [code-review, test-coverage, adversarial-review]
     trigger_rule: one_success
     context: fresh
+    provider: claude
+    model: sonnet
+    modelReasoningEffort: medium
 
   - id: fix-locally
     command: cleanup-fix-locally
     depends_on: [synthesize]
     context: fresh
+    provider: claude
+    model: claude-opus-4-6
+    modelReasoningEffort: high
 
   # PHASE 6: PUSH + CREATE PR
   # Single push covers both the implement-loop commits and the
