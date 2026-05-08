@@ -34,8 +34,10 @@ import {
   streaks,
 } from '@eduagent/database';
 import {
+  buildKnowledgeInventory,
   buildSubjectInventory,
   buildSubjectMetric,
+  countCompletedBooks,
   getLatestSnapshot,
   getLatestSnapshotOnOrBefore,
   getSnapshotsInRange,
@@ -72,7 +74,7 @@ const TODAY = '2026-04-19';
 // ---------------------------------------------------------------------------
 
 function makeMetrics(
-  overrides: Partial<ProgressMetrics> = {}
+  overrides: Partial<ProgressMetrics> = {},
 ): ProgressMetrics {
   return {
     totalSessions: 0,
@@ -82,6 +84,10 @@ function makeMetrics(
     topicsAttempted: 0,
     topicsMastered: 0,
     topicsInProgress: 0,
+    booksCompleted: 0,
+    weeklyDeltaTopicsMastered: null,
+    weeklyDeltaVocabularyTotal: null,
+    weeklyDeltaTopicsExplored: null,
     vocabularyTotal: 0,
     vocabularyMastered: 0,
     vocabularyLearning: 0,
@@ -101,7 +107,7 @@ function makeSnapshotRow(
     snapshotDate?: string;
     metrics?: ProgressMetrics;
     updatedAt?: Date;
-  } = {}
+  } = {},
 ) {
   return {
     id: 'snap-1',
@@ -118,7 +124,7 @@ function makeMilestoneRow(
     id?: string;
     milestoneType?: string;
     threshold?: number;
-  } = {}
+  } = {},
 ) {
   return {
     id: overrides.id ?? '660e8400-e29b-41d4-a716-446655440001',
@@ -135,7 +141,7 @@ function makeMilestoneRow(
 
 function makeSubjectRow(
   id = '550e8400-e29b-41d4-a716-446655440010',
-  name = 'Mathematics'
+  name = 'Mathematics',
 ): SubjectRow {
   return {
     id,
@@ -178,7 +184,7 @@ function makeSessionRow(overrides: Partial<SessionRow> = {}): SessionRow {
 }
 
 function makeAssessmentRow(
-  overrides: Partial<AssessmentRow> = {}
+  overrides: Partial<AssessmentRow> = {},
 ): AssessmentRow {
   return {
     id: '880e8400-e29b-41d4-a716-446655440001',
@@ -198,7 +204,7 @@ function makeAssessmentRow(
 }
 
 function makeRetentionCardRow(
-  overrides: Partial<RetentionCardRow> = {}
+  overrides: Partial<RetentionCardRow> = {},
 ): RetentionCardRow {
   return {
     id: '990e8400-e29b-41d4-a716-446655440001',
@@ -222,7 +228,7 @@ function makeRetentionCardRow(
 function makeTopicWithSubject(
   id = '770e8400-e29b-41d4-a716-446655440001',
   subjectId = '550e8400-e29b-41d4-a716-446655440010',
-  filedFrom: TopicRow['filedFrom'] = 'session_filing'
+  filedFrom: TopicRow['filedFrom'] = 'session_filing',
 ): TopicWithSubject {
   return {
     id,
@@ -263,7 +269,7 @@ interface ProgressStateFixture {
 }
 
 function makeProgressState(
-  overrides: Partial<ProgressStateFixture> = {}
+  overrides: Partial<ProgressStateFixture> = {},
 ): ProgressStateFixture {
   const topic = makeTopicWithSubject();
   return {
@@ -283,7 +289,7 @@ function makeProgressState(
 }
 
 function makeSubjectMetric(
-  subjectId = '550e8400-e29b-41d4-a716-446655440010'
+  subjectId = '550e8400-e29b-41d4-a716-446655440010',
 ): SubjectProgressMetrics {
   return {
     subjectId,
@@ -380,7 +386,7 @@ function createMilestonesDb({
       if (milestoneCallCount === 1) {
         // The backfill check — returns session_count milestones (id only)
         return Promise.resolve(
-          milestonesSessionCount.map((m) => ({ id: m.id }))
+          milestonesSessionCount.map((m) => ({ id: m.id })),
         );
       }
       // The final fetch
@@ -555,7 +561,7 @@ describe('getSnapshotsInRange', () => {
       db,
       profileId,
       '2026-04-01',
-      '2026-04-30'
+      '2026-04-30',
     );
     expect(result).toEqual([]);
   });
@@ -574,7 +580,7 @@ describe('getSnapshotsInRange', () => {
       db,
       profileId,
       '2026-04-01',
-      '2026-04-30'
+      '2026-04-30',
     );
 
     expect(result).toHaveLength(3);
@@ -598,7 +604,7 @@ describe('getSnapshotsInRange', () => {
       db,
       profileId,
       '2026-04-01',
-      '2026-04-30'
+      '2026-04-30',
     );
 
     expect(result).toHaveLength(1);
@@ -617,7 +623,7 @@ describe('getSnapshotsInRange', () => {
       expect.objectContaining({
         snapshotDate: TODAY,
         metrics: expect.objectContaining({ totalSessions: 7 }),
-      })
+      }),
     );
     // updatedAt must NOT be present on the returned shape
     expect('updatedAt' in result[0]).toBe(false);
@@ -632,10 +638,49 @@ describe('getSnapshotsInRange', () => {
       db,
       profileId,
       '2026-04-01',
-      '2026-04-30'
+      '2026-04-30',
     );
 
     expect(result).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildKnowledgeInventory
+// ---------------------------------------------------------------------------
+
+describe('buildKnowledgeInventory', () => {
+  it('includes learner weekly deltas from the prior-week snapshot', async () => {
+    const subjectId = '550e8400-e29b-41d4-a716-446655440010';
+    const latest = makeSnapshotRow({
+      snapshotDate: TODAY,
+      metrics: makeMetrics({
+        topicsMastered: 5,
+        vocabularyTotal: 12,
+        subjects: [{ ...makeSubjectMetric(subjectId), topicsExplored: 6 }],
+      }),
+    });
+    const previous = makeSnapshotRow({
+      snapshotDate: '2026-04-12',
+      metrics: makeMetrics({
+        topicsMastered: 2,
+        vocabularyTotal: 8,
+        subjects: [{ ...makeSubjectMetric(subjectId), topicsExplored: 3 }],
+      }),
+    });
+    const db = createSnapshotDb({
+      findFirst: latest,
+      findMany: [latest, previous],
+    });
+    (
+      db.query as Record<string, { findMany: jest.Mock }>
+    ).subjects.findMany.mockResolvedValue([makeSubjectRow(subjectId)]);
+
+    const result = await buildKnowledgeInventory(db, profileId);
+
+    expect(result.global.weeklyDeltaTopicsMastered).toBe(3);
+    expect(result.global.weeklyDeltaVocabularyTotal).toBe(4);
+    expect(result.global.weeklyDeltaTopicsExplored).toBe(3);
   });
 });
 
@@ -656,7 +701,7 @@ describe('upsertProgressSnapshot', () => {
   it('resolves without throwing', async () => {
     const db = createSnapshotDb();
     await expect(
-      upsertProgressSnapshot(db, profileId, TODAY, makeMetrics())
+      upsertProgressSnapshot(db, profileId, TODAY, makeMetrics()),
     ).resolves.toBeUndefined();
   });
 });
@@ -759,7 +804,7 @@ describe('listRecentMilestones', () => {
 
   it('respects the limit parameter', async () => {
     const rows = Array.from({ length: 10 }, (_, i) =>
-      makeMilestoneRow({ id: `ms-${i}`, threshold: i + 1 })
+      makeMilestoneRow({ id: `ms-${i}`, threshold: i + 1 }),
     );
     const db = createMilestonesDb({
       snapshotFindFirst: undefined,
@@ -829,7 +874,7 @@ describe('refreshProgressSnapshot', () => {
     expect(result.milestones).toEqual([]);
     // The expensive recompute path loads subjects; it must not run.
     expect(
-      (db.query as Record<string, { findMany: jest.Mock }>).subjects.findMany
+      (db.query as Record<string, { findMany: jest.Mock }>).subjects.findMany,
     ).not.toHaveBeenCalled();
   });
 
@@ -850,7 +895,7 @@ describe('refreshProgressSnapshot', () => {
 
     expect(result.milestones).toEqual([]);
     expect(
-      (db.query as Record<string, { findMany: jest.Mock }>).subjects.findMany
+      (db.query as Record<string, { findMany: jest.Mock }>).subjects.findMany,
     ).not.toHaveBeenCalled();
   });
 
@@ -875,7 +920,7 @@ describe('refreshProgressSnapshot', () => {
 
     // The recompute path must have loaded subjects (even if empty)
     expect(
-      (db.query as Record<string, { findMany: jest.Mock }>).subjects.findMany
+      (db.query as Record<string, { findMany: jest.Mock }>).subjects.findMany,
     ).toHaveBeenCalled();
   });
 
@@ -893,7 +938,7 @@ describe('refreshProgressSnapshot', () => {
     await refreshProgressSnapshot(db, profileId, { sessionEndedAt });
 
     expect(
-      (db.query as Record<string, { findMany: jest.Mock }>).subjects.findMany
+      (db.query as Record<string, { findMany: jest.Mock }>).subjects.findMany,
     ).toHaveBeenCalled();
   });
 
@@ -904,7 +949,7 @@ describe('refreshProgressSnapshot', () => {
     await refreshProgressSnapshot(db, profileId, { sessionEndedAt });
 
     expect(
-      (db.query as Record<string, { findMany: jest.Mock }>).subjects.findMany
+      (db.query as Record<string, { findMany: jest.Mock }>).subjects.findMany,
     ).toHaveBeenCalled();
   });
 
@@ -926,7 +971,7 @@ describe('refreshProgressSnapshot', () => {
 
     // Must still invoke the full recompute path
     expect(
-      (db.query as Record<string, { findMany: jest.Mock }>).subjects.findMany
+      (db.query as Record<string, { findMany: jest.Mock }>).subjects.findMany,
     ).toHaveBeenCalled();
   });
 
@@ -1005,7 +1050,7 @@ describe('refreshProgressSnapshot', () => {
       profileId,
       expect.any(String), // celebrationName
       expect.any(String), // celebrationReason
-      expect.anything() // detail text (may be string or null)
+      expect.anything(), // detail text (may be string or null)
     );
   });
 
@@ -1033,14 +1078,14 @@ describe('refreshProgressSnapshot', () => {
     };
     (storeMilestones as jest.Mock).mockResolvedValue([detectedMilestone]);
     (queueCelebration as jest.Mock).mockRejectedValue(
-      new Error('Celebration queue error')
+      new Error('Celebration queue error'),
     );
 
     const db = createSnapshotDb({ findFirst: undefined });
 
     // refreshProgressSnapshot must not propagate the celebration error
     await expect(refreshProgressSnapshot(db, profileId)).resolves.toEqual(
-      expect.objectContaining({})
+      expect.objectContaining({}),
     );
   });
 
@@ -1122,6 +1167,92 @@ describe('buildSubjectMetric mastery', () => {
   });
 });
 
+describe('countCompletedBooks', () => {
+  it('counts books where every active topic has been studied', () => {
+    const subject = makeSubjectRow();
+    const completedBookId = 'bb0e8400-e29b-41d4-a716-446655440001';
+    const incompleteBookId = 'bb0e8400-e29b-41d4-a716-446655440002';
+    const completedTopicA = makeTopicWithSubject(
+      '770e8400-e29b-41d4-a716-446655440001',
+      subject.id,
+    );
+    const completedTopicB = makeTopicWithSubject(
+      '770e8400-e29b-41d4-a716-446655440002',
+      subject.id,
+    );
+    const incompleteTopicA = makeTopicWithSubject(
+      '770e8400-e29b-41d4-a716-446655440003',
+      subject.id,
+    );
+    const incompleteTopicB = makeTopicWithSubject(
+      '770e8400-e29b-41d4-a716-446655440004',
+      subject.id,
+    );
+    completedTopicA.bookId = completedBookId;
+    completedTopicB.bookId = completedBookId;
+    incompleteTopicA.bookId = incompleteBookId;
+    incompleteTopicB.bookId = incompleteBookId;
+
+    const result = countCompletedBooks({
+      allTopicsBySubject: new Map([
+        [
+          subject.id,
+          [
+            completedTopicA,
+            completedTopicB,
+            incompleteTopicA,
+            incompleteTopicB,
+          ],
+        ],
+      ]),
+      retentionCards: [
+        makeRetentionCardRow({
+          topicId: completedTopicA.id,
+          repetitions: 1,
+        }),
+        makeRetentionCardRow({
+          topicId: completedTopicB.id,
+          repetitions: 2,
+        }),
+        makeRetentionCardRow({
+          topicId: incompleteTopicA.id,
+          repetitions: 1,
+        }),
+      ],
+    });
+
+    expect(result).toBe(1);
+  });
+
+  it('excludes skipped topics from the required topic set', () => {
+    const subject = makeSubjectRow();
+    const bookId = 'bb0e8400-e29b-41d4-a716-446655440001';
+    const studiedTopic = makeTopicWithSubject(
+      '770e8400-e29b-41d4-a716-446655440001',
+      subject.id,
+    );
+    const skippedTopic = makeTopicWithSubject(
+      '770e8400-e29b-41d4-a716-446655440002',
+      subject.id,
+    );
+    studiedTopic.bookId = bookId;
+    skippedTopic.bookId = bookId;
+    skippedTopic.skipped = true;
+
+    const result = countCompletedBooks({
+      allTopicsBySubject: new Map([[subject.id, [studiedTopic, skippedTopic]]]),
+      retentionCards: [
+        makeRetentionCardRow({
+          topicId: studiedTopic.id,
+          repetitions: 1,
+        }),
+      ],
+    });
+
+    expect(result).toBe(1);
+  });
+});
+
 describe('buildSubjectInventory mastery', () => {
   it('does not count assessment-only topic as in progress (no session = not started)', async () => {
     const state = makeProgressState({
@@ -1133,7 +1264,7 @@ describe('buildSubjectInventory mastery', () => {
     const result = await buildSubjectInventory(
       null as unknown as Database,
       state,
-      makeSubjectMetric()
+      makeSubjectMetric(),
     );
 
     expect(result.topics.mastered).toBe(0);
@@ -1154,7 +1285,7 @@ describe('buildSubjectInventory mastery', () => {
     const result = await buildSubjectInventory(
       null as unknown as Database,
       state,
-      makeSubjectMetric()
+      makeSubjectMetric(),
     );
 
     expect(result.topics.mastered).toBe(1);
@@ -1167,7 +1298,7 @@ describe('explored topic session gating', () => {
     const topic = makeTopicWithSubject(
       '770e8400-e29b-41d4-a716-446655440099',
       subject.id,
-      'session_filing'
+      'session_filing',
     );
     const state = makeProgressState({
       subjects: [subject],
@@ -1187,7 +1318,7 @@ describe('explored topic session gating', () => {
     const topic = makeTopicWithSubject(
       '770e8400-e29b-41d4-a716-446655440002',
       subject.id,
-      'session_filing'
+      'session_filing',
     );
     const state = makeProgressState({
       subjects: [subject],
@@ -1213,7 +1344,7 @@ describe('explored topic session gating', () => {
     const topic = makeTopicWithSubject(
       '770e8400-e29b-41d4-a716-446655440003',
       subject.id,
-      'session_filing'
+      'session_filing',
     );
     const state = makeProgressState({
       subjects: [subject],
@@ -1226,7 +1357,7 @@ describe('explored topic session gating', () => {
     const result = await buildSubjectInventory(
       null as unknown as Database,
       state,
-      makeSubjectMetric(subject.id)
+      makeSubjectMetric(subject.id),
     );
 
     expect(result.topics.explored).toBe(0);
@@ -1246,7 +1377,7 @@ describe('buildSubjectMetric and buildSubjectInventory stay aligned', () => {
     const inventory = await buildSubjectInventory(
       null as unknown as Database,
       state,
-      metric
+      metric,
     );
 
     expect(metric.topicsMastered).toBe(0);
@@ -1270,7 +1401,7 @@ describe('buildSubjectMetric and buildSubjectInventory stay aligned', () => {
     const inventory = await buildSubjectInventory(
       null as unknown as Database,
       state,
-      metric
+      metric,
     );
 
     expect(metric.topicsMastered).toBe(1);

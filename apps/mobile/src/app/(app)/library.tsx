@@ -50,6 +50,7 @@ interface SubjectRetentionTopic {
   repetitions: number;
   nextReviewAt?: string | null;
   lastReviewedAt: string | null;
+  daysSinceLastReview?: number | null;
   xpStatus: 'pending' | 'verified' | 'decayed';
   failureCount: number;
 }
@@ -72,7 +73,7 @@ interface LibraryRetentionResponse {
 // ---------------------------------------------------------------------------
 
 function computeShelfRetention(
-  retentionData: SubjectRetentionResponse | undefined
+  retentionData: SubjectRetentionResponse | undefined,
 ): RetentionStatus | null {
   const topics = retentionData?.topics;
   if (!Array.isArray(topics) || topics.length === 0) return null;
@@ -158,7 +159,7 @@ export default function LibraryScreen() {
   const subjectsQuery = useSubjects({ includeInactive: true });
   const subjects = useMemo(
     () => (Array.isArray(subjectsQuery.data) ? subjectsQuery.data : []),
-    [subjectsQuery.data]
+    [subjectsQuery.data],
   );
 
   const progressQuery = useOverallProgress();
@@ -186,7 +187,7 @@ export default function LibraryScreen() {
       try {
         const res = await apiClient.library.retention.$get(
           {},
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         return (await res.json()) as LibraryRetentionResponse;
@@ -213,9 +214,9 @@ export default function LibraryScreen() {
   const progressBySubjectId = useMemo(
     () =>
       new Map(
-        (progressQuery.data?.subjects ?? []).map((s) => [s.subjectId, s])
+        (progressQuery.data?.subjects ?? []).map((s) => [s.subjectId, s]),
       ),
-    [progressQuery.data?.subjects]
+    [progressQuery.data?.subjects],
   );
 
   // ---- Books grouped by subjectId -----------------------------------------
@@ -265,7 +266,7 @@ export default function LibraryScreen() {
         params: { subjectId },
       } as never);
     },
-    [router]
+    [router],
   );
 
   const handleRetry = (): void => {
@@ -277,7 +278,7 @@ export default function LibraryScreen() {
 
   const handleSubjectStatusChange = async (
     subject: Subject,
-    status: Subject['status']
+    status: Subject['status'],
   ): Promise<void> => {
     setPendingSubjectId(subject.id);
     try {
@@ -457,7 +458,7 @@ export default function LibraryScreen() {
           progressQuery.data.subjects.every(
             (subject) =>
               subject.topicsTotal > 0 &&
-              subject.topicsVerified >= subject.topicsTotal
+              subject.topicsVerified >= subject.topicsTotal,
           ) && (
             <View
               className="bg-surface rounded-card px-4 py-5 mb-3"
@@ -581,13 +582,13 @@ export default function LibraryScreen() {
                       subjectCount: subjectsQuery.data?.length ?? 0,
                     })
                 : totalTopicsAcrossBooks > 0
-                ? t('library.subtitle', {
-                    subjectCount: subjectsQuery.data?.length ?? 0,
-                    topicCount: totalTopicsAcrossBooks,
-                  })
-                : t('library.subtitleNoTopics', {
-                    subjectCount: subjectsQuery.data?.length ?? 0,
-                  })}
+                  ? t('library.subtitle', {
+                      subjectCount: subjectsQuery.data?.length ?? 0,
+                      topicCount: totalTopicsAcrossBooks,
+                    })
+                  : t('library.subtitleNoTopics', {
+                      subjectCount: subjectsQuery.data?.length ?? 0,
+                    })}
             </Text>
           </View>
         </View>
@@ -646,7 +647,7 @@ export default function LibraryScreen() {
             style={{
               paddingBottom: Math.max(
                 insets.bottom,
-                Platform.OS === 'web' ? 80 : 24
+                Platform.OS === 'web' ? 80 : 24,
               ),
             }}
             onPress={(e) => e.stopPropagation()}
@@ -696,7 +697,7 @@ export default function LibraryScreen() {
                             onPress={() =>
                               void handleSubjectStatusChange(
                                 subject,
-                                'archived'
+                                'archived',
                               )
                             }
                             disabled={isPending}
@@ -728,7 +729,7 @@ export default function LibraryScreen() {
                             onPress={() =>
                               void handleSubjectStatusChange(
                                 subject,
-                                'archived'
+                                'archived',
                               )
                             }
                             disabled={isPending}

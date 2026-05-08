@@ -35,6 +35,7 @@ export const progressMetricsSchema = z.object({
   topicsAttempted: z.number().int(),
   topicsMastered: z.number().int(),
   topicsInProgress: z.number().int(),
+  booksCompleted: z.number().int().min(0).default(0),
   vocabularyTotal: z.number().int(),
   vocabularyMastered: z.number().int(),
   vocabularyLearning: z.number().int(),
@@ -85,6 +86,9 @@ export const knowledgeInventorySchema = z.object({
     topicsMastered: z.number().int(),
     vocabularyTotal: z.number().int(),
     vocabularyMastered: z.number().int(),
+    weeklyDeltaTopicsMastered: z.number().int().nullable().default(null),
+    weeklyDeltaVocabularyTotal: z.number().int().nullable().default(null),
+    weeklyDeltaTopicsExplored: z.number().int().nullable().default(null),
     totalSessions: z.number().int(),
     totalActiveMinutes: z.number().int(),
     // [F-045] Wall-clock minutes for user-facing display

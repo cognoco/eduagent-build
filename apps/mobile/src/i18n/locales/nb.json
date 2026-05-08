@@ -1137,6 +1137,14 @@
       "wordsLink": "{{count}} ord →",
       "vocabularyLink": "Vokabular →"
     },
+    "weeklyDelta": {
+      "topicsMastered": "+{{count}} emne denne uka",
+      "topicsMastered_other": "+{{count}} emner denne uka",
+      "vocabularyTotal": "+{{count}} ord denne uka",
+      "vocabularyTotal_other": "+{{count}} ord denne uka",
+      "topicsExplored": "+{{count}} emne utforsket denne uka",
+      "topicsExplored_other": "+{{count}} emner utforsket denne uka"
+    },
     "growth": {
       "title": "Din vekst",
       "subtitle": "Ukentlige endringer i mestrede temaer og vokabular",
@@ -1274,6 +1282,16 @@
       },
       "forgotten": {
         "label": "Trenger en ny gjennomgang"
+      },
+      "elapsed": {
+        "remembered_one": "Husket etter {{count}} dag",
+        "remembered_other": "Husket etter {{count}} dager",
+        "fading_one": "Begynner å bli uklart etter {{count}} dag",
+        "fading_other": "Begynner å bli uklart etter {{count}} dager",
+        "weak_one": "Glemmes etter {{count}} dag",
+        "weak_other": "Glemmes etter {{count}} dager",
+        "forgotten_one": "Sist sett for {{count}} dag siden",
+        "forgotten_other": "Sist sett for {{count}} dager siden"
       }
     },
     "growthChart": {

@@ -1137,6 +1137,14 @@
       "wordsLink": "{{count}}語 →",
       "vocabularyLink": "語彙 →"
     },
+    "weeklyDelta": {
+      "topicsMastered": "+{{count}} topic this week",
+      "topicsMastered_other": "+{{count}} topics this week",
+      "vocabularyTotal": "+{{count}} word this week",
+      "vocabularyTotal_other": "+{{count}} words this week",
+      "topicsExplored": "+{{count}} topic explored this week",
+      "topicsExplored_other": "+{{count}} topics explored this week"
+    },
     "growth": {
       "title": "あなたの成長",
       "subtitle": "習得したトピックと語彙の週ごとの変化",
@@ -1274,6 +1282,16 @@
       },
       "forgotten": {
         "label": "もう一度取り組みましょう"
+      },
+      "elapsed": {
+        "remembered_one": "Remembered after {{count}} day",
+        "remembered_other": "Remembered after {{count}} days",
+        "fading_one": "Getting fuzzy after {{count}} day",
+        "fading_other": "Getting fuzzy after {{count}} days",
+        "weak_one": "Slipping after {{count}} day",
+        "weak_other": "Slipping after {{count}} days",
+        "forgotten_one": "Last seen {{count}} day ago",
+        "forgotten_other": "Last seen {{count}} days ago"
       }
     },
     "growthChart": {

@@ -156,6 +156,7 @@ const SAMPLE_METRICS = {
   topicsAttempted: 8,
   topicsMastered: 5,
   topicsInProgress: 3,
+  booksCompleted: 2,
   vocabularyTotal: 40,
   vocabularyMastered: 20,
   vocabularyLearning: 15,
@@ -207,7 +208,7 @@ async function executeCronSteps(): Promise<Record<string, unknown>> {
 
 /** Simulate Inngest step runner for the generate event handler */
 async function executeGenerateSteps(
-  eventData: Record<string, unknown>
+  eventData: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
   const mockStep = {
     run: jest.fn(async (name: string, fn: () => Promise<unknown>) => fn()),
@@ -224,7 +225,7 @@ async function executeGenerateSteps(
 }
 
 function makeGenerateEvent(
-  overrides: Record<string, unknown> = {}
+  overrides: Record<string, unknown> = {},
 ): Record<string, unknown> {
   return {
     parentId: 'parent-001',
@@ -250,7 +251,7 @@ beforeEach(() => {
     mockMonthlyReportDb.query.familyLinks.findMany as jest.Mock
   ).mockResolvedValue([]);
   (mockMonthlyReportDb.query.profiles.findFirst as jest.Mock).mockResolvedValue(
-    null
+    null,
   );
   mockGetSnapshotsInRange.mockResolvedValue([]);
   mockOnConflictDoNothing.mockResolvedValue(undefined);
@@ -278,7 +279,7 @@ describe('monthlyReportCron', () => {
   it('should have a cron trigger at 10:00 UTC on the 1st of each month', () => {
     const triggers = (monthlyReportCron as any).opts?.triggers;
     expect(triggers).toEqual(
-      expect.arrayContaining([expect.objectContaining({ cron: '0 10 1 * *' })])
+      expect.arrayContaining([expect.objectContaining({ cron: '0 10 1 * *' })]),
     );
   });
 
@@ -350,7 +351,7 @@ describe('monthlyReportCron', () => {
             name: 'app/monthly-report.generate',
             data: { parentId: 'parent-002', childId: 'child-002' },
           }),
-        ])
+        ]),
       );
     });
 
@@ -464,7 +465,7 @@ describe('monthlyReportCron', () => {
             batchSize: 200,
             totalPairs: 401,
           }),
-        })
+        }),
       );
     });
   });
@@ -489,7 +490,7 @@ describe('monthlyReportGenerate', () => {
     expect(triggers).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ event: 'app/monthly-report.generate' }),
-      ])
+      ]),
     );
   });
 
@@ -502,7 +503,7 @@ describe('monthlyReportGenerate', () => {
       const { result } = await executeGenerateSteps(makeGenerateEvent());
 
       expect(result).toEqual(
-        expect.objectContaining({ status: 'skipped', reason: 'child_missing' })
+        expect.objectContaining({ status: 'skipped', reason: 'child_missing' }),
       );
     });
 
@@ -540,7 +541,7 @@ describe('monthlyReportGenerate', () => {
       const { result } = await executeGenerateSteps(makeGenerateEvent());
 
       expect(result).toEqual(
-        expect.objectContaining({ status: 'skipped', reason: 'no_snapshot' })
+        expect.objectContaining({ status: 'skipped', reason: 'no_snapshot' }),
       );
     });
 
@@ -593,7 +594,7 @@ describe('monthlyReportGenerate', () => {
         'Emma',
         expect.any(String), // monthLabel from toLocaleDateString
         SAMPLE_METRICS,
-        SAMPLE_METRICS // previousMetrics from last snapshot of previous window
+        SAMPLE_METRICS, // previousMetrics from last snapshot of previous window
       );
     });
 
@@ -601,7 +602,7 @@ describe('monthlyReportGenerate', () => {
       await executeGenerateSteps(makeGenerateEvent());
 
       expect(mockGenerateReportHighlights).toHaveBeenCalledWith(
-        expect.objectContaining({ childName: 'Emma' })
+        expect.objectContaining({ childName: 'Emma' }),
       );
     });
 
@@ -615,7 +616,7 @@ describe('monthlyReportGenerate', () => {
           childProfileId: 'child-001',
           reportMonth: expect.any(String),
           reportData: expect.objectContaining({ childName: 'Emma' }),
-        })
+        }),
       );
       expect(mockOnConflictDoNothing).toHaveBeenCalled();
     });
@@ -630,7 +631,7 @@ describe('monthlyReportGenerate', () => {
           type: 'monthly_report',
           title: expect.stringContaining('Emma'),
           body: expect.any(String),
-        })
+        }),
       );
     });
 
@@ -650,7 +651,7 @@ describe('monthlyReportGenerate', () => {
             highlights: ['Great month!'],
             nextSteps: ['Try more maths'],
           }),
-        })
+        }),
       );
     });
 
@@ -670,7 +671,7 @@ describe('monthlyReportGenerate', () => {
               comparison: 'Equivalent to a library visit',
             }),
           }),
-        })
+        }),
       );
     });
 
@@ -691,7 +692,7 @@ describe('monthlyReportGenerate', () => {
               label: expect.any(String),
             }),
           }),
-        })
+        }),
       );
     });
 
@@ -723,7 +724,7 @@ describe('monthlyReportGenerate', () => {
         'Sam',
         expect.any(String),
         SAMPLE_METRICS,
-        null // previousMetrics is null
+        null, // previousMetrics is null
       );
     });
 
@@ -770,7 +771,7 @@ describe('monthlyReportGenerate', () => {
         'Your child',
         expect.any(String),
         SAMPLE_METRICS,
-        null
+        null,
       );
     });
   });
@@ -796,7 +797,7 @@ describe('monthlyReportGenerate', () => {
         expect.anything(),
         'parent-001',
         'monthly_report',
-        24
+        24,
       );
       expect(mockSendPushNotification).not.toHaveBeenCalled();
     });
@@ -813,14 +814,14 @@ describe('monthlyReportGenerate', () => {
       mockGetRecentNotificationCount.mockResolvedValueOnce(0);
 
       await executeGenerateSteps(
-        makeGenerateEvent({ parentId: 'parent-XYZ', childId: 'child-XYZ' })
+        makeGenerateEvent({ parentId: 'parent-XYZ', childId: 'child-XYZ' }),
       );
 
       expect(mockGetRecentNotificationCount).toHaveBeenCalledWith(
         expect.anything(),
         'parent-XYZ',
         'monthly_report',
-        24
+        24,
       );
     });
   });
@@ -862,7 +863,7 @@ describe('monthlyReportGenerate', () => {
       ).mockRejectedValueOnce(new Error('DB connection lost'));
 
       await expect(executeGenerateSteps(makeGenerateEvent())).rejects.toThrow(
-        'DB connection lost'
+        'DB connection lost',
       );
     });
 
@@ -873,8 +874,8 @@ describe('monthlyReportGenerate', () => {
 
       await expect(
         executeGenerateSteps(
-          makeGenerateEvent({ parentId: 'parent-999', childId: 'child-999' })
-        )
+          makeGenerateEvent({ parentId: 'parent-999', childId: 'child-999' }),
+        ),
       ).rejects.toThrow('DB connection lost');
 
       // captureException must fire BEFORE the re-throw so Sentry sees the
@@ -887,7 +888,7 @@ describe('monthlyReportGenerate', () => {
             childId: 'child-999',
             context: 'monthly-report-generate',
           }),
-        })
+        }),
       );
     });
 
@@ -903,11 +904,11 @@ describe('monthlyReportGenerate', () => {
         ])
         .mockResolvedValueOnce([]);
       mockGenerateReportHighlights.mockRejectedValueOnce(
-        new Error('LLM timeout')
+        new Error('LLM timeout'),
       );
 
       await expect(executeGenerateSteps(makeGenerateEvent())).rejects.toThrow(
-        'LLM timeout'
+        'LLM timeout',
       );
 
       expect(mockCaptureException).toHaveBeenCalledWith(
@@ -916,7 +917,7 @@ describe('monthlyReportGenerate', () => {
           extra: expect.objectContaining({
             context: 'monthly-report-generate',
           }),
-        })
+        }),
       );
     });
 
@@ -936,12 +937,12 @@ describe('monthlyReportGenerate', () => {
         ])
         .mockResolvedValueOnce([]);
       mockSendPushNotification.mockRejectedValueOnce(
-        new Error('Push service unavailable')
+        new Error('Push service unavailable'),
       );
 
       // Error propagates — the step runner should throw (triggering Inngest retry)
       await expect(executeGenerateSteps(makeGenerateEvent())).rejects.toThrow(
-        'Push service unavailable'
+        'Push service unavailable',
       );
 
       // Report generation step DID complete (insert was called)
@@ -986,14 +987,14 @@ describe('monthlyReportGenerate', () => {
         expect.anything(), // db
         'child-xyz',
         expect.any(String), // from date
-        expect.any(String) // to date
+        expect.any(String), // to date
       );
       expect(mockGetSnapshotsInRange).toHaveBeenNthCalledWith(
         2,
         expect.anything(),
         'child-xyz',
         expect.any(String),
-        expect.any(String)
+        expect.any(String),
       );
     });
 
@@ -1019,7 +1020,7 @@ describe('monthlyReportGenerate', () => {
         'Emma',
         expect.any(String),
         laterMetrics, // last() snapshot used
-        null
+        null,
       );
     });
   });

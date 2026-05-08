@@ -5,6 +5,7 @@ import { useThemeColors } from '../../lib/theme';
 
 interface RetentionPillProps {
   status: RetentionStatus;
+  daysSinceLastReview?: number | null;
   size?: 'small' | 'default' | 'large';
   testID?: string;
 }
@@ -16,8 +17,16 @@ const STATUS_KEY: Record<RetentionStatus, string> = {
   forgotten: 'progress.retention.forgotten.label',
 };
 
+const ELAPSED_KEY: Record<RetentionStatus, string> = {
+  strong: 'progress.retention.elapsed.remembered',
+  fading: 'progress.retention.elapsed.fading',
+  weak: 'progress.retention.elapsed.weak',
+  forgotten: 'progress.retention.elapsed.forgotten',
+};
+
 export function RetentionPill({
   status,
+  daysSinceLastReview,
   size = 'default',
   testID,
 }: RetentionPillProps) {
@@ -39,34 +48,59 @@ export function RetentionPill({
 
   const dotSize = size === 'large' ? 10 : 8;
   const fontSize = size === 'large' ? 14 : 12;
+  const elapsedFontSize = size === 'large' ? 12 : 11;
   const showLabel = size !== 'small';
+  const showElapsed =
+    showLabel &&
+    daysSinceLastReview !== null &&
+    daysSinceLastReview !== undefined &&
+    daysSinceLastReview >= 2;
 
   const label = t(STATUS_KEY[status]);
+  const elapsedLabel = showElapsed
+    ? t(ELAPSED_KEY[status], { count: daysSinceLastReview })
+    : null;
 
   return (
     <View
       testID={testID}
-      accessibilityLabel={`Memory check: ${label}`}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+      accessibilityLabel={`Memory check: ${
+        elapsedLabel ? `${label}, ${elapsedLabel}` : label
+      }`}
+      style={{ gap: showElapsed ? 2 : 0 }}
     >
-      <View
-        testID="retention-pill-dot"
-        style={{
-          width: dotSize,
-          height: dotSize,
-          borderRadius: dotSize / 2,
-          backgroundColor: dotColor,
-        }}
-      />
-      {showLabel ? (
-        <Text
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        <View
+          testID="retention-pill-dot"
           style={{
-            fontSize,
-            color: dotColor,
-            fontWeight: '500',
+            width: dotSize,
+            height: dotSize,
+            borderRadius: dotSize / 2,
+            backgroundColor: dotColor,
+          }}
+        />
+        {showLabel ? (
+          <Text
+            style={{
+              fontSize,
+              color: dotColor,
+              fontWeight: '500',
+            }}
+          >
+            {label}
+          </Text>
+        ) : null}
+      </View>
+      {elapsedLabel ? (
+        <Text
+          testID="retention-pill-elapsed"
+          style={{
+            color: colors.textSecondary,
+            fontSize: elapsedFontSize,
+            fontWeight: '400',
           }}
         >
-          {label}
+          {elapsedLabel}
         </Text>
       ) : null}
     </View>

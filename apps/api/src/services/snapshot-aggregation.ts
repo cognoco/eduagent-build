@@ -39,6 +39,7 @@ import { getCurrentLanguageProgress } from './language-curriculum';
 // dynamic `await import()` added per-call module-resolution overhead on a
 // hot path with no justification. Static import resolves once at cold start.
 import { detectMilestones, storeMilestones } from './milestone-detection';
+import { computeWeeklyDeltas } from './progress-helpers';
 import { captureException } from './sentry';
 
 type SubjectRow = typeof subjects.$inferSelect;
@@ -98,6 +99,7 @@ function defaultMetrics(): ProgressMetrics {
     topicsAttempted: 0,
     topicsMastered: 0,
     topicsInProgress: 0,
+    booksCompleted: 0,
     vocabularyTotal: 0,
     vocabularyMastered: 0,
     vocabularyLearning: 0,
@@ -134,7 +136,7 @@ function mondayKey(input: string): string {
 
 function mapCefrLabel(
   level: string | null,
-  sublevel: string | null
+  sublevel: string | null,
 ): string | null {
   if (!level) return null;
 
@@ -157,7 +159,7 @@ function mapCefrLabel(
 // (memory must run before snapshot if the snapshot consumes its output).
 async function loadProgressState(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<ProgressState> {
   const subjectRows = (
     await db.query.subjects.findMany({
@@ -200,7 +202,7 @@ async function loadProgressState(
   const curriculumSubjectMap = new Map(
     allCurricula
       .filter((c) => curriculumIds.includes(c.id))
-      .map((curriculum) => [curriculum.id, curriculum.subjectId])
+      .map((curriculum) => [curriculum.id, curriculum.subjectId]),
   );
 
   const topicRows =
@@ -215,7 +217,7 @@ async function loadProgressState(
             const subjectId = curriculumSubjectMap.get(topic.curriculumId);
             if (!subjectId)
               throw new Error(
-                `No subject found for curriculumId ${topic.curriculumId}`
+                `No subject found for curriculumId ${topic.curriculumId}`,
               );
             return { ...topic, subjectId };
           })
@@ -248,7 +250,7 @@ async function loadProgressState(
     db.query.learningSessions.findMany({
       where: and(
         eq(learningSessions.profileId, profileId),
-        gte(learningSessions.exchangeCount, 1)
+        gte(learningSessions.exchangeCount, 1),
       ),
     }),
     db.query.assessments.findMany({
@@ -288,15 +290,52 @@ async function loadProgressState(
 }
 
 /** @internal - exported for testing only */
+export function countCompletedBooks(state: {
+  allTopicsBySubject: Map<
+    string,
+    Array<{ id: string; bookId: string | null; skipped?: boolean }>
+  >;
+  retentionCards: Array<{ topicId: string; repetitions: number }>;
+}): number {
+  const studiedTopicIds = new Set(
+    state.retentionCards
+      .filter((card) => card.repetitions > 0)
+      .map((card) => card.topicId),
+  );
+  const activeTopicsByBook = new Map<string, string[]>();
+
+  for (const topics of state.allTopicsBySubject.values()) {
+    for (const topic of topics) {
+      if (!topic.bookId || topic.skipped) continue;
+      const bookTopics = activeTopicsByBook.get(topic.bookId) ?? [];
+      bookTopics.push(topic.id);
+      activeTopicsByBook.set(topic.bookId, bookTopics);
+    }
+  }
+
+  let completed = 0;
+  for (const topicIds of activeTopicsByBook.values()) {
+    if (
+      topicIds.length > 0 &&
+      topicIds.every((topicId) => studiedTopicIds.has(topicId))
+    ) {
+      completed += 1;
+    }
+  }
+
+  return completed;
+}
+
+/** @internal - exported for testing only */
 export function buildSubjectMetric(
   subject: SubjectRow,
-  state: ProgressState
+  state: ProgressState,
 ): SubjectProgressMetrics {
   const subjectSessions = state.sessions.filter(
-    (session) => session.subjectId === subject.id
+    (session) => session.subjectId === subject.id,
   );
   const subjectVocabulary = state.vocabulary.filter(
-    (item) => item.subjectId === subject.id
+    (item) => item.subjectId === subject.id,
   );
   const latestTopics = state.latestTopicsBySubject.get(subject.id) ?? [];
   const allTopics = state.allTopicsBySubject.get(subject.id) ?? [];
@@ -304,21 +343,21 @@ export function buildSubjectMetric(
   const preGeneratedLatestTopicIds = new Set(
     latestTopics
       .filter((topic) => topic.filedFrom === 'pre_generated')
-      .map((topic) => topic.id)
+      .map((topic) => topic.id),
   );
   const subjectSessionTopicIds = new Set(
     subjectSessions
       .filter((session) => session.topicId != null)
-      .map((session) => session.topicId as string)
+      .map((session) => session.topicId as string),
   );
   const exploredTopicIds = new Set(
     allTopics
       .filter(
         (topic) =>
           topic.filedFrom !== 'pre_generated' &&
-          subjectSessionTopicIds.has(topic.id)
+          subjectSessionTopicIds.has(topic.id),
       )
-      .map((topic) => topic.id)
+      .map((topic) => topic.id),
   );
   const attemptedTopicIds = new Set<string>(exploredTopicIds);
 
@@ -348,15 +387,15 @@ export function buildSubjectMetric(
   const totalActiveMinutes = Math.round(
     subjectSessions.reduce(
       (sum, session) => sum + (session.durationSeconds ?? 0),
-      0
-    ) / 60
+      0,
+    ) / 60,
   );
   // [F-045] Wall-clock minutes per subject for user-facing display
   const totalWallClockMinutes = Math.round(
     subjectSessions.reduce(
       (sum, session) => sum + cappedWallClock(session),
-      0
-    ) / 60
+      0,
+    ) / 60,
   );
   const lastSessionAt = subjectSessions
     .map((session) => session.lastActivityAt)
@@ -382,7 +421,7 @@ export function buildSubjectMetric(
 
 export async function computeProgressMetrics(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<ProgressMetrics> {
   const state = await loadProgressState(db, profileId);
 
@@ -391,7 +430,7 @@ export async function computeProgressMetrics(
   }
 
   const subjectMetrics = state.subjects.map((subject) =>
-    buildSubjectMetric(subject, state)
+    buildSubjectMetric(subject, state),
   );
 
   const now = Date.now();
@@ -415,25 +454,25 @@ export async function computeProgressMetrics(
   }
 
   const vocabularyCardIds = new Set(
-    state.vocabularyRetentionCards.map((card) => card.vocabularyId)
+    state.vocabularyRetentionCards.map((card) => card.vocabularyId),
   );
   const vocabularyMastered = state.vocabulary.filter(
-    (item) => item.mastered
+    (item) => item.mastered,
   ).length;
   const vocabularyLearning = state.vocabulary.filter(
-    (item) => !item.mastered && vocabularyCardIds.has(item.id)
+    (item) => !item.mastered && vocabularyCardIds.has(item.id),
   ).length;
   const vocabularyNew = state.vocabulary.filter(
-    (item) => !item.mastered && !vocabularyCardIds.has(item.id)
+    (item) => !item.mastered && !vocabularyCardIds.has(item.id),
   ).length;
 
   const topicsAttempted = subjectMetrics.reduce(
     (sum, subject) => sum + subject.topicsAttempted,
-    0
+    0,
   );
   const topicsMastered = subjectMetrics.reduce(
     (sum, subject) => sum + subject.topicsMastered,
-    0
+    0,
   );
 
   return progressMetricsSchema.parse({
@@ -441,22 +480,23 @@ export async function computeProgressMetrics(
     totalActiveMinutes: Math.round(
       state.sessions.reduce(
         (sum, session) => sum + (session.durationSeconds ?? 0),
-        0
-      ) / 60
+        0,
+      ) / 60,
     ),
     totalWallClockMinutes: Math.round(
       state.sessions.reduce(
         (sum, session) => sum + cappedWallClock(session),
-        0
-      ) / 60
+        0,
+      ) / 60,
     ),
     totalExchanges: state.sessions.reduce(
       (sum, session) => sum + session.exchangeCount,
-      0
+      0,
     ),
     topicsAttempted,
     topicsMastered,
     topicsInProgress: Math.max(0, topicsAttempted - topicsMastered),
+    booksCompleted: countCompletedBooks(state),
     vocabularyTotal: state.vocabulary.length,
     vocabularyMastered,
     vocabularyLearning,
@@ -474,14 +514,14 @@ export async function computeProgressMetrics(
 export async function buildSubjectInventory(
   db: Database,
   state: ProgressState,
-  subjectMetric: SubjectProgressMetrics
+  subjectMetric: SubjectProgressMetrics,
 ): Promise<SubjectInventory> {
   const subject = state.subjects.find(
-    (item) => item.id === subjectMetric.subjectId
+    (item) => item.id === subjectMetric.subjectId,
   );
   if (!subject)
     throw new Error(
-      `Subject ${subjectMetric.subjectId} not found in progress state`
+      `Subject ${subjectMetric.subjectId} not found in progress state`,
     );
   const latestTopics = state.latestTopicsBySubject.get(subject.id) ?? [];
   const allTopics = state.allTopicsBySubject.get(subject.id) ?? [];
@@ -489,24 +529,24 @@ export async function buildSubjectInventory(
   const preGeneratedLatestTopicIds = new Set(
     latestTopics
       .filter((topic) => topic.filedFrom === 'pre_generated')
-      .map((topic) => topic.id)
+      .map((topic) => topic.id),
   );
   const subjectSessions = state.sessions.filter(
-    (s) => s.subjectId === subject.id
+    (s) => s.subjectId === subject.id,
   );
   const subjectSessionTopicIds = new Set(
     subjectSessions
       .filter((session) => session.topicId != null)
-      .map((session) => session.topicId as string)
+      .map((session) => session.topicId as string),
   );
   const exploredTopicIds = new Set(
     allTopics
       .filter(
         (topic) =>
           topic.filedFrom !== 'pre_generated' &&
-          subjectSessionTopicIds.has(topic.id)
+          subjectSessionTopicIds.has(topic.id),
       )
-      .map((topic) => topic.id)
+      .map((topic) => topic.id),
   );
   const attemptedTopicIds = new Set<string>(exploredTopicIds);
   const masteredTopicIds = new Set<string>();
@@ -530,7 +570,7 @@ export async function buildSubjectInventory(
   }
 
   const subjectVocabulary = state.vocabulary.filter(
-    (item) => item.subjectId === subject.id
+    (item) => item.subjectId === subject.id,
   );
   const byCefrLevel: Record<string, number> = {};
   for (const item of subjectVocabulary) {
@@ -539,12 +579,12 @@ export async function buildSubjectInventory(
   }
 
   const subjectVocabularyIds = new Set(
-    subjectVocabulary.map((item) => item.id)
+    subjectVocabulary.map((item) => item.id),
   );
   const vocabularyCardIds = new Set(
     state.vocabularyRetentionCards
       .filter((card) => subjectVocabularyIds.has(card.vocabularyId))
-      .map((card) => card.vocabularyId)
+      .map((card) => card.vocabularyId),
   );
 
   let estimatedProficiency: string | null = null;
@@ -553,7 +593,7 @@ export async function buildSubjectInventory(
     const languageProgress = await getCurrentLanguageProgress(
       db,
       state.profileId,
-      subject.id
+      subject.id,
     );
     if (languageProgress?.currentLevel) {
       estimatedProficiency = languageProgress.currentSublevel
@@ -561,7 +601,7 @@ export async function buildSubjectInventory(
         : languageProgress.currentLevel;
       estimatedProficiencyLabel = mapCefrLabel(
         languageProgress.currentLevel,
-        languageProgress.currentSublevel
+        languageProgress.currentSublevel,
       );
     }
   }
@@ -574,10 +614,10 @@ export async function buildSubjectInventory(
   // smaller number than what the session card (which reads wallClockSeconds live)
   // displays. Reading from state.sessions here keeps both surfaces consistent.
   const liveActiveMinutes = Math.round(
-    subjectSessions.reduce((sum, s) => sum + (s.durationSeconds ?? 0), 0) / 60
+    subjectSessions.reduce((sum, s) => sum + (s.durationSeconds ?? 0), 0) / 60,
   );
   const liveWallClockMinutes = Math.round(
-    subjectSessions.reduce((sum, s) => sum + cappedWallClock(s), 0) / 60
+    subjectSessions.reduce((sum, s) => sum + cappedWallClock(s), 0) / 60,
   );
   const liveLastSessionAt = subjectSessions
     .map((s) => s.lastActivityAt)
@@ -597,17 +637,17 @@ export async function buildSubjectInventory(
         topicsTotal === 0
           ? 0
           : [...preGeneratedLatestTopicIds].filter(
-              (topicId) => !attemptedTopicIds.has(topicId)
+              (topicId) => !attemptedTopicIds.has(topicId),
             ).length,
     },
     vocabulary: {
       total: subjectVocabulary.length,
       mastered: subjectVocabulary.filter((item) => item.mastered).length,
       learning: subjectVocabulary.filter(
-        (item) => !item.mastered && vocabularyCardIds.has(item.id)
+        (item) => !item.mastered && vocabularyCardIds.has(item.id),
       ).length,
       new: subjectVocabulary.filter(
-        (item) => !item.mastered && !vocabularyCardIds.has(item.id)
+        (item) => !item.mastered && !vocabularyCardIds.has(item.id),
       ).length,
       byCefrLevel,
     },
@@ -622,7 +662,7 @@ export async function buildSubjectInventory(
 
 export async function buildKnowledgeInventory(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<KnowledgeInventory> {
   const latestSnapshot = await getLatestSnapshot(db, profileId);
   let metrics =
@@ -638,7 +678,7 @@ export async function buildKnowledgeInventory(
   if (latestSnapshot) {
     const cachedSubjectIds = new Set(metrics.subjects.map((s) => s.subjectId));
     const hasMissingLiveSubject = state.subjects.some(
-      (s) => !cachedSubjectIds.has(s.id)
+      (s) => !cachedSubjectIds.has(s.id),
     );
     if (hasMissingLiveSubject) {
       metrics = await computeProgressMetrics(db, profileId);
@@ -646,7 +686,9 @@ export async function buildKnowledgeInventory(
   }
 
   const subjectInventories = await Promise.all(
-    metrics.subjects.map((subject) => buildSubjectInventory(db, state, subject))
+    metrics.subjects.map((subject) =>
+      buildSubjectInventory(db, state, subject),
+    ),
   );
 
   // [F-044] Always read streak from the live DB row rather than the snapshot.
@@ -664,10 +706,26 @@ export async function buildKnowledgeInventory(
   // older code paths may store seconds-as-minutes or lack the /60 divisor,
   // producing absurd hero-pill totals (e.g. 13 000 "minutes").
   const liveTotalActiveMinutes = Math.round(
-    state.sessions.reduce((sum, s) => sum + (s.durationSeconds ?? 0), 0) / 60
+    state.sessions.reduce((sum, s) => sum + (s.durationSeconds ?? 0), 0) / 60,
   );
   const liveTotalWallClockMinutes = Math.round(
-    state.sessions.reduce((sum, s) => sum + cappedWallClock(s), 0) / 60
+    state.sessions.reduce((sum, s) => sum + cappedWallClock(s), 0) / 60,
+  );
+  const previousWeeklySnapshot = latestSnapshot
+    ? await getLatestSnapshotOnOrBefore(
+        db,
+        profileId,
+        isoDate(
+          new Date(
+            new Date(`${latestSnapshot.snapshotDate}T00:00:00.000Z`).getTime() -
+              7 * 24 * 60 * 60 * 1000,
+          ),
+        ),
+      )
+    : null;
+  const weeklyDeltas = computeWeeklyDeltas(
+    previousWeeklySnapshot?.metrics ?? null,
+    metrics,
   );
 
   return knowledgeInventorySchema.parse({
@@ -678,6 +736,9 @@ export async function buildKnowledgeInventory(
       topicsMastered: metrics.topicsMastered,
       vocabularyTotal: metrics.vocabularyTotal,
       vocabularyMastered: metrics.vocabularyMastered,
+      weeklyDeltaTopicsMastered: weeklyDeltas.topicsMastered,
+      weeklyDeltaVocabularyTotal: weeklyDeltas.vocabularyTotal,
+      weeklyDeltaTopicsExplored: weeklyDeltas.topicsExplored,
       totalSessions: state.sessions.length,
       totalActiveMinutes: liveTotalActiveMinutes,
       totalWallClockMinutes: liveTotalWallClockMinutes,
@@ -699,7 +760,7 @@ export interface LatestSnapshot {
 }
 
 function snapshotRowToLatestSnapshot(
-  row: typeof progressSnapshots.$inferSelect
+  row: typeof progressSnapshots.$inferSelect,
 ): LatestSnapshot {
   return {
     snapshotDate: row.snapshotDate,
@@ -710,7 +771,7 @@ function snapshotRowToLatestSnapshot(
 
 export async function getLatestSnapshot(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<LatestSnapshot | null> {
   const row = await db.query.progressSnapshots.findFirst({
     where: eq(progressSnapshots.profileId, profileId),
@@ -723,7 +784,7 @@ export async function getLatestSnapshot(
 export async function getLatestSnapshotOnOrBefore(
   db: Database,
   profileId: string,
-  snapshotDate: string
+  snapshotDate: string,
 ): Promise<LatestSnapshot | null> {
   const rows = await db.query.progressSnapshots.findMany({
     where: eq(progressSnapshots.profileId, profileId),
@@ -737,7 +798,7 @@ export async function getSnapshotsInRange(
   db: Database,
   profileId: string,
   from: string,
-  to: string
+  to: string,
 ): Promise<Array<{ snapshotDate: string; metrics: ProgressMetrics }>> {
   const rows = await db.query.progressSnapshots.findMany({
     where: eq(progressSnapshots.profileId, profileId),
@@ -756,7 +817,7 @@ export async function getSnapshotsInRange(
 
 function metricsToHistoryPoint(
   snapshotDate: string,
-  metrics: ProgressMetrics
+  metrics: ProgressMetrics,
 ): ProgressDataPoint {
   return progressDataPointSchema.parse({
     date: snapshotDate,
@@ -764,7 +825,7 @@ function metricsToHistoryPoint(
     topicsAttempted: metrics.topicsAttempted,
     topicsExplored: metrics.subjects.reduce(
       (sum, subject) => sum + (subject.topicsExplored ?? 0),
-      0
+      0,
     ),
     vocabularyTotal: metrics.vocabularyTotal,
     vocabularyMastered: metrics.vocabularyMastered,
@@ -781,7 +842,7 @@ export async function buildProgressHistory(
     from?: string;
     to?: string;
     granularity?: 'daily' | 'weekly';
-  }
+  },
 ): Promise<ProgressHistory> {
   const to = input?.to ?? isoDate(new Date());
   const from =
@@ -790,7 +851,7 @@ export async function buildProgressHistory(
 
   const rows = await getSnapshotsInRange(db, profileId, from, to);
   let dataPoints = rows.map((row) =>
-    metricsToHistoryPoint(row.snapshotDate, row.metrics)
+    metricsToHistoryPoint(row.snapshotDate, row.metrics),
   );
 
   if (granularity === 'weekly') {
@@ -799,7 +860,7 @@ export async function buildProgressHistory(
       lastPointByWeek.set(mondayKey(point.date), point);
     }
     dataPoints = [...lastPointByWeek.values()].sort((a, b) =>
-      a.date.localeCompare(b.date)
+      a.date.localeCompare(b.date),
     );
   }
 
@@ -816,7 +877,7 @@ export async function upsertProgressSnapshot(
   db: Database,
   profileId: string,
   snapshotDate: string,
-  metrics: ProgressMetrics
+  metrics: ProgressMetrics,
 ): Promise<void> {
   await db
     .insert(progressSnapshots)
@@ -849,10 +910,10 @@ const SESSION_BACKFILL_THRESHOLDS = [1, 3, 5, 10, 25, 50, 100, 250];
 async function backfillSessionMilestones(
   db: Database,
   profileId: string,
-  totalSessions: number
+  totalSessions: number,
 ): Promise<void> {
   const thresholdsMissed = SESSION_BACKFILL_THRESHOLDS.filter(
-    (t) => totalSessions >= t
+    (t) => totalSessions >= t,
   );
   if (thresholdsMissed.length === 0) return;
 
@@ -873,7 +934,7 @@ async function backfillSessionMilestones(
 export async function listRecentMilestones(
   db: Database,
   profileId: string,
-  limit = 5
+  limit = 5,
 ): Promise<MilestoneRecord[]> {
   // [F-PV-10] Backfill missed session_count milestones, but only when the
   // user has fewer session_count milestones than expected for their total.
@@ -883,12 +944,12 @@ export async function listRecentMilestones(
   const totalSessions = latestSnapshot?.metrics.totalSessions ?? 0;
   if (totalSessions > 0) {
     const expectedCount = SESSION_BACKFILL_THRESHOLDS.filter(
-      (t) => totalSessions >= t
+      (t) => totalSessions >= t,
     ).length;
     const existingSessionMilestones = await db.query.milestones.findMany({
       where: and(
         eq(milestones.profileId, profileId),
-        eq(milestones.milestoneType, 'session_count')
+        eq(milestones.milestoneType, 'session_count'),
       ),
       columns: { id: true },
     });
@@ -915,14 +976,14 @@ export async function listRecentMilestones(
         (row.metadata as Record<string, unknown> | null | undefined) ?? null,
       celebratedAt: row.celebratedAt?.toISOString() ?? null,
       createdAt: row.createdAt.toISOString(),
-    })
+    }),
   );
 }
 
 async function previousSnapshotForToday(
   db: Database,
   profileId: string,
-  snapshotDate: string
+  snapshotDate: string,
 ): Promise<ProgressMetrics | null> {
   const row = await db.query.progressSnapshots.findFirst({
     where: eq(progressSnapshots.profileId, profileId),
@@ -935,7 +996,7 @@ async function previousSnapshotForToday(
       orderBy: desc(progressSnapshots.snapshotDate),
     });
     const previous = rows.find(
-      (candidate) => candidate.snapshotDate < snapshotDate
+      (candidate) => candidate.snapshotDate < snapshotDate,
     );
     return previous ? parseMetrics(previous.metrics) : null;
   }
@@ -946,7 +1007,7 @@ async function previousSnapshotForToday(
 // [FR237.6] Age-adapted detail text for milestone celebrations.
 function getMilestoneCelebrationDetail(
   milestone: MilestoneRecord,
-  age: number
+  age: number,
 ): string | null {
   const young = age < 12;
   const t = milestone.threshold;
@@ -971,6 +1032,15 @@ function getMilestoneCelebrationDetail(
     case 'book_completed': {
       const title =
         typeof meta?.bookTitle === 'string' ? meta.bookTitle : 'book';
+      if (title === 'book') {
+        return young
+          ? t === 1
+            ? 'You finished your first book! Woohoo! 📚'
+            : `You finished ${t} books! Woohoo! 📚`
+          : t === 1
+            ? 'First book finished.'
+            : `${t} books finished.`;
+      }
       return young
         ? `You finished the book "${title}"! Woohoo! 📚`
         : `Finished "${title}".`;
@@ -1018,7 +1088,7 @@ export interface RefreshProgressSnapshotOptions {
 export async function refreshProgressSnapshot(
   db: Database,
   profileId: string,
-  options: RefreshProgressSnapshotOptions = {}
+  options: RefreshProgressSnapshotOptions = {},
 ): Promise<RefreshSnapshotResult> {
   const snapshotDate = isoDate(new Date());
 
@@ -1045,7 +1115,7 @@ export async function refreshProgressSnapshot(
   const previousMetrics = await previousSnapshotForToday(
     db,
     profileId,
-    snapshotDate
+    snapshotDate,
   );
   const metrics = await computeProgressMetrics(db, profileId);
 
@@ -1055,7 +1125,7 @@ export async function refreshProgressSnapshot(
   const insertedMilestones = await storeMilestones(
     db,
     profileId,
-    detectMilestones(profileId, previousMetrics, metrics)
+    detectMilestones(profileId, previousMetrics, metrics),
   );
 
   // [FR234.5] Bridge newly inserted milestones to the celebration queue.
@@ -1111,7 +1181,7 @@ export async function refreshProgressSnapshot(
           profileId,
           celebrationName,
           celebrationReason,
-          detail
+          detail,
         );
       }
     } catch (err) {

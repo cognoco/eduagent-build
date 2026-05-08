@@ -57,7 +57,10 @@ import {
   type MemorySnapshot,
 } from '../memory/memory-facts';
 import { getRelevantMemories } from '../memory/relevance';
-import { getTeachingPreference } from '../retention-data';
+import {
+  computeDaysSinceLastReview,
+  getTeachingPreference,
+} from '../retention-data';
 import { shouldTriggerEvaluate } from '../evaluate';
 import { shouldTriggerTeachBack } from '../teach-back';
 import { getRetentionStatus, type RetentionState } from '../retention';
@@ -127,7 +130,7 @@ export function computeCorrectStreak(
     eventType: string;
     metadata: unknown;
   }>,
-  currentRung: number
+  currentRung: number,
 ): number {
   let streak = 0;
   for (let i = events.length - 1; i >= 0; i--) {
@@ -185,7 +188,7 @@ async function updateSessionMetadata(
   db: Database,
   profileId: string,
   sessionId: string,
-  nextMetadata: Record<string, unknown>
+  nextMetadata: Record<string, unknown>,
 ): Promise<void> {
   await db
     .update(learningSessions)
@@ -193,8 +196,8 @@ async function updateSessionMetadata(
     .where(
       and(
         eq(learningSessions.id, sessionId),
-        eq(learningSessions.profileId, profileId)
-      )
+        eq(learningSessions.profileId, profileId),
+      ),
     );
 }
 
@@ -202,7 +205,7 @@ async function applyContinuationScore(
   db: Database,
   profileId: string,
   sessionId: string,
-  retrievalScore?: number
+  retrievalScore?: number,
 ): Promise<void> {
   if (typeof retrievalScore !== 'number') return;
   // Re-read session metadata so we layer on top of any updates
@@ -216,8 +219,8 @@ async function applyContinuationScore(
     .where(
       and(
         eq(learningSessions.id, sessionId),
-        eq(learningSessions.profileId, profileId)
-      )
+        eq(learningSessions.profileId, profileId),
+      ),
     )
     .limit(1);
   const nextMetadata = {
@@ -261,7 +264,7 @@ async function maybeDispatchReviewCalibration(
   effectiveMode: string | undefined,
   conversationLanguage: ConversationLanguage | undefined,
   learnerMessageText: string,
-  topicTitle: string | undefined
+  topicTitle: string | undefined,
 ): Promise<void> {
   if (effectiveMode !== 'review' && effectiveMode !== 'practice') return;
   const topicId = session.topicId;
@@ -269,7 +272,7 @@ async function maybeDispatchReviewCalibration(
 
   const isSubstantive = isSubstantiveCalibrationAnswer(
     learnerMessageText,
-    conversationLanguage
+    conversationLanguage,
   );
 
   const payload = await db.transaction<ReviewCalibrationDispatchPayload | null>(
@@ -280,8 +283,8 @@ async function maybeDispatchReviewCalibration(
         .where(
           and(
             eq(learningSessions.id, session.id),
-            eq(learningSessions.profileId, profileId)
-          )
+            eq(learningSessions.profileId, profileId),
+          ),
         )
         .for('update')
         .limit(1);
@@ -311,8 +314,8 @@ async function maybeDispatchReviewCalibration(
           .where(
             and(
               eq(learningSessions.id, session.id),
-              eq(learningSessions.profileId, profileId)
-            )
+              eq(learningSessions.profileId, profileId),
+            ),
           );
         return null;
       }
@@ -326,8 +329,8 @@ async function maybeDispatchReviewCalibration(
         .where(
           and(
             eq(learningSessions.id, session.id),
-            eq(learningSessions.profileId, profileId)
-          )
+            eq(learningSessions.profileId, profileId),
+          ),
         );
 
       return {
@@ -338,7 +341,7 @@ async function maybeDispatchReviewCalibration(
         topicTitle,
         timestamp,
       };
-    }
+    },
   );
 
   if (!payload) return;
@@ -379,7 +382,7 @@ async function maybeDispatchTopicProbeExtraction(
   conversationLanguage: ConversationLanguage | undefined,
   learnerMessageText: string,
   topicTitle: string | undefined,
-  isFirstEncounter: boolean
+  isFirstEncounter: boolean,
 ): Promise<void> {
   if (effectiveMode !== 'learning') return;
   if (!isFirstEncounter) return;
@@ -399,8 +402,8 @@ async function maybeDispatchTopicProbeExtraction(
         .where(
           and(
             eq(learningSessions.id, session.id),
-            eq(learningSessions.profileId, profileId)
-          )
+            eq(learningSessions.profileId, profileId),
+          ),
         )
         .for('update')
         .limit(1);
@@ -423,8 +426,8 @@ async function maybeDispatchTopicProbeExtraction(
         .where(
           and(
             eq(learningSessions.id, session.id),
-            eq(learningSessions.profileId, profileId)
-          )
+            eq(learningSessions.profileId, profileId),
+          ),
         );
 
       return {
@@ -437,7 +440,7 @@ async function maybeDispatchTopicProbeExtraction(
         topicTitle,
         timestamp,
       };
-    }
+    },
   );
 
   if (!payload) return;
@@ -455,8 +458,8 @@ async function maybeDispatchTopicProbeExtraction(
         .where(
           and(
             eq(learningSessions.id, session.id),
-            eq(learningSessions.profileId, profileId)
-          )
+            eq(learningSessions.profileId, profileId),
+          ),
         )
         .for('update')
         .limit(1);
@@ -475,8 +478,8 @@ async function maybeDispatchTopicProbeExtraction(
         .where(
           and(
             eq(learningSessions.id, session.id),
-            eq(learningSessions.profileId, profileId)
-          )
+            eq(learningSessions.profileId, profileId),
+          ),
         );
     });
     logger.warn('[session-exchange] topic probe extraction dispatch failed', {
@@ -517,7 +520,7 @@ interface ExchangePrep {
 export async function checkExchangeLimit(
   db: Database,
   profileId: string,
-  sessionId: string
+  sessionId: string,
 ): Promise<void> {
   const repo = createScopedRepository(db, profileId);
   const row = await repo.sessions.findFirst(eq(learningSessions.id, sessionId));
@@ -537,7 +540,7 @@ export async function checkExchangeLimit(
  */
 export function mergeMemoryContexts(
   messageMemory: string,
-  rawInputMemory: string
+  rawInputMemory: string,
 ): string {
   if (!messageMemory && !rawInputMemory) return '';
   if (!rawInputMemory) return messageMemory;
@@ -587,15 +590,15 @@ export function buildExchangeHistory(events: ExchangeHistoryEvent[]): Array<{
       (e) =>
         e.eventType === 'user_message' ||
         e.eventType === 'ai_response' ||
-        e.eventType === 'system_prompt'
+        e.eventType === 'system_prompt',
     )
     .map((e) => ({
       role:
         e.eventType === 'user_message'
           ? ('user' as const)
           : e.eventType === 'system_prompt'
-          ? ('system' as const)
-          : ('assistant' as const),
+            ? ('system' as const)
+            : ('assistant' as const),
       ...(e.orphanReason ? { orphan_reason: e.orphanReason } : {}),
       content:
         e.eventType === 'ai_response'
@@ -633,7 +636,7 @@ export async function prepareExchangeContext(
     llmTier?: import('../subscription').LLMTier;
     memoryFactsReadEnabled?: boolean;
     memoryFactsRelevanceEnabled?: boolean;
-  }
+  },
 ): Promise<ExchangePrep> {
   // 1. Load session
   const session = await getSession(db, profileId, sessionId);
@@ -653,7 +656,7 @@ export async function prepareExchangeContext(
     db,
     profileId,
     sessionId,
-    session
+    session,
   );
 
   // 2. Load all supplementary data in parallel (all independent after session load)
@@ -670,7 +673,7 @@ export async function prepareExchangeContext(
               {
                 event: 'session_exchange.user_msg_embedding.failed',
                 reason: err instanceof Error ? err.message : String(err),
-              }
+              },
             );
             return undefined;
           })
@@ -691,7 +694,7 @@ export async function prepareExchangeContext(
     sessionId,
     session.subjectId,
     isFreeform,
-    staticContext
+    staticContext,
   );
 
   const [
@@ -724,8 +727,8 @@ export async function prepareExchangeContext(
           .where(
             and(
               eq(retentionCards.topicId, session.topicId),
-              eq(retentionCards.profileId, profileId)
-            )
+              eq(retentionCards.profileId, profileId),
+            ),
           )
           .limit(1)
       : Promise.resolve([]),
@@ -738,8 +741,8 @@ export async function prepareExchangeContext(
               eq(learningSessions.profileId, profileId),
               eq(learningSessions.topicId, session.topicId),
               ne(learningSessions.id, sessionId),
-              gte(learningSessions.exchangeCount, 1)
-            )
+              gte(learningSessions.exchangeCount, 1),
+            ),
           )
           .limit(1)
       : Promise.resolve([]),
@@ -751,14 +754,14 @@ export async function prepareExchangeContext(
           eq(learningSessions.profileId, profileId),
           eq(learningSessions.subjectId, session.subjectId),
           ne(learningSessions.id, sessionId),
-          gte(learningSessions.exchangeCount, 1)
-        )
+          gte(learningSessions.exchangeCount, 1),
+        ),
       )
       .limit(1),
     db.query.sessionEvents.findMany({
       where: and(
         eq(sessionEvents.sessionId, sessionId),
-        eq(sessionEvents.profileId, profileId)
+        eq(sessionEvents.profileId, profileId),
       ),
       // [BUG-913 sweep] Tie-break by id when created_at collides — see
       // session-crud.ts getSessionTranscript for the full rationale.
@@ -771,8 +774,8 @@ export async function prepareExchangeContext(
         userMessage,
         options?.voyageApiKey,
         undefined,
-        userMessageVector
-      )
+        userMessageVector,
+      ),
     ),
     // FR92: Load session metadata for interleaved topic list
     isInterleaved
@@ -782,8 +785,8 @@ export async function prepareExchangeContext(
           .where(
             and(
               eq(learningSessions.id, sessionId),
-              eq(learningSessions.profileId, profileId)
-            )
+              eq(learningSessions.profileId, profileId),
+            ),
           )
           .limit(1)
       : Promise.resolve([]),
@@ -795,7 +798,7 @@ export async function prepareExchangeContext(
           profileId,
           session.rawInput,
           options?.voyageApiKey,
-          5
+          5,
         )
       : Promise.resolve({ context: '', topicIds: [] }),
     // B.4: Most recent completed session summary within 14-day freshness window.
@@ -811,7 +814,7 @@ export async function prepareExchangeContext(
           .from(sessionSummaries)
           .innerJoin(
             learningSessions,
-            eq(sessionSummaries.sessionId, learningSessions.id)
+            eq(sessionSummaries.sessionId, learningSessions.id),
           )
           .where(
             and(
@@ -822,8 +825,8 @@ export async function prepareExchangeContext(
                 'accepted',
                 'auto_closed',
               ]),
-              gte(sessionSummaries.createdAt, freshnessCutoff)
-            )
+              gte(sessionSummaries.createdAt, freshnessCutoff),
+            ),
           )
           .orderBy(desc(sessionSummaries.createdAt))
           .limit(1);
@@ -857,7 +860,7 @@ export async function prepareExchangeContext(
       '[processExchange] Profile not found — birthYear will be null, LLM defaults to adult tone',
       {
         profileId,
-      }
+      },
     );
   }
   const retentionCard = retentionRows[0];
@@ -926,8 +929,8 @@ export async function prepareExchangeContext(
     ? retentionCard.repetitions <= 1
       ? 'full'
       : retentionCard.repetitions <= 4
-      ? 'fading'
-      : 'problem_first'
+        ? 'fading'
+        : 'problem_first'
     : 'full'; // default for new topics
   const exchangeHistory = buildExchangeHistory(events);
 
@@ -1011,8 +1014,8 @@ export async function prepareExchangeContext(
               and(
                 eq(subjects.id, silentClassification.subjectId),
                 eq(subjects.profileId, profileId),
-                eq(subjects.status, 'active')
-              )
+                eq(subjects.status, 'active'),
+              ),
             )
             .limit(1),
           getTeachingPreference(db, profileId, silentClassification.subjectId),
@@ -1020,20 +1023,20 @@ export async function prepareExchangeContext(
       : [[], null];
   const silentSubject = silentSubjectRows[0];
   const effectiveSubjectName = isFreeform
-    ? silentClassification?.subjectName ?? 'Unknown'
-    : subject?.name ?? 'Unknown';
+    ? (silentClassification?.subjectName ?? 'Unknown')
+    : (subject?.name ?? 'Unknown');
   const effectivePedagogyMode: 'socratic' | 'four_strands' = likelyLanguage
     ? 'four_strands'
     : isFreeform
-    ? (silentSubject?.pedagogyMode as
-        | 'socratic'
-        | 'four_strands'
-        | undefined) ?? 'socratic'
-    : (subject?.pedagogyMode as 'socratic' | 'four_strands' | undefined) ??
-      'socratic';
+      ? ((silentSubject?.pedagogyMode as
+          | 'socratic'
+          | 'four_strands'
+          | undefined) ?? 'socratic')
+      : ((subject?.pedagogyMode as 'socratic' | 'four_strands' | undefined) ??
+        'socratic');
   const effectiveLanguageCode = isFreeform
-    ? silentSubject?.languageCode ?? undefined
-    : subject?.languageCode ?? undefined;
+    ? (silentSubject?.languageCode ?? undefined)
+    : (subject?.languageCode ?? undefined);
   const effectiveTeachingPref = isFreeform ? silentTeachingPref : teachingPref;
   const effectiveVocabularySubjectId = isFreeform
     ? silentClassification?.subjectId
@@ -1047,8 +1050,8 @@ export async function prepareExchangeContext(
             and(
               eq(vocabulary.profileId, profileId),
               eq(vocabulary.subjectId, effectiveVocabularySubjectId),
-              eq(vocabulary.mastered, true)
-            )
+              eq(vocabulary.mastered, true),
+            ),
           )
           .orderBy(desc(vocabulary.updatedAt))
           .limit(60)
@@ -1076,11 +1079,8 @@ export async function prepareExchangeContext(
       lastReviewedAt: retentionCard.lastReviewedAt?.toISOString() ?? null,
     };
     retentionStatusValue = getRetentionStatus(retState);
-    if (retentionCard.lastReviewedAt) {
-      daysSinceLastReview =
-        (Date.now() - retentionCard.lastReviewedAt.getTime()) /
-        (1000 * 60 * 60 * 24);
-    }
+    daysSinceLastReview =
+      computeDaysSinceLastReview(retentionCard.lastReviewedAt) ?? undefined;
   }
 
   // 3c. Count questions at the current escalation rung + compute hint count
@@ -1088,7 +1088,7 @@ export async function prepareExchangeContext(
   const questionsAtCurrentRung = aiResponseEvents.filter(
     (e) =>
       (e.metadata as Record<string, unknown> | null)?.escalationRung ===
-      session.escalationRung
+      session.escalationRung,
   ).length;
   // Hint = AI response at escalation rung >= 2 (beyond basic Socratic)
   const hintCount = aiResponseEvents.filter((e) => {
@@ -1140,7 +1140,7 @@ export async function prepareExchangeContext(
       previousResponseHadPartialProgress,
       consecutiveHolds,
     },
-    userMessage
+    userMessage,
   );
   const effectiveRung = escalationDecision.shouldEscalate
     ? escalationDecision.newRung
@@ -1158,7 +1158,7 @@ export async function prepareExchangeContext(
           sessionId,
           session,
           topic.id,
-          topic.bookId
+          topic.bookId,
         )
       : undefined,
     session.sessionType === 'homework'
@@ -1177,10 +1177,10 @@ export async function prepareExchangeContext(
       ? (sessionMetadata.onboardingFastPath as Record<string, unknown>)[
           'extractedSignals'
         ]
-      : undefined
+      : undefined,
   );
   const extractedSignals = extractedInterviewSignalsSchema.safeParse(
-    sessionMetadata?.extractedSignals
+    sessionMetadata?.extractedSignals,
   );
   const extractedSignalsToReflect = extractedSignals.success
     ? {
@@ -1249,8 +1249,8 @@ export async function prepareExchangeContext(
       .where(
         and(
           eq(retentionCards.profileId, profileId),
-          gte(retentionCards.intervalDays, 21)
-        )
+          gte(retentionCards.intervalDays, 21),
+        ),
       );
     const strongTopicIds = strongCards.map((row) => row.topicId);
     if (strongTopicIds.length > 0) {
@@ -1275,8 +1275,8 @@ export async function prepareExchangeContext(
         and(
           eq(subjects.id, session.subjectId),
           eq(subjects.profileId, profileId),
-          eq(subjects.status, 'active')
-        )
+          eq(subjects.status, 'active'),
+        ),
       )
       .limit(1);
     const urgencyRow = urgencyRows[0];
@@ -1324,7 +1324,7 @@ export async function prepareExchangeContext(
   ) {
     memorySnapshot = await readMemorySnapshotFromFacts(
       scopedRepo,
-      learningProfile
+      learningProfile,
     );
   }
 
@@ -1336,8 +1336,8 @@ export async function prepareExchangeContext(
           interests: memorySnapshot
             ? memorySnapshot.interests
             : Array.isArray(learningProfile.interests)
-            ? learningProfile.interests
-            : [],
+              ? learningProfile.interests
+              : [],
           strengths: memorySnapshot
             ? memorySnapshot.strengths
             : ((Array.isArray(learningProfile.strengths)
@@ -1351,8 +1351,8 @@ export async function prepareExchangeContext(
           communicationNotes: memorySnapshot
             ? memorySnapshot.communicationNotes
             : Array.isArray(learningProfile.communicationNotes)
-            ? learningProfile.communicationNotes
-            : [],
+              ? learningProfile.communicationNotes
+              : [],
           memoryEnabled: learningProfile.memoryEnabled,
           memoryInjectionEnabled: learningProfile.memoryInjectionEnabled,
           memoryConsentStatus: learningProfile.memoryConsentStatus,
@@ -1365,8 +1365,8 @@ export async function prepareExchangeContext(
             lastSessionSummaryRows[0]?.exchangeCount ?? undefined,
         },
         isFreeform
-          ? silentClassification?.subjectName ?? null
-          : subject?.name ?? null,
+          ? (silentClassification?.subjectName ?? null)
+          : (subject?.name ?? null),
         topic?.title ?? null,
         {
           status: retentionStatusValue,
@@ -1376,7 +1376,7 @@ export async function prepareExchangeContext(
           ? (learningProfile.recentlyResolvedTopics as Array<
               string | { topic: string; subject: string | null }
             >)
-          : []
+          : [],
       )
     : null;
   const learnerMemoryContext = memoryBlock?.text || undefined;
@@ -1395,7 +1395,7 @@ export async function prepareExchangeContext(
   // FR254: Build accommodation block — independent of memory injection toggle
   const accommodationContext = learningProfile
     ? buildAccommodationBlock(
-        learningProfile.accommodationMode as string | null
+        learningProfile.accommodationMode as string | null,
       ) || undefined
     : undefined;
 
@@ -1493,7 +1493,7 @@ export async function persistExchangeResult(
   aiResponse: string,
   effectiveRung: EscalationRung,
   behavioral?: Partial<ExchangeBehavioralMetrics>,
-  clientId?: string
+  clientId?: string,
 ): Promise<{
   exchangeCount: number;
   aiEventId?: string;
@@ -1602,8 +1602,8 @@ export async function persistExchangeResult(
       and(
         eq(learningSessions.id, sessionId),
         eq(learningSessions.profileId, profileId),
-        lt(learningSessions.exchangeCount, MAX_EXCHANGES_PER_SESSION)
-      )
+        lt(learningSessions.exchangeCount, MAX_EXCHANGES_PER_SESSION),
+      ),
     )
     .returning({ exchangeCount: learningSessions.exchangeCount });
 
@@ -1615,8 +1615,8 @@ export async function persistExchangeResult(
           .where(
             and(
               eq(sessionEvents.id, insertedUserEventId),
-              eq(sessionEvents.profileId, profileId)
-            )
+              eq(sessionEvents.profileId, profileId),
+            ),
           );
       } catch (rollbackErr) {
         captureException(rollbackErr, {
@@ -1697,7 +1697,7 @@ export async function persistExchangeResult(
     const words = aiResponse.trim().split(/\s+/);
     const firstSixWords = words.slice(0, 6).join(' ').toLowerCase();
     const startsWithFiller = BANNED_FILLER_OPENERS.some((opener) =>
-      firstSixWords.startsWith(opener)
+      firstSixWords.startsWith(opener),
     );
     logger.info('[session-exchange] tone check', {
       event: 'llm.tone_check',
@@ -1750,7 +1750,7 @@ export async function processMessage(
     clientId?: string;
     memoryFactsReadEnabled?: boolean;
     memoryFactsRelevanceEnabled?: boolean;
-  }
+  },
 ): Promise<{
   response: string;
   escalationRung: number;
@@ -1776,7 +1776,7 @@ export async function processMessage(
     context.effectiveMode,
     context.conversationLanguage,
     input.message,
-    context.topicTitle
+    context.topicTitle,
   );
 
   const imageData: ImageData | undefined =
@@ -1840,7 +1840,7 @@ export async function processMessage(
       drillCorrect: result.fluencyDrill?.score?.correct,
       drillTotal: result.fluencyDrill?.score?.total,
     },
-    options?.clientId
+    options?.clientId,
   );
 
   await applyContinuationScore(db, profileId, sessionId, result.retrievalScore);
@@ -1857,7 +1857,7 @@ export async function processMessage(
       context.conversationLanguage,
       input.message,
       context.topicTitle,
-      context.isFirstEncounter === true
+      context.isFirstEncounter === true,
     );
   }
 
@@ -1886,7 +1886,7 @@ export async function streamMessage(
     clientId?: string;
     memoryFactsReadEnabled?: boolean;
     memoryFactsRelevanceEnabled?: boolean;
-  }
+  },
 ): Promise<{
   stream: AsyncIterable<string>;
   onComplete: () => Promise<{
@@ -1921,7 +1921,7 @@ export async function streamMessage(
     context.effectiveMode,
     context.conversationLanguage,
     input.message,
-    context.topicTitle
+    context.topicTitle,
   );
 
   // Compute time-to-answer before streaming begins
@@ -1962,7 +1962,7 @@ export async function streamMessage(
               {
                 clientId: options.clientId,
                 orphanReason: classifyOrphanError(err),
-              }
+              },
             );
           } catch (persistErr) {
             await inngest.send({
@@ -2010,7 +2010,7 @@ export async function streamMessage(
               {
                 clientId: options.clientId,
                 orphanReason: 'llm_empty_or_unparseable',
-              }
+              },
             );
           } catch (persistErr) {
             await inngest.send({
@@ -2040,7 +2040,7 @@ export async function streamMessage(
       const parsed = outcome.parsed;
       const expectedResponseMinutes = estimateExpectedResponseMinutes(
         parsed.cleanResponse,
-        context
+        context,
       );
       const persisted = await persistExchangeResult(
         db,
@@ -2063,13 +2063,13 @@ export async function streamMessage(
           drillCorrect: parsed.fluencyDrill?.score?.correct,
           drillTotal: parsed.fluencyDrill?.score?.total,
         },
-        options?.clientId
+        options?.clientId,
       );
       await applyContinuationScore(
         db,
         profileId,
         sessionId,
-        parsed.retrievalScore
+        parsed.retrievalScore,
       );
       if (persisted.persistedUserMessage) {
         await maybeDispatchTopicProbeExtraction(
@@ -2084,7 +2084,7 @@ export async function streamMessage(
           context.conversationLanguage,
           input.message,
           context.topicTitle,
-          context.isFirstEncounter === true
+          context.isFirstEncounter === true,
         );
       }
       return {

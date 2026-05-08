@@ -7,6 +7,7 @@ jest.mock('../../lib/theme', () => ({
     retentionFading: '#eab308',
     retentionWeak: '#f97316',
     retentionForgotten: '#737373',
+    textSecondary: '#525252',
   }),
 }));
 
@@ -31,5 +32,23 @@ describe('RetentionPill', () => {
   it('renders large variant', () => {
     render(<RetentionPill status="strong" size="large" />);
     expect(screen.getByText('Still remembered')).toBeTruthy();
+  });
+
+  it('renders elapsed-days copy when the review is at least two days old', () => {
+    render(<RetentionPill status="strong" daysSinceLastReview={9} />);
+    expect(screen.getByText('Remembered after 9 days')).toBeTruthy();
+    expect(screen.getByTestId('retention-pill-elapsed')).toBeTruthy();
+  });
+
+  it('hides elapsed-days copy below the suppression threshold', () => {
+    render(<RetentionPill status="fading" daysSinceLastReview={1} />);
+    expect(screen.queryByText('Getting fuzzy after 1 day')).toBeNull();
+    expect(screen.queryByTestId('retention-pill-elapsed')).toBeNull();
+  });
+
+  it('hides elapsed-days copy when the value is null', () => {
+    render(<RetentionPill status="forgotten" daysSinceLastReview={null} />);
+    expect(screen.queryByText(/Last seen/)).toBeNull();
+    expect(screen.queryByTestId('retention-pill-elapsed')).toBeNull();
   });
 });

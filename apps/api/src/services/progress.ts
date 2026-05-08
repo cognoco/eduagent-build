@@ -23,13 +23,14 @@ import type {
   SubjectProgress,
   TopicProgress,
 } from '@eduagent/schemas';
+import { computeDaysSinceLastReview } from './retention-data';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 function computeRetentionStatus(
-  nextReviewAt: Date | null
+  nextReviewAt: Date | null,
 ): 'strong' | 'fading' | 'weak' | 'forgotten' {
   if (!nextReviewAt) return 'forgotten';
   const now = new Date();
@@ -42,7 +43,7 @@ function computeRetentionStatus(
 }
 
 function computeAggregateRetentionStatus(
-  statuses: Array<'strong' | 'fading' | 'weak' | 'forgotten'>
+  statuses: Array<'strong' | 'fading' | 'weak' | 'forgotten'>,
 ): 'strong' | 'fading' | 'weak' | 'forgotten' {
   if (statuses.length === 0) return 'strong';
   const forgottenCount = statuses.filter((s) => s === 'forgotten').length;
@@ -58,7 +59,7 @@ function computeAggregateRetentionStatus(
 function computeCompletionStatus(
   sessionCount: number,
   assessment: { status: string; masteryScore: number | null } | undefined,
-  retentionCard: { xpStatus: string; nextReviewAt: Date | null } | undefined
+  retentionCard: { xpStatus: string; nextReviewAt: Date | null } | undefined,
 ): 'not_started' | 'in_progress' | 'completed' | 'verified' | 'stable' {
   if (retentionCard?.xpStatus === 'verified') return 'verified';
   if (assessment?.status === 'passed') return 'completed';
@@ -73,7 +74,7 @@ function computeCompletionStatus(
 export async function getSubjectProgress(
   db: Database,
   profileId: string,
-  subjectId: string
+  subjectId: string,
 ): Promise<SubjectProgress | null> {
   const repo = createScopedRepository(db, profileId);
 
@@ -103,7 +104,7 @@ export async function getSubjectProgress(
   const topics = await db.query.curriculumTopics.findMany({
     where: and(
       eq(curriculumTopics.curriculumId, curriculum.id),
-      eq(curriculumTopics.skipped, false)
+      eq(curriculumTopics.skipped, false),
     ),
   });
 
@@ -113,7 +114,7 @@ export async function getSubjectProgress(
   const topicCards =
     topicIds.length > 0
       ? await repo.retentionCards.findMany(
-          inArray(retentionCards.topicId, topicIds)
+          inArray(retentionCards.topicId, topicIds),
         )
       : [];
 
@@ -143,8 +144,8 @@ export async function getSubjectProgress(
   const sessions = await repo.sessions.findMany(
     and(
       eq(learningSessions.subjectId, subjectId),
-      gte(learningSessions.exchangeCount, 1)
-    )
+      gte(learningSessions.exchangeCount, 1),
+    ),
   );
 
   // [BUG-LIB-TOPICS] A completed session on a curriculum topic also counts as
@@ -163,19 +164,19 @@ export async function getSubjectProgress(
   }
 
   const lastSession = sessions.sort(
-    (a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime()
+    (a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime(),
   )[0];
 
   // Compute retention status from cards
   const retentionStatuses = topicCards.map((c) =>
-    computeRetentionStatus(c.nextReviewAt)
+    computeRetentionStatus(c.nextReviewAt),
   );
   const retentionStatus = computeAggregateRetentionStatus(retentionStatuses);
 
   // Urgency: count of overdue reviews
   const now = new Date();
   const overdueCount = topicCards.filter(
-    (c) => c.nextReviewAt && c.nextReviewAt.getTime() < now.getTime()
+    (c) => c.nextReviewAt && c.nextReviewAt.getTime() < now.getTime(),
   ).length;
 
   return {
@@ -194,7 +195,7 @@ export async function getTopicProgress(
   db: Database,
   profileId: string,
   subjectId: string,
-  topicId: string
+  topicId: string,
 ): Promise<TopicProgress | null> {
   const repo = createScopedRepository(db, profileId);
 
@@ -210,15 +211,15 @@ export async function getTopicProgress(
 
   // Get retention card
   const retentionCard = await repo.retentionCards.findFirst(
-    eq(retentionCards.topicId, topicId)
+    eq(retentionCards.topicId, topicId),
   );
 
   // Get latest assessment
   const topicAssessments = await repo.assessments.findMany(
-    eq(assessments.topicId, topicId)
+    eq(assessments.topicId, topicId),
   );
   const latestAssessment = topicAssessments.sort(
-    (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+    (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
   )[0];
 
   // Count sessions for this topic. Only sessions with at least 1 real exchange
@@ -227,32 +228,32 @@ export async function getTopicProgress(
   const topicSessions = await repo.sessions.findMany(
     and(
       eq(learningSessions.topicId, topicId),
-      gte(learningSessions.exchangeCount, 1)
-    )
+      gte(learningSessions.exchangeCount, 1),
+    ),
   );
 
   // Check needs-deepening status
   const deepeningTopics = await repo.needsDeepeningTopics.findMany(
-    eq(needsDeepeningTopics.topicId, topicId)
+    eq(needsDeepeningTopics.topicId, topicId),
   );
   const activeDeepening = deepeningTopics.find((d) => d.status === 'active');
 
   // Get XP ledger entry
   const xpEntries = await repo.xpLedger.findMany(eq(xpLedger.topicId, topicId));
   const latestXp = xpEntries.sort(
-    (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+    (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
   )[0];
 
   // Get session summary excerpt from the most recent session.
   // findMany returns DB insertion order — sort by createdAt to get the true latest.
   const sortedSessions = topicSessions.sort(
-    (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+    (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
   );
   const lastTopicSession = sortedSessions[0];
   const summaryRow =
     lastTopicSession != null
       ? await repo.sessionSummaries.findFirst(
-          eq(sessionSummaries.sessionId, lastTopicSession.id)
+          eq(sessionSummaries.sessionId, lastTopicSession.id),
         )
       : undefined;
 
@@ -269,7 +270,7 @@ export async function getTopicProgress(
           xpStatus: retentionCard.xpStatus,
           nextReviewAt: retentionCard.nextReviewAt,
         }
-      : undefined
+      : undefined,
   );
 
   const retentionStatus = retentionCard
@@ -298,6 +299,9 @@ export async function getTopicProgress(
     description: topic.description,
     completionStatus,
     retentionStatus: extendedRetentionStatus,
+    daysSinceLastReview: retentionCard
+      ? computeDaysSinceLastReview(retentionCard.lastReviewedAt)
+      : null,
     struggleStatus,
     masteryScore: latestAssessment?.masteryScore
       ? Number(latestAssessment.masteryScore)
@@ -310,7 +314,7 @@ export async function getTopicProgress(
 
 export async function getOverallProgress(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<{
   subjects: SubjectProgress[];
   totalTopicsCompleted: number;
@@ -333,7 +337,7 @@ export async function getOverallProgress(
 
   const curriculumIds = allCurricula.map((c) => c.id);
   const curriculumBySubject = new Map(
-    allCurricula.map((c) => [c.subjectId, c])
+    allCurricula.map((c) => [c.subjectId, c]),
   );
 
   // Fetch all topics for all curricula in one query
@@ -342,7 +346,7 @@ export async function getOverallProgress(
       ? await db.query.curriculumTopics.findMany({
           where: and(
             inArray(curriculumTopics.curriculumId, curriculumIds),
-            eq(curriculumTopics.skipped, false)
+            eq(curriculumTopics.skipped, false),
           ),
         })
       : [];
@@ -359,7 +363,7 @@ export async function getOverallProgress(
   const allCards =
     topicIds.length > 0
       ? await repo.retentionCards.findMany(
-          inArray(retentionCards.topicId, topicIds)
+          inArray(retentionCards.topicId, topicIds),
         )
       : [];
 
@@ -389,8 +393,8 @@ export async function getOverallProgress(
       ? await repo.sessions.findMany(
           and(
             inArray(learningSessions.subjectId, subjectIds),
-            gte(learningSessions.exchangeCount, 1)
-          )
+            gte(learningSessions.exchangeCount, 1),
+          ),
         )
       : [];
 
@@ -462,21 +466,21 @@ export async function getOverallProgress(
     }
 
     const lastSession = subjectSessions.sort(
-      (a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime()
+      (a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime(),
     )[0];
 
     // Retention status from all cards for this subject's topics
     const subjectTopicIds = new Set(topics.map((t) => t.id));
     const subjectCards = allCards.filter((c) => subjectTopicIds.has(c.topicId));
     const retentionStatuses = subjectCards.map((c) =>
-      computeRetentionStatus(c.nextReviewAt)
+      computeRetentionStatus(c.nextReviewAt),
     );
     const retentionStatus = computeAggregateRetentionStatus(retentionStatuses);
 
     // Urgency: count of overdue reviews
     const now = new Date();
     const overdueCount = subjectCards.filter(
-      (c) => c.nextReviewAt && c.nextReviewAt.getTime() < now.getTime()
+      (c) => c.nextReviewAt && c.nextReviewAt.getTime() < now.getTime(),
     ).length;
 
     const progress: SubjectProgress = {
@@ -515,7 +519,7 @@ export async function getOverallProgress(
 export async function getTopicProgressBatch(
   db: Database,
   profileId: string,
-  topics: Array<{ id: string; title: string; description: string }>
+  topics: Array<{ id: string; title: string; description: string }>,
 ): Promise<TopicProgress[]> {
   if (topics.length === 0) return [];
 
@@ -530,11 +534,11 @@ export async function getTopicProgressBatch(
       repo.sessions.findMany(
         and(
           inArray(learningSessions.topicId, topicIds),
-          gte(learningSessions.exchangeCount, 1)
-        )
+          gte(learningSessions.exchangeCount, 1),
+        ),
       ),
       repo.needsDeepeningTopics.findMany(
-        inArray(needsDeepeningTopics.topicId, topicIds)
+        inArray(needsDeepeningTopics.topicId, topicIds),
       ),
       repo.xpLedger.findMany(inArray(xpLedger.topicId, topicIds)),
     ]);
@@ -585,7 +589,7 @@ export async function getTopicProgressBatch(
   for (const topic of topics) {
     const topicSessions = sessionsByTopic.get(topic.id) ?? [];
     const sorted = topicSessions.sort(
-      (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+      (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
     );
     const last = sorted[0];
     if (last) {
@@ -597,7 +601,7 @@ export async function getTopicProgressBatch(
   const allSummaries =
     lastSessionIds.length > 0
       ? await repo.sessionSummaries.findMany(
-          inArray(sessionSummaries.sessionId, lastSessionIds)
+          inArray(sessionSummaries.sessionId, lastSessionIds),
         )
       : [];
   const summaryBySessionId = new Map(allSummaries.map((s) => [s.sessionId, s]));
@@ -608,7 +612,7 @@ export async function getTopicProgressBatch(
     const retentionCard = topicCards[0] ?? null;
 
     const topicAssessments = (assessmentsByTopic.get(topic.id) ?? []).sort(
-      (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+      (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
     );
     const latestAssessment = topicAssessments[0];
 
@@ -618,7 +622,7 @@ export async function getTopicProgressBatch(
     const activeDeepening = deepeningTopics.find((d) => d.status === 'active');
 
     const xpEntries = (xpByTopic.get(topic.id) ?? []).sort(
-      (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+      (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
     );
     const latestXp = xpEntries[0];
 
@@ -640,7 +644,7 @@ export async function getTopicProgressBatch(
             xpStatus: retentionCard.xpStatus,
             nextReviewAt: retentionCard.nextReviewAt,
           }
-        : undefined
+        : undefined,
     );
 
     const retentionStatus = retentionCard
@@ -669,6 +673,9 @@ export async function getTopicProgressBatch(
       description: topic.description,
       completionStatus,
       retentionStatus: extendedRetentionStatus,
+      daysSinceLastReview: retentionCard
+        ? computeDaysSinceLastReview(retentionCard.lastReviewedAt)
+        : null,
       struggleStatus,
       masteryScore: latestAssessment?.masteryScore
         ? Number(latestAssessment.masteryScore)
@@ -684,19 +691,19 @@ export async function getTopicProgressBatch(
 export async function getActiveSessionForTopic(
   db: Database,
   profileId: string,
-  topicId: string
+  topicId: string,
 ): Promise<{ sessionId: string } | null> {
   const repo = createScopedRepository(db, profileId);
   const sessions = await repo.sessions.findMany(
     and(
       eq(learningSessions.topicId, topicId),
-      inArray(learningSessions.status, ['active', 'paused'])
-    )
+      inArray(learningSessions.status, ['active', 'paused']),
+    ),
   );
   if (sessions.length === 0) return null;
   // Use spread to avoid mutating the repo array (consistent with getContinueSuggestion pattern)
   const sorted = [...sessions].sort(
-    (a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime()
+    (a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime(),
   );
   const newest = sorted[0];
   if (newest == null) return null;
@@ -708,7 +715,7 @@ export async function getActiveSessionForTopic(
 export async function resolveTopicSubject(
   db: Database,
   profileId: string,
-  topicId: string
+  topicId: string,
 ): Promise<{
   subjectId: string;
   subjectName: string;
@@ -735,7 +742,7 @@ export async function resolveTopicSubject(
 
   // Gate: verify the subject belongs to this profile via scoped repository
   const subject = await repo.subjects.findFirst(
-    eq(subjects.id, curriculum.subjectId)
+    eq(subjects.id, curriculum.subjectId),
   );
   if (!subject) return null;
 
@@ -747,22 +754,22 @@ export async function resolveTopicSubject(
 }
 
 function sortByLatestActivity<T extends { lastActivityAt: Date }>(
-  rows: T[]
+  rows: T[],
 ): T[] {
   return [...rows].sort(
-    (a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime()
+    (a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime(),
   );
 }
 
 function isRealLearningSession(
-  session: typeof learningSessions.$inferSelect
+  session: typeof learningSessions.$inferSelect,
 ): boolean {
   return session.sessionType === 'learning' && session.exchangeCount >= 1;
 }
 
 function subjectActivityOrder(
   activeSubjects: Array<typeof subjects.$inferSelect>,
-  sessions: Array<typeof learningSessions.$inferSelect>
+  sessions: Array<typeof learningSessions.$inferSelect>,
 ): Array<typeof subjects.$inferSelect> {
   const lastActivityBySubject = new Map<string, number>();
   for (const session of sessions) {
@@ -781,29 +788,29 @@ function subjectActivityOrder(
 export async function getLearningResumeTarget(
   db: Database,
   profileId: string,
-  scope: LearningResumeScope = {}
+  scope: LearningResumeScope = {},
 ): Promise<LearningResumeTarget | null> {
   const repo = createScopedRepository(db, profileId);
   let activeSubjects = (await repo.subjects.findMany()).filter(
-    (subject) => subject.status === 'active'
+    (subject) => subject.status === 'active',
   );
   if (scope.subjectId) {
     activeSubjects = activeSubjects.filter(
-      (subject) => subject.id === scope.subjectId
+      (subject) => subject.id === scope.subjectId,
     );
   }
   if (activeSubjects.length === 0) return null;
 
   const subjectIds = activeSubjects.map((subject) => subject.id);
   const subjectById = new Map(
-    activeSubjects.map((subject) => [subject.id, subject])
+    activeSubjects.map((subject) => [subject.id, subject]),
   );
   const allSessions = (
     await repo.sessions.findMany(
       and(
         inArray(learningSessions.subjectId, subjectIds),
-        gte(learningSessions.exchangeCount, 1)
-      )
+        gte(learningSessions.exchangeCount, 1),
+      ),
     )
   ).filter(isRealLearningSession);
 
@@ -832,15 +839,15 @@ export async function getLearningResumeTarget(
       sortByLatestActivity(
         allSessions.filter(
           (candidate) =>
-            candidate.status === 'active' || candidate.status === 'paused'
-        )
+            candidate.status === 'active' || candidate.status === 'paused',
+        ),
       )[0] ??
       sortByLatestActivity(
         allSessions.filter(
           (candidate) =>
             candidate.status === 'completed' ||
-            candidate.status === 'auto_closed'
-        )
+            candidate.status === 'auto_closed',
+        ),
       )[0];
     if (!session) return null;
 
@@ -863,8 +870,8 @@ export async function getLearningResumeTarget(
         session.status === 'active'
           ? 'active_session'
           : session.status === 'paused'
-          ? 'paused_session'
-          : 'subject_freeform',
+            ? 'paused_session'
+            : 'subject_freeform',
       lastActivityAt: session.lastActivityAt.toISOString(),
       reason:
         session.status === 'active' || session.status === 'paused'
@@ -876,7 +883,7 @@ export async function getLearningResumeTarget(
   const topics = await db.query.curriculumTopics.findMany({
     where: and(
       inArray(curriculumTopics.curriculumId, curriculumIds),
-      eq(curriculumTopics.skipped, false)
+      eq(curriculumTopics.skipped, false),
     ),
     orderBy: asc(curriculumTopics.sortOrder),
   });
@@ -891,7 +898,7 @@ export async function getLearningResumeTarget(
         if (scope.bookId && topic.bookId !== scope.bookId) return false;
         return true;
       })
-      .map((topic) => topic.id)
+      .map((topic) => topic.id),
   );
 
   if ((scope.topicId || scope.bookId) && scopedTopicIds.size === 0) {
@@ -908,8 +915,8 @@ export async function getLearningResumeTarget(
 
   const resumable = sortByLatestActivity(
     scopedSessions.filter(
-      (session) => session.status === 'active' || session.status === 'paused'
-    )
+      (session) => session.status === 'active' || session.status === 'paused',
+    ),
   )[0];
   if (resumable) {
     const subject = subjectById.get(resumable.subjectId);
@@ -936,8 +943,8 @@ export async function getLearningResumeTarget(
   const recentCompleted = sortByLatestActivity(
     scopedSessions.filter(
       (session) =>
-        session.status === 'completed' || session.status === 'auto_closed'
-    )
+        session.status === 'completed' || session.status === 'auto_closed',
+    ),
   )[0];
   if (recentCompleted) {
     const subject = subjectById.get(recentCompleted.subjectId);
@@ -962,26 +969,26 @@ export async function getLearningResumeTarget(
 
   const latestCurriculumIds = [...new Set(latestCurriculumBySubject.values())];
   const latestTopics = topics.filter((topic) =>
-    latestCurriculumIds.includes(topic.curriculumId)
+    latestCurriculumIds.includes(topic.curriculumId),
   );
   const latestTopicIds = latestTopics.map((topic) => topic.id);
   if (latestTopicIds.length === 0) return null;
 
   const [cards, topicAssessments] = await Promise.all([
     repo.retentionCards.findMany(
-      inArray(retentionCards.topicId, latestTopicIds)
+      inArray(retentionCards.topicId, latestTopicIds),
     ),
     repo.assessments.findMany(inArray(assessments.topicId, latestTopicIds)),
   ]);
   const verifiedTopicIds = new Set(
     cards
       .filter((card) => card.xpStatus === 'verified')
-      .map((card) => card.topicId)
+      .map((card) => card.topicId),
   );
   const passedTopicIds = new Set(
     topicAssessments
       .filter((assessment) => assessment.status === 'passed')
-      .map((assessment) => assessment.topicId)
+      .map((assessment) => assessment.topicId),
   );
 
   const latestTopicsByCurriculum = new Map<string, typeof latestTopics>();
@@ -998,7 +1005,7 @@ export async function getLearningResumeTarget(
     if (!curriculumId) continue;
     const nextTopic = (latestTopicsByCurriculum.get(curriculumId) ?? []).find(
       (topic) =>
-        !passedTopicIds.has(topic.id) && !verifiedTopicIds.has(topic.id)
+        !passedTopicIds.has(topic.id) && !verifiedTopicIds.has(topic.id),
     );
     if (!nextTopic) continue;
     return {
@@ -1019,7 +1026,7 @@ export async function getLearningResumeTarget(
 
 export async function getContinueSuggestion(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<{
   subjectId: string;
   subjectName: string;
@@ -1029,7 +1036,7 @@ export async function getContinueSuggestion(
 } | null> {
   const repo = createScopedRepository(db, profileId);
   const activeSubjects = (await repo.subjects.findMany()).filter(
-    (subject) => subject.status === 'active'
+    (subject) => subject.status === 'active',
   );
   if (activeSubjects.length === 0) return null;
 
@@ -1041,8 +1048,8 @@ export async function getContinueSuggestion(
   const allSessions = await repo.sessions.findMany(
     and(
       inArray(learningSessions.subjectId, subjectIds),
-      gte(learningSessions.exchangeCount, 1)
-    )
+      gte(learningSessions.exchangeCount, 1),
+    ),
   );
 
   // Sort subjects by most recent session activity (not insertion order)
@@ -1090,7 +1097,7 @@ export async function getContinueSuggestion(
   const topics = await db.query.curriculumTopics.findMany({
     where: and(
       inArray(curriculumTopics.curriculumId, curriculumIds),
-      eq(curriculumTopics.skipped, false)
+      eq(curriculumTopics.skipped, false),
     ),
     orderBy: asc(curriculumTopics.sortOrder),
   });
@@ -1105,12 +1112,12 @@ export async function getContinueSuggestion(
   const verifiedTopicIds = new Set(
     cards
       .filter((card) => card.xpStatus === 'verified')
-      .map((card) => card.topicId)
+      .map((card) => card.topicId),
   );
   const passedTopicIds = new Set(
     topicAssessments
       .filter((assessment) => assessment.status === 'passed')
-      .map((assessment) => assessment.topicId)
+      .map((assessment) => assessment.topicId),
   );
 
   const topicsByCurriculum = new Map<string, typeof topics>();
@@ -1126,7 +1133,7 @@ export async function getContinueSuggestion(
 
     const nextTopic = (topicsByCurriculum.get(curriculumId) ?? []).find(
       (topic) =>
-        !passedTopicIds.has(topic.id) && !verifiedTopicIds.has(topic.id)
+        !passedTopicIds.has(topic.id) && !verifiedTopicIds.has(topic.id),
     );
 
     if (nextTopic) {
@@ -1140,7 +1147,7 @@ export async function getContinueSuggestion(
       const resumable = (resumableBySubject.get(subject.id) ?? [])
         .filter((session) => session.topicId === nextTopic.id)
         .sort(
-          (a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime()
+          (a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime(),
         );
       const lastSession = resumable[0];
 

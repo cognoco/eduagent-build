@@ -26,8 +26,42 @@ export function subtractDays(date: Date, days: number): Date {
 export function sumTopicsExplored(metrics: ProgressMetrics): number {
   return metrics.subjects.reduce(
     (sum, subject) => sum + (subject.topicsExplored ?? 0),
-    0
+    0,
   );
+}
+
+export interface WeeklyProgressDeltas {
+  topicsMastered: number | null;
+  vocabularyTotal: number | null;
+  topicsExplored: number | null;
+}
+
+export function computeWeeklyDeltas(
+  previous: ProgressMetrics | null,
+  current: ProgressMetrics,
+): WeeklyProgressDeltas {
+  if (!previous) {
+    return {
+      topicsMastered: null,
+      vocabularyTotal: null,
+      topicsExplored: null,
+    };
+  }
+
+  return {
+    topicsMastered: Math.max(
+      0,
+      current.topicsMastered - previous.topicsMastered,
+    ),
+    vocabularyTotal: Math.max(
+      0,
+      current.vocabularyTotal - previous.vocabularyTotal,
+    ),
+    topicsExplored: Math.max(
+      0,
+      sumTopicsExplored(current) - sumTopicsExplored(previous),
+    ),
+  };
 }
 
 /**
@@ -52,7 +86,7 @@ export function sumTopicsExplored(metrics: ProgressMetrics): number {
  */
 export async function getActiveSubjectsByRecency(
   db: Database,
-  childProfileId: string
+  childProfileId: string,
 ): Promise<
   Array<{
     subjectId: string;
@@ -64,7 +98,7 @@ export async function getActiveSubjectsByRecency(
 
   // Load all active subjects for this profile (scoped, no profileId escape possible).
   const activeSubjects = await repo.subjects.findMany(
-    eq(subjects.status, 'active')
+    eq(subjects.status, 'active'),
   );
   if (activeSubjects.length === 0) return [];
 
@@ -82,8 +116,8 @@ export async function getActiveSubjectsByRecency(
       and(
         eq(learningSessions.profileId, childProfileId),
         inArray(learningSessions.subjectId, subjectIds),
-        gte(learningSessions.exchangeCount, 1)
-      )
+        gte(learningSessions.exchangeCount, 1),
+      ),
     )
     .orderBy(desc(learningSessions.lastActivityAt));
 

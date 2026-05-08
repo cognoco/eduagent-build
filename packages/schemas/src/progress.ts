@@ -242,6 +242,7 @@ export const topicProgressSchema = z.object({
     'stable',
   ]),
   retentionStatus: z.enum(['strong', 'fading', 'weak', 'forgotten']).nullable(),
+  daysSinceLastReview: z.number().int().min(0).nullable(),
   struggleStatus: z.enum(['normal', 'needs_deepening', 'blocked']),
   masteryScore: z.number().min(0).max(1).nullable(),
   summaryExcerpt: z.string().nullable(),
@@ -313,7 +314,7 @@ export const dashboardChildSchema = z.object({
       name: z.string(),
       retentionStatus: z.enum(['strong', 'fading', 'weak', 'forgotten']),
       rawInput: z.string().nullable().optional(),
-    })
+    }),
   ),
   guidedVsImmediateRatio: z.number().min(0).max(1),
   retentionTrend: z.enum(['improving', 'declining', 'stable']),

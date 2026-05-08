@@ -28,7 +28,7 @@ const curriculumId = '660e8400-e29b-41d4-a716-446655440000';
 const topicId = '770e8400-e29b-41d4-a716-446655440000';
 
 function mockSubjectRow(
-  overrides?: Partial<{ id: string; name: string; status: string }>
+  overrides?: Partial<{ id: string; name: string; status: string }>,
 ) {
   return {
     id: overrides?.id ?? subjectId,
@@ -47,7 +47,7 @@ function mockTopicRow(
     sortOrder: number;
     curriculumId: string;
     bookId: string | null;
-  }>
+  }>,
 ) {
   return {
     id: overrides?.id ?? topicId,
@@ -70,7 +70,7 @@ function mockRetentionCard(
     xpStatus: string;
     nextReviewAt: Date | null;
     failureCount: number;
-  }>
+  }>,
 ) {
   return {
     id: 'card-1',
@@ -95,7 +95,7 @@ function mockAssessmentRow(
     topicId: string;
     status: string;
     masteryScore: number | null;
-  }>
+  }>,
 ) {
   return {
     id: 'assessment-1',
@@ -121,7 +121,7 @@ function mockSessionRow(
     status: 'active' | 'paused' | 'completed' | 'auto_closed';
     exchangeCount: number;
     lastActivityAt: Date;
-  }>
+  }>,
 ) {
   return {
     id: overrides?.id ?? 'session-1',
@@ -465,6 +465,7 @@ describe('getTopicProgress', () => {
     expect(result!.masteryScore).toBe(0.85);
     expect(result!.xpStatus).toBe('pending');
     expect(result!.totalSessions).toBe(1);
+    expect(result!.daysSinceLastReview).toEqual(expect.any(Number));
   });
 
   it('marks struggle status as needs_deepening when active', async () => {

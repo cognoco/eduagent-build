@@ -168,6 +168,7 @@ export const retentionCardSchema = z.object({
   repetitions: z.number().int(),
   nextReviewAt: z.string().datetime().nullable(),
   lastReviewedAt: z.string().datetime().nullable(),
+  daysSinceLastReview: z.number().int().min(0).nullable(),
   xpStatus: z.enum(['pending', 'verified', 'decayed']),
   failureCount: z.number().int(),
   evaluateDifficultyRung: z.number().int().min(1).max(4).nullable().optional(),
@@ -189,7 +190,7 @@ export const recallTestSubmitSchema = z
     {
       message: 'Answer is required',
       path: ['answer'],
-    }
+    },
   );
 export type RecallTestSubmitInput = z.infer<typeof recallTestSubmitSchema>;
 
@@ -329,7 +330,7 @@ export const libraryRetentionResponseSchema = z.object({
       subjectId: z.string().uuid(),
       topics: z.array(retentionCardWithMetaSchema),
       reviewDueCount: z.number().int(),
-    })
+    }),
   ),
 });
 export type LibraryRetentionResponse = z.infer<
