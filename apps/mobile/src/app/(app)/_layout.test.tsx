@@ -18,7 +18,7 @@ import { createRoutedMockFetch } from '../../test-utils/mock-api-routes';
 const mockFetch = createRoutedMockFetch();
 
 jest.mock('../../lib/api-client', () =>
-  require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch)
+  require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
 );
 
 const mockUseProfile = jest.fn();
@@ -31,7 +31,7 @@ const mockTabs = Object.assign(
   },
   {
     Screen: () => null,
-  }
+  },
 );
 
 jest.mock('expo-router', () => ({
@@ -210,8 +210,8 @@ describe('AppLayout', () => {
             parentEmail: null,
             consentType: null,
           }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
     );
     mockFetch.setRoute(
       '/consent/request',
@@ -219,7 +219,7 @@ describe('AppLayout', () => {
         new Response(JSON.stringify({ sent: true }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
-        })
+        }),
     );
     mockFetch.setRoute(
       '/subjects',
@@ -227,7 +227,7 @@ describe('AppLayout', () => {
         new Response(JSON.stringify({ subjects: [] }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
-        })
+        }),
     );
     mockFetch.setRoute(
       '/dashboard',
@@ -235,7 +235,7 @@ describe('AppLayout', () => {
         new Response(JSON.stringify({ children: [], demoMode: false }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
-        })
+        }),
     );
     mockFetch.setRoute(
       '/dashboard/demo',
@@ -243,7 +243,7 @@ describe('AppLayout', () => {
         new Response(JSON.stringify({ children: [], demoMode: true }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
-        })
+        }),
     );
     mockFetch.setRoute(
       '/settings/push-token',
@@ -251,7 +251,7 @@ describe('AppLayout', () => {
         new Response(JSON.stringify({ registered: true }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
-        })
+        }),
     );
   });
 
@@ -276,7 +276,7 @@ describe('AppLayout', () => {
       const initialAuthLogs = logSpy.mock.calls.filter(
         (args) =>
           typeof args[0] === 'string' &&
-          args[0].includes('[AUTH-DEBUG] (app) layout')
+          args[0].includes('[AUTH-DEBUG] (app) layout'),
       ).length;
       // Re-render with the same auth state — the debug log must not fire again.
       rerender(<AppLayout />);
@@ -284,7 +284,7 @@ describe('AppLayout', () => {
       const afterRerendersAuthLogs = logSpy.mock.calls.filter(
         (args) =>
           typeof args[0] === 'string' &&
-          args[0].includes('[AUTH-DEBUG] (app) layout')
+          args[0].includes('[AUTH-DEBUG] (app) layout'),
       ).length;
       expect(initialAuthLogs).toBe(1);
       expect(afterRerendersAuthLogs).toBe(initialAuthLogs);
@@ -475,8 +475,8 @@ describe('AppLayout', () => {
             parentEmail: null,
             consentType: null,
           }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
     );
     // No subjects yet — pre-fix this triggered the celebration.
     // Default /subjects route returns [] — no override needed.
@@ -518,8 +518,8 @@ describe('AppLayout', () => {
             parentEmail: null,
             consentType: null,
           }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
     );
     // User already has a subject — post-approval screen should NOT appear
     mockFetch.setRoute(
@@ -529,8 +529,8 @@ describe('AppLayout', () => {
           JSON.stringify({
             subjects: [{ id: 's1', name: 'Spanish', isActive: true }],
           }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
     );
 
     renderLayout();
@@ -628,8 +628,8 @@ describe('AppLayout', () => {
             parentEmail: 'parent@example.com',
             consentType: 'GDPR',
           }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
     );
 
     renderLayout();
@@ -638,34 +638,17 @@ describe('AppLayout', () => {
     expect(screen.getByText('Checking automatically…')).toBeTruthy();
   });
 
-  it('shows permission setup gate when permissions are not granted and flag is not set', async () => {
+  // Permission setup gate is JIT-disabled — permissions are requested at
+  // feature entry (mic on first voice tap, camera on homework screen, etc.),
+  // never via an upfront screen at app launch. The gate component still
+  // exists in code but is never rendered on the (app) layout path.
+  it('never shows the permission setup gate even when permissions are denied', async () => {
     const ExpoNotifications = require('expo-notifications');
     (ExpoNotifications.getPermissionsAsync as jest.Mock).mockResolvedValue({
       status: 'undetermined',
     });
     mockSpeechGetPermissions.mockResolvedValue({
       granted: false,
-      canAskAgain: true,
-    });
-
-    const SecureStoreMock = require('../../lib/secure-storage');
-    (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
-
-    renderLayout();
-
-    await waitFor(() => {
-      screen.getByTestId('permission-setup-gate');
-    });
-    expect(screen.queryByTestId('tabs')).toBeNull();
-  });
-
-  it('skips permission gate when both permissions are already granted', async () => {
-    const ExpoNotifications = require('expo-notifications');
-    (ExpoNotifications.getPermissionsAsync as jest.Mock).mockResolvedValue({
-      status: 'granted',
-    });
-    mockSpeechGetPermissions.mockResolvedValue({
-      granted: true,
       canAskAgain: true,
     });
 
@@ -678,95 +661,6 @@ describe('AppLayout', () => {
       screen.getByTestId('tabs');
     });
     expect(screen.queryByTestId('permission-setup-gate')).toBeNull();
-  });
-
-  it('skips permission gate when SecureStore flag is already set', async () => {
-    const ExpoNotifications = require('expo-notifications');
-    (ExpoNotifications.getPermissionsAsync as jest.Mock).mockResolvedValue({
-      status: 'undetermined',
-    });
-    mockSpeechGetPermissions.mockResolvedValue({
-      granted: false,
-      canAskAgain: true,
-    });
-
-    const SecureStoreMock = require('../../lib/secure-storage');
-    (SecureStoreMock.getItemAsync as jest.Mock).mockImplementation(
-      (key: string) => {
-        if (key.startsWith('permissionSetupSeen_'))
-          return Promise.resolve('true');
-        return Promise.resolve(null);
-      }
-    );
-
-    renderLayout();
-
-    await waitFor(() => {
-      screen.getByTestId('tabs');
-    });
-    expect(screen.queryByTestId('permission-setup-gate')).toBeNull();
-  });
-
-  it('dismisses permission gate when Continue is tapped', async () => {
-    const ExpoNotifications = require('expo-notifications');
-    (ExpoNotifications.getPermissionsAsync as jest.Mock).mockResolvedValue({
-      status: 'undetermined',
-    });
-    mockSpeechGetPermissions.mockResolvedValue({
-      granted: false,
-      canAskAgain: true,
-    });
-
-    const SecureStoreMock = require('../../lib/secure-storage');
-    (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
-    (SecureStoreMock.setItemAsync as jest.Mock).mockResolvedValue(undefined);
-
-    renderLayout();
-
-    await waitFor(() => {
-      screen.getByTestId('permission-setup-gate');
-    });
-
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('permission-continue'));
-    });
-
-    await waitFor(() => {
-      screen.getByTestId('tabs');
-    });
-    expect(SecureStoreMock.setItemAsync).toHaveBeenCalledWith(
-      'permissionSetupSeen_p1',
-      'true'
-    );
-  });
-
-  it('dismisses permission gate when Skip is tapped', async () => {
-    const ExpoNotifications = require('expo-notifications');
-    (ExpoNotifications.getPermissionsAsync as jest.Mock).mockResolvedValue({
-      status: 'undetermined',
-    });
-    mockSpeechGetPermissions.mockResolvedValue({
-      granted: false,
-      canAskAgain: true,
-    });
-
-    const SecureStoreMock = require('../../lib/secure-storage');
-    (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
-    (SecureStoreMock.setItemAsync as jest.Mock).mockResolvedValue(undefined);
-
-    renderLayout();
-
-    await waitFor(() => {
-      screen.getByTestId('permission-setup-gate');
-    });
-
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('permission-skip'));
-    });
-
-    await waitFor(() => {
-      screen.getByTestId('tabs');
-    });
   });
 });
 
@@ -821,7 +715,7 @@ describe('[BUG-776] buildSwitchProfileConfirmation', () => {
         activeProfile: null,
         profiles: [{ id: 'p1', displayName: 'Alex' }],
         t: testT,
-      })
+      }),
     ).toBeNull();
   });
 
@@ -831,7 +725,7 @@ describe('[BUG-776] buildSwitchProfileConfirmation', () => {
         activeProfile: { id: 'p1' },
         profiles: [{ id: 'p1', displayName: 'Alex' }],
         t: testT,
-      })
+      }),
     ).toBeNull();
   });
 
@@ -876,7 +770,7 @@ describe('[BUG-776] buildSwitchProfileConfirmation', () => {
     expect(result.message).toBe(
       'tabs.switchProfile.messageSingle Alex\n\n' +
         'tabs.switchProfile.otherProfiles Sam, Jordan\n\n' +
-        'tabs.switchProfile.cancelHint'
+        'tabs.switchProfile.cancelHint',
     );
   });
 });

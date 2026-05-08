@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { AppState, Platform } from 'react-native';
+import { AppState } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as SecureStore from '../lib/secure-storage';
 import { sanitizeSecureStoreKey } from '../lib/secure-storage';
@@ -15,18 +15,33 @@ export type PermState = {
 };
 
 /**
- * One-time permission setup gate. Prompts for mic + notifications before
- * the user reaches the tab navigator. Auto-skips if both are already granted.
+ * Permission state hook. Reads OS permission status for mic + notifications
+ * so downstream consumers (push token registration, JIT request callers)
+ * can react to changes — but never gates the user behind an upfront screen.
+ *
+ * Permissions are requested just-in-time at feature entry:
+ *   - Microphone — requested by `use-speech-recognition.ts` when the user
+ *     first taps the voice button on a session screen.
+ *   - Camera — requested by `expo-camera` `useCameraPermissions()` when
+ *     the user opens the homework camera screen.
+ *   - Media library — requested by `expo-image-picker` when the user picks
+ *     an image from the gallery.
+ *   - Notifications — requested after the user completes their first
+ *     session (the post-value moment, not at cold launch).
+ *
+ * `shouldShow` always returns `false`. The legacy `PermissionSetupGate`
+ * component is kept temporarily for blocked-permission recovery flows.
+ *
  * Returns [shouldShow, dismiss, permState, requestMic, requestNotif].
  */
 export function usePermissionSetup(
-  profileId: string | undefined
+  profileId: string | undefined,
 ): [
   shouldShow: boolean,
   dismiss: () => void,
   permState: PermState,
   requestMic: () => Promise<void>,
-  requestNotif: () => Promise<void>
+  requestNotif: () => Promise<void>,
 ] {
   const [shouldShow, setShouldShow] = useState(false);
   const [checked, setChecked] = useState(false);
@@ -105,32 +120,14 @@ export function usePermissionSetup(
     // [I-4] Sanitize profileId before interpolating into a SecureStore key.
     const key = sanitizeSecureStoreKey(`permissionSetupSeen_${profileId}`);
     void (async () => {
-      try {
-        const value = await SecureStore.getItemAsync(key);
-        if (cancelled) return;
-        if (value === 'true') {
-          setShouldShow(false);
-          setChecked(true);
-          return;
-        }
-      } catch {
-        /* SecureStore failure — show gate (safe default) */
-      }
-
-      const { micStatus, notifStatus, micAvailable } = await checkPermissions();
+      // Permissions are JIT — never display the upfront gate. We still
+      // probe OS state so push token registration and inline asks have
+      // accurate `permState` to read.
+      await checkPermissions();
       if (cancelled) return;
 
-      const hasMicRow = micAvailable && micStatus !== 'granted';
-      const hasNotifRow = Platform.OS !== 'web' && notifStatus !== 'granted';
-
-      if (!hasMicRow && !hasNotifRow) {
-        setShouldShow(false);
-        void SecureStore.setItemAsync(key, 'true').catch(() => undefined);
-        setChecked(true);
-        return;
-      }
-
-      setShouldShow(true);
+      setShouldShow(false);
+      void SecureStore.setItemAsync(key, 'true').catch(() => undefined);
       setChecked(true);
     })();
 
