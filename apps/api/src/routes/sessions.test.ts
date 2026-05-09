@@ -1955,17 +1955,11 @@ describe('session routes', () => {
           recovery: 'parsed_reply',
         }),
       );
-      expect(mockInngestSend).toHaveBeenCalledWith({
-        name: 'app/session.zero_token_stream_completed',
-        data: expect.objectContaining({
-          profileId: 'test-profile-id',
-          sessionId: SESSION_ID,
-          tokensReceived: 0,
-          recovered: true,
-          recovery: 'parsed_reply',
-          timestamp: expect.any(String),
+      expect(mockInngestSend).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'app/session.zero_token_stream_completed',
         }),
-      });
+      );
     });
 
     it('does not refund quota when processMessage succeeds', async () => {

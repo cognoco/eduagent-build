@@ -354,6 +354,16 @@ export function streamSSEViaXHR(
     }
     const code = parsed?.error?.code ?? parsed?.code;
     const apiMessage = parsed?.error?.message ?? parsed?.message;
+    const fallbackQuotaDetails: QuotaExceededDetails = {
+      tier: 'free',
+      reason: 'monthly',
+      monthlyLimit: 0,
+      usedThisMonth: 0,
+      dailyLimit: null,
+      usedToday: 0,
+      topUpCreditsRemaining: 0,
+      upgradeOptions: [],
+    };
 
     if (status === 400) {
       return new BadRequestError(apiMessage ?? (responseText || 'Bad request'));
@@ -369,12 +379,10 @@ export function streamSSEViaXHR(
       return err;
     }
     if (status === 402) {
-      if (code === 'QUOTA_EXCEEDED' && parsed?.details) {
-        return new QuotaExceededError(
-          apiMessage ?? 'Quota exceeded',
-          parsed.details,
-        );
-      }
+      return new QuotaExceededError(
+        apiMessage ?? 'Quota exceeded',
+        parsed?.details ?? fallbackQuotaDetails,
+      );
     }
     if (status === 403) {
       return new ForbiddenError(apiMessage ?? undefined, code ?? undefined);

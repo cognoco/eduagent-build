@@ -494,6 +494,30 @@ describe('streamSSEViaXHR', () => {
     expect((caught as { status?: number }).status).toBe(401);
   });
 
+  it('[BUG-955] throws QuotaExceededError for malformed 402 responses', async () => {
+    const xhr = installFakeXhr();
+    const { events } = streamSSEViaXHR('https://example.test/stream', {
+      method: 'POST',
+    });
+
+    xhr._emitError(402, 'Payment required');
+
+    let caught: unknown = null;
+    try {
+      for await (const event of events) {
+        void event;
+      }
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as Error).name).toBe('QuotaExceededError');
+    expect(
+      (caught as { details?: { upgradeOptions?: unknown[] } }).details,
+    ).toEqual(expect.objectContaining({ upgradeOptions: [] }));
+  });
+
   it('[BUG-955] throws NetworkError for onerror (status 0 / offline)', async () => {
     const xhr = installFakeXhr();
     const { events } = streamSSEViaXHR('https://example.test/stream', {

@@ -622,6 +622,37 @@ describe('SessionScreen homework flow', () => {
     );
   });
 
+  it('starts a fresh session route from the session-expired primary action', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: 'subject-1',
+      subjectName: 'Math',
+      topicId: 'topic-1',
+      topicName: 'Linear equations',
+      sessionId: 'expired-session',
+    });
+    const { NotFoundError } = require('../../../lib/api-client');
+    mockUseSessionTranscript.mockReturnValue({
+      data: null,
+      error: new NotFoundError('Session not found'),
+    } as never);
+
+    render(<SessionScreen />, { wrapper: createWrapper() });
+
+    fireEvent.press(screen.getByTestId('session-expired-new-session'));
+
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/(app)/session',
+      params: {
+        mode: 'learning',
+        subjectId: 'subject-1',
+        subjectName: 'Math',
+        topicId: 'topic-1',
+        topicName: 'Linear equations',
+      },
+    });
+  });
+
   it('disables the learning mode header while the mode is loading', async () => {
     jest.useRealTimers();
     mockLearningMode = undefined;

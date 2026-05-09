@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type {
   InputMode,
   PendingCelebration,
@@ -166,6 +166,14 @@ export interface UseSessionStreamingOptions {
 }
 
 export function useSessionStreaming(opts: UseSessionStreamingOptions) {
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   const {
     activeSessionId,
     setActiveSessionId,
@@ -1051,18 +1059,23 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       const startedAt = Date.now();
 
       while (Date.now() - startedAt < 3000) {
+        if (!mountedRef.current) return [];
         const res = await apiClient.celebrations.pending.$get();
+        if (!mountedRef.current) return [];
         if (res.ok) {
           const data = await res.json();
+          if (!mountedRef.current) return [];
           if (data.pendingCelebrations.length > 0) {
             await apiClient.celebrations.seen.$post({
               json: { viewer: 'child' },
             });
+            if (!mountedRef.current) return [];
             return data.pendingCelebrations;
           }
         }
 
         await new Promise((resolve) => setTimeout(resolve, 500));
+        if (!mountedRef.current) return [];
       }
 
       return [];

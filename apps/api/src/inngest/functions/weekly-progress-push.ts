@@ -417,7 +417,7 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
           },
         });
         const shouldSendPush =
-          prefs == null || (prefs.pushEnabled && prefs.weeklyProgressPush);
+          prefs != null && prefs.pushEnabled && prefs.weeklyProgressPush;
         const shouldSendEmail = prefs?.weeklyProgressEmail ?? true;
 
         const pushResult = shouldSendPush
@@ -458,10 +458,8 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
             });
             emailSent = emailResult.sent;
           } else {
-            captureException(
-              new Error('Weekly digest email skipped: parent has no email'),
-              { extra: { parentId, context: 'weekly-progress-push-email' } },
-            );
+            // Expected: OAuth-only accounts or Clerk not exposing email field.
+            // emailSent flag in the return value already provides observability.
           }
         }
 

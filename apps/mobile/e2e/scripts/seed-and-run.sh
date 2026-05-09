@@ -426,6 +426,26 @@ while [ $BUNDLE_ELAPSED -lt $BUNDLE_TIMEOUT ]; do
     # Still on dev-client launcher — bundle not loaded yet
     if echo "$DUMP" | grep -q "DEVELOPMENT"; then
       echo "[seed-and-run] Still on launcher (${BUNDLE_ELAPSED}s) ..."
+      if [ $((BUNDLE_ELAPSED % 9)) -eq 0 ]; then
+        RETRY_METRO_BOUNDS=""
+        if [ -n "${METRO_REQUESTED_PORT:-}" ]; then
+          RETRY_METRO_BOUNDS=$(echo "$DUMP" | first_bounds_for_text "^http://10\.0\.2\.2:${METRO_REQUESTED_PORT}$" || echo "")
+        fi
+        if [ -z "$RETRY_METRO_BOUNDS" ]; then
+          RETRY_METRO_BOUNDS=$(echo "$DUMP" | first_bounds_for_text '^http://10\.0\.2\.2:8082$' || echo "")
+        fi
+        if [ -n "$RETRY_METRO_BOUNDS" ]; then
+          RX1=$(bounds_coord "$RETRY_METRO_BOUNDS" 1)
+          RY1=$(bounds_coord "$RETRY_METRO_BOUNDS" 2)
+          RX2=$(bounds_coord "$RETRY_METRO_BOUNDS" 3)
+          RY2=$(bounds_coord "$RETRY_METRO_BOUNDS" 4)
+          RX1=${RX1:-0}; RY1=${RY1:-0}; RX2=${RX2:-0}; RY2=${RY2:-0}
+          RTX=$(( RX2 + 300 ))
+          RTY=$(( (RY1 + RY2) / 2 ))
+          echo "[seed-and-run] Retapping Metro at ($RTX, $RTY) ..."
+          adb_tap $RTX $RTY
+        fi
+      fi
       continue
     fi
 

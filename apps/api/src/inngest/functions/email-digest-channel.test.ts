@@ -75,6 +75,7 @@ const mockFormatMonthlyProgressEmail = jest.fn().mockReturnValue({
 });
 
 jest.mock(
+  // gc1-allow: handler control-flow test; services tested in own suites
   '../../services/notifications' /* gc1-allow: unit test boundary */,
   () => ({
     sendPushNotification: (...args: unknown[]) =>
@@ -89,6 +90,7 @@ jest.mock(
 
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
 jest.mock(
+  // gc1-allow: handler control-flow test; services tested in own suites
   '../../services/settings' /* gc1-allow: unit test boundary */,
   () => ({
     getRecentNotificationCount: (...args: unknown[]) =>
@@ -96,11 +98,15 @@ jest.mock(
   }),
 );
 
+const mockGetSnapshotsInRange = jest.fn();
 const mockGetLatestSnapshot = jest.fn();
 const mockGetLatestSnapshotOnOrBefore = jest.fn().mockResolvedValue(null);
 jest.mock(
+  // gc1-allow: handler control-flow test; services tested in own suites
   '../../services/snapshot-aggregation' /* gc1-allow: unit test boundary */,
   () => ({
+    getSnapshotsInRange: (...args: unknown[]) =>
+      mockGetSnapshotsInRange(...args),
     getLatestSnapshot: (...args: unknown[]) => mockGetLatestSnapshot(...args),
     getLatestSnapshotOnOrBefore: (...args: unknown[]) =>
       mockGetLatestSnapshotOnOrBefore(...args),
@@ -111,6 +117,7 @@ const mockGenerateWeeklyReportData = jest
   .fn()
   .mockReturnValue({ reportData: {} });
 jest.mock(
+  // gc1-allow: handler control-flow test; services tested in own suites
   '../../services/weekly-report' /* gc1-allow: unit test boundary */,
   () => ({
     generateWeeklyReportData: (...args: unknown[]) =>
@@ -125,7 +132,6 @@ jest.mock(
 // Mutable db state per test — reset in beforeEach
 let dbState: {
   consentStatus: string | null; // null = no row (missing = CONSENTED presumed)
-  childConsentStatuses: Record<string, string | null>; // childId → status | null
   weeklyProgressEmail: boolean;
   monthlyProgressEmail: boolean;
   parentEmail: string | null;
@@ -136,23 +142,12 @@ let dbState: {
 function resetDbState() {
   dbState = {
     consentStatus: 'CONSENTED',
-    childConsentStatuses: {},
     weeklyProgressEmail: true,
     monthlyProgressEmail: true,
     parentEmail: 'parent@example.com',
     struggles: [],
     childDisplayName: 'Emma',
   };
-}
-
-function _makeConsentRow(childId: string) {
-  // Per-child override takes priority; fall back to global dbState.consentStatus
-  const status =
-    childId in dbState.childConsentStatuses
-      ? dbState.childConsentStatuses[childId]
-      : dbState.consentStatus;
-  if (status === null) return null; // missing row = no restriction
-  return { status, profileId: childId, consentType: 'GDPR' };
 }
 
 // Build the mock db object used by all tests
@@ -174,13 +169,11 @@ function buildMockDb(
         findMany: jest.fn().mockResolvedValue(childLinks),
       },
       consentStates: {
-        findFirst: jest
-          .fn()
-          .mockImplementation(({ where: _where }: { where: unknown }) => {
-            // Extract childProfileId from the where clause args
-            // The actual test hooks via childConsentStatuses map
-            return Promise.resolve(null);
-          }),
+        findFirst: jest.fn().mockImplementation(() => {
+          // Default: no consent restriction. Tests that need specific consent
+          // behavior override findFirst directly on the returned db object.
+          return Promise.resolve(null);
+        }),
       },
       profiles: {
         findFirst: jest
@@ -389,8 +382,8 @@ describe('Email digest channel — weekly', () => {
     expect(mockSendEmail).not.toHaveBeenCalled();
   });
 
-  // Break test 3: Email skipped when parent has no accounts.email; Sentry called
-  it('(T3) skips email and calls captureException when parent has no email', async () => {
+  // Break test 3: Email skipped silently when parent has no accounts.email (OAuth-only, expected path)
+  it('(T3) skips email silently when parent has no email — no Sentry noise', async () => {
     const db = buildMockDb();
     db.query.consentStates.findFirst = jest.fn().mockResolvedValue({
       status: 'CONSENTED',
@@ -402,14 +395,13 @@ describe('Email digest channel — weekly', () => {
     await executeWeeklyGenerate(PARENT_ID, db);
 
     expect(mockSendEmail).not.toHaveBeenCalled();
-    expect(mockCaptureException).toHaveBeenCalledWith(
-      expect.objectContaining({ message: expect.stringContaining('no email') }),
-      expect.objectContaining({
-        extra: expect.objectContaining({
-          context: 'weekly-progress-push-email',
-        }),
-      }),
-    );
+    const noEmailCalls = mockCaptureException.mock.calls.filter((call) => {
+      const msg = (call[0] as Error)?.message ?? '';
+      return (
+        msg.includes('no email') || msg.includes('weekly-progress-push-email')
+      );
+    });
+    expect(noEmailCalls).toHaveLength(0);
   });
 
   it('completes an email-only weekly digest without calling push', async () => {
@@ -638,7 +630,6 @@ describe('Email digest channel — weekly', () => {
 // ---------------------------------------------------------------------------
 
 // Shared monthly mock services
-const mockGetSnapshotsInRange = jest.fn();
 const mockGenerateMonthlyReportData = jest.fn().mockReturnValue({
   childName: 'Emma',
   month: 'April 2026',
@@ -660,17 +651,7 @@ const mockGenerateReportHighlights = jest.fn().mockResolvedValue({
 });
 
 jest.mock(
-  '../../services/snapshot-aggregation' /* gc1-allow: unit test boundary */,
-  () => ({
-    getSnapshotsInRange: (...args: unknown[]) =>
-      mockGetSnapshotsInRange(...args),
-    getLatestSnapshot: (...args: unknown[]) => mockGetLatestSnapshot(...args),
-    getLatestSnapshotOnOrBefore: (...args: unknown[]) =>
-      mockGetLatestSnapshotOnOrBefore(...args),
-  }),
-);
-
-jest.mock(
+  // gc1-allow: handler control-flow test; services tested in own suites
   '../../services/monthly-report' /* gc1-allow: unit test boundary */,
   () => ({
     generateMonthlyReportData: (...args: unknown[]) =>
@@ -771,21 +752,21 @@ describe('Email digest channel — monthly', () => {
     expect(mockSendEmail).not.toHaveBeenCalled();
   });
 
-  // Break test 3 (monthly): Email skipped when no parent email, Sentry called
-  it('(T3-monthly) skips email and calls captureException when parent has no email', async () => {
+  // Break test 3 (monthly): Email skipped silently when parent has no email (OAuth-only, expected path)
+  it('(T3-monthly) skips email silently when parent has no email — no Sentry noise', async () => {
     const db = buildMonthlyMockDb(undefined, null);
 
     await executeMonthlyGenerate('parent-001', 'child-001', db);
 
     expect(mockSendEmail).not.toHaveBeenCalled();
-    expect(mockCaptureException).toHaveBeenCalledWith(
-      expect.objectContaining({ message: expect.stringContaining('no email') }),
-      expect.objectContaining({
-        extra: expect.objectContaining({
-          context: 'monthly-report-generate-email',
-        }),
-      }),
-    );
+    const noEmailCalls = mockCaptureException.mock.calls.filter((call) => {
+      const msg = (call[0] as Error)?.message ?? '';
+      return (
+        msg.includes('no email') ||
+        msg.includes('monthly-report-generate-email')
+      );
+    });
+    expect(noEmailCalls).toHaveLength(0);
   });
 
   // Break test 4 (monthly): Struggle watch-line rendered with topic name

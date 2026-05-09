@@ -86,6 +86,7 @@ import {
 } from '../../../hooks/use-milestone-tracker';
 import {
   useApiClient,
+  NotFoundError,
   type QuotaExceededDetails,
 } from '../../../lib/api-client';
 import { useThemeColors } from '../../../lib/theme';
@@ -107,7 +108,6 @@ import * as FileSystem from 'expo-file-system';
 import { parseHomeworkProblems } from '../../../components/homework/problem-cards';
 import {
   getInputModeKey,
-  errorHasStatus,
   getConversationStage,
   type MessageFeedbackState,
   type PendingSubjectResolution,
@@ -445,6 +445,19 @@ function SessionScreenInner() {
 
     goBackOrReplace(router, homeBackHref);
   }, [homeBackHref, returnTo, router]);
+  const handleStartNewSession = useCallback(() => {
+    router.replace({
+      pathname: '/(app)/session',
+      params: {
+        ...(mode ? { mode } : {}),
+        ...(subjectId ? { subjectId } : {}),
+        ...(subjectName ? { subjectName } : {}),
+        ...(topicId ? { topicId } : {}),
+        ...(topicName ? { topicName } : {}),
+        ...(returnTo ? { returnTo } : {}),
+      },
+    } as never);
+  }, [mode, returnTo, router, subjectId, subjectName, topicId, topicName]);
   const normalizedOcrText = Array.isArray(ocrText) ? ocrText[0] : ocrText;
   const normalizedCaptureSource = Array.isArray(captureSource)
     ? captureSource[0]
@@ -810,7 +823,7 @@ function SessionScreenInner() {
   const { stream: streamMessage } = useStreamMessage(activeSessionId ?? '');
   const activeHomeworkProblem = homeworkProblemsState[currentProblemIndex];
   const sessionExpired =
-    !!routeSessionId && errorHasStatus(transcript.error, 404);
+    !!routeSessionId && transcript.error instanceof NotFoundError;
 
   const showConfirmation = useCallback((message: string) => {
     setConfirmationToast(message);
@@ -1495,7 +1508,7 @@ function SessionScreenInner() {
       return (
         <View className="flex-row gap-2 mt-2">
           <Pressable
-            onPress={handleHomeBack}
+            onPress={handleStartNewSession}
             className="bg-primary rounded-button px-4 py-2.5 items-center justify-center min-h-[40px]"
             accessibilityRole="button"
             accessibilityLabel="Start new session"

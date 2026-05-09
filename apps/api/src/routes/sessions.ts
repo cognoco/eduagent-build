@@ -17,6 +17,7 @@ import {
   filingRetryEventSchema,
   LlmStreamError,
   RateLimitedError,
+  SafetyFilterError,
   streamFallbackFrameSchema,
   UpstreamLlmError,
   getSubjectSessionsResponseSchema,
@@ -74,6 +75,13 @@ import {
 } from '../config';
 
 const logger = createLogger();
+
+function isSafetyFilterError(err: unknown): boolean {
+  return (
+    err instanceof SafetyFilterError ||
+    (err instanceof LlmStreamError && err.cause instanceof SafetyFilterError)
+  );
+}
 
 // [BUG-CONT-DEPTH-SWEEP] Follow-up: apply zValidator('param', sessionIdParamsSchema)
 // to ALL /:sessionId endpoints in this file (GET /sessions/:sessionId,
@@ -460,12 +468,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
               extra: { sessionId, phase: 'llm_stream' },
             });
 
-            const isSafetyFilterError =
-              streamErr instanceof Error &&
-              streamErr.message.includes('safety filters');
             if (
               !(streamErr instanceof RateLimitedError) &&
-              !isSafetyFilterError
+              !isSafetyFilterError(streamErr)
             ) {
               logger.warn(
                 chunkCount === 0
@@ -563,7 +568,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             const errorCode: string = (() => {
               if (streamErr instanceof RateLimitedError)
                 return 'quota_exhausted';
-              if (isSafetyFilterError) return 'safety_filter';
+              if (isSafetyFilterError(streamErr)) return 'safety_filter';
               return 'unknown_error';
             })();
             await sseStream.writeSSE({
@@ -609,27 +614,6 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                   recovery: zeroTokenRecovery,
                 },
               );
-              try {
-                await inngest.send({
-                  name: 'app/session.zero_token_stream_completed',
-                  data: {
-                    profileId,
-                    sessionId,
-                    timestamp: new Date().toISOString(),
-                    tokensReceived: 0,
-                    recovered: zeroTokenRecovered,
-                    recovery: zeroTokenRecovery,
-                  },
-                });
-              } catch (metricErr) {
-                captureException(metricErr, {
-                  profileId,
-                  extra: {
-                    sessionId,
-                    route: 'sessions.stream.zero_token_metric',
-                  },
-                });
-              }
             }
 
             // [BUG-941] If the LLM response was empty or unparseable, emit a
@@ -770,15 +754,13 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           );
         }
 
-        const isSafetyFilterError =
-          err instanceof Error && err.message.includes('safety filters');
         const isUpstreamLlmError =
           err instanceof UpstreamLlmError ||
           (err instanceof LlmStreamError &&
             err.cause instanceof UpstreamLlmError);
         if (
           !(err instanceof RateLimitedError) &&
-          !isSafetyFilterError &&
+          !isSafetyFilterError(err) &&
           !isUpstreamLlmError
         ) {
           logger.warn(

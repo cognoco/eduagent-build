@@ -408,12 +408,8 @@ export const monthlyReportGenerate = inngest.createFunction(
             idempotencyKey: `monthly-${parentId}-${reportResult.reportMonth}`,
           });
         } else {
-          captureException(
-            new Error('Monthly digest email skipped: parent has no email'),
-            {
-              extra: { parentId, context: 'monthly-report-generate-email' },
-            },
-          );
+          // Expected: OAuth-only accounts or Clerk not exposing email field.
+          // The return value's sent: false already provides observability.
         }
       }
 

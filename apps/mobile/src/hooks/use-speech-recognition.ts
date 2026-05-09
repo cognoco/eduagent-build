@@ -191,6 +191,7 @@ export function useSpeechRecognition(
         setTranscript('');
         setStatus('listening');
       }
+      if (!mountedRef.current) return;
       speechModule.start({
         lang: options?.lang ?? 'en-US',
         interimResults: true,
