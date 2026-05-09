@@ -14,7 +14,7 @@ import Animated, {
   Easing,
   type AnimatedProps,
 } from 'react-native-reanimated';
-import Svg, { Path, Rect, Line, Circle, Polygon } from 'react-native-svg';
+import Svg, { Path, Rect, Line, Circle, Ellipse } from 'react-native-svg';
 
 // ---------------------------------------------------------------------------
 // Fabric-safe animated component setup
@@ -27,7 +27,7 @@ type AnimatedPathComponent = ComponentType<
 let AnimatedPath: AnimatedPathComponent;
 try {
   AnimatedPath = Animated.createAnimatedComponent(
-    Path
+    Path,
   ) as AnimatedPathComponent;
 } catch {
   AnimatedPath = Path as unknown as AnimatedPathComponent;
@@ -45,45 +45,52 @@ interface MagicPenAnimationProps {
 }
 
 // ---------------------------------------------------------------------------
-// Pen SVG — viewBox 0 0 100 100, animated at a writing angle.
+// Pen SVG — viewBox 0 0 100 100, drawn horizontally then rotated.
 //
-// The pen is intentionally large within its viewBox so it stays legible at
-// the smallest render size (48px → penSize ≈ 30px).
+// The SVG draws a slim capsule pen oriented left-to-right with the writing
+// tip on the right; the parent Animated.View rotates it ~32–45° clockwise
+// so it appears tilted with the cap at upper-left and nib at lower-right.
 //
-// Anatomy: the SVG is drawn upright and rotated by the parent Animated.View.
+// Anatomy (left → right along the horizontal axis):
 //
-//   Barrel:  slim rounded-rect, pencil-like rather than marker-like
-//   Grip:    narrower band below barrel
-//   Nib:     fine triangle below grip
-//   Slit:    thin line down the center of the nib
+//   Cap:      dark rounded capsule (the back of the pen)
+//   Ferrule:  thin teal band linking cap to barrel
+//   Barrel:   translucent mint glass with an inner highlight strip
+//   Section:  solid teal collar between barrel and nib
+//   Nib:      short cone tapering to the writing tip
+//   Tip:      yellow ink-bead glow at the writing point
 // ---------------------------------------------------------------------------
 
 // All coordinates are in the 100×100 pen viewBox.
-// Barrel: intentionally slim so the idle ornament reads as a pen, not a marker.
-const BARREL_X = 40;
-const BARREL_Y = 6;
-const BARREL_W = 20;
-const BARREL_H = 62;
-const BARREL_RX = 5;
+// Pen lies horizontally with the writing tip on the right; rotated by the
+// parent Animated.View so it appears tilted with the cap upper-left and
+// nib lower-right.
+//
+// Layout along the horizontal axis:
+//   x=14–22   cap finial (rounded dark end)
+//   x=22–24   thread ring (dark band at cap base)
+//   x=24–70   translucent tinted barrel with inner ink cartridge
+//   x=70–72   black ring above the steel grip
+//   x=72–75   polished steel grip ring (with white shine on top edge)
+//   x=75–78   black grip trapezoid (narrows toward the nib)
+//   x=78–87.5 silver steel nib triangle (with slit and breather hole)
+//   x=88      writing-tip ink bead
 
-// Grip: a separate second-color band below the barrel.
-const GRIP_X = 35;
-const GRIP_Y = 67;
-const GRIP_W = 30;
-const GRIP_H = 14;
-const GRIP_RX = 4;
+// Cap finial: rounded LEFT end, square at the barrel side.
+const FINIAL_PATH = 'M 22 44 L 22 56 L 19 56 Q 14 56, 14 50 Q 14 44, 19 44 Z';
 
-// Nib: longer metal fountain-pen point, split into two tones.
-const NIB_PATH = 'M36 81 L64 81 L50 100 Z';
-const NIB_LEFT_PATH = 'M36 81 L50 81 L50 100 Z';
-const NIB_RIGHT_PATH = 'M50 81 L64 81 L50 100 Z';
-const NIB_SHOULDER_PATH = 'M39 81 L61 81 L58 86 L42 86 Z';
+// Black grip trapezoid: wider on the steel side, narrower at the nib base.
+const GRIP_PATH = 'M 75 44 L 75 56 L 78 53 L 78 47 Z';
 
-// Slit: center line on nib
-const SLIT_X1 = 50;
-const SLIT_Y1 = 79;
-const SLIT_X2 = 50;
-const SLIT_Y2 = 98;
+// Silver steel nib: triangle from grip base to a near-point at the tip.
+const NIB_PATH = 'M 78 47 L 78 53 L 87.5 50.5 L 87.5 49.5 Z';
+
+// Nib upper-half white shading.
+const NIB_SHADING_PATH = 'M 78 47 L 78 50 L 87.5 50 L 87.5 49.5 Z';
+
+// Writing-tip ink bead position (and pen reference point).
+const TIP_CX = 88;
+const TIP_CY = 50;
 
 // ---------------------------------------------------------------------------
 // Writing path — cursive wave in viewBox 0 0 100 100.
@@ -109,16 +116,20 @@ const PEN_END = { x: 94, y: 54 };
 const INK_GLOW_COLOR = '#fbbf24';
 
 // ---------------------------------------------------------------------------
-// Timing constants — total cycle ≈ 3 000 ms
+// Timing constants — total cycle ≈ 5 800 ms (slow handwriting pace)
 // ---------------------------------------------------------------------------
-const DROP_IN_MS = 300; // pen drops in from above
+const DROP_IN_MS = 400; // pen drops in from above
 const SWAY_MS = 200; // brief settle/sway pause
-const TRACE_MS = 1800; // pen traces the path
+const TRACE_MS = 4500; // pen traces the path
 const FLICK_MS = 200; // upward flick at end
-const FLOAT_BACK_MS = 400; // pen floats back to start
-const FADE_MS = 300; // stroke fades out
+const FLOAT_BACK_MS = 500; // pen floats back to start
+const FADE_MS = 350; // stroke fades out
+const GAP_MS = 200; // pause before next loop
 const TOTAL_MS = DROP_IN_MS + SWAY_MS + TRACE_MS + FLICK_MS + FLOAT_BACK_MS;
-// sanity-check: ~2900ms ≈ 3s
+
+// Falling ink droplet: triggers at ~40% of trace, falls and fades over 1.5s.
+const DROP_TRIGGER_PROGRESS = 0.4;
+const DROP_FALL_MS = 1500;
 
 // ---------------------------------------------------------------------------
 // Easing helpers — defined as lazy getter functions so they are only
@@ -155,7 +166,7 @@ export function MagicPenAnimation({
   // moves because it is animated as an Animated.View.
   const animationDisabled = reduceMotion;
   const penMotion = useRef(
-    new RNAnimated.Value(animationDisabled ? 0.55 : 0)
+    new RNAnimated.Value(animationDisabled ? 0.55 : 0),
   ).current;
 
   // -------------------------------------------------------------------------
@@ -186,9 +197,12 @@ export function MagicPenAnimation({
   const flick = useSharedValue(0);
   // strokeFade: 1 = visible, 0 = faded out
   const strokeFade = useSharedValue(animationDisabled ? 1 : 0);
-  // droplet: 0→1 swells, then fades
+  // droplet: 0→1 appears, then fades; dropletFall: 0→1 falls under gravity
   const dropletScale = useSharedValue(0);
   const dropletOpacity = useSharedValue(0);
+  const dropletFall = useSharedValue(0);
+  // penOpacity: fades in during drop-in, holds, fades out during float-back
+  const penOpacity = useSharedValue(animationDisabled ? 1 : 0);
   // sparkle: 0→1
   const sparkle = useSharedValue(0);
 
@@ -221,8 +235,8 @@ export function MagicPenAnimation({
           easing: RNEasing.out(RNEasing.cubic),
           useNativeDriver: true,
         }),
-        RNAnimated.delay(180),
-      ])
+        RNAnimated.delay(GAP_MS),
+      ]),
     );
 
     loop.start();
@@ -250,6 +264,8 @@ export function MagicPenAnimation({
     strokeFade.value = 0;
     dropletScale.value = 0;
     dropletOpacity.value = 0;
+    dropletFall.value = 0;
+    penOpacity.value = 0;
     sparkle.value = 0;
 
     // Resolve easing functions here (inside useEffect) so they are only
@@ -267,15 +283,15 @@ export function MagicPenAnimation({
         // hold through trace + flick
         withDelay(
           SWAY_MS + TRACE_MS + FLICK_MS,
-          withTiming(1, { duration: 0 })
+          withTiming(1, { duration: 0 }),
         ),
         // float back
         withTiming(0, { duration: FLOAT_BACK_MS, easing: easeOut }),
         // brief gap before next cycle
-        withTiming(0, { duration: 100 })
+        withTiming(0, { duration: 100 }),
       ),
       -1,
-      false
+      false,
     );
 
     // --- Stroke progress (drives both AnimatedPath and pen X/Y) ---
@@ -284,15 +300,15 @@ export function MagicPenAnimation({
         // wait for drop-in + sway
         withDelay(
           DROP_IN_MS + SWAY_MS,
-          withTiming(1, { duration: TRACE_MS, easing: easeTrace })
+          withTiming(1, { duration: TRACE_MS, easing: easeTrace }),
         ),
         // hold through flick
         withTiming(1, { duration: FLICK_MS }),
         // reset for next cycle
-        withTiming(0, { duration: FLOAT_BACK_MS + 100 })
+        withTiming(0, { duration: FLOAT_BACK_MS + 100 }),
       ),
       -1,
-      false
+      false,
     );
 
     // --- Stroke visibility (fade out at end of cycle) ---
@@ -304,13 +320,13 @@ export function MagicPenAnimation({
         withDelay(
           TRACE_MS - 200 + FLICK_MS,
           // fade out during float-back
-          withTiming(0, { duration: FADE_MS, easing: easeOut })
+          withTiming(0, { duration: FADE_MS, easing: easeOut }),
         ),
         // gap
-        withTiming(0, { duration: 100 })
+        withTiming(0, { duration: 100 }),
       ),
       -1,
-      false
+      false,
     );
 
     // --- Pen flick at end ---
@@ -319,40 +335,71 @@ export function MagicPenAnimation({
         // wait for drop-in + sway + trace
         withDelay(
           DROP_IN_MS + SWAY_MS + TRACE_MS,
-          withTiming(1, { duration: FLICK_MS / 2, easing: easeOut })
+          withTiming(1, { duration: FLICK_MS / 2, easing: easeOut }),
         ),
         withTiming(0, { duration: FLICK_MS / 2, easing: easeOut }),
         // hold through float-back + gap
-        withTiming(0, { duration: FLOAT_BACK_MS + 100 })
+        withTiming(0, { duration: FLOAT_BACK_MS + 100 }),
       ),
       -1,
-      false
+      false,
     );
 
-    // --- Ink droplet at nib (swells then dissolves, once per cycle at ~60% trace) ---
-    // Uses Animated.View scale (Fabric-safe — NOT AnimatedCircle with r=0)
-    const dropletDelay = DROP_IN_MS + SWAY_MS + Math.round(TRACE_MS * 0.6);
+    // --- Falling ink droplet — appears at the nib at ~40% trace, falls under
+    // gravity (easeIn) and fades out over ~1.5s. Fabric-safe (Animated.View
+    // scale + translateY, not AnimatedCircle r=0). ---
+    const dropletDelay =
+      DROP_IN_MS + SWAY_MS + Math.round(TRACE_MS * DROP_TRIGGER_PROGRESS);
+    const dropletTrailing = TOTAL_MS - dropletDelay - DROP_FALL_MS;
+    // scale: pop to 1 quickly at trigger, hold during fall, then disappear
     dropletScale.value = withRepeat(
       withSequence(
         withDelay(
           dropletDelay,
-          withTiming(1, { duration: 120, easing: easeOut })
+          withTiming(1, { duration: 80, easing: easeOut }),
         ),
-        withTiming(1.4, { duration: 80 }),
-        withTiming(0, { duration: 200, easing: easeIn }),
-        withTiming(0, { duration: TOTAL_MS - dropletDelay - 400 })
+        withTiming(1, { duration: DROP_FALL_MS - 80 }),
+        withTiming(0, { duration: 0 }),
+        withTiming(0, { duration: dropletTrailing }),
       ),
       -1,
-      false
+      false,
     );
+    // opacity: fade in fast, fade out gently as it falls
     dropletOpacity.value = withRepeat(
       withSequence(
-        withDelay(dropletDelay, withTiming(0.9, { duration: 120 })),
-        withTiming(0, { duration: 280 }),
-        withTiming(0, { duration: TOTAL_MS - dropletDelay - 400 })
+        withDelay(dropletDelay, withTiming(0.85, { duration: 80 })),
+        withTiming(0, { duration: DROP_FALL_MS - 80, easing: easeIn }),
+        withTiming(0, { duration: dropletTrailing }),
       ),
       -1,
-      false
+      false,
+    );
+    // fall: 0 → 1 with easeIn (gravity) over the full fall duration
+    dropletFall.value = withRepeat(
+      withSequence(
+        withDelay(dropletDelay, withTiming(0, { duration: 0 })),
+        withTiming(1, { duration: DROP_FALL_MS, easing: easeIn }),
+        withTiming(0, { duration: 0 }),
+        withTiming(0, { duration: dropletTrailing }),
+      ),
+      -1,
+      false,
+    );
+
+    // --- Pen body + tip-glow opacity ---
+    // Fades in during drop-in, holds at 1 through trace+flick, fades out
+    // during float-back (matches the reference's `fade` envelope so the pen
+    // and yellow halo disappear together at the end of each cycle).
+    penOpacity.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: DROP_IN_MS, easing: easeOut }),
+        withTiming(1, { duration: SWAY_MS + TRACE_MS + FLICK_MS }),
+        withTiming(0, { duration: FLOAT_BACK_MS, easing: easeIn }),
+        withTiming(0, { duration: GAP_MS }),
+      ),
+      -1,
+      false,
     );
 
     // --- Sparkle (one cross puff at ~80% trace) ---
@@ -361,13 +408,13 @@ export function MagicPenAnimation({
       withSequence(
         withDelay(
           sparkleDelay,
-          withTiming(1, { duration: 150, easing: easeOut })
+          withTiming(1, { duration: 150, easing: easeOut }),
         ),
         withTiming(0, { duration: 200, easing: easeIn }),
-        withTiming(0, { duration: TOTAL_MS - sparkleDelay - 350 })
+        withTiming(0, { duration: TOTAL_MS - sparkleDelay - 350 }),
       ),
       -1,
-      false
+      false,
     );
 
     return () => {
@@ -377,6 +424,8 @@ export function MagicPenAnimation({
       cancelAnimation(strokeFade);
       cancelAnimation(dropletScale);
       cancelAnimation(dropletOpacity);
+      cancelAnimation(dropletFall);
+      cancelAnimation(penOpacity);
       cancelAnimation(sparkle);
     };
   }, [
@@ -387,6 +436,8 @@ export function MagicPenAnimation({
     strokeFade,
     dropletScale,
     dropletOpacity,
+    dropletFall,
+    penOpacity,
     sparkle,
   ]);
 
@@ -406,20 +457,30 @@ export function MagicPenAnimation({
     opacity: strokeFade.value,
   }));
 
-  // Droplet at nib tip (Animated.View scale — Fabric-safe, no AnimatedCircle r=0)
-  const dropletStyle = useAnimatedStyle(() => {
-    // Position droplet at the current nib position
-    const drawX = PEN_START.x + (PEN_END.x - PEN_START.x) * progress.value;
-    const drawY = PEN_START.y + (PEN_END.y - PEN_START.y) * progress.value;
-    const nibPixelX = drawX * drawingScale;
-    const nibPixelY = drawY * drawingScale;
+  // Pen body + tip-glow opacity (fades in/out around the trace)
+  const penOpacityStyle = useAnimatedStyle(() => ({
+    opacity: penOpacity.value,
+  }));
 
+  // Falling droplet — anchored at the nib position when triggered (40% trace),
+  // then falls under gravity by `dropletFall.value * size * 0.18` pixels and
+  // elongates slightly along Y as it stretches.
+  const dropletAnchorX =
+    (PEN_START.x + (PEN_END.x - PEN_START.x) * DROP_TRIGGER_PROGRESS) *
+    drawingScale;
+  const dropletAnchorY =
+    (PEN_START.y + (PEN_END.y - PEN_START.y) * DROP_TRIGGER_PROGRESS) *
+    drawingScale;
+  const dropletFallDistance = size * 0.18;
+  const dropletStyle = useAnimatedStyle(() => {
+    const fallY = dropletFall.value * dropletFallDistance;
     return {
       opacity: dropletOpacity.value,
       transform: [
-        { translateX: nibPixelX - 4 },
-        { translateY: nibPixelY - 2 },
-        { scale: dropletScale.value },
+        { translateX: dropletAnchorX - dropletRadius },
+        { translateY: dropletAnchorY + fallY - dropletRadius },
+        { scaleX: dropletScale.value },
+        { scaleY: dropletScale.value * (1 + dropletFall.value * 0.5) },
       ],
     };
   });
@@ -457,17 +518,19 @@ export function MagicPenAnimation({
   // Droplet base size
   const dropletRadius = Math.max(3, size * 0.055);
   const bodyColor = color;
-  const trimColor = INK_GLOW_COLOR;
-  const nibColor = '#f8fafc';
-  const nibShadowColor = '#dbeafe';
-  const outlineColor = '#111827';
-  const capColor = '#0f766e';
-  const clipColor = '#ccfbf1';
+  const capColor = '#1a1a1a';
+  const steelColor = '#cfd4dc';
+  const steelDeepColor = '#9aa3ad';
+  const slitColor = '#5a6470';
   // The visible pen travel uses React Native core Animated. Reanimated SVG
   // props can be static in Expo web previews, while core transform animation is
   // reliable there and still works on native.
-  const nibOffsetX = penContainerSize * 0.35;
-  const nibOffsetY = penContainerSize * 0.85;
+  // The pen is drawn horizontally with the writing tip at (88, 50) inside a
+  // 100×100 viewBox, then rotated ~32–45° clockwise. The empirical offsets
+  // below place the rotated tip onto the writing path with minimal drift
+  // across the rotation range.
+  const nibOffsetX = penContainerSize * 0.79;
+  const nibOffsetY = penContainerSize * 0.74;
   const penStartX = PEN_START.x * drawingScale - nibOffsetX;
   const penEndX = PEN_END.x * drawingScale - nibOffsetX;
   const penStartY = PEN_START.y * drawingScale - nibOffsetY;
@@ -497,9 +560,22 @@ export function MagicPenAnimation({
         }),
       },
       {
+        // Tangent-following tilt — pen leans into each curve segment, a la
+        // handwriting. Computed by sampling the cubic-bezier WRITING_PATH
+        // tangent at t = 0, 0.25, 0.5, 0.75, 1.0 (in degrees, atan2 of dy/dx)
+        // and applying:  rotation = BASE_TILT(38°) + 0.30 × tangentDeg.
+        // The 0.30 scale (≈70% reduction from the reference's full influence)
+        // tames our path's wide ±70° tangent swing into a gentle ±18° lean.
         rotate: penMotion.interpolate({
-          inputRange: [0, 0.5, 1, 1.08],
-          outputRange: ['32deg', '39deg', '45deg', '26deg'],
+          inputRange: [0, 0.25, 0.5, 0.75, 1, 1.08],
+          outputRange: [
+            '17deg', // tangent -69°: motion up-right, pen flatter
+            '46deg', // tangent +25°: motion down-right, pen leans forward
+            '20deg', // tangent -62°: motion up-right again
+            '39deg', // tangent  +2°: motion roughly horizontal
+            '53deg', // tangent +51°: motion down-right at end
+            '35deg', // flick lifts the pen back ~18°
+          ],
           extrapolate: 'clamp',
         }),
       },
@@ -549,7 +625,7 @@ export function MagicPenAnimation({
             transform: [
               { translateX: staticNibX - nibOffsetX },
               { translateY: staticNibY - nibOffsetY },
-              { rotate: `${34 + staticProgress * 10}deg` },
+              { rotate: `${36 + staticProgress * 8}deg` },
             ],
             pointerEvents: 'none',
           }}
@@ -559,85 +635,98 @@ export function MagicPenAnimation({
             height={penContainerSize}
             viewBox="0 0 100 100"
           >
-            {/* Barrel */}
-            <Polygon
-              points="40,6 60,6 64,14 36,14"
-              fill={capColor}
-              opacity={0.95}
+            {/* Cap finial — rounded dark end */}
+            <Path d={FINIAL_PATH} fill={capColor} />
+            {/* Finial highlight */}
+            <Ellipse
+              cx={16.5}
+              cy={47}
+              rx={0.6}
+              ry={1.4}
+              fill="#ffffff"
+              opacity={0.4}
             />
+            {/* Thread ring at cap base */}
+            <Rect x={22} y={44} width={2} height={12} fill={capColor} />
+            {/* Translucent tinted barrel */}
             <Rect
-              x={BARREL_X}
-              y={BARREL_Y}
-              width={BARREL_W}
-              height={BARREL_H}
-              rx={BARREL_RX}
+              x={24}
+              y={44}
+              width={46}
+              height={12}
               fill={bodyColor}
-              stroke={outlineColor}
-              strokeWidth={1.5 / penScale}
-              strokeOpacity={0.2}
+              fillOpacity={0.18}
+              stroke={bodyColor}
+              strokeOpacity={0.45}
+              strokeWidth={0.5 / penScale}
             />
+            {/* Inner ink cartridge — visible through translucent barrel */}
             <Rect
-              x={BARREL_X + 2}
-              y={BARREL_Y}
-              width={BARREL_W - 4}
-              height={10}
-              rx={3.5}
-              fill={trimColor}
-              opacity={0.95}
+              x={28}
+              y={47}
+              width={36}
+              height={6}
+              fill={bodyColor}
+              opacity={0.7}
             />
-            <Path
-              d="M57 17 C64 29, 62 43, 56 53"
-              stroke={clipColor}
-              strokeWidth={3 / penScale}
-              strokeOpacity={0.82}
-              fill="none"
-              strokeLinecap="round"
-            />
-            {/* Grip */}
+            {/* Cartridge inner highlight */}
             <Rect
-              x={GRIP_X}
-              y={GRIP_Y}
-              width={GRIP_W}
-              height={GRIP_H}
-              rx={GRIP_RX}
-              fill={trimColor}
-              stroke={outlineColor}
-              strokeWidth={1.5 / penScale}
-              strokeOpacity={0.2}
+              x={28}
+              y={48}
+              width={34}
+              height={0.8}
+              fill="#ffffff"
+              opacity={0.5}
             />
-            {/* Split nib: pale metal plus blue shadow for depth. */}
-            <Path
-              d={NIB_SHOULDER_PATH}
-              fill={trimColor}
-              opacity={0.95}
-              strokeLinejoin="round"
+            {/* Barrel exterior highlight — long white shimmer */}
+            <Rect
+              x={26}
+              y={45}
+              width={42}
+              height={0.7}
+              fill="#ffffff"
+              opacity={0.6}
             />
-            <Path d={NIB_LEFT_PATH} fill={nibColor} strokeLinejoin="round" />
-            <Path
-              d={NIB_RIGHT_PATH}
-              fill={nibShadowColor}
-              strokeLinejoin="round"
+            {/* Black ring above steel */}
+            <Rect x={70} y={45} width={2} height={10} fill={capColor} />
+            {/* Polished steel grip ring */}
+            <Rect x={72} y={45} width={3} height={10} fill={steelDeepColor} />
+            {/* Steel highlight (white shine on top edge) */}
+            <Rect
+              x={72}
+              y={45}
+              width={3}
+              height={1.2}
+              fill="#ffffff"
+              opacity={0.7}
             />
-            <Path
-              d={NIB_PATH}
-              fill="none"
-              stroke={outlineColor}
-              strokeWidth={1 / penScale}
-              strokeOpacity={0.25}
-              strokeLinejoin="round"
-            />
-            {/* Nib center slit */}
+            {/* Black grip trapezoid */}
+            <Path d={GRIP_PATH} fill={capColor} />
+            {/* Steel nib triangle */}
+            <Path d={NIB_PATH} fill={steelColor} />
+            {/* Nib upper-half white shading */}
+            <Path d={NIB_SHADING_PATH} fill="#ffffff" opacity={0.45} />
+            {/* Nib slit (horizontal in our layout) */}
             <Line
-              x1={SLIT_X1}
-              y1={SLIT_Y1}
-              x2={SLIT_X2}
-              y2={SLIT_Y2}
-              stroke={outlineColor}
-              strokeOpacity={0.3}
-              strokeWidth={1 / penScale}
-              strokeLinecap="round"
+              x1={79}
+              y1={50}
+              x2={87}
+              y2={50}
+              stroke={slitColor}
+              strokeWidth={0.5 / penScale}
             />
-            <Circle cx={50} cy={97} r={1.5} fill={bodyColor} opacity={0.7} />
+            {/* Breather hole on nib */}
+            <Circle cx={80.5} cy={50} r={0.7} fill={slitColor} />
+            {/* Yellow tip glow (outer halo) */}
+            <Circle
+              cx={TIP_CX}
+              cy={TIP_CY}
+              r={5}
+              fill={INK_GLOW_COLOR}
+              opacity={0.35}
+            />
+            {/* Yellow tip ink bead */}
+            <Circle cx={TIP_CX} cy={TIP_CY} r={2.6} fill={INK_GLOW_COLOR} />
           </Svg>
         </View>
       </View>
@@ -793,151 +882,139 @@ export function MagicPenAnimation({
       </Animated.View>
 
       {/* ------------------------------------------------------------------ */}
-      {/* Pen body — Animated.View with static SVG inside (Fabric-safe)       */}
+      {/* Pen body — RNAnimated.View with static SVG inside (Fabric-safe)     */}
       {/* The SVG uses a 100×100 viewBox with a large, clearly readable pen.  */}
-      {/* Rotated by the animated style so it points upper-left to lower-right. */}
+      {/* Wrapped in a Reanimated Animated.View whose opacity tracks          */}
+      {/* strokeFade — so the pen and its yellow tip glow fade out together   */}
+      {/* with the ink stroke at the end of each cycle.                        */}
       {/* ------------------------------------------------------------------ */}
-      <RNAnimated.View
+      <Animated.View
         style={[
           {
             position: 'absolute',
             top: 0,
             left: 0,
-            width: penContainerSize,
-            height: penContainerSize,
+            width: size,
+            height: size,
           },
-          penBodyMotionStyle,
+          penOpacityStyle,
           { pointerEvents: 'none' },
         ]}
       >
-        <Svg
-          width={penContainerSize}
-          height={penContainerSize}
-          viewBox="0 0 100 100"
+        <RNAnimated.View
+          style={[
+            {
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: penContainerSize,
+              height: penContainerSize,
+            },
+            penBodyMotionStyle,
+            { pointerEvents: 'none' },
+          ]}
         >
-          {/* ----- Barrel ----- */}
-          <Polygon
-            points="40,6 60,6 64,14 36,14"
-            fill={capColor}
-            opacity={0.95}
-          />
-          <Rect
-            x={BARREL_X}
-            y={BARREL_Y}
-            width={BARREL_W}
-            height={BARREL_H}
-            rx={BARREL_RX}
-            fill={bodyColor}
-            stroke={outlineColor}
-            strokeWidth={1.5 / penScale}
-            strokeOpacity={0.2}
-          />
-          {/* Clip-like cap band: the second color keeps the pen from becoming a blob. */}
-          <Rect
-            x={BARREL_X + 2}
-            y={BARREL_Y}
-            width={BARREL_W - 4}
-            height={10}
-            rx={3.5}
-            fill={trimColor}
-            opacity={0.95}
-          />
-          <Path
-            d="M57 17 C64 29, 62 43, 56 53"
-            stroke={clipColor}
-            strokeWidth={3 / penScale}
-            strokeOpacity={0.82}
-            fill="none"
-            strokeLinecap="round"
-          />
-          {/* Barrel highlight stripe (white shimmer) */}
-          <Rect
-            x={BARREL_X + 5}
-            y={BARREL_Y + 17}
-            width={4}
-            height={BARREL_H - 24}
-            rx={2}
-            fill="#ffffff"
-            opacity={0.22}
-          />
+          <Svg
+            width={penContainerSize}
+            height={penContainerSize}
+            viewBox="0 0 100 100"
+          >
+            {/* Cap finial — rounded dark end */}
+            <Path d={FINIAL_PATH} fill={capColor} />
+            {/* Finial highlight */}
+            <Ellipse
+              cx={16.5}
+              cy={47}
+              rx={0.6}
+              ry={1.4}
+              fill="#ffffff"
+              opacity={0.4}
+            />
+            {/* Thread ring at cap base */}
+            <Rect x={22} y={44} width={2} height={12} fill={capColor} />
+            {/* Translucent tinted barrel */}
+            <Rect
+              x={24}
+              y={44}
+              width={46}
+              height={12}
+              fill={bodyColor}
+              fillOpacity={0.18}
+              stroke={bodyColor}
+              strokeOpacity={0.45}
+              strokeWidth={0.5 / penScale}
+            />
+            {/* Inner ink cartridge — visible through translucent barrel */}
+            <Rect
+              x={28}
+              y={47}
+              width={36}
+              height={6}
+              fill={bodyColor}
+              opacity={0.7}
+            />
+            {/* Cartridge inner highlight */}
+            <Rect
+              x={28}
+              y={48}
+              width={34}
+              height={0.8}
+              fill="#ffffff"
+              opacity={0.5}
+            />
+            {/* Barrel exterior highlight — long white shimmer */}
+            <Rect
+              x={26}
+              y={45}
+              width={42}
+              height={0.7}
+              fill="#ffffff"
+              opacity={0.6}
+            />
+            {/* Black ring above steel */}
+            <Rect x={70} y={45} width={2} height={10} fill={capColor} />
+            {/* Polished steel grip ring */}
+            <Rect x={72} y={45} width={3} height={10} fill={steelDeepColor} />
+            {/* Steel highlight (white shine on top edge) */}
+            <Rect
+              x={72}
+              y={45}
+              width={3}
+              height={1.2}
+              fill="#ffffff"
+              opacity={0.7}
+            />
+            {/* Black grip trapezoid */}
+            <Path d={GRIP_PATH} fill={capColor} />
+            {/* Steel nib triangle */}
+            <Path d={NIB_PATH} fill={steelColor} />
+            {/* Nib upper-half white shading */}
+            <Path d={NIB_SHADING_PATH} fill="#ffffff" opacity={0.45} />
+            {/* Nib slit (horizontal in our layout) */}
+            <Line
+              x1={79}
+              y1={50}
+              x2={87}
+              y2={50}
+              stroke={slitColor}
+              strokeWidth={0.5 / penScale}
+            />
+            {/* Breather hole on nib */}
+            <Circle cx={80.5} cy={50} r={0.7} fill={slitColor} />
 
-          {/* ----- Grip ----- */}
-          <Rect
-            x={GRIP_X}
-            y={GRIP_Y}
-            width={GRIP_W}
-            height={GRIP_H}
-            rx={GRIP_RX}
-            fill={trimColor}
-            stroke={outlineColor}
-            strokeWidth={1.5 / penScale}
-            strokeOpacity={0.2}
-          />
-          <Line
-            x1={GRIP_X + 6}
-            y1={GRIP_Y + 3}
-            x2={GRIP_X + 6}
-            y2={GRIP_Y + GRIP_H - 3}
-            stroke={outlineColor}
-            strokeOpacity={0.18}
-            strokeWidth={1 / penScale}
-          />
-          <Line
-            x1={GRIP_X + 17}
-            y1={GRIP_Y + 3}
-            x2={GRIP_X + 17}
-            y2={GRIP_Y + GRIP_H - 3}
-            stroke={outlineColor}
-            strokeOpacity={0.18}
-            strokeWidth={1 / penScale}
-          />
-          <Line
-            x1={GRIP_X + 28}
-            y1={GRIP_Y + 3}
-            x2={GRIP_X + 28}
-            y2={GRIP_Y + GRIP_H - 3}
-            stroke={outlineColor}
-            strokeOpacity={0.18}
-            strokeWidth={1 / penScale}
-          />
-
-          {/* ----- Nib (triangle) ----- */}
-          <Path
-            d={NIB_SHOULDER_PATH}
-            fill={trimColor}
-            opacity={0.95}
-            strokeLinejoin="round"
-          />
-          <Path d={NIB_LEFT_PATH} fill={nibColor} strokeLinejoin="round" />
-          <Path
-            d={NIB_RIGHT_PATH}
-            fill={nibShadowColor}
-            strokeLinejoin="round"
-          />
-          <Path
-            d={NIB_PATH}
-            fill="none"
-            stroke={outlineColor}
-            strokeWidth={1 / penScale}
-            strokeOpacity={0.25}
-            strokeLinejoin="round"
-          />
-          {/* Nib center slit */}
-          <Line
-            x1={SLIT_X1}
-            y1={SLIT_Y1}
-            x2={SLIT_X2}
-            y2={SLIT_Y2}
-            stroke={outlineColor}
-            strokeOpacity={0.3}
-            strokeWidth={1.2 / penScale}
-            strokeLinecap="round"
-          />
-
-          {/* Nib tip gleam — small white dot (static, no AnimatedCircle) */}
-          <Circle cx={50} cy={97} r={1.5} fill={bodyColor} opacity={0.7} />
-        </Svg>
-      </RNAnimated.View>
+            {/* Yellow tip glow (outer halo) */}
+            <Circle
+              cx={TIP_CX}
+              cy={TIP_CY}
+              r={5}
+              fill={INK_GLOW_COLOR}
+              opacity={0.35}
+            />
+            {/* Yellow tip ink bead */}
+            <Circle cx={TIP_CX} cy={TIP_CY} r={2.6} fill={INK_GLOW_COLOR} />
+          </Svg>
+        </RNAnimated.View>
+      </Animated.View>
     </View>
   );
 }
