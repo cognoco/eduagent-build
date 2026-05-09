@@ -212,7 +212,6 @@ export default function MoreScreen() {
     useUpdateWithdrawalArchivePreference();
   const {
     data: learnerProfile,
-    isLoading: learnerProfileLoading,
     isError: learnerProfileError,
     refetch: refetchLearnerProfile,
   } = useLearnerProfile();
@@ -515,40 +514,56 @@ export default function MoreScreen() {
             </Text>
           </Pressable>
         ) : null}
-        {learnerProfileLoading || (!learnerProfile && !learnerProfileError) ? (
-          <View className="bg-surface rounded-card px-4 py-4 mb-2">
-            <Text className="text-body-sm text-text-secondary">
-              {t('common.loading')}
-            </Text>
-          </View>
-        ) : learnerProfileError ? (
-          <View className="bg-surface rounded-card px-4 py-4 mb-2">
-            <Text className="text-body-sm text-text-secondary">
-              {t('session.mentorMemory.loadError')}
-            </Text>
-            <Pressable
-              onPress={() => void refetchLearnerProfile()}
-              className="self-start mt-3"
-              accessibilityRole="button"
-              testID="accommodation-mode-retry"
-            >
-              <Text className="text-caption font-semibold text-primary">
-                {t('common.retry')}
+        {!learnerProfile ? (
+          learnerProfileError ? (
+            <View className="bg-surface rounded-card px-4 py-4 mb-2">
+              <Text className="text-body-sm text-text-secondary">
+                {t('session.mentorMemory.loadError')}
               </Text>
-            </Pressable>
-          </View>
+              <Pressable
+                onPress={() => void refetchLearnerProfile()}
+                className="self-start mt-3"
+                accessibilityRole="button"
+                testID="accommodation-mode-retry"
+              >
+                <Text className="text-caption font-semibold text-primary">
+                  {t('common.retry')}
+                </Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View className="bg-surface rounded-card px-4 py-4 mb-2">
+              <Text className="text-body-sm text-text-secondary">
+                {t('common.loading')}
+              </Text>
+            </View>
+          )
         ) : (
-          ACCOMMODATION_OPTIONS.map((opt) => (
-            <LearningModeOption
-              key={opt.mode}
-              title={opt.title}
-              description={opt.description}
-              selected={learnerProfile.accommodationMode === opt.mode}
-              disabled={updateAccommodation.isPending}
-              onPress={() => handleSelectAccommodation(opt.mode)}
-              testID={`accommodation-mode-${opt.mode}`}
-            />
-          ))
+          <>
+            {learnerProfileError ? (
+              <Pressable
+                onPress={() => void refetchLearnerProfile()}
+                className="self-start mb-3"
+                accessibilityRole="button"
+                testID="accommodation-mode-retry"
+              >
+                <Text className="text-caption font-semibold text-primary">
+                  {t('common.retry')}
+                </Text>
+              </Pressable>
+            ) : null}
+            {ACCOMMODATION_OPTIONS.map((opt) => (
+              <LearningModeOption
+                key={opt.mode}
+                title={opt.title}
+                description={opt.description}
+                selected={learnerProfile.accommodationMode === opt.mode}
+                disabled={updateAccommodation.isPending}
+                onPress={() => handleSelectAccommodation(opt.mode)}
+                testID={`accommodation-mode-${opt.mode}`}
+              />
+            ))}
+          </>
         )}
 
         {/* 3. What My Mentor Knows — shown after learning prefs, hidden for new learners */}

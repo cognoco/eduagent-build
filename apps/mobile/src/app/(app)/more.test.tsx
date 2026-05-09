@@ -325,6 +325,18 @@ describe('MoreScreen — Learning Mode', () => {
     expect(mockLearnerProfileRefetch).toHaveBeenCalledTimes(1);
   });
 
+  it('shows stale accommodation options and a retry affordance when a background refresh fails', () => {
+    mockLearnerProfile = { accommodationMode: 'none' };
+    mockLearnerProfileError = true;
+
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    // Stale data is visible — user can still see their current setting.
+    screen.getByTestId('accommodation-mode-none');
+    // Retry affordance is present so the user can re-trigger the load.
+    screen.getByTestId('accommodation-mode-retry');
+  });
+
   // [BUG-960 / BUG-961 / BUG-962] These testIDs are load-bearing for Maestro.
   // E2E text-search regressed earlier because section headers were
   // renamed (e.g. "Celebrations" → "Your celebrations"). Locking the testIDs
