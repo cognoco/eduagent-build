@@ -9,17 +9,21 @@ source "$(dirname "${BASH_SOURCE[0]}")/_env.sh"
 # Usage:
 #   cleanup-compare-runs.sh <run-id-A> <run-id-B> [<output-md>]
 #
-# Inputs are Archon workflow run IDs. Artifacts are read from
-# ~/.archon/workspaces/cognoco/eduagent-build/artifacts/runs/<id>/.
-# Per-node wall time is extracted from ~/.archon/logs/archon.stdout.log
-# by filtering lines with the run's PID.
+# Inputs are Archon workflow_run_id values (32-char hex). Both invocation
+# paths (web UI and CLI in separate terminals) populate the same DB tables.
+# Per-run timing and tool-call detail come from ~/.archon/archon.db
+# (remote_agent_workflow_runs + remote_agent_workflow_events). Artifact
+# detail (work-order, findings, scope-violation, plan-review verdict) is
+# read from the run's artifacts directory on disk.
 #
 # Output: markdown to <output-md>, or stdout if not provided.
 #
-# Limitations:
-#   - Token cost per node is NOT extracted (would require Logfire querying).
-#   - Findings overlap is by file_path + title-substring; cross-flavor
-#     finding-id correlation is heuristic.
+# Known gaps:
+#   - LLM token cost per node is NOT in the DB; it lives in Logfire spans
+#     keyed by LOGFIRE_ENVIRONMENT. Add as a follow-up if needed.
+#   - workflow_runs.status is currently unreliable for live runs (we saw
+#     'failed' / SIGINT metadata appear while events kept flowing). Trust
+#     the events stream over the status column for run liveness.
 
 if [[ $# -lt 2 ]]; then
     echo "Usage: $0 <run-id-A> <run-id-B> [<output-md>]" >&2
@@ -30,98 +34,92 @@ RUN_A="$1"
 RUN_B="$2"
 OUT="${3:-/dev/stdout}"
 
+DB="$HOME/.archon/archon.db"
 ARTIFACTS_ROOT="$HOME/.archon/workspaces/cognoco/eduagent-build/artifacts/runs"
-LOG="$HOME/.archon/logs/archon.stdout.log"
 
 A_DIR="$ARTIFACTS_ROOT/$RUN_A"
 B_DIR="$ARTIFACTS_ROOT/$RUN_B"
 
-for d in "$A_DIR" "$B_DIR"; do
-    [[ -d "$d" ]] || { echo "ERROR: artifacts dir not found: $d" >&2; exit 1; }
-done
-[[ -f "$LOG" ]] || { echo "ERROR: archon log not found: $LOG" >&2; exit 1; }
+[[ -f "$DB" ]] || { echo "ERROR: Archon DB not found at $DB" >&2; exit 1; }
 
-# ── Extract per-run metadata from log ─────────────────────────────────
-
-run_meta() {
-    local run_id="$1"
-    # Find the workflow_starting line for this run; pull pid + workflowName + start time
-    grep "\"workflowRunId\":\"$run_id\"" "$LOG" 2>/dev/null \
-        | grep '"msg":"workflow_starting"' \
-        | head -1
-}
-
-run_pid() {
-    run_meta "$1" | grep -oE '"pid":[0-9]+' | head -1 | grep -oE '[0-9]+'
-}
-
-run_workflow() {
-    run_meta "$1" | grep -oE '"workflowName":"[^"]*"' | head -1 | sed 's/"workflowName":"//;s/"$//'
-}
-
-run_start_ms() {
-    run_meta "$1" | grep -oE '"time":[0-9]+' | head -1 | grep -oE '[0-9]+'
-}
-
-run_args() {
-    # The cmd.workflow_starting line carries the args; sibling event to workflow_starting
-    grep "\"args\":\"" "$LOG" 2>/dev/null \
-        | grep "\"pid\":$(run_pid "$1")," \
-        | grep '"msg":"cmd.workflow_starting"' \
-        | head -1 \
-        | grep -oE '"args":"[^"]*"' \
-        | head -1 \
-        | sed 's/"args":"//;s/"$//'
-}
-
-# Find the upper time bound for this run by locating the next
-# workflow_starting event (any run) after this run's start, OR using "now"
-# if this is the most recent run. This is reliable when runs are serial;
-# concurrent runs (same Archon process, overlapping intervals) will still
-# bleed events because dag_node_* events don't carry workflowRunId.
-run_end_ms() {
-    local run_id="$1"
-    local start; start="$(run_start_ms "$run_id")"
-    [[ -z "$start" ]] && return 0
-    local next_start
-    next_start=$(grep '"msg":"workflow_starting"' "$LOG" \
-        | grep -oE '"time":[0-9]+' \
-        | grep -oE '[0-9]+' \
-        | awk -v s="$start" '$1 > s' \
-        | sort -n \
-        | head -1)
-    if [[ -n "$next_start" ]]; then
-        echo "$next_start"
-    else
-        # Use 24h after start as a safe upper bound when this is the latest run
-        echo "$((start + 86400000))"
+# Confirm both run IDs exist in the DB.
+for rid in "$RUN_A" "$RUN_B"; do
+    n=$(sqlite3 "$DB" "SELECT COUNT(*) FROM remote_agent_workflow_runs WHERE id = '$rid';")
+    if [[ "$n" != "1" ]]; then
+        echo "ERROR: workflow_run_id '$rid' not found in DB (got $n rows)" >&2
+        exit 1
     fi
+done
+
+# ── DB query helpers ────────────────────────────────────────────────
+
+# Fetch a single field from workflow_runs.
+run_field() {
+    local rid="$1"
+    local field="$2"
+    sqlite3 "$DB" "SELECT COALESCE($field, '') FROM remote_agent_workflow_runs WHERE id = '$rid';"
 }
 
-# Per-node events filtered by pid AND time-window (this run's start to next
-# run's start). Output: nodeId TAB ms TAB status TAB reason
-node_events() {
-    local run_id="$1"
-    local pid; pid="$(run_pid "$run_id")"
-    local start; start="$(run_start_ms "$run_id")"
-    local end; end="$(run_end_ms "$run_id")"
-    [[ -z "$pid" || -z "$start" || -z "$end" ]] && return 0
-    grep "\"pid\":$pid," "$LOG" \
-        | grep -E '"msg":"dag_node_(completed|failed|skipped)"' \
-        | jq -rc --argjson start "$start" --argjson end "$end" \
-            'select(.time >= $start and .time < $end) | [.nodeId, (.durationMs // 0), (.msg | sub("dag_node_"; "")), (.reason // "-")] | @tsv' \
-        2>/dev/null
+# Per-node completion events as: step_name<TAB>duration_ms
+# Order is by created_at to preserve workflow execution order.
+node_durations() {
+    local rid="$1"
+    sqlite3 -separator $'\t' "$DB" "
+        SELECT step_name, COALESCE(json_extract(data, '\$.duration_ms'), 0)
+        FROM remote_agent_workflow_events
+        WHERE workflow_run_id = '$rid'
+          AND event_type = 'node_completed'
+        ORDER BY created_at;
+    "
 }
 
-# ── Read artifact data ───────────────────────────────────────────────
+# Set of node names that have a node_started event (regardless of completion).
+nodes_started() {
+    local rid="$1"
+    sqlite3 "$DB" "
+        SELECT DISTINCT step_name
+        FROM remote_agent_workflow_events
+        WHERE workflow_run_id = '$rid'
+          AND event_type = 'node_started';
+    "
+}
+
+# Tool-call summary per step: step_name<TAB>tool_name<TAB>calls<TAB>total_ms.
+# claude reports clean tool names (Bash, Read, Write); codex reports the full
+# shell command as the tool name (`/bin/zsh -lc '...'`). We bucket codex's
+# shell calls as `Bash` so the two flavors compare on equal footing.
+tool_summary() {
+    local rid="$1"
+    sqlite3 -separator $'\t' "$DB" "
+        WITH bucketed AS (
+            SELECT
+                step_name,
+                CASE
+                    WHEN json_extract(data, '\$.tool_name') LIKE '/bin/%' THEN 'Bash'
+                    WHEN json_extract(data, '\$.tool_name') LIKE 'shell%' THEN 'Bash'
+                    ELSE COALESCE(json_extract(data, '\$.tool_name'), 'unknown')
+                END AS tool,
+                COALESCE(json_extract(data, '\$.duration_ms'), 0) AS ms
+            FROM remote_agent_workflow_events
+            WHERE workflow_run_id = '$rid'
+              AND event_type = 'tool_completed'
+        )
+        SELECT step_name, tool, COUNT(*) AS calls, SUM(ms) AS total_ms
+        FROM bucketed
+        GROUP BY step_name, tool
+        ORDER BY step_name, total_ms DESC;
+    "
+}
+
+# ── Artifact-dir helpers (unchanged from log-based version) ─────────
 
 read_simple() {
-    # Read a small file, default to "(missing)"
     [[ -f "$1" ]] && cat "$1" | tr -d '\n\r' || echo "(missing)"
 }
 
-pr_id() {
+pr_id_from_artifacts() {
     local d="$1"
+    [[ -f "$d/work-order.md" ]] || { echo "(unknown)"; return; }
     grep -oE 'PR-[0-9]+' "$d/work-order.md" 2>/dev/null | head -1 || echo "(unknown)"
 }
 
@@ -129,33 +127,32 @@ plan_review_verdict() {
     read_simple "$1/plan-review-verdict.txt"
 }
 
-# Extract risk-class verdict from log (it's a stdout-only output of the bash node).
-# Captured via jq from the dag_node_completed event of the risk-class node.
-# Actually risk-class output isn't in the dag_node_completed event itself —
-# it's in stdout which Archon may capture separately. Look in the log for
-# the bash node's stdout summary line.
+# risk-class verdict: prefer the artifact-side capture (if we ever add one);
+# fall back to scraping bash_node_stderr from the log if available, else
+# parse it out of the events.data blob.
 risk_class_verdict() {
-    local run_id="$1"
-    local pid; pid="$(run_pid "$run_id")"
-    [[ -z "$pid" ]] && { echo "(unknown)"; return; }
-    # risk-class.sh writes verdict to stdout AND logs "verdict=X" to stderr.
-    # Archon captures stderr in bash_node_stderr events; grep that.
-    local v
-    v=$(grep "\"pid\":$pid," "$LOG" \
-        | grep '"nodeId":"risk-class"' \
-        | grep '"msg":"bash_node_stderr"' \
-        | head -1 \
+    local rid="$1"
+    sqlite3 "$DB" "
+        SELECT COALESCE(
+            (SELECT json_extract(data, '\$.stderr')
+             FROM remote_agent_workflow_events
+             WHERE workflow_run_id = '$rid'
+               AND step_name = 'risk-class'
+               AND event_type = 'node_completed'
+             LIMIT 1),
+            ''
+        );
+    " 2>/dev/null \
         | grep -oE 'verdict=(tiny|normal|risky)' \
         | head -1 \
-        | sed 's/verdict=//')
-    echo "${v:-(not found)}"
+        | sed 's/verdict=//' \
+        | grep . \
+        || echo "(not captured)"
 }
 
 scope_guard_outcome() {
     local d="$1"
     if [[ -f "$d/scope-violation.md" ]]; then
-        # Extract files from the "## Unexpected Files" section only — ignore
-        # the "## Allowed Files" section which lists everything in scope.
         local files
         files=$(awk '
             /^## Unexpected Files/ { in_section = 1; next }
@@ -179,7 +176,6 @@ validation_status() {
     grep -E '^\*\*Status\*\*:' "$d/validation.md" | head -1 | sed 's/.*: //'
 }
 
-# Findings counts: returns "TOTAL CRIT HIGH MED LOW"
 findings_counts() {
     local f="$1/review/findings.json"
     [[ -f "$f" ]] || { echo "0 0 0 0 0"; return; }
@@ -196,9 +192,6 @@ findings_counts() {
         | tr '\t' ' '
 }
 
-# Findings list: id|severity|source|file|summary — one per line.
-# Note: the synthesizer emits `.file` (not `.file_path`) and `.summary`
-# (not `.title`) in findings.json.
 findings_list() {
     local f="$1/review/findings.json"
     [[ -f "$f" ]] || return 0
@@ -207,35 +200,47 @@ findings_list() {
 
 final_outcome() {
     local d="$1"
-    local run_id="$2"
+    local rid="$2"
     if [[ -f "$d/.pr-number" ]]; then
         echo "PR #$(cat "$d/.pr-number")"
-    else
-        # Find the FIRST failed node within this run's time window.
-        local failed_node
-        failed_node=$(node_events "$run_id" \
-            | awk -F'\t' '$3 == "failed" {print $1; exit}')
-        echo "FAILED at: ${failed_node:-(unknown)}"
+        return
     fi
+    local status; status=$(run_field "$rid" "status")
+    if [[ "$status" == "completed" ]]; then
+        echo "completed (no PR file — check artifacts)"
+        return
+    fi
+    # Find the last node_started without a matching node_completed.
+    local stuck_node
+    stuck_node=$(sqlite3 "$DB" "
+        WITH started AS (
+            SELECT step_name, created_at FROM remote_agent_workflow_events
+            WHERE workflow_run_id = '$rid' AND event_type = 'node_started'
+        ),
+        completed AS (
+            SELECT step_name FROM remote_agent_workflow_events
+            WHERE workflow_run_id = '$rid' AND event_type = 'node_completed'
+        )
+        SELECT s.step_name FROM started s
+        WHERE s.step_name NOT IN (SELECT step_name FROM completed)
+        ORDER BY s.created_at DESC
+        LIMIT 1;
+    ")
+    echo "${status} (last incomplete node: ${stuck_node:-(none)})"
 }
 
 # ── Build the report ─────────────────────────────────────────────────
 
-A_PR=$(pr_id "$A_DIR")
-B_PR=$(pr_id "$B_DIR")
-A_FLAVOR=$(run_workflow "$RUN_A")
-B_FLAVOR=$(run_workflow "$RUN_B")
-A_START_MS=$(run_start_ms "$RUN_A")
-B_START_MS=$(run_start_ms "$RUN_B")
-
-date_from_ms() {
-    local ms="$1"
-    [[ -z "$ms" ]] && { echo "(unknown)"; return; }
-    date -u -r "$((ms / 1000))" '+%Y-%m-%d %H:%M UTC' 2>/dev/null || echo "(parse failed)"
-}
-
-A_DATE=$(date_from_ms "$A_START_MS")
-B_DATE=$(date_from_ms "$B_START_MS")
+A_PR=$(pr_id_from_artifacts "$A_DIR")
+B_PR=$(pr_id_from_artifacts "$B_DIR")
+A_FLAVOR=$(run_field "$RUN_A" "workflow_name")
+B_FLAVOR=$(run_field "$RUN_B" "workflow_name")
+A_STARTED=$(run_field "$RUN_A" "started_at")
+B_STARTED=$(run_field "$RUN_B" "started_at")
+A_COMPLETED=$(run_field "$RUN_A" "completed_at")
+B_COMPLETED=$(run_field "$RUN_B" "completed_at")
+A_STATUS=$(run_field "$RUN_A" "status")
+B_STATUS=$(run_field "$RUN_B" "status")
 
 {
     cat <<EOF
@@ -246,40 +251,44 @@ B_DATE=$(date_from_ms "$B_START_MS")
 | Run ID | \`$RUN_A\` | \`$RUN_B\` |
 | Flavor | $A_FLAVOR | $B_FLAVOR |
 | PR | $A_PR | $B_PR |
-| Started | $A_DATE | $B_DATE |
+| Started | $A_STARTED | $B_STARTED |
+| Completed | ${A_COMPLETED:-(running)} | ${B_COMPLETED:-(running)} |
+| Status | $A_STATUS | $B_STATUS |
 
 ---
 
 ## Per-node wall time
 
-| Node | $A_FLAVOR (ms) | $B_FLAVOR (ms) | Δ | Status A | Status B |
-|---|---:|---:|---:|---|---|
+Source: \`remote_agent_workflow_events\` filtered by \`workflow_run_id\` and \`event_type = 'node_completed'\`. \`(absent)\` means the node has no node_started event for that run.
+
+| Node | $A_FLAVOR (ms) | $B_FLAVOR (ms) | Δ |
+|---|---:|---:|---:|
 EOF
 
-    # Build a sorted union of node IDs from both runs.
-    a_events=$(node_events "$RUN_A")
-    b_events=$(node_events "$RUN_B")
+    A_DURS=$(node_durations "$RUN_A")
+    B_DURS=$(node_durations "$RUN_B")
+    A_STARTED_NODES=$(nodes_started "$RUN_A")
+    B_STARTED_NODES=$(nodes_started "$RUN_B")
 
-    # Get distinct node IDs in workflow order. Pull from union, dedupe.
-    nodes=$(printf "%s\n%s\n" "$a_events" "$b_events" | awk -F'\t' '!seen[$1]++ {print $1}')
+    # Distinct node IDs in encounter order (A first, then any new from B).
+    nodes=$(printf "%s\n%s\n" "$A_DURS" "$B_DURS" | awk -F'\t' '$1 != "" && !seen[$1]++ {print $1}')
 
     while IFS= read -r node; do
         [[ -z "$node" ]] && continue
-        a_line=$(echo "$a_events" | awk -F'\t' -v n="$node" '$1 == n {print; exit}')
-        b_line=$(echo "$b_events" | awk -F'\t' -v n="$node" '$1 == n {print; exit}')
-        a_ms=$(echo "$a_line" | awk -F'\t' '{print $2}')
-        b_ms=$(echo "$b_line" | awk -F'\t' '{print $2}')
-        a_status=$(echo "$a_line" | awk -F'\t' '{print $3}')
-        b_status=$(echo "$b_line" | awk -F'\t' '{print $3}')
-        [[ -z "$a_ms" ]] && a_ms="-"
-        [[ -z "$b_ms" ]] && b_ms="-"
-        [[ -z "$a_status" ]] && a_status="(absent)"
-        [[ -z "$b_status" ]] && b_status="(absent)"
+        a_ms=$(echo "$A_DURS" | awk -F'\t' -v n="$node" '$1 == n {print $2; exit}')
+        b_ms=$(echo "$B_DURS" | awk -F'\t' -v n="$node" '$1 == n {print $2; exit}')
+        a_started=$(echo "$A_STARTED_NODES" | grep -Fxq -- "$node" && echo y || echo n)
+        b_started=$(echo "$B_STARTED_NODES" | grep -Fxq -- "$node" && echo y || echo n)
+
+        # If a node started but never completed, show "(in flight)".
+        if [[ -z "$a_ms" ]]; then a_ms=$([[ "$a_started" == y ]] && echo "(in flight)" || echo "-"); fi
+        if [[ -z "$b_ms" ]]; then b_ms=$([[ "$b_started" == y ]] && echo "(in flight)" || echo "-"); fi
+
         delta="-"
-        if [[ "$a_ms" != "-" && "$b_ms" != "-" && "$a_ms" -gt 0 && "$b_ms" -gt 0 ]]; then
+        if [[ "$a_ms" =~ ^[0-9]+$ && "$b_ms" =~ ^[0-9]+$ ]]; then
             delta=$((a_ms - b_ms))
         fi
-        echo "| $node | $a_ms | $b_ms | $delta | $a_status | $b_status |"
+        echo "| $node | $a_ms | $b_ms | $delta |"
     done <<< "$nodes"
 
     cat <<EOF
@@ -335,22 +344,22 @@ EOF
 
 ### Findings detail — $A_FLAVOR
 
-| ID | Severity | Source | File | Title |
+| ID | Severity | Source | File | Summary |
 |---|---|---|---|---|
 EOF
-    findings_list "$A_DIR" | while IFS=$'\t' read -r id sev src file title; do
-        echo "| ${id} | ${sev} | ${src} | \`${file}\` | ${title} |"
+    findings_list "$A_DIR" | while IFS=$'\t' read -r id sev src file summary; do
+        echo "| ${id} | ${sev} | ${src} | \`${file}\` | ${summary} |"
     done
 
     cat <<EOF
 
 ### Findings detail — $B_FLAVOR
 
-| ID | Severity | Source | File | Title |
+| ID | Severity | Source | File | Summary |
 |---|---|---|---|---|
 EOF
-    findings_list "$B_DIR" | while IFS=$'\t' read -r id sev src file title; do
-        echo "| ${id} | ${sev} | ${src} | \`${file}\` | ${title} |"
+    findings_list "$B_DIR" | while IFS=$'\t' read -r id sev src file summary; do
+        echo "| ${id} | ${sev} | ${src} | \`${file}\` | ${summary} |"
     done
 
     cat <<EOF
@@ -389,6 +398,36 @@ EOF
 
 ---
 
+## tool-call summary
+
+Per-node tool usage from \`remote_agent_workflow_events\` filtered by \`event_type = 'tool_completed'\`. Useful for "where did each provider spend its turns" — a high tool-call count on one flavor for the same node suggests one model is more thorough or more confused.
+
+### Tool calls — $A_FLAVOR
+
+| Step | Tool | Calls | Total ms |
+|---|---|---:|---:|
+EOF
+    tool_summary "$RUN_A" | while IFS=$'\t' read -r step tool calls total; do
+        [[ -z "$step" ]] && continue
+        echo "| ${step} | ${tool} | ${calls} | ${total} |"
+    done
+
+    cat <<EOF
+
+### Tool calls — $B_FLAVOR
+
+| Step | Tool | Calls | Total ms |
+|---|---|---:|---:|
+EOF
+    tool_summary "$RUN_B" | while IFS=$'\t' read -r step tool calls total; do
+        [[ -z "$step" ]] && continue
+        echo "| ${step} | ${tool} | ${calls} | ${total} |"
+    done
+
+    cat <<EOF
+
+---
+
 ## final outcome
 
 | | $A_FLAVOR | $B_FLAVOR |
@@ -399,11 +438,10 @@ EOF
 
 ## known gaps
 
-- **Token cost per node** is not captured here. Logfire spans carry it (claude side via \`LOGFIRE_ENVIRONMENT\` tagging from Stage 1; codex side via \`ARCHON_DEPLOYMENT_ENVIRONMENT\` and codex_sdk_ts OTel emission) — adding requires a Logfire query step.
-- **Concurrent runs in the same Archon process** share a pid and \`dag_node_*\` events have no \`workflowRunId\`. The script uses a time-window filter (this run's start to the next run's start) to disambiguate, which works only for **serial** runs. Run flavors back-to-back per PR, not in parallel, until Archon's log emission carries \`workflowRunId\` on every event.
-- **Log rotation** drops events. \`~/.archon/logs/archon.stdout.log\` is the source of truth for timing; rotated runs disappear from this report. Run the comparison soon after the runs complete.
-- **Adversarial vs reviewer attribution** is via the \`source\` field on each finding; if reviewers were skipped (tiny class), only adversarial+scope sources appear.
-- **Wall-time totals** are per-node; pipeline wall-clock is the sum of the longest path through the DAG, not the sum of all node times. The table is for differential analysis, not absolute runtime.
+- **LLM token cost per node** is not in the DB. Spans tagged by \`LOGFIRE_ENVIRONMENT\` (set in init-tracing.sh) carry per-call cost — adding requires a Logfire query function. Defer until cost data is needed for the merge decision.
+- **\`workflow_runs.status\`** can be misleading on live runs. We've observed runs with \`status='failed'\` and SIGINT metadata while the events stream continued flowing. The events table is the reliable source of liveness.
+- **Web UI vs CLI** both populate the DB equivalently. Run-id is the universal handle. PIDs no longer matter for extraction.
+- **\`risk-class\` verdict capture** depends on a node_completed event whose data blob includes the bash node's stderr. If Archon's event schema changes, this falls back to "(not captured)".
 
 EOF
 } > "$OUT"
