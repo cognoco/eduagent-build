@@ -392,12 +392,12 @@ export const skipSummaryResponseSchema = z.object({
 });
 export type SkipSummaryResponse = z.infer<typeof skipSummaryResponseSchema>;
 
-export const learnerRecapResponseSchema = z.object({
+export const learnerRecapLlmOutputSchema = z.object({
   closingLine: z.string().min(1).max(150),
   takeaways: z.array(z.string().min(1).max(200)).min(1).max(4),
   nextTopicReason: z.string().min(1).max(120).nullable(),
 });
-export type LearnerRecapResponse = z.infer<typeof learnerRecapResponseSchema>;
+export type LearnerRecapLlmOutput = z.infer<typeof learnerRecapLlmOutputSchema>;
 
 // Parking lot schemas
 

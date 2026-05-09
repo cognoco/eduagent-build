@@ -132,7 +132,7 @@ export const generateRoundInputSchema = z
       .max(100)
       .regex(
         /^[\p{L}\p{N} ,.'!?_-]+$/u,
-        'Theme must contain only letters, numbers, spaces, and basic punctuation'
+        'Theme must contain only letters, numbers, spaces, and basic punctuation',
       )
       .optional(),
     subjectId: z.string().uuid().optional(),
@@ -176,18 +176,6 @@ export const quizRoundResponseSchema = z.object({
   difficultyBump: z.boolean().optional(),
 });
 export type QuizRoundResponse = z.infer<typeof quizRoundResponseSchema>;
-
-// Server-internal round response — full question data for DB/service use
-export const internalQuizRoundResponseSchema = z.object({
-  id: z.string().uuid(),
-  activityType: quizActivityTypeSchema,
-  theme: z.string(),
-  questions: z.array(quizQuestionSchema),
-  total: z.number().int().positive(),
-});
-export type InternalQuizRoundResponse = z.infer<
-  typeof internalQuizRoundResponseSchema
->;
 
 export const validatedQuestionResultSchema = z.object({
   questionIndex: z.number().int().min(0),
@@ -336,7 +324,7 @@ export const completedRoundQuestionSchema = z.intersection(
   z.object({
     correctAnswer: z.string(),
     acceptedAliases: z.array(z.string()).optional(),
-  })
+  }),
 );
 export type CompletedRoundQuestion = z.infer<
   typeof completedRoundQuestionSchema

@@ -1,4 +1,4 @@
-import { learnerRecapResponseSchema } from '@eduagent/schemas';
+import { learnerRecapLlmOutputSchema } from '@eduagent/schemas';
 import type { EvalProfile } from '../fixtures/profiles';
 import type { FlowDefinition, PromptMessages } from '../runner/types';
 import {
@@ -59,7 +59,7 @@ export const sessionRecapFlow: FlowDefinition<SessionRecapInput> = {
     safeParse(value: unknown) {
       try {
         const parsed = typeof value === 'string' ? JSON.parse(value) : value;
-        return learnerRecapResponseSchema.safeParse(parsed);
+        return learnerRecapLlmOutputSchema.safeParse(parsed);
       } catch (error) {
         return { success: false, error };
       }
@@ -68,14 +68,14 @@ export const sessionRecapFlow: FlowDefinition<SessionRecapInput> = {
 
   async runLive(
     _input: SessionRecapInput,
-    messages: PromptMessages
+    messages: PromptMessages,
   ): Promise<string> {
     return callLlm(
       [
         { role: 'system', content: messages.system },
         { role: 'user', content: messages.user ?? '' },
       ],
-      { flow: 'session-recap', rung: 2 }
+      { flow: 'session-recap', rung: 2 },
     );
   },
 };

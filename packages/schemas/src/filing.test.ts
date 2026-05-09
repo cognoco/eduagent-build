@@ -1,6 +1,6 @@
 import {
   filingRequestSchema,
-  filingResponseSchema,
+  filingLlmOutputSchema,
   filedFromSchema,
 } from './filing.js';
 
@@ -27,9 +27,9 @@ describe('filingRequestSchema', () => {
   });
 });
 
-describe('filingResponseSchema', () => {
+describe('filingLlmOutputSchema', () => {
   it('accepts new entities', () => {
-    const result = filingResponseSchema.safeParse({
+    const result = filingLlmOutputSchema.safeParse({
       shelf: { name: 'Geography' },
       book: { name: 'Europe', emoji: '🌍', description: 'European geography' },
       chapter: { name: 'Rivers' },
@@ -39,7 +39,7 @@ describe('filingResponseSchema', () => {
   });
 
   it('accepts existing entity references', () => {
-    const result = filingResponseSchema.safeParse({
+    const result = filingLlmOutputSchema.safeParse({
       shelf: { id: '019012ab-cdef-7000-8000-000000000001' },
       book: { id: '019012ab-cdef-7000-8000-000000000002' },
       chapter: { existing: 'Rivers' },
@@ -49,7 +49,7 @@ describe('filingResponseSchema', () => {
   });
 
   it('accepts post-session variant with extracted field', () => {
-    const result = filingResponseSchema.safeParse({
+    const result = filingLlmOutputSchema.safeParse({
       extracted: 'European rivers and the Danube',
       shelf: { name: 'Geography' },
       book: { name: 'Europe', emoji: '🌍', description: 'European geography' },
