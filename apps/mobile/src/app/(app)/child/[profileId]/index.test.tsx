@@ -70,12 +70,14 @@ jest.mock('../../../../hooks/use-dashboard', () => ({
 const mockUseChildInventory = jest.fn();
 const mockUseChildProgressHistory = jest.fn();
 const mockUseChildReports = jest.fn();
+const mockUseProfileReports = jest.fn();
 
 jest.mock('../../../../hooks/use-progress', () => ({
   useChildInventory: (...args: unknown[]) => mockUseChildInventory(...args),
   useChildProgressHistory: (...args: unknown[]) =>
     mockUseChildProgressHistory(...args),
   useChildReports: (...args: unknown[]) => mockUseChildReports(...args),
+  useProfileReports: (...args: unknown[]) => mockUseProfileReports(...args),
 }));
 
 // ---------------------------------------------------------------------------
@@ -118,6 +120,14 @@ jest.mock('../../../../hooks/use-learner-profile', () => ({
     mockUseChildLearnerProfile(...args),
   useUpdateAccommodationMode: (...args: unknown[]) =>
     mockUseUpdateAccommodationMode(...args),
+}));
+
+jest.mock('../../../../hooks/use-settings', () => ({
+  useChildCelebrationLevel: () => ({ data: 'big_only' }),
+  useUpdateChildCelebrationLevel: () => ({
+    mutate: jest.fn(),
+    isPending: false,
+  }),
 }));
 
 // ---------------------------------------------------------------------------
@@ -170,6 +180,7 @@ function setupDefaultMocks() {
   mockUseChildInventory.mockReturnValue({ data: undefined });
   mockUseChildProgressHistory.mockReturnValue({ data: undefined });
   mockUseChildReports.mockReturnValue({ data: [] });
+  mockUseProfileReports.mockReturnValue({ data: [] });
 
   mockUseChildConsentStatus.mockReturnValue({
     data: { consentStatus: 'CONSENTED', respondedAt: null },

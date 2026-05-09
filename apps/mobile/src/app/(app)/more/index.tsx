@@ -4,7 +4,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth, useUser } from '@clerk/clerk-expo';
 import {
-  isAdultOwner,
   type AccommodationMode,
   type CelebrationLevel,
   type KnowledgeInventory,
@@ -18,10 +17,6 @@ import {
   useLearnerProfile,
   useUpdateAccommodationMode,
 } from '../../../hooks/use-learner-profile';
-import {
-  useFamilySubscription,
-  useSubscription,
-} from '../../../hooks/use-subscription';
 import {
   useCelebrationLevel,
   useUpdateCelebrationLevel,
@@ -62,11 +57,6 @@ export default function MoreScreen() {
   ]);
   const hideMentorMemory = isNewLearner(cachedInventory?.global.totalSessions);
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const { data: subscription, isLoading: subscriptionLoading } =
-    useSubscription();
-  const { data: familyData } = useFamilySubscription(
-    subscription?.tier === 'family' || subscription?.tier === 'pro',
-  );
   const { data: celebrationLevel = 'big_only', isLoading: celebrationLoading } =
     useCelebrationLevel();
   const updateCelebrationLevel = useUpdateCelebrationLevel();
@@ -96,51 +86,9 @@ export default function MoreScreen() {
     [learnerProfile?.accommodationMode, updateAccommodation, t],
   );
 
-  const handleAddChild = useCallback(() => {
-    if (subscriptionLoading || !subscription) return;
-    const tier = subscription.tier;
-    // Whitelist: only family/pro may add children. Blocks free and plus.
-    if (tier !== 'family' && tier !== 'pro') {
-      platformAlert(
-        t('more.family.upgradeRequiredTitle'),
-        t('more.family.upgradeRequiredMessage'),
-        [
-          {
-            text: t('more.family.viewPlans'),
-            onPress: () => router.push('/(app)/subscription'),
-          },
-          { text: t('common.cancel'), style: 'cancel' },
-        ],
-      );
-      return;
-    }
-
-    if (familyData && familyData.profileCount >= familyData.maxProfiles) {
-      platformAlert(
-        t('more.family.profileLimitTitle'),
-        t('more.family.profileLimitMessage', {
-          plan: tier === 'pro' ? 'Pro' : 'Family',
-          max: familyData.maxProfiles,
-        }),
-        tier === 'family'
-          ? [
-              {
-                text: t('more.family.viewPlans'),
-                onPress: () => router.push('/(app)/subscription'),
-              },
-              { text: t('common.cancel'), style: 'cancel' },
-            ]
-          : [{ text: t('common.ok') }],
-      );
-      return;
-    }
-
-    router.push('/create-profile?for=child');
-  }, [subscriptionLoading, subscription, familyData, router, t]);
-
   const handleChildProgressNavigation = useCallback(
     (href: string) => {
-      track('child_progress_navigated', { source: 'more_section' });
+      track('child_progress_navigated', { source: 'more_preferences_link' });
       router.push(href as never);
     },
     [router],
@@ -149,11 +97,6 @@ export default function MoreScreen() {
   const linkedChildren = activeProfile?.isOwner
     ? profiles.filter((p) => p.id !== activeProfile.id && !p.isOwner)
     : [];
-  const showAddChild = isAdultOwner({
-    role,
-    birthYear: activeProfile?.birthYear,
-  });
-
   const displayName =
     activeProfile?.displayName ??
     user?.fullName ??
@@ -350,27 +293,6 @@ export default function MoreScreen() {
               onPress={() => router.push('/(app)/mentor-memory?returnTo=more')}
               testID="mentor-memory-link"
             />
-          </>
-        ) : null}
-
-        {showAddChild ? (
-          <>
-            <SectionHeader>{t('more.family.sectionHeader')}</SectionHeader>
-            <Pressable
-              onPress={handleAddChild}
-              disabled={subscriptionLoading}
-              className={`bg-surface rounded-card px-4 py-3.5 mb-2${subscriptionLoading ? ' opacity-50' : ''}`}
-              accessibilityLabel={t('more.family.addChildAccessLabel')}
-              accessibilityRole="button"
-              testID="add-child-link"
-            >
-              <Text className="text-body font-semibold text-text-primary">
-                {t('more.family.addChild')}
-              </Text>
-              <Text className="text-body-sm text-text-secondary mt-1">
-                {t('more.family.addChildDescription')}
-              </Text>
-            </Pressable>
           </>
         ) : null}
 

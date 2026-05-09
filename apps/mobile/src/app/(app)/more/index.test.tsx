@@ -156,7 +156,7 @@ describe('MoreScreen landing', () => {
 
     screen.getByTestId('learning-accommodation-section-header');
     screen.getByTestId('mentor-memory-link');
-    screen.getByTestId('add-child-link');
+    expect(screen.queryByTestId('add-child-link')).toBeNull();
     screen.getByTestId('more-row-notifications');
     screen.getByTestId('more-row-account');
     screen.getByTestId('more-row-privacy');
@@ -207,36 +207,17 @@ describe('MoreScreen landing', () => {
     );
   });
 
-  it('hides Add a child for minor owners and unknown birth years', () => {
+  it('does not render Add a child from More', () => {
     mockActiveProfile = {
       id: 'profile-1',
       displayName: 'Alex',
       isOwner: true,
-      birthYear: new Date().getFullYear() - 17,
+      birthYear: 1990,
     };
     mockProfiles = [mockActiveProfile];
-    const { rerender } = render(<MoreScreen />, { wrapper: createWrapper() });
-
-    expect(screen.queryByTestId('add-child-link')).toBeNull();
-
-    mockActiveProfile = {
-      id: 'profile-1',
-      displayName: 'Alex',
-      isOwner: true,
-      birthYear: null as unknown as number,
-    };
-    mockProfiles = [mockActiveProfile];
-    rerender(<MoreScreen />);
-
-    expect(screen.queryByTestId('add-child-link')).toBeNull();
-  });
-
-  it('navigates to create-profile when Add a child is pressed', () => {
     render(<MoreScreen />, { wrapper: createWrapper() });
 
-    fireEvent.press(screen.getByTestId('add-child-link'));
-
-    expect(mockPush).toHaveBeenCalledWith('/create-profile?for=child');
+    expect(screen.queryByTestId('add-child-link')).toBeNull();
   });
 
   it('keeps child preference cross-links for owner profiles with children', () => {
@@ -250,7 +231,7 @@ describe('MoreScreen landing', () => {
     fireEvent.press(screen.getByTestId('accommodation-mode-child-link'));
 
     expect(mockTrack).toHaveBeenCalledWith('child_progress_navigated', {
-      source: 'more_section',
+      source: 'more_preferences_link',
     });
     expect(mockPush).toHaveBeenCalledWith('/(app)/child/child-1');
   });

@@ -5,16 +5,18 @@ import type { CopyRegister } from '../../lib/copy-register';
 interface CurrentlyWorkingOnCardProps {
   items: string[];
   register: CopyRegister;
+  maxItems?: number;
   testID?: string;
 }
 
 export function CurrentlyWorkingOnCard({
   items,
   register,
+  maxItems = 3,
   testID,
 }: CurrentlyWorkingOnCardProps): React.ReactElement | null {
   const { t } = useTranslation();
-  const visibleItems = items.slice(0, 3);
+  const visibleItems = items.slice(0, maxItems);
   const remaining = Math.max(0, items.length - visibleItems.length);
 
   if (visibleItems.length === 0) return null;
