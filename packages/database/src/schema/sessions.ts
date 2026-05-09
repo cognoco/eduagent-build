@@ -144,12 +144,12 @@ export const learningSessions = pgTable(
     index('learning_sessions_profile_subject_exchange_idx').on(
       table.profileId,
       table.subjectId,
-      table.exchangeCount
+      table.exchangeCount,
     ),
     index('learning_sessions_filing_status_idx')
       .on(table.filingStatus)
       .where(sql`${table.filingStatus} IS NOT NULL`),
-  ]
+  ],
 );
 
 export const sessionEvents = pgTable(
@@ -194,12 +194,13 @@ export const sessionEvents = pgTable(
     index('session_events_profile_event_created_idx').on(
       table.profileId,
       table.eventType,
-      table.createdAt
+      table.createdAt,
     ),
-    uniqueIndex('session_events_session_client_id_uniq')
-      .on(table.sessionId, table.clientId)
-      .where(sql`${table.clientId} IS NOT NULL`),
-  ]
+    uniqueIndex('session_events_session_client_id_uniq').on(
+      table.sessionId,
+      table.clientId,
+    ),
+  ],
 );
 
 export const sessionSummaries = pgTable(
@@ -249,12 +250,12 @@ export const sessionSummaries = pgTable(
   (table) => [
     index('session_summaries_session_profile_idx').on(
       table.sessionId,
-      table.profileId
+      table.profileId,
     ),
     index('session_summaries_purge_eligible_idx')
       .on(table.summaryGeneratedAt)
       .where(sql`${table.purgedAt} IS NULL`),
-  ]
+  ],
 );
 
 export const parkingLotItems = pgTable('parking_lot_items', {

@@ -1890,6 +1890,10 @@ export async function streamMessage(
 ): Promise<{
   stream: AsyncIterable<string>;
   onComplete: () => Promise<{
+    /** Parsed assistant text persisted for the exchange. Useful when the
+     *  streaming extractor yielded no visible chunks but the full envelope
+     *  parsed cleanly at completion. */
+    response?: string;
     exchangeCount: number;
     escalationRung: number;
     expectedResponseMinutes: number;
@@ -2088,6 +2092,7 @@ export async function streamMessage(
         );
       }
       return {
+        response: parsed.cleanResponse,
         exchangeCount: persisted.exchangeCount,
         escalationRung: effectiveRung,
         expectedResponseMinutes,
