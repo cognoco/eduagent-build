@@ -1579,7 +1579,7 @@
       "couldNotExportMemory": "Could not export memory",
       "controls": "Controls",
       "learnAboutChild": "Learn about child",
-      "learnAboutChildDescription": "Allow the mentor to build a memory of your child's strengths and struggles",
+      "learnAboutChildDescription": "Allow the mentor to build a memory of your child's strengths and focus areas",
       "useWhatMentorKnows": "Use what the mentor knows",
       "useWhatMentorKnowsDescription": "Let the mentor personalise sessions using what it has learned",
       "noObservationsYet": "No observations yet",
@@ -1839,14 +1839,14 @@
         "withdrawn": "Consent withdrawn"
       },
       "engagementTrend": {
-        "declining": "Engagement declining",
+        "declining": "Engagement needs attention",
         "increasing": "Engagement increasing",
         "stable": "Engagement stable"
       },
       "reviewHealth": "Review health",
       "retentionTrend": {
         "improving": "Improving",
-        "declining": "Declining",
+        "declining": "Needs review",
         "stable": "Stable"
       },
       "signal": {

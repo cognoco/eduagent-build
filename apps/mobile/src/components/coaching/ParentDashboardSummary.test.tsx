@@ -37,7 +37,7 @@ describe('ParentDashboardSummary', () => {
     render(<ParentDashboardSummary {...defaultProps} />);
 
     screen.getByText(
-      'Alex: Math strong, Science fading. 4 sessions this week.'
+      'Alex: Math strong, Science fading. 4 sessions this week.',
     );
   });
 
@@ -45,7 +45,7 @@ describe('ParentDashboardSummary', () => {
     render(<ParentDashboardSummary {...defaultProps} />);
 
     screen.getByText(
-      '4 sessions, 1h 25m this week (\u2191 up from 2 sessions, 40m last week)'
+      '4 sessions, 1h 25m this week (\u2191 up from 2 sessions, 40m last week)',
     );
   });
 
@@ -62,7 +62,7 @@ describe('ParentDashboardSummary', () => {
           engagementTrend: 'increasing',
           guidance: null,
         }}
-      />
+      />,
     );
 
     screen.getByTestId('engagement-trend-chip');
@@ -99,7 +99,7 @@ describe('ParentDashboardSummary', () => {
             engagementTrend: 'increasing',
             guidance: null,
           }}
-        />
+        />,
       );
 
       screen.getByTestId('consent-status-badge');
@@ -110,7 +110,7 @@ describe('ParentDashboardSummary', () => {
       expect(screen.queryByTestId('exchange-delta-chip')).toBeNull();
       expect(screen.queryByTestId('guided-ratio-chip')).toBeNull();
       expect(screen.queryByTestId('streak-xp-chip')).toBeNull();
-    }
+    },
   );
 
   it('uses a consent-focused primary action for restricted consent', () => {
@@ -118,12 +118,12 @@ describe('ParentDashboardSummary', () => {
       <ParentDashboardSummary
         {...defaultProps}
         consentStatus="PARENTAL_CONSENT_REQUESTED"
-      />
+      />,
     );
 
     screen.getByText('Check consent status');
     fireEvent.press(
-      screen.getByTestId('dashboard-child-test-profile-123-primary')
+      screen.getByTestId('dashboard-child-test-profile-123-primary'),
     );
     expect(defaultProps.onDrillDown).toHaveBeenCalled();
   });
@@ -137,11 +137,11 @@ describe('ParentDashboardSummary', () => {
         sessionsLastWeek={4}
         totalTimeThisWeek={12}
         totalTimeLastWeek={90}
-      />
+      />,
     );
 
     screen.getByText(
-      '1 session, 12m this week (\u2193 down from 4 sessions, 1h 30m last week)'
+      '1 session, 12m this week (\u2193 down from 4 sessions, 1h 30m last week)',
     );
   });
 
@@ -154,11 +154,11 @@ describe('ParentDashboardSummary', () => {
         sessionsLastWeek={3}
         totalTimeThisWeek={60}
         totalTimeLastWeek={60}
-      />
+      />,
     );
 
     screen.getByText(
-      '3 sessions, 1h this week (\u2192 same as 3 sessions, 1h last week)'
+      '3 sessions, 1h this week (\u2192 same as 3 sessions, 1h last week)',
     );
   });
 
@@ -184,7 +184,7 @@ describe('ParentDashboardSummary', () => {
     render(<ParentDashboardSummary {...defaultProps} />);
 
     fireEvent.press(
-      screen.getByTestId('dashboard-child-test-profile-123-primary')
+      screen.getByTestId('dashboard-child-test-profile-123-primary'),
     );
     expect(defaultProps.onDrillDown).toHaveBeenCalled();
   });
@@ -206,7 +206,7 @@ describe('ParentDashboardSummary', () => {
 
   it('renders retention trend badge when improving', () => {
     render(
-      <ParentDashboardSummary {...defaultProps} retentionTrend="improving" />
+      <ParentDashboardSummary {...defaultProps} retentionTrend="improving" />,
     );
 
     screen.getByTestId('retention-trend-badge');
@@ -216,16 +216,16 @@ describe('ParentDashboardSummary', () => {
 
   it('renders retention trend badge when declining', () => {
     render(
-      <ParentDashboardSummary {...defaultProps} retentionTrend="declining" />
+      <ParentDashboardSummary {...defaultProps} retentionTrend="declining" />,
     );
 
     screen.getByTestId('retention-trend-badge');
-    screen.getByText(/Declining/);
+    screen.getByText(/Needs review/);
   });
 
   it('renders retention trend badge when stable', () => {
     render(
-      <ParentDashboardSummary {...defaultProps} retentionTrend="stable" />
+      <ParentDashboardSummary {...defaultProps} retentionTrend="stable" />,
     );
 
     screen.getByTestId('retention-trend-badge');
@@ -254,7 +254,7 @@ describe('ParentDashboardSummary', () => {
           { name: 'Mathematics', retentionStatus: 'strong' },
           { name: 'Science', retentionStatus: 'strong' },
         ]}
-      />
+      />,
     );
 
     screen.getByTestId('aggregate-signal');
@@ -269,7 +269,7 @@ describe('ParentDashboardSummary', () => {
           { name: 'Mathematics', retentionStatus: 'strong' },
           { name: 'Science', retentionStatus: 'weak' },
         ]}
-      />
+      />,
     );
 
     screen.getByTestId('aggregate-signal');
@@ -281,7 +281,7 @@ describe('ParentDashboardSummary', () => {
       <ParentDashboardSummary
         {...defaultProps}
         subjects={[{ name: 'Mathematics', retentionStatus: 'forgotten' }]}
-      />
+      />,
     );
 
     screen.getByTestId('aggregate-signal');
@@ -311,7 +311,7 @@ describe('ParentDashboardSummary', () => {
           {...defaultProps}
           totalSessions={1}
           retentionTrend="improving"
-        />
+        />,
       );
 
       expect(screen.queryByTestId('retention-trend-badge')).toBeNull();
@@ -336,7 +336,7 @@ describe('ParentDashboardSummary', () => {
           {...defaultProps}
           totalSessions={10}
           retentionTrend="improving"
-        />
+        />,
       );
 
       screen.getByTestId('aggregate-signal');
@@ -353,7 +353,7 @@ describe('ParentDashboardSummary', () => {
 
     it('defaults to showing full signals when totalSessions is undefined', () => {
       render(
-        <ParentDashboardSummary {...defaultProps} retentionTrend="stable" />
+        <ParentDashboardSummary {...defaultProps} retentionTrend="stable" />,
       );
 
       screen.getByTestId('aggregate-signal');

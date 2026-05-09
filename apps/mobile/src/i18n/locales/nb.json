@@ -1579,7 +1579,7 @@
       "couldNotExportMemory": "Kunne ikke eksportere minne",
       "controls": "Kontroller",
       "learnAboutChild": "Lær om barnet",
-      "learnAboutChildDescription": "Tillat mentoren å bygge et minne om barnets styrker og utfordringer",
+      "learnAboutChildDescription": "Tillat mentoren å bygge et minne om barnets styrker og fokusområder",
       "useWhatMentorKnows": "Bruk det mentoren vet",
       "useWhatMentorKnowsDescription": "La mentoren tilpasse økter ved hjelp av det den har lært",
       "noObservationsYet": "Ingen observasjoner ennå",
@@ -1839,14 +1839,14 @@
         "withdrawn": "Samtykke trukket tilbake"
       },
       "engagementTrend": {
-        "declining": "Engagement declining",
+        "declining": "Engasjement trenger oppmerksomhet",
         "increasing": "Engagement increasing",
         "stable": "Engagement stable"
       },
       "reviewHealth": "Gjennomgå helse",
       "retentionTrend": {
         "improving": "Forbedres",
-        "declining": "Synkende",
+        "declining": "Bør gjennomgås",
         "stable": "Stabil"
       },
       "signal": {

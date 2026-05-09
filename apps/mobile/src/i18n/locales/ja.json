@@ -1579,7 +1579,7 @@
       "couldNotExportMemory": "記憶をエクスポートできませんでした",
       "controls": "コントロール",
       "learnAboutChild": "お子様について学ぶ",
-      "learnAboutChildDescription": "メンターがお子様の長所と短所の記憶を構築できるようにします",
+      "learnAboutChildDescription": "メンターがお子様の長所と注力分野の記憶を構築できるようにします",
       "useWhatMentorKnows": "メンターが知っていることを使う",
       "useWhatMentorKnowsDescription": "メンターが把握したことを使ってセッションをパーソナライズさせます",
       "noObservationsYet": "まだ観察がありません",
@@ -1839,14 +1839,14 @@
         "withdrawn": "同意が撤回されました"
       },
       "engagementTrend": {
-        "declining": "Engagement declining",
+        "declining": "エンゲージメントに注意",
         "increasing": "Engagement increasing",
         "stable": "Engagement stable"
       },
       "reviewHealth": "健康状態を確認",
       "retentionTrend": {
         "improving": "改善中",
-        "declining": "低下中",
+        "declining": "復習が必要",
         "stable": "安定"
       },
       "signal": {

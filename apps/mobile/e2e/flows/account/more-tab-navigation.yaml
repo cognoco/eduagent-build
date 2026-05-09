@@ -1,0 +1,198 @@
+# Flow N10: More Tab Navigation — master/detail settings
+# Validates the restructured More tab landing rows and nested sub-screens.
+appId: com.mentomate.app
+tags:
+  - pr-blocking
+  - account
+  - navigation
+---
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "onboarding-complete"
+      API_URL: ${API_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 15000
+
+- tapOn:
+    text: "More"
+
+- extendedWaitUntil:
+    visible:
+      id: "learning-accommodation-section-header"
+    timeout: 30000
+
+- assertVisible:
+    id: "accommodation-mode-none"
+- scrollUntilVisible:
+    element:
+      id: "accommodation-mode-short-burst"
+    direction: DOWN
+    timeout: 15000
+    speed: 50
+    visibilityPercentage: 40
+- scrollUntilVisible:
+    element:
+      id: "accommodation-mode-audio-first"
+    direction: DOWN
+    timeout: 15000
+    speed: 50
+    visibilityPercentage: 40
+- scrollUntilVisible:
+    element:
+      id: "accommodation-mode-predictable"
+    direction: DOWN
+    timeout: 15000
+    speed: 50
+    visibilityPercentage: 40
+
+- scrollUntilVisible:
+    element:
+      id: "more-row-notifications"
+    direction: DOWN
+    timeout: 15000
+    speed: 50
+    visibilityPercentage: 40
+- assertVisible:
+    id: "more-row-account"
+- assertVisible:
+    id: "more-row-privacy"
+- assertVisible:
+    id: "more-row-help"
+- assertVisible:
+    id: "sign-out-button"
+
+- takeScreenshot: more-tab-loaded
+
+# Notifications sub-screen
+- tapOn:
+    id: "more-row-notifications"
+- extendedWaitUntil:
+    visible:
+      id: "more-notifications-scroll"
+    timeout: 10000
+- assertVisible:
+    id: "push-notifications-toggle"
+- assertVisible:
+    id: "weekly-digest-toggle"
+- back
+- extendedWaitUntil:
+    visible:
+      id: "more-row-notifications"
+    timeout: 10000
+
+# Account sub-screen
+- tapOn:
+    id: "more-row-account"
+- extendedWaitUntil:
+    visible:
+      id: "more-account-scroll"
+    timeout: 10000
+- assertVisible:
+    id: "more-row-profile"
+- assertVisible:
+    id: "more-row-subscription"
+- back
+- extendedWaitUntil:
+    visible:
+      id: "more-row-account"
+    timeout: 10000
+
+# Privacy & data sub-screen plus standalone legal/delete routes
+- tapOn:
+    id: "more-row-privacy"
+- extendedWaitUntil:
+    visible:
+      id: "more-privacy-scroll"
+    timeout: 10000
+- assertVisible:
+    text: "Privacy Policy"
+- assertVisible:
+    text: "Terms of Service"
+- assertVisible:
+    id: "more-row-export"
+- assertVisible:
+    id: "more-row-delete-account"
+
+- tapOn:
+    text: "Privacy Policy"
+- extendedWaitUntil:
+    visible:
+      text: "Privacy Policy"
+    timeout: 10000
+- takeScreenshot: nav-privacy-policy
+- back
+- extendedWaitUntil:
+    visible:
+      id: "more-privacy-scroll"
+    timeout: 10000
+
+- tapOn:
+    text: "Terms of Service"
+- extendedWaitUntil:
+    visible:
+      text: "Terms of Service"
+    timeout: 10000
+- takeScreenshot: nav-terms-of-service
+- back
+- extendedWaitUntil:
+    visible:
+      id: "more-privacy-scroll"
+    timeout: 10000
+
+- tapOn:
+    id: "more-row-export"
+- tapOn:
+    text: "OK"
+    optional: true
+- takeScreenshot: nav-export-data
+
+- tapOn:
+    id: "more-row-delete-account"
+- extendedWaitUntil:
+    visible:
+      id: "delete-account-confirm"
+    timeout: 10000
+- assertVisible:
+    id: "delete-account-cancel"
+- takeScreenshot: nav-delete-account
+- tapOn:
+    id: "delete-account-cancel"
+- extendedWaitUntil:
+    visible:
+      id: "more-privacy-scroll"
+    timeout: 10000
+- back
+
+# Help & feedback sub-screen
+- extendedWaitUntil:
+    visible:
+      id: "more-row-help"
+    timeout: 10000
+- tapOn:
+    id: "more-row-help"
+- extendedWaitUntil:
+    visible:
+      id: "more-help-scroll"
+    timeout: 10000
+- assertVisible:
+    id: "more-row-help-support"
+- assertVisible:
+    id: "more-row-report-problem"
+- back
+
+# Sign out remains on the landing screen.
+- extendedWaitUntil:
+    visible:
+      id: "sign-out-button"
+    timeout: 10000
+- tapOn:
+    id: "sign-out-button"
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-button"
+    timeout: 15000
+- takeScreenshot: nav-signed-out

@@ -1579,7 +1579,7 @@
       "couldNotExportMemory": "Gedächtnis konnte nicht exportiert werden",
       "controls": "Steuerung",
       "learnAboutChild": "Über das Kind lernen",
-      "learnAboutChildDescription": "Erlaube dem Mentor, ein Gedächtnis über die Stärken und Schwächen deines Kindes aufzubauen",
+      "learnAboutChildDescription": "Erlaube dem Mentor, ein Gedächtnis über die Stärken und Fokusbereiche deines Kindes aufzubauen",
       "useWhatMentorKnows": "Nutzen, was der Mentor weiß",
       "useWhatMentorKnowsDescription": "Lass den Mentor Sitzungen personalisieren, indem er nutzt, was er über dein Kind weiß",
       "noObservationsYet": "Noch keine Beobachtungen",
@@ -1839,14 +1839,14 @@
         "withdrawn": "Zustimmung widerrufen"
       },
       "engagementTrend": {
-        "declining": "Engagement declining",
+        "declining": "Engagement braucht Aufmerksamkeit",
         "increasing": "Engagement increasing",
         "stable": "Engagement stable"
       },
       "reviewHealth": "Gesundheit überprüfen",
       "retentionTrend": {
         "improving": "Verbessert sich",
-        "declining": "Verschlechtert sich",
+        "declining": "Wiederholung empfohlen",
         "stable": "Stabil"
       },
       "signal": {

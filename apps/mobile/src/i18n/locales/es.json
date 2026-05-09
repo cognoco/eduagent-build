@@ -1579,7 +1579,7 @@
       "couldNotExportMemory": "No se pudo exportar la memoria",
       "controls": "Controles",
       "learnAboutChild": "Aprender sobre el niño",
-      "learnAboutChildDescription": "Permitir que el mentor construya una memoria de las fortalezas y dificultades de tu hijo",
+      "learnAboutChildDescription": "Permitir que el mentor construya una memoria de las fortalezas y áreas de enfoque de tu hijo",
       "useWhatMentorKnows": "Usar lo que el mentor sabe",
       "useWhatMentorKnowsDescription": "Dejar que el mentor personalice las sesiones usando lo que sabe sobre tu hijo",
       "noObservationsYet": "Aún no hay observaciones",
@@ -1839,14 +1839,14 @@
         "withdrawn": "Consentimiento retirado"
       },
       "engagementTrend": {
-        "declining": "Engagement declining",
+        "declining": "El compromiso necesita atención",
         "increasing": "Engagement increasing",
         "stable": "Engagement stable"
       },
       "reviewHealth": "Revisar salud",
       "retentionTrend": {
         "improving": "Mejorando",
-        "declining": "Disminuyendo",
+        "declining": "Necesita repaso",
         "stable": "Estable"
       },
       "signal": {
