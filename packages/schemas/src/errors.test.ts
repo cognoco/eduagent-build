@@ -14,7 +14,9 @@ import {
   ConflictError,
   ForbiddenError,
   NotFoundError,
+  QuotaExceededError,
   RateLimitedError,
+  ResourceGoneError,
   SafetyFilterError,
   UpstreamLlmError,
   VocabularyContextError,
@@ -123,6 +125,45 @@ describe('typed error classes [BUG-644]', () => {
         expect(classifyOrphanError(err)).toBe(expected);
       },
     );
+  });
+
+  it('QuotaExceededError carries code, errorCode, and details', () => {
+    const details = {
+      tier: 'free' as const,
+      reason: 'monthly' as const,
+      monthlyLimit: 10,
+      usedThisMonth: 10,
+      dailyLimit: null,
+      usedToday: 3,
+      topUpCreditsRemaining: 0,
+      upgradeOptions: [
+        { tier: 'pro' as const, monthlyQuota: 100, priceMonthly: 9.99 },
+      ],
+    };
+    const err = new QuotaExceededError('Quota exceeded', details);
+    expect(err).toBeInstanceOf(Error);
+    expect(err).toBeInstanceOf(QuotaExceededError);
+    expect(err.name).toBe('QuotaExceededError');
+    expect(err.code).toBe('QUOTA_EXCEEDED');
+    expect(err.errorCode).toBe('QUOTA_EXCEEDED');
+    expect(err.details).toBe(details);
+  });
+
+  it('ResourceGoneError exposes errorCode, optional code, and details', () => {
+    const err = new ResourceGoneError('Session archived', 'SESSION_ARCHIVED', {
+      id: '123',
+    });
+    expect(err).toBeInstanceOf(Error);
+    expect(err).toBeInstanceOf(ResourceGoneError);
+    expect(err.name).toBe('ResourceGoneError');
+    expect(err.errorCode).toBe('RESOURCE_GONE');
+    expect(err.code).toBe('SESSION_ARCHIVED');
+    expect(err.details).toEqual({ id: '123' });
+
+    const defaultErr = new ResourceGoneError();
+    expect(defaultErr.message).toBe('This resource is no longer available.');
+    expect(defaultErr.code).toBeUndefined();
+    expect(defaultErr.details).toBeUndefined();
   });
 
   // The whole point of moving these into schemas: an instance created
