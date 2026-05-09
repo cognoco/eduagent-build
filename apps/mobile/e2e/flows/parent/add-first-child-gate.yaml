@@ -10,7 +10,7 @@
 #
 # Seed analysis (test-seed.ts):
 #   parent-solo: isOwner=true, no children → hasLinkedChildren()=false →
-#   home renders LearnerScreen (not ParentGateway). The "add first child"
+#   home renders LearnerScreen (not LearnerScreen). The "add first child"
 #   entry point lives in More → Family section → add-child-link Pressable,
 #   which calls handleAddChild() → router.push('/create-profile?for=child').
 #

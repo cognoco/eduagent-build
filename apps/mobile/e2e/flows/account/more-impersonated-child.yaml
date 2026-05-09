@@ -32,10 +32,10 @@ tags:
       SEED_SCENARIO: "parent-with-children"
       API_URL: ${API_URL}
 
-# 2. Wait for parent gateway
+# 2. Wait for learner screen
 - extendedWaitUntil:
     visible:
-      id: "parent-gateway"
+      id: "learner-screen"
     timeout: 15000
 
 # 3. Switch to child profile ("Test Teen")

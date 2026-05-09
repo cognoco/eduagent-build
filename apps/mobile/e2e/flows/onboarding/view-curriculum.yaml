@@ -30,7 +30,7 @@ tags:
 # 3. Intent card stack should be present on home screen.
 # [BUG-989] Use extendedWaitUntil so a slow first-render of useSubjects (e.g.
 # fresh sign-in + cold-start cache) doesn't surface as a flaky test. Kept
-# optional because the seed scenario could land on a parent gateway that
+# optional because the seed scenario could land on a learner screen that
 # doesn't carry the carousel testID.
 - extendedWaitUntil:
     visible:

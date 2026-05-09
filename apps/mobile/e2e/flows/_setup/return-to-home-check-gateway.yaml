@@ -1,11 +1,11 @@
 # BUG-566: Second guard in the return-to-home chain.
-# Only press Back if parent-gateway is ALSO not visible.
-# parent-with-children scenario lands on ParentGateway (testID: parent-gateway),
+# Only press Back if learner-screen is ALSO not visible.
+# parent-with-children scenario lands on LearnerScreen (testID: learner-screen),
 # which is neither learner-screen nor dashboard-scroll.
 appId: com.mentomate.app
 ---
 - runFlow:
     when:
       notVisible:
-        id: "parent-gateway"
+        id: "learner-screen"
     file: return-to-home.yaml

@@ -25,7 +25,7 @@ jest.mock('../../../lib/theme', () => ({
 jest.mock('../../../lib/navigation', () => ({
   goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
   homeHrefForReturnTo: (returnTo: unknown) =>
-    returnTo === 'learner-home' ? '/(app)/home?view=learner' : '/(app)/home',
+    returnTo === 'learner-home' ? '/(app)/home' : '/(app)/home',
 }));
 
 jest.mock('../../../hooks/use-progress', () => ({
@@ -97,7 +97,7 @@ describe('PracticeScreen', () => {
     fireEvent.press(screen.getByTestId('practice-back'));
     expect(mockGoBackOrReplace).toHaveBeenCalledWith(
       expect.anything(),
-      '/(app)/home?view=learner',
+      '/(app)/home',
     );
   });
 

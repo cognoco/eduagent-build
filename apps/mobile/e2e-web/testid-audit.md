@@ -27,15 +27,14 @@ runtime-critical.
 | `intent-homework` | `components/home/LearnerScreen.tsx` | ✅ smoke runtime | J-01 |
 | `intent-continue` | `components/home/LearnerScreen.tsx` | ✅ source audit | Runtime coverage lands with later journeys |
 | `intent-quiz-discovery` | `components/home/LearnerScreen.tsx` | ✅ source audit | Runtime coverage lands with later journeys |
-| `parent-gateway` | `components/home/ParentGateway.tsx` | ✅ smoke runtime | J-03 |
-| `gateway-check-progress` | `components/home/ParentGateway.tsx` | ✅ smoke runtime | J-03 |
-| `gateway-learn` | `components/home/ParentGateway.tsx` | ✅ smoke runtime | J-03 |
+| `learner-screen` | `components/home/LearnerScreen.tsx` | ✅ smoke runtime | J-03 |
+| `home-child-card` | `components/home/LearnerScreen.tsx` | ✅ smoke runtime | J-03 |
+| `home-action-study-new` | `components/home/LearnerScreen.tsx` | ✅ smoke runtime | J-03 |
 | `profile-switcher-chip` | `components/common/ProfileSwitcher.tsx` | ✅ source audit | Needed by phase 2 journeys |
 | `profile-switcher-menu` | `components/common/ProfileSwitcher.tsx` | ✅ source audit | Needed by phase 2 journeys |
 | `profile-option-{id}` | `components/common/ProfileSwitcher.tsx` | ✅ source audit | Dynamic `testID` already implemented |
 | `post-approval-landing` | `app/(app)/_layout.tsx` | ✅ smoke runtime | Auth setup — overlay after consent |
 | `post-approval-continue` | `app/(app)/_layout.tsx` | ✅ smoke runtime | Auth setup — dismiss overlay |
-| `learner-back` | `components/home/LearnerScreen.tsx` | ✅ source audit | J-04 — back from inline learner to parent |
 | `dashboard-child-{id}` | `components/coaching/ParentDashboardSummary.tsx` | ✅ source audit | J-07 — per-child dashboard card (dynamic) |
 | `dashboard-back` | `app/(app)/dashboard.tsx` | ✅ source audit | J-07 — back from dashboard to home |
 | `dashboard-scroll` | `app/(app)/dashboard.tsx` | ✅ source audit | J-07 — dashboard scroll container |
@@ -77,8 +76,8 @@ runtime-critical.
 | `consent-pending-gate` | `app/(app)/_layout.tsx` | ✅ smoke runtime | J-13, J-14 — consent pending blocker |
 | `consent-check-again` | `app/(app)/_layout.tsx` | ✅ smoke runtime | J-13 — re-check consent |
 | `profile-loading` | `app/(app)/_layout.tsx` | ✅ smoke runtime | J-14 — loading spinner |
-| `add-first-child-screen` | `components/home/ParentGateway.tsx` | ✅ smoke runtime | J-15 — add first child empty state |
-| `add-first-child-cta` | `components/home/ParentGateway.tsx` | ✅ smoke runtime | J-15 — add child CTA |
+| `add-first-child-screen` | `components/home/LearnerScreen.tsx` | ✅ smoke runtime | J-15 — add first child empty state |
+| `add-first-child-cta` | `components/home/LearnerScreen.tsx` | ✅ smoke runtime | J-15 — add child CTA |
 | `subject-topics-scroll` | `app/(app)/child/[profileId]/subject.tsx` | ✅ smoke runtime | J-16 — subject topics list |
 | `topic-card-{id}` | `components/coaching/TopicCard.tsx` | ✅ smoke runtime | J-16, J-17 — dynamic topic card |
 | `topic-detail-screen` | `app/(app)/child/[profileId]/topic.tsx` | ✅ smoke runtime | J-16, J-17 — topic detail |

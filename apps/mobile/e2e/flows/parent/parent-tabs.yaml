@@ -5,7 +5,7 @@
 #
 # Journey: UX Journey 4 (Parent Oversight)
 # Tab bar:
-#   "Home"          → ParentGateway    (testID: parent-gateway)
+#   "Home"          → LearnerScreen    (testID: learner-screen)
 #   "Family"        → family.tsx       (testID: dashboard-scroll)
 #   "Library"       → library.tsx      (testID: shelves-list)
 #   "More"          → more.tsx         (testID: sign-out-button)
@@ -24,12 +24,12 @@ tags:
 # 2. Wait for parent Home gateway
 - extendedWaitUntil:
     visible:
-      id: "parent-gateway"
+      id: "learner-screen"
     timeout: 15000
 
 # 3. Verify Home gateway content
 - assertVisible:
-    id: "gateway-check-progress"
+    id: "home-child-card"
 
 # 4. Screenshot: Home tab (gateway)
 - takeScreenshot: parent-tabs-01-home
@@ -108,7 +108,7 @@ tags:
 # 16. Verify Home gateway is visible again
 - extendedWaitUntil:
     visible:
-      id: "parent-gateway"
+      id: "learner-screen"
     timeout: 10000
 
 # 17. Final screenshot: back on Home tab

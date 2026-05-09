@@ -44,7 +44,7 @@ jest.mock('react-i18next', () => {
     const template = TRANSLATIONS[key] ?? key;
     if (!opts) return template;
     return template.replace(/\{\{(\w+)\}\}/g, (_: string, k: string) =>
-      String(opts[k] ?? `{{${k}}}`)
+      String(opts[k] ?? `{{${k}}}`),
     );
   };
   return { useTranslation: () => ({ t }) };
@@ -71,7 +71,9 @@ const mockFetch = createRoutedMockFetch({
 });
 
 jest.mock('../../../lib/api-client', () =>
-  require('../../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch)
+  require('../../../test-utils/mock-api-routes').mockApiClientFactory(
+    mockFetch,
+  ),
 );
 
 jest.mock('../../../lib/profile', () => ({
@@ -196,7 +198,7 @@ describe('QuizIndexScreen', () => {
 
     fireEvent.press(screen.getByTestId('quiz-back'));
 
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/home?view=learner');
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
     expect(mockBack).not.toHaveBeenCalled();
   });
 
@@ -275,7 +277,7 @@ describe('QuizIndexScreen', () => {
         screen.getByText(/Best: 2\/6 · Played: 1/);
         // Spanish card has no stat row — must show neutral fallback, not the Italian stats.
         expect(
-          screen.getAllByText(/Practice new words and phrases/).length
+          screen.getAllByText(/Practice new words and phrases/).length,
         ).toBeGreaterThanOrEqual(1);
       });
     });
@@ -325,7 +327,7 @@ describe('QuizIndexScreen', () => {
         await waitFor(() => {
           screen.getByText('Italian basics');
           screen.getByText(
-            /Stock starter words — record 5 of your own to unlock personalised rounds/
+            /Stock starter words — record 5 of your own to unlock personalised rounds/,
           );
           // The misleading "Vocabulary: Italian" title must NOT appear.
           expect(screen.queryByText('Vocabulary: Italian')).toBeNull();
@@ -368,7 +370,7 @@ describe('QuizIndexScreen', () => {
           () =>
             new Promise(() => {
               /* never resolves */
-            })
+            }),
         );
         render(<QuizIndexScreen />, { wrapper: Wrapper });
         // The card must appear immediately in starter framing — before vocab resolves.
@@ -436,10 +438,10 @@ describe('QuizIndexScreen', () => {
         const newCalls = mockFetch.mock.calls.length;
         // Both stats and subjects queries should have been refetched.
         expect(
-          fetchCallsMatching(mockFetch, '/quiz/stats').length
+          fetchCallsMatching(mockFetch, '/quiz/stats').length,
         ).toBeGreaterThanOrEqual(2);
         expect(
-          fetchCallsMatching(mockFetch, '/subjects').length
+          fetchCallsMatching(mockFetch, '/subjects').length,
         ).toBeGreaterThanOrEqual(2);
         expect(newCalls).toBeGreaterThan(callsBefore);
       });

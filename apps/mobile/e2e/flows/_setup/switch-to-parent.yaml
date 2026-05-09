@@ -21,6 +21,6 @@ appId: com.mentomate.app
 - tapOn:
     id: "persona-theme-parent"
 
-# 4. Enter the Family dashboard from the parent gateway.
+# 4. Enter the Family dashboard from the learner screen.
 - runFlow:
     file: open-family-dashboard.yaml

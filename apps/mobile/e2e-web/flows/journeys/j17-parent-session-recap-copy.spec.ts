@@ -14,11 +14,11 @@ test('J-17 parent opens a session recap and copies the conversation prompt', asy
   const sessionId = seed.ids.session1Id;
 
   await page.goto('/home', { waitUntil: 'commit' });
-  await expect(page.getByTestId('parent-gateway')).toBeVisible({
+  await expect(page.getByTestId('learner-screen')).toBeVisible({
     timeout: 60_000,
   });
 
-  await page.getByTestId('gateway-check-progress').click();
+  await page.getByTestId('home-child-card').click();
   await page.getByTestId(`dashboard-child-${childProfileId}-primary`).click();
   await page.getByTestId(`subject-card-${subjectId}`).click();
   await page
@@ -26,7 +26,7 @@ test('J-17 parent opens a session recap and copies the conversation prompt', asy
     .click();
   const topicDetail = page.getByTestId('topic-detail-screen');
   await expect(
-    topicDetail.getByTestId(`session-card-${sessionId}`)
+    topicDetail.getByTestId(`session-card-${sessionId}`),
   ).toBeVisible({
     timeout: 30_000,
   });
@@ -42,6 +42,6 @@ test('J-17 parent opens a session recap and copies the conversation prompt', asy
 
   await copyConversation.click();
   await expect(page.getByTestId('session-recap-copy-prompt-toast')).toBeVisible(
-    { timeout: 30_000 }
+    { timeout: 30_000 },
   );
 });

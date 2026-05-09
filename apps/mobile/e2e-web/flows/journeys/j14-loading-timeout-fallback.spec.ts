@@ -15,13 +15,13 @@ test('J-14 profile loading resolves without dead-end', async ({ page }) => {
   await page.goto('/home', { waitUntil: 'commit' });
 
   // The app should resolve past profile-loading to a real screen.
-  // Accept learner home, parent gateway, or consent gate as valid states.
+  // Accept learner home, learner screen, or consent gate as valid states.
   const learnerScreen = page.getByTestId('learner-screen');
-  const parentGateway = page.getByTestId('parent-gateway');
+  const parentHome = page.getByTestId('learner-screen');
   const consentGate = page.getByTestId('consent-pending-gate');
   const profileLoading = page.getByTestId('profile-loading');
 
-  await expect(learnerScreen.or(parentGateway).or(consentGate)).toBeVisible({
+  await expect(learnerScreen.or(parentHome).or(consentGate)).toBeVisible({
     timeout: 60_000,
   });
 
