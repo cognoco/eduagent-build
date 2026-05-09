@@ -78,6 +78,14 @@ describe('ShelfRow', () => {
     screen.getByText('Paused');
   });
 
+  it('renders archived chip when status is archived', () => {
+    render(<ShelfRow {...defaultProps} status="archived" />);
+
+    screen.getByTestId('shelf-row-archived-sub-math');
+    screen.getByText('Archived');
+    expect(screen.queryByTestId('shelf-row-paused-sub-math')).toBeNull();
+  });
+
   it('does not render paused chip when isPaused is false', () => {
     render(<ShelfRow {...defaultProps} isPaused={false} />);
 
@@ -131,6 +139,13 @@ describe('ShelfRow', () => {
 
     const header = screen.getByTestId('shelf-row-header-sub-math');
     expect(header.props.accessibilityLabel).toContain('paused');
+  });
+
+  it('header accessibilityLabel includes archived state', () => {
+    render(<ShelfRow {...defaultProps} status="archived" />);
+
+    const header = screen.getByTestId('shelf-row-header-sub-math');
+    expect(header.props.accessibilityLabel).toContain('archived');
   });
 
   it('header accessibilityLabel mentions review needed when topics are overdue', () => {

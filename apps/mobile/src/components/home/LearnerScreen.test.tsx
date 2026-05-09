@@ -264,6 +264,28 @@ describe('LearnerScreen', () => {
     });
   });
 
+  it('labels subjects as preparing while curriculum is not ready', async () => {
+    mockFetch.setRoute('/subjects', {
+      subjects: [
+        {
+          id: 'sub-preparing',
+          name: 'Ancient History',
+          status: 'active',
+          curriculumStatus: 'preparing',
+        },
+      ],
+    });
+
+    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      screen.getByTestId('home-subject-card-sub-preparing');
+      screen.getByText('Ancient History');
+      screen.getByText('Preparing...');
+      expect(screen.queryByText('Open')).toBeNull();
+    });
+  });
+
   it('hides learner-only elements in parent proxy mode', async () => {
     mockFetch.setRoute('/subjects', {
       subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],

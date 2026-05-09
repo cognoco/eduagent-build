@@ -3,6 +3,7 @@ import {
   screen,
   fireEvent,
   waitFor,
+  act,
 } from '@testing-library/react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -42,7 +43,7 @@ const mockFetch = createRoutedMockFetch({
 jest.mock('react-i18next', () => require('../test-utils/mock-i18n').i18nMock);
 
 jest.mock('../lib/api-client', () =>
-  require('../test-utils/mock-api-routes').mockApiClientFactory(mockFetch)
+  require('../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
 );
 
 jest.mock('../lib/profile', () => ({
@@ -98,7 +99,7 @@ jest.mock(
   /* gc1-allow: error formatting */ () => ({
     formatApiError: (error: unknown) =>
       error instanceof Error ? error.message : 'Something went wrong',
-  })
+  }),
 );
 
 // NOT an API hook — keep as-is.
@@ -149,7 +150,7 @@ function defaultSubjectsHandler(url: string, init?: RequestInit): unknown {
     if (createSubjectShouldError) {
       return new Response(
         JSON.stringify({ message: createSubjectErrorMessage }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+        { status: 400, headers: { 'Content-Type': 'application/json' } },
       );
     }
     return (
@@ -197,7 +198,7 @@ describe('CreateSubjectScreen', () => {
     mockFetch.setRoute('/subjects/resolve', defaultResolveHandler);
     mockFetch.setRoute(
       '/sessions/first-curriculum',
-      defaultFirstCurriculumHandler
+      defaultFirstCurriculumHandler,
     );
     mockFetch.setRoute('/subjects', defaultSubjectsHandler);
     Wrapper = createWrapper();
@@ -243,6 +244,104 @@ describe('CreateSubjectScreen', () => {
       const body = extractJsonBody<{ rawInput: string }>(resolveCalls[0]?.init);
       expect(body?.rawInput).toBe('Math');
     });
+  });
+
+  it('shows the book page flip animation while checking the subject name', async () => {
+    let resolveCheck!: (v: unknown) => void;
+    const pendingResolve = new Promise((resolve) => {
+      resolveCheck = resolve;
+    });
+
+    mockFetch.setRoute('/subjects/resolve', () => pendingResolve);
+
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'History');
+    fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+    await waitFor(() => {
+      screen.getByTestId('subject-book-loading');
+      screen.getByText('Checking subject name...');
+      expect(screen.queryByTestId('create-subject-submit')).toBeNull();
+    });
+
+    await act(async () => {
+      resolveCheck({
+        status: 'ambiguous',
+        displayMessage: 'A few nearby subjects came up.',
+        suggestions: [
+          { name: 'Ancient History', description: 'Older civilizations' },
+        ],
+      });
+    });
+
+    await waitFor(() => {
+      screen.getByTestId('subject-suggestion-option-0');
+    });
+  });
+
+  it('keeps the book page flip animation while first curriculum is prepared', async () => {
+    jest.useFakeTimers();
+    try {
+      setResolveResponse({
+        status: 'direct_match',
+        resolvedName: 'Ancient History',
+        suggestions: [],
+        displayMessage: 'Ancient History works.',
+      });
+      createSubjectResponse = {
+        subject: { id: 'subject-history', name: 'Ancient History' },
+      };
+
+      let firstCurriculumCalls = 0;
+      mockFetch.setRoute('/sessions/first-curriculum', () => {
+        firstCurriculumCalls++;
+        if (firstCurriculumCalls === 1) {
+          return new Response(
+            JSON.stringify({
+              code: 'CONFLICT',
+              message: 'Curriculum is still being prepared',
+            }),
+            { status: 409, headers: { 'Content-Type': 'application/json' } },
+          );
+        }
+        return defaultFirstCurriculumHandler;
+      });
+
+      render(<CreateSubjectScreen />, { wrapper: Wrapper });
+
+      fireEvent.changeText(
+        screen.getByTestId('create-subject-name'),
+        'Ancient History',
+      );
+      fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+      await waitFor(() => {
+        screen.getByTestId('subject-book-loading');
+        screen.getByText('Preparing your first lesson...');
+        expect(screen.queryByTestId('create-subject-error')).toBeNull();
+      });
+
+      await act(async () => {
+        jest.advanceTimersByTime(2_000);
+      });
+
+      await waitFor(() => {
+        expect(firstCurriculumCalls).toBe(2);
+        expect(mockReplace).toHaveBeenCalledWith({
+          pathname: '/(app)/session',
+          params: {
+            mode: 'learning',
+            subjectId: 'subject-history',
+            subjectName: 'Ancient History',
+            sessionId: 'session-first',
+            topicId: 'topic-first',
+          },
+        });
+      });
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('reveals the clarify input when Something else is pressed', async () => {
@@ -303,7 +402,7 @@ describe('CreateSubjectScreen', () => {
     fireEvent.press(screen.getByTestId('subject-something-else'));
     fireEvent.changeText(
       screen.getByTestId('subject-clarify-input'),
-      'leaf cutter ants'
+      'leaf cutter ants',
     );
     fireEvent.press(screen.getByTestId('subject-clarify-submit'));
 
@@ -316,11 +415,11 @@ describe('CreateSubjectScreen', () => {
     await waitFor(() => {
       const createCalls = fetchCallsMatching(mockFetch, '/subjects').filter(
         (c: { url: string; init?: RequestInit }) =>
-          c.init?.method === 'POST' && !c.url.includes('/resolve')
+          c.init?.method === 'POST' && !c.url.includes('/resolve'),
       );
       expect(createCalls.length).toBeGreaterThanOrEqual(1);
       const body = extractJsonBody<{ name: string; rawInput: string }>(
-        createCalls[0]?.init
+        createCalls[0]?.init,
       );
       expect(body?.name).toBe('leaf cutter ants');
       expect(body?.rawInput).toBe('leaf cutter ants');
@@ -409,7 +508,7 @@ describe('CreateSubjectScreen', () => {
     await waitFor(() => {
       const createCalls = fetchCallsMatching(mockFetch, '/subjects').filter(
         (c: { url: string; init?: RequestInit }) =>
-          c.init?.method === 'POST' && !c.url.includes('/resolve')
+          c.init?.method === 'POST' && !c.url.includes('/resolve'),
       );
       expect(createCalls.length).toBeGreaterThanOrEqual(1);
       const body = extractJsonBody<{
@@ -482,7 +581,7 @@ describe('CreateSubjectScreen', () => {
       // When the suggestion has an explicit focus, use that instead of deriving
       const createCalls = fetchCallsMatching(mockFetch, '/subjects').filter(
         (c: { url: string; init?: RequestInit }) =>
-          c.init?.method === 'POST' && !c.url.includes('/resolve')
+          c.init?.method === 'POST' && !c.url.includes('/resolve'),
       );
       expect(createCalls.length).toBeGreaterThanOrEqual(1);
       const body = extractJsonBody<{
@@ -538,7 +637,7 @@ describe('CreateSubjectScreen', () => {
     await waitFor(() => {
       const createCalls = fetchCallsMatching(mockFetch, '/subjects').filter(
         (c: { url: string; init?: RequestInit }) =>
-          c.init?.method === 'POST' && !c.url.includes('/resolve')
+          c.init?.method === 'POST' && !c.url.includes('/resolve'),
       );
       expect(createCalls.length).toBeGreaterThanOrEqual(1);
       const body = extractJsonBody<{
@@ -596,7 +695,7 @@ describe('CreateSubjectScreen', () => {
       // Should split "Biology — Botany" → subjectName "Botany", focus "tea"
       const createCalls = fetchCallsMatching(mockFetch, '/subjects').filter(
         (c: { url: string; init?: RequestInit }) =>
-          c.init?.method === 'POST' && !c.url.includes('/resolve')
+          c.init?.method === 'POST' && !c.url.includes('/resolve'),
       );
       expect(createCalls.length).toBeGreaterThanOrEqual(1);
       const body = extractJsonBody<{
@@ -756,7 +855,7 @@ describe('CreateSubjectScreen', () => {
 
     expect(mockBack).toHaveBeenCalled();
     expect(mockReplace).not.toHaveBeenCalledWith(
-      expect.stringContaining('library')
+      expect.stringContaining('library'),
     );
   });
 
@@ -807,7 +906,7 @@ describe('CreateSubjectScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('create-subject-name'),
-      'World History'
+      'World History',
     );
     fireEvent.press(screen.getByTestId('create-subject-submit'));
 
@@ -825,7 +924,7 @@ describe('CreateSubjectScreen', () => {
 
     // Must NOT navigate to picker or library — that was the bug
     expect(mockReplace).not.toHaveBeenCalledWith(
-      expect.objectContaining({ pathname: '/(app)/pick-book/[subjectId]' })
+      expect.objectContaining({ pathname: '/(app)/pick-book/[subjectId]' }),
     );
   });
 
@@ -860,7 +959,7 @@ describe('CreateSubjectScreen', () => {
 
     // Must NOT navigate to session
     expect(mockReplace).not.toHaveBeenCalledWith(
-      expect.objectContaining({ pathname: '/(app)/session' })
+      expect.objectContaining({ pathname: '/(app)/session' }),
     );
   });
 
@@ -941,7 +1040,7 @@ describe('CreateSubjectScreen', () => {
 
     screen.getByTestId('not-sure-hint');
     expect(
-      screen.getByText(/Not sure\? Just describe what interests you/)
+      screen.getByText(/Not sure\? Just describe what interests you/),
     ).toBeTruthy();
   });
 
@@ -988,7 +1087,7 @@ describe('CreateSubjectScreen', () => {
     await waitFor(() => {
       const createCalls = fetchCallsMatching(mockFetch, '/subjects').filter(
         (c: { url: string; init?: RequestInit }) =>
-          c.init?.method === 'POST' && !c.url.includes('/resolve')
+          c.init?.method === 'POST' && !c.url.includes('/resolve'),
       );
       expect(createCalls.length).toBeGreaterThanOrEqual(1);
     });
@@ -1009,7 +1108,7 @@ describe('CreateSubjectScreen', () => {
     // (The cancel replaces to home/library, not to the first session)
     const hasOnboardingNav = replaceCalls.some(
       (call) =>
-        typeof call[0] === 'object' && call[0]?.pathname === '/(app)/session'
+        typeof call[0] === 'object' && call[0]?.pathname === '/(app)/session',
     );
     expect(hasOnboardingNav).toBe(false);
   });
@@ -1026,7 +1125,7 @@ describe('CreateSubjectScreen', () => {
         resolvedName: 'Science',
         suggestions: [],
         displayMessage: 'Science it is.',
-      }))
+      })),
     );
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
@@ -1046,7 +1145,7 @@ describe('CreateSubjectScreen', () => {
     // createSubject must NOT have been called — cancelled before it ran
     const createCalls = fetchCallsMatching(mockFetch, '/subjects').filter(
       (c: { url: string; init?: RequestInit }) =>
-        c.init?.method === 'POST' && !c.url.includes('/resolve')
+        c.init?.method === 'POST' && !c.url.includes('/resolve'),
     );
     expect(createCalls.length).toBe(0);
     // No post-cancel navigation from the mutation result
@@ -1078,13 +1177,13 @@ describe('CreateSubjectScreen', () => {
 
     const subjectCallsBefore = fetchCallsMatching(
       mockFetch,
-      '/subjects'
+      '/subjects',
     ).length;
     fireEvent.press(screen.getByTestId('subjects-load-error-retry'));
 
     await waitFor(() => {
       expect(fetchCallsMatching(mockFetch, '/subjects').length).toBeGreaterThan(
-        subjectCallsBefore
+        subjectCallsBefore,
       );
     });
   });
@@ -1112,7 +1211,7 @@ describe('CreateSubjectScreen', () => {
 
     // Lighter "We'll start with" message
     expect(screen.getByTestId('subject-confident-message').props.children).toBe(
-      "We'll start with Italian."
+      "We'll start with Italian.",
     );
 
     // Primary button says "Start", secondary says "Change"
@@ -1141,7 +1240,7 @@ describe('CreateSubjectScreen', () => {
     });
 
     expect(screen.getByTestId('subject-confident-message').props.children).toBe(
-      "We'll start with Calculus."
+      "We'll start with Calculus.",
     );
     expect(screen.getByText('Start')).toBeTruthy();
     expect(screen.getByText('Change')).toBeTruthy();
@@ -1210,7 +1309,7 @@ describe('CreateSubjectScreen', () => {
       expect(screen.queryByTestId('subject-confident-card')).toBeNull();
     });
     expect(screen.getByTestId('create-subject-name').props.value).toBe(
-      'Italian'
+      'Italian',
     );
   });
 
@@ -1285,7 +1384,7 @@ describe('CreateSubjectScreen — keyboard avoiding behavior', () => {
     const path = require('path');
     const src = fs.readFileSync(
       path.join(__dirname, 'create-subject.tsx'),
-      'utf8'
+      'utf8',
     );
     // The KeyboardAvoidingView block must contain Platform.select with
     // both ios and android keys.

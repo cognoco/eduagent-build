@@ -1,7 +1,12 @@
 import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import type { LibrarySearchResult, RetentionStatus } from '@eduagent/schemas';
+
+import type {
+  LibrarySearchResult,
+  RetentionStatus,
+  SubjectStatus,
+} from '@eduagent/schemas';
 
 import { useSubjectTint, useThemeColors } from '../../lib/theme';
 import { ShelfRow } from './ShelfRow';
@@ -15,6 +20,7 @@ export interface EnrichedSubjectResult {
   reviewDueCount: number;
   isFinished: boolean;
   isPaused: boolean;
+  status?: SubjectStatus;
 }
 
 interface LibrarySearchResultsProps {
@@ -395,7 +401,9 @@ export function LibrarySearchResults({
               topicProgress={subject.topicProgress}
               reviewDueCount={subject.reviewDueCount}
               isFinished={subject.isFinished}
-              isPaused={subject.isPaused}
+              status={
+                subject.status ?? (subject.isPaused ? 'paused' : 'active')
+              }
               onPress={onSubjectPress}
             />
           ))}

@@ -1,6 +1,9 @@
 import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+
+import type { SubjectStatus } from '@eduagent/schemas';
+
 import { useSubjectTint, useThemeColors } from '../../lib/theme';
 
 interface ShelfRowProps {
@@ -10,7 +13,8 @@ interface ShelfRowProps {
   topicProgress: string; // "18/32"
   reviewDueCount: number;
   isFinished: boolean;
-  isPaused: boolean;
+  isPaused?: boolean;
+  status?: SubjectStatus;
   onPress: (subjectId: string) => void;
   testID?: string;
 }
@@ -22,13 +26,38 @@ export function ShelfRow({
   topicProgress,
   reviewDueCount,
   isFinished,
-  isPaused,
+  isPaused = false,
+  status,
   onPress,
   testID,
 }: ShelfRowProps): React.ReactElement {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const tint = useSubjectTint(name || subjectId);
+  const rowStatus = status ?? (isPaused ? 'paused' : 'active');
+  const isInactive = rowStatus !== 'active';
+  const statusSuffix =
+    rowStatus === 'paused'
+      ? t('library.row.shelfPausedSuffix')
+      : rowStatus === 'archived'
+        ? t('library.row.shelfArchivedSuffix')
+        : '';
+  const statusChip =
+    rowStatus === 'paused'
+      ? {
+          testID: `shelf-row-paused-${subjectId}`,
+          label: t('library.row.paused'),
+          backgroundColor: colors.warning + '22',
+          color: colors.warning,
+        }
+      : rowStatus === 'archived'
+        ? {
+            testID: `shelf-row-archived-${subjectId}`,
+            label: t('library.row.archived'),
+            backgroundColor: colors.textSecondary + '22',
+            color: colors.textSecondary,
+          }
+        : null;
 
   // i18next pluralization picks shelfSubtitle_one vs shelfSubtitle_other based
   // on count, so the singular/plural form moves with the locale's plural rules
@@ -42,7 +71,7 @@ export function ShelfRow({
   const showFinished = isFinished && !needsReview;
 
   return (
-    <View style={{ opacity: isPaused ? 0.65 : 1 }}>
+    <View style={{ opacity: isInactive ? 0.65 : 1 }}>
       {/* Header row */}
       <Pressable
         testID={testID ?? `shelf-row-header-${subjectId}`}
@@ -51,7 +80,7 @@ export function ShelfRow({
         accessibilityLabel={t('library.row.shelfAccessibilityLabel', {
           name,
           subtitle,
-          pausedSuffix: isPaused ? t('library.row.shelfPausedSuffix') : '',
+          pausedSuffix: statusSuffix,
           reviewSuffix: needsReview
             ? t('library.row.shelfReviewSuffix')
             : showFinished
@@ -104,24 +133,24 @@ export function ShelfRow({
 
         {/* Right side: paused chip + status pill + chevron */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          {isPaused ? (
+          {statusChip ? (
             <View
-              testID={`shelf-row-paused-${subjectId}`}
+              testID={statusChip.testID}
               style={{
                 paddingHorizontal: 8,
                 paddingVertical: 2,
                 borderRadius: 10,
-                backgroundColor: colors.warning + '22',
+                backgroundColor: statusChip.backgroundColor,
               }}
             >
               <Text
                 style={{
                   fontSize: 11,
                   fontWeight: '500',
-                  color: colors.warning,
+                  color: statusChip.color,
                 }}
               >
-                {t('library.row.paused')}
+                {statusChip.label}
               </Text>
             </View>
           ) : null}

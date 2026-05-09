@@ -199,15 +199,19 @@ export function LearnerScreen({
         const total = progress?.topicsTotal ?? 0;
         const completed = progress?.topicsCompleted ?? 0;
 
-        let hint = 'Open';
+        let hint = s.curriculumStatus === 'preparing' ? 'Preparing...' : 'Open';
         if (
+          s.curriculumStatus !== 'preparing' &&
           resumeTarget?.subjectId === s.id &&
           ['active_session', 'paused_session'].includes(resumeTarget.resumeKind)
         ) {
           hint = `Continue ${resumeTarget.topicTitle ?? s.name}`;
-        } else if (reviewSummary?.nextReviewTopic?.subjectId === s.id) {
+        } else if (
+          s.curriculumStatus !== 'preparing' &&
+          reviewSummary?.nextReviewTopic?.subjectId === s.id
+        ) {
           hint = `Quiz: ${reviewSummary.nextReviewTopic.topicTitle}`;
-        } else if (completed > 0) {
+        } else if (s.curriculumStatus !== 'preparing' && completed > 0) {
           hint = `Practice: ${s.name}`;
         }
 
