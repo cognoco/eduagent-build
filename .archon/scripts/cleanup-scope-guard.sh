@@ -109,6 +109,45 @@ if [[ ${#violations[@]} -gt 0 ]]; then
         echo "  - ${f}" >&2
     done
     echo "Details written to: ${violation_file}" >&2
+
+    # File a Notion P1 so the human gets a clear handoff instead of digging
+    # for scope-violation.md in the artifacts dir. Best-effort: if Notion
+    # filing fails, we still exit 1 with the original violation.
+    pr_id="$(grep -oE 'PR-[0-9]+' "$wo" 2>/dev/null | head -1 || true)"
+    pr_id="${pr_id:-unknown}"
+    if [[ -d "${artifacts_dir}/review" ]]; then
+        node_label="cleanup-scope-guard-post-fix"
+    else
+        node_label="cleanup-scope-guard-post-implement"
+    fi
+    {
+        printf 'Workflow stopped: `%s` detected files changed that are not in the work-order.\n\n' "$node_label"
+        printf '**Unexpected files:**\n\n'
+        for f in "${violations[@]}"; do printf -- '- `%s`\n' "$f"; done
+        printf '\n**Most likely cause:** the work-order'\''s Files-claimed list is incomplete. The implement / fix-locally step touched a file as a natural consequence of the change (e.g. updating an integration test that referenced a deleted path), but `docs/audit/cleanup-plan.md` does not list that file under %s.\n\n' "$pr_id"
+        printf '**To resolve:**\n\n'
+        printf '1. Read the full report: `%s`\n' "$violation_file"
+        printf '2. Confirm the unexpected file(s) are legitimately part of this work.\n'
+        printf '3. Add them to %s'\''s Files-claimed list in `docs/audit/cleanup-plan.md`.\n' "$pr_id"
+        printf '4. Re-run the workflow.\n\n'
+        printf '**Run artifacts:** `%s`\n' "$artifacts_dir"
+    } > "${artifacts_dir}/scope-violation-followup-body.md"
+
+    followup_script="$(dirname "${BASH_SOURCE[0]}")/append-followup.sh"
+    if [[ -x "$followup_script" ]]; then
+        "$followup_script" \
+            --from "$node_label" \
+            --pr "$pr_id" \
+            --severity P1 \
+            --platform CI \
+            --title "Scope guard fired: work-order incomplete for ${pr_id}" \
+            --body "$(cat "${artifacts_dir}/scope-violation-followup-body.md")" \
+            >&2 \
+            || echo "WARNING: follow-up filer failed; relying on stderr report and scope-violation.md only." >&2
+    else
+        echo "WARNING: append-followup.sh not executable; skipping Notion ticket." >&2
+    fi
+
     exit 1
 fi
 
