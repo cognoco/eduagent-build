@@ -250,7 +250,8 @@
       "bigOnlyTitle": "Solo grandes hitos",
       "bigOnlyDescription": "Mantén Cometa y Cinturón de Orión, omite las animaciones más pequeñas",
       "offTitle": "Desactivado",
-      "offDescription": "Sigue los hitos discretamente sin animaciones"
+      "offDescription": "Sigue los hitos discretamente sin animaciones",
+      "inlinePrompt": "Celebraciones"
     },
     "notifications": {
       "sectionHeader": "Notificaciones",
@@ -285,7 +286,8 @@
     },
     "help": {
       "contactSupportTitle": "Contactar a soporte",
-      "contactSupportMessage": "Envía un correo a support@mentomate.app para obtener ayuda con tu cuenta."
+      "contactSupportMessage": "Envía un correo a support@mentomate.app para obtener ayuda con tu cuenta.",
+      "helpAndFeedback": "Ayuda y comentarios"
     },
     "errors": {
       "tryAgain": "Inténtalo de nuevo.",
@@ -312,7 +314,17 @@
       "withdrawalArchiveAlwaysDescription": "13+ accounts only. Under-13 always deletes immediately for privacy compliance.",
       "withdrawalArchiveNever": "Never archive - delete immediately",
       "withdrawalArchiveNeverDescription": "Delete at grace expiry instead of keeping a 30-day archive.",
-      "withdrawalArchiveError": "Couldn't update setting. Try again."
+      "withdrawalArchiveError": "Couldn't update setting. Try again.",
+      "privacyAndData": "Privacidad y datos"
+    },
+    "sections": {
+      "settings": "Configuración"
+    },
+    "subscreens": {
+      "notifications": "Notificaciones",
+      "account": "Cuenta",
+      "privacy": "Privacidad y datos",
+      "help": "Ayuda y comentarios"
     }
   },
   "session": {

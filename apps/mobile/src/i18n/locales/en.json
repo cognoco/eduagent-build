@@ -245,6 +245,7 @@
     },
     "celebrations": {
       "sectionHeader": "Your celebrations",
+      "inlinePrompt": "Celebrations",
       "allTitle": "All celebrations",
       "allDescription": "Show every milestone, including quick wins",
       "bigOnlyTitle": "Big milestones only",
@@ -263,6 +264,7 @@
     },
     "privacy": {
       "sectionHeader": "Privacy",
+      "privacyAndData": "Privacy & data",
       "withdrawalArchiveTitle": "When I withdraw consent for a child",
       "withdrawalArchiveAuto": "Automatic",
       "withdrawalArchiveAutoDescription": "Under-13 accounts are deleted at grace expiry. 13+ accounts are archived for 30 days, then deleted.",
@@ -295,8 +297,18 @@
       "preparingExport": "Preparing export..."
     },
     "help": {
+      "helpAndFeedback": "Help & feedback",
       "contactSupportTitle": "Contact support",
       "contactSupportMessage": "Email support@mentomate.app for help with your account."
+    },
+    "sections": {
+      "settings": "Settings"
+    },
+    "subscreens": {
+      "notifications": "Notifications",
+      "account": "Account",
+      "privacy": "Privacy & data",
+      "help": "Help & feedback"
     },
     "errors": {
       "tryAgain": "Please try again.",

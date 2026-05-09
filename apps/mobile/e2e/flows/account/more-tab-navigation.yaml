@@ -185,7 +185,7 @@ tags:
 # Verify we're back on More
 - extendedWaitUntil:
     visible:
-      text: "Account"
+      text: "Privacy Policy"
     timeout: 10000
 
 # ── Destination 4: Terms of Service (standalone route — Back returns to More) ──
@@ -217,7 +217,7 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      text: "Account"
+      text: "Terms of Service"
     timeout: 10000
 
 # ── Destination 5: Export my data (alert — stays on More screen) ──

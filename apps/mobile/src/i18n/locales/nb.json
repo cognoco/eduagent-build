@@ -250,7 +250,8 @@
       "bigOnlyTitle": "Kun store milepæler",
       "bigOnlyDescription": "Behold de store feiringene, hopp over de mindre",
       "offTitle": "Av",
-      "offDescription": "Spor milepæler stille uten animasjoner"
+      "offDescription": "Spor milepæler stille uten animasjoner",
+      "inlinePrompt": "Feiringer"
     },
     "notifications": {
       "sectionHeader": "Varsler",
@@ -285,7 +286,8 @@
     },
     "help": {
       "contactSupportTitle": "Kontakt kundestøtte",
-      "contactSupportMessage": "Send e-post til support@mentomate.app for hjelp med kontoen din."
+      "contactSupportMessage": "Send e-post til support@mentomate.app for hjelp med kontoen din.",
+      "helpAndFeedback": "Hjelp og tilbakemeldinger"
     },
     "errors": {
       "tryAgain": "Prøv igjen.",
@@ -312,7 +314,17 @@
       "withdrawalArchiveAlwaysDescription": "Gjelder kun kontoer fra 13 år. Kontoer under 13 år slettes alltid umiddelbart av personvernhensyn.",
       "withdrawalArchiveNever": "Arkiver aldri – slett umiddelbart",
       "withdrawalArchiveNeverDescription": "Slett ved fristens utløp i stedet for å beholde et 30-dagers arkiv.",
-      "withdrawalArchiveError": "Kunne ikke oppdatere innstillingen. Prøv igjen."
+      "withdrawalArchiveError": "Kunne ikke oppdatere innstillingen. Prøv igjen.",
+      "privacyAndData": "Personvern og data"
+    },
+    "sections": {
+      "settings": "Innstillinger"
+    },
+    "subscreens": {
+      "notifications": "Varsler",
+      "account": "Konto",
+      "privacy": "Personvern og data",
+      "help": "Hjelp og tilbakemeldinger"
     }
   },
   "session": {
