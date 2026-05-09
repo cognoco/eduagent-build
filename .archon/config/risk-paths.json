@@ -1,0 +1,24 @@
+{
+  "auth": [
+    "apps/api/src/middleware/auth.ts",
+    "apps/api/src/middleware/jwt.ts",
+    "apps/api/src/middleware/profile-scope.ts",
+    "apps/api/src/routes/auth.ts",
+    "apps/api/src/routes/account.ts",
+    "packages/schemas/src/auth.ts"
+  ],
+  "billing": [
+    "apps/api/src/routes/billing.ts",
+    "apps/api/src/routes/stripe-webhook.ts",
+    "apps/api/src/routes/revenuecat-webhook.ts",
+    "apps/api/src/services/billing/**"
+  ],
+  "migrations": [
+    "packages/database/src/migrations/**",
+    "packages/database/drizzle/**"
+  ],
+  "thresholds": {
+    "tiny": { "max_files": 5, "max_lines": 100 },
+    "risky": { "min_files": 20, "min_lines": 800 }
+  }
+}

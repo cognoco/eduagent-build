@@ -1,5 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "_comment": "includeGitInstructions disabled because the /commit skill (.claude/skills/commit/SKILL.md) is the single source of truth for git commit/push behavior. CLAUDE.md Git Commits section pins this. Do not enable without coordinating with commit skill governance.",
-  "includeGitInstructions": false
+  "includeGitInstructions": false,
+  "plansDirectory": "./plans"
 }

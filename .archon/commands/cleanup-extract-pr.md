@@ -96,15 +96,12 @@ The implementer needs this for context.
 
 ---
 
-## Phase 2: CONTEXT — Read Codebase Rules
+## Phase 2: CONTEXT — Codebase Rules
 
-### 2.1 Read CLAUDE.md
+### 2.1 Codebase Rules
 
-```bash
-cat CLAUDE.md
-```
-
-Extract the rules most relevant to this PR's scope:
+CLAUDE.md is already loaded into your system prompt — do not re-read it.
+Identify the rules most relevant to this PR's scope:
 - Non-negotiable engineering rules
 - Repo-specific guardrails
 - Known exceptions (to avoid "fixing" documented exceptions)
