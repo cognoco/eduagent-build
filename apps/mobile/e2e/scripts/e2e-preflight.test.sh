@@ -72,6 +72,40 @@ _spawn_slow_server() {
   return 1
 }
 
+# Spin up a mock proxy where the first request is slow (cold Metro transform)
+# and subsequent requests are fast. Preflight should warm then pass.
+_spawn_cold_then_fast_server() {
+  local port="$1" first_delay="$2"
+  node -e "
+    const http = require('http');
+    let count = 0;
+    const srv = http.createServer((req, res) => {
+      count += 1;
+      const delay = count === 1 ? ${first_delay} : 0;
+      setTimeout(() => {
+        res.writeHead(200, {'content-type':'application/javascript','content-length':'2'});
+        res.end('//');
+      }, delay * 1000);
+    });
+    srv.listen(${port}, '127.0.0.1');
+  " &
+  local pid=$!
+  _MOCK_PIDS+=("$pid")
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    if node -e "
+      const net=require('net');
+      const s=net.connect(${port},'127.0.0.1');
+      s.on('connect',()=>{s.end();process.exit(0)});
+      s.on('error',()=>process.exit(1));
+      setTimeout(()=>process.exit(1),500);
+    " 2>/dev/null; then
+      return 0
+    fi
+    sleep 0.2
+  done
+  return 1
+}
+
 # Spin up a mock /v1/health that returns 200 or 500.
 _spawn_api_mock() {
   local port="$1" health_status="${2:-200}" seed_status="${3:-200}"
@@ -152,9 +186,23 @@ else
   _tfail "check_bundle_proxy_fast rejected an absent optional proxy (rc=$rc). stderr: $(cat /tmp/pf_err_dead.txt)"
 fi
 
+# CASE 4: Cold first bundle should retry and PASS if the proxy is then fast.
+P=$(_next_port)
+_spawn_cold_then_fast_server "$P" 3 || _tfail "could not spawn cold mock proxy on $P"
+rc=0
+PREFLIGHT_PROXY_PORT=$P PREFLIGHT_METRO_HOST=127.0.0.1 \
+  PREFLIGHT_PROXY_MAX_SECONDS=2 \
+  check_bundle_proxy_fast >/dev/null 2>/tmp/pf_err_cold.txt || rc=$?
+if [ $rc -eq 0 ]; then
+  _tpass "accepts a cold first bundle when retry is fast"
+else
+  _tfail "check_bundle_proxy_fast rejected cold-then-fast proxy (rc=$rc). stderr: $(cat /tmp/pf_err_cold.txt)"
+fi
+_cleanup
+
 echo ""
 echo "─── check_metro_reachable ─────────────────────────────────────────────"
-# CASE 4: Metro not listening → fail.
+# CASE 5: Metro not listening → fail.
 PREFLIGHT_METRO_HOST=127.0.0.1 PREFLIGHT_METRO_PORT=19998 \
   check_metro_reachable >/dev/null 2>/tmp/pf_err_metro.txt
 if [ $? -ne 0 ] && grep -q "not reachable" /tmp/pf_err_metro.txt; then
@@ -165,7 +213,7 @@ fi
 
 echo ""
 echo "─── check_api_reachable ───────────────────────────────────────────────"
-# CASE 5: API returns 500 → fail.
+# CASE 6: API returns 500 → fail.
 P=$(_next_port)
 _spawn_api_mock "$P" 500 200 || _tfail "could not spawn 500-mock API on $P"
 rc=0
@@ -178,7 +226,7 @@ else
 fi
 _cleanup
 
-# CASE 6: API healthy → pass.
+# CASE 7: API healthy → pass.
 P=$(_next_port)
 _spawn_api_mock "$P" 200 200 || _tfail "could not spawn healthy mock API on $P"
 rc=0
@@ -193,7 +241,7 @@ fi
 echo ""
 echo "─── check_seed_secret_valid ───────────────────────────────────────────"
 
-# CASE 7: TEST_SEED_SECRET empty → fail with Doppler hint. (No API needed —
+# CASE 8: TEST_SEED_SECRET empty → fail with Doppler hint. (No API needed —
 # the check short-circuits before hitting the network.)
 rc=0
 PREFLIGHT_API_URL="http://127.0.0.1:${P}" \
@@ -206,7 +254,7 @@ else
 fi
 _cleanup
 
-# CASE 8: API returns 403 on seed (wrong secret) → fail.
+# CASE 9: API returns 403 on seed (wrong secret) → fail.
 P=$(_next_port)
 _spawn_api_mock "$P" 200 403 || _tfail "could not spawn 403-seed mock API on $P"
 rc=0
@@ -220,7 +268,7 @@ else
 fi
 _cleanup
 
-# CASE 9: Valid secret + API accepts → pass.
+# CASE 10: Valid secret + API accepts → pass.
 P=$(_next_port)
 _spawn_api_mock "$P" 200 200 || _tfail "could not spawn healthy mock API on $P"
 rc=0
@@ -235,7 +283,7 @@ fi
 
 echo ""
 echo "─── E2E_PREFLIGHT_SKIP honored ────────────────────────────────────────"
-# CASE 10: Escape hatch works.
+# CASE 11: Escape hatch works.
 E2E_PREFLIGHT_SKIP=1 run_preflight >/tmp/pf_skip_stdout.txt 2>&1
 if [ $? -eq 0 ] && grep -q "SKIPPED" /tmp/pf_skip_stdout.txt; then
   _tpass "E2E_PREFLIGHT_SKIP=1 bypasses checks"

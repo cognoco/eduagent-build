@@ -323,10 +323,24 @@ if [ $SKIP_TO_BUNDLE -eq 0 ]; then
   # Step C: Tap Metro server entry in launcher
   # Parse the dump to find the server entry's exact bounds.
   echo "[seed-and-run] Finding Metro server entry in UI dump ..."
-  # Try 8082 first (bundle proxy — BUG-7 workaround), then 10.0.2.2:any, then localhost:any
-  METRO_BOUNDS=$($ADB $DEVICE_FLAG exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null \
-    | first_bounds_for_text '^http://10\.0\.2\.2:8082$' || echo "")
+  METRO_REQUESTED_PORT=$(echo "$METRO_URL" | sed -n 's#.*:\([0-9][0-9]*\).*#\1#p')
+  METRO_BOUNDS=""
+  if [ -n "$METRO_REQUESTED_PORT" ]; then
+    for _ in 1 2 3 4 5; do
+      $ADB $DEVICE_FLAG shell uiautomator dump /sdcard/ui_dump.xml 2>/dev/null || true
+      METRO_BOUNDS=$($ADB $DEVICE_FLAG exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null \
+        | first_bounds_for_text "^http://10\.0\.2\.2:${METRO_REQUESTED_PORT}$" || echo "")
+      if [ -n "$METRO_BOUNDS" ]; then
+        break
+      fi
+      sleep 2
+    done
+  fi
   if [ -z "$METRO_BOUNDS" ]; then
+    METRO_BOUNDS=$($ADB $DEVICE_FLAG exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null \
+      | first_bounds_for_text '^http://10\.0\.2\.2:8082$' || echo "")
+  fi
+  if [ -z "$METRO_BOUNDS" ] && [ "${METRO_REQUESTED_PORT:-}" != "8082" ]; then
     METRO_BOUNDS=$($ADB $DEVICE_FLAG exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null \
       | first_bounds_for_text '^http://10\.0\.2\.2:[0-9]+$' || echo "")
   fi
@@ -343,6 +357,11 @@ if [ $SKIP_TO_BUNDLE -eq 0 ]; then
     X1=${X1:-0}; Y1=${Y1:-0}; X2=${X2:-0}; Y2=${Y2:-0}
     TAP_X=$(( (X1 + X2) / 2 ))
     TAP_Y=$(( (Y1 + Y2) / 2 ))
+    # Expo dev-client rows can ignore taps on the URL text itself. Tap the
+    # right side of the selected URL row while preserving that row's Y center.
+    # Do not use the generic "Chevron" content-desc: with multiple servers it
+    # can select the chevron from a different row.
+    TAP_X=$(( X2 + 300 ))
     echo "[seed-and-run] Tapping Metro at ($TAP_X, $TAP_Y) ..."
     adb_tap $TAP_X $TAP_Y
   else
