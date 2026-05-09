@@ -377,7 +377,7 @@ export const monthlyReportGenerate = inngest.createFunction(
         where: eq(notificationPreferences.profileId, parentId),
         columns: { monthlyProgressEmail: true },
       });
-      if (prefs?.monthlyProgressEmail) {
+      if (prefs?.monthlyProgressEmail ?? true) {
         const parentProfile = await db.query.profiles.findFirst({
           where: eq(profiles.id, parentId),
           columns: { accountId: true },

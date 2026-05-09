@@ -13,15 +13,19 @@ const mockCaptureException = jest.fn();
 jest.mock('../../services/sentry', () => ({
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
-jest.mock('../helpers', () => ({
-  getStepDatabase: () => ({
-    query: { notificationPreferences: { findMany: async () => [] } },
-    select: () => ({
-      from: () => ({
-        innerJoin: () => ({ where: async () => [] }),
-      }),
+const mockDb = {
+  query: {
+    familyLinks: { findMany: jest.fn().mockResolvedValue([]) },
+    notificationPreferences: { findMany: jest.fn().mockResolvedValue([]) },
+  },
+  select: jest.fn(() => ({
+    from: () => ({
+      innerJoin: () => ({ where: async () => [] }),
     }),
-  }),
+  })),
+};
+jest.mock('../helpers', () => ({
+  getStepDatabase: () => mockDb,
 }));
 jest.mock('../client', () => ({
   inngest: {
@@ -30,7 +34,7 @@ jest.mock('../client', () => ({
         fn,
         _config: config,
         _trigger: trigger,
-      })
+      }),
     ),
     send: jest.fn().mockResolvedValue(undefined),
   },
@@ -73,26 +77,26 @@ describe('weekly-progress-push isLocalHour9 (BUG-640 / J-4)', () => {
 
   it('null timezone falls back to UTC 09:00', () => {
     expect(isLocalHour9(null, new Date(Date.UTC(2026, 3, 13, 9, 0, 0)))).toBe(
-      true
+      true,
     );
     expect(isLocalHour9(null, new Date(Date.UTC(2026, 3, 13, 8, 0, 0)))).toBe(
-      false
+      false,
     );
   });
 
   it('invalid timezone string falls back to UTC 09:00 (no crash)', () => {
     expect(
-      isLocalHour9('Not/AReal_TZ', new Date(Date.UTC(2026, 3, 13, 9, 0, 0)))
+      isLocalHour9('Not/AReal_TZ', new Date(Date.UTC(2026, 3, 13, 9, 0, 0))),
     ).toBe(true);
   });
 
   it('Europe/Prague (UTC+2 DST) matches at 07:00 UTC on a DST Monday', () => {
     // 2026-04-13 is in CEST (UTC+2). Local 09:00 → UTC 07:00.
     expect(
-      isLocalHour9('Europe/Prague', new Date(Date.UTC(2026, 3, 13, 7, 0, 0)))
+      isLocalHour9('Europe/Prague', new Date(Date.UTC(2026, 3, 13, 7, 0, 0))),
     ).toBe(true);
     expect(
-      isLocalHour9('Europe/Prague', new Date(Date.UTC(2026, 3, 13, 9, 0, 0)))
+      isLocalHour9('Europe/Prague', new Date(Date.UTC(2026, 3, 13, 9, 0, 0))),
     ).toBe(false);
   });
 });
@@ -100,6 +104,14 @@ describe('weekly-progress-push isLocalHour9 (BUG-640 / J-4)', () => {
 describe('[BUG-850 / F-SVC-021] weekly-progress-push fan-out error escalation', () => {
   beforeEach(() => {
     mockCaptureException.mockClear();
+    jest.clearAllMocks();
+    mockDb.query.familyLinks.findMany.mockResolvedValue([]);
+    mockDb.query.notificationPreferences.findMany.mockResolvedValue([]);
+    mockDb.select.mockReturnValue({
+      from: () => ({
+        innerJoin: () => ({ where: async () => [] }),
+      }),
+    });
   });
 
   it('continues batching after a sendEvent failure and reports partial', async () => {
@@ -152,7 +164,106 @@ describe('[BUG-850 / F-SVC-021] weekly-progress-push fan-out error escalation', 
           batchSize: 200,
           totalParents: 401,
         }),
-      })
+      }),
     );
+  });
+});
+
+describe('weekly progress parent eligibility', () => {
+  function timezoneForLocalHour(targetHour: number): string {
+    const now = new Date();
+    const candidates = [
+      'Etc/GMT+12',
+      'Etc/GMT+11',
+      'Etc/GMT+10',
+      'Etc/GMT+9',
+      'Etc/GMT+8',
+      'Etc/GMT+7',
+      'Etc/GMT+6',
+      'Etc/GMT+5',
+      'Etc/GMT+4',
+      'Etc/GMT+3',
+      'Etc/GMT+2',
+      'Etc/GMT+1',
+      'Etc/GMT',
+      'Etc/GMT-1',
+      'Etc/GMT-2',
+      'Etc/GMT-3',
+      'Etc/GMT-4',
+      'Etc/GMT-5',
+      'Etc/GMT-6',
+      'Etc/GMT-7',
+      'Etc/GMT-8',
+      'Etc/GMT-9',
+      'Etc/GMT-10',
+      'Etc/GMT-11',
+      'Etc/GMT-12',
+      'Etc/GMT-13',
+      'Etc/GMT-14',
+    ];
+    const match = candidates.find((timezone) => {
+      const hour = Number(
+        now.toLocaleString('en-US', {
+          timeZone: timezone,
+          hour: 'numeric',
+          hour12: false,
+        }),
+      );
+      return hour === targetHour;
+    });
+    if (!match) throw new Error(`No timezone found for hour ${targetHour}`);
+    return match;
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockDb.query.familyLinks.findMany.mockResolvedValue([]);
+    mockDb.query.notificationPreferences.findMany.mockResolvedValue([]);
+  });
+
+  it('queues an email-only parent even when push is disabled', async () => {
+    mockDb.query.familyLinks.findMany.mockResolvedValue([
+      { parentProfileId: 'parent-email-only' },
+    ]);
+    mockDb.query.notificationPreferences.findMany.mockResolvedValue([
+      {
+        profileId: 'parent-email-only',
+        pushEnabled: false,
+        weeklyProgressPush: false,
+        weeklyProgressEmail: true,
+      },
+    ]);
+    mockDb.select.mockReturnValue({
+      from: () => ({
+        innerJoin: () => ({
+          where: async () => [
+            {
+              profileId: 'parent-email-only',
+              timezone: timezoneForLocalHour(9),
+            },
+          ],
+        }),
+      }),
+    });
+
+    const step = {
+      run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
+      sendEvent: jest.fn().mockResolvedValue(undefined),
+    };
+    const handler = (
+      weeklyProgressPushCron as unknown as {
+        fn: (ctx: { step: typeof step }) => Promise<unknown>;
+      }
+    ).fn;
+
+    const result = (await handler({ step })) as { queuedParents: number };
+
+    expect(result.queuedParents).toBe(1);
+    expect(step.sendEvent).toHaveBeenCalledWith(expect.any(String), [
+      expect.objectContaining({
+        name: 'app/weekly-progress-push.generate',
+        data: { parentId: 'parent-email-only' },
+      }),
+    ]);
   });
 });

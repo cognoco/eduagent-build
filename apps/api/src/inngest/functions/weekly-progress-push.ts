@@ -108,18 +108,43 @@ export const weeklyProgressPushCron = inngest.createFunction(
       const db = getStepDatabase();
       const nowUtc = new Date();
 
-      // 1. Find all parents who have weekly progress push enabled.
-      const prefs = await db.query.notificationPreferences.findMany({
-        where: and(
-          eq(notificationPreferences.pushEnabled, true),
-          eq(notificationPreferences.weeklyProgressPush, true),
-        ),
-        columns: { profileId: true },
+      // 1. Find all parents who can receive a weekly progress digest.
+      // Push still requires pushEnabled + weeklyProgressPush; email is its own
+      // channel and must not be gated by push permission. Missing preference
+      // rows use defaults, where weeklyProgressEmail is enabled.
+      const links = await db.query.familyLinks.findMany({
+        columns: { parentProfileId: true },
       });
 
-      if (prefs.length === 0) return [];
+      const linkedParentIds = Array.from(
+        new Set(links.map((link) => link.parentProfileId)),
+      );
 
-      const eligibleProfileIds = prefs.map((p) => p.profileId);
+      if (linkedParentIds.length === 0) return [];
+
+      const prefRows = await db.query.notificationPreferences.findMany({
+        where: inArray(notificationPreferences.profileId, linkedParentIds),
+        columns: {
+          profileId: true,
+          pushEnabled: true,
+          weeklyProgressPush: true,
+          weeklyProgressEmail: true,
+        },
+      });
+
+      const prefsByProfileId = new Map(
+        prefRows.map((pref) => [pref.profileId, pref]),
+      );
+      const eligibleProfileIds = linkedParentIds.filter((profileId) => {
+        const prefs = prefsByProfileId.get(profileId);
+        if (!prefs) return true;
+        return (
+          (prefs.pushEnabled && prefs.weeklyProgressPush) ||
+          prefs.weeklyProgressEmail
+        );
+      });
+
+      if (eligibleProfileIds.length === 0) return [];
 
       // 2. Fetch each parent profile's account timezone in one query.
       //    profiles.accountId → accounts.timezone
@@ -397,7 +422,7 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
           where: eq(notificationPreferences.profileId, parentId),
           columns: { weeklyProgressEmail: true },
         });
-        if (prefs?.weeklyProgressEmail) {
+        if (prefs?.weeklyProgressEmail ?? true) {
           const parentProfile = await db.query.profiles.findFirst({
             where: eq(profiles.id, parentId),
             columns: { accountId: true },

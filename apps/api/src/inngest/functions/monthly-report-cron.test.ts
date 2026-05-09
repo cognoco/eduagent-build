@@ -146,10 +146,20 @@ jest.mock('../../services/snapshot-aggregation', () => ({
 }));
 
 const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
+const mockSendEmail = jest.fn().mockResolvedValue({ sent: true });
+const mockFormatMonthlyProgressEmail = jest.fn((to: string, body: string) => ({
+  to,
+  subject: "This month's learning report",
+  body,
+  type: 'monthly_progress',
+}));
 
 jest.mock('../../services/notifications', () => ({
   sendPushNotification: (...args: unknown[]) =>
     mockSendPushNotification(...args),
+  sendEmail: (...args: unknown[]) => mockSendEmail(...args),
+  formatMonthlyProgressEmail: (...args: unknown[]) =>
+    mockFormatMonthlyProgressEmail(...args),
 }));
 
 // [BUG-699-FOLLOWUP] 24h dedup gate. Default 0 so existing tests keep sending;
@@ -169,6 +179,7 @@ jest.mock('../../services/sentry', () => ({
 
 jest.mock('../helpers', () => ({
   getStepDatabase: jest.fn().mockReturnValue(mockMonthlyReportDb),
+  getStepResendApiKey: jest.fn().mockReturnValue('resend-test-key'),
   resetDatabaseUrl: jest.fn(),
 }));
 
@@ -685,6 +696,36 @@ describe('monthlyReportGenerate', () => {
           type: 'monthly_report',
           title: expect.stringContaining('Emma'),
           body: expect.any(String),
+        }),
+      );
+    });
+
+    it('sends monthly email when the preference row is missing (default on)', async () => {
+      (
+        mockMonthlyReportDb.query.notificationPreferences.findFirst as jest.Mock
+      ).mockResolvedValueOnce(null);
+      (mockMonthlyReportDb.query.profiles.findFirst as jest.Mock)
+        .mockResolvedValueOnce({ displayName: 'Emma' })
+        .mockResolvedValueOnce({ accountId: 'account-parent' });
+      (
+        mockMonthlyReportDb.query.accounts.findFirst as jest.Mock
+      ).mockResolvedValueOnce({ email: 'parent@example.test' });
+
+      await executeGenerateSteps(makeGenerateEvent());
+
+      expect(mockFormatMonthlyProgressEmail).toHaveBeenCalledWith(
+        'parent@example.test',
+        expect.stringContaining("Emma's monthly report is ready"),
+        expect.any(Array),
+      );
+      expect(mockSendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'parent@example.test',
+          type: 'monthly_progress',
+        }),
+        expect.objectContaining({
+          resendApiKey: 'resend-test-key',
+          idempotencyKey: expect.stringContaining('monthly-parent-001-'),
         }),
       );
     });

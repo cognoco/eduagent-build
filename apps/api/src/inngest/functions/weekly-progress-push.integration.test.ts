@@ -367,13 +367,23 @@ describe('weekly progress push integration', () => {
       displayName: 'Queued Parent',
       timezone: matchingTimezone,
     });
+    const { profileId: queuedChildId } = await seedProfile({
+      displayName: 'Queued Child',
+      timezone: matchingTimezone,
+    });
     const { profileId: skippedParentId } = await seedProfile({
       displayName: 'Skipped Parent',
+      timezone: nonMatchingTimezone,
+    });
+    const { profileId: skippedChildId } = await seedProfile({
+      displayName: 'Skipped Child',
       timezone: nonMatchingTimezone,
     });
 
     await seedWeeklyPushPrefs(queuedParentId);
     await seedWeeklyPushPrefs(skippedParentId);
+    await seedFamilyLink(queuedParentId, queuedChildId);
+    await seedFamilyLink(skippedParentId, skippedChildId);
 
     const { result, step } = await executeCronSteps();
 
