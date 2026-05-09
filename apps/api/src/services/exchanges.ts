@@ -43,30 +43,6 @@ export function sanitizeUserContent(content: string): string {
   return content.replace(SERVER_NOTE_RE, '');
 }
 
-function buildOrphanSystemAddendum(
-  history: ExchangeContext['exchangeHistory'],
-): string {
-  const recentOrphans: ExchangeContext['exchangeHistory'] = [];
-  for (let i = history.length - 1; i >= 0; i--) {
-    const turn = history[i];
-    if (!turn) break;
-    if (turn.role === 'assistant') break;
-    if (turn.role === 'user' && turn.orphan_reason) {
-      recentOrphans.unshift(turn);
-    }
-  }
-  if (recentOrphans.length === 0) return '';
-  return (
-    '\n\n' +
-    recentOrphans
-      .map(
-        (t) =>
-          `<server_note kind="orphan_user_turn" reason="${t.orphan_reason}"/>`,
-      )
-      .join('\n')
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Multimodal image support — IMG-VISION
 // ---------------------------------------------------------------------------
@@ -331,9 +307,7 @@ export async function processExchange(
   userMessage: string,
   imageData?: ImageData,
 ): Promise<ExchangeResult> {
-  const systemPrompt =
-    _buildSystemPrompt(context) +
-    buildOrphanSystemAddendum(context.exchangeHistory);
+  const systemPrompt = _buildSystemPrompt(context);
 
   const messages: ChatMessage[] = [
     { role: 'system', content: systemPrompt },
@@ -398,9 +372,7 @@ export async function streamExchange(
   userMessage: string,
   imageData?: ImageData,
 ): Promise<ExchangeStreamResult> {
-  const systemPrompt =
-    _buildSystemPrompt(context) +
-    buildOrphanSystemAddendum(context.exchangeHistory);
+  const systemPrompt = _buildSystemPrompt(context);
 
   const messages: ChatMessage[] = [
     { role: 'system', content: systemPrompt },
