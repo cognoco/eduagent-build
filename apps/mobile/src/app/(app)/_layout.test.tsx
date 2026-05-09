@@ -635,9 +635,10 @@ describe('AppLayout', () => {
     expect(screen.getByText('Checking automatically…')).toBeTruthy();
   });
 
-  // Permissions are requested at feature entry (mic on first voice tap,
-  // camera on homework screen, notifications after session value), never via
-  // an upfront screen at app launch.
+  // Permission setup gate is JIT-disabled — permissions are requested at
+  // feature entry (mic on first voice tap, camera on homework screen,
+  // notifications after session value), never via an upfront screen at app
+  // launch.
   it('never shows the permission setup gate even when permissions are denied', async () => {
     const ExpoNotifications = require('expo-notifications');
     (ExpoNotifications.getPermissionsAsync as jest.Mock).mockResolvedValue({
@@ -656,7 +657,7 @@ describe('AppLayout', () => {
     await waitFor(() => {
       screen.getByTestId('tabs');
     });
-    expect(screen.queryByText("Let's get you set up")).toBeNull();
+    expect(screen.queryByTestId('permission-setup-gate')).toBeNull();
   });
 });
 
