@@ -1545,6 +1545,7 @@ export async function persistExchangeResult(
       })
       .onConflictDoNothing({
         target: [sessionEvents.sessionId, sessionEvents.clientId],
+        where: sql`${sessionEvents.clientId} IS NOT NULL`,
       })
       .returning({ id: sessionEvents.id });
 

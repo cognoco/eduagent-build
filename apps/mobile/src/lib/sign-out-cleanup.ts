@@ -47,7 +47,7 @@ export const PER_PROFILE_KEYS: ReadonlyArray<(profileId: string) => string> = [
   // (app)/_layout.tsx — postApprovalSeen flag per profile
   (id) => `postApprovalSeen_${id}`,
   // (app)/subscription.tsx — getNotifyStorageKey: child-paywall notify timestamp
-  (id) => `child-paywall-notified-at-${id}`,
+  (id) => sanitizeSecureStoreKey(`child-paywall-notified-at-${id}`),
   // Legacy permission setup gate — clear orphaned flag from existing installs.
   (id) => sanitizeSecureStoreKey(`permissionSetupSeen_${id}`),
   // use-post-session-notification-ask.ts — one-shot post-session notification primer flag.

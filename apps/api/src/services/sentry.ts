@@ -40,13 +40,40 @@ export function captureException(err: unknown, context?: ErrorContext): void {
 }
 
 /**
+ * Captures a queryable Sentry message event for operational anomalies that are
+ * not exceptions but still need alerting/24h volume checks.
+ */
+export function captureMessage(
+  message: string,
+  context?: ErrorContext & { level?: Sentry.SeverityLevel },
+): void {
+  Sentry.withScope((scope) => {
+    if (context?.userId) {
+      scope.setUser({ id: context.userId });
+    }
+    if (context?.profileId) {
+      scope.setTag('profileId', context.profileId);
+    }
+    if (context?.requestPath) {
+      scope.setTag('requestPath', context.requestPath);
+    }
+    if (context?.extra) {
+      for (const [key, value] of Object.entries(context.extra)) {
+        scope.setExtra(key, value);
+      }
+    }
+    Sentry.captureMessage(message, context?.level ?? 'info');
+  });
+}
+
+/**
  * Adds a breadcrumb to the current Sentry scope.
  */
 export function addBreadcrumb(
   message: string,
   category?: string,
   level?: Sentry.SeverityLevel,
-  data?: Record<string, unknown>
+  data?: Record<string, unknown>,
 ): void {
   Sentry.addBreadcrumb({
     message,

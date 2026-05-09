@@ -186,6 +186,39 @@ describe('usePushTokenRegistration', () => {
     });
   });
 
+  it('registers again when the Expo push token rotates for the same profile', async () => {
+    const getExpoPushTokenAsync =
+      Notifications.getExpoPushTokenAsync as jest.Mock;
+    getExpoPushTokenAsync.mockResolvedValue({
+      data: 'ExponentPushToken[first-token]',
+    });
+
+    renderHook(() => usePushTokenRegistration(), {
+      wrapper: createProfileWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(mockMutateAsync).toHaveBeenCalledWith(
+        'ExponentPushToken[first-token]',
+      );
+    });
+
+    getExpoPushTokenAsync.mockResolvedValue({
+      data: 'ExponentPushToken[rotated-token]',
+    });
+
+    await act(async () => {
+      appStateListeners.forEach((listener) => listener('active'));
+    });
+
+    await waitFor(() => {
+      expect(mockMutateAsync).toHaveBeenCalledWith(
+        'ExponentPushToken[rotated-token]',
+      );
+    });
+    expect(mockMutateAsync).toHaveBeenCalledTimes(2);
+  });
+
   it('does not register without an active profile', async () => {
     mockActiveProfile = null;
 

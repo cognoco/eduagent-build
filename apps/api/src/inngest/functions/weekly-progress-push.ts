@@ -36,7 +36,10 @@ import {
   formatWeeklyProgressEmail,
   type ChildStruggleLine,
 } from '../../services/notifications';
-import { getRecentNotificationCount } from '../../services/settings';
+import {
+  getRecentNotificationCount,
+  logNotification,
+} from '../../services/settings';
 import {
   getLatestSnapshot,
   getLatestSnapshotOnOrBefore,
@@ -457,6 +460,14 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
               idempotencyKey: `weekly-${parentId}-${reportWeek}`,
             });
             emailSent = emailResult.sent;
+            if (emailSent && !pushResult?.sent) {
+              await logNotification(
+                db,
+                parentId,
+                'weekly_progress',
+                `email-${reportWeek}`,
+              );
+            }
           } else {
             // Expected: OAuth-only accounts or Clerk not exposing email field.
             // emailSent flag in the return value already provides observability.

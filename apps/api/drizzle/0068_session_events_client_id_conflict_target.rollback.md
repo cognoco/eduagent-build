@@ -10,7 +10,8 @@ CREATE UNIQUE INDEX "session_events_session_client_id_uniq"
   WHERE "client_id" IS NOT NULL;
 ```
 
-No data is lost. PostgreSQL unique indexes allow multiple NULL values, so the
-forward migration does not change behavior for legacy rows without `client_id`;
-it only makes `ON CONFLICT ("session_id", "client_id")` match a non-partial
-arbiter index.
+No data is lost. The forward migration keeps the existing partial predicate
+(`WHERE "client_id" IS NOT NULL`) so legacy rows without `client_id` keep their
+previous duplicate-NULL behavior. Application writes that target this index must
+include the same conflict predicate (`targetWhere: client_id IS NOT NULL`) so
+Postgres can select the partial arbiter index.

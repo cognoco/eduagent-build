@@ -29,7 +29,11 @@ import { idempotencyPreflight } from '../middleware/idempotency';
 import { requireProfileId } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
 import { streamSSEUtf8 } from '../services/streaming/sse-utf8';
-import { addBreadcrumb, captureException } from '../services/sentry';
+import {
+  addBreadcrumb,
+  captureException,
+  captureMessage,
+} from '../services/sentry';
 import { createLogger } from '../services/logger';
 import {
   startSession,
@@ -614,6 +618,16 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                   recovery: zeroTokenRecovery,
                 },
               );
+              captureMessage('Zero-token stream completed', {
+                profileId,
+                level: 'warning',
+                extra: {
+                  sessionId,
+                  tokensReceived: 0,
+                  recovered: zeroTokenRecovered,
+                  recovery: zeroTokenRecovery,
+                },
+              });
             }
 
             // [BUG-941] If the LLM response was empty or unparseable, emit a

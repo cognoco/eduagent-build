@@ -74,9 +74,9 @@ const mockFormatMonthlyProgressEmail = jest.fn().mockReturnValue({
   type: 'monthly_progress',
 });
 
-jest.mock(
-  // gc1-allow: handler control-flow test; services tested in own suites
-  '../../services/notifications' /* gc1-allow: unit test boundary */,
+// prettier-ignore
+jest.mock( /* gc1-allow: handler control-flow test; services tested in own suites */
+  '../../services/notifications',
   () => ({
     sendPushNotification: (...args: unknown[]) =>
       mockSendPushNotification(...args),
@@ -89,21 +89,23 @@ jest.mock(
 );
 
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
-jest.mock(
-  // gc1-allow: handler control-flow test; services tested in own suites
-  '../../services/settings' /* gc1-allow: unit test boundary */,
+const mockLogNotification = jest.fn().mockResolvedValue(undefined);
+// prettier-ignore
+jest.mock( /* gc1-allow: handler control-flow test; services tested in own suites */
+  '../../services/settings',
   () => ({
     getRecentNotificationCount: (...args: unknown[]) =>
       mockGetRecentNotificationCount(...args),
+    logNotification: (...args: unknown[]) => mockLogNotification(...args),
   }),
 );
 
 const mockGetSnapshotsInRange = jest.fn();
 const mockGetLatestSnapshot = jest.fn();
 const mockGetLatestSnapshotOnOrBefore = jest.fn().mockResolvedValue(null);
-jest.mock(
-  // gc1-allow: handler control-flow test; services tested in own suites
-  '../../services/snapshot-aggregation' /* gc1-allow: unit test boundary */,
+// prettier-ignore
+jest.mock( /* gc1-allow: handler control-flow test; services tested in own suites */
+  '../../services/snapshot-aggregation',
   () => ({
     getSnapshotsInRange: (...args: unknown[]) =>
       mockGetSnapshotsInRange(...args),
@@ -116,9 +118,9 @@ jest.mock(
 const mockGenerateWeeklyReportData = jest
   .fn()
   .mockReturnValue({ reportData: {} });
-jest.mock(
-  // gc1-allow: handler control-flow test; services tested in own suites
-  '../../services/weekly-report' /* gc1-allow: unit test boundary */,
+// prettier-ignore
+jest.mock( /* gc1-allow: handler control-flow test; services tested in own suites */
+  '../../services/weekly-report',
   () => ({
     generateWeeklyReportData: (...args: unknown[]) =>
       mockGenerateWeeklyReportData(...args),
@@ -650,9 +652,9 @@ const mockGenerateReportHighlights = jest.fn().mockResolvedValue({
   comparison: null,
 });
 
-jest.mock(
-  // gc1-allow: handler control-flow test; services tested in own suites
-  '../../services/monthly-report' /* gc1-allow: unit test boundary */,
+// prettier-ignore
+jest.mock( /* gc1-allow: handler control-flow test; services tested in own suites */
+  '../../services/monthly-report',
   () => ({
     generateMonthlyReportData: (...args: unknown[]) =>
       mockGenerateMonthlyReportData(...args),

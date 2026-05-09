@@ -11,10 +11,12 @@ import { clearJWKSCache } from '../middleware/jwt';
 // [BUG-666] capture mock used by the SSE-onComplete-failure break test
 const mockCaptureException = jest.fn();
 const mockAddBreadcrumb = jest.fn();
+const mockCaptureMessage = jest.fn();
 
 jest.mock('../services/sentry', () => ({
   addBreadcrumb: (...args: unknown[]) => mockAddBreadcrumb(...args),
   captureException: (...args: unknown[]) => mockCaptureException(...args),
+  captureMessage: (...args: unknown[]) => mockCaptureMessage(...args),
 }));
 
 // ---------------------------------------------------------------------------
@@ -1909,6 +1911,7 @@ describe('session routes', () => {
     it('[BUG-866] emits parsed reply and breadcrumbs when the stream completes with zero tokens', async () => {
       mockCaptureException.mockClear();
       mockAddBreadcrumb.mockClear();
+      mockCaptureMessage.mockClear();
       mockInngestSend.mockClear();
 
       (streamMessage as jest.Mock).mockResolvedValueOnce({
@@ -1953,6 +1956,19 @@ describe('session routes', () => {
           tokensReceived: 0,
           recovered: true,
           recovery: 'parsed_reply',
+        }),
+      );
+      expect(mockCaptureMessage).toHaveBeenCalledWith(
+        'Zero-token stream completed',
+        expect.objectContaining({
+          profileId: 'test-profile-id',
+          level: 'warning',
+          extra: expect.objectContaining({
+            sessionId: SESSION_ID,
+            tokensReceived: 0,
+            recovered: true,
+            recovery: 'parsed_reply',
+          }),
         }),
       );
       expect(mockInngestSend).not.toHaveBeenCalledWith(

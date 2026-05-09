@@ -98,6 +98,7 @@ export default function MoreScreen() {
   const handleAddChild = useCallback(() => {
     if (!subscription) {
       // Query still loading — don't block with a false 'Upgrade required'
+      platformAlert(t('common.loading'), t('more.errors.tryAgainMoment'));
       return;
     }
     const tier = subscription.tier;

@@ -518,6 +518,31 @@ describe('streamSSEViaXHR', () => {
     ).toEqual(expect.objectContaining({ upgradeOptions: [] }));
   });
 
+  it('[BUG-955] leaves non-quota 402 responses as generic API errors', async () => {
+    const xhr = installFakeXhr();
+    const { events } = streamSSEViaXHR('https://example.test/stream', {
+      method: 'POST',
+    });
+
+    xhr._emitError(
+      402,
+      JSON.stringify({ code: 'BILLING_PROVIDER_UNAVAILABLE' }),
+    );
+
+    let caught: unknown = null;
+    try {
+      for await (const event of events) {
+        void event;
+      }
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as Error).name).not.toBe('QuotaExceededError');
+    expect((caught as Error).message).toContain('API error 402');
+  });
+
   it('[BUG-955] throws NetworkError for onerror (status 0 / offline)', async () => {
     const xhr = installFakeXhr();
     const { events } = streamSSEViaXHR('https://example.test/stream', {

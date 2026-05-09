@@ -196,10 +196,9 @@ export const sessionEvents = pgTable(
       table.eventType,
       table.createdAt,
     ),
-    uniqueIndex('session_events_session_client_id_uniq').on(
-      table.sessionId,
-      table.clientId,
-    ),
+    uniqueIndex('session_events_session_client_id_uniq')
+      .on(table.sessionId, table.clientId)
+      .where(sql`${table.clientId} IS NOT NULL`),
   ],
 );
 

@@ -1066,6 +1066,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
           const data = await res.json();
           if (!mountedRef.current) return [];
           if (data.pendingCelebrations.length > 0) {
+            if (!mountedRef.current) return [];
             await apiClient.celebrations.seen.$post({
               json: { viewer: 'child' },
             });

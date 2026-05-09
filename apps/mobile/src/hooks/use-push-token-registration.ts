@@ -32,7 +32,14 @@ function capturePushRegistrationFailure(
  * is requested just-in-time by the post-session primer.
  */
 export function usePushTokenRegistration(): PushRegistrationState {
-  const registeredProfileId = useRef<string | null>(null);
+  const registeredProfileToken = useRef<{
+    profileId: string;
+    token: string;
+  } | null>(null);
+  const pendingProfileToken = useRef<{
+    profileId: string;
+    token: string;
+  } | null>(null);
   const [state, setState] = useState<PushRegistrationState>({
     status: 'idle',
   });
@@ -42,7 +49,6 @@ export function usePushTokenRegistration(): PushRegistrationState {
   const registerIfAllowed = useCallback(async () => {
     const activeProfileId = activeProfile?.id ?? null;
     if (!activeProfileId) return;
-    if (registeredProfileId.current === activeProfileId) return;
 
     try {
       const { status } = await Notifications.getPermissionsAsync();
@@ -79,15 +85,42 @@ export function usePushTokenRegistration(): PushRegistrationState {
         return;
       }
 
+      if (
+        registeredProfileToken.current?.profileId === activeProfileId &&
+        registeredProfileToken.current.token === tokenData.data
+      ) {
+        return;
+      }
+      if (
+        pendingProfileToken.current?.profileId === activeProfileId &&
+        pendingProfileToken.current.token === tokenData.data
+      ) {
+        return;
+      }
+
       // Register with our API
       try {
+        pendingProfileToken.current = {
+          profileId: activeProfileId,
+          token: tokenData.data,
+        };
         await registerPushToken.mutateAsync(tokenData.data);
       } catch (err) {
         setState({ status: 'failed', reason: 'api_registration_failed' });
         capturePushRegistrationFailure(err, 'api_registration_failed');
         return;
+      } finally {
+        if (
+          pendingProfileToken.current?.profileId === activeProfileId &&
+          pendingProfileToken.current.token === tokenData.data
+        ) {
+          pendingProfileToken.current = null;
+        }
       }
-      registeredProfileId.current = activeProfileId;
+      registeredProfileToken.current = {
+        profileId: activeProfileId,
+        token: tokenData.data,
+      };
       setState({ status: 'registered' });
     } catch (err) {
       // Push registration is non-critical, but capture for prod observability [SC-3]

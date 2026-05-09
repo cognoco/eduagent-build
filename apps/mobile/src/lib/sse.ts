@@ -379,6 +379,12 @@ export function streamSSEViaXHR(
       return err;
     }
     if (status === 402) {
+      if (code && code !== 'QUOTA_EXCEEDED') {
+        return new Error(
+          apiMessage ??
+            `API error ${status}: ${responseText || 'Payment required'}`,
+        );
+      }
       return new QuotaExceededError(
         apiMessage ?? 'Quota exceeded',
         parsed?.details ?? fallbackQuotaDetails,
