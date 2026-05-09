@@ -45,7 +45,9 @@ tags:
     element:
       id: "notifications-section-header"
     direction: DOWN
-    timeout: 10000
+    timeout: 20000
+    speed: 70
+    visibilityPercentage: 50
 
 # 5b. Ensure Push notifications row itself is in view before tapping
 # (small phones can leave the toggle just below the section header).
@@ -53,7 +55,9 @@ tags:
     element:
       id: "push-notifications-toggle"
     direction: DOWN
-    timeout: 5000
+    timeout: 10000
+    speed: 70
+    visibilityPercentage: 50
 
 # 6. Tap "Push notifications" toggle (toggle on)
 - tapOn:
@@ -70,7 +74,9 @@ tags:
     element:
       id: "weekly-digest-toggle"
     direction: DOWN
-    timeout: 5000
+    timeout: 10000
+    speed: 70
+    visibilityPercentage: 50
 
 - tapOn:
     id: "weekly-digest-toggle"

@@ -346,6 +346,7 @@ describe('MoreScreen — Learning Mode', () => {
     render(<MoreScreen />, { wrapper: createWrapper() });
 
     // Section headers used by Maestro scrollUntilVisible.
+    screen.getByTestId('more-scroll');
     screen.getByTestId('learning-accommodation-section-header');
     screen.getByTestId('celebrations-section-header');
     screen.getByTestId('notifications-section-header');
@@ -355,6 +356,7 @@ describe('MoreScreen — Learning Mode', () => {
     screen.getByTestId('weekly-digest-toggle');
 
     // Sign-out button at bottom of scroll — must remain reachable.
+    screen.getByTestId('more-row-profile');
     screen.getByTestId('sign-out-button');
   });
 

@@ -29,7 +29,7 @@ tags:
 - tapOn:
     text: "More"
 
-# 4. Wait for More screen content to load — Learning Mode is always above the fold.
+# 4. Wait for More screen content to load.
 # Using text: "More" matched the tab label itself, resolving before ScrollView rendered.
 - extendedWaitUntil:
     visible:
@@ -39,13 +39,15 @@ tags:
 # 5. Scroll to Profile row
 - scrollUntilVisible:
     element:
-      text: "Profile"
+      id: "more-row-profile"
     direction: DOWN
-    timeout: 10000
+    timeout: 20000
+    speed: 70
+    visibilityPercentage: 50
 
 # 6. Tap Profile to open profiles modal
 - tapOn:
-    text: "Profile"
+    id: "more-row-profile"
 
 # 7. Wait for profiles screen
 - extendedWaitUntil:

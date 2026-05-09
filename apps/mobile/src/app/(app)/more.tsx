@@ -514,6 +514,7 @@ export default function MoreScreen() {
         className="flex-1 px-5"
         contentContainerStyle={{ paddingBottom: 24 }}
         keyboardShouldPersistTaps="handled"
+        testID="more-scroll"
       >
         {/* 1. Learning Accommodation */}
         <Text
@@ -807,6 +808,7 @@ export default function MoreScreen() {
           label={t('more.account.profile')}
           value={displayName}
           onPress={() => router.push('/profiles')}
+          testID="more-row-profile"
         />
         <AccountSecurity visible={activeProfile?.isOwner ?? false} />
         {FEATURE_FLAGS.I18N_ENABLED && (

@@ -35,21 +35,17 @@ tags:
     timeout: 10000
 
 # 5. Look for profile section
-- extendedWaitUntil:
-    visible:
-      text: "Profile"
-    timeout: 10000
-    optional: true
+- scrollUntilVisible:
+    element:
+      id: "more-row-profile"
+    direction: DOWN
+    timeout: 20000
+    speed: 70
+    visibilityPercentage: 50
 
 # 6. Tap on profile/account settings
 - tapOn:
-    text: "Profile"
-    optional: true
-
-# 7. Fallback: look for account option
-- tapOn:
-    text: "Account"
-    optional: true
+    id: "more-row-profile"
 
 # 8. Wait for profile detail screen
 - extendedWaitUntil:

@@ -38,13 +38,15 @@ tags:
 # 5. Scroll down to find Delete account row (More tab has many sections now)
 - scrollUntilVisible:
     element:
-      text: "Delete account"
+      id: "more-row-delete-account"
     direction: DOWN
-    timeout: 15000
+    timeout: 20000
+    speed: 70
+    visibilityPercentage: 50
 
 # 6. Tap Delete account
 - tapOn:
-    text: "Delete account"
+    id: "more-row-delete-account"
 
 # 7. Wait for delete account screen to appear
 - extendedWaitUntil:
@@ -129,7 +131,9 @@ tags:
     element:
       id: "sign-out-button"
     direction: DOWN
-    timeout: 10000
+    timeout: 15000
+    speed: 70
+    visibilityPercentage: 50
 
 # 22. Final screenshot — back to normal state
 - takeScreenshot: delete-account-cancelled

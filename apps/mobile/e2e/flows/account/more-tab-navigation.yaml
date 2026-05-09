@@ -48,37 +48,53 @@ tags:
 - assertVisible:
     id: "learning-accommodation-section-header"
 
-- scrollUntilVisible:
-    element:
-      id: "learning-accommodation-section-header"
-    direction: DOWN
-    timeout: 10000
 - assertVisible:
     id: "accommodation-mode-none"
-- assertVisible:
-    id: "accommodation-mode-short-burst"
-- assertVisible:
-    id: "accommodation-mode-audio-first"
-- assertVisible:
-    id: "accommodation-mode-predictable"
+- scrollUntilVisible:
+    element:
+      id: "accommodation-mode-short-burst"
+    direction: DOWN
+    timeout: 15000
+    speed: 70
+    visibilityPercentage: 50
+- scrollUntilVisible:
+    element:
+      id: "accommodation-mode-audio-first"
+    direction: DOWN
+    timeout: 15000
+    speed: 70
+    visibilityPercentage: 50
+- scrollUntilVisible:
+    element:
+      id: "accommodation-mode-predictable"
+    direction: DOWN
+    timeout: 15000
+    speed: 70
+    visibilityPercentage: 50
 
 - scrollUntilVisible:
     element:
       id: "celebrations-section-header"
     direction: DOWN
-    timeout: 5000
+    timeout: 15000
+    speed: 70
+    visibilityPercentage: 50
 
 - scrollUntilVisible:
     element:
       id: "notifications-section-header"
     direction: DOWN
-    timeout: 5000
+    timeout: 15000
+    speed: 70
+    visibilityPercentage: 50
 
 - scrollUntilVisible:
     element:
-      text: "Account"
+      id: "more-row-profile"
     direction: DOWN
-    timeout: 10000
+    timeout: 20000
+    speed: 70
+    visibilityPercentage: 50
 
 # Scroll back to top for screenshot
 - scrollUntilVisible:
@@ -93,12 +109,14 @@ tags:
 
 - scrollUntilVisible:
     element:
-      text: "Profile"
+      id: "more-row-profile"
     direction: DOWN
-    timeout: 10000
+    timeout: 20000
+    speed: 70
+    visibilityPercentage: 50
 
 - tapOn:
-    text: "Profile"
+    id: "more-row-profile"
 
 - extendedWaitUntil:
     visible:
@@ -119,6 +137,8 @@ tags:
       text: "Subscription"
     direction: DOWN
     timeout: 10000
+    speed: 70
+    visibilityPercentage: 50
 
 - tapOn:
     text: "Subscription"
@@ -142,6 +162,8 @@ tags:
       text: "Privacy Policy"
     direction: DOWN
     timeout: 15000
+    speed: 70
+    visibilityPercentage: 50
 
 - tapOn:
     text: "Privacy Policy"
@@ -173,6 +195,8 @@ tags:
       text: "Terms of Service"
     direction: DOWN
     timeout: 15000
+    speed: 70
+    visibilityPercentage: 50
 
 - tapOn:
     text: "Terms of Service"
@@ -203,6 +227,8 @@ tags:
       text: "Export my data"
     direction: DOWN
     timeout: 15000
+    speed: 70
+    visibilityPercentage: 50
 
 - tapOn:
     text: "Export my data"
@@ -220,6 +246,8 @@ tags:
       text: "Delete account"
     direction: DOWN
     timeout: 15000
+    speed: 70
+    visibilityPercentage: 50
 
 - tapOn:
     text: "Delete account"
@@ -254,6 +282,8 @@ tags:
       id: "sign-out-button"
     direction: DOWN
     timeout: 15000
+    speed: 70
+    visibilityPercentage: 50
 
 - tapOn:
     id: "sign-out-button"
