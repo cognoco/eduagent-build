@@ -583,15 +583,20 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             const result = await onComplete();
 
             if (chunkCount === 0) {
+              const zeroTokenRecovered =
+                result.fallback !== undefined ||
+                (result.response?.trim().length ?? 0) > 0;
+              const zeroTokenRecovery = result.fallback
+                ? 'fallback_frame'
+                : 'parsed_reply';
+
               logger.warn('[sessions/stream] Zero-token stream completed', {
                 surface: 'sessions.stream',
                 sessionId,
                 profileId,
                 tokensReceived: 0,
-                recovered:
-                  result.fallback !== undefined ||
-                  (result.response?.trim().length ?? 0) > 0,
-                recovery: result.fallback ? 'fallback_frame' : 'parsed_reply',
+                recovered: zeroTokenRecovered,
+                recovery: zeroTokenRecovery,
               });
               addBreadcrumb(
                 'Zero-token stream completed',
@@ -600,12 +605,31 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                 {
                   sessionId,
                   tokensReceived: 0,
-                  recovered:
-                    result.fallback !== undefined ||
-                    (result.response?.trim().length ?? 0) > 0,
-                  recovery: result.fallback ? 'fallback_frame' : 'parsed_reply',
+                  recovered: zeroTokenRecovered,
+                  recovery: zeroTokenRecovery,
                 },
               );
+              try {
+                await inngest.send({
+                  name: 'app/session.zero_token_stream_completed',
+                  data: {
+                    profileId,
+                    sessionId,
+                    timestamp: new Date().toISOString(),
+                    tokensReceived: 0,
+                    recovered: zeroTokenRecovered,
+                    recovery: zeroTokenRecovery,
+                  },
+                });
+              } catch (metricErr) {
+                captureException(metricErr, {
+                  profileId,
+                  extra: {
+                    sessionId,
+                    route: 'sessions.stream.zero_token_metric',
+                  },
+                });
+              }
             }
 
             // [BUG-941] If the LLM response was empty or unparseable, emit a

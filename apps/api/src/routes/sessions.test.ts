@@ -1909,6 +1909,7 @@ describe('session routes', () => {
     it('[BUG-866] emits parsed reply and breadcrumbs when the stream completes with zero tokens', async () => {
       mockCaptureException.mockClear();
       mockAddBreadcrumb.mockClear();
+      mockInngestSend.mockClear();
 
       (streamMessage as jest.Mock).mockResolvedValueOnce({
         stream: (async function* () {
@@ -1954,6 +1955,17 @@ describe('session routes', () => {
           recovery: 'parsed_reply',
         }),
       );
+      expect(mockInngestSend).toHaveBeenCalledWith({
+        name: 'app/session.zero_token_stream_completed',
+        data: expect.objectContaining({
+          profileId: 'test-profile-id',
+          sessionId: SESSION_ID,
+          tokensReceived: 0,
+          recovered: true,
+          recovery: 'parsed_reply',
+          timestamp: expect.any(String),
+        }),
+      });
     });
 
     it('does not refund quota when processMessage succeeds', async () => {
