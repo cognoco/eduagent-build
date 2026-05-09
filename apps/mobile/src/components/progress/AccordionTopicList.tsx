@@ -90,12 +90,6 @@ export function AccordionTopicList({
             key={topic.topicId}
             onPress={(event) => {
               event?.stopPropagation?.();
-              // Cross-tab deep links need the parent route first so back
-              // navigation returns to the child profile stack root.
-              router.push({
-                pathname: '/(app)/child/[profileId]',
-                params: { profileId: childProfileId },
-              } as never);
               router.push({
                 pathname: '/(app)/child/[profileId]/topic/[topicId]',
                 params: {
