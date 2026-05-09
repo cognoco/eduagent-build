@@ -55,9 +55,26 @@ while IFS= read -r file; do
     fi
 
     # Check if file is in the allowed list
-    if ! echo "$allowed_files" | grep -qxF "$file"; then
-        violations+=("$file")
+    if echo "$allowed_files" | grep -qxF "$file"; then
+        continue
     fi
+
+    # Allow test siblings of claimed source files.
+    # If Foo.tsx is claimed, Foo.test.tsx and Foo.test.ts are implicitly allowed
+    # (the implement loop is expected to update existing test siblings).
+    is_test_sibling=false
+    if [[ "$file" =~ \.(test|spec)\.(ts|tsx)$ ]]; then
+        # Strip .test.tsx → .tsx, .test.ts → .ts, .spec.tsx → .tsx
+        source_candidate="$(echo "$file" | sed -E 's/\.(test|spec)\.(ts|tsx)$/.\2/')"
+        if echo "$allowed_files" | grep -qxF "$source_candidate"; then
+            is_test_sibling=true
+        fi
+    fi
+    if [[ "$is_test_sibling" == true ]]; then
+        continue
+    fi
+
+    violations+=("$file")
 done <<< "$changed_files"
 
 if [[ ${#violations[@]} -gt 0 ]]; then
