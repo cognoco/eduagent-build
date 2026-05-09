@@ -1,21 +1,26 @@
+import { createElement, type ReactNode } from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import * as Notifications from 'expo-notifications';
 import { AppState, type AppStateStatus } from 'react-native';
 import { usePushTokenRegistration } from './use-push-token-registration';
+import { createTestProfile } from '../test-utils/app-hook-test-utils';
+import {
+  ProfileContext,
+  type Profile,
+  type ProfileContextValue,
+} from '../lib/profile';
 
 // ---------------------------------------------------------------------------
 // Mock useRegisterPushToken — mock-prefixed variable for Jest hoisting
 // ---------------------------------------------------------------------------
 
 const mockMutateAsync = jest.fn().mockResolvedValue({ registered: true });
-let mockActiveProfile: { id: string } | null = { id: 'profile-1' };
+let mockActiveProfile: Profile | null = createTestProfile({
+  id: 'profile-1',
+});
 
 jest.mock('./use-settings', () => ({
   useRegisterPushToken: () => ({ mutateAsync: mockMutateAsync }),
-}));
-
-jest.mock('../lib/profile', () => ({
-  useProfile: () => ({ activeProfile: mockActiveProfile }),
 }));
 
 jest.mock('expo-constants', () => {
@@ -30,12 +35,30 @@ jest.mock('expo-constants', () => {
 // Tests
 // ---------------------------------------------------------------------------
 
+function createProfileWrapper() {
+  function Wrapper({ children }: { children: ReactNode }) {
+    const value: ProfileContextValue = {
+      profiles: mockActiveProfile ? [mockActiveProfile] : [],
+      activeProfile: mockActiveProfile,
+      switchProfile: async () => ({ success: true }),
+      isLoading: false,
+      profileLoadError: null,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: () => undefined,
+    };
+
+    return createElement(ProfileContext.Provider, { value }, children);
+  }
+
+  return Wrapper;
+}
+
 describe('usePushTokenRegistration', () => {
   let appStateListeners: Array<(state: AppStateStatus) => void>;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockActiveProfile = { id: 'profile-1' };
+    mockActiveProfile = createTestProfile({ id: 'profile-1' });
     appStateListeners = [];
     jest
       .spyOn(AppState, 'addEventListener')
@@ -48,7 +71,9 @@ describe('usePushTokenRegistration', () => {
   });
 
   it('registers push token when notification permission is already granted', async () => {
-    const { result } = renderHook(() => usePushTokenRegistration());
+    const { result } = renderHook(() => usePushTokenRegistration(), {
+      wrapper: createProfileWrapper(),
+    });
 
     await waitFor(() => {
       expect(Notifications.getPermissionsAsync).toHaveBeenCalled();
@@ -76,7 +101,9 @@ describe('usePushTokenRegistration', () => {
       status: 'undetermined',
     });
 
-    const { result } = renderHook(() => usePushTokenRegistration());
+    const { result } = renderHook(() => usePushTokenRegistration(), {
+      wrapper: createProfileWrapper(),
+    });
 
     await waitFor(() => {
       expect(result.current).toEqual({
@@ -94,7 +121,9 @@ describe('usePushTokenRegistration', () => {
       status: 'denied',
     });
 
-    const { result } = renderHook(() => usePushTokenRegistration());
+    const { result } = renderHook(() => usePushTokenRegistration(), {
+      wrapper: createProfileWrapper(),
+    });
 
     await waitFor(() => {
       expect(result.current).toEqual({
@@ -112,7 +141,9 @@ describe('usePushTokenRegistration', () => {
       status: 'undetermined',
     });
 
-    const { result } = renderHook(() => usePushTokenRegistration());
+    const { result } = renderHook(() => usePushTokenRegistration(), {
+      wrapper: createProfileWrapper(),
+    });
 
     await waitFor(() => {
       expect(result.current).toEqual({
@@ -138,13 +169,15 @@ describe('usePushTokenRegistration', () => {
   });
 
   it('registers again when the active profile changes', async () => {
-    const { rerender } = renderHook(() => usePushTokenRegistration());
+    const { rerender } = renderHook(() => usePushTokenRegistration(), {
+      wrapper: createProfileWrapper(),
+    });
 
     await waitFor(() => {
       expect(mockMutateAsync).toHaveBeenCalledTimes(1);
     });
 
-    mockActiveProfile = { id: 'profile-2' };
+    mockActiveProfile = createTestProfile({ id: 'profile-2' });
 
     rerender({});
 
@@ -156,7 +189,9 @@ describe('usePushTokenRegistration', () => {
   it('does not register without an active profile', async () => {
     mockActiveProfile = null;
 
-    const { result } = renderHook(() => usePushTokenRegistration());
+    const { result } = renderHook(() => usePushTokenRegistration(), {
+      wrapper: createProfileWrapper(),
+    });
 
     await act(async () => {
       appStateListeners.forEach((listener) => listener('active'));
@@ -172,7 +207,9 @@ describe('usePushTokenRegistration', () => {
       new Error('Token fetch failed'),
     );
 
-    const { result } = renderHook(() => usePushTokenRegistration());
+    const { result } = renderHook(() => usePushTokenRegistration(), {
+      wrapper: createProfileWrapper(),
+    });
 
     await waitFor(() => {
       expect(result.current).toEqual({
