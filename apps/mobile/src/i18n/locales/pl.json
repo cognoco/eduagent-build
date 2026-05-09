@@ -206,6 +206,8 @@
       "childPreferencesAccessLabel": "Otwórz preferencje profilu {{name}}",
       "childPreferencesLink": "Aby zmienić preferencje {{name}}, otwórz jego profil →",
       "familyPreferencesLink": "Aby zmienić preferencje dziecka, otwórz Rodzina →",
+      "sheetTitle": "Tryb nauki",
+      "sheetEffectMessage": "Zadziała od Twojej następnej wiadomości.",
       "casual": {
         "title": "Odkrywca",
         "description": "Ucz się we własnym tempie. Twój mentor jest zrelaksowany i zachęcający. Od razu zdobywasz punkty i możesz pomijać powtórki."
@@ -254,6 +256,9 @@
       "sectionHeader": "Powiadomienia",
       "pushTitle": "Powiadomienia push",
       "weeklyDigestTitle": "Tygodniowe podsumowanie postępów",
+      "weeklyEmailDigestTitle": "Tygodniowy e-mail z postępami",
+      "monthlyEmailDigestTitle": "Miesięczny e-mail z postępami",
+      "emailDigestDescription": "Wysyłane na adres e-mail Twojego konta.",
       "updateErrorTitle": "Nie można zaktualizować ustawień powiadomień"
     },
     "account": {
@@ -453,6 +458,7 @@
       "speakNow": "Mów teraz — stuknij ponownie mikrofon, aby zatrzymać",
       "processing": "Przetwarzanie...",
       "inputUnavailable": "Wprowadzanie jest obecnie niedostępne",
+      "classifyingSubject": "Sprawdzam, jakiego przedmiotu to dotyczy…",
       "switchToTextMode": "Przełącz na tryb tekstowy",
       "textMode": "Tryb tekstowy",
       "switchToVoiceMode": "Przełącz na tryb głosowy",
@@ -761,6 +767,7 @@
     },
     "row": {
       "review": "Powtórz",
+      "finished": "Ukończone",
       "notStarted": "nierozpoczęty",
       "paused": "Wstrzymany",
       "hasNotes": "Ma notatki",
@@ -774,6 +781,7 @@
       "shelfAccessibilityLabel": "Półka {{name}}, {{subtitle}}{{pausedSuffix}}{{reviewSuffix}}. Stuknij, aby {{action}}.",
       "shelfPausedSuffix": ", wstrzymany",
       "shelfReviewSuffix": ", wymaga powtórki",
+      "shelfFinishedSuffix": ", ukończone",
       "shelfActionExpand": "rozwinąć",
       "shelfActionCollapse": "zwinąć",
       "shelfActionOpen": "otworzyć"

@@ -206,6 +206,8 @@
       "childPreferencesAccessLabel": "Open {{name}}'s profile preferences",
       "childPreferencesLink": "To change {{name}}'s preferences, open their profile →",
       "familyPreferencesLink": "To change a child's preferences, open Family →",
+      "sheetTitle": "Learning mode",
+      "sheetEffectMessage": "Takes effect from your next message.",
       "casual": {
         "title": "Explorer",
         "description": "Learn at your own pace. Your mentor is relaxed and encouraging. You earn points right away and can skip recaps."
@@ -254,6 +256,9 @@
       "sectionHeader": "Notifications",
       "pushTitle": "Push notifications",
       "weeklyDigestTitle": "Weekly progress digest",
+      "weeklyEmailDigestTitle": "Weekly progress email",
+      "monthlyEmailDigestTitle": "Monthly progress email",
+      "emailDigestDescription": "Sent to your account email.",
       "updateErrorTitle": "Could not update notification settings"
     },
     "privacy": {
@@ -453,6 +458,7 @@
       "speakNow": "Speak now — tap the mic again to stop",
       "processing": "Processing...",
       "inputUnavailable": "Input is currently unavailable",
+      "classifyingSubject": "Working out which subject this is for…",
       "switchToTextMode": "Switch to text mode",
       "textMode": "Text mode",
       "switchToVoiceMode": "Switch to voice mode",
@@ -761,6 +767,7 @@
     },
     "row": {
       "review": "Review",
+      "finished": "Finished",
       "notStarted": "not started",
       "paused": "Paused",
       "hasNotes": "Has notes",
@@ -774,6 +781,7 @@
       "shelfAccessibilityLabel": "{{name}} shelf, {{subtitle}}{{pausedSuffix}}{{reviewSuffix}}. Tap to {{action}}.",
       "shelfPausedSuffix": ", paused",
       "shelfReviewSuffix": ", review needed",
+      "shelfFinishedSuffix": ", finished",
       "shelfActionExpand": "expand",
       "shelfActionCollapse": "collapse",
       "shelfActionOpen": "open"

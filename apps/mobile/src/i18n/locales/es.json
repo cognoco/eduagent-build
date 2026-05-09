@@ -206,6 +206,8 @@
       "childPreferencesAccessLabel": "Abrir preferencias del perfil de {{name}}",
       "childPreferencesLink": "Para cambiar las preferencias de {{name}}, abre su perfil →",
       "familyPreferencesLink": "Para cambiar las preferencias de un niño, abre Familia →",
+      "sheetTitle": "Modo de aprendizaje",
+      "sheetEffectMessage": "Se aplicará a partir de tu próximo mensaje.",
       "casual": {
         "title": "Explorador",
         "description": "Aprende a tu propio ritmo. Tu mentor es relajado y alentador. Ganas puntos de inmediato y puedes omitir los repasos."
@@ -254,6 +256,9 @@
       "sectionHeader": "Notificaciones",
       "pushTitle": "Notificaciones push",
       "weeklyDigestTitle": "Resumen de progreso semanal",
+      "weeklyEmailDigestTitle": "Correo semanal de progreso",
+      "monthlyEmailDigestTitle": "Correo mensual de progreso",
+      "emailDigestDescription": "Se envía al correo electrónico de tu cuenta.",
       "updateErrorTitle": "No se pudo actualizar la configuración de notificaciones"
     },
     "account": {
@@ -453,6 +458,7 @@
       "speakNow": "Habla ahora — toca el micrófono de nuevo para parar",
       "processing": "Procesando...",
       "inputUnavailable": "La entrada no está disponible actualmente",
+      "classifyingSubject": "Averiguando para qué asignatura es esto…",
       "switchToTextMode": "Cambiar a modo de texto",
       "textMode": "Modo de texto",
       "switchToVoiceMode": "Cambiar a modo de voz",
@@ -761,6 +767,7 @@
     },
     "row": {
       "review": "Repasar",
+      "finished": "Terminado",
       "notStarted": "no empezado",
       "paused": "En pausa",
       "hasNotes": "Tiene notas",
@@ -774,6 +781,7 @@
       "shelfAccessibilityLabel": "Estante de {{name}}, {{subtitle}}{{pausedSuffix}}{{reviewSuffix}}. Toca para {{action}}.",
       "shelfPausedSuffix": ", en pausa",
       "shelfReviewSuffix": ", necesita repaso",
+      "shelfFinishedSuffix": ", terminado",
       "shelfActionExpand": "expandir",
       "shelfActionCollapse": "contraer",
       "shelfActionOpen": "abrir"

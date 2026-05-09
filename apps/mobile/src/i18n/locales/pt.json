@@ -206,6 +206,8 @@
       "childPreferencesAccessLabel": "Abrir preferências de perfil de {{name}}",
       "childPreferencesLink": "Para mudar as preferências de {{name}}, abra o perfil dele →",
       "familyPreferencesLink": "Para mudar as preferências de uma criança, abra Família →",
+      "sheetTitle": "Modo de aprendizagem",
+      "sheetEffectMessage": "Entra em vigor a partir da tua próxima mensagem.",
       "casual": {
         "title": "Explorador",
         "description": "Aprenda no seu próprio ritmo. Seu mentor é relaxado e encorajador. Você ganha pontos imediatamente e pode pular as revisões."
@@ -254,6 +256,9 @@
       "sectionHeader": "Notificações",
       "pushTitle": "Notificações push",
       "weeklyDigestTitle": "Resumo semanal de progresso",
+      "weeklyEmailDigestTitle": "Email semanal de progresso",
+      "monthlyEmailDigestTitle": "Email mensal de progresso",
+      "emailDigestDescription": "Enviado para o email da tua conta.",
       "updateErrorTitle": "Não foi possível atualizar as configurações de notificação"
     },
     "account": {
@@ -453,6 +458,7 @@
       "speakNow": "Fale agora — toque no microfone novamente para parar",
       "processing": "Processando...",
       "inputUnavailable": "A entrada está indisponível no momento",
+      "classifyingSubject": "A perceber a que disciplina isto pertence…",
       "switchToTextMode": "Mudar para modo de texto",
       "textMode": "Modo de texto",
       "switchToVoiceMode": "Mudar para modo de voz",
@@ -761,6 +767,7 @@
     },
     "row": {
       "review": "Revisar",
+      "finished": "Concluído",
       "notStarted": "não iniciado",
       "paused": "Pausado",
       "hasNotes": "Tem notas",
@@ -774,6 +781,7 @@
       "shelfAccessibilityLabel": "Prateleira {{name}}, {{subtitle}}{{pausedSuffix}}{{reviewSuffix}}. Toque para {{action}}.",
       "shelfPausedSuffix": ", pausado",
       "shelfReviewSuffix": ", revisão necessária",
+      "shelfFinishedSuffix": ", concluído",
       "shelfActionExpand": "expandir",
       "shelfActionCollapse": "recolher",
       "shelfActionOpen": "abrir"

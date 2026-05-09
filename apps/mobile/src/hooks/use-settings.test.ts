@@ -77,6 +77,9 @@ describe('useNotificationSettings', () => {
           preferences: {
             reviewReminders: true,
             dailyReminders: false,
+            weeklyProgressPush: true,
+            weeklyProgressEmail: false,
+            monthlyProgressEmail: true,
             pushEnabled: true,
             maxDailyPush: 5,
           },
@@ -97,6 +100,9 @@ describe('useNotificationSettings', () => {
     expect(result.current.data).toEqual({
       reviewReminders: true,
       dailyReminders: false,
+      weeklyProgressPush: true,
+      weeklyProgressEmail: false,
+      monthlyProgressEmail: true,
       pushEnabled: true,
       maxDailyPush: 5,
     });
@@ -220,6 +226,9 @@ describe('useUpdateNotificationSettings', () => {
           preferences: {
             reviewReminders: true,
             dailyReminders: true,
+            weeklyProgressPush: true,
+            weeklyProgressEmail: false,
+            monthlyProgressEmail: true,
             pushEnabled: true,
             maxDailyPush: 3,
           },
@@ -236,6 +245,8 @@ describe('useUpdateNotificationSettings', () => {
       await result.current.mutateAsync({
         reviewReminders: true,
         dailyReminders: true,
+        weeklyProgressEmail: false,
+        monthlyProgressEmail: true,
         pushEnabled: true,
       });
     });

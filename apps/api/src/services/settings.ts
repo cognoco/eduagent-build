@@ -30,6 +30,8 @@ export interface NotificationPrefs {
   reviewReminders: boolean;
   dailyReminders: boolean;
   weeklyProgressPush: boolean;
+  weeklyProgressEmail: boolean;
+  monthlyProgressEmail: boolean;
   pushEnabled: boolean;
   maxDailyPush: number;
 }
@@ -48,6 +50,8 @@ const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
   reviewReminders: false,
   dailyReminders: false,
   weeklyProgressPush: true,
+  weeklyProgressEmail: true,
+  monthlyProgressEmail: true,
   pushEnabled: false,
   maxDailyPush: 3,
 };
@@ -65,7 +69,7 @@ const DEFAULT_LEARNING_MODE: LearningModeRecord = {
 async function verifyProfileOwnership(
   db: Database,
   profileId: string,
-  accountId: string
+  accountId: string,
 ): Promise<void> {
   const [owner] = await db
     .select({ id: profiles.id })
@@ -82,7 +86,7 @@ async function verifyProfileOwnership(
 
 export async function getNotificationPrefs(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<NotificationPrefs> {
   const row = await db.query.notificationPreferences.findFirst({
     where: eq(notificationPreferences.profileId, profileId),
@@ -93,7 +97,9 @@ export async function getNotificationPrefs(
   return {
     reviewReminders: row.reviewReminders,
     dailyReminders: row.dailyReminders,
-    weeklyProgressPush: row.weeklyProgressPush,
+    weeklyProgressPush: row.weeklyProgressPush ?? true,
+    weeklyProgressEmail: row.weeklyProgressEmail ?? true,
+    monthlyProgressEmail: row.monthlyProgressEmail ?? true,
     pushEnabled: row.pushEnabled,
     maxDailyPush: row.maxDailyPush,
   };
@@ -103,7 +109,7 @@ export async function upsertNotificationPrefs(
   db: Database,
   profileId: string,
   accountId: string,
-  input: NotificationPrefsInput
+  input: NotificationPrefsInput,
 ): Promise<NotificationPrefs> {
   await verifyProfileOwnership(db, profileId, accountId);
   const existing = await db.query.notificationPreferences.findFirst({
@@ -111,6 +117,12 @@ export async function upsertNotificationPrefs(
   });
 
   const maxDailyPush = input.maxDailyPush ?? 3;
+  const weeklyProgressPush =
+    input.weeklyProgressPush ?? existing?.weeklyProgressPush ?? true;
+  const weeklyProgressEmail =
+    input.weeklyProgressEmail ?? existing?.weeklyProgressEmail ?? true;
+  const monthlyProgressEmail =
+    input.monthlyProgressEmail ?? existing?.monthlyProgressEmail ?? true;
 
   if (existing) {
     await db
@@ -118,7 +130,9 @@ export async function upsertNotificationPrefs(
       .set({
         reviewReminders: input.reviewReminders,
         dailyReminders: input.dailyReminders,
-        weeklyProgressPush: input.weeklyProgressPush ?? true,
+        weeklyProgressPush,
+        weeklyProgressEmail,
+        monthlyProgressEmail,
         pushEnabled: input.pushEnabled,
         maxDailyPush,
         updatedAt: new Date(),
@@ -129,7 +143,9 @@ export async function upsertNotificationPrefs(
       profileId,
       reviewReminders: input.reviewReminders,
       dailyReminders: input.dailyReminders,
-      weeklyProgressPush: input.weeklyProgressPush ?? true,
+      weeklyProgressPush,
+      weeklyProgressEmail,
+      monthlyProgressEmail,
       pushEnabled: input.pushEnabled,
       maxDailyPush,
     });
@@ -138,7 +154,9 @@ export async function upsertNotificationPrefs(
   return {
     reviewReminders: input.reviewReminders,
     dailyReminders: input.dailyReminders,
-    weeklyProgressPush: input.weeklyProgressPush ?? true,
+    weeklyProgressPush,
+    weeklyProgressEmail,
+    monthlyProgressEmail,
     pushEnabled: input.pushEnabled,
     maxDailyPush,
   };
@@ -150,7 +168,7 @@ export async function upsertNotificationPrefs(
 
 export async function getLearningMode(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<LearningModeRecord> {
   const row = await db.query.learningModes.findFirst({
     where: eq(learningModes.profileId, profileId),
@@ -169,7 +187,7 @@ export async function upsertLearningMode(
   db: Database,
   profileId: string,
   accountId: string,
-  mode: LearningMode
+  mode: LearningMode,
 ): Promise<LearningModeRecord> {
   await verifyProfileOwnership(db, profileId, accountId);
   const existing = await db.query.learningModes.findFirst({
@@ -190,7 +208,7 @@ export async function upsertLearningMode(
 
 export async function getCelebrationLevel(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<CelebrationLevel> {
   const row = await db.query.learningModes.findFirst({
     where: eq(learningModes.profileId, profileId),
@@ -203,7 +221,7 @@ export async function upsertCelebrationLevel(
   db: Database,
   profileId: string,
   accountId: string,
-  celebrationLevel: CelebrationLevel
+  celebrationLevel: CelebrationLevel,
 ): Promise<{ celebrationLevel: CelebrationLevel }> {
   await verifyProfileOwnership(db, profileId, accountId);
   const existing = await db.query.learningModes.findFirst({
@@ -230,7 +248,7 @@ export async function upsertCelebrationLevel(
 
 export async function getWithdrawalArchivePreference(
   db: Database,
-  ownerProfileId: string
+  ownerProfileId: string,
 ): Promise<WithdrawalArchivePreference> {
   const row = await db.query.withdrawalArchivePreferences.findFirst({
     where: eq(withdrawalArchivePreferences.ownerProfileId, ownerProfileId),
@@ -243,7 +261,7 @@ export async function upsertWithdrawalArchivePreference(
   db: Database,
   ownerProfileId: string,
   accountId: string,
-  value: WithdrawalArchivePreference
+  value: WithdrawalArchivePreference,
 ): Promise<{ value: WithdrawalArchivePreference }> {
   await verifyProfileOwnership(db, ownerProfileId, accountId);
 
@@ -272,7 +290,7 @@ export async function upsertWithdrawalArchivePreference(
 
 export async function getFamilyPoolBreakdownSharing(
   db: Database,
-  ownerProfileId: string
+  ownerProfileId: string,
 ): Promise<boolean> {
   const row = await db.query.familyPreferences.findFirst({
     where: eq(familyPreferences.ownerProfileId, ownerProfileId),
@@ -285,7 +303,7 @@ export async function getFamilyPoolBreakdownSharing(
 export async function getOwnedFamilyPoolBreakdownSharing(
   db: Database,
   ownerProfileId: string,
-  accountId: string
+  accountId: string,
 ): Promise<boolean> {
   await verifyProfileOwnership(db, ownerProfileId, accountId);
 
@@ -304,7 +322,7 @@ export async function upsertFamilyPoolBreakdownSharing(
   db: Database,
   ownerProfileId: string,
   accountId: string,
-  value: boolean
+  value: boolean,
 ): Promise<{ value: boolean }> {
   await verifyProfileOwnership(db, ownerProfileId, accountId);
 
@@ -329,7 +347,7 @@ export async function upsertFamilyPoolBreakdownSharing(
 
 export async function getMedianResponseSeconds(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<number | null> {
   const row = await db.query.learningModes.findFirst({
     where: eq(learningModes.profileId, profileId),
@@ -345,7 +363,7 @@ export async function getMedianResponseSeconds(
 export async function updateMedianResponseSeconds(
   db: Database,
   profileId: string,
-  sessionMedianSeconds: number
+  sessionMedianSeconds: number,
 ): Promise<number> {
   const existing = await db.query.learningModes.findFirst({
     where: eq(learningModes.profileId, profileId),
@@ -354,7 +372,7 @@ export async function updateMedianResponseSeconds(
   const nextMedian =
     existing?.medianResponseSeconds != null
       ? Math.round(
-          existing.medianResponseSeconds * 0.8 + sessionMedianSeconds * 0.2
+          existing.medianResponseSeconds * 0.8 + sessionMedianSeconds * 0.2,
         )
       : Math.round(sessionMedianSeconds);
 
@@ -414,7 +432,7 @@ export const SKIP_WARNING_THRESHOLD = 5;
 
 export async function getConsecutiveSummarySkips(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<number> {
   const row = await db.query.learningModes.findFirst({
     where: eq(learningModes.profileId, profileId),
@@ -429,7 +447,7 @@ export async function getConsecutiveSummarySkips(
  */
 export async function incrementSummarySkips(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<number> {
   const existing = await db.query.learningModes.findFirst({
     where: eq(learningModes.profileId, profileId),
@@ -458,7 +476,7 @@ export async function incrementSummarySkips(
  */
 export async function resetSummarySkips(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<void> {
   const existing = await db.query.learningModes.findFirst({
     where: eq(learningModes.profileId, profileId),
@@ -480,7 +498,7 @@ export async function registerPushToken(
   db: Database,
   profileId: string,
   accountId: string,
-  token: string
+  token: string,
 ): Promise<void> {
   await verifyProfileOwnership(db, profileId, accountId);
   const existing = await db.query.notificationPreferences.findFirst({
@@ -501,7 +519,7 @@ export async function registerPushToken(
 
 export async function getPushToken(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<string | null> {
   const row = await db.query.notificationPreferences.findFirst({
     where: eq(notificationPreferences.profileId, profileId),
@@ -515,7 +533,7 @@ export async function getPushToken(
 
 export async function getDailyNotificationCount(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<number> {
   const startOfDay = new Date();
   startOfDay.setUTCHours(0, 0, 0, 0);
@@ -526,8 +544,8 @@ export async function getDailyNotificationCount(
     .where(
       and(
         eq(notificationLog.profileId, profileId),
-        gte(notificationLog.sentAt, startOfDay)
-      )
+        gte(notificationLog.sentAt, startOfDay),
+      ),
     );
 
   return rows.length;
@@ -542,7 +560,7 @@ export async function logNotification(
   db: Database,
   profileId: string,
   type: NotificationPayload['type'],
-  ticketId?: string
+  ticketId?: string,
 ): Promise<void> {
   await db.insert(notificationLog).values({
     profileId,
@@ -558,7 +576,7 @@ export async function getRecentNotificationCount(
   db: Database,
   profileId: string,
   type: NotificationPayload['type'],
-  hours: number
+  hours: number,
 ): Promise<number> {
   const since = new Date(Date.now() - hours * 60 * 60 * 1000);
 
@@ -569,8 +587,8 @@ export async function getRecentNotificationCount(
       and(
         eq(notificationLog.profileId, profileId),
         eq(notificationLog.type, type),
-        gte(notificationLog.sentAt, since)
-      )
+        gte(notificationLog.sentAt, since),
+      ),
     );
 
   return rows.length;
@@ -592,7 +610,7 @@ export async function checkAndLogRateLimitInternal(
   db: Database,
   profileId: string,
   type: NotificationPayload['type'],
-  opts: { hours: number; maxCount: number }
+  opts: { hours: number; maxCount: number },
 ): Promise<boolean> {
   return db.transaction(async (tx) => {
     // Advisory lock per (profileId, notificationKey) — serializes concurrent
@@ -601,7 +619,7 @@ export async function checkAndLogRateLimitInternal(
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtextextended(${
         'rate-limit:' + profileId + ':' + type
-      }, 0))`
+      }, 0))`,
     );
 
     const since = new Date(Date.now() - opts.hours * 60 * 60 * 1000);
@@ -612,8 +630,8 @@ export async function checkAndLogRateLimitInternal(
         and(
           eq(notificationLog.profileId, profileId),
           eq(notificationLog.type, type),
-          gte(notificationLog.sentAt, since)
-        )
+          gte(notificationLog.sentAt, since),
+        ),
       );
 
     if (rows.length >= opts.maxCount) {
@@ -635,7 +653,7 @@ export async function checkAndLogRateLimit(
   profileId: string,
   accountId: string,
   type: NotificationPayload['type'],
-  opts: { hours: number; maxCount: number }
+  opts: { hours: number; maxCount: number },
 ): Promise<boolean> {
   await verifyProfileOwnership(db, profileId, accountId);
   return db.transaction(async (tx) => {
@@ -645,7 +663,7 @@ export async function checkAndLogRateLimit(
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtextextended(${
         'rate-limit:' + profileId + ':' + type
-      }, 0))`
+      }, 0))`,
     );
 
     const since = new Date(Date.now() - opts.hours * 60 * 60 * 1000);
@@ -656,8 +674,8 @@ export async function checkAndLogRateLimit(
         and(
           eq(notificationLog.profileId, profileId),
           eq(notificationLog.type, type),
-          gte(notificationLog.sentAt, since)
-        )
+          gte(notificationLog.sentAt, since),
+        ),
       );
 
     if (rows.length >= opts.maxCount) {

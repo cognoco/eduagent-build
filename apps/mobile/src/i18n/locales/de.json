@@ -206,6 +206,8 @@
       "childPreferencesAccessLabel": "Profileinstellungen von {{name}} öffnen",
       "childPreferencesLink": "Um {{name}}s Einstellungen zu ändern, öffne sein Profil →",
       "familyPreferencesLink": "Um die Einstellungen eines Kindes zu ändern, öffne Familie →",
+      "sheetTitle": "Lernmodus",
+      "sheetEffectMessage": "Gilt ab deiner nächsten Nachricht.",
       "casual": {
         "title": "Entdecker",
         "description": "Lerne in deinem eigenen Tempo. Dein Mentor ist entspannt und ermutigend. Du verdienst sofort Punkte und kannst Wiederholungen überspringen."
@@ -254,6 +256,9 @@
       "sectionHeader": "Benachrichtigungen",
       "pushTitle": "Push-Benachrichtigungen",
       "weeklyDigestTitle": "Wöchentlicher Fortschrittsbericht",
+      "weeklyEmailDigestTitle": "Wöchentliche Fortschritts-E-Mail",
+      "monthlyEmailDigestTitle": "Monatliche Fortschritts-E-Mail",
+      "emailDigestDescription": "Wird an die E-Mail-Adresse deines Kontos gesendet.",
       "updateErrorTitle": "Benachrichtigungseinstellungen konnten nicht aktualisiert werden"
     },
     "account": {
@@ -453,6 +458,7 @@
       "speakNow": "Sprich jetzt – tippe erneut auf das Mikrofon, um zu stoppen",
       "processing": "Verarbeite...",
       "inputUnavailable": "Eingabe derzeit nicht verfügbar",
+      "classifyingSubject": "Ich finde gerade heraus, zu welchem Fach das gehört…",
       "switchToTextMode": "In den Textmodus wechseln",
       "textMode": "Textmodus",
       "switchToVoiceMode": "In den Sprachmodus wechseln",
@@ -761,6 +767,7 @@
     },
     "row": {
       "review": "Wiederholen",
+      "finished": "Fertig",
       "notStarted": "nicht begonnen",
       "paused": "Pausiert",
       "hasNotes": "Hat Notizen",
@@ -774,6 +781,7 @@
       "shelfAccessibilityLabel": "{{name}}-Regal, {{subtitle}}{{pausedSuffix}}{{reviewSuffix}}. Tippen zum {{action}}.",
       "shelfPausedSuffix": ", pausiert",
       "shelfReviewSuffix": ", Wiederholung erforderlich",
+      "shelfFinishedSuffix": ", fertig",
       "shelfActionExpand": "Erweitern",
       "shelfActionCollapse": "Zuklappen",
       "shelfActionOpen": "Öffnen"

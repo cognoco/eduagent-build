@@ -26,6 +26,8 @@ interface NotificationPrefs {
   reviewReminders: boolean;
   dailyReminders: boolean;
   weeklyProgressPush: boolean;
+  weeklyProgressEmail: boolean;
+  monthlyProgressEmail: boolean;
   pushEnabled: boolean;
   maxDailyPush: number;
 }

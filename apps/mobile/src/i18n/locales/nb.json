@@ -206,6 +206,8 @@
       "childPreferencesAccessLabel": "Åpne {{name}}s profilinnstillinger",
       "childPreferencesLink": "For å endre {{name}}s preferanser, åpne profilen deres →",
       "familyPreferencesLink": "For å endre et barns preferanser, åpne Familie →",
+      "sheetTitle": "Læringsmodus",
+      "sheetEffectMessage": "Gjelder fra neste melding.",
       "casual": {
         "title": "Utforsker",
         "description": "Lær i ditt eget tempo. Mentoren din er avslappet og oppmuntrende. Du tjener poeng med en gang og kan hoppe over repetisjoner."
@@ -254,6 +256,9 @@
       "sectionHeader": "Varsler",
       "pushTitle": "Push-varsler",
       "weeklyDigestTitle": "Ukentlig fremgangsoppsummering",
+      "weeklyEmailDigestTitle": "Ukentlig fremdrifts-e-post",
+      "monthlyEmailDigestTitle": "Månedlig fremdrifts-e-post",
+      "emailDigestDescription": "Sendes til e-postadressen på kontoen din.",
       "updateErrorTitle": "Kunne ikke oppdatere varslingsinnstillinger"
     },
     "account": {
@@ -453,6 +458,7 @@
       "speakNow": "Snakk nå – trykk på mikrofonen igjen for å stoppe",
       "processing": "Behandler ...",
       "inputUnavailable": "Inndata er for øyeblikket utilgjengelig",
+      "classifyingSubject": "Finner ut hvilket fag dette hører til…",
       "switchToTextMode": "Bytt til tekstmodus",
       "textMode": "Tekstmodus",
       "switchToVoiceMode": "Bytt til talemodus",
@@ -788,6 +794,7 @@
     },
     "row": {
       "review": "Gjennomgå",
+      "finished": "Ferdig",
       "notStarted": "ikke startet",
       "paused": "Pauset",
       "hasNotes": "Har notater",
@@ -801,6 +808,7 @@
       "shelfAccessibilityLabel": "{{name}}-hylle, {{subtitle}}{{pausedSuffix}}{{reviewSuffix}}. Trykk for å {{action}}.",
       "shelfPausedSuffix": ", pauset",
       "shelfReviewSuffix": ", gjennomgang nødvendig",
+      "shelfFinishedSuffix": ", ferdig",
       "shelfActionExpand": "utvide",
       "shelfActionCollapse": "lukke",
       "shelfActionOpen": "åpne"

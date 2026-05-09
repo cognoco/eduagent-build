@@ -242,6 +242,8 @@ export default function MoreScreen() {
 
   const pushEnabled = notifPrefs?.pushEnabled ?? false;
   const weeklyDigest = notifPrefs?.weeklyProgressPush ?? false;
+  const weeklyEmailDigest = notifPrefs?.weeklyProgressEmail ?? true;
+  const monthlyEmailDigest = notifPrefs?.monthlyProgressEmail ?? true;
   const withdrawalArchiveOptions = [
     {
       value: 'auto',
@@ -267,6 +269,8 @@ export default function MoreScreen() {
           reviewReminders: notifPrefs?.reviewReminders ?? false,
           dailyReminders: notifPrefs?.dailyReminders ?? false,
           weeklyProgressPush: notifPrefs?.weeklyProgressPush ?? true,
+          weeklyProgressEmail: notifPrefs?.weeklyProgressEmail ?? true,
+          monthlyProgressEmail: notifPrefs?.monthlyProgressEmail ?? true,
           pushEnabled: value,
         },
         {
@@ -289,6 +293,56 @@ export default function MoreScreen() {
           reviewReminders: notifPrefs?.reviewReminders ?? false,
           dailyReminders: notifPrefs?.dailyReminders ?? false,
           weeklyProgressPush: value,
+          weeklyProgressEmail: notifPrefs?.weeklyProgressEmail ?? true,
+          monthlyProgressEmail: notifPrefs?.monthlyProgressEmail ?? true,
+          pushEnabled: notifPrefs?.pushEnabled ?? false,
+        },
+        {
+          onError: () => {
+            platformAlert(
+              t('more.notifications.updateErrorTitle'),
+              t('more.errors.tryAgain'),
+            );
+          },
+        },
+      );
+    },
+    [updateNotifications, notifPrefs, t],
+  );
+
+  const handleToggleWeeklyEmailDigest = useCallback(
+    (value: boolean) => {
+      updateNotifications.mutate(
+        {
+          reviewReminders: notifPrefs?.reviewReminders ?? false,
+          dailyReminders: notifPrefs?.dailyReminders ?? false,
+          weeklyProgressPush: notifPrefs?.weeklyProgressPush ?? true,
+          weeklyProgressEmail: value,
+          monthlyProgressEmail: notifPrefs?.monthlyProgressEmail ?? true,
+          pushEnabled: notifPrefs?.pushEnabled ?? false,
+        },
+        {
+          onError: () => {
+            platformAlert(
+              t('more.notifications.updateErrorTitle'),
+              t('more.errors.tryAgain'),
+            );
+          },
+        },
+      );
+    },
+    [updateNotifications, notifPrefs, t],
+  );
+
+  const handleToggleMonthlyEmailDigest = useCallback(
+    (value: boolean) => {
+      updateNotifications.mutate(
+        {
+          reviewReminders: notifPrefs?.reviewReminders ?? false,
+          dailyReminders: notifPrefs?.dailyReminders ?? false,
+          weeklyProgressPush: notifPrefs?.weeklyProgressPush ?? true,
+          weeklyProgressEmail: notifPrefs?.weeklyProgressEmail ?? true,
+          monthlyProgressEmail: value,
           pushEnabled: notifPrefs?.pushEnabled ?? false,
         },
         {
@@ -691,6 +745,22 @@ export default function MoreScreen() {
           onToggle={handleToggleDigest}
           disabled={notifLoading || updateNotifications.isPending}
           testID="weekly-digest-toggle"
+        />
+        <ToggleRow
+          label={t('more.notifications.weeklyEmailDigestTitle')}
+          description={t('more.notifications.emailDigestDescription')}
+          value={weeklyEmailDigest}
+          onToggle={handleToggleWeeklyEmailDigest}
+          disabled={notifLoading || updateNotifications.isPending}
+          testID="weekly-email-digest-toggle"
+        />
+        <ToggleRow
+          label={t('more.notifications.monthlyEmailDigestTitle')}
+          description={t('more.notifications.emailDigestDescription')}
+          value={monthlyEmailDigest}
+          onToggle={handleToggleMonthlyEmailDigest}
+          disabled={notifLoading || updateNotifications.isPending}
+          testID="monthly-email-digest-toggle"
         />
 
         {/* 7. Privacy */}

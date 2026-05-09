@@ -206,6 +206,8 @@
       "childPreferencesAccessLabel": "{{name}}さんのプロフィール設定を開く",
       "childPreferencesLink": "{{name}}さんの設定を変更するには、プロフィールを開いてください →",
       "familyPreferencesLink": "お子様の設定を変更するには、ファミリーを開いてください →",
+      "sheetTitle": "学習モード",
+      "sheetEffectMessage": "次のメッセージから反映されます。",
       "casual": {
         "title": "エクスプローラー",
         "description": "自分のペースで学習します。メンターはリラックスして励ましてくれます。すぐにポイントを獲得でき、要約をスキップできます。"
@@ -254,6 +256,9 @@
       "sectionHeader": "通知",
       "pushTitle": "プッシュ通知",
       "weeklyDigestTitle": "週ごとの進捗ダイジェスト",
+      "weeklyEmailDigestTitle": "週間進捗メール",
+      "monthlyEmailDigestTitle": "月間進捗メール",
+      "emailDigestDescription": "アカウントのメールアドレスに送信されます。",
       "updateErrorTitle": "通知設定を更新できませんでした"
     },
     "account": {
@@ -453,6 +458,7 @@
       "speakNow": "話してください — もう一度マイクをタップして停止",
       "processing": "処理中...",
       "inputUnavailable": "現在入力は利用できません",
+      "classifyingSubject": "どの教科か確認しています…",
       "switchToTextMode": "テキストモードに切り替え",
       "textMode": "テキストモード",
       "switchToVoiceMode": "音声モードに切り替え",
@@ -788,6 +794,7 @@
     },
     "row": {
       "review": "復習",
+      "finished": "完了",
       "notStarted": "未開始",
       "paused": "一時停止中",
       "hasNotes": "メモあり",
@@ -801,6 +808,7 @@
       "shelfAccessibilityLabel": "{{name}}の棚、{{subtitle}}{{pausedSuffix}}{{reviewSuffix}}。タップして{{action}}。",
       "shelfPausedSuffix": "、一時停止中",
       "shelfReviewSuffix": "、復習が必要",
+      "shelfFinishedSuffix": "、完了",
       "shelfActionExpand": "展開",
       "shelfActionCollapse": "折りたたむ",
       "shelfActionOpen": "開く"
