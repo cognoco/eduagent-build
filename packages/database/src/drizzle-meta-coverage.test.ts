@@ -25,9 +25,13 @@ interface DrizzleSnapshot {
   prevId: string;
 }
 
+interface DrizzleJournal {
+  entries: Array<{ idx: number; tag: string }>;
+}
+
 function loadSnapshot(tag: string): DrizzleSnapshot {
   return JSON.parse(
-    readFileSync(resolve(META_DIR, `${tag}_snapshot.json`), 'utf8')
+    readFileSync(resolve(META_DIR, `${tag}_snapshot.json`), 'utf8'),
   ) as DrizzleSnapshot;
 }
 
@@ -47,7 +51,7 @@ describe('drizzle migration snapshots [BUG-789]', () => {
       expect(snap.id.length).toBeGreaterThan(10);
       expect(typeof snap.prevId).toBe('string');
       expect(snap.prevId.length).toBeGreaterThan(10);
-    }
+    },
   );
 
   it('every present snapshot has a non-empty id and prevId', () => {
@@ -74,10 +78,19 @@ describe('drizzle migration snapshots [BUG-789]', () => {
       const prev = loadSnapshot(prevTag);
       if (snap.prevId !== prev.id) {
         breaks.push(
-          `${tag}.prevId=${snap.prevId} !== ${prevTag}.id=${prev.id}`
+          `${tag}.prevId=${snap.prevId} !== ${prevTag}.id=${prev.id}`,
         );
       }
     }
     expect(breaks).toEqual([]);
+  });
+
+  it('latest journal entry has a matching snapshot', () => {
+    const journal = JSON.parse(
+      readFileSync(resolve(META_DIR, '_journal.json'), 'utf8'),
+    ) as DrizzleJournal;
+    const latest = journal.entries.at(-1);
+    expect(latest).toBeDefined();
+    expect(snapshotTags()).toContain(String(latest?.idx).padStart(4, '0'));
   });
 });
