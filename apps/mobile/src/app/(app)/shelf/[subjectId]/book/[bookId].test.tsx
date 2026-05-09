@@ -263,6 +263,36 @@ describe('BookScreen', () => {
     getByTestId('book-loading');
   });
 
+  it('keeps cached book content visible during a background refetch', () => {
+    mockUseBookWithTopics.mockReturnValue(
+      makeBookQuery({
+        isLoading: true,
+      }),
+    );
+
+    const { getByTestId, queryByTestId, getByText } = render(<BookScreen />);
+
+    getByTestId('book-screen');
+    getByText('Algebra');
+    getByTestId('up-next-row-topic-1');
+    expect(queryByTestId('book-loading')).toBeNull();
+  });
+
+  it('keeps cached book content visible if a background refresh errors', () => {
+    mockUseBookWithTopics.mockReturnValue(
+      makeBookQuery({
+        isError: true,
+        error: new Error('Refresh failed'),
+      }),
+    );
+
+    const { getByTestId, queryByTestId, getByText } = render(<BookScreen />);
+
+    getByTestId('book-screen');
+    getByText('Algebra');
+    expect(queryByTestId('book-error')).toBeNull();
+  });
+
   it('shows the error state and wires retry plus back', () => {
     mockUseBookWithTopics.mockReturnValue(
       makeBookQuery({

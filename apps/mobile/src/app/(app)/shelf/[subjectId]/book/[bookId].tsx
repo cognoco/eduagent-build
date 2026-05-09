@@ -229,6 +229,7 @@ export default function BookScreen() {
   } | null>(null);
 
   const book = bookQuery.data?.book ?? null;
+  const hasBookData = bookQuery.data != null;
   const topics = useMemo(
     () => bookQuery.data?.topics ?? [],
     [bookQuery.data?.topics],
@@ -832,7 +833,6 @@ export default function BookScreen() {
     router,
     sessionCount,
     startFirstCurriculumSession,
-    startFirstCurriculumSession.isPending,
     subjectId,
   ]);
 
@@ -985,7 +985,7 @@ export default function BookScreen() {
   }
 
   // 1. Loading — show hero immediately from navigation params, sections shimmer
-  if (bookQuery.isLoading) {
+  if (bookQuery.isLoading && !hasBookData) {
     // Extract title/emoji from the books list query if available (already cached)
     const cachedBook = allBooksQuery.data?.find?.((b) => b.id === bookId);
     const heroTitle = cachedBook?.title ?? params.bookId ?? 'Book';
@@ -1079,7 +1079,7 @@ export default function BookScreen() {
   }
 
   // 2. Error
-  if (bookQuery.isError) {
+  if (bookQuery.isError && !hasBookData) {
     const errorMessage =
       bookQuery.error instanceof Error
         ? bookQuery.error.message
@@ -1285,7 +1285,7 @@ export default function BookScreen() {
           <Text className="mb-2 px-5 text-body-sm font-semibold text-text-secondary tracking-wide">
             Your Notes
           </Text>
-          {notesQuery.isLoading ? (
+          {notesQuery.isLoading && !notesQuery.data ? (
             <ShimmerSkeleton testID="book-notes-loading">
               <View className="px-5">
                 {[0, 1].map((i) => (
@@ -1643,7 +1643,7 @@ export default function BookScreen() {
             />
           </Pressable>
           {showPastConversations ? (
-            sessionsQuery.isLoading ? (
+            sessionsQuery.isLoading && !sessionsQuery.data ? (
               <ShimmerSkeleton testID="book-sessions-loading">
                 <View className="px-5">
                   {[0, 1, 2].map((i) => (
