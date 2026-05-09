@@ -50,7 +50,10 @@ nodes:
 
   - id: install
     depends_on: [extract]
-    bash: ./.archon/scripts/install.sh
+    bash: |
+      ./.archon/scripts/install.sh
+      git rev-parse HEAD > "$ARTIFACTS_DIR/.pre-implement-sha"
+      echo "Saved pre-implement SHA: $(cat "$ARTIFACTS_DIR/.pre-implement-sha")"
 
   # ── PHASE 2: IMPLEMENT ───────────────────────────────────────────────
 

@@ -26,9 +26,19 @@ fi
 
 allowed_count="$(echo "$allowed_files" | wc -l | tr -d ' ')"
 
-# Get actual changed files relative to origin/main
-base="${BASE_BRANCH:-origin/main}"
-changed_files="$(git diff --name-only "${base}...HEAD" 2>/dev/null || git diff --name-only "origin/main...HEAD")"
+# Determine the base ref for the diff.
+# Prefer the pre-implement SHA (saved by the install node) so we only
+# check files changed by the implement loop, not the entire branch
+# history. Falls back to origin/main for backwards compatibility.
+pre_sha_file="${artifacts_dir}/.pre-implement-sha"
+if [[ -f "$pre_sha_file" ]]; then
+    base="$(cat "$pre_sha_file" | tr -d '[:space:]')"
+    echo "Using pre-implement SHA as base: ${base:0:8}"
+else
+    base="${BASE_BRANCH:-origin/main}"
+    echo "WARNING: .pre-implement-sha not found — falling back to ${base}" >&2
+fi
+changed_files="$(git diff --name-only "${base}..HEAD" 2>/dev/null || true)"
 
 if [[ -z "$changed_files" ]]; then
     echo "Scope guard: clean — no files changed relative to ${base}"
