@@ -53,10 +53,23 @@ nodes:
       git rev-parse HEAD > "$ARTIFACTS_DIR/.pre-implement-sha"
       echo "Saved pre-implement SHA: $(cat "$ARTIFACTS_DIR/.pre-implement-sha")"
 
+  # ── PHASE 1c: PLAN-REVIEW (pre-implement gate) ──────────────────────
+  # Reads work-order.md and verifies claimed files exist on origin/main
+  # and phase descriptions match real code structure. BLOCK does NOT halt
+  # the workflow — it forces all reviewers to run later via risk-class.
+
+  - id: plan-review
+    command: cleanup-plan-review
+    depends_on: [install]
+    context: fresh
+    provider: codex
+    model: gpt-5.5
+    modelReasoningEffort: medium
+
   # ── PHASE 2: IMPLEMENT ───────────────────────────────────────────────
 
   - id: implement
-    depends_on: [install]
+    depends_on: [plan-review]
     context: fresh
     idle_timeout: 600000
     loop:
@@ -83,11 +96,20 @@ nodes:
     model: gpt-5.5
     modelReasoningEffort: medium
 
+  # ── PHASE 3.5: RISK CLASSIFICATION ───────────────────────────────────
+  # Emits 'tiny' | 'normal' | 'risky' to stdout based on diff stats,
+  # sensitive-path matches, and plan-review verdict. Tiny PRs skip
+  # code-review + test-coverage. Risky PRs always run all reviewers.
+
+  - id: risk-class
+    depends_on: [validate]
+    bash: ./.archon/scripts/cleanup-risk-class.sh "$ARTIFACTS_DIR"
+
   # ── PHASE 4: PARALLEL REVIEW ──────────────────────────────────────────
 
   - id: review-scope
     command: cleanup-pr-review-scope
-    depends_on: [validate]
+    depends_on: [risk-class]
     context: fresh
     provider: codex
     model: gpt-5.5
@@ -96,6 +118,7 @@ nodes:
   - id: code-review
     command: cleanup-code-review-agent
     depends_on: [review-scope]
+    when: "$risk-class.output != 'tiny'"
     context: fresh
     provider: codex
     model: gpt-5.5
@@ -104,6 +127,7 @@ nodes:
   - id: test-coverage
     command: cleanup-test-coverage-agent
     depends_on: [review-scope]
+    when: "$risk-class.output != 'tiny'"
     context: fresh
     provider: codex
     model: gpt-5.5
@@ -165,8 +189,30 @@ nodes:
     depends_on: [create-pr]
     bash: ./.archon/scripts/post-review-comments.sh "$ARTIFACTS_DIR"
 
+  # ── PHASE 7.5: CI WATCH & AUTO-FIX ────────────────────────────────────
+  # Watches GitHub CI on the just-pushed PR. If checks fail, classifies
+  # them (gc1-ratchet/lint/typecheck/test/build/flake/code-review),
+  # applies a targeted fix locally, re-validates, pushes, repeats.
+  # Hard caps: max_iterations=3, same-failure-twice early stop.
+  # On giveup: posts PR comment + files Notion P1.
+
+  - id: ci-watch-and-fix
+    depends_on: [post-review-comments]
+    context: fresh
+    idle_timeout: 1800000
+    provider: codex
+    model: gpt-5.5
+    modelReasoningEffort: medium
+    loop:
+      prompt: |
+        Read and execute the instructions in `.archon/commands/cleanup-ci-watch-and-fix.md`.
+        Artifacts directory: $ARTIFACTS_DIR
+      until: ALL_CHECKS_GREEN_OR_GIVEUP
+      max_iterations: 3
+      fresh_context: true
+
   # ── PHASE 8: SUMMARY ──────────────────────────────────────────────────
 
   - id: summary
-    depends_on: [post-review-comments]
+    depends_on: [ci-watch-and-fix]
     bash: ./.archon/scripts/cleanup-summary.sh "$ARTIFACTS_DIR"
