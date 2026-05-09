@@ -134,7 +134,8 @@ export function computeCorrectStreak(
 ): number {
   let streak = 0;
   for (let i = events.length - 1; i >= 0; i--) {
-    const event = events[i]!;
+    const event = events[i];
+    if (!event) break;
     if (event.eventType !== 'ai_response') continue;
     const meta = event.metadata;
     if (!meta || typeof meta !== 'object') break;

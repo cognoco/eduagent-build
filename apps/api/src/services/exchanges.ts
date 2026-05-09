@@ -44,11 +44,12 @@ export function sanitizeUserContent(content: string): string {
 }
 
 function buildOrphanSystemAddendum(
-  history: ExchangeContext['exchangeHistory']
+  history: ExchangeContext['exchangeHistory'],
 ): string {
   const recentOrphans: ExchangeContext['exchangeHistory'] = [];
   for (let i = history.length - 1; i >= 0; i--) {
-    const turn = history[i]!;
+    const turn = history[i];
+    if (!turn) break;
     if (turn.role === 'assistant') break;
     if (turn.role === 'user' && turn.orphan_reason) {
       recentOrphans.unshift(turn);
@@ -60,7 +61,7 @@ function buildOrphanSystemAddendum(
     recentOrphans
       .map(
         (t) =>
-          `<server_note kind="orphan_user_turn" reason="${t.orphan_reason}"/>`
+          `<server_note kind="orphan_user_turn" reason="${t.orphan_reason}"/>`,
       )
       .join('\n')
   );
@@ -77,7 +78,7 @@ export interface ImageData {
 
 export function buildUserContent(
   userMessage: string,
-  imageData?: ImageData
+  imageData?: ImageData,
 ): string | MessagePart[] {
   if (!imageData) return userMessage;
   return [
@@ -261,7 +262,7 @@ const UNDERSTANDING_CHECK_PATTERNS = [
 
 export function estimateExpectedResponseMinutes(
   response: string,
-  context: Pick<ExchangeContext, 'sessionType'>
+  context: Pick<ExchangeContext, 'sessionType'>,
 ): number {
   const trimmed = response.trim();
   const lower = trimmed.toLowerCase();
@@ -285,7 +286,7 @@ export function estimateExpectedResponseMinutes(
 
   if (
     /(take your time|work it out|pause here|on paper|try solving|come back when)/i.test(
-      lower
+      lower,
     )
   ) {
     return 8;
@@ -328,7 +329,7 @@ export { buildSystemPrompt } from './exchange-prompts';
 export async function processExchange(
   context: ExchangeContext,
   userMessage: string,
-  imageData?: ImageData
+  imageData?: ImageData,
 ): Promise<ExchangeResult> {
   const systemPrompt =
     _buildSystemPrompt(context) +
@@ -357,7 +358,7 @@ export async function processExchange(
       // safety preamble carries it on every provider uniformly.
       conversationLanguage: context.conversationLanguage,
       pronouns: context.pronouns,
-    }
+    },
   );
 
   const parsed = parseExchangeEnvelope(result.response, {
@@ -372,7 +373,7 @@ export async function processExchange(
     isUnderstandingCheck: parsed.understandingCheck,
     expectedResponseMinutes: estimateExpectedResponseMinutes(
       parsed.cleanResponse,
-      context
+      context,
     ),
     needsDeepening: parsed.needsDeepening,
     partialProgress: parsed.partialProgress,
@@ -395,7 +396,7 @@ export async function processExchange(
 export async function streamExchange(
   context: ExchangeContext,
   userMessage: string,
-  imageData?: ImageData
+  imageData?: ImageData,
 ): Promise<ExchangeStreamResult> {
   const systemPrompt =
     _buildSystemPrompt(context) +
@@ -422,11 +423,11 @@ export async function streamExchange(
       ageBracket,
       conversationLanguage: context.conversationLanguage,
       pronouns: context.pronouns,
-    }
+    },
   );
 
   const { cleanReplyStream, rawResponsePromise } = teeEnvelopeStream(
-    result.stream
+    result.stream,
   );
 
   return {
@@ -510,7 +511,7 @@ function clampDrillDuration(seconds: number): number {
  */
 export function parseExchangeEnvelope(
   response: string,
-  context?: { sessionId?: string; profileId?: string; flow?: string }
+  context?: { sessionId?: string; profileId?: string; flow?: string },
 ): ParsedExchangeEnvelope {
   // [BUG-847] Tag the surface so parser-side telemetry can distinguish
   // session-flow parse failures from silent_classify ones below.
@@ -557,7 +558,7 @@ export function parseExchangeEnvelope(
 // Split out so callers that already hold a `LlmResponseEnvelope` (e.g.
 // classifyExchangeOutcome) don't re-run `parseEnvelope` on the raw response.
 function envelopeToParsedExchange(
-  envelope: LlmResponseEnvelope
+  envelope: LlmResponseEnvelope,
 ): ParsedExchangeEnvelope {
   const signals = envelope.signals ?? {};
   const uiHints = envelope.ui_hints ?? {};
@@ -708,7 +709,7 @@ function extractKnownMarkerKey(response: string): string | null {
 // ---------------------------------------------------------------------------
 export function classifyExchangeOutcome(
   rawResponse: string,
-  _context?: { sessionId?: string; profileId?: string; flow?: string }
+  _context?: { sessionId?: string; profileId?: string; flow?: string },
 ): ClassifiedExchangeOutcome {
   // [BUG-847] Distinct surface tag — silent_classify is the marker-only
   // fallback path, expected to fail full envelope validation more often.
@@ -810,6 +811,6 @@ export function classifyExchangeOutcome(
 function detectUnderstandingCheckFromProse(response: string): boolean {
   const lower = response.toLowerCase();
   return UNDERSTANDING_CHECK_PATTERNS.some((pattern) =>
-    lower.includes(pattern.toLowerCase())
+    lower.includes(pattern.toLowerCase()),
   );
 }

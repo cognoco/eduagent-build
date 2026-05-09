@@ -16,7 +16,7 @@
 // Valid UUID constants (weekly handler validates parentId via z.string().uuid())
 // ---------------------------------------------------------------------------
 const PARENT_ID = 'aaaaaaaa-0000-4000-8000-000000000001';
-const PARENT_ID_2 = 'aaaaaaaa-0000-4000-8000-000000000002';
+const _PARENT_ID_2 = 'aaaaaaaa-0000-4000-8000-000000000002';
 const CHILD_ID_A = 'bbbbbbbb-0000-4000-8000-000000000001';
 const CHILD_ID_B = 'bbbbbbbb-0000-4000-8000-000000000002';
 const CHILD_ID_RESTRICTED = 'cccccccc-0000-4000-8000-000000000001';
@@ -133,7 +133,7 @@ function resetDbState() {
   };
 }
 
-function makeConsentRow(childId: string) {
+function _makeConsentRow(childId: string) {
   // Per-child override takes priority; fall back to global dbState.consentStatus
   const status =
     childId in dbState.childConsentStatuses
@@ -164,7 +164,7 @@ function buildMockDb(
       consentStates: {
         findFirst: jest
           .fn()
-          .mockImplementation(({ where }: { where: unknown }) => {
+          .mockImplementation(({ where: _where }: { where: unknown }) => {
             // Extract childProfileId from the where clause args
             // The actual test hooks via childConsentStatuses map
             return Promise.resolve(null);
@@ -175,7 +175,7 @@ function buildMockDb(
           .fn()
           .mockImplementation(
             ({
-              where,
+              where: _where,
             }: {
               where: { config?: { value?: string }; name?: string };
             }) => {
@@ -362,12 +362,10 @@ describe('Email digest channel — weekly', () => {
       profileId: CHILD_ID_A,
       consentType: 'GDPR',
     });
-    db.query.notificationPreferences.findFirst = jest
-      .fn()
-      .mockResolvedValue({
-        weeklyProgressEmail: false,
-        monthlyProgressEmail: true,
-      });
+    db.query.notificationPreferences.findFirst = jest.fn().mockResolvedValue({
+      weeklyProgressEmail: false,
+      monthlyProgressEmail: true,
+    });
 
     await executeWeeklyGenerate(PARENT_ID, db);
 
@@ -651,17 +649,15 @@ function buildMonthlyMockDb(
   return {
     query: {
       consentStates: {
-        findFirst: jest
-          .fn()
-          .mockResolvedValue(
-            consentOverride === undefined
-              ? {
-                  status: 'CONSENTED',
-                  profileId: 'child-001',
-                  consentType: 'GDPR',
-                }
-              : consentOverride,
-          ),
+        findFirst: jest.fn().mockResolvedValue(
+          consentOverride === undefined
+            ? {
+                status: 'CONSENTED',
+                profileId: 'child-001',
+                consentType: 'GDPR',
+              }
+            : consentOverride,
+        ),
       },
       profiles: {
         findFirst: jest.fn().mockResolvedValue({
@@ -717,12 +713,10 @@ describe('Email digest channel — monthly', () => {
   it('(T2-monthly) skips email but still sends push when monthly_progress_email=false', async () => {
     dbState.monthlyProgressEmail = false;
     const db = buildMonthlyMockDb();
-    db.query.notificationPreferences.findFirst = jest
-      .fn()
-      .mockResolvedValue({
-        weeklyProgressEmail: true,
-        monthlyProgressEmail: false,
-      });
+    db.query.notificationPreferences.findFirst = jest.fn().mockResolvedValue({
+      weeklyProgressEmail: true,
+      monthlyProgressEmail: false,
+    });
 
     await executeMonthlyGenerate('parent-001', 'child-001', db);
 
@@ -840,7 +834,7 @@ describe('formatWeeklyProgressEmail', () => {
   // Import the real formatter (not the mock used in the Inngest handler tests above)
   const {
     formatWeeklyProgressEmail: realFormatWeeklyProgressEmail,
-    formatMonthlyProgressEmail: realFormatMonthlyProgressEmail,
+    formatMonthlyProgressEmail: _realFormatMonthlyProgressEmail,
   } = jest.requireActual<typeof import('../../services/notifications')>(
     '../../services/notifications',
   );

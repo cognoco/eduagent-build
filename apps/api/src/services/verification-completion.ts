@@ -37,7 +37,7 @@ export async function processEvaluateCompletion(
   db: Database,
   profileId: string,
   sessionId: string,
-  topicId: string
+  topicId: string,
 ): Promise<number | undefined> {
   // Find the last ai_response event for this session
   const events = await db
@@ -47,8 +47,8 @@ export async function processEvaluateCompletion(
       and(
         eq(sessionEvents.sessionId, sessionId),
         eq(sessionEvents.profileId, profileId),
-        eq(sessionEvents.eventType, 'ai_response')
-      )
+        eq(sessionEvents.eventType, 'ai_response'),
+      ),
     )
     // [BUG-913 sweep] Tie-break by id when created_at collides — see
     // session-crud.ts getSessionTranscript for the full rationale. With
@@ -73,7 +73,8 @@ export async function processEvaluateCompletion(
 
   if (!assessment || assessmentEventIndex === -1) return undefined; // No parseable assessment found
 
-  const assessmentEvent = events[assessmentEventIndex]!;
+  const assessmentEvent = events[assessmentEventIndex];
+  if (!assessmentEvent) return undefined;
 
   // Load the retention card
   const cards = await db
@@ -82,8 +83,8 @@ export async function processEvaluateCompletion(
     .where(
       and(
         eq(retentionCards.topicId, topicId),
-        eq(retentionCards.profileId, profileId)
-      )
+        eq(retentionCards.profileId, profileId),
+      ),
     )
     .limit(1);
 
@@ -95,7 +96,7 @@ export async function processEvaluateCompletion(
   // Map EVALUATE result to SM-2 quality
   const sm2Quality = mapEvaluateQualityToSm2(
     assessment.challengePassed,
-    assessment.quality
+    assessment.quality,
   );
 
   // Handle three-strike escalation for failures
@@ -119,7 +120,7 @@ export async function processEvaluateCompletion(
 
     const failureAction = handleEvaluateFailure(
       consecutiveFailures,
-      currentRung
+      currentRung,
     );
 
     if (
@@ -146,8 +147,8 @@ export async function processEvaluateCompletion(
     .where(
       and(
         eq(retentionCards.id, card.id),
-        eq(retentionCards.profileId, profileId)
-      )
+        eq(retentionCards.profileId, profileId),
+      ),
     );
 
   // Store structured assessment in the event that produced it (not blindly events[0])
@@ -165,8 +166,8 @@ export async function processEvaluateCompletion(
     .where(
       and(
         eq(sessionEvents.id, assessmentEvent.id),
-        eq(sessionEvents.profileId, profileId)
-      )
+        eq(sessionEvents.profileId, profileId),
+      ),
     );
 
   return sm2Quality;
@@ -186,7 +187,7 @@ export async function processEvaluateCompletion(
 export async function processTeachBackCompletion(
   db: Database,
   profileId: string,
-  sessionId: string
+  sessionId: string,
 ): Promise<number | undefined> {
   // Find the last ai_response event for this session
   const events = await db
@@ -196,8 +197,8 @@ export async function processTeachBackCompletion(
       and(
         eq(sessionEvents.sessionId, sessionId),
         eq(sessionEvents.profileId, profileId),
-        eq(sessionEvents.eventType, 'ai_response')
-      )
+        eq(sessionEvents.eventType, 'ai_response'),
+      ),
     )
     // [BUG-913 sweep] Tie-break by id when created_at collides — see
     // session-crud.ts getSessionTranscript for the full rationale. With
@@ -237,8 +238,8 @@ export async function processTeachBackCompletion(
     .where(
       and(
         eq(sessionEvents.id, assessmentEvent.id),
-        eq(sessionEvents.profileId, profileId)
-      )
+        eq(sessionEvents.profileId, profileId),
+      ),
     );
 
   return sm2Quality;

@@ -1,8 +1,6 @@
-import { and, eq, sql } from 'drizzle-orm';
-
 import {
-  memoryDedupDecisions,
-  memoryFacts,
+  memoryDedupDecisions as _memoryDedupDecisions,
+  memoryFacts as _memoryFacts,
   type Database,
   type ScopedRepository,
 } from '@eduagent/database';
@@ -14,12 +12,11 @@ import {
   runDedupForProfile,
   type DedupPassArgs,
 } from './dedup-pass';
-import type { DedupResponse } from './dedup-prompt';
 
 describe('dedupPairKey', () => {
   it('is independent of pair order', () => {
     expect(dedupPairKey('fractions', 'fraction arithmetic')).toBe(
-      dedupPairKey('fraction arithmetic', 'fractions')
+      dedupPairKey('fraction arithmetic', 'fractions'),
     );
   });
 });
@@ -45,7 +42,7 @@ function makeFact(
     createdAt: Date;
     updatedAt: Date;
     supersededAt: Date | null;
-  }> = {}
+  }> = {},
 ) {
   return {
     id: 'fact-1',
@@ -76,7 +73,11 @@ type EmittedEvent = { name: string; data: Record<string, unknown> };
 function makeArgs(opts: {
   candidates?: ReturnType<typeof makeFact>[];
   neighbours?: ReturnType<typeof makeFact>[];
-  memoRow?: { decision: 'merge' | 'supersede' | 'keep_both' | 'discard_new'; mergedText: string | null; modelVersion: string } | null;
+  memoRow?: {
+    decision: 'merge' | 'supersede' | 'keep_both' | 'discard_new';
+    mergedText: string | null;
+    modelVersion: string;
+  } | null;
   llmResult?: DedupLlmResult;
   actionOutcome?: DedupActionOutcome;
   profileId?: string;
@@ -91,11 +92,13 @@ function makeArgs(opts: {
     findActiveCandidatesWithEmbedding: jest
       .fn()
       .mockResolvedValue(opts.candidates ?? []),
-    findRelevant: jest.fn().mockResolvedValue(
-      opts.neighbours
-        ? opts.neighbours.map((n) => ({ ...n, distance: 0.1 }))
-        : []
-    ),
+    findRelevant: jest
+      .fn()
+      .mockResolvedValue(
+        opts.neighbours
+          ? opts.neighbours.map((n) => ({ ...n, distance: 0.1 }))
+          : [],
+      ),
     findManyActive: jest.fn().mockResolvedValue([]),
     findCascadeAncestry: jest.fn().mockResolvedValue({ rows: [] }),
   };
@@ -115,14 +118,16 @@ function makeArgs(opts: {
     onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
   };
 
-  const txSelect = {
+  const _txSelect = {
     from: jest.fn().mockReturnThis(),
     where: jest.fn().mockReturnThis(),
-    limit: jest.fn().mockResolvedValue(
-      opts.candidates && opts.candidates.length > 0
-        ? [opts.candidates[0]]
-        : []
-    ),
+    limit: jest
+      .fn()
+      .mockResolvedValue(
+        opts.candidates && opts.candidates.length > 0
+          ? [opts.candidates[0]]
+          : [],
+      ),
   };
 
   let txSelectCallCount = 0;
@@ -138,7 +143,7 @@ function makeArgs(opts: {
           .mockResolvedValue(
             opts.candidates && opts.candidates.length > 0
               ? [opts.candidates[0]]
-              : []
+              : [],
           ),
       };
     }
@@ -151,36 +156,48 @@ function makeArgs(opts: {
         .mockResolvedValue(
           opts.neighbours && opts.neighbours.length > 0
             ? [opts.neighbours[0]]
-            : []
+            : [],
         ),
     };
   });
 
-  const fakeApplyDedupAction = jest
+  const _fakeApplyDedupAction = jest
     .fn()
     .mockResolvedValue(opts.actionOutcome ?? { kind: 'keep_both' as const });
 
   const fakeDb = {
     select: jest.fn().mockReturnValue(memoSelect),
     insert: jest.fn().mockReturnValue(insertChain),
-    delete: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue(undefined) }),
-    transaction: jest.fn().mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) => {
-      const tx = {
-        select: txSelectFn,
-        update: jest.fn().mockReturnValue({
-          set: jest.fn().mockReturnThis(),
-          where: jest.fn().mockResolvedValue(undefined),
-        }),
-        delete: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue(undefined) }),
-        insert: jest.fn().mockReturnValue({ values: jest.fn().mockResolvedValue(undefined) }),
-      };
-      return cb(tx);
-    }),
+    delete: jest
+      .fn()
+      .mockReturnValue({ where: jest.fn().mockResolvedValue(undefined) }),
+    transaction: jest
+      .fn()
+      .mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) => {
+        const tx = {
+          select: txSelectFn,
+          update: jest.fn().mockReturnValue({
+            set: jest.fn().mockReturnThis(),
+            where: jest.fn().mockResolvedValue(undefined),
+          }),
+          delete: jest
+            .fn()
+            .mockReturnValue({ where: jest.fn().mockResolvedValue(undefined) }),
+          insert: jest
+            .fn()
+            .mockReturnValue({
+              values: jest.fn().mockResolvedValue(undefined),
+            }),
+        };
+        return cb(tx);
+      }),
   } as unknown as Database;
 
-  const llmFn = jest.fn().mockResolvedValue(
-    opts.llmResult ?? { ok: false, reason: 'transient', message: 'test' }
-  );
+  const llmFn = jest
+    .fn()
+    .mockResolvedValue(
+      opts.llmResult ?? { ok: false, reason: 'transient', message: 'test' },
+    );
 
   return {
     emitted,
@@ -211,23 +228,36 @@ describe('runDedupForProfile', () => {
     const args = makeArgs({ candidates: [noEmbedding] });
     const { report, events } = await runDedupForProfile(args);
     expect(report.skippedNoEmbedding).toBe(1);
-    expect(events.some((e) => e.name === 'memory.dedup.skipped_no_embedding')).toBe(true);
+    expect(
+      events.some((e) => e.name === 'memory.dedup.skipped_no_embedding'),
+    ).toBe(true);
   });
 
   it('counts keptAsNew when no neighbour within threshold', async () => {
     const candidate = makeFact({ embedding: [1, 0] });
     // neighbour has distance > threshold
-    const farNeighbour = { ...makeFact({ id: 'fact-2', text: 'something else' }), distance: 0.9 };
+    const farNeighbour = {
+      ...makeFact({ id: 'fact-2', text: 'something else' }),
+      distance: 0.9,
+    };
     const fakeScoped = {
       memoryFacts: {
         findFirstActive: jest.fn().mockResolvedValue(null),
-        findActiveCandidatesWithEmbedding: jest.fn().mockResolvedValue([candidate]),
+        findActiveCandidatesWithEmbedding: jest
+          .fn()
+          .mockResolvedValue([candidate]),
         findRelevant: jest.fn().mockResolvedValue([farNeighbour]),
       },
     } as unknown as ScopedRepository;
 
     const fakeDb = {
-      select: jest.fn().mockReturnValue({ from: jest.fn().mockReturnThis(), where: jest.fn().mockReturnThis(), limit: jest.fn().mockResolvedValue([]) }),
+      select: jest
+        .fn()
+        .mockReturnValue({
+          from: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          limit: jest.fn().mockResolvedValue([]),
+        }),
       insert: jest.fn(),
       transaction: jest.fn(),
     } as unknown as Database;
@@ -245,8 +275,16 @@ describe('runDedupForProfile', () => {
 
   it('increments memoHits and skips LLM when pair already in decisions table', async () => {
     const candidate = makeFact({ id: 'c1', textNormalized: 'fractions' });
-    const neighbour = makeFact({ id: 'n1', text: 'fraction work', textNormalized: 'fraction work' });
-    const memoRow = { decision: 'keep_both' as const, mergedText: null, modelVersion: 'memo' };
+    const neighbour = makeFact({
+      id: 'n1',
+      text: 'fraction work',
+      textNormalized: 'fraction work',
+    });
+    const memoRow = {
+      decision: 'keep_both' as const,
+      mergedText: null,
+      modelVersion: 'memo',
+    };
 
     const args = makeArgs({
       candidates: [candidate],
@@ -268,20 +306,30 @@ describe('runDedupForProfile', () => {
       neighbours: [neighbour],
       memoRow: null,
       cap: 0, // cap=0 means any pending pair is immediately capped
-      llmResult: { ok: true, decision: { action: 'keep_both' }, modelVersion: 'v1' },
+      llmResult: {
+        ok: true,
+        decision: { action: 'keep_both' },
+        modelVersion: 'v1',
+      },
     });
 
     const { report, events } = await runDedupForProfile(args);
     expect(report.capHit).toBe(true);
     expect(report.cappedSkipped).toBe(1);
     expect(report.llmCalls).toBe(0);
-    expect(events.some((e) => e.name === 'memory.dedup.capped_skip')).toBe(true);
+    expect(events.some((e) => e.name === 'memory.dedup.capped_skip')).toBe(
+      true,
+    );
     expect(events.some((e) => e.name === 'memory.dedup.cap_hit')).toBe(true);
   });
 
   it('increments merges when LLM returns merge action', async () => {
     const candidate = makeFact({ id: 'c1', textNormalized: 'fractions' });
-    const neighbour = makeFact({ id: 'n1', text: 'fraction arithmetic', textNormalized: 'fraction arithmetic' });
+    const neighbour = makeFact({
+      id: 'n1',
+      text: 'fraction arithmetic',
+      textNormalized: 'fraction arithmetic',
+    });
 
     const llmResult: DedupLlmResult = {
       ok: true,
@@ -291,33 +339,65 @@ describe('runDedupForProfile', () => {
 
     // Build a tx that returns fresh candidate and fresh neighbour for the in-tx selects
     const freshCandidate = makeFact({ id: 'c1', supersededBy: null });
-    const freshNeighbour = makeFact({ id: 'n1', text: 'fraction arithmetic', supersededBy: null });
+    const freshNeighbour = makeFact({
+      id: 'n1',
+      text: 'fraction arithmetic',
+      supersededBy: null,
+    });
 
     let txSelectCount = 0;
     const fakeDb = {
-      select: jest.fn().mockReturnValue({ from: jest.fn().mockReturnThis(), where: jest.fn().mockReturnThis(), limit: jest.fn().mockResolvedValue([]) }),
-      insert: jest.fn().mockReturnValue({ values: jest.fn().mockReturnThis(), onConflictDoNothing: jest.fn().mockResolvedValue(undefined) }),
-      transaction: jest.fn().mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) => {
-        const tx = {
-          select: jest.fn().mockImplementation(() => ({
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockImplementation(() => {
-              txSelectCount += 1;
-              return Promise.resolve(txSelectCount === 1 ? [freshCandidate] : [freshNeighbour]);
-            }),
-          })),
-          insert: jest.fn().mockReturnValue({ values: jest.fn().mockResolvedValue(undefined) }),
-          update: jest.fn().mockReturnValue({ set: jest.fn().mockReturnThis(), where: jest.fn().mockResolvedValue(undefined) }),
-        };
-        return cb(tx);
-      }),
+      select: jest
+        .fn()
+        .mockReturnValue({
+          from: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          limit: jest.fn().mockResolvedValue([]),
+        }),
+      insert: jest
+        .fn()
+        .mockReturnValue({
+          values: jest.fn().mockReturnThis(),
+          onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
+        }),
+      transaction: jest
+        .fn()
+        .mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) => {
+          const tx = {
+            select: jest.fn().mockImplementation(() => ({
+              from: jest.fn().mockReturnThis(),
+              where: jest.fn().mockReturnThis(),
+              limit: jest.fn().mockImplementation(() => {
+                txSelectCount += 1;
+                return Promise.resolve(
+                  txSelectCount === 1 ? [freshCandidate] : [freshNeighbour],
+                );
+              }),
+            })),
+            insert: jest
+              .fn()
+              .mockReturnValue({
+                values: jest.fn().mockResolvedValue(undefined),
+              }),
+            update: jest
+              .fn()
+              .mockReturnValue({
+                set: jest.fn().mockReturnThis(),
+                where: jest.fn().mockResolvedValue(undefined),
+              }),
+          };
+          return cb(tx);
+        }),
     } as unknown as Database;
 
     const fakeScoped = {
       memoryFacts: {
-        findActiveCandidatesWithEmbedding: jest.fn().mockResolvedValue([candidate]),
-        findRelevant: jest.fn().mockResolvedValue([{ ...neighbour, distance: 0.1 }]),
+        findActiveCandidatesWithEmbedding: jest
+          .fn()
+          .mockResolvedValue([candidate]),
+        findRelevant: jest
+          .fn()
+          .mockResolvedValue([{ ...neighbour, distance: 0.1 }]),
         findFirstActive: jest.fn().mockResolvedValue(null),
       },
     } as unknown as ScopedRepository;
@@ -337,7 +417,11 @@ describe('runDedupForProfile', () => {
 
   it('increments supersedes when LLM returns supersede action', async () => {
     const candidate = makeFact({ id: 'c1', textNormalized: 'fractions v2' });
-    const neighbour = makeFact({ id: 'n1', text: 'fractions v1', textNormalized: 'fractions v1' });
+    const neighbour = makeFact({
+      id: 'n1',
+      text: 'fractions v1',
+      textNormalized: 'fractions v1',
+    });
 
     const llmResult: DedupLlmResult = {
       ok: true,
@@ -350,29 +434,57 @@ describe('runDedupForProfile', () => {
     let txSelectCount = 0;
 
     const fakeDb = {
-      select: jest.fn().mockReturnValue({ from: jest.fn().mockReturnThis(), where: jest.fn().mockReturnThis(), limit: jest.fn().mockResolvedValue([]) }),
-      insert: jest.fn().mockReturnValue({ values: jest.fn().mockReturnThis(), onConflictDoNothing: jest.fn().mockResolvedValue(undefined) }),
-      transaction: jest.fn().mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) => {
-        const tx = {
-          select: jest.fn().mockImplementation(() => ({
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockImplementation(() => {
-              txSelectCount += 1;
-              return Promise.resolve(txSelectCount === 1 ? [freshCandidate] : [freshNeighbour]);
-            }),
-          })),
-          insert: jest.fn().mockReturnValue({ values: jest.fn().mockResolvedValue(undefined) }),
-          update: jest.fn().mockReturnValue({ set: jest.fn().mockReturnThis(), where: jest.fn().mockResolvedValue(undefined) }),
-        };
-        return cb(tx);
-      }),
+      select: jest
+        .fn()
+        .mockReturnValue({
+          from: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          limit: jest.fn().mockResolvedValue([]),
+        }),
+      insert: jest
+        .fn()
+        .mockReturnValue({
+          values: jest.fn().mockReturnThis(),
+          onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
+        }),
+      transaction: jest
+        .fn()
+        .mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) => {
+          const tx = {
+            select: jest.fn().mockImplementation(() => ({
+              from: jest.fn().mockReturnThis(),
+              where: jest.fn().mockReturnThis(),
+              limit: jest.fn().mockImplementation(() => {
+                txSelectCount += 1;
+                return Promise.resolve(
+                  txSelectCount === 1 ? [freshCandidate] : [freshNeighbour],
+                );
+              }),
+            })),
+            insert: jest
+              .fn()
+              .mockReturnValue({
+                values: jest.fn().mockResolvedValue(undefined),
+              }),
+            update: jest
+              .fn()
+              .mockReturnValue({
+                set: jest.fn().mockReturnThis(),
+                where: jest.fn().mockResolvedValue(undefined),
+              }),
+          };
+          return cb(tx);
+        }),
     } as unknown as Database;
 
     const fakeScoped = {
       memoryFacts: {
-        findActiveCandidatesWithEmbedding: jest.fn().mockResolvedValue([candidate]),
-        findRelevant: jest.fn().mockResolvedValue([{ ...neighbour, distance: 0.1 }]),
+        findActiveCandidatesWithEmbedding: jest
+          .fn()
+          .mockResolvedValue([candidate]),
+        findRelevant: jest
+          .fn()
+          .mockResolvedValue([{ ...neighbour, distance: 0.1 }]),
         findFirstActive: jest.fn().mockResolvedValue(null),
       },
     } as unknown as ScopedRepository;
@@ -392,7 +504,11 @@ describe('runDedupForProfile', () => {
 
   it('increments keptBoth when LLM returns keep_both action', async () => {
     const candidate = makeFact({ id: 'c1', textNormalized: 'history' });
-    const neighbour = makeFact({ id: 'n1', text: 'math struggles', textNormalized: 'math struggles' });
+    const neighbour = makeFact({
+      id: 'n1',
+      text: 'math struggles',
+      textNormalized: 'math struggles',
+    });
 
     const llmResult: DedupLlmResult = {
       ok: true,
@@ -405,29 +521,57 @@ describe('runDedupForProfile', () => {
     let txSelectCount = 0;
 
     const fakeDb = {
-      select: jest.fn().mockReturnValue({ from: jest.fn().mockReturnThis(), where: jest.fn().mockReturnThis(), limit: jest.fn().mockResolvedValue([]) }),
-      insert: jest.fn().mockReturnValue({ values: jest.fn().mockReturnThis(), onConflictDoNothing: jest.fn().mockResolvedValue(undefined) }),
-      transaction: jest.fn().mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) => {
-        const tx = {
-          select: jest.fn().mockImplementation(() => ({
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockImplementation(() => {
-              txSelectCount += 1;
-              return Promise.resolve(txSelectCount === 1 ? [freshCandidate] : [freshNeighbour]);
-            }),
-          })),
-          insert: jest.fn().mockReturnValue({ values: jest.fn().mockResolvedValue(undefined) }),
-          update: jest.fn().mockReturnValue({ set: jest.fn().mockReturnThis(), where: jest.fn().mockResolvedValue(undefined) }),
-        };
-        return cb(tx);
-      }),
+      select: jest
+        .fn()
+        .mockReturnValue({
+          from: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          limit: jest.fn().mockResolvedValue([]),
+        }),
+      insert: jest
+        .fn()
+        .mockReturnValue({
+          values: jest.fn().mockReturnThis(),
+          onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
+        }),
+      transaction: jest
+        .fn()
+        .mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) => {
+          const tx = {
+            select: jest.fn().mockImplementation(() => ({
+              from: jest.fn().mockReturnThis(),
+              where: jest.fn().mockReturnThis(),
+              limit: jest.fn().mockImplementation(() => {
+                txSelectCount += 1;
+                return Promise.resolve(
+                  txSelectCount === 1 ? [freshCandidate] : [freshNeighbour],
+                );
+              }),
+            })),
+            insert: jest
+              .fn()
+              .mockReturnValue({
+                values: jest.fn().mockResolvedValue(undefined),
+              }),
+            update: jest
+              .fn()
+              .mockReturnValue({
+                set: jest.fn().mockReturnThis(),
+                where: jest.fn().mockResolvedValue(undefined),
+              }),
+          };
+          return cb(tx);
+        }),
     } as unknown as Database;
 
     const fakeScoped = {
       memoryFacts: {
-        findActiveCandidatesWithEmbedding: jest.fn().mockResolvedValue([candidate]),
-        findRelevant: jest.fn().mockResolvedValue([{ ...neighbour, distance: 0.1 }]),
+        findActiveCandidatesWithEmbedding: jest
+          .fn()
+          .mockResolvedValue([candidate]),
+        findRelevant: jest
+          .fn()
+          .mockResolvedValue([{ ...neighbour, distance: 0.1 }]),
         findFirstActive: jest.fn().mockResolvedValue(null),
       },
     } as unknown as ScopedRepository;
@@ -445,8 +589,15 @@ describe('runDedupForProfile', () => {
   });
 
   it('increments discarded when LLM returns discard_new action', async () => {
-    const candidate = makeFact({ id: 'c1', textNormalized: 'fractions repeat' });
-    const neighbour = makeFact({ id: 'n1', text: 'fractions', textNormalized: 'fractions' });
+    const candidate = makeFact({
+      id: 'c1',
+      textNormalized: 'fractions repeat',
+    });
+    const neighbour = makeFact({
+      id: 'n1',
+      text: 'fractions',
+      textNormalized: 'fractions',
+    });
 
     const llmResult: DedupLlmResult = {
       ok: true,
@@ -459,30 +610,62 @@ describe('runDedupForProfile', () => {
     let txSelectCount = 0;
 
     const fakeDb = {
-      select: jest.fn().mockReturnValue({ from: jest.fn().mockReturnThis(), where: jest.fn().mockReturnThis(), limit: jest.fn().mockResolvedValue([]) }),
-      insert: jest.fn().mockReturnValue({ values: jest.fn().mockReturnThis(), onConflictDoNothing: jest.fn().mockResolvedValue(undefined) }),
-      transaction: jest.fn().mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) => {
-        const tx = {
-          select: jest.fn().mockImplementation(() => ({
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockImplementation(() => {
-              txSelectCount += 1;
-              return Promise.resolve(txSelectCount === 1 ? [freshCandidate] : [freshNeighbour]);
-            }),
-          })),
-          insert: jest.fn().mockReturnValue({ values: jest.fn().mockResolvedValue(undefined) }),
-          update: jest.fn().mockReturnValue({ set: jest.fn().mockReturnThis(), where: jest.fn().mockResolvedValue(undefined) }),
-          delete: jest.fn().mockReturnValue({ where: jest.fn().mockResolvedValue(undefined) }),
-        };
-        return cb(tx);
-      }),
+      select: jest
+        .fn()
+        .mockReturnValue({
+          from: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          limit: jest.fn().mockResolvedValue([]),
+        }),
+      insert: jest
+        .fn()
+        .mockReturnValue({
+          values: jest.fn().mockReturnThis(),
+          onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
+        }),
+      transaction: jest
+        .fn()
+        .mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) => {
+          const tx = {
+            select: jest.fn().mockImplementation(() => ({
+              from: jest.fn().mockReturnThis(),
+              where: jest.fn().mockReturnThis(),
+              limit: jest.fn().mockImplementation(() => {
+                txSelectCount += 1;
+                return Promise.resolve(
+                  txSelectCount === 1 ? [freshCandidate] : [freshNeighbour],
+                );
+              }),
+            })),
+            insert: jest
+              .fn()
+              .mockReturnValue({
+                values: jest.fn().mockResolvedValue(undefined),
+              }),
+            update: jest
+              .fn()
+              .mockReturnValue({
+                set: jest.fn().mockReturnThis(),
+                where: jest.fn().mockResolvedValue(undefined),
+              }),
+            delete: jest
+              .fn()
+              .mockReturnValue({
+                where: jest.fn().mockResolvedValue(undefined),
+              }),
+          };
+          return cb(tx);
+        }),
     } as unknown as Database;
 
     const fakeScoped = {
       memoryFacts: {
-        findActiveCandidatesWithEmbedding: jest.fn().mockResolvedValue([candidate]),
-        findRelevant: jest.fn().mockResolvedValue([{ ...neighbour, distance: 0.1 }]),
+        findActiveCandidatesWithEmbedding: jest
+          .fn()
+          .mockResolvedValue([candidate]),
+        findRelevant: jest
+          .fn()
+          .mockResolvedValue([{ ...neighbour, distance: 0.1 }]),
         findFirstActive: jest.fn().mockResolvedValue(null),
       },
     } as unknown as ScopedRepository;
