@@ -103,7 +103,7 @@ describe('AccordionTopicList', () => {
     expect(refetch).toHaveBeenCalled();
   });
 
-  it('renders topic labels and navigates to topic details through the child parent route', () => {
+  it('renders topic labels and navigates directly to topic details', () => {
     mockUseChildSubjectTopics.mockReturnValue({
       data: [
         {
@@ -177,17 +177,9 @@ describe('AccordionTopicList', () => {
 
     fireEvent.press(screen.getByTestId('accordion-topic-topic-1'));
 
+    expect(mockPush).toHaveBeenCalledTimes(1);
     expect(mockPush).toHaveBeenNthCalledWith(
       1,
-      expect.objectContaining({
-        pathname: '/(app)/child/[profileId]',
-        params: {
-          profileId: 'child-1',
-        },
-      }),
-    );
-    expect(mockPush).toHaveBeenNthCalledWith(
-      2,
       expect.objectContaining({
         pathname: '/(app)/child/[profileId]/topic/[topicId]',
         params: expect.objectContaining({
