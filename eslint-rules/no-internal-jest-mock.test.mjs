@@ -18,6 +18,9 @@ ruleTester.run('no-internal-jest-mock', rule, {
     // Non-string-literal arguments fall outside the rule's scope.
     'jest.mock(modulePath);',
     'jest.mock();',
+    // GC1 ratchet escape hatch — must be on the jest.mock/argument line.
+    "jest.mock('./sentry' /* gc1-allow: unit test boundary */, () => ({}));",
+    "jest.mock( // gc1-allow: handler control-flow test\n  '../services/notifications',\n  () => ({})\n);",
   ],
   invalid: [
     {

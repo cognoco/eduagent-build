@@ -51,6 +51,8 @@ export async function readSessionRecoveryMarker(
   try {
     const parsed = JSON.parse(effectiveRaw) as SessionRecoveryMarker;
     if (!parsed.sessionId || !parsed.updatedAt) return null;
+    // Unscoped legacy markers are dropped intentionally: accepting them can
+    // surface another profile's in-progress session on shared devices.
     if (profileId && parsed.profileId !== profileId) {
       return null;
     }

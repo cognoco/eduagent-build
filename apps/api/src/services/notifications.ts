@@ -383,7 +383,7 @@ export function formatWeeklyProgressEmail(
         .slice(0, 2)
         .map(
           (topic) =>
-            `${sl.childName}: You might want to keep an eye on **${topic}**.`,
+            `${sl.childName}: You might want to keep an eye on ${topic}.`,
         )
         .join('\n');
       return topicLines;
@@ -419,7 +419,7 @@ export function formatMonthlyProgressEmail(
         .slice(0, 2)
         .map(
           (topic) =>
-            `${sl.childName}: You might want to keep an eye on **${topic}**.`,
+            `${sl.childName}: You might want to keep an eye on ${topic}.`,
         )
         .join('\n');
     })

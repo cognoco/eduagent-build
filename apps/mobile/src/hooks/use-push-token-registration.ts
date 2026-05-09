@@ -47,6 +47,10 @@ export function usePushTokenRegistration(): PushRegistrationState {
   const registerPushToken = useRegisterPushToken();
 
   const registerIfAllowed = useCallback(async () => {
+    // React Query keeps mutation objects stable; this prevents duplicate
+    // registrations while a foreground/AppState retry is already in flight.
+    if (registerPushToken.isPending) return;
+
     const activeProfileId = activeProfile?.id ?? null;
     if (!activeProfileId) return;
 

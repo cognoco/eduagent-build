@@ -494,7 +494,47 @@ describe('streamSSEViaXHR', () => {
     expect((caught as { status?: number }).status).toBe(401);
   });
 
-  it('[BUG-955] throws QuotaExceededError for malformed 402 responses', async () => {
+  it('[BUG-955] throws QuotaExceededError for structured quota 402 responses', async () => {
+    const xhr = installFakeXhr();
+    const { events } = streamSSEViaXHR('https://example.test/stream', {
+      method: 'POST',
+    });
+
+    xhr._emitError(
+      402,
+      JSON.stringify({
+        code: 'QUOTA_EXCEEDED',
+        message: 'Quota reached',
+        details: {
+          tier: 'free',
+          reason: 'monthly',
+          monthlyLimit: 10,
+          usedThisMonth: 10,
+          dailyLimit: null,
+          usedToday: 0,
+          topUpCreditsRemaining: 0,
+          upgradeOptions: [],
+        },
+      }),
+    );
+
+    let caught: unknown = null;
+    try {
+      for await (const event of events) {
+        void event;
+      }
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as Error).name).toBe('QuotaExceededError');
+    expect((caught as { details?: { monthlyLimit?: number } }).details).toEqual(
+      expect.objectContaining({ monthlyLimit: 10 }),
+    );
+  });
+
+  it('[BUG-955] leaves malformed 402 responses as generic API errors', async () => {
     const xhr = installFakeXhr();
     const { events } = streamSSEViaXHR('https://example.test/stream', {
       method: 'POST',
@@ -512,10 +552,8 @@ describe('streamSSEViaXHR', () => {
     }
 
     expect(caught).toBeInstanceOf(Error);
-    expect((caught as Error).name).toBe('QuotaExceededError');
-    expect(
-      (caught as { details?: { upgradeOptions?: unknown[] } }).details,
-    ).toEqual(expect.objectContaining({ upgradeOptions: [] }));
+    expect((caught as Error).name).not.toBe('QuotaExceededError');
+    expect((caught as Error).message).toContain('API error 402');
   });
 
   it('[BUG-955] leaves non-quota 402 responses as generic API errors', async () => {

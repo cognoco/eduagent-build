@@ -75,7 +75,7 @@ const mockFormatMonthlyProgressEmail = jest.fn().mockReturnValue({
 });
 
 // prettier-ignore
-jest.mock( /* gc1-allow: handler control-flow test; services tested in own suites */
+jest.mock( // gc1-allow: handler control-flow test; services tested in own suites
   '../../services/notifications',
   () => ({
     sendPushNotification: (...args: unknown[]) =>
@@ -91,7 +91,7 @@ jest.mock( /* gc1-allow: handler control-flow test; services tested in own suite
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
 const mockLogNotification = jest.fn().mockResolvedValue(undefined);
 // prettier-ignore
-jest.mock( /* gc1-allow: handler control-flow test; services tested in own suites */
+jest.mock( // gc1-allow: handler control-flow test; services tested in own suites
   '../../services/settings',
   () => ({
     getRecentNotificationCount: (...args: unknown[]) =>
@@ -104,7 +104,7 @@ const mockGetSnapshotsInRange = jest.fn();
 const mockGetLatestSnapshot = jest.fn();
 const mockGetLatestSnapshotOnOrBefore = jest.fn().mockResolvedValue(null);
 // prettier-ignore
-jest.mock( /* gc1-allow: handler control-flow test; services tested in own suites */
+jest.mock( // gc1-allow: handler control-flow test; services tested in own suites
   '../../services/snapshot-aggregation',
   () => ({
     getSnapshotsInRange: (...args: unknown[]) =>
@@ -119,7 +119,7 @@ const mockGenerateWeeklyReportData = jest
   .fn()
   .mockReturnValue({ reportData: {} });
 // prettier-ignore
-jest.mock( /* gc1-allow: handler control-flow test; services tested in own suites */
+jest.mock( // gc1-allow: handler control-flow test; services tested in own suites
   '../../services/weekly-report',
   () => ({
     generateWeeklyReportData: (...args: unknown[]) =>
@@ -653,7 +653,7 @@ const mockGenerateReportHighlights = jest.fn().mockResolvedValue({
 });
 
 // prettier-ignore
-jest.mock( /* gc1-allow: handler control-flow test; services tested in own suites */
+jest.mock( // gc1-allow: handler control-flow test; services tested in own suites
   '../../services/monthly-report',
   () => ({
     generateMonthlyReportData: (...args: unknown[]) =>
@@ -886,10 +886,10 @@ describe('formatWeeklyProgressEmail', () => {
       [{ childName: 'Emma', topics: ['fractions', 'decimals'] }],
     );
     expect(result.body).toContain(
-      'Emma: You might want to keep an eye on **fractions**.',
+      'Emma: You might want to keep an eye on fractions.',
     );
     expect(result.body).toContain(
-      'Emma: You might want to keep an eye on **decimals**.',
+      'Emma: You might want to keep an eye on decimals.',
     );
   });
 
@@ -904,10 +904,10 @@ describe('formatWeeklyProgressEmail', () => {
     );
 
     expect(result.body).toContain(
-      'Emma: You might want to keep an eye on **fractions**.',
+      'Emma: You might want to keep an eye on fractions.',
     );
     expect(result.body).toContain(
-      'Noah: You might want to keep an eye on **geometry**.',
+      'Noah: You might want to keep an eye on geometry.',
     );
   });
 
@@ -954,7 +954,7 @@ describe('formatMonthlyProgressEmail', () => {
       [{ childName: 'Emma', topics: ['long division'] }],
     );
     expect(result.body).toContain(
-      'Emma: You might want to keep an eye on **long division**.',
+      'Emma: You might want to keep an eye on long division.',
     );
   });
 
@@ -969,10 +969,10 @@ describe('formatMonthlyProgressEmail', () => {
     );
 
     expect(result.body).toContain(
-      'Emma: You might want to keep an eye on **long division**.',
+      'Emma: You might want to keep an eye on long division.',
     );
     expect(result.body).toContain(
-      'Noah: You might want to keep an eye on **geometry**.',
+      'Noah: You might want to keep an eye on geometry.',
     );
   });
 });

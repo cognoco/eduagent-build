@@ -187,11 +187,9 @@ export function useSpeechRecognition(
         return;
       }
 
-      if (mountedRef.current) {
-        setTranscript('');
-        setStatus('listening');
-      }
       if (!mountedRef.current) return;
+      setTranscript('');
+      setStatus('listening');
       speechModule.start({
         lang: options?.lang ?? 'en-US',
         interimResults: true,

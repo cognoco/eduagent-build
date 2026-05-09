@@ -42,6 +42,7 @@ import {
 } from '../services/settings';
 import { notifyParentToSubscribe } from '../services/notifications';
 import { clearSessionStaticContextForProfile } from '../services/session/session-cache';
+import { captureException } from '../services/sentry';
 import {
   getAnalogyDomain,
   getNativeLanguage,
@@ -123,7 +124,11 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
       );
       try {
         clearSessionStaticContextForProfile(profileId);
-      } catch {
+      } catch (err) {
+        captureException(err, {
+          profileId,
+          extra: { context: 'clear-session-static-context' },
+        });
         // best-effort — don't 500 a successful mode change on cache failure
       }
       return c.json(getLearningModeResponseSchema.parse({ mode: result.mode }));

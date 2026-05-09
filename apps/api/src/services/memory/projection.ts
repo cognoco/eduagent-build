@@ -15,7 +15,7 @@ import type {
   StrengthEntry,
   StruggleEntry,
 } from '@eduagent/schemas';
-import { interestsArraySchema } from '@eduagent/schemas';
+import { interestsArraySchema, learningStyleSchema } from '@eduagent/schemas';
 import type { CuratedMemoryView } from '../curated-memory';
 import { buildCuratedMemoryView } from '../curated-memory';
 import {
@@ -201,6 +201,7 @@ function buildProjectionFromRow(
   },
 ): MemoryProjection {
   const interestsParsed = interestsArraySchema.safeParse(row.interests);
+  const learningStyleParsed = learningStyleSchema.safeParse(row.learningStyle);
 
   return {
     id: row.id,
@@ -221,7 +222,9 @@ function buildProjectionFromRow(
     interestTimestamps: asInterestTimestamps(row.interestTimestamps),
     memoryFactsBackfilledAt: row.memoryFactsBackfilledAt,
 
-    learningStyle: (row.learningStyle as LearningStyle) ?? null,
+    learningStyle: learningStyleParsed.success
+      ? learningStyleParsed.data
+      : null,
 
     memoryEnabled: row.memoryEnabled,
     memoryCollectionEnabled: row.memoryCollectionEnabled,

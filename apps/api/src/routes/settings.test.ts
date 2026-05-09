@@ -65,6 +65,11 @@ jest.mock(
   },
 );
 
+const mockCaptureException = jest.fn();
+jest.mock('../services/sentry' /* gc1-allow: unit test boundary */, () => ({
+  captureException: (...args: unknown[]) => mockCaptureException(...args),
+}));
+
 import { app } from '../index';
 import { BASE_AUTH_ENV, makeAuthHeaders } from '../test-utils/test-env';
 import { ForbiddenError } from '@eduagent/schemas';
@@ -211,5 +216,29 @@ describe('settings routes', () => {
     expect(mockClearSessionStaticContextForProfile).toHaveBeenCalledWith(
       'profile-1',
     );
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it('PUT /v1/settings/learning-mode reports cache clear failures without failing the update', async () => {
+    const cacheError = new Error('cache clear failed');
+    mockClearSessionStaticContextForProfile.mockImplementationOnce(() => {
+      throw cacheError;
+    });
+
+    const res = await app.request(
+      '/v1/settings/learning-mode',
+      {
+        method: 'PUT',
+        headers: PROFILE_HEADERS,
+        body: JSON.stringify({ mode: 'serious' }),
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockCaptureException).toHaveBeenCalledWith(cacheError, {
+      profileId: 'profile-1',
+      extra: { context: 'clear-session-static-context' },
+    });
   });
 });

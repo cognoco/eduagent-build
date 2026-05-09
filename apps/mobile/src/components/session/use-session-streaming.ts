@@ -280,7 +280,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       // Session-creation errors propagate to the sendMessage catch block,
       // which classifies quota / reconnectable / fatal errors properly.
       // Previously swallowed here, collapsing all failures to a generic message. [IMP-3]
-      const sessionRawInput = rawInput ?? initialRawInput;
+      const sessionRawInput = initialRawInput ?? rawInput;
 
       let newId: string;
       if (overrideSubjectId) {
