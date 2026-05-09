@@ -234,7 +234,7 @@ export default function BookScreen() {
     [bookQuery.data?.topics],
   );
   const activeTopics = useMemo(
-    () => topics.filter((topic) => !topic.skipped),
+    () => topics.filter((topic) => !topic.skipped && topic.title.trim()),
     [topics],
   );
 

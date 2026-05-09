@@ -17,6 +17,7 @@ import { formatApiError } from '../../../../lib/format-api-error';
 import { goBackOrReplace } from '../../../../lib/navigation';
 import { Button } from '../../../../components/common/Button';
 import { ErrorFallback } from '../../../../components/common/ErrorFallback';
+import { isAssessmentReadinessReply } from './assessment-readiness';
 
 export default function AssessmentScreen() {
   const router = useRouter();
@@ -51,11 +52,24 @@ export default function AssessmentScreen() {
       if (isStreaming || !subjectId || !topicId) return;
 
       setLastError(null);
-      setLastUserText(text);
+      const isFirstLearnerTurn = !messages.some(
+        (message) => message.role === 'user',
+      );
       setMessages((prev) => [
         ...prev,
         { id: `user-${Date.now()}`, role: 'user', content: text },
       ]);
+
+      if (isFirstLearnerTurn && isAssessmentReadinessReply(text)) {
+        animateResponse(
+          t('assessment.firstQuestion'),
+          setMessages,
+          setIsStreaming,
+        );
+        return;
+      }
+
+      setLastUserText(text);
 
       try {
         let currentAssessmentId = assessmentId;
@@ -100,11 +114,12 @@ export default function AssessmentScreen() {
       isStreaming,
       subjectId,
       topicId,
+      messages,
       assessmentId,
       createAssessment,
       submitAnswer,
       t,
-    ]
+    ],
   );
 
   if (!subjectId || !topicId) {
@@ -135,14 +150,14 @@ export default function AssessmentScreen() {
     : 0;
   const bandLabel =
     masteryPercent >= 90
-      ? 'Excellent'
+      ? t('assessment.bands.excellent')
       : masteryPercent >= 80
-      ? 'Good'
-      : masteryPercent >= 70
-      ? 'Meets the bar'
-      : masteryPercent >= 60
-      ? 'Core ideas are there'
-      : 'Needs another look';
+        ? t('assessment.bands.good')
+        : masteryPercent >= 70
+          ? t('assessment.bands.meetsBar')
+          : masteryPercent >= 60
+            ? t('assessment.bands.coreIdeas')
+            : t('assessment.bands.needsReview');
   const weakAreas = terminalResult?.evaluation.weakAreas ?? [];
 
   const resultCard = terminalResult ? (
@@ -151,17 +166,19 @@ export default function AssessmentScreen() {
       className="bg-surface-elevated rounded-card px-4 py-4 gap-3"
     >
       <Text className="text-body font-semibold text-text-primary">
-        You got {masteryPercent}%! {bandLabel}.
+        {t('assessment.resultSummary', {
+          mastery: masteryPercent,
+          band: bandLabel,
+        })}
       </Text>
       {terminalResult.status === 'borderline' ? (
         <>
           <Text className="text-body-sm text-text-secondary">
-            You got the core ideas. Want a quick catch-up on the bits you
-            weren't sure about?
+            {t('assessment.borderlineBody')}
           </Text>
           <View className="gap-2">
             <Button
-              label="Yes, show me what I missed"
+              label={t('assessment.gapFillAction')}
               testID="assessment-gap-fill"
               onPress={() =>
                 router.push({
@@ -177,7 +194,7 @@ export default function AssessmentScreen() {
             />
             <Button
               variant="secondary"
-              label="No thanks, I'm done"
+              label={t('assessment.declineRefreshAction')}
               testID="assessment-decline-refresh"
               loading={declineRefresh.isPending}
               onPress={() => {
@@ -190,11 +207,11 @@ export default function AssessmentScreen() {
       ) : terminalResult.status === 'failed_exhausted' ? (
         <>
           <Text className="text-body-sm text-text-secondary">
-            That topic needs another look. Let's go through it together.
+            {t('assessment.failedExhaustedBody')}
           </Text>
           <View className="gap-2">
             <Button
-              label="Start a session"
+              label={t('assessment.startSessionAction')}
               testID="assessment-start-session"
               onPress={() =>
                 router.push({
@@ -205,7 +222,7 @@ export default function AssessmentScreen() {
             />
             <Button
               variant="secondary"
-              label="Not now"
+              label={t('assessment.notNowAction')}
               testID="assessment-not-now"
               onPress={() =>
                 goBackOrReplace(router, '/(app)/practice' as const)
@@ -220,7 +237,7 @@ export default function AssessmentScreen() {
           </Text>
           <Button
             variant="secondary"
-            label="Done"
+            label={t('common.done')}
             testID="assessment-done"
             onPress={() => goBackOrReplace(router, '/(app)/practice' as const)}
           />
