@@ -54,7 +54,7 @@ export function AccordionTopicList({
     refetch,
   } = useChildSubjectTopics(
     expanded ? childProfileId : undefined,
-    expanded ? subjectId : undefined
+    expanded ? subjectId : undefined,
   );
 
   if (!expanded) {
@@ -90,6 +90,10 @@ export function AccordionTopicList({
             key={topic.topicId}
             onPress={(event) => {
               event?.stopPropagation?.();
+              router.push({
+                pathname: '/(app)/child/[profileId]',
+                params: { profileId: childProfileId },
+              } as never);
               router.push({
                 pathname: '/(app)/child/[profileId]/topic/[topicId]',
                 params: {
