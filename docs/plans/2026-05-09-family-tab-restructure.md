@@ -3,7 +3,7 @@
 **Date:** 2026-05-09
 **Branch:** `ux-cleanup`
 **Status:** Spec — ready to implement
-**Siblings:** `2026-05-09-more-tab-restructure.md`, `2026-05-09-parent-home-restructure.md`
+**Siblings:** `2026-05-09-more-tab-restructure.md`, `2026-05-09-parent-home-restructure.md`, `2026-05-09-progress-tab-currently-working-on.md`, `2026-05-09-positive-framing-copy-sweep.md`
 
 ## Why
 
@@ -26,7 +26,9 @@ We consolidate all child-management surfaces into the Family tab, enhance the pe
 | **D-FT-5** | "Add a child" affordance lives **only in Family tab** (not duplicated in More). Removes D5 of the more-tab spec. |
 | **D-FT-6** | Empty state (no children, owner on Family/Pro plan) is the primary "Add your first child" flow. Already exists at `family.tsx:441-466` — keep as-is. |
 | **D-FT-7** | Child-detail screen `/(app)/child/[profileId]` becomes the per-child settings + reporting hub: latest weekly headline (live), latest monthly highlights (LLM bullets + next steps), browsable history (already exists), per-child accommodation mode + celebrations follow-up, mentor memory link, subjects, sessions. |
-| **D-FT-8** | Copy sweep: rewrite all UI-visible "struggle / struggling / declining / weak" to positive framing per `feedback_positive_framing_no_struggle`. Internal instrumentation names (`struggles` table, `struggle_noticed` event) unchanged. |
+| **D-FT-8** | Copy sweep: rewrite all UI-visible "struggle / struggling / declining / weak" to positive framing per `feedback_positive_framing_no_struggle`. Internal instrumentation names (`struggles` table, `struggle_noticed` event) unchanged. **Sweep ships as its own PR ahead of this one** (`2026-05-09-positive-framing-copy-sweep.md`) so Family-tab and the in-flight Progress redesign both inherit clean copy. |
+| **D-FT-9** | "Currently working on" data is **not Family-tab-only** — it's a self-view signal too. The dashboard endpoint extension lands the data; Progress consumes it for self-view via the sibling spec `2026-05-09-progress-tab-currently-working-on.md`. Family/child-detail and Progress share the source. |
+| **D-FT-10** | We considered unifying Progress and child-detail into a single profile-aware Progress tab (parent passes `?profileId=` to view a child's progress). **Rejected:** different audiences, different copy register (self-view vs. parent third-person), different navigation entry, different settings surfaces. The reuse already happens at the component level (`WeeklyReportCard`, `MonthlyReportCard`, `GrowthChart`, `ReportsListCard`, `RecentSessionsList`) — that's the right seam. Two routes, shared building blocks. |
 
 ## Affected Surfaces
 
@@ -110,7 +112,11 @@ Suggested replacements:
 
 ## Implementation Steps
 
-1. **Backend: extend dashboard endpoint** to include `weeklyHeadline` and `currentlyWorkingOn` per child. Reuse `generateWeeklyReportData(getLatestSnapshot(childId))` for headline. Pull active focus areas from `learning_profiles.struggles` JSON, filter to non-resolved, return as `string[]` of topic labels (positively phrased — convert at API edge: `"struggling with fractions"` → `"fractions"`; the UI prefixes with "Currently working on:"). Update `dashboardSchema` in `@eduagent/schemas`.
+> **Order:** ship the copy sweep PR (`2026-05-09-positive-framing-copy-sweep.md`) first so this PR doesn't collide with translation-file edits. The Progress "currently working on" PR (`2026-05-09-progress-tab-currently-working-on.md`) can ship before, after, or alongside this one — they share the data source but render in different routes.
+
+0. **Schema + data source (shared with Progress spec).** Extend `learner-profile.ts` (or the closest service) to expose `getCurrentlyWorkingOn(profileId): Promise<string[]>` — pulls active, non-resolved entries from `learning_profiles.struggles`, returns positively-phrased topic labels (strip "struggling with" / "trouble with" prefixes at the API edge). Add `currentlyWorkingOn: string[]` to the relevant response schemas in `@eduagent/schemas`. Both Family's dashboard endpoint and Progress's inventory endpoint read from this helper.
+
+1. **Backend: extend dashboard endpoint** to include `weeklyHeadline` and `currentlyWorkingOn` per child. Reuse `generateWeeklyReportData(getLatestSnapshot(childId))` for headline. Pull `currentlyWorkingOn` via the helper from step 0. Update `dashboardSchema` in `@eduagent/schemas`.
 2. **Update `ParentDashboardSummary`** to accept and render `weeklyHeadline` + `currentlyWorkingOn`. Sweep any internal "struggle / declining" copy.
 3. **Update Family tab landing** (`family.tsx`):
    - Pass new fields into `renderChildCards`.
@@ -122,7 +128,7 @@ Suggested replacements:
    - Add "Currently working on" section (when non-empty).
    - Verify per-child accommodation mode picker is exposed in the rendered UI (file beyond line 80 was not read in this spec — implementer to verify and add if missing).
    - Add per-child celebrations follow-up under accommodation when mode is `short-burst` or `predictable`.
-5. **Copy sweep across all 7 i18n locale files + the listed component files.** Edit string values, not keys. Track each replacement.
+5. **Copy sweep — moved to its own PR.** See `2026-05-09-positive-framing-copy-sweep.md`. This PR depends on it landing first. The list of files in [Copy sweep (per D-FT-8)](#copy-sweep-per-d-ft-8) below is preserved here only as the inventory the sweep PR works from.
 6. **Update `more.tsx`** (per D-FT-5): remove the "Add a child" row from the top section. (This is also documented in the updated more-tab spec.)
 7. **Update sibling spec** `2026-05-09-more-tab-restructure.md`: strike D5, remove "Add a child" from the layout sketch, drop the implementation steps that build that row in More.
 8. **Tests:**
@@ -148,6 +154,7 @@ Suggested replacements:
 - LLM-inferred "Anna struggled with X" signals. Explicitly out of scope — `learning_profiles.struggles` is real product instrumentation, not LLM inference. We use it positively framed.
 - Replacing the existing `ParentDashboardSummary` design wholesale. Enhance, don't redesign.
 - Animation / transitions on the new cards. Match the existing card style.
+- **Unifying Progress and child-detail into a profile-aware Progress tab.** Considered and rejected — see D-FT-10. Don't reopen this without new evidence (e.g., a measurable confusion problem from real users about which screen shows what).
 
 ## Verification Checklist (before PR)
 
@@ -165,9 +172,11 @@ Suggested replacements:
 
 ## Coordination With Sibling Specs
 
-- Depends on: nothing. Can ship before, after, or alongside More-tab and parent-home specs.
-- Affects: `2026-05-09-more-tab-restructure.md` D5 removal and layout update — must be applied as a follow-up edit to that spec when this one ships.
-- Suggested order:
-  1. Parent home (smallest, deletes Gateway).
-  2. Family tab (this doc) — depends on dashboard endpoint extension.
-  3. More tab — last, with D5 removed.
+- **Depends on:** `2026-05-09-positive-framing-copy-sweep.md` lands first, so this PR doesn't conflict on locale files.
+- **Shares with:** `2026-05-09-progress-tab-currently-working-on.md` — both consume the `getCurrentlyWorkingOn` helper introduced in step 0. Whichever ships first owns the helper; the second consumes it.
+- **Affects:** `2026-05-09-more-tab-restructure.md` D5 removal and layout update — must be applied as a follow-up edit to that spec when this one ships.
+- **Suggested order:**
+  1. Copy sweep (`2026-05-09-positive-framing-copy-sweep.md`) — clears the i18n decks.
+  2. Parent home (smallest, deletes Gateway).
+  3. Progress "currently working on" (`2026-05-09-progress-tab-currently-working-on.md`) OR Family tab (this doc) — either can go first; whichever does, lands the `getCurrentlyWorkingOn` helper. Other consumes it.
+  4. More tab — last, with D5 removed.
