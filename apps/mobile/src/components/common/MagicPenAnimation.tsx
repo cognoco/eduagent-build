@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import type { ComponentProps, ComponentType, ReactNode } from 'react';
-import { Animated as RNAnimated, Easing as RNEasing, View } from 'react-native';
+import { View } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -11,6 +11,8 @@ import Animated, {
   withSequence,
   withDelay,
   cancelAnimation,
+  interpolate,
+  Extrapolation,
   Easing,
   type AnimatedProps,
 } from 'react-native-reanimated';
@@ -125,7 +127,13 @@ const FLICK_MS = 200; // upward flick at end
 const FLOAT_BACK_MS = 500; // pen floats back to start
 const FADE_MS = 350; // stroke fades out
 const GAP_MS = 200; // pause before next loop
-const TOTAL_MS = DROP_IN_MS + SWAY_MS + TRACE_MS + FLICK_MS + FLOAT_BACK_MS;
+// Single canonical cycle length. Every withRepeat sequence below MUST sum to
+// CYCLE_MS so the values stay in lockstep — otherwise individual animations
+// drift cycle-by-cycle and ink/pen/flick fall out of sync.
+const CYCLE_MS =
+  DROP_IN_MS + SWAY_MS + TRACE_MS + FLICK_MS + FLOAT_BACK_MS + GAP_MS;
+// Backwards-compatible alias used by droplet/sparkle math below.
+const TOTAL_MS = CYCLE_MS;
 
 // Falling ink droplet: triggers at ~40% of trace, falls and fades over 1.5s.
 const DROP_TRIGGER_PROGRESS = 0.4;
@@ -165,9 +173,6 @@ export function MagicPenAnimation({
   // available on a target, the ink stroke may be static, but the pen body still
   // moves because it is animated as an Animated.View.
   const animationDisabled = reduceMotion;
-  const penMotion = useRef(
-    new RNAnimated.Value(animationDisabled ? 0.55 : 0),
-  ).current;
 
   // -------------------------------------------------------------------------
   // Pen sizing
@@ -206,46 +211,6 @@ export function MagicPenAnimation({
   // sparkle: 0→1
   const sparkle = useSharedValue(0);
 
-  useEffect(() => {
-    if (animationDisabled) {
-      penMotion.stopAnimation();
-      penMotion.setValue(0.55);
-      return;
-    }
-
-    penMotion.setValue(0);
-    const loop = RNAnimated.loop(
-      RNAnimated.sequence([
-        RNAnimated.delay(DROP_IN_MS),
-        RNAnimated.timing(penMotion, {
-          toValue: 1,
-          duration: TRACE_MS,
-          easing: RNEasing.inOut(RNEasing.cubic),
-          useNativeDriver: true,
-        }),
-        RNAnimated.timing(penMotion, {
-          toValue: 1.08,
-          duration: FLICK_MS,
-          easing: RNEasing.out(RNEasing.cubic),
-          useNativeDriver: true,
-        }),
-        RNAnimated.timing(penMotion, {
-          toValue: 0,
-          duration: FLOAT_BACK_MS,
-          easing: RNEasing.out(RNEasing.cubic),
-          useNativeDriver: true,
-        }),
-        RNAnimated.delay(GAP_MS),
-      ]),
-    );
-
-    loop.start();
-    return () => {
-      loop.stop();
-      penMotion.stopAnimation();
-    };
-  }, [animationDisabled, penMotion]);
-
   // -------------------------------------------------------------------------
   // Animation loop
   // -------------------------------------------------------------------------
@@ -277,69 +242,73 @@ export function MagicPenAnimation({
     const easeIn = getEaseIn();
 
     // --- Pen drop-in (bouncy settle) ---
+    // 400 + 4900 + 500 + 200 = 6000
     dropIn.value = withRepeat(
       withSequence(
         withTiming(1, { duration: DROP_IN_MS, easing: easeBounce }),
-        // hold through trace + flick
+        // hold through sway + trace + flick
         withDelay(
           SWAY_MS + TRACE_MS + FLICK_MS,
           withTiming(1, { duration: 0 }),
         ),
         // float back
         withTiming(0, { duration: FLOAT_BACK_MS, easing: easeOut }),
-        // brief gap before next cycle
-        withTiming(0, { duration: 100 }),
+        // gap before next cycle (matches GAP_MS so cycle = CYCLE_MS)
+        withTiming(0, { duration: GAP_MS }),
       ),
       -1,
       false,
     );
 
-    // --- Stroke progress (drives both AnimatedPath and pen X/Y) ---
+    // --- Stroke progress (drives both ink stroke AND pen X/Y) ---
+    // 5100 + 900 + 0 = 6000
+    // Hold at 1 through flick + float-back + gap, then snap back instantly so
+    // the pen — which is positioned from progress — doesn't visibly rewind
+    // along the path during the reset. penOpacity hides the pen during the
+    // back-half of the hold so the snap is invisible.
     progress.value = withRepeat(
       withSequence(
-        // wait for drop-in + sway
         withDelay(
           DROP_IN_MS + SWAY_MS,
           withTiming(1, { duration: TRACE_MS, easing: easeTrace }),
         ),
-        // hold through flick
-        withTiming(1, { duration: FLICK_MS }),
-        // reset for next cycle
-        withTiming(0, { duration: FLOAT_BACK_MS + 100 }),
+        withTiming(1, { duration: FLICK_MS + FLOAT_BACK_MS + GAP_MS }),
+        withTiming(0, { duration: 0 }),
       ),
       -1,
       false,
     );
 
     // --- Stroke visibility (fade out at end of cycle) ---
+    // 800 + 4850 + 350 = 6000
     strokeFade.value = withRepeat(
       withSequence(
         // appears as trace begins
         withDelay(DROP_IN_MS + SWAY_MS, withTiming(1, { duration: 200 })),
-        // stay visible through trace + flick
+        // stay visible through trace + flick, then fade during float-back
         withDelay(
           TRACE_MS - 200 + FLICK_MS,
-          // fade out during float-back
           withTiming(0, { duration: FADE_MS, easing: easeOut }),
         ),
-        // gap
-        withTiming(0, { duration: 100 }),
+        // remaining gap to fill the cycle
+        withTiming(0, { duration: CYCLE_MS - 800 - 4850 }),
       ),
       -1,
       false,
     );
 
     // --- Pen flick at end ---
+    // 5400 + 100 + 500 = 6000
     flick.value = withRepeat(
       withSequence(
-        // wait for drop-in + sway + trace
+        // wait for drop-in + sway + trace, then peak
         withDelay(
           DROP_IN_MS + SWAY_MS + TRACE_MS,
           withTiming(1, { duration: FLICK_MS / 2, easing: easeOut }),
         ),
         withTiming(0, { duration: FLICK_MS / 2, easing: easeOut }),
         // hold through float-back + gap
-        withTiming(0, { duration: FLOAT_BACK_MS + 100 }),
+        withTiming(0, { duration: FLOAT_BACK_MS }),
       ),
       -1,
       false,
@@ -523,8 +492,6 @@ export function MagicPenAnimation({
   const steelDeepColor = '#9aa3ad';
   const slitColor = '#5a6470';
   // The visible pen travel uses React Native core Animated. Reanimated SVG
-  // props can be static in Expo web previews, while core transform animation is
-  // reliable there and still works on native.
   // The pen is drawn horizontally with the writing tip at (88, 50) inside a
   // 100×100 viewBox, then rotated ~32–45° clockwise. The empirical offsets
   // below place the rotated tip onto the writing path with minimal drift
@@ -536,51 +503,66 @@ export function MagicPenAnimation({
   const penStartY = PEN_START.y * drawingScale - nibOffsetY;
   const penEndY = PEN_END.y * drawingScale - nibOffsetY;
   const penMidY = ((PEN_START.y + PEN_END.y) / 2) * drawingScale - nibOffsetY;
-  const penBodyMotionStyle = {
-    transform: [
-      {
-        translateX: penMotion.interpolate({
-          inputRange: [0, 1, 1.08],
-          outputRange: [penStartX, penEndX, penEndX + size * 0.04],
-          extrapolate: 'clamp',
-        }),
-      },
-      {
-        translateY: penMotion.interpolate({
-          inputRange: [0, 0.18, 0.5, 0.82, 1, 1.08],
-          outputRange: [
-            penStartY - size * 0.38,
-            penStartY + size * 0.03,
-            penMidY - size * 0.04,
-            penEndY + size * 0.04,
-            penEndY,
-            penEndY - size * 0.09,
-          ],
-          extrapolate: 'clamp',
-        }),
-      },
-      {
-        // Tangent-following tilt — pen leans into each curve segment, a la
-        // handwriting. Computed by sampling the cubic-bezier WRITING_PATH
-        // tangent at t = 0, 0.25, 0.5, 0.75, 1.0 (in degrees, atan2 of dy/dx)
-        // and applying:  rotation = BASE_TILT(38°) + 0.30 × tangentDeg.
-        // The 0.30 scale (≈70% reduction from the reference's full influence)
-        // tames our path's wide ±70° tangent swing into a gentle ±18° lean.
-        rotate: penMotion.interpolate({
-          inputRange: [0, 0.25, 0.5, 0.75, 1, 1.08],
-          outputRange: [
-            '17deg', // tangent -69°: motion up-right, pen flatter
-            '46deg', // tangent +25°: motion down-right, pen leans forward
-            '20deg', // tangent -62°: motion up-right again
-            '39deg', // tangent  +2°: motion roughly horizontal
-            '53deg', // tangent +51°: motion down-right at end
-            '35deg', // flick lifts the pen back ~18°
-          ],
-          extrapolate: 'clamp',
-        }),
-      },
-    ],
-  };
+
+  // Pen body motion driven entirely from Reanimated shared values so it
+  // shares the ink stroke's scheduler — no two-clock drift, and the pen
+  // actually animates on Expo web previews where react-native-svg transforms
+  // ignore RN core Animated values driven via useNativeDriver.
+  //
+  //   progress: 0 pre-trace, 0→1 along the path during trace, held at 1
+  //             through flick + float-back (snaps to 0 at cycle wrap).
+  //   dropIn:   0 above the path, 0→1 during drop-in, 1 across the trace,
+  //             1→0 during float-back.
+  //   flick:    0→1→0 spike at end of trace; adds the upward flick.
+  //
+  // Drop-in is applied as a separate Y lift on top of the trace waveform,
+  // so the pen lands on the path BEFORE the trace starts (instead of
+  // hovering above it for the first ~1.6s of the eased trace).
+  const penBodyAnimatedStyle = useAnimatedStyle(() => {
+    const p = progress.value;
+    const di = dropIn.value;
+    const fl = flick.value;
+
+    const baseX = penStartX + (penEndX - penStartX) * p;
+    const flickX = fl * size * 0.04;
+
+    // Y wobble along the cursive path during the trace. Waypoints are the
+    // original wobble (minus the drop-in entry) re-keyed to `p` (which is
+    // already eased, so input fractions are in eased-time-space matching
+    // the original 0.5 / 0.82 keyframes).
+    const baseY = interpolate(
+      p,
+      [0, 0.5, 0.82, 1],
+      [
+        penStartY + size * 0.03,
+        penMidY - size * 0.04,
+        penEndY + size * 0.04,
+        penEndY,
+      ],
+      Extrapolation.CLAMP,
+    );
+    const dropInLift = (1 - di) * size * 0.38;
+    const flickY = -fl * size * 0.09;
+
+    // Tangent-following tilt — pen leans into each curve segment.
+    // Sampled from the cubic-bezier WRITING_PATH at t = 0, 0.25, 0.5, 0.75, 1.
+    const baseRotateDeg = interpolate(
+      p,
+      [0, 0.25, 0.5, 0.75, 1],
+      [17, 46, 20, 39, 53],
+      Extrapolation.CLAMP,
+    );
+    // Flick raises the nib by ~18°.
+    const flickRotateDeg = -fl * 18;
+
+    return {
+      transform: [
+        { translateX: baseX + flickX },
+        { translateY: baseY - dropInLift + flickY },
+        { rotate: `${baseRotateDeg + flickRotateDeg}deg` },
+      ],
+    };
+  });
 
   // -------------------------------------------------------------------------
   // Reduced motion: static render (pen mid-stroke, full line visible)
@@ -882,7 +864,7 @@ export function MagicPenAnimation({
       </Animated.View>
 
       {/* ------------------------------------------------------------------ */}
-      {/* Pen body — RNAnimated.View with static SVG inside (Fabric-safe)     */}
+      {/* Pen body — Animated.View with static SVG inside (Fabric-safe)       */}
       {/* The SVG uses a 100×100 viewBox with a large, clearly readable pen.  */}
       {/* Wrapped in a Reanimated Animated.View whose opacity tracks          */}
       {/* strokeFade — so the pen and its yellow tip glow fade out together   */}
@@ -901,7 +883,7 @@ export function MagicPenAnimation({
           { pointerEvents: 'none' },
         ]}
       >
-        <RNAnimated.View
+        <Animated.View
           style={[
             {
               position: 'absolute',
@@ -910,7 +892,7 @@ export function MagicPenAnimation({
               width: penContainerSize,
               height: penContainerSize,
             },
-            penBodyMotionStyle,
+            penBodyAnimatedStyle,
             { pointerEvents: 'none' },
           ]}
         >
@@ -1013,7 +995,7 @@ export function MagicPenAnimation({
             {/* Yellow tip ink bead */}
             <Circle cx={TIP_CX} cy={TIP_CY} r={2.6} fill={INK_GLOW_COLOR} />
           </Svg>
-        </RNAnimated.View>
+        </Animated.View>
       </Animated.View>
     </View>
   );
