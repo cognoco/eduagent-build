@@ -9,6 +9,7 @@ import {
   Switch,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { isAdultOwner } from '@eduagent/schemas';
 import type { Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -214,6 +215,7 @@ function FamilyContent(): React.ReactElement {
   const isDemo = dashboard?.demoMode === true;
   const hasChildren = (dashboard?.children?.length ?? 0) > 0;
   const showFamilyManagement = !isDemo && hasChildren;
+  const showAddChild = isAdultOwner(activeProfile);
 
   const handleDrillDown = (profileId: string): void => {
     if (isDemo) {
@@ -403,20 +405,22 @@ function FamilyContent(): React.ReactElement {
                     updateFamilyPoolBreakdownSharing.isPending
                   }
                 />
-                <Pressable
-                  onPress={handleAddChild}
-                  className="bg-surface rounded-card px-4 py-3.5 mb-2"
-                  accessibilityLabel={t('more.family.addChildAccessLabel')}
-                  accessibilityRole="button"
-                  testID="family-add-child-link"
-                >
-                  <Text className="text-body font-semibold text-text-primary">
-                    {t('more.family.addChild')}
-                  </Text>
-                  <Text className="text-body-sm text-text-secondary mt-1">
-                    {t('more.family.addChildDescription')}
-                  </Text>
-                </Pressable>
+                {showAddChild ? (
+                  <Pressable
+                    onPress={handleAddChild}
+                    className="bg-surface rounded-card px-4 py-3.5 mb-2"
+                    accessibilityLabel={t('more.family.addChildAccessLabel')}
+                    accessibilityRole="button"
+                    testID="family-add-child-link"
+                  >
+                    <Text className="text-body font-semibold text-text-primary">
+                      {t('more.family.addChild')}
+                    </Text>
+                    <Text className="text-body-sm text-text-secondary mt-1">
+                      {t('more.family.addChildDescription')}
+                    </Text>
+                  </Pressable>
+                ) : null}
               </>
             ) : null}
             {isDemo && (

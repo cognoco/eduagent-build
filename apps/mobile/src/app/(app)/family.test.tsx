@@ -128,10 +128,20 @@ jest.mock(
 jest.mock('../../lib/profile', () => ({
   useProfile: () => ({
     profiles: [
-      { id: 'parent-id', displayName: 'Parent', isOwner: true },
+      {
+        id: 'parent-id',
+        displayName: 'Parent',
+        isOwner: true,
+        birthYear: 1990,
+      },
       { id: 'child-id', displayName: 'Learner', isOwner: false },
     ],
-    activeProfile: { id: 'parent-id', displayName: 'Parent', isOwner: true },
+    activeProfile: {
+      id: 'parent-id',
+      displayName: 'Parent',
+      isOwner: true,
+      birthYear: 1990,
+    },
     switchProfile: mockSwitchProfile,
   }),
 }));

@@ -1,5 +1,11 @@
 export type AgeBracket = 'adolescent' | 'adult';
 
+export interface AgeGateProfile {
+  role?: 'owner' | 'child' | 'impersonated-child' | string | null;
+  isOwner?: boolean | null;
+  birthYear?: number | null;
+}
+
 /**
  * Computes an age bracket from birthYear for voice tone selection.
  *
@@ -17,11 +23,24 @@ export type AgeBracket = 'adolescent' | 'adult';
  */
 export function computeAgeBracket(
   birthYear: number,
-  currentYear?: number
+  currentYear?: number,
 ): AgeBracket {
   const year = currentYear ?? new Date().getFullYear();
   const age = year - birthYear;
 
   if (age < 18) return 'adolescent';
   return 'adult';
+}
+
+export function isAdultOwner(
+  profile: AgeGateProfile | null | undefined,
+  currentYear?: number,
+): boolean {
+  if (!profile) return false;
+  if (profile.role !== undefined && profile.role !== 'owner') return false;
+  if (profile.role === undefined && profile.isOwner !== true) return false;
+  if (profile.birthYear == null) return false;
+
+  const year = currentYear ?? new Date().getFullYear();
+  return year - profile.birthYear >= 18;
 }
