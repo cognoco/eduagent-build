@@ -52,61 +52,105 @@ Each entry in `ci-attempts.json` has shape:
 
 ### 1.3 Verify We Are On The PR Branch
 
-The loop runs in the same worktree the PR was pushed from, but verify before pushing later:
+The loop runs in the same worktree the PR was pushed from. Capture branch + worktree state for later use, but do NOT treat a dirty worktree as a fatal precondition — only remote CI determines green/fail status:
 
 ```bash
 HEAD_BRANCH=$(git branch --show-current)
 echo "Branch: $HEAD_BRANCH"
-git status --porcelain
+
+# Capture worktree dirtiness as informational state; checked again only before
+# Step 7 (commit + push). Remote CI is the source of truth for the loop's verdict.
+WORKTREE_DIRTY=0
+if [[ -n "$(git status --porcelain)" ]]; then
+    WORKTREE_DIRTY=1
+    echo "WARNING: worktree is dirty (informational; not a failure)." >&2
+    git status --porcelain >&2
+fi
 ```
 
-The working tree should be clean. If dirty, that's a workflow contract violation — capture and proceed to giveup at Step 9.
+Dirty-worktree handling rule:
+- Before Step 2 (remote CI poll/watch) and Step 2.1 (success-fast on green): dirtiness is a soft warning only.
+- Before Step 7 (commit + push of a fix): dirtiness blocks the push, because we can't safely push a targeted fix on top of leftover scratch files. In that case the iteration records `fix_applied: "worktree dirty — cannot safely commit fix"` and falls through to Step 8 / Step 9.
 
 ---
 
-## Step 2: Watch CI
+## Step 2: Check Remote CI (Source Of Truth)
 
-Bound the watch at ~25 minutes so an indefinitely-pending check can't consume the whole `idle_timeout`:
+Remote CI status is the canonical signal for this loop. Always poll it FIRST, before doing anything else with the worktree. The local worktree state never short-circuits this check.
+
+### 2.0 Immediate Status Poll (No Watching Yet)
 
 ```bash
 log_file="$ARTIFACTS_DIR/ci-attempt-${ITER}.log"
 checks_json="$ARTIFACTS_DIR/ci-attempt-${ITER}-checks.json"
 
-# `gh pr checks --watch` blocks until all checks finish; cap with `timeout`.
-# Exit codes: 0 all green, 8 any failure, 124 timeout (per `timeout(1)`).
-set +e
-timeout 1500 gh pr checks "$PR" --watch --interval 30 > "$log_file" 2>&1
-watch_rc=$?
-set -e
-
-# Snapshot the post-watch check status as JSON for downstream parsing.
+# One non-blocking snapshot first. We only fall into `--watch` if there are
+# still-pending checks; if the run is already terminal we skip the wait.
 gh pr checks "$PR" --json name,state,bucket,link,workflow > "$checks_json" 2>&1 || true
+
+has_pending=$(jq -e '[.[] | select(.bucket == "pending")] | length > 0' "$checks_json" > /dev/null 2>&1 && echo 1 || echo 0)
+has_failed=$(jq  -e '[.[] | select(.bucket == "fail" or .bucket == "cancel")] | length > 0' "$checks_json" > /dev/null 2>&1 && echo 1 || echo 0)
 ```
 
-### 2.1 If All Green
+### 2.1 If All Green (Success-Fast)
+
+If the immediate snapshot shows no pending and no failed checks, we are done — regardless of whether the local worktree is dirty:
 
 ```bash
-if [[ "$watch_rc" -eq 0 ]] || ! jq -e '[.[] | select(.bucket == "fail" or .bucket == "cancel")] | length > 0' "$checks_json" > /dev/null 2>&1; then
+if [[ "$has_pending" -eq 0 && "$has_failed" -eq 0 ]]; then
+    if [[ "${WORKTREE_DIRTY:-0}" -eq 1 ]]; then
+        echo "NOTE: All CI checks green on PR #${PR}, but local worktree is dirty (informational)." >&2
+    fi
     echo "All CI checks green on PR #${PR} after ${ITER} iteration(s)."
     echo "<promise>ALL_CHECKS_GREEN_OR_GIVEUP</promise>"
     exit 0
 fi
 ```
 
-### 2.2 If Timeout
+### 2.2 If Pending — Wait With `--watch`
 
-If `watch_rc` is 124 (timeout), record this iteration as `unknown` and proceed to giveup — we cannot reason about a frozen pipeline:
+Only fall into the blocking watch when at least one check is still pending. Bound it at ~25 minutes so an indefinitely-pending check can't consume the whole `idle_timeout`:
+
+```bash
+watch_rc=0
+if [[ "$has_pending" -eq 1 ]]; then
+    # `gh pr checks --watch` blocks until all checks finish; cap with `timeout`.
+    # Exit codes: 0 all green, 8 any failure, 124 timeout (per `timeout(1)`).
+    set +e
+    timeout 1500 gh pr checks "$PR" --watch --interval 30 > "$log_file" 2>&1
+    watch_rc=$?
+    set -e
+
+    # Refresh post-watch snapshot.
+    gh pr checks "$PR" --json name,state,bucket,link,workflow > "$checks_json" 2>&1 || true
+
+    # Re-evaluate green after the watch returns.
+    if [[ "$watch_rc" -eq 0 ]] || ! jq -e '[.[] | select(.bucket == "fail" or .bucket == "cancel")] | length > 0' "$checks_json" > /dev/null 2>&1; then
+        if [[ "${WORKTREE_DIRTY:-0}" -eq 1 ]]; then
+            echo "NOTE: All CI checks green on PR #${PR} after watch, but local worktree is dirty (informational)." >&2
+        fi
+        echo "All CI checks green on PR #${PR} after ${ITER} iteration(s)."
+        echo "<promise>ALL_CHECKS_GREEN_OR_GIVEUP</promise>"
+        exit 0
+    fi
+fi
+```
+
+### 2.3 If Watch Timed Out
+
+If `watch_rc` is 124 (timeout), record this iteration as `unknown` and proceed to giveup — we cannot reason about a frozen pipeline. The reason for giveup is "CI never reached a terminal state," not anything to do with the worktree:
 
 ```bash
 if [[ "$watch_rc" -eq 124 ]]; then
     classification="unknown"
     failure_signature="watch-timeout:gh-pr-checks-1500s"
     fix_applied="no fix — watch timed out"
+    GIVEUP_REASON="ci-frozen"
     # Skip ahead to Step 9 (giveup) after appending the iteration entry.
 fi
 ```
 
-### 2.3 If Failed — Gather Failed Run Logs
+### 2.4 If Failed — Gather Failed Run Logs
 
 ```bash
 mapfile -t failed_runs < <(
@@ -384,6 +428,40 @@ If any of 6.1–6.4 fails, set `LOCAL_VALIDATION_FAILED=1`, skip Step 7, append 
 
 This is the workflow's authorized commit point (see CLAUDE.md "Subagents must never run git add..." exception for structured-workflow commits).
 
+### 7.0 Refuse To Push From A Dirty Worktree
+
+This is the only point in the loop where worktree dirtiness is fatal — it would be unsafe to commit and push a targeted fix on top of unknown leftover state. Re-check freshly (a previous step may have cleaned it):
+
+```bash
+# Compute the set of files in `git status --porcelain` whose paths are NOT in changed_files[].
+# Any such file is a leftover (scratch, build artifact, or unrelated edit) — pushing on top of
+# unknown state is unsafe.
+unexpected_dirty=""
+while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    # `git status --porcelain` lines: "XY path"; rename lines have "orig -> new" — take the new path.
+    p="$(printf '%s\n' "$line" | sed -E 's|^.. (.*-> )?(.*)$|\2|')"
+    is_known=0
+    for cf in "${changed_files[@]:-}"; do
+        if [[ "$p" == "$cf" ]]; then is_known=1; break; fi
+    done
+    if [[ "$is_known" -eq 0 ]]; then
+        unexpected_dirty+="${line}"$'\n'
+    fi
+done < <(git status --porcelain)
+
+if [[ -n "$unexpected_dirty" ]]; then
+    echo "ERROR: worktree is dirty with files this fix did not touch; refusing to push." >&2
+    printf '%s' "$unexpected_dirty" >&2
+    fix_applied="worktree dirty — cannot safely commit fix"
+    LOCAL_VALIDATION_FAILED=1
+    GIVEUP_REASON="worktree-dirty-blocks-push"
+    # Fall through: skip the rest of Step 7, append iteration in Step 8, decide in Step 9.
+fi
+```
+
+If `LOCAL_VALIDATION_FAILED=1` was set above, skip 7.1–7.3 and proceed to Step 8.
+
 ### 7.1 Stage only the files you edited
 
 Never `git add -A` blind. Stage explicitly:
@@ -405,7 +483,7 @@ fix(ci): ${classification} — ${summary}
 Iteration ${ITER}/3 of cleanup-ci-watch-and-fix loop on PR #${PR}.
 See ci-attempts.json and ci-attempt-${ITER}.log under the workflow artifacts.
 
-Co-Authored-By: Claude <noreply@anthropic.com>
+Co-Authored-By: Archon <archon@anthropic.com>
 CMSG
 git commit -F "$ARTIFACTS_DIR/ci-attempt-${ITER}-commit-msg.txt"
 ```
@@ -460,15 +538,61 @@ if [[ "$GIVEUP" -eq 0 ]]; then
 fi
 ```
 
-### 9.1 Build Giveup Comment
+### 9.1 Classify The Giveup Reason
+
+Distinguish "CI was actually failing and we couldn't fix it" (real CI failure → P1) from "we never observed remote CI failing — something blocked us locally" (operational issue → PR comment only, no P1):
+
+```bash
+# Re-poll CI one last time so the giveup comment reflects current state, not stale data.
+gh pr checks "$PR" --json name,state,bucket,link,workflow > "$checks_json" 2>&1 || true
+ci_currently_failing=$(jq -e '[.[] | select(.bucket == "fail" or .bucket == "cancel")] | length > 0' "$checks_json" > /dev/null 2>&1 && echo 1 || echo 0)
+
+# GIVEUP_REASON may already be set from Step 2.3 (ci-frozen) or Step 7.0 (worktree-dirty-blocks-push).
+# If unset, derive it from the loop state.
+if [[ -z "${GIVEUP_REASON:-}" ]]; then
+    if [[ "${SAME_FAILURE_TWICE:-0}" -eq 1 ]]; then
+        GIVEUP_REASON="same-failure-twice"
+    elif [[ "$classification" == "unknown" ]]; then
+        GIVEUP_REASON="unclassifiable-failure"
+    elif [[ "$ITER" -ge 3 ]]; then
+        GIVEUP_REASON="iteration-cap"
+    else
+        GIVEUP_REASON="other"
+    fi
+fi
+
+# Only file P1 when remote CI actually shows failures we couldn't fix. Operational
+# blockers (worktree dirty, watch timeout) get a PR comment but no Notion ticket —
+# they are workflow infrastructure issues, not engineering work to escalate.
+case "$GIVEUP_REASON" in
+    same-failure-twice|iteration-cap|unclassifiable-failure)
+        FILE_P1=1
+        ;;
+    ci-frozen|worktree-dirty-blocks-push|other)
+        # ci-frozen: indeterminate, not a confirmed failure. worktree-dirty: operational.
+        # Only file P1 if CI is currently observably failing.
+        if [[ "$ci_currently_failing" -eq 1 ]]; then
+            FILE_P1=1
+        else
+            FILE_P1=0
+        fi
+        ;;
+    *)
+        FILE_P1=0
+        ;;
+esac
+```
+
+### 9.2 Build Giveup Comment
 
 Use a heredoc + temp file (mirroring `post-review-comments.sh`):
 
 ```bash
 giveup_body="$ARTIFACTS_DIR/ci-giveup-comment.md"
 
-# Most recent failing-check names
-fail_names="$(jq -r '[.[] | select(.bucket == "fail" or .bucket == "cancel") | .name] | unique | join(", ")' "$checks_json" 2>/dev/null || echo "(unknown)")"
+# Most recent failing-check names (may be empty when giveup was operational, not CI-driven).
+fail_names="$(jq -r '[.[] | select(.bucket == "fail" or .bucket == "cancel") | .name] | unique | join(", ")' "$checks_json" 2>/dev/null)"
+[[ -z "$fail_names" ]] && fail_names="(none — remote CI was not in a failing state at giveup)"
 
 # Last 3 attempts (or fewer)
 attempts_table="$(jq -r '
@@ -483,6 +607,7 @@ cat > "$giveup_body" <<MD
 
 PR: #${PR}
 Loop: \`cleanup-ci-watch-and-fix\` — gave up after ${ITER} iteration(s).
+Giveup reason: \`${GIVEUP_REASON}\`
 
 ### Attempts
 
@@ -500,49 +625,73 @@ ${fail_names}
 
 ### Why we stopped
 
-$(if [[ "${SAME_FAILURE_TWICE:-0}" -eq 1 ]]; then
-    echo "- The same failure signature appeared in two iterations — the previous fix did not resolve it."
-elif [[ "$classification" == "unknown" ]]; then
-    echo "- Failure could not be classified by the regex rules in this loop."
-else
-    echo "- Hit the ${ITER}-iteration cap without reaching green CI."
-fi)
+$(case "$GIVEUP_REASON" in
+    same-failure-twice)
+        echo "- The same failure signature appeared in two iterations — the previous fix did not resolve it."
+        ;;
+    unclassifiable-failure)
+        echo "- Failure could not be classified by the regex rules in this loop."
+        ;;
+    iteration-cap)
+        echo "- Hit the ${ITER}-iteration cap without reaching green CI."
+        ;;
+    ci-frozen)
+        echo "- \`gh pr checks --watch\` timed out (~25 min) — remote CI never reached a terminal state."
+        echo "- Note: this is an indeterminate result, not a confirmed CI failure. Re-check the PR before assuming it is broken."
+        ;;
+    worktree-dirty-blocks-push)
+        echo "- Local worktree was dirty with files unrelated to the fix; the loop refused to push on top of unknown state."
+        echo "- Note: remote CI status was \\\`$([[ "$ci_currently_failing" -eq 1 ]] && echo failing || echo "green or pending")\\\` at giveup — separate from the worktree issue."
+        ;;
+    *)
+        echo "- Loop ended without reaching green CI."
+        ;;
+esac)
 
 A human reviewer needs to:
-1. Read the latest \`ci-attempt-N.log\` for the raw failure output.
+1. Read the latest \`ci-attempt-N.log\` for the raw failure output (if any).
 2. Decide whether to retry, escalate the underlying engineering rule, or close the PR.
 3. If retrying, push a fix to this branch directly — the loop has exited and won't re-trigger automatically.
 
-A P1 follow-up has been filed in the Notion bug tracker.
+$([[ "$FILE_P1" -eq 1 ]] && echo "A P1 follow-up has been filed in the Notion bug tracker." || echo "No Notion P1 was filed — this giveup was an operational/indeterminate condition, not a confirmed CI failure.")
 MD
 
 gh pr comment "$PR" --body-file "$giveup_body"
 echo "Posted giveup comment to PR #${PR}"
 ```
 
-### 9.2 File Notion P1
+### 9.3 File Notion P1 (Only When CI Is Actually Failing)
 
-Don't fail the workflow on filer error — best-effort with `|| echo ...`:
+Skip the filer entirely for operational giveups (dirty worktree, frozen CI without a confirmed failure). Don't fail the workflow on filer error — best-effort with `|| echo ...`:
 
 ```bash
-./.archon/scripts/append-followup.sh \
-    --from cleanup-ci-watch-and-fix \
-    --pr "$PR" \
-    --severity P1 \
-    --platform "CI" \
-    --title "CI giveup: ${classification} on PR #${PR}" \
-    --body "Cleanup CI watch+fix loop gave up after ${ITER} iteration(s) on PR #${PR}. Last classification: ${classification}. Last signature: ${failure_signature:-n/a}. See \$ARTIFACTS_DIR/ci-attempts.json and ci-attempt-${ITER}.log for full context. PR comment posted with attempt summary." \
-    || echo "follow-up filer failed; PR comment posted only"
+if [[ "$FILE_P1" -eq 1 ]]; then
+    ./.archon/scripts/append-followup.sh \
+        --from cleanup-ci-watch-and-fix \
+        --pr "$PR" \
+        --severity P1 \
+        --platform "CI" \
+        --title "CI giveup: ${classification} on PR #${PR}" \
+        --body "Cleanup CI watch+fix loop gave up after ${ITER} iteration(s) on PR #${PR}. Giveup reason: ${GIVEUP_REASON}. Last classification: ${classification}. Last signature: ${failure_signature:-n/a}. See \$ARTIFACTS_DIR/ci-attempts.json and ci-attempt-${ITER}.log for full context. PR comment posted with attempt summary." \
+        || echo "follow-up filer failed; PR comment posted only"
+else
+    echo "Skipping Notion P1 — giveup reason '${GIVEUP_REASON}' is operational, not a confirmed CI failure."
+fi
 ```
 
-### 9.3 Mark Giveup For Summary Node
+### 9.4 Mark Giveup For Summary Node
 
 ```bash
-echo "${classification}" > "$ARTIFACTS_DIR/.ci-watch-giveup"
+# First line: classification (back-compat). Second line: giveup reason. Third: filed-P1 flag.
+{
+    echo "${classification}"
+    echo "reason=${GIVEUP_REASON}"
+    echo "filed_p1=${FILE_P1}"
+} > "$ARTIFACTS_DIR/.ci-watch-giveup"
 echo "Wrote $ARTIFACTS_DIR/.ci-watch-giveup"
 ```
 
-The downstream summary node can detect the file's presence and surface the giveup in its report.
+The downstream summary node can detect the file's presence and surface the giveup in its report. The `reason=` and `filed_p1=` lines let downstream nodes distinguish CI-failure giveups from operational ones.
 
 ---
 

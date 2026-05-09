@@ -143,5 +143,18 @@ fi
     echo "INFO: cleanup-risk-class: verdict=${verdict}"
 } >&2
 
+# ── Persist verdict to a file for downstream bash scripts ───────────────
+# Archon exposes this script's stdout to YAML `when:` gates as
+# $risk-class.output, but downstream bash scripts (e.g. cleanup-synthesize.sh)
+# don't have access to that variable. Write the verdict to a known file so
+# they can determine which reviewer artifacts are *expected* vs. legitimately
+# skipped (tiny PRs skip code-review + test-coverage).
+verdict_file="${artifacts_dir}/risk-class.txt"
+if printf '%s\n' "$verdict" > "$verdict_file" 2>/dev/null; then
+    echo "INFO: cleanup-risk-class: wrote verdict to ${verdict_file}" >&2
+else
+    echo "WARNING: cleanup-risk-class: failed to write ${verdict_file}" >&2
+fi
+
 # ── Single-line stdout output ───────────────────────────────────────────
 echo "$verdict"

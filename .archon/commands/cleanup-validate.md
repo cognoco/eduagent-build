@@ -155,7 +155,7 @@ fix: address validation failures in cleanup PR
 
 Post-implementation validation fixes.
 
-Co-Authored-By: Claude <noreply@anthropic.com>
+Co-Authored-By: Archon <archon@anthropic.com>
 CMSG
 git commit -F "$ARTIFACTS_DIR/commit-msg.txt"
 ```

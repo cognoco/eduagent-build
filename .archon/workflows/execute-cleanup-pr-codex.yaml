@@ -72,6 +72,9 @@ nodes:
     depends_on: [plan-review]
     context: fresh
     idle_timeout: 600000
+    provider: codex
+    model: gpt-5.5
+    modelReasoningEffort: high
     loop:
       prompt: |
         Read and execute the instructions in `.archon/commands/cleanup-implement-phase.md`.
@@ -94,7 +97,7 @@ nodes:
     context: fresh
     provider: codex
     model: gpt-5.5
-    modelReasoningEffort: medium
+    modelReasoningEffort: low
 
   # ── PHASE 3.5: RISK CLASSIFICATION ───────────────────────────────────
   # Emits 'tiny' | 'normal' | 'risky' to stdout based on diff stats,
@@ -168,7 +171,7 @@ nodes:
     context: fresh
     provider: codex
     model: gpt-5.5
-    modelReasoningEffort: medium
+    modelReasoningEffort: low
 
   # ── PHASE 6: PUSH + CREATE PR ─────────────────────────────────────────
 

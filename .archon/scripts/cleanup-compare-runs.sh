@@ -257,6 +257,19 @@ B_STATUS=$(run_field "$RUN_B" "status")
 
 ---
 
+## Configuration Matrix
+
+| Tier | Claude flavor | Codex flavor |
+|------|---------------|--------------|
+| Implementation (implement, fix-locally) | claude-opus-4-6 / high | gpt-5.5 / high |
+| Triage (plan-review, review-scope, code-review, test-coverage, ci-watch-and-fix) | sonnet / medium | gpt-5.5 / medium |
+| Validation (validate, re-validate) | sonnet / low | gpt-5.5 / low |
+| Adversarial (cross-LLM) | gpt-5.5 / high | claude-opus-4-6 / high |
+
+Note: this is "best-tuned per provider," not a model-controlled A/B. Claude uses model size as the primary lever (opus/sonnet/haiku) plus effort as secondary; Codex uses one model with effort as the primary lever.
+
+---
+
 ## Per-node wall time
 
 Source: \`remote_agent_workflow_events\` filtered by \`workflow_run_id\` and \`event_type = 'node_completed'\`. \`(absent)\` means the node has no node_started event for that run.

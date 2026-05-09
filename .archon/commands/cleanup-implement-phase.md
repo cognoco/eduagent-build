@@ -152,7 +152,7 @@ refactor(<scope>): <phase description>
 Cleanup PR-XX Phase N: <brief details>
 See docs/audit/cleanup-plan.md for full context.
 
-Co-Authored-By: Claude <noreply@anthropic.com>
+Co-Authored-By: Archon <archon@anthropic.com>
 CMSG
 git commit -F "$ARTIFACTS_DIR/commit-msg.txt"
 ```

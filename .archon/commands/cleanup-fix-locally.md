@@ -245,7 +245,7 @@ Tests added:
 Skipped (see review artifacts):
 - {brief list of unfixable if any}
 
-Co-Authored-By: Claude <noreply@anthropic.com>
+Co-Authored-By: Archon <archon@anthropic.com>
 CMSG
 git commit -F "$ARTIFACTS_DIR/commit-msg.txt"
 ```
