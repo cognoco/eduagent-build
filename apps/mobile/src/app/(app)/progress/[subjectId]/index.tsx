@@ -56,7 +56,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
   const languageProgress = languageProgressQuery.data;
 
   const subject = inventoryQuery.data?.subjects.find(
-    (entry) => entry.subjectId === subjectId
+    (entry) => entry.subjectId === subjectId,
   );
   const legacyProgress = subjectProgressQuery.data;
   const isLanguageSubject =
@@ -68,6 +68,15 @@ export default function ProgressSubjectScreen(): React.ReactElement {
       pathname: '/(app)/shelf/[subjectId]',
       params: { subjectId: targetSubjectId },
     } as never);
+  };
+
+  const handlePrimarySubjectAction = (): void => {
+    if (!subject) return;
+    if (canResumeSubject && resumeTargetQuery.data) {
+      pushLearningResumeTarget(router, resumeTargetQuery.data);
+      return;
+    }
+    openSubjectShelf(subject.subjectId);
   };
 
   const hideSubject = async (): Promise<void> => {
@@ -100,7 +109,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
           },
         },
       ],
-      { cancelable: true }
+      { cancelable: true },
     );
   };
 
@@ -256,13 +265,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
           </View>
           {subject ? (
             <Pressable
-              onPress={() => {
-                if (canResumeSubject && resumeTargetQuery.data) {
-                  pushLearningResumeTarget(router, resumeTargetQuery.data);
-                  return;
-                }
-                openSubjectShelf(subject.subjectId);
-              }}
+              onPress={handlePrimarySubjectAction}
               className="bg-primary rounded-button px-4 py-2 ms-2 items-center justify-center min-h-[40px]"
               accessibilityRole="button"
               accessibilityLabel={
@@ -291,14 +294,16 @@ export default function ProgressSubjectScreen(): React.ReactElement {
                       total: subject.topics.total,
                     })
                   : subject.topics.total === 0
-                  ? t('progress.subject.noTopicsPlanned')
-                  : (() => {
-                      const n = Math.max(
-                        subject.topics.explored,
-                        subject.topics.mastered + subject.topics.inProgress
-                      );
-                      return t('progress.subject.topicsExplored', { count: n });
-                    })()}
+                    ? t('progress.subject.noTopicsPlanned')
+                    : (() => {
+                        const n = Math.max(
+                          subject.topics.explored,
+                          subject.topics.mastered + subject.topics.inProgress,
+                        );
+                        return t('progress.subject.topicsExplored', {
+                          count: n,
+                        });
+                      })()}
               </Text>
               <Text className="text-body-sm text-text-secondary mt-2">
                 {subject.vocabulary.total > 0
@@ -335,7 +340,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
               <StatCard
                 label={t('progress.subject.statTimeSpent')}
                 value={formatMinutes(
-                  subject.wallClockMinutes || subject.activeMinutes
+                  subject.wallClockMinutes || subject.activeMinutes,
                 )}
               />
               <StatCard
@@ -370,7 +375,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
                           {t('progress.subject.wordCount', { count })}
                         </Text>
                       </View>
-                    )
+                    ),
                   )}
                 </View>
                 <Pressable
@@ -454,7 +459,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
                           style={{
                             width: `${Math.round(
                               languageProgress.currentMilestone
-                                .milestoneProgress * 100
+                                .milestoneProgress * 100,
                             )}%`,
                           }}
                         />
@@ -501,7 +506,18 @@ export default function ProgressSubjectScreen(): React.ReactElement {
                 </Pressable>
               </View>
             ) : legacyProgress && subject.sessionsCount > 0 ? (
-              <View className="bg-surface rounded-card p-4 mt-4">
+              <Pressable
+                onPress={handlePrimarySubjectAction}
+                className="bg-surface rounded-card p-4 mt-4"
+                accessibilityRole="button"
+                accessibilityLabel={t('progress.subject.retentionTitle')}
+                accessibilityHint={
+                  canResumeSubject
+                    ? t('progress.subject.resume')
+                    : t('progress.subject.openShelf')
+                }
+                testID="progress-subject-retention-card"
+              >
                 <Text className="text-h3 font-semibold text-text-primary">
                   {t('progress.subject.retentionTitle')}
                 </Text>
@@ -509,10 +525,10 @@ export default function ProgressSubjectScreen(): React.ReactElement {
                   {legacyProgress.retentionStatus === 'strong'
                     ? t(`progress.register.${register}.retentionStrong`)
                     : legacyProgress.retentionStatus === 'fading'
-                    ? t(`progress.register.${register}.retentionFading`)
-                    : t(`progress.register.${register}.retentionWeak`)}
+                      ? t(`progress.register.${register}.retentionFading`)
+                      : t(`progress.register.${register}.retentionWeak`)}
                 </Text>
-              </View>
+              </Pressable>
             ) : null}
 
             <View className="flex-row gap-3 mt-6">

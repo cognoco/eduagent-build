@@ -36,8 +36,17 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
+const mockRouter = {
+  replace: jest.fn(),
+  back: jest.fn(),
+  push: jest.fn(),
+  canGoBack: jest.fn(() => true),
+};
+let mockSearchParams: Record<string, string | string[] | undefined> = {};
+
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ replace: jest.fn(), back: jest.fn(), push: jest.fn() }),
+  useRouter: () => mockRouter,
+  useLocalSearchParams: () => mockSearchParams,
   Redirect: () => null,
 }));
 
@@ -74,7 +83,7 @@ const mockFetch = createRoutedMockFetch({
 });
 
 jest.mock('../../lib/api-client', () =>
-  require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch)
+  require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
 );
 
 // use-parent-proxy uses setProxyMode from api-client (not the RPC useApiClient hook)
@@ -138,20 +147,21 @@ const MentorMemoryScreen = require('./mentor-memory').default;
 describe('MentorMemoryScreen — interests null guard', () => {
   afterEach(() => {
     mockProfileData = { ...mockProfileBase, interests: [] };
+    mockSearchParams = {};
     jest.clearAllMocks();
   });
 
   it('does not crash when profile.interests is undefined', () => {
     mockProfileData = { ...mockProfileBase, interests: undefined };
     expect(() =>
-      render(<MentorMemoryScreen />, { wrapper: makeWrapper() })
+      render(<MentorMemoryScreen />, { wrapper: makeWrapper() }),
     ).not.toThrow();
   });
 
   it('does not crash when profile.interests is null', () => {
     mockProfileData = { ...mockProfileBase, interests: null };
     expect(() =>
-      render(<MentorMemoryScreen />, { wrapper: makeWrapper() })
+      render(<MentorMemoryScreen />, { wrapper: makeWrapper() }),
     ).not.toThrow();
   });
 
@@ -180,7 +190,7 @@ describe('MentorMemoryScreen — interests null guard', () => {
     await screen.findByTestId('mentor-memory-interests-section');
     expect(
       screen.getByTestId('interest-context-Football-free_time').props
-        .accessibilityState?.selected
+        .accessibilityState?.selected,
     ).toBe(true);
   });
 
@@ -196,7 +206,7 @@ describe('MentorMemoryScreen — interests null guard', () => {
     render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
 
     const bothOption = await screen.findByTestId(
-      'interest-context-Football-both'
+      'interest-context-Football-both',
     );
     await act(async () => {
       fireEvent.press(bothOption);
@@ -221,7 +231,7 @@ describe('MentorMemoryScreen — interests null guard', () => {
     render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
 
     const bothOption = await screen.findByTestId(
-      'interest-context-Football-both'
+      'interest-context-Football-both',
     );
     await act(async () => {
       fireEvent.press(bothOption);
@@ -229,7 +239,7 @@ describe('MentorMemoryScreen — interests null guard', () => {
 
     expect(
       screen.getByTestId('interest-context-Football-both').props
-        .accessibilityState?.selected
+        .accessibilityState?.selected,
     ).toBe(true);
   });
 
@@ -321,8 +331,8 @@ describe('MentorMemoryScreen — catch blocks use formatApiError not generic cop
             message: 'subject is paused',
             code: 'SUBJECT_INACTIVE',
           }),
-          { status: 403, headers: { 'Content-Type': 'application/json' } }
-        )
+          { status: 403, headers: { 'Content-Type': 'application/json' } },
+        ),
     );
 
     render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
@@ -344,5 +354,31 @@ describe('MentorMemoryScreen — catch blocks use formatApiError not generic cop
     expect(alertMessage).not.toBe('Please try again.');
     // formatApiError for SUBJECT_INACTIVE maps to the friendly paused message
     expect(alertMessage).toMatch(/paused|archived|resume/i);
+  });
+});
+
+describe('MentorMemoryScreen — explicit return target from More', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSearchParams = { returnTo: 'more' };
+    mockProfileData = {
+      ...mockProfileBase,
+      interests: [],
+      memoryConsentStatus: 'granted',
+    };
+  });
+
+  afterEach(() => {
+    mockSearchParams = {};
+  });
+
+  it('replaces to /(app)/more instead of calling router.back() when opened from More', async () => {
+    render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
+
+    const backButton = await screen.findByLabelText('Go Back');
+    fireEvent.press(backButton);
+
+    expect(mockRouter.replace).toHaveBeenCalledWith('/(app)/more');
+    expect(mockRouter.back).not.toHaveBeenCalled();
   });
 });

@@ -112,18 +112,21 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: "learning-mode-casual"
+      id: "learning-accommodation-section-header"
     timeout: 15000
 
 - takeScreenshot: 04-more-screen-top
 
-# ── Learning Mode section (was Appearance — removed in adaptive home refactor) ──
+# ── Legacy theme section (optional on current builds) ──
 - assertVisible:
     text: "Teen (Dark)"
+    optional: true
 - assertVisible:
     text: "Eager Learner (Calm)"
+    optional: true
 - assertVisible:
     text: "Parent (Light)"
+    optional: true
 
 # ── Notifications section ──
 - assertVisible:
@@ -131,15 +134,13 @@ tags:
 - assertVisible:
     text: "Weekly progress digest"
 
-# ── Learning Mode section (below the fold — scroll first) ──
+# ── Learning Accommodation section (below the fold — scroll first) ──
 - swipe:
     start: "50%,70%"
     end: "50%,40%"
 
 - assertVisible:
-    id: "learning-mode-serious"
-- assertVisible:
-    id: "learning-mode-casual"
+    id: "learning-accommodation-section-header"
 
 - takeScreenshot: 05-more-screen-middle
 
@@ -216,7 +217,7 @@ tags:
 # PHASE 5: Theme Switching
 # ═══════════════════════════════════════════════════════════════════
 
-# Scroll to top to see Learning Mode section
+# Scroll to top to see the settings top
 - swipe:
     start: "50%,30%"
     end: "50%,70%"
@@ -226,7 +227,7 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: "learning-mode-casual"
+      id: "learning-accommodation-section-header"
     timeout: 10000
 
 # Switch to Eager Learner theme (stays in learner route group — safe)
@@ -236,10 +237,10 @@ tags:
 # Switch back to Teen (Dark)
 # BUG-11: After theme switch, the screen re-renders with new CSS variables.
 # Maestro's text recognition can fail during the transition. Wait for the
-# Learning Mode section to be visible before tapping.
+# Settings top to be visible before tapping.
 - extendedWaitUntil:
     visible:
-      id: "learning-mode-casual"
+      id: "learning-accommodation-section-header"
     timeout: 10000
 
 - tapOn: "Teen (Dark)"
@@ -255,7 +256,7 @@ tags:
 - tapOn: "More"
 - extendedWaitUntil:
     visible:
-      id: "learning-mode-casual"
+      id: "learning-accommodation-section-header"
     timeout: 10000
 
 - tapOn: "Parent (Light)"

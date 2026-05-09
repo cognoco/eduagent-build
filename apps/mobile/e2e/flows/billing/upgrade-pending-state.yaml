@@ -43,7 +43,7 @@ tags:
 # 4. Wait for More screen
 - extendedWaitUntil:
     visible:
-      id: "learning-mode-casual"
+      id: "learning-accommodation-section-header"
     timeout: 10000
 
 # 5. Scroll to and tap Subscription row

@@ -40,20 +40,20 @@ export default function PracticeScreen(): React.ReactElement {
   const reviewSubtitle = reviewError
     ? 'Could not load review status'
     : hasOverdue
-    ? `${reviewDueCount} ${
-        reviewDueCount === 1 ? 'topic' : 'topics'
-      } ready for review`
-    : 'Nothing to review right now';
+      ? `${reviewDueCount} ${
+          reviewDueCount === 1 ? 'topic' : 'topics'
+        } ready for review`
+      : 'Nothing to review right now';
   // [F-034] Aggregate stats across ALL activity types so Guess Who / Vocabulary
   // players also see their stats on the Practice hub card.
   const bestActivity = quizStats
     ?.filter(
-      (s) => s.bestScore != null && s.bestTotal != null && s.bestTotal > 0
+      (s) => s.bestScore != null && s.bestTotal != null && s.bestTotal > 0,
     )
     .sort(
       (a, b) =>
         (b.bestScore ?? 0) / (b.bestTotal ?? 1) -
-        (a.bestScore ?? 0) / (a.bestTotal ?? 1)
+        (a.bestScore ?? 0) / (a.bestTotal ?? 1),
     )[0];
   const totalRoundsPlayed =
     quizStats?.reduce((sum, s) => sum + (s.roundsPlayed ?? 0), 0) ?? 0;
@@ -67,26 +67,26 @@ export default function PracticeScreen(): React.ReactElement {
     bestActivity.bestTotal != null &&
     bestActivity.bestTotal > 0
       ? `Best: ${Math.round(
-          (bestActivity.bestScore / bestActivity.bestTotal) * 100
+          (bestActivity.bestScore / bestActivity.bestTotal) * 100,
         )}%`
       : null;
   const quizSubtitle = statsError
     ? 'Could not load quiz stats'
     : bestPct
-    ? [bestPct, `Played: ${totalRoundsPlayed}`, `${totalXp} XP`]
-        .filter(Boolean)
-        .join(' · ')
-    : totalRoundsPlayed > 0
-    ? [`Played: ${totalRoundsPlayed}`, `${totalXp} XP`].join(' · ')
-    : `Test yourself with multiple choice questions · ${totalXp} XP`;
+      ? [bestPct, `Played: ${totalRoundsPlayed}`, `${totalXp} XP`]
+          .filter(Boolean)
+          .join(' · ')
+      : totalRoundsPlayed > 0
+        ? [`Played: ${totalRoundsPlayed}`, `${totalXp} XP`].join(' · ')
+        : `Test yourself with multiple choice questions · ${totalXp} XP`;
   const assessmentCount = assessmentTopics?.length ?? 0;
   const assessmentSubtitle = assessmentTopicsError
     ? 'Could not load assessment topics'
     : assessmentCount > 0
-    ? `${assessmentCount} ${
-        assessmentCount === 1 ? 'topic' : 'topics'
-      } ready to test`
-    : 'Study a topic first';
+      ? `${assessmentCount} ${
+          assessmentCount === 1 ? 'topic' : 'topics'
+        } ready to test`
+      : 'Study a topic first';
 
   const handleBack = () => {
     goBackOrReplace(router, homeHrefForReturnTo(returnTo));
@@ -116,10 +116,10 @@ export default function PracticeScreen(): React.ReactElement {
         </Pressable>
         <View className="flex-1">
           <Text className="text-h2 font-bold text-text-primary">
-            Practice for a test
+            Test yourself
           </Text>
           <Text className="text-body-sm text-text-secondary mt-1">
-            Refresh what is fading, then check yourself.
+            Review what is fading, then check yourself.
           </Text>
         </View>
       </View>
@@ -178,6 +178,22 @@ export default function PracticeScreen(): React.ReactElement {
           </View>
         ) : null}
         <IntentCard
+          title="Quiz yourself"
+          subtitle={quizSubtitle}
+          icon="help-circle-outline"
+          onPress={() => router.push('/(app)/quiz' as never)}
+          testID="practice-quiz"
+        />
+        <IntentCard
+          title="Prove I know this"
+          subtitle={assessmentSubtitle}
+          icon="checkmark-circle-outline"
+          onPress={() =>
+            router.push('/(app)/practice/assessment-picker' as never)
+          }
+          testID="practice-assessment"
+        />
+        <IntentCard
           title="Recite from memory (Beta)"
           subtitle="Recite a poem or text from memory"
           icon="mic-outline"
@@ -197,24 +213,9 @@ export default function PracticeScreen(): React.ReactElement {
           testID="practice-dictation"
         />
         <IntentCard
-          title="Quiz yourself"
-          subtitle={quizSubtitle}
-          icon="help-circle-outline"
-          onPress={() => router.push('/(app)/quiz' as never)}
-          testID="practice-quiz"
-        />
-        <IntentCard
-          title="Prove I know this"
-          subtitle={assessmentSubtitle}
-          icon="checkmark-circle-outline"
-          onPress={() =>
-            router.push('/(app)/practice/assessment-picker' as never)
-          }
-          testID="practice-assessment"
-        />
-        <IntentCard
           title="Quiz history"
           subtitle="View past quiz rounds"
+          variant="subtle"
           icon="time-outline"
           onPress={() => router.push('/(app)/quiz/history' as never)}
           testID="practice-quiz-history"

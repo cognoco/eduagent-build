@@ -83,7 +83,7 @@ tags:
 
 # 11. Verify learning mode section (first section in More screen)
 - assertVisible:
-    id: "learning-mode-section-header"
+    id: "learning-accommodation-section-header"
     optional: true
 
 # 12. Verify notifications section

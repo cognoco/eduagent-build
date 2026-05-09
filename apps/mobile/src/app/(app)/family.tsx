@@ -5,7 +5,9 @@ import {
   ScrollView,
   RefreshControl,
   ActivityIndicator,
+  Switch,
 } from 'react-native';
+import { useCallback } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -18,6 +20,14 @@ import { FamilyOrientationCue } from '../../components/family/FamilyOrientationC
 import { WithdrawalCountdownBanner } from '../../components/family/WithdrawalCountdownBanner';
 import type { RetentionStatus } from '../../components/progress';
 import { useDashboard } from '../../hooks/use-dashboard';
+import {
+  useFamilyPoolBreakdownSharing,
+  useUpdateFamilyPoolBreakdownSharing,
+} from '../../hooks/use-settings';
+import {
+  useFamilySubscription,
+  useSubscription,
+} from '../../hooks/use-subscription';
 
 function CardSkeleton(): React.ReactNode {
   return (
@@ -52,6 +62,40 @@ function DemoBanner(): React.ReactNode {
       <Text className="text-caption text-text-secondary mt-1">
         {t('dashboard.demoPreviewMessage')}
       </Text>
+    </View>
+  );
+}
+
+function FamilySharingToggle({
+  value,
+  onToggle,
+  disabled,
+}: {
+  value: boolean;
+  onToggle: (value: boolean) => void;
+  disabled?: boolean;
+}): React.ReactNode {
+  const { t } = useTranslation();
+  return (
+    <View
+      className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3 mb-2"
+      testID="family-breakdown-sharing-toggle"
+    >
+      <View className="flex-1 pr-3">
+        <Text className="text-body text-text-primary">
+          {t('more.family.breakdownSharingTitle')}
+        </Text>
+        <Text className="text-body-sm text-text-secondary mt-1">
+          {t('more.family.breakdownSharingDescription')}
+        </Text>
+      </View>
+      <Switch
+        value={value}
+        onValueChange={onToggle}
+        disabled={disabled}
+        accessibilityLabel={t('more.family.breakdownSharingTitle')}
+        testID="family-breakdown-sharing-toggle-switch"
+      />
     </View>
   );
 }
@@ -153,8 +197,20 @@ function FamilyContent(): React.ReactElement {
     refetch,
     isRefetching,
   } = useDashboard();
+  const { data: subscription } = useSubscription();
+  const { data: familyData } = useFamilySubscription(
+    subscription?.tier === 'family' || subscription?.tier === 'pro',
+  );
+  const {
+    data: familyPoolBreakdownSharing,
+    isLoading: breakdownSharingLoading,
+  } = useFamilyPoolBreakdownSharing();
+  const updateFamilyPoolBreakdownSharing =
+    useUpdateFamilyPoolBreakdownSharing();
 
   const isDemo = dashboard?.demoMode === true;
+  const hasChildren = (dashboard?.children?.length ?? 0) > 0;
+  const showFamilyManagement = !isDemo && hasChildren;
 
   const handleDrillDown = (profileId: string): void => {
     if (isDemo) {
@@ -170,6 +226,50 @@ function FamilyContent(): React.ReactElement {
       params: { profileId },
     } as never);
   };
+
+  const handleAddChild = useCallback(() => {
+    if (!subscription) {
+      return;
+    }
+
+    const tier = subscription.tier;
+    if (tier !== 'family' && tier !== 'pro') {
+      platformAlert(
+        t('more.family.upgradeRequiredTitle'),
+        t('more.family.upgradeRequiredMessage'),
+        [
+          {
+            text: t('more.family.viewPlans'),
+            onPress: () => router.push('/(app)/subscription' as never),
+          },
+          { text: t('common.cancel'), style: 'cancel' },
+        ],
+      );
+      return;
+    }
+
+    if (familyData && familyData.profileCount >= familyData.maxProfiles) {
+      platformAlert(
+        t('more.family.profileLimitTitle'),
+        t('more.family.profileLimitMessage', {
+          plan: tier === 'pro' ? 'Pro' : 'Family',
+          max: familyData.maxProfiles,
+        }),
+        tier === 'family'
+          ? [
+              {
+                text: t('more.family.viewPlans'),
+                onPress: () => router.push('/(app)/subscription' as never),
+              },
+              { text: t('common.cancel'), style: 'cancel' },
+            ]
+          : [{ text: t('common.ok') }],
+      );
+      return;
+    }
+
+    router.push('/create-profile?for=child' as never);
+  }, [familyData, router, subscription, t]);
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
@@ -269,6 +369,44 @@ function FamilyContent(): React.ReactElement {
           <>
             {isDemo && <DemoBanner />}
             {renderChildCards(dashboard.children, handleDrillDown)}
+            {showFamilyManagement ? (
+              <>
+                <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6">
+                  {t('more.family.sectionHeader')}
+                </Text>
+                <FamilySharingToggle
+                  value={familyPoolBreakdownSharing ?? false}
+                  onToggle={(value) => {
+                    updateFamilyPoolBreakdownSharing.mutate(value, {
+                      onError: () => {
+                        platformAlert(
+                          t('more.errors.couldNotSaveSetting'),
+                          t('more.family.breakdownSharingError'),
+                        );
+                      },
+                    });
+                  }}
+                  disabled={
+                    breakdownSharingLoading ||
+                    updateFamilyPoolBreakdownSharing.isPending
+                  }
+                />
+                <Pressable
+                  onPress={handleAddChild}
+                  className="bg-surface rounded-card px-4 py-3.5 mb-2"
+                  accessibilityLabel={t('more.family.addChildAccessLabel')}
+                  accessibilityRole="button"
+                  testID="family-add-child-link"
+                >
+                  <Text className="text-body font-semibold text-text-primary">
+                    {t('more.family.addChild')}
+                  </Text>
+                  <Text className="text-body-sm text-text-secondary mt-1">
+                    {t('more.family.addChildDescription')}
+                  </Text>
+                </Pressable>
+              </>
+            ) : null}
             {isDemo && (
               <Pressable
                 onPress={() => router.push('/(app)/more' as never)}

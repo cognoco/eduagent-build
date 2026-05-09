@@ -23,7 +23,7 @@ tags:
 # so use the section header as the screen-loaded signal instead.
 - extendedWaitUntil:
     visible:
-      id: "learning-mode-section-header"
+      id: "learning-accommodation-section-header"
     timeout: 10000
 
 - scrollUntilVisible:
@@ -51,7 +51,7 @@ tags:
 # sign-out-button is reachable by scrolling to it.
 - extendedWaitUntil:
     visible:
-      id: "learning-mode-section-header"
+      id: "learning-accommodation-section-header"
     timeout: 10000
 
 - scrollUntilVisible:

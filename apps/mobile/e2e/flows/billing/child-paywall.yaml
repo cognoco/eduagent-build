@@ -65,7 +65,7 @@ tags:
 # 5. Wait for More screen — Learning Mode section is always above the fold
 - extendedWaitUntil:
     visible:
-      id: "learning-mode-casual"
+      id: "learning-accommodation-section-header"
     timeout: 15000
 
 # 6. Scroll to Subscription (may be below fold after switch-to-child scrolled to Profile)

@@ -53,6 +53,7 @@ jest.mock('../../../lib/api-client', () => {
       },
       subjects: [],
     },
+    '/learning-mode': { mode: 'casual' },
     // Default: no active session for topic (null = route not matched → empty 200)
     // Per-test overrides use mockFetch.setRoute('/progress/topic', ...)
 
@@ -162,7 +163,7 @@ type TranscriptMockReturn = {
   };
 };
 const mockUseSessionTranscript = jest.fn<TranscriptMockReturn, [string?]>(
-  () => ({ data: null })
+  () => ({ data: null }),
 );
 jest.mock('../../../hooks/use-sessions', () => ({
   useSession: () => ({ data: null }),
@@ -260,6 +261,7 @@ jest.mock('../../../components/session', () => ({
     footer,
     inputDisabled,
     disabledReason,
+    showDisabledBanner,
   }: {
     subtitle?: string;
     headerBelow?: React.ReactNode;
@@ -281,6 +283,7 @@ jest.mock('../../../components/session', () => ({
     footer?: React.ReactNode;
     inputDisabled?: boolean;
     disabledReason?: string;
+    showDisabledBanner?: boolean;
   }) => {
     const { View, Text, Pressable } = require('react-native');
     return (
@@ -288,9 +291,9 @@ jest.mock('../../../components/session', () => ({
         <Text testID="session-subtitle">{subtitle}</Text>
         <Text testID="mock-input-mode">{inputMode ?? 'text'}</Text>
         {headerBelow}
-        {inputDisabled && disabledReason ? (
+        {inputDisabled && showDisabledBanner !== false ? (
           <View testID="input-disabled-banner">
-            <Text>{disabledReason}</Text>
+            <Text>{disabledReason ?? 'Input is currently unavailable'}</Text>
           </View>
         ) : null}
         {(messages ?? []).map((message) => (
@@ -366,7 +369,7 @@ jest.mock('../../../lib/session-recovery', () => ({
 const secureStore: Record<string, string> = {};
 jest.mock('../../../lib/secure-storage', () => ({
   getItemAsync: jest.fn((key: string) =>
-    Promise.resolve(secureStore[key] ?? null)
+    Promise.resolve(secureStore[key] ?? null),
   ),
   setItemAsync: jest.fn((key: string, value: string) => {
     secureStore[key] = value;
@@ -455,7 +458,7 @@ describe('SessionScreen homework flow', () => {
           exchangeCount: number;
           escalationRung: number;
           aiEventId?: string;
-        }) => void
+        }) => void,
       ) => {
         // Real SSE streams always emit at least one token before completion
         onChunk('Got it.');
@@ -464,7 +467,7 @@ describe('SessionScreen homework flow', () => {
           escalationRung: 1,
           aiEventId: `event-${++aiEventCount}`,
         });
-      }
+      },
     );
     mockRecordSystemPrompt.mockResolvedValue({ ok: true });
     mockCloseSession.mockResolvedValue({ wallClockSeconds: 120 });
@@ -480,6 +483,144 @@ describe('SessionScreen homework flow', () => {
     jest.useRealTimers();
   });
 
+  it('renders Explorer learning mode in the session header', async () => {
+    jest.useRealTimers();
+    mockFetch.setRoute('/learning-mode', { mode: 'casual' });
+
+    const testScreen = render(<SessionScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      testScreen.getByTestId('learning-mode-header-button');
+      testScreen.getByText('Explorer');
+    });
+    expect(testScreen.queryByTestId('agency-badge')).toBeNull();
+    expect(testScreen.queryByText('Independent mode')).toBeNull();
+    expect(testScreen.queryByText('Guided mode')).toBeNull();
+  });
+
+  it('renders Challenge mode in the session header', async () => {
+    jest.useRealTimers();
+    mockFetch.setRoute('/learning-mode', { mode: 'serious' });
+
+    const testScreen = render(<SessionScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      testScreen.getByText('Challenge mode');
+    });
+  });
+
+  it('opens the learning mode selector from the session header', async () => {
+    jest.useRealTimers();
+    const testScreen = render(<SessionScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      testScreen.getByTestId('learning-mode-header-button');
+    });
+    fireEvent.press(testScreen.getByTestId('learning-mode-header-button'));
+
+    testScreen.getByTestId('learning-mode-sheet');
+    testScreen.getByText('Takes effect from your next message.');
+    testScreen.getByTestId('session-learning-mode-casual');
+    testScreen.getByTestId('session-learning-mode-serious');
+  });
+
+  it('closes the selector without a network call when active mode is tapped', async () => {
+    jest.useRealTimers();
+    const testScreen = render(<SessionScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      testScreen.getByTestId('learning-mode-header-button');
+    });
+    fireEvent.press(testScreen.getByTestId('learning-mode-header-button'));
+    fireEvent.press(testScreen.getByTestId('session-learning-mode-casual'));
+
+    await waitFor(() => {
+      expect(testScreen.queryByTestId('learning-mode-sheet')).toBeNull();
+    });
+    expect(fetchCallsMatching(mockFetch, '/learning-mode')).toHaveLength(1);
+  });
+
+  it('updates learning mode optimistically when an inactive mode is selected', async () => {
+    jest.useRealTimers();
+    let currentMode = 'casual';
+    mockFetch.setRoute('/learning-mode', (_url: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') {
+        const body = extractJsonBody<{ mode: string }>(init);
+        currentMode = body?.mode ?? currentMode;
+      }
+      return { mode: currentMode };
+    });
+
+    const testScreen = render(<SessionScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      testScreen.getByText('Explorer');
+    });
+    fireEvent.press(testScreen.getByTestId('learning-mode-header-button'));
+    fireEvent.press(testScreen.getByTestId('session-learning-mode-serious'));
+
+    await waitFor(() => {
+      testScreen.getByText('Challenge mode');
+    });
+    const updateCalls = fetchCallsMatching(mockFetch, '/learning-mode').filter(
+      (call) => call.init?.method === 'PUT',
+    );
+    expect(updateCalls).toHaveLength(1);
+    expect(extractJsonBody(updateCalls[0]?.init)).toEqual({ mode: 'serious' });
+  });
+
+  it('disables the learning mode header while the mode is loading', async () => {
+    jest.useRealTimers();
+    let resolveLoading!: () => void;
+    mockFetch.setRoute(
+      '/learning-mode',
+      () =>
+        new Promise((resolve) => {
+          resolveLoading = () => resolve({ mode: 'casual' });
+        }),
+    );
+
+    const testScreen = render(<SessionScreen />, { wrapper: createWrapper() });
+
+    expect(
+      testScreen.getByTestId('learning-mode-header-button').props
+        .accessibilityState.disabled,
+    ).toBe(true);
+    resolveLoading();
+    await flushAsyncWork();
+  });
+
+  it('disables learning mode choices while a mode save is pending', async () => {
+    jest.useRealTimers();
+    let resolveSave!: () => void;
+    mockFetch.setRoute('/learning-mode', (_url: string, init?: RequestInit) => {
+      if (init?.method === 'PUT') {
+        return new Promise((resolve) => {
+          resolveSave = () => resolve({ mode: 'serious' });
+        });
+      }
+      return { mode: 'casual' };
+    });
+
+    const testScreen = render(<SessionScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      testScreen.getByText('Explorer');
+    });
+    fireEvent.press(testScreen.getByTestId('learning-mode-header-button'));
+    fireEvent.press(testScreen.getByTestId('session-learning-mode-serious'));
+
+    await waitFor(() => {
+      expect(
+        testScreen.getByTestId('session-learning-mode-casual').props
+          .accessibilityState.disabled,
+      ).toBe(true);
+    });
+
+    resolveSave();
+    await flushAsyncWork();
+  });
+
   it('keeps homework progress in one session when moving to the next problem', async () => {
     const wrapper = createWrapper();
     const testScreen = render(<SessionScreen />, { wrapper });
@@ -493,13 +634,13 @@ describe('SessionScreen homework flow', () => {
         expect.any(Function),
         expect.any(Function),
         'session-1',
-        expect.objectContaining({ idempotencyKey: expect.any(String) })
+        expect.objectContaining({ idempotencyKey: expect.any(String) }),
       );
     });
     expect(mockStartSession).toHaveBeenCalledTimes(1);
 
     expect(
-      testScreen.getByTestId('homework-problem-progress')
+      testScreen.getByTestId('homework-problem-progress'),
     ).toHaveTextContent('Problem 1 of 2');
 
     fireEvent.press(testScreen.getByTestId('next-problem-chip'));
@@ -516,13 +657,13 @@ describe('SessionScreen homework flow', () => {
         expect.any(Function),
         expect.any(Function),
         'session-1',
-        expect.objectContaining({ idempotencyKey: expect.any(String) })
+        expect.objectContaining({ idempotencyKey: expect.any(String) }),
       );
     });
     expect(mockStartSession).toHaveBeenCalledTimes(1);
 
     expect(
-      testScreen.getByTestId('homework-problem-progress')
+      testScreen.getByTestId('homework-problem-progress'),
     ).toHaveTextContent('Problem 2 of 2');
   }, 15000);
 
@@ -557,7 +698,7 @@ describe('SessionScreen homework flow', () => {
               ocrText: 'Solve 2x + 5 = 17',
             }),
           }),
-        })
+        }),
       );
     });
 
@@ -566,7 +707,7 @@ describe('SessionScreen homework flow', () => {
       const hwCalls = fetchCallsMatching(mockFetch, '/homework-state');
       expect(hwCalls.length).toBeGreaterThan(0);
       const body = extractJsonBody<{ metadata: { source?: string } }>(
-        hwCalls[0]?.init
+        hwCalls[0]?.init,
       );
       expect(body?.metadata).toMatchObject({ source: 'gallery' });
     });
@@ -601,7 +742,7 @@ describe('SessionScreen homework flow', () => {
         expect.any(Function),
         expect.any(Function),
         'session-1',
-        expect.objectContaining({ idempotencyKey: expect.any(String) })
+        expect.objectContaining({ idempotencyKey: expect.any(String) }),
       );
     });
 
@@ -616,7 +757,7 @@ describe('SessionScreen homework flow', () => {
           metadata: expect.objectContaining({
             chip: 'too_easy',
           }),
-        })
+        }),
       );
       expect(mockRecordSystemPrompt).toHaveBeenCalledWith({
         content:
@@ -628,13 +769,13 @@ describe('SessionScreen homework flow', () => {
         expect.any(Function),
         expect.any(Function),
         'session-1',
-        expect.objectContaining({ idempotencyKey: expect.any(String) })
+        expect.objectContaining({ idempotencyKey: expect.any(String) }),
       );
     });
     testScreen.getByTestId('session-confirmation-toast');
 
     fireEvent.press(
-      testScreen.getByTestId('message-feedback-not-helpful-event-2')
+      testScreen.getByTestId('message-feedback-not-helpful-event-2'),
     );
     await flushAsyncWork();
 
@@ -647,7 +788,7 @@ describe('SessionScreen homework flow', () => {
             value: 'not_helpful',
             eventId: 'event-2',
           },
-        })
+        }),
       );
       expect(mockRecordSystemPrompt).toHaveBeenCalledWith({
         content:
@@ -663,12 +804,12 @@ describe('SessionScreen homework flow', () => {
         expect.any(Function),
         expect.any(Function),
         'session-1',
-        expect.objectContaining({ idempotencyKey: expect.any(String) })
+        expect.objectContaining({ idempotencyKey: expect.any(String) }),
       );
     });
 
     fireEvent.press(
-      testScreen.getByTestId('message-feedback-incorrect-event-3')
+      testScreen.getByTestId('message-feedback-incorrect-event-3'),
     );
     await flushAsyncWork();
 
@@ -681,7 +822,7 @@ describe('SessionScreen homework flow', () => {
             value: 'incorrect',
             eventId: 'event-3',
           },
-        })
+        }),
       );
       expect(mockFlagSessionContent).toHaveBeenCalledWith({
         eventId: 'event-3',
@@ -701,7 +842,7 @@ describe('SessionScreen homework flow', () => {
         expect.any(Function),
         expect.any(Function),
         'session-1',
-        expect.objectContaining({ idempotencyKey: expect.any(String) })
+        expect.objectContaining({ idempotencyKey: expect.any(String) }),
       );
     });
   });
@@ -781,7 +922,7 @@ describe('SessionScreen homework flow', () => {
     await waitFor(() => {
       expect(testScreen.queryByText('Tell me about Africa')).toBeTruthy();
       expect(
-        testScreen.queryByText('Africa is the second-largest continent.')
+        testScreen.queryByText('Africa is the second-largest continent.'),
       ).toBeTruthy();
     });
   });
@@ -923,9 +1064,13 @@ describe('SessionScreen homework flow', () => {
     await waitFor(() => {
       testScreen.getByTestId('session-subject-resolution');
       expect(
-        testScreen.getAllByText(/math or physics/i).length
+        testScreen.getAllByText(/math or physics/i).length,
       ).toBeGreaterThan(0);
     });
+
+    expect(testScreen.queryByTestId('input-disabled-banner')).toBeNull();
+    expect(testScreen.queryByText('Switch topic')).toBeNull();
+    expect(testScreen.queryByText('Park it')).toBeNull();
 
     expect(mockStartSession).not.toHaveBeenCalled();
 
@@ -938,13 +1083,17 @@ describe('SessionScreen homework flow', () => {
     await waitFor(() => {
       const startCalls = fetchCallsMatching(
         mockFetch,
-        '/subjects/subject-2/sessions'
+        '/subjects/subject-2/sessions',
       );
       expect(startCalls.length).toBeGreaterThan(0);
       const body = extractJsonBody<{ subjectId: string; inputMode: string }>(
-        startCalls[0]?.init
+        startCalls[0]?.init,
       );
-      expect(body).toMatchObject({ subjectId: 'subject-2', inputMode: 'text' });
+      expect(body).toMatchObject({
+        subjectId: 'subject-2',
+        inputMode: 'text',
+        rawInput: 'Solve 2x + 5 = 17',
+      });
     });
 
     await waitFor(() => {
@@ -953,7 +1102,7 @@ describe('SessionScreen homework flow', () => {
         expect.any(Function),
         expect.any(Function),
         'session-1',
-        expect.objectContaining({ idempotencyKey: expect.any(String) })
+        expect.objectContaining({ idempotencyKey: expect.any(String) }),
       );
     });
   });
@@ -965,7 +1114,7 @@ describe('SessionScreen homework flow', () => {
     // Return a 500 error for classify
     mockFetch.setRoute(
       '/subjects/classify',
-      new Response(JSON.stringify({ error: 'Network error' }), { status: 500 })
+      new Response(JSON.stringify({ error: 'Network error' }), { status: 500 }),
     );
 
     const wrapper = createWrapper();
@@ -1053,7 +1202,7 @@ describe('SessionScreen homework flow', () => {
           'End session?',
           expect.any(String),
           expect.any(Array),
-          expect.objectContaining({ cancelable: true })
+          expect.objectContaining({ cancelable: true }),
         );
       });
 
@@ -1122,7 +1271,7 @@ describe('SessionScreen homework flow', () => {
               filedSubjectId: 'shelf-1',
               filedBookId: 'book-1',
             }),
-          })
+          }),
         );
       });
     }, 15000);
@@ -1141,7 +1290,7 @@ describe('SessionScreen homework flow', () => {
         expect(mockReplace).toHaveBeenCalledWith(
           expect.objectContaining({
             pathname: '/session-summary/session-1',
-          })
+          }),
         );
       });
     }, 15000);
@@ -1154,6 +1303,9 @@ describe('voice mode persistence', () => {
     jest.useFakeTimers();
     mockFetch.mockClear();
     mockUseSessionTranscript.mockReturnValue({ data: null });
+    mockLearningMode = 'casual';
+    mockLearningModeLoading = false;
+    mockLearningModePending = false;
     mockFetch.setRoute('/progress/topic', null);
     Object.keys(secureStore).forEach((key) => delete secureStore[key]);
     (useRouter as jest.Mock).mockReturnValue({
@@ -1173,11 +1325,11 @@ describe('voice mode persistence', () => {
       async (
         _msg: string,
         onChunk: (value: string) => void,
-        onDone: (r: { exchangeCount: number; escalationRung: number }) => void
+        onDone: (r: { exchangeCount: number; escalationRung: number }) => void,
       ) => {
         onChunk('Got it.');
         onDone({ exchangeCount: 1, escalationRung: 1 });
-      }
+      },
     );
     mockRecordSystemPrompt.mockResolvedValue({ ok: true });
     mockSetSessionInputMode.mockResolvedValue({
@@ -1249,7 +1401,7 @@ describe('voice mode persistence', () => {
       upgradeOptions: [],
     };
     mockStream.mockRejectedValueOnce(
-      new QuotaExceededError('Quota exceeded', details)
+      new QuotaExceededError('Quota exceeded', details),
     );
 
     const wrapper = createWrapper();

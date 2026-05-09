@@ -7,7 +7,14 @@ import {
   useMemo,
 } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
-import { AppState, View, Text, Pressable, ScrollView } from 'react-native';
+import {
+  AppState,
+  View,
+  Text,
+  Pressable,
+  ScrollView,
+  Modal,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { platformAlert } from '../../../lib/platform-alert';
 import { goBackOrReplace, homeHrefForReturnTo } from '../../../lib/navigation';
@@ -24,6 +31,7 @@ import type {
   HomeworkCaptureSource,
   HomeworkProblem,
   InputMode,
+  LearningMode,
   PendingCelebration,
 } from '@eduagent/schemas';
 import {
@@ -62,7 +70,11 @@ import {
 } from '../../../hooks/use-progress';
 import { useNetworkStatus } from '../../../hooks/use-network-status';
 import { useApiReachability } from '../../../hooks/use-api-reachability';
-import { useCelebrationLevel } from '../../../hooks/use-settings';
+import {
+  useCelebrationLevel,
+  useLearningMode,
+  useUpdateLearningMode,
+} from '../../../hooks/use-settings';
 import { useCelebration } from '../../../hooks/use-celebration';
 import { useSubjects, useCreateSubject } from '../../../hooks/use-subjects';
 import { useCurriculum } from '../../../hooks/use-curriculum';
@@ -117,6 +129,7 @@ import { SessionTopicHeader } from '../../../components/session/SessionTopicHead
 import { getResumeBannerCopy } from '../../../components/session/resume-banner-copy';
 import { Sentry } from '../../../lib/sentry';
 import { OutboxFailedBanner } from '../../../components/durability/OutboxFailedBanner';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Session-specific error boundary with visible diagnostics.
@@ -148,7 +161,7 @@ class SessionErrorBoundary extends Component<
       '\n\nError stack:',
       error.stack,
       '\n\nComponent stack:',
-      stack
+      stack,
     );
     Sentry.captureException(error, {
       tags: { screen: 'session', crashLocation: 'SessionErrorBoundary' },
@@ -396,14 +409,15 @@ function SessionScreenInner() {
   const insets = useSafeAreaInsets();
   const { activeProfile } = useProfile();
   const colors = useThemeColors();
+  const { t } = useTranslation();
 
   const effectiveMode = mode ?? 'freeform';
   const homeBackHref = homeHrefForReturnTo(returnTo);
   const chatBackFallback = returnTo
     ? (homeBackHref as string)
     : subjectId
-    ? `/(app)/shelf/${subjectId}`
-    : undefined;
+      ? `/(app)/shelf/${subjectId}`
+      : undefined;
   // [BUG-867] String-templated dynamic paths (`/(app)/shelf/${subjectId}`)
   // don't always resolve on web — the chevron looked clickable but the URL
   // never changed. Supplying an explicit handler that uses Expo Router's
@@ -444,7 +458,7 @@ function SessionScreenInner() {
       effectiveMode === 'homework'
         ? parseHomeworkProblems(homeworkProblems, problemText)
         : [],
-    [effectiveMode, homeworkProblems, problemText]
+    [effectiveMode, homeworkProblems, problemText],
   );
   const initialProblemText =
     initialHomeworkProblems[0]?.text ?? problemText ?? undefined;
@@ -453,6 +467,9 @@ function SessionScreenInner() {
   const { data: overallProgress } = useOverallProgress();
   const progressInventory = useProgressInventory();
   const { data: celebrationLevel = 'all' } = useCelebrationLevel();
+  const { data: learningMode, isLoading: learningModeLoading } =
+    useLearningMode();
+  const updateLearningMode = useUpdateLearningMode();
   const sessionExperience = streak?.longestStreak ?? 0;
   const openingContent = getOpeningMessage(
     effectiveMode,
@@ -461,7 +478,7 @@ function SessionScreenInner() {
     topicName ?? undefined,
     subjectName ?? undefined,
     rawInput ?? undefined,
-    recap ?? undefined
+    recap ?? undefined,
   );
   // [M-7] Capture openingContent in a ref at render time so the transcript
   // hydration effect can use a stable reference. Without this, streak data
@@ -488,7 +505,7 @@ function SessionScreenInner() {
   const [escalationRung, setEscalationRung] = useState(1);
   const [isClosing, setIsClosing] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(
-    routeSessionId ?? null
+    routeSessionId ?? null,
   );
   const [pendingClassification, setPendingClassification] = useState(false);
   const [classifyError, setClassifyError] = useState<string | null>(null);
@@ -540,6 +557,7 @@ function SessionScreenInner() {
   const [showParkingLot, setShowParkingLot] = useState(false);
   const [parkingLotDraft, setParkingLotDraft] = useState('');
   const [showTopicSwitcher, setShowTopicSwitcher] = useState(false);
+  const [showLearningModeSheet, setShowLearningModeSheet] = useState(false);
   const [topicSwitcherSubjectId, setTopicSwitcherSubjectId] = useState<
     string | null
   >(subjectId ?? null);
@@ -554,17 +572,17 @@ function SessionScreenInner() {
     Record<string, string | null>
   >({});
   const [confirmationToast, setConfirmationToast] = useState<string | null>(
-    null
+    null,
   );
   const [notePromptOffered, setNotePromptOffered] = useState(false);
   const [showNoteInput, setShowNoteInput] = useState(false);
   const [fluencyDrill, setFluencyDrill] = useState<FluencyDrillEvent | null>(
-    null
+    null,
   );
   const [showFilingPrompt, setShowFilingPrompt] = useState(false);
   const [filingDismissed, setFilingDismissed] = useState(false);
   const [quotaError, setQuotaError] = useState<QuotaExceededDetails | null>(
-    null
+    null,
   );
   /** F6: ID of the latest AI message where the LLM reported confidence=low */
   const [lowConfidenceMessageId, setLowConfidenceMessageId] = useState<
@@ -596,7 +614,7 @@ function SessionScreenInner() {
   const transcript = useSessionTranscript(routeSessionId ?? '');
   const activeSession = useSession(activeSessionId ?? '');
   const clearContinuationDepth = useClearContinuationDepth(
-    activeSessionId ?? ''
+    activeSessionId ?? '',
   );
   const liveTranscript =
     transcript.data?.archived === false ? transcript.data : null;
@@ -613,7 +631,7 @@ function SessionScreenInner() {
   const shouldLookupActiveSession =
     effectiveMode === 'learning' && !!topicId && !routeSessionId;
   const activeSessionLookup = useActiveSessionForTopic(
-    shouldLookupActiveSession ? topicId : undefined
+    shouldLookupActiveSession ? topicId : undefined,
   );
   const hasResolvedActiveSessionRef = useRef(false);
   useEffect(() => {
@@ -626,7 +644,7 @@ function SessionScreenInner() {
   }, [activeSessionLookup.data?.sessionId, shouldLookupActiveSession, router]);
 
   const sessionBookmarksQuery = useSessionBookmarks(
-    activeSessionId ?? routeSessionId ?? undefined
+    activeSessionId ?? routeSessionId ?? undefined,
   );
   const createBookmark = useCreateBookmark();
   const deleteBookmark = useDeleteBookmark();
@@ -719,7 +737,7 @@ function SessionScreenInner() {
       routeSessionId,
       initialHomeworkProblems,
       subjectId,
-    ])
+    ]),
   );
 
   useEffect(() => {
@@ -759,7 +777,7 @@ function SessionScreenInner() {
   const effectiveSubjectId = classifiedSubject?.subjectId ?? subjectId ?? '';
   const effectiveSubjectName = classifiedSubject?.subjectName ?? subjectName;
   const activeSubject = availableSubjects.find(
-    (availableSubject) => availableSubject.id === effectiveSubjectId
+    (availableSubject) => availableSubject.id === effectiveSubjectId,
   );
   const languageVoiceLocale =
     activeSubject?.pedagogyMode === 'four_strands'
@@ -834,13 +852,13 @@ function SessionScreenInner() {
               role: 'assistant',
               content: openingContentRef.current,
             },
-          ]
+          ],
     );
     setExchangeCount(liveTranscript.session.exchangeCount);
     setEscalationRung(
       liveTranscript.exchanges
         .filter((entry) => entry.role === 'assistant' && !entry.isSystemPrompt)
-        .at(-1)?.escalationRung ?? 1
+        .at(-1)?.escalationRung ?? 1,
     );
     setInputMode(liveTranscript.session.inputMode ?? 'text');
     setActiveSessionId(routeSessionId);
@@ -882,7 +900,7 @@ function SessionScreenInner() {
           liveTranscript?.session.milestonesReached ?? [];
         if (transcriptMilestones.length > 0) {
           hydrate(
-            createMilestoneTrackerStateFromMilestones(transcriptMilestones)
+            createMilestoneTrackerStateFromMilestones(transcriptMilestones),
           );
           hasHydratedRecoveryRef.current = true;
         }
@@ -919,7 +937,7 @@ function SessionScreenInner() {
             milestoneTracker: trackerState,
             updatedAt: new Date().toISOString(),
           },
-          activeProfile?.id
+          activeProfile?.id,
         ).catch(() => undefined);
       }
     });
@@ -959,15 +977,15 @@ function SessionScreenInner() {
             imageMimeType === 'image/png'
               ? 'image/png'
               : imageMimeType === 'image/webp'
-              ? 'image/webp'
-              : imageMimeType?.includes('jpeg') ||
-                imageMimeType?.includes('jpg')
-              ? 'image/jpeg'
-              : ext === 'png'
-              ? 'image/png'
-              : ext === 'webp'
-              ? 'image/webp'
-              : 'image/jpeg';
+                ? 'image/webp'
+                : imageMimeType?.includes('jpeg') ||
+                    imageMimeType?.includes('jpg')
+                  ? 'image/jpeg'
+                  : ext === 'png'
+                    ? 'image/png'
+                    : ext === 'webp'
+                      ? 'image/webp'
+                      : 'image/jpeg';
           imageMimeTypeRef.current = mimeType;
         }
       } catch (err) {
@@ -1049,14 +1067,14 @@ function SessionScreenInner() {
   // use it to decide whether to re-trigger classification.
   const userMessageCount = useMemo(
     () => messages.filter((m) => m.role === 'user' && !m.isAutoSent).length,
-    [messages]
+    [messages],
   );
 
   const hasSubject = !!(classifiedSubject?.subjectId || subjectId);
   const conversationStage = getConversationStage(
     userMessageCount,
     hasSubject,
-    effectiveMode
+    effectiveMode,
   );
 
   const {
@@ -1184,12 +1202,12 @@ function SessionScreenInner() {
     () =>
       isStreaming
         ? null
-        : [...messages]
+        : ([...messages]
             .reverse()
             .find(
-              (message) => message.role === 'assistant' && !message.streaming
-            )?.id ?? null,
-    [messages, isStreaming]
+              (message) => message.role === 'assistant' && !message.streaming,
+            )?.id ?? null),
+    [messages, isStreaming],
   );
 
   const aiResponseCount = useMemo(
@@ -1199,9 +1217,9 @@ function SessionScreenInner() {
           message.role === 'assistant' &&
           !message.streaming &&
           !message.isSystemPrompt &&
-          !!message.eventId
+          !!message.eventId,
       ).length,
-    [messages]
+    [messages],
   );
 
   const updateBookmarkEntry = useCallback(
@@ -1212,7 +1230,7 @@ function SessionScreenInner() {
         return next;
       });
     },
-    []
+    [],
   );
 
   const handleToggleBookmark = useCallback(
@@ -1233,7 +1251,7 @@ function SessionScreenInner() {
           updateBookmarkEntry(eventId, existingBookmarkId);
           platformAlert(
             'Could not remove bookmark',
-            error instanceof Error ? error.message : 'Please try again.'
+            error instanceof Error ? error.message : 'Please try again.',
           );
         }
         return;
@@ -1247,11 +1265,11 @@ function SessionScreenInner() {
         updateBookmarkEntry(eventId, null);
         platformAlert(
           'Could not save bookmark',
-          error instanceof Error ? error.message : 'Please try again.'
+          error instanceof Error ? error.message : 'Please try again.',
         );
       }
     },
-    [createBookmark, deleteBookmark, updateBookmarkEntry]
+    [createBookmark, deleteBookmark, updateBookmarkEntry],
   );
 
   // [UX-DE-H5] Exit button is always rendered (no gating on session existence).
@@ -1271,41 +1289,81 @@ function SessionScreenInner() {
     </Pressable>
   );
 
-  const agencyLabel = escalationRung >= 3 ? 'Guided' : 'Independent';
-  // [BUG-936] On narrow widths (375px) the header was fighting for room
-  // between a back arrow, a "Learning Session" title, a textual agency
-  // pill ("Independent" / "Guided"), milestone dots, and a textual "I'm
-  // Done" pill — title and subtitle truncated to ~7 chars. The agency
-  // pill is a passive state indicator (not a primary action) so we
-  // collapse it to an icon-only Pressable. The full label is preserved
-  // in accessibilityLabel and the tap-for-info modal so SR users and
-  // curious learners still see the textual mode name. Saves ~60-80px
-  // for the title column without removing functionality.
-  const agencyIconName: keyof typeof Ionicons.glyphMap =
-    agencyLabel === 'Guided' ? 'school-outline' : 'compass-outline';
-  const agencyBadge = (
-    <Pressable
-      onPress={() =>
+  const learningModeOptions: Array<{
+    mode: LearningMode;
+    title: string;
+    description: string;
+    icon: keyof typeof Ionicons.glyphMap;
+  }> = [
+    {
+      mode: 'casual',
+      title: t('more.learningMode.casual.title'),
+      description: t('more.learningMode.casual.description'),
+      icon: 'compass-outline',
+    },
+    {
+      mode: 'serious',
+      title: t('more.learningMode.serious.title'),
+      description: t('more.learningMode.serious.description'),
+      icon: 'trophy-outline',
+    },
+  ];
+  const selectedLearningMode = learningModeOptions.find(
+    (option) => option.mode === learningMode,
+  );
+  const learningModeButtonDisabled =
+    !learningMode || learningModeLoading || updateLearningMode.isPending;
+  const handleSelectLearningMode = (nextMode: LearningMode) => {
+    if (updateLearningMode.isPending) return;
+    if (nextMode === learningMode) {
+      setShowLearningModeSheet(false);
+      return;
+    }
+    updateLearningMode.mutate(nextMode, {
+      onSuccess: () => {
+        setShowLearningModeSheet(false);
+      },
+      onError: () => {
         platformAlert(
-          agencyLabel === 'Guided' ? 'Guided mode' : 'Independent mode',
-          agencyLabel === 'Guided'
-            ? "I'm giving more structure right now because the conversation needed extra support."
-            : "I'm mostly letting you drive and checking in with lighter guidance."
-        )
-      }
-      className="ms-1 px-2 py-2 rounded-button bg-surface-elevated min-h-[44px] min-w-[44px] items-center justify-center"
+          t('more.errors.couldNotSaveSetting'),
+          t('more.errors.tryAgain'),
+        );
+      },
+    });
+  };
+  const learningModeButton = (
+    <Pressable
+      onPress={() => setShowLearningModeSheet(true)}
+      disabled={learningModeButtonDisabled}
+      className={`ms-1 px-2 py-2 rounded-button bg-surface-elevated min-h-[44px] min-w-[44px] items-center justify-center flex-row ${
+        learningModeButtonDisabled ? 'opacity-50' : ''
+      }`}
       accessibilityRole="button"
-      accessibilityLabel={`Session mode: ${agencyLabel}`}
-      testID="agency-badge"
+      accessibilityLabel={
+        selectedLearningMode
+          ? `Learning mode: ${selectedLearningMode.title}`
+          : 'Learning mode loading'
+      }
+      accessibilityState={{ disabled: learningModeButtonDisabled }}
+      testID="learning-mode-header-button"
     >
-      <Ionicons name={agencyIconName} size={20} color={colors.textSecondary} />
+      <Ionicons
+        name={selectedLearningMode?.icon ?? 'options-outline'}
+        size={20}
+        color={colors.textSecondary}
+      />
+      {selectedLearningMode ? (
+        <Text className="ms-1 text-caption font-semibold text-text-secondary">
+          {selectedLearningMode.title}
+        </Text>
+      ) : null}
     </Pressable>
   );
 
   const headerRight = (
     <View className="flex-row items-center">
       {modeConfig.showTimer && <SessionTimer />}
-      {agencyBadge}
+      {learningModeButton}
       <MilestoneDots count={milestonesReached.length} />
       {endSessionButton}
     </View>
@@ -1314,14 +1372,14 @@ function SessionScreenInner() {
   const subtitle = pendingClassification
     ? 'Figuring out what this is about...'
     : classifyError
-    ? classifyError
-    : sessionExpired
-    ? 'Session expired - start a new one.'
-    : resumedBanner
-    ? getResumeBannerCopy(topicName)
-    : apiChecked && !isApiReachable
-    ? 'Server unreachable - messages may fail'
-    : modeConfig.subtitle;
+      ? classifyError
+      : sessionExpired
+        ? 'Session expired - start a new one.'
+        : resumedBanner
+          ? getResumeBannerCopy(topicName)
+          : apiChecked && !isApiReachable
+            ? 'Server unreachable - messages may fail'
+            : modeConfig.subtitle;
 
   // [M6] Retry chip shown below the header when subject classification failed.
   const classifyErrorChip = classifyError ? (
@@ -1391,6 +1449,9 @@ function SessionScreenInner() {
       stage={conversationStage}
     />
   );
+
+  const isSubjectFlowBlockingComposer =
+    pendingClassification || !!pendingSubjectResolution;
 
   const drillStrip = fluencyDrill ? (
     <FluencyDrillStrip
@@ -1525,21 +1586,21 @@ function SessionScreenInner() {
         isStreaming={isStreaming}
         inputDisabled={
           isOffline ||
-          pendingClassification ||
-          !!pendingSubjectResolution ||
+          isSubjectFlowBlockingComposer ||
           sessionExpired ||
           !!quotaError ||
           // CR-6: Disable input while session close is in flight.
           isClosing
         }
+        showDisabledBanner={!isSubjectFlowBlockingComposer}
         disabledReason={
           isOffline
             ? "You're offline — input will return when you reconnect"
             : sessionExpired
-            ? 'This session has ended'
-            : quotaError
-            ? 'Your session limit has been reached'
-            : undefined
+              ? 'This session has ended'
+              : quotaError
+                ? 'Your session limit has been reached'
+                : undefined
         }
         verificationType={liveTranscript?.session.verificationType ?? undefined}
         inputMode={inputMode}
@@ -1555,7 +1616,15 @@ function SessionScreenInner() {
             sessionAccessory
           )
         }
-        belowInput={sessionToolAccessory}
+        belowInput={
+          isSubjectFlowBlockingComposer ||
+          isOffline ||
+          sessionExpired ||
+          !!quotaError ||
+          isClosing
+            ? null
+            : sessionToolAccessory
+        }
         onDraftChange={setDraftText}
         renderMessageActions={renderMessageActions}
         speechRecognitionLanguage={languageVoiceLocale}
@@ -1602,6 +1671,75 @@ function SessionScreenInner() {
           </>
         }
       />
+      <Modal
+        visible={showLearningModeSheet}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowLearningModeSheet(false)}
+      >
+        <Pressable
+          className="flex-1 bg-black/40 justify-end"
+          onPress={() => setShowLearningModeSheet(false)}
+          testID="learning-mode-sheet-backdrop"
+        >
+          <Pressable
+            className="bg-background rounded-t-card px-5 pt-4 pb-6"
+            onPress={() => undefined}
+            testID="learning-mode-sheet"
+          >
+            <Text className="text-title-sm font-semibold text-text-primary mb-1">
+              Learning mode
+            </Text>
+            <Text
+              className="text-caption text-text-secondary mb-3"
+              testID="learning-mode-next-message-copy"
+            >
+              Takes effect from your next message.
+            </Text>
+            {learningModeOptions.map((option) => {
+              const selected = learningMode === option.mode;
+              return (
+                <Pressable
+                  key={option.mode}
+                  onPress={() => handleSelectLearningMode(option.mode)}
+                  disabled={updateLearningMode.isPending}
+                  className={`bg-surface rounded-card px-4 py-3.5 mb-2 border-2 ${
+                    selected ? 'border-primary' : 'border-transparent'
+                  } ${updateLearningMode.isPending ? 'opacity-50' : ''}`}
+                  accessibilityLabel={`${option.title}: ${option.description}`}
+                  accessibilityRole="radio"
+                  accessibilityState={{
+                    selected,
+                    disabled: updateLearningMode.isPending,
+                  }}
+                  testID={`session-learning-mode-${option.mode}`}
+                >
+                  <View className="flex-row items-center justify-between">
+                    <View className="flex-row items-center flex-1">
+                      <Ionicons
+                        name={option.icon}
+                        size={20}
+                        color={colors.textSecondary}
+                      />
+                      <Text className="ms-2 text-body font-semibold text-text-primary">
+                        {option.title}
+                      </Text>
+                    </View>
+                    {selected ? (
+                      <Text className="text-primary text-body font-semibold">
+                        {t('more.active')}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <Text className="text-body-sm text-text-secondary mt-1">
+                    {option.description}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </Pressable>
+        </Pressable>
+      </Modal>
       {activeProfile?.id ? (
         <OutboxFailedBanner profileId={activeProfile.id} flow="session" />
       ) : null}

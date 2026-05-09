@@ -32,7 +32,7 @@ tags:
 # sign-out-button lives at the bottom of the scroll and isn't visible on load.
 - extendedWaitUntil:
     visible:
-      id: "learning-mode-section-header"
+      id: "learning-accommodation-section-header"
     timeout: 10000
 
 - scrollUntilVisible:
@@ -77,7 +77,7 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: "learning-mode-section-header"
+      id: "learning-accommodation-section-header"
     timeout: 10000
 
 - scrollUntilVisible:

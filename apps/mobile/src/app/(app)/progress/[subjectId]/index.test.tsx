@@ -120,7 +120,8 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockLocalSearchParams(),
 }));
 
-jest.mock('../../../../hooks/use-active-profile-role', () => ({ // gc1-allow: subject progress screen varies retention copy by role; mocking the role hook pins the register for deterministic assertions.
+jest.mock('../../../../hooks/use-active-profile-role', () => ({
+  // gc1-allow: subject progress screen varies retention copy by role; mocking the role hook pins the register for deterministic assertions.
   useActiveProfileRole: () => 'owner',
 }));
 
@@ -457,10 +458,10 @@ describe('ProgressSubjectScreen', () => {
 
       expect(mockPushLearningResumeTarget).toHaveBeenCalledWith(
         expect.anything(),
-        target
+        target,
       );
       expect(mockPush).not.toHaveBeenCalledWith(
-        '/(app)/session?mode=learning&subjectId=s1'
+        '/(app)/session?mode=learning&subjectId=s1',
       );
     });
 
@@ -480,7 +481,7 @@ describe('ProgressSubjectScreen', () => {
       fireEvent.press(screen.getByTestId('progress-subject-back'));
       expect(mockGoBackOrReplace).toHaveBeenCalledWith(
         expect.anything(),
-        '/(app)/progress'
+        '/(app)/progress',
       );
     });
 
@@ -500,7 +501,7 @@ describe('ProgressSubjectScreen', () => {
             style: 'destructive',
           }),
         ]),
-        { cancelable: true }
+        { cancelable: true },
       );
       expect(mockMutateSubjectAsync).not.toHaveBeenCalled();
     });
@@ -540,7 +541,7 @@ describe('ProgressSubjectScreen', () => {
       await waitFor(() => {
         expect(mockPlatformAlert).toHaveBeenLastCalledWith(
           'Could not hide subject',
-          'formatted: Nope'
+          'formatted: Nope',
         );
       });
     });
@@ -690,7 +691,7 @@ describe('ProgressSubjectScreen', () => {
       });
       render(<ProgressSubjectScreen />);
       screen.getByText(
-        'Complete a session to start tracking your milestone progress.'
+        'Complete a session to start tracking your milestone progress.',
       );
     });
 
@@ -756,6 +757,42 @@ describe('ProgressSubjectScreen', () => {
       mockHooks({ subjectProgressData: { retentionStatus: 'weak' } });
       render(<ProgressSubjectScreen />);
       screen.getByText('Needs a quick refresh.');
+    });
+
+    it('opens the shelf when the retention card is pressed without a resume target', () => {
+      mockHooks({ subjectProgressData: { retentionStatus: 'weak' } });
+      render(<ProgressSubjectScreen />);
+
+      fireEvent.press(screen.getByTestId('progress-subject-retention-card'));
+
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/shelf/[subjectId]',
+        params: { subjectId: 's1' },
+      });
+    });
+
+    it('resumes the subject target when the retention card is pressed and a resume target exists', () => {
+      const target = {
+        subjectId: 's1',
+        subjectName: 'Math',
+        topicId: 't1',
+        topicTitle: 'Fractions',
+        sessionId: null,
+        resumeFromSessionId: 'prev-session',
+        resumeKind: 'recent_topic',
+        lastActivityAt: '2026-02-15T09:00:00.000Z',
+        reason: 'Continue Fractions',
+      };
+      mockHooks({ subjectProgressData: { retentionStatus: 'weak' } });
+      mockUseLearningResumeTarget.mockReturnValue({ data: target });
+
+      render(<ProgressSubjectScreen />);
+      fireEvent.press(screen.getByTestId('progress-subject-retention-card'));
+
+      expect(mockPushLearningResumeTarget).toHaveBeenCalledWith(
+        expect.anything(),
+        target,
+      );
     });
   });
 });

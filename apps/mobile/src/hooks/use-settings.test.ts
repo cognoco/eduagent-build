@@ -47,6 +47,19 @@ function createWrapper() {
   return w.wrapper;
 }
 
+// For optimistic-update tests: gcTime:0 evicts data before onMutate resolves
+// (no active observers keep the entry alive). Use Infinity so pre-seeded data
+// persists through the async cancelQueries tick inside onMutate.
+function createPersistentWrapper() {
+  const w = createQueryWrapper({
+    queryClientOptions: {
+      defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+    },
+  });
+  queryClient = w.queryClient;
+  return w.wrapper;
+}
+
 describe('useNotificationSettings', () => {
   beforeEach(() => {
     mockFetch.mockReset();
@@ -68,8 +81,8 @@ describe('useNotificationSettings', () => {
             maxDailyPush: 5,
           },
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useNotificationSettings(), {
@@ -91,7 +104,7 @@ describe('useNotificationSettings', () => {
 
   it('handles API errors', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response('Network error', { status: 500 })
+      new Response('Network error', { status: 500 }),
     );
 
     const { result } = renderHook(() => useNotificationSettings(), {
@@ -118,7 +131,7 @@ describe('useLearningMode', () => {
 
   it('fetches learning mode from API', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ mode: 'casual' }), { status: 200 })
+      new Response(JSON.stringify({ mode: 'casual' }), { status: 200 }),
     );
 
     const { result } = renderHook(() => useLearningMode(), {
@@ -148,7 +161,7 @@ describe('useCelebrationLevel', () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ celebrationLevel: 'big_only' }), {
         status: 200,
-      })
+      }),
     );
 
     const { result } = renderHook(() => useCelebrationLevel(), {
@@ -175,7 +188,7 @@ describe('useFamilyPoolBreakdownSharing', () => {
 
   it('fetches family pool breakdown sharing from API', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ value: true }), { status: 200 })
+      new Response(JSON.stringify({ value: true }), { status: 200 }),
     );
 
     const { result } = renderHook(() => useFamilyPoolBreakdownSharing(), {
@@ -211,8 +224,8 @@ describe('useUpdateNotificationSettings', () => {
             maxDailyPush: 3,
           },
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useUpdateNotificationSettings(), {
@@ -243,7 +256,7 @@ describe('useUpdateLearningMode', () => {
 
   it('calls PUT with learning mode', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ mode: 'casual' }), { status: 200 })
+      new Response(JSON.stringify({ mode: 'casual' }), { status: 200 }),
     );
 
     const { result } = renderHook(() => useUpdateLearningMode(), {
@@ -255,6 +268,66 @@ describe('useUpdateLearningMode', () => {
     });
 
     expect(mockFetch).toHaveBeenCalled();
+  });
+
+  it('optimistically updates learning mode while save is pending', async () => {
+    let resolveSave!: () => void;
+    mockFetch.mockReturnValueOnce(
+      new Promise<Response>((resolve) => {
+        resolveSave = () =>
+          resolve(
+            new Response(JSON.stringify({ mode: 'serious' }), { status: 200 }),
+          );
+      }),
+    );
+
+    const wrapper = createPersistentWrapper();
+    queryClient.setQueryData(
+      ['settings', 'learning-mode', 'test-profile-id'],
+      'casual',
+    );
+    const { result } = renderHook(() => useUpdateLearningMode(), { wrapper });
+
+    act(() => {
+      result.current.mutate('serious');
+    });
+
+    await waitFor(() => {
+      expect(
+        queryClient.getQueryData([
+          'settings',
+          'learning-mode',
+          'test-profile-id',
+        ]),
+      ).toBe('serious');
+    });
+
+    await act(async () => {
+      resolveSave();
+    });
+  });
+
+  it('rolls back optimistic learning mode on save failure', async () => {
+    mockFetch.mockResolvedValueOnce(new Response('nope', { status: 500 }));
+
+    const wrapper = createPersistentWrapper();
+    queryClient.setQueryData(
+      ['settings', 'learning-mode', 'test-profile-id'],
+      'casual',
+    );
+    const { result } = renderHook(() => useUpdateLearningMode(), { wrapper });
+
+    await act(async () => {
+      await expect(result.current.mutateAsync('serious')).rejects.toThrow();
+    });
+
+    expect(
+      queryClient.getQueryData([
+        'settings',
+        'learning-mode',
+        'test-profile-id',
+      ]),
+    ).toBe('casual');
   });
 });
 
@@ -270,7 +343,7 @@ describe('useRegisterPushToken', () => {
 
   it('calls POST with push token', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ registered: true }), { status: 200 })
+      new Response(JSON.stringify({ registered: true }), { status: 200 }),
     );
 
     const { result } = renderHook(() => useRegisterPushToken(), {
@@ -299,7 +372,7 @@ describe('useUpdateCelebrationLevel', () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ celebrationLevel: 'off' }), {
         status: 200,
-      })
+      }),
     );
 
     const { result } = renderHook(() => useUpdateCelebrationLevel(), {
@@ -326,18 +399,15 @@ describe('useUpdateFamilyPoolBreakdownSharing', () => {
 
   it('calls PUT with the sharing value', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ value: true }), { status: 200 })
+      new Response(JSON.stringify({ value: true }), { status: 200 }),
     );
 
     const wrapper = createWrapper();
     const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
 
-    const { result } = renderHook(
-      () => useUpdateFamilyPoolBreakdownSharing(),
-      {
-        wrapper,
-      }
-    );
+    const { result } = renderHook(() => useUpdateFamilyPoolBreakdownSharing(), {
+      wrapper,
+    });
 
     await act(async () => {
       await result.current.mutateAsync(true);

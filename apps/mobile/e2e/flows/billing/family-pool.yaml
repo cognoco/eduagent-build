@@ -33,7 +33,7 @@ tags:
 # 4. Wait for More screen — Learning Mode section is always above the fold
 - extendedWaitUntil:
     visible:
-      id: "learning-mode-casual"
+      id: "learning-accommodation-section-header"
     timeout: 10000
 
 # 5. Scroll to the Subscription row and tap it

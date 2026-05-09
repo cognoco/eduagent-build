@@ -33,7 +33,7 @@ tags:
 # Using text: "More" matched the tab label itself, resolving before ScrollView rendered.
 - extendedWaitUntil:
     visible:
-      id: "learning-mode-casual"
+      id: "learning-accommodation-section-header"
     timeout: 10000
 
 # 5. Scroll to Profile row

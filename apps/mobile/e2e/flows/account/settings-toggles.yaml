@@ -1,6 +1,6 @@
-# Flow N11: Settings Toggles — Notifications & Learning Mode
+# Flow N11: Settings Toggles — Notifications
 # Validates: inline settings controls on the More screen respond to taps.
-# Tests notification toggles and learning mode radio options with screenshots.
+# Tests notification toggles with screenshots.
 # Note: Theme/Accent/Persona sections were removed (persona system cleanup).
 # Tags: nightly, account, settings
 #
@@ -30,10 +30,10 @@ tags:
 - tapOn:
     text: "More"
 
-# 4. Wait for More screen to load (Learning Mode section is always above the fold)
+# 4. Wait for More screen to load
 - extendedWaitUntil:
     visible:
-      id: "learning-mode-casual"
+      id: "learning-accommodation-section-header"
     timeout: 10000
 
 - takeScreenshot: settings-initial
@@ -83,26 +83,5 @@ tags:
 
 - takeScreenshot: settings-notifications-reset
 
-# ── Learning Mode section ──
-
-# 10. Scroll until the Casual Explorer radio button is visible
-- scrollUntilVisible:
-    element:
-      id: "learning-mode-casual"
-    direction: UP
-    timeout: 10000
-
-# 11. Tap Casual Explorer mode
-- tapOn:
-    id: "learning-mode-casual"
-
-- takeScreenshot: settings-mode-casual
-
-# 12. Tap Serious Learner mode (reset)
-- tapOn:
-    id: "learning-mode-serious"
-
-- takeScreenshot: settings-mode-serious
-
-# 13. Final screenshot — all settings fully exercised
+# 10. Final screenshot — notification settings exercised
 - takeScreenshot: settings-toggles-complete

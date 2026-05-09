@@ -48,7 +48,7 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: "learning-mode-section-header"
+      id: "learning-accommodation-section-header"
     timeout: 10000
 
 - takeScreenshot: add-first-child-02-more-screen

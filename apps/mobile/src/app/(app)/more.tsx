@@ -16,11 +16,7 @@ import { clearProfileSecureStorageOnSignOut } from '../../lib/sign-out-cleanup';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth, useUser } from '@clerk/clerk-expo';
-import type {
-  AccommodationMode,
-  KnowledgeInventory,
-  LearningMode,
-} from '@eduagent/schemas';
+import type { AccommodationMode, KnowledgeInventory } from '@eduagent/schemas';
 import { useProfile } from '../../lib/profile';
 import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
 import { useQueryClient } from '@tanstack/react-query';
@@ -36,14 +32,10 @@ import { useFeedbackContext } from '../../components/feedback/FeedbackProvider';
 import {
   useNotificationSettings,
   useUpdateNotificationSettings,
-  useLearningMode,
-  useUpdateLearningMode,
   useCelebrationLevel,
   useUpdateCelebrationLevel,
   useWithdrawalArchivePreference,
   useUpdateWithdrawalArchivePreference,
-  useFamilyPoolBreakdownSharing,
-  useUpdateFamilyPoolBreakdownSharing,
 } from '../../hooks/use-settings';
 import { useSubscription } from '../../hooks/use-subscription';
 import { ACCOMMODATION_OPTIONS } from '../../lib/accommodation-options';
@@ -206,13 +198,11 @@ export default function MoreScreen() {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const { data: subscription } = useSubscription();
   const { data: familyData } = useFamilySubscription(
-    subscription?.tier === 'family' || subscription?.tier === 'pro'
+    subscription?.tier === 'family' || subscription?.tier === 'pro',
   );
   const { data: notifPrefs, isLoading: notifLoading } =
     useNotificationSettings();
   const updateNotifications = useUpdateNotificationSettings();
-  const { data: learningMode, isLoading: modeLoading } = useLearningMode();
-  const updateLearningMode = useUpdateLearningMode();
   const { data: celebrationLevel, isLoading: celebrationLoading } =
     useCelebrationLevel();
   const updateCelebrationLevel = useUpdateCelebrationLevel();
@@ -220,11 +210,12 @@ export default function MoreScreen() {
     useWithdrawalArchivePreference();
   const updateWithdrawalArchivePreference =
     useUpdateWithdrawalArchivePreference();
-  const { data: familyPoolBreakdownSharing, isLoading: breakdownSharingLoading } =
-    useFamilyPoolBreakdownSharing();
-  const updateFamilyPoolBreakdownSharing =
-    useUpdateFamilyPoolBreakdownSharing();
-  const { data: learnerProfile } = useLearnerProfile();
+  const {
+    data: learnerProfile,
+    isLoading: learnerProfileLoading,
+    isError: learnerProfileError,
+    refetch: refetchLearnerProfile,
+  } = useLearnerProfile();
   const updateAccommodation = useUpdateAccommodationMode();
   const { openFeedback } = useFeedbackContext();
   const { t } = useTranslation();
@@ -243,30 +234,12 @@ export default function MoreScreen() {
         platformAlert(
           t('settings.languageChangeFailedTitle'),
           t('settings.languageChangeFailedMessage'),
-          [{ text: t('common.ok') }]
+          [{ text: t('common.ok') }],
         );
       }
     },
-    [t]
+    [t],
   );
-
-  // LEARNING_MODE_OPTIONS defined inside component to access t()
-  const LEARNING_MODE_OPTIONS: {
-    mode: LearningMode;
-    title: string;
-    description: string;
-  }[] = [
-    {
-      mode: 'casual',
-      title: t('more.learningMode.casual.title'),
-      description: t('more.learningMode.casual.description'),
-    },
-    {
-      mode: 'serious',
-      title: t('more.learningMode.serious.title'),
-      description: t('more.learningMode.serious.description'),
-    },
-  ];
 
   const pushEnabled = notifPrefs?.pushEnabled ?? false;
   const weeklyDigest = notifPrefs?.weeklyProgressPush ?? false;
@@ -301,13 +274,13 @@ export default function MoreScreen() {
           onError: () => {
             platformAlert(
               t('more.notifications.updateErrorTitle'),
-              t('more.errors.tryAgain')
+              t('more.errors.tryAgain'),
             );
           },
-        }
+        },
       );
     },
-    [updateNotifications, notifPrefs, t]
+    [updateNotifications, notifPrefs, t],
   );
 
   const handleToggleDigest = useCallback(
@@ -323,34 +296,13 @@ export default function MoreScreen() {
           onError: () => {
             platformAlert(
               t('more.notifications.updateErrorTitle'),
-              t('more.errors.tryAgain')
+              t('more.errors.tryAgain'),
             );
           },
-        }
+        },
       );
     },
-    [updateNotifications, notifPrefs, t]
-  );
-
-  const handleSelectMode = useCallback(
-    (mode: LearningMode) => {
-      // [BUG-814] In addition to the JSX `disabled={updateLearningMode.isPending}`
-      // guard, fail closed at the handler level. A rapid double-tap can fire
-      // before React processes the disabled re-render, so the JSX guard is
-      // necessary but not sufficient.
-      if (updateLearningMode.isPending) return;
-      if (mode !== learningMode) {
-        updateLearningMode.mutate(mode, {
-          onError: () => {
-            platformAlert(
-              t('more.errors.couldNotSaveSetting'),
-              t('more.errors.tryAgain')
-            );
-          },
-        });
-      }
-    },
-    [learningMode, updateLearningMode, t]
+    [updateNotifications, notifPrefs, t],
   );
 
   const handleSelectAccommodation = useCallback(
@@ -362,13 +314,13 @@ export default function MoreScreen() {
           onError: () => {
             platformAlert(
               t('more.errors.couldNotSaveSetting'),
-              t('more.errors.tryAgain')
+              t('more.errors.tryAgain'),
             );
           },
-        }
+        },
       );
     },
-    [learnerProfile?.accommodationMode, updateAccommodation, t]
+    [learnerProfile?.accommodationMode, updateAccommodation, t],
   );
 
   const handleExport = useCallback(async () => {
@@ -418,12 +370,12 @@ export default function MoreScreen() {
   const handleHelp = useCallback(async () => {
     try {
       await Linking.openURL(
-        'mailto:support@mentomate.app?subject=MentoMate%20Support'
+        'mailto:support@mentomate.app?subject=MentoMate%20Support',
       );
     } catch {
       platformAlert(
         t('more.help.contactSupportTitle'),
-        t('more.help.contactSupportMessage')
+        t('more.help.contactSupportMessage'),
       );
     }
   }, [t]);
@@ -445,7 +397,7 @@ export default function MoreScreen() {
             onPress: () => router.push('/(app)/subscription'),
           },
           { text: t('common.cancel'), style: 'cancel' },
-        ]
+        ],
       );
       return;
     }
@@ -465,7 +417,7 @@ export default function MoreScreen() {
               },
               { text: t('common.cancel'), style: 'cancel' },
             ]
-          : [{ text: t('common.ok') }]
+          : [{ text: t('common.ok') }],
       );
       return;
     }
@@ -478,12 +430,18 @@ export default function MoreScreen() {
       track('child_progress_navigated', { source: 'more_section' });
       router.push(href as never);
     },
-    [router]
+    [router],
   );
 
   const linkedChildren = activeProfile?.isOwner
     ? profiles.filter((p) => p.id !== activeProfile.id && !p.isOwner)
     : [];
+  const isFamilyCapablePlan =
+    subscription?.tier === 'family' || subscription?.tier === 'pro';
+  const showFamilyOnboarding =
+    activeProfile?.isOwner === true &&
+    linkedChildren.length === 0 &&
+    isFamilyCapablePlan;
 
   const displayName =
     activeProfile?.displayName ??
@@ -504,16 +462,12 @@ export default function MoreScreen() {
         contentContainerStyle={{ paddingBottom: 24 }}
         keyboardShouldPersistTaps="handled"
       >
-        {/* 1. Learning Mode */}
-        {/* BUG-909: Prefix with the active profile's display name and add a */}
-        {/* clarifying subtitle so parents know these toggles apply to their */}
-        {/* OWN learning sessions, not their child's. The child's settings */}
-        {/* live on /child/[id] (per-profile surface). */}
+        {/* 1. Learning Accommodation */}
         <Text
-          className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-1 mt-4"
-          testID="learning-mode-section-header"
+          className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-1 mt-6"
+          testID="learning-accommodation-section-header"
         >
-          {t('more.learningMode.sectionHeader', { name: displayName })}
+          {t('more.accommodation.sectionHeader', { name: displayName })}
         </Text>
         <Text className="text-caption text-text-secondary mb-2">
           {activeProfile?.isOwner && linkedChildren.length > 0
@@ -524,7 +478,7 @@ export default function MoreScreen() {
           <Pressable
             onPress={() =>
               handleChildProgressNavigation(
-                `/(app)/child/${linkedChildren[0]?.id ?? ''}`
+                `/(app)/child/${linkedChildren[0]?.id ?? ''}`,
               )
             }
             className="self-start mb-3"
@@ -534,9 +488,9 @@ export default function MoreScreen() {
               {
                 name:
                   linkedChildren[0]?.displayName ?? t('more.family.yourChild'),
-              }
+              },
             )}
-            testID="learning-mode-child-link"
+            testID="accommodation-mode-child-link"
           >
             <Text className="text-caption font-semibold text-primary">
               {t('more.learningMode.childPreferencesLink', {
@@ -552,52 +506,50 @@ export default function MoreScreen() {
             className="self-start mb-3"
             accessibilityRole="button"
             accessibilityLabel={t(
-              'more.family.openFamilyPreferencesAccessLabel'
+              'more.family.openFamilyPreferencesAccessLabel',
             )}
-            testID="learning-mode-family-link"
+            testID="accommodation-mode-family-link"
           >
             <Text className="text-caption font-semibold text-primary">
               {t('more.learningMode.familyPreferencesLink')}
             </Text>
           </Pressable>
         ) : null}
-        {LEARNING_MODE_OPTIONS.map((opt) => (
-          <LearningModeOption
-            key={opt.mode}
-            title={opt.title}
-            description={opt.description}
-            selected={learningMode === opt.mode}
-            disabled={modeLoading || updateLearningMode.isPending}
-            onPress={() => handleSelectMode(opt.mode)}
-            testID={`learning-mode-${opt.mode}`}
-          />
-        ))}
-
-        {/* 2. Learning Accommodation */}
-        <Text
-          className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-1 mt-6"
-          testID="learning-accommodation-section-header"
-        >
-          {t('more.accommodation.sectionHeader', { name: displayName })}
-        </Text>
-        <Text className="text-caption text-text-secondary mb-2">
-          {activeProfile?.isOwner && linkedChildren.length > 0
-            ? t('more.learningMode.subtitleWithChildren')
-            : t('more.learningMode.subtitle')}
-        </Text>
-        {ACCOMMODATION_OPTIONS.map((opt) => (
-          <LearningModeOption
-            key={opt.mode}
-            title={opt.title}
-            description={opt.description}
-            selected={
-              (learnerProfile?.accommodationMode ?? 'none') === opt.mode
-            }
-            disabled={updateAccommodation.isPending}
-            onPress={() => handleSelectAccommodation(opt.mode)}
-            testID={`accommodation-mode-${opt.mode}`}
-          />
-        ))}
+        {learnerProfileLoading || (!learnerProfile && !learnerProfileError) ? (
+          <View className="bg-surface rounded-card px-4 py-4 mb-2">
+            <Text className="text-body-sm text-text-secondary">
+              {t('common.loading')}
+            </Text>
+          </View>
+        ) : learnerProfileError ? (
+          <View className="bg-surface rounded-card px-4 py-4 mb-2">
+            <Text className="text-body-sm text-text-secondary">
+              {t('session.mentorMemory.loadError')}
+            </Text>
+            <Pressable
+              onPress={() => void refetchLearnerProfile()}
+              className="self-start mt-3"
+              accessibilityRole="button"
+              testID="accommodation-mode-retry"
+            >
+              <Text className="text-caption font-semibold text-primary">
+                {t('common.retry')}
+              </Text>
+            </Pressable>
+          </View>
+        ) : (
+          ACCOMMODATION_OPTIONS.map((opt) => (
+            <LearningModeOption
+              key={opt.mode}
+              title={opt.title}
+              description={opt.description}
+              selected={learnerProfile.accommodationMode === opt.mode}
+              disabled={updateAccommodation.isPending}
+              onPress={() => handleSelectAccommodation(opt.mode)}
+              testID={`accommodation-mode-${opt.mode}`}
+            />
+          ))
+        )}
 
         {/* 3. What My Mentor Knows — shown after learning prefs, hidden for new learners */}
         {!hideMentorMemory ? (
@@ -610,49 +562,18 @@ export default function MoreScreen() {
             </Text>
             <SettingsRow
               label={t('more.mentorMemory.viewAndManage')}
-              onPress={() => router.push('/(app)/mentor-memory')}
+              onPress={() => router.push('/(app)/mentor-memory?returnTo=more')}
               testID="mentor-memory-link"
             />
           </>
         ) : null}
 
-        {/* 4. Family — conditional on profile owner */}
-        {activeProfile?.isOwner && (
+        {/* 4. Family onboarding — the Family tab owns family management once children exist. */}
+        {showFamilyOnboarding && (
           <>
             <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6">
               {t('more.family.sectionHeader')}
             </Text>
-            {linkedChildren.length > 0 && (
-              <SettingsRow
-                label={t('more.family.childProgress')}
-                value={t('more.family.childCount', {
-                  count: linkedChildren.length,
-                })}
-                onPress={() =>
-                  router.push(`${FAMILY_HOME_PATH}?returnTo=more` as never)
-                }
-              />
-            )}
-            <ToggleRow
-              label={t('more.family.breakdownSharingTitle')}
-              description={t('more.family.breakdownSharingDescription')}
-              value={familyPoolBreakdownSharing ?? false}
-              onToggle={(value) => {
-                updateFamilyPoolBreakdownSharing.mutate(value, {
-                  onError: () => {
-                    platformAlert(
-                      t('more.errors.couldNotSaveSetting'),
-                      t('more.family.breakdownSharingError')
-                    );
-                  },
-                });
-              }}
-              disabled={
-                breakdownSharingLoading ||
-                updateFamilyPoolBreakdownSharing.isPending
-              }
-              testID="more-breakdown-sharing-toggle"
-            />
             <Pressable
               onPress={handleAddChild}
               className="bg-surface rounded-card px-4 py-3.5 mb-2"
@@ -688,7 +609,7 @@ export default function MoreScreen() {
                 onError: () => {
                   platformAlert(
                     t('more.errors.couldNotSaveSetting'),
-                    t('more.errors.tryAgain')
+                    t('more.errors.tryAgain'),
                   );
                 },
               });
@@ -707,7 +628,7 @@ export default function MoreScreen() {
                 onError: () => {
                   platformAlert(
                     t('more.errors.couldNotSaveSetting'),
-                    t('more.errors.tryAgain')
+                    t('more.errors.tryAgain'),
                   );
                 },
               });
@@ -726,7 +647,7 @@ export default function MoreScreen() {
                 onError: () => {
                   platformAlert(
                     t('more.errors.couldNotSaveSetting'),
-                    t('more.errors.tryAgain')
+                    t('more.errors.tryAgain'),
                   );
                 },
               });
@@ -782,7 +703,7 @@ export default function MoreScreen() {
                     onError: () => {
                       platformAlert(
                         t('more.errors.couldNotSaveSetting'),
-                        t('more.privacy.withdrawalArchiveError')
+                        t('more.privacy.withdrawalArchiveError'),
                       );
                     },
                   });
@@ -986,13 +907,13 @@ export default function MoreScreen() {
                 // too. Best-effort: per-key failure is swallowed inside the
                 // helper so cleanup never blocks sign-out.
                 await clearProfileSecureStorageOnSignOut(
-                  profiles.map((p) => p.id)
+                  profiles.map((p) => p.id),
                 );
                 await signOut();
               } catch {
                 platformAlert(
                   t('more.account.couldNotSignOut'),
-                  t('more.errors.tryAgainMoment')
+                  t('more.errors.tryAgainMoment'),
                 );
                 setIsSigningOut(false);
               }

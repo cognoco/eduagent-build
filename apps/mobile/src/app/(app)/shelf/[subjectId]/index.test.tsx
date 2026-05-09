@@ -9,7 +9,7 @@ import ShelfScreen from './index';
 
 jest.mock(
   'react-i18next',
-  () => require('../../../../test-utils/mock-i18n').i18nMock
+  () => require('../../../../test-utils/mock-i18n').i18nMock,
 );
 
 // ---------------------------------------------------------------------------
@@ -87,7 +87,7 @@ jest.mock('../../../../lib/theme', () => ({
 
 jest.mock('../../../../lib/format-api-error', () => {
   const actual = jest.requireActual(
-    '../../../../lib/format-api-error'
+    '../../../../lib/format-api-error',
   ) as Record<string, unknown>;
   return {
     ...actual,
@@ -218,7 +218,7 @@ describe('ShelfScreen', () => {
     });
     getByTestId('shelf-missing-param');
     expect(
-      getByText('Missing subject. Please go back and try again.')
+      getByText('Missing subject. Please go back and try again.'),
     ).toBeTruthy();
   });
 
@@ -252,7 +252,7 @@ describe('ShelfScreen', () => {
       new Response(JSON.stringify({ books: DEFAULT_BOOKS }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
-      })
+      }),
     );
   });
 
@@ -271,7 +271,7 @@ describe('ShelfScreen', () => {
       new Response(JSON.stringify({ books: DEFAULT_BOOKS }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
-      })
+      }),
     );
   });
 
@@ -283,8 +283,8 @@ describe('ShelfScreen', () => {
       Promise.resolve(
         new Response(JSON.stringify({ message: 'Failed to load books' }), {
           status: 500,
-        })
-      )
+        }),
+      ),
     );
 
     const { getByTestId } = render(<ShelfScreen />, {
@@ -305,7 +305,7 @@ describe('ShelfScreen', () => {
       return Promise.resolve(
         new Response(JSON.stringify({ message: 'Network error' }), {
           status: 500,
-        })
+        }),
       );
     });
 
@@ -327,8 +327,8 @@ describe('ShelfScreen', () => {
   it('go-home button on error screen returns to home [BUG-82]', async () => {
     mockFetch.setRoute('/subjects/sub-1/books', () =>
       Promise.resolve(
-        new Response(JSON.stringify({ message: 'oops' }), { status: 500 })
-      )
+        new Response(JSON.stringify({ message: 'oops' }), { status: 500 }),
+      ),
     );
 
     const { getByTestId } = render(<ShelfScreen />, { wrapper: TestWrapper });
@@ -345,8 +345,8 @@ describe('ShelfScreen', () => {
       Promise.resolve(
         new Response(JSON.stringify({ message: 'Subjects unavailable' }), {
           status: 500,
-        })
-      )
+        }),
+      ),
     );
 
     const { getByTestId } = render(<ShelfScreen />, { wrapper: TestWrapper });
@@ -365,7 +365,7 @@ describe('ShelfScreen', () => {
       return Promise.resolve(
         new Response(JSON.stringify({ message: 'Subjects unavailable' }), {
           status: 500,
-        })
+        }),
       );
     });
 
@@ -433,7 +433,7 @@ describe('ShelfScreen', () => {
           subjectId: 'sub-1',
           bookId: 'book-1',
         }),
-      })
+      }),
     );
   });
 
@@ -465,14 +465,14 @@ describe('ShelfScreen', () => {
     });
     const callsBeforeRetry = fetchCallsMatching(
       mockFetch,
-      '/subjects/sub-1/books'
+      '/subjects/sub-1/books',
     ).length;
 
     fireEvent.press(getByTestId('shelf-empty-retry'));
 
     await waitFor(() => {
       expect(
-        fetchCallsMatching(mockFetch, '/subjects/sub-1/books').length
+        fetchCallsMatching(mockFetch, '/subjects/sub-1/books').length,
       ).toBeGreaterThan(callsBeforeRetry);
     });
   });
@@ -565,7 +565,7 @@ describe('ShelfScreen', () => {
       expect.objectContaining({
         pathname: '/(app)/pick-book/[subjectId]',
         params: { subjectId: 'sub-1' },
-      })
+      }),
     );
   });
 
@@ -630,7 +630,7 @@ describe('ShelfScreen', () => {
             subjectId: 'sub-1',
             bookId: 'book-new',
           },
-        })
+        }),
       );
     });
   });
@@ -644,56 +644,64 @@ describe('ShelfScreen', () => {
   // book they just chose to skip. Test mirrors the existing pick-book guard.
   it('[BUG-692] Skip during filing prevents stale onSuccess navigation', async () => {
     jest.useFakeTimers();
-    try {
-      mockFetch.setRoute('/book-suggestions', [
-        { id: 'sug-1', title: 'Number Theory', emoji: '🔢' },
-      ]);
 
-      // Delay the filing response so we can press Skip while it's in flight
-      let resolveFilingResponse!: (r: Response) => void;
-      const filingPromise = new Promise<Response>((resolve) => {
-        resolveFilingResponse = resolve;
-      });
-      mockFetch.setRoute('/filing', () => filingPromise);
+    mockFetch.setRoute('/book-suggestions', [
+      { id: 'sug-1', title: 'Number Theory', emoji: '🔢' },
+    ]);
 
-      const { getByTestId, queryByTestId, rerender } = render(<ShelfScreen />, {
-        wrapper: TestWrapper,
-      });
+    // Delay the filing response so we can press Skip while it's in flight
+    let resolveFilingResponse!: (r: Response) => void;
+    const filingPromise = new Promise<Response>((resolve) => {
+      resolveFilingResponse = resolve;
+    });
+    mockFetch.setRoute('/filing', () => filingPromise);
 
-      // Wait for suggestions to appear (books + subjects loaded)
-      await act(async () => {
-        jest.advanceTimersByTime(0);
-      });
+    const { getByTestId, queryByTestId, rerender } = render(<ShelfScreen />, {
+      wrapper: TestWrapper,
+    });
 
-      await waitFor(() => {
-        getByTestId('shelf-suggestion-sug-1');
-      });
+    // Wait for suggestions to appear (books + subjects loaded)
+    await act(async () => {
+      jest.advanceTimersByTime(0);
+    });
 
-      fireEvent.press(getByTestId('shelf-suggestion-sug-1'));
+    await waitFor(() => {
+      getByTestId('shelf-suggestion-sug-1');
+    });
 
-      // Re-render to pick up isPending state
-      rerender(<ShelfScreen />);
+    fireEvent.press(getByTestId('shelf-suggestion-sug-1'));
 
-      await waitFor(() => {
-        getByTestId('shelf-filing-overlay');
-      });
+    // Re-render to pick up isPending state
+    rerender(<ShelfScreen />);
 
-      // Advance past the 15s skip-button delay
-      await act(async () => {
-        jest.advanceTimersByTime(15_500);
-      });
-      getByTestId('shelf-filing-skip');
+    await waitFor(() => {
+      getByTestId('shelf-filing-overlay');
+    });
 
-      // User taps Skip — must replace route AND mark filing as skipped.
-      fireEvent.press(getByTestId('shelf-filing-skip'));
-      expect(mockReplace).toHaveBeenCalledWith(
-        expect.objectContaining({
-          pathname: '/(app)/shelf/[subjectId]',
-          params: { subjectId: 'sub-1' },
-        })
-      );
+    // Advance past the 15s skip-button delay
+    await act(async () => {
+      jest.advanceTimersByTime(15_500);
+    });
+    getByTestId('shelf-filing-skip');
 
-      // Now resolve the pending filing — this is the core of the bug.
+    // User taps Skip — must replace route AND mark filing as skipped.
+    fireEvent.press(getByTestId('shelf-filing-skip'));
+    expect(mockReplace).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/(app)/shelf/[subjectId]',
+        params: { subjectId: 'sub-1' },
+      }),
+    );
+
+    // Switch to real timers before resolving the mutation so act() can drain
+    // microtasks properly (fake timers intercept queueMicrotask).
+    jest.useRealTimers();
+
+    // Wrap the resolve in act() so the full TanStack Query chain runs:
+    // fetch resolve → assertOk → res.json → mutateAsync → continuation.
+    // Without act(), the async continuations never execute in the test and the
+    // assertion trivially passes even when the filingSkipped guard is absent.
+    await act(async () => {
       resolveFilingResponse(
         new Response(
           JSON.stringify({
@@ -706,25 +714,26 @@ describe('ShelfScreen', () => {
             topicTitle: 'Numbers',
             isNew: { shelf: false, book: true, chapter: true },
           }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
       );
-      // Flush microtasks so the awaited mutateAsync resumes.
+      // Drain the full Promise chain: fetch resolve → assertOk → res.json →
+      // mutateAsync → handlePickSuggestion continuation.
       await Promise.resolve();
       await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
 
-      // The break: push to the book route must NOT have fired even though
-      // the mutation succeeded — filingSkipped.current was true.
-      const bookPushed = mockPush.mock.calls.some((call) => {
-        const arg = call[0] as { pathname?: string } | undefined;
-        return arg?.pathname === '/(app)/shelf/[subjectId]/book/[bookId]';
-      });
-      expect(bookPushed).toBe(false);
-      // Sanity: error overlay also did not appear.
-      expect(queryByTestId('shelf-filing-error-overlay')).toBeNull();
-    } finally {
-      jest.useRealTimers();
-    }
+    // The break: push to the book route must NOT have fired even though
+    // the mutation succeeded — filingSkipped.current was true.
+    const bookPushed = mockPush.mock.calls.some((call) => {
+      const arg = call[0] as { pathname?: string } | undefined;
+      return arg?.pathname === '/(app)/shelf/[subjectId]/book/[bookId]';
+    });
+    expect(bookPushed).toBe(false);
+    // Sanity: error overlay also did not appear.
+    expect(queryByTestId('shelf-filing-error-overlay')).toBeNull();
   });
 
   it('shows ErrorFallback overlay when picking a book suggestion fails', async () => {
@@ -735,8 +744,8 @@ describe('ShelfScreen', () => {
       Promise.resolve(
         new Response(JSON.stringify({ message: 'Filing failed' }), {
           status: 500,
-        })
-      )
+        }),
+      ),
     );
 
     const { getByTestId } = render(<ShelfScreen />, { wrapper: TestWrapper });

@@ -109,7 +109,7 @@ const DEFAULT_MESSAGES: ChatMessage[] = [
 ];
 
 function renderChatShell(
-  overrides: Partial<React.ComponentProps<typeof ChatShell>> = {}
+  overrides: Partial<React.ComponentProps<typeof ChatShell>> = {},
 ) {
   const defaultProps = {
     title: 'Session',
@@ -610,7 +610,7 @@ describe('ChatShell', () => {
       // Since we can't easily re-render with new messages in this test setup,
       // we verify the toggle changed state
       expect(
-        screen.getByTestId('voice-toggle').props.accessibilityState.checked
+        screen.getByTestId('voice-toggle').props.accessibilityState.checked,
       ).toBe(false);
     });
 
@@ -669,7 +669,7 @@ describe('ChatShell', () => {
         onSend={jest.fn()}
         isStreaming={false}
         inputDisabled={false}
-      />
+      />,
     );
 
     screen.getByTestId('chat-input');
@@ -729,7 +729,7 @@ describe('ChatShell', () => {
         .spyOn(AccessibilityInfo, 'addEventListener')
         .mockImplementation((_event, listener) => {
           screenReaderChangedListener = listener as unknown as (
-            enabled: boolean
+            enabled: boolean,
           ) => void;
           return { remove: mockRemove } as unknown as ReturnType<
             typeof AccessibilityInfo.addEventListener
@@ -769,7 +769,7 @@ describe('ChatShell', () => {
             { id: 'ai-1', role: 'assistant', content: 'Please explain.' },
             { id: 'ai-2', role: 'assistant', content: 'Second message' },
           ]}
-        />
+        />,
       );
 
       expect(mockSpeak).not.toHaveBeenCalled();
@@ -800,7 +800,7 @@ describe('ChatShell', () => {
 
       // Shows the manual-playback notice instead of auto-speaking
       screen.getByText(
-        'Screen reader is on. Voice input is not available. Use text input below.'
+        'Screen reader is on. Voice input is not available. Use text input below.',
       );
     });
 
@@ -816,7 +816,7 @@ describe('ChatShell', () => {
 
       expect(AccessibilityInfo.addEventListener).toHaveBeenCalledWith(
         'screenReaderChanged',
-        expect.any(Function)
+        expect.any(Function),
       );
 
       // Unmount should call subscription.remove()
@@ -914,8 +914,8 @@ describe('ChatShell', () => {
         // screenReaderEnabled on web, this assertion will fail.
         expect(
           screen.queryByText(
-            'Screen reader is on. Voice input is not available. Use text input below.'
-          )
+            'Screen reader is on. Voice input is not available. Use text input below.',
+          ),
         ).toBeNull();
       } finally {
         Object.defineProperty(RN.Platform, 'OS', {
@@ -951,7 +951,7 @@ describe('ChatShell', () => {
 
       // The manual-playback notice appears
       screen.getByText(
-        'Screen reader is on. Voice input is not available. Use text input below.'
+        'Screen reader is on. Voice input is not available. Use text input below.',
       );
     });
   });
@@ -991,7 +991,7 @@ describe('ChatShell', () => {
 
       renderChatShell({ verificationType: 'teach_back' });
       const appStateChangedListener = addEventListenerSpy.mock.calls.at(
-        -1
+        -1,
       )?.[1] as ((status: string) => void) | undefined;
       expect(appStateChangedListener).toBeInstanceOf(Function);
 
@@ -1019,7 +1019,7 @@ describe('ChatShell', () => {
 
       renderChatShell({ verificationType: 'teach_back' });
       const appStateChangedListener = addEventListenerSpy.mock.calls.at(
-        -1
+        -1,
       )?.[1] as ((status: string) => void) | undefined;
       expect(appStateChangedListener).toBeInstanceOf(Function);
 
@@ -1055,7 +1055,7 @@ describe('ChatShell', () => {
         messages={messagesWithImage}
         onSend={jest.fn()}
         isStreaming={false}
-      />
+      />,
     );
 
     getByTestId('message-image-msg-img');
@@ -1139,6 +1139,16 @@ describe('ChatShell', () => {
       renderChatShell({ inputDisabled: false });
 
       expect(screen.queryByTestId('input-disabled-banner')).toBeNull();
+    });
+
+    it('hides the disabled banner when showDisabledBanner is false', () => {
+      renderChatShell({
+        inputDisabled: true,
+        showDisabledBanner: false,
+      });
+
+      expect(screen.queryByTestId('input-disabled-banner')).toBeNull();
+      expect(screen.queryByTestId('chat-input')).toBeNull();
     });
   });
 
@@ -1235,12 +1245,12 @@ describe('ChatShell', () => {
         // intent is the same.
         expect(
           row?.props['aria-hidden'] === true ||
-            row?.props.accessibilityElementsHidden === true
+            row?.props.accessibilityElementsHidden === true,
         ).toBe(true);
         // tabIndex is web-only; RN may strip it from native host props.
         // Accept either the literal -1 or the focusable=false equivalent.
         expect(
-          row?.props.tabIndex === -1 || row?.props.focusable === false
+          row?.props.tabIndex === -1 || row?.props.focusable === false,
         ).toBe(true);
       } finally {
         Object.defineProperty(RN.Platform, 'OS', {

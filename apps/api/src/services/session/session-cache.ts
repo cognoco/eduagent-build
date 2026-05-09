@@ -84,7 +84,7 @@ const supplementaryInflight = new Map<
 
 export function getSessionStaticContextCacheKey(
   profileId: string,
-  sessionId: string
+  sessionId: string,
 ): string {
   return `${profileId}:${sessionId}`;
 }
@@ -107,7 +107,7 @@ export function pruneSessionStaticContextCache(now = Date.now()): void {
 
 export function touchSessionStaticContextCacheEntry(
   key: string,
-  entry: SessionStaticContextCacheEntry
+  entry: SessionStaticContextCacheEntry,
 ): SessionStaticContextCacheEntry {
   entry.expiresAt = Date.now() + SESSION_STATIC_CONTEXT_TTL_MS;
   sessionStaticContextCache.delete(key);
@@ -120,7 +120,7 @@ export async function getSessionStaticContext(
   db: Database,
   profileId: string,
   sessionId: string,
-  session: LearningSession
+  session: LearningSession,
 ): Promise<SessionStaticContextCacheEntry> {
   const key = getSessionStaticContextCacheKey(profileId, sessionId);
   const now = Date.now();
@@ -164,14 +164,14 @@ export async function getCachedHomeworkLibraryContext(
   db: Database,
   profileId: string,
   sessionId: string,
-  session: LearningSession
+  session: LearningSession,
 ): Promise<string | undefined> {
   const key = getSessionStaticContextCacheKey(profileId, sessionId);
   const entry = await getSessionStaticContext(
     db,
     profileId,
     sessionId,
-    session
+    session,
   );
 
   if (entry.homeworkLibraryContextLoaded) {
@@ -180,7 +180,7 @@ export async function getCachedHomeworkLibraryContext(
 
   entry.homeworkLibraryContext = await buildHomeworkLibraryContext(
     db,
-    session.subjectId
+    session.subjectId,
   );
   entry.homeworkLibraryContextLoaded = true;
   touchSessionStaticContextCacheEntry(key, entry);
@@ -193,14 +193,14 @@ export async function getCachedBookLearningHistoryContext(
   sessionId: string,
   session: LearningSession,
   currentTopicId: string,
-  bookId: string
+  bookId: string,
 ): Promise<string | undefined> {
   const key = getSessionStaticContextCacheKey(profileId, sessionId);
   const entry = await getSessionStaticContext(
     db,
     profileId,
     sessionId,
-    session
+    session,
   );
   const historyKey = `${bookId}:${currentTopicId}`;
 
@@ -212,7 +212,7 @@ export async function getCachedBookLearningHistoryContext(
     db,
     profileId,
     currentTopicId,
-    bookId
+    bookId,
   );
   entry.bookLearningHistoryContexts.set(historyKey, context);
   touchSessionStaticContextCacheEntry(key, entry);
@@ -221,11 +221,25 @@ export async function getCachedBookLearningHistoryContext(
 
 export function clearSessionStaticContext(
   profileId: string,
-  sessionId: string
+  sessionId: string,
 ): void {
-  sessionStaticContextCache.delete(
-    getSessionStaticContextCacheKey(profileId, sessionId)
-  );
+  const key = getSessionStaticContextCacheKey(profileId, sessionId);
+  sessionStaticContextCache.delete(key);
+  supplementaryInflight.delete(key);
+}
+
+export function clearSessionStaticContextForProfile(profileId: string): void {
+  const prefix = `${profileId}:`;
+  for (const key of sessionStaticContextCache.keys()) {
+    if (key.startsWith(prefix)) {
+      sessionStaticContextCache.delete(key);
+    }
+  }
+  for (const key of supplementaryInflight.keys()) {
+    if (key.startsWith(prefix)) {
+      supplementaryInflight.delete(key);
+    }
+  }
 }
 
 export function resetSessionStaticContextCache(): void {
@@ -241,7 +255,7 @@ async function loadSessionSupplementary(
   db: Database,
   profileId: string,
   subjectId: string,
-  isFreeform: boolean
+  isFreeform: boolean,
 ): Promise<SessionSupplementaryData> {
   const [
     priorTopics,
@@ -287,7 +301,7 @@ export async function getOrLoadSessionSupplementary(
   sessionId: string,
   subjectId: string,
   isFreeform: boolean,
-  cacheEntry: SessionStaticContextCacheEntry
+  cacheEntry: SessionStaticContextCacheEntry,
 ): Promise<SessionSupplementaryData> {
   if (cacheEntry.supplementary) return cacheEntry.supplementary;
 
@@ -297,10 +311,14 @@ export async function getOrLoadSessionSupplementary(
 
   const promise = loadSessionSupplementary(db, profileId, subjectId, isFreeform)
     .then((supp) => {
-      // Re-read the cache entry — TTL pruning could have evicted ours mid-fetch.
-      const live = sessionStaticContextCache.get(cacheKey) ?? cacheEntry;
-      live.supplementary = supp;
-      touchSessionStaticContextCacheEntry(cacheKey, live);
+      // Re-read the cache entry. If a profile/session invalidation evicted or
+      // replaced our entry while the fan-out was in flight, do not resurrect it
+      // with stale supplementary data.
+      const live = sessionStaticContextCache.get(cacheKey);
+      if (live === cacheEntry) {
+        live.supplementary = supp;
+        touchSessionStaticContextCacheEntry(cacheKey, live);
+      }
       return supp;
     })
     .finally(() => {
@@ -316,4 +334,8 @@ export async function getOrLoadSessionSupplementary(
 // Test-only: surface the size of the in-flight map for assertions.
 export function _supplementaryInflightSize(): number {
   return supplementaryInflight.size;
+}
+
+export function _sessionStaticContextCacheSize(): number {
+  return sessionStaticContextCache.size;
 }

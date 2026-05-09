@@ -23,7 +23,8 @@ const mockDatabaseModule = createDatabaseModuleMock({
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-jest.mock('../services/account', () => ({ // gc1-allow: stubs findOrCreateAccount — avoids real Clerk/DB round-trip in unit tests for settings routes
+jest.mock('../services/account', () => ({
+  // gc1-allow: stubs findOrCreateAccount — avoids real Clerk/DB round-trip in unit tests for settings routes
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
     clerkUserId: 'user_test',
@@ -35,15 +36,28 @@ jest.mock('../services/account', () => ({ // gc1-allow: stubs findOrCreateAccoun
 
 const mockGetOwnedFamilyPoolBreakdownSharing = jest.fn();
 const mockUpsertFamilyPoolBreakdownSharing = jest.fn();
+const mockUpsertLearningMode = jest.fn();
 
-jest.mock('../services/settings', () => { // gc1-allow: uses requireActual with targeted overrides for getOwnedFamilyPoolBreakdownSharing/upsertFamilyPoolBreakdownSharing — canonical partial-mock pattern from CLAUDE.md
+jest.mock('../services/settings', () => {
+  // gc1-allow: uses requireActual with targeted overrides for getOwnedFamilyPoolBreakdownSharing/upsertFamilyPoolBreakdownSharing — canonical partial-mock pattern from CLAUDE.md
   const actual = jest.requireActual('../services/settings');
   return {
     ...actual,
+    upsertLearningMode: (...args: unknown[]) => mockUpsertLearningMode(...args),
     getOwnedFamilyPoolBreakdownSharing: (...args: unknown[]) =>
       mockGetOwnedFamilyPoolBreakdownSharing(...args),
     upsertFamilyPoolBreakdownSharing: (...args: unknown[]) =>
       mockUpsertFamilyPoolBreakdownSharing(...args),
+  };
+});
+
+const mockClearSessionStaticContextForProfile = jest.fn();
+jest.mock('../services/session/session-cache', () => {
+  const actual = jest.requireActual('../services/session/session-cache');
+  return {
+    ...actual,
+    clearSessionStaticContextForProfile: (...args: unknown[]) =>
+      mockClearSessionStaticContextForProfile(...args),
   };
 });
 
@@ -86,6 +100,7 @@ beforeEach(() => {
   });
   mockGetOwnedFamilyPoolBreakdownSharing.mockResolvedValue(false);
   mockUpsertFamilyPoolBreakdownSharing.mockResolvedValue({ value: true });
+  mockUpsertLearningMode.mockResolvedValue({ mode: 'serious' });
 });
 
 describe('settings routes', () => {
@@ -112,7 +127,7 @@ describe('settings routes', () => {
     const res = await app.request(
       '/v1/settings/withdrawal-archive',
       { headers: PROFILE_HEADERS },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(403);
@@ -124,7 +139,7 @@ describe('settings routes', () => {
     const res = await app.request(
       '/v1/settings/family-pool-breakdown-sharing',
       { headers: PROFILE_HEADERS },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -139,7 +154,7 @@ describe('settings routes', () => {
         headers: PROFILE_HEADERS,
         body: JSON.stringify({ value: true }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -148,13 +163,13 @@ describe('settings routes', () => {
       expect.anything(),
       'profile-1',
       'test-account-id',
-      true
+      true,
     );
   });
 
   it('PUT /v1/settings/family-pool-breakdown-sharing rejects non-owner callers', async () => {
     mockUpsertFamilyPoolBreakdownSharing.mockRejectedValue(
-      new ForbiddenError('Profile owner required')
+      new ForbiddenError('Profile owner required'),
     );
 
     const res = await app.request(
@@ -164,9 +179,33 @@ describe('settings routes', () => {
         headers: PROFILE_HEADERS,
         body: JSON.stringify({ value: true }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(403);
+  });
+
+  it('PUT /v1/settings/learning-mode clears cached session context for the active profile', async () => {
+    const res = await app.request(
+      '/v1/settings/learning-mode',
+      {
+        method: 'PUT',
+        headers: PROFILE_HEADERS,
+        body: JSON.stringify({ mode: 'serious' }),
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ mode: 'serious' });
+    expect(mockUpsertLearningMode).toHaveBeenCalledWith(
+      expect.anything(),
+      'profile-1',
+      'test-account-id',
+      'serious',
+    );
+    expect(mockClearSessionStaticContextForProfile).toHaveBeenCalledWith(
+      'profile-1',
+    );
   });
 });

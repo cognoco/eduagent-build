@@ -41,6 +41,7 @@ import {
   registerPushToken,
 } from '../services/settings';
 import { notifyParentToSubscribe } from '../services/notifications';
+import { clearSessionStaticContextForProfile } from '../services/session/session-cache';
 import {
   getAnalogyDomain,
   getNativeLanguage,
@@ -91,10 +92,10 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
         db,
         profileId,
         accountId,
-        body
+        body,
       );
       return c.json(getNotificationsResponseSchema.parse({ preferences }));
-    }
+    },
   )
 
   // Get learning mode
@@ -118,10 +119,11 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
         db,
         profileId,
         accountId,
-        body.mode
+        body.mode,
       );
+      clearSessionStaticContextForProfile(profileId);
       return c.json(getLearningModeResponseSchema.parse({ mode: result.mode }));
-    }
+    },
   )
 
   .get('/settings/celebration-level', async (c) => {
@@ -129,7 +131,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     const profileId = requireProfileId(c.get('profileId'));
     const celebrationLevel = await getCelebrationLevel(db, profileId);
     return c.json(
-      getCelebrationLevelResponseSchema.parse({ celebrationLevel })
+      getCelebrationLevelResponseSchema.parse({ celebrationLevel }),
     );
   })
 
@@ -145,10 +147,10 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
         db,
         profileId,
         accountId,
-        body.celebrationLevel
+        body.celebrationLevel,
       );
       return c.json(getCelebrationLevelResponseSchema.parse(result));
-    }
+    },
   )
 
   .get('/settings/withdrawal-archive', async (c) => {
@@ -167,7 +169,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
 
     const value = await getWithdrawalArchivePreference(db, profileId);
     return c.json(
-      getWithdrawalArchivePreferenceResponseSchema.parse({ value })
+      getWithdrawalArchivePreferenceResponseSchema.parse({ value }),
     );
   })
 
@@ -185,10 +187,10 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
           db,
           profileId,
           accountId,
-          body.value
+          body.value,
         );
         return c.json(
-          updateWithdrawalArchivePreferenceResponseSchema.parse(result)
+          updateWithdrawalArchivePreferenceResponseSchema.parse(result),
         );
       } catch (error) {
         if (error instanceof ForbiddenError) {
@@ -196,7 +198,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
         }
         throw error;
       }
-    }
+    },
   )
 
   .get('/settings/family-pool-breakdown-sharing', async (c) => {
@@ -208,10 +210,10 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
       const value = await getOwnedFamilyPoolBreakdownSharing(
         db,
         profileId,
-        accountId
+        accountId,
       );
       return c.json(
-        getFamilyPoolBreakdownSharingResponseSchema.parse({ value })
+        getFamilyPoolBreakdownSharingResponseSchema.parse({ value }),
       );
     } catch (error) {
       if (error instanceof ForbiddenError) {
@@ -235,10 +237,10 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
           db,
           profileId,
           accountId,
-          body.value
+          body.value,
         );
         return c.json(
-          updateFamilyPoolBreakdownSharingResponseSchema.parse(result)
+          updateFamilyPoolBreakdownSharingResponseSchema.parse(result),
         );
       } catch (error) {
         if (error instanceof ForbiddenError) {
@@ -246,7 +248,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
         }
         throw error;
       }
-    }
+    },
   )
 
   // Register push token
@@ -260,9 +262,9 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
       const body = c.req.valid('json');
       await registerPushToken(db, profileId, accountId, body.token);
       return c.json(
-        pushTokenRegisteredResponseSchema.parse({ registered: true })
+        pushTokenRegisteredResponseSchema.parse({ registered: true }),
       );
-    }
+    },
   )
 
   // Notify parent to subscribe (child-friendly paywall)
@@ -283,7 +285,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
         resendApiKey: c.env.RESEND_API_KEY,
         emailFrom: c.env.EMAIL_FROM,
       },
-      apiOrigin
+      apiOrigin,
     );
     return c.json(notifyParentSubscribeResponseSchema.parse(result));
   })
@@ -298,7 +300,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
       const { subjectId } = c.req.valid('param');
       const analogyDomain = await getAnalogyDomain(db, profileId, subjectId);
       return c.json(analogyDomainResponseSchema.parse({ analogyDomain }));
-    }
+    },
   )
 
   // Update analogy domain preference for a subject (FR134-137)
@@ -317,7 +319,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
           db,
           profileId,
           subjectId,
-          body.analogyDomain
+          body.analogyDomain,
         );
         return c.json(analogyDomainResponseSchema.parse({ analogyDomain }));
       } catch (error) {
@@ -326,7 +328,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
         }
         throw error;
       }
-    }
+    },
   )
   .get(
     '/settings/subjects/:subjectId/native-language',
@@ -337,7 +339,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
       const { subjectId } = c.req.valid('param');
       const nativeLanguage = await getNativeLanguage(db, profileId, subjectId);
       return c.json(nativeLanguageResponseSchema.parse({ nativeLanguage }));
-    }
+    },
   )
   .put(
     '/settings/subjects/:subjectId/native-language',
@@ -354,7 +356,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
           db,
           profileId,
           subjectId,
-          body.nativeLanguage
+          body.nativeLanguage,
         );
         return c.json(nativeLanguageResponseSchema.parse({ nativeLanguage }));
       } catch (error) {
@@ -363,5 +365,5 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
         }
         throw error;
       }
-    }
+    },
   );
