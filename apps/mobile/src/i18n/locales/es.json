@@ -137,20 +137,14 @@
         }
       }
     },
-    "parentGateway": {
-      "seeHowTheyAreDoing": "Mira cómo les va",
-      "practicedThisWeek": "{{name}} practicó {{minutes}} min esta semana",
-      "notPracticedThisWeek": "{{name}} no ha practicado esta semana",
-      "checkProgress": "Ver el progreso del niño",
-      "learnSomething": "Aprende algo",
-      "dashboardError": "No pudimos cargar el panel",
-      "reviewHealth": "Revisar salud"
-    },
     "notices": {
       "consentArchivedTitle": "{{name}}'s account was archived",
       "consentArchivedBody": "Data is retained for 30 days, then deleted.",
       "consentDeletedTitle": "{{name}}'s account was deleted",
       "consentDeletedBody": "The withdrawal grace period has ended."
+    },
+    "childCard": {
+      "title": "Niños"
     }
   },
   "dashboard": {
@@ -1146,7 +1140,9 @@
         "retentionFading": "Worth a quick refresh.",
         "retentionWeak": "Worth coming back to.",
         "growthPrimaryLegend": "Topics learned",
-        "growthSecondaryLegend": "Words added"
+        "growthSecondaryLegend": "Words added",
+        "currentlyWorkingOnTitle": "Lo que estás trabajando ahora",
+        "currentlyWorkingOnDetected": "Detectado en tus sesiones recientes"
       },
       "adult": {
         "weekTitle": "Weekly report",
@@ -1158,7 +1154,35 @@
         "retentionFading": "Getting fuzzy — a quick review will help.",
         "retentionWeak": "Needs a quick refresh.",
         "growthPrimaryLegend": "Topics mastered",
-        "growthSecondaryLegend": "Vocabulary growth"
+        "growthSecondaryLegend": "Vocabulary growth",
+        "currentlyWorkingOnTitle": "Trabajando ahora",
+        "currentlyWorkingOnDetected": "Detectado en sesiones recientes"
+      }
+    },
+    "currentlyWorkingOn": {
+      "andNMore": "y {{count}} más"
+    },
+    "weeklyReport": {
+      "thisWeekSoFar": "Esta semana hasta ahora",
+      "mini": {
+        "sessions": "{{count}} sesión",
+        "sessions_other": "{{count}} sesiones",
+        "words": "{{count}} palabra",
+        "words_other": "{{count}} palabras",
+        "topics": "{{count}} tema tocado",
+        "topics_other": "{{count}} temas tocados"
+      },
+      "empty": {
+        "child": "Tu primer resumen semanal está en camino.",
+        "adult": "Tu primer resumen semanal llega después de una semana completa de aprendizaje."
+      }
+    },
+    "monthlyReport": {
+      "highlightsTitle": "Destacados",
+      "nextStepsTitle": "Qué sigue",
+      "empty": {
+        "child": "Tu primer resumen mensual llega al final de {{month}}.",
+        "adult": "Tu primer resumen mensual llega al final de {{month}}."
       }
     },
     "newLearner": {

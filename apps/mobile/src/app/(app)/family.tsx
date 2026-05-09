@@ -278,7 +278,7 @@ function FamilyContent(): React.ReactElement {
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
-      {/* [BUG-999] zIndex:20 ensures this header wins over the ParentGateway
+      {/* [BUG-999] zIndex:20 ensures this header wins over Home
           header (zIndex:10) that sits in the home-tab stack on web. Without it,
           the Home header intercepts pointer events after a deep-drilldown back. */}
       <View className="px-5 pt-4 pb-2" style={{ zIndex: 20, elevation: 20 }}>

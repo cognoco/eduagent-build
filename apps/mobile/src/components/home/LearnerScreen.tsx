@@ -15,6 +15,7 @@ import {
   useOverallProgress,
   useReviewSummary,
 } from '../../hooks/use-progress';
+import { useDashboard } from '../../hooks/use-dashboard';
 import { useSubjects } from '../../hooks/use-subjects';
 import { getGreeting } from '../../lib/greeting';
 import {
@@ -32,6 +33,8 @@ import { FEATURE_FLAGS } from '../../lib/feature-flags';
 import { getSubjectTint } from '../../lib/subject-tints';
 import { useTheme } from '../../lib/theme';
 import { useThemeColors } from '../../lib/theme';
+import { WithdrawalCountdownBanner } from '../family/WithdrawalCountdownBanner';
+import { ChildCard } from './ChildCard';
 import { CoachBand } from './CoachBand';
 import { ChildQuotaLine } from './ChildQuotaLine';
 import { EarlyAdopterCard } from './EarlyAdopterCard';
@@ -91,14 +94,12 @@ const HOME_INTENT_ACTIONS: HomeIntentAction[] = [
 export interface LearnerScreenProps {
   profiles: Profile[];
   activeProfile: Profile | null;
-  onBack?: () => void;
   now?: Date;
 }
 
 export function LearnerScreen({
   profiles,
   activeProfile,
-  onBack,
   now,
 }: LearnerScreenProps): React.ReactElement {
   const { t } = useTranslation();
@@ -110,6 +111,7 @@ export function LearnerScreen({
   const { data: reviewSummary } = useReviewSummary();
   const { data: overallProgress } = useOverallProgress();
   const { data: quizDiscovery } = useQuizDiscoveryCard();
+  const { data: dashboard } = useDashboard();
   const markQuizDiscoverySurfaced = useMarkQuizDiscoverySurfaced();
   const [recoveryMarker, setRecoveryMarker] =
     useState<SessionRecoveryMarker | null>(null);
@@ -119,6 +121,17 @@ export function LearnerScreen({
   const isParentProxy = Boolean(
     activeProfile && !activeProfile.isOwner && profiles.some((p) => p.isOwner),
   );
+  const linkedChildren = useMemo(
+    () =>
+      activeProfile?.isOwner === true
+        ? profiles.filter(
+            (profile) => profile.id !== activeProfile.id && !profile.isOwner,
+          )
+        : [],
+    [activeProfile?.id, activeProfile?.isOwner, profiles],
+  );
+  const showChildCard =
+    activeProfile?.isOwner === true && linkedChildren.length > 0;
 
   const [coachBandDismissed, setCoachBandDismissed] = useState(false);
 
@@ -376,23 +389,13 @@ export function LearnerScreen({
                 Retry
               </Text>
             </Pressable>
-            {onBack ? (
-              <Pressable
-                onPress={onBack}
-                className="mt-2 min-h-[44px] items-center justify-center px-6 py-2"
-                testID="learner-loading-go-back"
-              >
-                <Text className="text-body text-text-secondary">Go back</Text>
-              </Pressable>
-            ) : (
-              <Pressable
-                onPress={() => router.replace('/(app)/home' as never)}
-                className="mt-2 min-h-[44px] items-center justify-center px-6 py-2"
-                testID="learner-loading-go-home"
-              >
-                <Text className="text-body text-text-secondary">Go home</Text>
-              </Pressable>
-            )}
+            <Pressable
+              onPress={() => router.replace('/(app)/home' as never)}
+              className="mt-2 min-h-[44px] items-center justify-center px-6 py-2"
+              testID="learner-loading-go-home"
+            >
+              <Text className="text-body text-text-secondary">Go home</Text>
+            </Pressable>
           </View>
         )}
       </ScrollView>
@@ -438,21 +441,6 @@ export function LearnerScreen({
     <View className="flex-1 bg-background" testID="learner-screen">
       <View className="px-5" style={{ paddingTop: insets.top + 16 }}>
         <View className="flex-row items-center">
-          {onBack ? (
-            <Pressable
-              onPress={onBack}
-              className="mr-3 min-h-[44px] min-w-[44px] items-center justify-center"
-              accessibilityRole="button"
-              accessibilityLabel="Go back"
-              testID="learner-back"
-            >
-              <Ionicons
-                name="arrow-back"
-                size={24}
-                color={colors.textPrimary}
-              />
-            </Pressable>
-          ) : null}
           <View className="flex-1">
             <Text className="text-h2 font-bold text-text-primary leading-tight">
               Hey {firstName}!
@@ -460,7 +448,7 @@ export function LearnerScreen({
             <Text className="text-body-sm text-text-secondary mt-0.5">
               {subtitle}
             </Text>
-            {!isParentProxy ? <ChildQuotaLine /> : null}
+            {!isParentProxy && !showChildCard ? <ChildQuotaLine /> : null}
           </View>
         </View>
       </View>
@@ -485,6 +473,14 @@ export function LearnerScreen({
             />
           </View>
         )}
+
+        <View className="px-5">
+          <WithdrawalCountdownBanner />
+        </View>
+
+        {showChildCard ? (
+          <ChildCard linkedChildren={linkedChildren} dashboard={dashboard} />
+        ) : null}
 
         {!isParentProxy && (
           <View className={showCoachBand ? 'mt-1' : 'mt-5'}>

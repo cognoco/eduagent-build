@@ -1526,7 +1526,7 @@ export default function AppLayout() {
   }
 
   // Linked-parent accounts intentionally enter through /(app)/home now.
-  // home.tsx renders ParentGateway for owners with child profiles and routes
+  // home.tsx renders LearnerScreen for owners with child profiles and routes
   // them to /(app)/family only when they explicitly choose progress
   // management. That keeps the adaptive home flow reachable.
 
