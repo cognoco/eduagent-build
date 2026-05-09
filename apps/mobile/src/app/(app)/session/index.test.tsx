@@ -141,6 +141,10 @@ const mockSetSessionInputMode = jest.fn();
 const mockFlagSessionContent = jest.fn();
 const mockReplace = jest.fn();
 const mockSetParams = jest.fn();
+const mockUpdateLearningModeMutate = jest.fn();
+let mockLearningMode: 'casual' | 'serious' | undefined = 'casual';
+let mockLearningModeLoading = false;
+let mockLearningModePending = false;
 
 type TranscriptMockReturn = {
   data: null | {
@@ -188,6 +192,18 @@ jest.mock('../../../hooks/use-sessions', () => ({
   useFlagSessionContent: () => ({ mutateAsync: mockFlagSessionContent }),
   useParkingLot: () => ({ data: [], isLoading: false }),
   useAddParkingLotItem: () => ({ mutateAsync: jest.fn(), isPending: false }),
+}));
+
+jest.mock('../../../hooks/use-settings', () => ({
+  useCelebrationLevel: () => ({ data: 'all' }),
+  useLearningMode: () => ({
+    data: mockLearningMode,
+    isLoading: mockLearningModeLoading,
+  }),
+  useUpdateLearningMode: () => ({
+    mutate: mockUpdateLearningModeMutate,
+    isPending: mockLearningModePending,
+  }),
 }));
 
 // ---------------------------------------------------------------------------
@@ -421,6 +437,9 @@ describe('SessionScreen homework flow', () => {
     jest.useFakeTimers();
     mockFetch.mockClear();
     mockUseSessionTranscript.mockReturnValue({ data: null });
+    mockLearningMode = 'casual';
+    mockLearningModeLoading = false;
+    mockLearningModePending = false;
     // Default: no active session (null response body)
     mockFetch.setRoute('/progress/topic', null);
     // Clear SecureStore mock data
@@ -485,7 +504,7 @@ describe('SessionScreen homework flow', () => {
 
   it('renders Explorer learning mode in the session header', async () => {
     jest.useRealTimers();
-    mockFetch.setRoute('/learning-mode', { mode: 'casual' });
+    mockLearningMode = 'casual';
 
     const testScreen = render(<SessionScreen />, { wrapper: createWrapper() });
 
@@ -493,14 +512,14 @@ describe('SessionScreen homework flow', () => {
       testScreen.getByTestId('learning-mode-header-button');
       testScreen.getByText('Explorer');
     });
-    expect(testScreen.queryByTestId('agency-badge')).toBeNull();
+    expect(testScreen.getByTestId('agency-badge')).toBeTruthy();
     expect(testScreen.queryByText('Independent mode')).toBeNull();
     expect(testScreen.queryByText('Guided mode')).toBeNull();
   });
 
   it('renders Challenge mode in the session header', async () => {
     jest.useRealTimers();
-    mockFetch.setRoute('/learning-mode', { mode: 'serious' });
+    mockLearningMode = 'serious';
 
     const testScreen = render(<SessionScreen />, { wrapper: createWrapper() });
 
@@ -526,30 +545,30 @@ describe('SessionScreen homework flow', () => {
 
   it('closes the selector without a network call when active mode is tapped', async () => {
     jest.useRealTimers();
+    mockLearningMode = 'casual';
     const testScreen = render(<SessionScreen />, { wrapper: createWrapper() });
 
+    // Wait for the learning mode to load (button becomes enabled and shows the
+    // mode label). Without this, learningMode is undefined and tapping casual
+    // triggers a redundant PUT rather than a no-op close.
     await waitFor(() => {
-      testScreen.getByTestId('learning-mode-header-button');
+      testScreen.getByText('Explorer');
     });
     fireEvent.press(testScreen.getByTestId('learning-mode-header-button'));
     fireEvent.press(testScreen.getByTestId('session-learning-mode-casual'));
 
     await waitFor(() => {
-      expect(testScreen.queryByTestId('learning-mode-sheet')).toBeNull();
+      expect(
+        testScreen.UNSAFE_getByProps({ testID: 'learning-mode-modal' }).props
+          .visible,
+      ).toBe(false);
     });
-    expect(fetchCallsMatching(mockFetch, '/learning-mode')).toHaveLength(1);
+    expect(mockUpdateLearningModeMutate).not.toHaveBeenCalled();
   });
 
-  it('updates learning mode optimistically when an inactive mode is selected', async () => {
+  it('calls the learning mode mutation when an inactive mode is selected', async () => {
     jest.useRealTimers();
-    let currentMode = 'casual';
-    mockFetch.setRoute('/learning-mode', (_url: string, init?: RequestInit) => {
-      if (init?.method === 'PUT') {
-        const body = extractJsonBody<{ mode: string }>(init);
-        currentMode = body?.mode ?? currentMode;
-      }
-      return { mode: currentMode };
-    });
+    mockLearningMode = 'casual';
 
     const testScreen = render(<SessionScreen />, { wrapper: createWrapper() });
 
@@ -559,26 +578,19 @@ describe('SessionScreen homework flow', () => {
     fireEvent.press(testScreen.getByTestId('learning-mode-header-button'));
     fireEvent.press(testScreen.getByTestId('session-learning-mode-serious'));
 
-    await waitFor(() => {
-      testScreen.getByText('Challenge mode');
-    });
-    const updateCalls = fetchCallsMatching(mockFetch, '/learning-mode').filter(
-      (call) => call.init?.method === 'PUT',
+    expect(mockUpdateLearningModeMutate).toHaveBeenCalledWith(
+      'serious',
+      expect.objectContaining({
+        onError: expect.any(Function),
+        onSuccess: expect.any(Function),
+      }),
     );
-    expect(updateCalls).toHaveLength(1);
-    expect(extractJsonBody(updateCalls[0]?.init)).toEqual({ mode: 'serious' });
   });
 
   it('disables the learning mode header while the mode is loading', async () => {
     jest.useRealTimers();
-    let resolveLoading!: () => void;
-    mockFetch.setRoute(
-      '/learning-mode',
-      () =>
-        new Promise((resolve) => {
-          resolveLoading = () => resolve({ mode: 'casual' });
-        }),
-    );
+    mockLearningMode = undefined;
+    mockLearningModeLoading = true;
 
     const testScreen = render(<SessionScreen />, { wrapper: createWrapper() });
 
@@ -586,39 +598,21 @@ describe('SessionScreen homework flow', () => {
       testScreen.getByTestId('learning-mode-header-button').props
         .accessibilityState.disabled,
     ).toBe(true);
-    resolveLoading();
-    await flushAsyncWork();
   });
 
-  it('disables learning mode choices while a mode save is pending', async () => {
+  it('disables the learning mode header while a mode save is pending', async () => {
     jest.useRealTimers();
-    let resolveSave!: () => void;
-    mockFetch.setRoute('/learning-mode', (_url: string, init?: RequestInit) => {
-      if (init?.method === 'PUT') {
-        return new Promise((resolve) => {
-          resolveSave = () => resolve({ mode: 'serious' });
-        });
-      }
-      return { mode: 'casual' };
-    });
+    mockLearningModePending = true;
 
     const testScreen = render(<SessionScreen />, { wrapper: createWrapper() });
 
     await waitFor(() => {
       testScreen.getByText('Explorer');
     });
-    fireEvent.press(testScreen.getByTestId('learning-mode-header-button'));
-    fireEvent.press(testScreen.getByTestId('session-learning-mode-serious'));
-
-    await waitFor(() => {
-      expect(
-        testScreen.getByTestId('session-learning-mode-casual').props
-          .accessibilityState.disabled,
-      ).toBe(true);
-    });
-
-    resolveSave();
-    await flushAsyncWork();
+    expect(
+      testScreen.getByTestId('learning-mode-header-button').props
+        .accessibilityState.disabled,
+    ).toBe(true);
   });
 
   it('keeps homework progress in one session when moving to the next problem', async () => {

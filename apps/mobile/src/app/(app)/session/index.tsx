@@ -1289,6 +1289,37 @@ function SessionScreenInner() {
     </Pressable>
   );
 
+  const agencyLabel = escalationRung >= 3 ? 'Guided' : 'Independent';
+  // [BUG-936] On narrow widths (375px) the header was fighting for room
+  // between a back arrow, a "Learning Session" title, a textual agency
+  // pill ("Independent" / "Guided"), milestone dots, and a textual "I'm
+  // Done" pill — title and subtitle truncated to ~7 chars. The agency
+  // pill is a passive state indicator (not a primary action) so we
+  // collapse it to an icon-only Pressable. The full label is preserved
+  // in accessibilityLabel and the tap-for-info modal so SR users and
+  // curious learners still see the textual mode name. Saves ~60-80px
+  // for the title column without removing functionality.
+  const agencyIconName: keyof typeof Ionicons.glyphMap =
+    agencyLabel === 'Guided' ? 'school-outline' : 'compass-outline';
+  const agencyBadge = (
+    <Pressable
+      onPress={() =>
+        platformAlert(
+          agencyLabel === 'Guided' ? 'Guided mode' : 'Independent mode',
+          agencyLabel === 'Guided'
+            ? "I'm giving more structure right now because the conversation needed extra support."
+            : "I'm mostly letting you drive and checking in with lighter guidance.",
+        )
+      }
+      className="ms-1 px-2 py-2 rounded-button bg-surface-elevated min-h-[44px] min-w-[44px] items-center justify-center"
+      accessibilityRole="button"
+      accessibilityLabel={`Session mode: ${agencyLabel}`}
+      testID="agency-badge"
+    >
+      <Ionicons name={agencyIconName} size={20} color={colors.textSecondary} />
+    </Pressable>
+  );
+
   const learningModeOptions: Array<{
     mode: LearningMode;
     title: string;
@@ -1364,6 +1395,7 @@ function SessionScreenInner() {
     <View className="flex-row items-center">
       {modeConfig.showTimer && <SessionTimer />}
       {learningModeButton}
+      {agencyBadge}
       <MilestoneDots count={milestonesReached.length} />
       {endSessionButton}
     </View>
@@ -1592,7 +1624,9 @@ function SessionScreenInner() {
           // CR-6: Disable input while session close is in flight.
           isClosing
         }
-        showDisabledBanner={!isSubjectFlowBlockingComposer}
+        showDisabledBanner={
+          pendingClassification || !isSubjectFlowBlockingComposer
+        }
         disabledReason={
           isOffline
             ? "You're offline — input will return when you reconnect"
@@ -1600,7 +1634,9 @@ function SessionScreenInner() {
               ? 'This session has ended'
               : quotaError
                 ? 'Your session limit has been reached'
-                : undefined
+                : pendingClassification
+                  ? t('session.chatShell.classifyingSubject')
+                  : undefined
         }
         verificationType={liveTranscript?.session.verificationType ?? undefined}
         inputMode={inputMode}
@@ -1676,6 +1712,7 @@ function SessionScreenInner() {
         transparent
         animationType="fade"
         onRequestClose={() => setShowLearningModeSheet(false)}
+        testID="learning-mode-modal"
       >
         <Pressable
           className="flex-1 bg-black/40 justify-end"
@@ -1688,13 +1725,13 @@ function SessionScreenInner() {
             testID="learning-mode-sheet"
           >
             <Text className="text-title-sm font-semibold text-text-primary mb-1">
-              Learning mode
+              {t('more.learningMode.sheetTitle')}
             </Text>
             <Text
               className="text-caption text-text-secondary mb-3"
               testID="learning-mode-next-message-copy"
             >
-              Takes effect from your next message.
+              {t('more.learningMode.sheetEffectMessage')}
             </Text>
             {learningModeOptions.map((option) => {
               const selected = learningMode === option.mode;
