@@ -75,6 +75,7 @@ import {
   useLearningMode,
   useUpdateLearningMode,
 } from '../../../hooks/use-settings';
+import { useLearnerProfile } from '../../../hooks/use-learner-profile';
 import { useCelebration } from '../../../hooks/use-celebration';
 import { useSubjects, useCreateSubject } from '../../../hooks/use-subjects';
 import { useCurriculum } from '../../../hooks/use-curriculum';
@@ -467,6 +468,7 @@ function SessionScreenInner() {
   const { data: overallProgress } = useOverallProgress();
   const progressInventory = useProgressInventory();
   const { data: celebrationLevel = 'all' } = useCelebrationLevel();
+  const { data: learnerProfile } = useLearnerProfile();
   const { data: learningMode, isLoading: learningModeLoading } =
     useLearningMode();
   const updateLearningMode = useUpdateLearningMode();
@@ -673,6 +675,7 @@ function SessionScreenInner() {
   >(null);
   const { CelebrationOverlay, trigger } = useCelebration({
     celebrationLevel,
+    accommodationMode: learnerProfile?.accommodationMode,
     audience: 'child',
   });
 
@@ -1289,37 +1292,6 @@ function SessionScreenInner() {
     </Pressable>
   );
 
-  const agencyLabel = escalationRung >= 3 ? 'Guided' : 'Independent';
-  // [BUG-936] On narrow widths (375px) the header was fighting for room
-  // between a back arrow, a "Learning Session" title, a textual agency
-  // pill ("Independent" / "Guided"), milestone dots, and a textual "I'm
-  // Done" pill — title and subtitle truncated to ~7 chars. The agency
-  // pill is a passive state indicator (not a primary action) so we
-  // collapse it to an icon-only Pressable. The full label is preserved
-  // in accessibilityLabel and the tap-for-info modal so SR users and
-  // curious learners still see the textual mode name. Saves ~60-80px
-  // for the title column without removing functionality.
-  const agencyIconName: keyof typeof Ionicons.glyphMap =
-    agencyLabel === 'Guided' ? 'school-outline' : 'compass-outline';
-  const agencyBadge = (
-    <Pressable
-      onPress={() =>
-        platformAlert(
-          agencyLabel === 'Guided' ? 'Guided mode' : 'Independent mode',
-          agencyLabel === 'Guided'
-            ? "I'm giving more structure right now because the conversation needed extra support."
-            : "I'm mostly letting you drive and checking in with lighter guidance.",
-        )
-      }
-      className="ms-1 px-2 py-2 rounded-button bg-surface-elevated min-h-[44px] min-w-[44px] items-center justify-center"
-      accessibilityRole="button"
-      accessibilityLabel={`Session mode: ${agencyLabel}`}
-      testID="agency-badge"
-    >
-      <Ionicons name={agencyIconName} size={20} color={colors.textSecondary} />
-    </Pressable>
-  );
-
   const learningModeOptions: Array<{
     mode: LearningMode;
     title: string;
@@ -1395,7 +1367,6 @@ function SessionScreenInner() {
     <View className="flex-row items-center">
       {modeConfig.showTimer && <SessionTimer />}
       {learningModeButton}
-      {agencyBadge}
       <MilestoneDots count={milestonesReached.length} />
       {endSessionButton}
     </View>

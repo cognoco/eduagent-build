@@ -9,6 +9,7 @@ import {
   usePendingCelebrations,
 } from '../../hooks/use-celebrations';
 import { useCelebrationLevel } from '../../hooks/use-settings';
+import { useLearnerProfile } from '../../hooks/use-learner-profile';
 import { useAckNotice, useDashboard } from '../../hooks/use-dashboard';
 import { useProfile } from '../../lib/profile';
 
@@ -31,6 +32,7 @@ export default function HomeScreen(): React.ReactElement {
   const { view } = useLocalSearchParams<{ view?: string }>();
   const { profiles, activeProfile, isLoading } = useProfile();
   const { data: celebrationLevel = 'all' } = useCelebrationLevel();
+  const { data: learnerProfile } = useLearnerProfile();
   const { data: pendingCelebrations } = usePendingCelebrations();
   const markCelebrationsSeen = useMarkCelebrationsSeen();
   const { data: dashboard } = useDashboard();
@@ -39,6 +41,7 @@ export default function HomeScreen(): React.ReactElement {
   const { CelebrationOverlay } = useCelebration({
     queue: pendingCelebrations ?? [],
     celebrationLevel,
+    accommodationMode: learnerProfile?.accommodationMode,
     audience: isOwner ? 'adult' : 'child',
     onAllComplete: () => {
       markCelebrationsSeen

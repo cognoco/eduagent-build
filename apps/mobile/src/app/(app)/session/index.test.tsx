@@ -512,7 +512,7 @@ describe('SessionScreen homework flow', () => {
       testScreen.getByTestId('learning-mode-header-button');
       testScreen.getByText('Explorer');
     });
-    expect(testScreen.getByTestId('agency-badge')).toBeTruthy();
+    expect(testScreen.queryByTestId('agency-badge')).toBeNull();
     expect(testScreen.queryByText('Independent mode')).toBeNull();
     expect(testScreen.queryByText('Guided mode')).toBeNull();
   });
