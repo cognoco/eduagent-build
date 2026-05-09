@@ -118,6 +118,8 @@ function renderChildCards(
     trend: string;
     retentionTrend?: string;
     totalSessions?: number;
+    weeklyHeadline?: { label: string; value: number; comparison: string };
+    currentlyWorkingOn?: string[];
     currentStreak: number;
     totalXp: number;
     consentStatus: string | null;
@@ -152,6 +154,8 @@ function renderChildCards(
         child.retentionTrend as 'improving' | 'declining' | 'stable' | undefined
       }
       totalSessions={child.totalSessions}
+      weeklyHeadline={child.weeklyHeadline}
+      currentlyWorkingOn={child.currentlyWorkingOn}
       currentStreak={child.currentStreak}
       totalXp={child.totalXp}
       consentStatus={
@@ -405,23 +409,23 @@ function FamilyContent(): React.ReactElement {
                     updateFamilyPoolBreakdownSharing.isPending
                   }
                 />
-                {showAddChild ? (
-                  <Pressable
-                    onPress={handleAddChild}
-                    className="bg-surface rounded-card px-4 py-3.5 mb-2"
-                    accessibilityLabel={t('more.family.addChildAccessLabel')}
-                    accessibilityRole="button"
-                    testID="family-add-child-link"
-                  >
-                    <Text className="text-body font-semibold text-text-primary">
-                      {t('more.family.addChild')}
-                    </Text>
-                    <Text className="text-body-sm text-text-secondary mt-1">
-                      {t('more.family.addChildDescription')}
-                    </Text>
-                  </Pressable>
-                ) : null}
               </>
+            ) : null}
+            {!isDemo && showAddChild ? (
+              <Pressable
+                onPress={handleAddChild}
+                className="bg-surface rounded-card px-4 py-3.5 mb-2 mt-2"
+                accessibilityLabel={t('more.family.addChildAccessLabel')}
+                accessibilityRole="button"
+                testID="family-add-child-link"
+              >
+                <Text className="text-body font-semibold text-text-primary">
+                  {t('more.family.addChild')}
+                </Text>
+                <Text className="text-body-sm text-text-secondary mt-1">
+                  {t('more.family.addChildDescription')}
+                </Text>
+              </Pressable>
             ) : null}
             {isDemo && (
               <Pressable

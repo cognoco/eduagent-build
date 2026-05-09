@@ -63,6 +63,7 @@ import {
   listMonthlyReportsForParentChild,
   markMonthlyReportViewed,
 } from './monthly-report';
+import { getCurrentlyWorkingOn } from './learner-profile';
 import { assertParentAccess } from './family-access';
 import { generateWeeklyReportData } from './weekly-report';
 import {
@@ -304,6 +305,7 @@ function redactDashboardChild(child: DashboardChild): DashboardChild {
     retentionTrend: 'stable',
     totalSessions: 0,
     weeklyHeadline: hiddenWeeklyHeadline(),
+    currentlyWorkingOn: [],
     progress: null,
     currentStreak: 0,
     longestStreak: 0,
@@ -554,26 +556,30 @@ async function buildChildProgressSummary(
   progress: DashboardChild['progress'];
   totalSessions: number;
   weeklyHeadline: DashboardChild['weeklyHeadline'];
+  currentlyWorkingOn: DashboardChild['currentlyWorkingOn'];
 }> {
   // [F-PV-07] Compute totalSessions live with the same filter as getChildSessions
   // (exchangeCount >= 1) instead of reading the stale snapshot value. This
   // prevents the dashboard aggregate from disagreeing with the sessions list.
-  const [latestSnapshot, liveCountRows] = await Promise.all([
-    getLatestSnapshot(db, childProfileId),
-    db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(learningSessions)
-      .where(
-        and(
-          eq(learningSessions.profileId, childProfileId),
-          // "Completed session" = exchangeCount >= 1 AND status !== 'active'.
-          // SYNC: apps/mobile/src/lib/progressive-disclosure.ts
-          //       apps/api/src/services/snapshot-aggregation.ts computeProgressMetrics()
-          gte(learningSessions.exchangeCount, 1),
-          ne(learningSessions.status, 'active'),
+  const [latestSnapshot, liveCountRows, currentlyWorkingOn] = await Promise.all(
+    [
+      getLatestSnapshot(db, childProfileId),
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(learningSessions)
+        .where(
+          and(
+            eq(learningSessions.profileId, childProfileId),
+            // "Completed session" = exchangeCount >= 1 AND status !== 'active'.
+            // SYNC: apps/mobile/src/lib/progressive-disclosure.ts
+            //       apps/api/src/services/snapshot-aggregation.ts computeProgressMetrics()
+            gte(learningSessions.exchangeCount, 1),
+            ne(learningSessions.status, 'active'),
+          ),
         ),
-      ),
-  ]);
+      getCurrentlyWorkingOn(db, childProfileId),
+    ],
+  );
   const liveSessionCount = liveCountRows[0]?.count ?? 0;
   const weekStart = isoDate(getStartOfWeek(new Date()));
   if (!latestSnapshot) {
@@ -586,6 +592,7 @@ async function buildChildProgressSummary(
         emptyProgressMetrics(),
         null,
       ).headlineStat,
+      currentlyWorkingOn,
     };
   }
 
@@ -634,6 +641,7 @@ async function buildChildProgressSummary(
     },
     totalSessions: liveSessionCount,
     weeklyHeadline,
+    currentlyWorkingOn,
   };
 }
 
@@ -934,7 +942,8 @@ export async function getChildrenForParent(
     const progressSummary = progressSummaries[i];
     if (!progressSummary)
       throw new Error(`progressSummaries[${i}] is unexpectedly undefined`);
-    const { progress, totalSessions, weeklyHeadline } = progressSummary;
+    const { progress, totalSessions, weeklyHeadline, currentlyWorkingOn } =
+      progressSummary;
     // [BUG-906] Inject lifetime count so generateChildSummary can pick the
     // right framing (lifetime for new learners, weekly cadence otherwise).
     const summary = generateChildSummary({
@@ -973,6 +982,7 @@ export async function getChildrenForParent(
       retentionTrend,
       totalSessions,
       weeklyHeadline,
+      currentlyWorkingOn,
       progress,
       currentStreak: streaksByProfile.get(p.childProfileId)?.currentStreak ?? 0,
       longestStreak: streaksByProfile.get(p.childProfileId)?.longestStreak ?? 0,
@@ -1109,6 +1119,7 @@ export async function getChildDetail(
     progress: progressSummary,
     totalSessions,
     weeklyHeadline,
+    currentlyWorkingOn,
   } = await buildChildProgressSummary(
     db,
     childProfileId,
@@ -1177,6 +1188,7 @@ export async function getChildDetail(
     retentionTrend,
     totalSessions,
     weeklyHeadline,
+    currentlyWorkingOn,
     progress: progressSummary,
     // streakData is already decay-adjusted (repo.streaks.findCurrentForToday).
     currentStreak: streakData?.currentStreak ?? 0,

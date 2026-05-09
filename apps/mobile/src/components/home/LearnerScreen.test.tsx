@@ -263,6 +263,7 @@ describe('LearnerScreen', () => {
             value: 12,
             comparison: 'up from 5 last week',
           },
+          currentlyWorkingOn: [],
           progress: null,
           currentStreak: 0,
           longestStreak: 0,

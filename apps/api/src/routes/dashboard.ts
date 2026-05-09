@@ -376,6 +376,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
               value: 12,
               comparison: 'up from 5 last week',
             },
+            currentlyWorkingOn: ['Fractions', 'Cell structure'],
             currentStreak: 3,
             longestStreak: 7,
             totalXp: 450,
@@ -404,6 +405,7 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
               comparison:
                 "No activity this week - that's OK. A nudge can help.",
             },
+            currentlyWorkingOn: ['Essay structure'],
             currentStreak: 1,
             longestStreak: 5,
             totalXp: 280,

@@ -5,6 +5,7 @@ import { createRoutedMockFetch } from '../../test-utils/mock-api-routes';
 
 const mockFetch = createRoutedMockFetch({
   '/celebrations/pending': { pendingCelebrations: [] },
+  '/learner-profile': { profile: { accommodationMode: 'none' } },
   '/settings/celebration-level': { celebrationLevel: 'all' },
 });
 
