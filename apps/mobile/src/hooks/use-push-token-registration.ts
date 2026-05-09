@@ -4,6 +4,7 @@ import Constants from 'expo-constants';
 import { AppState, Platform } from 'react-native';
 import { useRegisterPushToken } from './use-settings';
 import { Sentry } from '../lib/sentry';
+import { useProfile } from '../lib/profile';
 
 export type PushRegistrationFailure =
   | 'permission_denied'
@@ -31,14 +32,17 @@ function capturePushRegistrationFailure(
  * is requested just-in-time by the post-session primer.
  */
 export function usePushTokenRegistration(): PushRegistrationState {
-  const hasRegistered = useRef(false);
+  const registeredProfileId = useRef<string | null>(null);
   const [state, setState] = useState<PushRegistrationState>({
     status: 'idle',
   });
+  const { activeProfile } = useProfile();
   const registerPushToken = useRegisterPushToken();
 
   const registerIfAllowed = useCallback(async () => {
-    if (hasRegistered.current) return;
+    const activeProfileId = activeProfile?.id ?? null;
+    if (!activeProfileId) return;
+    if (registeredProfileId.current === activeProfileId) return;
 
     try {
       const { status } = await Notifications.getPermissionsAsync();
@@ -83,14 +87,14 @@ export function usePushTokenRegistration(): PushRegistrationState {
         capturePushRegistrationFailure(err, 'api_registration_failed');
         return;
       }
-      hasRegistered.current = true;
+      registeredProfileId.current = activeProfileId;
       setState({ status: 'registered' });
     } catch (err) {
       // Push registration is non-critical, but capture for prod observability [SC-3]
       setState({ status: 'failed', reason: 'unsupported_device' });
       capturePushRegistrationFailure(err, 'unsupported_device');
     }
-  }, [registerPushToken]);
+  }, [activeProfile?.id, registerPushToken]);
 
   useEffect(() => {
     void registerIfAllowed();

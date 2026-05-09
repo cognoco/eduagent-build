@@ -8,9 +8,14 @@ import { usePushTokenRegistration } from './use-push-token-registration';
 // ---------------------------------------------------------------------------
 
 const mockMutateAsync = jest.fn().mockResolvedValue({ registered: true });
+let mockActiveProfile: { id: string } | null = { id: 'profile-1' };
 
 jest.mock('./use-settings', () => ({
   useRegisterPushToken: () => ({ mutateAsync: mockMutateAsync }),
+}));
+
+jest.mock('../lib/profile', () => ({
+  useProfile: () => ({ activeProfile: mockActiveProfile }),
 }));
 
 jest.mock('expo-constants', () => {
@@ -30,6 +35,7 @@ describe('usePushTokenRegistration', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockActiveProfile = { id: 'profile-1' };
     appStateListeners = [];
     jest
       .spyOn(AppState, 'addEventListener')
@@ -129,6 +135,36 @@ describe('usePushTokenRegistration', () => {
         'ExponentPushToken[mock-token]',
       );
     });
+  });
+
+  it('registers again when the active profile changes', async () => {
+    const { rerender } = renderHook(() => usePushTokenRegistration());
+
+    await waitFor(() => {
+      expect(mockMutateAsync).toHaveBeenCalledTimes(1);
+    });
+
+    mockActiveProfile = { id: 'profile-2' };
+
+    rerender({});
+
+    await waitFor(() => {
+      expect(mockMutateAsync).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('does not register without an active profile', async () => {
+    mockActiveProfile = null;
+
+    const { result } = renderHook(() => usePushTokenRegistration());
+
+    await act(async () => {
+      appStateListeners.forEach((listener) => listener('active'));
+    });
+
+    expect(Notifications.getPermissionsAsync).not.toHaveBeenCalled();
+    expect(mockMutateAsync).not.toHaveBeenCalled();
+    expect(result.current.status).toBe('idle');
   });
 
   it('does not crash on registration error', async () => {
