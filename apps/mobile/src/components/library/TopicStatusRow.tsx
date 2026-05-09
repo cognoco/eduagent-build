@@ -139,13 +139,7 @@ export function TopicStatusRow({
         </Text>
 
         <View className="flex-1">
-          <View
-            className={
-              state === 'done'
-                ? 'flex-row items-center justify-between'
-                : undefined
-            }
-          >
+          <View className="flex-row items-center justify-between">
             <Text
               className="flex-1 text-body font-medium text-text-primary"
               numberOfLines={2}
