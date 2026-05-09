@@ -4,7 +4,7 @@
 // Haptic feedback on state transitions (FR147).
 // ---------------------------------------------------------------------------
 
-import { View, Text, Pressable } from 'react-native';
+import { View, Text, Pressable, TextInput } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -36,7 +36,7 @@ export function VoiceRecordButton({
       pulseScale.value = withRepeat(
         withTiming(1.15, { duration: 800 }),
         -1,
-        true
+        true,
       );
     } else {
       cancelAnimation(pulseScale);
@@ -96,6 +96,8 @@ interface VoiceTranscriptPreviewProps {
   onSend: () => void;
   onDiscard: () => void;
   onReRecord: () => void;
+  /** Lets the user tap into the transcript and correct STT mistakes before sending. */
+  onTranscriptChange?: (text: string) => void;
 }
 
 export function VoiceTranscriptPreview({
@@ -103,6 +105,7 @@ export function VoiceTranscriptPreview({
   onSend,
   onDiscard,
   onReRecord,
+  onTranscriptChange,
 }: VoiceTranscriptPreviewProps) {
   const colors = useThemeColors();
   if (!transcript) return null;
@@ -119,7 +122,17 @@ export function VoiceTranscriptPreview({
 
   return (
     <View className="mx-4 mb-2 p-3 bg-surface-elevated rounded-xl">
-      <Text className="text-body text-text-primary mb-2">{transcript}</Text>
+      <TextInput
+        className="text-body text-text-primary mb-2 p-0"
+        value={transcript}
+        onChangeText={onTranscriptChange}
+        editable={Boolean(onTranscriptChange)}
+        multiline
+        maxLength={5000}
+        placeholderTextColor={colors.textSecondary}
+        accessibilityLabel="Voice transcript — tap to edit"
+        testID="voice-transcript-input"
+      />
       {/* [BUG-715 / ACC-12] Secondary buttons collapse to icon-only on the 360pt-budget row. accessibilityLabel preserved for screen readers; Send keeps text + flex-1 prominence. */}
       <View className="flex-row gap-2">
         <Pressable

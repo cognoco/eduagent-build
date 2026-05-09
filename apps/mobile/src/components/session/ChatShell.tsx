@@ -808,6 +808,7 @@ export function ChatShell({
           onSend={handleVoiceSend}
           onDiscard={handleVoiceDiscard}
           onReRecord={handleVoiceReRecord}
+          onTranscriptChange={setPendingTranscript}
         />
       )}
 

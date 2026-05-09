@@ -50,7 +50,7 @@ describe('VoiceRecordButton', () => {
         isListening={false}
         onPress={jest.fn()}
         disabled={false}
-      />
+      />,
     );
 
     screen.getByTestId('voice-record-button');
@@ -64,7 +64,7 @@ describe('VoiceRecordButton', () => {
         isListening={true}
         onPress={jest.fn()}
         disabled={false}
-      />
+      />,
     );
 
     // Icon is a11y-hidden — must use includeHiddenElements to find it
@@ -82,7 +82,7 @@ describe('VoiceRecordButton', () => {
         isListening={false}
         onPress={onPress}
         disabled={false}
-      />
+      />,
     );
 
     fireEvent.press(screen.getByTestId('voice-record-button'));
@@ -99,7 +99,7 @@ describe('VoiceRecordButton', () => {
         isListening={true}
         onPress={onPress}
         disabled={false}
-      />
+      />,
     );
 
     fireEvent.press(screen.getByTestId('voice-record-button'));
@@ -120,7 +120,7 @@ describe('VoiceRecordButton', () => {
         isListening={false}
         onPress={onPress}
         disabled={true}
-      />
+      />,
     );
 
     const button = screen.getByTestId('voice-record-button');
@@ -143,7 +143,7 @@ describe('VoiceRecordButton', () => {
         isListening={false}
         onPress={jest.fn()}
         disabled={false}
-      />
+      />,
     );
 
     screen.getByLabelText('Start recording');
@@ -155,7 +155,7 @@ describe('VoiceRecordButton', () => {
         isListening={true}
         onPress={jest.fn()}
         disabled={false}
-      />
+      />,
     );
 
     screen.getByLabelText('Stop recording');
@@ -171,7 +171,7 @@ describe('VoiceRecordButton', () => {
         isListening={true}
         onPress={jest.fn()}
         disabled={false}
-      />
+      />,
     );
 
     // The component renders — Animated.View wraps the Pressable.
@@ -187,7 +187,7 @@ describe('VoiceRecordButton', () => {
         isListening={false}
         onPress={jest.fn()}
         disabled={false}
-      />
+      />,
     );
 
     expect(toJSON()).toBeTruthy();
@@ -202,7 +202,7 @@ describe('VoiceRecordButton', () => {
         isListening={false}
         onPress={jest.fn()}
         disabled={false}
-      />
+      />,
     );
     // includeHiddenElements required because the wrapper is itself a11y-hidden.
     const iconWrapper = screen.getByTestId('voice-record-icon', {
@@ -210,7 +210,7 @@ describe('VoiceRecordButton', () => {
     });
     expect(iconWrapper.props.accessibilityElementsHidden).toBe(true);
     expect(iconWrapper.props.importantForAccessibility).toBe(
-      'no-hide-descendants'
+      'no-hide-descendants',
     );
   });
 
@@ -220,7 +220,7 @@ describe('VoiceRecordButton', () => {
         isListening={false}
         onPress={jest.fn()}
         disabled={false}
-      />
+      />,
     );
     expect(screen.queryByTestId('voice-record-icon')).toBeNull();
   });
@@ -238,13 +238,45 @@ describe('VoiceTranscriptPreview', () => {
         onSend={jest.fn()}
         onDiscard={jest.fn()}
         onReRecord={jest.fn()}
-      />
+      />,
     );
 
-    screen.getByText('Plants use sunlight');
+    screen.getByDisplayValue('Plants use sunlight');
     screen.getByTestId('voice-send-button');
     screen.getByTestId('voice-discard-button');
     screen.getByTestId('voice-rerecord-button');
+  });
+
+  it('lets the user tap in and correct the transcript before sending', () => {
+    const onTranscriptChange = jest.fn();
+    render(
+      <VoiceTranscriptPreview
+        transcript="I love folding"
+        onSend={jest.fn()}
+        onDiscard={jest.fn()}
+        onReRecord={jest.fn()}
+        onTranscriptChange={onTranscriptChange}
+      />,
+    );
+
+    const input = screen.getByTestId('voice-transcript-input');
+    expect(input.props.editable).toBe(true);
+    fireEvent.changeText(input, 'I love coding');
+    expect(onTranscriptChange).toHaveBeenCalledWith('I love coding');
+  });
+
+  it('renders transcript read-only when no onTranscriptChange supplied', () => {
+    render(
+      <VoiceTranscriptPreview
+        transcript="Read only"
+        onSend={jest.fn()}
+        onDiscard={jest.fn()}
+        onReRecord={jest.fn()}
+      />,
+    );
+
+    const input = screen.getByTestId('voice-transcript-input');
+    expect(input.props.editable).toBe(false);
   });
 
   it('returns null when transcript is empty', () => {
@@ -254,7 +286,7 @@ describe('VoiceTranscriptPreview', () => {
         onSend={jest.fn()}
         onDiscard={jest.fn()}
         onReRecord={jest.fn()}
-      />
+      />,
     );
 
     expect(toJSON()).toBeNull();
@@ -268,7 +300,7 @@ describe('VoiceTranscriptPreview', () => {
         onSend={onSend}
         onDiscard={jest.fn()}
         onReRecord={jest.fn()}
-      />
+      />,
     );
 
     fireEvent.press(screen.getByTestId('voice-send-button'));
@@ -285,7 +317,7 @@ describe('VoiceTranscriptPreview', () => {
         onSend={jest.fn()}
         onDiscard={onDiscard}
         onReRecord={jest.fn()}
-      />
+      />,
     );
 
     fireEvent.press(screen.getByTestId('voice-discard-button'));
@@ -302,7 +334,7 @@ describe('VoiceTranscriptPreview', () => {
         onSend={jest.fn()}
         onDiscard={jest.fn()}
         onReRecord={onReRecord}
-      />
+      />,
     );
 
     fireEvent.press(screen.getByTestId('voice-rerecord-button'));
@@ -317,7 +349,7 @@ describe('VoiceTranscriptPreview', () => {
         onSend={jest.fn()}
         onDiscard={jest.fn()}
         onReRecord={jest.fn()}
-      />
+      />,
     );
     // No visible text label for the secondary actions
     expect(screen.queryByText('Discard')).toBeNull();

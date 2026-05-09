@@ -401,7 +401,7 @@ describe('ChatShell', () => {
       };
       renderChatShell({ verificationType: 'teach_back' });
 
-      screen.getByText('Photosynthesis is the process...');
+      screen.getByDisplayValue('Photosynthesis is the process...');
       screen.getByTestId('voice-send-button');
       screen.getByTestId('voice-discard-button');
       screen.getByTestId('voice-rerecord-button');
@@ -471,7 +471,7 @@ describe('ChatShell', () => {
       rerender(<ChatShell {...props} />);
 
       // The useEffect([isListening, transcript]) should sync to pendingTranscript
-      screen.getByText('Delayed recognition result');
+      screen.getByDisplayValue('Delayed recognition result');
       screen.getByTestId('voice-send-button');
     });
 
@@ -487,7 +487,7 @@ describe('ChatShell', () => {
       });
 
       // Preview shows the transcript
-      screen.getByText('First attempt');
+      screen.getByDisplayValue('First attempt');
 
       // User discards the transcript
       fireEvent.press(screen.getByTestId('voice-discard-button'));
@@ -537,7 +537,7 @@ describe('ChatShell', () => {
 
       // discardedRef should have been cleared by handleVoicePress,
       // allowing the effect to capture this new transcript
-      screen.getByText('New attempt after discard');
+      screen.getByDisplayValue('New attempt after discard');
       screen.getByTestId('voice-send-button');
     });
 
