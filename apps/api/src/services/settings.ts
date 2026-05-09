@@ -8,6 +8,7 @@ import {
   notificationPreferences,
   notificationLog,
   learningModes,
+  learningProfiles,
   profiles,
   withdrawalArchivePreferences,
   familyPreferences,
@@ -20,6 +21,7 @@ import type {
   WithdrawalArchivePreference,
 } from '@eduagent/schemas';
 import { ForbiddenError } from '@eduagent/schemas';
+import { assertParentAccess } from './family-access';
 import type { NotificationPayload } from './notifications';
 
 // ---------------------------------------------------------------------------
@@ -217,6 +219,19 @@ export async function getCelebrationLevel(
   return (row?.celebrationLevel as CelebrationLevel | undefined) ?? 'all';
 }
 
+export async function getChildCelebrationLevel(
+  db: Database,
+  parentProfileId: string,
+  childProfileId: string,
+): Promise<CelebrationLevel> {
+  await assertParentAccess(db, parentProfileId, childProfileId);
+  const row = await db.query.learningProfiles.findFirst({
+    where: eq(learningProfiles.profileId, childProfileId),
+  });
+
+  return (row?.celebrationLevel as CelebrationLevel | undefined) ?? 'big_only';
+}
+
 export async function upsertCelebrationLevel(
   db: Database,
   profileId: string,
@@ -238,6 +253,24 @@ export async function upsertCelebrationLevel(
       .insert(learningModes)
       .values({ profileId, celebrationLevel, mode: 'serious' });
   }
+
+  return { celebrationLevel };
+}
+
+export async function upsertChildCelebrationLevel(
+  db: Database,
+  parentProfileId: string,
+  childProfileId: string,
+  celebrationLevel: CelebrationLevel,
+): Promise<{ celebrationLevel: CelebrationLevel }> {
+  await assertParentAccess(db, parentProfileId, childProfileId);
+  await db
+    .insert(learningProfiles)
+    .values({ profileId: childProfileId, celebrationLevel })
+    .onConflictDoUpdate({
+      target: learningProfiles.profileId,
+      set: { celebrationLevel, updatedAt: new Date() },
+    });
 
   return { celebrationLevel };
 }

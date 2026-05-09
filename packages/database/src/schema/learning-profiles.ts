@@ -9,6 +9,7 @@ import {
   index,
 } from 'drizzle-orm/pg-core';
 import { profiles } from './profiles';
+import { celebrationLevelEnum } from './progress';
 import { generateUUIDv7 } from '../utils/uuid';
 
 export const learningProfiles = pgTable(
@@ -51,6 +52,9 @@ export const learningProfiles = pgTable(
     })
       .notNull()
       .default('none'),
+    celebrationLevel: celebrationLevelEnum('celebration_level')
+      .notNull()
+      .default('big_only'),
     recentlyResolvedTopics: jsonb('recently_resolved_topics')
       .notNull()
       .default([]),
@@ -65,5 +69,5 @@ export const learningProfiles = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (table) => [index('learning_profiles_profile_id_idx').on(table.profileId)]
+  (table) => [index('learning_profiles_profile_id_idx').on(table.profileId)],
 );

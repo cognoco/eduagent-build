@@ -6,6 +6,7 @@ import {
   learningModeUpdateSchema,
   pushTokenRegisterSchema,
   analogyDomainUpdateSchema,
+  celebrationLevelQuerySchema,
   celebrationLevelUpdateSchema,
   withdrawalArchivePreferenceUpdateSchema,
   familyPoolBreakdownSharingUpdateSchema,
@@ -33,7 +34,9 @@ import {
   getLearningMode,
   upsertLearningMode,
   getCelebrationLevel,
+  getChildCelebrationLevel,
   upsertCelebrationLevel,
+  upsertChildCelebrationLevel,
   getWithdrawalArchivePreference,
   upsertWithdrawalArchivePreference,
   getOwnedFamilyPoolBreakdownSharing,
@@ -143,14 +146,21 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
     },
   )
 
-  .get('/settings/celebration-level', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
-    const celebrationLevel = await getCelebrationLevel(db, profileId);
-    return c.json(
-      getCelebrationLevelResponseSchema.parse({ celebrationLevel }),
-    );
-  })
+  .get(
+    '/settings/celebration-level',
+    zValidator('query', celebrationLevelQuerySchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const query = c.req.valid('query');
+      const celebrationLevel = query.childProfileId
+        ? await getChildCelebrationLevel(db, profileId, query.childProfileId)
+        : await getCelebrationLevel(db, profileId);
+      return c.json(
+        getCelebrationLevelResponseSchema.parse({ celebrationLevel }),
+      );
+    },
+  )
 
   .put(
     '/settings/celebration-level',
@@ -160,12 +170,19 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
       const profileId = requireProfileId(c.get('profileId'));
       const accountId = c.get('account').id;
       const body = c.req.valid('json');
-      const result = await upsertCelebrationLevel(
-        db,
-        profileId,
-        accountId,
-        body.celebrationLevel,
-      );
+      const result = body.childProfileId
+        ? await upsertChildCelebrationLevel(
+            db,
+            profileId,
+            body.childProfileId,
+            body.celebrationLevel,
+          )
+        : await upsertCelebrationLevel(
+            db,
+            profileId,
+            accountId,
+            body.celebrationLevel,
+          );
       return c.json(getCelebrationLevelResponseSchema.parse(result));
     },
   )

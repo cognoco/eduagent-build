@@ -110,10 +110,16 @@ export type LearningModeUpdate = z.infer<typeof learningModeUpdateSchema>;
 
 export const celebrationLevelUpdateSchema = z.object({
   celebrationLevel: celebrationLevelSchema,
+  childProfileId: z.string().uuid().optional(),
 });
 export type CelebrationLevelUpdate = z.infer<
   typeof celebrationLevelUpdateSchema
 >;
+
+export const celebrationLevelQuerySchema = z.object({
+  childProfileId: z.string().uuid().optional(),
+});
+export type CelebrationLevelQuery = z.infer<typeof celebrationLevelQuerySchema>;
 
 export const celebrationSeenSchema = z.object({
   viewer: z.enum(['child', 'parent']),
@@ -325,6 +331,7 @@ export const dashboardChildSchema = z.object({
   retentionTrend: z.enum(['improving', 'declining', 'stable']),
   totalSessions: z.number().int(),
   weeklyHeadline: monthlyReportHeadlineSchema,
+  currentlyWorkingOn: z.array(z.string()).default([]),
   progress: dashboardChildProgressSchema.nullable().optional(),
   currentStreak: z.number().int().default(0),
   longestStreak: z.number().int().default(0),

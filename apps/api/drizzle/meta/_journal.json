@@ -484,6 +484,13 @@
       "when": 1779000013000,
       "tag": "0068_session_events_client_id_conflict_target",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1779000014000,
+      "tag": "0069_learning_profile_celebration_level",
+      "breakpoints": true
     }
   ]
 }
