@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import { render, screen } from '@testing-library/react-native';
 import {
   fetchLearningResumeTarget,
   useLearningResumeTarget,
@@ -53,6 +53,10 @@ jest.mock('react-i18next', () => ({
         return 'Topics learned';
       if (key === 'progress.register.child.growthSecondaryLegend')
         return 'Words added';
+      if (key === 'progress.register.child.currentlyWorkingOnTitle')
+        return "What you're working on right now";
+      if (key === 'progress.register.child.currentlyWorkingOnDetected')
+        return 'Spotted in your recent sessions';
       if (key === 'progress.register.adult.weekTitle') return 'Weekly report';
       if (key === 'progress.register.adult.monthTitle') return 'Monthly report';
       if (key === 'progress.register.adult.growthTitle') return 'Your growth';
@@ -62,6 +66,12 @@ jest.mock('react-i18next', () => ({
         return 'Topics mastered';
       if (key === 'progress.register.adult.growthSecondaryLegend')
         return 'Vocabulary growth';
+      if (key === 'progress.register.adult.currentlyWorkingOnTitle')
+        return 'Currently working on';
+      if (key === 'progress.register.adult.currentlyWorkingOnDetected')
+        return 'Detected from recent sessions';
+      if (key === 'progress.currentlyWorkingOn.andNMore')
+        return `and ${opts?.count ?? ''} more`;
       // New learner
       if (key === 'progress.newLearner.title') {
         const count = opts?.count as number;
@@ -156,6 +166,7 @@ const baseGlobal: {
   weeklyDeltaTopicsExplored: number | null;
   totalSessions: number;
   totalActiveMinutes: number;
+  totalWallClockMinutes: number;
   currentStreak: number;
   longestStreak: number;
 } = {
@@ -168,6 +179,7 @@ const baseGlobal: {
   weeklyDeltaTopicsExplored: null,
   totalSessions: 0,
   totalActiveMinutes: 0,
+  totalWallClockMinutes: 0,
   currentStreak: 0,
   longestStreak: 0,
 };
@@ -199,7 +211,18 @@ const fullSubject = {
 
 function mockHooks(
   overrides: {
-    inventory?: { global: typeof baseGlobal; subjects: unknown[] } | undefined;
+    inventory?:
+      | {
+          global: typeof baseGlobal;
+          subjects: unknown[];
+          currentlyWorkingOn?: string[];
+          thisWeekMini?: {
+            sessions: number;
+            wordsLearned: number;
+            topicsTouched: number;
+          };
+        }
+      | undefined;
     isLoading?: boolean;
     isError?: boolean;
   } = {},
@@ -279,7 +302,7 @@ describe('ProgressScreen — progressive disclosure', () => {
     mockUseActiveProfileRole.mockReturnValue('owner');
   });
 
-  it('shows new learner teaser when totalSessions < 4', () => {
+  it('shows full progress view when totalSessions < 4', () => {
     mockHooks({
       inventory: {
         global: { ...baseGlobal, totalSessions: 2 },
@@ -288,9 +311,8 @@ describe('ProgressScreen — progressive disclosure', () => {
     });
     render(<ProgressScreen />);
 
-    screen.getByTestId('progress-new-learner-teaser');
-    screen.getByText(/2 more sessions/);
-    screen.getByTestId('progress-new-learner-start');
+    expect(screen.queryByTestId('progress-new-learner-teaser')).toBeNull();
+    screen.getByText('2 sessions completed');
   });
 
   it('shows full progress view when totalSessions >= 4', () => {
@@ -376,7 +398,7 @@ describe('ProgressScreen — progressive disclosure', () => {
     screen.getByText('+0 topics explored this week');
   });
 
-  it('shows teaser with "1 more session" when totalSessions is 3', () => {
+  it('shows full view when totalSessions is 3', () => {
     mockHooks({
       inventory: {
         global: { ...baseGlobal, totalSessions: 3 },
@@ -385,7 +407,8 @@ describe('ProgressScreen — progressive disclosure', () => {
     });
     render(<ProgressScreen />);
 
-    screen.getByText(/1 more session to/);
+    expect(screen.queryByTestId('progress-new-learner-teaser')).toBeNull();
+    screen.getByText('3 sessions completed');
   });
 
   it('shows empty state (not teaser) when totalSessions is 0 and no subjects', () => {
@@ -398,7 +421,7 @@ describe('ProgressScreen — progressive disclosure', () => {
     expect(screen.queryByTestId('progress-new-learner-teaser')).toBeNull();
   });
 
-  it('shows teaser when totalSessions is 1 with subjects', () => {
+  it('shows full view when totalSessions is 1 with subjects', () => {
     mockHooks({
       inventory: {
         global: { ...baseGlobal, totalSessions: 1 },
@@ -407,8 +430,8 @@ describe('ProgressScreen — progressive disclosure', () => {
     });
     render(<ProgressScreen />);
 
-    screen.getByTestId('progress-new-learner-teaser');
-    screen.getByText(/3 more sessions/);
+    expect(screen.queryByTestId('progress-new-learner-teaser')).toBeNull();
+    screen.getByText('1 session completed');
   });
 
   it('shows full view when totalSessions is exactly 4', () => {
@@ -456,57 +479,33 @@ describe('ProgressScreen — progressive disclosure', () => {
     expect(screen.queryByText('Your week')).toBeNull();
   });
 
-  it('navigates to home when Start learning pressed in teaser', () => {
+  it('renders currently working on when inventory has current focus areas', () => {
     mockHooks({
       inventory: {
-        global: { ...baseGlobal, totalSessions: 2 },
+        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 1 },
         subjects: [fullSubject],
+        currentlyWorkingOn: ['Fractions', 'Decimals'],
       },
     });
     render(<ProgressScreen />);
 
-    fireEvent.press(screen.getByTestId('progress-new-learner-start'));
-
-    const { useRouter } = require('expo-router');
-    expect(useRouter().push).toHaveBeenCalledWith('/(app)/home');
+    screen.getByTestId('progress-currently-working-on');
+    screen.getByText('Currently working on');
+    screen.getByText('Fractions');
+    screen.getByText('Decimals');
   });
 
-  it('resumes the shared target when Start learning pressed in teaser', () => {
+  it('keeps currently working on hidden when inventory has no focus areas', () => {
     mockHooks({
       inventory: {
-        global: { ...baseGlobal, totalSessions: 2 },
+        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 1 },
         subjects: [fullSubject],
-      },
-    });
-    (useLearningResumeTarget as jest.Mock).mockReturnValue({
-      data: {
-        subjectId: 's1',
-        subjectName: 'Math',
-        topicId: 't1',
-        topicTitle: 'Fractions',
-        sessionId: 'session-1',
-        resumeFromSessionId: null,
-        resumeKind: 'active_session',
-        lastActivityAt: '2026-02-15T09:00:00.000Z',
-        reason: 'Resume Fractions',
+        currentlyWorkingOn: [],
       },
     });
     render(<ProgressScreen />);
 
-    fireEvent.press(screen.getByTestId('progress-new-learner-start'));
-
-    const { useRouter } = require('expo-router');
-    expect(useRouter().push).toHaveBeenCalledWith({
-      pathname: '/(app)/session',
-      params: {
-        mode: 'learning',
-        subjectId: 's1',
-        subjectName: 'Math',
-        topicId: 't1',
-        topicName: 'Fractions',
-        sessionId: 'session-1',
-      },
-    });
+    expect(screen.queryByTestId('progress-currently-working-on')).toBeNull();
   });
 
   it('does not gate when inventory is undefined (loading resolved with no data)', () => {

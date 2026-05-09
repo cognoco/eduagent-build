@@ -1,10 +1,17 @@
 import { Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useProfileWeeklyReports } from '../../hooks/use-progress';
+import type { CopyRegister } from '../../lib/copy-register';
 
 type ReportingComponentProps = {
   profileId: string;
   title?: string;
+  register?: CopyRegister;
+  thisWeekMini?: {
+    sessions: number;
+    wordsLearned: number;
+    topicsTouched: number;
+  };
 };
 
 function formatWeek(weekStart: string): string {
@@ -17,10 +24,17 @@ function formatWeek(weekStart: string): string {
 export function WeeklyReportCard({
   profileId,
   title,
+  register = 'adult',
+  thisWeekMini,
 }: ReportingComponentProps): React.ReactElement {
   const { t } = useTranslation();
   const reportsQuery = useProfileWeeklyReports(profileId);
   const latest = reportsQuery.data?.[0];
+  const hasMiniSummary =
+    !!thisWeekMini &&
+    (thisWeekMini.sessions > 0 ||
+      thisWeekMini.wordsLearned > 0 ||
+      thisWeekMini.topicsTouched > 0);
 
   return (
     <View className="bg-surface rounded-card p-4 mt-6" testID="weekly-report">
@@ -47,11 +61,42 @@ export function WeeklyReportCard({
             {latest.headlineStat.comparison}
           </Text>
         </View>
+      ) : hasMiniSummary ? (
+        <View className="bg-background rounded-card p-3 mt-3">
+          <Text className="text-caption text-text-secondary">
+            {t('progress.weeklyReport.thisWeekSoFar')}
+          </Text>
+          <View className="flex-row flex-wrap gap-2 mt-3">
+            <View className="bg-surface rounded-full px-3 py-1.5">
+              <Text className="text-caption font-semibold text-text-primary">
+                {t('progress.weeklyReport.mini.sessions', {
+                  count: thisWeekMini.sessions,
+                })}
+              </Text>
+            </View>
+            {thisWeekMini.wordsLearned > 0 ? (
+              <View className="bg-surface rounded-full px-3 py-1.5">
+                <Text className="text-caption font-semibold text-text-primary">
+                  {t('progress.weeklyReport.mini.words', {
+                    count: thisWeekMini.wordsLearned,
+                  })}
+                </Text>
+              </View>
+            ) : null}
+            {thisWeekMini.topicsTouched > 0 ? (
+              <View className="bg-surface rounded-full px-3 py-1.5">
+                <Text className="text-caption font-semibold text-text-primary">
+                  {t('progress.weeklyReport.mini.topics', {
+                    count: thisWeekMini.topicsTouched,
+                  })}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
       ) : (
         <Text className="text-body-sm text-text-secondary mt-2">
-          {t('parentView.reports.weeklySnapshotsEmpty', {
-            name: t('parentView.index.yourChild'),
-          })}
+          {t(`progress.weeklyReport.empty.${register}`)}
         </Text>
       )}
     </View>

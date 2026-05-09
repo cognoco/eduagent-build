@@ -13,12 +13,9 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ErrorFallback, TrackedView } from '../../../components/common';
-import {
-  isNewLearner,
-  sessionsUntilFullProgress,
-} from '../../../lib/progressive-disclosure';
 import { formatMinutes } from '../../../lib/format-relative-date';
 import {
+  CurrentlyWorkingOnCard,
   GrowthChart,
   MilestoneCard,
   MonthlyReportCard,
@@ -267,8 +264,6 @@ export default function ProgressScreen(): React.ReactElement {
     !profileSessionsQuery.isLoading &&
     isProfileStale({ sessionCount, lastSessionAt });
 
-  const newLearner = !isEmpty && isNewLearner(inventory?.global.totalSessions);
-  const remaining = sessionsUntilFullProgress(inventory?.global.totalSessions);
   const hasLanguageSubject = inventory?.subjects?.some(
     (s) => s.pedagogyMode === 'four_strands',
   );
@@ -345,31 +340,6 @@ export default function ProgressScreen(): React.ReactElement {
               accessibilityRole="button"
               accessibilityLabel={t('progress.startLearning')}
               testID="progress-start-learning"
-            >
-              <Text className="text-body font-semibold text-text-inverse">
-                {t('progress.startLearning')}
-              </Text>
-            </Pressable>
-          </View>
-        ) : newLearner ? (
-          <View
-            className="bg-coaching-card rounded-card p-5"
-            testID="progress-new-learner-teaser"
-          >
-            <Text className="text-h3 font-semibold text-text-primary">
-              {t('progress.newLearner.title', {
-                count: inventory?.global.totalSessions ?? 0,
-              })}
-            </Text>
-            <Text className="text-body text-text-secondary mt-2">
-              {t('progress.newLearner.subtitle', { count: remaining })}
-            </Text>
-            <Pressable
-              onPress={handleGlobalResume}
-              className="bg-primary rounded-button px-4 py-3 mt-4 items-center"
-              accessibilityRole="button"
-              accessibilityLabel={t('progress.startLearning')}
-              testID="progress-new-learner-start"
             >
               <Text className="text-body font-semibold text-text-inverse">
                 {t('progress.startLearning')}
@@ -462,6 +432,52 @@ export default function ProgressScreen(): React.ReactElement {
               ) : null}
             </View>
 
+            {inventory?.currentlyWorkingOn?.length ? (
+              <CurrentlyWorkingOnCard
+                items={inventory.currentlyWorkingOn}
+                register={register}
+                testID="progress-currently-working-on"
+              />
+            ) : null}
+
+            {activeProfile ? (
+              <>
+                <TrackedView
+                  eventName="progress_report_viewed"
+                  dwellMs={1000}
+                  properties={{
+                    profile_id_hash: activeProfileHash,
+                    is_active_profile_owner: activeProfile.isOwner,
+                    report_type: 'weekly',
+                  }}
+                  testID="progress-weekly-report-tracker"
+                >
+                  <WeeklyReportCard
+                    profileId={activeProfile.id}
+                    title={t(`progress.register.${register}.weekTitle`)}
+                    register={register}
+                    thisWeekMini={inventory?.thisWeekMini}
+                  />
+                </TrackedView>
+                <TrackedView
+                  eventName="progress_report_viewed"
+                  dwellMs={1000}
+                  properties={{
+                    profile_id_hash: activeProfileHash,
+                    is_active_profile_owner: activeProfile.isOwner,
+                    report_type: 'monthly',
+                  }}
+                  testID="progress-monthly-report-tracker"
+                >
+                  <MonthlyReportCard
+                    profileId={activeProfile.id}
+                    title={t(`progress.register.${register}.monthTitle`)}
+                    register={register}
+                  />
+                </TrackedView>
+              </>
+            ) : null}
+
             <View className="mt-6">
               <GrowthChart
                 title={t(`progress.register.${register}.growthTitle`)}
@@ -484,39 +500,7 @@ export default function ProgressScreen(): React.ReactElement {
             </View>
 
             {activeProfile ? (
-              <>
-                <TrackedView
-                  eventName="progress_report_viewed"
-                  dwellMs={1000}
-                  properties={{
-                    profile_id_hash: activeProfileHash,
-                    is_active_profile_owner: activeProfile.isOwner,
-                    report_type: 'weekly',
-                  }}
-                  testID="progress-weekly-report-tracker"
-                >
-                  <WeeklyReportCard
-                    profileId={activeProfile.id}
-                    title={t(`progress.register.${register}.weekTitle`)}
-                  />
-                </TrackedView>
-                <TrackedView
-                  eventName="progress_report_viewed"
-                  dwellMs={1000}
-                  properties={{
-                    profile_id_hash: activeProfileHash,
-                    is_active_profile_owner: activeProfile.isOwner,
-                    report_type: 'monthly',
-                  }}
-                  testID="progress-monthly-report-tracker"
-                >
-                  <MonthlyReportCard
-                    profileId={activeProfile.id}
-                    title={t(`progress.register.${register}.monthTitle`)}
-                  />
-                </TrackedView>
-                <RecentSessionsList profileId={activeProfile.id} />
-              </>
+              <RecentSessionsList profileId={activeProfile.id} />
             ) : null}
 
             <View className="flex-row items-center justify-between mt-6 mb-2">
