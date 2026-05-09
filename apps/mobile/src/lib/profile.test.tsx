@@ -3,6 +3,10 @@ import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as SecureStore from './secure-storage';
 import { ProfileProvider, useProfile, type Profile } from './profile';
+import {
+  setActiveProfileId as pushProfileIdToApiClient,
+  setProxyMode,
+} from './api-client';
 
 jest.mock('./secure-storage', () => ({
   getItemAsync: jest.fn(),
@@ -80,7 +84,7 @@ describe('ProfileProvider', () => {
     (SecureStore.getItemAsync as jest.Mock).mockResolvedValue(null);
     (SecureStore.setItemAsync as jest.Mock).mockResolvedValue(undefined);
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ profiles: mockProfiles }), { status: 200 })
+      new Response(JSON.stringify({ profiles: mockProfiles }), { status: 200 }),
     );
   });
 
@@ -131,14 +135,14 @@ describe('ProfileProvider', () => {
     expect(result.current.activeProfile?.id).toBe('owner-id');
     expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
       'mentomate_active_profile_id',
-      'owner-id'
+      'owner-id',
     );
   });
 
   it('switchProfile updates active profile and persists to SecureStore', async () => {
     // Mock the switch POST call
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ ok: true }), { status: 200 })
+      new Response(JSON.stringify({ ok: true }), { status: 200 }),
     );
 
     const { result } = renderHook(() => useProfile(), {
@@ -157,7 +161,7 @@ describe('ProfileProvider', () => {
     expect(mockFetch).toHaveBeenCalledTimes(2);
     expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
       'mentomate_active_profile_id',
-      'child-id'
+      'child-id',
     );
 
     // activeProfile updates immediately via setActiveProfileId (profiles
@@ -165,10 +169,51 @@ describe('ProfileProvider', () => {
     expect(result.current.activeProfile?.id).toBe('child-id');
   });
 
+  it('[BREAK] updates API-client profile and proxy mode before query resets on parent-to-child switch', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: true }), { status: 200 }),
+    );
+
+    const resetSpy = jest.spyOn(QueryClient.prototype, 'resetQueries');
+
+    const { result } = renderHook(() => useProfile(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.switchProfile('child-id');
+    });
+
+    const profilePushCalls = pushProfileIdToApiClient as jest.Mock;
+    const proxyPushCalls = setProxyMode as jest.Mock;
+    const childProfilePushIndex = profilePushCalls.mock.calls.findIndex(
+      (call) => call[0] === 'child-id',
+    );
+    const proxyEnabledPushIndex = proxyPushCalls.mock.calls.findIndex(
+      (call) => call[0] === true,
+    );
+    const profilePushOrder =
+      profilePushCalls.mock.invocationCallOrder[childProfilePushIndex];
+    const proxyPushOrder =
+      proxyPushCalls.mock.invocationCallOrder[proxyEnabledPushIndex];
+    const resetOrder = resetSpy.mock.invocationCallOrder.at(-1);
+
+    expect(pushProfileIdToApiClient).toHaveBeenLastCalledWith('child-id');
+    expect(setProxyMode).toHaveBeenLastCalledWith(true);
+    expect(childProfilePushIndex).toBeGreaterThanOrEqual(0);
+    expect(proxyEnabledPushIndex).toBeGreaterThanOrEqual(0);
+    expect(profilePushOrder).toBeLessThan(resetOrder!);
+    expect(proxyPushOrder).toBeLessThan(resetOrder!);
+  });
+
   it('resets data queries on profile switch (cache isolation)', async () => {
     // Simulate cached data from child A's session
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ ok: true }), { status: 200 })
+      new Response(JSON.stringify({ ok: true }), { status: 200 }),
     );
 
     const { result } = renderHook(() => useProfile(), {
@@ -182,17 +227,28 @@ describe('ProfileProvider', () => {
     // Seed query cache with data belonging to owner profile
     queryClient.setQueryData(
       ['subjects', 'owner-id'],
-      [{ id: 's1', name: 'Math' }]
+      [{ id: 's1', name: 'Math' }],
     );
     queryClient.setQueryData(['progress', 'overview', 'owner-id'], {
       subjects: [],
     });
     queryClient.setQueryData(['dashboard'], { children: [] });
+    queryClient.setQueryData(
+      ['books', 'subject-1', 'owner-id'],
+      [{ id: 'book-1' }],
+    );
+    queryClient.setQueryData(['book', 'subject-1', 'book-1', 'owner-id'], {
+      id: 'book-1',
+    });
+    queryClient.setQueryData(
+      ['book-suggestions', 'subject-1'],
+      [{ id: 'suggestion-1' }],
+    );
 
     // Verify data is cached
     expect(queryClient.getQueryData(['subjects', 'owner-id'])).toBeTruthy();
     expect(
-      queryClient.getQueryData(['progress', 'overview', 'owner-id'])
+      queryClient.getQueryData(['progress', 'overview', 'owner-id']),
     ).toBeTruthy();
 
     // Switch to child profile
@@ -203,9 +259,18 @@ describe('ProfileProvider', () => {
     // All non-profiles queries must be reset (data cleared)
     expect(queryClient.getQueryData(['subjects', 'owner-id'])).toBeUndefined();
     expect(
-      queryClient.getQueryData(['progress', 'overview', 'owner-id'])
+      queryClient.getQueryData(['progress', 'overview', 'owner-id']),
     ).toBeUndefined();
     expect(queryClient.getQueryData(['dashboard'])).toBeUndefined();
+    expect(
+      queryClient.getQueryData(['books', 'subject-1', 'owner-id']),
+    ).toBeUndefined();
+    expect(
+      queryClient.getQueryData(['book', 'subject-1', 'book-1', 'owner-id']),
+    ).toBeUndefined();
+    expect(
+      queryClient.getQueryData(['book-suggestions', 'subject-1']),
+    ).toBeUndefined();
 
     // Profiles query must survive (not reset) to avoid blank screen
     expect(queryClient.getQueryData(['profiles'])).toBeTruthy();
@@ -219,7 +284,7 @@ describe('ProfileProvider', () => {
   // silently swallowed and callers had no way to know.
   it('[BREAK / BUG-828] returns persistenceFailed when SecureStore write fails', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ ok: true }), { status: 200 })
+      new Response(JSON.stringify({ ok: true }), { status: 200 }),
     );
 
     const { result } = renderHook(() => useProfile(), {
@@ -233,7 +298,7 @@ describe('ProfileProvider', () => {
       expect(result.current.isLoading).toBe(false);
     });
     (SecureStore.setItemAsync as jest.Mock).mockRejectedValueOnce(
-      new Error('SecureStore unavailable')
+      new Error('SecureStore unavailable'),
     );
 
     let switchResult: Awaited<
@@ -251,7 +316,7 @@ describe('ProfileProvider', () => {
   it('returns empty profiles when API returns none', async () => {
     mockFetch.mockReset();
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ profiles: [] }), { status: 200 })
+      new Response(JSON.stringify({ profiles: [] }), { status: 200 }),
     );
 
     const { result } = renderHook(() => useProfile(), {
@@ -272,7 +337,7 @@ describe('ProfileProvider', () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ message: 'Server error' }), {
         status: 500,
-      })
+      }),
     );
 
     const { result } = renderHook(() => useProfile(), {

@@ -15,12 +15,12 @@ import { useProfile } from '../../lib/profile';
 /** True when the active user is the account owner AND has at least one child profile. */
 function hasLinkedChildren(
   activeProfile: { id: string; isOwner: boolean } | null,
-  profiles: ReadonlyArray<{ id: string; isOwner: boolean }>
+  profiles: ReadonlyArray<{ id: string; isOwner: boolean }>,
 ): boolean {
   return (
     activeProfile?.isOwner === true &&
     profiles.some(
-      (profile) => profile.id !== activeProfile.id && !profile.isOwner
+      (profile) => profile.id !== activeProfile.id && !profile.isOwner,
     )
   );
 }
@@ -29,7 +29,7 @@ export default function HomeScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
   const { view } = useLocalSearchParams<{ view?: string }>();
-  const { profiles, activeProfile, switchProfile, isLoading } = useProfile();
+  const { profiles, activeProfile, isLoading } = useProfile();
   const { data: celebrationLevel = 'all' } = useCelebrationLevel();
   const { data: pendingCelebrations } = usePendingCelebrations();
   const markCelebrationsSeen = useMarkCelebrationsSeen();
@@ -48,7 +48,7 @@ export default function HomeScreen(): React.ReactElement {
         .catch((err) => {
           console.warn(
             '[Celebrations] Failed to mark as seen, will retry on next visit:',
-            err
+            err,
           );
         });
     },
@@ -159,16 +159,13 @@ export default function HomeScreen(): React.ReactElement {
     <View className="flex-1">
       {showParentGateway ? (
         <ParentGateway
-          profiles={profiles}
           activeProfile={activeProfile}
-          switchProfile={switchProfile}
           onLearn={() => setShowLearnerView(true)}
         />
       ) : (
         <LearnerScreen
           profiles={profiles}
           activeProfile={activeProfile}
-          switchProfile={switchProfile}
           onBack={
             isParentGatewayEligible
               ? () => setShowLearnerView(false)

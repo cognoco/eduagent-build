@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,14 +8,12 @@ import {
   ActivityIndicator,
   Switch,
 } from 'react-native';
-import { useCallback } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { goBackOrReplace } from '../../lib/navigation';
-import { platformAlert } from '../../lib/platform-alert';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ParentDashboardSummary } from '../../components/coaching';
+import { ProfileSwitcher } from '../../components/common';
 import { ParentOnly } from '../../components/_internal/ParentOnly';
 import { FamilyOrientationCue } from '../../components/family/FamilyOrientationCue';
 import { WithdrawalCountdownBanner } from '../../components/family/WithdrawalCountdownBanner';
@@ -28,6 +27,9 @@ import {
   useFamilySubscription,
   useSubscription,
 } from '../../hooks/use-subscription';
+import { goBackOrReplace } from '../../lib/navigation';
+import { platformAlert } from '../../lib/platform-alert';
+import { useProfile } from '../../lib/profile';
 
 function CardSkeleton(): React.ReactNode {
   return (
@@ -181,6 +183,7 @@ function FamilyContent(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { profiles, activeProfile, switchProfile } = useProfile();
   const { returnTo: rawReturnTo } = useLocalSearchParams<{
     returnTo?: string;
   }>();
@@ -276,7 +279,7 @@ function FamilyContent(): React.ReactElement {
       {/* [BUG-999] zIndex:20 ensures this header wins over the ParentGateway
           header (zIndex:10) that sits in the home-tab stack on web. Without it,
           the Home header intercepts pointer events after a deep-drilldown back. */}
-      <View className="px-5 pt-4 pb-2" style={{ zIndex: 20 }}>
+      <View className="px-5 pt-4 pb-2" style={{ zIndex: 20, elevation: 20 }}>
         <Pressable
           onPress={() => goBackOrReplace(router, backFallback)}
           className="mb-2 self-start"
@@ -287,12 +290,21 @@ function FamilyContent(): React.ReactElement {
         >
           <Text className="text-body text-accent">← {t('common.back')}</Text>
         </Pressable>
-        <Text className="text-h1 font-bold text-text-primary">
-          {t('family.title')}
-        </Text>
-        <Text className="text-body-sm text-text-secondary mt-1">
-          {isDemo ? t('dashboard.demoDashboardHint') : t('family.subtitle')}
-        </Text>
+        <View className="flex-row items-start justify-between">
+          <View className="flex-1 me-3">
+            <Text className="text-h1 font-bold text-text-primary">
+              {t('family.title')}
+            </Text>
+            <Text className="text-body-sm text-text-secondary mt-1">
+              {isDemo ? t('dashboard.demoDashboardHint') : t('family.subtitle')}
+            </Text>
+          </View>
+          <ProfileSwitcher
+            profiles={profiles}
+            activeProfileId={activeProfile?.id}
+            onSwitch={switchProfile}
+          />
+        </View>
       </View>
       <ScrollView
         className="flex-1 px-5"

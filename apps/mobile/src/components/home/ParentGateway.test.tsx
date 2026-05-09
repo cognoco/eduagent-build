@@ -10,11 +10,8 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-jest.mock('../common', () => ({
-  ProfileSwitcher: () => null,
-}));
-
-jest.mock('../family/WithdrawalCountdownBanner', () => ({ // gc1-allow: ParentGateway tests layout/child summaries; countdown banner behavior is covered by its own component tests.
+jest.mock('../family/WithdrawalCountdownBanner', () => ({
+  // gc1-allow: ParentGateway tests layout/child summaries; countdown banner behavior is covered by its own component tests.
   WithdrawalCountdownBanner: () => null,
 }));
 
@@ -48,12 +45,7 @@ jest.mock('../../lib/greeting', () => ({
 const { ParentGateway } = require('./ParentGateway');
 
 const defaultProps = {
-  profiles: [
-    { id: 'p1', displayName: 'Maria', isOwner: true },
-    { id: 'c1', displayName: 'Emma', isOwner: false },
-  ],
   activeProfile: { id: 'p1', displayName: 'Maria', isOwner: true },
-  switchProfile: jest.fn(),
 };
 
 describe('ParentGateway', () => {
