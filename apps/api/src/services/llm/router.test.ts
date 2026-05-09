@@ -40,6 +40,25 @@ function createFailingStreamProvider(id: string): LLMProvider {
   };
 }
 
+/** Mock provider whose chatStream drains cleanly without yielding text. */
+function createEmptyStreamProvider(id: string): LLMProvider {
+  const base = createMockProvider(id);
+  return {
+    ...base,
+    chatStream() {
+      return {
+        stream: (async function* () {
+          // Successful zero-token stream.
+        })(),
+        stopReasonPromise: Promise.resolve('stop'),
+        [Symbol.asyncIterator]() {
+          return this.stream[Symbol.asyncIterator]();
+        },
+      };
+    },
+  };
+}
+
 /** Mock provider whose chat() fails N times then succeeds. */
 function createTransientFailProvider(
   id: string,
@@ -372,6 +391,35 @@ describe('LLM Router', () => {
       expect(result.fallbackUsed).toBe(true);
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining('failed before first byte, trying fallback'),
+      );
+      warnSpy.mockRestore();
+    });
+
+    it('[BUG-ZERO-TOKEN-STREAM] falls back when primary stream completes with zero chunks', async () => {
+      _clearProviders();
+      _resetCircuits();
+      registerProvider(createEmptyStreamProvider('gemini'));
+      registerProvider(createMockProvider('anthropic'));
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      const result = await routeAndStream(
+        [{ role: 'user', content: 'test' }],
+        1,
+      );
+
+      expect(result.provider).toBe('gemini');
+      expect(result.fallbackUsed).toBe(false);
+
+      const chunks: string[] = [];
+      for await (const chunk of result.stream) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks.join('')).toContain('Mock streamed');
+      expect(result.fallbackUsed).toBe(true);
+      await expect(result.stopReasonPromise).resolves.toBe('stop');
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('completed with zero chunks, trying fallback'),
       );
       warnSpy.mockRestore();
     });

@@ -656,6 +656,45 @@ async function* wrapStreamWithCircuitBreaker(
       chunksYielded++;
       yield chunk;
     }
+
+    // Gemini can occasionally complete an SSE request with finishReason=STOP
+    // but no text parts. Treat that like a pre-first-byte stream failure so
+    // the user gets a real assistant turn from the fallback provider instead
+    // of a session-level empty-reply fallback frame.
+    if (chunksYielded === 0 && fallbackConfig) {
+      const fallbackProvider = providers.get(fallbackConfig.provider);
+      if (fallbackProvider && canAttempt(fallbackConfig.provider)) {
+        logger.warn(
+          '[llm] Primary stream completed with zero chunks, trying fallback',
+          {
+            provider: providerId,
+            fallback: fallbackConfig.provider,
+          },
+        );
+        const fallbackResult = normalizeStreamResult(
+          fallbackProvider.chatStream(messages, fallbackConfig),
+        );
+        const fallbackStream = wrapStreamWithCircuitBreaker(
+          fallbackResult.stream,
+          fallbackConfig.provider,
+          fallbackResult.stopReasonPromise,
+          null, // no further fallback
+          messages,
+          onStopReason,
+        );
+        let signalled = false;
+        for await (const chunk of fallbackStream) {
+          if (!signalled) {
+            onFallback?.();
+            signalled = true;
+          }
+          yield chunk;
+        }
+        forwardedStopReason = true;
+        return;
+      }
+    }
+
     recordSuccess(providerId);
     onStopReason(await innerStopReasonPromise);
     forwardedStopReason = true;
