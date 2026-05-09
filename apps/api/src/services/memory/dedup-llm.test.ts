@@ -14,7 +14,7 @@ describe('runDedupLlm', () => {
     const caller = jest.fn().mockResolvedValue({
       response:
         '{"action":"merge","merged_text":"struggles with fraction arithmetic"}',
-      model: 'claude-sonnet-4-6',
+      model: 'claude-sonnet-4-20250514',
       provider: 'anthropic',
       latencyMs: 1,
       stopReason: 'stop',
@@ -26,7 +26,7 @@ describe('runDedupLlm', () => {
         action: 'merge',
         merged_text: 'struggles with fraction arithmetic',
       },
-      modelVersion: 'claude-sonnet-4-6',
+      modelVersion: 'claude-sonnet-4-20250514',
     });
   });
 

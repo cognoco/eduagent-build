@@ -6,6 +6,7 @@ import {
   _clearProviders,
   _resetCircuits,
   MIN_REPLY_MAX_TOKENS,
+  ANTHROPIC_SONNET_MODEL,
 } from './router';
 import { createMockProvider } from './providers/mock';
 import type {
@@ -202,6 +203,49 @@ describe('LLM Router', () => {
       // rely on so test ordering remains independent.
       _clearProviders();
       registerProvider(createMockProvider('gemini'));
+    });
+  });
+
+  describe('Anthropic model routing', () => {
+    function createCapturingProvider(id: string): LLMProvider & {
+      lastConfig: ModelConfig | null;
+    } {
+      let captured: ModelConfig | null = null;
+      const base = createMockProvider(id);
+      return {
+        ...base,
+        get lastConfig() {
+          return captured;
+        },
+        async chat(
+          messages: ChatMessage[],
+          config: ModelConfig,
+        ): Promise<ChatResult> {
+          captured = config;
+          return base.chat(messages, config);
+        },
+      };
+    }
+
+    afterEach(() => {
+      _clearProviders();
+      _resetCircuits();
+      registerProvider(createMockProvider('gemini'));
+    });
+
+    it('[BUG-ANTHROPIC-MODEL-ID] uses a valid snapshot model ID for premium Anthropic calls', async () => {
+      _clearProviders();
+      _resetCircuits();
+      const spy = createCapturingProvider('anthropic');
+      registerProvider(spy);
+
+      await routeAndCall([{ role: 'user', content: 'test' }], 1, {
+        llmTier: 'premium',
+      });
+
+      expect(spy.lastConfig?.model).toBe(ANTHROPIC_SONNET_MODEL);
+      expect(spy.lastConfig?.model).toBe('claude-sonnet-4-20250514');
+      expect(spy.lastConfig?.model).not.toBe('claude-sonnet-4-6');
     });
   });
 

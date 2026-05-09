@@ -203,6 +203,10 @@ function withSafetyPreamble(
 // constant (drift between code and test would be silent).
 export const MIN_REPLY_MAX_TOKENS = 8192;
 
+// Anthropic requires snapshot model IDs in production. The shorter
+// "claude-sonnet-4-6" string is not a valid Messages API model id.
+export const ANTHROPIC_SONNET_MODEL = 'claude-sonnet-4-20250514';
+
 function getModelConfig(
   rung: EscalationRung,
   llmTier: LLMTier = 'standard',
@@ -212,7 +216,7 @@ function getModelConfig(
   if (llmTier === 'premium' && providers.has('anthropic')) {
     return {
       provider: 'anthropic',
-      model: 'claude-sonnet-4-6',
+      model: ANTHROPIC_SONNET_MODEL,
       maxTokens: MIN_REPLY_MAX_TOKENS,
     };
   }
@@ -297,7 +301,7 @@ function getFallbackConfig(
   if (providers.has('anthropic')) {
     return {
       provider: 'anthropic',
-      model: 'claude-sonnet-4-6',
+      model: ANTHROPIC_SONNET_MODEL,
       maxTokens: MIN_REPLY_MAX_TOKENS,
     };
   }
