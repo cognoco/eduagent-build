@@ -1,5 +1,6 @@
-import { renderHook, waitFor } from '@testing-library/react-native';
+import { act, renderHook, waitFor } from '@testing-library/react-native';
 import * as Notifications from 'expo-notifications';
+import { AppState, type AppStateStatus } from 'react-native';
 import { usePushTokenRegistration } from './use-push-token-registration';
 
 // ---------------------------------------------------------------------------
@@ -25,14 +26,23 @@ jest.mock('expo-constants', () => {
 // ---------------------------------------------------------------------------
 
 describe('usePushTokenRegistration', () => {
+  let appStateListeners: Array<(state: AppStateStatus) => void>;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    appStateListeners = [];
+    jest
+      .spyOn(AppState, 'addEventListener')
+      .mockImplementation((_event, listener) => {
+        appStateListeners.push(listener);
+        return { remove: jest.fn() };
+      });
     // Restore resolved values after clearAllMocks
     mockMutateAsync.mockResolvedValue({ registered: true });
   });
 
-  it('requests permissions and registers push token', async () => {
-    const { result } = renderHook(() => usePushTokenRegistration(true));
+  it('registers push token when notification permission is already granted', async () => {
+    const { result } = renderHook(() => usePushTokenRegistration());
 
     await waitFor(() => {
       expect(Notifications.getPermissionsAsync).toHaveBeenCalled();
@@ -46,7 +56,7 @@ describe('usePushTokenRegistration', () => {
 
     await waitFor(() => {
       expect(mockMutateAsync).toHaveBeenCalledWith(
-        'ExponentPushToken[mock-token]'
+        'ExponentPushToken[mock-token]',
       );
     });
 
@@ -60,7 +70,7 @@ describe('usePushTokenRegistration', () => {
       status: 'undetermined',
     });
 
-    const { result } = renderHook(() => usePushTokenRegistration(true));
+    const { result } = renderHook(() => usePushTokenRegistration());
 
     await waitFor(() => {
       expect(result.current).toEqual({
@@ -78,7 +88,7 @@ describe('usePushTokenRegistration', () => {
       status: 'denied',
     });
 
-    const { result } = renderHook(() => usePushTokenRegistration(true));
+    const { result } = renderHook(() => usePushTokenRegistration());
 
     await waitFor(() => {
       expect(result.current).toEqual({
@@ -91,38 +101,42 @@ describe('usePushTokenRegistration', () => {
     expect(mockMutateAsync).not.toHaveBeenCalled();
   });
 
-  it('registers token when notificationGranted flips from false to true', async () => {
+  it('registers token after returning active with newly granted permission', async () => {
     (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValue({
       status: 'undetermined',
     });
 
-    const { rerender } = renderHook(
-      ({ granted }: { granted: boolean }) => usePushTokenRegistration(granted),
-      { initialProps: { granted: false } }
-    );
+    const { result } = renderHook(() => usePushTokenRegistration());
 
-    await new Promise((r) => setTimeout(r, 50));
+    await waitFor(() => {
+      expect(result.current).toEqual({
+        status: 'failed',
+        reason: 'permission_denied',
+      });
+    });
     expect(mockMutateAsync).not.toHaveBeenCalled();
 
     (Notifications.getPermissionsAsync as jest.Mock).mockResolvedValue({
       status: 'granted',
     });
 
-    rerender({ granted: true });
+    await act(async () => {
+      appStateListeners.forEach((listener) => listener('active'));
+    });
 
     await waitFor(() => {
       expect(mockMutateAsync).toHaveBeenCalledWith(
-        'ExponentPushToken[mock-token]'
+        'ExponentPushToken[mock-token]',
       );
     });
   });
 
   it('does not crash on registration error', async () => {
     (Notifications.getExpoPushTokenAsync as jest.Mock).mockRejectedValue(
-      new Error('Token fetch failed')
+      new Error('Token fetch failed'),
     );
 
-    const { result } = renderHook(() => usePushTokenRegistration(true));
+    const { result } = renderHook(() => usePushTokenRegistration());
 
     await waitFor(() => {
       expect(result.current).toEqual({

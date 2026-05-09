@@ -38,7 +38,7 @@ describe('clearProfileSecureStorageOnSignOut [BUG-723 / SEC-7]', () => {
         'parent-proxy-active',
         'session-recovery-marker',
         'mentomate_active_profile_id',
-      ])
+      ]),
     );
   });
 
@@ -73,11 +73,12 @@ describe('clearProfileSecureStorageOnSignOut [BUG-723 / SEC-7]', () => {
           // sanitizeSecureStoreKey replaces non-[a-zA-Z0-9._-] chars with '_'
           // The mock above uses the same replacement so the key shape matches.
           `permissionSetupSeen_${id}`,
+          `notificationFirstAskShown_${id}`,
           `voice-input-mode-${id}`,
           // [CR-PR129-M6] Accent preset — was previously hidden from registry
           // enforcement because _layout.tsx was file-scoped in REGISTRY_EXCEPTIONS.
           `accentPreset_${id}`,
-        ])
+        ]),
       );
     }
   });
@@ -86,10 +87,10 @@ describe('clearProfileSecureStorageOnSignOut [BUG-723 / SEC-7]', () => {
     // One stuck key must not block the rest. Otherwise a single Keychain
     // hiccup would leave most SecureStore entries on the device.
     mockDelete.mockImplementationOnce(() =>
-      Promise.reject(new Error('Keychain error'))
+      Promise.reject(new Error('Keychain error')),
     );
     await expect(
-      clearProfileSecureStorageOnSignOut(['p1'])
+      clearProfileSecureStorageOnSignOut(['p1']),
     ).resolves.toBeUndefined();
     // We still attempted to delete every other key.
     expect(mockDelete.mock.calls.length).toBeGreaterThan(5);
@@ -99,7 +100,7 @@ describe('clearProfileSecureStorageOnSignOut [BUG-723 / SEC-7]', () => {
     await clearProfileSecureStorageOnSignOut(['', 'real-id', '']);
     const calledWith = mockDelete.mock.calls.map((c) => c[0] as string);
     expect(calledWith).toEqual(
-      expect.arrayContaining([`dictation-pace-real-id`])
+      expect.arrayContaining([`dictation-pace-real-id`]),
     );
     // The empty string would yield malformed keys like `dictation-pace-` —
     // the helper must filter them out.
@@ -110,7 +111,7 @@ describe('clearProfileSecureStorageOnSignOut [BUG-723 / SEC-7]', () => {
     await clearProfileSecureStorageOnSignOut(['profile-a']);
 
     expect(AsyncStorage.multiRemove).toHaveBeenCalledWith(
-      expect.arrayContaining(['i18n-auto-suggest-dismissed'])
+      expect.arrayContaining(['i18n-auto-suggest-dismissed']),
     );
   });
 

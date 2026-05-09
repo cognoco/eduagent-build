@@ -187,9 +187,8 @@ $ADB $DEVICE_FLAG shell am kill dev.mobile.maestro.test 2>/dev/null || true
 $ADB $DEVICE_FLAG shell pm grant "$APP_ID" android.permission.POST_NOTIFICATIONS 2>/dev/null || true
 # BUG-39: Pre-grant camera permission so homework flows don't hit system dialog
 $ADB $DEVICE_FLAG shell pm grant "$APP_ID" android.permission.CAMERA 2>/dev/null || true
-# BUG-549: Pre-grant microphone so the one-time permission setup gate auto-skips.
-# The gate shows when RECORD_AUDIO or POST_NOTIFICATIONS are not granted after pm clear.
-# With both pre-granted, usePermissionSetup detects 0 renderable rows and skips.
+# Pre-grant microphone so voice-focused flows don't hit the Android system
+# dialog unless the flow is explicitly testing the just-in-time permission ask.
 $ADB $DEVICE_FLAG shell pm grant "$APP_ID" android.permission.RECORD_AUDIO 2>/dev/null || true
 # Give the OS time to settle after pm clear + pm grants before launching
 sleep 2

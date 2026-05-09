@@ -123,15 +123,6 @@ appId: com.mentomate.app
       visible: "You're approved!"
     file: dismiss-post-approval.yaml
 
-# BUG-549: PermissionSetupGate intercepts users when RECORD_AUDIO or
-# POST_NOTIFICATIONS are not granted after pm clear. seed-and-run.sh pre-grants
-# both via ADB so this should normally not appear, but tap Skip if it does.
-- runFlow:
-    when:
-      visible:
-        id: "permission-setup-gate"
-    file: dismiss-permission-gate.yaml
-
 # BUG-43: After PostApproval dismiss, the coaching card may auto-navigate to
 # a Practice Session (for scenarios with active sessions like retention-due,
 # homework-ready, failed-recall-3x). The session screen hides the tab bar,
