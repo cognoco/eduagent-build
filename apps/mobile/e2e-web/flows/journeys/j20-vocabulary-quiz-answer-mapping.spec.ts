@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
+import { pressableClick } from '../../helpers/pressable';
 
 /**
  * J-20 — vocabulary quiz answer mapping (BUG-924)
@@ -37,11 +38,11 @@ test('J-20 vocabulary quiz: tapped option text matches POSTed answerGiven (BUG-9
   await expect(page.getByTestId('learner-screen')).toBeVisible({
     timeout: 60_000,
   });
-  await page.getByTestId('home-action-practice').click();
+  await pressableClick(page.getByTestId('home-action-practice'));
   await expect(page.getByTestId('practice-screen')).toBeVisible({
     timeout: 30_000,
   });
-  await page.getByTestId('practice-quiz').click();
+  await pressableClick(page.getByTestId('practice-quiz'));
   await expect(page.getByTestId('quiz-index-screen')).toBeVisible({
     timeout: 30_000,
   });
@@ -51,7 +52,7 @@ test('J-20 vocabulary quiz: tapped option text matches POSTed answerGiven (BUG-9
   // subjectId is generated at seed time.
   const vocabCard = page.locator('[data-testid^="quiz-vocabulary-"]').first();
   await expect(vocabCard).toBeVisible({ timeout: 30_000 });
-  await vocabCard.click();
+  await pressableClick(vocabCard);
 
   await expect(page.getByTestId('quiz-play-screen')).toBeVisible({
     timeout: 60_000,
@@ -99,7 +100,7 @@ test('J-20 vocabulary quiz: tapped option text matches POSTed answerGiven (BUG-9
       { timeout: 30_000 },
     );
 
-    await targetOption.click();
+    await pressableClick(targetOption);
 
     const checkRequest = await checkRequestPromise;
     const body = checkRequest.postDataJSON() as {
@@ -125,7 +126,7 @@ test('J-20 vocabulary quiz: tapped option text matches POSTed answerGiven (BUG-9
     await expect(page.getByText('Tap anywhere to continue')).toBeVisible({
       timeout: 30_000,
     });
-    await quizScreen.click();
+    await pressableClick(quizScreen);
   }
 
   // Round must have completed — confirms the cycle wasn't accidentally a

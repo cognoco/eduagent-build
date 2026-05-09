@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
+import { pressableClick } from '../../helpers/pressable';
 
 /**
  * J-09 — empty home → Add a subject → first session screen
@@ -34,15 +35,7 @@ test('J-09 learner → Add a subject → language setup → session chat', async
   await expect(page.getByTestId('home-empty-subjects')).toBeVisible({
     timeout: 30_000,
   });
-  // React Native Web Pressable wires onPress to pointerdown/pointerup in
-  // its responder system. A standard Playwright click occasionally hangs on
-  // the post-action stability wait when the source button is removed mid-
-  // click by the navigation. Drive the pointer events explicitly so React
-  // Native Web's PressResponder fires onPress.
-  const addCta = page.getByTestId('home-add-first-subject');
-  await addCta.dispatchEvent('pointerdown');
-  await addCta.dispatchEvent('pointerup');
-  await addCta.dispatchEvent('click');
+  await pressableClick(page.getByTestId('home-add-first-subject'));
   await expect(page.getByTestId('create-subject-name')).toBeVisible({
     timeout: 30_000,
   });
@@ -52,7 +45,7 @@ test('J-09 learner → Add a subject → language setup → session chat', async
   await page.getByTestId('create-subject-name').fill('Italian');
   // The TextInput has no onSubmitEditing handler — submission must go
   // through the explicit Start Learning button (testID create-subject-submit).
-  await page.getByTestId('create-subject-submit').click();
+  await pressableClick(page.getByTestId('create-subject-submit'));
 
   // The resolver may render a suggestion card OR jump straight into the
   // language-setup flow when it can determine the subject confidently. If
@@ -63,18 +56,16 @@ test('J-09 learner → Add a subject → language setup → session chat', async
     timeout: 60_000,
   });
   if (await suggestionAccept.isVisible()) {
-    await suggestionAccept.click();
+    await pressableClick(suggestionAccept);
   }
 
   // Language setup calibration screen — pick native language + level.
-  await expect(
-    page.getByTestId('language-setup-calibration-title'),
-  ).toBeVisible({ timeout: 30_000 });
+  await expect(calibrationTitle).toBeVisible({ timeout: 30_000 });
   // Default native language is the device locale; tap English explicitly so
   // the test is deterministic across environments.
-  await page.getByTestId('native-language-en').click();
-  await page.getByTestId('level-beginner').click();
-  await page.getByTestId('language-setup-continue').click();
+  await pressableClick(page.getByTestId('native-language-en'));
+  await pressableClick(page.getByTestId('level-beginner'));
+  await pressableClick(page.getByTestId('language-setup-continue'));
 
   // BUG-1000: After language-setup continues, the API kicks off curriculum
   // generation and the mobile client polls /sessions/first-curriculum until
