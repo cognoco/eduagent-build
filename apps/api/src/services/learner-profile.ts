@@ -1,5 +1,6 @@
 import { and, eq, sql } from 'drizzle-orm';
 import {
+  createScopedRepository,
   learningProfiles,
   memoryFacts,
   profiles,
@@ -19,6 +20,7 @@ import {
   type SessionAnalysisOutput,
   type StrengthEntry,
   type StruggleEntry,
+  struggleEntrySchema,
 } from '@eduagent/schemas';
 import { routeAndCall, type ChatMessage } from './llm';
 import {
@@ -44,6 +46,8 @@ const INTEREST_DEMOTION_DAYS = 60;
 const MEMORY_BLOCK_TOKEN_BUDGET = 500;
 const MEMORY_BLOCK_CHAR_BUDGET = MEMORY_BLOCK_TOKEN_BUDGET * 4;
 const LEARNING_STYLE_CORROBORATION_THRESHOLD = 3;
+const CURRENTLY_WORKING_ON_WINDOW_DAYS = 30;
+const CURRENTLY_WORKING_ON_LIMIT = 10;
 
 const CONFIDENCE_ORDER: Record<ConfidenceLevel, number> = {
   low: 0,
@@ -150,7 +154,7 @@ export function normalizeMemoryValue(value: string | null | undefined): string {
 
 export function sameNormalized(
   left: string | null | undefined,
-  right: string | null | undefined
+  right: string | null | undefined,
 ): boolean {
   return normalizeMemoryValue(left) === normalizeMemoryValue(right);
 }
@@ -222,7 +226,7 @@ export function mergeInterests(
   existing: string[],
   incoming: string[],
   suppressed: string[],
-  timestamps: Record<string, string> = {}
+  timestamps: Record<string, string> = {},
 ): { interests: string[]; timestamps: Record<string, string> } {
   const suppressedSet = new Set(suppressed.map(normalizeMemoryValue));
   const updatedTimestamps = { ...timestamps };
@@ -235,7 +239,7 @@ export function mergeInterests(
     if (!normalized || suppressedSet.has(normalized)) continue;
 
     const existingIndex = merged.findIndex((value) =>
-      sameNormalized(value, trimmed)
+      sameNormalized(value, trimmed),
     );
     if (existingIndex >= 0) {
       updatedTimestamps[normalized] = now;
@@ -247,7 +251,7 @@ export function mergeInterests(
   }
 
   const cutoff = new Date(
-    Date.now() - INTEREST_DEMOTION_DAYS * 24 * 60 * 60 * 1000
+    Date.now() - INTEREST_DEMOTION_DAYS * 24 * 60 * 60 * 1000,
   ).toISOString();
   const fresh: string[] = [];
   const stale: string[] = [];
@@ -276,7 +280,7 @@ export function mergeInterests(
 export function mergeStrengths(
   existing: StrengthEntry[],
   incoming: StrengthSignal[],
-  suppressed: string[]
+  suppressed: string[],
 ): StrengthEntry[] {
   const suppressedSet = new Set(suppressed.map(normalizeMemoryValue));
   const result = [...existing];
@@ -286,7 +290,7 @@ export function mergeStrengths(
     if (suppressedSet.has(normalizeMemoryValue(signal.topic))) continue;
 
     const subjectIndex = result.findIndex((entry) =>
-      sameNormalized(entry.subject, signal.subject)
+      sameNormalized(entry.subject, signal.subject),
     );
 
     if (subjectIndex >= 0) {
@@ -294,7 +298,7 @@ export function mergeStrengths(
       if (!existingEntry)
         throw new Error(`result[${subjectIndex}] is unexpectedly undefined`);
       const hasTopic = existingEntry.topics.some((topic) =>
-        sameNormalized(topic, signal.topic)
+        sameNormalized(topic, signal.topic),
       );
       if (hasTopic) {
         if (
@@ -335,10 +339,10 @@ export function mergeStrengths(
 }
 
 export function archiveStaleStruggles(
-  struggles: StruggleEntry[]
+  struggles: StruggleEntry[],
 ): StruggleEntry[] {
   const cutoff = new Date(
-    Date.now() - STRUGGLE_ARCHIVAL_DAYS * 24 * 60 * 60 * 1000
+    Date.now() - STRUGGLE_ARCHIVAL_DAYS * 24 * 60 * 60 * 1000,
   ).toISOString();
   return struggles.filter((entry) => entry.lastSeen >= cutoff);
 }
@@ -346,7 +350,7 @@ export function archiveStaleStruggles(
 export function mergeStruggles(
   existing: StruggleEntry[],
   incoming: StruggleSignal[],
-  suppressed: string[]
+  suppressed: string[],
 ): StruggleEntry[] {
   const suppressedSet = new Set(suppressed.map(normalizeMemoryValue));
   const result = [...existing];
@@ -357,7 +361,7 @@ export function mergeStruggles(
     const existingIndex = result.findIndex(
       (entry) =>
         sameNormalized(entry.topic, signal.topic) &&
-        sameNormalized(entry.subject, signal.subject)
+        sameNormalized(entry.subject, signal.subject),
     );
 
     if (existingIndex >= 0) {
@@ -394,7 +398,7 @@ export function mergeStruggles(
 export function mergeCommunicationNotes(
   existing: string[],
   incoming: string[],
-  suppressed: string[]
+  suppressed: string[],
 ): string[] {
   const suppressedSet = new Set(suppressed.map(normalizeMemoryValue));
   const merged = [...existing];
@@ -417,13 +421,13 @@ export function mergeCommunicationNotes(
 export function resolveStruggle(
   struggles: StruggleEntry[],
   topic: string,
-  subject?: string | null
+  subject?: string | null,
 ): StruggleEntry[] {
   const result = [...struggles];
   const index = result.findIndex(
     (entry) =>
       sameNormalized(entry.topic, topic) &&
-      sameNormalized(entry.subject, subject)
+      sameNormalized(entry.subject, subject),
   );
   if (index < 0) return result;
 
@@ -447,7 +451,7 @@ export function resolveStruggle(
 export function detectStruggleNotifications(
   beforeStruggles: StruggleEntry[],
   afterStruggles: StruggleEntry[],
-  resolvedTopics: Array<{ topic: string; subject: string | null }> | null
+  resolvedTopics: Array<{ topic: string; subject: string | null }> | null,
 ): StruggleNotification[] {
   const notifications: StruggleNotification[] = [];
 
@@ -455,7 +459,7 @@ export function detectStruggleNotifications(
     const before = beforeStruggles.find(
       (b) =>
         sameNormalized(b.topic, after.topic) &&
-        sameNormalized(b.subject, after.subject)
+        sameNormalized(b.subject, after.subject),
     );
 
     if (
@@ -483,7 +487,7 @@ export function detectStruggleNotifications(
       const wasInBefore = beforeStruggles.some(
         (b) =>
           sameNormalized(b.topic, resolved.topic) &&
-          sameNormalized(b.subject, resolved.subject)
+          sameNormalized(b.subject, resolved.subject),
       );
       if (wasInBefore) {
         notifications.push({
@@ -501,7 +505,7 @@ export function detectStruggleNotifications(
 export function shouldUpdateLearningStyle(
   existingConfidence: ConfidenceLevel | undefined,
   newConfidence: ConfidenceLevel,
-  corroboratingSessions: number
+  corroboratingSessions: number,
 ): boolean {
   if (corroboratingSessions < LEARNING_STYLE_CORROBORATION_THRESHOLD) {
     return false;
@@ -514,7 +518,7 @@ function mergeLearningStyle(
   existing: LearningStyle,
   analysis: SessionAnalysisOutput,
   effectivenessSessionCount: number,
-  source: MemorySource
+  source: MemorySource,
 ): { learningStyle: LearningStyle; effectivenessSessionCount: number } {
   if (!analysis.explanationEffectiveness) {
     return {
@@ -525,7 +529,7 @@ function mergeLearningStyle(
 
   const nextCount = effectivenessSessionCount + 1;
   const effective = analysis.explanationEffectiveness.effective.filter(
-    (style) => !analysis.explanationEffectiveness?.ineffective.includes(style)
+    (style) => !analysis.explanationEffectiveness?.ineffective.includes(style),
   );
 
   if (effective.length === 0) {
@@ -541,7 +545,7 @@ function mergeLearningStyle(
     !shouldUpdateLearningStyle(
       existingConfidence,
       analysis.confidence,
-      nextCount
+      nextCount,
     )
   ) {
     return {
@@ -575,7 +579,7 @@ function buildAnalysisUpdates(
   profile: LearningProfileRow,
   analysis: SessionAnalysisOutput,
   source: MemorySource,
-  subjectName: string | null
+  subjectName: string | null,
 ): {
   updates: Record<string, unknown>;
   fieldsUpdated: string[];
@@ -590,7 +594,7 @@ function buildAnalysisUpdates(
       asStringArray(profile.interests),
       analysis.interests,
       suppressed,
-      asInterestTimestampMap(profile.interestTimestamps)
+      asInterestTimestampMap(profile.interestTimestamps),
     );
     updates.interests = interests;
     updates.interestTimestamps = timestamps;
@@ -605,7 +609,7 @@ function buildAnalysisUpdates(
         subject: signal.subject ?? subjectName,
         source: signal.source ?? source,
       })),
-      suppressed
+      suppressed,
     );
     fieldsUpdated.push('strengths');
   }
@@ -620,8 +624,8 @@ function buildAnalysisUpdates(
           ...signal,
           source: signal.source ?? source,
         })),
-        suppressed
-      )
+        suppressed,
+      ),
     );
     updates.struggles = mergedStruggles;
     fieldsUpdated.push('struggles');
@@ -644,7 +648,7 @@ function buildAnalysisUpdates(
     updates.communicationNotes = mergeCommunicationNotes(
       asStringArray(profile.communicationNotes),
       analysis.communicationNotes,
-      suppressed
+      suppressed,
     );
     fieldsUpdated.push('communicationNotes');
   }
@@ -653,7 +657,7 @@ function buildAnalysisUpdates(
     asLearningStyle(profile.learningStyle),
     analysis,
     profile.effectivenessSessionCount ?? 0,
-    source
+    source,
   );
 
   if (
@@ -678,7 +682,7 @@ function buildAnalysisUpdates(
   const notifications = detectStruggleNotifications(
     beforeStruggles,
     afterStruggles,
-    analysis.resolvedTopics ?? null
+    analysis.resolvedTopics ?? null,
   );
 
   // Persist resolved topic names so the next session's buildMemoryBlock can
@@ -700,14 +704,14 @@ function buildDeleteMemoryItemUpdates(
   category: string,
   value: string,
   suppress = false,
-  subject?: string
+  subject?: string,
 ): Record<string, unknown> | null {
   const updates: Record<string, unknown> = {};
 
   switch (category) {
     case 'interests': {
       const nextInterests = asStringArray(profile.interests).filter(
-        (entry) => !sameNormalized(entry, value)
+        (entry) => !sameNormalized(entry, value),
       );
       const timestamps = {
         ...asInterestTimestampMap(profile.interestTimestamps),
@@ -719,7 +723,7 @@ function buildDeleteMemoryItemUpdates(
     }
     case 'strengths': {
       updates.strengths = asStrengthArray(profile.strengths).filter(
-        (entry) => !sameNormalized(entry.subject, value)
+        (entry) => !sameNormalized(entry.subject, value),
       );
       break;
     }
@@ -729,13 +733,13 @@ function buildDeleteMemoryItemUpdates(
           !(
             sameNormalized(entry.topic, value) &&
             (subject === undefined || sameNormalized(entry.subject, subject))
-          )
+          ),
       );
       break;
     }
     case 'communicationNotes': {
       updates.communicationNotes = asStringArray(
-        profile.communicationNotes
+        profile.communicationNotes,
       ).filter((entry) => !sameNormalized(entry, value));
       break;
     }
@@ -822,7 +826,7 @@ export function buildMemoryBlock(
   currentSubject: string | null,
   currentTopic: string | null,
   retentionContext?: MemoryRetentionContext | null,
-  recentlyResolved?: Array<string | { topic: string; subject: string | null }>
+  recentlyResolved?: Array<string | { topic: string; subject: string | null }>,
 ): MemoryBlock {
   // [F-PV-09] Gate injection on consent status — if consent is not granted,
   // no memory should be injected into LLM prompts.
@@ -838,7 +842,7 @@ export function buildMemoryBlock(
   // the truncation loop from popping the wrong entry.
   const sectionHasEntry: boolean[] = [];
   const strongTopicSet = new Set(
-    (retentionContext?.strongTopics ?? []).map(normalizeMemoryValue)
+    (retentionContext?.strongTopics ?? []).map(normalizeMemoryValue),
   );
 
   const relevantStruggles = profile.struggles.filter((entry) => {
@@ -903,13 +907,13 @@ export function buildMemoryBlock(
 
   // P1.3: Inject strengths — top 3 entries by number of topics (confidence proxy)
   const sortedStrengths = [...profile.strengths].sort(
-    (a, b) => b.topics.length - a.topics.length
+    (a, b) => b.topics.length - a.topics.length,
   );
   const topStrengths = sortedStrengths.slice(0, 3);
   if (topStrengths.length > 0) {
     const strengthLabels = topStrengths
       .map(
-        (entry) => `${entry.topics.slice(0, 3).join(', ')} (${entry.subject})`
+        (entry) => `${entry.topics.slice(0, 3).join(', ')} (${entry.subject})`,
       )
       .join('; ');
     const text = `- Confident with: ${strengthLabels}.`;
@@ -924,22 +928,22 @@ export function buildMemoryBlock(
     if (profile.learningStyle.preferredExplanations?.length) {
       styleParts.push(
         `${profile.learningStyle.preferredExplanations.join(
-          ' and '
-        )}-based explanations`
+          ' and ',
+        )}-based explanations`,
       );
     }
     if (profile.learningStyle.pacePreference) {
       styleParts.push(
         profile.learningStyle.pacePreference === 'thorough'
           ? 'a step-by-step pace'
-          : 'a quicker pace'
+          : 'a quicker pace',
       );
     }
     if (profile.learningStyle.responseToChallenge) {
       styleParts.push(
         profile.learningStyle.responseToChallenge === 'motivated'
           ? 'challenge as motivation'
-          : 'extra encouragement when work gets difficult'
+          : 'extra encouragement when work gets difficult',
       );
     }
     if (styleParts.length > 0) {
@@ -960,14 +964,14 @@ export function buildMemoryBlock(
   // preprocessor which has already normalized, but fixtures and any untyped
   // JSONB writes still hit this path cleanly.
   const normalizedInterests: InterestEntry[] = profile.interests.map((i) =>
-    typeof i === 'string' ? { label: i, context: 'both' as const } : i
+    typeof i === 'string' ? { label: i, context: 'both' as const } : i,
   );
   const topInterests = normalizedInterests.slice(-5).reverse();
   const schoolInterests = topInterests.filter(
-    (i) => i.context === 'school' || i.context === 'both'
+    (i) => i.context === 'school' || i.context === 'both',
   );
   const freeTimeInterests = topInterests.filter(
-    (i) => i.context === 'free_time' || i.context === 'both'
+    (i) => i.context === 'free_time' || i.context === 'both',
   );
   if (schoolInterests.length > 0) {
     const labels = schoolInterests.map((i) => i.label).join(', ');
@@ -1011,7 +1015,7 @@ export function buildMemoryBlock(
     // memory signal. Passing null ensures truncation doesn't pop the wrong entry.
     addSection(
       "- If it fits naturally, ask one gentle check-in question such as 'Did that help?' or 'Want another kind of example?' — no more than once per session.",
-      null
+      null,
     );
   }
 
@@ -1023,8 +1027,8 @@ export function buildMemoryBlock(
       const daysAway = Math.max(
         1,
         Math.round(
-          (boostUntil.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-        )
+          (boostUntil.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+        ),
       );
       const text = `- Upcoming: ${reason}, ${daysAway} day${
         daysAway === 1 ? '' : 's'
@@ -1054,7 +1058,7 @@ export function buildMemoryBlock(
   const parked = (profile.parkedQuestions ?? []).slice(0, 5);
   if (parked.length > 0) {
     const text = `- Parked questions from recent sessions: ${parked.join(
-      '; '
+      '; ',
     )}`;
     addSection(text, {
       kind: 'communication_note',
@@ -1070,7 +1074,7 @@ export function buildMemoryBlock(
     'Avoid repeating the same fact if another memory section already covers it.';
 
   let block = `About this learner:\n${sections.join(
-    '\n'
+    '\n',
   )}\n\n${metaInstruction}`;
   const originalSectionCount = sections.length;
   while (block.length > MEMORY_BLOCK_CHAR_BUDGET && sections.length > 0) {
@@ -1097,7 +1101,7 @@ export function buildMemoryBlock(
 async function verifyProfileOwnership(
   db: Database,
   profileId: string,
-  accountId: string | undefined
+  accountId: string | undefined,
 ): Promise<void> {
   if (!accountId) return; // skipped when caller has verified via parent chain (assertParentAccess)
   const [owner] = await db
@@ -1111,16 +1115,68 @@ async function verifyProfileOwnership(
 
 export async function getLearningProfile(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<LearningProfileRow | undefined> {
   return db.query.learningProfiles.findFirst({
     where: eq(learningProfiles.profileId, profileId),
   });
 }
 
+export function cleanCurrentlyWorkingOnLabel(topic: string): string {
+  return topic
+    .trim()
+    .replace(
+      /^(?:struggling\s+with|struggle\s+with|has\s+trouble\s+with|trouble\s+with|weak\s+in|declining\s+in)\s+/i,
+      '',
+    )
+    .trim();
+}
+
+export function selectCurrentlyWorkingOn(
+  struggles: unknown,
+  now: Date = new Date(),
+): string[] {
+  if (!Array.isArray(struggles)) return [];
+
+  const cutoffMs =
+    now.getTime() - CURRENTLY_WORKING_ON_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+  const labels: string[] = [];
+  const seen = new Set<string>();
+
+  for (const value of struggles) {
+    const parsed = struggleEntrySchema.safeParse(value);
+    if (!parsed.success) continue;
+
+    const entry = parsed.data;
+    if (entry.confidence === 'low') continue;
+    if (new Date(entry.lastSeen).getTime() < cutoffMs) continue;
+
+    const label = cleanCurrentlyWorkingOnLabel(entry.topic);
+    if (!label) continue;
+
+    const key = label.toLocaleLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    labels.push(label);
+
+    if (labels.length >= CURRENTLY_WORKING_ON_LIMIT) break;
+  }
+
+  return labels;
+}
+
+export async function getCurrentlyWorkingOn(
+  db: Database,
+  profileId: string,
+): Promise<string[]> {
+  const scoped = createScopedRepository(db, profileId);
+  const row = await scoped.learningProfiles.findFirst();
+  return selectCurrentlyWorkingOn(row?.struggles);
+}
+
 export async function getOrCreateLearningProfile(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<LearningProfileRow> {
   const existing = await getLearningProfile(db, profileId);
   if (existing) return existing;
@@ -1142,7 +1198,7 @@ export async function getOrCreateLearningProfile(
 
 async function getOrCreateLearningProfileTx(
   tx: Database,
-  profileId: string
+  profileId: string,
 ): Promise<LearningProfileRow> {
   const [locked] = await tx
     .select()
@@ -1172,7 +1228,7 @@ async function getOrCreateLearningProfileTx(
 
 function mergeProfileState(
   profile: LearningProfileRow,
-  updates: Record<string, unknown>
+  updates: Record<string, unknown>,
 ): LearningProfileRow {
   return {
     ...profile,
@@ -1195,7 +1251,7 @@ export async function applyAnalysis(
   source: MemorySource = 'inferred',
   /** [CR-119.3]: Prefer subjectId for urgency boost writes — name match
    *  is ambiguous when no (profileId, name) uniqueness constraint exists. */
-  subjectId?: string | null
+  subjectId?: string | null,
 ): Promise<ApplyAnalysisResult> {
   if (analysis.confidence === 'low') {
     // [logging sweep] structured logger so PII fields land as JSON context
@@ -1210,7 +1266,7 @@ export async function applyAnalysis(
     async (tx) => {
       const profile = await getOrCreateLearningProfileTx(
         tx as unknown as Database,
-        profileId
+        profileId,
       );
 
       if (
@@ -1224,7 +1280,7 @@ export async function applyAnalysis(
         profile,
         analysis,
         source,
-        subjectName
+        subjectName,
       );
 
       if (Object.keys(updates).length === 0) {
@@ -1246,7 +1302,7 @@ export async function applyAnalysis(
         finalFieldsUpdated: fieldsUpdated,
         finalNotifications: notifications,
       };
-    }
+    },
   );
 
   if (finalNotifications.length > 0) {
@@ -1267,12 +1323,12 @@ export async function applyAnalysis(
   const subjectFilter = subjectId
     ? eq(subjects.id, subjectId)
     : subjectName
-    ? eq(subjects.name, subjectName)
-    : null;
+      ? eq(subjects.name, subjectName)
+      : null;
   if (analysis.urgencyDeadline && subjectFilter) {
     try {
       const boostUntil = new Date(
-        Date.now() + analysis.urgencyDeadline.daysFromNow * 24 * 60 * 60 * 1000
+        Date.now() + analysis.urgencyDeadline.daysFromNow * 24 * 60 * 60 * 1000,
       );
       await db
         .update(subjects)
@@ -1313,7 +1369,7 @@ export async function deleteMemoryItem(
   category: string,
   value: string,
   suppress = false,
-  subject?: string
+  subject?: string,
 ): Promise<void> {
   await verifyProfileOwnership(db, profileId, accountId);
   await db.transaction(async (tx) => {
@@ -1330,7 +1386,7 @@ export async function deleteMemoryItem(
       category,
       value,
       suppress,
-      subject
+      subject,
     );
     if (!updates) return;
 
@@ -1345,8 +1401,8 @@ export async function deleteMemoryItem(
             eq(memoryFacts.profileId, profileId),
             eq(memoryFacts.category, factCategory),
             eq(memoryFacts.textNormalized, normalizeMemoryValue(value)),
-            sql`${memoryFacts.supersededBy} IS NULL`
-          )
+            sql`${memoryFacts.supersededBy} IS NULL`,
+          ),
         );
       for (const row of matchingRows) {
         await cascadeDeleteFactWithAncestry(tx, profileId, row.id, {
@@ -1373,11 +1429,11 @@ export async function deleteMemoryItem(
 
 function buildUnsuppressUpdates(
   profile: LearningProfileRow,
-  value: string
+  value: string,
 ): Record<string, unknown> {
   return {
     suppressedInferences: asStringArray(profile.suppressedInferences).filter(
-      (entry) => !sameNormalized(entry, value)
+      (entry) => !sameNormalized(entry, value),
     ),
   };
 }
@@ -1386,7 +1442,7 @@ export async function unsuppressInference(
   db: Database,
   profileId: string,
   accountId: string | undefined,
-  value: string
+  value: string,
 ): Promise<void> {
   await verifyProfileOwnership(db, profileId, accountId);
   await db.transaction(async (tx) => {
@@ -1416,7 +1472,7 @@ export async function toggleMemoryEnabled(
   db: Database,
   profileId: string,
   accountId: string | undefined,
-  enabled: boolean
+  enabled: boolean,
 ): Promise<void> {
   await verifyProfileOwnership(db, profileId, accountId);
   const profile = await getOrCreateLearningProfile(db, profileId);
@@ -1440,7 +1496,7 @@ export async function toggleMemoryCollection(
   db: Database,
   profileId: string,
   accountId: string | undefined,
-  enabled: boolean
+  enabled: boolean,
 ): Promise<void> {
   await verifyProfileOwnership(db, profileId, accountId);
   const profile = await getOrCreateLearningProfile(db, profileId);
@@ -1465,7 +1521,7 @@ export async function toggleMemoryInjection(
   db: Database,
   profileId: string,
   accountId: string | undefined,
-  enabled: boolean
+  enabled: boolean,
 ): Promise<void> {
   await verifyProfileOwnership(db, profileId, accountId);
   const profile = await getOrCreateLearningProfile(db, profileId);
@@ -1490,7 +1546,7 @@ export async function grantMemoryConsent(
   db: Database,
   profileId: string,
   accountId: string | undefined,
-  consent: 'granted' | 'declined'
+  consent: 'granted' | 'declined',
 ): Promise<void> {
   await verifyProfileOwnership(db, profileId, accountId);
   await getOrCreateLearningProfile(db, profileId);
@@ -1520,7 +1576,7 @@ export async function grantMemoryConsent(
 export async function deleteAllMemory(
   db: Database,
   profileId: string,
-  accountId: string | undefined
+  accountId: string | undefined,
 ): Promise<void> {
   await verifyProfileOwnership(db, profileId, accountId);
   await db.transaction(async (tx) => {
@@ -1547,12 +1603,12 @@ export async function analyzeSessionTranscript(
   profileContext?: {
     knownStruggles?: Array<{ topic: string; subject: string | null }>;
     suppressedTopics?: string[];
-  }
+  },
 ): Promise<SessionAnalysisOutput | null> {
   const conversationEvents = transcript
     .filter(
       (entry) =>
-        entry.eventType === 'user_message' || entry.eventType === 'ai_response'
+        entry.eventType === 'user_message' || entry.eventType === 'ai_response',
     )
     .slice(-MAX_TRANSCRIPT_EVENTS);
 
@@ -1657,7 +1713,7 @@ export async function analyzeSessionTranscript(
 }
 
 export function buildHumanReadableMemoryExport(
-  profile: LearningProfile | LearningProfileRow | null | undefined
+  profile: LearningProfile | LearningProfileRow | null | undefined,
 ): string {
   if (!profile) {
     return 'No learner memory has been stored yet.';
@@ -1684,7 +1740,7 @@ export function buildHumanReadableMemoryExport(
     sections.push(
       `Accommodation mode\n${
         modeLabels[profile.accommodationMode] ?? profile.accommodationMode
-      }`
+      }`,
     );
   }
 
@@ -1692,7 +1748,7 @@ export function buildHumanReadableMemoryExport(
     const styleParts: string[] = [];
     if (style.preferredExplanations?.length) {
       styleParts.push(
-        `Preferred explanations: ${style.preferredExplanations.join(', ')}`
+        `Preferred explanations: ${style.preferredExplanations.join(', ')}`,
       );
     }
     if (style.pacePreference) {
@@ -1708,7 +1764,7 @@ export function buildHumanReadableMemoryExport(
 
   if (interests.length > 0) {
     sections.push(
-      `Interests\n${interests.map((value) => `- ${value}`).join('\n')}`
+      `Interests\n${interests.map((value) => `- ${value}`).join('\n')}`,
     );
   }
 
@@ -1719,9 +1775,9 @@ export function buildHumanReadableMemoryExport(
           (entry) =>
             `- ${entry.subject}: ${entry.topics.join(', ')} (${
               entry.confidence
-            })`
+            })`,
         )
-        .join('\n')}`
+        .join('\n')}`,
     );
   }
 
@@ -1732,19 +1788,19 @@ export function buildHumanReadableMemoryExport(
           const subject = entry.subject ? `${entry.subject}: ` : '';
           return `- ${subject}${entry.topic} (${entry.confidence}, attempts ${entry.attempts})`;
         })
-        .join('\n')}`
+        .join('\n')}`,
     );
   }
 
   if (notes.length > 0) {
     sections.push(
-      `Communication notes\n${notes.map((value) => `- ${value}`).join('\n')}`
+      `Communication notes\n${notes.map((value) => `- ${value}`).join('\n')}`,
     );
   }
 
   if (hidden.length > 0) {
     sections.push(
-      `Hidden items\n${hidden.map((value) => `- ${value}`).join('\n')}`
+      `Hidden items\n${hidden.map((value) => `- ${value}`).join('\n')}`,
     );
   }
 
@@ -1789,7 +1845,7 @@ const ACCOMMODATION_META =
   'The above learning accommodation is a parental preference. Follow it consistently. Do not override it based on inferred learner behavior.';
 
 export function buildAccommodationBlock(
-  mode: AccommodationMode | string | null | undefined
+  mode: AccommodationMode | string | null | undefined,
 ): string {
   if (!mode || mode === 'none') return '';
   const preamble = ACCOMMODATION_PREAMBLES[mode];
@@ -1801,7 +1857,7 @@ export async function updateAccommodationMode(
   db: Database,
   profileId: string,
   accountId: string | undefined,
-  mode: AccommodationMode
+  mode: AccommodationMode,
 ): Promise<void> {
   await verifyProfileOwnership(db, profileId, accountId);
   // FR253.4: create row if it doesn't exist

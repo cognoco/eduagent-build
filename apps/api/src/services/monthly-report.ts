@@ -25,7 +25,7 @@ function safeDelta(current: number, previous: number | undefined): number {
 function subjectExploredTotal(metrics: ProgressMetrics): number {
   return metrics.subjects.reduce(
     (sum, subject) => sum + (subject.topicsExplored ?? 0),
-    0
+    0,
   );
 }
 
@@ -33,27 +33,27 @@ export function generateMonthlyReportData(
   childName: string,
   monthLabel: string,
   thisMonth: ProgressMetrics,
-  lastMonth: ProgressMetrics | null
+  lastMonth: ProgressMetrics | null,
 ): MonthlyReportData {
   const topicsMasteredDelta = safeDelta(
     thisMonth.topicsMastered,
-    lastMonth?.topicsMastered
+    lastMonth?.topicsMastered,
   );
   const topicsExploredDelta = safeDelta(
     subjectExploredTotal(thisMonth),
-    lastMonth ? subjectExploredTotal(lastMonth) : undefined
+    lastMonth ? subjectExploredTotal(lastMonth) : undefined,
   );
   const vocabularyDelta = safeDelta(
     thisMonth.vocabularyTotal,
-    lastMonth?.vocabularyTotal
+    lastMonth?.vocabularyTotal,
   );
   const activeMinutesDelta = safeDelta(
     thisMonth.totalActiveMinutes,
-    lastMonth?.totalActiveMinutes
+    lastMonth?.totalActiveMinutes,
   );
   const sessionsDelta = safeDelta(
     thisMonth.totalSessions,
-    lastMonth?.totalSessions
+    lastMonth?.totalSessions,
   );
 
   const headlineMode =
@@ -66,22 +66,22 @@ export function generateMonthlyReportData(
             : 'in a first month',
         }
       : topicsExploredDelta > topicsMasteredDelta
-      ? {
-          label: 'Topics explored',
-          value: topicsExploredDelta,
-          comparison: lastMonth
-            ? `up from ${subjectExploredTotal(
-                lastMonth
-              )} total topics before this month`
-            : 'in a first month',
-        }
-      : {
-          label: 'Topics mastered',
-          value: topicsMasteredDelta,
-          comparison: lastMonth
-            ? `up from ${lastMonth.topicsMastered} last month`
-            : 'in a first month',
-        };
+        ? {
+            label: 'Topics explored',
+            value: topicsExploredDelta,
+            comparison: lastMonth
+              ? `up from ${subjectExploredTotal(
+                  lastMonth,
+                )} total topics before this month`
+              : 'in a first month',
+          }
+        : {
+            label: 'Topics mastered',
+            value: topicsMasteredDelta,
+            comparison: lastMonth
+              ? `up from ${lastMonth.topicsMastered} last month`
+              : 'in a first month',
+          };
 
   return monthlyReportDataSchema.parse({
     childName,
@@ -115,26 +115,26 @@ export function generateMonthlyReportData(
     nextSteps: [],
     subjects: thisMonth.subjects.map((subject) => {
       const previousSubject = lastMonth?.subjects.find(
-        (candidate) => candidate.subjectId === subject.subjectId
+        (candidate) => candidate.subjectId === subject.subjectId,
       );
       const activeDeltaForSubject = safeDelta(
         subject.activeMinutes,
-        previousSubject?.activeMinutes
+        previousSubject?.activeMinutes,
       );
 
       return {
         subjectName: subject.subjectName,
         topicsMastered: safeDelta(
           subject.topicsMastered,
-          previousSubject?.topicsMastered
+          previousSubject?.topicsMastered,
         ),
         topicsAttempted: safeDelta(
           subject.topicsAttempted,
-          previousSubject?.topicsAttempted
+          previousSubject?.topicsAttempted,
         ),
         topicsExplored: safeDelta(
           subject.topicsExplored ?? 0,
-          previousSubject?.topicsExplored
+          previousSubject?.topicsExplored,
         ),
         // [EP15-I2] Cumulative end-of-month total for this subject,
         // matching the new `vocabularyTotal` contract. The per-month
@@ -147,8 +147,8 @@ export function generateMonthlyReportData(
           activeDeltaForSubject > 0
             ? 'growing'
             : activeDeltaForSubject === 0
-            ? 'stable'
-            : 'declining',
+              ? 'stable'
+              : 'declining',
       };
     }),
     headlineStat: headlineMode,
@@ -156,7 +156,7 @@ export function generateMonthlyReportData(
 }
 
 export async function generateReportHighlights(
-  reportData: MonthlyReportData
+  reportData: MonthlyReportData,
 ): Promise<{
   highlights: string[];
   nextSteps: string[];
@@ -215,7 +215,7 @@ export async function generateReportHighlights(
 }
 
 function mapMonthlyReportRow(
-  row: typeof monthlyReports.$inferSelect
+  row: typeof monthlyReports.$inferSelect,
 ): MonthlyReportRecord {
   return monthlyReportRecordSchema.parse({
     id: row.id,
@@ -231,12 +231,12 @@ function mapMonthlyReportRow(
 export async function listMonthlyReportsForParentChild(
   db: Database,
   parentProfileId: string,
-  childProfileId: string
+  childProfileId: string,
 ): Promise<MonthlyReportSummary[]> {
   const rows = await db.query.monthlyReports.findMany({
     where: and(
       eq(monthlyReports.profileId, parentProfileId),
-      eq(monthlyReports.childProfileId, childProfileId)
+      eq(monthlyReports.childProfileId, childProfileId),
     ),
     orderBy: desc(monthlyReports.reportMonth),
   });
@@ -252,17 +252,24 @@ export async function listMonthlyReportsForParentChild(
         value: 0,
         comparison: '',
       },
-    })
+      highlights: (
+        (row.reportData as MonthlyReportData).highlights ?? []
+      ).slice(0, 3),
+      nextSteps: ((row.reportData as MonthlyReportData).nextSteps ?? []).slice(
+        0,
+        2,
+      ),
+    }),
   );
 }
 
 export async function listMonthlyReportsForProfile(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<MonthlyReportSummary[]> {
   const scoped = createScopedRepository(db, profileId);
   const rows = await scoped.monthlyReports.findMany(
-    eq(monthlyReports.childProfileId, profileId)
+    eq(monthlyReports.childProfileId, profileId),
   );
 
   return rows.map((row) =>
@@ -276,7 +283,14 @@ export async function listMonthlyReportsForProfile(
         value: 0,
         comparison: '',
       },
-    })
+      highlights: (
+        (row.reportData as MonthlyReportData).highlights ?? []
+      ).slice(0, 3),
+      nextSteps: ((row.reportData as MonthlyReportData).nextSteps ?? []).slice(
+        0,
+        2,
+      ),
+    }),
   );
 }
 
@@ -284,13 +298,13 @@ export async function getMonthlyReportForParentChild(
   db: Database,
   parentProfileId: string,
   childProfileId: string,
-  reportId: string
+  reportId: string,
 ): Promise<MonthlyReportRecord | null> {
   const row = await db.query.monthlyReports.findFirst({
     where: and(
       eq(monthlyReports.id, reportId),
       eq(monthlyReports.profileId, parentProfileId),
-      eq(monthlyReports.childProfileId, childProfileId)
+      eq(monthlyReports.childProfileId, childProfileId),
     ),
   });
 
@@ -301,7 +315,7 @@ export async function markMonthlyReportViewed(
   db: Database,
   parentProfileId: string,
   childProfileId: string,
-  reportId: string
+  reportId: string,
 ): Promise<void> {
   await db
     .update(monthlyReports)
@@ -310,7 +324,7 @@ export async function markMonthlyReportViewed(
       and(
         eq(monthlyReports.id, reportId),
         eq(monthlyReports.profileId, parentProfileId),
-        eq(monthlyReports.childProfileId, childProfileId)
-      )
+        eq(monthlyReports.childProfileId, childProfileId),
+      ),
     );
 }

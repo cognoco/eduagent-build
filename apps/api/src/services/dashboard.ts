@@ -47,6 +47,7 @@ import type {
   ProgressHistory,
   SessionMetadata,
   ConsentStatus,
+  ProgressMetrics,
   TopicProgress,
 } from '@eduagent/schemas';
 import { getOverallProgress, getTopicProgressBatch } from './progress';
@@ -63,6 +64,7 @@ import {
   markMonthlyReportViewed,
 } from './monthly-report';
 import { assertParentAccess } from './family-access';
+import { generateWeeklyReportData } from './weekly-report';
 import {
   isoDate,
   subtractDays,
@@ -250,6 +252,37 @@ function redactedConsentSummary(
   }
 }
 
+function hiddenWeeklyHeadline(): DashboardChild['weeklyHeadline'] {
+  return {
+    label: 'Progress',
+    value: 0,
+    comparison: 'Learning metrics are hidden until consent is active.',
+  };
+}
+
+function emptyProgressMetrics(): ProgressMetrics {
+  return {
+    totalSessions: 0,
+    totalActiveMinutes: 0,
+    totalWallClockMinutes: 0,
+    totalExchanges: 0,
+    topicsAttempted: 0,
+    topicsMastered: 0,
+    topicsInProgress: 0,
+    booksCompleted: 0,
+    vocabularyTotal: 0,
+    vocabularyMastered: 0,
+    vocabularyLearning: 0,
+    vocabularyNew: 0,
+    retentionCardsDue: 0,
+    retentionCardsStrong: 0,
+    retentionCardsFading: 0,
+    currentStreak: 0,
+    longestStreak: 0,
+    subjects: [],
+  };
+}
+
 function redactDashboardChild(child: DashboardChild): DashboardChild {
   if (isChildLearningDataVisible(child.consentStatus)) return child;
 
@@ -270,6 +303,7 @@ function redactDashboardChild(child: DashboardChild): DashboardChild {
     guidedVsImmediateRatio: 0,
     retentionTrend: 'stable',
     totalSessions: 0,
+    weeklyHeadline: hiddenWeeklyHeadline(),
     progress: null,
     currentStreak: 0,
     longestStreak: 0,
@@ -516,7 +550,11 @@ async function buildChildProgressSummary(
   totalTimeThisWeekMinutes: number,
   subjectNames: string[],
   currentStreak?: number,
-): Promise<{ progress: DashboardChild['progress']; totalSessions: number }> {
+): Promise<{
+  progress: DashboardChild['progress'];
+  totalSessions: number;
+  weeklyHeadline: DashboardChild['weeklyHeadline'];
+}> {
   // [F-PV-07] Compute totalSessions live with the same filter as getChildSessions
   // (exchangeCount >= 1) instead of reading the stale snapshot value. This
   // prevents the dashboard aggregate from disagreeing with the sessions list.
@@ -537,8 +575,18 @@ async function buildChildProgressSummary(
       ),
   ]);
   const liveSessionCount = liveCountRows[0]?.count ?? 0;
+  const weekStart = isoDate(getStartOfWeek(new Date()));
   if (!latestSnapshot) {
-    return { progress: null, totalSessions: liveSessionCount };
+    return {
+      progress: null,
+      totalSessions: liveSessionCount,
+      weeklyHeadline: generateWeeklyReportData(
+        childName,
+        weekStart,
+        emptyProgressMetrics(),
+        null,
+      ).headlineStat,
+    };
   }
 
   const previousSnapshot = await getLatestSnapshotOnOrBefore(
@@ -552,6 +600,12 @@ async function buildChildProgressSummary(
   const previousMetrics = previousSnapshot?.metrics ?? null;
   const currentMetrics = latestSnapshot.metrics;
   const weeklyDeltas = computeWeeklyDeltas(previousMetrics, currentMetrics);
+  const weeklyHeadline = generateWeeklyReportData(
+    childName,
+    weekStart,
+    currentMetrics,
+    previousMetrics,
+  ).headlineStat;
 
   return {
     progress: {
@@ -579,6 +633,7 @@ async function buildChildProgressSummary(
       ),
     },
     totalSessions: liveSessionCount,
+    weeklyHeadline,
   };
 }
 
@@ -879,7 +934,7 @@ export async function getChildrenForParent(
     const progressSummary = progressSummaries[i];
     if (!progressSummary)
       throw new Error(`progressSummaries[${i}] is unexpectedly undefined`);
-    const { progress, totalSessions } = progressSummary;
+    const { progress, totalSessions, weeklyHeadline } = progressSummary;
     // [BUG-906] Inject lifetime count so generateChildSummary can pick the
     // right framing (lifetime for new learners, weekly cadence otherwise).
     const summary = generateChildSummary({
@@ -917,6 +972,7 @@ export async function getChildrenForParent(
       ),
       retentionTrend,
       totalSessions,
+      weeklyHeadline,
       progress,
       currentStreak: streaksByProfile.get(p.childProfileId)?.currentStreak ?? 0,
       longestStreak: streaksByProfile.get(p.childProfileId)?.longestStreak ?? 0,
@@ -1049,18 +1105,21 @@ export async function getChildDetail(
       : sortSubjectsByActivityPriority(progress.subjects).map((s) => s.name);
 
   // Step 6: buildChildProgressSummary — 2 queries (snapshot reads)
-  const { progress: progressSummary, totalSessions } =
-    await buildChildProgressSummary(
-      db,
-      childProfileId,
-      profile.displayName,
-      sessionsThisWeek,
-      sessionsLastWeek,
-      totalTimeThisWeekMinutes,
-      subjectNames,
-      // streakData.currentStreak is already decay-adjusted by the repo layer.
-      streakData?.currentStreak ?? 0,
-    );
+  const {
+    progress: progressSummary,
+    totalSessions,
+    weeklyHeadline,
+  } = await buildChildProgressSummary(
+    db,
+    childProfileId,
+    profile.displayName,
+    sessionsThisWeek,
+    sessionsLastWeek,
+    totalTimeThisWeekMinutes,
+    subjectNames,
+    // streakData.currentStreak is already decay-adjusted by the repo layer.
+    streakData?.currentStreak ?? 0,
+  );
 
   // Step 7: Compute all derived fields using the same helpers as getChildrenForParent
   const subjectRetentionData = progress.subjects.map((s) => ({
@@ -1117,6 +1176,7 @@ export async function getChildDetail(
     ),
     retentionTrend,
     totalSessions,
+    weeklyHeadline,
     progress: progressSummary,
     // streakData is already decay-adjusted (repo.streaks.findCurrentForToday).
     currentStreak: streakData?.currentStreak ?? 0,

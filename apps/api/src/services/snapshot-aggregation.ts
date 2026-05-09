@@ -34,6 +34,7 @@ import {
 } from '@eduagent/schemas';
 import { queueCelebration } from './celebrations';
 import { getCurrentLanguageProgress } from './language-curriculum';
+import { getCurrentlyWorkingOn } from './learner-profile';
 // [EP15-I7] Static import of milestone-detection. No circular dependency
 // (milestone-detection does not import snapshot-aggregation), so the prior
 // dynamic `await import()` added per-call module-resolution overhead on a
@@ -41,6 +42,7 @@ import { getCurrentLanguageProgress } from './language-curriculum';
 import { detectMilestones, storeMilestones } from './milestone-detection';
 import { computeWeeklyDeltas } from './progress-helpers';
 import { captureException } from './sentry';
+import { generateWeeklyReportData } from './weekly-report';
 
 type SubjectRow = typeof subjects.$inferSelect;
 type TopicRow = typeof curriculumTopics.$inferSelect;
@@ -195,6 +197,10 @@ function mondayKey(input: string): string {
   const day = date.getUTCDay() || 7;
   date.setUTCDate(date.getUTCDate() - day + 1);
   return isoDate(date);
+}
+
+function currentWeekStart(): string {
+  return mondayKey(isoDate(new Date()));
 }
 
 function mapCefrLabel(
@@ -799,10 +805,27 @@ export async function buildKnowledgeInventory(
     previousWeeklySnapshot?.metrics ?? null,
     metrics,
   );
+  const weeklyReportData = generateWeeklyReportData(
+    'Learner',
+    currentWeekStart(),
+    metrics,
+    previousWeeklySnapshot?.metrics ?? null,
+  );
+  const currentlyWorkingOn = await getCurrentlyWorkingOn(db, profileId);
 
   return knowledgeInventorySchema.parse({
     profileId,
     snapshotDate: latestSnapshot?.snapshotDate ?? isoDate(new Date()),
+    currentlyWorkingOn,
+    thisWeekMini: {
+      sessions: weeklyReportData.thisWeek.totalSessions,
+      wordsLearned: Math.max(
+        0,
+        weeklyReportData.thisWeek.vocabularyTotal -
+          (weeklyReportData.lastWeek?.vocabularyTotal ?? 0),
+      ),
+      topicsTouched: weeklyReportData.thisWeek.topicsExplored,
+    },
     global: {
       topicsAttempted: metrics.topicsAttempted,
       topicsMastered: metrics.topicsMastered,

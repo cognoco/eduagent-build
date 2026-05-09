@@ -344,6 +344,9 @@ function createSnapshotDb({
           .fn()
           .mockResolvedValue({ id: profileId, birthYear: 2012 }),
       },
+      learningProfiles: {
+        findFirst: jest.fn().mockResolvedValue({ struggles: [] }),
+      },
     },
     insert: jest.fn().mockReturnValue({
       values: jest.fn().mockReturnValue({
@@ -415,6 +418,9 @@ function createMilestonesDb({
         findFirst: jest
           .fn()
           .mockResolvedValue({ id: profileId, birthYear: 2012 }),
+      },
+      learningProfiles: {
+        findFirst: jest.fn().mockResolvedValue({ struggles: [] }),
       },
     },
     insert: jest.fn().mockReturnValue({

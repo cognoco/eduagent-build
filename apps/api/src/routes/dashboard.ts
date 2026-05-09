@@ -371,6 +371,11 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
             guidedVsImmediateRatio: 0.6,
             retentionTrend: 'stable',
             totalSessions: 12,
+            weeklyHeadline: {
+              label: 'Words learned',
+              value: 12,
+              comparison: 'up from 5 last week',
+            },
             currentStreak: 3,
             longestStreak: 7,
             totalXp: 450,
@@ -393,6 +398,12 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
             guidedVsImmediateRatio: 0.3,
             retentionTrend: 'improving',
             totalSessions: 8,
+            weeklyHeadline: {
+              label: 'Topics mastered',
+              value: 0,
+              comparison:
+                "No activity this week - that's OK. A nudge can help.",
+            },
             currentStreak: 1,
             longestStreak: 5,
             totalXp: 280,
