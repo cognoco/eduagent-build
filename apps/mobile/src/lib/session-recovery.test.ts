@@ -39,12 +39,41 @@ describe('session-recovery', () => {
     );
   });
 
-  it('rejects legacy unscoped markers that do not carry the active profile id', async () => {
+  it('migrates legacy unscoped markers (no profileId field) to the scoped key', async () => {
+    // A legacy marker stored without a profileId field — e.g. written before
+    // profile-scoped keys were introduced. The code lets it through and
+    // rewrites it under the scoped key so the fallback only fires once.
+    const legacyMarker = {
+      sessionId: 'session-from-legacy',
+      updatedAt: new Date().toISOString(),
+    };
     mockGet.mockImplementation(async (key: string) => {
       if (key === 'session-recovery-marker-profile-2') return null;
       if (key === 'session-recovery-marker') {
+        return JSON.stringify(legacyMarker);
+      }
+      return null;
+    });
+
+    const result = await readSessionRecoveryMarker('profile-2');
+    expect(result).not.toBeNull();
+    expect(result?.sessionId).toBe('session-from-legacy');
+    // Migration: rewritten under scoped key, legacy key deleted.
+    expect(mockSet).toHaveBeenCalledWith(
+      'session-recovery-marker-profile-2',
+      expect.stringContaining('"sessionId":"session-from-legacy"'),
+    );
+    expect(mockDelete).toHaveBeenCalledWith('session-recovery-marker');
+  });
+
+  it('rejects a scoped marker belonging to a different profile', async () => {
+    // A marker that explicitly carries a different profileId is rejected
+    // (cross-profile contamination guard).
+    mockGet.mockImplementation(async (key: string) => {
+      if (key === 'session-recovery-marker-profile-2') {
         return JSON.stringify({
-          sessionId: 'session-from-another-profile',
+          sessionId: 'session-from-profile-1',
+          profileId: 'profile-1',
           updatedAt: new Date().toISOString(),
         });
       }

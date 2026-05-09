@@ -62,7 +62,8 @@ export default function MoreScreen() {
   ]);
   const hideMentorMemory = isNewLearner(cachedInventory?.global.totalSessions);
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const { data: subscription } = useSubscription();
+  const { data: subscription, isLoading: subscriptionLoading } =
+    useSubscription();
   const { data: familyData } = useFamilySubscription(
     subscription?.tier === 'family' || subscription?.tier === 'pro',
   );
@@ -96,11 +97,7 @@ export default function MoreScreen() {
   );
 
   const handleAddChild = useCallback(() => {
-    if (!subscription) {
-      // Query still loading — don't block with a false 'Upgrade required'
-      platformAlert(t('common.loading'), t('more.errors.tryAgainMoment'));
-      return;
-    }
+    if (subscriptionLoading || !subscription) return;
     const tier = subscription.tier;
     // Whitelist: only family/pro may add children. Blocks free and plus.
     if (tier !== 'family' && tier !== 'pro') {
@@ -139,7 +136,7 @@ export default function MoreScreen() {
     }
 
     router.push('/create-profile?for=child');
-  }, [subscription, familyData, router, t]);
+  }, [subscriptionLoading, subscription, familyData, router, t]);
 
   const handleChildProgressNavigation = useCallback(
     (href: string) => {
@@ -203,11 +200,11 @@ export default function MoreScreen() {
         </Text>
         {activeProfile?.isOwner && linkedChildren.length === 1 ? (
           <Pressable
-            onPress={() =>
-              handleChildProgressNavigation(
-                `/(app)/child/${linkedChildren[0]?.id ?? ''}`,
-              )
-            }
+            onPress={() => {
+              const childId = linkedChildren[0]?.id;
+              if (!childId) return;
+              handleChildProgressNavigation(`/(app)/child/${childId}`);
+            }}
             className="self-start mb-3"
             accessibilityRole="button"
             accessibilityLabel={t(
@@ -273,7 +270,7 @@ export default function MoreScreen() {
                 onPress={() => void refetchLearnerProfile()}
                 className="self-start mb-3"
                 accessibilityRole="button"
-                testID="accommodation-mode-retry"
+                testID="accommodation-mode-retry-stale"
               >
                 <Text className="text-caption font-semibold text-primary">
                   {t('common.retry')}
@@ -361,7 +358,8 @@ export default function MoreScreen() {
             <SectionHeader>{t('more.family.sectionHeader')}</SectionHeader>
             <Pressable
               onPress={handleAddChild}
-              className="bg-surface rounded-card px-4 py-3.5 mb-2"
+              disabled={subscriptionLoading}
+              className={`bg-surface rounded-card px-4 py-3.5 mb-2${subscriptionLoading ? ' opacity-50' : ''}`}
               accessibilityLabel={t('more.family.addChildAccessLabel')}
               accessibilityRole="button"
               testID="add-child-link"

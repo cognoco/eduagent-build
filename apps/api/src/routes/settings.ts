@@ -43,6 +43,7 @@ import {
 import { notifyParentToSubscribe } from '../services/notifications';
 import { clearSessionStaticContextForProfile } from '../services/session/session-cache';
 import { captureException } from '../services/sentry';
+import { createLogger } from '../services/logger';
 import {
   getAnalogyDomain,
   getNativeLanguage,
@@ -70,6 +71,8 @@ type SettingsRouteEnv = {
 const subjectParamSchema = z.object({
   subjectId: z.string().uuid(),
 });
+
+const logger = createLogger();
 
 export const settingsRoutes = new Hono<SettingsRouteEnv>()
   // Get notification preferences
@@ -125,6 +128,11 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
       try {
         clearSessionStaticContextForProfile(profileId);
       } catch (err) {
+        logger.warn('[settings] clearSessionStaticContext failed', {
+          event: 'settings.clear_session_context_failed',
+          profileId,
+          error: err instanceof Error ? err.message : String(err),
+        });
         captureException(err, {
           profileId,
           extra: { context: 'clear-session-static-context' },
