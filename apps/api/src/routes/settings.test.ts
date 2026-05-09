@@ -53,6 +53,7 @@ jest.mock('../services/settings', () => {
 
 const mockClearSessionStaticContextForProfile = jest.fn();
 jest.mock('../services/session/session-cache', () => {
+  // gc1-allow: partial mock via requireActual — intercepts clearSessionStaticContextForProfile to verify cache invalidation fires on learning-mode change
   const actual = jest.requireActual('../services/session/session-cache');
   return {
     ...actual,

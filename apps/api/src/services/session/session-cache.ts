@@ -228,6 +228,11 @@ export function clearSessionStaticContext(
   supplementaryInflight.delete(key);
 }
 
+// NOTE: This clears only the in-memory Map of the running Worker isolate.
+// Other same-region isolates retain their caches until TTL expiry — stale
+// context can be served for up to that window after a learning-mode change.
+// Folding learningMode into the cache key would give hard invalidation but
+// also busts supplementary data that is unrelated to mode.
 export function clearSessionStaticContextForProfile(profileId: string): void {
   const prefix = `${profileId}:`;
   for (const key of sessionStaticContextCache.keys()) {
