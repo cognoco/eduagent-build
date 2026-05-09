@@ -121,7 +121,11 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
         accountId,
         body.mode,
       );
-      clearSessionStaticContextForProfile(profileId);
+      try {
+        clearSessionStaticContextForProfile(profileId);
+      } catch {
+        // best-effort — don't 500 a successful mode change on cache failure
+      }
       return c.json(getLearningModeResponseSchema.parse({ mode: result.mode }));
     },
   )

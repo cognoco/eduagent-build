@@ -45,11 +45,13 @@ jest.mock('../learner-profile', () => ({
 
 const mockGetSubject = jest.fn();
 jest.mock('../subject', () => ({
+  // gc1-allow: mutex unit test — controls getSubject call count to verify single supplementary fan-out
   getSubject: (...args: unknown[]) => mockGetSubject(...args),
 }));
 
 const mockLoadProfileRowById = jest.fn();
 jest.mock('../profile', () => ({
+  // gc1-allow: mutex unit test — controls loadProfileRowById call count to verify single supplementary fan-out
   loadProfileRowById: (...args: unknown[]) => mockLoadProfileRowById(...args),
 }));
 
@@ -222,6 +224,7 @@ describe('[BUG-667 / S-10] getOrLoadSessionSupplementary — concurrent fetch mu
     await makeCachedEntry({ profileId: 'profile-2', sessionId: 'session-3' });
 
     clearSessionStaticContextForProfile('profile-1');
+    mockGetSubject.mockClear();
 
     expect(_sessionStaticContextCacheSize()).toBe(1);
     const remaining = await getSessionStaticContext(
@@ -231,7 +234,7 @@ describe('[BUG-667 / S-10] getOrLoadSessionSupplementary — concurrent fetch mu
       { subjectId: 'subject-1', topicId: null } as never,
     );
     expect(remaining.profileId).toBe('profile-2');
-    expect(mockGetSubject).toHaveBeenCalledTimes(3);
+    expect(mockGetSubject).not.toHaveBeenCalled(); // profile-2 cache survived the clear
   });
 
   it('clear during in-flight fetch does not resurrect stale supplementary cache', async () => {
