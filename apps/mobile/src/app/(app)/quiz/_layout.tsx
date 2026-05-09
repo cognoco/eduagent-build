@@ -70,13 +70,13 @@ export function QuizFlowProvider({
     (prefetchedRoundId: string | null) => {
       setState((current) => ({ ...current, prefetchedRoundId }));
     },
-    []
+    [],
   );
   const setCompletionResult = useCallback(
     (completionResult: CompleteRoundResponse | null) => {
       setState((current) => ({ ...current, completionResult }));
     },
-    []
+    [],
   );
   const clear = useCallback(() => {
     setState(INITIAL_STATE);
@@ -100,6 +100,8 @@ export function QuizFlowProvider({
   );
 }
 
+export const unstable_settings = { initialRouteName: 'index' };
+
 export default function QuizLayout(): React.ReactElement {
   const colors = useThemeColors();
   const { isParentProxy } = useParentProxy();
@@ -109,6 +111,7 @@ export default function QuizLayout(): React.ReactElement {
   return (
     <QuizFlowProvider>
       <Stack
+        initialRouteName="index"
         screenOptions={{
           headerShown: false,
           animation: 'slide_from_right',
