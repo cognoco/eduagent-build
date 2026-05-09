@@ -19,12 +19,12 @@ export const consentRequestSchema = z.object({
 
 export type ConsentRequest = z.infer<typeof consentRequestSchema>;
 
-export const consentResponseSchema = z.object({
+export const consentRespondRequestSchema = z.object({
   token: z.string(),
   approved: z.boolean(),
 });
 
-export type ConsentResponse = z.infer<typeof consentResponseSchema>;
+export type ConsentRespondRequest = z.infer<typeof consentRespondRequestSchema>;
 
 // Consent request result — response after submitting a consent request
 
@@ -36,10 +36,15 @@ export const consentRequestResultSchema = z.object({
 export type ConsentRequestResult = z.infer<typeof consentRequestResultSchema>;
 
 // Response after a parent processes a consent token (approve/deny)
-export const consentRespondResultSchema = z.object({
+export const consentRespondResponseSchema = z.object({
   message: z.string(),
 });
-export type ConsentRespondResult = z.infer<typeof consentRespondResultSchema>;
+export type ConsentRespondResponse = z.infer<
+  typeof consentRespondResponseSchema
+>;
+
+export const consentRespondResultSchema = consentRespondResponseSchema;
+export type ConsentRespondResult = ConsentRespondResponse;
 
 // Response for GET /consent/my-status (child profile view)
 export const myConsentStatusSchema = z.object({

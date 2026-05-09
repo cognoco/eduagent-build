@@ -2,11 +2,11 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import {
   assessmentAnswerSchema,
-  quickCheckResponseSchema,
+  quickCheckRequestSchema,
   createAssessmentResponseSchema,
   submitAssessmentAnswerResponseSchema,
   getAssessmentResponseSchema,
-  quickCheckFeedbackResponseSchema,
+  quickCheckResponseSchema,
   chatExchangeSchema,
   declineAssessmentRefreshResponseSchema,
 } from '@eduagent/schemas';
@@ -32,7 +32,7 @@ import { createLogger } from '../services/logger';
 const logger = createLogger();
 
 function countLearnerAnswers(
-  history: Array<{ role: 'user' | 'assistant'; content: string }>
+  history: Array<{ role: 'user' | 'assistant'; content: string }>,
 ): number {
   return history.filter((entry) => entry.role === 'user').length;
 }
@@ -49,7 +49,7 @@ export const assessmentRoutes = new Hono<RouteEnv>()
       db,
       profileId,
       subjectId,
-      topicId
+      topicId,
     );
 
     return c.json(
@@ -63,7 +63,7 @@ export const assessmentRoutes = new Hono<RouteEnv>()
           createdAt: assessment.createdAt,
         },
       }),
-      201
+      201,
     );
   })
 
@@ -83,7 +83,7 @@ export const assessmentRoutes = new Hono<RouteEnv>()
       const topicTitle = await loadTopicTitle(
         db,
         assessment.topicId,
-        profileId
+        profileId,
       );
 
       const evaluation = await evaluateAssessmentAnswer(
@@ -93,7 +93,7 @@ export const assessmentRoutes = new Hono<RouteEnv>()
           currentDepth: assessment.verificationDepth,
           exchangeHistory: assessment.exchangeHistory,
         },
-        answer
+        answer,
       );
 
       const updatedHistory = [
@@ -112,15 +112,15 @@ export const assessmentRoutes = new Hono<RouteEnv>()
       const newStatus = shouldContinueDepth
         ? 'in_progress'
         : evaluation.passed
-        ? 'passed'
-        : evaluation.masteryScore >= 0.6 &&
-          (capReached ||
-            !evaluation.shouldEscalateDepth ||
-            !evaluation.nextDepth)
-        ? 'borderline'
-        : capReached
-        ? 'failed_exhausted'
-        : 'in_progress';
+          ? 'passed'
+          : evaluation.masteryScore >= 0.6 &&
+              (capReached ||
+                !evaluation.shouldEscalateDepth ||
+                !evaluation.nextDepth)
+            ? 'borderline'
+            : capReached
+              ? 'failed_exhausted'
+              : 'in_progress';
 
       const updatedAssessment = await updateAssessment(
         db,
@@ -133,7 +133,7 @@ export const assessmentRoutes = new Hono<RouteEnv>()
           masteryScore: evaluation.masteryScore,
           qualityRating: evaluation.qualityRating,
           exchangeHistory: updatedHistory,
-        }
+        },
       );
 
       // Wire terminal standalone assessments into the retention lifecycle.
@@ -145,7 +145,7 @@ export const assessmentRoutes = new Hono<RouteEnv>()
       ) {
         const sm2Quality = mapEvaluateQualityToSm2(
           evaluation.passed,
-          Math.round(evaluation.masteryScore * 5)
+          Math.round(evaluation.masteryScore * 5),
         );
         const sessionTimestamp =
           updatedAssessment?.updatedAt ?? new Date().toISOString();
@@ -158,14 +158,14 @@ export const assessmentRoutes = new Hono<RouteEnv>()
             profileId,
             assessment.topicId,
             sm2Quality,
-            sessionTimestamp
+            sessionTimestamp,
           );
           if (newStatus === 'passed') {
             await insertSessionXpEntry(
               txDb,
               profileId,
               assessment.topicId,
-              assessment.subjectId
+              assessment.subjectId,
             );
           }
         });
@@ -175,9 +175,9 @@ export const assessmentRoutes = new Hono<RouteEnv>()
         submitAssessmentAnswerResponseSchema.parse({
           evaluation,
           status: newStatus,
-        })
+        }),
       );
-    }
+    },
   )
 
   .patch('/assessments/:assessmentId/decline-refresh', async (c) => {
@@ -195,7 +195,7 @@ export const assessmentRoutes = new Hono<RouteEnv>()
           code: 'BAD_REQUEST',
           message: 'Assessment is not in a terminal state',
         },
-        400
+        400,
       );
     }
 
@@ -232,7 +232,7 @@ export const assessmentRoutes = new Hono<RouteEnv>()
 
     const sanitizedHistory = Array.isArray(assessment.exchangeHistory)
       ? assessment.exchangeHistory.filter(
-          (entry) => chatExchangeSchema.safeParse(entry).success
+          (entry) => chatExchangeSchema.safeParse(entry).success,
         )
       : [];
     logger.warn(
@@ -241,19 +241,19 @@ export const assessmentRoutes = new Hono<RouteEnv>()
         assessmentId,
         droppedEntries:
           (assessment.exchangeHistory?.length ?? 0) - sanitizedHistory.length,
-      }
+      },
     );
     return c.json(
       getAssessmentResponseSchema.parse({
         assessment: { ...assessment, exchangeHistory: sanitizedHistory },
-      })
+      }),
     );
   })
 
   // Submit quick check response during session
   .post(
     '/sessions/:sessionId/quick-check',
-    zValidator('json', quickCheckResponseSchema),
+    zValidator('json', quickCheckRequestSchema),
     async (c) => {
       const { db, profileId } = withProfile(c);
       const sessionId = c.req.param('sessionId');
@@ -274,14 +274,14 @@ export const assessmentRoutes = new Hono<RouteEnv>()
           currentDepth: 'recall',
           exchangeHistory: [],
         },
-        answer
+        answer,
       );
 
       return c.json(
-        quickCheckFeedbackResponseSchema.parse({
+        quickCheckResponseSchema.parse({
           feedback: evaluation.feedback,
           isCorrect: evaluation.passed,
-        })
+        }),
       );
-    }
+    },
   );

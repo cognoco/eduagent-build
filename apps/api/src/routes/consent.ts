@@ -2,9 +2,9 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import {
   consentRequestSchema,
-  consentResponseSchema,
+  consentRespondRequestSchema,
   consentRequestResultSchema,
-  consentRespondResultSchema,
+  consentRespondResponseSchema,
   myConsentStatusSchema,
   childConsentStatusSchema,
   consentActionResultSchema,
@@ -131,12 +131,12 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       const childProfile = await getProfile(
         db,
         input.childProfileId,
-        account.id
+        account.id,
       );
       if (!childProfile) {
         return forbidden(
           c,
-          'Not authorized to request consent for this profile'
+          'Not authorized to request consent for this profile',
         );
       }
 
@@ -148,7 +148,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
           c,
           400,
           ERROR_CODES.VALIDATION_ERROR,
-          'Parent email must be different from your account email'
+          'Parent email must be different from your account email',
         );
       }
 
@@ -170,7 +170,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
             resendApiKey: c.env.RESEND_API_KEY,
             emailFrom: c.env.EMAIL_FROM,
           },
-          account.id
+          account.id,
         );
       } catch (error) {
         if (error instanceof ConsentResendLimitError) {
@@ -200,7 +200,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
         // [A-23] logger.warn alone is invisible in prod — escalate to Sentry so
         // we can query how often the GDPR reminder workflow is permanently skipped.
         logger.warn(
-          '[consent] Failed to dispatch Inngest event — reminder workflow skipped'
+          '[consent] Failed to dispatch Inngest event — reminder workflow skipped',
         );
         captureException(err, {
           extra: {
@@ -216,13 +216,13 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
           consentType: input.consentType,
           emailStatus: result.emailDelivered ? 'sent' : 'failed',
         }),
-        201
+        201,
       );
-    }
+    },
   )
   .post(
     '/consent/respond',
-    zValidator('json', consentResponseSchema),
+    zValidator('json', consentRespondRequestSchema),
     async (c) => {
       const db = c.get('db');
       const input = c.req.valid('json');
@@ -239,23 +239,23 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
         'unknown';
       if (isConsentRespondRateLimited(ipKey)) {
         const retryAfterSecs = Math.ceil(
-          CONSENT_RESPOND_RATE_LIMIT_WINDOW_MS / 1000
+          CONSENT_RESPOND_RATE_LIMIT_WINDOW_MS / 1000,
         );
         c.header('Retry-After', String(retryAfterSecs));
         return apiError(
           c,
           429,
           ERROR_CODES.RATE_LIMITED,
-          'Too many consent attempts. Please try again later.'
+          'Too many consent attempts. Please try again later.',
         );
       }
 
       try {
         await processConsentResponse(db, input.token, input.approved);
         return c.json(
-          consentRespondResultSchema.parse({
+          consentRespondResponseSchema.parse({
             message: input.approved ? 'Consent granted' : 'Consent denied',
-          })
+          }),
         );
       } catch (error) {
         if (error instanceof ConsentTokenNotFoundError) {
@@ -269,7 +269,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
         }
         throw error;
       }
-    }
+    },
   )
   .get('/consent/my-status', async (c) => {
     // This route intentionally works without a profile —
@@ -281,7 +281,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
           consentStatus: null,
           parentEmail: null,
           consentType: null,
-        })
+        }),
       );
     }
     const db = c.get('db');
@@ -296,7 +296,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
         // Mask to "p***@example.com" — preserves verification UX, reduces leak.
         parentEmail: maskEmail(state?.parentEmail ?? null),
         consentType: state?.consentType ?? null,
-      })
+      }),
     );
   })
 
@@ -310,7 +310,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       const state = await getChildConsentForParent(
         db,
         childProfileId,
-        parentProfileId
+        parentProfileId,
       );
       if (!state) {
         return c.json(
@@ -318,7 +318,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
             consentStatus: null,
             respondedAt: null,
             consentType: null,
-          })
+          }),
         );
       }
       return c.json(
@@ -326,7 +326,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
           consentStatus: state.status,
           respondedAt: state.respondedAt,
           consentType: state.consentType,
-        })
+        }),
       );
     } catch (error) {
       if (error instanceof ConsentNotAuthorizedError) {
@@ -361,7 +361,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
         // [A-23] logger.warn alone is invisible in prod — escalate to Sentry so
         // we can query how often the GDPR 7-day deletion grace period is skipped.
         logger.warn(
-          '[consent] Failed to dispatch Inngest revocation event — grace period job skipped'
+          '[consent] Failed to dispatch Inngest revocation event — grace period job skipped',
         );
         captureException(err, {
           extra: {
@@ -376,7 +376,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
           message:
             'Consent revoked. Data will be deleted after 7-day grace period.',
           consentStatus: state.status,
-        })
+        }),
       );
     } catch (error) {
       if (error instanceof ConsentNotAuthorizedError) {
@@ -401,7 +401,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
         consentActionResultSchema.parse({
           message: 'Consent restored. Deletion cancelled.',
           consentStatus: state.status,
-        })
+        }),
       );
     } catch (error) {
       if (error instanceof ConsentNotAuthorizedError) {
