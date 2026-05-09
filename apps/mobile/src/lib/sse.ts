@@ -117,7 +117,7 @@ function isValidStreamEvent(obj: Record<string, unknown>): boolean {
  * Kept for tests and future web support.
  */
 export async function* parseSSEStream(
-  response: Response
+  response: Response,
 ): AsyncGenerator<StreamEvent> {
   if (!response.body) {
     throw new Error('Response body is null — streaming not supported');
@@ -174,7 +174,7 @@ export async function* parseSSEStream(
 function parseSSEBuffer(
   buffer: string,
   queue: StreamEvent[],
-  onDone: () => void
+  onDone: () => void,
 ): string {
   // SSE spec allows \r\n, \r, and \n as line terminators
   const lines = buffer.split(/\r\n|\r|\n/);
@@ -198,7 +198,12 @@ function parseSSEBuffer(
         'type' in parsed &&
         isValidStreamEvent(parsed as Record<string, unknown>)
       ) {
-        queue.push(parsed as StreamEvent);
+        const event = parsed as StreamEvent;
+        queue.push(event);
+        if (event.type === 'done') {
+          onDone();
+          return '';
+        }
       }
     } catch {
       // Skip malformed events
@@ -226,7 +231,7 @@ export function streamSSEViaXHR(
     method?: string;
     headers?: Record<string, string>;
     body?: string;
-  }
+  },
 ): { events: AsyncGenerator<StreamEvent>; abort: () => void } {
   const eventQueue: StreamEvent[] = [];
   let resolve: (() => void) | null = null;
@@ -254,7 +259,7 @@ export function streamSSEViaXHR(
       // Placeholder — onloadend will overwrite with a richer error once the
       // full response body is available (needed for QuotaExceededError on 402).
       streamError = new Error(
-        `API error ${xhr.status}: ${xhr.statusText || 'request failed'}`
+        `API error ${xhr.status}: ${xhr.statusText || 'request failed'}`,
       ) as Error & { status?: number };
       (streamError as Error & { status?: number }).status = xhr.status;
       done = true;
@@ -270,7 +275,7 @@ export function streamSSEViaXHR(
   let idleTimer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
     if (done) return;
     const timeoutError = new Error(
-      'The connection timed out while waiting for a reply'
+      'The connection timed out while waiting for a reply',
     ) as Error & { isTimeout: boolean };
     timeoutError.isTimeout = true;
     streamError = timeoutError;
@@ -286,7 +291,7 @@ export function streamSSEViaXHR(
     idleTimer = setTimeout(() => {
       if (done) return;
       const timeoutError = new Error(
-        'The connection timed out while waiting for a reply'
+        'The connection timed out while waiting for a reply',
       ) as Error & { isTimeout: boolean };
       timeoutError.isTimeout = true;
       streamError = timeoutError;
@@ -309,6 +314,10 @@ export function streamSSEViaXHR(
 
     buffer = parseSSEBuffer(buffer, eventQueue, () => {
       done = true;
+      if (idleTimer) {
+        clearTimeout(idleTimer);
+        idleTimer = null;
+      }
     });
 
     const r = resolve;
@@ -319,7 +328,7 @@ export function streamSSEViaXHR(
   xhr.onerror = () => {
     if (idleTimer) clearTimeout(idleTimer);
     streamError = new NetworkError(
-      "Looks like you're offline or our servers can't be reached. Check your internet connection and try again."
+      "Looks like you're offline or our servers can't be reached. Check your internet connection and try again.",
     );
     done = true;
     const r = resolve;
@@ -354,7 +363,7 @@ export function streamSSEViaXHR(
       // isReconnectableSessionError can classify it as non-reconnectable and
       // the UI can show "Session expired" rather than a generic reconnect card.
       const err = new Error(
-        apiMessage ?? 'Session expired — please sign in again'
+        apiMessage ?? 'Session expired — please sign in again',
       ) as Error & { status: number };
       err.status = 401;
       return err;
@@ -363,7 +372,7 @@ export function streamSSEViaXHR(
       if (code === 'QUOTA_EXCEEDED' && parsed?.details) {
         return new QuotaExceededError(
           apiMessage ?? 'Quota exceeded',
-          parsed.details
+          parsed.details,
         );
       }
     }
@@ -372,7 +381,7 @@ export function streamSSEViaXHR(
     }
     if (status === 404) {
       return new NotFoundError(
-        apiMessage ?? (responseText || 'Resource not found')
+        apiMessage ?? (responseText || 'Resource not found'),
       );
     }
     if (status === 409) {
@@ -382,7 +391,7 @@ export function streamSSEViaXHR(
       return new ResourceGoneError(
         apiMessage ?? undefined,
         code ?? undefined,
-        parsed?.details
+        parsed?.details,
       );
     }
     if (status === 429) {
@@ -390,7 +399,7 @@ export function streamSSEViaXHR(
         apiMessage ?? undefined,
         code ?? undefined,
         undefined,
-        undefined
+        undefined,
       );
     }
     if (status >= 500) {
@@ -401,18 +410,18 @@ export function streamSSEViaXHR(
       return new UpstreamError(
         apiMessage ?? (responseText || 'Server error'),
         code ?? 'UPSTREAM_ERROR',
-        status
+        status,
       );
     }
     if (code) {
       return new UpstreamError(
         apiMessage ?? (responseText || 'Server error'),
         code,
-        status
+        status,
       );
     }
     return new Error(
-      `API error ${status}: ${responseText || 'request failed'}`
+      `API error ${status}: ${responseText || 'request failed'}`,
     );
   }
 

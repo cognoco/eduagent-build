@@ -397,6 +397,32 @@ describe('streamSSEViaXHR', () => {
     expect(collected).toEqual([]);
   });
 
+  it('[BUG-958] treats app-level done frame as terminal without waiting for XHR loadend', async () => {
+    const xhr = installFakeXhr();
+    const { events } = streamSSEViaXHR('https://example.test/stream', {
+      method: 'POST',
+    });
+
+    const collectedPromise = (async () => {
+      const collected: StreamEvent[] = [];
+      for await (const ev of events) {
+        collected.push(ev);
+      }
+      return collected;
+    })();
+
+    xhr._emitProgress('data: {"type":"chunk","content":"answer"}\n\n');
+    xhr._emitProgress(
+      'data: {"type":"done","exchangeCount":3,"escalationRung":1}\n\n',
+    );
+
+    await expect(collectedPromise).resolves.toEqual([
+      { type: 'chunk', content: 'answer' },
+      { type: 'done', exchangeCount: 3, escalationRung: 1 },
+    ]);
+    expect(xhr.abort).not.toHaveBeenCalled();
+  });
+
   // [BUG-955] classifyXhrError must produce typed errors for each HTTP error
   // class so that session-types.ts can route to the correct user-facing message.
 
