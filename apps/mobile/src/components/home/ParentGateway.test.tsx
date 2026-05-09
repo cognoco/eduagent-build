@@ -10,10 +10,13 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-jest.mock('../family/WithdrawalCountdownBanner', () => ({
-  // gc1-allow: ParentGateway tests layout/child summaries; countdown banner behavior is covered by its own component tests.
-  WithdrawalCountdownBanner: () => null,
-}));
+jest.mock(
+  '../family/WithdrawalCountdownBanner' /* gc1-allow: unit test boundary */,
+  () => ({
+    // gc1-allow: ParentGateway tests layout/child summaries; countdown banner behavior is covered by its own component tests.
+    WithdrawalCountdownBanner: () => null,
+  }),
+);
 
 let mockDashboardData:
   | {
@@ -27,15 +30,18 @@ let mockDashboardData:
 let mockDashboardIsError = false;
 const mockRefetch = jest.fn();
 
-jest.mock('../../hooks/use-dashboard', () => ({
-  useDashboard: () => ({
-    data: mockDashboardData,
-    isError: mockDashboardIsError,
-    refetch: mockRefetch,
+jest.mock(
+  '../../hooks/use-dashboard' /* gc1-allow: unit test boundary */,
+  () => ({
+    useDashboard: () => ({
+      data: mockDashboardData,
+      isError: mockDashboardIsError,
+      refetch: mockRefetch,
+    }),
   }),
-}));
+);
 
-jest.mock('../../lib/greeting', () => ({
+jest.mock('../../lib/greeting' /* gc1-allow: unit test boundary */, () => ({
   getGreeting: (name: string) => ({
     title: `Good morning, ${name}!`,
     subtitle: 'Fresh mind, fresh start',

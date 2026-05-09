@@ -29,7 +29,7 @@ import SessionScreen from './index';
 // the factory and expose it via `global.__sessionTestMockFetch` so the rest of
 // the test file can reference it through a typed alias below.
 
-jest.mock('../../../lib/api-client', () => {
+jest.mock('../../../lib/api-client' /* gc1-allow: unit test boundary */, () => {
   const {
     createRoutedMockFetch: _create,
     mockApiClientFactory: _factory,
@@ -169,63 +169,78 @@ type TranscriptMockReturn = {
 const mockUseSessionTranscript = jest.fn<TranscriptMockReturn, [string?]>(
   () => ({ data: null }),
 );
-jest.mock('../../../hooks/use-sessions', () => ({
-  useSession: () => ({ data: null }),
-  useStartSession: () => ({
-    mutateAsync: mockStartSession,
+jest.mock(
+  '../../../hooks/use-sessions' /* gc1-allow: unit test boundary */,
+  () => ({
+    useSession: () => ({ data: null }),
+    useStartSession: () => ({
+      mutateAsync: mockStartSession,
+    }),
+    useCloseSession: () => ({
+      mutateAsync: mockCloseSession,
+    }),
+    useStreamMessage: () => ({
+      stream: mockStream,
+    }),
+    useClearContinuationDepth: () => ({
+      mutateAsync: mockClearContinuationDepth,
+      isPending: false,
+    }),
+    useSessionTranscript: (sessionId: string) =>
+      mockUseSessionTranscript(sessionId),
+    useRecordSystemPrompt: () => ({ mutateAsync: mockRecordSystemPrompt }),
+    useRecordSessionEvent: () => ({ mutateAsync: mockRecordSessionEvent }),
+    useSetSessionInputMode: () => ({ mutateAsync: mockSetSessionInputMode }),
+    useFlagSessionContent: () => ({ mutateAsync: mockFlagSessionContent }),
+    useParkingLot: () => ({ data: [], isLoading: false }),
+    useAddParkingLotItem: () => ({ mutateAsync: jest.fn(), isPending: false }),
   }),
-  useCloseSession: () => ({
-    mutateAsync: mockCloseSession,
-  }),
-  useStreamMessage: () => ({
-    stream: mockStream,
-  }),
-  useClearContinuationDepth: () => ({
-    mutateAsync: mockClearContinuationDepth,
-    isPending: false,
-  }),
-  useSessionTranscript: (sessionId: string) =>
-    mockUseSessionTranscript(sessionId),
-  useRecordSystemPrompt: () => ({ mutateAsync: mockRecordSystemPrompt }),
-  useRecordSessionEvent: () => ({ mutateAsync: mockRecordSessionEvent }),
-  useSetSessionInputMode: () => ({ mutateAsync: mockSetSessionInputMode }),
-  useFlagSessionContent: () => ({ mutateAsync: mockFlagSessionContent }),
-  useParkingLot: () => ({ data: [], isLoading: false }),
-  useAddParkingLotItem: () => ({ mutateAsync: jest.fn(), isPending: false }),
-}));
+);
 
-jest.mock('../../../hooks/use-settings', () => ({
-  useCelebrationLevel: () => ({ data: 'all' }),
-  useLearningMode: () => ({
-    data: mockLearningMode,
-    isLoading: mockLearningModeLoading,
+jest.mock(
+  '../../../hooks/use-settings' /* gc1-allow: unit test boundary */,
+  () => ({
+    useCelebrationLevel: () => ({ data: 'all' }),
+    useLearningMode: () => ({
+      data: mockLearningMode,
+      isLoading: mockLearningModeLoading,
+    }),
+    useUpdateLearningMode: () => ({
+      mutate: mockUpdateLearningModeMutate,
+      isPending: mockLearningModePending,
+    }),
   }),
-  useUpdateLearningMode: () => ({
-    mutate: mockUpdateLearningModeMutate,
-    isPending: mockLearningModePending,
-  }),
-}));
+);
 
 // ---------------------------------------------------------------------------
 // Local-state / device hooks — no useApiClient(), keep as mocks
 // ---------------------------------------------------------------------------
 
-jest.mock('../../../hooks/use-network-status', () => ({
-  useNetworkStatus: () => ({ isOffline: false }),
-}));
+jest.mock(
+  '../../../hooks/use-network-status' /* gc1-allow: unit test boundary */,
+  () => ({
+    useNetworkStatus: () => ({ isOffline: false }),
+  }),
+);
 
-jest.mock('../../../hooks/use-api-reachability', () => ({
-  useApiReachability: () => ({ isApiReachable: true, isChecked: true }),
-}));
+jest.mock(
+  '../../../hooks/use-api-reachability' /* gc1-allow: unit test boundary */,
+  () => ({
+    useApiReachability: () => ({ isApiReachable: true, isChecked: true }),
+  }),
+);
 
 const mockTrigger = jest.fn();
 const mockCelebrationResult = {
   CelebrationOverlay: null,
   trigger: mockTrigger,
 };
-jest.mock('../../../hooks/use-celebration', () => ({
-  useCelebration: () => mockCelebrationResult,
-}));
+jest.mock(
+  '../../../hooks/use-celebration' /* gc1-allow: unit test boundary */,
+  () => ({
+    useCelebration: () => mockCelebrationResult,
+  }),
+);
 
 const mockTrackExchangeResult = { triggered: [] as string[], trackerState: {} };
 const mockTrackExchange = jest.fn().mockReturnValue(mockTrackExchangeResult);
@@ -238,12 +253,15 @@ const mockMilestoneTracker = {
   hydrate: mockHydrate,
   reset: mockResetMilestones,
 };
-jest.mock('../../../hooks/use-milestone-tracker', () => ({
-  celebrationForReason: jest.fn(),
-  createMilestoneTrackerStateFromMilestones: jest.fn().mockReturnValue({}),
-  normalizeMilestoneTrackerState: jest.fn().mockReturnValue({}),
-  useMilestoneTracker: () => mockMilestoneTracker,
-}));
+jest.mock(
+  '../../../hooks/use-milestone-tracker' /* gc1-allow: unit test boundary */,
+  () => ({
+    celebrationForReason: jest.fn(),
+    createMilestoneTrackerStateFromMilestones: jest.fn().mockReturnValue({}),
+    normalizeMilestoneTrackerState: jest.fn().mockReturnValue({}),
+    useMilestoneTracker: () => mockMilestoneTracker,
+  }),
+);
 
 // ---------------------------------------------------------------------------
 // External / rendering mocks
@@ -262,151 +280,168 @@ jest.mock('expo-router', () => ({
   },
 }));
 
-jest.mock('../../../components/session', () => ({
-  ChatShell: ({
-    subtitle,
-    headerBelow,
-    messages,
-    inputAccessory,
-    belowInput,
-    inputMode,
-    onInputModeChange,
-    onSend,
-    renderMessageActions,
-    rightAction,
-    footer,
-    inputDisabled,
-    disabledReason,
-    showDisabledBanner,
-  }: {
-    subtitle?: string;
-    headerBelow?: React.ReactNode;
-    messages?: Array<{ id: string; content: string }>;
-    inputAccessory?: React.ReactNode;
-    belowInput?: React.ReactNode;
-    inputMode?: InputMode;
-    onInputModeChange?: (mode: InputMode) => void;
-    onSend: (text: string) => void;
-    renderMessageActions?: (message: {
-      id: string;
-      role: string;
-      content: string;
-      eventId?: string;
-      streaming?: boolean;
-      isSystemPrompt?: boolean;
-    }) => React.ReactNode;
-    rightAction?: React.ReactNode;
-    footer?: React.ReactNode;
-    inputDisabled?: boolean;
-    disabledReason?: string;
-    showDisabledBanner?: boolean;
-  }) => {
-    const { View, Text, Pressable } = require('react-native');
-    return (
-      <View>
-        <Text testID="session-subtitle">{subtitle}</Text>
-        <Text testID="mock-input-mode">{inputMode ?? 'text'}</Text>
-        {headerBelow}
-        {inputDisabled && showDisabledBanner !== false ? (
-          <View testID="input-disabled-banner">
-            <Text>{disabledReason ?? 'Input is currently unavailable'}</Text>
-          </View>
-        ) : null}
-        {(messages ?? []).map((message) => (
-          <View key={message.id} testID={`mock-message-${message.id}`}>
-            <Text>{message.content}</Text>
-            {renderMessageActions?.(message as never)}
-          </View>
-        ))}
-        {inputAccessory}
-        {belowInput}
-        {rightAction}
-        {footer}
-        <Pressable
-          testID="mock-set-voice-mode"
-          onPress={() => onInputModeChange?.('voice')}
-        >
-          <Text>Voice mode</Text>
-        </Pressable>
-        <Pressable
-          testID="mock-set-text-mode"
-          onPress={() => onInputModeChange?.('text')}
-        >
-          <Text>Text mode</Text>
-        </Pressable>
-        <Pressable
-          testID="manual-send-button"
-          onPress={() => onSend('Solve 2x + 5 = 17')}
-        >
-          <Text>Send</Text>
-        </Pressable>
-      </View>
-    );
-  },
-  animateResponse: jest.fn(),
-  getModeConfig: jest.fn().mockReturnValue({
-    title: 'Homework',
-    subtitle: 'Homework help',
-    placeholder: 'Ask for help',
-    showTimer: false,
-    showQuestionCount: false,
+jest.mock(
+  '../../../components/session' /* gc1-allow: unit test boundary */,
+  () => ({
+    ChatShell: ({
+      subtitle,
+      headerBelow,
+      messages,
+      inputAccessory,
+      belowInput,
+      inputMode,
+      onInputModeChange,
+      onSend,
+      renderMessageActions,
+      rightAction,
+      footer,
+      inputDisabled,
+      disabledReason,
+      showDisabledBanner,
+    }: {
+      subtitle?: string;
+      headerBelow?: React.ReactNode;
+      messages?: Array<{ id: string; content: string }>;
+      inputAccessory?: React.ReactNode;
+      belowInput?: React.ReactNode;
+      inputMode?: InputMode;
+      onInputModeChange?: (mode: InputMode) => void;
+      onSend: (text: string) => void;
+      renderMessageActions?: (message: {
+        id: string;
+        role: string;
+        content: string;
+        eventId?: string;
+        streaming?: boolean;
+        isSystemPrompt?: boolean;
+      }) => React.ReactNode;
+      rightAction?: React.ReactNode;
+      footer?: React.ReactNode;
+      inputDisabled?: boolean;
+      disabledReason?: string;
+      showDisabledBanner?: boolean;
+    }) => {
+      const { View, Text, Pressable } = require('react-native');
+      return (
+        <View>
+          <Text testID="session-subtitle">{subtitle}</Text>
+          <Text testID="mock-input-mode">{inputMode ?? 'text'}</Text>
+          {headerBelow}
+          {inputDisabled && showDisabledBanner !== false ? (
+            <View testID="input-disabled-banner">
+              <Text>{disabledReason ?? 'Input is currently unavailable'}</Text>
+            </View>
+          ) : null}
+          {(messages ?? []).map((message) => (
+            <View key={message.id} testID={`mock-message-${message.id}`}>
+              <Text>{message.content}</Text>
+              {renderMessageActions?.(message as never)}
+            </View>
+          ))}
+          {inputAccessory}
+          {belowInput}
+          {rightAction}
+          {footer}
+          <Pressable
+            testID="mock-set-voice-mode"
+            onPress={() => onInputModeChange?.('voice')}
+          >
+            <Text>Voice mode</Text>
+          </Pressable>
+          <Pressable
+            testID="mock-set-text-mode"
+            onPress={() => onInputModeChange?.('text')}
+          >
+            <Text>Text mode</Text>
+          </Pressable>
+          <Pressable
+            testID="manual-send-button"
+            onPress={() => onSend('Solve 2x + 5 = 17')}
+          >
+            <Text>Send</Text>
+          </Pressable>
+        </View>
+      );
+    },
+    animateResponse: jest.fn(),
+    getModeConfig: jest.fn().mockReturnValue({
+      title: 'Homework',
+      subtitle: 'Homework help',
+      placeholder: 'Ask for help',
+      showTimer: false,
+      showQuestionCount: false,
+    }),
+    getOpeningMessage: jest
+      .fn()
+      .mockReturnValue('Let us tackle this worksheet.'),
+    SessionTimer: () => null,
+    MilestoneDots: () => null,
+    QuestionCounter: () => null,
+    LibraryPrompt: () => null,
+    SessionInputModeToggle: () => null,
+    QuotaExceededCard: ({
+      details,
+      isOwner,
+    }: {
+      details: { reason: string };
+      isOwner: boolean;
+    }) => {
+      const { View, Text } = require('react-native');
+      return (
+        <View testID="quota-exceeded-card">
+          <Text>{isOwner ? 'Upgrade plan' : 'Ask your parent'}</Text>
+          <Text>
+            {details.reason === 'daily'
+              ? "today's limit"
+              : "this month's limit"}
+          </Text>
+        </View>
+      );
+    },
   }),
-  getOpeningMessage: jest.fn().mockReturnValue('Let us tackle this worksheet.'),
-  SessionTimer: () => null,
-  MilestoneDots: () => null,
-  QuestionCounter: () => null,
-  LibraryPrompt: () => null,
-  SessionInputModeToggle: () => null,
-  QuotaExceededCard: ({
-    details,
-    isOwner,
-  }: {
-    details: { reason: string };
-    isOwner: boolean;
-  }) => {
-    const { View, Text } = require('react-native');
-    return (
-      <View testID="quota-exceeded-card">
-        <Text>{isOwner ? 'Upgrade plan' : 'Ask your parent'}</Text>
-        <Text>
-          {details.reason === 'daily' ? "today's limit" : "this month's limit"}
-        </Text>
-      </View>
-    );
-  },
-}));
+);
 
-jest.mock('../../../lib/session-recovery', () => ({
-  clearSessionRecoveryMarker: jest.fn().mockResolvedValue(undefined),
-  readSessionRecoveryMarker: jest.fn().mockResolvedValue(null),
-  writeSessionRecoveryMarker: jest.fn().mockResolvedValue(undefined),
-}));
+jest.mock(
+  '../../../lib/session-recovery' /* gc1-allow: unit test boundary */,
+  () => ({
+    clearSessionRecoveryMarker: jest.fn().mockResolvedValue(undefined),
+    readSessionRecoveryMarker: jest.fn().mockResolvedValue(null),
+    writeSessionRecoveryMarker: jest.fn().mockResolvedValue(undefined),
+  }),
+);
 
 const secureStore: Record<string, string> = {};
-jest.mock('../../../lib/secure-storage', () => ({
-  getItemAsync: jest.fn((key: string) =>
-    Promise.resolve(secureStore[key] ?? null),
-  ),
-  setItemAsync: jest.fn((key: string, value: string) => {
-    secureStore[key] = value;
-    return Promise.resolve();
+jest.mock(
+  '../../../lib/secure-storage' /* gc1-allow: unit test boundary */,
+  () => ({
+    getItemAsync: jest.fn((key: string) =>
+      Promise.resolve(secureStore[key] ?? null),
+    ),
+    setItemAsync: jest.fn((key: string, value: string) => {
+      secureStore[key] = value;
+      return Promise.resolve();
+    }),
+    // [I-4] sanitizeSecureStoreKey is a pure string function — no mock needed,
+    // but the module mock must export it or callers get "not a function".
+    sanitizeSecureStoreKey: (raw: string) =>
+      raw.replace(/[^a-zA-Z0-9._-]/g, '_'),
   }),
-  // [I-4] sanitizeSecureStoreKey is a pure string function — no mock needed,
-  // but the module mock must export it or callers get "not a function".
-  sanitizeSecureStoreKey: (raw: string) => raw.replace(/[^a-zA-Z0-9._-]/g, '_'),
-}));
+);
 
 const { readSessionRecoveryMarker: mockReadSessionRecoveryMarker } =
   require('../../../lib/session-recovery') as {
     readSessionRecoveryMarker: jest.Mock;
   };
 
-jest.mock('../../../lib/format-api-error', () => ({
-  formatApiError: (error: unknown) =>
-    error instanceof Error ? error.message : 'Unknown error',
-}));
+jest.mock(
+  '../../../lib/format-api-error' /* gc1-allow: unit test boundary */,
+  () => ({
+    formatApiError: (error: unknown) =>
+      error instanceof Error ? error.message : 'Unknown error',
+  }),
+);
 
-jest.mock('../../../lib/profile', () => ({
+jest.mock('../../../lib/profile' /* gc1-allow: unit test boundary */, () => ({
   useProfile: () => ({
     activeProfile: {
       id: 'profile-1',

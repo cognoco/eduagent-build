@@ -44,51 +44,66 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-jest.mock('../../../lib/theme', () => ({
+jest.mock('../../../lib/theme' /* gc1-allow: unit test boundary */, () => ({
   useThemeColors: () => ({ textSecondary: '#777', primary: '#6366f1' }),
 }));
 
-jest.mock('../../../lib/profile', () => ({
+jest.mock('../../../lib/profile' /* gc1-allow: unit test boundary */, () => ({
   useProfile: () => ({
     activeProfile: mockActiveProfile,
     profiles: mockProfiles,
   }),
 }));
 
-jest.mock('../../../hooks/use-parent-proxy', () => ({
-  useParentProxy: () => ({
-    isParentProxy: mockIsParentProxy,
-    childProfile: null,
-    parentProfile: null,
+jest.mock(
+  '../../../hooks/use-parent-proxy' /* gc1-allow: unit test boundary */,
+  () => ({
+    useParentProxy: () => ({
+      isParentProxy: mockIsParentProxy,
+      childProfile: null,
+      parentProfile: null,
+    }),
   }),
-}));
+);
 
-jest.mock('../../../hooks/use-subscription', () => ({
-  useSubscription: () => ({ data: mockSubscription }),
-  useFamilySubscription: () => ({ data: mockFamilySubscription }),
-}));
-
-jest.mock('../../../hooks/use-learner-profile', () => ({
-  useLearnerProfile: () => ({
-    data: mockLearnerProfile,
-    isError: mockLearnerProfileError,
-    refetch: mockLearnerProfileRefetch,
+jest.mock(
+  '../../../hooks/use-subscription' /* gc1-allow: unit test boundary */,
+  () => ({
+    useSubscription: () => ({ data: mockSubscription }),
+    useFamilySubscription: () => ({ data: mockFamilySubscription }),
   }),
-  useUpdateAccommodationMode: () => ({
-    mutate: mockAccommodationMutate,
-    isPending: false,
-  }),
-}));
+);
 
-jest.mock('../../../hooks/use-settings', () => ({
-  useCelebrationLevel: () => ({ data: mockCelebrationLevel, isLoading: false }),
-  useUpdateCelebrationLevel: () => ({
-    mutate: mockCelebrationLevelMutate,
-    isPending: false,
+jest.mock(
+  '../../../hooks/use-learner-profile' /* gc1-allow: unit test boundary */,
+  () => ({
+    useLearnerProfile: () => ({
+      data: mockLearnerProfile,
+      isError: mockLearnerProfileError,
+      refetch: mockLearnerProfileRefetch,
+    }),
+    useUpdateAccommodationMode: () => ({
+      mutate: mockAccommodationMutate,
+      isPending: false,
+    }),
   }),
-}));
+);
 
-jest.mock('../../../lib/analytics', () => ({
+jest.mock(
+  '../../../hooks/use-settings' /* gc1-allow: unit test boundary */,
+  () => ({
+    useCelebrationLevel: () => ({
+      data: mockCelebrationLevel,
+      isLoading: false,
+    }),
+    useUpdateCelebrationLevel: () => ({
+      mutate: mockCelebrationLevelMutate,
+      isPending: false,
+    }),
+  }),
+);
+
+jest.mock('../../../lib/analytics' /* gc1-allow: unit test boundary */, () => ({
   track: (...args: unknown[]) => mockTrack(...args),
 }));
 

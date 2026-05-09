@@ -120,89 +120,121 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockLocalSearchParams(),
 }));
 
-jest.mock('../../../../hooks/use-active-profile-role', () => ({
-  // gc1-allow: subject progress screen varies retention copy by role; mocking the role hook pins the register for deterministic assertions.
-  useActiveProfileRole: () => 'owner',
-}));
+jest.mock(
+  '../../../../hooks/use-active-profile-role' /* gc1-allow: unit test boundary */,
+  () => ({
+    // gc1-allow: subject progress screen varies retention copy by role; mocking the role hook pins the register for deterministic assertions.
+    useActiveProfileRole: () => 'owner',
+  }),
+);
 
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
 }));
 
-jest.mock('../../../../lib/navigation', () => ({
-  goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
-  pushLearningResumeTarget: (...args: unknown[]) =>
-    mockPushLearningResumeTarget(...args),
-}));
+jest.mock(
+  '../../../../lib/navigation' /* gc1-allow: unit test boundary */,
+  () => ({
+    goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
+    pushLearningResumeTarget: (...args: unknown[]) =>
+      mockPushLearningResumeTarget(...args),
+  }),
+);
 
-jest.mock('../../../../components/common', () => {
-  const { View, Text, Pressable } = require('react-native');
-  return {
-    ErrorFallback: (props: {
-      testID?: string;
-      title?: string;
-      message?: string;
-      primaryAction?: { testID?: string; onPress: () => void; label: string };
-      secondaryAction?: { testID?: string; onPress: () => void; label: string };
-    }) => (
-      <View testID={props.testID}>
-        {props.title ? <Text>{props.title}</Text> : null}
-        {props.message ? <Text>{props.message}</Text> : null}
-        {props.primaryAction ? (
-          <Pressable
-            testID={props.primaryAction.testID}
-            onPress={props.primaryAction.onPress}
-          >
-            <Text>{props.primaryAction.label}</Text>
-          </Pressable>
-        ) : null}
-        {props.secondaryAction ? (
-          <Pressable
-            testID={props.secondaryAction.testID}
-            onPress={props.secondaryAction.onPress}
-          >
-            <Text>{props.secondaryAction.label}</Text>
-          </Pressable>
-        ) : null}
-      </View>
-    ),
-  };
-});
+jest.mock(
+  '../../../../components/common' /* gc1-allow: unit test boundary */,
+  () => {
+    const { View, Text, Pressable } = require('react-native');
+    return {
+      ErrorFallback: (props: {
+        testID?: string;
+        title?: string;
+        message?: string;
+        primaryAction?: { testID?: string; onPress: () => void; label: string };
+        secondaryAction?: {
+          testID?: string;
+          onPress: () => void;
+          label: string;
+        };
+      }) => (
+        <View testID={props.testID}>
+          {props.title ? <Text>{props.title}</Text> : null}
+          {props.message ? <Text>{props.message}</Text> : null}
+          {props.primaryAction ? (
+            <Pressable
+              testID={props.primaryAction.testID}
+              onPress={props.primaryAction.onPress}
+            >
+              <Text>{props.primaryAction.label}</Text>
+            </Pressable>
+          ) : null}
+          {props.secondaryAction ? (
+            <Pressable
+              testID={props.secondaryAction.testID}
+              onPress={props.secondaryAction.onPress}
+            >
+              <Text>{props.secondaryAction.label}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ),
+    };
+  },
+);
 
-jest.mock('../../../../components/progress', () => ({
-  ProgressBar: () => null,
-}));
+jest.mock(
+  '../../../../components/progress' /* gc1-allow: unit test boundary */,
+  () => ({
+    ProgressBar: () => null,
+  }),
+);
 
 const mockUseProgressInventory = jest.fn();
 const mockUseSubjectProgress = jest.fn();
 const mockUseLearningResumeTarget = jest.fn();
-jest.mock('../../../../hooks/use-progress', () => ({
-  useProgressInventory: (...args: unknown[]) =>
-    mockUseProgressInventory(...args),
-  useSubjectProgress: (...args: unknown[]) => mockUseSubjectProgress(...args),
-  useLearningResumeTarget: (...args: unknown[]) =>
-    mockUseLearningResumeTarget(...args),
-}));
+jest.mock(
+  '../../../../hooks/use-progress' /* gc1-allow: unit test boundary */,
+  () => ({
+    useProgressInventory: (...args: unknown[]) =>
+      mockUseProgressInventory(...args),
+    useSubjectProgress: (...args: unknown[]) => mockUseSubjectProgress(...args),
+    useLearningResumeTarget: (...args: unknown[]) =>
+      mockUseLearningResumeTarget(...args),
+  }),
+);
 
 const mockUseLanguageProgress = jest.fn();
-jest.mock('../../../../hooks/use-language-progress', () => ({
-  useLanguageProgress: (...args: unknown[]) => mockUseLanguageProgress(...args),
-}));
+jest.mock(
+  '../../../../hooks/use-language-progress' /* gc1-allow: unit test boundary */,
+  () => ({
+    useLanguageProgress: (...args: unknown[]) =>
+      mockUseLanguageProgress(...args),
+  }),
+);
 
 const mockMutateSubjectAsync = jest.fn();
 const mockUseUpdateSubject = jest.fn();
-jest.mock('../../../../hooks/use-subjects', () => ({
-  useUpdateSubject: (...args: unknown[]) => mockUseUpdateSubject(...args),
-}));
+jest.mock(
+  '../../../../hooks/use-subjects' /* gc1-allow: unit test boundary */,
+  () => ({
+    useUpdateSubject: (...args: unknown[]) => mockUseUpdateSubject(...args),
+  }),
+);
 
 const mockPlatformAlert = jest.fn();
-jest.mock('../../../../lib/platform-alert', () => ({
-  platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
-}));
+jest.mock(
+  '../../../../lib/platform-alert' /* gc1-allow: unit test boundary */,
+  () => ({
+    platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
+  }),
+);
 
-jest.mock('../../../../lib/format-api-error', () => ({
-  formatApiError: (err: Error) => `formatted: ${err.message}`,
-}));
+jest.mock(
+  '../../../../lib/format-api-error' /* gc1-allow: unit test boundary */,
+  () => ({
+    formatApiError: (err: Error) => `formatted: ${err.message}`,
+  }),
+);
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 

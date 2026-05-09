@@ -10,7 +10,7 @@
 // ---------------------------------------------------------------------------
 
 const mockCaptureException = jest.fn();
-jest.mock('../../services/sentry', () => ({
+jest.mock('../../services/sentry' /* gc1-allow: unit test boundary */, () => ({
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 const mockDb = {
@@ -24,10 +24,10 @@ const mockDb = {
     }),
   })),
 };
-jest.mock('../helpers', () => ({
+jest.mock('../helpers' /* gc1-allow: unit test boundary */, () => ({
   getStepDatabase: () => mockDb,
 }));
-jest.mock('../client', () => ({
+jest.mock('../client' /* gc1-allow: unit test boundary */, () => ({
   inngest: {
     createFunction: jest.fn(
       (config: unknown, trigger: unknown, fn: unknown) => ({

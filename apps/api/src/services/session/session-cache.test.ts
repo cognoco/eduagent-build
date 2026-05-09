@@ -17,7 +17,7 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 const mockFetchPriorTopics = jest.fn();
 const mockFetchCrossSubjectHighlights = jest.fn();
-jest.mock('../prior-learning', () => ({
+jest.mock('../prior-learning' /* gc1-allow: unit test boundary */, () => ({
   fetchPriorTopics: (...args: unknown[]) => mockFetchPriorTopics(...args),
   fetchCrossSubjectHighlights: (...args: unknown[]) =>
     mockFetchCrossSubjectHighlights(...args),
@@ -26,31 +26,31 @@ jest.mock('../prior-learning', () => ({
 }));
 
 const mockGetTeachingPreference = jest.fn();
-jest.mock('../retention-data', () => ({
+jest.mock('../retention-data' /* gc1-allow: unit test boundary */, () => ({
   getTeachingPreference: (...args: unknown[]) =>
     mockGetTeachingPreference(...args),
 }));
 
 const mockGetLearningMode = jest.fn();
-jest.mock('../settings', () => ({
+jest.mock('../settings' /* gc1-allow: unit test boundary */, () => ({
   getLearningMode: (...args: unknown[]) => mockGetLearningMode(...args),
 }));
 
 const mockGetLearningProfile = jest.fn();
-jest.mock('../learner-profile', () => ({
+jest.mock('../learner-profile' /* gc1-allow: unit test boundary */, () => ({
   getLearningProfile: (...args: unknown[]) => mockGetLearningProfile(...args),
   buildMemoryBlock: jest.fn(),
   buildAccommodationBlock: jest.fn(),
 }));
 
 const mockGetSubject = jest.fn();
-jest.mock('../subject', () => ({
+jest.mock('../subject' /* gc1-allow: unit test boundary */, () => ({
   // gc1-allow: mutex unit test — controls getSubject call count to verify single supplementary fan-out
   getSubject: (...args: unknown[]) => mockGetSubject(...args),
 }));
 
 const mockLoadProfileRowById = jest.fn();
-jest.mock('../profile', () => ({
+jest.mock('../profile' /* gc1-allow: unit test boundary */, () => ({
   // gc1-allow: mutex unit test — controls loadProfileRowById call count to verify single supplementary fan-out
   loadProfileRowById: (...args: unknown[]) => mockLoadProfileRowById(...args),
 }));

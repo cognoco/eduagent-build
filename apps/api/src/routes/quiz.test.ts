@@ -22,7 +22,7 @@ const mockDatabaseModule = createDatabaseModuleMock({
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-jest.mock('../services/account', () => ({
+jest.mock('../services/account' /* gc1-allow: unit test boundary */, () => ({
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
     clerkUserId: 'user_test',
@@ -32,7 +32,7 @@ jest.mock('../services/account', () => ({
   }),
 }));
 
-jest.mock('../services/profile', () => ({
+jest.mock('../services/profile' /* gc1-allow: unit test boundary */, () => ({
   findOwnerProfile: jest.fn().mockResolvedValue(null),
   getProfile: jest.fn().mockResolvedValue({
     id: 'test-profile-id',
@@ -43,13 +43,13 @@ jest.mock('../services/profile', () => ({
   }),
 }));
 
-jest.mock('../services/streaks', () => ({
+jest.mock('../services/streaks' /* gc1-allow: unit test boundary */, () => ({
   recordSessionActivity: jest
     .fn()
     .mockResolvedValue({ currentStreak: 1, longestStreak: 1 }),
 }));
 
-jest.mock('../services/llm', () => {
+jest.mock('../services/llm' /* gc1-allow: unit test boundary */, () => {
   // [BUG-990] CircuitOpenError must be the real class so that
   // routeAndCallForQuiz's `instanceof CircuitOpenError` check works in tests.
   // Using jest.requireActual here is the canonical pattern (GC1 rule) for

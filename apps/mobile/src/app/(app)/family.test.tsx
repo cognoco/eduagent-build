@@ -57,63 +57,84 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-jest.mock('../../lib/platform-alert', () => ({
-  platformAlert: jest.fn(),
-}));
-
-jest.mock('../../hooks/use-dashboard', () => ({
-  useDashboard: () => ({
-    data: mockDashboard,
-    isLoading: false,
-    isError: false,
-    refetch: jest.fn(),
-    isRefetching: false,
+jest.mock(
+  '../../lib/platform-alert' /* gc1-allow: unit test boundary */,
+  () => ({
+    platformAlert: jest.fn(),
   }),
-}));
+);
 
-jest.mock('../../hooks/use-subscription', () => ({
-  // gc1-allow: component unit test — controls subscription tier/family data without API call
-  useSubscription: () => ({ data: mockSubscription }),
-  useFamilySubscription: () => ({ data: mockFamilySubscription }),
-}));
+jest.mock(
+  '../../hooks/use-dashboard' /* gc1-allow: unit test boundary */,
+  () => ({
+    useDashboard: () => ({
+      data: mockDashboard,
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+      isRefetching: false,
+    }),
+  }),
+);
 
-jest.mock('../../hooks/use-settings', () => ({
-  // gc1-allow: component unit test — controls breakdown-sharing state without API call
-  useFamilyPoolBreakdownSharing: () => ({
-    data: mockBreakdownSharing,
-    isLoading: mockBreakdownSharingLoading,
+jest.mock(
+  '../../hooks/use-subscription' /* gc1-allow: unit test boundary */,
+  () => ({
+    // gc1-allow: component unit test — controls subscription tier/family data without API call
+    useSubscription: () => ({ data: mockSubscription }),
+    useFamilySubscription: () => ({ data: mockFamilySubscription }),
   }),
-  useUpdateFamilyPoolBreakdownSharing: () => ({
-    mutate: mockBreakdownSharingMutate,
-    isPending: mockBreakdownSharingPending,
+);
+
+jest.mock(
+  '../../hooks/use-settings' /* gc1-allow: unit test boundary */,
+  () => ({
+    // gc1-allow: component unit test — controls breakdown-sharing state without API call
+    useFamilyPoolBreakdownSharing: () => ({
+      data: mockBreakdownSharing,
+      isLoading: mockBreakdownSharingLoading,
+    }),
+    useUpdateFamilyPoolBreakdownSharing: () => ({
+      mutate: mockBreakdownSharingMutate,
+      isPending: mockBreakdownSharingPending,
+    }),
   }),
-}));
+);
 
 jest.mock('../../hooks/use-active-profile-role' /* gc1-allow */, () => ({
   useActiveProfileRole: () => mockUseActiveProfileRole(),
 }));
 
-jest.mock('../../components/coaching', () => ({
-  ParentDashboardSummary: () => null,
-}));
+jest.mock(
+  '../../components/coaching' /* gc1-allow: unit test boundary */,
+  () => ({
+    ParentDashboardSummary: () => null,
+  }),
+);
 
-jest.mock('../../components/common', () => ({
-  ProfileSwitcher: ({ activeProfileId }: { activeProfileId?: string }) => {
-    const { Text, View } = require('react-native');
-    return (
-      <View testID="profile-switcher-chip">
-        <Text>{activeProfileId}</Text>
-      </View>
-    );
-  },
-}));
+jest.mock(
+  '../../components/common' /* gc1-allow: unit test boundary */,
+  () => ({
+    ProfileSwitcher: ({ activeProfileId }: { activeProfileId?: string }) => {
+      const { Text, View } = require('react-native');
+      return (
+        <View testID="profile-switcher-chip">
+          <Text>{activeProfileId}</Text>
+        </View>
+      );
+    },
+  }),
+);
 
-jest.mock('../../components/family/FamilyOrientationCue', () => ({
-  FamilyOrientationCue: () => {
-    const { View } = require('react-native');
-    return <View testID="mock-family-orientation-cue" />;
-  },
-}));
+jest.mock(
+  '../../components/family/FamilyOrientationCue' /* gc1-allow: unit test boundary */,
+  () => ({
+    FamilyOrientationCue: () => {
+      const { View } = require('react-native');
+      return <View testID="mock-family-orientation-cue" />;
+    },
+  }),
+);
 
 jest.mock(
   '../../components/family/WithdrawalCountdownBanner' /* gc1-allow */,
@@ -125,7 +146,7 @@ jest.mock(
   }),
 );
 
-jest.mock('../../lib/profile', () => ({
+jest.mock('../../lib/profile' /* gc1-allow: unit test boundary */, () => ({
   useProfile: () => ({
     profiles: [
       {

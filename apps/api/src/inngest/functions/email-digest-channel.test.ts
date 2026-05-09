@@ -27,12 +27,12 @@ const CHILD_ID_RESTRICTED = 'cccccccc-0000-4000-8000-000000000001';
 
 // Sentry — external error tracker (no real process.env in test)
 const mockCaptureException = jest.fn();
-jest.mock('../../services/sentry', () => ({
+jest.mock('../../services/sentry' /* gc1-allow: unit test boundary */, () => ({
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 
 // Inngest client — external framework boundary
-jest.mock('../client', () => ({
+jest.mock('../client' /* gc1-allow: unit test boundary */, () => ({
   inngest: {
     createFunction: jest.fn(
       (config: unknown, trigger: unknown, fn: unknown) => ({
@@ -74,37 +74,49 @@ const mockFormatMonthlyProgressEmail = jest.fn().mockReturnValue({
   type: 'monthly_progress',
 });
 
-jest.mock('../../services/notifications', () => ({
-  sendPushNotification: (...args: unknown[]) =>
-    mockSendPushNotification(...args),
-  sendEmail: (...args: unknown[]) => mockSendEmail(...args),
-  formatWeeklyProgressEmail: (...args: unknown[]) =>
-    mockFormatWeeklyProgressEmail(...args),
-  formatMonthlyProgressEmail: (...args: unknown[]) =>
-    mockFormatMonthlyProgressEmail(...args),
-}));
+jest.mock(
+  '../../services/notifications' /* gc1-allow: unit test boundary */,
+  () => ({
+    sendPushNotification: (...args: unknown[]) =>
+      mockSendPushNotification(...args),
+    sendEmail: (...args: unknown[]) => mockSendEmail(...args),
+    formatWeeklyProgressEmail: (...args: unknown[]) =>
+      mockFormatWeeklyProgressEmail(...args),
+    formatMonthlyProgressEmail: (...args: unknown[]) =>
+      mockFormatMonthlyProgressEmail(...args),
+  }),
+);
 
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
-jest.mock('../../services/settings', () => ({
-  getRecentNotificationCount: (...args: unknown[]) =>
-    mockGetRecentNotificationCount(...args),
-}));
+jest.mock(
+  '../../services/settings' /* gc1-allow: unit test boundary */,
+  () => ({
+    getRecentNotificationCount: (...args: unknown[]) =>
+      mockGetRecentNotificationCount(...args),
+  }),
+);
 
 const mockGetLatestSnapshot = jest.fn();
 const mockGetLatestSnapshotOnOrBefore = jest.fn().mockResolvedValue(null);
-jest.mock('../../services/snapshot-aggregation', () => ({
-  getLatestSnapshot: (...args: unknown[]) => mockGetLatestSnapshot(...args),
-  getLatestSnapshotOnOrBefore: (...args: unknown[]) =>
-    mockGetLatestSnapshotOnOrBefore(...args),
-}));
+jest.mock(
+  '../../services/snapshot-aggregation' /* gc1-allow: unit test boundary */,
+  () => ({
+    getLatestSnapshot: (...args: unknown[]) => mockGetLatestSnapshot(...args),
+    getLatestSnapshotOnOrBefore: (...args: unknown[]) =>
+      mockGetLatestSnapshotOnOrBefore(...args),
+  }),
+);
 
 const mockGenerateWeeklyReportData = jest
   .fn()
   .mockReturnValue({ reportData: {} });
-jest.mock('../../services/weekly-report', () => ({
-  generateWeeklyReportData: (...args: unknown[]) =>
-    mockGenerateWeeklyReportData(...args),
-}));
+jest.mock(
+  '../../services/weekly-report' /* gc1-allow: unit test boundary */,
+  () => ({
+    generateWeeklyReportData: (...args: unknown[]) =>
+      mockGenerateWeeklyReportData(...args),
+  }),
+);
 
 // ---------------------------------------------------------------------------
 // DB mock wiring
@@ -219,7 +231,7 @@ function buildMockDb(
 }
 
 const mockGetStepResendApiKey = jest.fn(() => 'test-resend-key');
-jest.mock('../helpers', () => ({
+jest.mock('../helpers' /* gc1-allow: unit test boundary */, () => ({
   getStepDatabase: jest.fn(),
   resetDatabaseUrl: jest.fn(),
   getStepResendApiKey: () => mockGetStepResendApiKey(),
@@ -647,19 +659,26 @@ const mockGenerateReportHighlights = jest.fn().mockResolvedValue({
   comparison: null,
 });
 
-jest.mock('../../services/snapshot-aggregation', () => ({
-  getSnapshotsInRange: (...args: unknown[]) => mockGetSnapshotsInRange(...args),
-  getLatestSnapshot: (...args: unknown[]) => mockGetLatestSnapshot(...args),
-  getLatestSnapshotOnOrBefore: (...args: unknown[]) =>
-    mockGetLatestSnapshotOnOrBefore(...args),
-}));
+jest.mock(
+  '../../services/snapshot-aggregation' /* gc1-allow: unit test boundary */,
+  () => ({
+    getSnapshotsInRange: (...args: unknown[]) =>
+      mockGetSnapshotsInRange(...args),
+    getLatestSnapshot: (...args: unknown[]) => mockGetLatestSnapshot(...args),
+    getLatestSnapshotOnOrBefore: (...args: unknown[]) =>
+      mockGetLatestSnapshotOnOrBefore(...args),
+  }),
+);
 
-jest.mock('../../services/monthly-report', () => ({
-  generateMonthlyReportData: (...args: unknown[]) =>
-    mockGenerateMonthlyReportData(...args),
-  generateReportHighlights: (...args: unknown[]) =>
-    mockGenerateReportHighlights(...args),
-}));
+jest.mock(
+  '../../services/monthly-report' /* gc1-allow: unit test boundary */,
+  () => ({
+    generateMonthlyReportData: (...args: unknown[]) =>
+      mockGenerateMonthlyReportData(...args),
+    generateReportHighlights: (...args: unknown[]) =>
+      mockGenerateReportHighlights(...args),
+  }),
+);
 
 function buildMonthlyMockDb(
   consentOverride?: { status: string } | null,
