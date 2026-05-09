@@ -1,6 +1,6 @@
 # Consistency Cleanup Plan
 
-**Last updated:** 2026-05-04 UTC
+**Last updated:** 2026-05-08 UTC (validation sweep — see "Recent main activity" section)
 **Branch:** `consistency`
 **Replaces:** `docs/audit/2026-05-02-artefact-consistency-punchlist.md` (superseded; preserved as historical record only)
 **Maintained by:** `/my:audit-status` skill (read mode refreshes PR/file claims; deviation mode appends to Deviations Log)
@@ -32,6 +32,34 @@ Each cluster table uses the audit-status skill schema:
 - `PR` is `#NNNN` GitHub number or commit hash for direct merges
 - `Files-claimed` is a glob/path list — coordination metadata so two agents don't touch the same files concurrently
 - `Notes` carries severity tag `[YELLOW]` / `[YELLOW-RED]` / `[RED]`, effort estimate, and decision-ID dependencies
+
+---
+
+## Recent main activity (since 2026-05-04)
+
+Validation sweep on 2026-05-08 (DEV-002) — PRs that landed on main between the last plan update and the start of Stage 3 execution, and how they affected plan items.
+
+| PR | Date | Summary | Effect on plan |
+|---|---|---|---|
+| #153 | 2026-05-05 | "cleanup branch — schemas, i18n, polyfills, Hermes leak guards" | Added `queued` field to `feedbackResponseSchema` (closes **C1 P2**). Touched many schema files (assessments, consent, dictation, feedback, filing, language, learning-profiles, profiles, progress, quiz, sessions, snapshots, subjects) but did NOT do the renames or wraps the plan targets. Lockfile regenerated (~4,300-line diff). |
+| #155 | 2026-05-05 | "harden external-boundary mocks per C1 D-MOCK-1/D-MOCK-2" | Touched the 3 C2 P3 target files but only hardened the mocking pattern (comments, break-tests). The `jest.mock` calls themselves remain. C2 P3 still pending. |
+| #163 | 2026-05-05 | "Student UX v2 + library/shelf fixes + API stream resilience" | Touched `apps/mobile/src/lib/profile.ts`, `design-tokens.ts`, mobile `_layout.tsx`, `sse.ts`. **C4 P1 hex count shrank from 20→6** (`session/index.tsx` and `_layout.tsx` now have zero hex). |
+| #169 | 2026-05-06 | "feat(memory): implement architecture phase 2" | No plan overlap detected. |
+| #170 | 2026-05-06 | "tighten integration test mock comments and break-test assertions" | Touched 2 of 3 C2 P3 target files; same pattern as #155. C2 P3 still pending. |
+| #171 | 2026-05-06 | **"GC1 ratchet — block new internal jest.mock() in PRs"** | CI step blocks any new `jest.mock('./...')` or `jest.mock('../...')` line in test diffs, with `// gc1-allow: <reason>` escape hatch. **Supersedes C2 P1 and C2 P2** (both per-channel runtime guard tests no longer needed; CI gate is broader and adequate). **Unblocks C2 P4.** |
+| #172 | 2026-05-06 | "profilelens" merge | Not deeply evaluated — flag for re-check before any C4/C7 phases that touch profile flow. |
+| #173 | 2026-05-06 | "ux/emotional-retention-language" merge | Not deeply evaluated — flag for re-check before C4 P1 if mobile copy/strings landed. |
+| #174 | 2026-05-06 | "consistency" branch merged back | This plan + Archon scaffolding + `/commit` skill landed on main. No code-level execution work was in this merge. |
+
+**Workflow-development drafts (do NOT merge):** PRs #179, #184, #185 (and any other Archon-flavored drafts dated 2026-05-08 onward) were iterations of the `execute-cleanup-pr-{claude,codex}` workflow itself, all run against PR-08 as their input. They are scaffolding-validation artifacts, not real cleanup landings. **All to be closed unmerged.** PR-08's plan items (C3 P1 + P2) remain `todo` until a workflow run produces a PR intended to merge.
+
+**Net effect on Stage 3 plan:**
+- **Done:** C1 P2 (PR #153), C2 P1 + C2 P2 (superseded by PR #171)
+- **Unblocked:** C2 P4 (was blocked on P2)
+- **Scope shrank:** C4 P1 (6 hex / 4 files, was 20 / 6)
+- **Scope grew:** C8 P1 (14 missing snapshots, was 10)
+- **Partial drift:** C1 P3 — re-grep on 2026-05-08 showed several routes already use `.parse()` wraps (e.g. `notes.ts` is fully wrapped). Original "12 wrappable sites" count needs re-verification before claiming P3.
+- **Tilde pins partly applied at root:** C5 P1 — root already has `~` for 6 of 8 SDK-coupled deps (svg has bare version, svg-transformer has slight drift). Mobile manifest still has `^`. Plan target unchanged: delete root duplicates + pin mobile to `~`.
 
 ---
 
@@ -76,10 +104,10 @@ Consecutive numbering across all clusters. **Numbering does not imply strict seq
 | PR-02 | C1 | P3 | SCHEMA-2 wrap — 12 `c.json` route sites + celebration schema rename. **Gates PR-06.** |
 | PR-03 | C1 | P4+P5+P6 | Rename misnamed request schemas, author response schemas, add `streamErrorFrameSchema`, execute D-C1-1 dispositions |
 | PR-04 | C1 | P7 | Delete auth 501 stub surface (routes, tests, schemas, mount) |
-| PR-05 | C2 | P1+P2 | Two forward-only guard tests — database mock guard + Inngest mock guard. **Gates PR-07.** |
+| ~~PR-05~~ | C2 | ~~P1+P2~~ | **SUPERSEDED by PR #171 (GC1 ratchet).** No PR needed; C2 P1 and P2 closed-as-done. |
 | PR-06 | C2 | P3 | Drain 3 LLM mock allowlist offenders (~10-15 hr). Pairs with PR-02. |
-| PR-07 | C2 | P4 | Drain 6 Inngest mock allowlist offenders. Blocked on PR-05. |
-| PR-08 | C3 | P1+P2 | `unstable_settings` on 3 layouts + `AccordionTopicList` cross-tab push fix |
+| PR-07 | C2 | P4 | Drain 6 Inngest mock allowlist offenders. ~~Blocked on PR-05.~~ **Unblocked** — GC1 ratchet (#171) prevents regression during/after drain. |
+| PR-08 | C3 | P1+P2 | `unstable_settings` on `quiz/_layout.tsx` + `AccordionTopicList` cross-tab push fix. (Workflow-development drafts #179/#184/#185 ran this PR's input; all to be closed unmerged.) |
 | PR-09 | C4 | P1+P2 | Replace 20 hex literals with tokens + CLAUDE.md brand hex carve-out |
 | PR-10 | C4 | P3+P4+P6 | RemediationCard dead branch deletion + persona comment sweep + weekly-report route verification + persona-fossil guard test |
 | PR-11 | C4 | P7 | Root migration: `personaFromBirthYear()` → `computeAgeBracket()` across all callers. **Land before PR-17.** |
@@ -104,7 +132,7 @@ Consecutive numbering across all clusters. **Numbering does not imply strict seq
 ### Key dependencies
 
 - **PR-02 → PR-06:** C2 LLM mock drain needs C1 schema wraps for test assertions
-- **PR-05 → PR-07:** Inngest mock drain needs the guard test in place first
+- ~~**PR-05 → PR-07:** Inngest mock drain needs the guard test in place first~~ — superseded; GC1 ratchet (PR #171) provides forward-only protection at CI level. PR-07 is independently startable.
 - **PR-11 → PR-17:** CLAUDE.md persona rule wording depends on `computeAgeBracket()` vocabulary
 - **PR-12 → PR-13:** Shared lockfile — small dep fixes must follow the large manifest cleanup
 - **PR-17 ↔ PR-27:** Inbound-link conflicts must co-land with doc reconciliation
@@ -112,7 +140,8 @@ Consecutive numbering across all clusters. **Numbering does not imply strict seq
 
 ### Independently startable (no ordering constraints)
 
-PR-01, PR-04, PR-05, PR-08, PR-09, PR-10, PR-12, PR-14, PR-15, PR-16, PR-18–PR-26, PR-28
+PR-01, PR-04, PR-07, PR-09, PR-10, PR-12, PR-14, PR-15, PR-16, PR-18–PR-26, PR-28
+(PR-05 superseded.)
 
 ### Human involvement required
 
@@ -136,8 +165,8 @@ These PRs need coordinator or human review beyond agent execution:
 | Phase | Description | Status | Owner | PR | Files-claimed | Notes |
 |---|---|---|---|---|---|---|
 | P1 | AUDIT-TYPES-2.7 — Move `QuotaExceededError` + `ResourceGoneError` to `@eduagent/schemas/errors.ts`; convert `error.name === 'X'` checks to `instanceof` | todo | | **PR-01** | `packages/schemas/src/errors.ts`, `apps/mobile/src/lib/api-errors.ts`, `apps/mobile/src/lib/format-api-error.ts`, `apps/mobile/src/components/session/use-session-streaming.ts`, `apps/mobile/src/lib/api-client.ts` | [YELLOW-RED] ~1-2 hr. Note: classifier uses `error.name` + shape checks (not `instanceof`) — the HMR-resilient path is already the primary implementation. Moving classes to schemas doesn't change classifier behavior. BUG-947 tests remain valid. Verify: `pnpm exec jest --findRelatedTests <changed-files> --no-coverage` + `pnpm exec nx run api:typecheck` + `cd apps/mobile && pnpm exec tsc --noEmit`. |
-| P2 | AUDIT-TYPES-2.2 — Add `queued: z.boolean()` to `feedbackResponseSchema` before any wrap | todo | | **PR-01** | `packages/schemas/src/feedback.ts`, `apps/api/src/routes/feedback.ts` (verification only) | [YELLOW] ~15 min. Bundled with P1. Verify: `pnpm exec jest --findRelatedTests packages/schemas/src/feedback.ts apps/api/src/routes/feedback.ts --no-coverage`. |
-| P3 | AUDIT-TYPES-2.1 — SCHEMA-2 PR 1: wrap 12 ready-to-fit c.json sites with their existing schemas + rename `coachingCardCelebrationResponseSchema` → `pendingCelebrationsResponseSchema` during the celebrations wrap (per D-C1-1 deferral) | todo | | **PR-02** | `apps/api/src/routes/quiz.ts`, `apps/api/src/routes/account.ts`, `apps/api/src/routes/celebrations.ts`, `apps/api/src/routes/curriculum.ts`, `apps/api/src/routes/notes.ts`, `apps/api/src/routes/billing.ts`, `packages/schemas/src/progress.ts` (celebration-rename only) | [YELLOW] ~1 hr + ~10 min for rename. **Gates PR-06.** Verify: `pnpm exec nx run api:test` + `pnpm exec nx run api:typecheck`. |
+| P2 | AUDIT-TYPES-2.2 — Add `queued: z.boolean()` to `feedbackResponseSchema` before any wrap | done | | PR #153 | `packages/schemas/src/feedback.ts` | [YELLOW] ~15 min. **Shipped 2026-05-05 in PR #153** — `feedback.ts:17` now has `queued: z.boolean()`. |
+| P3 | AUDIT-TYPES-2.1 — SCHEMA-2 PR 1: wrap 12 ready-to-fit c.json sites with their existing schemas + rename `coachingCardCelebrationResponseSchema` → `pendingCelebrationsResponseSchema` during the celebrations wrap (per D-C1-1 deferral) | todo | | **PR-02** | `apps/api/src/routes/quiz.ts`, `apps/api/src/routes/account.ts`, `apps/api/src/routes/celebrations.ts`, `apps/api/src/routes/curriculum.ts`, `apps/api/src/routes/notes.ts`, `apps/api/src/routes/billing.ts`, `packages/schemas/src/progress.ts` (celebration-rename only) | [YELLOW] ~1 hr + ~10 min for rename. **Gates PR-06.** **2026-05-08 re-grep: partial progress detected** — `notes.ts` is now fully wrapped (7/7), `curriculum.ts` 5/7, `quiz.ts` 3/9, `celebrations.ts` 1/3, `account.ts` 1/3, `billing.ts` 1/9. Re-audit before claiming P3 to confirm exact unwrapped count and which sites still need C1 P4 schema authoring. Verify: `pnpm exec nx run api:test` + `pnpm exec nx run api:typecheck`. |
 | P4 | AUDIT-TYPES-2.3 — Rename `quickCheckResponseSchema` → `*RequestSchema` and `consentResponseSchema` → `consentRespondRequestSchema`; author real response schemas | todo | | **PR-03** | `packages/schemas/src/assessments.ts`, `packages/schemas/src/consent.ts`, `apps/api/src/routes/assessments.ts`, `apps/api/src/routes/consent.ts` | [YELLOW-RED] ~1.5 hr. Verify: `pnpm exec jest --findRelatedTests <changed-files> --no-coverage` + `pnpm exec nx run api:typecheck`. |
 | P5 | AUDIT-TYPES-2.4 — Per D-C1-3: author `streamErrorFrameSchema` in `packages/schemas/src/stream-fallback.ts`; add `.parse()` at 4 emission sites. Server-side only. | todo | | **PR-03** | `packages/schemas/src/stream-fallback.ts`, `apps/api/src/routes/interview.ts`, `apps/api/src/routes/sessions.ts` | [YELLOW] ~30 min. Resolved by D-C1-3. |
 | P8 | AUDIT-TYPES-2.4-FOLLOWUP — Unified `streamFrameSchema` discriminated union; migrate `apps/mobile/src/lib/sse.ts`. | blocked | | (future) | `packages/schemas/src/stream-fallback.ts`, `apps/api/src/routes/interview.ts`, `apps/api/src/routes/sessions.ts`, `apps/mobile/src/lib/sse.ts` (+ tests) | [GREEN] ~2 hr. **blocked-dependency on PR-03 + blocked-validation: PR-03 must run in production ≥1 week without `.parse()` errors before expanding to full envelope.** |
@@ -159,10 +188,10 @@ These PRs need coordinator or human review beyond agent execution:
 
 | Phase | Description | Status | Owner | PR | Files-claimed | Notes |
 |---|---|---|---|---|---|---|
-| P1 | AUDIT-TESTS-2A — Extend BUG-743 guard pattern to `@eduagent/database` mocks in integration tests (forward-only, empty allowlist) | todo | | **PR-05** | `apps/api/src/services/db/integration-mock-guard.test.ts` (new) | [YELLOW] ~1-2 hr. Verify: `pnpm exec jest --findRelatedTests apps/api/src/services/db/integration-mock-guard.test.ts --no-coverage`. |
-| P2 | AUDIT-TESTS-2B — Extend BUG-743 guard pattern to `inngest` mocks (initial allowlist of 6) | todo | | **PR-05** | `apps/api/src/inngest/integration-mock-guard.test.ts` (new) | [YELLOW] ~1-2 hr. **Gates PR-07.** Verify: `pnpm exec jest --findRelatedTests apps/api/src/inngest/integration-mock-guard.test.ts --no-coverage`. |
-| P3 | AUDIT-TESTS-2C — Drain LLM allowlist: migrate 3 KNOWN_OFFENDERS to HTTP-boundary or provider-registry pattern | todo | | **PR-06** | `apps/api/src/services/session-summary.integration.test.ts`, `apps/api/src/services/quiz/vocabulary.integration.test.ts`, `apps/api/src/inngest/functions/interview-persist-curriculum.integration.test.ts` | [YELLOW] ~10-15 hr. Pairs with PR-02. |
-| P4 | AUDIT-TESTS-2D — Drain inngest allowlist: sweep 5+1 known offenders | blocked | | **PR-07** | `tests/integration/{account-deletion,consent-email,learning-session,onboarding,stripe-webhook}.integration.test.ts`, `apps/api/src/inngest/functions/interview-persist-curriculum.integration.test.ts` | [YELLOW] ~10-18 hr. **blocked-dependency on PR-05** (guard test must exist before draining allowlist). |
+| P1 | AUDIT-TESTS-2A — Extend BUG-743 guard pattern to `@eduagent/database` mocks in integration tests (forward-only, empty allowlist) | done | | PR #171 | n/a | **Superseded 2026-05-06 by GC1 ratchet (PR #171)** — CI step blocks any new internal `jest.mock()` in test diffs across all channels (db, inngest, llm, anything). Per-channel runtime guard test no longer needed. See "Closed/revised" section. |
+| P2 | AUDIT-TESTS-2B — Extend BUG-743 guard pattern to `inngest` mocks (initial allowlist of 6) | done | | PR #171 | n/a | **Superseded 2026-05-06 by GC1 ratchet (PR #171)** — same as P1. C2 P4 is no longer blocked; GC1 prevents regressions during/after the drain. |
+| P3 | AUDIT-TESTS-2C — Drain LLM allowlist: migrate 3 KNOWN_OFFENDERS to HTTP-boundary or provider-registry pattern | todo | | **PR-06** | `apps/api/src/services/session-summary.integration.test.ts`, `apps/api/src/services/quiz/vocabulary.integration.test.ts`, `apps/api/src/inngest/functions/interview-persist-curriculum.integration.test.ts` | [YELLOW] ~10-15 hr. Pairs with PR-02. **Note (2026-05-08):** PRs #155 + #170 hardened the mock pattern (comments, break-tests) but did NOT remove the `jest.mock` calls — the drain is unchanged. |
+| P4 | AUDIT-TESTS-2D — Drain inngest allowlist: sweep 5+1 known offenders | todo | | **PR-07** | `tests/integration/{account-deletion,consent-email,learning-session,onboarding,stripe-webhook}.integration.test.ts`, `apps/api/src/inngest/functions/interview-persist-curriculum.integration.test.ts` | [YELLOW] ~10-18 hr. ~~**blocked-dependency on PR-05**~~ **Unblocked 2026-05-08** — GC1 ratchet (PR #171) supersedes the per-channel guard. Drain may proceed independently. |
 | P5 | AUDIT-TESTS-2E — Close TESTS-1 F2 as not-actionable (driver shim, not behavior mock) | done | | (closed in this plan) | n/a | [N/A] Documentation-only. See "Closed / revised" section below. |
 
 **Cross-coupling:**
@@ -180,8 +209,8 @@ These PRs need coordinator or human review beyond agent execution:
 
 | Phase | Description | Status | Owner | PR | Files-claimed | Notes |
 |---|---|---|---|---|---|---|
-| P1 | MOBILE-1 1a / MOBILE-2 F5 — Add `unstable_settings = { initialRouteName: 'index' }` to 3 nested layouts | todo | | **PR-08** | `apps/mobile/src/app/(app)/progress/_layout.tsx`, `apps/mobile/src/app/(app)/quiz/_layout.tsx`, `apps/mobile/src/app/(app)/child/[profileId]/_layout.tsx` | [YELLOW] ~30 min total. Verify: `cd apps/mobile && pnpm exec tsc --noEmit`. |
-| P2 | MOBILE-1 F2 — `AccordionTopicList` cross-tab push must push parent chain | todo | | **PR-08** | `apps/mobile/src/components/progress/AccordionTopicList.tsx` | [YELLOW] ~15-30 min. Verify: `pnpm exec jest --findRelatedTests apps/mobile/src/components/progress/AccordionTopicList.tsx --no-coverage`. |
+| P1 | MOBILE-1 1a / MOBILE-2 F5 — Add `unstable_settings = { initialRouteName: 'index' }` to 3 nested layouts | todo | | **PR-08** | `apps/mobile/src/app/(app)/quiz/_layout.tsx` (only file to change; the other two layouts already had the export on `origin/main`) | [YELLOW] ~10 min. Workflow-development drafts (#179, #184, #185) exercised this fix; all closed unmerged. Real PR still pending. |
+| P2 | MOBILE-1 F2 — `AccordionTopicList` cross-tab push must push parent chain | todo | | **PR-08** | `apps/mobile/src/components/progress/AccordionTopicList.tsx`, `apps/mobile/src/components/progress/AccordionTopicList.test.tsx` | [YELLOW] ~30 min. Use route-aware guard via `useSegments` to avoid double-push when component renders inside the same stack. Workflow-development drafts (#179, #184, #185) exercised this fix; all closed unmerged. |
 
 **Cross-coupling:** None — independent of all other clusters.
 
@@ -191,11 +220,11 @@ These PRs need coordinator or human review beyond agent execution:
 
 **Source:** MOBILE-1, MOBILE-2 deepening, baseline-delta, **Epic 12 persona-fossil sweep (2026-05-03)**
 **Severity:** **YELLOW-RED** (upgraded from YELLOW — persona-fossil sweep expanded scope significantly beyond hex-code cleanup)
-**Headline:** 20 hex codes across 6 production .tsx files. 13 brand/animation/celebration files (98 occurrences) governed by D-C4-2 carve-out (RESOLVED). **Epic 12 persona-fossil sweep:** RemediationCard `isLearner` dead branch (D-C4-1 RESOLVED → delete), `relearn.tsx` `isLearner` fossil (D-C4-4 RESOLVED → absorbed into P7), `personaFromBirthYear()` root migration to `computeAgeBracket()` (D-C4-3 RESOLVED). All 4 C4 decisions resolved. Forward-only guard test + root migration + CLAUDE.md persona-rule tightening remain as execution work.
+**Headline:** ~~20 hex codes across 6 production .tsx files.~~ **6 hex codes across 4 files at HEAD** (re-verified 2026-05-08; PR #163 resolved `session/index.tsx` and `_layout.tsx`). 13 brand/animation/celebration files (98 occurrences) governed by D-C4-2 carve-out (RESOLVED). **Epic 12 persona-fossil sweep:** RemediationCard `isLearner` dead branch (D-C4-1 RESOLVED → delete), `relearn.tsx` `isLearner` fossil (D-C4-4 RESOLVED → absorbed into P7), `personaFromBirthYear()` root migration to `computeAgeBracket()` (D-C4-3 RESOLVED). All 4 C4 decisions resolved. Forward-only guard test + root migration + CLAUDE.md persona-rule tightening remain as execution work.
 
 | Phase | Description | Status | Owner | PR | Files-claimed | Notes |
 |---|---|---|---|---|---|---|
-| P1 | AUDIT-MOBILE-2a — Replace hex literals across production files with `tokens.colors.*` references | todo | | **PR-09** | `apps/mobile/src/app/(app)/session/index.tsx`, `apps/mobile/src/app/(app)/child/[profileId]/index.tsx`, `apps/mobile/src/app/_layout.tsx`, `apps/mobile/src/app/(app)/child/[profileId]/session/[sessionId].tsx`, `apps/mobile/src/app/profiles.tsx`, `apps/mobile/src/components/library/NoteInput.tsx` | [YELLOW] ~1-2 hr. Counts are pre-language-add; re-grep after dispatch. `session/index.tsx` and `app/_layout.tsx` may have zero hex at HEAD — scope may shrink. |
+| P1 | AUDIT-MOBILE-2a — Replace hex literals across production files with `tokens.colors.*` references | todo | | **PR-09** | `apps/mobile/src/app/(app)/child/[profileId]/index.tsx` (3 hex), `apps/mobile/src/app/(app)/child/[profileId]/session/[sessionId].tsx` (1), `apps/mobile/src/app/profiles.tsx` (1), `apps/mobile/src/components/library/NoteInput.tsx` (1) | [YELLOW] ~30-45 min (scope shrank). **Re-verified 2026-05-08:** `session/index.tsx` and `app/_layout.tsx` now have 0 hex hits — dropped from scope. Total: 6 hex across 4 files. |
 | P2 | AUDIT-MOBILE-2b — Codify brand/animation/celebration hex carve-out in CLAUDE.md | todo | | **PR-09** | `CLAUDE.md` (Non-Negotiable Engineering Rules section) | [YELLOW] ~15 min. Resolved by D-C4-2. |
 | P3 | Per D-C4-1: delete `RemediationCard.tsx` dead teen branch + sweep 3 stale persona comments. | todo | | **PR-10** | `apps/mobile/src/components/progress/RemediationCard.tsx`, `apps/mobile/src/app/(app)/topic/recall-test.tsx`, `apps/mobile/src/app/(app)/topic/recall-test.test.tsx`, `apps/mobile/src/components/MentomateLogo.tsx`, `apps/mobile/src/components/session/QuotaExceededCard.tsx`, `apps/mobile/src/components/session/LivingBook.tsx` | [YELLOW] ~45 min. Resolved by D-C4-1. |
 | P4 | AUDIT-MOBILE-2c — Confirm `weekly-report/[weeklyReportId]` route auto-discovery | todo | | **PR-10** | `apps/mobile/src/app/(app)/child/[profileId]/_layout.tsx` | [GREEN-YELLOW] ~5 min. |
@@ -290,7 +319,7 @@ These PRs need coordinator or human review beyond agent execution:
 
 | Phase | Description | Status | Owner | PR | Files-claimed | Notes |
 |---|---|---|---|---|---|---|
-| P1 | AUDIT-MIGRATIONS-1 — Regenerate 10 missing drizzle snapshots | todo | | **PR-18** | `apps/api/drizzle/meta/{0006-0010,0013,0021,0025,0043,0044}_snapshot.json` | [YELLOW] ~1 hr. Verify: `pnpm run db:generate:dev` completes without errors (or `db:generate` if PR-16 hasn't landed yet). |
+| P1 | AUDIT-MIGRATIONS-1 — Regenerate 14 missing drizzle snapshots (was 10; 4 new migrations added without snapshots) | todo | | **PR-18** | `apps/api/drizzle/meta/{0006,0007,0008,0009,0010,0013,0021,0025,0043,0044,0055,0063,0064,0065}_snapshot.json` | [YELLOW] ~1.5 hr. **Re-verified 2026-05-08:** 67 migrations, 53 snapshots → 14 missing (was 10 in original plan). Verify: `pnpm run db:generate:dev` completes without errors (or `db:generate` if PR-16 hasn't landed yet). |
 | P2 | AUDIT-MIGRATIONS-2 — Fix non-monotonic `_journal.json` timestamps | todo | | **PR-19** | `apps/api/drizzle/meta/_journal.json` | [YELLOW] ~30 min. Verify: timestamps are monotonically increasing in `_journal.json`. |
 | P3 | AUDIT-MIGRATIONS-3-SWEEP — Sweep destructive migrations for missing rollback sections | todo | | **PR-20** | `apps/api/drizzle/0*_*.sql`, `apps/api/drizzle/*.rollback.md` | [YELLOW] ~2 hr. |
 | P4 | AUDIT-MEMORY-2 — Memory file dedupe (~96 files) | todo | | **PR-21** | `.claude/memory/*.md` | [YELLOW] ~1 hr. |
@@ -357,6 +386,7 @@ These items appeared in earlier audit docs but were demoted, contradicted, or al
 | TYPES-1 F2 | `quickCheckResponseSchema` and `consentResponseSchema` shape ambiguous | Conclusively classified: both are actually-request-shaped (the `*Response` suffix means "user's response", not "HTTP response"). Schema rename + new response-schema authoring scheduled (C1 P4). | TYPES-2 F2 |
 | D-C4-1 original recommendation | "Allow + clarify CLAUDE.md ('prop-injected persona is persona-unaware')" — cheaper than refactor, architectural pattern otherwise clean | **Superseded by Epic 12 awareness.** Persona is not an architectural axis — it's a deleted concept (Epic 12). `isLearner` is a Story-10.9 fossil missed by Story 12.5's literal-string `personaType` sweep. The "allow" path would codify a pattern Epic 12 specifically eliminated. The "2-4 hr refactor" cost estimate was wrong (actual: ~30 min dead-branch deletion at the real call-site count of 1). Both MOBILE-1 and MOBILE-2 deepenings asked governance-posture questions without checking whether `personaType` still existed — a methodology gap, not a finding gap. | Epic 12 persona-fossil sweep (2026-05-03 session) |
 | MOBILE-2 F4 severity | YELLOW (governance call pending, no code change required) | Upgraded to YELLOW-RED. The broader persona-fossil sweep discovered `relearn.tsx` as a second active `isLearner` violation and `personaFromBirthYear()` as root cause with 5 callers returning deleted vocabulary. C4 scope expanded from 5 phases to 8. | Epic 12 persona-fossil sweep (2026-05-03 session) |
+| C2 P1 + P2 (per-channel runtime guard tests) | Build a database-mock guard test and an inngest-mock guard test, mirroring the BUG-743 LLM mock guard. Each runs at jest-time, scans test files, fails if mocks exceed allowlist. | **Superseded 2026-05-06 by PR #171 (GC1 ratchet).** GC1 is a CI step that blocks any new internal `jest.mock('./...')` or `jest.mock('../...')` line in test files at PR-diff time, with `// gc1-allow: <reason>` escape hatch. Broader (covers all channels at once), simpler to maintain (no per-channel allowlist files), forward-only on additions. The runtime guard tests would have duplicated enforcement at a different layer with negligible additional benefit. **Decision (2026-05-08):** close P1 + P2 as done; trust GC1. P4 unblocked since GC1 protects the drain. | DEV-002 (validation sweep, 2026-05-08) |
 
 ---
 
@@ -384,6 +414,8 @@ Reference table only — these items are NOT in the cluster status tables (they'
 | AUDIT-EVAL-2.1 | PR #137 review fixups | PR #139 |
 | BUG-743 / T-1 | Forward-only LLM mock guard for integration tests | commit `35fd074a` |
 | Pre-P0 hygiene batch | "Sweep when you fix" rule + phantom test-utils + memory hygiene + audit-status skill + 6 deepening recons + memory drift audit + relatedness step in /my:commit | commit `e622dd15` |
+| C1 P2 — `queued` field on `feedbackResponseSchema` | Schema field added (`feedback.ts:17`) | PR #153 (2026-05-05) |
+| C2 P1 + P2 — per-channel mock guard tests | Superseded by GC1 ratchet — broader CI gate on all channels | PR #171 (2026-05-06) |
 
 ---
 
@@ -407,3 +439,25 @@ Reference table only — these items are NOT in the cluster status tables (they'
 - C7 P3 scope expanded: tighten CLAUDE.md persona-unaware rule + update UX spec stale `(learner)/` paths
 - Closed/revised: 2 entries added (D-C4-1 original recommendation + MOBILE-2 F4 severity)
 - Methodology lesson: future audits should grep `docs/specs/epics.md` for the relevant axis before recommending governance posture. Forward-only guard tests (per BUG-743 pattern) should cover persona-shaped booleans in shared components.
+
+### DEV-002
+
+**Status:** `processed-2026-05-08`
+**Source:** Stage-3-prep validation sweep (user-requested re-baseline before dispatching subagents)
+**Finding:** Between the plan's last update (2026-05-04) and the start of Stage 3 execution, commits landed on main across PRs #153, #155, #163, #169, #170, #171, #172, #173, and #174. (PR #179 was an Archon workflow-development draft against PR-08 and never landed — it and follow-up dev drafts #184, #185 are all to be closed unmerged.) Several plan items were closed silently by the merged PRs, one item was scope-shrunk, one was scope-grown, and one had a previously-blocking dependency superseded. Without re-baselining, subagents would have re-validated against stale plan state at dispatch time, causing wasted work and noisy "already done" reports.
+
+**Root cause:** The plan was written assuming a serial Stage-3 dispatch, but parallel work (Archon spike + UX redesigns + integration test hardening) continued on `main` while Stage 3 was being prepared. The plan-doc has no built-in re-baseline cadence — drift accumulates silently until a Stage-3 dispatch tries to reconcile.
+
+**Delta applied (2026-05-08):**
+- New "Recent main activity (since 2026-05-04)" section at top of plan body, summarizing all 10 PRs and their effect on plan items.
+- C1 P2 marked `done` (PR #153).
+- C2 P1 + P2 marked `done` as superseded by PR #171 (GC1 ratchet); rationale captured in Closed/revised + this entry.
+- C2 P4 status changed from `blocked` to `todo` (was blocked on P2; GC1 now provides equivalent forward-only protection).
+- C4 P1 scope shrunk from 6 files / 20 hex to 4 files / 6 hex (re-verified counts; PR #163 resolved 2 of the original 6 files).
+- C8 P1 scope grew from 10 to 14 missing drizzle snapshots; specific list captured in Files-claimed.
+- C1 P3 Notes flagged for re-audit — many sites already use `.parse()` wraps; original "12 wrappable sites" count needs re-verification before claiming.
+- PR-05 marked superseded in PR Execution Plan table.
+- Independently-startable PR list updated: PR-05 removed (superseded), PR-07 added (unblocked).
+- C3 P1 + P2 remain `todo`. (Earlier notes had moved them to `review` while workflow-development drafts #179/#184/#185 were open against PR-08; those drafts will be closed unmerged.)
+
+**Methodology lesson:** Plan should be re-baselined at the start of each Stage-3 dispatch wave, not just on deviation. Adding a lightweight "main-activity" PR-table at the top of the plan (and updating it before each dispatch) gives subagents and the coordinator a fast cross-check against drift.
