@@ -26,7 +26,7 @@ describe('MessageBubble — envelope leak regression [BUG-941]', () => {
       '{"reply":"Very close. The letters gi together make a j sound, like in jungle. Try saying Buongiorno once more.","signals":{"partial_progress":true,"needs_deepening":false,"understanding_check":false},"ui_hints":{"note_prompt":{"show":false,"post_session":false},"fluency_drill":{"active":false,"duration_s":0,"score":{"correct":0,"total":0}}}}';
 
     const { queryByText } = render(
-      <MessageBubble role="assistant" content={envelope} />
+      <MessageBubble sender="assistant" content={envelope} />,
     );
 
     // The reply text renders.
@@ -47,7 +47,7 @@ describe('MessageBubble — envelope leak regression [BUG-941]', () => {
     // simple substring presence to avoid coupling to its tokenization.
     const prose = 'Lets break it down. What would you try first?';
     const { queryByText } = render(
-      <MessageBubble role="assistant" content={prose} />
+      <MessageBubble sender="assistant" content={prose} />,
     );
     expect(queryByText(/Lets break it down/)).toBeTruthy();
     expect(queryByText(/would you try first/)).toBeTruthy();
@@ -61,7 +61,7 @@ describe('MessageBubble — envelope leak regression [BUG-941]', () => {
     // tokenization), so an exact-string queryByText is the right check.
     const userText = '{"reply":"my own JSON paste"}';
     const { queryByText } = render(
-      <MessageBubble role="user" content={userText} />
+      <MessageBubble sender="user" content={userText} />,
     );
     expect(queryByText(userText)).toBeTruthy();
   });
@@ -69,7 +69,7 @@ describe('MessageBubble — envelope leak regression [BUG-941]', () => {
   it('renders the reply when envelope is wrapped in a markdown JSON code fence', () => {
     const fenced = '```json\n{"reply":"Fenced answer","signals":{}}\n```';
     const { queryByText } = render(
-      <MessageBubble role="assistant" content={fenced} />
+      <MessageBubble sender="assistant" content={fenced} />,
     );
     expect(queryByText(/Fenced answer/)).toBeTruthy();
     // Markdown fence and inner JSON wrapper must not reach the bubble.
@@ -85,7 +85,7 @@ describe('MessageBubble — envelope leak regression [BUG-941]', () => {
     // pin in this test.
     const truncated = '{"reply":"Half a sent';
     const { queryByText } = render(
-      <MessageBubble role="assistant" content={truncated} />
+      <MessageBubble sender="assistant" content={truncated} />,
     );
     expect(queryByText(/Half a sent/)).toBeTruthy();
   });
@@ -95,10 +95,10 @@ describe('verification badge styling', () => {
   it('renders evaluate badge as inline text below the bubble', () => {
     const { getByText } = render(
       <MessageBubble
-        role="assistant"
+        sender="assistant"
         content="Good work!"
         verificationBadge="evaluate"
-      />
+      />,
     );
     expect(getByText('✓ THINK-DEEPER CLEARED')).toBeTruthy();
   });
@@ -106,10 +106,10 @@ describe('verification badge styling', () => {
   it('renders teach_back badge as inline text below the bubble', () => {
     const { getByText } = render(
       <MessageBubble
-        role="assistant"
+        sender="assistant"
         content="Good work!"
         verificationBadge="teach_back"
-      />
+      />,
     );
     expect(getByText('✓ TEACH-BACK CLEARED')).toBeTruthy();
   });
@@ -117,10 +117,10 @@ describe('verification badge styling', () => {
   it('does not render badge for user messages', () => {
     const { queryByText } = render(
       <MessageBubble
-        role="user"
+        sender="user"
         content="My answer"
         verificationBadge="evaluate"
-      />
+      />,
     );
     expect(queryByText(/CLEARED/)).toBeNull();
   });

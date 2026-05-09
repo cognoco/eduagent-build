@@ -254,7 +254,7 @@ export function ChatShell({
           </View>
         )}
         <MessageBubble
-          role={msg.role}
+          sender={msg.role}
           content={msg.content}
           streaming={msg.streaming}
           outboxStatus={msg.outboxStatus}
@@ -265,7 +265,7 @@ export function ChatShell({
         />
       </View>
     ),
-    [failedImages, colors.muted, renderMessageActions],
+    [failedImages, colors.muted, renderMessageActions, t],
   );
 
   // Voice toggle — explicit initialVoiceEnabled (from input mode toggle) takes precedence.
