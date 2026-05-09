@@ -81,6 +81,10 @@ If dangerous files are already staged (even in STAGED mode), unstage them:
 Bracket files (e.g. `[sessionId].tsx`) need `:(literal)` pathspec prefix
 in `git reset` to avoid glob interpretation.
 
+Commit untracked files in the same batch as their dependencies (e.g.,
+`feedback.ts` together with the schema re-export it imports from) so the
+commit is self-contained.
+
 ### 5. Draft message
 
 Run `git diff --cached --stat` to see the final staged set. Draft from
@@ -111,6 +115,10 @@ diff fixes them — e.g. `fix(api): atomic quota decrement [CR-1C.1]`.
 | CR-YYY   | packages/database/baz.ts     | N/A: schema-only, migrate verified    |
 ```
 
+Every row needs a non-empty Verified By cell — `test:`, `manual:`, or
+`N/A:` with reason. If 6+ IDs are present, prefer splitting into smaller
+commits (one per logical fix) — bundles hide weak fixes among solid ones.
+
 **Sweep-audit block** — when the message claims a sweep (hook enforces):
 
 ```text
@@ -120,6 +128,12 @@ Sweep audit:
 ```
 
 Use `(no-sweep)` if a sweep keyword is incidental.
+
+**Prompt + eval pairing:** If the staged diff touches
+`apps/api/src/services/**/*-prompts.ts` or `apps/api/src/services/llm/*.ts`
+(non-test files), `apps/api/eval-llm/snapshots/**` must also be staged.
+Run `pnpm eval:llm` and re-stage before committing. Bypass only for pure
+refactors (rename, comment, type-only) that cannot affect generation output.
 
 ### 6. Commit
 
@@ -134,13 +148,42 @@ Do NOT use `--no-verify`. Let hooks run.
 
 ### 7. Handle failure
 
-If the commit fails, read `references/failure-recovery.md` for the
-recovery procedure. Short version:
+If the commit fails, changes are still staged — nothing is lost.
 
-1. Read the hook error output
-2. If lint-staged auto-fixed files, re-stage and retry
-3. If tsc/jest failed on unrelated files, unstage those and retry
-4. Maximum 2 attempts. If still failing, report to the user.
+**First, classify each failing file by relatedness to the staged changes:**
+- **Tooling noise** — stale jest snapshot, lint config glitch, pre-existing
+  failure in code you didn't touch. Skip-and-ship is appropriate.
+- **Unrelated** — failing file is in a different logical scope from your
+  commit (different feature, different layer). Skip-and-ship is appropriate.
+- **Related** — failing file is a test for code you're committing, is in
+  the same logical scope, or is a typecheck failure in code your commit
+  depends on. **Do NOT skip-and-ship.** Fix the failure inline or split the
+  commit. Shipping half a feature is forbidden when failures are related.
+- **If unsure,** assume related.
+
+**Then classify by failure type and apply the appropriate handling:**
+- **Lint/format errors**: lint-staged may have auto-fixed these. Re-stage
+  the fixed files (`git add` modified files) and retry.
+- **Type errors (tsc)**: parse file paths from tsc output. Unstage ONLY
+  those files with `git reset HEAD -- <file>`. Retry immediately.
+- **Test failures (jest)**: parse failing test file paths + their source
+  files (strip `.test.ts` / `.test.tsx`). Unstage both. Retry immediately.
+- **Type errors in unstaged files**: tsc checks the whole working tree.
+  Stash with `git stash push --keep-index -u -m "temp: unstaged WIP"`,
+  commit, then `git stash pop`. If output says "stash entry is kept," the
+  apply was **incomplete** — verify with `git stash show --stat 'stash@{0}'`
+  before proceeding.
+- **NX boundary errors** ("Static imports of lazy-loaded libraries are
+  forbidden"): stale NX project graph. Run `pnpm exec nx reset`, re-stage,
+  retry.
+
+**Retry** with the reduced staged set. Do NOT fix code — just commit what
+passes.
+
+**Maximum 2 attempts.** If still failing, report which files were excluded
+and why, and what errors remain. Do NOT keep retrying.
+
+Excluded files remain as unstaged changes — they are NOT lost.
 
 ### 8. Push (only if explicitly requested)
 
