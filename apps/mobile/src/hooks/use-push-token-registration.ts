@@ -26,6 +26,15 @@ function capturePushRegistrationFailure(
   });
 }
 
+function isMissingAndroidFirebaseAppError(err: unknown): boolean {
+  if (Platform.OS !== 'android' || !(err instanceof Error)) return false;
+
+  return (
+    err.message.includes('Default FirebaseApp is not initialized') ||
+    err.message.includes('/push-notifications/fcm-credentials/')
+  );
+}
+
 /**
  * Registers the Expo push token with the API when notification permission
  * is already granted. Does NOT prompt for permission — notification consent
@@ -85,6 +94,9 @@ export function usePushTokenRegistration(): PushRegistrationState {
         });
       } catch (err) {
         setState({ status: 'failed', reason: 'expo_token_unavailable' });
+        if (__DEV__ && isMissingAndroidFirebaseAppError(err)) {
+          return;
+        }
         capturePushRegistrationFailure(err, 'expo_token_unavailable');
         return;
       }
