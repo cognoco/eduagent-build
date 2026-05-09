@@ -664,6 +664,7 @@ async function* wrapStreamWithCircuitBreaker(
     if (chunksYielded === 0 && fallbackConfig) {
       const fallbackProvider = providers.get(fallbackConfig.provider);
       if (fallbackProvider && canAttempt(fallbackConfig.provider)) {
+        recordFailure(providerId);
         logger.warn(
           '[llm] Primary stream completed with zero chunks, trying fallback',
           {

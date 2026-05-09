@@ -620,6 +620,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                   sessionId,
                   tokensReceived: 0,
                   recovered: zeroTokenRecovered,
+                  surface: 'sessions.stream',
                   recovery: zeroTokenRecovery,
                 },
               });

@@ -423,6 +423,67 @@ describe('LLM Router', () => {
       );
       warnSpy.mockRestore();
     });
+
+    it('[HIGH-LLM-PROBE] releases half-open probe after zero-chunk fallback', async () => {
+      _clearProviders();
+      _resetCircuits();
+      registerProvider(createFailingStreamProvider('gemini'));
+
+      const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(1_000);
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+
+      try {
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const result = await routeAndStream(
+            [{ role: 'user', content: 'test' }],
+            1,
+          );
+          await expect(async () => {
+            for await (const _chunk of result.stream) {
+              // Drain the lazy stream so the circuit records the failure.
+            }
+          }).rejects.toThrow('Stream connection lost');
+        }
+
+        nowSpy.mockReturnValue(62_000);
+        registerProvider(createEmptyStreamProvider('gemini'));
+        registerProvider(createMockProvider('anthropic'));
+
+        const halfOpenResult = await routeAndStream(
+          [{ role: 'user', content: 'test' }],
+          1,
+        );
+        const fallbackChunks: string[] = [];
+        for await (const chunk of halfOpenResult.stream) {
+          fallbackChunks.push(chunk);
+        }
+
+        expect(fallbackChunks.join('')).toContain('Mock streamed');
+        expect(halfOpenResult.fallbackUsed).toBe(true);
+
+        nowSpy.mockReturnValue(123_000);
+        registerProvider(createMockProvider('gemini'));
+
+        const recoveredResult = await routeAndStream(
+          [{ role: 'user', content: 'test' }],
+          1,
+        );
+        const recoveredChunks: string[] = [];
+        for await (const chunk of recoveredResult.stream) {
+          recoveredChunks.push(chunk);
+        }
+
+        expect(recoveredResult.provider).toBe('gemini');
+        expect(recoveredResult.fallbackUsed).toBe(false);
+        expect(recoveredChunks.join('')).toContain('Mock streamed');
+      } finally {
+        warnSpy.mockRestore();
+        nowSpy.mockRestore();
+        _clearProviders();
+        _resetCircuits();
+        registerProvider(createMockProvider('gemini'));
+      }
+    });
   });
 
   describe('routeAndCall retry on transient failure', () => {
