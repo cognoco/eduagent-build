@@ -32,6 +32,8 @@ FAIL_COUNT=0
 SKIP_COUNT=0
 PARTIAL_COUNT=0
 TOTAL=0
+FLOW_LOG_DIR="$E2E_DIR/scripts/run-logs/flows-$(date +%Y%m%d-%H%M%S)"
+mkdir -p "$FLOW_LOG_DIR"
 
 # Hard cap on per-flow runtime. Without this a single hung adb/Maestro can
 # silently consume hours (observed 2026-04-25: 23h hang on flow [1] with no
@@ -66,18 +68,22 @@ run_seeded() {
   local scenario="$1"
   local flow="$2"
   local fast="${3:-$FAST}"
+  local flow_slug
+  flow_slug=$(echo "${scenario}-${flow}" | tr '/. :' '____')
+  local flow_log="$FLOW_LOG_DIR/${flow_slug}.log"
   echo ""
   echo "=========================================="
   echo "[$((TOTAL+1))] SEEDED: $scenario → $flow (FAST=$fast)"
   echo "=========================================="
-  if FAST=$fast timeout --signal=TERM --kill-after=15 "$PER_FLOW_TIMEOUT" "$SEED_SCRIPT" "$scenario" "$flow"; then
+  echo "[e2e-lib] Flow log: $flow_log"
+  if FAST=$fast timeout --signal=TERM --kill-after=15 "$PER_FLOW_TIMEOUT" "$SEED_SCRIPT" "$scenario" "$flow" > >(tee "$flow_log") 2> >(tee -a "$flow_log" >&2); then
     log_result "PASS" "$flow"
   else
     rc=$?
     if [ $rc -eq 124 ] || [ $rc -eq 137 ]; then
-      log_result "FAIL" "$flow" "(scenario: $scenario, TIMEOUT after ${PER_FLOW_TIMEOUT}s)"
+      log_result "FAIL" "$flow" "(scenario: $scenario, TIMEOUT after ${PER_FLOW_TIMEOUT}s, log: $flow_log)"
     else
-      log_result "FAIL" "$flow" "(scenario: $scenario)"
+      log_result "FAIL" "$flow" "(scenario: $scenario, log: $flow_log)"
     fi
   fi
 }
@@ -87,18 +93,22 @@ run_seeded() {
 run_noseed() {
   local flow="$1"
   local fast="${2:-$FAST}"
+  local flow_slug
+  flow_slug=$(echo "no-seed-${flow}" | tr '/. :' '____')
+  local flow_log="$FLOW_LOG_DIR/${flow_slug}.log"
   echo ""
   echo "=========================================="
   echo "[$((TOTAL+1))] NO-SEED: $flow (FAST=$fast)"
   echo "=========================================="
-  if FAST=$fast timeout --signal=TERM --kill-after=15 "$PER_FLOW_TIMEOUT" "$SEED_SCRIPT" --no-seed "$flow"; then
+  echo "[e2e-lib] Flow log: $flow_log"
+  if FAST=$fast timeout --signal=TERM --kill-after=15 "$PER_FLOW_TIMEOUT" "$SEED_SCRIPT" --no-seed "$flow" > >(tee "$flow_log") 2> >(tee -a "$flow_log" >&2); then
     log_result "PASS" "$flow"
   else
     rc=$?
     if [ $rc -eq 124 ] || [ $rc -eq 137 ]; then
-      log_result "FAIL" "$flow" "(no-seed, TIMEOUT after ${PER_FLOW_TIMEOUT}s)"
+      log_result "FAIL" "$flow" "(no-seed, TIMEOUT after ${PER_FLOW_TIMEOUT}s, log: $flow_log)"
     else
-      log_result "FAIL" "$flow" "(no-seed)"
+      log_result "FAIL" "$flow" "(no-seed, log: $flow_log)"
     fi
   fi
 }

@@ -25,8 +25,8 @@
 # e2e-preflight.test.sh.
 
 # ── Tunables ────────────────────────────────────────────────────────────────
-: "${PREFLIGHT_API_URL:=http://localhost:8787}"
-: "${PREFLIGHT_METRO_HOST:=localhost}"
+: "${PREFLIGHT_API_URL:=http://127.0.0.1:8787}"
+: "${PREFLIGHT_METRO_HOST:=127.0.0.1}"
 : "${PREFLIGHT_METRO_PORT:=8081}"
 : "${PREFLIGHT_PROXY_PORT:=8082}"
 : "${PREFLIGHT_PROXY_MAX_SECONDS:=2}"    # Fresh proxy serves bundle <0.2s; >2s = stale
@@ -118,10 +118,10 @@ check_metro_reachable() {
 #
 # Fresh proxy: <200ms. Degraded proxy: 5-15s. We fail at >${PREFLIGHT_PROXY_MAX_SECONDS}s.
 check_bundle_proxy_fast() {
-  # Skip if nothing is listening on the proxy port. On Windows, a refused TCP
-  # connection takes ~2.25s, which is indistinguishable from a slow proxy using
-  # a time-based check alone. No process on 8082 = no stale proxy = no problem.
-  if ! curl -s --max-time 1 "http://${PREFLIGHT_METRO_HOST}:${PREFLIGHT_PROXY_PORT}/" >/dev/null 2>&1; then
+  # Skip only if nothing is listening on the proxy port. Use a raw TCP connect
+  # instead of curl: a slow proxy can delay the HTTP response and would
+  # otherwise be mistaken for "not running".
+  if ! timeout 2 bash -c "</dev/tcp/${PREFLIGHT_METRO_HOST}/${PREFLIGHT_PROXY_PORT}" >/dev/null 2>&1; then
     _preflight_ok "Bundle proxy on :${PREFLIGHT_PROXY_PORT} not running (skipped — not required)"
     return 0
   fi

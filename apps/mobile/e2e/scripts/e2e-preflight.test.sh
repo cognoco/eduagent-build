@@ -139,16 +139,17 @@ else
 fi
 _cleanup
 
-# CASE 3: Dead proxy (port closed) should FAIL.
-# Pick a port nothing is listening on.
+# CASE 3: Dead proxy (port closed) should PASS/SKIP.
+# The current Android E2E path uses Metro directly on 8081. The 8082 proxy is
+# optional, but if it is present it must be fast.
 rc=0
 PREFLIGHT_PROXY_PORT=19999 PREFLIGHT_METRO_HOST=127.0.0.1 \
   PREFLIGHT_PROXY_MAX_SECONDS=2 \
   check_bundle_proxy_fast >/dev/null 2>/tmp/pf_err_dead.txt || rc=$?
-if [ $rc -ne 0 ]; then
-  _tpass "rejects a dead proxy port"
+if [ $rc -eq 0 ]; then
+  _tpass "skips an absent optional proxy"
 else
-  _tfail "check_bundle_proxy_fast accepted a dead port (wrong!)"
+  _tfail "check_bundle_proxy_fast rejected an absent optional proxy (rc=$rc). stderr: $(cat /tmp/pf_err_dead.txt)"
 fi
 
 echo ""

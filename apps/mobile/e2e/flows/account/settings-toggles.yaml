@@ -40,14 +40,26 @@ tags:
 
 # ── Notifications section ──
 
-# 5. Scroll to Notifications section header
+# 5. Scroll through an intermediate section first. Direct fast flings can
+# overshoot Notifications and land at the bottom of the long More screen.
+- scrollUntilVisible:
+    element:
+      id: "celebrations-section-header"
+    direction: DOWN
+    timeout: 15000
+    speed: 30
+    visibilityPercentage: 30
+    centerElement: true
+
+# 5a. Scroll to Notifications section header
 - scrollUntilVisible:
     element:
       id: "notifications-section-header"
     direction: DOWN
     timeout: 20000
-    speed: 70
-    visibilityPercentage: 50
+    speed: 30
+    visibilityPercentage: 30
+    centerElement: true
 
 # 5b. Ensure Push notifications row itself is in view before tapping
 # (small phones can leave the toggle just below the section header).
@@ -56,8 +68,9 @@ tags:
       id: "push-notifications-toggle"
     direction: DOWN
     timeout: 10000
-    speed: 70
-    visibilityPercentage: 50
+    speed: 30
+    visibilityPercentage: 30
+    centerElement: true
 
 # 6. Tap "Push notifications" toggle (toggle on)
 - tapOn:
@@ -75,8 +88,9 @@ tags:
       id: "weekly-digest-toggle"
     direction: DOWN
     timeout: 10000
-    speed: 70
-    visibilityPercentage: 50
+    speed: 30
+    visibilityPercentage: 30
+    centerElement: true
 
 - tapOn:
     id: "weekly-digest-toggle"

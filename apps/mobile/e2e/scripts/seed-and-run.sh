@@ -162,10 +162,13 @@ first_bounds_for_text() {
     const fs = require('fs');
     const pattern = new RegExp(process.argv[1]);
     const xml = fs.readFileSync(0, 'utf8');
-    const re = /<node\\b[^>]*text=\"([^\"]*)\"[^>]*bounds=\"([^\"]+)\"/g;
+    const re = /<node\\b[^>]*>/g;
     for (let match; (match = re.exec(xml));) {
-      if (pattern.test(match[1])) {
-        process.stdout.write(match[2]);
+      const node = match[0];
+      const text = /text=\"([^\"]*)\"/.exec(node)?.[1] ?? '';
+      const bounds = /bounds=\"([^\"]+)\"/.exec(node)?.[1] ?? '';
+      if (bounds && pattern.test(text)) {
+        process.stdout.write(bounds);
         process.exit(0);
       }
     }
@@ -178,10 +181,13 @@ first_bounds_for_content_desc() {
     const fs = require('fs');
     const pattern = new RegExp(process.argv[1]);
     const xml = fs.readFileSync(0, 'utf8');
-    const re = /<node\\b[^>]*content-desc=\"([^\"]*)\"[^>]*bounds=\"([^\"]+)\"/g;
+    const re = /<node\\b[^>]*>/g;
     for (let match; (match = re.exec(xml));) {
-      if (pattern.test(match[1])) {
-        process.stdout.write(match[2]);
+      const node = match[0];
+      const label = /content-desc=\"([^\"]*)\"/.exec(node)?.[1] ?? '';
+      const bounds = /bounds=\"([^\"]+)\"/.exec(node)?.[1] ?? '';
+      if (bounds && pattern.test(label)) {
+        process.stdout.write(bounds);
         process.exit(0);
       }
     }
@@ -262,9 +268,13 @@ if ! wait_for_text "DEVELOPMENT" "$LAUNCHER_TIMEOUT"; then
   sleep 2
   $ADB $DEVICE_FLAG shell uiautomator dump /sdcard/ui_dump.xml 2>/dev/null || true
   LAST_DUMP=$($ADB $DEVICE_FLAG exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null || echo "")
-  if echo "$LAST_DUMP" | grep -q "Reload\|Welcome back\|Welcome to MentoMate\|sign-in-button\|Connected to"; then
+  if echo "$LAST_DUMP" | grep -q "Reload\|Connected to\|Loading from"; then
     echo "[seed-and-run] App auto-connected to Metro (skipped launcher). Proceeding to bundle phase."
     SKIP_TO_BUNDLE=1
+  elif echo "$LAST_DUMP" | grep -q "Welcome back\|Welcome to MentoMate\|sign-in-button"; then
+    echo "[seed-and-run] FATAL: App opened the embedded sign-in bundle without showing the dev-client launcher or Metro connection." >&2
+    echo "[seed-and-run] This is unsafe for E2E because it may run stale JS from the APK. Reinstall a current dev-client APK or launch through the dev-client Metro entry." >&2
+    exit 1
   elif echo "$LAST_DUMP" | grep -q "DEVELOPMENT"; then
     # Launcher appeared just after the timeout — treat as normal launcher path
     echo "[seed-and-run] Launcher appeared just after timeout window — continuing."
@@ -282,9 +292,13 @@ if ! wait_for_text "DEVELOPMENT" "$LAUNCHER_TIMEOUT"; then
       sleep 2
       $ADB $DEVICE_FLAG shell uiautomator dump /sdcard/ui_dump.xml 2>/dev/null || true
       RETRY_DUMP=$($ADB $DEVICE_FLAG exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null || echo "")
-      if echo "$RETRY_DUMP" | grep -q "Reload\|Welcome back\|Welcome to MentoMate\|sign-in-button\|Connected to"; then
+      if echo "$RETRY_DUMP" | grep -q "Reload\|Connected to\|Loading from"; then
         echo "[seed-and-run] App auto-connected on relaunch. Proceeding to bundle phase."
         SKIP_TO_BUNDLE=1
+      elif echo "$RETRY_DUMP" | grep -q "Welcome back\|Welcome to MentoMate\|sign-in-button"; then
+        echo "[seed-and-run] FATAL: App opened the embedded sign-in bundle after relaunch without showing the dev-client launcher or Metro connection." >&2
+        echo "[seed-and-run] This is unsafe for E2E because it may run stale JS from the APK. Reinstall a current dev-client APK or launch through the dev-client Metro entry." >&2
+        exit 1
       else
         echo "[seed-and-run] FATAL: Dev-client launcher never appeared after relaunch. Is the APK installed?" >&2
         echo "[seed-and-run] Dump contents: $(echo "$RETRY_DUMP" | dump_visible_texts 10 || true)" >&2
@@ -311,10 +325,10 @@ if [ $SKIP_TO_BUNDLE -eq 0 ]; then
   echo "[seed-and-run] Finding Metro server entry in UI dump ..."
   # Try 8082 first (bundle proxy — BUG-7 workaround), then 10.0.2.2:any, then localhost:any
   METRO_BOUNDS=$($ADB $DEVICE_FLAG exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null \
-    | first_bounds_for_text '^http://10\\.0\\.2\\.2:8082$' || echo "")
+    | first_bounds_for_text '^http://10\.0\.2\.2:8082$' || echo "")
   if [ -z "$METRO_BOUNDS" ]; then
     METRO_BOUNDS=$($ADB $DEVICE_FLAG exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null \
-      | first_bounds_for_text '^http://10\\.0\\.2\\.2:[0-9]+$' || echo "")
+      | first_bounds_for_text '^http://10\.0\.2\.2:[0-9]+$' || echo "")
   fi
   # Fallback: after cold boot (no wipe), mDNS may resolve Metro as localhost
   if [ -z "$METRO_BOUNDS" ]; then

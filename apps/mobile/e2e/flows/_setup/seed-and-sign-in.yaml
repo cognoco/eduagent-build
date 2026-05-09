@@ -123,6 +123,15 @@ appId: com.mentomate.app
       visible: "You're approved!"
     file: dismiss-post-approval.yaml
 
+# PermissionSetupGate can appear immediately after sign-in on fresh app data.
+# Dismiss it before Back-key recovery, otherwise return-to-home can exit the app.
+- tapOn:
+    id: "permission-skip"
+    optional: true
+- tapOn:
+    text: "Skip for now"
+    optional: true
+
 # BUG-43: After PostApproval dismiss, the coaching card may auto-navigate to
 # a Practice Session (for scenarios with active sessions like retention-due,
 # homework-ready, failed-recall-3x). The session screen hides the tab bar,
