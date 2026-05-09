@@ -74,15 +74,7 @@ tags:
 
 - scrollUntilVisible:
     element:
-      id: "celebrations-section-header"
-    direction: DOWN
-    timeout: 15000
-    speed: 70
-    visibilityPercentage: 50
-
-- scrollUntilVisible:
-    element:
-      id: "notifications-section-header"
+      id: "more-row-notifications"
     direction: DOWN
     timeout: 15000
     speed: 70

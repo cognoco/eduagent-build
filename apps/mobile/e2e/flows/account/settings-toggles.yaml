@@ -38,28 +38,26 @@ tags:
 
 - takeScreenshot: settings-initial
 
-# ── Notifications section ──
+# ── Notifications section (now a sub-screen) ──
 
-# 5. Scroll through an intermediate section first. Direct fast flings can
-# overshoot Notifications and land at the bottom of the long More screen.
+# 5. Scroll to the Notifications row on the More main screen.
 - scrollUntilVisible:
     element:
-      id: "celebrations-section-header"
+      id: "more-row-notifications"
     direction: DOWN
     timeout: 15000
     speed: 30
     visibilityPercentage: 30
     centerElement: true
 
-# 5a. Scroll to Notifications section header
-- scrollUntilVisible:
-    element:
+# 5a. Navigate into the Notifications sub-screen.
+- tapOn:
+    id: "more-row-notifications"
+
+- extendedWaitUntil:
+    visible:
       id: "notifications-section-header"
-    direction: DOWN
-    timeout: 20000
-    speed: 30
-    visibilityPercentage: 30
-    centerElement: true
+    timeout: 10000
 
 # 5b. Ensure Push notifications row itself is in view before tapping
 # (small phones can leave the toggle just below the section header).
