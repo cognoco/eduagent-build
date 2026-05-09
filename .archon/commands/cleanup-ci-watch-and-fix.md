@@ -192,7 +192,7 @@ classification="unknown"
 
 # 1. GC1 ratchet
 if rg -q 'jest\.mock' "$log_file" \
-   && rg -q 'GC1 VIOLATION|GC1 — no new internal jest\.mock|gc1-allow' "$log_file"; then
+   && rg -q 'GC1 VIOLATION|GC1 — no new internal jest\.mock' "$log_file"; then
     classification="gc1-ratchet"
 
 # 2. Code review check failed
@@ -297,7 +297,7 @@ If `classification == "flake"`, log "flake suspected, no code change" and jump t
 ### Constraints (non-negotiable, from `cleanup-fix-locally.md`)
 
 - **No new test files.** If a fix would require creating a `*.test.ts` / `*.test.tsx` file, defer via `append-followup.sh` instead.
-- **No new internal `jest.mock('./...')` or `jest.mock('../...')`.** GC1 ratchet forbids it. Use `jest.requireActual()` with targeted overrides. Canonical pattern: `apps/api/src/inngest/functions/interview-persist-curriculum.integration.test.ts`. Never silence with `// gc1-allow:`.
+- **No new internal `jest.mock('./...')` or `jest.mock('../...')`** — except the `jest.requireActual()` real-type-preserving pattern below, which legitimately requires `// gc1-allow: <reason>` *on the same line as the `jest.mock(` call* (the ratchet grep is line-by-line). Canonical pattern: `apps/api/src/inngest/functions/interview-persist-curriculum.integration.test.ts`. Never use `// gc1-allow:` as a silence shortcut for a failing internal mock — refactor the test to use `requireActual` with targeted overrides, or remove the mock entirely.
 - **No `--no-verify`.** Pre-commit hooks must run.
 - **No suppression pragmas.** No `eslint-disable`, no `@ts-ignore`, no `@ts-expect-error` to silence problems. Fix the actual code.
 - **For `code-review`: only HIGH-severity findings.** Skip MEDIUM/LOW; defer them via `append-followup.sh` if they need eventual attention.
@@ -310,12 +310,11 @@ If `classification == "flake"`, log "flake suspected, no code change" and jump t
 // BEFORE (rejected by ratchet):
 jest.mock('./db', () => ({ db: { select: jest.fn() } }));
 
-// AFTER:
-jest.mock('./db', () => {
+// AFTER — gc1-allow MUST be on the same line as jest.mock( for the ratchet grep to skip it:
+jest.mock('./db', () => {  // gc1-allow: targeted override, retains real type via requireActual
     const actual = jest.requireActual<typeof import('./db')>('./db');
     return { ...actual, db: { ...actual.db, select: jest.fn() } };
 });
-// gc1-allow: targeted override, retains real type via requireActual
 ```
 
 If the test was added on a brand-new test file, delete the test (since constraint #1 forbids new test files in this loop) and file the coverage gap via `append-followup.sh --severity P2`.

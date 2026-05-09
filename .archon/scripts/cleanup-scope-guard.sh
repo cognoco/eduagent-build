@@ -62,11 +62,14 @@ while IFS= read -r file; do
     # Allow test siblings of claimed source files.
     # If Foo.tsx is claimed, Foo.test.tsx and Foo.test.ts are implicitly allowed
     # (the implement loop is expected to update existing test siblings).
+    # Also try the alternate extension: in React Native, Foo.test.ts may
+    # legitimately test a Foo.tsx component.
     is_test_sibling=false
     if [[ "$file" =~ \.(test|spec)\.(ts|tsx)$ ]]; then
-        # Strip .test.tsx → .tsx, .test.ts → .ts, .spec.tsx → .tsx
         source_candidate="$(echo "$file" | sed -E 's/\.(test|spec)\.(ts|tsx)$/.\2/')"
-        if echo "$allowed_files" | grep -qxF "$source_candidate"; then
+        source_candidate_alt="$(echo "$file" | sed -E 's/\.(test|spec)\.tsx?$/.tsx/')"
+        if echo "$allowed_files" | grep -qxF "$source_candidate" \
+           || echo "$allowed_files" | grep -qxF "$source_candidate_alt"; then
             is_test_sibling=true
         fi
     fi

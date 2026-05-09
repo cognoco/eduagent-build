@@ -34,6 +34,16 @@ RUN_A="$1"
 RUN_B="$2"
 OUT="${3:-/dev/stdout}"
 
+# workflow_run_id is a 32-char lowercase hex string. Reject anything else
+# before interpolating into SQL — the sqlite3 CLI does not expose parameter
+# binding the way the API does, so input validation is the defense.
+for rid in "$RUN_A" "$RUN_B"; do
+    if [[ ! "$rid" =~ ^[a-f0-9]{32}$ ]]; then
+        echo "ERROR: invalid workflow_run_id '$rid' (must be 32-char lowercase hex)" >&2
+        exit 64
+    fi
+done
+
 DB="$HOME/.archon/archon.db"
 ARTIFACTS_ROOT="$HOME/.archon/workspaces/cognoco/eduagent-build/artifacts/runs"
 

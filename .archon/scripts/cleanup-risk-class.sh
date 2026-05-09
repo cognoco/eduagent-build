@@ -115,7 +115,7 @@ verdict="normal"
 
 if [[ "$matches_risk" == true ]]; then
     verdict="risky"
-elif (( file_count > risky_min_files )) || (( line_count > risky_min_lines )); then
+elif (( file_count >= risky_min_files )) || (( line_count >= risky_min_lines )); then
     verdict="risky"
 elif (( file_count <= tiny_max_files )) && (( line_count <= tiny_max_lines )); then
     verdict="tiny"
