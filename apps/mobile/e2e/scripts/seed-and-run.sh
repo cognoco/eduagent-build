@@ -109,6 +109,18 @@ check_emulator() {
   fi
 }
 
+reset_maestro_driver() {
+  # Maestro owns the UIAutomator instrumentation channel while a test runs.
+  # If a previous run is killed mid-command, the next test can hang at the
+  # first inputText/tap call unless we release the driver explicitly.
+  $ADB $DEVICE_FLAG shell am force-stop dev.mobile.maestro 2>/dev/null || true
+  $ADB $DEVICE_FLAG shell am force-stop dev.mobile.maestro.test 2>/dev/null || true
+  $ADB $DEVICE_FLAG shell pm clear dev.mobile.maestro 2>/dev/null || true
+  $ADB $DEVICE_FLAG shell pm clear dev.mobile.maestro.test 2>/dev/null || true
+  $ADB $DEVICE_FLAG shell am kill dev.mobile.maestro 2>/dev/null || true
+  $ADB $DEVICE_FLAG shell am kill dev.mobile.maestro.test 2>/dev/null || true
+}
+
 # ── Pre-step: Clear state + launch app via ADB (BUG-19) ──
 # Maestro's launchApp (with or without clearState) fails intermittently on
 # WHPX emulators, especially with concurrent sessions. Workaround: clear state
@@ -233,15 +245,7 @@ $ADB $DEVICE_FLAG shell pm clear "$APP_ID" 2>/dev/null || true
 # BUG-21: Kill Bluetooth to prevent "Bluetooth keeps stopping" dialog on WHPX
 $ADB $DEVICE_FLAG shell am force-stop com.android.bluetooth 2>/dev/null || true
 # Stop Maestro driver to release UIAutomator service.
-# The Maestro instrumentation runner takes exclusive control of UIAutomator.
-# If a previous Maestro run left the driver running, it blocks uiautomator dump.
-# force-stop kills the process; the driver APK stays installed so Maestro can
-# reuse it without a slow reinstall (~120s on WHPX).
-$ADB $DEVICE_FLAG shell am force-stop dev.mobile.maestro 2>/dev/null || true
-$ADB $DEVICE_FLAG shell am force-stop dev.mobile.maestro.test 2>/dev/null || true
-# Kill any lingering instrumentation runner (belt-and-suspenders)
-$ADB $DEVICE_FLAG shell am kill dev.mobile.maestro 2>/dev/null || true
-$ADB $DEVICE_FLAG shell am kill dev.mobile.maestro.test 2>/dev/null || true
+reset_maestro_driver
 # BUG-22: Pre-grant notification permission so the dialog doesn't block UI
 $ADB $DEVICE_FLAG shell pm grant "$APP_ID" android.permission.POST_NOTIFICATIONS 2>/dev/null || true
 # BUG-39: Pre-grant camera permission so homework flows don't hit system dialog
@@ -570,6 +574,7 @@ if [ $NO_SEED -eq 1 ]; then
   fi
   CMD+=("${FLOW_FILE}")
   echo "[seed-and-run] Running: ${CMD[*]}"
+  reset_maestro_driver
   exec "${CMD[@]}"
 fi
 
@@ -636,4 +641,5 @@ fi
 CMD+=("${FLOW_FILE}")
 echo "[seed-and-run] Running: ${CMD[*]}"
 
+reset_maestro_driver
 exec "${CMD[@]}"
