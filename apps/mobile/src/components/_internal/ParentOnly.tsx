@@ -4,11 +4,7 @@ import { useRouter } from 'expo-router';
 
 import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
 
-export function ParentOnly({
-  children,
-}: {
-  children: ReactNode;
-}): ReactNode {
+export function ParentOnly({ children }: { children: ReactNode }): ReactNode {
   const role = useActiveProfileRole();
   const router = useRouter();
 

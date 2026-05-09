@@ -18,7 +18,7 @@ import { useParentProxy } from '../../../hooks/use-parent-proxy';
 
 function formatRelativeDate(
   dateStr: string,
-  t: (key: string, opts?: Record<string, unknown>) => string
+  t: (key: string, opts?: Record<string, unknown>) => string,
 ): string {
   const date = new Date(dateStr);
   const now = new Date();
@@ -118,7 +118,7 @@ export default function SavedBookmarksScreen() {
   const bookmarks = useMemo(
     () =>
       bookmarksQuery.data?.pages.flatMap((page) => page.bookmarks ?? []) ?? [],
-    [bookmarksQuery.data]
+    [bookmarksQuery.data],
   );
 
   const handleDelete = useCallback(
@@ -135,15 +135,15 @@ export default function SavedBookmarksScreen() {
               void deleteBookmark.mutateAsync(bookmark.id).catch((error) => {
                 platformAlert(
                   t('progress.saved.deleteErrorTitle'),
-                  error instanceof Error ? error.message : t('common.tryAgain')
+                  error instanceof Error ? error.message : t('common.tryAgain'),
                 );
               });
             },
           },
-        ]
+        ],
       );
     },
-    [deleteBookmark, t]
+    [deleteBookmark, t],
   );
 
   return (

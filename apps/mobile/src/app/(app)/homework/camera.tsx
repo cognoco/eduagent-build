@@ -99,7 +99,7 @@ export default function CameraScreen(): React.ReactNode {
       setAutoDetectedSubject(null);
       setShowSubjectPicker(false);
       classifyTriggeredRef.current = false;
-    }, [permission?.granted])
+    }, [permission?.granted]),
   );
 
   // Sync permission state into reducer
@@ -197,7 +197,7 @@ export default function CameraScreen(): React.ReactNode {
           } else {
             Sentry.captureMessage(
               'Homework auto-detect: malformed candidate (missing subjectId/Name)',
-              { level: 'warning', extra: { candidate } }
+              { level: 'warning', extra: { candidate } },
             );
             setShowSubjectPicker(true);
           }
@@ -232,8 +232,8 @@ export default function CameraScreen(): React.ReactNode {
             platformAlert(
               'Could not detect subject',
               `${formatApiError(
-                autoCreateErr
-              )} Please select your subject manually.`
+                autoCreateErr,
+              )} Please select your subject manually.`,
             );
             setShowSubjectPicker(true);
           }
@@ -252,7 +252,7 @@ export default function CameraScreen(): React.ReactNode {
         });
         platformAlert(
           "Couldn't identify the subject",
-          `${formatApiError(err)} Please pick the subject manually.`
+          `${formatApiError(err)} Please pick the subject manually.`,
         );
         setShowSubjectPicker(true);
       }
@@ -272,7 +272,7 @@ export default function CameraScreen(): React.ReactNode {
       console.error('[HomeworkCamera] Failed to capture photo:', error);
       platformAlert(
         'Could not take photo',
-        'Please try again. If the problem continues, try importing from your gallery instead.'
+        'Please try again. If the problem continues, try importing from your gallery instead.',
       );
     }
   }, []);
@@ -293,7 +293,7 @@ export default function CameraScreen(): React.ReactNode {
       if (!selectedImage?.uri) {
         platformAlert(
           "Couldn't open your photos",
-          'Please try again or use the camera instead.'
+          'Please try again or use the camera instead.',
         );
         return;
       }
@@ -321,14 +321,14 @@ export default function CameraScreen(): React.ReactNode {
                 void Linking.openSettings();
               },
             },
-          ]
+          ],
         );
         return;
       }
 
       platformAlert(
         "Couldn't open your photos",
-        'Please try again or use the camera instead.'
+        'Please try again or use the camera instead.',
       );
     }
   }, []);
@@ -365,7 +365,7 @@ export default function CameraScreen(): React.ReactNode {
       problems?: HomeworkProblem[],
       imageUri?: string,
       sourceOcrText?: string,
-      captureSource?: HomeworkCaptureSource
+      captureSource?: HomeworkCaptureSource,
     ) => {
       const MAX_PARAM_LENGTH = 8000; // safe URL param budget
 
@@ -396,12 +396,12 @@ export default function CameraScreen(): React.ReactNode {
               problem.text.length - (serialized.length - MAX_PARAM_LENGTH) - 30;
             const wordBoundary = problem.text.lastIndexOf(
               ' ',
-              Math.max(0, maxTextLen)
+              Math.max(0, maxTextLen),
             );
             const truncatedText =
               problem.text.slice(
                 0,
-                wordBoundary > 0 ? wordBoundary : maxTextLen
+                wordBoundary > 0 ? wordBoundary : maxTextLen,
               ) + ' [truncated]';
             truncatedProblems = [{ ...problem, text: truncatedText }];
             serialized = serializeHomeworkProblems(truncatedProblems);
@@ -456,7 +456,7 @@ export default function CameraScreen(): React.ReactNode {
         },
       } as never);
     },
-    [imageMimeType, returnTo, router]
+    [imageMimeType, returnTo, router],
   );
 
   const handleConfirmResult = useCallback(() => {
@@ -466,14 +466,14 @@ export default function CameraScreen(): React.ReactNode {
     if (!combinedProblemText.trim()) {
       platformAlert(
         'No problems found',
-        'Please keep at least one problem card.'
+        'Please keep at least one problem card.',
       );
       return;
     }
     if (!effectiveSubjectId) {
       platformAlert(
         'No subject selected',
-        'Please go back and select a subject first.'
+        'Please go back and select a subject first.',
       );
       return;
     }
@@ -484,7 +484,7 @@ export default function CameraScreen(): React.ReactNode {
       draftProblems,
       state.imageUri ?? undefined,
       ocrText,
-      homeworkCaptureSource
+      homeworkCaptureSource,
     );
   }, [
     navigateToSession,
@@ -507,7 +507,7 @@ export default function CameraScreen(): React.ReactNode {
         draftProblems,
         state.imageUri ?? undefined,
         ocrText,
-        homeworkCaptureSource
+        homeworkCaptureSource,
       );
     },
     [
@@ -517,7 +517,7 @@ export default function CameraScreen(): React.ReactNode {
       state.imageUri,
       ocrText,
       homeworkCaptureSource,
-    ]
+    ],
   );
 
   const handleManualSubjectContinue = useCallback(async () => {
@@ -525,7 +525,8 @@ export default function CameraScreen(): React.ReactNode {
     if (!typedName) return;
 
     const existingSubject = subjects?.find(
-      (subject) => subject.name.trim().toLowerCase() === typedName.toLowerCase()
+      (subject) =>
+        subject.name.trim().toLowerCase() === typedName.toLowerCase(),
     );
     if (existingSubject) {
       navigateToSession(
@@ -535,7 +536,7 @@ export default function CameraScreen(): React.ReactNode {
         draftProblems,
         state.imageUri ?? undefined,
         ocrText,
-        homeworkCaptureSource
+        homeworkCaptureSource,
       );
       return;
     }
@@ -552,7 +553,7 @@ export default function CameraScreen(): React.ReactNode {
         draftProblems,
         state.imageUri ?? undefined,
         ocrText,
-        homeworkCaptureSource
+        homeworkCaptureSource,
       );
     } catch (err: unknown) {
       platformAlert('Could not create subject', formatApiError(err));
@@ -578,7 +579,7 @@ export default function CameraScreen(): React.ReactNode {
         undefined,
         undefined,
         undefined,
-        homeworkCaptureSource
+        homeworkCaptureSource,
       );
       return;
     }
@@ -595,7 +596,7 @@ export default function CameraScreen(): React.ReactNode {
             undefined,
             undefined,
             undefined,
-            homeworkCaptureSource
+            homeworkCaptureSource,
           );
         }
       } else {
@@ -611,7 +612,7 @@ export default function CameraScreen(): React.ReactNode {
       platformAlert(
         'Could not identify the subject',
         'Please pick the subject this homework belongs to.',
-        [{ text: t('common.ok') }]
+        [{ text: t('common.ok') }],
       );
       setShowSubjectPicker(true);
     }
@@ -634,10 +635,10 @@ export default function CameraScreen(): React.ReactNode {
         undefined,
         undefined,
         undefined,
-        homeworkCaptureSource
+        homeworkCaptureSource,
       );
     },
-    [navigateToSession, manualText, homeworkCaptureSource]
+    [navigateToSession, manualText, homeworkCaptureSource],
   );
 
   const handleClose = useCallback(() => {
@@ -652,11 +653,11 @@ export default function CameraScreen(): React.ReactNode {
     (problemId: string, text: string) => {
       setDraftProblems((prev) =>
         prev.map((problem) =>
-          problem.id === problemId ? { ...problem, text } : problem
-        )
+          problem.id === problemId ? { ...problem, text } : problem,
+        ),
       );
     },
-    []
+    [],
   );
 
   const handleAddProblem = useCallback(() => {
@@ -674,7 +675,7 @@ export default function CameraScreen(): React.ReactNode {
 
   const handleRemoveProblem = useCallback((problemId: string) => {
     setDraftProblems((prev) =>
-      prev.filter((problem) => problem.id !== problemId)
+      prev.filter((problem) => problem.id !== problemId),
     );
   }, []);
 
@@ -1151,7 +1152,7 @@ export default function CameraScreen(): React.ReactNode {
                   onPress={() =>
                     handlePickSubject(
                       candidate.subjectId,
-                      candidate.subjectName
+                      candidate.subjectName,
                     )
                   }
                   className={`rounded-button py-3 px-4 mb-2 min-h-[48px] justify-center ${
@@ -1175,8 +1176,8 @@ export default function CameraScreen(): React.ReactNode {
               ?.filter(
                 (s) =>
                   !classifyMutation.data?.candidates?.some(
-                    (c) => c != null && c.subjectId === s.id
-                  )
+                    (c) => c != null && c.subjectId === s.id,
+                  ),
               )
               .map((s) => (
                 <Pressable
@@ -1392,7 +1393,7 @@ export default function CameraScreen(): React.ReactNode {
                           onPress={() => router.push('/create-subject')}
                           className="bg-primary rounded-button py-3 px-4 min-h-[48px] items-center justify-center"
                           accessibilityLabel={t(
-                            'homework.createNewSubjectLabel'
+                            'homework.createNewSubjectLabel',
                           )}
                           accessibilityRole="button"
                         >

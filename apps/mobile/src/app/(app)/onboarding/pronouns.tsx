@@ -75,11 +75,11 @@ export default function PronounsScreen(): React.ReactElement {
 
   const [choice, setChoice] = useState<Choice>(initialChoice);
   const [customPronouns, setCustomPronouns] = useState(
-    initialChoice === OTHER_KEY ? activeProfile?.pronouns ?? '' : ''
+    initialChoice === OTHER_KEY ? (activeProfile?.pronouns ?? '') : '',
   );
   const updatePronouns = useUpdatePronouns();
   const startFirstCurriculumSession = useStartFirstCurriculumSession(
-    subjectId ?? ''
+    subjectId ?? '',
   );
 
   const navigateForward = useCallback(() => {
@@ -109,7 +109,7 @@ export default function PronounsScreen(): React.ReactElement {
         onError: () => {
           goBackOrReplace(router, '/(app)/home' as const);
         },
-      }
+      },
     );
   }, [returnTo, router, subjectId, subjectName, startFirstCurriculumSession]);
 
@@ -135,7 +135,7 @@ export default function PronounsScreen(): React.ReactElement {
         // Skip is non-blocking — if the clear fails, still move forward
         // rather than trapping the user.
         onError: navigateForward,
-      }
+      },
     );
   }, [updatePronouns, navigateForward]);
 
@@ -161,10 +161,10 @@ export default function PronounsScreen(): React.ReactElement {
         onError: () => {
           platformAlert(
             t('onboarding.pronouns.saveErrorTitle'),
-            t('onboarding.pronouns.saveErrorMessage')
+            t('onboarding.pronouns.saveErrorMessage'),
           );
         },
-      }
+      },
     );
   }, [effectivePronouns, updatePronouns, navigateForward, t]);
 

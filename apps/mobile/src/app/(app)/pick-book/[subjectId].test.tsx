@@ -190,9 +190,12 @@ describe('PickBookScreen', () => {
 
     // 3000ms allows for the 800ms useStickyLoading hold plus React re-render
     // overhead that accumulates after prior tests in this file.
-    await waitFor(() => {
-      getByText('Europe');
-    }, { timeout: 3000 });
+    await waitFor(
+      () => {
+        getByText('Europe');
+      },
+      { timeout: 3000 },
+    );
     fireEvent.press(getByText('Europe'));
 
     await waitFor(() => {

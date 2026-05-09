@@ -134,7 +134,7 @@ const PRO_TIER_ENTRY: { tier: SubscriptionTier; features: string[] } = {
 };
 
 function getTiersToCompare(
-  currentTier: SubscriptionTier
+  currentTier: SubscriptionTier,
 ): Array<{ tier: SubscriptionTier; features: string[] }> {
   if (currentTier === 'family') {
     return [...TIER_FEATURES, FAMILY_TIER_ENTRY];
@@ -236,7 +236,7 @@ function isNetworkError(error: unknown): boolean {
  * CustomerInfo, or null if no entitlement is active.
  */
 function getActiveEntitlement(
-  customerInfo: CustomerInfo | null | undefined
+  customerInfo: CustomerInfo | null | undefined,
 ): string | null {
   if (!customerInfo) return null;
   const activeEntitlements = customerInfo.entitlements.active;
@@ -254,7 +254,7 @@ async function openSubscriptionManagement(): Promise<void> {
     await Linking.openURL('https://apps.apple.com/account/subscriptions');
   } else {
     await Linking.openURL(
-      'https://play.google.com/store/account/subscriptions'
+      'https://play.google.com/store/account/subscriptions',
     );
   }
 }
@@ -385,12 +385,12 @@ function ChildPaywall(): React.ReactElement {
         // Step 1: migrate legacy key → new key (no-ops if already migrated)
         await migrateSecureStoreKey(
           getLegacyNotifyStorageKey(profileId),
-          getNotifyStorageKey(profileId)
+          getNotifyStorageKey(profileId),
         );
         if (cancelled) return;
         // Step 2: restore persisted notified timestamp
         const value = await SecureStore.getItemAsync(
-          getNotifyStorageKey(profileId)
+          getNotifyStorageKey(profileId),
         );
         if (cancelled) return;
         if (!value) return;
@@ -446,7 +446,7 @@ function ChildPaywall(): React.ReactElement {
         if (profileId) {
           void SecureStore.setItemAsync(
             getNotifyStorageKey(profileId),
-            String(now)
+            String(now),
           ).catch(() => undefined);
         }
       } else if (result.sent) {
@@ -455,20 +455,20 @@ function ChildPaywall(): React.ReactElement {
         if (profileId) {
           void SecureStore.setItemAsync(
             getNotifyStorageKey(profileId),
-            String(now)
+            String(now),
           ).catch(() => undefined);
         }
         platformAlert('Sent!', 'We let your parent know!');
       } else {
         platformAlert(
           'Ask your parent',
-          'Ask your parent to open the app and subscribe.'
+          'Ask your parent to open the app and subscribe.',
         );
       }
     } catch {
       platformAlert(
         'Could not send notification',
-        'Please check your connection and try again.'
+        'Please check your connection and try again.',
       );
     }
   }, [notifyParent, profileId]);
@@ -728,7 +728,7 @@ function SubscriptionContent(): React.ReactElement {
     } catch {
       platformAlert(
         'Restore failed',
-        'Could not restore purchases. Please try again.'
+        'Could not restore purchases. Please try again.',
       );
       return;
     }
@@ -777,7 +777,7 @@ function SubscriptionContent(): React.ReactElement {
       await refetchUsage();
       platformAlert(
         t('subscription.alerts.restoredTitle'),
-        t('subscription.alerts.restoredBody')
+        t('subscription.alerts.restoredBody'),
       );
     } else {
       platformAlert(
@@ -791,7 +791,7 @@ function SubscriptionContent(): React.ReactElement {
             },
           },
           { text: t('common.ok'), style: 'cancel' },
-        ]
+        ],
       );
     }
   }, [
@@ -829,20 +829,20 @@ function SubscriptionContent(): React.ReactElement {
                 onPress: () => void handleRestore(),
               },
               { text: 'Cancel', style: 'cancel' },
-            ]
+            ],
           );
           return;
         }
         if (isNetworkError(error)) {
           platformAlert(
             'Network error',
-            'Please check your internet connection and try again.'
+            'Please check your internet connection and try again.',
           );
           return;
         }
         platformAlert(
           'Purchase failed',
-          'Something unexpected happened with your purchase. Please try again.'
+          'Something unexpected happened with your purchase. Please try again.',
         );
         return;
       }
@@ -891,13 +891,13 @@ function SubscriptionContent(): React.ReactElement {
       if (confirmed) {
         platformAlert(
           t('subscription.alerts.successTitle'),
-          t('subscription.alerts.successBody')
+          t('subscription.alerts.successBody'),
         );
       } else {
         platformAlert(
           t('subscription.alerts.purchaseConfirmedTitle'),
           t('subscription.alerts.purchaseConfirmedBody'),
-          [{ text: t('common.ok') }]
+          [{ text: t('common.ok') }],
         );
       }
     },
@@ -910,7 +910,7 @@ function SubscriptionContent(): React.ReactElement {
       activeProfile?.id,
       client,
       t,
-    ]
+    ],
   );
 
   // ---------------------------------------------------------------------------
@@ -939,7 +939,7 @@ function SubscriptionContent(): React.ReactElement {
             },
           },
           { text: t('common.ok'), style: 'cancel' },
-        ]
+        ],
       );
     }
   }, [t]);
@@ -965,7 +965,7 @@ function SubscriptionContent(): React.ReactElement {
             },
           },
           { text: t('common.ok'), style: 'cancel' },
-        ]
+        ],
       );
       return;
     }
@@ -974,7 +974,7 @@ function SubscriptionContent(): React.ReactElement {
     // RevenueCat consumables can be in a separate offering or as a non-subscription package
     const topUpOffering = offerings.all?.['top_up'] ?? offerings.current;
     const topUpPkg = topUpOffering?.availablePackages.find((p) =>
-      isTopUpPackage(p)
+      isTopUpPackage(p),
     );
 
     if (!topUpPkg) {
@@ -989,7 +989,7 @@ function SubscriptionContent(): React.ReactElement {
             },
           },
           { text: t('common.ok'), style: 'cancel' },
-        ]
+        ],
       );
       return;
     }
@@ -1006,13 +1006,13 @@ function SubscriptionContent(): React.ReactElement {
       if (isNetworkError(error)) {
         platformAlert(
           'Network error',
-          'Please check your internet connection and try again.'
+          'Please check your internet connection and try again.',
         );
         return;
       }
       platformAlert(
         'Purchase failed',
-        'Something unexpected happened with your purchase. Please try again.'
+        'Something unexpected happened with your purchase. Please try again.',
       );
       return;
     }
@@ -1025,7 +1025,7 @@ function SubscriptionContent(): React.ReactElement {
     const messageTimer = setTimeout(() => {
       if (mountedRef.current) {
         setPollMessage(
-          'Still confirming \u2014 this can take up to 30 seconds. Your purchase is safe.'
+          'Still confirming \u2014 this can take up to 30 seconds. Your purchase is safe.',
         );
       }
     }, 10_000);
@@ -1070,13 +1070,13 @@ function SubscriptionContent(): React.ReactElement {
     if (confirmed) {
       platformAlert(
         t('subscription.alerts.topUpTitle'),
-        t('subscription.alerts.topUpBody')
+        t('subscription.alerts.topUpBody'),
       );
     } else {
       platformAlert(
         'Purchase confirmed',
         'Your 500 credits are being added. They usually appear within a minute \u2014 pull down to refresh your usage.',
-        [{ text: t('common.ok') }]
+        [{ text: t('common.ok') }],
       );
     }
   }, [
@@ -1095,12 +1095,12 @@ function SubscriptionContent(): React.ReactElement {
   const handleContactSupport = useCallback(async () => {
     try {
       await Linking.openURL(
-        'mailto:support@mentomate.app?subject=Subscription%20Help'
+        'mailto:support@mentomate.app?subject=Subscription%20Help',
       );
     } catch {
       platformAlert(
         'Contact support',
-        'Email support@mentomate.app for help with subscriptions.'
+        'Email support@mentomate.app for help with subscriptions.',
       );
     }
   }, []);
@@ -1126,18 +1126,18 @@ function SubscriptionContent(): React.ReactElement {
                   ]);
                   platformAlert(
                     'Family updated',
-                    `${displayName} was removed from your family plan.`
+                    `${displayName} was removed from your family plan.`,
                   );
                 } catch {
                   platformAlert(
                     'Could not remove profile',
-                    'Please check your connection and try again.'
+                    'Please check your connection and try again.',
                   );
                 }
               })();
             },
           },
-        ]
+        ],
       );
     },
     [
@@ -1146,7 +1146,7 @@ function SubscriptionContent(): React.ReactElement {
       refetchUsage,
       removeFamilyProfile,
       t,
-    ]
+    ],
   );
 
   // ---------------------------------------------------------------------------
@@ -1158,7 +1158,7 @@ function SubscriptionContent(): React.ReactElement {
       await byokWaitlist.mutateAsync();
       setByokJoined(true);
       void SecureStore.setItemAsync(BYOK_JOINED_KEY, 'true').catch(
-        () => undefined
+        () => undefined,
       );
       platformAlert('Waitlist', 'You have been added to the BYOK waitlist.');
     } catch {
@@ -1195,7 +1195,7 @@ function SubscriptionContent(): React.ReactElement {
   const currentOffering: PurchasesOffering | null = offerings?.current ?? null;
   const availablePackages = currentOffering?.availablePackages ?? [];
   const subscriptionPackages = availablePackages.filter(
-    (pkg) => !isTopUpPackage(pkg)
+    (pkg) => !isTopUpPackage(pkg),
   );
 
   return (
@@ -1287,7 +1287,7 @@ function SubscriptionContent(): React.ReactElement {
                         year: 'numeric',
                         month: 'long',
                         day: 'numeric',
-                      }
+                      },
                     ),
                   })}
                 </Text>
@@ -1312,12 +1312,12 @@ function SubscriptionContent(): React.ReactElement {
                   {cancelAtPeriodEnd
                     ? 'Cancelling'
                     : status === 'past_due'
-                    ? 'Past due'
-                    : status === 'expired'
-                    ? 'Expired'
-                    : status === 'trial'
-                    ? t('subscription.statusBadge.trial')
-                    : 'Active'}
+                      ? 'Past due'
+                      : status === 'expired'
+                        ? 'Expired'
+                        : status === 'trial'
+                          ? t('subscription.statusBadge.trial')
+                          : 'Active'}
                 </Text>
               </View>
             </View>
@@ -1328,14 +1328,14 @@ function SubscriptionContent(): React.ReactElement {
               <Text className="text-caption text-text-secondary mt-1">
                 {cancelAtPeriodEnd
                   ? `Access until ${new Date(
-                      subscription.currentPeriodEnd
+                      subscription.currentPeriodEnd,
                     ).toLocaleDateString(undefined, {
                       year: 'numeric',
                       month: 'long',
                       day: 'numeric',
                     })}`
                   : `Renews ${new Date(
-                      subscription.currentPeriodEnd
+                      subscription.currentPeriodEnd,
                     ).toLocaleDateString(undefined, {
                       year: 'numeric',
                       month: 'long',
@@ -1386,7 +1386,7 @@ function SubscriptionContent(): React.ReactElement {
                 features until{' '}
                 {new Date(subscription.currentPeriodEnd).toLocaleDateString(
                   undefined,
-                  { year: 'numeric', month: 'long', day: 'numeric' }
+                  { year: 'numeric', month: 'long', day: 'numeric' },
                 )}
                 . After that, your account will revert to the Free tier.
               </Text>
@@ -1437,8 +1437,8 @@ function SubscriptionContent(): React.ReactElement {
                             {row.is_self && activeProfile?.isOwner
                               ? 'Your share'
                               : row.is_self
-                              ? 'Your usage'
-                              : row.name}
+                                ? 'Your usage'
+                                : row.name}
                           </Text>
                           <Text className="text-caption font-semibold text-text-primary">
                             {row.used} questions
@@ -1470,7 +1470,7 @@ function SubscriptionContent(): React.ReactElement {
                           year: 'numeric',
                           month: 'long',
                           day: 'numeric',
-                        }
+                        },
                       )}
                   </Text>
                   {usage.renewsAtLabel ? (
@@ -1534,7 +1534,7 @@ function SubscriptionContent(): React.ReactElement {
                           onPress={() =>
                             handleRemoveFamilyProfile(
                               member.profileId,
-                              member.displayName
+                              member.displayName,
                             )
                           }
                           disabled={removeFamilyProfile.isPending}
@@ -1573,7 +1573,7 @@ function SubscriptionContent(): React.ReactElement {
                 const isCurrentPlan =
                   hasActiveSubscription &&
                   customerInfo?.activeSubscriptions.includes(
-                    pkg.product.identifier
+                    pkg.product.identifier,
                   ) === true;
                 return (
                   <PackageOption
@@ -1717,7 +1717,7 @@ function SubscriptionContent(): React.ReactElement {
                   setRestorePolling(false);
                   platformAlert(
                     'Restore cancelled',
-                    'Restore will continue in background.'
+                    'Restore will continue in background.',
                   );
                 }}
                 className="mt-2 items-center py-2"
@@ -1774,7 +1774,7 @@ function SubscriptionContent(): React.ReactElement {
                     setTopUpPolling(false);
                     platformAlert(
                       'Check later',
-                      'Credits will appear shortly — tap refresh to check.'
+                      'Credits will appear shortly — tap refresh to check.',
                     );
                   }}
                   className="mt-2 items-center py-2"

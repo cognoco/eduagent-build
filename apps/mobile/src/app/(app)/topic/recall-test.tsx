@@ -81,14 +81,14 @@ export default function RecallTestScreen() {
                 setIsStreaming,
                 () => {
                   setInputDisabled(true);
-                }
+                },
               );
             } else if (result.failureAction === 'feedback_only') {
               // Under 3 failures — encourage retry
               cleanupRef.current = animateResponse(
                 "Not quite there yet, but that's okay! Think about the key concepts and try explaining again. What stands out most to you?",
                 setMessages,
-                setIsStreaming
+                setIsStreaming,
               );
             } else if (result.failureAction === 'redirect_to_library') {
               // 3+ failures — show remediation card
@@ -102,10 +102,10 @@ export default function RecallTestScreen() {
                     failureCount: result.failureCount,
                     cooldownEndsAt: result.remediation?.cooldownEndsAt,
                     retentionStatus: deriveStatus(
-                      result.remediation?.retentionStatus
+                      result.remediation?.retentionStatus,
                     ),
                   });
-                }
+                },
               );
             }
           },
@@ -113,13 +113,13 @@ export default function RecallTestScreen() {
             // UX-DE-L8: error is not an AI reply
             platformAlert(
               t('topic.recallTest.errorTitle'),
-              classifyApiError(err).message
+              classifyApiError(err).message,
             );
           },
-        }
+        },
       );
     },
-    [topicId, submitRecallTest, t]
+    [topicId, submitRecallTest, t],
   );
 
   const handleReviewRetest = useCallback(() => {
@@ -169,10 +169,10 @@ export default function RecallTestScreen() {
                   failureCount: result.failureCount,
                   cooldownEndsAt: result.remediation?.cooldownEndsAt,
                   retentionStatus: deriveStatus(
-                    result.remediation?.retentionStatus
+                    result.remediation?.retentionStatus,
                   ),
                 });
-              }
+              },
             );
             return;
           }
@@ -180,7 +180,7 @@ export default function RecallTestScreen() {
           cleanupRef.current = animateResponse(
             result.hint ?? DONT_REMEMBER_FALLBACK_HINT,
             setMessages,
-            setIsStreaming
+            setIsStreaming,
           );
         },
         onError: (err: Error) => {
@@ -188,10 +188,10 @@ export default function RecallTestScreen() {
           // UX-DE-L8: error is not an AI reply
           platformAlert(
             t('topic.recallTest.errorTitle'),
-            classifyApiError(err).message
+            classifyApiError(err).message,
           );
         },
-      }
+      },
     );
   }, [dontRememberCount, submitRecallTest, topicId, t]);
 

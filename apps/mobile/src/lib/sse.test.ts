@@ -70,7 +70,7 @@ describe('parseSSEStream', () => {
   it('throws when response body is null', async () => {
     const gen = parseSSEStream(mockResponse(null));
     await expect(gen.next()).rejects.toThrow(
-      'Response body is null — streaming not supported'
+      'Response body is null — streaming not supported',
     );
   });
 
@@ -343,7 +343,7 @@ function installFakeXhr(): FakeXhrInstance {
     },
   };
   (global as unknown as { XMLHttpRequest: unknown }).XMLHttpRequest = jest.fn(
-    () => instance
+    () => instance,
   ) as unknown;
   return instance;
 }
@@ -452,7 +452,7 @@ describe('streamSSEViaXHR', () => {
 
     xhr._emitError(
       401,
-      JSON.stringify({ message: 'Session expired — please sign in again' })
+      JSON.stringify({ message: 'Session expired — please sign in again' }),
     );
 
     let caught: unknown = null;
