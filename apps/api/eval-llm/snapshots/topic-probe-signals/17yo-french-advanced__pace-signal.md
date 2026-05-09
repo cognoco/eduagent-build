@@ -85,18 +85,3 @@ USER: Full picture, but organized.
 ## Builder notes
 
 - Dimension: pace-signal
-
-## Live LLM response
-
-```
-```json
-{
-  "goals": ["understand L'Étranger"],
-  "experienceLevel": "beginner",
-  "currentKnowledge": "The user has not stated what they know about the topic.",
-  "interests": [],
-  "interestContext": {},
-  "analogyFraming": "concrete"
-}
-```
-```

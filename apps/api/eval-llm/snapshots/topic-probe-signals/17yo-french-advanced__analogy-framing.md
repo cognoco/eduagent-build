@@ -85,18 +85,3 @@ USER: Anything around music.
 ## Builder notes
 
 - Dimension: analogy-framing
-
-## Live LLM response
-
-```
-```json
-{
-  "goals": [],
-  "experienceLevel": "beginner",
-  "currentKnowledge": "",
-  "interests": ["music"],
-  "interestContext": { "music": "both" },
-  "analogyFraming": "concrete"
-}
-```
-```

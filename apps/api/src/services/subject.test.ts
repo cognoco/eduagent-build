@@ -37,7 +37,7 @@ function mockSubjectRow(
     rawInput: string | null;
     status: 'active' | 'paused' | 'archived';
     updatedAt: Date;
-  }>
+  }>,
 ) {
   return {
     id: overrides?.id ?? 'subject-1',
@@ -69,7 +69,7 @@ function mockBookRow(
     title: string;
     description: string | null;
     topicsGenerated: boolean;
-  }>
+  }>,
 ) {
   return {
     id: overrides?.id ?? uuidBookId,
@@ -87,8 +87,18 @@ function mockBookRow(
 function createMockDb({
   insertReturning = [] as ReturnType<typeof mockSubjectRow>[],
   updateReturning = [] as ReturnType<typeof mockSubjectRow>[],
+  readyBook = null as ReturnType<typeof mockBookRow> | null,
+  bookSuggestion = null as { id: string } | null,
 } = {}): Database {
   return {
+    query: {
+      curriculumBooks: {
+        findFirst: jest.fn().mockResolvedValue(readyBook),
+      },
+      bookSuggestions: {
+        findFirst: jest.fn().mockResolvedValue(bookSuggestion),
+      },
+    },
     insert: jest.fn().mockReturnValue({
       values: jest.fn().mockReturnValue({
         returning: jest.fn().mockResolvedValue(insertReturning),
@@ -130,13 +140,43 @@ describe('listSubjects', () => {
       mockSubjectRow({ id: 's2', name: 'Science' }),
     ];
     setupScopedRepo({ findManyResult: rows });
-    const db = createMockDb();
+    const db = createMockDb({ readyBook: mockBookRow() });
     const result = await listSubjects(db, profileId);
 
     expect(result).toHaveLength(2);
     expect(result[0].name).toBe('Math');
     expect(result[1].name).toBe('Science');
+    expect(result[0].curriculumStatus).toBe('ready');
+    expect(result[1].curriculumStatus).toBe('ready');
     expect(result[0].createdAt).toBe('2025-01-15T10:00:00.000Z');
+  });
+
+  it('marks active subjects as preparing when no generated books or suggestions exist', async () => {
+    setupScopedRepo({
+      findManyResult: [mockSubjectRow({ id: 'subject-preparing' })],
+    });
+    const db = createMockDb();
+
+    const result = await listSubjects(db, profileId);
+
+    expect(result[0]).toMatchObject({
+      id: 'subject-preparing',
+      curriculumStatus: 'preparing',
+    });
+  });
+
+  it('marks broad subjects with book suggestions as ready for picking', async () => {
+    setupScopedRepo({
+      findManyResult: [mockSubjectRow({ id: 'subject-broad' })],
+    });
+    const db = createMockDb({ bookSuggestion: { id: 'suggestion-1' } });
+
+    const result = await listSubjects(db, profileId);
+
+    expect(result[0]).toMatchObject({
+      id: 'subject-broad',
+      curriculumStatus: 'ready',
+    });
   });
 
   it('filters by active status by default', async () => {
@@ -242,6 +282,7 @@ describe('createSubjectWithStructure focused_book prewarm', () => {
   function createFocusedBookDb(options?: {
     subjectRow?: ReturnType<typeof mockSubjectRow>;
     existingBook?: ReturnType<typeof mockBookRow> | null;
+    existingBooks?: ReturnType<typeof mockBookRow>[];
     insertedBook?: ReturnType<typeof mockBookRow>;
   }): Database {
     const subjectRow =
@@ -261,6 +302,7 @@ describe('createSubjectWithStructure focused_book prewarm', () => {
         },
         curriculumBooks: {
           findFirst: jest.fn().mockResolvedValue(options?.existingBook ?? null),
+          findMany: jest.fn().mockResolvedValue(options?.existingBooks ?? []),
         },
       },
       select: jest.fn().mockReturnValue({
@@ -272,7 +314,7 @@ describe('createSubjectWithStructure focused_book prewarm', () => {
           returning: jest
             .fn()
             .mockResolvedValue(
-              'title' in values ? [insertedBook] : [subjectRow]
+              'title' in values ? [insertedBook] : [subjectRow],
             ),
           onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
         })),
@@ -341,6 +383,39 @@ describe('createSubjectWithStructure focused_book prewarm', () => {
         version: 1,
         subjectId: uuidSubjectId,
         profileId: uuidProfileId,
+        bookId: uuidExistingBookId,
+      }),
+    });
+  });
+
+  it('reuses a near-duplicate existing focused book title', async () => {
+    const subjectRow = mockSubjectRow({
+      id: uuidSubjectId,
+      profileId: uuidProfileId,
+      name: 'Ancient History',
+    });
+    const nearDuplicateBook = mockBookRow({
+      id: uuidExistingBookId,
+      title: 'Mesopotamia',
+    });
+    setupScopedRepo({ findManyResult: [subjectRow] });
+    const db = createFocusedBookDb({
+      subjectRow,
+      existingBook: null,
+      existingBooks: [nearDuplicateBook],
+    });
+
+    const result = await createSubjectWithStructure(db, uuidProfileId, {
+      name: 'Ancient History',
+      focus: 'Mesopotania',
+    });
+
+    expect(result.bookId).toBe(uuidExistingBookId);
+    expect(result.bookTitle).toBe('Mesopotamia');
+    expect(db.insert).not.toHaveBeenCalledWith(expect.anything());
+    expect(sendSpy).toHaveBeenCalledWith({
+      name: 'app/subject.curriculum-prewarm-requested',
+      data: expect.objectContaining({
         bookId: uuidExistingBookId,
       }),
     });

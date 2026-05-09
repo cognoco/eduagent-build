@@ -85,18 +85,3 @@ USER: Use French literature if it fits.
 ## Builder notes
 
 - Dimension: interest-context
-
-## Live LLM response
-
-```
-```json
-{
-  "goals": ["Learn Camus — L'Étranger"],
-  "experienceLevel": "intermediate",
-  "currentKnowledge": "Some familiarity with French literature",
-  "interests": ["French literature"],
-  "interestContext": { "French literature": "both" },
-  "analogyFraming": "concrete"
-}
-```
-```

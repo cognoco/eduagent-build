@@ -85,18 +85,3 @@ USER: Full picture, but organized.
 ## Builder notes
 
 - Dimension: pace-signal
-
-## Live LLM response
-
-```
-```json
-{
-  "goals": ["Learn a detailed and organized overview of Spanish present tense verbs"],
-  "experienceLevel": "beginner",
-  "currentKnowledge": "",
-  "interests": [],
-  "interestContext": {},
-  "analogyFraming": "concrete"
-}
-```
-```

@@ -85,18 +85,3 @@ USER: Full picture, but organized.
 ## Builder notes
 
 - Dimension: pace-signal
-
-## Live LLM response
-
-```
-```json
-{
-  "goals": ["understand Czech reading comprehension"],
-  "experienceLevel": "beginner",
-  "currentKnowledge": "None explicitly stated, but indicates a need for detailed, organized information.",
-  "interests": [],
-  "interestContext": {},
-  "analogyFraming": "concrete"
-}
-```
-```

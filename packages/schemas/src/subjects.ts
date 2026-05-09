@@ -18,6 +18,11 @@ const isoDateField = z.union([
 export const subjectStatusSchema = z.enum(['active', 'paused', 'archived']);
 export type SubjectStatus = z.infer<typeof subjectStatusSchema>;
 
+export const subjectCurriculumStatusSchema = z.enum(['ready', 'preparing']);
+export type SubjectCurriculumStatus = z.infer<
+  typeof subjectCurriculumStatusSchema
+>;
+
 export const topicRelevanceSchema = z.enum([
   'core',
   'recommended',
@@ -55,6 +60,7 @@ export const subjectSchema = z.object({
   name: z.string(),
   rawInput: z.string().nullable().optional(),
   status: subjectStatusSchema,
+  curriculumStatus: subjectCurriculumStatusSchema.optional(),
   pedagogyMode: pedagogyModeSchema,
   languageCode: languageCodeSchema.nullable().optional(),
   createdAt: isoDateField,
@@ -187,8 +193,8 @@ export type CurriculumInput = z.infer<typeof curriculumInputSchema>;
 // Generated topic — LLM-generated topic before persistence
 
 export const generatedTopicSchema = z.object({
-  title: z.string(),
-  description: z.string(),
+  title: z.string().trim().min(1).max(200),
+  description: z.string().trim().min(1),
   relevance: topicRelevanceSchema,
   estimatedMinutes: z.number().int().min(5).max(240),
   cefrLevel: cefrLevelSchema.optional(),
@@ -199,17 +205,17 @@ export const generatedTopicSchema = z.object({
 export type GeneratedTopic = z.infer<typeof generatedTopicSchema>;
 
 export const generatedBookSchema = z.object({
-  title: z.string(),
-  description: z.string(),
-  emoji: z.string(),
+  title: z.string().trim().min(1).max(200),
+  description: z.string().trim().min(1),
+  emoji: z.string().trim().min(1),
   sortOrder: z.number().int(),
 });
 export type GeneratedBook = z.infer<typeof generatedBookSchema>;
 
 export const generatedBookTopicSchema = z.object({
-  title: z.string(),
-  description: z.string(),
-  chapter: z.string(),
+  title: z.string().trim().min(1).max(200),
+  description: z.string().trim().min(1),
+  chapter: z.string().trim().min(1).max(200),
   sortOrder: z.number().int(),
   estimatedMinutes: z.number().int().min(5).max(240),
 });
@@ -459,7 +465,7 @@ export const getAllProfileBooksResponseSchema = z.object({
       subjectId: z.string().uuid(),
       subjectName: z.string(),
       books: z.array(curriculumBookSchema),
-    })
+    }),
   ),
 });
 export type GetAllProfileBooksResponse = z.infer<

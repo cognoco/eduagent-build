@@ -85,18 +85,3 @@ USER: Anything around nature.
 ## Builder notes
 
 - Dimension: analogy-framing
-
-## Live LLM response
-
-```
-```json
-{
-  "goals": ["Understand Spanish present tense verbs"],
-  "experienceLevel": "beginner",
-  "currentKnowledge": "Not specified",
-  "interests": ["nature"],
-  "interestContext": { "nature": "free_time" },
-  "analogyFraming": "concrete"
-}
-```
-```

@@ -85,18 +85,3 @@ USER: Tiny.
 ## Builder notes
 
 - Dimension: pace-signal
-
-## Live LLM response
-
-```
-```json
-{
-  "goals": [],
-  "experienceLevel": "beginner",
-  "currentKnowledge": "",
-  "interests": [],
-  "interestContext": {},
-  "analogyFraming": "concrete"
-}
-```
-```

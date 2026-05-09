@@ -21,10 +21,15 @@ import type {
   SubjectCreateInput,
   SubjectUpdateInput,
   Subject,
+  SubjectCurriculumStatus,
   SubjectStructureType,
 } from '@eduagent/schemas';
 import { inngest } from '../inngest/client';
-import { ensureCurriculum, persistNarrowTopics } from './curriculum';
+import {
+  areEquivalentBookTitles,
+  ensureCurriculum,
+  persistNarrowTopics,
+} from './curriculum';
 import { detectLanguageSubject } from './language-detect';
 import {
   generateLanguageCurriculum,
@@ -56,18 +61,42 @@ const logger = createLogger();
 // Mapper — Drizzle Date → API ISO string
 // ---------------------------------------------------------------------------
 
-function mapSubjectRow(row: typeof subjects.$inferSelect): Subject {
+function mapSubjectRow(
+  row: typeof subjects.$inferSelect,
+  curriculumStatus?: SubjectCurriculumStatus,
+): Subject {
   return {
     id: row.id,
     profileId: row.profileId,
     name: row.name,
     rawInput: row.rawInput ?? null,
     status: row.status,
+    ...(curriculumStatus ? { curriculumStatus } : {}),
     pedagogyMode: row.pedagogyMode,
     languageCode: row.languageCode ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
+}
+
+async function getSubjectCurriculumStatus(
+  db: Database,
+  subjectId: string,
+): Promise<SubjectCurriculumStatus> {
+  const readyBook = await db.query.curriculumBooks.findFirst({
+    where: and(
+      eq(curriculumBooks.subjectId, subjectId),
+      eq(curriculumBooks.topicsGenerated, true),
+    ),
+  });
+  if (readyBook) return 'ready';
+
+  const bookSuggestion = await db.query.bookSuggestions.findFirst({
+    where: eq(bookSuggestions.subjectId, subjectId),
+  });
+  if (bookSuggestion) return 'ready';
+
+  return 'preparing';
 }
 
 async function dispatchCurriculumPrewarm(args: {
@@ -105,7 +134,7 @@ async function dispatchCurriculumPrewarm(args: {
 export async function listSubjects(
   db: Database,
   profileId: string,
-  options?: { includeInactive?: boolean }
+  options?: { includeInactive?: boolean },
 ): Promise<Subject[]> {
   const repo = createScopedRepository(db, profileId);
   const extraWhere = options?.includeInactive
@@ -115,13 +144,22 @@ export async function listSubjects(
   // Sort by most recently updated first — prevents arbitrary subject[0] picks
   // in freeform classifier fallback and Learn New "Continue with X" card
   rows.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
-  return rows.map(mapSubjectRow);
+  return Promise.all(
+    rows.map(async (row) =>
+      mapSubjectRow(
+        row,
+        row.status === 'active'
+          ? await getSubjectCurriculumStatus(db, row.id)
+          : undefined,
+      ),
+    ),
+  );
 }
 
 export async function createSubject(
   db: Database,
   profileId: string,
-  input: SubjectCreateInput
+  input: SubjectCreateInput,
 ): Promise<Subject> {
   const detectedLanguage =
     input.pedagogyMode === 'four_strands' && input.languageCode
@@ -162,14 +200,14 @@ export interface CreatedSubjectWithStructure {
 async function findExistingSubjectByName(
   db: Database,
   profileId: string,
-  name: string
+  name: string,
 ): Promise<Subject | null> {
   const repo = createScopedRepository(db, profileId);
   const rows = await repo.subjects.findMany(
     and(
       sql`LOWER(${subjects.name}) = LOWER(${name})`,
-      eq(subjects.status, 'active')
-    )
+      eq(subjects.status, 'active'),
+    ),
   );
   return rows.length > 0 && rows[0] ? mapSubjectRow(rows[0]) : null;
 }
@@ -177,7 +215,7 @@ async function findExistingSubjectByName(
 export async function createSubjectWithStructure(
   db: Database,
   profileId: string,
-  input: SubjectCreateInput
+  input: SubjectCreateInput,
 ): Promise<CreatedSubjectWithStructure> {
   // Server-side focus inference: if rawInput ("tea") differs from name ("Botany"),
   // the rawInput IS the focus even if the client didn't send it explicitly.
@@ -194,7 +232,7 @@ export async function createSubjectWithStructure(
     const existingSubject = await findExistingSubjectByName(
       db,
       profileId,
-      input.name
+      input.name,
     );
     const targetSubject =
       existingSubject ??
@@ -205,13 +243,22 @@ export async function createSubjectWithStructure(
 
     await ensureCurriculum(db, targetSubject.id);
 
-    // Check if a book with this focus already exists on the subject
-    const existingBook = await db.query.curriculumBooks.findFirst({
+    // Check if a book with this focus already exists on the subject.
+    // The second pass catches one-character LLM/user spelling drift such as
+    // "Mesopotania" beside "Mesopotamia" without merging short ambiguous names.
+    const exactExistingBook = await db.query.curriculumBooks.findFirst({
       where: and(
         eq(curriculumBooks.subjectId, targetSubject.id),
-        sql`LOWER(${curriculumBooks.title}) = LOWER(${effectiveFocus})`
+        sql`LOWER(${curriculumBooks.title}) = LOWER(${effectiveFocus})`,
       ),
     });
+    const existingBook =
+      exactExistingBook ??
+      (
+        await db.query.curriculumBooks.findMany({
+          where: eq(curriculumBooks.subjectId, targetSubject.id),
+        })
+      ).find((book) => areEquivalentBookTitles(book.title, effectiveFocus));
     if (existingBook) {
       if (!existingBook.topicsGenerated) {
         await dispatchCurriculumPrewarm({
@@ -274,7 +321,7 @@ export async function createSubjectWithStructure(
       db,
       subject.id,
       subject.languageCode,
-      'A1'
+      'A1',
     );
     return {
       subject,
@@ -326,7 +373,7 @@ export async function createSubjectWithStructure(
       '[createSubjectWithStructure] Falling back to narrow subject flow',
       {
         error: error instanceof Error ? error.message : String(error),
-      }
+      },
     );
   }
 
@@ -340,7 +387,7 @@ export async function createSubjectWithStructure(
 export async function getSubject(
   db: Database,
   profileId: string,
-  subjectId: string
+  subjectId: string,
 ): Promise<Subject | null> {
   const repo = createScopedRepository(db, profileId);
   const row = await repo.subjects.findFirst(eq(subjects.id, subjectId));
@@ -351,7 +398,7 @@ export async function configureLanguageSubject(
   db: Database,
   profileId: string,
   subjectId: string,
-  input: LanguageSetupInput
+  input: LanguageSetupInput,
 ): Promise<Subject> {
   const subject = await getSubject(db, profileId, subjectId);
   if (!subject) {
@@ -366,7 +413,7 @@ export async function configureLanguageSubject(
     db,
     subjectId,
     subject.languageCode,
-    input.startingLevel
+    input.startingLevel,
   );
 
   return subject;
@@ -376,7 +423,7 @@ export async function updateSubject(
   db: Database,
   profileId: string,
   subjectId: string,
-  input: SubjectUpdateInput
+  input: SubjectUpdateInput,
 ): Promise<Subject | null> {
   const rows = await db
     .update(subjects)
@@ -399,7 +446,7 @@ export async function updateSubject(
  */
 export async function archiveInactiveSubjects(
   db: Database,
-  cutoffDate: Date
+  cutoffDate: Date,
 ): Promise<{ id: string }[]> {
   const now = new Date();
 
@@ -411,8 +458,8 @@ export async function archiveInactiveSubjects(
     .where(
       and(
         sql`${learningSessions.lastActivityAt} >= ${cutoffDate}`,
-        gte(learningSessions.exchangeCount, 1)
-      )
+        gte(learningSessions.exchangeCount, 1),
+      ),
     )
     .groupBy(learningSessions.subjectId);
 
@@ -426,8 +473,8 @@ export async function archiveInactiveSubjects(
       and(
         eq(subjects.status, 'active'),
         sql`${subjects.createdAt} <= ${cutoffDate}`,
-        notInArray(subjects.id, recentlyActiveSubjectIds)
-      )
+        notInArray(subjects.id, recentlyActiveSubjectIds),
+      ),
     )
     .returning({ id: subjects.id });
 
