@@ -408,21 +408,32 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
           return { status: 'throttled', reason: 'dedup_24h', parentId };
         }
 
-        const result = await sendPushNotification(db, {
-          profileId: parentId,
-          title: 'Weekly learning progress',
-          body: childSummaries.join(' '),
-          type: 'weekly_progress',
+        const prefs = await db.query.notificationPreferences.findFirst({
+          where: eq(notificationPreferences.profileId, parentId),
+          columns: {
+            pushEnabled: true,
+            weeklyProgressPush: true,
+            weeklyProgressEmail: true,
+          },
         });
+        const shouldSendPush =
+          prefs == null || (prefs.pushEnabled && prefs.weeklyProgressPush);
+        const shouldSendEmail = prefs?.weeklyProgressEmail ?? true;
+
+        const pushResult = shouldSendPush
+          ? await sendPushNotification(db, {
+              profileId: parentId,
+              title: 'Weekly learning progress',
+              body: childSummaries.join(' '),
+              type: 'weekly_progress',
+            })
+          : null;
 
         // Email channel: send when weekly_progress_email = true AND parent has
         // accounts.email. Resend idempotency-key dedupes within 24h window so
         // Inngest step retries are safe.
-        const prefs = await db.query.notificationPreferences.findFirst({
-          where: eq(notificationPreferences.profileId, parentId),
-          columns: { weeklyProgressEmail: true },
-        });
-        if (prefs?.weeklyProgressEmail ?? true) {
+        let emailSent = false;
+        if (shouldSendEmail) {
           const parentProfile = await db.query.profiles.findFirst({
             where: eq(profiles.id, parentId),
             columns: { accountId: true },
@@ -441,10 +452,11 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
               childSummaries,
               struggleLines,
             );
-            await sendEmail(emailPayload, {
+            const emailResult = await sendEmail(emailPayload, {
               resendApiKey: getStepResendApiKey(),
               idempotencyKey: `weekly-${parentId}-${reportWeek}`,
             });
+            emailSent = emailResult.sent;
           } else {
             captureException(
               new Error('Weekly digest email skipped: parent has no email'),
@@ -454,7 +466,7 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
         }
 
         return {
-          status: result.sent ? 'completed' : 'throttled',
+          status: pushResult?.sent || emailSent ? 'completed' : 'throttled',
           parentId,
         };
       } catch (error) {

@@ -381,7 +381,10 @@ export function formatWeeklyProgressEmail(
     .map((sl) => {
       const topicLines = sl.topics
         .slice(0, 2)
-        .map((topic) => `You might want to keep an eye on **${topic}**.`)
+        .map(
+          (topic) =>
+            `${sl.childName}: You might want to keep an eye on **${topic}**.`,
+        )
         .join('\n');
       return topicLines;
     })
@@ -414,7 +417,10 @@ export function formatMonthlyProgressEmail(
     .map((sl) => {
       return sl.topics
         .slice(0, 2)
-        .map((topic) => `You might want to keep an eye on **${topic}**.`)
+        .map(
+          (topic) =>
+            `${sl.childName}: You might want to keep an eye on **${topic}**.`,
+        )
         .join('\n');
     })
     .join('\n\n');

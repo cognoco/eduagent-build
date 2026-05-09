@@ -196,6 +196,8 @@ function buildMockDb(
       },
       notificationPreferences: {
         findFirst: jest.fn().mockResolvedValue({
+          pushEnabled: true,
+          weeklyProgressPush: true,
           weeklyProgressEmail: dbState.weeklyProgressEmail,
           monthlyProgressEmail: dbState.monthlyProgressEmail,
         }),
@@ -363,6 +365,8 @@ describe('Email digest channel — weekly', () => {
       consentType: 'GDPR',
     });
     db.query.notificationPreferences.findFirst = jest.fn().mockResolvedValue({
+      pushEnabled: true,
+      weeklyProgressPush: true,
       weeklyProgressEmail: false,
       monthlyProgressEmail: true,
     });
@@ -394,6 +398,30 @@ describe('Email digest channel — weekly', () => {
         }),
       }),
     );
+  });
+
+  it('completes an email-only weekly digest without calling push', async () => {
+    const db = buildMockDb();
+    db.query.consentStates.findFirst = jest.fn().mockResolvedValue({
+      status: 'CONSENTED',
+      profileId: CHILD_ID_A,
+      consentType: 'GDPR',
+    });
+    db.query.notificationPreferences.findFirst = jest.fn().mockResolvedValue({
+      pushEnabled: false,
+      weeklyProgressPush: false,
+      weeklyProgressEmail: true,
+      monthlyProgressEmail: true,
+    });
+
+    const result = (await executeWeeklyGenerate(PARENT_ID, db)) as {
+      status: string;
+      parentId: string;
+    };
+
+    expect(result).toEqual({ status: 'completed', parentId: PARENT_ID });
+    expect(mockSendPushNotification).not.toHaveBeenCalled();
+    expect(mockSendEmail).toHaveBeenCalledTimes(1);
   });
 
   // Break test 4: Struggle watch-line rendered with topic name when struggles non-empty
@@ -856,10 +884,28 @@ describe('formatWeeklyProgressEmail', () => {
       [{ childName: 'Emma', topics: ['fractions', 'decimals'] }],
     );
     expect(result.body).toContain(
-      'You might want to keep an eye on **fractions**.',
+      'Emma: You might want to keep an eye on **fractions**.',
     );
     expect(result.body).toContain(
-      'You might want to keep an eye on **decimals**.',
+      'Emma: You might want to keep an eye on **decimals**.',
+    );
+  });
+
+  it('attributes watch-lines to the right child when multiple children have topics', () => {
+    const result = realFormatWeeklyProgressEmail(
+      'test@example.com',
+      ['Emma: +2 topics', 'Noah: +1 topic'],
+      [
+        { childName: 'Emma', topics: ['fractions'] },
+        { childName: 'Noah', topics: ['geometry'] },
+      ],
+    );
+
+    expect(result.body).toContain(
+      'Emma: You might want to keep an eye on **fractions**.',
+    );
+    expect(result.body).toContain(
+      'Noah: You might want to keep an eye on **geometry**.',
     );
   });
 
@@ -906,7 +952,25 @@ describe('formatMonthlyProgressEmail', () => {
       [{ childName: 'Emma', topics: ['long division'] }],
     );
     expect(result.body).toContain(
-      'You might want to keep an eye on **long division**.',
+      'Emma: You might want to keep an eye on **long division**.',
+    );
+  });
+
+  it('attributes monthly watch-lines to the child name', () => {
+    const result = realFormatMonthlyProgressEmail(
+      'test@example.com',
+      "Emma's monthly report is ready.",
+      [
+        { childName: 'Emma', topics: ['long division'] },
+        { childName: 'Noah', topics: ['geometry'] },
+      ],
+    );
+
+    expect(result.body).toContain(
+      'Emma: You might want to keep an eye on **long division**.',
+    );
+    expect(result.body).toContain(
+      'Noah: You might want to keep an eye on **geometry**.',
     );
   });
 });
