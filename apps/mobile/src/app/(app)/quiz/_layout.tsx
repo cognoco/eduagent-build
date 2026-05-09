@@ -38,6 +38,10 @@ const INITIAL_STATE: QuizFlowState = {
   completionResult: null,
 };
 
+export const unstable_settings = {
+  initialRouteName: 'index',
+};
+
 export function useQuizFlow(): QuizFlowContextType {
   const context = useContext(QuizFlowContext);
   if (!context) {
@@ -70,13 +74,13 @@ export function QuizFlowProvider({
     (prefetchedRoundId: string | null) => {
       setState((current) => ({ ...current, prefetchedRoundId }));
     },
-    []
+    [],
   );
   const setCompletionResult = useCallback(
     (completionResult: CompleteRoundResponse | null) => {
       setState((current) => ({ ...current, completionResult }));
     },
-    []
+    [],
   );
   const clear = useCallback(() => {
     setState(INITIAL_STATE);
