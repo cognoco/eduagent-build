@@ -41,13 +41,13 @@ describe('AccordionTopicList', () => {
         subjectId="subject-1"
         subjectName="Mathematics"
         expanded={false}
-      />
+      />,
     );
 
     expect(screen.queryByText('No topics yet')).toBeNull();
     expect(mockUseChildSubjectTopics).toHaveBeenCalledWith(
       undefined,
-      undefined
+      undefined,
     );
   });
 
@@ -65,13 +65,13 @@ describe('AccordionTopicList', () => {
         subjectId="subject-1"
         subjectName="Mathematics"
         expanded
-      />
+      />,
     );
 
     expect(screen.getAllByTestId('accordion-topic-skeleton')).toHaveLength(3);
     expect(mockUseChildSubjectTopics).toHaveBeenCalledWith(
       'child-1',
-      'subject-1'
+      'subject-1',
     );
   });
 
@@ -90,15 +90,15 @@ describe('AccordionTopicList', () => {
         subjectId="subject-1"
         subjectName="Mathematics"
         expanded
-      />
+      />,
     );
 
     fireEvent.press(screen.getByTestId('accordion-topics-retry'));
 
     expect(
       screen.getByText(
-        'Could not load topics. Tap to retry, or close the subject card to dismiss.'
-      )
+        'Could not load topics. Tap to retry, or close the subject card to dismiss.',
+      ),
     ).toBeTruthy();
     expect(refetch).toHaveBeenCalled();
   });
@@ -166,7 +166,7 @@ describe('AccordionTopicList', () => {
         subjectId="subject-1"
         subjectName="Mathematics"
         expanded
-      />
+      />,
     );
 
     screen.getByText('Started');
@@ -177,7 +177,12 @@ describe('AccordionTopicList', () => {
 
     fireEvent.press(screen.getByTestId('accordion-topic-topic-1'));
 
-    expect(mockPush).toHaveBeenCalledWith(
+    expect(mockPush).toHaveBeenNthCalledWith(1, {
+      pathname: '/(app)/child/[profileId]',
+      params: { profileId: 'child-1' },
+    });
+    expect(mockPush).toHaveBeenNthCalledWith(
+      2,
       expect.objectContaining({
         pathname: '/(app)/child/[profileId]/topic/[topicId]',
         params: expect.objectContaining({
@@ -187,7 +192,7 @@ describe('AccordionTopicList', () => {
           topicId: 'topic-1',
           totalSessions: '3',
         }),
-      })
+      }),
     );
   });
 
@@ -205,7 +210,7 @@ describe('AccordionTopicList', () => {
         subjectId="subject-1"
         subjectName="Mathematics"
         expanded
-      />
+      />,
     );
 
     screen.getByText('No topics yet');
@@ -225,7 +230,7 @@ describe('AccordionTopicList', () => {
         subjectId="subject-1"
         subjectName="Mathematics"
         expanded
-      />
+      />,
     );
 
     screen.getByTestId('accordion-topics-empty');
