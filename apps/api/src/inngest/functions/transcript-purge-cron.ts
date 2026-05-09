@@ -48,8 +48,8 @@ export const transcriptPurgeCron = inngest.createFunction(
             isNotNull(sessionSummaries.llmSummary),
             isNotNull(sessionSummaries.learnerRecap),
             isNotNull(sessionSummaries.summaryGeneratedAt),
-            lte(sessionSummaries.summaryGeneratedAt, cutoff)
-          )
+            lte(sessionSummaries.summaryGeneratedAt, cutoff),
+          ),
         )
         .limit(PURGE_LIMIT);
     });
@@ -74,17 +74,33 @@ export const transcriptPurgeCron = inngest.createFunction(
               isNotNull(sessionSummaries.summaryGeneratedAt),
               or(
                 isNull(sessionSummaries.llmSummary),
-                isNull(sessionSummaries.learnerRecap)
+                isNull(sessionSummaries.learnerRecap),
               ),
-              lte(sessionSummaries.summaryGeneratedAt, delayedCutoff)
-            )
+              lte(sessionSummaries.summaryGeneratedAt, delayedCutoff),
+            ),
           )
           .limit(DELAYED_LIMIT);
-      }
+      },
     );
 
     if (candidates.length === 0) {
       if (delayed.length > 0) {
+        // [BUG-993] captureException surfaces delayed purge count to Sentry so
+        // ops can query how many sessions are stuck past day-37 without a
+        // complete summary. The Inngest dashboard alert targets the event count;
+        // Sentry captures the same signal so both surfaces stay in sync.
+        captureException(
+          new Error(
+            `transcript-purge-cron: ${delayed.length} session(s) past day-37 with missing llmSummary/learnerRecap`,
+          ),
+          {
+            extra: {
+              surface: 'transcript-purge-delayed',
+              delayedCount: delayed.length,
+              sessionIds: delayed.map((c) => c.sessionId),
+            },
+          },
+        );
         await step.sendEvent('notify-purge-delayed', {
           name: 'app/session.purge.delayed',
           data: {
@@ -105,10 +121,24 @@ export const transcriptPurgeCron = inngest.createFunction(
       candidates.map((candidate) => ({
         name: 'app/session.transcript.purge' as const,
         data: { ...candidate, timestamp },
-      }))
+      })),
     );
 
     if (delayed.length > 0) {
+      // [BUG-993] Same captureException pattern as the candidates.length === 0
+      // branch above: surfaces delayed count to Sentry alongside the Inngest event.
+      captureException(
+        new Error(
+          `transcript-purge-cron: ${delayed.length} session(s) past day-37 with missing llmSummary/learnerRecap`,
+        ),
+        {
+          extra: {
+            surface: 'transcript-purge-delayed',
+            delayedCount: delayed.length,
+            sessionIds: delayed.map((c) => c.sessionId),
+          },
+        },
+      );
       await step.sendEvent('notify-purge-delayed', {
         name: 'app/session.purge.delayed',
         data: {
@@ -125,7 +155,64 @@ export const transcriptPurgeCron = inngest.createFunction(
       queued: candidates.length,
       delayed: delayed.length,
     };
-  }
+  },
+);
+
+// ---------------------------------------------------------------------------
+// onFailure handler — fires after all 3 retries are exhausted.
+//
+// [BUG-992] The SLO alert for app/session.transcript.purged tracks failure
+// rate (warn >2%, page >5%) via the Inngest dashboard. For the dashboard to
+// expose a queryable failure-rate counter, a terminal-failure event must be
+// emitted explicitly — Inngest function failures alone are not surfaced as
+// first-class events by default. captureException ensures Sentry also records
+// the terminal failure so the two surfaces stay in sync.
+// ---------------------------------------------------------------------------
+export const transcriptPurgeHandlerOnFailure = inngest.createFunction(
+  {
+    id: 'transcript-purge-handler-on-failure',
+    name: 'Handle terminal transcript purge failures (SLO)',
+  },
+  { event: 'inngest/function.failed' },
+  async ({ event }) => {
+    const failedEvent = event.data as {
+      function_id?: string;
+      run_id?: string;
+      error?: { name?: string; message?: string };
+      event?: { data?: Record<string, unknown> };
+    };
+
+    // Only handle failures from our purge handler
+    if (failedEvent.function_id !== 'transcript-purge-handler') {
+      return { status: 'skipped' };
+    }
+
+    const originalData = (failedEvent.event?.data ?? {}) as Record<
+      string,
+      unknown
+    >;
+
+    captureException(
+      new Error(
+        `transcript-purge: all retries exhausted — ${failedEvent.error?.message ?? 'unknown error'}`,
+      ),
+      {
+        extra: {
+          surface: 'transcript-purge-on-failure',
+          profileId: originalData.profileId ?? null,
+          sessionSummaryId: originalData.sessionSummaryId ?? null,
+          runId: failedEvent.run_id ?? null,
+          errorName: failedEvent.error?.name ?? null,
+        },
+      },
+    );
+
+    return {
+      status: 'captured',
+      profileId: originalData.profileId ?? null,
+      sessionSummaryId: originalData.sessionSummaryId ?? null,
+    };
+  },
 );
 
 export const transcriptPurgeHandler = inngest.createFunction(
@@ -144,7 +231,7 @@ export const transcriptPurgeHandler = inngest.createFunction(
           surface: 'transcript-purge',
           validationIssues: parsed.error.issues
             .map(
-              (issue) => `${issue.path.join('.') || 'root'}: ${issue.message}`
+              (issue) => `${issue.path.join('.') || 'root'}: ${issue.message}`,
             )
             .join('; '),
         },
@@ -161,7 +248,7 @@ export const transcriptPurgeHandler = inngest.createFunction(
           db,
           profileId,
           sessionSummaryId,
-          getStepVoyageApiKey()
+          getStepVoyageApiKey(),
         );
       } catch (error) {
         captureException(error, {
@@ -205,5 +292,5 @@ export const transcriptPurgeHandler = inngest.createFunction(
     }
 
     return result;
-  }
+  },
 );
