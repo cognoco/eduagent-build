@@ -17,7 +17,7 @@ const mockAddListener = jest.fn(
         delete listeners[eventName];
       }),
     };
-  }
+  },
 );
 
 async function flushEffects(): Promise<void> {
@@ -42,7 +42,7 @@ describe('useSpeechRecognition', () => {
 
   it('initializes in idle state', () => {
     const { result } = renderHook(() =>
-      useSpeechRecognition(mockLoadSpeechModule)
+      useSpeechRecognition(mockLoadSpeechModule),
     );
 
     expect(result.current.status).toBe('idle');
@@ -53,7 +53,7 @@ describe('useSpeechRecognition', () => {
 
   it('sets error when speech recognition is unavailable', async () => {
     const { result } = renderHook(() =>
-      useSpeechRecognition(mockLoadSpeechModule)
+      useSpeechRecognition(mockLoadSpeechModule),
     );
 
     await act(async () => {
@@ -72,7 +72,7 @@ describe('useSpeechRecognition', () => {
       addListener: mockAddListener,
     });
     const { result } = renderHook(() =>
-      useSpeechRecognition(mockLoadSpeechModule)
+      useSpeechRecognition(mockLoadSpeechModule),
     );
     await flushEffects();
 
@@ -98,7 +98,7 @@ describe('useSpeechRecognition', () => {
       addListener: mockAddListener,
     });
     const { result } = renderHook(() =>
-      useSpeechRecognition({ lang: 'es-ES' }, mockLoadSpeechModule)
+      useSpeechRecognition({ lang: 'es-ES' }, mockLoadSpeechModule),
     );
     await flushEffects();
 
@@ -121,7 +121,7 @@ describe('useSpeechRecognition', () => {
       addListener: mockAddListener,
     });
     const { result } = renderHook(() =>
-      useSpeechRecognition(mockLoadSpeechModule)
+      useSpeechRecognition(mockLoadSpeechModule),
     );
     await flushEffects();
 
@@ -133,9 +133,40 @@ describe('useSpeechRecognition', () => {
     });
 
     expect(result.current.transcript).toBe(
-      'Photosynthesis is how plants make food'
+      'Photosynthesis is how plants make food',
     );
     expect(result.current.error).toBeNull();
+  });
+
+  it('uses only the top alternative when results[] contains N-best alternatives', async () => {
+    mockLoadSpeechModule.mockResolvedValue({
+      requestPermissionsAsync: mockRequestPermissionsAsync,
+      start: mockStart,
+      stop: mockStop,
+      addListener: mockAddListener,
+    });
+    const { result } = renderHook(() =>
+      useSpeechRecognition(mockLoadSpeechModule),
+    );
+    await flushEffects();
+
+    // expo-speech-recognition delivers the N-best alternatives for one utterance
+    // in results[]. They must NOT be concatenated — that produced the
+    // "close to equator close to equator close to a Quaker" duplication bug.
+    act(() => {
+      listeners.result?.({
+        isFinal: true,
+        results: [
+          { transcript: 'maybe that they are close to equator' },
+          { transcript: "maybe that they're close to equator" },
+          { transcript: 'maybe that they are close to a Quaker' },
+        ],
+      });
+    });
+
+    expect(result.current.transcript).toBe(
+      'maybe that they are close to equator',
+    );
   });
 
   it('captures native error events', async () => {
@@ -146,7 +177,7 @@ describe('useSpeechRecognition', () => {
       addListener: mockAddListener,
     });
     const { result } = renderHook(() =>
-      useSpeechRecognition(mockLoadSpeechModule)
+      useSpeechRecognition(mockLoadSpeechModule),
     );
     await flushEffects();
 
@@ -160,7 +191,7 @@ describe('useSpeechRecognition', () => {
 
   it('clearTranscript resets state', () => {
     const { result } = renderHook(() =>
-      useSpeechRecognition(mockLoadSpeechModule)
+      useSpeechRecognition(mockLoadSpeechModule),
     );
 
     act(() => {
@@ -174,7 +205,7 @@ describe('useSpeechRecognition', () => {
 
   it('stopListening returns to idle even if module unavailable', async () => {
     const { result } = renderHook(() =>
-      useSpeechRecognition(mockLoadSpeechModule)
+      useSpeechRecognition(mockLoadSpeechModule),
     );
 
     await act(async () => {
@@ -194,7 +225,7 @@ describe('useSpeechRecognition', () => {
     });
 
     const { result } = renderHook(() =>
-      useSpeechRecognition(mockLoadSpeechModule)
+      useSpeechRecognition(mockLoadSpeechModule),
     );
 
     let permissionStatus: Awaited<
@@ -224,13 +255,13 @@ describe('useSpeechRecognition', () => {
         () =>
           new Promise((resolve) => {
             resolveModule = resolve;
-          })
+          }),
       ) as jest.Mock & (() => Promise<unknown>);
 
       const { result, unmount } = renderHook(() =>
         useSpeechRecognition(
-          slowLoadModule as Parameters<typeof useSpeechRecognition>[0]
-        )
+          slowLoadModule as Parameters<typeof useSpeechRecognition>[0],
+        ),
       );
 
       // Start listening — this will await the slow module
@@ -266,7 +297,7 @@ describe('useSpeechRecognition', () => {
       });
 
       const { result, unmount } = renderHook(() =>
-        useSpeechRecognition(mockLoadSpeechModule)
+        useSpeechRecognition(mockLoadSpeechModule),
       );
       await flushEffects();
 
@@ -299,7 +330,7 @@ describe('useSpeechRecognition', () => {
       });
 
       const { unmount } = renderHook(() =>
-        useSpeechRecognition(mockLoadSpeechModule)
+        useSpeechRecognition(mockLoadSpeechModule),
       );
       await flushEffects();
 
@@ -328,7 +359,7 @@ describe('useSpeechRecognition', () => {
       });
 
       const { result } = renderHook(() =>
-        useSpeechRecognition(mockLoadSpeechModule)
+        useSpeechRecognition(mockLoadSpeechModule),
       );
       await flushEffects();
 
@@ -356,7 +387,7 @@ describe('useSpeechRecognition', () => {
       });
 
       const { result } = renderHook(() =>
-        useSpeechRecognition(mockLoadSpeechModule)
+        useSpeechRecognition(mockLoadSpeechModule),
       );
       await flushEffects();
 
@@ -385,7 +416,7 @@ describe('useSpeechRecognition', () => {
           return {
             remove: eventName === 'result' ? removeResult1 : removeError1,
           };
-        }
+        },
       );
 
       const module1 = {
@@ -400,7 +431,7 @@ describe('useSpeechRecognition', () => {
       const { rerender } = renderHook(
         ({ loader }: { loader: () => Promise<unknown> }) =>
           useSpeechRecognition(loader as () => Promise<null>),
-        { initialProps: { loader: loadModule1 } }
+        { initialProps: { loader: loadModule1 } },
       );
       await flushEffects();
 
@@ -416,7 +447,7 @@ describe('useSpeechRecognition', () => {
           return {
             remove: eventName === 'result' ? removeResult2 : removeError2,
           };
-        }
+        },
       );
 
       const module2 = {
@@ -448,7 +479,7 @@ describe('useSpeechRecognition', () => {
           return {
             remove: eventName === 'result' ? removeResult : removeError,
           };
-        }
+        },
       );
 
       mockLoadSpeechModule.mockResolvedValue({
@@ -459,7 +490,7 @@ describe('useSpeechRecognition', () => {
       });
 
       const { unmount } = renderHook(() =>
-        useSpeechRecognition(mockLoadSpeechModule)
+        useSpeechRecognition(mockLoadSpeechModule),
       );
       await flushEffects();
 

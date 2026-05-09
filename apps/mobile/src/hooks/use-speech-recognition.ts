@@ -52,7 +52,7 @@ type SpeechRecognitionModule = {
   stop: () => void;
   addListener?: (
     eventName: 'result' | 'error',
-    listener: (event: unknown) => void
+    listener: (event: unknown) => void,
   ) => { remove: () => void };
 };
 
@@ -87,14 +87,14 @@ export function useSpeechRecognition(
   optionsOrLoadModule?:
     | UseSpeechRecognitionOptions
     | SpeechRecognitionModuleLoader,
-  maybeLoadModule?: SpeechRecognitionModuleLoader
+  maybeLoadModule?: SpeechRecognitionModuleLoader,
 ): UseSpeechRecognitionResult {
   const options =
     typeof optionsOrLoadModule === 'function' ? undefined : optionsOrLoadModule;
   const loadModule =
     typeof optionsOrLoadModule === 'function'
       ? optionsOrLoadModule
-      : maybeLoadModule ?? loadSpeechModule;
+      : (maybeLoadModule ?? loadSpeechModule);
   const [status, setStatus] = useState<SpeechRecognitionStatus>('idle');
   const [transcript, setTranscript] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -132,11 +132,11 @@ export function useSpeechRecognition(
           console.warn('[SpeechRecognition] Malformed result event:', event);
           return;
         }
-        const nextTranscript = (resultEvent.results ?? [])
-          .map((result) => result.transcript?.trim() ?? '')
-          .filter(Boolean)
-          .join(' ')
-          .trim();
+        // results[] is the N-best alternatives for the current utterance, ordered
+        // by confidence — not a sequence of utterances. Joining them concatenates
+        // the same speech multiple times (e.g. "...close to equator ...close to
+        // equator ...close to a Quaker"). Take the top alternative only.
+        const nextTranscript = resultEvent.results[0]?.transcript?.trim() ?? '';
 
         if (!nextTranscript) {
           console.warn('[SpeechRecognition] Empty transcript event:', event);
@@ -199,7 +199,7 @@ export function useSpeechRecognition(
     } catch (err) {
       if (mountedRef.current) {
         setError(
-          err instanceof Error ? err.message : 'Speech recognition failed'
+          err instanceof Error ? err.message : 'Speech recognition failed',
         );
         setStatus('error');
       }
