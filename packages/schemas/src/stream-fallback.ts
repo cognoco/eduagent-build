@@ -29,6 +29,13 @@ export const streamFallbackFrameSchema = z.object({
 });
 export type StreamFallbackFrame = z.infer<typeof streamFallbackFrameSchema>;
 
+export const streamErrorFrameSchema = z.object({
+  type: z.literal('error'),
+  message: z.string(),
+  code: z.string().optional(),
+});
+export type StreamErrorFrame = z.infer<typeof streamErrorFrameSchema>;
+
 export const exchangeFallbackSchema = z.object({
   reason: exchangeFallbackReasonSchema,
   fallbackText: z.string().min(1),
