@@ -89,6 +89,26 @@ function computeShelfRetention(
   return worst;
 }
 
+const SUBJECT_STATUS_ORDER: Record<Subject['status'], number> = {
+  active: 0,
+  paused: 1,
+  archived: 2,
+};
+
+function sortSubjectsByStatus<T extends { status: Subject['status'] }>(
+  input: readonly T[],
+): T[] {
+  return input
+    .map((subject, index) => ({ subject, index }))
+    .sort((a, b) => {
+      const statusDelta =
+        SUBJECT_STATUS_ORDER[a.subject.status] -
+        SUBJECT_STATUS_ORDER[b.subject.status];
+      return statusDelta === 0 ? a.index - b.index : statusDelta;
+    })
+    .map(({ subject }) => subject);
+}
+
 // ---------------------------------------------------------------------------
 // SubjectStatusPill
 // ---------------------------------------------------------------------------
@@ -158,12 +178,17 @@ export default function LibraryScreen() {
   // ---- Manage modal state -------------------------------------------------
   const [showManageSubjects, setShowManageSubjects] = useState(false);
   const [pendingSubjectId, setPendingSubjectId] = useState<string | null>(null);
+  const statusUpdateInFlightRef = useRef(false);
 
   // ---- Data hooks ---------------------------------------------------------
   const subjectsQuery = useSubjects({ includeInactive: true });
   const subjects = useMemo(
     () => (Array.isArray(subjectsQuery.data) ? subjectsQuery.data : []),
     [subjectsQuery.data],
+  );
+  const sortedSubjects = useMemo(
+    () => sortSubjectsByStatus(subjects),
+    [subjects],
   );
 
   const progressQuery = useOverallProgress();
@@ -277,7 +302,12 @@ export default function LibraryScreen() {
         bookCount: books.length,
         topicProgress: `${progress?.topicsCompleted ?? 0}/${progress?.topicsTotal ?? 0}`,
         retentionStatus,
+        reviewDueCount: retData?.reviewDueCount ?? 0,
+        isFinished:
+          (progress?.topicsTotal ?? 0) > 0 &&
+          (progress?.topicsVerified ?? 0) >= (progress?.topicsTotal ?? 0),
         isPaused: subject?.status !== 'active',
+        status: subject?.status ?? 'active',
       };
     });
   }, [
@@ -359,12 +389,15 @@ export default function LibraryScreen() {
     subject: Subject,
     status: Subject['status'],
   ): Promise<void> => {
+    if (statusUpdateInFlightRef.current) return;
+    statusUpdateInFlightRef.current = true;
     setPendingSubjectId(subject.id);
     try {
       await updateSubject.mutateAsync({ subjectId: subject.id, status });
     } catch (err: unknown) {
       platformAlert(t('library.manage.updateErrorTitle'), formatApiError(err));
     } finally {
+      statusUpdateInFlightRef.current = false;
       setPendingSubjectId(null);
     }
   };
@@ -373,13 +406,13 @@ export default function LibraryScreen() {
 
   const visibleSubjects = useMemo(() => {
     const q = debouncedQuery.trim().toLowerCase();
-    if (!q) return subjects;
-    return subjects.filter((s) => {
+    if (!q) return sortedSubjects;
+    return sortedSubjects.filter((s) => {
       const clientMatch = s.name.toLowerCase().includes(q);
       const serverMatch = serverMatchSubjectIds.has(s.id);
       return clientMatch || serverMatch;
     });
-  }, [subjects, debouncedQuery, serverMatchSubjectIds]);
+  }, [sortedSubjects, debouncedQuery, serverMatchSubjectIds]);
 
   // ---- Shimmer skeleton ---------------------------------------------------
 
@@ -611,13 +644,15 @@ export default function LibraryScreen() {
           <View testID="shelves-list">
             {visibleSubjects.map((subject) => {
               const retData = retentionDataBySubjectId.get(subject.id);
-              const retentionStatus = computeShelfRetention(retData);
               const books = booksBySubjectId.get(subject.id) ?? [];
               const bookCount = books.length;
               const progress = progressBySubjectId.get(subject.id);
               const topicsTotal = progress?.topicsTotal ?? 0;
               const topicsCompleted = progress?.topicsCompleted ?? 0;
               const topicProgress = `${topicsCompleted}/${topicsTotal}`;
+              const isFinished =
+                topicsTotal > 0 &&
+                (progress?.topicsVerified ?? 0) >= topicsTotal;
 
               return (
                 <ShelfRow
@@ -626,8 +661,9 @@ export default function LibraryScreen() {
                   name={subject.name}
                   bookCount={bookCount}
                   topicProgress={topicProgress}
-                  retentionStatus={retentionStatus}
-                  isPaused={subject.status !== 'active'}
+                  reviewDueCount={retData?.reviewDueCount ?? 0}
+                  isFinished={isFinished}
+                  status={subject.status}
                   onPress={handleShelfPress}
                 />
               );
@@ -744,8 +780,9 @@ export default function LibraryScreen() {
             </Text>
 
             <ScrollView style={{ maxHeight: 360 }}>
-              {subjects.map((subject) => {
+              {sortedSubjects.map((subject) => {
                 const isPending = pendingSubjectId === subject.id;
+                const isSavingAnySubject = pendingSubjectId !== null;
                 return (
                   <View
                     key={subject.id}
@@ -764,7 +801,7 @@ export default function LibraryScreen() {
                             onPress={() =>
                               void handleSubjectStatusChange(subject, 'paused')
                             }
-                            disabled={isPending}
+                            disabled={isSavingAnySubject}
                             className="flex-1 rounded-button bg-surface-elevated py-2.5 items-center"
                             testID={`pause-subject-${subject.id}`}
                           >
@@ -781,7 +818,7 @@ export default function LibraryScreen() {
                                 'archived',
                               )
                             }
-                            disabled={isPending}
+                            disabled={isSavingAnySubject}
                             className="flex-1 rounded-button bg-surface-elevated py-2.5 items-center"
                             testID={`archive-subject-${subject.id}`}
                           >
@@ -796,7 +833,7 @@ export default function LibraryScreen() {
                             onPress={() =>
                               void handleSubjectStatusChange(subject, 'active')
                             }
-                            disabled={isPending}
+                            disabled={isSavingAnySubject}
                             className="flex-1 rounded-button bg-primary py-2.5 items-center"
                             testID={`resume-subject-${subject.id}`}
                           >
@@ -813,7 +850,7 @@ export default function LibraryScreen() {
                                 'archived',
                               )
                             }
-                            disabled={isPending}
+                            disabled={isSavingAnySubject}
                             className="flex-1 rounded-button bg-surface-elevated py-2.5 items-center"
                             testID={`archive-subject-${subject.id}`}
                           >
@@ -827,7 +864,7 @@ export default function LibraryScreen() {
                           onPress={() =>
                             void handleSubjectStatusChange(subject, 'active')
                           }
-                          disabled={isPending}
+                          disabled={isSavingAnySubject}
                           className="flex-1 rounded-button bg-primary py-2.5 items-center"
                           testID={`restore-subject-${subject.id}`}
                         >

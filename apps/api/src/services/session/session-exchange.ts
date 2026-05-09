@@ -134,7 +134,8 @@ export function computeCorrectStreak(
 ): number {
   let streak = 0;
   for (let i = events.length - 1; i >= 0; i--) {
-    const event = events[i]!;
+    const event = events[i];
+    if (!event) break;
     if (event.eventType !== 'ai_response') continue;
     const meta = event.metadata;
     if (!meta || typeof meta !== 'object') break;
@@ -1544,6 +1545,7 @@ export async function persistExchangeResult(
       })
       .onConflictDoNothing({
         target: [sessionEvents.sessionId, sessionEvents.clientId],
+        where: sql`${sessionEvents.clientId} IS NOT NULL`,
       })
       .returning({ id: sessionEvents.id });
 
@@ -1890,6 +1892,10 @@ export async function streamMessage(
 ): Promise<{
   stream: AsyncIterable<string>;
   onComplete: () => Promise<{
+    /** Parsed assistant text persisted for the exchange. Useful when the
+     *  streaming extractor yielded no visible chunks but the full envelope
+     *  parsed cleanly at completion. */
+    response?: string;
     exchangeCount: number;
     escalationRung: number;
     expectedResponseMinutes: number;
@@ -2088,6 +2094,7 @@ export async function streamMessage(
         );
       }
       return {
+        response: parsed.cleanResponse,
         exchangeCount: persisted.exchangeCount,
         escalationRung: effectiveRung,
         expectedResponseMinutes,

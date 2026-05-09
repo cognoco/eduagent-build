@@ -97,3 +97,54 @@ export const topicProbeRequestedEventSchema = z.object({
 export type TopicProbeRequestedEvent = z.infer<
   typeof topicProbeRequestedEventSchema
 >;
+
+// ---------------------------------------------------------------------------
+// Retention SLO monitoring events (BUG-991 / BUG-992 / BUG-993 / BUG-994)
+// ---------------------------------------------------------------------------
+
+/** BUG-991 — emitted when LLM summary generation fails for a session. */
+export const sessionSummaryFailedEventSchema = z.object({
+  profileId: z.string(),
+  sessionId: z.string(),
+  sessionSummaryId: z.string().nullable(),
+  timestamp: z.string(),
+});
+export type SessionSummaryFailedEvent = z.infer<
+  typeof sessionSummaryFailedEventSchema
+>;
+
+/** BUG-992 — emitted on successful transcript purge (failure rate = 1 - success rate). */
+export const sessionTranscriptPurgedEventSchema = z.object({
+  profileId: z.string().uuid(),
+  sessionId: z.string(),
+  sessionSummaryId: z.string().nullable(),
+  eventsDeleted: z.number().int().nonnegative(),
+  embeddingRowsReplaced: z.number().int().nonnegative(),
+  purgedAt: z.string().optional(),
+});
+export type SessionTranscriptPurgedEvent = z.infer<
+  typeof sessionTranscriptPurgedEventSchema
+>;
+
+/** BUG-993 — emitted when sessions are past day-37 without llmSummary/learnerRecap. */
+export const sessionPurgeDelayedEventSchema = z.object({
+  delayedCount: z.number().int().positive(),
+  sessionIds: z.array(z.string()),
+  missingPreconditionCount: z.number().int().nonnegative(),
+  timestamp: z.string(),
+});
+export type SessionPurgeDelayedEvent = z.infer<
+  typeof sessionPurgeDelayedEventSchema
+>;
+
+/** BUG-994 — emitted when reconciliation cron requeues sessions for summary work. */
+export const summaryReconciliationRequeuedEventSchema = z.object({
+  queryARequeued: z.number().int().nonnegative(),
+  queryBRequeued: z.number().int().nonnegative(),
+  queryCRequeued: z.number().int().nonnegative(),
+  totalRequeued: z.number().int().positive(),
+  timestamp: z.string(),
+});
+export type SummaryReconciliationRequeuedEvent = z.infer<
+  typeof summaryReconciliationRequeuedEventSchema
+>;

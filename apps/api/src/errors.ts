@@ -15,6 +15,7 @@ export {
   ForbiddenError,
   ConflictError,
   RateLimitedError,
+  SafetyFilterError,
   UpstreamLlmError,
   VocabularyContextError,
   SubjectNotFoundError,
@@ -41,44 +42,44 @@ export function apiError(
     | 503,
   code: ErrorCode,
   message: string,
-  details?: unknown
+  details?: unknown,
 ): Response & TypedResponse {
   return c.json(
     { code, message, ...(details !== undefined && { details }) },
-    status
+    status,
   );
 }
 
 export function notFound(
   c: Context,
-  message = 'Resource not found'
+  message = 'Resource not found',
 ): Response & TypedResponse {
   return apiError(c, 404, ERROR_CODES.NOT_FOUND, message);
 }
 
 export function unauthorized(
   c: Context,
-  message = 'Authentication required'
+  message = 'Authentication required',
 ): Response & TypedResponse {
   return apiError(c, 401, ERROR_CODES.UNAUTHORIZED, message);
 }
 
 export function forbidden(
   c: Context,
-  message = 'Insufficient permissions'
+  message = 'Insufficient permissions',
 ): Response & TypedResponse {
   return apiError(c, 403, ERROR_CODES.FORBIDDEN, message);
 }
 
 export function validationError(
   c: Context,
-  details: unknown
+  details: unknown,
 ): Response & TypedResponse {
   return apiError(
     c,
     400,
     ERROR_CODES.VALIDATION_ERROR,
     'Validation failed',
-    details
+    details,
   );
 }

@@ -7,7 +7,6 @@ import {
   Platform,
   ScrollView,
   Dimensions,
-  ActivityIndicator,
   Pressable,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -18,11 +17,13 @@ import { useCreateSubject, useSubjects } from '../hooks/use-subjects';
 import { useResolveSubject } from '../hooks/use-resolve-subject';
 import { useThemeColors } from '../lib/theme';
 import { Button } from '../components/common/Button';
+import { BookPageFlipAnimation } from '../components/common/BookPageFlipAnimation';
 import { useKeyboardScroll } from '../hooks/use-keyboard-scroll';
 import { formatApiError } from '../lib/format-api-error';
 import { homeHrefForReturnTo, goBackOrReplace } from '../lib/navigation';
 import { useApiClient } from '../lib/api-client';
 import { assertOk } from '../lib/assert-ok';
+import { ConflictError } from '../lib/api-errors';
 import type { LearningSession, SubjectResolveResult } from '@eduagent/schemas';
 
 /** Strip markdown bold markers so `**Science**` renders as plain "Science". */
@@ -51,7 +52,7 @@ const STARTER_CHIPS = [
 
 function isStarterChipInput(input: string): boolean {
   return STARTER_CHIPS.some(
-    (chip) => chip.toLowerCase() === input.trim().toLowerCase()
+    (chip) => chip.toLowerCase() === input.trim().toLowerCase(),
   );
 }
 
@@ -59,7 +60,22 @@ type ResolveState =
   | { phase: 'idle' }
   | { phase: 'resolving' }
   | { phase: 'suggestion'; result: SubjectResolveResult }
-  | { phase: 'creating' };
+  | { phase: 'creating' }
+  | { phase: 'preparing' };
+
+const FIRST_CURRICULUM_SESSION_RETRY_MS = 2_000;
+const FIRST_CURRICULUM_SESSION_MAX_ATTEMPTS = 30;
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isFirstCurriculumPreparingError(err: unknown): boolean {
+  return (
+    err instanceof ConflictError &&
+    /curriculum is still being prepared/i.test(err.message)
+  );
+}
 
 export default function CreateSubjectScreen() {
   const insets = useSafeAreaInsets();
@@ -103,31 +119,53 @@ export default function CreateSubjectScreen() {
       subjectName: string;
       bookId?: string;
     }) => {
-      const res = await apiClient.subjects[':subjectId'].sessions[
-        'first-curriculum'
-      ].$post({
-        param: { subjectId: input.subjectId },
-        json: {
-          ...(input.bookId ? { bookId: input.bookId } : {}),
-          sessionType: 'learning',
-          inputMode: 'text',
-        },
-      });
-      const okRes = await assertOk(res);
-      const data = (await okRes.json()) as { session: LearningSession };
-      if (cancelledRef.current) return;
-      router.replace({
-        pathname: '/(app)/session',
-        params: {
-          mode: 'learning',
-          subjectId: input.subjectId,
-          subjectName: input.subjectName,
-          sessionId: data.session.id,
-          topicId: data.session.topicId ?? undefined,
-        },
-      } as never);
+      setResolveState({ phase: 'preparing' });
+
+      for (
+        let attempt = 0;
+        attempt < FIRST_CURRICULUM_SESSION_MAX_ATTEMPTS;
+        attempt++
+      ) {
+        try {
+          const res = await apiClient.subjects[':subjectId'].sessions[
+            'first-curriculum'
+          ].$post({
+            param: { subjectId: input.subjectId },
+            json: {
+              ...(input.bookId ? { bookId: input.bookId } : {}),
+              sessionType: 'learning',
+              inputMode: 'text',
+            },
+          });
+          const okRes = await assertOk(res);
+          const data = (await okRes.json()) as { session: LearningSession };
+          if (cancelledRef.current) return;
+          router.replace({
+            pathname: '/(app)/session',
+            params: {
+              mode: 'learning',
+              subjectId: input.subjectId,
+              subjectName: input.subjectName,
+              sessionId: data.session.id,
+              topicId: data.session.topicId ?? undefined,
+            },
+          } as never);
+          return;
+        } catch (err) {
+          if (
+            isFirstCurriculumPreparingError(err) &&
+            attempt < FIRST_CURRICULUM_SESSION_MAX_ATTEMPTS - 1
+          ) {
+            if (cancelledRef.current) return;
+            await wait(FIRST_CURRICULUM_SESSION_RETRY_MS);
+            if (cancelledRef.current) return;
+            continue;
+          }
+          throw err;
+        }
+      }
     },
-    [apiClient, router]
+    [apiClient, router],
   );
 
   // [M4] 30s timeout on resolve phase — show error + retry
@@ -148,10 +186,12 @@ export default function CreateSubjectScreen() {
       resolveTimeoutRef.current = null;
     }
     return undefined;
-  }, [resolveState.phase]);
+  }, [resolveState.phase, t]);
 
   const isBusy =
-    resolveState.phase === 'resolving' || resolveState.phase === 'creating';
+    resolveState.phase === 'resolving' ||
+    resolveState.phase === 'creating' ||
+    resolveState.phase === 'preparing';
   const canSubmit = name.trim().length >= 1 && !isBusy;
   const showSuggestion = resolveState.phase === 'suggestion';
 
@@ -160,7 +200,7 @@ export default function CreateSubjectScreen() {
       subjectName: string,
       rawInputOverride?: string | null,
       focus?: string,
-      focusDescription?: string
+      focusDescription?: string,
     ) => {
       setResolveState({ phase: 'creating' });
       setError('');
@@ -169,10 +209,10 @@ export default function CreateSubjectScreen() {
         const rawInput =
           rawInputOverride === null
             ? undefined
-            : rawInputOverride ??
+            : (rawInputOverride ??
               (originalInput && originalInput !== subjectName
                 ? originalInput
-                : undefined);
+                : undefined));
         const result = await createSubject.mutateAsync({
           name: subjectName,
           ...(rawInput ? { rawInput } : {}),
@@ -246,7 +286,7 @@ export default function CreateSubjectScreen() {
         if (cancelledRef.current) return;
         const rawMsg = err instanceof Error ? err.message : '';
         setIsSubjectLimitError(
-          /subject limit|max subjects|too many subjects/i.test(rawMsg)
+          /subject limit|max subjects|too many subjects/i.test(rawMsg),
         );
         setError(formatApiError(err));
         setResolveState({ phase: 'idle' });
@@ -259,7 +299,7 @@ export default function CreateSubjectScreen() {
       returnTo,
       chatTopic,
       transitionToFirstSession,
-    ]
+    ],
   );
 
   const resolveInput = useCallback(
@@ -286,7 +326,7 @@ export default function CreateSubjectScreen() {
             result.resolvedName ?? trimmedInput,
             undefined,
             result.focus ?? undefined,
-            result.focusDescription ?? undefined
+            result.focusDescription ?? undefined,
           );
           return;
         }
@@ -302,7 +342,7 @@ export default function CreateSubjectScreen() {
         return;
       }
     },
-    [doCreate, resolveSubject]
+    [doCreate, resolveSubject, t],
   );
 
   const onSubmit = useCallback(async () => {
@@ -313,7 +353,7 @@ export default function CreateSubjectScreen() {
     if (!canSubmit) return;
     setError('');
     await resolveInput(name.trim());
-  }, [canSubmit, name, resolveInput]);
+  }, [canSubmit, name, resolveInput, t]);
 
   const onPickSuggestion = useCallback(
     async (suggestion: {
@@ -353,15 +393,15 @@ export default function CreateSubjectScreen() {
           : undefined;
       const effectiveFocus = isStarterCategoryRefinement
         ? undefined
-        : suggestionFocus ?? derivedFocus;
+        : (suggestionFocus ?? derivedFocus);
       await doCreate(
         subjectName,
         isStarterCategoryRefinement ? null : originalInput || undefined,
         effectiveFocus,
-        effectiveFocus ? suggestion.description : undefined
+        effectiveFocus ? suggestion.description : undefined,
       );
     },
-    [doCreate, originalInput]
+    [doCreate, originalInput],
   );
 
   const onAcceptSuggestion = useCallback(async () => {
@@ -411,7 +451,7 @@ export default function CreateSubjectScreen() {
       }
       setResolveRounds(0);
     },
-    [resolveState.phase, error]
+    [resolveState.phase, error],
   );
 
   const handleCancel = useCallback(() => {
@@ -452,15 +492,15 @@ export default function CreateSubjectScreen() {
       setResolveRounds(0);
       await resolveInput(chip);
     },
-    [resolveInput]
+    [resolveInput],
   );
 
   const starterChips = useMemo(() => {
     const existingNames = new Set(
-      (existingSubjects ?? []).map((s) => s.name.toLowerCase())
+      (existingSubjects ?? []).map((s) => s.name.toLowerCase()),
     );
     return STARTER_CHIPS.filter(
-      (chip) => !existingNames.has(chip.toLowerCase())
+      (chip) => !existingNames.has(chip.toLowerCase()),
     );
   }, [existingSubjects]);
 
@@ -483,6 +523,12 @@ export default function CreateSubjectScreen() {
   const subjectLimitGuidance = isSubjectLimitError
     ? ' Delete an old subject first to make room.'
     : '';
+  const busyLabel =
+    resolveState.phase === 'resolving'
+      ? t('subject.checkingName')
+      : resolveState.phase === 'preparing'
+        ? t('subject.preparingCurriculum')
+        : t('subject.creatingSubject');
 
   return (
     <KeyboardAvoidingView
@@ -690,19 +736,21 @@ export default function CreateSubjectScreen() {
           </Text>
         )}
 
-        {/* Resolve loading indicator */}
-        {resolveState.phase === 'resolving' && (
+        {/* Resolve/create loading indicator */}
+        {isBusy && (
           <View
-            className="flex-row items-center mb-4"
+            className="items-center justify-center bg-surface-elevated rounded-button mb-4 py-4"
             testID="subject-resolve-loading"
+            accessibilityRole="image"
+            accessibilityLabel={busyLabel}
           >
-            <ActivityIndicator
-              size="small"
+            <BookPageFlipAnimation
+              size={72}
               color={colors.primary}
-              style={{ marginRight: 8 }}
+              testID="subject-book-loading"
             />
-            <Text className="text-body-sm text-text-secondary">
-              {t('subject.checkingName')}
+            <Text className="text-body-sm text-text-secondary mt-1">
+              {busyLabel}
             </Text>
           </View>
         )}
@@ -944,14 +992,15 @@ export default function CreateSubjectScreen() {
         {/* Only show Start Learning when not showing suggestions */}
         {!showSuggestion && (
           <>
-            <Button
-              variant="primary"
-              label={t('subject.startLearning')}
-              onPress={onSubmit}
-              disabled={!canSubmit}
-              loading={isBusy}
-              testID="create-subject-submit"
-            />
+            {!isBusy && (
+              <Button
+                variant="primary"
+                label={t('subject.startLearning')}
+                onPress={onSubmit}
+                disabled={!canSubmit}
+                testID="create-subject-submit"
+              />
+            )}
             {/* BUG-414: Explain why button is disabled */}
             {!canSubmit && !isBusy && (
               <Text

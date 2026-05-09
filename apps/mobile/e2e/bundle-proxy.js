@@ -33,7 +33,7 @@ const server = http.createServer((req, res) => {
 
   const proxyReq = http.request(
     {
-      hostname: 'localhost',
+      hostname: '127.0.0.1',
       port: METRO_PORT,
       path: proxyPath,
       method: req.method,
@@ -84,7 +84,7 @@ const server = http.createServer((req, res) => {
           console.error('Failed to extract JS bundle from multipart response');
           res.writeHead(502, { 'content-type': 'text/plain' });
           res.end(
-            'Bundle proxy: failed to extract JS bundle from multipart response'
+            'Bundle proxy: failed to extract JS bundle from multipart response',
           );
           return;
         }
@@ -92,7 +92,7 @@ const server = http.createServer((req, res) => {
         res.writeHead(proxyRes.statusCode, responseHeaders);
         res.end(body);
       });
-    }
+    },
   );
 
   proxyReq.on('error', (err) => {
@@ -107,7 +107,7 @@ const server = http.createServer((req, res) => {
 server.on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
     console.error(
-      `Port ${PROXY_PORT} is already in use. Kill the existing process or use a different port.`
+      `Port ${PROXY_PORT} is already in use. Kill the existing process or use a different port.`,
     );
   } else {
     console.error('Server error:', err.message);
@@ -117,9 +117,9 @@ server.on('error', (err) => {
 
 server.listen(PROXY_PORT, () => {
   console.log(
-    `Bundle proxy listening on port ${PROXY_PORT}, forwarding to Metro on port ${METRO_PORT}`
+    `Bundle proxy listening on port ${PROXY_PORT}, forwarding to Metro on port ${METRO_PORT}`,
   );
   console.log(
-    'Configure dev-client to connect to: http://10.0.2.2:' + PROXY_PORT
+    'Configure dev-client to connect to: http://10.0.2.2:' + PROXY_PORT,
   );
 });

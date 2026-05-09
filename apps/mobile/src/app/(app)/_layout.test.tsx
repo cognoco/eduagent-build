@@ -106,9 +106,6 @@ jest.mock('../../lib/theme', () => ({
   useTokenVars: () => ({}),
 }));
 
-// use-push-token-registration indirectly uses useApiClient (via useRegisterPushToken).
-// Mocked at the fetch boundary via mockFetch — route: POST /settings/push-token
-
 jest.mock('../../hooks/use-revenuecat', () => ({
   useRevenueCatIdentity: jest.fn(),
 }));
@@ -639,9 +636,9 @@ describe('AppLayout', () => {
   });
 
   // Permission setup gate is JIT-disabled — permissions are requested at
-  // feature entry (mic on first voice tap, camera on homework screen, etc.),
-  // never via an upfront screen at app launch. The gate component still
-  // exists in code but is never rendered on the (app) layout path.
+  // feature entry (mic on first voice tap, camera on homework screen,
+  // notifications after session value), never via an upfront screen at app
+  // launch.
   it('never shows the permission setup gate even when permissions are denied', async () => {
     const ExpoNotifications = require('expo-notifications');
     (ExpoNotifications.getPermissionsAsync as jest.Mock).mockResolvedValue({

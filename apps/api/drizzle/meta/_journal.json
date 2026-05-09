@@ -470,6 +470,20 @@
       "when": 1779000012000,
       "tag": "0066_enable_rls_pending_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1778247099027,
+      "tag": "0067_plain_spyke",
+      "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1779000013000,
+      "tag": "0068_session_events_client_id_conflict_target",
+      "breakpoints": true
     }
   ]
 }

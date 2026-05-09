@@ -2,7 +2,7 @@ import { buildSystemPrompt } from './exchange-prompts';
 import type { ExchangeContext } from './exchanges';
 
 function makeContext(
-  overrides: Partial<ExchangeContext> = {}
+  overrides: Partial<ExchangeContext> = {},
 ): ExchangeContext {
   return {
     sessionId: 'session-1',
@@ -24,7 +24,7 @@ describe('buildSystemPrompt — anti-fabrication block [BUG-937]', () => {
         topicTitle: 'Greetings & Introductions',
         topicDescription:
           'Meet people, say hello, and share simple personal details.',
-      })
+      }),
     );
 
     expect(prompt).toContain('ANTI-FABRICATION');
@@ -41,7 +41,7 @@ describe('buildSystemPrompt — anti-fabrication block [BUG-937]', () => {
         sessionType: 'learning',
         topicTitle: 'Photosynthesis',
         topicDescription: 'How plants turn sunlight into energy.',
-      })
+      }),
     );
 
     expect(prompt).toContain('ANTI-FABRICATION');
@@ -56,7 +56,7 @@ describe('buildSystemPrompt — anti-fabrication block [BUG-937]', () => {
         learnerName: 'Zuzana',
         pedagogyMode: 'four_strands',
         languageCode: 'it',
-      })
+      }),
     );
 
     const antiFabIdx = prompt.indexOf('ANTI-FABRICATION');
@@ -76,7 +76,7 @@ describe('buildSystemPrompt — anti-fabrication block [BUG-937]', () => {
         pedagogyMode: 'four_strands',
         languageCode: 'it',
         knownVocabulary: [],
-      })
+      }),
     );
 
     expect(prompt).toMatch(/"You already know X" is forbidden/i);
@@ -88,7 +88,7 @@ describe('buildSystemPrompt — anti-fabrication block [BUG-937]', () => {
         pedagogyMode: 'four_strands',
         languageCode: 'it',
         knownVocabulary: [],
-      })
+      }),
     );
 
     // The empty-vocabulary block from language-prompts.ts must reach the final
@@ -106,7 +106,7 @@ describe('buildSystemPrompt — first-encounter topic probe', () => {
         exchangeCount: 0,
         isFirstEncounter: true,
         isFirstSessionOfSubject: true,
-      })
+      }),
     );
 
     expect(prompt).toContain('SUBJECT OPENER');
@@ -122,17 +122,17 @@ describe('buildSystemPrompt — first-encounter topic probe', () => {
         exchangeCount: 0,
         isFirstEncounter: true,
         isFirstSessionOfSubject: false,
-      })
+      }),
     );
 
     expect(prompt).toContain('FIRST-ENCOUNTER TOPIC RULE');
     expect(prompt).toContain(
-      'one teaching nugget AND one focused follow-up question'
+      'one teaching nugget AND one focused follow-up question',
     );
     expect(prompt).toContain('end with exactly one focused follow-up question');
     expect(prompt).not.toContain('end with exactly one learner action');
     expect(prompt).toContain(
-      'NEVER frame this as an interview, intake, or assessment'
+      'NEVER frame this as an interview, intake, or assessment',
     );
   });
 
@@ -146,7 +146,7 @@ describe('buildSystemPrompt — first-encounter topic probe', () => {
           { role: 'assistant', content: 'Yes - sunlight matters.' },
         ],
         isFirstEncounter: true,
-      })
+      }),
     );
     const turn4Prompt = buildSystemPrompt(
       makeContext({
@@ -157,7 +157,7 @@ describe('buildSystemPrompt — first-encounter topic probe', () => {
           { role: 'assistant', content: 'Yes - sunlight matters.' },
         ],
         isFirstEncounter: true,
-      })
+      }),
     );
 
     expect(turn3Prompt).toContain('FIRST-ENCOUNTER TOPIC RULE');
@@ -171,7 +171,7 @@ describe('buildSystemPrompt — first-encounter topic probe', () => {
         exchangeCount: 0,
         isFirstEncounter: false,
         isFirstSessionOfSubject: false,
-      })
+      }),
     );
 
     expect(prompt).toContain('end with exactly one learner action');
@@ -185,7 +185,7 @@ describe('buildSystemPrompt — first-encounter topic probe', () => {
         pedagogyMode: 'four_strands',
         exchangeCount: 0,
         isFirstEncounter: true,
-      })
+      }),
     );
     const reviewPrompt = buildSystemPrompt(
       makeContext({
@@ -193,7 +193,7 @@ describe('buildSystemPrompt — first-encounter topic probe', () => {
         topicTitle: 'Photosynthesis',
         exchangeCount: 0,
         isFirstEncounter: true,
-      })
+      }),
     );
 
     expect(languagePrompt).not.toContain('FIRST-ENCOUNTER TOPIC RULE');
@@ -210,11 +210,37 @@ describe('buildSystemPrompt — first-encounter topic probe', () => {
           currentKnowledge: 'has already used chemistry sets',
           interests: ['experiments'],
         },
-      })
+      }),
     );
 
     expect(prompt).toContain('SIGNAL REFLECTION');
     expect(prompt).toContain('has already used chemistry sets');
     expect(prompt).toContain('experiments');
+  });
+
+  it('[BUG-ZERO-TOKEN-STREAM] keeps response format as the final instruction when orphan turns exist', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        exchangeHistory: [
+          { role: 'user', content: 'first question' },
+          { role: 'assistant', content: 'first answer' },
+          {
+            role: 'user',
+            content: 'lost retry',
+            orphan_reason: 'llm_empty_or_unparseable',
+          },
+        ],
+      }),
+    );
+
+    const orphanIdx = prompt.indexOf('ORPHAN USER TURN RECOVERY');
+    const formatIdx = prompt.lastIndexOf('RESPONSE FORMAT — CRITICAL');
+    expect(orphanIdx).toBeGreaterThan(-1);
+    expect(formatIdx).toBeGreaterThan(orphanIdx);
+    expect(prompt).toContain(
+      '<server_note kind="orphan_user_turn" reason="llm_empty_or_unparseable"/>',
+    );
+    expect(prompt.slice(formatIdx)).not.toContain('<server_note');
+    expect(prompt.trim()).toMatch(/observational only\.$/);
   });
 });

@@ -69,7 +69,7 @@ export function FeedbackSheet({
         onError: (err) => {
           setError(formatApiError(err));
         },
-      }
+      },
     );
   }
 
@@ -104,10 +104,18 @@ export function FeedbackSheet({
             <Text className="text-primary text-body font-semibold">Cancel</Text>
           </Pressable>
           <Text className="text-h2 font-bold text-text-primary">
-            Report a Problem
+            Give us feedback now!
           </Text>
           <View style={{ minWidth: 44 }} />
         </View>
+        {Platform.OS !== 'web' && (
+          <Text
+            className="text-body-sm font-bold text-secondary text-center px-5 pb-2"
+            testID="feedback-shake-hint"
+          >
+            Or shake your phone anytime to contact us.
+          </Text>
+        )}
 
         {submitted ? (
           <View className="flex-1 items-center justify-center px-5">
@@ -191,14 +199,6 @@ export function FeedbackSheet({
                 We&apos;ll also include your app version and device info to help
                 us investigate.
               </Text>
-              {Platform.OS !== 'web' && (
-                <Text
-                  className="text-caption text-text-muted mt-2"
-                  testID="feedback-shake-hint"
-                >
-                  Tip: shake your phone anytime to open this.
-                </Text>
-              )}
             </ScrollView>
 
             <View className="px-5 pb-4">

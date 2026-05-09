@@ -29,7 +29,7 @@ import SessionScreen from './index';
 // the factory and expose it via `global.__sessionTestMockFetch` so the rest of
 // the test file can reference it through a typed alias below.
 
-jest.mock('../../../lib/api-client', () => {
+jest.mock('../../../lib/api-client' /* gc1-allow: unit test boundary */, () => {
   const {
     createRoutedMockFetch: _create,
     mockApiClientFactory: _factory,
@@ -53,6 +53,7 @@ jest.mock('../../../lib/api-client', () => {
       },
       subjects: [],
     },
+    '/learning-mode': { mode: 'casual' },
     // Default: no active session for topic (null = route not matched → empty 200)
     // Per-test overrides use mockFetch.setRoute('/progress/topic', ...)
 
@@ -140,6 +141,10 @@ const mockSetSessionInputMode = jest.fn();
 const mockFlagSessionContent = jest.fn();
 const mockReplace = jest.fn();
 const mockSetParams = jest.fn();
+const mockUpdateLearningModeMutate = jest.fn();
+let mockLearningMode: 'casual' | 'serious' | undefined = 'casual';
+let mockLearningModeLoading = false;
+let mockLearningModePending = false;
 
 type TranscriptMockReturn = {
   data: null | {
@@ -162,53 +167,80 @@ type TranscriptMockReturn = {
   };
 };
 const mockUseSessionTranscript = jest.fn<TranscriptMockReturn, [string?]>(
-  () => ({ data: null })
+  () => ({ data: null }),
 );
-jest.mock('../../../hooks/use-sessions', () => ({
-  useSession: () => ({ data: null }),
-  useStartSession: () => ({
-    mutateAsync: mockStartSession,
+jest.mock(
+  '../../../hooks/use-sessions' /* gc1-allow: unit test boundary */,
+  () => ({
+    useSession: () => ({ data: null }),
+    useStartSession: () => ({
+      mutateAsync: mockStartSession,
+    }),
+    useCloseSession: () => ({
+      mutateAsync: mockCloseSession,
+    }),
+    useStreamMessage: () => ({
+      stream: mockStream,
+    }),
+    useClearContinuationDepth: () => ({
+      mutateAsync: mockClearContinuationDepth,
+      isPending: false,
+    }),
+    useSessionTranscript: (sessionId: string) =>
+      mockUseSessionTranscript(sessionId),
+    useRecordSystemPrompt: () => ({ mutateAsync: mockRecordSystemPrompt }),
+    useRecordSessionEvent: () => ({ mutateAsync: mockRecordSessionEvent }),
+    useSetSessionInputMode: () => ({ mutateAsync: mockSetSessionInputMode }),
+    useFlagSessionContent: () => ({ mutateAsync: mockFlagSessionContent }),
+    useParkingLot: () => ({ data: [], isLoading: false }),
+    useAddParkingLotItem: () => ({ mutateAsync: jest.fn(), isPending: false }),
   }),
-  useCloseSession: () => ({
-    mutateAsync: mockCloseSession,
+);
+
+jest.mock(
+  '../../../hooks/use-settings' /* gc1-allow: unit test boundary */,
+  () => ({
+    useCelebrationLevel: () => ({ data: 'all' }),
+    useLearningMode: () => ({
+      data: mockLearningMode,
+      isLoading: mockLearningModeLoading,
+    }),
+    useUpdateLearningMode: () => ({
+      mutate: mockUpdateLearningModeMutate,
+      isPending: mockLearningModePending,
+    }),
   }),
-  useStreamMessage: () => ({
-    stream: mockStream,
-  }),
-  useClearContinuationDepth: () => ({
-    mutateAsync: mockClearContinuationDepth,
-    isPending: false,
-  }),
-  useSessionTranscript: (sessionId: string) =>
-    mockUseSessionTranscript(sessionId),
-  useRecordSystemPrompt: () => ({ mutateAsync: mockRecordSystemPrompt }),
-  useRecordSessionEvent: () => ({ mutateAsync: mockRecordSessionEvent }),
-  useSetSessionInputMode: () => ({ mutateAsync: mockSetSessionInputMode }),
-  useFlagSessionContent: () => ({ mutateAsync: mockFlagSessionContent }),
-  useParkingLot: () => ({ data: [], isLoading: false }),
-  useAddParkingLotItem: () => ({ mutateAsync: jest.fn(), isPending: false }),
-}));
+);
 
 // ---------------------------------------------------------------------------
 // Local-state / device hooks — no useApiClient(), keep as mocks
 // ---------------------------------------------------------------------------
 
-jest.mock('../../../hooks/use-network-status', () => ({
-  useNetworkStatus: () => ({ isOffline: false }),
-}));
+jest.mock(
+  '../../../hooks/use-network-status' /* gc1-allow: unit test boundary */,
+  () => ({
+    useNetworkStatus: () => ({ isOffline: false }),
+  }),
+);
 
-jest.mock('../../../hooks/use-api-reachability', () => ({
-  useApiReachability: () => ({ isApiReachable: true, isChecked: true }),
-}));
+jest.mock(
+  '../../../hooks/use-api-reachability' /* gc1-allow: unit test boundary */,
+  () => ({
+    useApiReachability: () => ({ isApiReachable: true, isChecked: true }),
+  }),
+);
 
 const mockTrigger = jest.fn();
 const mockCelebrationResult = {
   CelebrationOverlay: null,
   trigger: mockTrigger,
 };
-jest.mock('../../../hooks/use-celebration', () => ({
-  useCelebration: () => mockCelebrationResult,
-}));
+jest.mock(
+  '../../../hooks/use-celebration' /* gc1-allow: unit test boundary */,
+  () => ({
+    useCelebration: () => mockCelebrationResult,
+  }),
+);
 
 const mockTrackExchangeResult = { triggered: [] as string[], trackerState: {} };
 const mockTrackExchange = jest.fn().mockReturnValue(mockTrackExchangeResult);
@@ -221,12 +253,15 @@ const mockMilestoneTracker = {
   hydrate: mockHydrate,
   reset: mockResetMilestones,
 };
-jest.mock('../../../hooks/use-milestone-tracker', () => ({
-  celebrationForReason: jest.fn(),
-  createMilestoneTrackerStateFromMilestones: jest.fn().mockReturnValue({}),
-  normalizeMilestoneTrackerState: jest.fn().mockReturnValue({}),
-  useMilestoneTracker: () => mockMilestoneTracker,
-}));
+jest.mock(
+  '../../../hooks/use-milestone-tracker' /* gc1-allow: unit test boundary */,
+  () => ({
+    celebrationForReason: jest.fn(),
+    createMilestoneTrackerStateFromMilestones: jest.fn().mockReturnValue({}),
+    normalizeMilestoneTrackerState: jest.fn().mockReturnValue({}),
+    useMilestoneTracker: () => mockMilestoneTracker,
+  }),
+);
 
 // ---------------------------------------------------------------------------
 // External / rendering mocks
@@ -245,149 +280,168 @@ jest.mock('expo-router', () => ({
   },
 }));
 
-jest.mock('../../../components/session', () => ({
-  ChatShell: ({
-    subtitle,
-    headerBelow,
-    messages,
-    inputAccessory,
-    belowInput,
-    inputMode,
-    onInputModeChange,
-    onSend,
-    renderMessageActions,
-    rightAction,
-    footer,
-    inputDisabled,
-    disabledReason,
-  }: {
-    subtitle?: string;
-    headerBelow?: React.ReactNode;
-    messages?: Array<{ id: string; content: string }>;
-    inputAccessory?: React.ReactNode;
-    belowInput?: React.ReactNode;
-    inputMode?: InputMode;
-    onInputModeChange?: (mode: InputMode) => void;
-    onSend: (text: string) => void;
-    renderMessageActions?: (message: {
-      id: string;
-      role: string;
-      content: string;
-      eventId?: string;
-      streaming?: boolean;
-      isSystemPrompt?: boolean;
-    }) => React.ReactNode;
-    rightAction?: React.ReactNode;
-    footer?: React.ReactNode;
-    inputDisabled?: boolean;
-    disabledReason?: string;
-  }) => {
-    const { View, Text, Pressable } = require('react-native');
-    return (
-      <View>
-        <Text testID="session-subtitle">{subtitle}</Text>
-        <Text testID="mock-input-mode">{inputMode ?? 'text'}</Text>
-        {headerBelow}
-        {inputDisabled && disabledReason ? (
-          <View testID="input-disabled-banner">
-            <Text>{disabledReason}</Text>
-          </View>
-        ) : null}
-        {(messages ?? []).map((message) => (
-          <View key={message.id} testID={`mock-message-${message.id}`}>
-            <Text>{message.content}</Text>
-            {renderMessageActions?.(message as never)}
-          </View>
-        ))}
-        {inputAccessory}
-        {belowInput}
-        {rightAction}
-        {footer}
-        <Pressable
-          testID="mock-set-voice-mode"
-          onPress={() => onInputModeChange?.('voice')}
-        >
-          <Text>Voice mode</Text>
-        </Pressable>
-        <Pressable
-          testID="mock-set-text-mode"
-          onPress={() => onInputModeChange?.('text')}
-        >
-          <Text>Text mode</Text>
-        </Pressable>
-        <Pressable
-          testID="manual-send-button"
-          onPress={() => onSend('Solve 2x + 5 = 17')}
-        >
-          <Text>Send</Text>
-        </Pressable>
-      </View>
-    );
-  },
-  animateResponse: jest.fn(),
-  getModeConfig: jest.fn().mockReturnValue({
-    title: 'Homework',
-    subtitle: 'Homework help',
-    placeholder: 'Ask for help',
-    showTimer: false,
-    showQuestionCount: false,
+jest.mock(
+  '../../../components/session' /* gc1-allow: unit test boundary */,
+  () => ({
+    ChatShell: ({
+      subtitle,
+      headerBelow,
+      messages,
+      inputAccessory,
+      belowInput,
+      inputMode,
+      onInputModeChange,
+      onSend,
+      renderMessageActions,
+      rightAction,
+      footer,
+      inputDisabled,
+      disabledReason,
+      showDisabledBanner,
+    }: {
+      subtitle?: string;
+      headerBelow?: React.ReactNode;
+      messages?: Array<{ id: string; content: string }>;
+      inputAccessory?: React.ReactNode;
+      belowInput?: React.ReactNode;
+      inputMode?: InputMode;
+      onInputModeChange?: (mode: InputMode) => void;
+      onSend: (text: string) => void;
+      renderMessageActions?: (message: {
+        id: string;
+        role: string;
+        content: string;
+        eventId?: string;
+        streaming?: boolean;
+        isSystemPrompt?: boolean;
+      }) => React.ReactNode;
+      rightAction?: React.ReactNode;
+      footer?: React.ReactNode;
+      inputDisabled?: boolean;
+      disabledReason?: string;
+      showDisabledBanner?: boolean;
+    }) => {
+      const { View, Text, Pressable } = require('react-native');
+      return (
+        <View>
+          <Text testID="session-subtitle">{subtitle}</Text>
+          <Text testID="mock-input-mode">{inputMode ?? 'text'}</Text>
+          {headerBelow}
+          {inputDisabled && showDisabledBanner !== false ? (
+            <View testID="input-disabled-banner">
+              <Text>{disabledReason ?? 'Input is currently unavailable'}</Text>
+            </View>
+          ) : null}
+          {(messages ?? []).map((message) => (
+            <View key={message.id} testID={`mock-message-${message.id}`}>
+              <Text>{message.content}</Text>
+              {renderMessageActions?.(message as never)}
+            </View>
+          ))}
+          {inputAccessory}
+          {belowInput}
+          {rightAction}
+          {footer}
+          <Pressable
+            testID="mock-set-voice-mode"
+            onPress={() => onInputModeChange?.('voice')}
+          >
+            <Text>Voice mode</Text>
+          </Pressable>
+          <Pressable
+            testID="mock-set-text-mode"
+            onPress={() => onInputModeChange?.('text')}
+          >
+            <Text>Text mode</Text>
+          </Pressable>
+          <Pressable
+            testID="manual-send-button"
+            onPress={() => onSend('Solve 2x + 5 = 17')}
+          >
+            <Text>Send</Text>
+          </Pressable>
+        </View>
+      );
+    },
+    animateResponse: jest.fn(),
+    getModeConfig: jest.fn().mockReturnValue({
+      title: 'Homework',
+      subtitle: 'Homework help',
+      placeholder: 'Ask for help',
+      showTimer: false,
+      showQuestionCount: false,
+    }),
+    getOpeningMessage: jest
+      .fn()
+      .mockReturnValue('Let us tackle this worksheet.'),
+    SessionTimer: () => null,
+    MilestoneDots: () => null,
+    QuestionCounter: () => null,
+    LibraryPrompt: () => null,
+    SessionInputModeToggle: () => null,
+    QuotaExceededCard: ({
+      details,
+      isOwner,
+    }: {
+      details: { reason: string };
+      isOwner: boolean;
+    }) => {
+      const { View, Text } = require('react-native');
+      return (
+        <View testID="quota-exceeded-card">
+          <Text>{isOwner ? 'Upgrade plan' : 'Ask your parent'}</Text>
+          <Text>
+            {details.reason === 'daily'
+              ? "today's limit"
+              : "this month's limit"}
+          </Text>
+        </View>
+      );
+    },
   }),
-  getOpeningMessage: jest.fn().mockReturnValue('Let us tackle this worksheet.'),
-  SessionTimer: () => null,
-  MilestoneDots: () => null,
-  QuestionCounter: () => null,
-  LibraryPrompt: () => null,
-  SessionInputModeToggle: () => null,
-  QuotaExceededCard: ({
-    details,
-    isOwner,
-  }: {
-    details: { reason: string };
-    isOwner: boolean;
-  }) => {
-    const { View, Text } = require('react-native');
-    return (
-      <View testID="quota-exceeded-card">
-        <Text>{isOwner ? 'Upgrade plan' : 'Ask your parent'}</Text>
-        <Text>
-          {details.reason === 'daily' ? "today's limit" : "this month's limit"}
-        </Text>
-      </View>
-    );
-  },
-}));
+);
 
-jest.mock('../../../lib/session-recovery', () => ({
-  clearSessionRecoveryMarker: jest.fn().mockResolvedValue(undefined),
-  readSessionRecoveryMarker: jest.fn().mockResolvedValue(null),
-  writeSessionRecoveryMarker: jest.fn().mockResolvedValue(undefined),
-}));
+jest.mock(
+  '../../../lib/session-recovery' /* gc1-allow: unit test boundary */,
+  () => ({
+    clearSessionRecoveryMarker: jest.fn().mockResolvedValue(undefined),
+    readSessionRecoveryMarker: jest.fn().mockResolvedValue(null),
+    writeSessionRecoveryMarker: jest.fn().mockResolvedValue(undefined),
+  }),
+);
 
 const secureStore: Record<string, string> = {};
-jest.mock('../../../lib/secure-storage', () => ({
-  getItemAsync: jest.fn((key: string) =>
-    Promise.resolve(secureStore[key] ?? null)
-  ),
-  setItemAsync: jest.fn((key: string, value: string) => {
-    secureStore[key] = value;
-    return Promise.resolve();
+jest.mock(
+  '../../../lib/secure-storage' /* gc1-allow: unit test boundary */,
+  () => ({
+    getItemAsync: jest.fn((key: string) =>
+      Promise.resolve(secureStore[key] ?? null),
+    ),
+    setItemAsync: jest.fn((key: string, value: string) => {
+      secureStore[key] = value;
+      return Promise.resolve();
+    }),
+    // [I-4] sanitizeSecureStoreKey is a pure string function — no mock needed,
+    // but the module mock must export it or callers get "not a function".
+    sanitizeSecureStoreKey: (raw: string) =>
+      raw.replace(/[^a-zA-Z0-9._-]/g, '_'),
   }),
-  // [I-4] sanitizeSecureStoreKey is a pure string function — no mock needed,
-  // but the module mock must export it or callers get "not a function".
-  sanitizeSecureStoreKey: (raw: string) => raw.replace(/[^a-zA-Z0-9._-]/g, '_'),
-}));
+);
 
 const { readSessionRecoveryMarker: mockReadSessionRecoveryMarker } =
   require('../../../lib/session-recovery') as {
     readSessionRecoveryMarker: jest.Mock;
   };
 
-jest.mock('../../../lib/format-api-error', () => ({
-  formatApiError: (error: unknown) =>
-    error instanceof Error ? error.message : 'Unknown error',
-}));
+jest.mock(
+  '../../../lib/format-api-error' /* gc1-allow: unit test boundary */,
+  () => ({
+    formatApiError: (error: unknown) =>
+      error instanceof Error ? error.message : 'Unknown error',
+  }),
+);
 
-jest.mock('../../../lib/profile', () => ({
+jest.mock('../../../lib/profile' /* gc1-allow: unit test boundary */, () => ({
   useProfile: () => ({
     activeProfile: {
       id: 'profile-1',
@@ -418,6 +472,9 @@ describe('SessionScreen homework flow', () => {
     jest.useFakeTimers();
     mockFetch.mockClear();
     mockUseSessionTranscript.mockReturnValue({ data: null });
+    mockLearningMode = 'casual';
+    mockLearningModeLoading = false;
+    mockLearningModePending = false;
     // Default: no active session (null response body)
     mockFetch.setRoute('/progress/topic', null);
     // Clear SecureStore mock data
@@ -455,7 +512,7 @@ describe('SessionScreen homework flow', () => {
           exchangeCount: number;
           escalationRung: number;
           aiEventId?: string;
-        }) => void
+        }) => void,
       ) => {
         // Real SSE streams always emit at least one token before completion
         onChunk('Got it.');
@@ -464,7 +521,7 @@ describe('SessionScreen homework flow', () => {
           escalationRung: 1,
           aiEventId: `event-${++aiEventCount}`,
         });
-      }
+      },
     );
     mockRecordSystemPrompt.mockResolvedValue({ ok: true });
     mockCloseSession.mockResolvedValue({ wallClockSeconds: 120 });
@@ -480,6 +537,150 @@ describe('SessionScreen homework flow', () => {
     jest.useRealTimers();
   });
 
+  it('renders Explorer learning mode in the session header', async () => {
+    jest.useRealTimers();
+    mockLearningMode = 'casual';
+
+    const testScreen = render(<SessionScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      testScreen.getByTestId('learning-mode-header-button');
+      testScreen.getByText('Explorer');
+    });
+    expect(testScreen.queryByTestId('agency-badge')).toBeNull();
+    expect(testScreen.queryByText('Independent mode')).toBeNull();
+    expect(testScreen.queryByText('Guided mode')).toBeNull();
+  });
+
+  it('renders Challenge mode in the session header', async () => {
+    jest.useRealTimers();
+    mockLearningMode = 'serious';
+
+    const testScreen = render(<SessionScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      testScreen.getByText('Challenge mode');
+    });
+  });
+
+  it('opens the learning mode selector from the session header', async () => {
+    jest.useRealTimers();
+    const testScreen = render(<SessionScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      testScreen.getByTestId('learning-mode-header-button');
+    });
+    fireEvent.press(testScreen.getByTestId('learning-mode-header-button'));
+
+    testScreen.getByTestId('learning-mode-sheet');
+    testScreen.getByText('Takes effect from your next message.');
+    testScreen.getByTestId('session-learning-mode-casual');
+    testScreen.getByTestId('session-learning-mode-serious');
+  });
+
+  it('closes the selector without a network call when active mode is tapped', async () => {
+    jest.useRealTimers();
+    mockLearningMode = 'casual';
+    const testScreen = render(<SessionScreen />, { wrapper: createWrapper() });
+
+    // Wait for the learning mode to load (button becomes enabled and shows the
+    // mode label). Without this, learningMode is undefined and tapping casual
+    // triggers a redundant PUT rather than a no-op close.
+    await waitFor(() => {
+      testScreen.getByText('Explorer');
+    });
+    fireEvent.press(testScreen.getByTestId('learning-mode-header-button'));
+    fireEvent.press(testScreen.getByTestId('session-learning-mode-casual'));
+
+    await waitFor(() => {
+      expect(
+        testScreen.UNSAFE_getByProps({ testID: 'learning-mode-modal' }).props
+          .visible,
+      ).toBe(false);
+    });
+    expect(mockUpdateLearningModeMutate).not.toHaveBeenCalled();
+  });
+
+  it('calls the learning mode mutation when an inactive mode is selected', async () => {
+    jest.useRealTimers();
+    mockLearningMode = 'casual';
+
+    const testScreen = render(<SessionScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      testScreen.getByText('Explorer');
+    });
+    fireEvent.press(testScreen.getByTestId('learning-mode-header-button'));
+    fireEvent.press(testScreen.getByTestId('session-learning-mode-serious'));
+
+    expect(mockUpdateLearningModeMutate).toHaveBeenCalledWith(
+      'serious',
+      expect.objectContaining({
+        onError: expect.any(Function),
+        onSuccess: expect.any(Function),
+      }),
+    );
+  });
+
+  it('starts a fresh session route from the session-expired primary action', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: 'subject-1',
+      subjectName: 'Math',
+      topicId: 'topic-1',
+      topicName: 'Linear equations',
+      sessionId: 'expired-session',
+    });
+    const { NotFoundError } = require('../../../lib/api-client');
+    mockUseSessionTranscript.mockReturnValue({
+      data: null,
+      error: new NotFoundError('Session not found'),
+    } as never);
+
+    render(<SessionScreen />, { wrapper: createWrapper() });
+
+    fireEvent.press(screen.getByTestId('session-expired-new-session'));
+
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/(app)/session',
+      params: {
+        mode: 'learning',
+        subjectId: 'subject-1',
+        subjectName: 'Math',
+        topicId: 'topic-1',
+        topicName: 'Linear equations',
+      },
+    });
+  });
+
+  it('disables the learning mode header while the mode is loading', async () => {
+    jest.useRealTimers();
+    mockLearningMode = undefined;
+    mockLearningModeLoading = true;
+
+    const testScreen = render(<SessionScreen />, { wrapper: createWrapper() });
+
+    expect(
+      testScreen.getByTestId('learning-mode-header-button').props
+        .accessibilityState.disabled,
+    ).toBe(true);
+  });
+
+  it('disables the learning mode header while a mode save is pending', async () => {
+    jest.useRealTimers();
+    mockLearningModePending = true;
+
+    const testScreen = render(<SessionScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      testScreen.getByText('Explorer');
+    });
+    expect(
+      testScreen.getByTestId('learning-mode-header-button').props
+        .accessibilityState.disabled,
+    ).toBe(true);
+  });
+
   it('keeps homework progress in one session when moving to the next problem', async () => {
     const wrapper = createWrapper();
     const testScreen = render(<SessionScreen />, { wrapper });
@@ -493,13 +694,13 @@ describe('SessionScreen homework flow', () => {
         expect.any(Function),
         expect.any(Function),
         'session-1',
-        expect.objectContaining({ idempotencyKey: expect.any(String) })
+        expect.objectContaining({ idempotencyKey: expect.any(String) }),
       );
     });
     expect(mockStartSession).toHaveBeenCalledTimes(1);
 
     expect(
-      testScreen.getByTestId('homework-problem-progress')
+      testScreen.getByTestId('homework-problem-progress'),
     ).toHaveTextContent('Problem 1 of 2');
 
     fireEvent.press(testScreen.getByTestId('next-problem-chip'));
@@ -516,13 +717,13 @@ describe('SessionScreen homework flow', () => {
         expect.any(Function),
         expect.any(Function),
         'session-1',
-        expect.objectContaining({ idempotencyKey: expect.any(String) })
+        expect.objectContaining({ idempotencyKey: expect.any(String) }),
       );
     });
     expect(mockStartSession).toHaveBeenCalledTimes(1);
 
     expect(
-      testScreen.getByTestId('homework-problem-progress')
+      testScreen.getByTestId('homework-problem-progress'),
     ).toHaveTextContent('Problem 2 of 2');
   }, 15000);
 
@@ -557,7 +758,7 @@ describe('SessionScreen homework flow', () => {
               ocrText: 'Solve 2x + 5 = 17',
             }),
           }),
-        })
+        }),
       );
     });
 
@@ -566,7 +767,7 @@ describe('SessionScreen homework flow', () => {
       const hwCalls = fetchCallsMatching(mockFetch, '/homework-state');
       expect(hwCalls.length).toBeGreaterThan(0);
       const body = extractJsonBody<{ metadata: { source?: string } }>(
-        hwCalls[0]?.init
+        hwCalls[0]?.init,
       );
       expect(body?.metadata).toMatchObject({ source: 'gallery' });
     });
@@ -601,7 +802,7 @@ describe('SessionScreen homework flow', () => {
         expect.any(Function),
         expect.any(Function),
         'session-1',
-        expect.objectContaining({ idempotencyKey: expect.any(String) })
+        expect.objectContaining({ idempotencyKey: expect.any(String) }),
       );
     });
 
@@ -616,7 +817,7 @@ describe('SessionScreen homework flow', () => {
           metadata: expect.objectContaining({
             chip: 'too_easy',
           }),
-        })
+        }),
       );
       expect(mockRecordSystemPrompt).toHaveBeenCalledWith({
         content:
@@ -628,13 +829,13 @@ describe('SessionScreen homework flow', () => {
         expect.any(Function),
         expect.any(Function),
         'session-1',
-        expect.objectContaining({ idempotencyKey: expect.any(String) })
+        expect.objectContaining({ idempotencyKey: expect.any(String) }),
       );
     });
     testScreen.getByTestId('session-confirmation-toast');
 
     fireEvent.press(
-      testScreen.getByTestId('message-feedback-not-helpful-event-2')
+      testScreen.getByTestId('message-feedback-not-helpful-event-2'),
     );
     await flushAsyncWork();
 
@@ -647,7 +848,7 @@ describe('SessionScreen homework flow', () => {
             value: 'not_helpful',
             eventId: 'event-2',
           },
-        })
+        }),
       );
       expect(mockRecordSystemPrompt).toHaveBeenCalledWith({
         content:
@@ -663,12 +864,12 @@ describe('SessionScreen homework flow', () => {
         expect.any(Function),
         expect.any(Function),
         'session-1',
-        expect.objectContaining({ idempotencyKey: expect.any(String) })
+        expect.objectContaining({ idempotencyKey: expect.any(String) }),
       );
     });
 
     fireEvent.press(
-      testScreen.getByTestId('message-feedback-incorrect-event-3')
+      testScreen.getByTestId('message-feedback-incorrect-event-3'),
     );
     await flushAsyncWork();
 
@@ -681,7 +882,7 @@ describe('SessionScreen homework flow', () => {
             value: 'incorrect',
             eventId: 'event-3',
           },
-        })
+        }),
       );
       expect(mockFlagSessionContent).toHaveBeenCalledWith({
         eventId: 'event-3',
@@ -701,7 +902,7 @@ describe('SessionScreen homework flow', () => {
         expect.any(Function),
         expect.any(Function),
         'session-1',
-        expect.objectContaining({ idempotencyKey: expect.any(String) })
+        expect.objectContaining({ idempotencyKey: expect.any(String) }),
       );
     });
   });
@@ -781,7 +982,7 @@ describe('SessionScreen homework flow', () => {
     await waitFor(() => {
       expect(testScreen.queryByText('Tell me about Africa')).toBeTruthy();
       expect(
-        testScreen.queryByText('Africa is the second-largest continent.')
+        testScreen.queryByText('Africa is the second-largest continent.'),
       ).toBeTruthy();
     });
   });
@@ -923,9 +1124,13 @@ describe('SessionScreen homework flow', () => {
     await waitFor(() => {
       testScreen.getByTestId('session-subject-resolution');
       expect(
-        testScreen.getAllByText(/math or physics/i).length
+        testScreen.getAllByText(/math or physics/i).length,
       ).toBeGreaterThan(0);
     });
+
+    expect(testScreen.queryByTestId('input-disabled-banner')).toBeNull();
+    expect(testScreen.queryByText('Switch topic')).toBeNull();
+    expect(testScreen.queryByText('Park it')).toBeNull();
 
     expect(mockStartSession).not.toHaveBeenCalled();
 
@@ -938,13 +1143,17 @@ describe('SessionScreen homework flow', () => {
     await waitFor(() => {
       const startCalls = fetchCallsMatching(
         mockFetch,
-        '/subjects/subject-2/sessions'
+        '/subjects/subject-2/sessions',
       );
       expect(startCalls.length).toBeGreaterThan(0);
       const body = extractJsonBody<{ subjectId: string; inputMode: string }>(
-        startCalls[0]?.init
+        startCalls[0]?.init,
       );
-      expect(body).toMatchObject({ subjectId: 'subject-2', inputMode: 'text' });
+      expect(body).toMatchObject({
+        subjectId: 'subject-2',
+        inputMode: 'text',
+        rawInput: 'Solve 2x + 5 = 17',
+      });
     });
 
     await waitFor(() => {
@@ -953,7 +1162,7 @@ describe('SessionScreen homework flow', () => {
         expect.any(Function),
         expect.any(Function),
         'session-1',
-        expect.objectContaining({ idempotencyKey: expect.any(String) })
+        expect.objectContaining({ idempotencyKey: expect.any(String) }),
       );
     });
   });
@@ -965,7 +1174,7 @@ describe('SessionScreen homework flow', () => {
     // Return a 500 error for classify
     mockFetch.setRoute(
       '/subjects/classify',
-      new Response(JSON.stringify({ error: 'Network error' }), { status: 500 })
+      new Response(JSON.stringify({ error: 'Network error' }), { status: 500 }),
     );
 
     const wrapper = createWrapper();
@@ -1053,7 +1262,7 @@ describe('SessionScreen homework flow', () => {
           'End session?',
           expect.any(String),
           expect.any(Array),
-          expect.objectContaining({ cancelable: true })
+          expect.objectContaining({ cancelable: true }),
         );
       });
 
@@ -1122,7 +1331,7 @@ describe('SessionScreen homework flow', () => {
               filedSubjectId: 'shelf-1',
               filedBookId: 'book-1',
             }),
-          })
+          }),
         );
       });
     }, 15000);
@@ -1141,7 +1350,7 @@ describe('SessionScreen homework flow', () => {
         expect(mockReplace).toHaveBeenCalledWith(
           expect.objectContaining({
             pathname: '/session-summary/session-1',
-          })
+          }),
         );
       });
     }, 15000);
@@ -1154,6 +1363,9 @@ describe('voice mode persistence', () => {
     jest.useFakeTimers();
     mockFetch.mockClear();
     mockUseSessionTranscript.mockReturnValue({ data: null });
+    mockLearningMode = 'casual';
+    mockLearningModeLoading = false;
+    mockLearningModePending = false;
     mockFetch.setRoute('/progress/topic', null);
     Object.keys(secureStore).forEach((key) => delete secureStore[key]);
     (useRouter as jest.Mock).mockReturnValue({
@@ -1173,11 +1385,11 @@ describe('voice mode persistence', () => {
       async (
         _msg: string,
         onChunk: (value: string) => void,
-        onDone: (r: { exchangeCount: number; escalationRung: number }) => void
+        onDone: (r: { exchangeCount: number; escalationRung: number }) => void,
       ) => {
         onChunk('Got it.');
         onDone({ exchangeCount: 1, escalationRung: 1 });
-      }
+      },
     );
     mockRecordSystemPrompt.mockResolvedValue({ ok: true });
     mockSetSessionInputMode.mockResolvedValue({
@@ -1249,7 +1461,7 @@ describe('voice mode persistence', () => {
       upgradeOptions: [],
     };
     mockStream.mockRejectedValueOnce(
-      new QuotaExceededError('Quota exceeded', details)
+      new QuotaExceededError('Quota exceeded', details),
     );
 
     const wrapper = createWrapper();

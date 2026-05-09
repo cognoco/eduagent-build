@@ -85,18 +85,3 @@ USER: Use football if it fits.
 ## Builder notes
 
 - Dimension: interest-context
-
-## Live LLM response
-
-```
-```json
-{
-  "goals": ["learn algebra equations"],
-  "experienceLevel": "beginner",
-  "currentKnowledge": "The learner wants to learn algebra equations, implying they are new to the topic.",
-  "interests": ["football"],
-  "interestContext": { "football": "free_time" },
-  "analogyFraming": "concrete"
-}
-```
-```

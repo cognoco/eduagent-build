@@ -26,16 +26,16 @@ function getRecoveryKey(profileId?: string | null): string {
 
 export async function writeSessionRecoveryMarker(
   marker: SessionRecoveryMarker,
-  profileId?: string | null
+  profileId?: string | null,
 ): Promise<void> {
   await SecureStore.setItemAsync(
     getRecoveryKey(profileId),
-    JSON.stringify(marker)
+    JSON.stringify(marker),
   );
 }
 
 export async function readSessionRecoveryMarker(
-  profileId?: string | null
+  profileId?: string | null,
 ): Promise<SessionRecoveryMarker | null> {
   const raw = await SecureStore.getItemAsync(getRecoveryKey(profileId));
 
@@ -51,7 +51,9 @@ export async function readSessionRecoveryMarker(
   try {
     const parsed = JSON.parse(effectiveRaw) as SessionRecoveryMarker;
     if (!parsed.sessionId || !parsed.updatedAt) return null;
-    if (profileId && parsed.profileId && parsed.profileId !== profileId) {
+    // Unscoped legacy markers are dropped intentionally: accepting them can
+    // surface another profile's in-progress session on shared devices.
+    if (profileId && parsed.profileId !== profileId) {
       return null;
     }
 
@@ -59,7 +61,7 @@ export async function readSessionRecoveryMarker(
     // and clean up the old one so this fallback only fires once.
     if (!raw && profileId) {
       await writeSessionRecoveryMarker(parsed, profileId).catch(
-        () => undefined
+        () => undefined,
       );
       await SecureStore.deleteItemAsync(RECOVERY_KEY).catch(() => undefined);
     }
@@ -72,7 +74,7 @@ export async function readSessionRecoveryMarker(
 }
 
 export async function clearSessionRecoveryMarker(
-  profileId?: string | null
+  profileId?: string | null,
 ): Promise<void> {
   await SecureStore.deleteItemAsync(getRecoveryKey(profileId));
   // Also clean up the legacy unscoped key if it exists, preventing orphaned entries.
@@ -83,7 +85,7 @@ export async function clearSessionRecoveryMarker(
 
 export function isRecoveryMarkerFresh(
   marker: SessionRecoveryMarker,
-  now = Date.now()
+  now = Date.now(),
 ): boolean {
   const updatedAt = new Date(marker.updatedAt).getTime();
   return Number.isFinite(updatedAt) && now - updatedAt < RECOVERY_WINDOW_MS;

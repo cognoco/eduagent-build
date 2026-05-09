@@ -100,7 +100,7 @@ describe('book-generation', () => {
           expect.objectContaining({
             role: 'system',
             content: expect.stringContaining(
-              'For ages 18+, use clear adult-learning titles'
+              'For ages 18+, use clear adult-learning titles',
             ),
           }),
           expect.objectContaining({
@@ -112,7 +112,7 @@ describe('book-generation', () => {
             content: expect.stringContaining('Learner age: 20'),
           }),
         ]),
-        2
+        2,
       );
     });
   });
@@ -154,7 +154,7 @@ describe('book-generation', () => {
       const result = await generateBookTopics(
         'Ancient Egypt',
         'Explore pyramids and pharaohs',
-        11
+        11,
       );
 
       expect(result.topics).toHaveLength(3);
@@ -175,7 +175,7 @@ describe('book-generation', () => {
         'Ancient Egypt',
         'Explore pyramids',
         11,
-        'I already know about pyramids'
+        'I already know about pyramids',
       );
 
       expect(mockRouteAndCall).toHaveBeenCalledWith(
@@ -185,8 +185,32 @@ describe('book-generation', () => {
             content: expect.stringContaining('I already know about pyramids'),
           }),
         ]),
-        2
+        2,
       );
+    });
+
+    it('rejects blank generated topic titles', async () => {
+      mockRouteAndCall.mockResolvedValueOnce({
+        response: JSON.stringify({
+          topics: [
+            {
+              title: '   ',
+              description: 'How it all began',
+              chapter: 'The Story',
+              sortOrder: 1,
+              estimatedMinutes: 30,
+            },
+          ],
+          connections: [],
+        }),
+        provider: 'mock',
+        model: 'mock-model',
+        latencyMs: 12,
+      });
+
+      await expect(
+        generateBookTopics('Ancient Egypt', 'Explore pyramids', 11),
+      ).rejects.toThrow('LLM returned unexpected book topic structure');
     });
 
     it('asks for adult-appropriate book topic naming when the learner is adult', async () => {
@@ -200,7 +224,7 @@ describe('book-generation', () => {
       await generateBookTopics(
         'Life Sciences',
         'Living things, ecosystems, and the human body',
-        20
+        20,
       );
 
       expect(mockRouteAndCall).toHaveBeenCalledWith(
@@ -208,19 +232,19 @@ describe('book-generation', () => {
           expect.objectContaining({
             role: 'system',
             content: expect.stringContaining(
-              'For ages 18+, use clear adult-learning titles'
+              'For ages 18+, use clear adult-learning titles',
             ),
           }),
           expect.objectContaining({
             role: 'system',
             content: expect.stringContaining(
-              'never preschool, early-reader, or babyish wording'
+              'never preschool, early-reader, or babyish wording',
             ),
           }),
           expect.objectContaining({
             role: 'system',
             content: expect.stringContaining(
-              'Avoid cutesy labels, exclamation marks'
+              'Avoid cutesy labels, exclamation marks',
             ),
           }),
           expect.objectContaining({
@@ -228,7 +252,7 @@ describe('book-generation', () => {
             content: expect.stringContaining('Learner age: 20'),
           }),
         ]),
-        2
+        2,
       );
     });
   });
@@ -247,7 +271,7 @@ describe('book-generation', () => {
       });
 
       await expect(detectSubjectType('History', 11)).rejects.toThrow(
-        'LLM returned invalid JSON for subject detection'
+        'LLM returned invalid JSON for subject detection',
       );
     });
 
@@ -260,7 +284,7 @@ describe('book-generation', () => {
       });
 
       await expect(detectSubjectType('History', 11)).rejects.toThrow(
-        'LLM returned invalid JSON for subject detection'
+        'LLM returned invalid JSON for subject detection',
       );
     });
 
@@ -277,7 +301,7 @@ describe('book-generation', () => {
       });
 
       await expect(detectSubjectType('History', 11)).rejects.toThrow(
-        'LLM returned unexpected subject detection structure'
+        'LLM returned unexpected subject detection structure',
       );
     });
 
@@ -293,7 +317,7 @@ describe('book-generation', () => {
       });
 
       await expect(detectSubjectType('History', 11)).rejects.toThrow(
-        'LLM returned unexpected subject detection structure'
+        'LLM returned unexpected subject detection structure',
       );
     });
 
@@ -331,7 +355,7 @@ describe('book-generation', () => {
       });
 
       await expect(detectSubjectType('History', 11)).rejects.toThrow(
-        'LLM returned invalid JSON for subject detection'
+        'LLM returned invalid JSON for subject detection',
       );
     });
   });
@@ -346,7 +370,7 @@ describe('book-generation', () => {
       });
 
       await expect(
-        generateBookTopics('Ancient Egypt', 'Explore pyramids', 11)
+        generateBookTopics('Ancient Egypt', 'Explore pyramids', 11),
       ).rejects.toThrow('LLM returned invalid JSON for book topic generation');
     });
 
@@ -359,7 +383,7 @@ describe('book-generation', () => {
       });
 
       await expect(
-        generateBookTopics('Ancient Egypt', 'Explore pyramids', 11)
+        generateBookTopics('Ancient Egypt', 'Explore pyramids', 11),
       ).rejects.toThrow('LLM returned invalid JSON for book topic generation');
     });
 
@@ -376,7 +400,7 @@ describe('book-generation', () => {
       });
 
       await expect(
-        generateBookTopics('Ancient Egypt', 'Explore pyramids', 11)
+        generateBookTopics('Ancient Egypt', 'Explore pyramids', 11),
       ).rejects.toThrow('LLM returned unexpected book topic structure');
     });
 
@@ -400,7 +424,7 @@ describe('book-generation', () => {
       });
 
       await expect(
-        generateBookTopics('Ancient Egypt', 'Explore pyramids', 11)
+        generateBookTopics('Ancient Egypt', 'Explore pyramids', 11),
       ).rejects.toThrow('LLM returned unexpected book topic structure');
     });
 
@@ -429,7 +453,7 @@ describe('book-generation', () => {
       const result = await generateBookTopics(
         'Ancient Egypt',
         'Explore pyramids',
-        11
+        11,
       );
       expect(result.topics).toHaveLength(1);
       expect(result.topics[0]?.title).toBe('Timeline');
@@ -446,7 +470,7 @@ describe('book-generation', () => {
       // extractJson regex /\{[\s\S]*\}/ extracts {"title":"Timeline"} from the array,
       // which parses as valid JSON but fails schema validation (no topics/connections).
       await expect(
-        generateBookTopics('Ancient Egypt', 'Explore pyramids', 11)
+        generateBookTopics('Ancient Egypt', 'Explore pyramids', 11),
       ).rejects.toThrow('LLM returned unexpected book topic structure');
     });
   });

@@ -60,7 +60,7 @@ export class RateLimitedError extends Error {
     message = "You've hit the limit. Wait a moment and try again.",
     code?: string,
     _details?: unknown,
-    retryAfter?: number
+    retryAfter?: number,
   ) {
     super(message);
     this.name = RATE_LIMITED_ERROR_NAME;
@@ -76,6 +76,15 @@ export class UpstreamLlmError extends Error {
     super(message);
     this.name = 'UpstreamLlmError';
     Object.setPrototypeOf(this, UpstreamLlmError.prototype);
+  }
+}
+
+export class SafetyFilterError extends Error {
+  readonly errorCode = 'SAFETY_FILTER' as const;
+  constructor(message: string) {
+    super(message);
+    this.name = 'SafetyFilterError';
+    Object.setPrototypeOf(this, SafetyFilterError.prototype);
   }
 }
 
@@ -122,7 +131,10 @@ export class BadRequestError extends Error {
 
 export class LlmStreamError extends Error {
   readonly errorCode = 'LLM_STREAM_ERROR' as const;
-  constructor(message: string, public override cause?: unknown) {
+  constructor(
+    message: string,
+    public override cause?: unknown,
+  ) {
     super(message);
     this.name = 'LlmStreamError';
     Object.setPrototypeOf(this, LlmStreamError.prototype);
@@ -131,7 +143,10 @@ export class LlmStreamError extends Error {
 
 export class LlmEnvelopeError extends Error {
   readonly errorCode = 'LLM_ENVELOPE_ERROR' as const;
-  constructor(message: string, public override cause?: unknown) {
+  constructor(
+    message: string,
+    public override cause?: unknown,
+  ) {
     super(message);
     this.name = 'LlmEnvelopeError';
     Object.setPrototypeOf(this, LlmEnvelopeError.prototype);
@@ -152,7 +167,7 @@ export class PersistCurriculumError extends Error {
   public code: PersistFailureCode;
   constructor(
     codeOrMessage: PersistFailureCode | string,
-    messageOrCause?: string | unknown
+    messageOrCause?: string | unknown,
   ) {
     const isCode = persistFailureCodeSchema.safeParse(codeOrMessage).success;
     const code = isCode ? (codeOrMessage as PersistFailureCode) : 'unknown';
@@ -170,7 +185,7 @@ export class PersistCurriculumError extends Error {
 }
 
 export function classifyOrphanError(
-  err: unknown
+  err: unknown,
 ): import('./sessions').OrphanReason {
   if (err instanceof LlmStreamError) return 'llm_stream_error';
   if (err instanceof LlmEnvelopeError) return 'llm_empty_or_unparseable';
@@ -213,7 +228,7 @@ export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];
 
 const errorCodeValues = Object.values(ERROR_CODES) as [
   ErrorCode,
-  ...ErrorCode[]
+  ...ErrorCode[],
 ];
 export const errorCodeSchema = z.enum(errorCodeValues);
 

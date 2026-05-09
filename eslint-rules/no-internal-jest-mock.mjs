@@ -36,6 +36,13 @@ const rule = {
   },
 
   create(context) {
+    const sourceCode = context.sourceCode;
+
+    function hasGc1AllowOnLine(node) {
+      const line = sourceCode.lines[node.loc.start.line - 1] ?? '';
+      return line.includes('gc1-allow');
+    }
+
     function check(node) {
       const arg = node.arguments[0];
       if (!arg || arg.type !== 'Literal' || typeof arg.value !== 'string') {
@@ -43,6 +50,9 @@ const rule = {
       }
       const specifier = arg.value;
       if (specifier.startsWith('./') || specifier.startsWith('../')) {
+        if (hasGc1AllowOnLine(node) || hasGc1AllowOnLine(arg)) {
+          return;
+        }
         context.report({
           node: arg,
           messageId: 'internalMock',

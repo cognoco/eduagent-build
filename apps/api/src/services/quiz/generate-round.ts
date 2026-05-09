@@ -13,7 +13,7 @@ import {
 import { createScopedRepository, type Database } from '@eduagent/database';
 import { getRecentMissedItems, markMissedItemsSurfaced } from './queries';
 import type { ChatMessage } from '../llm';
-import { routeAndCall } from '../llm';
+import { routeAndCall, CircuitOpenError } from '../llm';
 import { captureException } from '../sentry';
 import { UpstreamLlmError, VocabularyContextError } from '../../errors';
 import { getLearningProfile } from '../learner-profile';
@@ -46,9 +46,44 @@ export { buildCapitalsPrompt } from './quiz-prompts';
 
 const logger = createLogger();
 
+/**
+ * [BUG-990] Wrap routeAndCall for quiz generation so that AbortError (from
+ * Cloudflare Worker request timeout) and CircuitOpenError (LLM provider
+ * circuit open) are converted into UpstreamLlmError instead of propagating
+ * as unhandled errors. UpstreamLlmError is caught by the global onError
+ * handler in index.ts and returned as 502 UPSTREAM_ERROR — a proper JSON
+ * error response instead of a hard Worker crash with 502 Bad Gateway.
+ */
+async function routeAndCallForQuiz(
+  messages: ChatMessage[],
+  rung: Parameters<typeof routeAndCall>[1],
+  options?: Parameters<typeof routeAndCall>[2],
+): ReturnType<typeof routeAndCall> {
+  try {
+    return await routeAndCall(messages, rung, options);
+  } catch (err) {
+    // AbortError: Cloudflare Worker request timeout fires and aborts in-flight
+    // fetch calls. DOMException with name 'AbortError' is the W3C standard form;
+    // plain Error with name 'AbortError' is Node.js / undici form.
+    const isAbortError =
+      (err instanceof Error && err.name === 'AbortError') ||
+      (typeof DOMException !== 'undefined' &&
+        err instanceof DOMException &&
+        err.name === 'AbortError');
+    if (isAbortError || err instanceof CircuitOpenError) {
+      throw new UpstreamLlmError(
+        err instanceof Error
+          ? err.message
+          : 'Quiz LLM request timed out or circuit is open',
+      );
+    }
+    throw err;
+  }
+}
+
 function buildMasteryDistractors(correctAnswer: string): string[] {
   const pool = CAPITALS_DATA.filter(
-    (entry) => entry.capital.toLowerCase() !== correctAnswer.toLowerCase()
+    (entry) => entry.capital.toLowerCase() !== correctAnswer.toLowerCase(),
   );
   return shuffle(pool)
     .slice(0, 3)
@@ -58,7 +93,7 @@ function buildMasteryDistractors(correctAnswer: string): string[] {
 export function injectMasteryQuestions(
   discoveryQuestions: CapitalsQuestion[],
   masteryItems: LibraryItem[],
-  activityType: QuizActivityType
+  activityType: QuizActivityType,
 ): CapitalsQuestion[] {
   if (activityType !== 'capitals' || masteryItems.length === 0) {
     return discoveryQuestions;
@@ -128,7 +163,7 @@ export interface AssembledRound {
 
 export function assembleRound(
   theme: string,
-  questions: QuizQuestion[]
+  questions: QuizQuestion[],
 ): AssembledRound {
   const libraryQuestionIndices = questions
     .map((question, index) => (question.isLibraryItem ? index : -1))
@@ -232,7 +267,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
         // all DB interests are treated as 'free_time' unless the caller annotates them.
         const rawInterests = Array.isArray(profile.interests)
           ? (profile.interests as unknown[]).filter(
-              (i): i is string => typeof i === 'string'
+              (i): i is string => typeof i === 'string',
             )
           : [];
         resolvedInterests = rawInterests.map((label) => ({
@@ -248,7 +283,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
               (entry): entry is { topic: string; confidence?: string } =>
                 typeof entry === 'object' &&
                 entry !== null &&
-                typeof (entry as { topic?: unknown }).topic === 'string'
+                typeof (entry as { topic?: unknown }).topic === 'string',
             )
             .filter((entry) => entry.confidence !== 'low')
             .slice(0, 10)
@@ -268,7 +303,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
   // `getRecentMissedItems` returns [] on any DB error.
   const missedRows = await getRecentMissedItems(db, profileId, activityType);
   const recentlyMissedItems = missedRows.map((row) =>
-    extractMissedItemLabel(row.questionText, row.correctAnswer, activityType)
+    extractMissedItemLabel(row.questionText, row.correctAnswer, activityType),
   );
 
   let theme = '';
@@ -300,7 +335,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
       { role: 'user', content: 'Generate the quiz round.' },
     ];
 
-    const llmResult = await routeAndCall(messages, 1, {
+    const llmResult = await routeAndCallForQuiz(messages, 1, {
       ageBracket,
     });
 
@@ -309,7 +344,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
     let llmOutput;
     try {
       llmOutput = capitalsLlmOutputSchema.parse(
-        JSON.parse(extractJsonObject(raw))
+        JSON.parse(extractJsonObject(raw)),
       );
     } catch (parseErr) {
       captureException(
@@ -320,7 +355,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
           userId: undefined,
           profileId,
           requestPath: 'services/quiz/generate-round',
-        }
+        },
       );
       throw new UpstreamLlmError('Quiz LLM returned invalid structured output');
     }
@@ -345,14 +380,14 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
     questions = injectMasteryQuestions(
       discoveryQuestions,
       plan.masteryItems,
-      activityType
+      activityType,
     );
     theme = validated.theme;
   } else if (activityType === 'vocabulary') {
     if (!languageCode || !cefrCeiling) {
       // [BUG-543] VocabularyContextError so the quiz route catches it as 400
       throw new VocabularyContextError(
-        'languageCode and cefrCeiling are required for vocabulary rounds'
+        'languageCode and cefrCeiling are required for vocabulary rounds',
       );
     }
 
@@ -381,7 +416,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
       { role: 'user', content: 'Generate the quiz round.' },
     ];
 
-    const llmResult = await routeAndCall(messages, 1, {
+    const llmResult = await routeAndCallForQuiz(messages, 1, {
       ageBracket,
     });
 
@@ -390,7 +425,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
     let llmOutput;
     try {
       llmOutput = vocabularyLlmOutputSchema.parse(
-        JSON.parse(extractJsonObject(raw))
+        JSON.parse(extractJsonObject(raw)),
       );
     } catch (parseErr) {
       captureException(
@@ -402,7 +437,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
           profileId,
           requestPath: 'services/quiz/generate-round',
           extra: { activityType },
-        }
+        },
       );
       throw new UpstreamLlmError('Quiz LLM returned invalid structured output');
     }
@@ -419,7 +454,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
       const result = buildVocabularyMasteryQuestion(
         item,
         allVocabulary ?? [],
-        item.cefrLevel ?? effectiveCefrCeiling
+        item.cefrLevel ?? effectiveCefrCeiling,
       );
       return result.ok ? [result.question] : [];
     });
@@ -449,7 +484,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
       { role: 'user', content: 'Generate the quiz round.' },
     ];
 
-    const llmResult = await routeAndCall(messages, 1, {
+    const llmResult = await routeAndCallForQuiz(messages, 1, {
       ageBracket,
     });
 
@@ -458,7 +493,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
     let llmOutput;
     try {
       llmOutput = guessWhoLlmOutputSchema.parse(
-        JSON.parse(extractJsonObject(raw))
+        JSON.parse(extractJsonObject(raw)),
       );
     } catch (parseErr) {
       captureException(
@@ -470,7 +505,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
           profileId,
           requestPath: 'services/quiz/generate-round',
           extra: { activityType },
-        }
+        },
       );
       throw new UpstreamLlmError('Quiz LLM returned invalid structured output');
     }
@@ -490,7 +525,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
       for (const item of plan.masteryItems) {
         const cluePrompt = buildGuessWhoMasteryCluePrompt(
           item.answer,
-          ageBracket
+          ageBracket,
         );
         const clueMessages: ChatMessage[] = [
           { role: 'system', content: cluePrompt },
@@ -498,12 +533,12 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
         ];
 
         try {
-          const clueResult = await routeAndCall(clueMessages, 1, {
+          const clueResult = await routeAndCallForQuiz(clueMessages, 1, {
             ageBracket,
           });
           const clueRaw = clueResult.response.slice(0, 16 * 1024);
           const parsed = guessWhoMasteryClueSchema.parse(
-            JSON.parse(extractJsonObject(clueRaw))
+            JSON.parse(extractJsonObject(clueRaw)),
           );
           if (
             parsed.clues.length === 5 &&
@@ -515,7 +550,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
               correctAnswer: item.answer,
               acceptedAliases: appendSurnameAlias(
                 item.answer,
-                parsed.acceptedAliases
+                parsed.acceptedAliases,
               ),
               clues: parsed.clues,
               mcFallbackOptions: parsed.mcFallbackOptions,
@@ -553,7 +588,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
     status: 'active',
     // [BUG-926] Persist the language being practised so aggregateCompletedStats
     // can group by (activityType, languageCode). NULL for non-vocabulary rounds.
-    languageCode: activityType === 'vocabulary' ? languageCode ?? null : null,
+    languageCode: activityType === 'vocabulary' ? (languageCode ?? null) : null,
   });
 
   if (!inserted) {
@@ -590,7 +625,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
 function extractMissedItemLabel(
   questionText: string,
   correctAnswer: string,
-  activityType: QuizActivityType
+  activityType: QuizActivityType,
 ): string {
   if (activityType === 'capitals') {
     const match = questionText.match(/^What is the capital of (.+?)\?$/);

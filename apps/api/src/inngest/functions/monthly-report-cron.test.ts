@@ -45,6 +45,26 @@ const mockMonthlyReportDb = createTransactionalMockDb({
     profiles: {
       findFirst: jest.fn().mockResolvedValue(null),
     },
+    // Consent gate added by email digest channel spec (2026-05-08).
+    // Default: null row → no restriction (pre-consent-flow accounts, CONSENTED presumed).
+    consentStates: {
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
+    // Learning profile struggles: default empty (no watch-line).
+    learningProfiles: {
+      findFirst: jest.fn().mockResolvedValue({ struggles: [] }),
+    },
+    // Notification prefs for email channel gate.
+    notificationPreferences: {
+      findFirst: jest.fn().mockResolvedValue({
+        weeklyProgressEmail: false,
+        monthlyProgressEmail: false,
+      }),
+    },
+    // Parent email lookup.
+    accounts: {
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
   },
   selectDistinct: mockSelectDistinct,
   insert: mockInsert,
@@ -63,6 +83,24 @@ const mockDatabaseModule = createDatabaseModuleMock({
       childProfileId: col('childProfileId'),
       reportMonth: col('reportMonth'),
       reportData: col('reportData'),
+    },
+    consentStates: {
+      profileId: col('profileId'),
+      consentType: col('consentType'),
+      status: col('status'),
+      requestedAt: col('requestedAt'),
+    },
+    learningProfiles: {
+      profileId: col('profileId'),
+      struggles: col('struggles'),
+    },
+    notificationPreferences: {
+      profileId: col('profileId'),
+      monthlyProgressEmail: col('monthlyProgressEmail'),
+    },
+    accounts: {
+      id: col('id'),
+      email: col('email'),
     },
   },
 });
@@ -108,10 +146,20 @@ jest.mock('../../services/snapshot-aggregation', () => ({
 }));
 
 const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
+const mockSendEmail = jest.fn().mockResolvedValue({ sent: true });
+const mockFormatMonthlyProgressEmail = jest.fn((to: string, body: string) => ({
+  to,
+  subject: "This month's learning report",
+  body,
+  type: 'monthly_progress',
+}));
 
 jest.mock('../../services/notifications', () => ({
   sendPushNotification: (...args: unknown[]) =>
     mockSendPushNotification(...args),
+  sendEmail: (...args: unknown[]) => mockSendEmail(...args),
+  formatMonthlyProgressEmail: (...args: unknown[]) =>
+    mockFormatMonthlyProgressEmail(...args),
 }));
 
 // [BUG-699-FOLLOWUP] 24h dedup gate. Default 0 so existing tests keep sending;
@@ -131,6 +179,7 @@ jest.mock('../../services/sentry', () => ({
 
 jest.mock('../helpers', () => ({
   getStepDatabase: jest.fn().mockReturnValue(mockMonthlyReportDb),
+  getStepResendApiKey: jest.fn().mockReturnValue('resend-test-key'),
   resetDatabaseUrl: jest.fn(),
 }));
 
@@ -251,6 +300,22 @@ beforeEach(() => {
     mockMonthlyReportDb.query.familyLinks.findMany as jest.Mock
   ).mockResolvedValue([]);
   (mockMonthlyReportDb.query.profiles.findFirst as jest.Mock).mockResolvedValue(
+    null,
+  );
+  // Consent gate: null row = no restriction (pre-consent-flow / CONSENTED presumed).
+  (
+    mockMonthlyReportDb.query.consentStates.findFirst as jest.Mock
+  ).mockResolvedValue(null);
+  (
+    mockMonthlyReportDb.query.learningProfiles.findFirst as jest.Mock
+  ).mockResolvedValue({ struggles: [] });
+  (
+    mockMonthlyReportDb.query.notificationPreferences.findFirst as jest.Mock
+  ).mockResolvedValue({
+    weeklyProgressEmail: false,
+    monthlyProgressEmail: false,
+  });
+  (mockMonthlyReportDb.query.accounts.findFirst as jest.Mock).mockResolvedValue(
     null,
   );
   mockGetSnapshotsInRange.mockResolvedValue([]);
@@ -631,6 +696,36 @@ describe('monthlyReportGenerate', () => {
           type: 'monthly_report',
           title: expect.stringContaining('Emma'),
           body: expect.any(String),
+        }),
+      );
+    });
+
+    it('sends monthly email when the preference row is missing (default on)', async () => {
+      (
+        mockMonthlyReportDb.query.notificationPreferences.findFirst as jest.Mock
+      ).mockResolvedValueOnce(null);
+      (mockMonthlyReportDb.query.profiles.findFirst as jest.Mock)
+        .mockResolvedValueOnce({ displayName: 'Emma' })
+        .mockResolvedValueOnce({ accountId: 'account-parent' });
+      (
+        mockMonthlyReportDb.query.accounts.findFirst as jest.Mock
+      ).mockResolvedValueOnce({ email: 'parent@example.test' });
+
+      await executeGenerateSteps(makeGenerateEvent());
+
+      expect(mockFormatMonthlyProgressEmail).toHaveBeenCalledWith(
+        'parent@example.test',
+        expect.stringContaining("Emma's monthly report is ready"),
+        expect.any(Array),
+      );
+      expect(mockSendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'parent@example.test',
+          type: 'monthly_progress',
+        }),
+        expect.objectContaining({
+          resendApiKey: 'resend-test-key',
+          idempotencyKey: expect.stringContaining('monthly-parent-001-'),
         }),
       );
     });

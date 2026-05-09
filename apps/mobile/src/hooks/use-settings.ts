@@ -26,6 +26,8 @@ interface NotificationPrefs {
   reviewReminders: boolean;
   dailyReminders: boolean;
   weeklyProgressPush: boolean;
+  weeklyProgressEmail: boolean;
+  monthlyProgressEmail: boolean;
   pushEnabled: boolean;
   maxDailyPush: number;
 }
@@ -45,7 +47,7 @@ export function useNotificationSettings(): UseQueryResult<NotificationPrefs> {
       try {
         const res = await client.settings.notifications.$get(
           {},
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         const data = await res.json();
@@ -69,7 +71,7 @@ export function useLearningMode(): UseQueryResult<LearningMode> {
       try {
         const res = await client.settings['learning-mode'].$get(
           {},
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         const data = await res.json();
@@ -93,10 +95,12 @@ export function useCelebrationLevel(): UseQueryResult<CelebrationLevel> {
       try {
         const res = await client.settings['celebration-level'].$get(
           {},
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
-        const data = (await res.json()) as { celebrationLevel: CelebrationLevel };
+        const data = (await res.json()) as {
+          celebrationLevel: CelebrationLevel;
+        };
         return data.celebrationLevel as CelebrationLevel;
       } finally {
         cleanup();
@@ -117,7 +121,7 @@ export function useWithdrawalArchivePreference(): UseQueryResult<WithdrawalArchi
       try {
         const res = await client.settings['withdrawal-archive'].$get(
           {},
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         const data = (await res.json()) as {
@@ -143,7 +147,7 @@ export function useFamilyPoolBreakdownSharing(): UseQueryResult<boolean> {
       try {
         const res = await client.settings['family-pool-breakdown-sharing'].$get(
           {},
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         const data = (await res.json()) as { value: boolean };
@@ -187,7 +191,8 @@ export function useUpdateNotificationSettings(): UseMutationResult<
 export function useUpdateLearningMode(): UseMutationResult<
   LearningMode,
   Error,
-  LearningMode
+  LearningMode,
+  { previous?: LearningMode }
 > {
   const client = useApiClient();
   const queryClient = useQueryClient();
@@ -202,7 +207,20 @@ export function useUpdateLearningMode(): UseMutationResult<
       const data = await res.json();
       return data.mode;
     },
-    onSuccess: () => {
+    onMutate: async (mode) => {
+      const queryKey = ['settings', 'learning-mode', activeProfile?.id];
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<LearningMode>(queryKey);
+      queryClient.setQueryData(queryKey, mode);
+      return { previous };
+    },
+    onError: (_error, _mode, context) => {
+      const queryKey = ['settings', 'learning-mode', activeProfile?.id];
+      if (context?.previous !== undefined) {
+        queryClient.setQueryData(queryKey, context.previous);
+      }
+    },
+    onSettled: () => {
       void queryClient.invalidateQueries({
         queryKey: ['settings', 'learning-mode', activeProfile?.id],
       });
@@ -350,7 +368,7 @@ export function useNotifyParentSubscribe(): UseMutationResult<
 // ---------------------------------------------------------------------------
 
 export function useAnalogyDomain(
-  subjectId: string
+  subjectId: string,
 ): UseQueryResult<AnalogyDomain | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -375,7 +393,7 @@ export function useAnalogyDomain(
 }
 
 export function useUpdateAnalogyDomain(
-  subjectId: string
+  subjectId: string,
 ): UseMutationResult<AnalogyDomain | null, Error, AnalogyDomain | null> {
   const client = useApiClient();
   const queryClient = useQueryClient();
@@ -402,7 +420,7 @@ export function useUpdateAnalogyDomain(
 }
 
 export function useNativeLanguage(
-  subjectId: string
+  subjectId: string,
 ): UseQueryResult<LanguageCode | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -427,7 +445,7 @@ export function useNativeLanguage(
 }
 
 export function useUpdateNativeLanguage(
-  subjectId: string
+  subjectId: string,
 ): UseMutationResult<LanguageCode | null, Error, LanguageCode | null> {
   const client = useApiClient();
   const queryClient = useQueryClient();

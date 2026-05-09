@@ -32,9 +32,18 @@ import {
 } from '../services/learner-profile';
 import { parseLearnerInput } from '../services/learner-input';
 import { assertParentAccess } from '../services/family-access';
+import {
+  getOrCreateMemoryProjection,
+  toLearnerSelfView,
+} from '../services/memory/projection';
+import { isMemoryFactsReadEnabled } from '../config';
 
 type LearnerProfileRouteEnv = {
-  Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
+  Bindings: {
+    DATABASE_URL: string;
+    CLERK_JWKS_URL?: string;
+    MEMORY_FACTS_READ_ENABLED?: string;
+  };
   Variables: {
     user: AuthUser;
     db: Database;
@@ -47,8 +56,16 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
   .get('/learner-profile', async (c) => {
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
-    const profile = await getOrCreateLearningProfile(db, profileId);
-    return c.json(learnerProfileGetResponseSchema.parse({ profile }));
+    const projection = await getOrCreateMemoryProjection(db, profileId, {
+      memoryFactsReadEnabled: isMemoryFactsReadEnabled(
+        c.env.MEMORY_FACTS_READ_ENABLED,
+      ),
+    });
+    return c.json(
+      learnerProfileGetResponseSchema.parse({
+        profile: toLearnerSelfView(projection),
+      }),
+    );
   })
   .get('/learner-profile/export-text', async (c) => {
     const db = c.get('db');
@@ -58,7 +75,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       learnerProfileExportTextResponseSchema.parse({
         text: buildHumanReadableMemoryExport(profile),
         profile,
-      })
+      }),
     );
   })
   .get('/learner-profile/:profileId/export-text', async (c) => {
@@ -71,7 +88,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       learnerProfileExportTextResponseSchema.parse({
         text: buildHumanReadableMemoryExport(profile),
         profile,
-      })
+      }),
     );
   })
   .get('/learner-profile/:profileId', async (c) => {
@@ -97,12 +114,12 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
         input.category,
         input.value,
         input.suppress ?? false,
-        input.subject
+        input.subject,
       );
       return c.json(
-        learnerProfileSuccessResponseSchema.parse({ success: true })
+        learnerProfileSuccessResponseSchema.parse({ success: true }),
       );
-    }
+    },
   )
   .delete(
     '/learner-profile/:profileId/item',
@@ -121,12 +138,12 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
         input.category,
         input.value,
         input.suppress ?? false,
-        input.subject
+        input.subject,
       );
       return c.json(
-        learnerProfileSuccessResponseSchema.parse({ success: true })
+        learnerProfileSuccessResponseSchema.parse({ success: true }),
       );
-    }
+    },
   )
   .delete('/learner-profile/all', async (c) => {
     const db = c.get('db');
@@ -154,9 +171,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const { memoryEnabled } = c.req.valid('json');
       await toggleMemoryEnabled(db, profileId, accountId, memoryEnabled);
       return c.json(
-        learnerProfileSuccessResponseSchema.parse({ success: true })
+        learnerProfileSuccessResponseSchema.parse({ success: true }),
       );
-    }
+    },
   )
   .patch(
     '/learner-profile/:profileId/memory-enabled',
@@ -170,9 +187,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       // accountId omitted: ownership verified via assertParentAccess (parent chain)
       await toggleMemoryEnabled(db, childProfileId, undefined, memoryEnabled);
       return c.json(
-        learnerProfileSuccessResponseSchema.parse({ success: true })
+        learnerProfileSuccessResponseSchema.parse({ success: true }),
       );
-    }
+    },
   )
   .patch(
     '/learner-profile/collection',
@@ -186,12 +203,12 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
         db,
         profileId,
         accountId,
-        memoryCollectionEnabled
+        memoryCollectionEnabled,
       );
       return c.json(
-        learnerProfileSuccessResponseSchema.parse({ success: true })
+        learnerProfileSuccessResponseSchema.parse({ success: true }),
       );
-    }
+    },
   )
   .patch(
     '/learner-profile/:profileId/collection',
@@ -207,12 +224,12 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
         db,
         childProfileId,
         undefined,
-        memoryCollectionEnabled
+        memoryCollectionEnabled,
       );
       return c.json(
-        learnerProfileSuccessResponseSchema.parse({ success: true })
+        learnerProfileSuccessResponseSchema.parse({ success: true }),
       );
-    }
+    },
   )
   .patch(
     '/learner-profile/injection',
@@ -226,12 +243,12 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
         db,
         profileId,
         accountId,
-        memoryInjectionEnabled
+        memoryInjectionEnabled,
       );
       return c.json(
-        learnerProfileSuccessResponseSchema.parse({ success: true })
+        learnerProfileSuccessResponseSchema.parse({ success: true }),
       );
-    }
+    },
   )
   .patch(
     '/learner-profile/:profileId/injection',
@@ -247,12 +264,12 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
         db,
         childProfileId,
         undefined,
-        memoryInjectionEnabled
+        memoryInjectionEnabled,
       );
       return c.json(
-        learnerProfileSuccessResponseSchema.parse({ success: true })
+        learnerProfileSuccessResponseSchema.parse({ success: true }),
       );
-    }
+    },
   )
   .post(
     '/learner-profile/consent',
@@ -264,9 +281,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const { consent } = c.req.valid('json');
       await grantMemoryConsent(db, profileId, accountId, consent);
       return c.json(
-        learnerProfileSuccessResponseSchema.parse({ success: true })
+        learnerProfileSuccessResponseSchema.parse({ success: true }),
       );
-    }
+    },
   )
   .post(
     '/learner-profile/:profileId/consent',
@@ -280,9 +297,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       // accountId omitted: ownership verified via assertParentAccess (parent chain)
       await grantMemoryConsent(db, childProfileId, undefined, consent);
       return c.json(
-        learnerProfileSuccessResponseSchema.parse({ success: true })
+        learnerProfileSuccessResponseSchema.parse({ success: true }),
       );
-    }
+    },
   )
   .post(
     '/learner-profile/tell',
@@ -293,7 +310,7 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const { text } = c.req.valid('json');
       const result = await parseLearnerInput(db, profileId, text, 'learner');
       return c.json(parseLearnerInputResultSchema.parse(result));
-    }
+    },
   )
   .post(
     '/learner-profile/:profileId/tell',
@@ -308,10 +325,10 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
         db,
         childProfileId,
         text,
-        'parent'
+        'parent',
       );
       return c.json(parseLearnerInputResultSchema.parse(result));
-    }
+    },
   )
   .post(
     '/learner-profile/unsuppress',
@@ -323,9 +340,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       const { value } = c.req.valid('json');
       await unsuppressInference(db, profileId, accountId, value);
       return c.json(
-        learnerProfileSuccessResponseSchema.parse({ success: true })
+        learnerProfileSuccessResponseSchema.parse({ success: true }),
       );
-    }
+    },
   )
   .post(
     '/learner-profile/:profileId/unsuppress',
@@ -339,9 +356,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       // accountId omitted: ownership verified via assertParentAccess (parent chain)
       await unsuppressInference(db, childProfileId, undefined, value);
       return c.json(
-        learnerProfileSuccessResponseSchema.parse({ success: true })
+        learnerProfileSuccessResponseSchema.parse({ success: true }),
       );
-    }
+    },
   )
   .patch(
     '/learner-profile/accommodation-mode',
@@ -355,12 +372,12 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
         db,
         profileId,
         accountId,
-        accommodationMode
+        accommodationMode,
       );
       return c.json(
-        learnerProfileSuccessResponseSchema.parse({ success: true })
+        learnerProfileSuccessResponseSchema.parse({ success: true }),
       );
-    }
+    },
   )
   .patch(
     '/learner-profile/:profileId/accommodation-mode',
@@ -376,10 +393,10 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
         db,
         childProfileId,
         undefined,
-        accommodationMode
+        accommodationMode,
       );
       return c.json(
-        learnerProfileSuccessResponseSchema.parse({ success: true })
+        learnerProfileSuccessResponseSchema.parse({ success: true }),
       );
-    }
+    },
   );

@@ -29,8 +29,42 @@ export interface CreateSubjectResponse {
   bookCount?: number;
 }
 
+interface UpdateSubjectInput {
+  subjectId: string;
+  name?: string;
+  status?: SubjectStatus;
+  pedagogyMode?: PedagogyMode;
+  languageCode?: string | null;
+}
+
+function isTransientSubjectUpdateError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.name === 'NetworkError' ||
+      error.name === 'RateLimitedError' ||
+      (error.name === 'UpstreamError' &&
+        'status' in error &&
+        typeof (error as { status?: unknown }).status === 'number' &&
+        ((error as { status: number }).status === 429 ||
+          (error as { status: number }).status >= 500)))
+  );
+}
+
+function subjectUpdateRetryDelay(attemptIndex: number, error: unknown): number {
+  if (
+    error instanceof Error &&
+    error.name === 'RateLimitedError' &&
+    'retryAfter' in error &&
+    typeof (error as { retryAfter?: unknown }).retryAfter === 'number'
+  ) {
+    return Math.min((error as { retryAfter: number }).retryAfter * 1000, 3000);
+  }
+
+  return Math.min(500 * 2 ** attemptIndex, 3000);
+}
+
 export function useSubjects(
-  options: UseSubjectsOptions = {}
+  options: UseSubjectsOptions = {},
 ): UseQueryResult<Subject[]> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -47,7 +81,7 @@ export function useSubjects(
               ? { query: { includeInactive: 'true' } }
               : undefined),
           },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         const data = await res.json();
@@ -94,28 +128,13 @@ export function useCreateSubject(): UseMutationResult<
 export function useUpdateSubject(): UseMutationResult<
   { subject: Subject },
   Error,
-  {
-    subjectId: string;
-    name?: string;
-    status?: SubjectStatus;
-    pedagogyMode?: PedagogyMode;
-    languageCode?: string | null;
-  }
+  UpdateSubjectInput
 > {
   const client = useApiClient();
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: async ({
-      subjectId,
-      ...input
-    }: {
-      subjectId: string;
-      name?: string;
-      status?: SubjectStatus;
-      pedagogyMode?: PedagogyMode;
-      languageCode?: string | null;
-    }) => {
+  return useMutation<{ subject: Subject }, Error, UpdateSubjectInput>({
+    mutationFn: async ({ subjectId, ...input }) => {
       const res = await client.subjects[':id'].$patch({
         param: { id: subjectId },
         json: input,
@@ -127,6 +146,9 @@ export function useUpdateSubject(): UseMutationResult<
       void queryClient.invalidateQueries({ queryKey: ['subjects'] });
       void queryClient.invalidateQueries({ queryKey: ['progress'] });
     },
+    retry: (failureCount, error) =>
+      failureCount < 2 && isTransientSubjectUpdateError(error),
+    retryDelay: subjectUpdateRetryDelay,
   });
 }
 

@@ -6,6 +6,7 @@ import {
   _clearProviders,
   _resetCircuits,
   MIN_REPLY_MAX_TOKENS,
+  ANTHROPIC_SONNET_MODEL,
 } from './router';
 import { createMockProvider } from './providers/mock';
 import type {
@@ -39,10 +40,29 @@ function createFailingStreamProvider(id: string): LLMProvider {
   };
 }
 
+/** Mock provider whose chatStream drains cleanly without yielding text. */
+function createEmptyStreamProvider(id: string): LLMProvider {
+  const base = createMockProvider(id);
+  return {
+    ...base,
+    chatStream() {
+      return {
+        stream: (async function* () {
+          // Successful zero-token stream.
+        })(),
+        stopReasonPromise: Promise.resolve('stop'),
+        [Symbol.asyncIterator]() {
+          return this.stream[Symbol.asyncIterator]();
+        },
+      };
+    },
+  };
+}
+
 /** Mock provider whose chat() fails N times then succeeds. */
 function createTransientFailProvider(
   id: string,
-  failCount: number
+  failCount: number,
 ): LLMProvider & { callCount: number } {
   const base = createMockProvider(id);
   let calls = 0;
@@ -73,7 +93,7 @@ describe('LLM Router', () => {
     it('routes to provider and returns response', async () => {
       const result = await routeAndCall(
         [{ role: 'user', content: 'Hello world' }],
-        1
+        1,
       );
 
       expect(result.response).toContain('Mock response');
@@ -117,7 +137,7 @@ describe('LLM Router', () => {
           { role: 'system', content: 'You are helpful.' },
           { role: 'user', content: 'Tell me about TypeScript' },
         ],
-        1
+        1,
       );
 
       expect(result.response).toContain('Tell me about TypeScript');
@@ -149,7 +169,7 @@ describe('LLM Router', () => {
         },
         async chat(
           messages: ChatMessage[],
-          config: ModelConfig
+          config: ModelConfig,
         ): Promise<ChatResult> {
           captured = config;
           return base.chat(messages, config);
@@ -187,14 +207,14 @@ describe('LLM Router', () => {
             },
           ],
           rung as 1 | 2 | 3 | 4 | 5,
-          { llmTier: tier as 'standard' | 'flash' | 'premium' }
+          { llmTier: tier as 'standard' | 'flash' | 'premium' },
         );
 
         expect(spy.lastConfig).not.toBeNull();
         expect(spy.lastConfig?.maxTokens).toBeGreaterThanOrEqual(
-          MIN_REPLY_MAX_TOKENS
+          MIN_REPLY_MAX_TOKENS,
         );
-      }
+      },
     );
 
     afterAll(() => {
@@ -205,11 +225,54 @@ describe('LLM Router', () => {
     });
   });
 
+  describe('Anthropic model routing', () => {
+    function createCapturingProvider(id: string): LLMProvider & {
+      lastConfig: ModelConfig | null;
+    } {
+      let captured: ModelConfig | null = null;
+      const base = createMockProvider(id);
+      return {
+        ...base,
+        get lastConfig() {
+          return captured;
+        },
+        async chat(
+          messages: ChatMessage[],
+          config: ModelConfig,
+        ): Promise<ChatResult> {
+          captured = config;
+          return base.chat(messages, config);
+        },
+      };
+    }
+
+    afterEach(() => {
+      _clearProviders();
+      _resetCircuits();
+      registerProvider(createMockProvider('gemini'));
+    });
+
+    it('[BUG-ANTHROPIC-MODEL-ID] uses a valid snapshot model ID for premium Anthropic calls', async () => {
+      _clearProviders();
+      _resetCircuits();
+      const spy = createCapturingProvider('anthropic');
+      registerProvider(spy);
+
+      await routeAndCall([{ role: 'user', content: 'test' }], 1, {
+        llmTier: 'premium',
+      });
+
+      expect(spy.lastConfig?.model).toBe(ANTHROPIC_SONNET_MODEL);
+      expect(spy.lastConfig?.model).toBe('claude-sonnet-4-20250514');
+      expect(spy.lastConfig?.model).not.toBe('claude-sonnet-4-6');
+    });
+  });
+
   describe('routeAndStream', () => {
     it('returns async iterable stream', async () => {
       const result = await routeAndStream(
         [{ role: 'user', content: 'Stream test' }],
-        1
+        1,
       );
 
       expect(result.provider).toBe('gemini');
@@ -227,7 +290,7 @@ describe('LLM Router', () => {
     it('uses pro model for rung 4', async () => {
       const result = await routeAndStream(
         [{ role: 'user', content: 'test' }],
-        4
+        4,
       );
 
       expect(result.model).toBe('gemini-2.5-pro');
@@ -252,7 +315,7 @@ describe('LLM Router', () => {
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
       const result = await routeAndStream(
         [{ role: 'user', content: 'test' }],
-        1
+        1,
       );
 
       // Provider metadata reflects initial selection (gemini)
@@ -272,7 +335,7 @@ describe('LLM Router', () => {
       expect(result.fallbackUsed).toBe(true);
 
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('failed before first byte, trying fallback')
+        expect.stringContaining('failed before first byte, trying fallback'),
       );
       warnSpy.mockRestore();
     });
@@ -287,7 +350,7 @@ describe('LLM Router', () => {
       const result = await routeAndStream(
         [{ role: 'user', content: 'test' }],
         1,
-        { llmTier: 'premium' }
+        { llmTier: 'premium' },
       );
 
       expect(result.provider).toBe('anthropic');
@@ -300,9 +363,126 @@ describe('LLM Router', () => {
       expect(chunks.join('')).toContain('Mock streamed');
       expect(result.fallbackUsed).toBe(true);
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('failed before first byte, trying fallback')
+        expect.stringContaining('failed before first byte, trying fallback'),
       );
       warnSpy.mockRestore();
+    });
+
+    it('[BUG-GEMINI-ANTHROPIC-FALLBACK] falls back from Gemini to Anthropic when OpenAI is absent', async () => {
+      _clearProviders();
+      _resetCircuits();
+      registerProvider(createFailingStreamProvider('gemini'));
+      registerProvider(createMockProvider('anthropic'));
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      const result = await routeAndStream(
+        [{ role: 'user', content: 'test' }],
+        1,
+      );
+
+      expect(result.provider).toBe('gemini');
+
+      const chunks: string[] = [];
+      for await (const chunk of result.stream) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks.join('')).toContain('Mock streamed');
+      expect(result.fallbackUsed).toBe(true);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('failed before first byte, trying fallback'),
+      );
+      warnSpy.mockRestore();
+    });
+
+    it('[BUG-ZERO-TOKEN-STREAM] falls back when primary stream completes with zero chunks', async () => {
+      _clearProviders();
+      _resetCircuits();
+      registerProvider(createEmptyStreamProvider('gemini'));
+      registerProvider(createMockProvider('anthropic'));
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      const result = await routeAndStream(
+        [{ role: 'user', content: 'test' }],
+        1,
+      );
+
+      expect(result.provider).toBe('gemini');
+      expect(result.fallbackUsed).toBe(false);
+
+      const chunks: string[] = [];
+      for await (const chunk of result.stream) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks.join('')).toContain('Mock streamed');
+      expect(result.fallbackUsed).toBe(true);
+      await expect(result.stopReasonPromise).resolves.toBe('stop');
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('completed with zero chunks, trying fallback'),
+      );
+      warnSpy.mockRestore();
+    });
+
+    it('[HIGH-LLM-PROBE] releases half-open probe after zero-chunk fallback', async () => {
+      _clearProviders();
+      _resetCircuits();
+      registerProvider(createFailingStreamProvider('gemini'));
+
+      const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(1_000);
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+
+      try {
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const result = await routeAndStream(
+            [{ role: 'user', content: 'test' }],
+            1,
+          );
+          await expect(async () => {
+            for await (const _chunk of result.stream) {
+              // Drain the lazy stream so the circuit records the failure.
+            }
+          }).rejects.toThrow('Stream connection lost');
+        }
+
+        nowSpy.mockReturnValue(62_000);
+        registerProvider(createEmptyStreamProvider('gemini'));
+        registerProvider(createMockProvider('anthropic'));
+
+        const halfOpenResult = await routeAndStream(
+          [{ role: 'user', content: 'test' }],
+          1,
+        );
+        const fallbackChunks: string[] = [];
+        for await (const chunk of halfOpenResult.stream) {
+          fallbackChunks.push(chunk);
+        }
+
+        expect(fallbackChunks.join('')).toContain('Mock streamed');
+        expect(halfOpenResult.fallbackUsed).toBe(true);
+
+        nowSpy.mockReturnValue(123_000);
+        registerProvider(createMockProvider('gemini'));
+
+        const recoveredResult = await routeAndStream(
+          [{ role: 'user', content: 'test' }],
+          1,
+        );
+        const recoveredChunks: string[] = [];
+        for await (const chunk of recoveredResult.stream) {
+          recoveredChunks.push(chunk);
+        }
+
+        expect(recoveredResult.provider).toBe('gemini');
+        expect(recoveredResult.fallbackUsed).toBe(false);
+        expect(recoveredChunks.join('')).toContain('Mock streamed');
+      } finally {
+        warnSpy.mockRestore();
+        nowSpy.mockRestore();
+        _clearProviders();
+        _resetCircuits();
+        registerProvider(createMockProvider('gemini'));
+      }
     });
   });
 
@@ -327,7 +507,7 @@ describe('LLM Router', () => {
       // First call fails, second succeeds → 2 total calls
       expect(flaky.callCount).toBe(2);
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('attempt 1 failed, retrying')
+        expect.stringContaining('attempt 1 failed, retrying'),
       );
       warnSpy.mockRestore();
     });
@@ -361,7 +541,25 @@ describe('LLM Router', () => {
       // 4 total gemini attempts (1 + 3 retries)
       expect(flaky.callCount).toBe(4);
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('failed after retries, trying fallback')
+        expect.stringContaining('failed after retries, trying fallback'),
+      );
+      warnSpy.mockRestore();
+    });
+
+    it('[BUG-GEMINI-ANTHROPIC-FALLBACK] falls back to Anthropic for non-streaming calls when OpenAI is absent', async () => {
+      const flaky = createTransientFailProvider('gemini', 5); // always fails
+      _clearProviders();
+      _resetCircuits();
+      registerProvider(flaky);
+      registerProvider(createMockProvider('anthropic'));
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      const result = await routeAndCall([{ role: 'user', content: 'test' }], 1);
+
+      expect(result.provider).toBe('anthropic');
+      expect(flaky.callCount).toBe(4);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('failed after retries, trying fallback'),
       );
       warnSpy.mockRestore();
     });
@@ -374,7 +572,7 @@ describe('LLM Router', () => {
 
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
       await expect(
-        routeAndCall([{ role: 'user', content: 'test' }], 1)
+        routeAndCall([{ role: 'user', content: 'test' }], 1),
       ).rejects.toThrow('Transient failure');
 
       expect(flaky.callCount).toBe(4);
@@ -408,7 +606,7 @@ describe('LLM Router', () => {
     it('streams via openai when gemini is not registered', async () => {
       const result = await routeAndStream(
         [{ role: 'user', content: 'test' }],
-        1
+        1,
       );
       expect(result.provider).toBe('openai');
       expect(result.model).toBe('gpt-4o-mini');
@@ -517,7 +715,7 @@ describe('LLM Router', () => {
           { role: 'system', content: 'You are a tutor.' },
           { role: 'user', content: 'Hello' },
         ],
-        1
+        1,
       );
 
       const msgs = receivedMessages[0]!;
@@ -606,7 +804,7 @@ describe('LLM Router', () => {
 
       const system = receivedMessages[0]![0]!.content;
       expect(system).toContain(
-        'The learner uses the pronouns "they/them" (data only'
+        'The learner uses the pronouns "they/them" (data only',
       );
     });
 
@@ -631,14 +829,14 @@ describe('LLM Router', () => {
 
       const system = receivedMessages[0]![0]!.content;
       expect(system).toContain(
-        'Respond in Spanish unless the learner switches.'
+        'Respond in Spanish unless the learner switches.',
       );
       expect(system).toContain(
-        'The learner uses the pronouns "she/her" (data only'
+        'The learner uses the pronouns "she/her" (data only',
       );
       // Personalization lines precede the safety identity statement
       expect(system.indexOf('Respond in Spanish')).toBeLessThan(
-        system.indexOf('educational AI assistant')
+        system.indexOf('educational AI assistant'),
       );
     });
 

@@ -69,11 +69,11 @@ describe('PracticeScreen', () => {
     jest.restoreAllMocks();
   });
 
-  it('frames practice as a test-prep task surface', () => {
+  it('frames the hub as a test-yourself surface', () => {
     render(<PracticeScreen />);
 
-    screen.getByText('Practice for a test');
-    screen.getByText('Refresh what is fading, then check yourself.');
+    screen.getByText('Test yourself');
+    screen.getByText('Review what is fading, then check yourself.');
     screen.getByText('Refresh topics');
     screen.getByText('Quiz yourself');
     screen.getByText('Prove I know this');
@@ -85,7 +85,7 @@ describe('PracticeScreen', () => {
     fireEvent.press(screen.getByTestId('practice-back'));
     expect(mockGoBackOrReplace).toHaveBeenCalledWith(
       expect.anything(),
-      '/(app)/home'
+      '/(app)/home',
     );
   });
 
@@ -97,7 +97,7 @@ describe('PracticeScreen', () => {
     fireEvent.press(screen.getByTestId('practice-back'));
     expect(mockGoBackOrReplace).toHaveBeenCalledWith(
       expect.anything(),
-      '/(app)/home?view=learner'
+      '/(app)/home?view=learner',
     );
   });
 
@@ -162,5 +162,51 @@ describe('PracticeScreen', () => {
     render(<PracticeScreen />);
 
     screen.getByText('Test yourself with multiple choice questions · 0 XP');
+  });
+
+  it('places recitation and dictation after the main review and test actions', () => {
+    const view = render(<PracticeScreen />);
+
+    // node is typed as ReactTestInstance (from react-test-renderer which ships no
+    // .d.ts in v19), so the predicate parameter is effectively `any`. Explicit
+    // structural annotation silences noImplicitAny without using `any` directly.
+    type RNTestNode = { props?: Record<string, unknown> };
+    const cardOrder = view.UNSAFE_root.findAll(
+      (node: RNTestNode) =>
+        typeof node.props?.testID === 'string' &&
+        (node.props.testID as string).startsWith('practice-') &&
+        !(node.props.testID as string).includes('-icon') &&
+        !(node.props.testID as string).includes('-chevron'),
+    )
+      .map((node: RNTestNode) => node.props?.testID as string)
+      .filter((testID: string) =>
+        [
+          'practice-review',
+          'practice-quiz',
+          'practice-assessment',
+          'practice-recitation',
+          'practice-dictation',
+          'practice-quiz-history',
+        ].includes(testID),
+      );
+    const uniqueCardOrder = [...new Set(cardOrder)];
+
+    expect(uniqueCardOrder).toEqual([
+      'practice-review',
+      'practice-quiz',
+      'practice-assessment',
+      'practice-recitation',
+      'practice-dictation',
+      'practice-quiz-history',
+    ]);
+  });
+
+  it('renders quiz history with a quieter visual treatment', () => {
+    render(<PracticeScreen />);
+
+    const quizHistoryCard = screen.getByTestId('practice-quiz-history');
+    expect(quizHistoryCard.props.className).toContain(
+      'bg-surface border-border',
+    );
   });
 });

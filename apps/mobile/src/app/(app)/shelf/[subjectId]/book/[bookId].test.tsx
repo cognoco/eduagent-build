@@ -263,6 +263,36 @@ describe('BookScreen', () => {
     getByTestId('book-loading');
   });
 
+  it('keeps cached book content visible during a background refetch', () => {
+    mockUseBookWithTopics.mockReturnValue(
+      makeBookQuery({
+        isLoading: true,
+      }),
+    );
+
+    const { getByTestId, queryByTestId, getByText } = render(<BookScreen />);
+
+    getByTestId('book-screen');
+    getByText('Algebra');
+    getByTestId('up-next-row-topic-1');
+    expect(queryByTestId('book-loading')).toBeNull();
+  });
+
+  it('keeps cached book content visible if a background refresh errors', () => {
+    mockUseBookWithTopics.mockReturnValue(
+      makeBookQuery({
+        isError: true,
+        error: new Error('Refresh failed'),
+      }),
+    );
+
+    const { getByTestId, queryByTestId, getByText } = render(<BookScreen />);
+
+    getByTestId('book-screen');
+    getByText('Algebra');
+    expect(queryByTestId('book-error')).toBeNull();
+  });
+
   it('shows the error state and wires retry plus back', () => {
     mockUseBookWithTopics.mockReturnValue(
       makeBookQuery({
@@ -562,6 +592,43 @@ describe('BookScreen', () => {
         topicName: 'Linear Equations',
       },
     });
+  });
+
+  it('does not render empty topic slots when generated data has blank titles', () => {
+    mockUseBookWithTopics.mockReturnValue(
+      makeBookQuery({
+        data: {
+          ...makeBookQuery().data,
+          topics: [
+            makeTopic({
+              id: 'topic-1',
+              title: 'Linear Equations',
+              sortOrder: 1,
+              chapter: 'Foundations',
+            }),
+            makeTopic({
+              id: 'topic-blank',
+              title: '   ',
+              sortOrder: 2,
+              chapter: 'Generated blanks',
+            }),
+            makeTopic({
+              id: 'topic-3',
+              title: 'Quadratic Equations',
+              sortOrder: 3,
+              chapter: 'Foundations',
+            }),
+          ],
+        },
+      }),
+    );
+
+    const { getByTestId, queryByTestId, queryByText } = render(<BookScreen />);
+
+    getByTestId('up-next-row-topic-1');
+    getByTestId('later-row-topic-3');
+    expect(queryByTestId('later-row-topic-blank')).toBeNull();
+    expect(queryByText('Generated blanks')).toBeNull();
   });
 
   it('starts from the shared resume target when available', () => {

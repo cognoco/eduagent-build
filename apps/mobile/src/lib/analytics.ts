@@ -16,28 +16,33 @@ export type HomeworkOcrGateTelemetry = {
 
 function emitHomeworkOcrGateEvent(
   event: string,
-  payload: HomeworkOcrGateTelemetry
+  payload: HomeworkOcrGateTelemetry,
 ): void {
-  Sentry.withScope((scope) => {
-    scope.setTag('event', event);
-    scope.setContext('homework_ocr_gate', {
+  Sentry.addBreadcrumb({
+    category: 'analytics.homework_ocr_gate',
+    level: 'info',
+    message: event,
+    data: {
       ...payload,
       ...(payload.confidence == null
         ? {}
         : { confidence: Number(payload.confidence.toFixed(3)) }),
-    });
-    Sentry.captureMessage(event, 'info');
+    },
   });
 }
 
 export function track(
   event: string,
-  properties: AnalyticsProperties = {}
+  properties: AnalyticsProperties = {},
 ): void {
-  Sentry.withScope((scope) => {
-    scope.setTag('analytics_event', event);
-    scope.setContext('analytics', { event, ...properties });
-    Sentry.captureMessage(event, 'info');
+  Sentry.addBreadcrumb({
+    category: 'analytics',
+    level: 'info',
+    message: event,
+    data: {
+      event,
+      ...properties,
+    },
   });
 }
 
@@ -63,7 +68,7 @@ export function bucketAccountAge(createdAt: string | null | undefined): string {
   if (Number.isNaN(createdAtMs)) return '0-7';
   const ageDays = Math.max(
     0,
-    Math.floor((Date.now() - createdAtMs) / 86_400_000)
+    Math.floor((Date.now() - createdAtMs) / 86_400_000),
   );
   if (ageDays <= 7) return '0-7';
   if (ageDays <= 30) return '8-30';
@@ -72,19 +77,19 @@ export function bucketAccountAge(createdAt: string | null | undefined): string {
 }
 
 export function trackHomeworkOcrGateAccepted(
-  payload: HomeworkOcrGateTelemetry & { source: HomeworkOcrGateSource }
+  payload: HomeworkOcrGateTelemetry & { source: HomeworkOcrGateSource },
 ): void {
   emitHomeworkOcrGateEvent('homework_ocr_gate_accepted', payload);
 }
 
 export function trackHomeworkOcrGateRejected(
-  payload: HomeworkOcrGateTelemetry & { source: HomeworkOcrGateSource }
+  payload: HomeworkOcrGateTelemetry & { source: HomeworkOcrGateSource },
 ): void {
   emitHomeworkOcrGateEvent('homework_ocr_gate_rejected', payload);
 }
 
 export function trackHomeworkOcrGateShortcircuit(
-  payload: HomeworkOcrGateTelemetry
+  payload: HomeworkOcrGateTelemetry,
 ): void {
   emitHomeworkOcrGateEvent('homework_ocr_gate_shortcircuit', payload);
 }

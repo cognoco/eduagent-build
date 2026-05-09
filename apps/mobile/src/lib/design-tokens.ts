@@ -136,7 +136,7 @@ export type SubjectTint =
 
 export function pickSubjectTint(
   subjectId: string,
-  colorScheme: ColorScheme
+  colorScheme: ColorScheme,
 ): SubjectTint {
   const palette = SUBJECT_TINT_PALETTE[colorScheme];
   let hash = 0;
@@ -144,7 +144,7 @@ export function pickSubjectTint(
     hash = (hash * 31 + subjectId.charCodeAt(i)) | 0;
   }
   const idx = Math.abs(hash) % palette.length;
-  return palette[idx]!;
+  return palette[idx] as SubjectTint;
 }
 
 /** Accent color overrides — only the colors that shift with the user's choice. */

@@ -56,7 +56,7 @@ tags:
 # 5. Wait for More screen to load
 - extendedWaitUntil:
     visible:
-      id: "learning-mode-section-header"
+      id: "learning-accommodation-section-header"
     timeout: 15000
 
 - takeScreenshot: 01-more-as-impersonated-child

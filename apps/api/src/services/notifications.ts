@@ -233,7 +233,9 @@ export interface EmailPayload {
     | 'consent_expired'
     | 'consent_archived'
     | 'subscribe_request'
-    | 'feedback';
+    | 'feedback'
+    | 'weekly_progress'
+    | 'monthly_progress';
 }
 
 export interface EmailOptions {
@@ -345,6 +347,93 @@ export function formatConsentReminderEmail(
     subject: `Reminder: Consent pending for ${childName}'s MentoMate account`,
     body: `We're still waiting for your consent for ${childName}'s MentoMate account. You have ${daysRemaining} days remaining to respond before the account is automatically removed.\n\nClick here to approve or deny: ${tokenUrl}`,
     type: 'consent_reminder',
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Parent Digest Email Formatters — Weekly + Monthly
+// ---------------------------------------------------------------------------
+
+/**
+ * A single child's struggle watch-line for inclusion in a parent digest email.
+ * Rendered from `learning_profiles.struggles` JSONB (topic + subject pairs).
+ * Path A (v1): topic name only — no contextNote. Max 2 topics per child.
+ */
+export interface ChildStruggleLine {
+  childName: string;
+  topics: string[]; // max 2, empty = omit the watch-line for this child
+}
+
+/**
+ * Formats the weekly progress digest email for a parent.
+ * `childSummaries` is the same text lines built for the push notification body.
+ * `struggleLines` adds per-child watch-lines below the summary (omitted when empty).
+ */
+export function formatWeeklyProgressEmail(
+  parentEmail: string,
+  childSummaries: string[],
+  struggleLines: ChildStruggleLine[],
+): EmailPayload {
+  const summarySection = childSummaries.join('\n');
+
+  const watchLines = struggleLines
+    .filter((sl) => sl.topics.length > 0)
+    .map((sl) => {
+      const topicLines = sl.topics
+        .slice(0, 2)
+        .map(
+          (topic) =>
+            `${sl.childName}: You might want to keep an eye on ${topic}.`,
+        )
+        .join('\n');
+      return topicLines;
+    })
+    .join('\n\n');
+
+  const body = watchLines
+    ? `${summarySection}\n\n${watchLines}`
+    : summarySection;
+
+  return {
+    to: parentEmail,
+    subject: "This week's learning progress",
+    body,
+    type: 'weekly_progress',
+  };
+}
+
+/**
+ * Formats the monthly report digest email for a parent.
+ * `monthlyReportSummary` is the human-readable report line for the child.
+ * `struggleLines` adds per-child watch-lines below (omitted when empty).
+ */
+export function formatMonthlyProgressEmail(
+  parentEmail: string,
+  monthlyReportSummary: string,
+  struggleLines: ChildStruggleLine[],
+): EmailPayload {
+  const watchLines = struggleLines
+    .filter((sl) => sl.topics.length > 0)
+    .map((sl) => {
+      return sl.topics
+        .slice(0, 2)
+        .map(
+          (topic) =>
+            `${sl.childName}: You might want to keep an eye on ${topic}.`,
+        )
+        .join('\n');
+    })
+    .join('\n\n');
+
+  const body = watchLines
+    ? `${monthlyReportSummary}\n\n${watchLines}`
+    : monthlyReportSummary;
+
+  return {
+    to: parentEmail,
+    subject: "This month's learning report",
+    body,
+    type: 'monthly_progress',
   };
 }
 

@@ -10,9 +10,13 @@ import { clearJWKSCache } from '../middleware/jwt';
 
 // [BUG-666] capture mock used by the SSE-onComplete-failure break test
 const mockCaptureException = jest.fn();
+const mockAddBreadcrumb = jest.fn();
+const mockCaptureMessage = jest.fn();
 
 jest.mock('../services/sentry', () => ({
+  addBreadcrumb: (...args: unknown[]) => mockAddBreadcrumb(...args),
   captureException: (...args: unknown[]) => mockCaptureException(...args),
+  captureMessage: (...args: unknown[]) => mockCaptureMessage(...args),
 }));
 
 // ---------------------------------------------------------------------------
@@ -87,7 +91,7 @@ const mockSafeRefundQuota = jest.fn(
   async (db: unknown, subscriptionId: string, _context?: unknown) => {
     await mockIncrementQuota(db, subscriptionId);
     return { refunded: true };
-  }
+  },
 );
 
 jest.mock('../services/billing', () => ({
@@ -319,7 +323,7 @@ jest.mock('../services/session', () => {
           exchangeCount: 1,
           escalationRung: 1,
         }),
-      })
+      }),
     ),
     claimSessionForFilingRetry: (
       jest.requireActual('../services/session') as Record<string, unknown>
@@ -437,7 +441,7 @@ describe('session routes', () => {
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/sessions`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -449,7 +453,7 @@ describe('session routes', () => {
           topicTitle: 'Fractions',
           bookTitle: 'Numbers',
           sessionType: 'learning',
-        })
+        }),
       );
     });
 
@@ -457,7 +461,7 @@ describe('session routes', () => {
       const res = await app.request(
         `/v1/subjects/not-a-uuid/sessions`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -467,7 +471,7 @@ describe('session routes', () => {
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/sessions`,
         { headers: {} },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -487,7 +491,7 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ subjectId: SUBJECT_ID }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(201);
@@ -512,7 +516,7 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ subjectId: 'not-a-uuid' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -526,7 +530,7 @@ describe('session routes', () => {
           body: JSON.stringify({ subjectId: SUBJECT_ID }),
           headers: { 'Content-Type': 'application/json' },
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -542,7 +546,7 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ sessionType: 'learning', inputMode: 'text' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(201);
@@ -556,7 +560,7 @@ describe('session routes', () => {
           sessionType: 'learning',
           inputMode: 'text',
         }),
-        { matcherEnabled: false }
+        { matcherEnabled: false },
       );
     });
 
@@ -568,7 +572,7 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ sessionType: 'learning', inputMode: 'text' }),
         },
-        { ...TEST_ENV, MATCHER_ENABLED: 'true' }
+        { ...TEST_ENV, MATCHER_ENABLED: 'true' },
       );
 
       expect(res.status).toBe(201);
@@ -580,7 +584,7 @@ describe('session routes', () => {
           sessionType: 'learning',
           inputMode: 'text',
         }),
-        { matcherEnabled: true }
+        { matcherEnabled: true },
       );
     });
   });
@@ -594,7 +598,7 @@ describe('session routes', () => {
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -623,7 +627,7 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'Explain photosynthesis' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -643,7 +647,7 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: '' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -657,7 +661,7 @@ describe('session routes', () => {
           body: JSON.stringify({ message: 'Hello' }),
           headers: { 'Content-Type': 'application/json' },
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -666,7 +670,7 @@ describe('session routes', () => {
     // BUG-91: session limit must return EXCHANGE_LIMIT_EXCEEDED code, not generic 429
     it('returns 429 with EXCHANGE_LIMIT_EXCEEDED code when session limit is hit [BUG-91]', async () => {
       (processMessage as jest.Mock).mockRejectedValueOnce(
-        new SessionExchangeLimitError(50)
+        new SessionExchangeLimitError(50),
       );
 
       const res = await app.request(
@@ -676,7 +680,7 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'one more question' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(429);
@@ -694,7 +698,7 @@ describe('session routes', () => {
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/transcript`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -703,7 +707,7 @@ describe('session routes', () => {
       expect(body.session.sessionId).toBe(SESSION_ID);
       expect(body.exchanges).toHaveLength(3);
       expect(body.exchanges[2]).toEqual(
-        expect.objectContaining({ isSystemPrompt: true })
+        expect.objectContaining({ isSystemPrompt: true }),
       );
       expect(getSessionTranscript).toHaveBeenCalled();
     });
@@ -727,7 +731,7 @@ describe('session routes', () => {
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/transcript`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -739,7 +743,7 @@ describe('session routes', () => {
       expect(body.summary.topicsCovered).toContain('gravity');
       expect(body.summary.sessionState).toBe('completed');
       expect(body.summary.learnerRecap).toBe(
-        'I learned gravity pulls things down.'
+        'I learned gravity pulls things down.',
       );
       expect(body.session).toBeUndefined();
     });
@@ -765,7 +769,7 @@ describe('session routes', () => {
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/evaluate-depth`,
         { method: 'POST', headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(410);
@@ -774,7 +778,7 @@ describe('session routes', () => {
         expect.objectContaining({
           code: 'SESSION_ARCHIVED',
           message: 'Session transcript has been archived',
-        })
+        }),
       );
     });
   });
@@ -788,7 +792,7 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ inputMode: 'voice' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -799,7 +803,7 @@ describe('session routes', () => {
         expect.anything(),
         expect.any(String),
         SESSION_ID,
-        { inputMode: 'voice' }
+        { inputMode: 'voice' },
       );
     });
 
@@ -811,7 +815,7 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ inputMode: 'keyboard' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -834,7 +838,7 @@ describe('session routes', () => {
               "Still working on it? Take your time - I'm here when you're ready.",
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -856,7 +860,7 @@ describe('session routes', () => {
             metadata: { chip: 'too_easy' },
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -868,7 +872,7 @@ describe('session routes', () => {
         expect.objectContaining({
           eventType: 'quick_action',
           content: 'too_easy',
-        })
+        }),
       );
     });
   });
@@ -898,7 +902,7 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({}),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -917,7 +921,7 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ summaryStatus: 'skipped' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(sendSpy).toHaveBeenCalledWith({
@@ -941,7 +945,7 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({}),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(sendSpy).not.toHaveBeenCalled();
@@ -955,7 +959,7 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ milestonesReached: ['polar_star', 'comet'] }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(closeSession).toHaveBeenCalledWith(
@@ -964,7 +968,7 @@ describe('session routes', () => {
         SESSION_ID,
         expect.objectContaining({
           milestonesReached: ['polar_star', 'comet'],
-        })
+        }),
       );
     });
 
@@ -976,7 +980,7 @@ describe('session routes', () => {
           body: JSON.stringify({}),
           headers: { 'Content-Type': 'application/json' },
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -994,7 +998,7 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ summaryStatus: 'accepted' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -1004,7 +1008,7 @@ describe('session routes', () => {
         expect.anything(),
         expect.any(String),
         SESSION_ID,
-        expect.objectContaining({ summaryStatus: undefined })
+        expect.objectContaining({ summaryStatus: undefined }),
       );
 
       const body = await res.json();
@@ -1024,7 +1028,7 @@ describe('session routes', () => {
             summaryStatus: 'auto_closed',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       // auto_closed is an internal-only value — route strips it
@@ -1032,7 +1036,7 @@ describe('session routes', () => {
         expect.anything(),
         expect.any(String),
         SESSION_ID,
-        expect.objectContaining({ summaryStatus: undefined })
+        expect.objectContaining({ summaryStatus: undefined }),
       );
     });
 
@@ -1044,14 +1048,14 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ summaryStatus: 'skipped' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(closeSession).toHaveBeenCalledWith(
         expect.anything(),
         expect.any(String),
         SESSION_ID,
-        expect.objectContaining({ summaryStatus: 'skipped' })
+        expect.objectContaining({ summaryStatus: 'skipped' }),
       );
     });
   });
@@ -1084,7 +1088,7 @@ describe('session routes', () => {
             },
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -1106,7 +1110,7 @@ describe('session routes', () => {
             },
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -1126,7 +1130,7 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ eventId: EVENT_ID }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -1143,7 +1147,7 @@ describe('session routes', () => {
           body: JSON.stringify({ eventId: EVENT_ID }),
           headers: { 'Content-Type': 'application/json' },
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -1159,7 +1163,7 @@ describe('session routes', () => {
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/summary`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -1172,7 +1176,7 @@ describe('session routes', () => {
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/summary`,
         {},
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -1195,7 +1199,7 @@ describe('session routes', () => {
               'Photosynthesis converts light energy into chemical energy in plants.',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -1224,7 +1228,7 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ content: 'Short' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -1240,7 +1244,7 @@ describe('session routes', () => {
           }),
           headers: { 'Content-Type': 'application/json' },
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -1255,7 +1259,7 @@ describe('session routes', () => {
           method: 'POST',
           headers: AUTH_HEADERS,
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -1292,7 +1296,7 @@ describe('session routes', () => {
           method: 'POST',
           headers: AUTH_HEADERS,
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -1315,7 +1319,7 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'Explain gravity' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -1335,7 +1339,7 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'Explain gravity' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       const body = await res.text();
@@ -1378,7 +1382,7 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'ok' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -1396,7 +1400,7 @@ describe('session routes', () => {
         expect.objectContaining({
           clientId: undefined,
           llmTier: 'premium',
-        })
+        }),
       );
       expect(mockSafeRefundQuota).not.toHaveBeenCalled();
     });
@@ -1429,7 +1433,7 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'ok' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -1449,7 +1453,7 @@ describe('session routes', () => {
         expect.objectContaining({
           clientId: undefined,
           llmTier: 'premium',
-        })
+        }),
       );
       expect(mockSafeRefundQuota).not.toHaveBeenCalled();
     });
@@ -1457,7 +1461,7 @@ describe('session routes', () => {
     it('[CHAT-STREAM-FALLBACK] falls back to non-streaming when stream setup fails', async () => {
       mockSafeRefundQuota.mockClear();
       (streamMessage as jest.Mock).mockRejectedValueOnce(
-        new Error('streamExchange threw')
+        new Error('streamExchange threw'),
       );
       (processMessage as jest.Mock).mockResolvedValueOnce({
         response: 'Pre-stream fallback lesson response',
@@ -1475,7 +1479,7 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'ok' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -1493,7 +1497,7 @@ describe('session routes', () => {
         expect.objectContaining({
           clientId: undefined,
           llmTier: 'premium',
-        })
+        }),
       );
       expect(mockSafeRefundQuota).not.toHaveBeenCalled();
     });
@@ -1506,7 +1510,7 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: '' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -1520,7 +1524,7 @@ describe('session routes', () => {
           body: JSON.stringify({ message: 'Hello' }),
           headers: { 'Content-Type': 'application/json' },
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -1556,7 +1560,7 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'Spiega passo per passo' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -1570,7 +1574,7 @@ describe('session routes', () => {
       // Route MUST refund quota since the exchange was not persisted.
       expect(mockIncrementQuota).toHaveBeenCalledWith(
         expect.anything(),
-        'sub-1'
+        'sub-1',
       );
     });
 
@@ -1598,7 +1602,7 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'Hello' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       const body = await res.text();
@@ -1638,7 +1642,7 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'Hello' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -1657,7 +1661,7 @@ describe('session routes', () => {
         async (db: unknown, subscriptionId: string) => {
           await mockIncrementQuota(db, subscriptionId);
           return { refunded: true };
-        }
+        },
       );
     });
 
@@ -1682,7 +1686,7 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'Hello' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -1698,7 +1702,7 @@ describe('session routes', () => {
         async (db: unknown, subscriptionId: string) => {
           await mockIncrementQuota(db, subscriptionId);
           return { refunded: true };
-        }
+        },
       );
     });
   });
@@ -1726,14 +1730,14 @@ describe('session routes', () => {
             exchangeCount: 1,
             escalationRung: 1,
           }),
-        })
+        }),
       );
       mockIncrementQuota.mockClear();
     });
 
     it('refunds quota when processMessage throws (messages endpoint)', async () => {
       (processMessage as jest.Mock).mockRejectedValueOnce(
-        new Error('LLM provider unavailable')
+        new Error('LLM provider unavailable'),
       );
 
       const res = await app.request(
@@ -1743,7 +1747,7 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'Explain photosynthesis' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       // The error handler should return 500
@@ -1751,16 +1755,16 @@ describe('session routes', () => {
       // incrementQuota should have been called with the subscriptionId
       expect(mockIncrementQuota).toHaveBeenCalledWith(
         expect.anything(),
-        'sub-1'
+        'sub-1',
       );
     });
 
     it('refunds quota when streamMessage throws (stream endpoint)', async () => {
       (streamMessage as jest.Mock).mockRejectedValueOnce(
-        new Error('LLM provider unavailable')
+        new Error('LLM provider unavailable'),
       );
       (processMessage as jest.Mock).mockRejectedValueOnce(
-        new Error('Fallback LLM provider unavailable')
+        new Error('Fallback LLM provider unavailable'),
       );
 
       const res = await app.request(
@@ -1770,7 +1774,7 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'Explain gravity' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       // The error handler should return 500
@@ -1778,7 +1782,7 @@ describe('session routes', () => {
       // incrementQuota should have been called with the subscriptionId
       expect(mockIncrementQuota).toHaveBeenCalledWith(
         expect.anything(),
-        'sub-1'
+        'sub-1',
       );
     });
 
@@ -1795,8 +1799,8 @@ describe('session routes', () => {
       (streamMessage as jest.Mock).mockRejectedValueOnce(
         new LlmStreamError(
           'streamExchange threw',
-          new UpstreamLlmError('Anthropic 503 — upstream LLM unavailable')
-        )
+          new UpstreamLlmError('Anthropic 503 — upstream LLM unavailable'),
+        ),
       );
 
       const res = await app.request(
@@ -1806,7 +1810,7 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'Hello' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(502);
@@ -1815,7 +1819,7 @@ describe('session routes', () => {
       // Quota refund still fires — user must not be charged for a no-op.
       expect(mockIncrementQuota).toHaveBeenCalledWith(
         expect.anything(),
-        'sub-1'
+        'sub-1',
       );
     });
 
@@ -1824,11 +1828,11 @@ describe('session routes', () => {
       (streamMessage as jest.Mock).mockRejectedValueOnce(
         new LlmStreamError(
           'streamExchange threw',
-          new Error('envelope parse rejected before first chunk')
-        )
+          new Error('envelope parse rejected before first chunk'),
+        ),
       );
       (processMessage as jest.Mock).mockRejectedValueOnce(
-        new Error('Fallback LLM provider unavailable')
+        new Error('Fallback LLM provider unavailable'),
       );
 
       const res = await app.request(
@@ -1838,7 +1842,7 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'Hello' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(503);
@@ -1877,7 +1881,7 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'Tell me about photosynthesis' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       // SSE response itself opens with 200; the failure surfaces via the
@@ -1890,7 +1894,7 @@ describe('session routes', () => {
       // for an exchange that was never persisted.
       expect(mockIncrementQuota).toHaveBeenCalledWith(
         expect.anything(),
-        'sub-1'
+        'sub-1',
       );
       // Escalation must fire — without this, persistent onComplete drift
       // (e.g. envelope schema rot) is invisible in production.
@@ -1898,15 +1902,17 @@ describe('session routes', () => {
         onCompleteErr,
         expect.objectContaining({
           extra: expect.objectContaining({ sessionId: SESSION_ID }),
-        })
+        }),
       );
     });
 
-    // [BUG-866] Zero-token stream must escalate to Sentry so ops can query
-    // how often the failure mode fires — logger.warn alone is not queryable.
-    // The rule: "silent recovery without escalation is banned" (CLAUDE.md).
-    it('[BUG-866] captureException is called when the stream completes with zero tokens', async () => {
+    // [BUG-866] Zero-token streams should recover from the parsed envelope,
+    // while still emitting a queryable Sentry event for the silent recovery.
+    it('[BUG-866] emits parsed reply and captures zero-token recovery when the stream completes with zero tokens', async () => {
       mockCaptureException.mockClear();
+      mockAddBreadcrumb.mockClear();
+      mockCaptureMessage.mockClear();
+      mockInngestSend.mockClear();
 
       (streamMessage as jest.Mock).mockResolvedValueOnce({
         stream: (async function* () {
@@ -1914,6 +1920,7 @@ describe('session routes', () => {
           yield '   ';
         })(),
         onComplete: jest.fn().mockResolvedValue({
+          response: 'Recovered parsed reply',
           exchangeCount: 1,
           escalationRung: 1,
         }),
@@ -1926,23 +1933,43 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'Hello' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       // SSE response still opens with 200 — the zero-token detection is
       // a background escalation, not a client-visible error.
       expect(res.status).toBe(200);
-      await res.text(); // drain body to ensure the callback ran
+      const body = await res.text();
+      expect(body).toContain('Recovered parsed reply');
+      expect(body).toContain('"type":"done"');
 
+      expect(mockAddBreadcrumb).toHaveBeenCalledWith(
+        'Zero-token stream completed',
+        'sessions.stream',
+        'warning',
+        expect.objectContaining({
+          sessionId: SESSION_ID,
+          tokensReceived: 0,
+          recovered: true,
+          recovery: 'parsed_reply',
+        }),
+      );
       expect(mockCaptureException).toHaveBeenCalledWith(
         expect.objectContaining({ message: 'Zero-token stream completed' }),
         expect.objectContaining({
+          profileId: 'test-profile-id',
           extra: expect.objectContaining({
-            surface: 'sessions.stream',
             sessionId: SESSION_ID,
             tokensReceived: 0,
+            recovered: true,
+            recovery: 'parsed_reply',
           }),
-        })
+        }),
+      );
+      expect(mockInngestSend).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'app/session.zero_token_stream_completed',
+        }),
       );
     });
 
@@ -1954,7 +1981,7 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'Explain photosynthesis' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -1979,7 +2006,7 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ topicCount: 3 }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(201);
@@ -2002,7 +2029,7 @@ describe('session routes', () => {
             topicCount: 5,
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(201);
@@ -2012,7 +2039,7 @@ describe('session routes', () => {
         expect.objectContaining({
           subjectId: SUBJECT_ID,
           topicCount: 5,
-        })
+        }),
       );
     });
 
@@ -2022,7 +2049,7 @@ describe('session routes', () => {
         NoInterleavedTopicsError: new () => Error;
       };
       mockStartInterleavedSession.mockRejectedValueOnce(
-        new interleavedMock.NoInterleavedTopicsError()
+        new interleavedMock.NoInterleavedTopicsError(),
       );
 
       const res = await app.request(
@@ -2032,14 +2059,14 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({}),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
 
       const body = await res.json();
       expect(body.message).toBe(
-        'No topics available for interleaved retrieval'
+        'No topics available for interleaved retrieval',
       );
     });
 
@@ -2049,7 +2076,7 @@ describe('session routes', () => {
     // remapped to a 400 — typed instanceof breaks that string-coupling.
     it('[BUG-764] does NOT classify a generic Error as 400 even when its message matches', async () => {
       mockStartInterleavedSession.mockRejectedValueOnce(
-        new Error('No topics available for interleaved retrieval')
+        new Error('No topics available for interleaved retrieval'),
       );
 
       const res = await app.request(
@@ -2059,7 +2086,7 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({}),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       // Must NOT be 400 — only NoInterleavedTopicsError should map to 400.
@@ -2076,7 +2103,7 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ subjectId: 'not-a-uuid' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -2090,7 +2117,7 @@ describe('session routes', () => {
           body: JSON.stringify({}),
           headers: { 'Content-Type': 'application/json' },
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -2104,13 +2131,13 @@ describe('session routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({}),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(mockStartInterleavedSession).toHaveBeenCalledWith(
         expect.anything(),
         expect.any(String),
-        expect.objectContaining({ topicCount: 5 })
+        expect.objectContaining({ topicCount: 5 }),
       );
     });
   });
@@ -2133,7 +2160,7 @@ describe('session routes', () => {
         filingStatus: string | null;
         filingRetryCount: number;
         sessionType: string;
-      }> = {}
+      }> = {},
     ) => ({
       id: SESSION_ID,
       subjectId: SUBJECT_ID,
@@ -2232,14 +2259,14 @@ describe('session routes', () => {
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/retry-filing`,
         { method: 'POST', headers: RETRY_AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.session).toEqual(expect.objectContaining({}));
       expect(mockInngestSend).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'app/filing.retry' })
+        expect.objectContaining({ name: 'app/filing.retry' }),
       );
     });
 
@@ -2261,7 +2288,7 @@ describe('session routes', () => {
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/retry-filing`,
         { method: 'POST', headers: RETRY_AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(409);
@@ -2287,7 +2314,7 @@ describe('session routes', () => {
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/retry-filing`,
         { method: 'POST', headers: RETRY_AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(409);
@@ -2313,7 +2340,7 @@ describe('session routes', () => {
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/retry-filing`,
         { method: 'POST', headers: RETRY_AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(409);
@@ -2342,7 +2369,7 @@ describe('session routes', () => {
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/retry-filing`,
         { method: 'POST', headers: RETRY_AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(429);
@@ -2357,7 +2384,7 @@ describe('session routes', () => {
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/retry-filing`,
         { method: 'POST', headers: RETRY_AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(404);
@@ -2387,7 +2414,7 @@ describe('session routes', () => {
       await app.request(
         `/v1/sessions/${SESSION_ID}/retry-filing`,
         { method: 'POST', headers: RETRY_AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(mockDatabaseModule.db.update).toHaveBeenCalledTimes(1);
@@ -2418,7 +2445,7 @@ describe('session routes', () => {
       await app.request(
         `/v1/sessions/${SESSION_ID}/retry-filing`,
         { method: 'POST', headers: RETRY_AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(mockInngestSend).not.toHaveBeenCalled();

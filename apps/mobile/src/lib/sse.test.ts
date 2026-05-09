@@ -70,7 +70,7 @@ describe('parseSSEStream', () => {
   it('throws when response body is null', async () => {
     const gen = parseSSEStream(mockResponse(null));
     await expect(gen.next()).rejects.toThrow(
-      'Response body is null — streaming not supported'
+      'Response body is null — streaming not supported',
     );
   });
 
@@ -343,7 +343,7 @@ function installFakeXhr(): FakeXhrInstance {
     },
   };
   (global as unknown as { XMLHttpRequest: unknown }).XMLHttpRequest = jest.fn(
-    () => instance
+    () => instance,
   ) as unknown;
   return instance;
 }
@@ -397,6 +397,32 @@ describe('streamSSEViaXHR', () => {
     expect(collected).toEqual([]);
   });
 
+  it('[BUG-958] treats app-level done frame as terminal without waiting for XHR loadend', async () => {
+    const xhr = installFakeXhr();
+    const { events } = streamSSEViaXHR('https://example.test/stream', {
+      method: 'POST',
+    });
+
+    const collectedPromise = (async () => {
+      const collected: StreamEvent[] = [];
+      for await (const ev of events) {
+        collected.push(ev);
+      }
+      return collected;
+    })();
+
+    xhr._emitProgress('data: {"type":"chunk","content":"answer"}\n\n');
+    xhr._emitProgress(
+      'data: {"type":"done","exchangeCount":3,"escalationRung":1}\n\n',
+    );
+
+    await expect(collectedPromise).resolves.toEqual([
+      { type: 'chunk', content: 'answer' },
+      { type: 'done', exchangeCount: 3, escalationRung: 1 },
+    ]);
+    expect(xhr.abort).not.toHaveBeenCalled();
+  });
+
   // [BUG-955] classifyXhrError must produce typed errors for each HTTP error
   // class so that session-types.ts can route to the correct user-facing message.
 
@@ -410,8 +436,8 @@ describe('streamSSEViaXHR', () => {
 
     let caught: unknown = null;
     try {
-      for await (const _ of events) {
-        // drain
+      for await (const event of events) {
+        void event; // drain — consume without using
       }
     } catch (err) {
       caught = err;
@@ -432,8 +458,8 @@ describe('streamSSEViaXHR', () => {
 
     let caught: unknown = null;
     try {
-      for await (const _ of events) {
-        // drain
+      for await (const event of events) {
+        void event; // drain — consume without using
       }
     } catch (err) {
       caught = err;
@@ -452,13 +478,13 @@ describe('streamSSEViaXHR', () => {
 
     xhr._emitError(
       401,
-      JSON.stringify({ message: 'Session expired — please sign in again' })
+      JSON.stringify({ message: 'Session expired — please sign in again' }),
     );
 
     let caught: unknown = null;
     try {
-      for await (const _ of events) {
-        // drain
+      for await (const event of events) {
+        void event; // drain — consume without using
       }
     } catch (err) {
       caught = err;
@@ -466,6 +492,127 @@ describe('streamSSEViaXHR', () => {
 
     expect(caught).toBeInstanceOf(Error);
     expect((caught as { status?: number }).status).toBe(401);
+  });
+
+  it('[BUG-955] throws QuotaExceededError for structured quota 402 responses', async () => {
+    const xhr = installFakeXhr();
+    const { events } = streamSSEViaXHR('https://example.test/stream', {
+      method: 'POST',
+    });
+
+    xhr._emitError(
+      402,
+      JSON.stringify({
+        code: 'QUOTA_EXCEEDED',
+        message: 'Quota reached',
+        details: {
+          tier: 'free',
+          reason: 'monthly',
+          monthlyLimit: 10,
+          usedThisMonth: 10,
+          dailyLimit: null,
+          usedToday: 0,
+          topUpCreditsRemaining: 0,
+          upgradeOptions: [],
+        },
+      }),
+    );
+
+    let caught: unknown = null;
+    try {
+      for await (const event of events) {
+        void event;
+      }
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as Error).name).toBe('QuotaExceededError');
+    expect((caught as { details?: { monthlyLimit?: number } }).details).toEqual(
+      expect.objectContaining({ monthlyLimit: 10 }),
+    );
+  });
+
+  it('[BUG-955] leaves malformed 402 responses as generic API errors', async () => {
+    const xhr = installFakeXhr();
+    const { events } = streamSSEViaXHR('https://example.test/stream', {
+      method: 'POST',
+    });
+
+    xhr._emitError(402, 'Payment required');
+
+    let caught: unknown = null;
+    try {
+      for await (const event of events) {
+        void event;
+      }
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as Error).name).not.toBe('QuotaExceededError');
+    expect((caught as Error).message).toContain('API error 402');
+  });
+
+  it('[BUG-955] leaves quota-coded 402 responses with malformed details as generic API errors', async () => {
+    const xhr = installFakeXhr();
+    const { events } = streamSSEViaXHR('https://example.test/stream', {
+      method: 'POST',
+    });
+
+    xhr._emitError(
+      402,
+      JSON.stringify({
+        code: 'QUOTA_EXCEEDED',
+        message: 'Quota reached',
+        details: {
+          tier: 'plus',
+          reason: 'monthly',
+          monthlyLimit: 0,
+          usedThisMonth: 0,
+        },
+      }),
+    );
+
+    let caught: unknown = null;
+    try {
+      for await (const event of events) {
+        void event;
+      }
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as Error).name).not.toBe('QuotaExceededError');
+    expect((caught as Error).message).toContain('Quota reached');
+  });
+
+  it('[BUG-955] leaves non-quota 402 responses as generic API errors', async () => {
+    const xhr = installFakeXhr();
+    const { events } = streamSSEViaXHR('https://example.test/stream', {
+      method: 'POST',
+    });
+
+    xhr._emitError(
+      402,
+      JSON.stringify({ code: 'BILLING_PROVIDER_UNAVAILABLE' }),
+    );
+
+    let caught: unknown = null;
+    try {
+      for await (const event of events) {
+        void event;
+      }
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as Error).name).not.toBe('QuotaExceededError');
+    expect((caught as Error).message).toContain('API error 402');
   });
 
   it('[BUG-955] throws NetworkError for onerror (status 0 / offline)', async () => {
@@ -479,8 +626,8 @@ describe('streamSSEViaXHR', () => {
 
     let caught: unknown = null;
     try {
-      for await (const _ of events) {
-        // drain
+      for await (const event of events) {
+        void event; // drain — consume without using
       }
     } catch (err) {
       caught = err;

@@ -22,7 +22,7 @@ async function constantTimeEqual(a: string, b: string): Promise<boolean> {
 
   let diff = 0;
   for (let i = 0; i < bytesA.length; i += 1) {
-    diff |= bytesA[i]! ^ bytesB[i]!;
+    diff |= (bytesA[i] as number) ^ (bytesB[i] as number);
   }
   return diff === 0;
 }
@@ -46,7 +46,7 @@ export const maintenanceRoutes = new Hono<MaintenanceEnv>().post(
           code: ERROR_CODES.FORBIDDEN,
           message: 'Maintenance secret required',
         },
-        403
+        403,
       );
     }
 
@@ -59,5 +59,5 @@ export const maintenanceRoutes = new Hono<MaintenanceEnv>().post(
     });
 
     return c.json({ queued: true });
-  }
+  },
 );

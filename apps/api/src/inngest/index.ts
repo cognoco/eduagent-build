@@ -66,6 +66,7 @@ import { summaryReconciliationCron } from './functions/summary-reconciliation-cr
 import {
   transcriptPurgeCron,
   transcriptPurgeHandler,
+  transcriptPurgeHandlerOnFailure,
 } from './functions/transcript-purge-cron';
 import { memoryFactsBackfill } from './functions/memory-facts-backfill';
 import { memoryFactsEmbedBackfill } from './functions/memory-facts-embed-backfill';
@@ -122,6 +123,7 @@ export {
   summaryReconciliationCron,
   transcriptPurgeCron,
   transcriptPurgeHandler,
+  transcriptPurgeHandlerOnFailure,
   memoryFactsBackfill,
   memoryFactsEmbedBackfill,
   reviewCalibrationGrade,
@@ -179,6 +181,7 @@ export const functions = [
   summaryReconciliationCron,
   transcriptPurgeCron,
   transcriptPurgeHandler,
+  transcriptPurgeHandlerOnFailure,
   memoryFactsBackfill,
   memoryFactsEmbedBackfill,
   reviewCalibrationGrade,

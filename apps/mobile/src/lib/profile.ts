@@ -37,7 +37,7 @@ export type { Profile };
 export type Persona = 'teen' | 'learner' | 'parent';
 
 export function personaFromBirthYear(
-  birthYear: number | null | undefined
+  birthYear: number | null | undefined,
 ): Persona {
   if (birthYear == null) return 'learner';
   const age = new Date().getFullYear() - birthYear;
@@ -55,7 +55,7 @@ export function personaFromBirthYear(
  */
 export function isGuardianProfile(
   profile: { isOwner: boolean } | null | undefined,
-  allProfiles: ReadonlyArray<{ isOwner: boolean }>
+  allProfiles: ReadonlyArray<{ isOwner: boolean }>,
 ): boolean {
   if (!profile?.isOwner) return false;
   return allProfiles.some((p) => !p.isOwner);
@@ -90,7 +90,7 @@ export interface ProfileContextValue {
 // outside [a-zA-Z0-9._-]. The current literals are already safe; this is
 // belt-and-suspenders and matches summary-draft.ts / session-recovery.ts.
 const ACTIVE_PROFILE_KEY = sanitizeSecureStoreKey(
-  'mentomate_active_profile_id'
+  'mentomate_active_profile_id',
 );
 const PARENT_PROXY_KEY = sanitizeSecureStoreKey('parent-proxy-active');
 
@@ -180,7 +180,7 @@ export function ProfileProvider({
 
   const activeProfile = useMemo(
     () => profiles.find((p) => p.id === activeProfileId) ?? null,
-    [profiles, activeProfileId]
+    [profiles, activeProfileId],
   );
 
   // [BUG-520] Push the active profile ID to the api-client module so
@@ -229,6 +229,21 @@ export function ProfileProvider({
           },
         });
       }
+      const nextActiveProfile =
+        profiles.find((profile) => profile.id === profileId) ?? null;
+      const nextIsParentProxy = Boolean(
+        nextActiveProfile &&
+        !nextActiveProfile.isOwner &&
+        profiles.some((profile) => profile.isOwner),
+      );
+
+      // Keep imperative request headers in step with the requested switch
+      // before resetting/refetching profile-scoped queries. Waiting for the
+      // next committed render leaves a brief window where resetQueries can
+      // reload child routes with the previous X-Profile-Id / proxy flag.
+      pushProfileIdToApiClient(profileId);
+      setProxyMode(nextIsParentProxy);
+
       // State update LAST — triggers re-renders that change themeKey and
       // remount the navigation tree.  Callers should close modals before
       // awaiting this function to avoid navigation state corruption.
@@ -258,6 +273,10 @@ export function ProfileProvider({
         'learning-modes',
         'notification-preferences',
         'teaching-preferences',
+        'books',
+        'book',
+        'book-suggestions',
+        'all-books',
       ];
       await queryClient.resetQueries({
         predicate: (query) =>
@@ -267,7 +286,7 @@ export function ProfileProvider({
         ? { success: true, persistenceFailed: true }
         : { success: true };
     },
-    [client, queryClient]
+    [client, profiles, queryClient],
   );
 
   const acknowledgeProfileRemoval = useCallback(() => {
@@ -311,7 +330,7 @@ export function ProfileProvider({
       profileLoadError,
       profileWasRemoved,
       acknowledgeProfileRemoval,
-    ]
+    ],
   );
 
   return createElement(ProfileContext.Provider, { value }, children);

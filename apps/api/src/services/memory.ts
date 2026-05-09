@@ -49,11 +49,11 @@ export async function retrieveRelevantMemory(
   currentMessage: string,
   voyageApiKey?: string,
   limit?: number,
-  queryVector?: number[]
+  queryVector?: number[],
 ): Promise<MemoryRetrievalResult> {
   if (!voyageApiKey && !queryVector) {
     logger.warn(
-      '[memory] VOYAGE_API_KEY not provided — embedding retrieval skipped for this exchange'
+      '[memory] VOYAGE_API_KEY not provided — embedding retrieval skipped for this exchange',
     );
     return EMPTY_RESULT;
   }
@@ -61,13 +61,13 @@ export async function retrieveRelevantMemory(
   try {
     const vector =
       queryVector ??
-      (await generateEmbedding(currentMessage, voyageApiKey!)).vector;
+      (await generateEmbedding(currentMessage, voyageApiKey as string)).vector;
 
     const similarTopics = await findSimilarTopics(
       db,
       vector,
       limit ?? DEFAULT_LIMIT,
-      profileId
+      profileId,
     );
 
     if (similarTopics.length === 0) {
@@ -86,7 +86,7 @@ export async function retrieveRelevantMemory(
       '[memory] Embedding retrieval failed, continuing without memory',
       {
         error: err instanceof Error ? err.message : String(err),
-      }
+      },
     );
     return EMPTY_RESULT;
   }
@@ -134,7 +134,7 @@ function formatMemoryContext(contents: (string | undefined | null)[]): string {
     '',
     'Use this context to connect to concepts the learner has encountered before.',
     'Reference their prior learning naturally — e.g. "Remember when we talked about X?" or "This connects to what you learned about Y."',
-    'Weave references in conversationally. The learner should feel you genuinely remember them.'
+    'Weave references in conversationally. The learner should feel you genuinely remember them.',
   );
 
   return lines.join('\n');

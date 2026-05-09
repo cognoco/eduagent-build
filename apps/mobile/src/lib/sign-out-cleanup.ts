@@ -47,9 +47,11 @@ export const PER_PROFILE_KEYS: ReadonlyArray<(profileId: string) => string> = [
   // (app)/_layout.tsx — postApprovalSeen flag per profile
   (id) => `postApprovalSeen_${id}`,
   // (app)/subscription.tsx — getNotifyStorageKey: child-paywall notify timestamp
-  (id) => `child-paywall-notified-at-${id}`,
-  // use-permission-setup.ts — permissionSetupSeen flag, sanitized
+  (id) => sanitizeSecureStoreKey(`child-paywall-notified-at-${id}`),
+  // Legacy permission setup gate — clear orphaned flag from existing installs.
   (id) => sanitizeSecureStoreKey(`permissionSetupSeen_${id}`),
+  // use-post-session-notification-ask.ts — one-shot post-session notification primer flag.
+  (id) => sanitizeSecureStoreKey(`notificationFirstAskShown_${id}`),
   // session-types.ts — getInputModeKey, sanitized
   (id) => sanitizeSecureStoreKey(`voice-input-mode-${id}`),
   // [CR-PR129-M6] (app)/_layout.tsx — ACCENT_STORE_PREFIX: accent preset per profile, sanitized.
@@ -161,7 +163,7 @@ export const SIGNOUT_CLEANUP_TIMEOUT_MS = 3_000;
 const OUTBOX_FLOWS = ['session'] as const;
 
 export async function clearProfileSecureStorageOnSignOut(
-  profileIds: ReadonlyArray<string>
+  profileIds: ReadonlyArray<string>,
 ): Promise<void> {
   const keys = new Set<string>();
 
@@ -192,7 +194,7 @@ export async function clearProfileSecureStorageOnSignOut(
       SecureStore.deleteItemAsync(key).catch(() => {
         // Per-key failure is non-fatal — better to clear what we can than
         // to abort cleanup over one stuck key.
-      })
+      }),
     ),
     outboxKeys.length > 0
       ? AsyncStorage.multiRemove(outboxKeys).catch(() => {
@@ -212,7 +214,7 @@ export async function clearProfileSecureStorageOnSignOut(
   await Promise.race([
     cleanup,
     new Promise<void>((resolve) =>
-      setTimeout(resolve, SIGNOUT_CLEANUP_TIMEOUT_MS)
+      setTimeout(resolve, SIGNOUT_CLEANUP_TIMEOUT_MS),
     ),
   ]);
 }

@@ -1,6 +1,6 @@
-# Flow N11: Settings Toggles — Notifications & Learning Mode
+# Flow N11: Settings Toggles — Notifications
 # Validates: inline settings controls on the More screen respond to taps.
-# Tests notification toggles and learning mode radio options with screenshots.
+# Tests notification toggles with screenshots.
 # Note: Theme/Accent/Persona sections were removed (persona system cleanup).
 # Tags: nightly, account, settings
 #
@@ -30,21 +30,33 @@ tags:
 - tapOn:
     text: "More"
 
-# 4. Wait for More screen to load (Learning Mode section is always above the fold)
+# 4. Wait for More screen to load
 - extendedWaitUntil:
     visible:
-      id: "learning-mode-casual"
+      id: "learning-accommodation-section-header"
     timeout: 10000
 
 - takeScreenshot: settings-initial
 
-# ── Notifications section ──
+# ── Notifications section (now a sub-screen) ──
 
-# 5. Scroll to Notifications section header
+# 5. Scroll to the Notifications row on the More main screen.
 - scrollUntilVisible:
     element:
-      id: "notifications-section-header"
+      id: "more-row-notifications"
     direction: DOWN
+    timeout: 15000
+    speed: 30
+    visibilityPercentage: 30
+    centerElement: true
+
+# 5a. Navigate into the Notifications sub-screen.
+- tapOn:
+    id: "more-row-notifications"
+
+- extendedWaitUntil:
+    visible:
+      id: "notifications-section-header"
     timeout: 10000
 
 # 5b. Ensure Push notifications row itself is in view before tapping
@@ -53,7 +65,10 @@ tags:
     element:
       id: "push-notifications-toggle"
     direction: DOWN
-    timeout: 5000
+    timeout: 10000
+    speed: 30
+    visibilityPercentage: 30
+    centerElement: true
 
 # 6. Tap "Push notifications" toggle (toggle on)
 - tapOn:
@@ -70,7 +85,10 @@ tags:
     element:
       id: "weekly-digest-toggle"
     direction: DOWN
-    timeout: 5000
+    timeout: 10000
+    speed: 30
+    visibilityPercentage: 30
+    centerElement: true
 
 - tapOn:
     id: "weekly-digest-toggle"
@@ -83,26 +101,5 @@ tags:
 
 - takeScreenshot: settings-notifications-reset
 
-# ── Learning Mode section ──
-
-# 10. Scroll until the Casual Explorer radio button is visible
-- scrollUntilVisible:
-    element:
-      id: "learning-mode-casual"
-    direction: UP
-    timeout: 10000
-
-# 11. Tap Casual Explorer mode
-- tapOn:
-    id: "learning-mode-casual"
-
-- takeScreenshot: settings-mode-casual
-
-# 12. Tap Serious Learner mode (reset)
-- tapOn:
-    id: "learning-mode-serious"
-
-- takeScreenshot: settings-mode-serious
-
-# 13. Final screenshot — all settings fully exercised
+# 10. Final screenshot — notification settings exercised
 - takeScreenshot: settings-toggles-complete

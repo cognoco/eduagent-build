@@ -4,7 +4,7 @@
 
 // Mock JWT so auth middleware passes
 jest.mock('./jwt', () =>
-  require('../test-utils/auth-fixture').createJwtModuleMock()
+  require('../test-utils/auth-fixture').createJwtModuleMock(),
 );
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
@@ -169,7 +169,7 @@ const TEST_ENV = {
   ...BASE_AUTH_ENV,
 };
 
-const SUBJECT_ID = 'subject-1';
+const _SUBJECT_ID = 'subject-1';
 
 function mockSubscription(overrides?: Record<string, unknown>) {
   return {
@@ -232,7 +232,7 @@ describe('metering middleware', () => {
       const res = await app.request(
         '/v1/subscription',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -254,7 +254,7 @@ describe('metering middleware', () => {
       const res = await app.request(
         '/v1/quiz/rounds',
         { method: 'GET', headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(mockDecrementQuota).not.toHaveBeenCalled();
@@ -268,7 +268,7 @@ describe('metering middleware', () => {
       const res = await app.request(
         '/v1/quiz/rounds/prefetch',
         { method: 'GET', headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(mockDecrementQuota).not.toHaveBeenCalled();
@@ -280,7 +280,7 @@ describe('metering middleware', () => {
       const res = await app.request(
         '/v1/dictation/generate',
         { method: 'GET', headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(mockDecrementQuota).not.toHaveBeenCalled();
@@ -312,7 +312,7 @@ describe('metering middleware', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({}),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       // Critical: regardless of route response code, the metering middleware
@@ -320,7 +320,7 @@ describe('metering middleware', () => {
       expect(mockDecrementQuota).toHaveBeenCalledWith(
         expect.anything(),
         'sub-1',
-        'test-profile-id'
+        'test-profile-id',
       );
       expect(res.status).toBe(200);
     });
@@ -347,13 +347,13 @@ describe('metering middleware', () => {
           method: 'POST',
           headers: AUTH_HEADERS,
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(mockDecrementQuota).toHaveBeenCalledWith(
         expect.anything(),
         'sub-1',
-        'test-profile-id'
+        'test-profile-id',
       );
       expect(res.status).toBe(200);
     });
@@ -364,7 +364,7 @@ describe('metering middleware', () => {
       // its LLM call. Otherwise the quota is meaningless on this route.
       mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
       mockGetQuotaPool.mockResolvedValue(
-        mockQuota({ usedThisMonth: 500, monthlyLimit: 500 })
+        mockQuota({ usedThisMonth: 500, monthlyLimit: 500 }),
       );
       mockDecrementQuota.mockResolvedValue({
         success: false,
@@ -380,7 +380,7 @@ describe('metering middleware', () => {
           method: 'POST',
           headers: AUTH_HEADERS,
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(402);
@@ -389,7 +389,7 @@ describe('metering middleware', () => {
     it('[BUG-623 / A-6] returns 402 when quota exhausted on POST /sessions/:id/recall-bridge', async () => {
       mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
       mockGetQuotaPool.mockResolvedValue(
-        mockQuota({ usedThisMonth: 500, monthlyLimit: 500 })
+        mockQuota({ usedThisMonth: 500, monthlyLimit: 500 }),
       );
       mockDecrementQuota.mockResolvedValue({
         success: false,
@@ -406,7 +406,7 @@ describe('metering middleware', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({}),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(402);
@@ -432,14 +432,14 @@ describe('metering middleware', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'What is 2+2?' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
       expect(mockDecrementQuota).toHaveBeenCalledWith(
         expect.anything(),
         'sub-1',
-        'test-profile-id'
+        'test-profile-id',
       );
     });
 
@@ -461,7 +461,7 @@ describe('metering middleware', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'hello' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.headers.get('X-Quota-Remaining')).toBe('399');
@@ -470,7 +470,7 @@ describe('metering middleware', () => {
     it('sets X-Quota-Warning-Level header', async () => {
       mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
       mockGetQuotaPool.mockResolvedValue(
-        mockQuota({ usedThisMonth: 450, monthlyLimit: 500 })
+        mockQuota({ usedThisMonth: 450, monthlyLimit: 500 }),
       );
       mockDecrementQuota.mockResolvedValue({
         success: true,
@@ -487,7 +487,7 @@ describe('metering middleware', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'hello' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       // 450/500 = 90% => soft warning
@@ -496,7 +496,7 @@ describe('metering middleware', () => {
 
     it('sets X-Daily-Remaining header for free tier', async () => {
       mockEnsureFreeSubscription.mockResolvedValue(
-        mockSubscription({ tier: 'free' })
+        mockSubscription({ tier: 'free' }),
       );
       mockGetQuotaPool.mockResolvedValue(
         mockQuota({
@@ -504,7 +504,7 @@ describe('metering middleware', () => {
           usedThisMonth: 10,
           dailyLimit: 10,
           usedToday: 3,
-        })
+        }),
       );
       mockDecrementQuota.mockResolvedValue({
         success: true,
@@ -521,7 +521,7 @@ describe('metering middleware', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'hello' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -546,7 +546,7 @@ describe('metering middleware', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'hello' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.headers.get('X-Daily-Remaining')).toBeNull();
@@ -560,7 +560,7 @@ describe('metering middleware', () => {
   describe('LLM routes with quota exceeded', () => {
     it('returns 402 when monthly quota is exhausted and decrement fails', async () => {
       mockEnsureFreeSubscription.mockResolvedValue(
-        mockSubscription({ tier: 'free' })
+        mockSubscription({ tier: 'free' }),
       );
       mockGetQuotaPool.mockResolvedValue(
         mockQuota({
@@ -568,7 +568,7 @@ describe('metering middleware', () => {
           monthlyLimit: 100,
           dailyLimit: 10,
           usedToday: 5,
-        })
+        }),
       );
       mockDecrementQuota.mockResolvedValue({
         success: false,
@@ -585,7 +585,7 @@ describe('metering middleware', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'hello' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(402);
@@ -600,7 +600,7 @@ describe('metering middleware', () => {
 
     it('returns 402 with daily reason when daily limit hit', async () => {
       mockEnsureFreeSubscription.mockResolvedValue(
-        mockSubscription({ tier: 'free' })
+        mockSubscription({ tier: 'free' }),
       );
       mockGetQuotaPool.mockResolvedValue(
         mockQuota({
@@ -608,7 +608,7 @@ describe('metering middleware', () => {
           monthlyLimit: 100,
           dailyLimit: 10,
           usedToday: 10,
-        })
+        }),
       );
       mockDecrementQuota.mockResolvedValue({
         success: false,
@@ -625,7 +625,7 @@ describe('metering middleware', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'hello' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(402);
@@ -640,7 +640,7 @@ describe('metering middleware', () => {
 
     it('includes upgrade options in 402 response', async () => {
       mockEnsureFreeSubscription.mockResolvedValue(
-        mockSubscription({ tier: 'free' })
+        mockSubscription({ tier: 'free' }),
       );
       mockGetQuotaPool.mockResolvedValue(
         mockQuota({
@@ -648,7 +648,7 @@ describe('metering middleware', () => {
           monthlyLimit: 100,
           dailyLimit: 10,
           usedToday: 5,
-        })
+        }),
       );
       mockDecrementQuota.mockResolvedValue({
         success: false,
@@ -665,12 +665,12 @@ describe('metering middleware', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'hello' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       const body = await res.json();
       const tiers = body.details.upgradeOptions.map(
-        (o: { tier: string }) => o.tier
+        (o: { tier: string }) => o.tier,
       );
       expect(tiers).toContain('plus');
       expect(tiers).toContain('family');
@@ -680,7 +680,7 @@ describe('metering middleware', () => {
     it('auto-provisions free tier and meters new users (CR1 fix)', async () => {
       // ensureFreeSubscription auto-creates a free sub
       mockEnsureFreeSubscription.mockResolvedValue(
-        mockSubscription({ id: 'sub-free', tier: 'free', status: 'active' })
+        mockSubscription({ id: 'sub-free', tier: 'free', status: 'active' }),
       );
       mockGetQuotaPool.mockResolvedValue(
         mockQuota({
@@ -689,7 +689,7 @@ describe('metering middleware', () => {
           monthlyLimit: 100,
           dailyLimit: 10,
           usedToday: 0,
-        })
+        }),
       );
       mockDecrementQuota.mockResolvedValue({
         success: true,
@@ -706,20 +706,20 @@ describe('metering middleware', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'hello' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
       // ensureFreeSubscription called (auto-provisions if needed)
       expect(mockEnsureFreeSubscription).toHaveBeenCalledWith(
         expect.anything(),
-        'test-account-id'
+        'test-account-id',
       );
       // Decrement called with the auto-provisioned subscription
       expect(mockDecrementQuota).toHaveBeenCalledWith(
         expect.anything(),
         'sub-free',
-        'test-profile-id'
+        'test-profile-id',
       );
     });
   });
@@ -754,7 +754,7 @@ describe('metering middleware', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'hello' }),
         },
-        { ...TEST_ENV, SUBSCRIPTION_KV: {} as KVNamespace }
+        { ...TEST_ENV, SUBSCRIPTION_KV: {} as KVNamespace },
       );
 
       expect(res.status).toBe(200);
@@ -782,7 +782,7 @@ describe('metering middleware', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'hello' }),
         },
-        { ...TEST_ENV, SUBSCRIPTION_KV: {} as KVNamespace }
+        { ...TEST_ENV, SUBSCRIPTION_KV: {} as KVNamespace },
       );
 
       // I7: writeSubscriptionStatus called twice — backfill + post-decrement update
@@ -795,7 +795,7 @@ describe('metering middleware', () => {
           status: 'active',
           monthlyLimit: 500,
           dailyLimit: null,
-        })
+        }),
       );
     });
 
@@ -819,7 +819,7 @@ describe('metering middleware', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'hello' }),
         },
-        { ...TEST_ENV, SUBSCRIPTION_KV: {} as KVNamespace }
+        { ...TEST_ENV, SUBSCRIPTION_KV: {} as KVNamespace },
       );
 
       // Should fall through to DB, not crash
@@ -829,7 +829,7 @@ describe('metering middleware', () => {
       // this we can't measure KV outage rate from logs.
       const kvReadWarns = mockLoggerWarn.mock.calls.filter(
         (call) =>
-          (call[1] as { event?: string })?.event === 'metering.kv_read_failed'
+          (call[1] as { event?: string })?.event === 'metering.kv_read_failed',
       );
       expect(kvReadWarns).toHaveLength(1);
       expect(kvReadWarns[0]?.[1]).toMatchObject({
@@ -843,7 +843,7 @@ describe('metering middleware', () => {
       mockLoggerWarn.mockClear();
       mockReadSubscriptionStatus.mockResolvedValue(null);
       mockWriteSubscriptionStatus.mockRejectedValue(
-        new Error('KV write timeout')
+        new Error('KV write timeout'),
       );
       mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
       mockGetQuotaPool.mockResolvedValue(mockQuota());
@@ -862,7 +862,7 @@ describe('metering middleware', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'hello' }),
         },
-        { ...TEST_ENV, SUBSCRIPTION_KV: {} as KVNamespace }
+        { ...TEST_ENV, SUBSCRIPTION_KV: {} as KVNamespace },
       );
 
       // Should still succeed — KV is best-effort
@@ -873,7 +873,7 @@ describe('metering middleware', () => {
       // and post-decrement update — both should surface a metric.)
       const kvWriteWarns = mockLoggerWarn.mock.calls.filter(
         (call) =>
-          (call[1] as { event?: string })?.event === 'metering.kv_write_failed'
+          (call[1] as { event?: string })?.event === 'metering.kv_write_failed',
       );
       expect(kvWriteWarns.length).toBeGreaterThanOrEqual(1);
       expect(kvWriteWarns[0]?.[1]).toMatchObject({
@@ -887,11 +887,11 @@ describe('metering middleware', () => {
       // KV read returns null (cache miss), KV write throws on backfill
       mockReadSubscriptionStatus.mockResolvedValue(null);
       mockWriteSubscriptionStatus.mockRejectedValue(
-        new Error('KV write timeout')
+        new Error('KV write timeout'),
       );
       mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
       mockGetQuotaPool.mockResolvedValue(
-        mockQuota({ usedThisMonth: 50, monthlyLimit: 500 })
+        mockQuota({ usedThisMonth: 50, monthlyLimit: 500 }),
       );
       mockDecrementQuota.mockResolvedValue({
         success: true,
@@ -908,7 +908,7 @@ describe('metering middleware', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'hello' }),
         },
-        { ...TEST_ENV, SUBSCRIPTION_KV: {} as KVNamespace }
+        { ...TEST_ENV, SUBSCRIPTION_KV: {} as KVNamespace },
       );
 
       // Request succeeds — DB path is used for quota enforcement
@@ -920,7 +920,7 @@ describe('metering middleware', () => {
       expect(mockDecrementQuota).toHaveBeenCalledWith(
         expect.anything(),
         'sub-1',
-        'test-profile-id'
+        'test-profile-id',
       );
     });
 
@@ -940,7 +940,7 @@ describe('metering middleware', () => {
 
       // DB returns the post-reset state
       mockEnsureFreeSubscription.mockResolvedValue(
-        mockSubscription({ id: 'sub-free', tier: 'free' })
+        mockSubscription({ id: 'sub-free', tier: 'free' }),
       );
       mockGetQuotaPool.mockResolvedValue(
         mockQuota({
@@ -949,7 +949,7 @@ describe('metering middleware', () => {
           usedThisMonth: 10,
           dailyLimit: 10,
           usedToday: 0, // DB was reset by cron
-        })
+        }),
       );
       mockDecrementQuota.mockResolvedValue({
         success: true,
@@ -966,7 +966,7 @@ describe('metering middleware', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'hello' }),
         },
-        { ...TEST_ENV, SUBSCRIPTION_KV: {} as KVNamespace }
+        { ...TEST_ENV, SUBSCRIPTION_KV: {} as KVNamespace },
       );
 
       // Must NOT return 402 — DB says quota is available
@@ -990,7 +990,7 @@ describe('metering middleware', () => {
       });
       // First call is post-decrement update — it will fail
       mockWriteSubscriptionStatus.mockRejectedValue(
-        new Error('KV network error')
+        new Error('KV network error'),
       );
       mockDecrementQuota.mockResolvedValue({
         success: true,
@@ -1007,7 +1007,7 @@ describe('metering middleware', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'hello' }),
         },
-        { ...TEST_ENV, SUBSCRIPTION_KV: {} as KVNamespace }
+        { ...TEST_ENV, SUBSCRIPTION_KV: {} as KVNamespace },
       );
 
       // Request succeeds even though post-decrement KV update failed
@@ -1028,7 +1028,7 @@ describe('metering middleware', () => {
       // but atomic decrement fails because concurrent request consumed last slot
       mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
       mockGetQuotaPool.mockResolvedValue(
-        mockQuota({ usedThisMonth: 499, monthlyLimit: 500 })
+        mockQuota({ usedThisMonth: 499, monthlyLimit: 500 }),
       );
       // Fast-path says OK (1 remaining), but atomic decrement races and fails
       mockDecrementQuota.mockResolvedValue({
@@ -1046,7 +1046,7 @@ describe('metering middleware', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'hello' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(402);
@@ -1057,7 +1057,7 @@ describe('metering middleware', () => {
 
     it('returns 402 with daily reason when decrement returns daily_exceeded', async () => {
       mockEnsureFreeSubscription.mockResolvedValue(
-        mockSubscription({ tier: 'free' })
+        mockSubscription({ tier: 'free' }),
       );
       mockGetQuotaPool.mockResolvedValue(
         mockQuota({
@@ -1065,7 +1065,7 @@ describe('metering middleware', () => {
           monthlyLimit: 100,
           dailyLimit: 10,
           usedToday: 9, // Fast-path sees 1 remaining
-        })
+        }),
       );
       // But atomic decrement finds daily now exhausted (concurrent request)
       mockDecrementQuota.mockResolvedValue({
@@ -1083,7 +1083,7 @@ describe('metering middleware', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'hello' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(402);
@@ -1102,7 +1102,7 @@ describe('metering middleware', () => {
     it('allows through when monthly exhausted but top-up succeeds', async () => {
       mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
       mockGetQuotaPool.mockResolvedValue(
-        mockQuota({ usedThisMonth: 500, monthlyLimit: 500 })
+        mockQuota({ usedThisMonth: 500, monthlyLimit: 500 }),
       );
       mockGetTopUpCreditsRemaining.mockResolvedValue(500);
       mockDecrementQuota.mockResolvedValue({
@@ -1120,7 +1120,7 @@ describe('metering middleware', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'hello' }),
         },
-        { ...TEST_ENV, SUBSCRIPTION_KV: {} as KVNamespace }
+        { ...TEST_ENV, SUBSCRIPTION_KV: {} as KVNamespace },
       );
 
       expect(res.status).toBe(200);
@@ -1130,7 +1130,7 @@ describe('metering middleware', () => {
         'test-account-id',
         expect.objectContaining({
           usedThisMonth: 500,
-        })
+        }),
       );
     });
   });
@@ -1142,7 +1142,7 @@ describe('metering middleware', () => {
   describe('streaming endpoint', () => {
     it('applies metering to /sessions/:id/stream', async () => {
       mockEnsureFreeSubscription.mockResolvedValue(
-        mockSubscription({ tier: 'free' })
+        mockSubscription({ tier: 'free' }),
       );
       mockGetQuotaPool.mockResolvedValue(
         mockQuota({
@@ -1150,7 +1150,7 @@ describe('metering middleware', () => {
           monthlyLimit: 100,
           dailyLimit: 10,
           usedToday: 5,
-        })
+        }),
       );
 
       const res = await app.request(
@@ -1160,7 +1160,7 @@ describe('metering middleware', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'hello' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       // Fast-path rejection: checkQuota sees monthly exhausted (no top-ups)
@@ -1169,11 +1169,11 @@ describe('metering middleware', () => {
 
     it('matches stream endpoint with trailing slash (I6 fix)', async () => {
       mockEnsureFreeSubscription.mockResolvedValue(
-        mockSubscription({ tier: 'free' })
+        mockSubscription({ tier: 'free' }),
       );
       // Set exhausted quota so metering rejects
       mockGetQuotaPool.mockResolvedValue(
-        mockQuota({ usedThisMonth: 100, monthlyLimit: 100 })
+        mockQuota({ usedThisMonth: 100, monthlyLimit: 100 }),
       );
 
       const res = await app.request(
@@ -1183,7 +1183,7 @@ describe('metering middleware', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'hello' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       // Should be caught by metering (402) not pass through unmetered

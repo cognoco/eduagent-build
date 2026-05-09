@@ -16,6 +16,7 @@ jest.mock('../../lib/theme', () => ({
     retentionFading: '#a16207',
     retentionWeak: '#ea580c',
     retentionForgotten: '#737373',
+    success: '#15803d',
   }),
   useSubjectTint: () => ({
     name: 'teal',
@@ -33,7 +34,8 @@ const defaultProps = {
   name: 'Mathematics',
   bookCount: 3,
   topicProgress: '18/32',
-  retentionStatus: 'fading' as const,
+  reviewDueCount: 0,
+  isFinished: false,
   isPaused: false,
   onPress: jest.fn(),
 };
@@ -76,6 +78,14 @@ describe('ShelfRow', () => {
     screen.getByText('Paused');
   });
 
+  it('renders archived chip when status is archived', () => {
+    render(<ShelfRow {...defaultProps} status="archived" />);
+
+    screen.getByTestId('shelf-row-archived-sub-math');
+    screen.getByText('Archived');
+    expect(screen.queryByTestId('shelf-row-paused-sub-math')).toBeNull();
+  });
+
   it('does not render paused chip when isPaused is false', () => {
     render(<ShelfRow {...defaultProps} isPaused={false} />);
 
@@ -89,36 +99,32 @@ describe('ShelfRow', () => {
     screen.getByText('1 book · 18/32 topics');
   });
 
-  it('renders Review pill when retentionStatus is weak', () => {
-    render(<ShelfRow {...defaultProps} retentionStatus="weak" />);
+  it('renders Review pill when reviewDueCount is positive', () => {
+    render(<ShelfRow {...defaultProps} reviewDueCount={1} />);
 
     screen.getByTestId('shelf-row-review-sub-math');
     screen.getByText('Review');
   });
 
-  it('renders Review pill when retentionStatus is forgotten', () => {
-    render(<ShelfRow {...defaultProps} retentionStatus="forgotten" />);
-
-    screen.getByTestId('shelf-row-review-sub-math');
-  });
-
-  it('does not render Review pill when retentionStatus is strong', () => {
-    render(<ShelfRow {...defaultProps} retentionStatus="strong" />);
+  it('does not render Review pill when no topics are overdue', () => {
+    render(<ShelfRow {...defaultProps} reviewDueCount={0} />);
 
     expect(screen.queryByTestId('shelf-row-review-sub-math')).toBeNull();
     expect(screen.queryByText('Review')).toBeNull();
   });
 
-  it('does not render Review pill when retentionStatus is fading', () => {
-    render(<ShelfRow {...defaultProps} retentionStatus="fading" />);
+  it('renders Finished pill when the shelf is finished and no topics are overdue', () => {
+    render(<ShelfRow {...defaultProps} isFinished />);
 
-    expect(screen.queryByTestId('shelf-row-review-sub-math')).toBeNull();
+    screen.getByTestId('shelf-row-finished-sub-math');
+    screen.getByText('Finished');
   });
 
-  it('does not render Review pill when retentionStatus is null', () => {
-    render(<ShelfRow {...defaultProps} retentionStatus={null} />);
+  it('does not render Finished pill when review is due', () => {
+    render(<ShelfRow {...defaultProps} isFinished reviewDueCount={1} />);
 
-    expect(screen.queryByTestId('shelf-row-review-sub-math')).toBeNull();
+    screen.getByTestId('shelf-row-review-sub-math');
+    expect(screen.queryByTestId('shelf-row-finished-sub-math')).toBeNull();
   });
 
   it('header has correct accessibilityRole', () => {
@@ -135,10 +141,23 @@ describe('ShelfRow', () => {
     expect(header.props.accessibilityLabel).toContain('paused');
   });
 
-  it('header accessibilityLabel mentions review needed when status is weak', () => {
-    render(<ShelfRow {...defaultProps} retentionStatus="weak" />);
+  it('header accessibilityLabel includes archived state', () => {
+    render(<ShelfRow {...defaultProps} status="archived" />);
+
+    const header = screen.getByTestId('shelf-row-header-sub-math');
+    expect(header.props.accessibilityLabel).toContain('archived');
+  });
+
+  it('header accessibilityLabel mentions review needed when topics are overdue', () => {
+    render(<ShelfRow {...defaultProps} reviewDueCount={1} />);
     const header = screen.getByTestId('shelf-row-header-sub-math');
     expect(header.props.accessibilityLabel).toContain('review needed');
+  });
+
+  it('header accessibilityLabel mentions finished when the shelf is finished', () => {
+    render(<ShelfRow {...defaultProps} isFinished />);
+    const header = screen.getByTestId('shelf-row-header-sub-math');
+    expect(header.props.accessibilityLabel).toContain('finished');
   });
 
   it('header accessibilityLabel mentions the open action', () => {

@@ -2,12 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text } from 'react-native';
 import type { ReactElement } from 'react';
 import type {
+  AccommodationMode,
   CelebrationLevel,
   CelebrationName,
   CelebrationReason,
   PendingCelebration,
 } from '@eduagent/schemas';
 import { Comet, OrionsBelt, PolarStar, TwinStars } from '../components/common';
+import { resolveCelebrationLevelForAccommodation } from '../lib/celebration-level';
 
 type QueueEntry = PendingCelebration;
 
@@ -32,7 +34,7 @@ const CELEBRATION_REGISTRY: Record<
 
 function getCelebrationMessage(
   reason: CelebrationReason,
-  audience: 'child' | 'adult'
+  audience: 'child' | 'adult',
 ): string {
   if (reason === 'comet' || reason === 'topic_mastered') {
     return audience === 'child'
@@ -59,7 +61,7 @@ function getCelebrationMessage(
 
 function filterByLevel(
   entry: QueueEntry,
-  celebrationLevel: CelebrationLevel
+  celebrationLevel: CelebrationLevel,
 ): boolean {
   if (celebrationLevel === 'off') return false;
   if (celebrationLevel === 'big_only') {
@@ -71,10 +73,14 @@ function filterByLevel(
 export function useCelebration(options?: {
   queue?: QueueEntry[];
   celebrationLevel?: CelebrationLevel;
+  accommodationMode?: AccommodationMode;
   audience?: 'child' | 'adult';
   onAllComplete?: () => void;
 }) {
-  const celebrationLevel = options?.celebrationLevel ?? 'all';
+  const celebrationLevel = resolveCelebrationLevelForAccommodation(
+    options?.accommodationMode,
+    options?.celebrationLevel ?? 'all',
+  );
   const audience = options?.audience ?? 'child';
   const [activeEntry, setActiveEntry] = useState<QueueEntry | null>(null);
   const [pendingQueue, setPendingQueue] = useState<QueueEntry[]>([]);
@@ -152,7 +158,7 @@ export function useCelebration(options?: {
       }
       setPendingQueue((current) => [...current, nextEntry]);
     },
-    [celebrationLevel]
+    [celebrationLevel],
   );
 
   const CelebrationOverlay = useMemo(() => {

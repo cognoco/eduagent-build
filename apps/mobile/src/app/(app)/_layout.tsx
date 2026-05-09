@@ -38,8 +38,6 @@ import { FeedbackProvider } from '../../components/feedback/FeedbackProvider';
 import { ErrorFallback, GateContent } from '../../components/common';
 import { goBackOrReplace } from '../../lib/navigation';
 import { useSubjects } from '../../hooks/use-subjects';
-import { usePermissionSetup } from '../../hooks/use-permission-setup';
-import { PermissionSetupGate } from '../../components/PermissionSetupGate';
 import { useParentProxy } from '../../hooks/use-parent-proxy';
 import { useFamilyPresence } from '../../hooks/use-family-presence';
 import {
@@ -60,7 +58,7 @@ const BASE_VISIBLE_TABS: ReadonlySet<string> = new Set([
 
 export function computeVisibleTabs(
   hasFamily: boolean,
-  role: ActiveProfileRole | null = 'owner'
+  role: ActiveProfileRole | null = 'owner',
 ): Set<string> {
   const next = new Set<string>(BASE_VISIBLE_TABS);
   if (hasFamily && role === 'owner') next.add('family');
@@ -192,7 +190,7 @@ function resolveAuthRedirectPath(pathname: string | undefined): string {
  */
 function canSwitchFromConsentGate(
   activeProfile: { id: string; birthYear: number } | null,
-  profiles: ReadonlyArray<{ id: string; birthYear: number }>
+  profiles: ReadonlyArray<{ id: string; birthYear: number }>,
 ): boolean {
   if (!activeProfile) return false;
   const currentYear = new Date().getFullYear();
@@ -200,7 +198,7 @@ function canSwitchFromConsentGate(
   if (age < 18) return false;
   // Must have at least one OTHER profile that belongs to a minor
   return profiles.some(
-    (p) => p.id !== activeProfile.id && currentYear - p.birthYear < 18
+    (p) => p.id !== activeProfile.id && currentYear - p.birthYear < 18,
   );
 }
 
@@ -264,7 +262,7 @@ function usePostApprovalLanding(
   // an impersonating parent isn't the audience for "Your parent said yes"
   // either. Gating on the discriminated role lets all role-aware copy
   // sites (more.tsx, mentor-memory.tsx, this hook) speak one vocabulary.
-  role: ActiveProfileRole | null
+  role: ActiveProfileRole | null,
 ): [boolean, () => void] {
   const isConsented = !!profileId && consentStatus === 'CONSENTED';
   const isChildProfile = role === 'child';
@@ -541,7 +539,7 @@ function CreateProfileGate(): React.ReactElement {
       console.error('signOut failed:', err);
       platformAlert(
         t('tabs.createProfile.signOutFailedTitle'),
-        t('tabs.createProfile.signOutFailedMessage')
+        t('tabs.createProfile.signOutFailedMessage'),
       );
     }
   };
@@ -617,7 +615,7 @@ function ConsentWithdrawnGate(): React.ReactElement {
       console.error('signOut failed:', err);
       platformAlert(
         t('tabs.createProfile.signOutFailedTitle'),
-        t('tabs.createProfile.signOutFailedMessage')
+        t('tabs.createProfile.signOutFailedMessage'),
       );
     }
   };
@@ -696,7 +694,7 @@ function ConsentWithdrawnGate(): React.ReactElement {
                     void switchProfile(prompt.target.id).catch(() => {
                       platformAlert(
                         t('tabs.switchProfile.errorTitle'),
-                        t('tabs.switchProfile.errorMessage')
+                        t('tabs.switchProfile.errorMessage'),
                       );
                     });
                   },
@@ -747,7 +745,7 @@ function ConsentPendingGate(): React.ReactElement {
       console.error('signOut failed:', err);
       platformAlert(
         t('tabs.createProfile.signOutFailedTitle'),
-        t('tabs.createProfile.signOutFailedMessage')
+        t('tabs.createProfile.signOutFailedMessage'),
       );
     }
   };
@@ -819,7 +817,7 @@ function ConsentPendingGate(): React.ReactElement {
           setResendFeedback('error');
           setResendErrorMsg(formatApiError(err));
         },
-      }
+      },
     );
   };
 
@@ -860,13 +858,13 @@ function ConsentPendingGate(): React.ReactElement {
           });
           platformAlert(
             t('tabs.consentPending.linkSentTitle'),
-            t('tabs.consentPending.linkSentMessage', { email: sentTo })
+            t('tabs.consentPending.linkSentMessage', { email: sentTo }),
           );
         },
         onError: (err) => {
           setChangeEmailError(formatApiError(err));
         },
-      }
+      },
     );
   };
 
@@ -940,7 +938,7 @@ function ConsentPendingGate(): React.ReactElement {
                       void switchProfile(prompt.target.id).catch(() => {
                         platformAlert(
                           'Could not switch profile',
-                          'Please try again.'
+                          'Please try again.',
                         );
                       });
                     },
@@ -1030,7 +1028,7 @@ function ConsentPendingGate(): React.ReactElement {
             testID="consent-resend"
             accessibilityRole="button"
             accessibilityLabel={t(
-              'tabs.consentPending.resendApprovalEmailLabel'
+              'tabs.consentPending.resendApprovalEmailLabel',
             )}
           >
             {resendMutation.isPending ? (
@@ -1226,7 +1224,7 @@ function ConsentPendingGate(): React.ReactElement {
                     void switchProfile(prompt.target.id).catch(() => {
                       platformAlert(
                         t('tabs.switchProfile.errorTitle'),
-                        t('tabs.switchProfile.errorMessage')
+                        t('tabs.switchProfile.errorMessage'),
                       );
                     });
                   },
@@ -1283,7 +1281,7 @@ export default function AppLayout() {
   const role = useActiveProfileRole();
   const visibleTabs = React.useMemo(
     () => computeVisibleTabs(hasFamily, role),
-    [hasFamily, role]
+    [hasFamily, role],
   );
 
   // Sync Clerk auth state with RevenueCat identity (runs on auth change)
@@ -1322,7 +1320,7 @@ export default function AppLayout() {
   React.useEffect(() => {
     evaluateSentryForProfile(
       activeProfile?.birthYear ?? null,
-      activeProfile?.consentStatus ?? null
+      activeProfile?.consentStatus ?? null,
     );
   }, [
     activeProfile?.id,
@@ -1378,11 +1376,9 @@ export default function AppLayout() {
   const [showPostApproval, dismissPostApproval] = usePostApprovalLanding(
     activeProfile?.id,
     activeProfile?.consentStatus,
-    role
+    role,
   );
-  const [showPermSetup, dismissPermSetup, permState, requestMic, requestNotif] =
-    usePermissionSetup(activeProfile?.id);
-  usePushTokenRegistration(permState.notif === 'granted');
+  usePushTokenRegistration();
 
   // [BUG-923] Previously fired on every render of the (app) layout, drowning
   // signal in noise during debugging sessions. Log only when isLoaded or
@@ -1390,7 +1386,7 @@ export default function AppLayout() {
   React.useEffect(() => {
     if (__DEV__) {
       console.log(
-        `[AUTH-DEBUG] (app) layout | isLoaded=${isLoaded} | isSignedIn=${isSignedIn}`
+        `[AUTH-DEBUG] (app) layout | isLoaded=${isLoaded} | isSignedIn=${isSignedIn}`,
       );
     }
   }, [isLoaded, isSignedIn]);
@@ -1404,10 +1400,10 @@ export default function AppLayout() {
   if (!isSignedIn) {
     if (__DEV__)
       console.warn(
-        '[AUTH-DEBUG] (app) layout → NOT signed in, bouncing to sign-in'
+        '[AUTH-DEBUG] (app) layout → NOT signed in, bouncing to sign-in',
       );
     const redirectTo = encodeURIComponent(
-      rememberPendingAuthRedirect(resolveAuthRedirectPath(pathname))
+      rememberPendingAuthRedirect(resolveAuthRedirectPath(pathname)),
     );
     return <Redirect href={`/sign-in?redirectTo=${redirectTo}` as const} />;
   }
@@ -1560,19 +1556,6 @@ export default function AppLayout() {
     return (
       <FeedbackProvider>
         <PostApprovalLanding onContinue={dismissPostApproval} />
-      </FeedbackProvider>
-    );
-  }
-
-  if (showPermSetup) {
-    return (
-      <FeedbackProvider>
-        <PermissionSetupGate
-          permState={permState}
-          onRequestMic={requestMic}
-          onRequestNotif={requestNotif}
-          onContinue={dismissPermSetup}
-        />
       </FeedbackProvider>
     );
   }

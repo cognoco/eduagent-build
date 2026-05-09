@@ -31,7 +31,7 @@ tags:
 # 4. Wait for settings/more screen — Learning Mode section is always above the fold
 - extendedWaitUntil:
     visible:
-      id: "learning-mode-casual"
+      id: "learning-accommodation-section-header"
     timeout: 10000
 
 # 5. Look for subscription/billing option

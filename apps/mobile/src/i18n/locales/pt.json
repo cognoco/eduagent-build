@@ -206,6 +206,8 @@
       "childPreferencesAccessLabel": "Abrir preferências de perfil de {{name}}",
       "childPreferencesLink": "Para mudar as preferências de {{name}}, abra o perfil dele →",
       "familyPreferencesLink": "Para mudar as preferências de uma criança, abra Família →",
+      "sheetTitle": "Modo de aprendizagem",
+      "sheetEffectMessage": "Entra em vigor a partir da tua próxima mensagem.",
       "casual": {
         "title": "Explorador",
         "description": "Aprenda no seu próprio ritmo. Seu mentor é relaxado e encorajador. Você ganha pontos imediatamente e pode pular as revisões."
@@ -248,12 +250,16 @@
       "bigOnlyTitle": "Apenas grandes marcos",
       "bigOnlyDescription": "Manter Cometa e Cinturão de Órion, pular as menores",
       "offTitle": "Desligado",
-      "offDescription": "Acompanhar marcos silenciosamente, sem animações"
+      "offDescription": "Acompanhar marcos silenciosamente, sem animações",
+      "inlinePrompt": "Celebrações"
     },
     "notifications": {
       "sectionHeader": "Notificações",
       "pushTitle": "Notificações push",
       "weeklyDigestTitle": "Resumo semanal de progresso",
+      "weeklyEmailDigestTitle": "Email semanal de progresso",
+      "monthlyEmailDigestTitle": "Email mensal de progresso",
+      "emailDigestDescription": "Enviado para o email da tua conta.",
       "updateErrorTitle": "Não foi possível atualizar as configurações de notificação"
     },
     "account": {
@@ -280,7 +286,8 @@
     },
     "help": {
       "contactSupportTitle": "Contatar o suporte",
-      "contactSupportMessage": "Envie um e-mail para support@mentomate.app para obter ajuda com sua conta."
+      "contactSupportMessage": "Envie um e-mail para support@mentomate.app para obter ajuda com sua conta.",
+      "helpAndFeedback": "Ajuda e feedback"
     },
     "errors": {
       "tryAgain": "Tente novamente.",
@@ -307,7 +314,17 @@
       "withdrawalArchiveAlwaysDescription": "13+ accounts only. Under-13 always deletes immediately for privacy compliance.",
       "withdrawalArchiveNever": "Never archive - delete immediately",
       "withdrawalArchiveNeverDescription": "Delete at grace expiry instead of keeping a 30-day archive.",
-      "withdrawalArchiveError": "Couldn't update setting. Try again."
+      "withdrawalArchiveError": "Couldn't update setting. Try again.",
+      "privacyAndData": "Privacidade e dados"
+    },
+    "sections": {
+      "settings": "Configurações"
+    },
+    "subscreens": {
+      "notifications": "Notificações",
+      "account": "Conta",
+      "privacy": "Privacidade e dados",
+      "help": "Ajuda e feedback"
     }
   },
   "session": {
@@ -453,6 +470,7 @@
       "speakNow": "Fale agora — toque no microfone novamente para parar",
       "processing": "Processando...",
       "inputUnavailable": "A entrada está indisponível no momento",
+      "classifyingSubject": "A perceber a que disciplina isto pertence…",
       "switchToTextMode": "Mudar para modo de texto",
       "textMode": "Modo de texto",
       "switchToVoiceMode": "Mudar para modo de voz",
@@ -761,8 +779,10 @@
     },
     "row": {
       "review": "Revisar",
+      "finished": "Concluído",
       "notStarted": "não iniciado",
       "paused": "Pausado",
+      "archived": "Arquivado",
       "hasNotes": "Tem notas",
       "bookTopics": "{{progress}} tópicos",
       "shelfSubtitle_one": "{{count}} livro · {{progress}} tópicos",
@@ -773,7 +793,9 @@
       "bookNotesSuffix": ", tem notas",
       "shelfAccessibilityLabel": "Prateleira {{name}}, {{subtitle}}{{pausedSuffix}}{{reviewSuffix}}. Toque para {{action}}.",
       "shelfPausedSuffix": ", pausado",
+      "shelfArchivedSuffix": ", arquivado",
       "shelfReviewSuffix": ", revisão necessária",
+      "shelfFinishedSuffix": ", concluído",
       "shelfActionExpand": "expandir",
       "shelfActionCollapse": "recolher",
       "shelfActionOpen": "abrir"
@@ -849,6 +871,8 @@
     "startSubjectLabel": "Começar {{name}}",
     "notSureHint": "Não tem certeza? Apenas descreva o que te interessa — como \"Quero entender como as plantas crescem\"",
     "checkingName": "Verificando nome da matéria...",
+    "creatingSubject": "Criando matéria...",
+    "preparingCurriculum": "Preparando sua primeira lição...",
     "somethingElse": "Outra coisa",
     "somethingElseHint": "Seja o mais específico que quiser.",
     "clarifyLabel": "O que exatamente você quer aprender?",
@@ -994,6 +1018,21 @@
   "assessment": {
     "title": "Verificação de Conhecimento",
     "openingMessage": "Vamos ver o que você aprendeu até agora. Farei algumas perguntas — apenas faça o seu melhor, e eu ajudarei a preencher quaisquer lacunas.",
+    "firstQuestion": "Primeira pergunta: quais são as principais coisas que você lembra sobre este tema? Compartilhe um ou dois exemplos, se puder.",
+    "resultSummary": "Você acertou {{mastery}}%! {{band}}.",
+    "bands": {
+      "excellent": "Excelente",
+      "good": "Bom",
+      "meetsBar": "Atinge o objetivo",
+      "coreIdeas": "As ideias principais estão lá",
+      "needsReview": "Precisa de outra revisão"
+    },
+    "borderlineBody": "Você entendeu as ideias principais. Quer uma revisão rápida das partes em que ficou menos seguro?",
+    "gapFillAction": "Sim, mostre o que faltou",
+    "declineRefreshAction": "Não, obrigado, terminei",
+    "failedExhaustedBody": "Este tema precisa de outra olhada. Vamos passar por ele juntos.",
+    "startSessionAction": "Iniciar uma sessão",
+    "notNowAction": "Agora não",
     "passedMessage": "Você tem um bom domínio da maior parte disso — {{mastery}}% de maestria! As áreas a serem revisitadas aparecerão na sua Biblioteca.",
     "missingParams": "Esta avaliação não pode ser iniciada — faltam informações necessárias.",
     "pickerTitle": "Escolhe um tema para verificar",
@@ -1540,7 +1579,7 @@
       "couldNotExportMemory": "Não foi possível exportar a memória",
       "controls": "Controles",
       "learnAboutChild": "Aprender sobre a criança",
-      "learnAboutChildDescription": "Permitir que o mentor construa uma memória dos pontos fortes e dificuldades do seu filho",
+      "learnAboutChildDescription": "Permitir que o mentor construa uma memória dos pontos fortes e áreas de foco do seu filho",
       "useWhatMentorKnows": "Usar o que o mentor sabe",
       "useWhatMentorKnowsDescription": "Deixar o mentor personalizar as sessões usando o que conhece",
       "noObservationsYet": "Nenhuma observação ainda",
@@ -1800,14 +1839,14 @@
         "withdrawn": "Consentimento retirado"
       },
       "engagementTrend": {
-        "declining": "Engagement declining",
+        "declining": "Engajamento precisa de atenção",
         "increasing": "Engagement increasing",
         "stable": "Engagement stable"
       },
       "reviewHealth": "Revisar saúde",
       "retentionTrend": {
         "improving": "Melhorando",
-        "declining": "Diminuindo",
+        "declining": "Precisa de revisão",
         "stable": "Estável"
       },
       "signal": {

@@ -19,7 +19,7 @@ appId: com.mentomate.app
 # 2. Wait for More screen to load — Learning Mode is always above the fold
 - extendedWaitUntil:
     visible:
-      id: "learning-mode-casual"
+      id: "learning-accommodation-section-header"
     timeout: 10000
 
 # 3. Scroll to find Profile row and tap it

@@ -17,7 +17,7 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 const mockFetchPriorTopics = jest.fn();
 const mockFetchCrossSubjectHighlights = jest.fn();
-jest.mock('../prior-learning', () => ({
+jest.mock('../prior-learning' /* gc1-allow: unit test boundary */, () => ({
   fetchPriorTopics: (...args: unknown[]) => mockFetchPriorTopics(...args),
   fetchCrossSubjectHighlights: (...args: unknown[]) =>
     mockFetchCrossSubjectHighlights(...args),
@@ -26,48 +26,44 @@ jest.mock('../prior-learning', () => ({
 }));
 
 const mockGetTeachingPreference = jest.fn();
-jest.mock('../retention-data', () => ({
+jest.mock('../retention-data' /* gc1-allow: unit test boundary */, () => ({
   getTeachingPreference: (...args: unknown[]) =>
     mockGetTeachingPreference(...args),
 }));
 
 const mockGetLearningMode = jest.fn();
-jest.mock('../settings', () => ({
+jest.mock('../settings' /* gc1-allow: unit test boundary */, () => ({
   getLearningMode: (...args: unknown[]) => mockGetLearningMode(...args),
 }));
 
 const mockGetLearningProfile = jest.fn();
-jest.mock('../learner-profile', () => ({
+jest.mock('../learner-profile' /* gc1-allow: unit test boundary */, () => ({
   getLearningProfile: (...args: unknown[]) => mockGetLearningProfile(...args),
   buildMemoryBlock: jest.fn(),
   buildAccommodationBlock: jest.fn(),
 }));
 
-jest.mock('../subject', () => ({ getSubject: jest.fn() }));
+const mockGetSubject = jest.fn();
+jest.mock('../subject' /* gc1-allow: unit test boundary */, () => ({
+  // gc1-allow: mutex unit test — controls getSubject call count to verify single supplementary fan-out
+  getSubject: (...args: unknown[]) => mockGetSubject(...args),
+}));
+
+const mockLoadProfileRowById = jest.fn();
+jest.mock('../profile' /* gc1-allow: unit test boundary */, () => ({
+  // gc1-allow: mutex unit test — controls loadProfileRowById call count to verify single supplementary fan-out
+  loadProfileRowById: (...args: unknown[]) => mockLoadProfileRowById(...args),
+}));
 
 import {
+  clearSessionStaticContextForProfile,
+  getSessionStaticContext,
   getOrLoadSessionSupplementary,
   resetSessionStaticContextCache,
+  _sessionStaticContextCacheSize,
   _supplementaryInflightSize,
   type SessionStaticContextCacheEntry,
 } from './session-cache';
-
-function makeEntry(
-  overrides: Partial<SessionStaticContextCacheEntry> = {}
-): SessionStaticContextCacheEntry {
-  return {
-    profileId: 'profile-1',
-    sessionId: 'session-1',
-    subjectId: 'subject-1',
-    topicId: null,
-    expiresAt: Date.now() + 60_000,
-    profile: null,
-    subject: null,
-    homeworkLibraryContextLoaded: false,
-    bookLearningHistoryContexts: new Map(),
-    ...overrides,
-  };
-}
 
 describe('[BUG-667 / S-10] getOrLoadSessionSupplementary — concurrent fetch mutex', () => {
   beforeEach(() => {
@@ -79,14 +75,30 @@ describe('[BUG-667 / S-10] getOrLoadSessionSupplementary — concurrent fetch mu
     mockGetTeachingPreference.mockResolvedValue(null);
     mockGetLearningMode.mockResolvedValue(null);
     mockGetLearningProfile.mockResolvedValue(null);
+    mockGetSubject.mockResolvedValue(null);
+    mockLoadProfileRowById.mockResolvedValue(null);
   });
+
+  async function makeCachedEntry(
+    overrides: Partial<SessionStaticContextCacheEntry> = {},
+  ): Promise<SessionStaticContextCacheEntry> {
+    return getSessionStaticContext(
+      {} as never,
+      overrides.profileId ?? 'profile-1',
+      overrides.sessionId ?? 'session-1',
+      {
+        subjectId: overrides.subjectId ?? 'subject-1',
+        topicId: overrides.topicId ?? null,
+      } as never,
+    );
+  }
 
   it('runs the 5-query fan-out exactly ONCE under concurrent first-exchange calls', async () => {
     // Arrange: two concurrent callers will hit the cache miss path
     // simultaneously. Pre-fix, each caller would invoke each fan-out query
     // independently — call counts would be 2x. With the mutex, the second
     // caller awaits the first caller's in-flight promise.
-    const entry = makeEntry();
+    const entry = await makeCachedEntry();
 
     const [first, second] = await Promise.all([
       getOrLoadSessionSupplementary(
@@ -95,7 +107,7 @@ describe('[BUG-667 / S-10] getOrLoadSessionSupplementary — concurrent fetch mu
         'session-1',
         'subject-1',
         false,
-        entry
+        entry,
       ),
       getOrLoadSessionSupplementary(
         {} as never,
@@ -103,7 +115,7 @@ describe('[BUG-667 / S-10] getOrLoadSessionSupplementary — concurrent fetch mu
         'session-1',
         'subject-1',
         false,
-        entry
+        entry,
       ),
     ]);
 
@@ -124,7 +136,7 @@ describe('[BUG-667 / S-10] getOrLoadSessionSupplementary — concurrent fetch mu
   });
 
   it('caches the resolved value on the entry and skips the fan-out entirely on repeat calls', async () => {
-    const entry = makeEntry();
+    const entry = await makeCachedEntry();
 
     await getOrLoadSessionSupplementary(
       {} as never,
@@ -132,7 +144,7 @@ describe('[BUG-667 / S-10] getOrLoadSessionSupplementary — concurrent fetch mu
       'session-1',
       'subject-1',
       false,
-      entry
+      entry,
     );
     expect(mockFetchPriorTopics).toHaveBeenCalledTimes(1);
 
@@ -144,7 +156,7 @@ describe('[BUG-667 / S-10] getOrLoadSessionSupplementary — concurrent fetch mu
       'session-1',
       'subject-1',
       false,
-      entry
+      entry,
     );
     expect(mockFetchPriorTopics).toHaveBeenCalledTimes(1);
     expect(entry.supplementary).toEqual(expect.objectContaining({}));
@@ -155,7 +167,7 @@ describe('[BUG-667 / S-10] getOrLoadSessionSupplementary — concurrent fetch mu
     // run the fan-out fresh.
     mockFetchPriorTopics.mockRejectedValueOnce(new Error('transient DB blip'));
 
-    const entry = makeEntry();
+    const entry = await makeCachedEntry();
     await expect(
       getOrLoadSessionSupplementary(
         {} as never,
@@ -163,8 +175,8 @@ describe('[BUG-667 / S-10] getOrLoadSessionSupplementary — concurrent fetch mu
         'session-1',
         'subject-1',
         false,
-        entry
-      )
+        entry,
+      ),
     ).rejects.toThrow('transient DB blip');
 
     expect(_supplementaryInflightSize()).toBe(0);
@@ -178,8 +190,8 @@ describe('[BUG-667 / S-10] getOrLoadSessionSupplementary — concurrent fetch mu
         'session-1',
         'subject-1',
         false,
-        entry
-      )
+        entry,
+      ),
     ).resolves.toEqual(expect.objectContaining({}));
     expect(mockFetchPriorTopics).toHaveBeenCalledTimes(2); // initial fail + retry
   });
@@ -187,7 +199,7 @@ describe('[BUG-667 / S-10] getOrLoadSessionSupplementary — concurrent fetch mu
   it('skips freeform-irrelevant queries (priorTopics, teachingPref, crossSubjectHighlights)', async () => {
     // Freeform sessions have no subject-specific learning history, so those
     // three queries should be elided regardless of the mutex.
-    const entry = makeEntry();
+    const entry = await makeCachedEntry();
 
     await getOrLoadSessionSupplementary(
       {} as never,
@@ -195,7 +207,7 @@ describe('[BUG-667 / S-10] getOrLoadSessionSupplementary — concurrent fetch mu
       'session-1',
       'subject-1',
       true, // isFreeform
-      entry
+      entry,
     );
 
     expect(mockFetchPriorTopics).not.toHaveBeenCalled();
@@ -204,5 +216,53 @@ describe('[BUG-667 / S-10] getOrLoadSessionSupplementary — concurrent fetch mu
     // But the always-on lookups still fire.
     expect(mockGetLearningMode).toHaveBeenCalledTimes(1);
     expect(mockGetLearningProfile).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears cached session context only for the requested profile', async () => {
+    await makeCachedEntry({ profileId: 'profile-1', sessionId: 'session-1' });
+    await makeCachedEntry({ profileId: 'profile-1', sessionId: 'session-2' });
+    await makeCachedEntry({ profileId: 'profile-2', sessionId: 'session-3' });
+
+    clearSessionStaticContextForProfile('profile-1');
+    mockGetSubject.mockClear();
+
+    expect(_sessionStaticContextCacheSize()).toBe(1);
+    const remaining = await getSessionStaticContext(
+      {} as never,
+      'profile-2',
+      'session-3',
+      { subjectId: 'subject-1', topicId: null } as never,
+    );
+    expect(remaining.profileId).toBe('profile-2');
+    expect(mockGetSubject).not.toHaveBeenCalled(); // profile-2 cache survived the clear
+  });
+
+  it('clear during in-flight fetch does not resurrect stale supplementary cache', async () => {
+    let resolveLearningMode!: (value: { mode: 'casual' }) => void;
+    mockGetLearningMode.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveLearningMode = resolve;
+      }),
+    );
+    const entry = await makeCachedEntry();
+
+    const promise = getOrLoadSessionSupplementary(
+      {} as never,
+      'profile-1',
+      'session-1',
+      'subject-1',
+      false,
+      entry,
+    );
+
+    expect(_supplementaryInflightSize()).toBe(1);
+    clearSessionStaticContextForProfile('profile-1');
+    expect(_supplementaryInflightSize()).toBe(0);
+
+    resolveLearningMode({ mode: 'casual' });
+    await promise;
+
+    expect(_sessionStaticContextCacheSize()).toBe(0);
+    expect(entry.supplementary).toBeUndefined();
   });
 });

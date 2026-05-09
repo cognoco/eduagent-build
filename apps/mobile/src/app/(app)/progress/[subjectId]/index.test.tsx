@@ -120,88 +120,121 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockLocalSearchParams(),
 }));
 
-jest.mock('../../../../hooks/use-active-profile-role', () => ({ // gc1-allow: subject progress screen varies retention copy by role; mocking the role hook pins the register for deterministic assertions.
-  useActiveProfileRole: () => 'owner',
-}));
+jest.mock(
+  '../../../../hooks/use-active-profile-role' /* gc1-allow: unit test boundary */,
+  () => ({
+    // gc1-allow: subject progress screen varies retention copy by role; mocking the role hook pins the register for deterministic assertions.
+    useActiveProfileRole: () => 'owner',
+  }),
+);
 
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
 }));
 
-jest.mock('../../../../lib/navigation', () => ({
-  goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
-  pushLearningResumeTarget: (...args: unknown[]) =>
-    mockPushLearningResumeTarget(...args),
-}));
+jest.mock(
+  '../../../../lib/navigation' /* gc1-allow: unit test boundary */,
+  () => ({
+    goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
+    pushLearningResumeTarget: (...args: unknown[]) =>
+      mockPushLearningResumeTarget(...args),
+  }),
+);
 
-jest.mock('../../../../components/common', () => {
-  const { View, Text, Pressable } = require('react-native');
-  return {
-    ErrorFallback: (props: {
-      testID?: string;
-      title?: string;
-      message?: string;
-      primaryAction?: { testID?: string; onPress: () => void; label: string };
-      secondaryAction?: { testID?: string; onPress: () => void; label: string };
-    }) => (
-      <View testID={props.testID}>
-        {props.title ? <Text>{props.title}</Text> : null}
-        {props.message ? <Text>{props.message}</Text> : null}
-        {props.primaryAction ? (
-          <Pressable
-            testID={props.primaryAction.testID}
-            onPress={props.primaryAction.onPress}
-          >
-            <Text>{props.primaryAction.label}</Text>
-          </Pressable>
-        ) : null}
-        {props.secondaryAction ? (
-          <Pressable
-            testID={props.secondaryAction.testID}
-            onPress={props.secondaryAction.onPress}
-          >
-            <Text>{props.secondaryAction.label}</Text>
-          </Pressable>
-        ) : null}
-      </View>
-    ),
-  };
-});
+jest.mock(
+  '../../../../components/common' /* gc1-allow: unit test boundary */,
+  () => {
+    const { View, Text, Pressable } = require('react-native');
+    return {
+      ErrorFallback: (props: {
+        testID?: string;
+        title?: string;
+        message?: string;
+        primaryAction?: { testID?: string; onPress: () => void; label: string };
+        secondaryAction?: {
+          testID?: string;
+          onPress: () => void;
+          label: string;
+        };
+      }) => (
+        <View testID={props.testID}>
+          {props.title ? <Text>{props.title}</Text> : null}
+          {props.message ? <Text>{props.message}</Text> : null}
+          {props.primaryAction ? (
+            <Pressable
+              testID={props.primaryAction.testID}
+              onPress={props.primaryAction.onPress}
+            >
+              <Text>{props.primaryAction.label}</Text>
+            </Pressable>
+          ) : null}
+          {props.secondaryAction ? (
+            <Pressable
+              testID={props.secondaryAction.testID}
+              onPress={props.secondaryAction.onPress}
+            >
+              <Text>{props.secondaryAction.label}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ),
+    };
+  },
+);
 
-jest.mock('../../../../components/progress', () => ({
-  ProgressBar: () => null,
-}));
+jest.mock(
+  '../../../../components/progress' /* gc1-allow: unit test boundary */,
+  () => ({
+    ProgressBar: () => null,
+  }),
+);
 
 const mockUseProgressInventory = jest.fn();
 const mockUseSubjectProgress = jest.fn();
 const mockUseLearningResumeTarget = jest.fn();
-jest.mock('../../../../hooks/use-progress', () => ({
-  useProgressInventory: (...args: unknown[]) =>
-    mockUseProgressInventory(...args),
-  useSubjectProgress: (...args: unknown[]) => mockUseSubjectProgress(...args),
-  useLearningResumeTarget: (...args: unknown[]) =>
-    mockUseLearningResumeTarget(...args),
-}));
+jest.mock(
+  '../../../../hooks/use-progress' /* gc1-allow: unit test boundary */,
+  () => ({
+    useProgressInventory: (...args: unknown[]) =>
+      mockUseProgressInventory(...args),
+    useSubjectProgress: (...args: unknown[]) => mockUseSubjectProgress(...args),
+    useLearningResumeTarget: (...args: unknown[]) =>
+      mockUseLearningResumeTarget(...args),
+  }),
+);
 
 const mockUseLanguageProgress = jest.fn();
-jest.mock('../../../../hooks/use-language-progress', () => ({
-  useLanguageProgress: (...args: unknown[]) => mockUseLanguageProgress(...args),
-}));
+jest.mock(
+  '../../../../hooks/use-language-progress' /* gc1-allow: unit test boundary */,
+  () => ({
+    useLanguageProgress: (...args: unknown[]) =>
+      mockUseLanguageProgress(...args),
+  }),
+);
 
 const mockMutateSubjectAsync = jest.fn();
 const mockUseUpdateSubject = jest.fn();
-jest.mock('../../../../hooks/use-subjects', () => ({
-  useUpdateSubject: (...args: unknown[]) => mockUseUpdateSubject(...args),
-}));
+jest.mock(
+  '../../../../hooks/use-subjects' /* gc1-allow: unit test boundary */,
+  () => ({
+    useUpdateSubject: (...args: unknown[]) => mockUseUpdateSubject(...args),
+  }),
+);
 
 const mockPlatformAlert = jest.fn();
-jest.mock('../../../../lib/platform-alert', () => ({
-  platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
-}));
+jest.mock(
+  '../../../../lib/platform-alert' /* gc1-allow: unit test boundary */,
+  () => ({
+    platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
+  }),
+);
 
-jest.mock('../../../../lib/format-api-error', () => ({
-  formatApiError: (err: Error) => `formatted: ${err.message}`,
-}));
+jest.mock(
+  '../../../../lib/format-api-error' /* gc1-allow: unit test boundary */,
+  () => ({
+    formatApiError: (err: Error) => `formatted: ${err.message}`,
+  }),
+);
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -457,10 +490,10 @@ describe('ProgressSubjectScreen', () => {
 
       expect(mockPushLearningResumeTarget).toHaveBeenCalledWith(
         expect.anything(),
-        target
+        target,
       );
       expect(mockPush).not.toHaveBeenCalledWith(
-        '/(app)/session?mode=learning&subjectId=s1'
+        '/(app)/session?mode=learning&subjectId=s1',
       );
     });
 
@@ -480,7 +513,7 @@ describe('ProgressSubjectScreen', () => {
       fireEvent.press(screen.getByTestId('progress-subject-back'));
       expect(mockGoBackOrReplace).toHaveBeenCalledWith(
         expect.anything(),
-        '/(app)/progress'
+        '/(app)/progress',
       );
     });
 
@@ -500,7 +533,7 @@ describe('ProgressSubjectScreen', () => {
             style: 'destructive',
           }),
         ]),
-        { cancelable: true }
+        { cancelable: true },
       );
       expect(mockMutateSubjectAsync).not.toHaveBeenCalled();
     });
@@ -540,7 +573,7 @@ describe('ProgressSubjectScreen', () => {
       await waitFor(() => {
         expect(mockPlatformAlert).toHaveBeenLastCalledWith(
           'Could not hide subject',
-          'formatted: Nope'
+          'formatted: Nope',
         );
       });
     });
@@ -690,7 +723,7 @@ describe('ProgressSubjectScreen', () => {
       });
       render(<ProgressSubjectScreen />);
       screen.getByText(
-        'Complete a session to start tracking your milestone progress.'
+        'Complete a session to start tracking your milestone progress.',
       );
     });
 
@@ -756,6 +789,42 @@ describe('ProgressSubjectScreen', () => {
       mockHooks({ subjectProgressData: { retentionStatus: 'weak' } });
       render(<ProgressSubjectScreen />);
       screen.getByText('Needs a quick refresh.');
+    });
+
+    it('opens the shelf when the retention card is pressed without a resume target', () => {
+      mockHooks({ subjectProgressData: { retentionStatus: 'weak' } });
+      render(<ProgressSubjectScreen />);
+
+      fireEvent.press(screen.getByTestId('progress-subject-retention-card'));
+
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/shelf/[subjectId]',
+        params: { subjectId: 's1' },
+      });
+    });
+
+    it('resumes the subject target when the retention card is pressed and a resume target exists', () => {
+      const target = {
+        subjectId: 's1',
+        subjectName: 'Math',
+        topicId: 't1',
+        topicTitle: 'Fractions',
+        sessionId: null,
+        resumeFromSessionId: 'prev-session',
+        resumeKind: 'recent_topic',
+        lastActivityAt: '2026-02-15T09:00:00.000Z',
+        reason: 'Continue Fractions',
+      };
+      mockHooks({ subjectProgressData: { retentionStatus: 'weak' } });
+      mockUseLearningResumeTarget.mockReturnValue({ data: target });
+
+      render(<ProgressSubjectScreen />);
+      fireEvent.press(screen.getByTestId('progress-subject-retention-card'));
+
+      expect(mockPushLearningResumeTarget).toHaveBeenCalledWith(
+        expect.anything(),
+        target,
+      );
     });
   });
 });

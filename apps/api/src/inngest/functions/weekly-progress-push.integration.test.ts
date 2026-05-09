@@ -26,13 +26,21 @@ import {
 // This exercises the full sendPushNotification pipeline (token lookup, daily
 // cap check, notification logging) while mocking only the external Expo API.
 const EXPO_PUSH_API_URL = 'https://exp.host/--/api/v2/push/send';
+const RESEND_API_URL = 'https://api.resend.com/emails';
 const pushApiCalls: Array<{
   to: string;
   title: string;
   body: string;
   data: unknown;
 }> = [];
+const emailApiCalls: Array<{
+  to: string[];
+  subject: string;
+  text: string;
+  idempotencyKey?: string;
+}> = [];
 const originalFetch = globalThis.fetch;
+const originalResendApiKey = process.env['RESEND_API_KEY'];
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -223,6 +231,17 @@ async function seedWeeklyPushPrefs(profileId: string): Promise<void> {
   });
 }
 
+async function seedWeeklyEmailPrefs(profileId: string): Promise<void> {
+  await db.insert(notificationPreferences).values({
+    profileId,
+    weeklyProgressEmail: true,
+    weeklyProgressPush: false,
+    pushEnabled: false,
+    maxDailyPush: 3,
+    expoPushToken: null,
+  });
+}
+
 async function seedFamilyLink(
   parentProfileId: string,
   childProfileId: string,
@@ -322,8 +341,9 @@ beforeAll(async () => {
 
   db = createDatabase(databaseUrl);
   await ensureWeeklyReportsTable();
+  process.env['RESEND_API_KEY'] = 'resend-test-key';
 
-  // Intercept Expo Push API calls at the fetch level
+  // Intercept external notification APIs at the fetch level.
   globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input.toString();
     if (url === EXPO_PUSH_API_URL) {
@@ -341,6 +361,27 @@ beforeAll(async () => {
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       );
     }
+    if (url === RESEND_API_URL) {
+      const body = init?.body
+        ? (JSON.parse(init.body as string) as {
+            to?: string[];
+            subject?: string;
+            text?: string;
+          })
+        : {};
+      emailApiCalls.push({
+        to: body.to ?? [],
+        subject: body.subject ?? '',
+        text: body.text ?? '',
+        idempotencyKey: init?.headers
+          ? (init.headers as Record<string, string>)['Idempotency-Key']
+          : undefined,
+      });
+      return new Response(JSON.stringify({ id: 'email-integration' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
     return originalFetch(input, init);
   };
 }, 30_000);
@@ -348,10 +389,16 @@ beforeAll(async () => {
 beforeEach(() => {
   jest.clearAllMocks();
   pushApiCalls.length = 0;
+  emailApiCalls.length = 0;
 });
 
 afterAll(async () => {
   globalThis.fetch = originalFetch;
+  if (originalResendApiKey === undefined) {
+    delete process.env['RESEND_API_KEY'];
+  } else {
+    process.env['RESEND_API_KEY'] = originalResendApiKey;
+  }
   await db
     .delete(accounts)
     .where(like(accounts.clerkUserId, `clerk_weekly_push_${RUN_ID}%`));
@@ -367,13 +414,23 @@ describe('weekly progress push integration', () => {
       displayName: 'Queued Parent',
       timezone: matchingTimezone,
     });
+    const { profileId: queuedChildId } = await seedProfile({
+      displayName: 'Queued Child',
+      timezone: matchingTimezone,
+    });
     const { profileId: skippedParentId } = await seedProfile({
       displayName: 'Skipped Parent',
+      timezone: nonMatchingTimezone,
+    });
+    const { profileId: skippedChildId } = await seedProfile({
+      displayName: 'Skipped Child',
       timezone: nonMatchingTimezone,
     });
 
     await seedWeeklyPushPrefs(queuedParentId);
     await seedWeeklyPushPrefs(skippedParentId);
+    await seedFamilyLink(queuedParentId, queuedChildId);
+    await seedFamilyLink(skippedParentId, skippedChildId);
 
     const { result, step } = await executeCronSteps();
 
@@ -576,6 +633,66 @@ describe('weekly progress push integration', () => {
       ),
     });
     expect(storedReports).toHaveLength(1);
+  });
+
+  it('[BUG-699-FOLLOWUP] logs email-only weekly sends so the 24h dedup gate can see them', async () => {
+    const { profileId: parentProfileId } = await seedProfile({
+      displayName: 'Email Parent',
+      timezone: 'UTC',
+    });
+    const { profileId: childProfileId } = await seedProfile({
+      displayName: 'Emma',
+      timezone: 'UTC',
+    });
+    await seedFamilyLink(parentProfileId, childProfileId);
+    await seedWeeklyEmailPrefs(parentProfileId);
+
+    const today = new Date();
+    const latestSnapshotDate = isoDate(today);
+    const previousSnapshotDate = isoDate(
+      subtractDays(new Date(`${latestSnapshotDate}T00:00:00.000Z`), 7),
+    );
+
+    await seedSnapshot({
+      profileId: childProfileId,
+      snapshotDate: previousSnapshotDate,
+      metrics: buildProgressMetrics({
+        totalSessions: 1,
+        topicsMastered: 1,
+        vocabularyTotal: 5,
+      }),
+    });
+    await seedSnapshot({
+      profileId: childProfileId,
+      snapshotDate: latestSnapshotDate,
+      metrics: buildProgressMetrics({
+        totalSessions: 3,
+        topicsMastered: 4,
+        vocabularyTotal: 9,
+      }),
+    });
+
+    const result = await executeGenerateHandler(parentProfileId);
+
+    expect(result).toEqual({ status: 'completed', parentId: parentProfileId });
+    expect(pushApiCalls).toHaveLength(0);
+    expect(emailApiCalls).toHaveLength(1);
+    expect(emailApiCalls[0]).toEqual(
+      expect.objectContaining({
+        idempotencyKey: `weekly-${parentProfileId}-${weekStartIso(today)}`,
+      }),
+    );
+
+    const storedNotifications = await db.query.notificationLog.findMany({
+      where: and(
+        eq(notificationLog.profileId, parentProfileId),
+        eq(notificationLog.type, 'weekly_progress'),
+      ),
+    });
+    expect(storedNotifications).toHaveLength(1);
+    expect(storedNotifications[0]!.ticketId).toBe(
+      `email-${weekStartIso(today)}`,
+    );
   });
 
   it('skips children with no snapshots but still pushes for children that have activity', async () => {

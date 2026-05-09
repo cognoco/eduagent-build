@@ -51,7 +51,9 @@ function createMockDb({
         findFirst: jest.fn().mockResolvedValue(findFirstResult),
       },
       familyPreferences: {
-        findFirst: jest.fn().mockResolvedValue(familyPreferencesFindFirstResult),
+        findFirst: jest
+          .fn()
+          .mockResolvedValue(familyPreferencesFindFirstResult),
       },
       profiles: {
         findFirst: jest.fn().mockResolvedValue(profileFindFirstResult),
@@ -88,6 +90,8 @@ describe('getNotificationPrefs', () => {
       pushEnabled: false,
       maxDailyPush: 3,
       weeklyProgressPush: true,
+      weeklyProgressEmail: true,
+      monthlyProgressEmail: true,
     });
   });
 
@@ -98,6 +102,9 @@ describe('getNotificationPrefs', () => {
         dailyReminders: true,
         pushEnabled: true,
         maxDailyPush: 5,
+        weeklyProgressPush: false,
+        weeklyProgressEmail: false,
+        monthlyProgressEmail: true,
       },
     });
     const result = await getNotificationPrefs(db, profileId);
@@ -107,6 +114,9 @@ describe('getNotificationPrefs', () => {
       dailyReminders: true,
       pushEnabled: true,
       maxDailyPush: 5,
+      weeklyProgressPush: false,
+      weeklyProgressEmail: false,
+      monthlyProgressEmail: true,
     });
   });
 });
@@ -123,7 +133,7 @@ describe('upsertNotificationPrefs', () => {
         dailyReminders: false,
         pushEnabled: true,
         maxDailyPush: 7,
-      }
+      },
     );
 
     expect(result).toEqual({
@@ -132,6 +142,8 @@ describe('upsertNotificationPrefs', () => {
       pushEnabled: true,
       maxDailyPush: 7,
       weeklyProgressPush: true,
+      weeklyProgressEmail: true,
+      monthlyProgressEmail: true,
     });
     expect(db.insert).toHaveBeenCalled();
     expect(db.update).not.toHaveBeenCalled();
@@ -144,6 +156,9 @@ describe('upsertNotificationPrefs', () => {
         dailyReminders: false,
         pushEnabled: false,
         maxDailyPush: 3,
+        weeklyProgressPush: false,
+        weeklyProgressEmail: false,
+        monthlyProgressEmail: false,
       },
     });
     const result = await upsertNotificationPrefs(
@@ -154,7 +169,7 @@ describe('upsertNotificationPrefs', () => {
         reviewReminders: true,
         dailyReminders: true,
         pushEnabled: true,
-      }
+      },
     );
 
     expect(result).toEqual({
@@ -162,7 +177,9 @@ describe('upsertNotificationPrefs', () => {
       dailyReminders: true,
       pushEnabled: true,
       maxDailyPush: 3,
-      weeklyProgressPush: true,
+      weeklyProgressPush: false,
+      weeklyProgressEmail: false,
+      monthlyProgressEmail: false,
     });
     expect(db.update).toHaveBeenCalled();
     expect(db.insert).not.toHaveBeenCalled();
@@ -178,7 +195,7 @@ describe('upsertNotificationPrefs', () => {
         reviewReminders: false,
         dailyReminders: false,
         pushEnabled: false,
-      }
+      },
     );
 
     expect(result.maxDailyPush).toBe(3);
@@ -226,7 +243,7 @@ describe('upsertLearningMode', () => {
       db,
       profileId,
       TEST_ACCOUNT_ID,
-      'casual'
+      'casual',
     );
 
     expect(result).toEqual({ mode: 'casual' });
@@ -242,7 +259,7 @@ describe('upsertLearningMode', () => {
       db,
       profileId,
       TEST_ACCOUNT_ID,
-      'casual'
+      'casual',
     );
 
     expect(result).toEqual({ mode: 'casual' });
@@ -269,7 +286,7 @@ describe('upsertCelebrationLevel', () => {
   it('inserts when no row exists', async () => {
     const db = createMockDb({ findFirstResult: undefined });
     await expect(
-      upsertCelebrationLevel(db, profileId, TEST_ACCOUNT_ID, 'off')
+      upsertCelebrationLevel(db, profileId, TEST_ACCOUNT_ID, 'off'),
     ).resolves.toEqual({ celebrationLevel: 'off' });
     expect(db.insert).toHaveBeenCalled();
   });
@@ -279,7 +296,7 @@ describe('upsertCelebrationLevel', () => {
       findFirstResult: { celebrationLevel: 'all' },
     });
     await expect(
-      upsertCelebrationLevel(db, profileId, TEST_ACCOUNT_ID, 'big_only')
+      upsertCelebrationLevel(db, profileId, TEST_ACCOUNT_ID, 'big_only'),
     ).resolves.toEqual({ celebrationLevel: 'big_only' });
     expect(db.update).toHaveBeenCalled();
   });
@@ -290,7 +307,7 @@ describe('family pool breakdown sharing', () => {
     const db = createMockDb({ familyPreferencesFindFirstResult: undefined });
 
     await expect(getFamilyPoolBreakdownSharing(db, profileId)).resolves.toBe(
-      false
+      false,
     );
   });
 
@@ -300,7 +317,7 @@ describe('family pool breakdown sharing', () => {
     });
 
     await expect(getFamilyPoolBreakdownSharing(db, profileId)).resolves.toBe(
-      true
+      true,
     );
   });
 
@@ -308,7 +325,7 @@ describe('family pool breakdown sharing', () => {
     const db = createMockDb({ profileFindFirstResult: { isOwner: false } });
 
     await expect(
-      getOwnedFamilyPoolBreakdownSharing(db, profileId, TEST_ACCOUNT_ID)
+      getOwnedFamilyPoolBreakdownSharing(db, profileId, TEST_ACCOUNT_ID),
     ).rejects.toThrow('Profile owner required');
   });
 
@@ -316,12 +333,7 @@ describe('family pool breakdown sharing', () => {
     const db = createMockDb();
 
     await expect(
-      upsertFamilyPoolBreakdownSharing(
-        db,
-        profileId,
-        TEST_ACCOUNT_ID,
-        true
-      )
+      upsertFamilyPoolBreakdownSharing(db, profileId, TEST_ACCOUNT_ID, true),
     ).resolves.toEqual({ value: true });
 
     expect(db.insert).toHaveBeenCalled();
@@ -331,12 +343,7 @@ describe('family pool breakdown sharing', () => {
     const db = createMockDb({ profileFindFirstResult: { isOwner: false } });
 
     await expect(
-      upsertFamilyPoolBreakdownSharing(
-        db,
-        profileId,
-        TEST_ACCOUNT_ID,
-        true
-      )
+      upsertFamilyPoolBreakdownSharing(db, profileId, TEST_ACCOUNT_ID, true),
     ).rejects.toThrow('Profile owner required');
   });
 });
@@ -357,7 +364,7 @@ describe('median response baseline', () => {
   it('creates a new baseline when none exists', async () => {
     const db = createMockDb({ findFirstResult: undefined });
     await expect(updateMedianResponseSeconds(db, profileId, 180)).resolves.toBe(
-      180
+      180,
     );
     expect(db.insert).toHaveBeenCalled();
   });
@@ -367,7 +374,7 @@ describe('median response baseline', () => {
       findFirstResult: { medianResponseSeconds: 200 },
     });
     await expect(updateMedianResponseSeconds(db, profileId, 100)).resolves.toBe(
-      180
+      180,
     );
     expect(db.update).toHaveBeenCalled();
   });
@@ -485,7 +492,7 @@ describe('registerPushToken', () => {
       db,
       profileId,
       TEST_ACCOUNT_ID,
-      'ExponentPushToken[abc]'
+      'ExponentPushToken[abc]',
     );
 
     expect(db.insert).toHaveBeenCalled();
@@ -500,7 +507,7 @@ describe('registerPushToken', () => {
       db,
       profileId,
       TEST_ACCOUNT_ID,
-      'ExponentPushToken[new]'
+      'ExponentPushToken[new]',
     );
 
     expect(db.update).toHaveBeenCalled();

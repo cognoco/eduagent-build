@@ -47,6 +47,7 @@ import {
 } from './snapshot-aggregation';
 import { detectMilestones, storeMilestones } from './milestone-detection';
 import { queueCelebration } from './celebrations';
+import { captureException } from './sentry';
 import type {
   ProgressMetrics,
   SubjectProgressMetrics,
@@ -850,6 +851,42 @@ describe('refreshProgressSnapshot', () => {
   // -------------------------------------------------------------------------
   // Debounce: cache hit
   // -------------------------------------------------------------------------
+
+  it('retries transient Neon connection drops while loading progress state', async () => {
+    jest.useRealTimers();
+    const subject = makeSubjectRow();
+    const connectionError = new Error('Connection terminated');
+    const vocabularyCardsFindMany = jest
+      .fn()
+      .mockRejectedValueOnce(connectionError)
+      .mockResolvedValue([]);
+    const db = createSnapshotDb({ findFirst: undefined });
+    (
+      db.query.subjects.findMany as jest.MockedFunction<
+        typeof db.query.subjects.findMany
+      >
+    ).mockResolvedValue([subject]);
+    (
+      db.query.vocabularyRetentionCards.findMany as jest.MockedFunction<
+        typeof db.query.vocabularyRetentionCards.findMany
+      >
+    ).mockImplementation(vocabularyCardsFindMany);
+
+    const result = await refreshProgressSnapshot(db, profileId);
+
+    expect(result.snapshotDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(vocabularyCardsFindMany).toHaveBeenCalledTimes(2);
+    expect(captureException).toHaveBeenCalledWith(
+      connectionError,
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          feature: 'progress_snapshot',
+          operation: 'load_progress_state',
+          retryable: true,
+        }),
+      }),
+    );
+  });
 
   it('[AR-13] returns cached result without recomputing when snapshot is fresh', async () => {
     const sessionEndedAt = new Date(`${TODAY}T11:00:00.000Z`);

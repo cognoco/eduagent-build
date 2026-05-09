@@ -149,6 +149,13 @@ export default [
     },
   },
   {
-    ignores: ['.expo', 'web-build', 'cache', 'dist', '**/out-tsc'],
+    ignores: [
+      '.expo',
+      'web-build',
+      'cache',
+      'dist',
+      '**/out-tsc',
+      'e2e-web/playwright-report',
+    ],
   },
 ];

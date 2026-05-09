@@ -44,14 +44,14 @@ export function installTestJwksInterceptor(): void {
 
   globalThis.fetch = async (
     input: RequestInfo | URL,
-    init?: RequestInit
+    init?: RequestInit,
   ): Promise<Response> => {
     const url =
       typeof input === 'string'
         ? input
         : input instanceof URL
-        ? input.href
-        : (input as Request).url;
+          ? input.href
+          : (input as Request).url;
 
     if (url.includes('.well-known/jwks') || url.includes('/jwks')) {
       return new Response(JSON.stringify(TEST_JWKS), {
@@ -60,7 +60,10 @@ export function installTestJwksInterceptor(): void {
       });
     }
 
-    return _originalFetch!(input, init);
+    if (!_originalFetch) {
+      throw new Error('jwks-interceptor: _originalFetch is not set');
+    }
+    return _originalFetch(input, init);
   };
 }
 

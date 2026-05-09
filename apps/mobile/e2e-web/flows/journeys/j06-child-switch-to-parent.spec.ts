@@ -7,12 +7,11 @@ test('J-06 child switches back to parent profile → parent gateway', async ({
 }) => {
   const seed = await readSeedData('owner-with-children');
   const childProfileId = seed.ids.child1ProfileId;
-  const parentProfileId = seed.ids.parentProfileId;
 
-  await page.goto('/home', { waitUntil: 'commit' });
+  await page.goto('/family', { waitUntil: 'commit' });
 
-  // Start on parent gateway
-  await expect(page.getByTestId('parent-gateway')).toBeVisible({
+  // Start on Family, where the profile switcher lives.
+  await expect(page.getByTestId('dashboard-scroll')).toBeVisible({
     timeout: 60_000,
   });
 
@@ -22,10 +21,11 @@ test('J-06 child switches back to parent profile → parent gateway', async ({
   await page.getByTestId(`profile-option-${childProfileId}`).click();
   await waitForScreenDismissingPostApproval(page, 'learner-screen');
 
-  // Now switch back to parent
-  await page.getByTestId('profile-switcher-chip').click();
-  await expect(page.getByTestId('profile-switcher-menu')).toBeVisible();
-  await page.getByTestId(`profile-option-${parentProfileId}`).click();
+  // Child proxy mode exposes the dedicated switch-back affordance.
+  await expect(page.getByTestId('proxy-banner')).toBeVisible({
+    timeout: 30_000,
+  });
+  await page.getByTestId('proxy-banner-switch-back').click();
 
   // Parent gateway is back
   await expect(page.getByTestId('parent-gateway')).toBeVisible({

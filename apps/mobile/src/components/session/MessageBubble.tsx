@@ -25,7 +25,7 @@ import { useThemeColors } from '../../lib/theme';
 export type VerificationBadge = 'evaluate' | 'teach_back';
 
 interface MessageBubbleProps {
-  role: 'assistant' | 'user';
+  sender: 'assistant' | 'user';
   content: string;
   streaming?: boolean;
   outboxStatus?: 'pending' | 'permanently-failed';
@@ -42,10 +42,10 @@ function ThinkingDot({ delay }: { delay: number }): React.ReactElement {
     opacity.value = withRepeat(
       withSequence(
         withTiming(1, { duration: 400 }),
-        withTiming(0.3, { duration: 400 })
+        withTiming(0.3, { duration: 400 }),
       ),
       -1,
-      false
+      false,
     );
   }, [opacity]);
 
@@ -71,10 +71,10 @@ function PencilTapIcon(): React.ReactElement {
     translateY.value = withRepeat(
       withSequence(
         withTiming(-2, { duration: 300 }),
-        withTiming(0, { duration: 300 })
+        withTiming(0, { duration: 300 }),
       ),
       -1,
-      false
+      false,
     );
   }, [reduceMotion, translateY]);
 
@@ -113,10 +113,10 @@ function BlinkingCursor(): React.ReactElement {
     opacity.value = withRepeat(
       withSequence(
         withTiming(0.2, { duration: 400 }),
-        withTiming(1, { duration: 400 })
+        withTiming(1, { duration: 400 }),
       ),
       -1,
-      false
+      false,
     );
   }, [opacity]);
 
@@ -181,7 +181,7 @@ const ESCALATION_STYLES: Partial<
 // ---------------------------------------------------------------------------
 
 function buildMarkdownStyles(
-  fallbackTextColor: string
+  fallbackTextColor: string,
 ): Record<string, TextStyle | { backgroundColor?: string }> {
   // Primary text color comes from NativeWind className="text-text-primary"
   // on the custom inline/textgroup render rules (see `rules` prop below).
@@ -265,7 +265,7 @@ const VERIFICATION_BADGE_CONFIG: Record<VerificationBadge, { label: string }> =
   };
 
 export function MessageBubble({
-  role,
+  sender,
   content,
   streaming,
   outboxStatus,
@@ -274,7 +274,7 @@ export function MessageBubble({
   actions,
   testID,
 }: MessageBubbleProps): React.ReactElement {
-  const isAI = role === 'assistant';
+  const isAI = sender === 'assistant';
   const colors = useThemeColors();
   // [BUG-941] Render-boundary defense: any AI message whose content arrived
   // shaped like a full LLM envelope (`{"reply":"...","signals":...}`) gets
@@ -303,21 +303,21 @@ export function MessageBubble({
         setIsCollapsible(true);
       }
     },
-    [isExpanded]
+    [isExpanded],
   );
 
   const showCollapseToggle = isAI && isCollapsible && !streaming;
 
   const mdStyles = useMemo(
     () => buildMarkdownStyles(colors.textPrimary),
-    [colors.textPrimary]
+    [colors.textPrimary],
   );
 
   const bubbleBg = escalation
     ? `${escalation.bg} ${escalation.border}`
     : isAI
-    ? 'bg-coach-bubble'
-    : 'bg-primary';
+      ? 'bg-coach-bubble'
+      : 'bg-primary';
 
   return (
     <Animated.View
@@ -373,7 +373,7 @@ export function MessageBubble({
                 ),
                 textgroup: (
                   node: { key: string },
-                  children: React.ReactNode
+                  children: React.ReactNode,
                 ) => (
                   <Text
                     key={node.key}

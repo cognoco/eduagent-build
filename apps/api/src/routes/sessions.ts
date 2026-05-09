@@ -17,6 +17,7 @@ import {
   filingRetryEventSchema,
   LlmStreamError,
   RateLimitedError,
+  SafetyFilterError,
   streamFallbackFrameSchema,
   UpstreamLlmError,
   getSubjectSessionsResponseSchema,
@@ -28,7 +29,7 @@ import { idempotencyPreflight } from '../middleware/idempotency';
 import { requireProfileId } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
 import { streamSSEUtf8 } from '../services/streaming/sse-utf8';
-import { captureException } from '../services/sentry';
+import { addBreadcrumb, captureException } from '../services/sentry';
 import { createLogger } from '../services/logger';
 import {
   startSession,
@@ -75,6 +76,13 @@ import {
 
 const logger = createLogger();
 
+function isSafetyFilterError(err: unknown): boolean {
+  return (
+    err instanceof SafetyFilterError ||
+    (err instanceof LlmStreamError && err.cause instanceof SafetyFilterError)
+  );
+}
+
 // [BUG-CONT-DEPTH-SWEEP] Follow-up: apply zValidator('param', sessionIdParamsSchema)
 // to ALL /:sessionId endpoints in this file (GET /sessions/:sessionId,
 // /transcript, /evaluate-depth, /recall-bridge, /close, etc.) for consistent
@@ -109,7 +117,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
   .use('/sessions/:sessionId/stream', idempotencyPreflight({ flow: 'session' }))
   .use(
     '/sessions/:sessionId/messages',
-    idempotencyPreflight({ flow: 'session' })
+    idempotencyPreflight({ flow: 'session' }),
   )
   .get('/sessions/resume-nudge', async (c) => {
     const db = c.get('db');
@@ -127,7 +135,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const { subjectId } = c.req.valid('param');
       const sessions = await getSubjectSessions(db, profileId, subjectId);
       return c.json(getSubjectSessionsResponseSchema.parse({ sessions }));
-    }
+    },
   )
   // Start a new learning session for a subject
   .post(
@@ -147,7 +155,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           input,
           {
             matcherEnabled: isTopicIntentMatcherEnabled(c.env.MATCHER_ENABLED),
-          }
+          },
         );
         return c.json({ session }, 201);
       } catch (err) {
@@ -159,7 +167,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         }
         throw err;
       }
-    }
+    },
   )
 
   .post(
@@ -180,7 +188,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         }
         throw err;
       }
-    }
+    },
   )
 
   // Get session state
@@ -203,7 +211,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const session = await clearContinuationDepth(db, profileId, sessionId);
       if (!session) return notFound(c, 'Session not found');
       return c.json({ session });
-    }
+    },
   )
 
   .post(
@@ -220,7 +228,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const updated = await claimSessionForFilingRetry(
         db,
         profileId,
-        sessionId
+        sessionId,
       );
 
       if (!updated) {
@@ -229,13 +237,13 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         if (fresh.filingRetryCount >= 3) {
           throw new RateLimitedError(
             'Retry limit reached for this session.',
-            ERROR_CODES.RATE_LIMITED
+            ERROR_CODES.RATE_LIMITED,
           );
         }
         throw new ConflictError(
           `Session is not in a retriable state (status: ${
             fresh.filingStatus ?? 'null'
-          })`
+          })`,
         );
       }
 
@@ -250,7 +258,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const updatedSession = await getSession(db, profileId, sessionId);
       if (!updatedSession) return notFound(c, 'Session not found');
       return c.json({ session: updatedSession });
-    }
+    },
   )
 
   // Send a message (the core learning exchange)
@@ -266,7 +274,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
 
       const llmTier = c.get('llmTier');
       const memoryFactsReadEnabled = isMemoryFactsReadEnabled(
-        c.env.MEMORY_FACTS_READ_ENABLED
+        c.env.MEMORY_FACTS_READ_ENABLED,
       );
       const memoryFactsRelevanceEnabled =
         memoryFactsReadEnabled &&
@@ -284,7 +292,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             clientId,
             memoryFactsReadEnabled,
             memoryFactsRelevanceEnabled,
-          }
+          },
         );
         await markPersisted({
           kv: c.env.IDEMPOTENCY_KV,
@@ -299,7 +307,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             c,
             429,
             ERROR_CODES.EXCHANGE_LIMIT_EXCEEDED,
-            err.message
+            err.message,
           );
         }
 
@@ -313,7 +321,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         }
         throw err;
       }
-    }
+    },
   )
 
   .get('/sessions/:sessionId/transcript', async (c) => {
@@ -322,7 +330,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     const transcript = await getSessionTranscript(
       db,
       profileId,
-      c.req.param('sessionId')
+      c.req.param('sessionId'),
     );
     if (!transcript) return notFound(c, 'Session not found');
     return c.json(transcript);
@@ -339,7 +347,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         c,
         410,
         ERROR_CODES.SESSION_ARCHIVED,
-        'Session transcript has been archived'
+        'Session transcript has been archived',
       );
     }
 
@@ -410,7 +418,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
 
       const llmTier = c.get('llmTier');
       const memoryFactsReadEnabled = isMemoryFactsReadEnabled(
-        c.env.MEMORY_FACTS_READ_ENABLED
+        c.env.MEMORY_FACTS_READ_ENABLED,
       );
       const memoryFactsRelevanceEnabled =
         memoryFactsReadEnabled &&
@@ -428,7 +436,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             clientId,
             memoryFactsReadEnabled,
             memoryFactsRelevanceEnabled,
-          }
+          },
         );
 
         return streamSSEUtf8(c, async (sseStream) => {
@@ -460,12 +468,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
               extra: { sessionId, phase: 'llm_stream' },
             });
 
-            const isSafetyFilterError =
-              streamErr instanceof Error &&
-              streamErr.message.includes('safety filters');
             if (
               !(streamErr instanceof RateLimitedError) &&
-              !isSafetyFilterError
+              !isSafetyFilterError(streamErr)
             ) {
               logger.warn(
                 chunkCount === 0
@@ -479,7 +484,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                     streamErr instanceof Error
                       ? streamErr.name
                       : typeof streamErr,
-                }
+                },
               );
               try {
                 const fallback = await processMessage(
@@ -493,7 +498,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                     clientId,
                     memoryFactsReadEnabled,
                     memoryFactsRelevanceEnabled,
-                  }
+                  },
                 );
                 const eventType = chunkCount === 0 ? 'chunk' : 'replace';
                 await sseStream.writeSSE({
@@ -532,7 +537,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                       fallbackErr instanceof Error
                         ? fallbackErr.name
                         : typeof fallbackErr,
-                  }
+                  },
                 );
                 captureException(fallbackErr, {
                   profileId,
@@ -563,7 +568,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             const errorCode: string = (() => {
               if (streamErr instanceof RateLimitedError)
                 return 'quota_exhausted';
-              if (isSafetyFilterError) return 'safety_filter';
+              if (isSafetyFilterError(streamErr)) return 'safety_filter';
               return 'unknown_error';
             })();
             await sseStream.writeSSE({
@@ -577,31 +582,49 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             return;
           }
 
-          // [BUG-866] Structured metric on zero-token stream — "silent recovery
-          // without escalation is banned" (CLAUDE.md). logger.warn alone is not
-          // queryable; captureException makes this event discoverable in Sentry
-          // so ops can measure how often the failure mode fires in production.
-          if (chunkCount === 0) {
-            logger.warn('[sessions/stream] Zero-token stream completed', {
-              surface: 'sessions.stream',
-              sessionId,
-              profileId,
-              tokensReceived: 0,
-            });
-            captureException(new Error('Zero-token stream completed'), {
-              profileId,
-              extra: {
-                surface: 'sessions.stream',
-                sessionId,
-                tokensReceived: 0,
-              },
-            });
-          }
-
           try {
             // onComplete reads the raw envelope via rawResponsePromise internally —
             // the clean reply text from the stream is not needed.
             const result = await onComplete();
+
+            if (chunkCount === 0) {
+              const zeroTokenRecovered =
+                result.fallback !== undefined ||
+                (result.response?.trim().length ?? 0) > 0;
+              const zeroTokenRecovery = result.fallback
+                ? 'fallback_frame'
+                : 'parsed_reply';
+
+              logger.warn('[sessions/stream] Zero-token stream completed', {
+                surface: 'sessions.stream',
+                sessionId,
+                profileId,
+                tokensReceived: 0,
+                recovered: zeroTokenRecovered,
+                recovery: zeroTokenRecovery,
+              });
+              addBreadcrumb(
+                'Zero-token stream completed',
+                'sessions.stream',
+                'warning',
+                {
+                  sessionId,
+                  tokensReceived: 0,
+                  recovered: zeroTokenRecovered,
+                  recovery: zeroTokenRecovery,
+                },
+              );
+              captureException(new Error('Zero-token stream completed'), {
+                profileId,
+                extra: {
+                  sessionId,
+                  tokensReceived: 0,
+                  recovered: zeroTokenRecovered,
+                  surface: 'sessions.stream',
+                  recovery: zeroTokenRecovery,
+                },
+              });
+            }
 
             // [BUG-941] If the LLM response was empty or unparseable, emit a
             // typed `fallback` SSE frame so the client shows a meaningful
@@ -636,7 +659,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                         refundErr instanceof Error
                           ? refundErr.message
                           : String(refundErr),
-                    }
+                    },
                   );
                 }
               }
@@ -652,6 +675,15 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                 }),
               });
               return;
+            }
+
+            if (chunkCount === 0 && result.response?.trim()) {
+              await sseStream.writeSSE({
+                data: JSON.stringify({
+                  type: 'chunk',
+                  content: result.response,
+                }),
+              });
             }
 
             await sseStream.writeSSE({
@@ -704,7 +736,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                       refundErr instanceof Error
                         ? refundErr.message
                         : String(refundErr),
-                  }
+                  },
                 );
               }
             }
@@ -728,19 +760,17 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             c,
             429,
             ERROR_CODES.EXCHANGE_LIMIT_EXCEEDED,
-            err.message
+            err.message,
           );
         }
 
-        const isSafetyFilterError =
-          err instanceof Error && err.message.includes('safety filters');
         const isUpstreamLlmError =
           err instanceof UpstreamLlmError ||
           (err instanceof LlmStreamError &&
             err.cause instanceof UpstreamLlmError);
         if (
           !(err instanceof RateLimitedError) &&
-          !isSafetyFilterError &&
+          !isSafetyFilterError(err) &&
           !isUpstreamLlmError
         ) {
           logger.warn(
@@ -749,7 +779,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
               sessionId,
               error: err instanceof Error ? err.message : String(err),
               errorName: err instanceof Error ? err.name : typeof err,
-            }
+            },
           );
           try {
             const fallback = await processMessage(
@@ -763,7 +793,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                 clientId,
                 memoryFactsReadEnabled,
                 memoryFactsRelevanceEnabled,
-              }
+              },
             );
             return streamSSEUtf8(c, async (sseStream) => {
               await sseStream.writeSSE({
@@ -802,7 +832,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                   fallbackErr instanceof Error
                     ? fallbackErr.name
                     : typeof fallbackErr,
-              }
+              },
             );
             captureException(fallbackErr, {
               profileId,
@@ -825,7 +855,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         }
         throw err;
       }
-    }
+    },
   )
 
   // Close a session
@@ -855,7 +885,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         db,
         profileId,
         c.req.param('sessionId'),
-        { ...body, summaryStatus: sanitizedSummaryStatus }
+        { ...body, summaryStatus: sanitizedSummaryStatus },
       );
 
       const shouldDispatchCompletionEvent =
@@ -873,7 +903,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           {
             summaryStatus: result.summaryStatus,
             summaryTrackingHandled: result.summaryStatus === 'skipped',
-          }
+          },
         );
         pipelineQueued = dispatch.pipelineQueued;
       }
@@ -882,7 +912,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         ...result,
         pipelineQueued,
       });
-    }
+    },
   )
 
   .post(
@@ -898,10 +928,10 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         profileId,
         c.req.param('sessionId'),
         body.content,
-        body.metadata
+        body.metadata,
       );
       return c.json({ ok: true });
-    }
+    },
   )
 
   .post(
@@ -914,7 +944,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
 
       await recordSessionEvent(db, profileId, c.req.param('sessionId'), body);
       return c.json({ ok: true });
-    }
+    },
   )
 
   .post(
@@ -927,10 +957,10 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         db,
         profileId,
         c.req.param('sessionId'),
-        c.req.valid('json')
+        c.req.valid('json'),
       );
       return c.json({ session });
-    }
+    },
   )
 
   // Sync homework problem metadata + analytics events
@@ -945,11 +975,11 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         db,
         profileId,
         c.req.param('sessionId'),
-        c.req.valid('json')
+        c.req.valid('json'),
       );
 
       return c.json(result);
-    }
+    },
   )
 
   // Flag content as incorrect
@@ -963,10 +993,10 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         db,
         profileId,
         c.req.param('sessionId'),
-        c.req.valid('json')
+        c.req.valid('json'),
       );
       return c.json(result);
-    }
+    },
   )
 
   // Get session summary
@@ -976,7 +1006,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     const summary = await getSessionSummary(
       db,
       profileId,
-      c.req.param('sessionId')
+      c.req.param('sessionId'),
     );
     return c.json({ summary });
   })
@@ -987,7 +1017,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     const previousSummary = await getSessionSummary(
       db,
       profileId,
-      c.req.param('sessionId')
+      c.req.param('sessionId'),
     );
     const result = await skipSummary(db, profileId, c.req.param('sessionId'));
 
@@ -1006,7 +1036,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         {
           summaryStatus: result.summary.status,
           summaryTrackingHandled: true,
-        }
+        },
       );
       pipelineQueued = dispatch.pipelineQueued;
     }
@@ -1026,13 +1056,13 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const previousSummary = await getSessionSummary(
         db,
         profileId,
-        c.req.param('sessionId')
+        c.req.param('sessionId'),
       );
       const result = await submitSummary(
         db,
         profileId,
         c.req.param('sessionId'),
-        c.req.valid('json')
+        c.req.valid('json'),
       );
       // BD-09: Surface pipeline status so client knows if post-processing was queued.
       // Default false — only true when dispatch actually succeeds.
@@ -1049,15 +1079,15 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           {
             summaryStatus: result.summary.status,
             qualityRating: qualityRatingFromSummaryStatus(
-              result.summary.status
+              result.summary.status,
             ),
             summaryTrackingHandled: true,
-          }
+          },
         );
         pipelineQueued = dispatch.pipelineQueued;
       }
       return c.json({ ...result, pipelineQueued });
-    }
+    },
   )
 
   // Start an interleaved retrieval session (FR92)
@@ -1079,7 +1109,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         }
         throw err;
       }
-    }
+    },
   )
 
   // Generate recall bridge questions after homework success (Story 2.7)
@@ -1096,7 +1126,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         c,
         400,
         ERROR_CODES.VALIDATION_ERROR,
-        'Recall bridge is only available for homework sessions'
+        'Recall bridge is only available for homework sessions',
       );
     }
 
@@ -1105,7 +1135,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
   });
 
 function qualityRatingFromSummaryStatus(
-  status: 'accepted' | 'submitted'
+  status: 'accepted' | 'submitted',
 ): number {
   return status === 'accepted' ? 4 : 2;
 }
@@ -1128,13 +1158,13 @@ async function dispatchSessionCompletedEvent(
       | 'auto_closed';
     qualityRating?: number;
     summaryTrackingHandled?: boolean;
-  }
+  },
 ): Promise<{ pipelineQueued: boolean }> {
   try {
     const completion = await getSessionCompletionContext(
       db,
       profileId,
-      sessionId
+      sessionId,
     );
 
     await inngest.send({

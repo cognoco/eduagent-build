@@ -32,7 +32,7 @@ export function OutboxDrainProvider({
   children,
 }: {
   children: React.ReactNode;
-}): React.ReactElement {
+}): React.ReactNode {
   const client = useApiClient();
   const { getToken } = useAuth();
   const { activeProfile } = useProfile();
@@ -64,7 +64,7 @@ export function OutboxDrainProvider({
         throw new Error(`Support spillover failed: ${res.status}`);
       }
     },
-    [client]
+    [client],
   );
 
   const buildHeaders = React.useCallback(
@@ -79,7 +79,7 @@ export function OutboxDrainProvider({
       if (getProxyMode()) headers['X-Proxy-Mode'] = 'true';
       return withIdempotencyKey(headers, idempotencyKey);
     },
-    [activeProfile?.id]
+    [activeProfile?.id],
   );
 
   const replaySessionEntry = React.useCallback(
@@ -91,7 +91,7 @@ export function OutboxDrainProvider({
           activeProfile.id,
           'session',
           entry.id,
-          'missing_session_id'
+          'missing_session_id',
         );
         return;
       }
@@ -108,7 +108,7 @@ export function OutboxDrainProvider({
               ? { homeworkMode: metadata.homeworkMode }
               : {}),
           }),
-        }
+        },
       );
 
       let fallbackReason: string | null = null;
@@ -126,7 +126,7 @@ export function OutboxDrainProvider({
               activeProfile.id,
               'session',
               entry.id,
-              fallbackReason
+              fallbackReason,
             );
             return;
           }
@@ -135,7 +135,7 @@ export function OutboxDrainProvider({
         }
       }
     },
-    [activeProfile?.id, buildHeaders]
+    [activeProfile?.id, buildHeaders],
   );
 
   const runDrain = React.useCallback(async () => {
@@ -153,7 +153,7 @@ export function OutboxDrainProvider({
             activeProfile.id,
             'session',
             entry.id,
-            err instanceof Error ? err.message : 'replay_failed'
+            err instanceof Error ? err.message : 'replay_failed',
           );
           Sentry.captureException(err, {
             tags: { feature: 'message_outbox', flow: 'session' },
@@ -169,7 +169,7 @@ export function OutboxDrainProvider({
               flow: 'session',
             },
           });
-        }
+        },
       );
     } finally {
       runningRef.current = false;
@@ -189,5 +189,5 @@ export function OutboxDrainProvider({
     return () => sub.remove();
   }, [runDrain]);
 
-  return <>{children}</>;
+  return children;
 }

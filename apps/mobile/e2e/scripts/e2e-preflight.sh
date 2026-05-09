@@ -25,11 +25,11 @@
 # e2e-preflight.test.sh.
 
 # ── Tunables ────────────────────────────────────────────────────────────────
-: "${PREFLIGHT_API_URL:=http://localhost:8787}"
-: "${PREFLIGHT_METRO_HOST:=localhost}"
+: "${PREFLIGHT_API_URL:=http://127.0.0.1:8787}"
+: "${PREFLIGHT_METRO_HOST:=127.0.0.1}"
 : "${PREFLIGHT_METRO_PORT:=8081}"
 : "${PREFLIGHT_PROXY_PORT:=8082}"
-: "${PREFLIGHT_PROXY_MAX_SECONDS:=2}"    # Fresh proxy serves bundle <0.2s; >2s = stale
+: "${PREFLIGHT_PROXY_MAX_SECONDS:=2}"    # Fresh warm proxy serves bundle <0.2s; repeat >2s = stale
 : "${PREFLIGHT_APP_ID:=com.mentomate.app}"
 : "${PREFLIGHT_ADB:=${ADB_PATH:-/c/Android/Sdk/platform-tools/adb.exe}}"
 
@@ -118,10 +118,10 @@ check_metro_reachable() {
 #
 # Fresh proxy: <200ms. Degraded proxy: 5-15s. We fail at >${PREFLIGHT_PROXY_MAX_SECONDS}s.
 check_bundle_proxy_fast() {
-  # Skip if nothing is listening on the proxy port. On Windows, a refused TCP
-  # connection takes ~2.25s, which is indistinguishable from a slow proxy using
-  # a time-based check alone. No process on 8082 = no stale proxy = no problem.
-  if ! curl -s --max-time 1 "http://${PREFLIGHT_METRO_HOST}:${PREFLIGHT_PROXY_PORT}/" >/dev/null 2>&1; then
+  # Skip only if nothing is listening on the proxy port. Use a raw TCP connect
+  # instead of curl: a slow proxy can delay the HTTP response and would
+  # otherwise be mistaken for "not running".
+  if ! timeout 2 bash -c "</dev/tcp/${PREFLIGHT_METRO_HOST}/${PREFLIGHT_PROXY_PORT}" >/dev/null 2>&1; then
     _preflight_ok "Bundle proxy on :${PREFLIGHT_PROXY_PORT} not running (skipped — not required)"
     return 0
   fi
@@ -133,7 +133,18 @@ check_bundle_proxy_fast() {
   local is_slow
   is_slow=$(awk -v t="$time_s" -v limit="$PREFLIGHT_PROXY_MAX_SECONDS" 'BEGIN { print (t+0 > limit+0) ? 1 : 0 }')
   if [ "$time_s" = "999" ] || [ "$is_slow" = "1" ]; then
+    # Metro can spend several seconds transforming a cold bundle after code
+    # changes. Stale proxy detection should fail only when the proxy remains
+    # slow after that warm-up request.
+    local retry_time_s retry_is_slow
+    retry_time_s=$(curl -s -o /dev/null -w "%{time_total}" --max-time 30 "$url" 2>/dev/null || echo "999")
+    retry_is_slow=$(awk -v t="$retry_time_s" -v limit="$PREFLIGHT_PROXY_MAX_SECONDS" 'BEGIN { print (t+0 > limit+0) ? 1 : 0 }')
+    if [ "$retry_time_s" != "999" ] && [ "$retry_is_slow" != "1" ]; then
+      _preflight_ok "Bundle proxy on :${PREFLIGHT_PROXY_PORT} healthy after warm-up (first ${time_s}s, retry ${retry_time_s}s)"
+      return 0
+    fi
     _preflight_fail "Bundle proxy on :${PREFLIGHT_PROXY_PORT} is DEGRADED (served bundle in ${time_s}s; limit ${PREFLIGHT_PROXY_MAX_SECONDS}s)."
+    _preflight_fail "  Retry also took ${retry_time_s}s."
     _preflight_fail "  Root cause: a stale 'node bundle-proxy.js' process is buffering the bundle slowly."
     _preflight_fail "  Fix:"
     _preflight_fail "    1. Kill the stale proxy: netstat -ano | grep ':${PREFLIGHT_PROXY_PORT}' | grep LISTEN → taskkill /PID <pid> /F"

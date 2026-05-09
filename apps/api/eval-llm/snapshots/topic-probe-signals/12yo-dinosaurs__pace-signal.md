@@ -85,18 +85,3 @@ USER: Tiny.
 ## Builder notes
 
 - Dimension: pace-signal
-
-## Live LLM response
-
-```
-```json
-{
-  "goals": ["Understand Mesozoic era briefly"],
-  "experienceLevel": "beginner",
-  "currentKnowledge": "Limited knowledge, seeking a simple overview",
-  "interests": [],
-  "interestContext": {},
-  "analogyFraming": "concrete"
-}
-```
-```

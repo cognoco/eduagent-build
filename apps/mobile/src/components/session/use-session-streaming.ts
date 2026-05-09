@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type {
   InputMode,
   PendingCelebration,
@@ -48,11 +48,11 @@ export function buildSessionApiMessage(
     effectiveMode: string;
     topicName?: string;
     messages: ChatMessage[];
-  }
+  },
 ): string {
   const trimmed = text.trim();
   const isFirstLearnerTurn = !opts.messages.some(
-    (message) => message.role === 'user' && !message.isAutoSent
+    (message) => message.role === 'user' && !message.isAutoSent,
   );
 
   if (
@@ -166,6 +166,14 @@ export interface UseSessionStreamingOptions {
 }
 
 export function useSessionStreaming(opts: UseSessionStreamingOptions) {
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   const {
     activeSessionId,
     setActiveSessionId,
@@ -227,7 +235,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
     async (
       targetSessionId: string,
       problems: HomeworkProblem[],
-      problemIndex: number
+      problemIndex: number,
     ) => {
       if (effectiveMode !== 'homework' || problems.length === 0) {
         return;
@@ -242,7 +250,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
             problems,
             problemIndex,
             normalizedOcrText,
-            homeworkCaptureSource
+            homeworkCaptureSource,
           ),
         },
       });
@@ -251,11 +259,14 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
         throw new Error(`Homework state sync failed: ${res.status}`);
       }
     },
-    [apiClient, effectiveMode, normalizedOcrText, homeworkCaptureSource]
+    [apiClient, effectiveMode, normalizedOcrText, homeworkCaptureSource],
   );
 
   const ensureSession = useCallback(
-    async (overrideSubjectId?: string): Promise<string | null> => {
+    async (
+      overrideSubjectId?: string,
+      initialRawInput?: string,
+    ): Promise<string | null> => {
       if (activeSessionId) return activeSessionId;
 
       const sid = overrideSubjectId ?? effectiveSubjectId;
@@ -269,6 +280,8 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       // Session-creation errors propagate to the sendMessage catch block,
       // which classifies quota / reconnectable / fatal errors properly.
       // Previously swallowed here, collapsing all failures to a generic message. [IMP-3]
+      const sessionRawInput = initialRawInput ?? rawInput;
+
       let newId: string;
       if (overrideSubjectId) {
         // Use API client directly — useStartSession's URL param may be
@@ -280,7 +293,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
             topicId: topicId ?? undefined,
             sessionType,
             inputMode,
-            ...(rawInput ? { rawInput } : {}),
+            ...(sessionRawInput ? { rawInput: sessionRawInput } : {}),
             metadata: {
               inputMode,
               effectiveMode,
@@ -293,7 +306,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
                       homeworkProblemsState,
                       currentProblemIndex,
                       normalizedOcrText,
-                      homeworkCaptureSource
+                      homeworkCaptureSource,
                     ),
                   }
                 : {}),
@@ -324,7 +337,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
                     | 'teach_back',
                 }
               : {}),
-            ...(rawInput ? { rawInput } : {}),
+            ...(sessionRawInput ? { rawInput: sessionRawInput } : {}),
             metadata: {
               inputMode,
               effectiveMode,
@@ -337,7 +350,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
                       homeworkProblemsState,
                       currentProblemIndex,
                       normalizedOcrText,
-                      homeworkCaptureSource
+                      homeworkCaptureSource,
                     ),
                   }
                 : {}),
@@ -354,12 +367,12 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
           await syncHomeworkMetadata(
             newId,
             homeworkProblemsState,
-            currentProblemIndex
+            currentProblemIndex,
           );
         } catch (err) {
           console.warn(
             '[Session] Homework metadata sync failed during ensureSession:',
-            err
+            err,
           );
           // Keep the session alive even if homework metadata sync fails.
         }
@@ -388,7 +401,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       normalizedOcrText,
       homeworkCaptureSource,
       syncHomeworkMetadata,
-    ]
+    ],
   );
 
   const scheduleSilencePrompt = useCallback(
@@ -401,53 +414,56 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
         20,
         Math.max(
           2,
-          expectedResponseMinutes * computePaceMultiplier(responseHistory)
-        )
+          expectedResponseMinutes * computePaceMultiplier(responseHistory),
+        ),
       );
 
-      silenceTimerRef.current = setTimeout(async () => {
-        if (draftText.trim()) return;
+      silenceTimerRef.current = setTimeout(
+        async () => {
+          if (draftText.trim()) return;
 
-        const prompt =
-          "Still working on it? Take your time - I'm here when you're ready.";
+          const prompt =
+            "Still working on it? Take your time - I'm here when you're ready.";
 
-        setMessages((prev) => {
-          if (prev.some((message) => message.id === 'silence-prompt')) {
-            return prev;
+          setMessages((prev) => {
+            if (prev.some((message) => message.id === 'silence-prompt')) {
+              return prev;
+            }
+            return [
+              ...prev,
+              {
+                id: 'silence-prompt',
+                role: 'assistant',
+                content: prompt,
+                isSystemPrompt: true,
+              },
+            ];
+          });
+
+          try {
+            await recordSystemPrompt.mutateAsync({ content: prompt });
+          } catch (err) {
+            console.warn('[Session] Silence prompt failed to persist:', err);
+            // Best effort only.
           }
-          return [
-            ...prev,
+
+          await writeSessionRecoveryMarker(
             {
-              id: 'silence-prompt',
-              role: 'assistant',
-              content: prompt,
-              isSystemPrompt: true,
+              sessionId: sessionIdToUse,
+              profileId: activeProfileId ?? undefined,
+              subjectId: effectiveSubjectId || undefined,
+              subjectName: effectiveSubjectName || undefined,
+              topicId: topicId ?? undefined,
+              topicName: topicName ?? undefined,
+              mode: effectiveMode,
+              milestoneTracker: trackerStateRef.current,
+              updatedAt: new Date().toISOString(),
             },
-          ];
-        });
-
-        try {
-          await recordSystemPrompt.mutateAsync({ content: prompt });
-        } catch (err) {
-          console.warn('[Session] Silence prompt failed to persist:', err);
-          // Best effort only.
-        }
-
-        await writeSessionRecoveryMarker(
-          {
-            sessionId: sessionIdToUse,
-            profileId: activeProfileId ?? undefined,
-            subjectId: effectiveSubjectId || undefined,
-            subjectName: effectiveSubjectName || undefined,
-            topicId: topicId ?? undefined,
-            topicName: topicName ?? undefined,
-            mode: effectiveMode,
-            milestoneTracker: trackerStateRef.current,
-            updatedAt: new Date().toISOString(),
-          },
-          activeProfileId
-        ).catch(() => undefined);
-      }, thresholdMinutes * 60 * 1000);
+            activeProfileId,
+          ).catch(() => undefined);
+        },
+        thresholdMinutes * 60 * 1000,
+      );
     },
     [
       activeProfileId,
@@ -462,7 +478,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       topicId,
       topicName,
       trackerStateRef,
-    ]
+    ],
   );
 
   const continueWithMessage = useCallback(
@@ -472,7 +488,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
         sessionSubjectId?: string;
         sessionSubjectName?: string;
         existingEntry?: OutboxEntry;
-      }
+      },
     ) => {
       let streamId: string | null = null;
       // [H6] SSE freeze watchdog — hoisted so finally can always clear it.
@@ -488,7 +504,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
             ? withProblemMode(
                 homeworkProblemsState,
                 currentHomeworkProblemId,
-                homeworkMode
+                homeworkMode,
               )
             : homeworkProblemsState;
 
@@ -515,7 +531,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
             : undefined,
         };
 
-        const sid = await ensureSession(sessionSubjectId);
+        const sid = await ensureSession(sessionSubjectId, text);
         if (!sid) {
           const hasSubject = !!(
             subjectId ||
@@ -528,7 +544,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
           animationCleanupRef.current = animateResponse(
             errorMessage,
             setMessages,
-            setIsStreaming
+            setIsStreaming,
           );
           return;
         }
@@ -548,7 +564,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
             milestoneTracker: trackerStateRef.current,
             updatedAt: new Date().toISOString(),
           },
-          activeProfileId
+          activeProfileId,
         );
 
         if (effectiveMode === 'homework' && updatedProblems.length > 0) {
@@ -556,7 +572,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
             await syncHomeworkMetadata(
               sid,
               updatedProblems,
-              currentProblemIndex
+              currentProblemIndex,
             );
           } catch {
             // Don't block the tutoring exchange on metadata sync.
@@ -599,8 +615,8 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
                         streaming: false,
                         kind: 'reconnect_prompt' as const,
                       }
-                    : m
-                )
+                    : m,
+                ),
               );
             }
           }
@@ -608,7 +624,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
 
         const outboxEntry =
           activeProfileId && sid
-            ? options?.existingEntry ??
+            ? (options?.existingEntry ??
               (await enqueue({
                 profileId: activeProfileId,
                 flow: 'session',
@@ -620,7 +636,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
                     ? { homeworkMode }
                     : {}),
                 },
-              }))
+              })))
             : null;
 
         if (outboxEntry && activeProfileId) {
@@ -679,8 +695,8 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
                       streaming: false,
                       isSystemPrompt: true,
                     }
-                  : m
-              )
+                  : m,
+              ),
             );
             setIsStreaming(false);
           };
@@ -694,8 +710,8 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
             chunkCount += 1;
             setMessages((prev) =>
               prev.map((m) =>
-                m.id === streamId ? { ...m, content: accumulated } : m
-              )
+                m.id === streamId ? { ...m, content: accumulated } : m,
+              ),
             );
           },
           async (result) => {
@@ -742,7 +758,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
                   eventId: result.aiEventId,
                   escalationRung: result.escalationRung,
                 };
-              })
+              }),
             );
             setIsStreaming(false);
             setExchangeCount(result.exchangeCount);
@@ -754,7 +770,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
                   activeProfileId,
                   'session',
                   outboxEntry.id,
-                  result.fallback?.reason ?? 'missing_reply'
+                  result.fallback?.reason ?? 'missing_reply',
                 );
               }
               setLowConfidenceMessageId(null);
@@ -814,11 +830,11 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
                 milestoneTracker: nextTrackerState,
                 updatedAt: new Date().toISOString(),
               },
-              activeProfileId
+              activeProfileId,
             );
           },
           sid,
-          Object.keys(streamOptions).length > 0 ? streamOptions : undefined
+          Object.keys(streamOptions).length > 0 ? streamOptions : undefined,
         );
       } catch (err: unknown) {
         if (activeProfileId && lastRetryPayloadRef.current?.outboxEntryId) {
@@ -826,7 +842,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
             activeProfileId,
             'session',
             lastRetryPayloadRef.current.outboxEntryId,
-            err instanceof Error ? err.message : 'stream_failed'
+            err instanceof Error ? err.message : 'stream_failed',
           );
         }
         // Detect quota before reconnect classification — QuotaExceededError is
@@ -839,7 +855,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
         ) {
           setIsStreaming(false);
           setQuotaError(
-            (err as Error & { details: QuotaExceededDetails }).details
+            (err as Error & { details: QuotaExceededDetails }).details,
           );
           if (streamId) {
             setMessages((prev) =>
@@ -852,8 +868,8 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
                       kind: 'quota_exceeded' as const,
                       isSystemPrompt: true,
                     }
-                  : message
-              )
+                  : message,
+              ),
             );
           } else {
             setMessages((prev) => [
@@ -890,8 +906,8 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
                     kind: reconnectable ? 'reconnect_prompt' : undefined,
                     isSystemPrompt: reconnectable,
                   }
-                : message
-            )
+                : message,
+            ),
           );
           return;
         }
@@ -926,12 +942,12 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
                       streaming: false,
                       kind: 'reconnect_prompt' as const,
                     }
-                  : m
+                  : m,
               );
             }
             if (msg.streaming) {
               return prev.map((m) =>
-                m.id === streamId ? { ...m, streaming: false } : m
+                m.id === streamId ? { ...m, streaming: false } : m,
               );
             }
             return prev;
@@ -981,7 +997,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       // CR-2: trackerState removed — reads trackerStateRef.current inside body.
       // CR-3: Removed duplicate createLocalMessageId entry.
       trigger,
-    ]
+    ],
   );
 
   const handleReconnect = useCallback(
@@ -1003,7 +1019,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
           ? await getOutboxEntry(
               activeProfileId,
               'session',
-              retryPayload.outboxEntryId
+              retryPayload.outboxEntryId,
             )
           : null;
       // Remove both the error message AND the user's preceding message to
@@ -1033,7 +1049,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       quotaError,
       sessionExpired,
       setMessages,
-    ]
+    ],
   );
 
   const fetchFastCelebrations = useCallback(async (): Promise<
@@ -1043,18 +1059,24 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       const startedAt = Date.now();
 
       while (Date.now() - startedAt < 3000) {
+        if (!mountedRef.current) return [];
         const res = await apiClient.celebrations.pending.$get();
+        if (!mountedRef.current) return [];
         if (res.ok) {
           const data = await res.json();
+          if (!mountedRef.current) return [];
           if (data.pendingCelebrations.length > 0) {
+            if (!mountedRef.current) return [];
             await apiClient.celebrations.seen.$post({
               json: { viewer: 'child' },
             });
+            if (!mountedRef.current) return [];
             return data.pendingCelebrations;
           }
         }
 
         await new Promise((resolve) => setTimeout(resolve, 500));
+        if (!mountedRef.current) return [];
       }
 
       return [];

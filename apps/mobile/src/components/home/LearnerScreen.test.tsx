@@ -46,12 +46,12 @@ const mockFetch = createRoutedMockFetch({
 });
 
 jest.mock('../../lib/api-client', () =>
-  require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch)
+  require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
 );
 
 jest.mock(
   'react-i18next',
-  () => require('../../test-utils/mock-i18n').i18nMock
+  () => require('../../test-utils/mock-i18n').i18nMock,
 );
 
 jest.mock('../../lib/profile', () => ({
@@ -87,7 +87,6 @@ jest.mock('react-native-safe-area-context', () => ({
 
 jest.mock('../common', () => ({
   BookPageFlipAnimation: () => null,
-  ProfileSwitcher: () => null,
 }));
 
 jest.mock('../../lib/theme', () => ({
@@ -138,7 +137,6 @@ const HOME_RETURN_PARAMS = { returnTo: LEARNER_HOME_RETURN_TO };
 const defaultProps = {
   profiles: [{ id: 'p1', displayName: 'Alex', isOwner: true }],
   activeProfile: { id: 'p1', displayName: 'Alex', isOwner: true },
-  switchProfile: jest.fn(),
 };
 
 const QUIZ_DISCOVERY_CARD = {
@@ -266,6 +264,28 @@ describe('LearnerScreen', () => {
     });
   });
 
+  it('labels subjects as preparing while curriculum is not ready', async () => {
+    mockFetch.setRoute('/subjects', {
+      subjects: [
+        {
+          id: 'sub-preparing',
+          name: 'Ancient History',
+          status: 'active',
+          curriculumStatus: 'preparing',
+        },
+      ],
+    });
+
+    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      screen.getByTestId('home-subject-card-sub-preparing');
+      screen.getByText('Ancient History');
+      screen.getByText('Preparing...');
+      expect(screen.queryByText('Open')).toBeNull();
+    });
+  });
+
   it('hides learner-only elements in parent proxy mode', async () => {
     mockFetch.setRoute('/subjects', {
       subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
@@ -284,7 +304,7 @@ describe('LearnerScreen', () => {
           isOwner: false,
         }}
       />,
-      { wrapper: Wrapper }
+      { wrapper: Wrapper },
     );
 
     await waitFor(() => {
@@ -514,11 +534,11 @@ describe('LearnerScreen', () => {
     await waitFor(() => {
       const surfacedCalls = fetchCallsMatching(
         mockFetch,
-        '/quiz/missed-items/mark-surfaced'
+        '/quiz/missed-items/mark-surfaced',
       );
       expect(surfacedCalls.length).toBeGreaterThanOrEqual(1);
       const body = extractJsonBody<{ activityType: string }>(
-        surfacedCalls[0]?.init
+        surfacedCalls[0]?.init,
       );
       expect(body?.activityType).toBe('capitals');
     });
@@ -589,7 +609,7 @@ describe('LearnerScreen', () => {
           isOwner: false,
         }}
       />,
-      { wrapper: Wrapper }
+      { wrapper: Wrapper },
     );
 
     await waitFor(() => screen.getByTestId('home-subject-card-sub-1'));

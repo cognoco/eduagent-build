@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import type { Profile } from '@eduagent/schemas';
-import { BookPageFlipAnimation, ProfileSwitcher } from '../common';
+import { BookPageFlipAnimation } from '../common';
 import {
   useMarkQuizDiscoverySurfaced,
   useQuizDiscoveryCard,
@@ -91,9 +91,6 @@ const HOME_INTENT_ACTIONS: HomeIntentAction[] = [
 export interface LearnerScreenProps {
   profiles: Profile[];
   activeProfile: Profile | null;
-  switchProfile: (
-    profileId: string
-  ) => Promise<{ success: boolean; error?: string }>;
   onBack?: () => void;
   now?: Date;
 }
@@ -101,7 +98,6 @@ export interface LearnerScreenProps {
 export function LearnerScreen({
   profiles,
   activeProfile,
-  switchProfile,
   onBack,
   now,
 }: LearnerScreenProps): React.ReactElement {
@@ -121,7 +117,7 @@ export function LearnerScreen({
     string | null
   >(null);
   const isParentProxy = Boolean(
-    activeProfile && !activeProfile.isOwner && profiles.some((p) => p.isOwner)
+    activeProfile && !activeProfile.isOwner && profiles.some((p) => p.isOwner),
   );
 
   const [coachBandDismissed, setCoachBandDismissed] = useState(false);
@@ -153,7 +149,7 @@ export function LearnerScreen({
             current?.sessionId === marker.sessionId &&
             current?.updatedAt === marker.updatedAt
               ? current
-              : marker
+              : marker,
           );
           return;
         }
@@ -161,7 +157,7 @@ export function LearnerScreen({
         setRecoveryMarker((current) => (current === null ? current : null));
         if (marker) {
           void clearSessionRecoveryMarker(activeProfile?.id).catch((err) =>
-            console.error('[LearnerScreen] stale marker cleanup failed:', err)
+            console.error('[LearnerScreen] stale marker cleanup failed:', err),
           );
         }
       } catch {
@@ -193,7 +189,7 @@ export function LearnerScreen({
   const subjectCards = useMemo(() => {
     if (!subjects?.length) return [];
     const progressBySubject = new Map(
-      (overallProgress?.subjects ?? []).map((p) => [p.subjectId, p])
+      (overallProgress?.subjects ?? []).map((p) => [p.subjectId, p]),
     );
     return subjects
       .filter((s) => s.status === 'active')
@@ -203,15 +199,19 @@ export function LearnerScreen({
         const total = progress?.topicsTotal ?? 0;
         const completed = progress?.topicsCompleted ?? 0;
 
-        let hint = 'Open';
+        let hint = s.curriculumStatus === 'preparing' ? 'Preparing...' : 'Open';
         if (
+          s.curriculumStatus !== 'preparing' &&
           resumeTarget?.subjectId === s.id &&
           ['active_session', 'paused_session'].includes(resumeTarget.resumeKind)
         ) {
           hint = `Continue ${resumeTarget.topicTitle ?? s.name}`;
-        } else if (reviewSummary?.nextReviewTopic?.subjectId === s.id) {
+        } else if (
+          s.curriculumStatus !== 'preparing' &&
+          reviewSummary?.nextReviewTopic?.subjectId === s.id
+        ) {
           hint = `Quiz: ${reviewSummary.nextReviewTopic.topicTitle}`;
-        } else if (completed > 0) {
+        } else if (s.curriculumStatus !== 'preparing' && completed > 0) {
           hint = `Practice: ${s.name}`;
         }
 
@@ -243,8 +243,8 @@ export function LearnerScreen({
           void clearSessionRecoveryMarker(activeProfile?.id).catch((err) =>
             console.error(
               '[LearnerScreen] clearSessionRecoveryMarker failed:',
-              err
-            )
+              err,
+            ),
           );
           router.push({
             pathname: '/(app)/session',
@@ -279,7 +279,7 @@ export function LearnerScreen({
           pushLearningResumeTarget(
             router,
             resumeTarget,
-            LEARNER_HOME_RETURN_TO
+            LEARNER_HOME_RETURN_TO,
           ),
       };
     }
@@ -344,7 +344,7 @@ export function LearnerScreen({
             : HOME_RETURN_PARAMS,
       } as never);
     },
-    []
+    [],
   );
 
   if (isLoading) {
@@ -436,15 +436,8 @@ export function LearnerScreen({
 
   return (
     <View className="flex-1 bg-background" testID="learner-screen">
-      <View
-        className="flex-row items-center justify-between px-5"
-        style={{
-          paddingTop: insets.top + 16,
-          zIndex: 10,
-          elevation: 10,
-        }}
-      >
-        <View className="flex-row items-center flex-1 me-3">
+      <View className="px-5" style={{ paddingTop: insets.top + 16 }}>
+        <View className="flex-row items-center">
           {onBack ? (
             <Pressable
               onPress={onBack}
@@ -470,11 +463,6 @@ export function LearnerScreen({
             {!isParentProxy ? <ChildQuotaLine /> : null}
           </View>
         </View>
-        <ProfileSwitcher
-          profiles={profiles}
-          activeProfileId={activeProfile?.id}
-          onSwitch={switchProfile}
-        />
       </View>
 
       <ScrollView

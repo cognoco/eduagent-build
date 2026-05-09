@@ -38,7 +38,11 @@ const EXEMPT_SCREENS: string[] = [
   // Tab screens — bottom tab navigation provides navigation
   '(app)/home.tsx',
   '(app)/library.tsx',
-  '(app)/more.tsx',
+  '(app)/more/index.tsx',
+  '(app)/more/notifications.tsx', // Native Stack header provides back
+  '(app)/more/account.tsx', // Native Stack header provides back
+  '(app)/more/privacy.tsx', // Native Stack header provides back
+  '(app)/more/help.tsx', // Native Stack header provides back
   '(app)/progress/index.tsx', // Visible bottom tab (see (app)/_layout.tsx VISIBLE_TABS)
   // Sign-in is the auth entry point — no "back" since there's nowhere
   // to go when unauthenticated. Has links to sign-up and forgot-password.
@@ -105,7 +109,7 @@ describe('Screen navigation audit', () => {
       // Extra context on failure (Jest shows the expect, this adds guidance)
       console.error(
         `Screen "${relativeName}" has no back/close/home button. ` +
-          'Every screen must have a visible way for the user to navigate away.'
+          'Every screen must have a visible way for the user to navigate away.',
       );
     }
   });

@@ -40,7 +40,7 @@ function getCooldownMessage(remainingMs: number, isLearner: boolean): string {
 
   // Teen copy
   return `Your brain needs a break — try again in ${formatCountdown(
-    remainingMs
+    remainingMs,
   )}`;
 }
 
@@ -88,13 +88,13 @@ export function RemediationCard({
 
   const encouragement = isLearner
     ? "Don't worry — it's totally normal to need another go. Let's find what works for you!"
-    : "Don't worry — struggling with a topic is part of learning. You can review and try again, or try relearning with a different approach.";
+    : "Don't worry — working through a tricky topic is part of learning. You can review and try again, or try relearning with a different approach.";
 
   const primaryLabel = isLearner
     ? 'Try a different way'
     : cooldownActive
-    ? `Available in ${formatCountdown(remainingMs)}`
-    : 'Review and try again';
+      ? `Available in ${formatCountdown(remainingMs)}`
+      : 'Review and try again';
 
   const secondaryLabel = isLearner
     ? 'Or try again later'

@@ -9,7 +9,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { platformAlert } from '../../lib/platform-alert';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Redirect, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { InterestContext } from '@eduagent/schemas';
 import { personaFromBirthYear, useProfile } from '../../lib/profile';
@@ -45,6 +45,9 @@ export default function MentorMemoryScreen() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { returnTo } = useLocalSearchParams<{
+    returnTo?: string | string[];
+  }>();
   const { activeProfile } = useProfile();
   const { data: profile, isLoading, isError, refetch } = useLearnerProfile();
   const deleteItem = useDeleteMemoryItem();
@@ -71,7 +74,7 @@ export default function MentorMemoryScreen() {
 
   const learningStyleRows = useMemo(
     () => getLearningStyleRows(profile?.learningStyle ?? null),
-    [profile?.learningStyle]
+    [profile?.learningStyle],
   );
 
   // [F-021] Check if all five data sections are empty — if so, render a
@@ -83,7 +86,7 @@ export default function MentorMemoryScreen() {
       (profile?.strengths ?? []).length === 0 &&
       (profile?.struggles ?? []).length === 0 &&
       (profile?.communicationNotes ?? []).length === 0,
-    [learningStyleRows, profile]
+    [learningStyleRows, profile],
   );
 
   const accommodationMode = profile?.accommodationMode ?? 'none';
@@ -134,7 +137,7 @@ export default function MentorMemoryScreen() {
             } catch (err) {
               platformAlert(
                 t('session.mentorMemory.errors.clearFailed'),
-                formatApiError(err)
+                formatApiError(err),
               );
               Sentry.captureException(err, {
                 tags: { surface: 'mentor-memory', action: 'delete_all' },
@@ -142,7 +145,7 @@ export default function MentorMemoryScreen() {
             }
           },
         },
-      ]
+      ],
     );
   }, [deleteAll, t]);
 
@@ -155,7 +158,7 @@ export default function MentorMemoryScreen() {
     } catch (err) {
       platformAlert(
         t('session.mentorMemory.errors.saveFailed'),
-        formatApiError(err)
+        formatApiError(err),
       );
       Sentry.captureException(err, {
         tags: { surface: 'mentor-memory', action: 'tell_mentor' },
@@ -173,7 +176,7 @@ export default function MentorMemoryScreen() {
         } catch (err) {
           platformAlert(
             t('session.mentorMemory.errors.updateFailed'),
-            formatApiError(err)
+            formatApiError(err),
           );
           Sentry.captureException(err, {
             tags: { surface: 'mentor-memory', action: 'toggle_injection' },
@@ -181,7 +184,7 @@ export default function MentorMemoryScreen() {
         }
       })();
     },
-    [toggleInjection, t]
+    [toggleInjection, t],
   );
 
   const handleInterestContextChange = useCallback(
@@ -190,13 +193,13 @@ export default function MentorMemoryScreen() {
       try {
         await updateInterestsContext.mutateAsync({
           interests: interests.map((interest) =>
-            interest.label === label ? { ...interest, context } : interest
+            interest.label === label ? { ...interest, context } : interest,
           ),
         });
       } catch (err) {
         platformAlert(
           t('session.mentorMemory.errors.updateFailed'),
-          formatApiError(err)
+          formatApiError(err),
         );
         Sentry.captureException(err, {
           tags: { surface: 'mentor-memory', action: 'update_interest_context' },
@@ -204,10 +207,20 @@ export default function MentorMemoryScreen() {
         throw err;
       }
     },
-    [profile?.interests, t, updateInterestsContext]
+    [profile?.interests, t, updateInterestsContext],
   );
 
   const consentStatus = profile?.memoryConsentStatus ?? 'pending';
+  const resolvedReturnTo = Array.isArray(returnTo) ? returnTo[0] : returnTo;
+
+  const handleBack = useCallback(() => {
+    if (resolvedReturnTo === 'more') {
+      router.replace('/(app)/more');
+      return;
+    }
+
+    goBackOrReplace(router, '/(app)/more' as const);
+  }, [resolvedReturnTo, router]);
 
   if (isParentProxy) return <Redirect href="/(app)/home" />;
 
@@ -229,7 +242,7 @@ export default function MentorMemoryScreen() {
             }}
             secondaryAction={{
               label: t('common.goBack'),
-              onPress: () => goBackOrReplace(router, '/(app)/more'),
+              onPress: handleBack,
               testID: 'mentor-memory-load-timeout-back',
             }}
             testID="mentor-memory-load-timeout"
@@ -269,7 +282,7 @@ export default function MentorMemoryScreen() {
         </Pressable>
         <Pressable
           testID="mentor-memory-go-back"
-          onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
+          onPress={handleBack}
           className="mt-3 px-6 py-3"
           accessibilityRole="button"
         >
@@ -283,7 +296,7 @@ export default function MentorMemoryScreen() {
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
+          onPress={handleBack}
           className="me-3 py-2 pe-2"
           accessibilityRole="button"
           accessibilityLabel={t('common.goBack')}
@@ -317,15 +330,15 @@ export default function MentorMemoryScreen() {
             {consentStatus === 'granted'
               ? t('session.mentorMemory.status.enabled')
               : consentStatus === 'declined'
-              ? t('session.mentorMemory.status.disabled')
-              : // BUG-[NOTION-3468bce9]: role-aware pending copy.
-              // Adult/owner accounts (isOwner === true) control their own
-              // consent — don't tell them a guardian must act. Child
-              // profiles under a family link (isOwner === false) DO need
-              // a parent/guardian to enable memory collection.
-              activeProfile?.isOwner
-              ? t('session.mentorMemory.status.pendingOwner')
-              : t('session.mentorMemory.status.pendingChild')}
+                ? t('session.mentorMemory.status.disabled')
+                : // BUG-[NOTION-3468bce9]: role-aware pending copy.
+                  // Adult/owner accounts (isOwner === true) control their own
+                  // consent — don't tell them a guardian must act. Child
+                  // profiles under a family link (isOwner === false) DO need
+                  // a parent/guardian to enable memory collection.
+                  activeProfile?.isOwner
+                  ? t('session.mentorMemory.status.pendingOwner')
+                  : t('session.mentorMemory.status.pendingChild')}
           </Text>
           <View className="flex-row items-center justify-between mt-4">
             <Text className="text-body text-text-primary">
@@ -336,7 +349,7 @@ export default function MentorMemoryScreen() {
               onValueChange={handleToggleInjection}
               disabled={isLoading || toggleInjection.isPending}
               accessibilityLabel={t(
-                'session.mentorMemory.status.useMemoryLabel'
+                'session.mentorMemory.status.useMemoryLabel',
               )}
             />
           </View>
@@ -355,7 +368,7 @@ export default function MentorMemoryScreen() {
                   } catch (err) {
                     platformAlert(
                       t('session.mentorMemory.errors.enableFailed'),
-                      formatApiError(err)
+                      formatApiError(err),
                     );
                     Sentry.captureException(err, {
                       tags: {
@@ -373,7 +386,7 @@ export default function MentorMemoryScreen() {
                   } catch (err) {
                     platformAlert(
                       t('session.mentorMemory.errors.updateFailed'),
-                      formatApiError(err)
+                      formatApiError(err),
                     );
                     Sentry.captureException(err, {
                       tags: {
@@ -453,7 +466,7 @@ export default function MentorMemoryScreen() {
                   } catch (err) {
                     platformAlert(
                       t('session.mentorMemory.errors.deleteFailed'),
-                      formatApiError(err)
+                      formatApiError(err),
                     );
                     Sentry.captureException(err, {
                       tags: {
@@ -474,7 +487,7 @@ export default function MentorMemoryScreen() {
           <MemorySection
             title={t('session.mentorMemory.sections.interests')}
             description={t(
-              'session.mentorMemory.sections.interestsContextHint'
+              'session.mentorMemory.sections.interestsContextHint',
             )}
             testID="mentor-memory-interests-section"
           >
@@ -503,7 +516,7 @@ export default function MentorMemoryScreen() {
                     } catch (err) {
                       platformAlert(
                         t('session.mentorMemory.errors.deleteFailed'),
-                        formatApiError(err)
+                        formatApiError(err),
                       );
                       Sentry.captureException(err, {
                         tags: {
@@ -536,7 +549,7 @@ export default function MentorMemoryScreen() {
                   } catch (err) {
                     platformAlert(
                       t('session.mentorMemory.errors.deleteFailed'),
-                      formatApiError(err)
+                      formatApiError(err),
                     );
                     Sentry.captureException(err, {
                       tags: {
@@ -587,7 +600,7 @@ export default function MentorMemoryScreen() {
                     } catch (err) {
                       platformAlert(
                         t('session.mentorMemory.errors.deleteFailed'),
-                        formatApiError(err)
+                        formatApiError(err),
                       );
                       Sentry.captureException(err, {
                         tags: {
@@ -623,7 +636,7 @@ export default function MentorMemoryScreen() {
                   } catch (err) {
                     platformAlert(
                       t('session.mentorMemory.errors.deleteFailed'),
-                      formatApiError(err)
+                      formatApiError(err),
                     );
                     Sentry.captureException(err, {
                       tags: {
@@ -656,7 +669,7 @@ export default function MentorMemoryScreen() {
                   } catch (err) {
                     platformAlert(
                       t('session.mentorMemory.errors.restoreFailed'),
-                      formatApiError(err)
+                      formatApiError(err),
                     );
                     Sentry.captureException(err, {
                       tags: {
@@ -682,7 +695,7 @@ export default function MentorMemoryScreen() {
                 name:
                   activeProfile?.displayName ??
                   t('session.mentorMemory.clearAll.defaultName'),
-              }
+              },
             )}
           >
             <Text className="text-body font-semibold text-danger">

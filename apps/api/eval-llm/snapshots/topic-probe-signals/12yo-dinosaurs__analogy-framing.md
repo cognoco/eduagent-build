@@ -85,21 +85,3 @@ USER: Anything around nature.
 ## Builder notes
 
 - Dimension: analogy-framing
-
-## Live LLM response
-
-```
-```json
-{
-  "goals": ["Mesozoic era"],
-  "experienceLevel": "beginner",
-  "currentKnowledge": "The learner wants to explore the Mesozoic era.",
-  "interests": ["game quests", "nature"],
-  "interestContext": {
-    "game quests": "free_time",
-    "nature": "both"
-  },
-  "analogyFraming": "playful"
-}
-```
-```

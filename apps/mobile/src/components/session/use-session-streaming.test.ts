@@ -38,13 +38,13 @@ const WATCHDOG_RECONNECT_TEXT = 'Connection dropped — Try again';
 
 function applyMessageUpdates(
   calls: Array<[unknown]>,
-  initialState: Array<Record<string, unknown>>
+  initialState: Array<Record<string, unknown>>,
 ) {
   return calls.reduce<Array<Record<string, unknown>>>((state, [update]) => {
     if (typeof update === 'function') {
       return (
         update as (
-          prev: Array<Record<string, unknown>>
+          prev: Array<Record<string, unknown>>,
         ) => Array<Record<string, unknown>>
       )(state);
     }
@@ -157,7 +157,7 @@ function createMockOpts(overrides: Record<string, unknown> = {}) {
         _text: string,
         onChunk: (accumulated: string) => void,
         onComplete: (result: Record<string, unknown>) => Promise<void>,
-        _sessionId: string
+        _sessionId: string,
       ) => {
         onChunk('Helpful answer');
         await onComplete({
@@ -166,7 +166,7 @@ function createMockOpts(overrides: Record<string, unknown> = {}) {
           escalationRung: 0,
           expectedResponseMinutes: 5,
         });
-      }
+      },
     ),
 
     recordSystemPrompt: {
@@ -180,7 +180,7 @@ function createMockOpts(overrides: Record<string, unknown> = {}) {
     trigger: jest.fn(),
 
     createLocalMessageId: jest.fn(
-      (prefix: string) => `${prefix}-${Date.now()}`
+      (prefix: string) => `${prefix}-${Date.now()}`,
     ),
     responseHistory: [],
 
@@ -199,7 +199,7 @@ describe('buildSessionApiMessage', () => {
         effectiveMode: 'learning',
         topicName: 'Cells',
         messages: [{ id: 'opening', role: 'assistant', content: 'Ready?' }],
-      } as any)
+      } as any),
     ).toBe('I\'m ready. Please start teaching me "Cells" from the beginning.');
   });
 
@@ -209,7 +209,7 @@ describe('buildSessionApiMessage', () => {
         effectiveMode: 'learning',
         topicName: 'Cells',
         messages: [{ id: 'opening', role: 'assistant', content: 'Ready?' }],
-      } as any)
+      } as any),
     ).toBe('Can you explain cells?');
   });
 
@@ -222,7 +222,7 @@ describe('buildSessionApiMessage', () => {
           { id: 'opening', role: 'assistant', content: 'Ready?' },
           { id: 'user-1', role: 'user', content: 'Start here' },
         ],
-      } as any)
+      } as any),
     ).toBe('ok');
   });
 });
@@ -286,7 +286,7 @@ describe('useSessionStreaming', () => {
           sessionType: 'learning',
           inputMode: 'text',
           metadata: expect.objectContaining({ effectiveMode: 'learning' }),
-        })
+        }),
       );
       expect(opts.setActiveSessionId).toHaveBeenCalledWith('new-session-1');
     });
@@ -300,7 +300,7 @@ describe('useSessionStreaming', () => {
       });
 
       expect(
-        opts.apiClient.subjects[':subjectId'].sessions.$post
+        opts.apiClient.subjects[':subjectId'].sessions.$post,
       ).toHaveBeenCalled();
       // Should NOT use startSession.mutateAsync when override is given
       expect(opts.startSession.mutateAsync).not.toHaveBeenCalled();
@@ -327,7 +327,7 @@ describe('useSessionStreaming', () => {
       });
 
       expect(opts.startSession.mutateAsync).toHaveBeenCalledWith(
-        expect.objectContaining({ sessionType: 'homework' })
+        expect.objectContaining({ sessionType: 'homework' }),
       );
     });
   });
@@ -362,7 +362,7 @@ describe('useSessionStreaming', () => {
         expect.objectContaining({
           idempotencyKey: expect.any(String),
           onReplay: expect.any(Function),
-        })
+        }),
       );
     });
 
@@ -386,7 +386,7 @@ describe('useSessionStreaming', () => {
         expect.objectContaining({
           idempotencyKey: expect.any(String),
           onReplay: expect.any(Function),
-        })
+        }),
       );
       // State was updated via onComplete callback
       expect(opts.setExchangeCount).toHaveBeenCalledWith(1);
@@ -428,7 +428,7 @@ describe('useSessionStreaming', () => {
 
       expect(opts.trackExchange).toHaveBeenCalled();
       expect(opts.trigger).toHaveBeenCalledWith(
-        expect.objectContaining({ reason: 'first_exchange' })
+        expect.objectContaining({ reason: 'first_exchange' }),
       );
     });
 
@@ -445,7 +445,7 @@ describe('useSessionStreaming', () => {
       expect(animateResponse).toHaveBeenCalledWith(
         expect.stringContaining('select a subject'),
         opts.setMessages,
-        opts.setIsStreaming
+        opts.setIsStreaming,
       );
     });
 
@@ -464,7 +464,7 @@ describe('useSessionStreaming', () => {
         streamMessage: jest
           .fn()
           .mockRejectedValue(
-            new QuotaExceededError('Quota exceeded', quotaDetails)
+            new QuotaExceededError('Quota exceeded', quotaDetails),
           ),
       });
       const { result } = renderHook(() => useSessionStreaming(opts as any));
@@ -511,7 +511,7 @@ describe('useSessionStreaming', () => {
             _text: string,
             _onChunk: (accumulated: string) => void,
             onComplete: (result: Record<string, unknown>) => Promise<void>,
-            _sessionId: string
+            _sessionId: string,
           ) => {
             await onComplete({
               aiEventId: 'ai-event-fallback',
@@ -522,7 +522,7 @@ describe('useSessionStreaming', () => {
                 fallbackText: "I didn't have a reply — tap to try again.",
               },
             });
-          }
+          },
         ),
       });
       const { result } = renderHook(() => useSessionStreaming(opts as any));
@@ -533,7 +533,7 @@ describe('useSessionStreaming', () => {
 
       const finalMessages = applyMessageUpdates(
         (opts.setMessages as jest.Mock).mock.calls,
-        []
+        [],
       );
 
       expect(finalMessages).toEqual(
@@ -544,7 +544,7 @@ describe('useSessionStreaming', () => {
             content: "I didn't have a reply — tap to try again.",
             streaming: false,
           }),
-        ])
+        ]),
       );
       expect(opts.trackExchange).not.toHaveBeenCalled();
       expect(mockWriteRecoveryMarker).toHaveBeenCalledTimes(1);
@@ -557,14 +557,14 @@ describe('useSessionStreaming', () => {
             _text: string,
             _onChunk: (accumulated: string) => void,
             onComplete: (result: Record<string, unknown>) => Promise<void>,
-            _sessionId: string
+            _sessionId: string,
           ) => {
             await onComplete({
               aiEventId: 'ai-event-empty',
               exchangeCount: 1,
               escalationRung: 0,
             });
-          }
+          },
         ),
       });
       const { result } = renderHook(() => useSessionStreaming(opts as any));
@@ -575,7 +575,7 @@ describe('useSessionStreaming', () => {
 
       const finalMessages = applyMessageUpdates(
         (opts.setMessages as jest.Mock).mock.calls,
-        []
+        [],
       );
 
       expect(finalMessages).toEqual(
@@ -585,7 +585,7 @@ describe('useSessionStreaming', () => {
             kind: 'reconnect_prompt',
             content: "I didn't have a reply — tap to try again.",
           }),
-        ])
+        ]),
       );
       expect(opts.trackExchange).not.toHaveBeenCalled();
     });
@@ -614,7 +614,7 @@ describe('useSessionStreaming', () => {
 
       const finalMessages = applyMessageUpdates(
         (opts.setMessages as jest.Mock).mock.calls,
-        []
+        [],
       );
 
       // The streaming bubble must be converted into a reconnect prompt with
@@ -627,11 +627,11 @@ describe('useSessionStreaming', () => {
             content: 'Connection lost — Try again',
             streaming: false,
           }),
-        ])
+        ]),
       );
       // No ghost streaming bubble must be left over.
       const stillStreaming = finalMessages.filter(
-        (m: { streaming?: boolean }) => m.streaming === true
+        (m: { streaming?: boolean }) => m.streaming === true,
       );
       expect(stillStreaming).toHaveLength(0);
     });
@@ -649,7 +649,7 @@ describe('useSessionStreaming', () => {
             _text: string,
             _onChunk: (accumulated: string) => void,
             onComplete: (result: Record<string, unknown>) => Promise<void>,
-            _sessionId: string
+            _sessionId: string,
           ) =>
             new Promise<void>((resolve) => {
               finishStream = async (
@@ -657,12 +657,12 @@ describe('useSessionStreaming', () => {
                   aiEventId: 'ai-event-late',
                   exchangeCount: 1,
                   escalationRung: 0,
-                }
+                },
               ) => {
                 await onComplete(result);
                 resolve();
               };
-            })
+            }),
         ),
       });
       const { result } = renderHook(() => useSessionStreaming(opts as any));
@@ -685,7 +685,7 @@ describe('useSessionStreaming', () => {
 
         const finalMessages = applyMessageUpdates(
           (opts.setMessages as jest.Mock).mock.calls,
-          []
+          [],
         );
 
         expect(finalMessages).toEqual(
@@ -695,7 +695,7 @@ describe('useSessionStreaming', () => {
               kind: 'reconnect_prompt',
               content: WATCHDOG_RECONNECT_TEXT,
             }),
-          ])
+          ]),
         );
         expect(finalMessages[0]).not.toHaveProperty('isSystemPrompt');
       } finally {
@@ -739,7 +739,7 @@ describe('useSessionStreaming', () => {
         expect.objectContaining({
           idempotencyKey: expect.any(String),
           onReplay: expect.any(Function),
-        })
+        }),
       );
     });
 
@@ -809,7 +809,7 @@ describe('useSessionStreaming', () => {
         {
           ok: true,
           json: async () => ({ pendingCelebrations: mockCelebrations }),
-        }
+        },
       );
       const { result } = renderHook(() => useSessionStreaming(opts as any));
 
@@ -826,7 +826,7 @@ describe('useSessionStreaming', () => {
     it('returns empty array on API error', async () => {
       const opts = makeOpts();
       (opts.apiClient.celebrations.pending.$get as jest.Mock).mockRejectedValue(
-        new Error('Network error')
+        new Error('Network error'),
       );
       const { result } = renderHook(() => useSessionStreaming(opts as any));
 
@@ -836,6 +836,39 @@ describe('useSessionStreaming', () => {
       });
 
       expect(celebrations).toEqual([]);
+    });
+
+    it('stops polling when unmounted before the pending response resolves', async () => {
+      const opts = makeOpts();
+      let resolvePending!: (value: {
+        ok: boolean;
+        json: () => Promise<{ pendingCelebrations: unknown[] }>;
+      }) => void;
+      const pendingResponse = new Promise<{
+        ok: boolean;
+        json: () => Promise<{ pendingCelebrations: unknown[] }>;
+      }>((resolve) => {
+        resolvePending = resolve;
+      });
+      (opts.apiClient.celebrations.pending.$get as jest.Mock).mockReturnValue(
+        pendingResponse,
+      );
+      const { result, unmount } = renderHook(() =>
+        useSessionStreaming(opts as any),
+      );
+
+      const celebrationsPromise = result.current.fetchFastCelebrations();
+      unmount();
+      resolvePending({
+        ok: true,
+        json: async () => ({
+          pendingCelebrations: [{ type: 'streak', detail: { days: 5 } }],
+        }),
+      });
+
+      await expect(celebrationsPromise).resolves.toEqual([]);
+      expect(opts.apiClient.celebrations.pending.$get).toHaveBeenCalledTimes(1);
+      expect(opts.apiClient.celebrations.seen.$post).not.toHaveBeenCalled();
     });
   });
 
@@ -852,12 +885,12 @@ describe('useSessionStreaming', () => {
         await result.current.syncHomeworkMetadata(
           'session-1',
           [{ id: 'p1', text: 'Solve x+1=2' }] as any,
-          0
+          0,
         );
       });
 
       expect(
-        opts.apiClient.sessions[':sessionId']['homework-state'].$post
+        opts.apiClient.sessions[':sessionId']['homework-state'].$post,
       ).toHaveBeenCalled();
     });
 
@@ -869,12 +902,12 @@ describe('useSessionStreaming', () => {
         await result.current.syncHomeworkMetadata(
           'session-1',
           [{ id: 'p1', text: 'test' }] as any,
-          0
+          0,
         );
       });
 
       expect(
-        opts.apiClient.sessions[':sessionId']['homework-state'].$post
+        opts.apiClient.sessions[':sessionId']['homework-state'].$post,
       ).not.toHaveBeenCalled();
     });
 
@@ -887,7 +920,7 @@ describe('useSessionStreaming', () => {
       });
 
       expect(
-        opts.apiClient.sessions[':sessionId']['homework-state'].$post
+        opts.apiClient.sessions[':sessionId']['homework-state'].$post,
       ).not.toHaveBeenCalled();
     });
   });
@@ -904,7 +937,7 @@ describe('useSessionStreaming', () => {
             _text: string,
             onChunk: (accumulated: string) => void,
             onComplete: (result: Record<string, unknown>) => Promise<void>,
-            _sessionId: string
+            _sessionId: string,
           ) => {
             // Deliver at least one chunk — post-[EMPTY-REPLY-GUARD-3] a
             // zero-chunk stream routes to the reconnect-prompt branch and
@@ -918,7 +951,7 @@ describe('useSessionStreaming', () => {
               expectedResponseMinutes: 5,
               confidence: 'low',
             });
-          }
+          },
         ),
       });
       const { result } = renderHook(() => useSessionStreaming(opts as any));
@@ -929,7 +962,7 @@ describe('useSessionStreaming', () => {
 
       // setLowConfidenceMessageId should have been called with the AI stream message id
       expect(opts.setLowConfidenceMessageId).toHaveBeenCalledWith(
-        expect.stringMatching(/^ai-/)
+        expect.stringMatching(/^ai-/),
       );
     });
 
@@ -940,7 +973,7 @@ describe('useSessionStreaming', () => {
             _text: string,
             _onChunk: (accumulated: string) => void,
             onComplete: (result: Record<string, unknown>) => Promise<void>,
-            _sessionId: string
+            _sessionId: string,
           ) => {
             await onComplete({
               aiEventId: 'ai-event-3',
@@ -949,7 +982,7 @@ describe('useSessionStreaming', () => {
               expectedResponseMinutes: 5,
               confidence: 'high',
             });
-          }
+          },
         ),
       });
       const { result } = renderHook(() => useSessionStreaming(opts as any));

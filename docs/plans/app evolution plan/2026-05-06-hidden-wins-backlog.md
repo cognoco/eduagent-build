@@ -366,8 +366,8 @@ Items skipped from the dead-code PR because each carries a small product questio
 | P2 | Book-completed celebration | S | Library | **DONE** |
 | P2 | Quiz Challenge Mode visibility | XS / S | Practice | **DONE** (explainer shipped 2026-05-06 `af79a85e`; manual opt-in deferred) |
 | P2 | `memory_facts.confidence` UI | S | Memory | **DONE** (parent view only) |
-| P2 | Mentor-memory data source consolidation | M | Memory | **PARTIAL** (two paths confirmed) |
-| P2 | Email channel for product notifications | M | Notifications | **PARTIAL** (infra ready; consent-only) |
+| P2 | Mentor-memory data source consolidation | S | Memory | **SPEC** (option 2 — shared backbone, `docs/specs/2026-05-08-mentor-memory-shared-backbone.md`) |
+| P2 | Email channel for product notifications | S | Notifications | **SPEC** (digests only, struggle blurb embedded, consent redaction, `docs/specs/2026-05-08-email-digest-channel.md`) |
 | P3 | Family-link / child-invite flow | L | Parent | **TODO** |
 | P3 | Parent-facing LLM insight | L | Parent | **TODO** |
 | P3 | `library-filters.ts` wire-or-delete | XS | Library | **PARTIAL** (helpers gone, file+EnrichedBook remain) |

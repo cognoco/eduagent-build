@@ -39,12 +39,14 @@ tags:
 # 5. Scroll to find and tap Profile row to open profile switcher
 - scrollUntilVisible:
     element:
-      text: "Profile"
+      id: "more-row-profile"
     direction: DOWN
-    timeout: 10000
+    timeout: 20000
+    speed: 70
+    visibilityPercentage: 50
 
 - tapOn:
-    text: "Profile"
+    id: "more-row-profile"
 
 # 6. Wait for profiles screen to appear
 - extendedWaitUntil:

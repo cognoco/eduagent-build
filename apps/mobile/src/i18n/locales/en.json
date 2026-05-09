@@ -206,6 +206,8 @@
       "childPreferencesAccessLabel": "Open {{name}}'s profile preferences",
       "childPreferencesLink": "To change {{name}}'s preferences, open their profile →",
       "familyPreferencesLink": "To change a child's preferences, open Family →",
+      "sheetTitle": "Learning mode",
+      "sheetEffectMessage": "Takes effect from your next message.",
       "casual": {
         "title": "Explorer",
         "description": "Learn at your own pace. Your mentor is relaxed and encouraging. You earn points right away and can skip recaps."
@@ -243,6 +245,7 @@
     },
     "celebrations": {
       "sectionHeader": "Your celebrations",
+      "inlinePrompt": "Celebrations",
       "allTitle": "All celebrations",
       "allDescription": "Show every milestone, including quick wins",
       "bigOnlyTitle": "Big milestones only",
@@ -254,10 +257,14 @@
       "sectionHeader": "Notifications",
       "pushTitle": "Push notifications",
       "weeklyDigestTitle": "Weekly progress digest",
+      "weeklyEmailDigestTitle": "Weekly progress email",
+      "monthlyEmailDigestTitle": "Monthly progress email",
+      "emailDigestDescription": "Sent to your account email.",
       "updateErrorTitle": "Could not update notification settings"
     },
     "privacy": {
       "sectionHeader": "Privacy",
+      "privacyAndData": "Privacy & data",
       "withdrawalArchiveTitle": "When I withdraw consent for a child",
       "withdrawalArchiveAuto": "Automatic",
       "withdrawalArchiveAutoDescription": "Under-13 accounts are deleted at grace expiry. 13+ accounts are archived for 30 days, then deleted.",
@@ -290,8 +297,18 @@
       "preparingExport": "Preparing export..."
     },
     "help": {
+      "helpAndFeedback": "Help & feedback",
       "contactSupportTitle": "Contact support",
       "contactSupportMessage": "Email support@mentomate.app for help with your account."
+    },
+    "sections": {
+      "settings": "Settings"
+    },
+    "subscreens": {
+      "notifications": "Notifications",
+      "account": "Account",
+      "privacy": "Privacy & data",
+      "help": "Help & feedback"
     },
     "errors": {
       "tryAgain": "Please try again.",
@@ -453,6 +470,7 @@
       "speakNow": "Speak now — tap the mic again to stop",
       "processing": "Processing...",
       "inputUnavailable": "Input is currently unavailable",
+      "classifyingSubject": "Working out which subject this is for…",
       "switchToTextMode": "Switch to text mode",
       "textMode": "Text mode",
       "switchToVoiceMode": "Switch to voice mode",
@@ -761,8 +779,10 @@
     },
     "row": {
       "review": "Review",
+      "finished": "Finished",
       "notStarted": "not started",
       "paused": "Paused",
+      "archived": "Archived",
       "hasNotes": "Has notes",
       "bookTopics": "{{progress}} topics",
       "shelfSubtitle_one": "{{count}} book · {{progress}} topics",
@@ -773,7 +793,9 @@
       "bookNotesSuffix": ", has notes",
       "shelfAccessibilityLabel": "{{name}} shelf, {{subtitle}}{{pausedSuffix}}{{reviewSuffix}}. Tap to {{action}}.",
       "shelfPausedSuffix": ", paused",
+      "shelfArchivedSuffix": ", archived",
       "shelfReviewSuffix": ", review needed",
+      "shelfFinishedSuffix": ", finished",
       "shelfActionExpand": "expand",
       "shelfActionCollapse": "collapse",
       "shelfActionOpen": "open"
@@ -849,6 +871,8 @@
     "startSubjectLabel": "Start {{name}}",
     "notSureHint": "Not sure? Just describe what interests you — like \"I want to understand how plants grow\"",
     "checkingName": "Checking subject name...",
+    "creatingSubject": "Creating subject...",
+    "preparingCurriculum": "Preparing your first lesson...",
     "somethingElse": "Something else",
     "somethingElseHint": "Be as specific as you like.",
     "clarifyLabel": "What exactly do you want to learn?",
@@ -993,7 +1017,22 @@
   },
   "assessment": {
     "title": "Knowledge Check",
-    "openingMessage": "Let's see what you've picked up so far. I'll ask a few questions — just do your best, and I'll help fill in any gaps.",
+    "openingMessage": "Let's see what you've picked up so far. Just do your best, and I'll help fill in any gaps.\n\nFirst question: what are the main things you remember about this topic? Share one or two examples if you can.",
+    "firstQuestion": "First question: what are the main things you remember about this topic? Share one or two examples if you can.",
+    "resultSummary": "You got {{mastery}}%! {{band}}.",
+    "bands": {
+      "excellent": "Excellent",
+      "good": "Good",
+      "meetsBar": "Meets the bar",
+      "coreIdeas": "Core ideas are there",
+      "needsReview": "Needs another look"
+    },
+    "borderlineBody": "You got the core ideas. Want a quick catch-up on the bits you weren't sure about?",
+    "gapFillAction": "Yes, show me what I missed",
+    "declineRefreshAction": "No thanks, I'm done",
+    "failedExhaustedBody": "That topic needs another look. Let's go through it together.",
+    "startSessionAction": "Start a session",
+    "notNowAction": "Not now",
     "passedMessage": "You've got a solid grasp of most of this — {{mastery}}% mastery! The areas to revisit will show up in your Library.",
     "missingParams": "This assessment can't be started — missing required information.",
     "pickerTitle": "Pick a topic to check",
@@ -1540,7 +1579,7 @@
       "couldNotExportMemory": "Could not export memory",
       "controls": "Controls",
       "learnAboutChild": "Learn about child",
-      "learnAboutChildDescription": "Allow the mentor to build a memory of your child's strengths and struggles",
+      "learnAboutChildDescription": "Allow the mentor to build a memory of your child's strengths and focus areas",
       "useWhatMentorKnows": "Use what the mentor knows",
       "useWhatMentorKnowsDescription": "Let the mentor personalise sessions using what it has learned",
       "noObservationsYet": "No observations yet",
@@ -1800,14 +1839,14 @@
         "withdrawn": "Consent withdrawn"
       },
       "engagementTrend": {
-        "declining": "Engagement declining",
+        "declining": "Engagement needs attention",
         "increasing": "Engagement increasing",
         "stable": "Engagement stable"
       },
       "reviewHealth": "Review health",
       "retentionTrend": {
         "improving": "Improving",
-        "declining": "Declining",
+        "declining": "Needs review",
         "stable": "Stable"
       },
       "signal": {

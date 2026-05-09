@@ -72,6 +72,8 @@ const ENRICHED_SUBJECTS: EnrichedSubjectResult[] = [
     bookCount: 1,
     topicProgress: '2/5',
     retentionStatus: 'strong',
+    reviewDueCount: 0,
+    isFinished: false,
     isPaused: false,
   },
 ];

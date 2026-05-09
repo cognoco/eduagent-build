@@ -85,20 +85,3 @@ USER: Anything around nature.
 ## Builder notes
 
 - Dimension: analogy-framing
-
-## Live LLM response
-
-```
-```json
-{
-  "goals": ["Czech reading comprehension"],
-  "experienceLevel": "beginner",
-  "currentKnowledge": "Not specified",
-  "interests": ["nature"],
-  "interestContext": {
-    "nature": "both"
-  },
-  "analogyFraming": "playful"
-}
-```
-```

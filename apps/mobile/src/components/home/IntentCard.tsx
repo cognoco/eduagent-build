@@ -12,7 +12,7 @@ interface IntentCardProps {
   title: string;
   subtitle?: string;
   badge?: number;
-  variant?: 'default' | 'highlight';
+  variant?: 'default' | 'highlight' | 'subtle';
   icon?: React.ComponentProps<typeof Ionicons>['name'];
   onPress?: () => void;
   onDismiss?: () => void;
@@ -32,14 +32,21 @@ export function IntentCard({
   testID,
 }: IntentCardProps): React.ReactElement {
   const colors = useThemeColors();
+  const isHighlight = variant === 'highlight';
+  const isSubtle = variant === 'subtle';
+  const accentColor = isSubtle ? colors.textSecondary : colors.primary;
 
   function handleDismiss(event?: GestureResponderEvent) {
     event?.stopPropagation?.();
     onDismiss?.();
   }
 
-  const containerClassName = `rounded-card border-l-4 border-primary flex-row items-center px-5 py-5 min-h-[112px] ${
-    variant === 'highlight' ? 'bg-primary-soft' : 'bg-surface-elevated'
+  const containerClassName = `rounded-card border-l-4 flex-row items-center px-5 py-5 min-h-[112px] ${
+    isHighlight
+      ? 'bg-primary-soft'
+      : isSubtle
+        ? 'bg-surface border-border'
+        : 'bg-surface-elevated'
   }${onPress ? ' active:opacity-80' : ''}`;
 
   const Wrapper = onPress ? Pressable : View;
@@ -57,7 +64,12 @@ export function IntentCard({
       };
 
   return (
-    <Wrapper {...wrapperProps} className={containerClassName} testID={testID}>
+    <Wrapper
+      {...wrapperProps}
+      className={containerClassName}
+      style={{ borderLeftColor: accentColor }}
+      testID={testID}
+    >
       <View className="flex-1 flex-row items-center">
         {icon ? (
           <View
@@ -66,7 +78,7 @@ export function IntentCard({
             accessibilityElementsHidden
             importantForAccessibility="no-hide-descendants"
           >
-            <Ionicons name={icon} size={28} color={colors.primary} />
+            <Ionicons name={icon} size={28} color={accentColor} />
           </View>
         ) : null}
         <View className="flex-1 justify-center">
@@ -115,11 +127,7 @@ export function IntentCard({
               accessibilityElementsHidden
               importantForAccessibility="no-hide-descendants"
             >
-              <Ionicons
-                name="chevron-forward"
-                size={22}
-                color={colors.primary}
-              />
+              <Ionicons name="chevron-forward" size={22} color={accentColor} />
             </View>
           ) : null}
         </View>
@@ -129,7 +137,7 @@ export function IntentCard({
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
         >
-          <Ionicons name="chevron-forward" size={22} color={colors.primary} />
+          <Ionicons name="chevron-forward" size={22} color={accentColor} />
         </View>
       ) : null}
     </Wrapper>

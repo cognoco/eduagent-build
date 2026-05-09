@@ -30,7 +30,7 @@ export default function ProfilesScreen() {
   const { profiles, activeProfile, switchProfile, isLoading } = useProfile();
   const { data: subscription } = useSubscription();
   const { data: familyData } = useFamilySubscription(
-    subscription?.tier === 'family' || subscription?.tier === 'pro'
+    subscription?.tier === 'family' || subscription?.tier === 'pro',
   );
   const [isSwitching, setIsSwitching] = useState(false);
   const updateName = useUpdateProfileName();
@@ -55,7 +55,7 @@ export default function ProfilesScreen() {
       setRenaming({ profileId, currentName });
       setRenameValue(currentName);
     },
-    []
+    [],
   );
 
   const handleCancelRename = useCallback(() => {
@@ -80,7 +80,7 @@ export default function ProfilesScreen() {
         onError: (err) => {
           platformAlert('Could not rename profile', formatApiError(err));
         },
-      }
+      },
     );
   }, [renaming, renameValue, updateName, handleCancelRename]);
 
@@ -112,7 +112,7 @@ export default function ProfilesScreen() {
             onPress: () => router.push('/(app)/subscription'),
           },
           { text: 'Cancel', style: 'cancel' },
-        ]
+        ],
       );
       return;
     }
@@ -131,13 +131,13 @@ export default function ProfilesScreen() {
               },
               { text: t('common.ok'), style: 'cancel' },
             ]
-          : [{ text: t('common.ok') }]
+          : [{ text: t('common.ok') }],
       );
       return;
     }
 
     router.push('/create-profile');
-  }, [subscription, familyData, router, profiles.length]);
+  }, [subscription, familyData, router, profiles.length, t]);
 
   // UX-DE-L13: timeout on profile switch
   const handleSwitch = async (profileId: string) => {
@@ -153,7 +153,7 @@ export default function ProfilesScreen() {
       if (result?.success === false) {
         platformAlert(
           'Could not switch profiles',
-          result.error ?? 'Please try again.'
+          result.error ?? 'Please try again.',
         );
         return;
       }

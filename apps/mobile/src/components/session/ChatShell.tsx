@@ -62,6 +62,8 @@ interface ChatShellProps {
   inputDisabled?: boolean;
   /** Explains why input is disabled — shown inline where the input area normally appears. */
   disabledReason?: string;
+  /** When false, hides the disabled banner entirely while keeping the composer unavailable. */
+  showDisabledBanner?: boolean;
   rightAction?: React.ReactNode;
   footer?: React.ReactNode;
   inputAccessory?: React.ReactNode;
@@ -115,7 +117,7 @@ export function animateResponse(
   response: string,
   setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>,
   setIsStreaming: React.Dispatch<React.SetStateAction<boolean>>,
-  onDone?: () => void
+  onDone?: () => void,
 ): () => void {
   const streamId = `ai-${Date.now()}`;
   setMessages((prev) => [
@@ -132,8 +134,8 @@ export function animateResponse(
       clearInterval(interval);
       setMessages((prev) =>
         prev.map((m) =>
-          m.id === streamId ? { ...m, streaming: false, content: response } : m
-        )
+          m.id === streamId ? { ...m, streaming: false, content: response } : m,
+        ),
       );
       setIsStreaming(false);
       onDone?.();
@@ -141,7 +143,7 @@ export function animateResponse(
     }
     const partial = tokens.slice(0, tokenIndex + 1).join(' ');
     setMessages((prev) =>
-      prev.map((m) => (m.id === streamId ? { ...m, content: partial } : m))
+      prev.map((m) => (m.id === streamId ? { ...m, content: partial } : m)),
     );
     tokenIndex++;
   }, 40);
@@ -158,6 +160,7 @@ export function ChatShell({
   isStreaming,
   inputDisabled = false,
   disabledReason,
+  showDisabledBanner = true,
   rightAction,
   footer,
   inputAccessory,
@@ -217,7 +220,7 @@ export function ChatShell({
   // have no `kind` are hidden, everything else is shown.
   const visibleMessages = useMemo(
     () => messages.filter((msg) => !(msg.isSystemPrompt && !msg.kind)),
-    [messages]
+    [messages],
   );
   const keyExtractor = useCallback((item: ChatMessage) => item.id, []);
   const renderMessageItem = useCallback(
@@ -251,7 +254,7 @@ export function ChatShell({
           </View>
         )}
         <MessageBubble
-          role={msg.role}
+          sender={msg.role}
           content={msg.content}
           streaming={msg.streaming}
           outboxStatus={msg.outboxStatus}
@@ -262,7 +265,7 @@ export function ChatShell({
         />
       </View>
     ),
-    [failedImages, colors.muted, renderMessageActions]
+    [failedImages, colors.muted, renderMessageActions, t],
   );
 
   // Voice toggle — explicit initialVoiceEnabled (from input mode toggle) takes precedence.
@@ -270,7 +273,7 @@ export function ChatShell({
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(
     inputMode
       ? inputMode === 'voice'
-      : initialVoiceEnabled ?? verificationType === 'teach_back'
+      : (initialVoiceEnabled ?? verificationType === 'teach_back'),
   );
 
   // BUG-349: Sync voice state when inputMode prop changes after mount
@@ -376,7 +379,7 @@ export function ChatShell({
       'screenReaderChanged',
       (enabled) => {
         setScreenReaderEnabled(enabled);
-      }
+      },
     );
 
     return () => {
@@ -416,7 +419,7 @@ export function ChatShell({
       if (!enabled) stopSpeaking();
       onInputModeChange?.(enabled ? 'voice' : 'text');
     },
-    [onInputModeChange, stopSpeaking]
+    [onInputModeChange, stopSpeaking],
   );
 
   const handleSend = useCallback(() => {
@@ -482,7 +485,7 @@ export function ChatShell({
             { text: 'Cancel', style: 'cancel' },
             { text: 'Open Settings', onPress: () => Linking.openSettings() },
           ]
-        : undefined
+        : undefined,
     );
   }, [sttError]);
 
@@ -546,7 +549,7 @@ export function ChatShell({
       stopListening,
       clearTranscript,
       setVoiceEnabled,
-    ]
+    ],
   );
 
   // --- Idle "magic pen" animation ---
@@ -805,6 +808,7 @@ export function ChatShell({
           onSend={handleVoiceSend}
           onDiscard={handleVoiceDiscard}
           onReRecord={handleVoiceReRecord}
+          onTranscriptChange={setPendingTranscript}
         />
       )}
 
@@ -815,7 +819,7 @@ export function ChatShell({
       {/* Input — when disabled, show inline reason instead of hiding entirely.
           H4: Falls back to a generic message when no disabledReason is provided
           so users are never left staring at an empty void with no explanation. */}
-      {inputDisabled ? (
+      {inputDisabled && showDisabledBanner ? (
         <View
           className="px-4 py-4 bg-surface border-t border-surface-elevated"
           style={{ paddingBottom: Math.max(insets.bottom, 8) }}
@@ -826,7 +830,7 @@ export function ChatShell({
             {disabledReason ?? t('session.chatShell.inputUnavailable')}
           </Text>
         </View>
-      ) : (
+      ) : inputDisabled ? null : (
         <View>
           {!hideInputModeToggle && (
             <View className="px-4 py-2 bg-surface border-t border-surface-elevated">

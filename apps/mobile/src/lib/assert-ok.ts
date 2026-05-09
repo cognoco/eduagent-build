@@ -1,3 +1,5 @@
+import { ConflictError } from './api-errors';
+
 /**
  * Asserts that an API response is successful (2xx status).
  * Extracts the server's error message when available.
@@ -26,7 +28,7 @@ export interface ApiResponseError extends Error {
 type AssertedOk<T> = T extends { ok: false } ? never : T;
 
 export async function assertOk<T extends Response>(
-  res: T
+  res: T,
 ): Promise<AssertedOk<T>> {
   if (res.ok) return res as AssertedOk<T>;
 
@@ -58,6 +60,22 @@ export async function assertOk<T extends Response>(
         message = bodyText;
       }
     }
+  }
+
+  if (res.status === 409) {
+    const error = new ConflictError(message) as ConflictError &
+      ApiResponseError;
+    error.status = res.status;
+    if (code) {
+      error.code = code;
+    }
+    if (details !== undefined) {
+      error.details = details;
+    }
+    if (bodyText) {
+      error.bodyText = bodyText;
+    }
+    throw error;
   }
 
   const error = new Error(message) as ApiResponseError;

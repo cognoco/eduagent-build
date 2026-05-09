@@ -109,6 +109,18 @@ check_emulator() {
   fi
 }
 
+reset_maestro_driver() {
+  # Maestro owns the UIAutomator instrumentation channel while a test runs.
+  # If a previous run is killed mid-command, the next test can hang at the
+  # first inputText/tap call unless we release the driver explicitly.
+  $ADB $DEVICE_FLAG shell am force-stop dev.mobile.maestro 2>/dev/null || true
+  $ADB $DEVICE_FLAG shell am force-stop dev.mobile.maestro.test 2>/dev/null || true
+  $ADB $DEVICE_FLAG shell pm clear dev.mobile.maestro 2>/dev/null || true
+  $ADB $DEVICE_FLAG shell pm clear dev.mobile.maestro.test 2>/dev/null || true
+  $ADB $DEVICE_FLAG shell am kill dev.mobile.maestro 2>/dev/null || true
+  $ADB $DEVICE_FLAG shell am kill dev.mobile.maestro.test 2>/dev/null || true
+}
+
 # ── Pre-step: Clear state + launch app via ADB (BUG-19) ──
 # Maestro's launchApp (with or without clearState) fails intermittently on
 # WHPX emulators, especially with concurrent sessions. Workaround: clear state
@@ -139,6 +151,65 @@ wait_for_text() {
   done
   echo "[seed-and-run] FAILED: '${text}' not found after ${timeout}s" >&2
   return 1
+}
+
+dump_visible_texts() {
+  local limit="${1:-10}"
+  node -e "
+    const fs = require('fs');
+    const limit = Number(process.argv[1] || 10);
+    const xml = fs.readFileSync(0, 'utf8');
+    const texts = [];
+    const re = /text=\"([^\"]+)\"/g;
+    for (let match; (match = re.exec(xml)) && texts.length < limit;) {
+      texts.push(match[1]);
+    }
+    process.stdout.write(texts.join(', '));
+  " "$limit"
+}
+
+first_bounds_for_text() {
+  local pattern="$1"
+  node -e "
+    const fs = require('fs');
+    const pattern = new RegExp(process.argv[1]);
+    const xml = fs.readFileSync(0, 'utf8');
+    const re = /<node\\b[^>]*>/g;
+    for (let match; (match = re.exec(xml));) {
+      const node = match[0];
+      const text = /text=\"([^\"]*)\"/.exec(node)?.[1] ?? '';
+      const bounds = /bounds=\"([^\"]+)\"/.exec(node)?.[1] ?? '';
+      if (bounds && pattern.test(text)) {
+        process.stdout.write(bounds);
+        process.exit(0);
+      }
+    }
+  " "$pattern"
+}
+
+first_bounds_for_content_desc() {
+  local pattern="$1"
+  node -e "
+    const fs = require('fs');
+    const pattern = new RegExp(process.argv[1]);
+    const xml = fs.readFileSync(0, 'utf8');
+    const re = /<node\\b[^>]*>/g;
+    for (let match; (match = re.exec(xml));) {
+      const node = match[0];
+      const label = /content-desc=\"([^\"]*)\"/.exec(node)?.[1] ?? '';
+      const bounds = /bounds=\"([^\"]+)\"/.exec(node)?.[1] ?? '';
+      if (bounds && pattern.test(label)) {
+        process.stdout.write(bounds);
+        process.exit(0);
+      }
+    }
+  " "$pattern"
+}
+
+bounds_coord() {
+  local bounds="$1"
+  local index="$2"
+  echo "$bounds" | sed -E 's/[^0-9]+/ /g' | awk -v i="$index" '{ print $i }'
 }
 
 # ── Helper: tap coordinates via ADB input ──
@@ -174,22 +245,13 @@ $ADB $DEVICE_FLAG shell pm clear "$APP_ID" 2>/dev/null || true
 # BUG-21: Kill Bluetooth to prevent "Bluetooth keeps stopping" dialog on WHPX
 $ADB $DEVICE_FLAG shell am force-stop com.android.bluetooth 2>/dev/null || true
 # Stop Maestro driver to release UIAutomator service.
-# The Maestro instrumentation runner takes exclusive control of UIAutomator.
-# If a previous Maestro run left the driver running, it blocks uiautomator dump.
-# force-stop kills the process; the driver APK stays installed so Maestro can
-# reuse it without a slow reinstall (~120s on WHPX).
-$ADB $DEVICE_FLAG shell am force-stop dev.mobile.maestro 2>/dev/null || true
-$ADB $DEVICE_FLAG shell am force-stop dev.mobile.maestro.test 2>/dev/null || true
-# Kill any lingering instrumentation runner (belt-and-suspenders)
-$ADB $DEVICE_FLAG shell am kill dev.mobile.maestro 2>/dev/null || true
-$ADB $DEVICE_FLAG shell am kill dev.mobile.maestro.test 2>/dev/null || true
+reset_maestro_driver
 # BUG-22: Pre-grant notification permission so the dialog doesn't block UI
 $ADB $DEVICE_FLAG shell pm grant "$APP_ID" android.permission.POST_NOTIFICATIONS 2>/dev/null || true
 # BUG-39: Pre-grant camera permission so homework flows don't hit system dialog
 $ADB $DEVICE_FLAG shell pm grant "$APP_ID" android.permission.CAMERA 2>/dev/null || true
-# BUG-549: Pre-grant microphone so the one-time permission setup gate auto-skips.
-# The gate shows when RECORD_AUDIO or POST_NOTIFICATIONS are not granted after pm clear.
-# With both pre-granted, usePermissionSetup detects 0 renderable rows and skips.
+# Pre-grant microphone so voice-focused flows don't hit the Android system
+# dialog unless the flow is explicitly testing the just-in-time permission ask.
 $ADB $DEVICE_FLAG shell pm grant "$APP_ID" android.permission.RECORD_AUDIO 2>/dev/null || true
 # Give the OS time to settle after pm clear + pm grants before launching
 sleep 2
@@ -210,16 +272,20 @@ if ! wait_for_text "DEVELOPMENT" "$LAUNCHER_TIMEOUT"; then
   sleep 2
   $ADB $DEVICE_FLAG shell uiautomator dump /sdcard/ui_dump.xml 2>/dev/null || true
   LAST_DUMP=$($ADB $DEVICE_FLAG exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null || echo "")
-  if echo "$LAST_DUMP" | grep -q "Reload\|Welcome back\|Welcome to MentoMate\|sign-in-button\|Connected to"; then
+  if echo "$LAST_DUMP" | grep -q "Reload\|Connected to\|Loading from"; then
     echo "[seed-and-run] App auto-connected to Metro (skipped launcher). Proceeding to bundle phase."
     SKIP_TO_BUNDLE=1
+  elif echo "$LAST_DUMP" | grep -q "Welcome back\|Welcome to MentoMate\|sign-in-button"; then
+    echo "[seed-and-run] FATAL: App opened the embedded sign-in bundle without showing the dev-client launcher or Metro connection." >&2
+    echo "[seed-and-run] This is unsafe for E2E because it may run stale JS from the APK. Reinstall a current dev-client APK or launch through the dev-client Metro entry." >&2
+    exit 1
   elif echo "$LAST_DUMP" | grep -q "DEVELOPMENT"; then
     # Launcher appeared just after the timeout — treat as normal launcher path
     echo "[seed-and-run] Launcher appeared just after timeout window — continuing."
   else
     # Dump is empty or shows home/crashed state: force-stop + relaunch once before giving up.
     # This handles WHPX emulator stalls where the app silently fails to render on first launch.
-    DUMP_TEXTS=$(echo "$LAST_DUMP" | grep -oP 'text="\K[^"]+' | head -10 | tr '\n' ', ' || true)
+    DUMP_TEXTS=$(echo "$LAST_DUMP" | dump_visible_texts 10 || true)
     echo "[seed-and-run] Launcher not found (dump: [${DUMP_TEXTS:-empty}]). Force-stopping and relaunching ..." >&2
     $ADB $DEVICE_FLAG shell am force-stop "$APP_ID" 2>/dev/null || true
     sleep 3
@@ -230,12 +296,16 @@ if ! wait_for_text "DEVELOPMENT" "$LAUNCHER_TIMEOUT"; then
       sleep 2
       $ADB $DEVICE_FLAG shell uiautomator dump /sdcard/ui_dump.xml 2>/dev/null || true
       RETRY_DUMP=$($ADB $DEVICE_FLAG exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null || echo "")
-      if echo "$RETRY_DUMP" | grep -q "Reload\|Welcome back\|Welcome to MentoMate\|sign-in-button\|Connected to"; then
+      if echo "$RETRY_DUMP" | grep -q "Reload\|Connected to\|Loading from"; then
         echo "[seed-and-run] App auto-connected on relaunch. Proceeding to bundle phase."
         SKIP_TO_BUNDLE=1
+      elif echo "$RETRY_DUMP" | grep -q "Welcome back\|Welcome to MentoMate\|sign-in-button"; then
+        echo "[seed-and-run] FATAL: App opened the embedded sign-in bundle after relaunch without showing the dev-client launcher or Metro connection." >&2
+        echo "[seed-and-run] This is unsafe for E2E because it may run stale JS from the APK. Reinstall a current dev-client APK or launch through the dev-client Metro entry." >&2
+        exit 1
       else
         echo "[seed-and-run] FATAL: Dev-client launcher never appeared after relaunch. Is the APK installed?" >&2
-        echo "[seed-and-run] Dump contents: $(echo "$RETRY_DUMP" | grep -oP 'text="\K[^"]+' | head -10 | tr '\n' ', ')" >&2
+        echo "[seed-and-run] Dump contents: $(echo "$RETRY_DUMP" | dump_visible_texts 10 || true)" >&2
         exit 1
       fi
     fi
@@ -257,29 +327,45 @@ if [ $SKIP_TO_BUNDLE -eq 0 ]; then
   # Step C: Tap Metro server entry in launcher
   # Parse the dump to find the server entry's exact bounds.
   echo "[seed-and-run] Finding Metro server entry in UI dump ..."
-  # Try 8082 first (bundle proxy — BUG-7 workaround), then 10.0.2.2:any, then localhost:any
-  METRO_BOUNDS=$($ADB $DEVICE_FLAG exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null \
-    | grep -oP 'text="http://10.0.2.2:8082"[^/]*bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' \
-    | grep -oP 'bounds="\K[^"]+' || echo "")
+  METRO_REQUESTED_PORT=$(echo "$METRO_URL" | sed -n 's#.*:\([0-9][0-9]*\).*#\1#p')
+  METRO_BOUNDS=""
+  if [ -n "$METRO_REQUESTED_PORT" ]; then
+    for _ in 1 2 3 4 5; do
+      $ADB $DEVICE_FLAG shell uiautomator dump /sdcard/ui_dump.xml 2>/dev/null || true
+      METRO_BOUNDS=$($ADB $DEVICE_FLAG exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null \
+        | first_bounds_for_text "^http://10\.0\.2\.2:${METRO_REQUESTED_PORT}$" || echo "")
+      if [ -n "$METRO_BOUNDS" ]; then
+        break
+      fi
+      sleep 2
+    done
+  fi
   if [ -z "$METRO_BOUNDS" ]; then
     METRO_BOUNDS=$($ADB $DEVICE_FLAG exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null \
-      | grep -oP 'text="http://10.0.2.2:[0-9]+"[^/]*bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' \
-      | head -1 | grep -oP 'bounds="\K[^"]+' || echo "")
+      | first_bounds_for_text '^http://10\.0\.2\.2:8082$' || echo "")
+  fi
+  if [ -z "$METRO_BOUNDS" ] && [ "${METRO_REQUESTED_PORT:-}" != "8082" ]; then
+    METRO_BOUNDS=$($ADB $DEVICE_FLAG exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null \
+      | first_bounds_for_text '^http://10\.0\.2\.2:[0-9]+$' || echo "")
   fi
   # Fallback: after cold boot (no wipe), mDNS may resolve Metro as localhost
   if [ -z "$METRO_BOUNDS" ]; then
     METRO_BOUNDS=$($ADB $DEVICE_FLAG exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null \
-      | grep -oP 'text="http://localhost:[0-9]+"[^/]*bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' \
-      | head -1 | grep -oP 'bounds="\K[^"]+' || echo "")
+      | first_bounds_for_text '^http://localhost:[0-9]+$' || echo "")
   fi
   if [ -n "$METRO_BOUNDS" ]; then
-    X1=$(echo "$METRO_BOUNDS" | grep -oP '\d+' | sed -n '1p')
-    Y1=$(echo "$METRO_BOUNDS" | grep -oP '\d+' | sed -n '2p')
-    X2=$(echo "$METRO_BOUNDS" | grep -oP '\d+' | sed -n '3p')
-    Y2=$(echo "$METRO_BOUNDS" | grep -oP '\d+' | sed -n '4p')
+    X1=$(bounds_coord "$METRO_BOUNDS" 1)
+    Y1=$(bounds_coord "$METRO_BOUNDS" 2)
+    X2=$(bounds_coord "$METRO_BOUNDS" 3)
+    Y2=$(bounds_coord "$METRO_BOUNDS" 4)
     X1=${X1:-0}; Y1=${Y1:-0}; X2=${X2:-0}; Y2=${Y2:-0}
     TAP_X=$(( (X1 + X2) / 2 ))
     TAP_Y=$(( (Y1 + Y2) / 2 ))
+    # Expo dev-client rows can ignore taps on the URL text itself. Tap the
+    # right side of the selected URL row while preserving that row's Y center.
+    # Do not use the generic "Chevron" content-desc: with multiple servers it
+    # can select the chevron from a different row.
+    TAP_X=$(( X2 + 300 ))
     echo "[seed-and-run] Tapping Metro at ($TAP_X, $TAP_Y) ..."
     adb_tap $TAP_X $TAP_Y
   else
@@ -340,13 +426,33 @@ while [ $BUNDLE_ELAPSED -lt $BUNDLE_TIMEOUT ]; do
     # Still on dev-client launcher — bundle not loaded yet
     if echo "$DUMP" | grep -q "DEVELOPMENT"; then
       echo "[seed-and-run] Still on launcher (${BUNDLE_ELAPSED}s) ..."
+      if [ $((BUNDLE_ELAPSED % 9)) -eq 0 ]; then
+        RETRY_METRO_BOUNDS=""
+        if [ -n "${METRO_REQUESTED_PORT:-}" ]; then
+          RETRY_METRO_BOUNDS=$(echo "$DUMP" | first_bounds_for_text "^http://10\.0\.2\.2:${METRO_REQUESTED_PORT}$" || echo "")
+        fi
+        if [ -z "$RETRY_METRO_BOUNDS" ]; then
+          RETRY_METRO_BOUNDS=$(echo "$DUMP" | first_bounds_for_text '^http://10\.0\.2\.2:8082$' || echo "")
+        fi
+        if [ -n "$RETRY_METRO_BOUNDS" ]; then
+          RX1=$(bounds_coord "$RETRY_METRO_BOUNDS" 1)
+          RY1=$(bounds_coord "$RETRY_METRO_BOUNDS" 2)
+          RX2=$(bounds_coord "$RETRY_METRO_BOUNDS" 3)
+          RY2=$(bounds_coord "$RETRY_METRO_BOUNDS" 4)
+          RX1=${RX1:-0}; RY1=${RY1:-0}; RX2=${RX2:-0}; RY2=${RY2:-0}
+          RTX=$(( RX2 + 300 ))
+          RTY=$(( (RY1 + RY2) / 2 ))
+          echo "[seed-and-run] Retapping Metro at ($RTX, $RTY) ..."
+          adb_tap $RTX $RTY
+        fi
+      fi
       continue
     fi
 
     # HARD FAIL: Error screen detected (Metro can't load bundle)
     if echo "$DUMP" | grep -q "problem loading\|Unable to load script\|Could not connect to development server"; then
       echo "[seed-and-run] FATAL: Bundle load error detected!" >&2
-      ERROR_TEXT=$(echo "$DUMP" | grep -oP 'text="\K[^"]+' | head -5 | tr '\n' ' ' || true)
+      ERROR_TEXT=$(echo "$DUMP" | dump_visible_texts 5 || true)
       echo "[seed-and-run] Error: ${ERROR_TEXT}" >&2
       echo "[seed-and-run] Check: Metro running? adb reverse set? Bundle proxy on 8082?" >&2
       exit 1
@@ -354,12 +460,12 @@ while [ $BUNDLE_ELAPSED -lt $BUNDLE_TIMEOUT ]; do
 
     # "Continue" button on dev menu overlay — TAP it (not Back!)
     # Match exact button text to avoid false positives.
-    CONTINUE_BOUNDS=$(echo "$DUMP" | grep -oP 'text="Continue"[^/]*bounds="\K[^"]+' || echo "")
+    CONTINUE_BOUNDS=$(echo "$DUMP" | first_bounds_for_text '^Continue$' || echo "")
     if [ -n "$CONTINUE_BOUNDS" ] && [ $CONTINUE_TAPPED -lt 3 ]; then
-      CX1=$(echo "$CONTINUE_BOUNDS" | grep -oP '\d+' | sed -n '1p')
-      CY1=$(echo "$CONTINUE_BOUNDS" | grep -oP '\d+' | sed -n '2p')
-      CX2=$(echo "$CONTINUE_BOUNDS" | grep -oP '\d+' | sed -n '3p')
-      CY2=$(echo "$CONTINUE_BOUNDS" | grep -oP '\d+' | sed -n '4p')
+      CX1=$(bounds_coord "$CONTINUE_BOUNDS" 1)
+      CY1=$(bounds_coord "$CONTINUE_BOUNDS" 2)
+      CX2=$(bounds_coord "$CONTINUE_BOUNDS" 3)
+      CY2=$(bounds_coord "$CONTINUE_BOUNDS" 4)
       CX1=${CX1:-0}; CY1=${CY1:-0}; CX2=${CX2:-0}; CY2=${CY2:-0}
       CTX=$(( (CX1 + CX2) / 2 ))
       CTY=$(( (CY1 + CY2) / 2 ))
@@ -381,12 +487,12 @@ while [ $BUNDLE_ELAPSED -lt $BUNDLE_TIMEOUT ]; do
         echo "[seed-and-run] FATAL: Dev tools sheet won't dismiss after 3 Close taps." >&2
         exit 1
       fi
-      CLOSE_BOUNDS=$(echo "$DUMP" | grep -oP 'content-desc="Close"[^/]*bounds="\K[^"]+' || echo "")
+      CLOSE_BOUNDS=$(echo "$DUMP" | first_bounds_for_content_desc '^Close$' || echo "")
       if [ -n "$CLOSE_BOUNDS" ]; then
-        CLX1=$(echo "$CLOSE_BOUNDS" | grep -oP '\d+' | sed -n '1p')
-        CLY1=$(echo "$CLOSE_BOUNDS" | grep -oP '\d+' | sed -n '2p')
-        CLX2=$(echo "$CLOSE_BOUNDS" | grep -oP '\d+' | sed -n '3p')
-        CLY2=$(echo "$CLOSE_BOUNDS" | grep -oP '\d+' | sed -n '4p')
+        CLX1=$(bounds_coord "$CLOSE_BOUNDS" 1)
+        CLY1=$(bounds_coord "$CLOSE_BOUNDS" 2)
+        CLX2=$(bounds_coord "$CLOSE_BOUNDS" 3)
+        CLY2=$(bounds_coord "$CLOSE_BOUNDS" 4)
         CLX1=${CLX1:-0}; CLY1=${CLY1:-0}; CLX2=${CLX2:-0}; CLY2=${CLY2:-0}
         if [ "$CLX2" -gt 0 ] && [ "$CLY2" -gt 0 ]; then
           CLTX=$(( (CLX1 + CLX2) / 2 ))
@@ -420,12 +526,12 @@ while [ $BUNDLE_ELAPSED -lt $BUNDLE_TIMEOUT ]; do
         echo "[seed-and-run] FATAL: ANR dialog appeared 5 times. App is stuck." >&2
         exit 1
       fi
-      WAIT_BOUNDS=$(echo "$DUMP" | grep -oP '"Wait"[^>]*bounds="\K[^"]+' || echo "")
+      WAIT_BOUNDS=$(echo "$DUMP" | first_bounds_for_text '^Wait$' || echo "")
       if [ -n "$WAIT_BOUNDS" ]; then
-        WX1=$(echo "$WAIT_BOUNDS" | grep -oP '\d+' | sed -n '1p')
-        WY1=$(echo "$WAIT_BOUNDS" | grep -oP '\d+' | sed -n '2p')
-        WX2=$(echo "$WAIT_BOUNDS" | grep -oP '\d+' | sed -n '3p')
-        WY2=$(echo "$WAIT_BOUNDS" | grep -oP '\d+' | sed -n '4p')
+        WX1=$(bounds_coord "$WAIT_BOUNDS" 1)
+        WY1=$(bounds_coord "$WAIT_BOUNDS" 2)
+        WX2=$(bounds_coord "$WAIT_BOUNDS" 3)
+        WY2=$(bounds_coord "$WAIT_BOUNDS" 4)
         WX1=${WX1:-0}; WY1=${WY1:-0}; WX2=${WX2:-0}; WY2=${WY2:-0}
         WTX=$(( (WX1 + WX2) / 2 ))
         WTY=$(( (WY1 + WY2) / 2 ))
@@ -455,7 +561,7 @@ while [ $BUNDLE_ELAPSED -lt $BUNDLE_TIMEOUT ]; do
     # Unknown state — log what's visible for diagnosis
     # NOTE: || true prevents set -euo pipefail from killing the script when grep
     # returns 1 (no text values in the dump, e.g., during React Native loading).
-    VISIBLE_TEXTS=$(echo "$DUMP" | grep -oP 'text="\K[^"]+' | head -5 | tr '\n' ', ' || true)
+    VISIBLE_TEXTS=$(echo "$DUMP" | dump_visible_texts 5 || true)
     echo "[seed-and-run] Loading (${BUNDLE_ELAPSED}s) visible=[${VISIBLE_TEXTS:-empty}]"
   else
     # UI dump failed — likely overlay blocking uiautomator (OOM)
@@ -467,7 +573,7 @@ if [ $BUNDLE_ELAPSED -ge $BUNDLE_TIMEOUT ]; then
   echo "[seed-and-run] FATAL: Bundle did not load within ${BUNDLE_TIMEOUT}s" >&2
   # Dump final state for diagnosis
   MSYS_NO_PATHCONV=1 $ADB $DEVICE_FLAG shell uiautomator dump /sdcard/ui_dump.xml 2>/dev/null || true
-  FINAL_TEXTS=$($ADB $DEVICE_FLAG exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null | grep -oP 'text="\K[^"]+' | head -10 | tr '\n' ', ' || true)
+  FINAL_TEXTS=$($ADB $DEVICE_FLAG exec-out "cat /sdcard/ui_dump.xml" 2>/dev/null | dump_visible_texts 10 || true)
   echo "[seed-and-run] Final screen: [${FINAL_TEXTS:-empty/no text}]" >&2
   exit 1
 fi
@@ -482,8 +588,14 @@ if [ $NO_SEED -eq 1 ]; then
     -e "METRO_URL=${METRO_URL}"
   )
 
-  echo "[seed-and-run] Running: ${MAESTRO} test ${MAESTRO_ENV_ARGS[*]} ${FLOW_FILE} ${EXTRA_ARGS[*]:-}"
-  exec "${MAESTRO}" test "${MAESTRO_ENV_ARGS[@]}" "${EXTRA_ARGS[@]:+${EXTRA_ARGS[@]}}" "${FLOW_FILE}"
+  CMD=("${MAESTRO}" test "${MAESTRO_ENV_ARGS[@]}")
+  if [ ${#EXTRA_ARGS[@]} -gt 0 ]; then
+    CMD+=("${EXTRA_ARGS[@]}")
+  fi
+  CMD+=("${FLOW_FILE}")
+  echo "[seed-and-run] Running: ${CMD[*]}"
+  reset_maestro_driver
+  exec "${CMD[@]}"
 fi
 
 # ── Step 1: Seed via API ──
@@ -542,6 +654,12 @@ if [ -n "$SEED_IDS" ]; then
   done
 fi
 
-echo "[seed-and-run] Running: ${MAESTRO} test ${MAESTRO_ENV_ARGS[*]} ${FLOW_FILE} ${EXTRA_ARGS[*]:-}"
+CMD=("${MAESTRO}" test "${MAESTRO_ENV_ARGS[@]}")
+if [ ${#EXTRA_ARGS[@]} -gt 0 ]; then
+  CMD+=("${EXTRA_ARGS[@]}")
+fi
+CMD+=("${FLOW_FILE}")
+echo "[seed-and-run] Running: ${CMD[*]}"
 
-exec "${MAESTRO}" test "${MAESTRO_ENV_ARGS[@]}" "${EXTRA_ARGS[@]:+${EXTRA_ARGS[@]}}" "${FLOW_FILE}"
+reset_maestro_driver
+exec "${CMD[@]}"

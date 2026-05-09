@@ -3,7 +3,6 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { DashboardData, Profile } from '@eduagent/schemas';
-import { ProfileSwitcher } from '../common';
 import { WithdrawalCountdownBanner } from '../family/WithdrawalCountdownBanner';
 import { useDashboard } from '../../hooks/use-dashboard';
 import { FAMILY_HOME_PATH } from '../../lib/navigation';
@@ -12,14 +11,14 @@ import { IntentCard } from './IntentCard';
 
 function getChildHighlight(
   dashboard: DashboardData | undefined,
-  t: (key: string, options?: Record<string, string>) => string
+  t: (key: string, options?: Record<string, string>) => string,
 ): string {
   if (!dashboard || dashboard.children.length === 0) {
     return t('home.parentGateway.seeHowTheyAreDoing');
   }
 
   const child = [...dashboard.children].sort(
-    (a, b) => b.totalTimeThisWeek - a.totalTimeThisWeek
+    (a, b) => b.totalTimeThisWeek - a.totalTimeThisWeek,
   )[0];
 
   if (!child) {
@@ -42,11 +41,7 @@ function getChildHighlight(
 }
 
 export interface ParentGatewayProps {
-  profiles: Profile[];
   activeProfile: Profile | null;
-  switchProfile: (
-    profileId: string
-  ) => Promise<{ success: boolean; error?: string }>;
   /** Called when the parent taps "Learn something" — host should show the learner view. */
   onLearn?: () => void;
   /** Injectable clock for deterministic testing of time-based greeting. */
@@ -54,9 +49,7 @@ export interface ParentGatewayProps {
 }
 
 export function ParentGateway({
-  profiles,
   activeProfile,
-  switchProfile,
   onLearn,
   now,
 }: ParentGatewayProps): React.ReactElement {
@@ -66,29 +59,19 @@ export function ParentGateway({
   const { data: dashboard, isError, refetch } = useDashboard();
   const { title, subtitle } = getGreeting(
     activeProfile?.displayName ?? '',
-    now
+    now,
   );
 
   return (
     <View className="flex-1 bg-background" testID="parent-gateway">
-      {/* Keep the switcher outside the ScrollView so the web dropdown isn't clipped. */}
       <View
-        className="flex-row items-center justify-between px-5"
+        className="px-5"
         style={{
           paddingTop: insets.top + 16,
-          zIndex: 10,
-          elevation: 10,
         }}
       >
-        <View className="flex-1 me-3">
-          <Text className="text-h2 font-bold text-text-primary">{title}</Text>
-          <Text className="text-body text-text-secondary mt-1">{subtitle}</Text>
-        </View>
-        <ProfileSwitcher
-          profiles={profiles}
-          activeProfileId={activeProfile?.id}
-          onSwitch={switchProfile}
-        />
+        <Text className="text-h2 font-bold text-text-primary">{title}</Text>
+        <Text className="text-body text-text-secondary mt-1">{subtitle}</Text>
       </View>
 
       <ScrollView

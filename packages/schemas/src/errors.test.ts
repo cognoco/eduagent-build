@@ -15,6 +15,7 @@ import {
   ForbiddenError,
   NotFoundError,
   RateLimitedError,
+  SafetyFilterError,
   UpstreamLlmError,
   VocabularyContextError,
   LlmStreamError,
@@ -67,6 +68,13 @@ describe('typed error classes [BUG-644]', () => {
     expect(err.name).toBe('UpstreamLlmError');
   });
 
+  it('SafetyFilterError preserves type and code for provider safety blocks', () => {
+    const err = new SafetyFilterError('blocked by safety filters');
+    expect(err).toBeInstanceOf(SafetyFilterError);
+    expect(err.name).toBe('SafetyFilterError');
+    expect(err.errorCode).toBe('SAFETY_FILTER');
+  });
+
   it('VocabularyContextError accepts a cause via ErrorOptions', () => {
     const cause = new Error('underlying');
     const err = new VocabularyContextError('bad subjectId', { cause });
@@ -113,7 +121,7 @@ describe('typed error classes [BUG-644]', () => {
       'classifyOrphanError(%s) returns %s (no regex)',
       (err, expected) => {
         expect(classifyOrphanError(err)).toBe(expected);
-      }
+      },
     );
   });
 
@@ -125,10 +133,10 @@ describe('typed error classes [BUG-644]', () => {
   // round-trip throw/catch over a Promise still satisfies instanceof.
   it('instanceof survives a Promise.reject / catch round-trip', async () => {
     await expect(
-      Promise.reject(new ForbiddenError('nope'))
+      Promise.reject(new ForbiddenError('nope')),
     ).rejects.toBeInstanceOf(ForbiddenError);
     await expect(
-      Promise.reject(new NotFoundError('Foo'))
+      Promise.reject(new NotFoundError('Foo')),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 });

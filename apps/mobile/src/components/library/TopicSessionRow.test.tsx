@@ -5,6 +5,8 @@ jest.mock('../../lib/theme', () => ({
   useThemeColors: () => ({
     textPrimary: '#1a1a1a',
     textSecondary: '#525252',
+    border: '#e8e0d4',
+    surface: '#f8f5ef',
   }),
 }));
 
@@ -23,7 +25,7 @@ describe('TopicSessionRow', () => {
         durationSeconds={300}
         sessionType="Review"
         onPress={onPress}
-      />
+      />,
     );
     expect(screen.getByTestId('session-row-abc-123')).toBeTruthy();
   });
@@ -36,7 +38,7 @@ describe('TopicSessionRow', () => {
         durationSeconds={120}
         sessionType="Quiz"
         onPress={onPress}
-      />
+      />,
     );
     screen.getByText('Apr 30');
   });
@@ -49,7 +51,7 @@ describe('TopicSessionRow', () => {
         durationSeconds={120}
         sessionType="Quiz"
         onPress={onPress}
-      />
+      />,
     );
     screen.getByText('Quiz');
   });
@@ -62,7 +64,7 @@ describe('TopicSessionRow', () => {
         durationSeconds={300}
         sessionType="Review"
         onPress={onPress}
-      />
+      />,
     );
     screen.getByText('5 min');
   });
@@ -75,7 +77,7 @@ describe('TopicSessionRow', () => {
         durationSeconds={45}
         sessionType="Review"
         onPress={onPress}
-      />
+      />,
     );
     screen.getByText('<1 min');
   });
@@ -88,7 +90,7 @@ describe('TopicSessionRow', () => {
         durationSeconds={null}
         sessionType="Review"
         onPress={onPress}
-      />
+      />,
     );
     screen.getByText('—');
   });
@@ -101,7 +103,7 @@ describe('TopicSessionRow', () => {
         durationSeconds={300}
         sessionType="Review"
         onPress={onPress}
-      />
+      />,
     );
     fireEvent.press(screen.getByTestId('session-row-abc-123'));
     expect(onPress).toHaveBeenCalledTimes(1);
@@ -116,7 +118,7 @@ describe('TopicSessionRow', () => {
         durationSeconds={60}
         sessionType="Review"
         onPress={onPress}
-      />
+      />,
     );
     const row = screen.getByTestId('session-row-s1');
     expect(row.props.accessibilityRole).toBe('button');
@@ -130,7 +132,7 @@ describe('TopicSessionRow', () => {
         durationSeconds={60}
         sessionType="Study"
         onPress={onPress}
-      />
+      />,
     );
     screen.getByText('1 min');
   });

@@ -69,9 +69,39 @@ function formatLastStudiedText(
   })}`;
 }
 
+function getMostRecentSessionCreatedAt(
+  sessions: { createdAt: string }[] | undefined,
+): string | null {
+  if (!sessions || sessions.length === 0) return null;
+
+  return sessions.reduce<string | null>((latest, session) => {
+    if (!latest) return session.createdAt;
+    return new Date(session.createdAt).getTime() > new Date(latest).getTime()
+      ? session.createdAt
+      : latest;
+  }, null);
+}
+
 function formatSessionDate(createdAt: string): string {
   const date = new Date(createdAt);
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function formatSessionsSummary(
+  sessions: { durationSeconds: number | null }[] | undefined,
+): string | null {
+  if (!sessions || sessions.length === 0) return null;
+
+  const totalSeconds = sessions.reduce(
+    (total, session) => total + (session.durationSeconds ?? 0),
+    0,
+  );
+  const totalMinutes =
+    totalSeconds > 0 && totalSeconds < 60
+      ? '<1'
+      : String(Math.floor(totalSeconds / 60));
+  const sessionLabel = sessions.length === 1 ? 'session' : 'sessions';
+  return `${sessions.length} ${sessionLabel} · ${totalMinutes} min total`;
 }
 
 // ---------------------------------------------------------------------------
@@ -182,7 +212,12 @@ export default function TopicDetailScreen() {
   const retentionStatus = deriveRetentionStatus(retentionCard);
   const topicName = topicProgress?.title ?? '';
 
-  const lastStudiedText = formatLastStudiedText(retentionCard?.lastReviewedAt);
+  const lastStudiedText = formatLastStudiedText(
+    retentionCard?.lastReviewedAt ??
+      getMostRecentSessionCreatedAt(topicSessions) ??
+      null,
+  );
+  const sessionsSummary = formatSessionsSummary(topicSessions);
 
   const studyCTA = useMemo(
     () => deriveStudyCTA(topicProgress?.completionStatus, retentionStatus),
@@ -560,9 +595,16 @@ export default function TopicDetailScreen() {
 
             {/* SESSIONS section */}
             <View className="mt-4 mb-2">
-              <Text className="text-body-sm font-semibold text-text-secondary tracking-wide px-5 mb-1">
-                Sessions
-              </Text>
+              <View className="px-5 mb-2">
+                <Text className="text-body-sm font-semibold text-text-secondary tracking-wide">
+                  Sessions
+                </Text>
+                {sessionsSummary ? (
+                  <Text className="text-caption text-text-tertiary mt-1">
+                    {sessionsSummary}
+                  </Text>
+                ) : null}
+              </View>
 
               {sessionsLoading ? (
                 <ShimmerSkeleton testID="sessions-loading">

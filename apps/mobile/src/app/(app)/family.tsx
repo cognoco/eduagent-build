@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import {
   View,
   Text,
@@ -5,19 +6,31 @@ import {
   ScrollView,
   RefreshControl,
   ActivityIndicator,
+  Switch,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { isAdultOwner } from '@eduagent/schemas';
 import type { Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { goBackOrReplace } from '../../lib/navigation';
-import { platformAlert } from '../../lib/platform-alert';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ParentDashboardSummary } from '../../components/coaching';
+import { ProfileSwitcher } from '../../components/common';
 import { ParentOnly } from '../../components/_internal/ParentOnly';
 import { FamilyOrientationCue } from '../../components/family/FamilyOrientationCue';
 import { WithdrawalCountdownBanner } from '../../components/family/WithdrawalCountdownBanner';
 import type { RetentionStatus } from '../../components/progress';
 import { useDashboard } from '../../hooks/use-dashboard';
+import {
+  useFamilyPoolBreakdownSharing,
+  useUpdateFamilyPoolBreakdownSharing,
+} from '../../hooks/use-settings';
+import {
+  useFamilySubscription,
+  useSubscription,
+} from '../../hooks/use-subscription';
+import { goBackOrReplace } from '../../lib/navigation';
+import { platformAlert } from '../../lib/platform-alert';
+import { useProfile } from '../../lib/profile';
 
 function CardSkeleton(): React.ReactNode {
   return (
@@ -52,6 +65,40 @@ function DemoBanner(): React.ReactNode {
       <Text className="text-caption text-text-secondary mt-1">
         {t('dashboard.demoPreviewMessage')}
       </Text>
+    </View>
+  );
+}
+
+function FamilySharingToggle({
+  value,
+  onToggle,
+  disabled,
+}: {
+  value: boolean;
+  onToggle: (value: boolean) => void;
+  disabled?: boolean;
+}): React.ReactNode {
+  const { t } = useTranslation();
+  return (
+    <View
+      className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3 mb-2"
+      testID="family-breakdown-sharing-toggle"
+    >
+      <View className="flex-1 pr-3">
+        <Text className="text-body text-text-primary">
+          {t('more.family.breakdownSharingTitle')}
+        </Text>
+        <Text className="text-body-sm text-text-secondary mt-1">
+          {t('more.family.breakdownSharingDescription')}
+        </Text>
+      </View>
+      <Switch
+        value={value}
+        onValueChange={onToggle}
+        disabled={disabled}
+        accessibilityLabel={t('more.family.breakdownSharingTitle')}
+        testID="family-breakdown-sharing-toggle-switch"
+      />
     </View>
   );
 }
@@ -137,6 +184,7 @@ function FamilyContent(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { profiles, activeProfile, switchProfile } = useProfile();
   const { returnTo: rawReturnTo } = useLocalSearchParams<{
     returnTo?: string;
   }>();
@@ -153,8 +201,21 @@ function FamilyContent(): React.ReactElement {
     refetch,
     isRefetching,
   } = useDashboard();
+  const { data: subscription } = useSubscription();
+  const { data: familyData } = useFamilySubscription(
+    subscription?.tier === 'family' || subscription?.tier === 'pro',
+  );
+  const {
+    data: familyPoolBreakdownSharing,
+    isLoading: breakdownSharingLoading,
+  } = useFamilyPoolBreakdownSharing();
+  const updateFamilyPoolBreakdownSharing =
+    useUpdateFamilyPoolBreakdownSharing();
 
   const isDemo = dashboard?.demoMode === true;
+  const hasChildren = (dashboard?.children?.length ?? 0) > 0;
+  const showFamilyManagement = !isDemo && hasChildren;
+  const showAddChild = isAdultOwner(activeProfile);
 
   const handleDrillDown = (profileId: string): void => {
     if (isDemo) {
@@ -171,12 +232,56 @@ function FamilyContent(): React.ReactElement {
     } as never);
   };
 
+  const handleAddChild = useCallback(() => {
+    if (!subscription) {
+      return;
+    }
+
+    const tier = subscription.tier;
+    if (tier !== 'family' && tier !== 'pro') {
+      platformAlert(
+        t('more.family.upgradeRequiredTitle'),
+        t('more.family.upgradeRequiredMessage'),
+        [
+          {
+            text: t('more.family.viewPlans'),
+            onPress: () => router.push('/(app)/subscription' as never),
+          },
+          { text: t('common.cancel'), style: 'cancel' },
+        ],
+      );
+      return;
+    }
+
+    if (familyData && familyData.profileCount >= familyData.maxProfiles) {
+      platformAlert(
+        t('more.family.profileLimitTitle'),
+        t('more.family.profileLimitMessage', {
+          plan: tier === 'pro' ? 'Pro' : 'Family',
+          max: familyData.maxProfiles,
+        }),
+        tier === 'family'
+          ? [
+              {
+                text: t('more.family.viewPlans'),
+                onPress: () => router.push('/(app)/subscription' as never),
+              },
+              { text: t('common.cancel'), style: 'cancel' },
+            ]
+          : [{ text: t('common.ok') }],
+      );
+      return;
+    }
+
+    router.push('/create-profile?for=child' as never);
+  }, [familyData, router, subscription, t]);
+
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       {/* [BUG-999] zIndex:20 ensures this header wins over the ParentGateway
           header (zIndex:10) that sits in the home-tab stack on web. Without it,
           the Home header intercepts pointer events after a deep-drilldown back. */}
-      <View className="px-5 pt-4 pb-2" style={{ zIndex: 20 }}>
+      <View className="px-5 pt-4 pb-2" style={{ zIndex: 20, elevation: 20 }}>
         <Pressable
           onPress={() => goBackOrReplace(router, backFallback)}
           className="mb-2 self-start"
@@ -187,12 +292,21 @@ function FamilyContent(): React.ReactElement {
         >
           <Text className="text-body text-accent">← {t('common.back')}</Text>
         </Pressable>
-        <Text className="text-h1 font-bold text-text-primary">
-          {t('family.title')}
-        </Text>
-        <Text className="text-body-sm text-text-secondary mt-1">
-          {isDemo ? t('dashboard.demoDashboardHint') : t('family.subtitle')}
-        </Text>
+        <View className="flex-row items-start justify-between">
+          <View className="flex-1 me-3">
+            <Text className="text-h1 font-bold text-text-primary">
+              {t('family.title')}
+            </Text>
+            <Text className="text-body-sm text-text-secondary mt-1">
+              {isDemo ? t('dashboard.demoDashboardHint') : t('family.subtitle')}
+            </Text>
+          </View>
+          <ProfileSwitcher
+            profiles={profiles}
+            activeProfileId={activeProfile?.id}
+            onSwitch={switchProfile}
+          />
+        </View>
       </View>
       <ScrollView
         className="flex-1 px-5"
@@ -269,6 +383,46 @@ function FamilyContent(): React.ReactElement {
           <>
             {isDemo && <DemoBanner />}
             {renderChildCards(dashboard.children, handleDrillDown)}
+            {showFamilyManagement ? (
+              <>
+                <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6">
+                  {t('more.family.sectionHeader')}
+                </Text>
+                <FamilySharingToggle
+                  value={familyPoolBreakdownSharing ?? false}
+                  onToggle={(value) => {
+                    updateFamilyPoolBreakdownSharing.mutate(value, {
+                      onError: () => {
+                        platformAlert(
+                          t('more.errors.couldNotSaveSetting'),
+                          t('more.family.breakdownSharingError'),
+                        );
+                      },
+                    });
+                  }}
+                  disabled={
+                    breakdownSharingLoading ||
+                    updateFamilyPoolBreakdownSharing.isPending
+                  }
+                />
+                {showAddChild ? (
+                  <Pressable
+                    onPress={handleAddChild}
+                    className="bg-surface rounded-card px-4 py-3.5 mb-2"
+                    accessibilityLabel={t('more.family.addChildAccessLabel')}
+                    accessibilityRole="button"
+                    testID="family-add-child-link"
+                  >
+                    <Text className="text-body font-semibold text-text-primary">
+                      {t('more.family.addChild')}
+                    </Text>
+                    <Text className="text-body-sm text-text-secondary mt-1">
+                      {t('more.family.addChildDescription')}
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </>
+            ) : null}
             {isDemo && (
               <Pressable
                 onPress={() => router.push('/(app)/more' as never)}

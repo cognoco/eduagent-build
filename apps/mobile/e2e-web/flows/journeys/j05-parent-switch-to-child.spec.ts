@@ -8,10 +8,10 @@ test('J-05 parent switches to child profile → child learner home', async ({
   const seed = await readSeedData('owner-with-children');
   const childProfileId = seed.ids.child1ProfileId;
 
-  await page.goto('/home', { waitUntil: 'commit' });
+  await page.goto('/family', { waitUntil: 'commit' });
 
-  // Start on parent gateway
-  await expect(page.getByTestId('parent-gateway')).toBeVisible({
+  // Start on Family, where the profile switcher lives.
+  await expect(page.getByTestId('dashboard-scroll')).toBeVisible({
     timeout: 60_000,
   });
 
@@ -22,6 +22,5 @@ test('J-05 parent switches to child profile → child learner home', async ({
 
   // Wait for menu to close and child's learner screen (or post-approval first)
   await waitForScreenDismissingPostApproval(page, 'learner-screen');
-  await expect(page.getByTestId('parent-gateway')).toHaveCount(0);
   await expect(page.getByTestId('home-action-study-new')).toBeVisible();
 });

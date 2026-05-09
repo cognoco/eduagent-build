@@ -8,18 +8,18 @@ type JsonTree = ReturnType<ReturnType<typeof render>['toJSON']>;
 
 function hasNodeWithProps(
   node: JsonTree,
-  expected: Record<string, unknown>
+  expected: Record<string, unknown>,
 ): boolean {
   if (!node || typeof node !== 'object') return false;
   if ('props' in node) {
     const matches = Object.entries(expected).every(
-      ([key, value]) => node.props?.[key] === value
+      ([key, value]) => node.props?.[key] === value,
     );
     if (matches) return true;
   }
   if ('children' in node && Array.isArray(node.children)) {
     return node.children.some((child: unknown) =>
-      hasNodeWithProps(child as JsonTree, expected)
+      hasNodeWithProps(child as JsonTree, expected),
     );
   }
   return false;
@@ -40,7 +40,7 @@ describe('MagicPenAnimation', () => {
 
   it('accepts size prop at 48px', () => {
     const { getByTestId } = render(
-      <MagicPenAnimation testID="pen" size={48} />
+      <MagicPenAnimation testID="pen" size={48} />,
     );
     const el = getByTestId('pen');
     expect(el.props.style).toMatchObject({ width: 48, height: 48 });
@@ -48,7 +48,7 @@ describe('MagicPenAnimation', () => {
 
   it('accepts size prop at 100px', () => {
     const { getByTestId } = render(
-      <MagicPenAnimation testID="pen" size={100} />
+      <MagicPenAnimation testID="pen" size={100} />,
     );
     const el = getByTestId('pen');
     expect(el.props.style).toMatchObject({ width: 100, height: 100 });
@@ -60,15 +60,19 @@ describe('MagicPenAnimation', () => {
     }).not.toThrow();
   });
 
-  it('renders the pen with distinct cap, clip, and metal nib colors', () => {
+  it('renders the fountain pen with cap, steel nib, and yellow tip ink bead', () => {
     const { toJSON } = render(
-      <MagicPenAnimation testID="pen" color="#2dd4bf" />
+      <MagicPenAnimation testID="pen" color="#2dd4bf" />,
     );
     const tree = toJSON();
-    expect(hasNodeWithProps(tree, { fill: '#0f766e' })).toBe(true);
-    expect(hasNodeWithProps(tree, { stroke: '#ccfbf1' })).toBe(true);
-    expect(hasNodeWithProps(tree, { fill: '#f8fafc' })).toBe(true);
-    expect(hasNodeWithProps(tree, { fill: '#dbeafe' })).toBe(true);
+    // Dark cap finial / grip / thread ring
+    expect(hasNodeWithProps(tree, { fill: '#1a1a1a' })).toBe(true);
+    // Silver steel nib
+    expect(hasNodeWithProps(tree, { fill: '#cfd4dc' })).toBe(true);
+    // Polished steel grip ring
+    expect(hasNodeWithProps(tree, { fill: '#9aa3ad' })).toBe(true);
+    // Yellow ink bead at writing tip
+    expect(hasNodeWithProps(tree, { fill: '#fbbf24' })).toBe(true);
   });
 
   it('uses default props when none provided', () => {
@@ -99,7 +103,7 @@ describe('MagicPenAnimation', () => {
 
     try {
       const { getByTestId } = render(
-        <MagicPenAnimation testID="pen" size={80} color="#8b5cf6" />
+        <MagicPenAnimation testID="pen" size={80} color="#8b5cf6" />,
       );
       const el = getByTestId('pen');
       expect(el.props.style).toMatchObject({ width: 80, height: 80 });

@@ -1,4 +1,4 @@
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import {
   sessionEvents,
   learningSessions,
@@ -17,25 +17,25 @@ export async function persistUserMessageOnly(
   profileId: string,
   sessionId: string,
   message: string,
-  options: Options
+  options: Options,
 ): Promise<void> {
   if (!options.clientId || options.clientId.length === 0) {
     throw new BadRequestError(
       'persistUserMessageOnly: Idempotency-Key required for orphan persistence ' +
-        '(missing clientId would defeat Layer 1 retry dedup)'
+        '(missing clientId would defeat Layer 1 retry dedup)',
     );
   }
 
   const owningSession = await db.query.learningSessions.findFirst({
     where: and(
       eq(learningSessions.id, sessionId),
-      eq(learningSessions.profileId, profileId)
+      eq(learningSessions.profileId, profileId),
     ),
     columns: { id: true, profileId: true, subjectId: true },
   });
   if (!owningSession || owningSession.profileId !== profileId) {
     throw new ForbiddenError(
-      'persistUserMessageOnly: session does not belong to profile'
+      'persistUserMessageOnly: session does not belong to profile',
     );
   }
 
@@ -52,5 +52,6 @@ export async function persistUserMessageOnly(
     })
     .onConflictDoNothing({
       target: [sessionEvents.sessionId, sessionEvents.clientId],
+      where: sql`${sessionEvents.clientId} IS NOT NULL`,
     });
 }

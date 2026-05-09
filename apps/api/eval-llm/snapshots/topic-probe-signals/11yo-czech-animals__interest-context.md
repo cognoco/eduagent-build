@@ -85,18 +85,3 @@ USER: Use horses if it fits.
 ## Builder notes
 
 - Dimension: interest-context
-
-## Live LLM response
-
-```
-```json
-{
-  "goals": ["learn Czech reading comprehension"],
-  "experienceLevel": "beginner",
-  "currentKnowledge": "",
-  "interests": ["horses"],
-  "interestContext": { "horses": "free_time" },
-  "analogyFraming": "concrete"
-}
-```
-```

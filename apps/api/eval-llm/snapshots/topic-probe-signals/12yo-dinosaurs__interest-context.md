@@ -85,18 +85,3 @@ USER: Use dinosaurs if it fits.
 ## Builder notes
 
 - Dimension: interest-context
-
-## Live LLM response
-
-```
-```json
-{
-  "goals": ["learn Mesozoic era", "learn about dinosaurs"],
-  "experienceLevel": "beginner",
-  "currentKnowledge": "",
-  "interests": ["dinosaurs"],
-  "interestContext": { "dinosaurs": "both" },
-  "analogyFraming": "concrete"
-}
-```
-```

@@ -30,34 +30,53 @@ export function TopicSessionRow({
       onPress={() => onPress(sessionId)}
       accessibilityRole="button"
       accessibilityLabel={`${sessionType}, ${date}, ${formatDuration(
-        durationSeconds
+        durationSeconds,
       )}`}
       style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 20,
+        justifyContent: 'space-between',
+        minHeight: 52,
+        marginHorizontal: 20,
+        marginBottom: 8,
+        paddingHorizontal: 12,
         paddingVertical: 12,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.surface,
         opacity: pressed ? 0.7 : 1,
       })}
     >
-      <View style={{ width: 80 }}>
+      <View style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
         <Text
-          style={{ fontSize: 13, color: colors.textSecondary }}
+          style={{
+            fontSize: 14,
+            fontWeight: '600',
+            color: colors.textPrimary,
+          }}
           numberOfLines={1}
         >
           {date}
         </Text>
       </View>
 
-      <View style={{ width: 60 }}>
-        <Text style={{ fontSize: 13, color: colors.textSecondary }}>
+      <View style={{ width: 64, alignItems: 'flex-end' }}>
+        <Text
+          style={{ fontSize: 13, color: colors.textSecondary }}
+          numberOfLines={1}
+        >
           {formatDuration(durationSeconds)}
         </Text>
       </View>
 
-      <View style={{ flex: 1 }}>
+      <View style={{ width: 88, alignItems: 'flex-end', paddingLeft: 8 }}>
         <Text
-          style={{ fontSize: 13, color: colors.textPrimary }}
+          style={{
+            fontSize: 13,
+            color: colors.textSecondary,
+            textTransform: 'capitalize',
+          }}
           numberOfLines={1}
         >
           {sessionType}

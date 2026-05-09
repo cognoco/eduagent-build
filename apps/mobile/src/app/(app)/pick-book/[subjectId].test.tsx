@@ -1,4 +1,4 @@
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -12,7 +12,10 @@ import PickBookScreen from './[subjectId]';
 let mockFetch: RoutedMockFetch;
 
 jest.mock('../../../lib/api-client', () => {
-  const { createRoutedMockFetch, mockApiClientFactory } = require('../../../test-utils/mock-api-routes');
+  const {
+    createRoutedMockFetch,
+    mockApiClientFactory,
+  } = require('../../../test-utils/mock-api-routes');
   mockFetch = createRoutedMockFetch();
   return mockApiClientFactory(mockFetch);
 });
@@ -68,7 +71,12 @@ jest.mock('expo-router', () => ({
 // ---------------------------------------------------------------------------
 
 const DEFAULT_SUGGESTIONS = [
-  { id: 'sug-1', title: 'Europe', emoji: null, description: 'European geography' },
+  {
+    id: 'sug-1',
+    title: 'Europe',
+    emoji: null,
+    description: 'European geography',
+  },
   { id: 'sug-2', title: 'Asia', emoji: null, description: 'Asian geography' },
 ];
 
@@ -169,7 +177,7 @@ describe('PickBookScreen', () => {
         expect.objectContaining({
           pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
           params: { subjectId: 'shelf-1', bookId: 'book-1' },
-        })
+        }),
       );
     });
   });
@@ -180,9 +188,14 @@ describe('PickBookScreen', () => {
   it('seeds the shelf ancestor before pushing the book leaf on suggestion success', async () => {
     const { getByText } = render(<PickBookScreen />, { wrapper: TestWrapper });
 
-    await waitFor(() => {
-      getByText('Europe');
-    });
+    // 3000ms allows for the 800ms useStickyLoading hold plus React re-render
+    // overhead that accumulates after prior tests in this file.
+    await waitFor(
+      () => {
+        getByText('Europe');
+      },
+      { timeout: 3000 },
+    );
     fireEvent.press(getByText('Europe'));
 
     await waitFor(() => {
@@ -220,7 +233,7 @@ describe('PickBookScreen', () => {
     fireEvent.press(getByText('Something else...'));
     fireEvent.changeText(
       getByTestId('pick-book-custom-input'),
-      'My custom book'
+      'My custom book',
     );
     fireEvent.press(getByTestId('pick-book-custom-submit'));
 
@@ -241,8 +254,10 @@ describe('PickBookScreen', () => {
     const alertSpy = jest.spyOn(Alert, 'alert');
     mockFetch.setRoute('/filing', () =>
       Promise.resolve(
-        new Response(JSON.stringify({ message: 'Network error' }), { status: 500 })
-      )
+        new Response(JSON.stringify({ message: 'Network error' }), {
+          status: 500,
+        }),
+      ),
     );
 
     const { getByText } = render(<PickBookScreen />, { wrapper: TestWrapper });
@@ -257,7 +272,7 @@ describe('PickBookScreen', () => {
         'Something went wrong',
         expect.stringContaining("Couldn't set up that book"),
         expect.any(Array),
-        undefined
+        undefined,
       );
     });
 
@@ -283,22 +298,24 @@ describe('PickBookScreen', () => {
     });
     mockFetch.setRoute('/book-suggestions', () => suggestionsPromise);
 
-    const { getByTestId } = render(<PickBookScreen />, { wrapper: TestWrapper });
+    const { getByTestId } = render(<PickBookScreen />, {
+      wrapper: TestWrapper,
+    });
     getByTestId('pick-book-loading');
 
     resolveResponse(
       new Response(JSON.stringify(DEFAULT_SUGGESTIONS), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
-      })
+      }),
     );
   });
 
   it('shows error message and retry button on fetch error', async () => {
     mockFetch.setRoute('/book-suggestions', () =>
       Promise.resolve(
-        new Response(JSON.stringify({ message: 'Failed' }), { status: 500 })
-      )
+        new Response(JSON.stringify({ message: 'Failed' }), { status: 500 }),
+      ),
     );
 
     const { getByTestId, getByText } = render(<PickBookScreen />, {
@@ -316,7 +333,9 @@ describe('PickBookScreen', () => {
   it('auto-opens custom input when suggestions are empty', async () => {
     mockFetch.setRoute('/book-suggestions', []);
 
-    const { getByTestId } = render(<PickBookScreen />, { wrapper: TestWrapper });
+    const { getByTestId } = render(<PickBookScreen />, {
+      wrapper: TestWrapper,
+    });
 
     await waitFor(() => {
       // BUG-318: When suggestions load empty, custom input auto-opens
@@ -325,7 +344,9 @@ describe('PickBookScreen', () => {
   });
 
   it('back button replaces shelf without relying on back history', async () => {
-    const { getByTestId } = render(<PickBookScreen />, { wrapper: TestWrapper });
+    const { getByTestId } = render(<PickBookScreen />, {
+      wrapper: TestWrapper,
+    });
 
     await waitFor(() => {
       getByTestId('pick-book-back');
@@ -367,7 +388,9 @@ describe('PickBookScreen', () => {
         isNew: { shelf: false, book: true, chapter: true },
       });
 
-      const { getByText } = render(<PickBookScreen />, { wrapper: TestWrapper });
+      const { getByText } = render(<PickBookScreen />, {
+        wrapper: TestWrapper,
+      });
 
       await waitFor(() => {
         getByText('Europe');
@@ -378,7 +401,7 @@ describe('PickBookScreen', () => {
         expect(mockPush).toHaveBeenCalledWith(
           expect.objectContaining({
             pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
-          })
+          }),
         );
       });
     });
@@ -425,27 +448,37 @@ describe('PickBookScreen', () => {
         params: { subjectId: 'sub-1' },
       });
 
-      // Now the slow filing call resolves AFTER the user already escaped.
-      resolveFiling(
-        new Response(
-          JSON.stringify({
-            shelfId: 'sub-1',
-            bookId: 'book-late',
-            shelfName: 'Geography',
-            bookName: 'Europe',
-            chapter: 'Western Europe',
-            topicId: 'topic-late',
-            topicTitle: 'France',
-            isNew: { shelf: false, book: true, chapter: true },
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
-      );
-
-      // Flush microtasks so the await continuation runs.
+      // Switch to real timers before resolving the mutation so act() can drain
+      // microtasks properly (fake timers intercept queueMicrotask).
       jest.useRealTimers();
-      await filingPromise;
-      await Promise.resolve();
+
+      // Wrap the resolve in act() so the full TanStack Query chain runs:
+      // fetch resolve → assertOk → res.json → mutateAsync → continuation.
+      // Without act(), the async continuations never execute in the test and the
+      // assertion trivially passes even when the filingSkipped guard is absent.
+      await act(async () => {
+        resolveFiling(
+          new Response(
+            JSON.stringify({
+              shelfId: 'sub-1',
+              bookId: 'book-late',
+              shelfName: 'Geography',
+              bookName: 'Europe',
+              chapter: 'Western Europe',
+              topicId: 'topic-late',
+              topicTitle: 'France',
+              isNew: { shelf: false, book: true, chapter: true },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        );
+        // Drain the full Promise chain: fetch resolve → assertOk → res.json →
+        // mutateAsync → handlePickSuggestion continuation.
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
 
       // The stale navigation must NOT fire.
       expect(mockPush).not.toHaveBeenCalled();

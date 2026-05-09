@@ -9,6 +9,7 @@ import {
   type MessagePart,
 } from '../types';
 import { normalizeStopReason, type StopReason } from '../stop-reason';
+import { SafetyFilterError } from '../../../errors';
 
 // ---------------------------------------------------------------------------
 // Gemini Provider — ARCH-8, ARCH-9
@@ -28,7 +29,7 @@ function readWithTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
     timer = setTimeout(
       () =>
         reject(new Error('Gemini stream stalled: no data received for 10s')),
-      ms
+      ms,
     );
   });
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
@@ -103,7 +104,7 @@ export function toGeminiParts(content: string | MessagePart[]): GeminiPart[] {
 
 function toGeminiRequest(
   messages: ChatMessage[],
-  config: ModelConfig
+  config: ModelConfig,
 ): GeminiRequest {
   // Gemini only supports systemInstruction as a top-level field, not inline
   // with chat turns. Use the first contiguous block of system messages as the
@@ -163,15 +164,15 @@ function extractFinishReason(data: GeminiResponse): string | undefined {
 function extractResponseText(data: GeminiResponse): string {
   // Prompt-level safety block — the entire input was rejected
   if (data.promptFeedback?.blockReason === 'SAFETY') {
-    throw new Error(
-      'Your message could not be processed due to content safety filters. Please rephrase and try again.'
+    throw new SafetyFilterError(
+      'Your message could not be processed due to content safety filters. Please rephrase and try again.',
     );
   }
 
   // Candidate-level safety block — the generated output was rejected
   if (data.candidates?.[0]?.finishReason === 'SAFETY') {
-    throw new Error(
-      'The response was blocked by content safety filters. Please try rephrasing your question.'
+    throw new SafetyFilterError(
+      'The response was blocked by content safety filters. Please try rephrasing your question.',
     );
   }
 
@@ -195,7 +196,7 @@ export function createGeminiProvider(apiKey: string): LLMProvider {
 
     async chat(
       messages: ChatMessage[],
-      config: ModelConfig
+      config: ModelConfig,
     ): Promise<ChatResult> {
       const body = toGeminiRequest(messages, config);
       const url = `${GEMINI_BASE_URL}/${config.model}:generateContent?key=${apiKey}`;
@@ -210,7 +211,7 @@ export function createGeminiProvider(apiKey: string): LLMProvider {
       if (!res.ok) {
         const errorBody = await res.text();
         throw new Error(
-          `Gemini API request failed (${res.status}): ${errorBody}`
+          `Gemini API request failed (${res.status}): ${errorBody}`,
         );
       }
 
@@ -245,7 +246,7 @@ export function createGeminiProvider(apiKey: string): LLMProvider {
           if (!res.ok) {
             const errorBody = await res.text();
             throw new Error(
-              `Gemini API stream failed (${res.status}): ${errorBody}`
+              `Gemini API stream failed (${res.status}): ${errorBody}`,
             );
           }
 
@@ -270,13 +271,13 @@ export function createGeminiProvider(apiKey: string): LLMProvider {
 
                 // Safety block during streaming
                 if (chunk.promptFeedback?.blockReason === 'SAFETY') {
-                  throw new Error(
-                    'Your message could not be processed due to content safety filters. Please rephrase and try again.'
+                  throw new SafetyFilterError(
+                    'Your message could not be processed due to content safety filters. Please rephrase and try again.',
                   );
                 }
                 if (chunk.candidates?.[0]?.finishReason === 'SAFETY') {
-                  throw new Error(
-                    'The response was blocked by content safety filters. Please try rephrasing your question.'
+                  throw new SafetyFilterError(
+                    'The response was blocked by content safety filters. Please try rephrasing your question.',
                   );
                 }
 
@@ -289,10 +290,7 @@ export function createGeminiProvider(apiKey: string): LLMProvider {
                 }
               } catch (e) {
                 // Re-throw safety errors; skip malformed JSON
-                if (
-                  e instanceof Error &&
-                  e.message.includes('safety filters')
-                ) {
+                if (e instanceof SafetyFilterError) {
                   throw e;
                 }
               }
@@ -306,7 +304,7 @@ export function createGeminiProvider(apiKey: string): LLMProvider {
               // waiting for the overall fetch AbortSignal or mobile XHR timeout.
               const { done, value } = await readWithTimeout(
                 reader.read(),
-                CHUNK_TIMEOUT_MS
+                CHUNK_TIMEOUT_MS,
               );
               if (done) break;
 

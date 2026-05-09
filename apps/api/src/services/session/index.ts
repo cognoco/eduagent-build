@@ -10,6 +10,7 @@ export {
   getSessionStaticContextCacheKey,
   touchSessionStaticContextCacheEntry,
   clearSessionStaticContext,
+  clearSessionStaticContextForProfile,
   getCachedHomeworkLibraryContext,
   getCachedBookLearningHistoryContext,
 } from './session-cache';

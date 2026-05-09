@@ -22,7 +22,7 @@ const mockDatabaseModule = createDatabaseModuleMock({
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-jest.mock('../services/account', () => ({
+jest.mock('../services/account' /* gc1-allow: unit test boundary */, () => ({
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
     clerkUserId: 'user_test',
@@ -32,7 +32,7 @@ jest.mock('../services/account', () => ({
   }),
 }));
 
-jest.mock('../services/profile', () => ({
+jest.mock('../services/profile' /* gc1-allow: unit test boundary */, () => ({
   findOwnerProfile: jest.fn().mockResolvedValue(null),
   getProfile: jest.fn().mockResolvedValue({
     id: 'test-profile-id',
@@ -43,75 +43,85 @@ jest.mock('../services/profile', () => ({
   }),
 }));
 
-jest.mock('../services/streaks', () => ({
+jest.mock('../services/streaks' /* gc1-allow: unit test boundary */, () => ({
   recordSessionActivity: jest
     .fn()
     .mockResolvedValue({ currentStreak: 1, longestStreak: 1 }),
 }));
 
-jest.mock('../services/llm', () => ({
-  routeAndCall: jest.fn().mockResolvedValue({
-    response: JSON.stringify({
-      theme: 'Central European Capitals',
-      questions: [
-        {
-          country: 'Austria',
-          correctAnswer: 'Vienna',
-          distractors: ['Salzburg', 'Graz', 'Innsbruck'],
-          funFact: 'Vienna is famous for its coffee houses.',
-        },
-        {
-          country: 'Germany',
-          correctAnswer: 'Berlin',
-          distractors: ['Munich', 'Hamburg', 'Frankfurt'],
-          funFact: 'Berlin has more bridges than Venice.',
-        },
-        {
-          country: 'Poland',
-          correctAnswer: 'Warsaw',
-          distractors: ['Krakow', 'Gdansk', 'Wroclaw'],
-          funFact: 'Warsaw was rebuilt from rubble after WWII.',
-        },
-        {
-          country: 'Czech Republic',
-          correctAnswer: 'Prague',
-          distractors: ['Brno', 'Ostrava', 'Pilsen'],
-          funFact: 'Prague Castle is the largest ancient castle complex.',
-        },
-        {
-          country: 'Hungary',
-          correctAnswer: 'Budapest',
-          distractors: ['Debrecen', 'Szeged', 'Pecs'],
-          funFact: 'Budapest was originally two cities.',
-        },
-        {
-          country: 'Slovakia',
-          correctAnswer: 'Bratislava',
-          distractors: ['Kosice', 'Zilina', 'Nitra'],
-          funFact: 'Bratislava borders two countries.',
-        },
-        {
-          country: 'Slovenia',
-          correctAnswer: 'Ljubljana',
-          distractors: ['Maribor', 'Celje', 'Kranj'],
-          funFact: 'Ljubljana has dragon statues on its bridge.',
-        },
-        {
-          country: 'Croatia',
-          correctAnswer: 'Zagreb',
-          distractors: ['Split', 'Rijeka', 'Dubrovnik'],
-          funFact: 'Zagreb has one of the oldest tram networks.',
-        },
-      ],
+jest.mock('../services/llm' /* gc1-allow: unit test boundary */, () => {
+  // [BUG-990] CircuitOpenError must be the real class so that
+  // routeAndCallForQuiz's `instanceof CircuitOpenError` check works in tests.
+  // Using jest.requireActual here is the canonical pattern (GC1 rule) for
+  // preserving named exports that are not being stubbed.
+  const actual = jest.requireActual(
+    '../services/llm',
+  ) as typeof import('../services/llm');
+  return {
+    ...actual,
+    routeAndCall: jest.fn().mockResolvedValue({
+      response: JSON.stringify({
+        theme: 'Central European Capitals',
+        questions: [
+          {
+            country: 'Austria',
+            correctAnswer: 'Vienna',
+            distractors: ['Salzburg', 'Graz', 'Innsbruck'],
+            funFact: 'Vienna is famous for its coffee houses.',
+          },
+          {
+            country: 'Germany',
+            correctAnswer: 'Berlin',
+            distractors: ['Munich', 'Hamburg', 'Frankfurt'],
+            funFact: 'Berlin has more bridges than Venice.',
+          },
+          {
+            country: 'Poland',
+            correctAnswer: 'Warsaw',
+            distractors: ['Krakow', 'Gdansk', 'Wroclaw'],
+            funFact: 'Warsaw was rebuilt from rubble after WWII.',
+          },
+          {
+            country: 'Czech Republic',
+            correctAnswer: 'Prague',
+            distractors: ['Brno', 'Ostrava', 'Pilsen'],
+            funFact: 'Prague Castle is the largest ancient castle complex.',
+          },
+          {
+            country: 'Hungary',
+            correctAnswer: 'Budapest',
+            distractors: ['Debrecen', 'Szeged', 'Pecs'],
+            funFact: 'Budapest was originally two cities.',
+          },
+          {
+            country: 'Slovakia',
+            correctAnswer: 'Bratislava',
+            distractors: ['Kosice', 'Zilina', 'Nitra'],
+            funFact: 'Bratislava borders two countries.',
+          },
+          {
+            country: 'Slovenia',
+            correctAnswer: 'Ljubljana',
+            distractors: ['Maribor', 'Celje', 'Kranj'],
+            funFact: 'Ljubljana has dragon statues on its bridge.',
+          },
+          {
+            country: 'Croatia',
+            correctAnswer: 'Zagreb',
+            distractors: ['Split', 'Rijeka', 'Dubrovnik'],
+            funFact: 'Zagreb has one of the oldest tram networks.',
+          },
+        ],
+      }),
+      provider: 'mock',
+      model: 'mock',
+      latencyMs: 50,
     }),
-    provider: 'mock',
-    model: 'mock',
-    latencyMs: 50,
-  }),
-}));
+  };
+});
 
 import { app } from '../index';
-import { routeAndCall } from '../services/llm';
+import { routeAndCall, CircuitOpenError } from '../services/llm';
 import { UpstreamLlmError } from '../errors';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 
@@ -331,6 +341,52 @@ describe('Quiz routes', () => {
     it('returns 502 UPSTREAM_ERROR when LLM fails during quiz generation [BUG-990]', async () => {
       (routeAndCall as jest.Mock).mockRejectedValueOnce(
         new UpstreamLlmError('Quiz LLM returned invalid structured output'),
+      );
+
+      const res = await app.request(
+        '/v1/quiz/rounds',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ activityType: 'capitals' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(502);
+      const body = await res.json();
+      expect(body.code).toBe('UPSTREAM_ERROR');
+    });
+
+    // [BUG-990] AbortError from Cloudflare Worker timeout must NOT crash the
+    // Worker with a hard 502 Bad Gateway. It must be converted to UpstreamLlmError
+    // and returned as a proper 502 JSON response with code UPSTREAM_ERROR.
+    it('returns 502 UPSTREAM_ERROR when routeAndCall throws AbortError (CF Worker timeout) [BUG-990]', async () => {
+      const abortErr = new Error('The operation was aborted');
+      abortErr.name = 'AbortError';
+      (routeAndCall as jest.Mock).mockRejectedValueOnce(abortErr);
+
+      const res = await app.request(
+        '/v1/quiz/rounds',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ activityType: 'capitals' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(502);
+      const body = await res.json();
+      expect(body.code).toBe('UPSTREAM_ERROR');
+    });
+
+    // [BUG-990] CircuitOpenError must also surface as 502 UPSTREAM_ERROR, not
+    // a generic 500 INTERNAL_ERROR. The circuit breaker trips when the LLM
+    // provider has 3+ consecutive failures — clients need a retryable signal.
+    it('returns 502 UPSTREAM_ERROR when routeAndCall throws CircuitOpenError [BUG-990]', async () => {
+      (routeAndCall as jest.Mock).mockRejectedValueOnce(
+        new CircuitOpenError('gemini'),
       );
 
       const res = await app.request(

@@ -95,6 +95,8 @@ export const notificationPrefsSchema = z.object({
   reviewReminders: z.boolean(),
   dailyReminders: z.boolean(),
   weeklyProgressPush: z.boolean().optional(),
+  weeklyProgressEmail: z.boolean().optional(),
+  monthlyProgressEmail: z.boolean().optional(),
   pushEnabled: z.boolean(),
   maxDailyPush: z.number().int().min(1).max(10).optional(),
 });
@@ -131,6 +133,8 @@ export type PushTokenRegisterInput = z.infer<typeof pushTokenRegisterSchema>;
 // historical value the DB might still hold).
 export const notificationPrefsResponseSchema = notificationPrefsSchema.extend({
   weeklyProgressPush: z.boolean(),
+  weeklyProgressEmail: z.boolean(),
+  monthlyProgressEmail: z.boolean(),
   maxDailyPush: z.number().int(),
 });
 export type NotificationPrefsResponse = z.infer<

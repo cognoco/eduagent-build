@@ -206,6 +206,8 @@
       "childPreferencesAccessLabel": "{{name}}さんのプロフィール設定を開く",
       "childPreferencesLink": "{{name}}さんの設定を変更するには、プロフィールを開いてください →",
       "familyPreferencesLink": "お子様の設定を変更するには、ファミリーを開いてください →",
+      "sheetTitle": "学習モード",
+      "sheetEffectMessage": "次のメッセージから反映されます。",
       "casual": {
         "title": "エクスプローラー",
         "description": "自分のペースで学習します。メンターはリラックスして励ましてくれます。すぐにポイントを獲得でき、要約をスキップできます。"
@@ -248,12 +250,16 @@
       "bigOnlyTitle": "大きなマイルストーンのみ",
       "bigOnlyDescription": "大きな達成のみ表示し、小さなアニメーションはスキップします",
       "offTitle": "オフ",
-      "offDescription": "アニメーションなしで静かにマイルストーンを記録します"
+      "offDescription": "アニメーションなしで静かにマイルストーンを記録します",
+      "inlinePrompt": "お祝い"
     },
     "notifications": {
       "sectionHeader": "通知",
       "pushTitle": "プッシュ通知",
       "weeklyDigestTitle": "週ごとの進捗ダイジェスト",
+      "weeklyEmailDigestTitle": "週間進捗メール",
+      "monthlyEmailDigestTitle": "月間進捗メール",
+      "emailDigestDescription": "アカウントのメールアドレスに送信されます。",
       "updateErrorTitle": "通知設定を更新できませんでした"
     },
     "account": {
@@ -280,7 +286,8 @@
     },
     "help": {
       "contactSupportTitle": "サポートに連絡",
-      "contactSupportMessage": "アカウントに関するヘルプは、support@mentomate.appまでメールでお問い合わせください。"
+      "contactSupportMessage": "アカウントに関するヘルプは、support@mentomate.appまでメールでお問い合わせください。",
+      "helpAndFeedback": "ヘルプとフィードバック"
     },
     "errors": {
       "tryAgain": "もう一度お試しください。",
@@ -307,7 +314,17 @@
       "withdrawalArchiveAlwaysDescription": "13+ accounts only. Under-13 always deletes immediately for privacy compliance.",
       "withdrawalArchiveNever": "Never archive - delete immediately",
       "withdrawalArchiveNeverDescription": "Delete at grace expiry instead of keeping a 30-day archive.",
-      "withdrawalArchiveError": "Couldn't update setting. Try again."
+      "withdrawalArchiveError": "Couldn't update setting. Try again.",
+      "privacyAndData": "プライバシーとデータ"
+    },
+    "sections": {
+      "settings": "設定"
+    },
+    "subscreens": {
+      "notifications": "通知",
+      "account": "アカウント",
+      "privacy": "プライバシーとデータ",
+      "help": "ヘルプとフィードバック"
     }
   },
   "session": {
@@ -453,6 +470,7 @@
       "speakNow": "話してください — もう一度マイクをタップして停止",
       "processing": "処理中...",
       "inputUnavailable": "現在入力は利用できません",
+      "classifyingSubject": "どの教科か確認しています…",
       "switchToTextMode": "テキストモードに切り替え",
       "textMode": "テキストモード",
       "switchToVoiceMode": "音声モードに切り替え",
@@ -788,8 +806,10 @@
     },
     "row": {
       "review": "復習",
+      "finished": "完了",
       "notStarted": "未開始",
       "paused": "一時停止中",
+      "archived": "アーカイブ済み",
       "hasNotes": "メモあり",
       "bookTopics": "{{progress}}トピック",
       "shelfSubtitle_one": "{{count}}冊の本・{{progress}}トピック",
@@ -800,7 +820,9 @@
       "bookNotesSuffix": "、メモあり",
       "shelfAccessibilityLabel": "{{name}}の棚、{{subtitle}}{{pausedSuffix}}{{reviewSuffix}}。タップして{{action}}。",
       "shelfPausedSuffix": "、一時停止中",
+      "shelfArchivedSuffix": "、アーカイブ済み",
       "shelfReviewSuffix": "、復習が必要",
+      "shelfFinishedSuffix": "、完了",
       "shelfActionExpand": "展開",
       "shelfActionCollapse": "折りたたむ",
       "shelfActionOpen": "開く"
@@ -849,6 +871,8 @@
     "startSubjectLabel": "{{name}}を開始",
     "notSureHint": "よくわかりませんか？興味のあることを説明してください — 例：「植物がどうやって育つか知りたい」",
     "checkingName": "科目名を確認中...",
+    "creatingSubject": "科目を作成中...",
+    "preparingCurriculum": "最初のレッスンを準備中...",
     "somethingElse": "その他",
     "somethingElseHint": "好きなだけ具体的に記述してください。",
     "clarifyLabel": "具体的に何を学びたいですか？",
@@ -994,6 +1018,21 @@
   "assessment": {
     "title": "知識チェック",
     "openingMessage": "これまでに学んだことを確認しましょう。いくつか質問をしますので、最善を尽くしてください。足りない部分は私が補います。",
+    "firstQuestion": "最初の質問です。このトピックについて主に覚えていることは何ですか？できれば例を1つか2つ挙げてください。",
+    "resultSummary": "{{mastery}}%できました！{{band}}。",
+    "bands": {
+      "excellent": "すばらしいです",
+      "good": "よくできています",
+      "meetsBar": "合格ラインです",
+      "coreIdeas": "基本はつかめています",
+      "needsReview": "もう一度見直しましょう"
+    },
+    "borderlineBody": "基本はつかめています。不安だったところを短く復習しますか？",
+    "gapFillAction": "はい、足りなかったところを見る",
+    "declineRefreshAction": "いいえ、これで終わります",
+    "failedExhaustedBody": "このトピックはもう一度確認が必要です。一緒に見直しましょう。",
+    "startSessionAction": "セッションを始める",
+    "notNowAction": "今はしない",
     "passedMessage": "ほとんどの内容をしっかり理解していますね — {{mastery}}%の習熟度です！復習が必要な分野はライブラリに表示されます。",
     "missingParams": "この評価は開始できません — 必要な情報が不足しています。",
     "pickerTitle": "確認するトピックを選びましょう",
@@ -1540,7 +1579,7 @@
       "couldNotExportMemory": "記憶をエクスポートできませんでした",
       "controls": "コントロール",
       "learnAboutChild": "お子様について学ぶ",
-      "learnAboutChildDescription": "メンターがお子様の長所と短所の記憶を構築できるようにします",
+      "learnAboutChildDescription": "メンターがお子様の長所と注力分野の記憶を構築できるようにします",
       "useWhatMentorKnows": "メンターが知っていることを使う",
       "useWhatMentorKnowsDescription": "メンターが把握したことを使ってセッションをパーソナライズさせます",
       "noObservationsYet": "まだ観察がありません",
@@ -1800,14 +1839,14 @@
         "withdrawn": "同意が撤回されました"
       },
       "engagementTrend": {
-        "declining": "Engagement declining",
+        "declining": "エンゲージメントに注意",
         "increasing": "Engagement increasing",
         "stable": "Engagement stable"
       },
       "reviewHealth": "健康状態を確認",
       "retentionTrend": {
         "improving": "改善中",
-        "declining": "低下中",
+        "declining": "復習が必要",
         "stable": "安定"
       },
       "signal": {

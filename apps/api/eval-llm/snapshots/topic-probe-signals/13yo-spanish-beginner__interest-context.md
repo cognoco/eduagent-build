@@ -85,18 +85,3 @@ USER: Use horses if it fits.
 ## Builder notes
 
 - Dimension: interest-context
-
-## Live LLM response
-
-```
-```json
-{
-  "goals": ["learn Spanish present tense verbs"],
-  "experienceLevel": "beginner",
-  "currentKnowledge": "The learner wants to start learning Spanish present tense verbs.",
-  "interests": ["horses"],
-  "interestContext": { "horses": "free_time" },
-  "analogyFraming": "concrete"
-}
-```
-```

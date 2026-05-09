@@ -184,7 +184,7 @@ function setupRoutes(opts: SetupOptions = {}) {
   // GET /progress/topic/t1/active-session → { sessionId } | null
   mockFetch.setRoute(
     '/active-session',
-    activeSessionId ? { sessionId: activeSessionId } : null
+    activeSessionId ? { sessionId: activeSessionId } : null,
   );
 
   // GET /progress/resume-target → { target }
@@ -253,7 +253,7 @@ describe('TopicDetailScreen action buttons', () => {
       new Response(JSON.stringify({ topic: { ...DEFAULT_TOPIC_PROGRESS } }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
-      })
+      }),
     );
   });
 
@@ -328,7 +328,7 @@ describe('TopicDetailScreen action buttons', () => {
     fireEvent.press(screen.getByTestId('study-cta'));
     expect(mockPushLearningResumeTarget).toHaveBeenCalledWith(
       expect.anything(),
-      target
+      target,
     );
     expect(mockPush).not.toHaveBeenCalled();
   });
@@ -364,7 +364,7 @@ describe('TopicDetailScreen action buttons', () => {
       completionStatus: 'completed',
       repetitions: 3,
       nextReviewAt: new Date(
-        Date.now() + 5 * 24 * 60 * 60 * 1000
+        Date.now() + 5 * 24 * 60 * 60 * 1000,
       ).toISOString(),
     });
 
@@ -396,7 +396,7 @@ describe('TopicDetailScreen error / empty / missing-params states', () => {
 
   it('shows missing-params state when route params are absent', async () => {
     mockUseLocalSearchParams.mockReturnValue(
-      {} as { subjectId: string; topicId: string }
+      {} as { subjectId: string; topicId: string },
     );
 
     render(<TopicDetailScreen />, { wrapper: TestWrapper });
@@ -426,16 +426,16 @@ describe('TopicDetailScreen error / empty / missing-params states', () => {
       Promise.resolve(
         new Response(
           JSON.stringify({ message: "We couldn't load this topic" }),
-          { status: 500 }
-        )
-      )
+          { status: 500 },
+        ),
+      ),
     );
     mockFetch.setRoute('/topics/t1/retention', () =>
       Promise.resolve(
         new Response(JSON.stringify({ message: 'Retention error' }), {
           status: 500,
-        })
-      )
+        }),
+      ),
     );
 
     render(<TopicDetailScreen />, { wrapper: TestWrapper });
@@ -473,8 +473,8 @@ describe('TopicDetailScreen error / empty / missing-params states', () => {
           subjectName: 'Mathematics',
           topicTitle: 'Algebra',
         }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
     );
   });
 
@@ -536,6 +536,28 @@ describe('TopicDetailScreen rendering details', () => {
     });
   });
 
+  it('uses the latest topic session date when retention has no review date', async () => {
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    setupRoutes({
+      lastReviewedAt: null,
+      sessions: [
+        {
+          id: 'session-1',
+          sessionType: 'learning',
+          durationSeconds: 120,
+          createdAt: yesterday,
+        },
+      ],
+    });
+
+    render(<TopicDetailScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      screen.getByText('Last studied yesterday');
+    });
+    expect(screen.queryByText('Never studied')).toBeNull();
+  });
+
   it('shows last studied date when topic has been reviewed', async () => {
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     setupRoutes({ lastReviewedAt: yesterday });
@@ -568,6 +590,31 @@ describe('TopicDetailScreen rendering details', () => {
       screen.getByTestId('topic-sessions-empty');
     });
     screen.getByText('No sessions yet. Start one below!');
+  });
+
+  it('shows session count and total time when sessions exist', async () => {
+    setupRoutes({
+      sessions: [
+        {
+          id: 'session-1',
+          sessionType: 'learning',
+          durationSeconds: 120,
+          createdAt: '2026-04-30T12:00:00.000Z',
+        },
+        {
+          id: 'session-2',
+          sessionType: 'learning',
+          durationSeconds: 45,
+          createdAt: '2026-04-29T12:00:00.000Z',
+        },
+      ],
+    });
+
+    render(<TopicDetailScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      screen.getByText('2 sessions · 2 min total');
+    });
   });
 
   it('shows "+ Add your first note for this topic" when no notes exist', async () => {
@@ -616,7 +663,7 @@ describe('TopicDetailScreen rendering details', () => {
       new Response(JSON.stringify({ topic: { ...DEFAULT_TOPIC_PROGRESS } }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
-      })
+      }),
     );
   });
 });

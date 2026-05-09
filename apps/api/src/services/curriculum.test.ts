@@ -58,13 +58,13 @@ function createCurriculumMockProvider(): LLMProvider {
     id: 'gemini',
     async chat(
       _messages: ChatMessage[],
-      _config: ModelConfig
+      _config: ModelConfig,
     ): Promise<string> {
       return `Here is your curriculum:\n${sampleTopics}`;
     },
     async *chatStream(
       _messages: ChatMessage[],
-      _config: ModelConfig
+      _config: ModelConfig,
     ): AsyncIterable<string> {
       yield sampleTopics;
     },
@@ -95,7 +95,7 @@ const defaultInput: CurriculumInput = {
 // ---------------------------------------------------------------------------
 
 function mockSubjectRow(
-  overrides?: Partial<{ id: string; profileId: string; name: string }>
+  overrides?: Partial<{ id: string; profileId: string; name: string }>,
 ) {
   return {
     id: overrides?.id ?? SUBJECT_ID,
@@ -112,7 +112,7 @@ function mockSubjectRow(
 // ---------------------------------------------------------------------------
 
 function mockCurriculumRow(
-  overrides?: Partial<{ id: string; subjectId: string; version: number }>
+  overrides?: Partial<{ id: string; subjectId: string; version: number }>,
 ) {
   return {
     id: overrides?.id ?? CURRICULUM_ID,
@@ -140,7 +140,7 @@ function mockTopicRow(
     estimatedMinutes: number;
     skipped: boolean;
     bookId: string;
-  }>
+  }>,
 ) {
   return {
     id: overrides?.id ?? TOPIC_ID,
@@ -158,7 +158,7 @@ function mockTopicRow(
 }
 
 function mockLatestSessionSelect(
-  rows: Array<{ metadata: unknown; rawInput: string | null }> = []
+  rows: Array<{ metadata: unknown; rawInput: string | null }> = [],
 ) {
   return jest.fn().mockReturnValue({
     from: jest.fn().mockReturnValue({
@@ -223,7 +223,7 @@ function createMockDb({
     transaction: jest
       .fn()
       .mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
-        fn(db)
+        fn(db),
       ),
   } as unknown as Database;
   return db;
@@ -277,7 +277,7 @@ describe('generateCurriculum', () => {
     registerProvider(badProvider);
 
     await expect(generateCurriculum(defaultInput)).rejects.toThrow(
-      'Failed to parse curriculum from LLM response'
+      'Failed to parse curriculum from LLM response',
     );
 
     // Restore curriculum mock for subsequent tests
@@ -445,7 +445,7 @@ describe('addCurriculumTopic', () => {
         title: 'Test',
         description: 'Desc',
         estimatedMinutes: 30,
-      })
+      }),
     ).rejects.toThrow('Subject not found');
   });
 
@@ -461,7 +461,7 @@ describe('addCurriculumTopic', () => {
         title: 'Test',
         description: 'Desc',
         estimatedMinutes: 30,
-      })
+      }),
     ).rejects.toThrow('Curriculum not found');
   });
 
@@ -508,7 +508,7 @@ describe('skipTopic', () => {
   it('throws when subject does not belong to profile', async () => {
     const db = createMockDb({ subjectFindFirst: undefined });
     await expect(
-      skipTopic(db, PROFILE_ID, SUBJECT_ID, TOPIC_ID)
+      skipTopic(db, PROFILE_ID, SUBJECT_ID, TOPIC_ID),
     ).rejects.toThrow('Subject not found');
   });
 
@@ -518,7 +518,7 @@ describe('skipTopic', () => {
       curriculumFindFirst: undefined,
     });
     await expect(
-      skipTopic(db, PROFILE_ID, SUBJECT_ID, TOPIC_ID)
+      skipTopic(db, PROFILE_ID, SUBJECT_ID, TOPIC_ID),
     ).rejects.toThrow('Curriculum not found');
   });
 
@@ -529,7 +529,7 @@ describe('skipTopic', () => {
       topicFindFirst: undefined,
     });
     await expect(
-      skipTopic(db, PROFILE_ID, SUBJECT_ID, TOPIC_ID)
+      skipTopic(db, PROFILE_ID, SUBJECT_ID, TOPIC_ID),
     ).rejects.toThrow('Topic not found');
   });
 
@@ -555,7 +555,7 @@ describe('unskipTopic', () => {
   it('throws when subject does not belong to profile', async () => {
     const db = createMockDb({ subjectFindFirst: undefined });
     await expect(
-      unskipTopic(db, PROFILE_ID, SUBJECT_ID, TOPIC_ID)
+      unskipTopic(db, PROFILE_ID, SUBJECT_ID, TOPIC_ID),
     ).rejects.toThrow('Subject not found');
   });
 
@@ -565,7 +565,7 @@ describe('unskipTopic', () => {
       curriculumFindFirst: undefined,
     });
     await expect(
-      unskipTopic(db, PROFILE_ID, SUBJECT_ID, TOPIC_ID)
+      unskipTopic(db, PROFILE_ID, SUBJECT_ID, TOPIC_ID),
     ).rejects.toThrow('Curriculum not found');
   });
 
@@ -576,7 +576,7 @@ describe('unskipTopic', () => {
       topicFindFirst: undefined,
     });
     await expect(
-      unskipTopic(db, PROFILE_ID, SUBJECT_ID, TOPIC_ID)
+      unskipTopic(db, PROFILE_ID, SUBJECT_ID, TOPIC_ID),
     ).rejects.toThrow('Topic not found');
   });
 
@@ -587,7 +587,7 @@ describe('unskipTopic', () => {
       topicFindFirst: mockTopicRow({ skipped: false }),
     });
     await expect(
-      unskipTopic(db, PROFILE_ID, SUBJECT_ID, TOPIC_ID)
+      unskipTopic(db, PROFILE_ID, SUBJECT_ID, TOPIC_ID),
     ).rejects.toThrow('Topic is not skipped');
   });
 
@@ -621,7 +621,7 @@ describe('challengeCurriculum', () => {
   it('throws when subject does not belong to profile', async () => {
     const db = createMockDb({ subjectFindFirst: undefined });
     await expect(
-      challengeCurriculum(db, PROFILE_ID, SUBJECT_ID, 'Some feedback')
+      challengeCurriculum(db, PROFILE_ID, SUBJECT_ID, 'Some feedback'),
     ).rejects.toThrow('Subject not found');
   });
 
@@ -652,7 +652,7 @@ describe('challengeCurriculum', () => {
       transaction: jest
         .fn()
         .mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
-          fn(db)
+          fn(db),
         ),
     };
     const typedDb = db as unknown as Database;
@@ -660,7 +660,7 @@ describe('challengeCurriculum', () => {
       typedDb,
       PROFILE_ID,
       SUBJECT_ID,
-      'Skip intro topics'
+      'Skip intro topics',
     );
     expect(result).not.toBeNull();
     expect(result.version).toBe(1);
@@ -703,11 +703,11 @@ describe('challengeCurriculum', () => {
       db,
       PROFILE_ID,
       SUBJECT_ID,
-      'Focus on proofs instead of intros'
+      'Focus on proofs instead of intros',
     );
 
     const userPrompt = capturedMessages.find(
-      (message) => message.role === 'user'
+      (message) => message.role === 'user',
     );
     expect(userPrompt?.content).toContain('Goals: ace exams');
     expect(userPrompt?.content).toContain('Experience Level: advanced');
@@ -730,7 +730,7 @@ describe('explainTopicOrdering', () => {
   it('throws when subject does not belong to profile', async () => {
     const db = createMockDb({ subjectFindFirst: undefined });
     await expect(
-      explainTopicOrdering(db, PROFILE_ID, SUBJECT_ID, TOPIC_ID)
+      explainTopicOrdering(db, PROFILE_ID, SUBJECT_ID, TOPIC_ID),
     ).rejects.toThrow('Subject not found');
   });
 
@@ -740,7 +740,7 @@ describe('explainTopicOrdering', () => {
       topicFindFirst: undefined,
     });
     await expect(
-      explainTopicOrdering(db, PROFILE_ID, SUBJECT_ID, TOPIC_ID)
+      explainTopicOrdering(db, PROFILE_ID, SUBJECT_ID, TOPIC_ID),
     ).rejects.toThrow('Topic not found');
   });
 
@@ -756,7 +756,7 @@ describe('explainTopicOrdering', () => {
       db,
       PROFILE_ID,
       SUBJECT_ID,
-      TOPIC_ID
+      TOPIC_ID,
     );
 
     expect(typeof result).toBe('string');
@@ -794,7 +794,7 @@ describe('adaptCurriculumFromPerformance', () => {
       db,
       PROFILE_ID,
       SUBJECT_ID,
-      request
+      request,
     );
 
     expect(result.adapted).toBe(false);
@@ -817,7 +817,7 @@ describe('adaptCurriculumFromPerformance', () => {
       db,
       PROFILE_ID,
       SUBJECT_ID,
-      request
+      request,
     );
 
     expect(result.adapted).toBe(false);
@@ -840,7 +840,7 @@ describe('adaptCurriculumFromPerformance', () => {
       db,
       PROFILE_ID,
       SUBJECT_ID,
-      request
+      request,
     );
 
     expect(result.adapted).toBe(true);
@@ -865,7 +865,7 @@ describe('adaptCurriculumFromPerformance', () => {
       db,
       PROFILE_ID,
       SUBJECT_ID,
-      request
+      request,
     );
 
     expect(result.adapted).toBe(true);
@@ -916,7 +916,7 @@ describe('adaptCurriculumFromPerformance', () => {
       db,
       PROFILE_ID,
       SUBJECT_ID,
-      request
+      request,
     );
 
     expect(result.adapted).toBe(true);
@@ -937,7 +937,7 @@ describe('adaptCurriculumFromPerformance', () => {
       db,
       PROFILE_ID,
       SUBJECT_ID,
-      { topicId: TOPIC_D, signal: 'struggling' }
+      { topicId: TOPIC_D, signal: 'struggling' },
     );
 
     expect(result.adapted).toBe(true);
@@ -967,7 +967,7 @@ describe('adaptCurriculumFromPerformance', () => {
       db,
       PROFILE_ID,
       SUBJECT_ID,
-      { topicId: TOPIC_A, signal: 'struggling' }
+      { topicId: TOPIC_A, signal: 'struggling' },
     );
 
     expect(result.adapted).toBe(true);
@@ -1044,7 +1044,7 @@ describe('persistBookTopics', () => {
         id: `existing-topic-${i}`,
         sortOrder: i,
         title: `Existing Topic ${i}`,
-      })
+      }),
     );
 
     // Build rows for the transaction's topic query
@@ -1122,7 +1122,7 @@ describe('persistBookTopics', () => {
       transaction: jest
         .fn()
         .mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
-          fn(db)
+          fn(db),
         ),
     } as unknown as Database;
 
@@ -1133,7 +1133,7 @@ describe('persistBookTopics', () => {
     const db = createPersistMockDb({ subjectExists: false });
 
     await expect(
-      persistBookTopics(db, PROFILE_ID, SUBJECT_ID, BOOK_ID, sampleTopics, [])
+      persistBookTopics(db, PROFILE_ID, SUBJECT_ID, BOOK_ID, sampleTopics, []),
     ).rejects.toThrow('Subject not found');
   });
 
@@ -1141,7 +1141,7 @@ describe('persistBookTopics', () => {
     const db = createPersistMockDb({ bookExists: false });
 
     await expect(
-      persistBookTopics(db, PROFILE_ID, SUBJECT_ID, BOOK_ID, sampleTopics, [])
+      persistBookTopics(db, PROFILE_ID, SUBJECT_ID, BOOK_ID, sampleTopics, []),
     ).rejects.toThrow('Book not found');
   });
 
@@ -1155,7 +1155,7 @@ describe('persistBookTopics', () => {
         SUBJECT_ID,
         BOOK_ID,
         sampleTopics,
-        sampleConnections
+        sampleConnections,
       );
 
       // Should NOT have entered a transaction (no new inserts)
@@ -1178,7 +1178,7 @@ describe('persistBookTopics', () => {
         SUBJECT_ID,
         BOOK_ID,
         sampleTopics,
-        sampleConnections
+        sampleConnections,
       );
 
       // Verify transaction was called for the first persist
@@ -1193,7 +1193,7 @@ describe('persistBookTopics', () => {
         SUBJECT_ID,
         BOOK_ID,
         sampleTopics,
-        sampleConnections
+        sampleConnections,
       );
 
       // Second call should NOT have entered a transaction
@@ -1211,7 +1211,7 @@ describe('persistBookTopics', () => {
         SUBJECT_ID,
         BOOK_ID,
         sampleTopics,
-        sampleConnections
+        sampleConnections,
       );
 
       expect(db.transaction).toHaveBeenCalledTimes(1);
@@ -1228,7 +1228,7 @@ describe('persistBookTopics', () => {
         SUBJECT_ID,
         BOOK_ID,
         [], // empty topics
-        []
+        [],
       );
 
       expect(db.transaction).toHaveBeenCalledTimes(1);
@@ -1253,7 +1253,7 @@ describe('persistBookTopics', () => {
         SUBJECT_ID,
         BOOK_ID,
         sampleTopics,
-        []
+        [],
       );
 
       // Should have called insert with onConflictDoNothing for the curriculum
@@ -1274,7 +1274,14 @@ describe('persistBookTopics', () => {
       // The mock already returns the subject by default — keep it
 
       await expect(
-        persistBookTopics(db, PROFILE_ID, SUBJECT_ID, BOOK_ID, sampleTopics, [])
+        persistBookTopics(
+          db,
+          PROFILE_ID,
+          SUBJECT_ID,
+          BOOK_ID,
+          sampleTopics,
+          [],
+        ),
       ).rejects.toThrow('Book not found');
     });
   });
@@ -1351,6 +1358,44 @@ describe('getBooks (BUG-884)', () => {
     expect(result[0].status).toBe('NOT_STARTED');
   });
 
+  it('collapses near-duplicate book titles before returning the shelf list', async () => {
+    const { db } = mockDbForGetBooks({
+      subject: mockSubjectRow(),
+      bookRows: [
+        {
+          id: 'book-mesopotamia',
+          subjectId: SUBJECT_ID,
+          sortOrder: 0,
+          title: 'Mesopotamia',
+          description: '',
+          emoji: null,
+          topicsGenerated: false,
+          createdAt: NOW,
+          updatedAt: NOW,
+        } as unknown as { id: string; subjectId: string; sortOrder: number },
+        {
+          id: 'book-mesopotania',
+          subjectId: SUBJECT_ID,
+          sortOrder: 1,
+          title: 'Mesopotania',
+          description: '',
+          emoji: null,
+          topicsGenerated: false,
+          createdAt: new Date(NOW.getTime() + 1_000),
+          updatedAt: new Date(NOW.getTime() + 1_000),
+        } as unknown as { id: string; subjectId: string; sortOrder: number },
+      ],
+      curriculumFindFirst: undefined,
+      topicRowsForLatestCurriculum: [],
+    });
+
+    const result = await getBooks(db, PROFILE_ID, SUBJECT_ID);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('book-mesopotamia');
+    expect(result[0].title).toBe('Mesopotamia');
+  });
+
   // BUG-884 break test: orphan curriculum_topics rows from prior curriculum
   // versions inflated topicCount because the WHERE clause matched on bookId
   // alone. After the fix the query is constrained to the latest curriculum,
@@ -1391,7 +1436,7 @@ describe('getBooks (BUG-884)', () => {
     function deepContains(
       value: unknown,
       needle: string,
-      seen = new Set<unknown>()
+      seen = new Set<unknown>(),
     ): boolean {
       if (value == null) return false;
       if (typeof value === 'string') return value.includes(needle);

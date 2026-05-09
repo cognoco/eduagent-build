@@ -1,4 +1,10 @@
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -17,6 +23,7 @@ const mockUseSubjects = jest.fn();
 const mockUseOverallProgress = jest.fn();
 const mockUseAllBooks = jest.fn();
 const mockUseLibrarySearch = jest.fn();
+const mockUpdateSubjectMutateAsync = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush, replace: jest.fn() }),
@@ -28,7 +35,7 @@ jest.mock('react-native-safe-area-context', () => ({
 
 jest.mock('../../hooks/use-subjects', () => ({
   useSubjects: () => mockUseSubjects(),
-  useUpdateSubject: () => ({ mutateAsync: jest.fn() }),
+  useUpdateSubject: () => ({ mutateAsync: mockUpdateSubjectMutateAsync }),
 }));
 
 jest.mock('../../hooks/use-progress', () => ({
@@ -232,6 +239,7 @@ describe('LibraryScreen', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUpdateSubjectMutateAsync.mockResolvedValue(undefined);
     const { queryClient, Wrapper } = createWrapper();
     testQueryClient = queryClient;
     TestWrapper = Wrapper;
@@ -404,6 +412,34 @@ describe('LibraryScreen', () => {
     screen.getByText('History');
   });
 
+  it('orders active subjects first, then paused, then archived', () => {
+    mockUseSubjects.mockReturnValue({
+      data: [
+        { id: 'sub-archived', name: 'Archived Spanish', status: 'archived' },
+        { id: 'sub-paused', name: 'Paused History', status: 'paused' },
+        { id: 'sub-active', name: 'Active Math', status: 'active' },
+      ],
+      isLoading: false,
+    });
+    mockUseOverallProgress.mockReturnValue({
+      data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
+      isLoading: false,
+    });
+
+    render(<LibraryScreen />, { wrapper: TestWrapper });
+
+    const orderedRowIds = screen
+      .UNSAFE_getAllByProps({ accessibilityRole: 'button' })
+      .filter((row) => String(row.props.testID).startsWith('shelf-row-header-'))
+      .map((row) => String(row.props.testID))
+      .filter((testID, index, allRows) => allRows.indexOf(testID) === index);
+    expect(orderedRowIds).toEqual([
+      'shelf-row-header-sub-active',
+      'shelf-row-header-sub-paused',
+      'shelf-row-header-sub-archived',
+    ]);
+  });
+
   it('has no top-level tabs — library opens subject shelves as the next level', () => {
     // Library v3 redesign replaced Shelves/Books/Topics tabs with a subject
     // shelf list. There are no tab controls at the library level.
@@ -527,6 +563,58 @@ describe('LibraryScreen', () => {
       const backdrop = screen.getByTestId('manage-subjects-backdrop');
       expect(backdrop.props.accessibilityRole).toBe('button');
       expect(backdrop.props.accessibilityLabel).toBe('Close manage subjects');
+    });
+
+    it('sends archived status when the Archive action is pressed', async () => {
+      arrangeWithOneSubject();
+      render(<LibraryScreen />, { wrapper: TestWrapper });
+
+      fireEvent.press(screen.getByTestId('manage-subjects-button'));
+      fireEvent.press(screen.getByTestId('archive-subject-sub-1'));
+
+      await waitFor(() => {
+        expect(mockUpdateSubjectMutateAsync).toHaveBeenCalledWith({
+          subjectId: 'sub-1',
+          status: 'archived',
+        });
+      });
+    });
+
+    it('disables other subject actions while one status update is saving', async () => {
+      let finishUpdate!: () => void;
+      mockUpdateSubjectMutateAsync.mockReturnValue(
+        new Promise<void>((resolve) => {
+          finishUpdate = resolve;
+        }),
+      );
+      mockUseSubjects.mockReturnValue({
+        data: [
+          { id: 'sub-1', name: 'Math', status: 'active' },
+          { id: 'sub-2', name: 'History', status: 'active' },
+        ],
+        isLoading: false,
+        isError: false,
+        refetch: jest.fn(),
+      });
+      mockUseOverallProgress.mockReturnValue({
+        data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
+        isLoading: false,
+        isError: false,
+        refetch: jest.fn(),
+      });
+      render(<LibraryScreen />, { wrapper: TestWrapper });
+
+      fireEvent.press(screen.getByTestId('manage-subjects-button'));
+      fireEvent.press(screen.getByTestId('archive-subject-sub-1'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('archive-subject-sub-2')).toBeDisabled();
+      });
+      expect(mockUpdateSubjectMutateAsync).toHaveBeenCalledWith({
+        subjectId: 'sub-1',
+        status: 'archived',
+      });
+      finishUpdate();
     });
   });
 
