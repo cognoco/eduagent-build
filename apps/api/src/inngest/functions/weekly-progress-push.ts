@@ -57,6 +57,23 @@ const weeklyProgressPushEventSchema = z.object({
   parentId: z.string().uuid(),
 });
 
+type PreparedWeeklyProgressDigest =
+  | {
+      status: 'prepared';
+      parentId: string;
+      reportWeek: string;
+      childSummaries: string[];
+      struggleLines: ChildStruggleLine[];
+      shouldSendPush: boolean;
+      shouldSendEmail: boolean;
+      parentEmail: string | null;
+    }
+  | {
+      status: 'skipped' | 'throttled';
+      reason: string;
+      parentId: string;
+    };
+
 // [FR239.1 UX-9] Returns true when 09:00 local time matches the UTC hour of nowUtc.
 // Parents with no timezone (or an invalid one) fall back to UTC, so they are
 // processed in the 09:00 UTC run.
@@ -233,263 +250,308 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
     }
     const { parentId } = parsed.data;
 
-    return step.run('send-weekly-push', async () => {
-      try {
-        const db = getStepDatabase();
+    try {
+      const prepared: PreparedWeeklyProgressDigest = await step.run(
+        'prepare-weekly-progress-digest',
+        async () => {
+          const db = getStepDatabase();
 
-        const links = await db.query.familyLinks.findMany({
-          where: eq(familyLinks.parentProfileId, parentId),
-          columns: { childProfileId: true },
-        });
-        if (links.length === 0) {
-          return { status: 'skipped', reason: 'no_children', parentId };
-        }
-
-        // [BUG-524] Compute the Monday start date for this week's report
-        const now = new Date();
-        const day = now.getUTCDay();
-        const mondayOffset = day === 0 ? -6 : 1 - day;
-        const weekStartDate = new Date(now);
-        weekStartDate.setUTCDate(weekStartDate.getUTCDate() + mondayOffset);
-        weekStartDate.setUTCHours(0, 0, 0, 0);
-        const reportWeek = isoDate(weekStartDate);
-
-        const childSummaries: string[] = [];
-        const struggleLines: ChildStruggleLine[] = [];
-        for (const link of links) {
-          // Consent gate (parity with sendStruggleNotification and ParentDashboardSummary):
-          // skip children whose most-recent GDPR consent state is anything other than
-          // CONSENTED. Missing row = no restriction (pre-consent-flow accounts).
-          const consentState = await db.query.consentStates.findFirst({
-            where: and(
-              eq(consentStates.profileId, link.childProfileId),
-              eq(consentStates.consentType, 'GDPR'),
-            ),
-            orderBy: desc(consentStates.requestedAt),
+          const links = await db.query.familyLinks.findMany({
+            where: eq(familyLinks.parentProfileId, parentId),
+            columns: { childProfileId: true },
           });
-          if (consentState != null && consentState.status !== 'CONSENTED') {
-            continue;
+          if (links.length === 0) {
+            return {
+              status: 'skipped' as const,
+              reason: 'no_children',
+              parentId,
+            };
           }
 
-          const latest = await getLatestSnapshot(db, link.childProfileId);
-          if (!latest) continue;
+          // [BUG-524] Compute the Monday start date for this week's report
+          const now = new Date();
+          const day = now.getUTCDay();
+          const mondayOffset = day === 0 ? -6 : 1 - day;
+          const weekStartDate = new Date(now);
+          weekStartDate.setUTCDate(weekStartDate.getUTCDate() + mondayOffset);
+          weekStartDate.setUTCHours(0, 0, 0, 0);
+          const reportWeek = isoDate(weekStartDate);
 
-          const previous = await getLatestSnapshotOnOrBefore(
-            db,
-            link.childProfileId,
-            isoDate(
-              subtractDays(new Date(`${latest.snapshotDate}T00:00:00Z`), 7),
-            ),
-          );
+          const childSummaries: string[] = [];
+          const struggleLines: ChildStruggleLine[] = [];
+          for (const link of links) {
+            // Consent gate (parity with sendStruggleNotification and ParentDashboardSummary):
+            // skip children whose most-recent GDPR consent state is anything other than
+            // CONSENTED. Missing row = no restriction (pre-consent-flow accounts).
+            const consentState = await db.query.consentStates.findFirst({
+              where: and(
+                eq(consentStates.profileId, link.childProfileId),
+                eq(consentStates.consentType, 'GDPR'),
+              ),
+              orderBy: desc(consentStates.requestedAt),
+            });
+            if (consentState != null && consentState.status !== 'CONSENTED') {
+              continue;
+            }
 
-          // [CR-2] Clamp: treat previous snapshot as null when the gap exceeds 14 days.
-          // A wider gap means the "delta" spans multiple weeks rather than the current
-          // 7-day window, producing inflated session and minute counts for inactive learners.
-          const MAX_SNAPSHOT_GAP_MS = 14 * 24 * 60 * 60 * 1000;
-          const snapshotGapMs =
-            previous != null
-              ? new Date(`${latest.snapshotDate}T00:00:00Z`).getTime() -
-                new Date(`${previous.snapshotDate}T00:00:00Z`).getTime()
-              : 0;
-          const cappedPrevious =
-            snapshotGapMs <= MAX_SNAPSHOT_GAP_MS ? previous : null;
+            const latest = await getLatestSnapshot(db, link.childProfileId);
+            if (!latest) continue;
 
-          const child = await db.query.profiles.findFirst({
-            where: eq(profiles.id, link.childProfileId),
-            columns: { displayName: true },
-          });
-
-          const name = child?.displayName ?? 'Your learner';
-          const topicDelta = cappedPrevious
-            ? Math.max(
-                0,
-                latest.metrics.topicsMastered -
-                  cappedPrevious.metrics.topicsMastered,
-              )
-            : null;
-          const vocabDelta = cappedPrevious
-            ? Math.max(
-                0,
-                latest.metrics.vocabularyTotal -
-                  cappedPrevious.metrics.vocabularyTotal,
-              )
-            : null;
-          const exploredDelta = cappedPrevious
-            ? Math.max(
-                0,
-                sumTopicsExplored(latest.metrics) -
-                  sumTopicsExplored(cappedPrevious.metrics),
-              )
-            : null;
-
-          // [BUG-524] Persist the weekly report before building the push summary.
-          // Uses onConflictDoNothing so re-runs for the same week are idempotent.
-          const reportData = generateWeeklyReportData(
-            name,
-            reportWeek,
-            latest.metrics,
-            cappedPrevious?.metrics ?? null,
-          );
-          await db
-            .insert(weeklyReports)
-            .values({
-              profileId: parentId,
-              childProfileId: link.childProfileId,
-              reportWeek,
-              reportData,
-            })
-            .onConflictDoNothing();
-
-          if (
-            latest.metrics.totalSessions === 0 ||
-            (topicDelta === 0 && vocabDelta === 0 && exploredDelta === 0)
-          ) {
-            childSummaries.push(
-              `${name} took a quieter week and still kept ${latest.metrics.topicsMastered} topics.`,
+            const previous = await getLatestSnapshotOnOrBefore(
+              db,
+              link.childProfileId,
+              isoDate(
+                subtractDays(new Date(`${latest.snapshotDate}T00:00:00Z`), 7),
+              ),
             );
-          } else {
-            const parts = [
-              topicDelta && topicDelta > 0 ? `+${topicDelta} topics` : null,
-              vocabDelta && vocabDelta > 0 ? `+${vocabDelta} words` : null,
-              exploredDelta && exploredDelta > 0
-                ? `+${exploredDelta} explored`
-                : null,
-            ].filter((value): value is string => !!value);
 
-            if (parts.length > 0) {
-              childSummaries.push(`${name}: ${parts.join(', ')}`);
+            // [CR-2] Clamp: treat previous snapshot as null when the gap exceeds 14 days.
+            // A wider gap means the "delta" spans multiple weeks rather than the current
+            // 7-day window, producing inflated session and minute counts for inactive learners.
+            const MAX_SNAPSHOT_GAP_MS = 14 * 24 * 60 * 60 * 1000;
+            const snapshotGapMs =
+              previous != null
+                ? new Date(`${latest.snapshotDate}T00:00:00Z`).getTime() -
+                  new Date(`${previous.snapshotDate}T00:00:00Z`).getTime()
+                : 0;
+            const cappedPrevious =
+              snapshotGapMs <= MAX_SNAPSHOT_GAP_MS ? previous : null;
+
+            const child = await db.query.profiles.findFirst({
+              where: eq(profiles.id, link.childProfileId),
+              columns: { displayName: true },
+            });
+
+            const name = child?.displayName ?? 'Your learner';
+            const topicDelta = cappedPrevious
+              ? Math.max(
+                  0,
+                  latest.metrics.topicsMastered -
+                    cappedPrevious.metrics.topicsMastered,
+                )
+              : null;
+            const vocabDelta = cappedPrevious
+              ? Math.max(
+                  0,
+                  latest.metrics.vocabularyTotal -
+                    cappedPrevious.metrics.vocabularyTotal,
+                )
+              : null;
+            const exploredDelta = cappedPrevious
+              ? Math.max(
+                  0,
+                  sumTopicsExplored(latest.metrics) -
+                    sumTopicsExplored(cappedPrevious.metrics),
+                )
+              : null;
+
+            // [BUG-524] Persist the weekly report before building the push summary.
+            // Uses onConflictDoNothing so re-runs for the same week are idempotent.
+            const reportData = generateWeeklyReportData(
+              name,
+              reportWeek,
+              latest.metrics,
+              cappedPrevious?.metrics ?? null,
+            );
+            await db
+              .insert(weeklyReports)
+              .values({
+                profileId: parentId,
+                childProfileId: link.childProfileId,
+                reportWeek,
+                reportData,
+              })
+              .onConflictDoNothing();
+
+            if (
+              latest.metrics.totalSessions === 0 ||
+              (topicDelta === 0 && vocabDelta === 0 && exploredDelta === 0)
+            ) {
+              childSummaries.push(
+                `${name} took a quieter week and still kept ${latest.metrics.topicsMastered} topics.`,
+              );
+            } else {
+              const parts = [
+                topicDelta && topicDelta > 0 ? `+${topicDelta} topics` : null,
+                vocabDelta && vocabDelta > 0 ? `+${vocabDelta} words` : null,
+                exploredDelta && exploredDelta > 0
+                  ? `+${exploredDelta} explored`
+                  : null,
+              ].filter((value): value is string => !!value);
+
+              if (parts.length > 0) {
+                childSummaries.push(`${name}: ${parts.join(', ')}`);
+              }
+            }
+
+            // Read current struggles for the watch-line (path A: topic names only).
+            // Malformed JSONB is skipped gracefully; digest still sends.
+            try {
+              const learningProfile = await db.query.learningProfiles.findFirst(
+                {
+                  where: eq(learningProfiles.profileId, link.childProfileId),
+                  columns: { struggles: true },
+                },
+              );
+              const rawStruggles = learningProfile?.struggles;
+              const topics = Array.isArray(rawStruggles)
+                ? (rawStruggles as Array<{ topic?: string }>)
+                    .map((s) => s.topic)
+                    .filter(
+                      (t): t is string => typeof t === 'string' && t.length > 0,
+                    )
+                    .slice(0, 2)
+                : [];
+              struggleLines.push({ childName: name, topics });
+            } catch (err) {
+              captureException(err, {
+                extra: {
+                  childProfileId: link.childProfileId,
+                  context: 'weekly-progress-push-struggles',
+                },
+              });
+              struggleLines.push({ childName: name, topics: [] });
             }
           }
 
-          // Read current struggles for the watch-line (path A: topic names only).
-          // Malformed JSONB is skipped gracefully; digest still sends.
-          try {
-            const learningProfile = await db.query.learningProfiles.findFirst({
-              where: eq(learningProfiles.profileId, link.childProfileId),
-              columns: { struggles: true },
-            });
-            const rawStruggles = learningProfile?.struggles;
-            const topics = Array.isArray(rawStruggles)
-              ? (rawStruggles as Array<{ topic?: string }>)
-                  .map((s) => s.topic)
-                  .filter(
-                    (t): t is string => typeof t === 'string' && t.length > 0,
-                  )
-                  .slice(0, 2)
-              : [];
-            struggleLines.push({ childName: name, topics });
-          } catch (err) {
-            captureException(err, {
-              extra: {
-                childProfileId: link.childProfileId,
-                context: 'weekly-progress-push-struggles',
-              },
-            });
-            struggleLines.push({ childName: name, topics: [] });
+          // Consent gate: if ALL linked children were redacted, skip entirely —
+          // do not send an empty digest (push or email).
+          if (childSummaries.length === 0) {
+            return {
+              status: 'skipped' as const,
+              reason: 'no_activity',
+              parentId,
+            };
           }
-        }
 
-        // Consent gate: if ALL linked children were redacted, skip entirely —
-        // do not send an empty digest (push or email).
-        if (childSummaries.length === 0) {
-          return { status: 'skipped', reason: 'no_activity', parentId };
-        }
+          // [BUG-699-FOLLOWUP] 24h dedup gate, scoped to the push only — the
+          // weeklyReports insert above is idempotent via onConflictDoNothing,
+          // so a duplicate `app/weekly-progress-push.generate` event leaves the
+          // report row intact but must NOT re-push the parent. Cron cadence
+          // (weekly) makes the read-then-write race window irrelevant; promote
+          // to a unique index on notificationLog if duplicates ever surface.
+          const recentCount = await getRecentNotificationCount(
+            db,
+            parentId,
+            'weekly_progress',
+            24,
+          );
+          if (recentCount > 0) {
+            return {
+              status: 'throttled' as const,
+              reason: 'dedup_24h',
+              parentId,
+            };
+          }
 
-        // [BUG-699-FOLLOWUP] 24h dedup gate, scoped to the push only — the
-        // weeklyReports insert above is idempotent via onConflictDoNothing,
-        // so a duplicate `app/weekly-progress-push.generate` event leaves the
-        // report row intact but must NOT re-push the parent. Cron cadence
-        // (weekly) makes the read-then-write race window irrelevant; promote
-        // to a unique index on notificationLog if duplicates ever surface.
-        const recentCount = await getRecentNotificationCount(
-          db,
-          parentId,
-          'weekly_progress',
-          24,
-        );
-        if (recentCount > 0) {
-          return { status: 'throttled', reason: 'dedup_24h', parentId };
-        }
+          const prefs = await db.query.notificationPreferences.findFirst({
+            where: eq(notificationPreferences.profileId, parentId),
+            columns: {
+              pushEnabled: true,
+              weeklyProgressPush: true,
+              weeklyProgressEmail: true,
+            },
+          });
+          const shouldSendPush =
+            prefs != null && prefs.pushEnabled && prefs.weeklyProgressPush;
+          const shouldSendEmail = prefs?.weeklyProgressEmail ?? true;
 
-        const prefs = await db.query.notificationPreferences.findFirst({
-          where: eq(notificationPreferences.profileId, parentId),
-          columns: {
-            pushEnabled: true,
-            weeklyProgressPush: true,
-            weeklyProgressEmail: true,
-          },
-        });
-        const shouldSendPush =
-          prefs != null && prefs.pushEnabled && prefs.weeklyProgressPush;
-        const shouldSendEmail = prefs?.weeklyProgressEmail ?? true;
+          let parentEmail: string | null = null;
+          if (shouldSendEmail) {
+            const parentProfile = await db.query.profiles.findFirst({
+              where: eq(profiles.id, parentId),
+              columns: { accountId: true },
+            });
+            const parentAccount = parentProfile?.accountId
+              ? await db.query.accounts.findFirst({
+                  where: eq(accounts.id, parentProfile.accountId),
+                  columns: { email: true },
+                })
+              : null;
+            parentEmail = parentAccount?.email ?? null;
+          }
 
-        const pushResult = shouldSendPush
-          ? await sendPushNotification(db, {
+          return {
+            status: 'prepared' as const,
+            parentId,
+            reportWeek,
+            childSummaries,
+            struggleLines,
+            shouldSendPush,
+            shouldSendEmail,
+            parentEmail,
+          };
+        },
+      );
+
+      if (prepared.status !== 'prepared') {
+        return prepared;
+      }
+
+      const pushResult = prepared.shouldSendPush
+        ? await step.run('send-weekly-progress-push', async () => {
+            const db = getStepDatabase();
+            return sendPushNotification(db, {
               profileId: parentId,
               title: 'Weekly learning progress',
-              body: childSummaries.join(' '),
+              body: prepared.childSummaries.join(' '),
               type: 'weekly_progress',
-            })
-          : null;
-
-        // Email channel: send when weekly_progress_email = true AND parent has
-        // accounts.email. Resend idempotency-key dedupes within 24h window so
-        // Inngest step retries are safe.
-        let emailSent = false;
-        if (shouldSendEmail) {
-          const parentProfile = await db.query.profiles.findFirst({
-            where: eq(profiles.id, parentId),
-            columns: { accountId: true },
-          });
-          const parentAccount = parentProfile?.accountId
-            ? await db.query.accounts.findFirst({
-                where: eq(accounts.id, parentProfile.accountId),
-                columns: { email: true },
-              })
-            : null;
-          const parentEmail = parentAccount?.email ?? null;
-
-          if (parentEmail) {
-            const emailPayload = formatWeeklyProgressEmail(
-              parentEmail,
-              childSummaries,
-              struggleLines,
-            );
-            const emailResult = await sendEmail(emailPayload, {
-              resendApiKey: getStepResendApiKey(),
-              idempotencyKey: `weekly-${parentId}-${reportWeek}`,
             });
-            emailSent = emailResult.sent;
-            if (emailSent && !pushResult?.sent) {
-              await logNotification(
-                db,
-                parentId,
-                'weekly_progress',
-                `email-${reportWeek}`,
-              );
-            }
-          } else {
-            // Expected: OAuth-only accounts or Clerk not exposing email field.
-            // emailSent flag in the return value already provides observability.
-          }
-        }
+          })
+        : null;
 
-        return {
-          status: pushResult?.sent || emailSent ? 'completed' : 'throttled',
-          parentId,
-        };
-      } catch (error) {
-        captureException(error, {
-          extra: { parentId, context: 'weekly-progress-push-generate' },
-        });
-        // [SWEEP-SILENT-RECOVERY / J-11] Returning { status: 'failed' } here
-        // resolves the step as a success — Inngest only retries on thrown
-        // errors. Without re-throw, transient DB/push errors are absorbed,
-        // the user never gets their weekly recap, and the dashboard counts
-        // it as completed. Re-throw lets Inngest retry and surface a real
-        // failure on terminal exhaustion. See daily-snapshot.ts:78-80.
-        throw error;
+      // Email channel: send when weekly_progress_email = true AND parent has
+      // accounts.email. The Resend call is isolated in its own Inngest step;
+      // if the later notification-log write fails, retries reuse this step's
+      // completed result instead of calling Resend a second time.
+      let emailSent = false;
+      if (prepared.shouldSendEmail && prepared.parentEmail) {
+        const emailResult = await step.run(
+          'send-weekly-progress-email',
+          async () => {
+            const emailPayload = formatWeeklyProgressEmail(
+              prepared.parentEmail!,
+              prepared.childSummaries,
+              prepared.struggleLines,
+            );
+            return sendEmail(emailPayload, {
+              resendApiKey: getStepResendApiKey(),
+              idempotencyKey: `weekly-${parentId}-${prepared.reportWeek}`,
+            });
+          },
+        );
+        emailSent = emailResult.sent;
+        if (emailSent && !pushResult?.sent) {
+          await step.run('log-weekly-progress-email', async () => {
+            const db = getStepDatabase();
+            await logNotification(
+              db,
+              parentId,
+              'weekly_progress',
+              `email-${prepared.reportWeek}`,
+            );
+          });
+        }
+      } else if (prepared.shouldSendEmail) {
+        // Expected: OAuth-only accounts or Clerk not exposing email field.
+        // emailSent flag in the return value already provides observability.
       }
-    });
+
+      return {
+        status: pushResult?.sent || emailSent ? 'completed' : 'throttled',
+        parentId,
+      };
+    } catch (error) {
+      captureException(error, {
+        extra: { parentId, context: 'weekly-progress-push-generate' },
+      });
+      // [SWEEP-SILENT-RECOVERY / J-11] Returning { status: 'failed' } here
+      // resolves the step as a success — Inngest only retries on thrown
+      // errors. Without re-throw, transient DB/push errors are absorbed,
+      // the user never gets their weekly recap, and the dashboard counts
+      // it as completed. Re-throw lets Inngest retry and surface a real
+      // failure on terminal exhaustion. See daily-snapshot.ts:78-80.
+      throw error;
+    }
   },
 );
