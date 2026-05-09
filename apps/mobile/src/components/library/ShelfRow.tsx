@@ -1,7 +1,6 @@
 import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import type { RetentionStatus } from '@eduagent/schemas';
 import { useSubjectTint, useThemeColors } from '../../lib/theme';
 
 interface ShelfRowProps {
@@ -9,7 +8,8 @@ interface ShelfRowProps {
   name: string;
   bookCount: number;
   topicProgress: string; // "18/32"
-  retentionStatus: RetentionStatus | null;
+  reviewDueCount: number;
+  isFinished: boolean;
   isPaused: boolean;
   onPress: (subjectId: string) => void;
   testID?: string;
@@ -20,7 +20,8 @@ export function ShelfRow({
   name,
   bookCount,
   topicProgress,
-  retentionStatus,
+  reviewDueCount,
+  isFinished,
   isPaused,
   onPress,
   testID,
@@ -37,8 +38,8 @@ export function ShelfRow({
     progress: topicProgress,
   });
 
-  const needsReview =
-    retentionStatus === 'weak' || retentionStatus === 'forgotten';
+  const needsReview = reviewDueCount > 0;
+  const showFinished = isFinished && !needsReview;
 
   return (
     <View style={{ opacity: isPaused ? 0.65 : 1 }}>
@@ -51,7 +52,11 @@ export function ShelfRow({
           name,
           subtitle,
           pausedSuffix: isPaused ? t('library.row.shelfPausedSuffix') : '',
-          reviewSuffix: needsReview ? t('library.row.shelfReviewSuffix') : '',
+          reviewSuffix: needsReview
+            ? t('library.row.shelfReviewSuffix')
+            : showFinished
+              ? t('library.row.shelfFinishedSuffix')
+              : '',
           action: t('library.row.shelfActionOpen'),
         })}
         style={{
@@ -97,7 +102,7 @@ export function ShelfRow({
           </Text>
         </View>
 
-        {/* Right side: paused chip + review pill + chevron */}
+        {/* Right side: paused chip + status pill + chevron */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           {isPaused ? (
             <View
@@ -147,6 +152,36 @@ export function ShelfRow({
                 }}
               >
                 {t('library.row.review')}
+              </Text>
+            </View>
+          ) : null}
+
+          {showFinished ? (
+            <View
+              testID={`shelf-row-finished-${subjectId}`}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 3,
+                paddingHorizontal: 8,
+                paddingVertical: 2,
+                borderRadius: 10,
+                backgroundColor: colors.success + '22',
+              }}
+            >
+              <Ionicons
+                name="checkmark-circle"
+                size={12}
+                color={colors.success}
+              />
+              <Text
+                style={{
+                  fontSize: 11,
+                  fontWeight: '600',
+                  color: colors.success,
+                }}
+              >
+                {t('library.row.finished')}
               </Text>
             </View>
           ) : null}

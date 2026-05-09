@@ -277,6 +277,10 @@ export default function LibraryScreen() {
         bookCount: books.length,
         topicProgress: `${progress?.topicsCompleted ?? 0}/${progress?.topicsTotal ?? 0}`,
         retentionStatus,
+        reviewDueCount: retData?.reviewDueCount ?? 0,
+        isFinished:
+          (progress?.topicsTotal ?? 0) > 0 &&
+          (progress?.topicsVerified ?? 0) >= (progress?.topicsTotal ?? 0),
         isPaused: subject?.status !== 'active',
       };
     });
@@ -611,13 +615,15 @@ export default function LibraryScreen() {
           <View testID="shelves-list">
             {visibleSubjects.map((subject) => {
               const retData = retentionDataBySubjectId.get(subject.id);
-              const retentionStatus = computeShelfRetention(retData);
               const books = booksBySubjectId.get(subject.id) ?? [];
               const bookCount = books.length;
               const progress = progressBySubjectId.get(subject.id);
               const topicsTotal = progress?.topicsTotal ?? 0;
               const topicsCompleted = progress?.topicsCompleted ?? 0;
               const topicProgress = `${topicsCompleted}/${topicsTotal}`;
+              const isFinished =
+                topicsTotal > 0 &&
+                (progress?.topicsVerified ?? 0) >= topicsTotal;
 
               return (
                 <ShelfRow
@@ -626,7 +632,8 @@ export default function LibraryScreen() {
                   name={subject.name}
                   bookCount={bookCount}
                   topicProgress={topicProgress}
-                  retentionStatus={retentionStatus}
+                  reviewDueCount={retData?.reviewDueCount ?? 0}
+                  isFinished={isFinished}
                   isPaused={subject.status !== 'active'}
                   onPress={handleShelfPress}
                 />

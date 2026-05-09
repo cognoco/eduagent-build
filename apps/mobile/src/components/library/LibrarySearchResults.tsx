@@ -12,6 +12,8 @@ export interface EnrichedSubjectResult {
   bookCount: number;
   topicProgress: string;
   retentionStatus: RetentionStatus | null;
+  reviewDueCount: number;
+  isFinished: boolean;
   isPaused: boolean;
 }
 
@@ -391,7 +393,8 @@ export function LibrarySearchResults({
               name={subject.name}
               bookCount={subject.bookCount}
               topicProgress={subject.topicProgress}
-              retentionStatus={subject.retentionStatus}
+              reviewDueCount={subject.reviewDueCount}
+              isFinished={subject.isFinished}
               isPaused={subject.isPaused}
               onPress={onSubjectPress}
             />
