@@ -32,7 +32,7 @@ export function OutboxDrainProvider({
   children,
 }: {
   children: React.ReactNode;
-}): React.ReactElement {
+}): React.ReactNode {
   const client = useApiClient();
   const { getToken } = useAuth();
   const { activeProfile } = useProfile();
@@ -189,5 +189,5 @@ export function OutboxDrainProvider({
     return () => sub.remove();
   }, [runDrain]);
 
-  return <>{children}</>;
+  return children;
 }

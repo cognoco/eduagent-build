@@ -801,6 +801,7 @@ function SubscriptionContent(): React.ReactElement {
     client,
     refetchSub,
     refetchUsage,
+    t,
   ]);
 
   // ---------------------------------------------------------------------------
@@ -908,6 +909,7 @@ function SubscriptionContent(): React.ReactElement {
       queryClient,
       activeProfile?.id,
       client,
+      t,
     ]
   );
 
@@ -940,7 +942,7 @@ function SubscriptionContent(): React.ReactElement {
         ]
       );
     }
-  }, []);
+  }, [t]);
 
   // ---------------------------------------------------------------------------
   // Top-up handler — RevenueCat consumable IAP + poll for webhook confirmation
@@ -1087,6 +1089,7 @@ function SubscriptionContent(): React.ReactElement {
     usage,
     queryClient,
     activeProfile?.id,
+    t,
   ]);
 
   const handleContactSupport = useCallback(async () => {

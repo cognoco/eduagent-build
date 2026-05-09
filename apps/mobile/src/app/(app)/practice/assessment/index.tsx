@@ -15,6 +15,7 @@ import {
 } from '../../../../hooks/use-assessments';
 import { formatApiError } from '../../../../lib/format-api-error';
 import { goBackOrReplace } from '../../../../lib/navigation';
+import { platformAlert } from '../../../../lib/platform-alert';
 import { Button } from '../../../../components/common/Button';
 import { ErrorFallback } from '../../../../components/common/ErrorFallback';
 import { isAssessmentReadinessReply } from './assessment-readiness';
@@ -197,9 +198,16 @@ export default function AssessmentScreen() {
               label={t('assessment.declineRefreshAction')}
               testID="assessment-decline-refresh"
               loading={declineRefresh.isPending}
-              onPress={() => {
-                void declineRefresh.mutateAsync();
-                goBackOrReplace(router, '/(app)/practice' as const);
+              onPress={async () => {
+                try {
+                  await declineRefresh.mutateAsync();
+                  goBackOrReplace(router, '/(app)/practice' as const);
+                } catch (err: unknown) {
+                  platformAlert(
+                    t('assessment.declineRefreshAction'),
+                    formatApiError(err),
+                  );
+                }
               }}
             />
           </View>

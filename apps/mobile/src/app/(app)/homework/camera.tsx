@@ -162,7 +162,7 @@ export default function CameraScreen(): React.ReactNode {
       });
     }, OCR_UI_TIMEOUT_MS);
     return () => clearTimeout(timeoutId);
-  }, [state.phase, ocr]);
+  }, [state.phase, ocr, t]);
 
   const combinedProblemText = getHomeworkProblemText(draftProblems);
   const homeworkCaptureSource = state.imageUri ? state.source : undefined;
@@ -622,6 +622,7 @@ export default function CameraScreen(): React.ReactNode {
     manualText,
     classifyMutation,
     homeworkCaptureSource,
+    t,
   ]);
 
   const handleManualPickSubject = useCallback(

@@ -119,7 +119,7 @@ export default function RecallTestScreen() {
         }
       );
     },
-    [topicId, submitRecallTest]
+    [topicId, submitRecallTest, t]
   );
 
   const handleReviewRetest = useCallback(() => {
@@ -193,7 +193,7 @@ export default function RecallTestScreen() {
         },
       }
     );
-  }, [dontRememberCount, submitRecallTest, topicId]);
+  }, [dontRememberCount, submitRecallTest, topicId, t]);
 
   if (!topicId) {
     return (

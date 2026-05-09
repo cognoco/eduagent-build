@@ -143,7 +143,7 @@ export default function SavedBookmarksScreen() {
         ]
       );
     },
-    [deleteBookmark]
+    [deleteBookmark, t]
   );
 
   return (

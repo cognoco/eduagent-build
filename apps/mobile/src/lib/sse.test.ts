@@ -410,8 +410,8 @@ describe('streamSSEViaXHR', () => {
 
     let caught: unknown = null;
     try {
-      for await (const _ of events) {
-        // drain
+      for await (const event of events) {
+        void event; // drain — consume without using
       }
     } catch (err) {
       caught = err;
@@ -432,8 +432,8 @@ describe('streamSSEViaXHR', () => {
 
     let caught: unknown = null;
     try {
-      for await (const _ of events) {
-        // drain
+      for await (const event of events) {
+        void event; // drain — consume without using
       }
     } catch (err) {
       caught = err;
@@ -457,8 +457,8 @@ describe('streamSSEViaXHR', () => {
 
     let caught: unknown = null;
     try {
-      for await (const _ of events) {
-        // drain
+      for await (const event of events) {
+        void event; // drain — consume without using
       }
     } catch (err) {
       caught = err;
@@ -479,8 +479,8 @@ describe('streamSSEViaXHR', () => {
 
     let caught: unknown = null;
     try {
-      for await (const _ of events) {
-        // drain
+      for await (const event of events) {
+        void event; // drain — consume without using
       }
     } catch (err) {
       caught = err;

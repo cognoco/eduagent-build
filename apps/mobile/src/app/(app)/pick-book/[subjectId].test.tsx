@@ -188,9 +188,11 @@ describe('PickBookScreen', () => {
   it('seeds the shelf ancestor before pushing the book leaf on suggestion success', async () => {
     const { getByText } = render(<PickBookScreen />, { wrapper: TestWrapper });
 
+    // 3000ms allows for the 800ms useStickyLoading hold plus React re-render
+    // overhead that accumulates after prior tests in this file.
     await waitFor(() => {
       getByText('Europe');
-    });
+    }, { timeout: 3000 });
     fireEvent.press(getByText('Europe'));
 
     await waitFor(() => {

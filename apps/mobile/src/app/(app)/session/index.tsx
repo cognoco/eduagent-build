@@ -1420,8 +1420,12 @@ function SessionScreenInner() {
   const skipWarmupChip = showSkipWarmup ? (
     <View className="flex-row items-center gap-2 px-4 pb-2">
       <Pressable
-        onPress={() => {
-          void clearContinuationDepth.mutateAsync();
+        onPress={async () => {
+          try {
+            await clearContinuationDepth.mutateAsync();
+          } catch {
+            platformAlert('Could not skip warm-up', 'Please try again.');
+          }
         }}
         disabled={clearContinuationDepth.isPending}
         className="bg-surface-elevated rounded-full px-3 py-1.5 items-center justify-center"

@@ -137,7 +137,7 @@ export default function ProfilesScreen() {
     }
 
     router.push('/create-profile');
-  }, [subscription, familyData, router, profiles.length]);
+  }, [subscription, familyData, router, profiles.length, t]);
 
   // UX-DE-L13: timeout on profile switch
   const handleSwitch = async (profileId: string) => {

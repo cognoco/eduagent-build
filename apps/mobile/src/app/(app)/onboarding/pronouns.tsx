@@ -166,7 +166,7 @@ export default function PronounsScreen(): React.ReactElement {
         },
       }
     );
-  }, [effectivePronouns, updatePronouns, navigateForward]);
+  }, [effectivePronouns, updatePronouns, navigateForward, t]);
 
   // While age-gate redirect is in flight, render nothing (brief flicker) —
   // below-13 learners should never see the form even momentarily.
