@@ -30,11 +30,13 @@ export function WeeklyReportCard({
   const { t } = useTranslation();
   const reportsQuery = useProfileWeeklyReports(profileId);
   const latest = reportsQuery.data?.[0];
+  const mini = thisWeekMini ?? {
+    sessions: 0,
+    wordsLearned: 0,
+    topicsTouched: 0,
+  };
   const hasMiniSummary =
-    !!thisWeekMini &&
-    (thisWeekMini.sessions > 0 ||
-      thisWeekMini.wordsLearned > 0 ||
-      thisWeekMini.topicsTouched > 0);
+    mini.sessions > 0 || mini.wordsLearned > 0 || mini.topicsTouched > 0;
 
   return (
     <View className="bg-surface rounded-card p-4 mt-6" testID="weekly-report">
@@ -70,24 +72,24 @@ export function WeeklyReportCard({
             <View className="bg-surface rounded-full px-3 py-1.5">
               <Text className="text-caption font-semibold text-text-primary">
                 {t('progress.weeklyReport.mini.sessions', {
-                  count: thisWeekMini.sessions,
+                  count: mini.sessions,
                 })}
               </Text>
             </View>
-            {thisWeekMini.wordsLearned > 0 ? (
+            {mini.wordsLearned > 0 ? (
               <View className="bg-surface rounded-full px-3 py-1.5">
                 <Text className="text-caption font-semibold text-text-primary">
                   {t('progress.weeklyReport.mini.words', {
-                    count: thisWeekMini.wordsLearned,
+                    count: mini.wordsLearned,
                   })}
                 </Text>
               </View>
             ) : null}
-            {thisWeekMini.topicsTouched > 0 ? (
+            {mini.topicsTouched > 0 ? (
               <View className="bg-surface rounded-full px-3 py-1.5">
                 <Text className="text-caption font-semibold text-text-primary">
                   {t('progress.weeklyReport.mini.topics', {
-                    count: thisWeekMini.topicsTouched,
+                    count: mini.topicsTouched,
                   })}
                 </Text>
               </View>
