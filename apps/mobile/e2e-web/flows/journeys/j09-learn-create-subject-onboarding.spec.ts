@@ -1,7 +1,26 @@
 import { expect, test } from '@playwright/test';
 import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
 
-test('J-09 learner → Learn → create subject → interview → curriculum → start session', async ({
+/**
+ * J-09 — empty home → Add a subject → first session screen
+ *
+ * Covers BUG-1000: After successful subject creation the learner must land on
+ * an actionable surface (the session chat), not on a stuck empty curriculum
+ * state.
+ *
+ * The legacy interview/curriculum-review/analogy/accommodation flow was
+ * removed in commit f0cbf5ee (refactor: remove legacy interview flow). The
+ * new flow for a language subject is:
+ *   create-subject (resolve + accept)
+ *     → /(app)/onboarding/language-setup (calibrate native lang + level)
+ *     → POST /v1/subjects/:id/sessions/first-curriculum
+ *     → /(app)/session (chat-input visible).
+ *
+ * This test asserts that the learner reaches the session chat with the
+ * expected URL — i.e. that BUG-1000's "stuck on empty curriculum" symptom
+ * cannot happen on the current flow.
+ */
+test('J-09 learner → Add a subject → language setup → session chat', async ({
   page,
 }) => {
   await seedAndSignIn(page, {
@@ -15,88 +34,52 @@ test('J-09 learner → Learn → create subject → interview → curriculum →
   await expect(page.getByTestId('home-empty-subjects')).toBeVisible({
     timeout: 30_000,
   });
-  await page.getByText('Add a subject').click();
+  // React Native Web Pressable wires onPress to pointerdown/pointerup in
+  // its responder system. A standard Playwright click occasionally hangs on
+  // the post-action stability wait when the source button is removed mid-
+  // click by the navigation. Drive the pointer events explicitly so React
+  // Native Web's PressResponder fires onPress.
+  const addCta = page.getByTestId('home-add-first-subject');
+  await addCta.dispatchEvent('pointerdown');
+  await addCta.dispatchEvent('pointerup');
+  await addCta.dispatchEvent('click');
   await expect(page.getByTestId('create-subject-name')).toBeVisible({
     timeout: 30_000,
   });
 
-  // Type a focused subject name and submit — real API resolves it and creates
-  // the focused-book path that proceeds directly to interview.
-  await page
-    .getByTestId('create-subject-name')
-    .fill('Italian verb conjugation - essere and avere');
+  // Type "Italian" — resolves to a language (four_strands) subject which
+  // routes through the language-setup calibration screen.
+  await page.getByTestId('create-subject-name').fill('Italian');
+  // The TextInput has no onSubmitEditing handler — submission must go
+  // through the explicit Start Learning button (testID create-subject-submit).
   await page.getByTestId('create-subject-submit').click();
-  await expect(page.getByText(/shall we go with that/i)).toBeVisible({
-    timeout: 30_000,
-  });
-  await page.getByRole('button', { name: /accept suggestion/i }).click();
 
-  // Interview screen: wait for the chat input to appear
-  await expect(page.getByTestId('chat-input')).toBeVisible({ timeout: 30_000 });
-
-  // First exchange — send a message and wait for the streamed response
-  await page
-    .getByTestId('chat-input')
-    .fill('I want to learn about stars and the moon.');
-  await page.getByTestId('send-button').click();
-  await expect(page.getByTestId('thinking-bulb-animation')).toBeVisible({
-    timeout: 15_000,
-  });
-  await expect(page.getByTestId('thinking-bulb-animation')).toBeHidden({
+  // The resolver may render a suggestion card OR jump straight into the
+  // language-setup flow when it can determine the subject confidently. If
+  // a suggestion appears, accept it; otherwise proceed.
+  const suggestionAccept = page.getByTestId('subject-suggestion-accept');
+  const calibrationTitle = page.getByTestId('language-setup-calibration-title');
+  await expect(suggestionAccept.or(calibrationTitle)).toBeVisible({
     timeout: 60_000,
   });
-
-  // Second exchange — after this the skip-interview-button becomes available
-  // (it appears once exchangeCount >= 2 per the BUG-464 escape hatch)
-  await page
-    .getByTestId('chat-input')
-    .fill('I find the phases of the moon interesting.');
-  await page.getByTestId('send-button').click();
-  await expect(page.getByTestId('thinking-bulb-animation')).toBeVisible({
-    timeout: 15_000,
-  });
-  await expect(page.getByTestId('thinking-bulb-animation')).toBeHidden({
-    timeout: 60_000,
-  });
-
-  // Use the deterministic escape hatch: skip interview after 2+ exchanges.
-  // This forces curriculum generation immediately rather than waiting on the
-  // LLM to emit isComplete in the done envelope.
-  await expect(page.getByTestId('skip-interview-button')).toBeVisible({
-    timeout: 10_000,
-  });
-  await page.getByTestId('skip-interview-button').click();
-
-  // Some completions route through the explicit "view curriculum" handoff,
-  // while others advance directly to the analogy-preference step.
-  await expect(
-    page
-      .getByTestId('view-curriculum-button')
-      .or(page.getByTestId('analogy-preference-title'))
-  ).toBeVisible({ timeout: 30_000 });
-  if ((await page.getByTestId('view-curriculum-button').count()) > 0) {
-    await page.getByTestId('view-curriculum-button').click();
-    await expect(page.getByTestId('analogy-preference-title')).toBeVisible({
-      timeout: 30_000,
-    });
+  if (await suggestionAccept.isVisible()) {
+    await suggestionAccept.click();
   }
 
-  // Analogy preference step — skip it
-  await page.getByTestId('analogy-skip-button').click();
+  // Language setup calibration screen — pick native language + level.
+  await expect(
+    page.getByTestId('language-setup-calibration-title'),
+  ).toBeVisible({ timeout: 30_000 });
+  // Default native language is the device locale; tap English explicitly so
+  // the test is deterministic across environments.
+  await page.getByTestId('native-language-en').click();
+  await page.getByTestId('level-beginner').click();
+  await page.getByTestId('language-setup-continue').click();
 
-  // Accommodation step — skip it
-  await expect(page.getByTestId('accommodation-skip')).toBeVisible({
-    timeout: 30_000,
-  });
-  await page.getByTestId('accommodation-skip').click();
-
-  // Curriculum screen with start button
-  await expect(page.getByTestId('start-learning-button')).toBeVisible({
-    timeout: 30_000,
-  });
-  await page.getByTestId('start-learning-button').click();
-
-  // Session screen is open
-  await expect(page.getByTestId('chat-input')).toBeVisible({ timeout: 30_000 });
+  // BUG-1000: After language-setup continues, the API kicks off curriculum
+  // generation and the mobile client polls /sessions/first-curriculum until
+  // a topic is ready. The user MUST land on the session chat — not on a
+  // "no curriculum yet" empty state.
+  await expect(page.getByTestId('chat-input')).toBeVisible({ timeout: 60_000 });
   await expect(page).toHaveURL(/\/session(?:\?.*)?$/);
 });
