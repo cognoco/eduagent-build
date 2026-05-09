@@ -108,7 +108,13 @@ carries a `// gc1-allow: <reason>` opt-out.
 
 ```bash
 BASE_REF="${BASE_REF:-main}"
-violations=$(git diff "origin/${BASE_REF}...HEAD" -- '*.test.ts' '*.test.tsx' \
+# Separate the diff call from the grep pipeline so a ref-resolution failure
+# (e.g. CI runner without origin/main fetched) is fatal, not silently "clean".
+if ! diff_output=$(git diff "origin/${BASE_REF}...HEAD" -- '*.test.ts' '*.test.tsx'); then
+    echo "GC1 check failed: could not diff against origin/${BASE_REF}" >&2
+    exit 1
+fi
+violations=$(printf '%s\n' "$diff_output" \
     | grep -E '^\+[^+]' \
     | grep -E "jest\.mock\(['\"\`]\.\.?/" \
     | grep -iv 'gc1-allow' \

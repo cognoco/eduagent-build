@@ -86,7 +86,13 @@ checks_json="$ARTIFACTS_DIR/ci-attempt-${ITER}-checks.json"
 
 # One non-blocking snapshot first. We only fall into `--watch` if there are
 # still-pending checks; if the run is already terminal we skip the wait.
-gh pr checks "$PR" --json name,state,bucket,link,workflow > "$checks_json" 2>&1 || true
+# Fail-closed: a `gh pr checks` error means we cannot reason about CI state,
+# so don't paper over it with `|| true` (which would silently produce
+# has_pending=0/has_failed=0 and emit a false ALL_CHECKS_GREEN_OR_GIVEUP).
+if ! gh pr checks "$PR" --json name,state,bucket,link,workflow > "$checks_json" 2>&1; then
+    echo "ERROR: failed to fetch PR checks for #${PR}" >&2
+    exit 1
+fi
 
 has_pending=$(jq -e '[.[] | select(.bucket == "pending")] | length > 0' "$checks_json" > /dev/null 2>&1 && echo 1 || echo 0)
 has_failed=$(jq  -e '[.[] | select(.bucket == "fail" or .bucket == "cancel")] | length > 0' "$checks_json" > /dev/null 2>&1 && echo 1 || echo 0)
@@ -121,11 +127,17 @@ if [[ "$has_pending" -eq 1 ]]; then
     watch_rc=$?
     set -e
 
-    # Refresh post-watch snapshot.
-    gh pr checks "$PR" --json name,state,bucket,link,workflow > "$checks_json" 2>&1 || true
+    # Refresh post-watch snapshot. Same fail-closed rule as the immediate poll.
+    if ! gh pr checks "$PR" --json name,state,bucket,link,workflow > "$checks_json" 2>&1; then
+        echo "ERROR: failed to refresh PR checks for #${PR} after watch" >&2
+        exit 1
+    fi
 
-    # Re-evaluate green after the watch returns.
-    if [[ "$watch_rc" -eq 0 ]] || ! jq -e '[.[] | select(.bucket == "fail" or .bucket == "cancel")] | length > 0' "$checks_json" > /dev/null 2>&1; then
+    # Re-evaluate green after the watch returns. Compute pending and failed
+    # explicitly rather than treating a jq parse failure as "no failed = green".
+    pending_after_watch=$(jq '[.[] | select(.bucket == "pending")] | length' "$checks_json")
+    failed_after_watch=$(jq '[.[] | select(.bucket == "fail" or .bucket == "cancel")] | length' "$checks_json")
+    if [[ "$pending_after_watch" -eq 0 && "$failed_after_watch" -eq 0 ]]; then
         if [[ "${WORKTREE_DIRTY:-0}" -eq 1 ]]; then
             echo "NOTE: All CI checks green on PR #${PR} after watch, but local worktree is dirty (informational)." >&2
         fi
@@ -406,7 +418,15 @@ Mirror the recipe from `cleanup-validate.md` Phase 2.5:
 
 ```bash
 BASE_REF="${BASE_REF:-main}"
-violations=$(git diff "origin/${BASE_REF}...HEAD" -- '*.test.ts' '*.test.tsx' \
+# Separate the diff call from the grep pipeline so a ref-resolution failure
+# is fatal, not silently "clean". (GC1 parity with cleanup-validate.md.)
+if ! diff_output=$(git diff "origin/${BASE_REF}...HEAD" -- '*.test.ts' '*.test.tsx'); then
+    echo "GC1 check failed: could not diff against origin/${BASE_REF}" >&2
+    fix_applied="local validation rejected (GC1 diff resolution failed)"
+    LOCAL_VALIDATION_FAILED=1
+    diff_output=""
+fi
+violations=$(printf '%s\n' "$diff_output" \
     | grep -E '^\+[^+]' \
     | grep -E "jest\.mock\(['\"\`]\.\.?/" \
     | grep -iv 'gc1-allow' \

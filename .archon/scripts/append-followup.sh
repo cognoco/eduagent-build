@@ -47,7 +47,14 @@ while [[ $# -gt 0 ]]; do
         --severity) severity="${2:?--severity requires value}"; shift 2;;
         --platform) platform_csv="${2:?--platform requires value}"; shift 2;;
         --title)    title="${2:?--title requires value}";       shift 2;;
-        --body)     body="${2:-}";                              shift 2;;
+        --body)
+            if [[ $# -lt 2 ]]; then
+                echo "ERROR: --body requires a value (use --body '' for empty)." >&2
+                usage
+            fi
+            body="$2"
+            shift 2
+            ;;
         --help|-h)  usage;;
         *) echo "Unknown arg: $1" >&2; usage;;
     esac

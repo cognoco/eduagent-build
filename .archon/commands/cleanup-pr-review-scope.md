@@ -182,7 +182,7 @@ git show "origin/main:<file>" 2>/dev/null | rg -n '<expected pattern>' || \
     echo "INVARIANT NOT IN origin/main — flag is legitimate"
 
 # Verify the diff did not remove it
-git diff origin/main...HEAD -- '<file>' | rg -E '^-[^-].*<expected pattern>' || \
+git diff origin/main...HEAD -- '<file>' | rg '^-[^-].*<expected pattern>' || \
     echo "DIFF DOES NOT REMOVE the invariant"
 ```
 

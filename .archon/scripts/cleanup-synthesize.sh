@@ -231,6 +231,14 @@ adv_h="$(jq '[.findings[] | select(.source == "adversarial" and .severity == "HI
 adv_m="$(jq '[.findings[] | select(.source == "adversarial" and .severity == "MEDIUM")] | length' "$out_json")"
 adv_l="$(jq '[.findings[] | select(.source == "adversarial" and .severity == "LOW")] | length' "$out_json")"
 
+# Synthesizer-emitted findings (e.g. MISSING-ARTIFACT). Without their own row,
+# the per-source rows would not sum to the Total when synthetics fire.
+syn_total="$(jq '[.findings[] | select(.source == "synthesize")] | length' "$out_json")"
+syn_c="$(jq '[.findings[] | select(.source == "synthesize" and .severity == "CRITICAL")] | length' "$out_json")"
+syn_h="$(jq '[.findings[] | select(.source == "synthesize" and .severity == "HIGH")] | length' "$out_json")"
+syn_m="$(jq '[.findings[] | select(.source == "synthesize" and .severity == "MEDIUM")] | length' "$out_json")"
+syn_l="$(jq '[.findings[] | select(.source == "synthesize" and .severity == "LOW")] | length' "$out_json")"
+
 # Render a findings section for one severity level
 # Usage: render_severity_section <severity>
 render_severity_section() {
@@ -283,6 +291,7 @@ HEADER
 | Code Review | ${cr_c} | ${cr_h} | ${cr_m} | ${cr_l} | ${cr_total} |
 | Test Coverage | ${tc_c} | ${tc_h} | ${tc_m} | ${tc_l} | ${tc_total} |
 | Adversarial Review | ${adv_c} | ${adv_h} | ${adv_m} | ${adv_l} | ${adv_total} |
+| Synthesized | ${syn_c} | ${syn_h} | ${syn_m} | ${syn_l} | ${syn_total} |
 | **Total** | **${n_critical}** | **${n_high}** | **${n_medium}** | **${n_low}** | **${total}** |
 
 ---

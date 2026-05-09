@@ -45,7 +45,9 @@ for rid in "$RUN_A" "$RUN_B"; do
 done
 
 DB="$HOME/.archon/archon.db"
-ARTIFACTS_ROOT="$HOME/.archon/workspaces/cognoco/eduagent-build/artifacts/runs"
+# ARTIFACTS_ROOT can be overridden via env. Default targets the current repo
+# layout; portability for forks/other repos is opt-in until needed.
+: "${ARTIFACTS_ROOT:=$HOME/.archon/workspaces/cognoco/eduagent-build/artifacts/runs}"
 
 A_DIR="$ARTIFACTS_ROOT/$RUN_A"
 B_DIR="$ARTIFACTS_ROOT/$RUN_B"

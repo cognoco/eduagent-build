@@ -16,7 +16,14 @@
         "required": ["id", "source", "severity", "category", "file", "summary"],
         "properties": {
           "id": { "type": "string" },
-          "source": { "enum": ["code-review", "test-coverage", "adversarial"] },
+          "source": {
+            "enum": [
+              "code-review",
+              "test-coverage",
+              "adversarial",
+              "synthesize"
+            ]
+          },
           "severity": { "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"] },
           "category": { "type": "string" },
           "file": { "type": "string" },

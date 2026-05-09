@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+# Renders the PR body for a cleanup-PR run.
+#
+# Side effect: writes the rendered body to ${artifacts_dir}/.pr-body.md
+#   and the PR title to ${artifacts_dir}/.pr-title.
+# Stdout:      the path to the generated body file (NOT the body itself).
+#              Callers consume the path, e.g.:
+#                ./create-pr.sh "$(./cleanup-create-pr-body.sh "$ARTIFACTS_DIR")"
 set -euo pipefail
 # shellcheck source=./_env.sh
 source "$(dirname "${BASH_SOURCE[0]}")/_env.sh"
@@ -78,7 +85,7 @@ if [[ -f "$validation" ]]; then
         validation_section="$(grep -E 'PASS|FAIL|✅|❌' "$validation" | head -10 || echo "(see validation.md)")"
     fi
 else
-    validation_section="- [x] TypeCheck\n- [x] Lint\n- [x] Tests\n- [x] GC1 ratchet"
+    validation_section=$'- [x] TypeCheck\n- [x] Lint\n- [x] Tests\n- [x] GC1 ratchet'
 fi
 
 # ---------------------------------------------------------------------------

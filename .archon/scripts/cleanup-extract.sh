@@ -223,7 +223,11 @@ echo "Wrote: $ARTIFACTS_DIR/work-order.md"
             done
 
             if [[ -n "$test_sibling" ]]; then
-                test_count="$(grep -cE '^\s*(it|test)\(' "$test_sibling" 2>/dev/null || echo "?")"
+                # `grep -c` exits non-zero when there are zero matches even though
+                # it prints "0" to stdout. Capture stdout, drop the exit status,
+                # and reserve "?" for the actual error path (empty output).
+                test_count="$(grep -cE '^\s*(it|test)\(' "$test_sibling" 2>/dev/null || true)"
+                test_count="${test_count:-?}"
                 echo "- Test sibling: \`${test_sibling}\` (${test_count} test cases)"
                 echo "- Action: append tests to existing file"
             else

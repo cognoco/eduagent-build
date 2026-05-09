@@ -20,8 +20,10 @@ allowed_files="$(grep -oE '\`[^`]+\`' "$wo" \
     | sort -u)"
 
 if [[ -z "$allowed_files" ]]; then
-    echo "WARNING: no file paths found in work-order.md — treating all files as allowed" >&2
-    exit 0
+    echo "ERROR: no file paths found in work-order.md — failing closed" >&2
+    echo "  (treating all files as allowed would silently disable the scope guard;" >&2
+    echo "   most likely the work-order is malformed or the extraction grep matched nothing)" >&2
+    exit 1
 fi
 
 allowed_count="$(echo "$allowed_files" | wc -l | tr -d ' ')"
@@ -38,7 +40,10 @@ else
     base="${BASE_BRANCH:-origin/main}"
     echo "WARNING: .pre-implement-sha not found — falling back to ${base}" >&2
 fi
-changed_files="$(git diff --name-only "${base}..HEAD" 2>/dev/null || true)"
+if ! changed_files="$(git diff --name-only "${base}..HEAD" 2>/dev/null)"; then
+    echo "ERROR: scope-guard: failed to diff against base ${base}" >&2
+    exit 1
+fi
 
 if [[ -z "$changed_files" ]]; then
     echo "Scope guard: clean — no files changed relative to ${base}"
@@ -68,8 +73,12 @@ while IFS= read -r file; do
     if [[ "$file" =~ \.(test|spec)\.(ts|tsx)$ ]]; then
         source_candidate="$(echo "$file" | sed -E 's/\.(test|spec)\.(ts|tsx)$/.\2/')"
         source_candidate_alt="$(echo "$file" | sed -E 's/\.(test|spec)\.tsx?$/.tsx/')"
-        if echo "$allowed_files" | grep -qxF "$source_candidate" \
-           || echo "$allowed_files" | grep -qxF "$source_candidate_alt"; then
+        # Also require the test file to have existed at the diff base — the
+        # implement constraint is "no NEW test files," so a brand-new sibling
+        # should NOT pass this exemption just because its source is claimed.
+        if (echo "$allowed_files" | grep -qxF "$source_candidate" \
+            || echo "$allowed_files" | grep -qxF "$source_candidate_alt") \
+           && git cat-file -e "${base}:${file}" 2>/dev/null; then
             is_test_sibling=true
         fi
     fi

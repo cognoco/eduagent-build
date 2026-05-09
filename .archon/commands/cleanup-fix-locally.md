@@ -182,7 +182,13 @@ Phase 2.5.
 
 ```bash
 BASE_REF="${BASE_REF:-main}"
-violations=$(git diff "origin/${BASE_REF}...HEAD" -- '*.test.ts' '*.test.tsx' \
+# Separate the diff call from the grep pipeline so a ref-resolution failure
+# is fatal, not silently "clean". (GC1 parity with cleanup-validate.md.)
+if ! diff_output=$(git diff "origin/${BASE_REF}...HEAD" -- '*.test.ts' '*.test.tsx'); then
+    echo "GC1 check failed: could not diff against origin/${BASE_REF}" >&2
+    exit 1
+fi
+violations=$(printf '%s\n' "$diff_output" \
     | grep -E '^\+[^+]' \
     | grep -E "jest\.mock\(['\"\`]\.\.?/" \
     | grep -iv 'gc1-allow' \

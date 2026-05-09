@@ -50,8 +50,21 @@ Cross-reference `work-order.md` phases against `progress.md`. For each phase
 NOT yet marked COMPLETED, check `phase-attempts.json`:
 
 - If `attempts[phase_id] < 3` → eligible.
-- If `attempts[phase_id] >= 3` → **blocked**. Skip it. Append to
-  `$ARTIFACTS_DIR/blocked.md`:
+- If `attempts[phase_id] >= 3` → **blocked**. Skip it.
+
+  **First, check whether this phase has already been recorded as blocked.**
+  Without this guard, every subsequent iteration re-appends a duplicate
+  `## BLOCKED:<phase-id>` and re-fires the P1 filer — spamming the Notion
+  tracker. Make the breaker idempotent:
+
+  ```bash
+  if rg -q "^## BLOCKED:${phase_id}$" "$ARTIFACTS_DIR/blocked.md" 2>/dev/null; then
+      # Already recorded — skip both the append AND the follow-up filer.
+      continue
+  fi
+  ```
+
+  Otherwise, append to `$ARTIFACTS_DIR/blocked.md`:
 
   ```
   ## BLOCKED:<phase-id>
