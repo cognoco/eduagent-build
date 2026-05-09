@@ -353,6 +353,12 @@ describe('Email digest channel — weekly', () => {
     await executeWeeklyGenerate(PARENT_ID, db);
 
     expect(mockSendEmail).toHaveBeenCalledTimes(1);
+    expect(mockLogNotification).toHaveBeenCalledWith(
+      db,
+      PARENT_ID,
+      'weekly_progress',
+      expect.stringMatching(/^email-\d{4}-\d{2}-\d{2}$/),
+    );
     expect(mockSendEmail).toHaveBeenCalledWith(
       expect.objectContaining({
         to: 'parent@example.com',
@@ -428,6 +434,12 @@ describe('Email digest channel — weekly', () => {
     expect(result).toEqual({ status: 'completed', parentId: PARENT_ID });
     expect(mockSendPushNotification).not.toHaveBeenCalled();
     expect(mockSendEmail).toHaveBeenCalledTimes(1);
+    expect(mockLogNotification).toHaveBeenCalledWith(
+      db,
+      PARENT_ID,
+      'weekly_progress',
+      expect.stringMatching(/^email-\d{4}-\d{2}-\d{2}$/),
+    );
   });
 
   // Break test 4: Struggle watch-line rendered with topic name when struggles non-empty

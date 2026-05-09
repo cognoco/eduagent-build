@@ -12,6 +12,7 @@
  *
  * Used by `useStreamMessage` to pipe real-time LLM tokens into the chat UI.
  */
+import { quotaExceededSchema } from '@eduagent/schemas';
 import {
   BadRequestError,
   ForbiddenError,
@@ -368,10 +369,11 @@ export function streamSSEViaXHR(
       return err;
     }
     if (status === 402) {
-      if (code === 'QUOTA_EXCEEDED' && parsed?.details) {
+      const quotaExceeded = quotaExceededSchema.safeParse(parsed);
+      if (quotaExceeded.success) {
         return new QuotaExceededError(
-          apiMessage ?? 'Quota exceeded',
-          parsed.details,
+          quotaExceeded.data.message,
+          quotaExceeded.data.details,
         );
       }
       return new Error(

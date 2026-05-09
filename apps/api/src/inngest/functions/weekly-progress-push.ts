@@ -521,7 +521,7 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
           },
         );
         emailSent = emailResult.sent;
-        if (emailSent && !pushResult?.sent) {
+        if (emailSent) {
           await step.run('log-weekly-progress-email', async () => {
             const db = getStepDatabase();
             await logNotification(

@@ -556,6 +556,40 @@ describe('streamSSEViaXHR', () => {
     expect((caught as Error).message).toContain('API error 402');
   });
 
+  it('[BUG-955] leaves quota-coded 402 responses with malformed details as generic API errors', async () => {
+    const xhr = installFakeXhr();
+    const { events } = streamSSEViaXHR('https://example.test/stream', {
+      method: 'POST',
+    });
+
+    xhr._emitError(
+      402,
+      JSON.stringify({
+        code: 'QUOTA_EXCEEDED',
+        message: 'Quota reached',
+        details: {
+          tier: 'plus',
+          reason: 'monthly',
+          monthlyLimit: 0,
+          usedThisMonth: 0,
+        },
+      }),
+    );
+
+    let caught: unknown = null;
+    try {
+      for await (const event of events) {
+        void event;
+      }
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as Error).name).not.toBe('QuotaExceededError');
+    expect((caught as Error).message).toContain('Quota reached');
+  });
+
   it('[BUG-955] leaves non-quota 402 responses as generic API errors', async () => {
     const xhr = installFakeXhr();
     const { events } = streamSSEViaXHR('https://example.test/stream', {

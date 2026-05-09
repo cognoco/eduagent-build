@@ -1906,9 +1906,9 @@ describe('session routes', () => {
       );
     });
 
-    // [BUG-866] Zero-token streams should recover from the parsed envelope
-    // instead of opening a Sentry error issue when completion succeeds.
-    it('[BUG-866] emits parsed reply and breadcrumbs when the stream completes with zero tokens', async () => {
+    // [BUG-866] Zero-token streams should recover from the parsed envelope,
+    // while still emitting a queryable Sentry event for the silent recovery.
+    it('[BUG-866] emits parsed reply and captures zero-token recovery when the stream completes with zero tokens', async () => {
       mockCaptureException.mockClear();
       mockAddBreadcrumb.mockClear();
       mockCaptureMessage.mockClear();
@@ -1943,10 +1943,6 @@ describe('session routes', () => {
       expect(body).toContain('Recovered parsed reply');
       expect(body).toContain('"type":"done"');
 
-      expect(mockCaptureException).not.toHaveBeenCalledWith(
-        expect.objectContaining({ message: 'Zero-token stream completed' }),
-        expect.anything(),
-      );
       expect(mockAddBreadcrumb).toHaveBeenCalledWith(
         'Zero-token stream completed',
         'sessions.stream',
@@ -1958,11 +1954,10 @@ describe('session routes', () => {
           recovery: 'parsed_reply',
         }),
       );
-      expect(mockCaptureMessage).toHaveBeenCalledWith(
-        'Zero-token stream completed',
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'Zero-token stream completed' }),
         expect.objectContaining({
           profileId: 'test-profile-id',
-          level: 'warning',
           extra: expect.objectContaining({
             sessionId: SESSION_ID,
             tokensReceived: 0,
