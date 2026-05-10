@@ -13,11 +13,18 @@ fi
 
 # Extract all backtick-wrapped paths that look like file paths (contain / and .)
 # from the work-order. Covers both the Files Summary table and per-phase Files lists.
+#
+# The trailing `|| true` is NOT a fail-open pattern. Under `set -euo pipefail`,
+# any grep in the chain that finds no matches exits 1, which (via pipefail)
+# fails the whole pipeline and (via set -e) kills the script BEFORE the
+# explicit empty-result check below runs. The `|| true` lets the pipeline
+# produce an empty string on no-match so the diagnostic at line below can fire.
+# The empty-allowed-files check IS the fail-closed gate.
 allowed_files="$(grep -oE '\`[^`]+\`' "$wo" \
     | tr -d '`' \
     | grep '/' \
     | grep '\.' \
-    | sort -u)"
+    | sort -u || true)"
 
 if [[ -z "$allowed_files" ]]; then
     echo "ERROR: no file paths found in work-order.md — failing closed" >&2
