@@ -10,11 +10,75 @@
 // No-ops gracefully when EXPO_PUBLIC_SENTRY_DSN is not set.
 // ---------------------------------------------------------------------------
 
+import type { EventHint } from '@sentry/core';
 import * as Sentry from '@sentry/react-native';
 
 /** Read DSN lazily so tests can set it after module load. */
 function getSentryDsn(): string | undefined {
   return process.env.EXPO_PUBLIC_SENTRY_DSN;
+}
+
+type ErrorEventLike = {
+  message?: unknown;
+  filename?: unknown;
+  lineno?: unknown;
+  colno?: unknown;
+  error?: unknown;
+  type?: unknown;
+};
+
+function isErrorEventLike(value: unknown): value is ErrorEventLike {
+  if (value == null || typeof value !== 'object') return false;
+  // ErrorEvent has filename + lineno; plain Error does not.
+  return 'filename' in value && 'lineno' in value;
+}
+
+/**
+ * Unwrap stringified ErrorEvent payloads so issue titles are readable.
+ *
+ * RN's XHR-based fetch polyfill and several global error handlers can pass
+ * a DOM-shaped ErrorEvent into Sentry's capture path. Sentry's default
+ * serializer falls back to String(errorEvent), which produces the useless
+ * "[object ErrorEvent]" message — losing the actual message, file, and
+ * source location. This rebuilds the exception value from the event's own
+ * properties before the event leaves the SDK.
+ */
+export function unwrapErrorEvent<T extends Sentry.ErrorEvent>(
+  event: T,
+  hint?: EventHint,
+): T {
+  const original = hint?.originalException;
+  if (!isErrorEventLike(original)) return event;
+
+  const inner = original.error;
+  const innerMessage =
+    inner instanceof Error && inner.message ? inner.message : null;
+  const ownMessage =
+    typeof original.message === 'string' && original.message
+      ? original.message
+      : null;
+  const message =
+    innerMessage ??
+    ownMessage ??
+    `Unhandled ErrorEvent at ${String(original.filename)}:${String(
+      original.lineno,
+    )}:${String(original.colno)}`;
+
+  if (event.exception?.values?.[0]) {
+    event.exception.values[0].value = message;
+    event.exception.values[0].type =
+      inner instanceof Error && inner.name ? inner.name : 'ErrorEvent';
+  } else {
+    event.message = message;
+  }
+  event.extra = {
+    ...event.extra,
+    errorEventFilename: original.filename,
+    errorEventLineno: original.lineno,
+    errorEventColno: original.colno,
+    errorEventType: original.type,
+  };
+  return event;
 }
 
 /** Whether Sentry.init() has ever been called (call at most once). */
@@ -38,8 +102,9 @@ export function enableSentry(): void {
       dsn: getSentryDsn(),
       tracesSampleRate: __DEV__ ? 1.0 : 0.1,
       debug: __DEV__,
-      beforeSend(event) {
-        return sentryActive ? event : null;
+      beforeSend(event, hint) {
+        if (!sentryActive) return null;
+        return unwrapErrorEvent(event, hint);
       },
       beforeSendTransaction(event) {
         return sentryActive ? event : null;

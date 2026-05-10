@@ -139,6 +139,7 @@ export const notificationTypeEnum = pgEnum('notification_type', [
   'dictation_review',
   'session_filing_failed',
   'interview_ready',
+  'nudge',
 ]);
 
 export const notificationLog = pgTable(

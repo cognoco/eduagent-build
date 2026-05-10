@@ -147,6 +147,47 @@
     "childCard": {
       "title": "Dzieci",
       "accessibilityLabel": "Otwórz Rodzinę"
+    },
+    "parent": {
+      "greeting": "Cześć {{displayName}}",
+      "intentHeader": "Czego teraz potrzebujesz?",
+      "encouragementNote": "Zachęty to krótkie, łagodne wiadomości w jedną stronę.",
+      "transitionNotice": "Jesteś teraz także rodzicem. To jest twój ekran główny - postępy dzieci i twoja nauka w jednym miejscu.",
+      "cards": {
+        "checkChild": "Sprawdź, jak idzie {{childName}}",
+        "checkChildFallback": "Dotknij, aby zobaczyć postępy z tego tygodnia",
+        "weeklyReport": "Przeczytaj tygodniowy raport profilu {{childName}}",
+        "weeklyReportSubtitle": "Zobacz najnowsze podsumowanie",
+        "sendNudge": "Wyślij zachętę do {{childName}}",
+        "sendNudgeSubtitle": "Wybierz krótką wiadomość wsparcia",
+        "continueOwn": "Kontynuuj własną naukę",
+        "continueOwnSubtitle": "Wróć do {{topicTitle}} w {{subjectName}}",
+        "continueOwnEmptySubtitle": "Wróć tam, gdzie przerwano"
+      }
+    }
+  },
+  "nudge": {
+    "sheet": {
+      "title": "Wyślij zachętę do {{childName}}",
+      "subtitle": "Wybierz krótką wiadomość wsparcia."
+    },
+    "templates": {
+      "you_got_this": "Dasz radę",
+      "proud_of_you": "Jestem z ciebie dumny/a",
+      "quick_session": "Może szybka sesja?",
+      "thinking_of_you": "Myślę o tobie"
+    },
+    "toast": {
+      "sent": "Zachęta wysłana"
+    },
+    "error": {
+      "rateLimit": "Na razie wysłano wystarczająco zachęt - {{childName}} zobaczy ją przy następnym otwarciu aplikacji.",
+      "consentPending": "Zgoda profilu {{childName}} jest w toku - zachęty zadziałają po zakończeniu konfiguracji."
+    },
+    "banner": {
+      "title": "{{fromDisplayName}} wysłał(a) ci zachętę",
+      "unreadCount": "{{count}} nowe",
+      "modalTitle": "Nowe zachęty"
     }
   },
   "dashboard": {

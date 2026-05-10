@@ -98,6 +98,8 @@ describe('profileScopeMiddleware', () => {
   });
 
   it('returns 403 with proper error body when profile does not belong to account', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const app = createApp();
     const res = await app.request('/test', {
       headers: { 'X-Profile-Id': 'other-account-profile' },
@@ -109,6 +111,18 @@ describe('profileScopeMiddleware', () => {
       code: 'FORBIDDEN',
       message: 'Profile does not belong to this account',
     });
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    const loggedJson = warnSpy.mock.calls[0][0] as string;
+    const logged = JSON.parse(loggedJson);
+    expect(logged.level).toBe('warn');
+    expect(logged.message).toBe('profile_scope.ownership_mismatch');
+    expect(logged.context).toMatchObject({
+      accountId: 'test-account-id',
+      requestedProfileId: 'other-account-profile',
+    });
+
+    warnSpy.mockRestore();
   });
 
   // [Finding #5] Break test: when X-Profile-Id is explicitly supplied but no

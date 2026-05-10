@@ -196,6 +196,11 @@ function isCoveredByPerProfileShape(rawArg: string): boolean {
         (s) => `child-paywall-notified-at-${s}`,
       ],
       [/^DISMISSED_KEY\([^)]*\)$/, (s) => `earlyAdopterDismissed_${s}`],
+      // ParentTransitionNotice.tsx — parentHomeSeenKey maps to sanitized key
+      [
+        /^parentHomeSeenKey\([^)]*\)$/,
+        (s) => `mentomate_parent_home_seen_${s}`,
+      ],
       // sanitizeSecureStoreKey wraps a template literal — handled by the
       // generic substitution path above (the `${...}` -> id replacement
       // already produced a sanitizable string; we run the sanitize fn here).

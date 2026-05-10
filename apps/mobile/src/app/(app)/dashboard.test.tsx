@@ -3,7 +3,7 @@ import { render } from '@testing-library/react-native';
 import DashboardRedirect from './dashboard';
 
 const mockUseLocalSearchParams = jest.fn();
-const mockRedirect = jest.fn(({ href }) => null);
+const mockRedirect = jest.fn((_props: { href: unknown }) => null);
 
 jest.mock('expo-router', () => ({
   Redirect: (props: { href: unknown }) => {
@@ -19,12 +19,12 @@ describe('DashboardRedirect (legacy /dashboard route)', () => {
     mockRedirect.mockReset();
   });
 
-  it('redirects to /(app)/family when no returnTo is provided', () => {
+  it('redirects to /(app)/home when no returnTo is provided', () => {
     mockUseLocalSearchParams.mockReturnValue({});
 
     render(<DashboardRedirect />);
 
-    expect(mockRedirect).toHaveBeenCalledWith({ href: '/(app)/family' });
+    expect(mockRedirect).toHaveBeenCalledWith({ href: '/(app)/home' });
   });
 
   it('preserves a string returnTo param', () => {
@@ -33,7 +33,7 @@ describe('DashboardRedirect (legacy /dashboard route)', () => {
     render(<DashboardRedirect />);
 
     expect(mockRedirect).toHaveBeenCalledWith({
-      href: { pathname: '/(app)/family', params: { returnTo: 'home' } },
+      href: { pathname: '/(app)/home', params: { returnTo: 'home' } },
     });
   });
 
@@ -43,7 +43,7 @@ describe('DashboardRedirect (legacy /dashboard route)', () => {
     render(<DashboardRedirect />);
 
     expect(mockRedirect).toHaveBeenCalledWith({
-      href: { pathname: '/(app)/family', params: { returnTo: 'more' } },
+      href: { pathname: '/(app)/home', params: { returnTo: 'more' } },
     });
   });
 });

@@ -3,10 +3,11 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, desc, and, sql, inArray } from 'drizzle-orm';
+import { eq, desc, and, sql, inArray, isNull } from 'drizzle-orm';
 import {
   consentStates,
   familyLinks,
+  nudges,
   profiles,
   type Database,
 } from '@eduagent/database';
@@ -40,7 +41,7 @@ export class EmailDeliveryError extends Error {
     super(
       reason
         ? `Consent email could not be delivered (${reason}). Please check the email address and try again.`
-        : 'Consent email could not be delivered. Please check the email address and try again.'
+        : 'Consent email could not be delivered. Please check the email address and try again.',
     );
     this.name = 'EmailDeliveryError';
   }
@@ -175,7 +176,7 @@ export function checkConsentRequired(birthYear: number): {
 export async function createPendingConsentState(
   db: Database,
   profileId: string,
-  consentType: ConsentType
+  consentType: ConsentType,
 ): Promise<ConsentState> {
   const [row] = await db
     .insert(consentStates)
@@ -214,7 +215,7 @@ export async function createGrantedConsentState(
   db: Database,
   profileId: string,
   consentType: ConsentType,
-  parentProfileId: string
+  parentProfileId: string,
 ): Promise<ConsentState> {
   const now = new Date();
 
@@ -282,7 +283,7 @@ export async function requestConsent(
   input: ConsentRequest,
   appUrl: string,
   emailOptions?: EmailOptions,
-  accountId?: string
+  accountId?: string,
 ): Promise<ConsentRequestResult> {
   // Verify childProfileId belongs to the calling account when accountId is provided.
   // Defense-in-depth: the route layer also enforces this via getProfile() before calling here.
@@ -293,8 +294,8 @@ export async function requestConsent(
       .where(
         and(
           eq(profiles.id, input.childProfileId),
-          eq(profiles.accountId, accountId)
-        )
+          eq(profiles.accountId, accountId),
+        ),
       );
     if (!owner) {
       throw new Error('Child profile not found');
@@ -359,9 +360,9 @@ export async function requestConsent(
       input.parentEmail,
       childName,
       input.consentType,
-      tokenUrl
+      tokenUrl,
     ),
-    emailOptions
+    emailOptions,
   );
 
   if (!emailResult.sent) {
@@ -412,7 +413,7 @@ export async function requestConsent(
 export async function processConsentResponse(
   db: Database,
   token: string,
-  approved: boolean
+  approved: boolean,
 ): Promise<ConsentState> {
   // 1. Look up consent record by token
   const row = await db.query.consentStates.findFirst({
@@ -450,8 +451,8 @@ export async function processConsentResponse(
       and(
         eq(consentStates.id, row.id),
         eq(consentStates.profileId, row.profileId),
-        sql`${consentStates.status} NOT IN ('CONSENTED', 'WITHDRAWN')`
-      )
+        sql`${consentStates.status} NOT IN ('CONSENTED', 'WITHDRAWN')`,
+      ),
     )
     .returning();
 
@@ -481,7 +482,7 @@ export async function processConsentResponse(
  */
 export async function getConsentStatus(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<ConsentStatus | null> {
   const row = await db.query.consentStates.findFirst({
     where: eq(consentStates.profileId, profileId),
@@ -497,7 +498,7 @@ export async function getConsentStatus(
  */
 export async function getChildNameByToken(
   db: Database,
-  token: string
+  token: string,
 ): Promise<string | null> {
   const consent = await db.query.consentStates.findFirst({
     where: eq(consentStates.consentToken, token),
@@ -513,7 +514,7 @@ export async function getChildNameByToken(
 
 export async function getProfileDisplayName(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<string | null> {
   const profile = await db.query.profiles.findFirst({
     where: eq(profiles.id, profileId),
@@ -524,7 +525,7 @@ export async function getProfileDisplayName(
 
 export async function getProfileForConsentRevocation(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<{
   displayName: string;
   birthYear: number;
@@ -541,7 +542,7 @@ export async function getProfileForConsentRevocation(
 export async function getFamilyOwnerProfileId(
   db: Database,
   childProfileId: string,
-  fallbackParentProfileId: string
+  fallbackParentProfileId: string,
 ): Promise<string> {
   const links = await db.query.familyLinks.findMany({
     where: eq(familyLinks.childProfileId, childProfileId),
@@ -551,7 +552,10 @@ export async function getFamilyOwnerProfileId(
   if (parentProfileIds.length === 0) return fallbackParentProfileId;
 
   const owners = await db.query.profiles.findMany({
-    where: and(inArray(profiles.id, parentProfileIds), eq(profiles.isOwner, true)),
+    where: and(
+      inArray(profiles.id, parentProfileIds),
+      eq(profiles.isOwner, true),
+    ),
     columns: { id: true },
   });
 
@@ -566,7 +570,7 @@ export async function getFamilyOwnerProfileId(
  */
 export async function getProfileConsentState(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<{
   status: ConsentStatus;
   parentEmail: string | null;
@@ -593,13 +597,13 @@ export async function getProfileConsentState(
 export async function getChildConsentForParent(
   db: Database,
   childProfileId: string,
-  parentProfileId: string
+  parentProfileId: string,
 ): Promise<ConsentState | null> {
   // Verify parent-child relationship
   const link = await db.query.familyLinks.findFirst({
     where: and(
       eq(familyLinks.childProfileId, childProfileId),
-      eq(familyLinks.parentProfileId, parentProfileId)
+      eq(familyLinks.parentProfileId, parentProfileId),
     ),
   });
   if (!link) {
@@ -628,13 +632,13 @@ export async function getChildConsentForParent(
 export async function revokeConsent(
   db: Database,
   childProfileId: string,
-  parentProfileId: string
+  parentProfileId: string,
 ): Promise<ConsentState> {
   // Verify parent-child relationship
   const link = await db.query.familyLinks.findFirst({
     where: and(
       eq(familyLinks.childProfileId, childProfileId),
-      eq(familyLinks.parentProfileId, parentProfileId)
+      eq(familyLinks.parentProfileId, parentProfileId),
     ),
   });
   if (!link) {
@@ -654,20 +658,31 @@ export async function revokeConsent(
   }
 
   const now = new Date();
-  const [row] = await db
-    .update(consentStates)
-    .set({
-      status: 'WITHDRAWN',
-      respondedAt: now,
-      updatedAt: now,
-    })
-    .where(
-      and(
-        eq(consentStates.id, existing.id),
-        eq(consentStates.profileId, childProfileId)
+  const [row] = await db.transaction(async (tx) => {
+    const updated = await tx
+      .update(consentStates)
+      .set({
+        status: 'WITHDRAWN',
+        respondedAt: now,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(consentStates.id, existing.id),
+          eq(consentStates.profileId, childProfileId),
+        ),
       )
-    )
-    .returning();
+      .returning();
+
+    await tx
+      .update(nudges)
+      .set({ readAt: now })
+      .where(
+        and(eq(nudges.toProfileId, childProfileId), isNull(nudges.readAt)),
+      );
+
+    return updated;
+  });
 
   if (!row) throw new Error('Update on consentStates did not return a row');
   return mapConsentRow(row);
@@ -680,13 +695,13 @@ export async function revokeConsent(
 export async function restoreConsent(
   db: Database,
   childProfileId: string,
-  parentProfileId: string
+  parentProfileId: string,
 ): Promise<ConsentState> {
   // Verify parent-child relationship
   const link = await db.query.familyLinks.findFirst({
     where: and(
       eq(familyLinks.childProfileId, childProfileId),
-      eq(familyLinks.parentProfileId, parentProfileId)
+      eq(familyLinks.parentProfileId, parentProfileId),
     ),
   });
   if (!link) {
@@ -720,8 +735,8 @@ export async function restoreConsent(
       .where(
         and(
           eq(consentStates.id, existing.id),
-          eq(consentStates.profileId, childProfileId)
-        )
+          eq(consentStates.profileId, childProfileId),
+        ),
       )
       .returning();
 

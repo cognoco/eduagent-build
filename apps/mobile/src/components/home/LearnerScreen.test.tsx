@@ -15,6 +15,12 @@ import {
   LEARNER_HOME_RETURN_TO,
 } from '../../lib/navigation';
 
+let mockLinkedChildren: Array<{
+  id: string;
+  displayName: string;
+  isOwner: boolean;
+}> = [];
+
 const mockFetch = createRoutedMockFetch({
   '/coaching-card': { coldStart: false, card: null, fallback: null },
   '/quiz/missed-items/mark-surfaced': { markedCount: 1 },
@@ -72,6 +78,8 @@ jest.mock('../../lib/profile', () => ({
       consentStatus: null,
     },
   }),
+  useLinkedChildren: () => mockLinkedChildren,
+  useHasLinkedChildren: () => mockLinkedChildren.length > 0,
   ProfileContext: {
     Provider: ({ children }: { children: React.ReactNode }) => children,
   },
@@ -197,6 +205,7 @@ describe('LearnerScreen', () => {
     mockReadSessionRecoveryMarker.mockResolvedValue(null);
     mockClearSessionRecoveryMarker.mockResolvedValue(undefined);
     mockIsRecoveryMarkerFresh.mockReturnValue(true);
+    mockLinkedChildren = [];
     Wrapper = createWrapper();
   });
 
@@ -238,7 +247,10 @@ describe('LearnerScreen', () => {
     });
   });
 
-  it('shows child card and hides quota line for owner with linked children', async () => {
+  it('shows parent Home for owner with linked children', async () => {
+    mockLinkedChildren = [
+      { id: 'child-id', displayName: 'Emma', isOwner: false },
+    ];
     mockFetch.setRoute('/dashboard', {
       children: [
         {
@@ -290,10 +302,11 @@ describe('LearnerScreen', () => {
     );
 
     await waitFor(() => {
-      screen.getByTestId('home-child-card');
-      screen.getByText('Emma');
-      screen.getByText('12 words learned — up from 5 last week');
-      expect(screen.queryByText(/questions left today/)).toBeNull();
+      screen.getByTestId('parent-home-screen');
+      screen.getByTestId('parent-home-check-child-child-id');
+      screen.getByText('See how Emma is doing');
+      screen.getByText('2 sessions this week');
+      screen.getByText(/7 questions left today.*84 left this month/);
     });
   });
 

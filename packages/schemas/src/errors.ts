@@ -70,6 +70,21 @@ export class RateLimitedError extends Error {
   }
 }
 
+export class ConsentRequiredError extends Error {
+  readonly errorCode = 'CONSENT_REQUIRED' as const;
+  readonly code: string | undefined;
+
+  constructor(
+    message = 'Consent is required before this action is available.',
+    code?: string,
+  ) {
+    super(message);
+    this.name = 'ConsentRequiredError';
+    this.code = code;
+    Object.setPrototypeOf(this, ConsentRequiredError.prototype);
+  }
+}
+
 export class UpstreamLlmError extends Error {
   readonly errorCode = 'UPSTREAM_LLM_ERROR' as const;
   constructor(message: string) {

@@ -147,6 +147,47 @@
     "childCard": {
       "title": "Crianças",
       "accessibilityLabel": "Abrir Família"
+    },
+    "parent": {
+      "greeting": "Oi, {{displayName}}",
+      "intentHeader": "O que voce precisa agora?",
+      "encouragementNote": "Nudges sao incentivos breves e gentis, sem resposta obrigatoria.",
+      "transitionNotice": "Agora voce tambem e responsavel. Esta e a sua tela inicial - progresso das criancas e seu proprio aprendizado em um so lugar.",
+      "cards": {
+        "checkChild": "Ver como {{childName}} esta indo",
+        "checkChildFallback": "Toque para ver o progresso desta semana",
+        "weeklyReport": "Ler o relatorio semanal de {{childName}}",
+        "weeklyReportSubtitle": "Veja o resumo mais recente",
+        "sendNudge": "Enviar um incentivo para {{childName}}",
+        "sendNudgeSubtitle": "Escolha uma mensagem curta de apoio",
+        "continueOwn": "Continuar seu proprio aprendizado",
+        "continueOwnSubtitle": "Continue {{topicTitle}} em {{subjectName}}",
+        "continueOwnEmptySubtitle": "Continue de onde parou"
+      }
+    }
+  },
+  "nudge": {
+    "sheet": {
+      "title": "Envie um incentivo para {{childName}}",
+      "subtitle": "Escolha uma mensagem curta de apoio."
+    },
+    "templates": {
+      "you_got_this": "Você consegue",
+      "proud_of_you": "Tenho orgulho de você",
+      "quick_session": "Quer fazer uma sessão rápida?",
+      "thinking_of_you": "Estou pensando em você"
+    },
+    "toast": {
+      "sent": "Incentivo enviado"
+    },
+    "error": {
+      "rateLimit": "Você já enviou incentivo suficiente por enquanto - {{childName}} verá na próxima vez que abrir o app.",
+      "consentPending": "O consentimento de {{childName}} está pendente - os incentivos funcionarão quando a configuração estiver pronta."
+    },
+    "banner": {
+      "title": "{{fromDisplayName}} enviou um incentivo para você",
+      "unreadCount": "{{count}} novos",
+      "modalTitle": "Novos incentivos"
     }
   },
   "dashboard": {

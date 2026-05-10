@@ -20,10 +20,10 @@ import type {
   LearningMode,
   CelebrationLevel,
   WithdrawalArchivePreference,
+  NotificationPayload,
 } from '@eduagent/schemas';
 import { ForbiddenError } from '@eduagent/schemas';
 import { assertParentAccess } from './family-access';
-import type { NotificationPayload } from './notifications';
 
 // ---------------------------------------------------------------------------
 // Types

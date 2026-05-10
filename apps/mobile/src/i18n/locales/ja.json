@@ -147,6 +147,23 @@
     "childCard": {
       "title": "子ども",
       "accessibilityLabel": "ファミリーを開く"
+    },
+    "parent": {
+      "greeting": "こんにちは、{{displayName}}",
+      "intentHeader": "今なにをしますか？",
+      "encouragementNote": "ナッジは短い応援メッセージです。返信は必要ありません。",
+      "transitionNotice": "保護者としてのホームも使えるようになりました。お子さんの進み具合と自分の学習をここで見られます。",
+      "cards": {
+        "checkChild": "{{childName}}さんの様子を見る",
+        "checkChildFallback": "今週の進み具合を見る",
+        "weeklyReport": "{{childName}}さんの週次レポートを読む",
+        "weeklyReportSubtitle": "最新のまとめを確認する",
+        "sendNudge": "{{childName}}さんにナッジを送る",
+        "sendNudgeSubtitle": "短い応援を選ぶ",
+        "continueOwn": "自分の学習を続ける",
+        "continueOwnSubtitle": "{{subjectName}}の{{topicTitle}}を続ける",
+        "continueOwnEmptySubtitle": "前回の続きから始める"
+      }
     }
   },
   "dashboard": {
@@ -2114,6 +2131,30 @@
       "title": "この会話は{{date}}にアーカイブされました。",
       "intro": "学習した内容:",
       "continueCta": "このトピックを続ける"
+    }
+  },
+  "nudge": {
+    "sheet": {
+      "title": "{{childName}}さんにナッジを送る",
+      "subtitle": "短い応援を選んでください。"
+    },
+    "templates": {
+      "you_got_this": "きっとできるよ",
+      "proud_of_you": "がんばっていてすごいね",
+      "quick_session": "短いセッションをしてみる？",
+      "thinking_of_you": "応援しているよ"
+    },
+    "toast": {
+      "sent": "ナッジを送信しました"
+    },
+    "error": {
+      "rateLimit": "今は十分に応援を送りました。{{childName}}さんは次にアプリを開いたときに見られます。",
+      "consentPending": "{{childName}}さんの同意がまだ完了していません。設定が終わるとナッジを送れます。"
+    },
+    "banner": {
+      "title": "{{fromDisplayName}}さんからナッジが届きました",
+      "unreadCount": "{{count}}件の新着",
+      "modalTitle": "新しいナッジ"
     }
   }
 }

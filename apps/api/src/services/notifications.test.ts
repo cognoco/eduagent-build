@@ -134,6 +134,53 @@ describe('sendPushNotification', () => {
     );
   });
 
+  it('forwards custom data fields to Expo payload data', async () => {
+    mockGetPushToken.mockResolvedValue('ExponentPushToken[abc123]');
+    mockGetDailyNotificationCount.mockResolvedValue(0);
+    mockFetchFn.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { id: 'ticket-xyz', status: 'ok' } }),
+    });
+    mockLogNotification.mockResolvedValue(undefined);
+
+    await sendPushNotification(mockDb, {
+      ...payload,
+      type: 'nudge',
+      data: {
+        nudgeId: 'nudge-1',
+        fromDisplayName: 'Parent',
+        templateKey: 'you_got_this',
+      },
+    });
+
+    const body = JSON.parse(mockFetchFn.mock.calls[0]?.[1]?.body as string) as {
+      data: Record<string, string>;
+    };
+    expect(body.data).toEqual({
+      type: 'nudge',
+      nudgeId: 'nudge-1',
+      fromDisplayName: 'Parent',
+      templateKey: 'you_got_this',
+    });
+  });
+
+  it('bypasses the daily cap when skipDailyCap is true', async () => {
+    mockGetPushToken.mockResolvedValue('ExponentPushToken[abc123]');
+    mockFetchFn.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { id: 'ticket-xyz', status: 'ok' } }),
+    });
+    mockLogNotification.mockResolvedValue(undefined);
+
+    const result = await sendPushNotification(mockDb, payload, {
+      skipDailyCap: true,
+    });
+
+    expect(result).toEqual({ sent: true, ticketId: 'ticket-xyz' });
+    expect(mockGetDailyNotificationCount).not.toHaveBeenCalled();
+    expect(mockFetchFn).toHaveBeenCalled();
+  });
+
   it('returns error on non-200 Expo API response', async () => {
     mockGetPushToken.mockResolvedValue('ExponentPushToken[abc123]');
     mockGetDailyNotificationCount.mockResolvedValue(0);

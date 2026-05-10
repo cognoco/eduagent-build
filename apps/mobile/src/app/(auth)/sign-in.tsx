@@ -8,6 +8,7 @@ import {
   ScrollView,
   Dimensions,
   ActivityIndicator,
+  AppState,
 } from 'react-native';
 import { useSignIn, useSSO } from '@clerk/clerk-expo';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -327,6 +328,30 @@ export default function SignInScreen() {
   const { startSSOFlow } = useSSO();
   const openAIStrategy = getOpenAISSOStrategy();
 
+  // Recovery for stuck OAuth spinner: on Android, dismissing the Chrome
+  // Custom Tab via swipe/back gesture sometimes leaves Clerk's startSSOFlow
+  // promise unresolved, so the `finally` that clears `oauthLoading` never
+  // runs and the SSO button is permanently stuck. When the app returns to
+  // foreground while a SSO flow is loading, give Clerk a short grace window
+  // to resolve naturally (success path runs setActive within ms); if the
+  // spinner is still set after that, force-clear it so the button is
+  // tappable again.
+  useEffect(() => {
+    if (oauthLoading === null) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next !== 'active') return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        setOauthLoading(null);
+      }, 1500);
+    });
+    return () => {
+      sub.remove();
+      if (timer) clearTimeout(timer);
+    };
+  }, [oauthLoading]);
+
   useWebBrowserWarmup();
 
   const canSubmit = emailAddress.trim() !== '' && password !== '' && !loading;
@@ -617,6 +642,19 @@ export default function SignInScreen() {
           signIn: ssoSignIn,
           signUp: ssoSignUp,
         } = ssoResult;
+
+        // User dismissed the in-app browser without completing OAuth — treat
+        // as a silent cancel rather than surfacing "could not complete".
+        const authSessionType = (
+          ssoResult as { authSessionResult?: { type?: string } }
+        ).authSessionResult?.type;
+        if (authSessionType && authSessionType !== 'success') {
+          if (__DEV__)
+            console.log(
+              `[AUTH-DEBUG] SSO cancelled by user: type=${authSessionType}`,
+            );
+          return;
+        }
 
         if (__DEV__)
           console.log(

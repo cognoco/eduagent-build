@@ -3,13 +3,18 @@ import { View, Text, Pressable } from 'react-native';
 import { platformAlert } from '../lib/platform-alert';
 import { useUser, useAuth } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { PasswordInput } from './common';
 import { extractClerkError } from '../lib/clerk-error';
+import { signOutWithCleanup } from '../lib/sign-out';
+import { useProfile } from '../lib/profile';
 
 export function ChangePassword(): React.JSX.Element {
   const { user } = useUser();
   const { signOut } = useAuth();
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const { profiles } = useProfile();
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -53,7 +58,11 @@ export function ChangePassword(): React.JSX.Element {
   const handleForgotPassword = useCallback(async () => {
     setIsSigningOut(true);
     try {
-      await signOut();
+      await signOutWithCleanup({
+        clerkSignOut: signOut,
+        queryClient,
+        profileIds: profiles.map((p) => p.id),
+      });
     } catch {
       platformAlert('Could not sign out', 'Please try again.');
       return;
@@ -61,7 +70,7 @@ export function ChangePassword(): React.JSX.Element {
       setIsSigningOut(false);
     }
     router.replace('/(auth)/sign-in' as never);
-  }, [signOut, router]);
+  }, [signOut, router, queryClient, profiles]);
 
   return (
     <View className="mt-3">

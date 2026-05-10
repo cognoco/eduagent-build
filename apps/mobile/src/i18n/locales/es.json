@@ -147,6 +147,23 @@
     "childCard": {
       "title": "Niños",
       "accessibilityLabel": "Abrir Familia"
+    },
+    "parent": {
+      "greeting": "Hola, {{displayName}}",
+      "intentHeader": "Que necesitas ahora?",
+      "encouragementNote": "Los nudges son animos suaves de una sola direccion.",
+      "transitionNotice": "Ahora tambien eres madre o padre. Este es tu inicio: el progreso de tus hijos y tu propio aprendizaje en un solo lugar.",
+      "cards": {
+        "checkChild": "Ver como le va a {{childName}}",
+        "checkChildFallback": "Toca para ver el progreso de esta semana",
+        "weeklyReport": "Leer el informe semanal de {{childName}}",
+        "weeklyReportSubtitle": "Ponte al dia con el resumen mas reciente",
+        "sendNudge": "Enviar un nudge a {{childName}}",
+        "sendNudgeSubtitle": "Elige un mensaje breve de animo",
+        "continueOwn": "Continuar tu propio aprendizaje",
+        "continueOwnSubtitle": "Sigue con {{topicTitle}} en {{subjectName}}",
+        "continueOwnEmptySubtitle": "Retoma donde lo dejaste"
+      }
     }
   },
   "dashboard": {
@@ -2114,6 +2131,30 @@
       "title": "Esta conversación se archivó el {{date}}.",
       "intro": "Esto es lo que repasaste:",
       "continueCta": "Continuar este tema"
+    }
+  },
+  "nudge": {
+    "sheet": {
+      "title": "Enviar un nudge a {{childName}}",
+      "subtitle": "Elige un mensaje breve de animo."
+    },
+    "templates": {
+      "you_got_this": "Tu puedes",
+      "proud_of_you": "Estoy orgulloso/a de ti",
+      "quick_session": "Quieres hacer una sesion rapida?",
+      "thinking_of_you": "Estoy pensando en ti"
+    },
+    "toast": {
+      "sent": "Nudge enviado"
+    },
+    "error": {
+      "rateLimit": "Has enviado suficiente animo por ahora - {{childName}} lo vera la proxima vez que abra la app.",
+      "consentPending": "El consentimiento de {{childName}} esta pendiente - los animos funcionaran cuando termine la configuracion."
+    },
+    "banner": {
+      "title": "{{fromDisplayName}} te envio un nudge",
+      "unreadCount": "{{count}} nuevos",
+      "modalTitle": "Nuevos nudges"
     }
   }
 }

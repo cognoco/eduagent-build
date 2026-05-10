@@ -26,7 +26,7 @@ import {
 } from '../../lib/consent-copy';
 import { evaluateSentryForProfile } from '../../lib/sentry';
 import { formatApiError } from '../../lib/format-api-error';
-import { clearTransitionState } from '../../lib/auth-transition';
+import { signOutWithCleanup } from '../../lib/sign-out';
 import { toInternalAppRedirectPath } from '../../lib/normalize-redirect-path';
 import {
   clearPendingAuthRedirect,
@@ -59,11 +59,9 @@ export function computeVisibleTabs(
   hasFamily: boolean,
   role: ActiveProfileRole | null = 'owner',
 ): Set<string> {
+  void hasFamily;
+  void role;
   const next = new Set<string>(BASE_VISIBLE_TABS);
-  // Family tab is only meaningful for an owner who has at least one linked
-  // child; solo adults have nothing to manage there. The Add-child entry
-  // for solo adults lives under More.
-  if (hasFamily && role === 'owner') next.add('family');
   return next;
 }
 
@@ -91,7 +89,6 @@ const iconMap: Record<
   Home: { focused: 'home', default: 'home-outline' },
   Book: { focused: 'book', default: 'book-outline' },
   Progress: { focused: 'stats-chart', default: 'stats-chart-outline' },
-  Family: { focused: 'people', default: 'people-outline' },
   More: { focused: 'menu', default: 'menu-outline' },
 };
 
@@ -530,13 +527,18 @@ function CreateProfileGate(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { signOut } = useClerk();
+  const queryClient = useQueryClient();
+  const { profiles } = useProfile();
   const { t } = useTranslation();
   const isPushingRef = React.useRef(false);
 
   const handleSignOut = async () => {
     try {
-      clearTransitionState();
-      await signOut();
+      await signOutWithCleanup({
+        clerkSignOut: signOut,
+        queryClient,
+        profileIds: profiles.map((p) => p.id),
+      });
     } catch (err: unknown) {
       console.error('signOut failed:', err);
       platformAlert(
@@ -607,12 +609,16 @@ function ConsentWithdrawnGate(): React.ReactElement {
   const { signOut } = useClerk();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+  const { profiles, activeProfile, switchProfile } = useProfile();
   const [refreshing, setRefreshing] = React.useState(false);
 
   const handleSignOut = async () => {
     try {
-      clearTransitionState();
-      await signOut();
+      await signOutWithCleanup({
+        clerkSignOut: signOut,
+        queryClient,
+        profileIds: profiles.map((p) => p.id),
+      });
     } catch (err: unknown) {
       console.error('signOut failed:', err);
       platformAlert(
@@ -632,8 +638,6 @@ function ConsentWithdrawnGate(): React.ReactElement {
       setRefreshing(false);
     }
   };
-
-  const { profiles, activeProfile, switchProfile } = useProfile();
   const persona = personaFromBirthYear(activeProfile?.birthYear);
   const copy = getConsentWithdrawnCopy(persona);
 
@@ -738,11 +742,15 @@ function ConsentPendingGate(): React.ReactElement {
   const queryClient = useQueryClient();
   const { signOut } = useClerk();
   const { t } = useTranslation();
+  const { profiles, activeProfile, switchProfile } = useProfile();
 
   const handleSignOut = async () => {
     try {
-      clearTransitionState();
-      await signOut();
+      await signOutWithCleanup({
+        clerkSignOut: signOut,
+        queryClient,
+        profileIds: profiles.map((p) => p.id),
+      });
     } catch (err: unknown) {
       console.error('signOut failed:', err);
       platformAlert(
@@ -751,7 +759,6 @@ function ConsentPendingGate(): React.ReactElement {
       );
     }
   };
-  const { profiles, activeProfile, switchProfile } = useProfile();
   const { data: consentData } = useConsentStatus();
   const resendMutation = useRequestConsent();
   const { user } = useUser();
@@ -1468,8 +1475,11 @@ export default function AppLayout() {
             secondaryAction={{
               label: t('common.signOut'),
               onPress: () => {
-                clearTransitionState();
-                void clerkSignOut();
+                void signOutWithCleanup({
+                  clerkSignOut,
+                  queryClient,
+                  profileIds: profiles.map((p) => p.id),
+                });
               },
               testID: 'profile-loading-timeout-signout',
             }}
@@ -1510,8 +1520,11 @@ export default function AppLayout() {
           secondaryAction={{
             label: t('common.signOut'),
             onPress: () => {
-              clearTransitionState();
-              void clerkSignOut();
+              void signOutWithCleanup({
+                clerkSignOut,
+                queryClient,
+                profileIds: profiles.map((p) => p.id),
+              });
             },
             testID: 'profile-load-error-signout',
           }}
@@ -1538,9 +1551,7 @@ export default function AppLayout() {
   }
 
   // Linked-parent accounts intentionally enter through /(app)/home now.
-  // home.tsx renders LearnerScreen for owners with child profiles and routes
-  // them to /(app)/family only when they explicitly choose progress
-  // management. That keeps the adaptive home flow reachable.
+  // home.tsx renders the parent JTBD surface for owners with child profiles.
 
   // Gate: block app access when parental consent is pending (COPPA/GDPR)
   if (
@@ -1663,17 +1674,6 @@ export default function AppLayout() {
               tabBarAccessibilityLabel: t('tabs.progressLabel'),
               tabBarIcon: ({ focused }) => (
                 <TabIcon name="Progress" focused={focused} />
-              ),
-            }}
-          />
-          <Tabs.Screen
-            name="family"
-            options={{
-              title: t('tabs.family'),
-              tabBarButtonTestID: 'tab-family',
-              tabBarAccessibilityLabel: t('tabs.familyLabel'),
-              tabBarIcon: ({ focused }) => (
-                <TabIcon name="Family" focused={focused} />
               ),
             }}
           />

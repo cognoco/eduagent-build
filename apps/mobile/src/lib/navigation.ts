@@ -1,7 +1,7 @@
 import type { Href, Router } from 'expo-router';
 import type { LearningResumeTarget } from '@eduagent/schemas';
 
-export const FAMILY_HOME_PATH = '/(app)/family';
+export const FAMILY_HOME_PATH = '/(app)/home';
 export const LEARNER_HOME_RETURN_TO = 'learner-home';
 export const LEARNER_HOME_HREF = '/(app)/home';
 

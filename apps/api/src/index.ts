@@ -10,6 +10,7 @@ import { captureException } from './services/sentry';
 import { isTransientDatabaseError } from './services/transient-db-retry';
 import {
   ForbiddenError,
+  ConsentRequiredError,
   NotFoundError,
   ConflictError,
   RateLimitedError,
@@ -60,6 +61,7 @@ import { coachingCardRoutes } from './routes/coaching-card';
 import { celebrationRoutes } from './routes/celebrations';
 import { dashboardRoutes } from './routes/dashboard';
 import { noticesRoutes } from './routes/notices';
+import { nudgeRoutes } from './routes/nudges';
 import { billingRoutes } from './routes/billing';
 import { stripeWebhookRoute } from './routes/stripe-webhook';
 import { testSeedRoutes } from './routes/test-seed';
@@ -228,6 +230,7 @@ const routes = api
   .route('/', celebrationRoutes)
   .route('/', dashboardRoutes)
   .route('/', noticesRoutes)
+  .route('/', nudgeRoutes)
   .route('/', billingRoutes)
   .route('/', stripeWebhookRoute)
   .route('/', revenuecatWebhookRoute)
@@ -269,6 +272,12 @@ app.onError((err, c) => {
   // expected domain outcomes, not server faults.
   if (err instanceof ForbiddenError) {
     return c.json({ code: ERROR_CODES.FORBIDDEN, message: err.message }, 403);
+  }
+  if (err instanceof ConsentRequiredError) {
+    return c.json(
+      { code: ERROR_CODES.CONSENT_REQUIRED, message: err.message },
+      403,
+    );
   }
   if (err instanceof NotFoundError) {
     return c.json({ code: ERROR_CODES.NOT_FOUND, message: err.message }, 404);

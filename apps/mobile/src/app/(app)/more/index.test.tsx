@@ -101,6 +101,14 @@ jest.mock(
       mutate: mockCelebrationLevelMutate,
       isPending: false,
     }),
+    useFamilyPoolBreakdownSharing: () => ({
+      data: false,
+      isLoading: false,
+    }),
+    useUpdateFamilyPoolBreakdownSharing: () => ({
+      mutate: jest.fn(),
+      isPending: false,
+    }),
   }),
 );
 
@@ -260,7 +268,7 @@ describe('MoreScreen landing', () => {
     expect(mockTrack).toHaveBeenCalledWith('child_progress_navigated', {
       source: 'more_preferences_link',
     });
-    expect(mockPush).toHaveBeenCalledWith('/(app)/family');
+    expect(mockPush).toHaveBeenCalledWith('/(app)/home');
   });
 
   it('hides sign out in impersonation', () => {

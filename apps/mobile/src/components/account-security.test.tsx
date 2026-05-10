@@ -1,4 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react-native';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import React from 'react';
 
 import { AccountSecurity } from './account-security';
 
@@ -13,6 +15,19 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: jest.fn() }),
 }));
 
+// ChangePassword (rendered when the row is expanded) calls useQueryClient()
+// and useProfile() — both need providers. Pattern mirrors change-password.test.tsx.
+jest.mock('../lib/profile', () => ({ useProfile: () => ({ profiles: [] }) })); // gc1-allow: external boundary stub for QueryClient-dependent child component
+
+function renderWithProviders(ui: React.ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+  );
+}
+
 describe('AccountSecurity', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -23,7 +38,7 @@ describe('AccountSecurity', () => {
   });
 
   it('renders Change Password row for password users', () => {
-    render(<AccountSecurity visible />);
+    renderWithProviders(<AccountSecurity visible />);
     screen.getByText('Change Password');
   });
 
@@ -32,7 +47,7 @@ describe('AccountSecurity', () => {
       passwordEnabled: false,
       externalAccounts: [{ provider: 'google' }],
     };
-    render(<AccountSecurity visible />);
+    renderWithProviders(<AccountSecurity visible />);
     screen.getByText(/Secured via Google/);
     expect(screen.queryByText('Change Password')).toBeNull();
   });
@@ -42,18 +57,18 @@ describe('AccountSecurity', () => {
       passwordEnabled: false,
       externalAccounts: [{ provider: 'apple' }],
     };
-    render(<AccountSecurity visible />);
+    renderWithProviders(<AccountSecurity visible />);
     screen.getByText(/Secured via Apple/);
   });
 
   it('expands password form when Change Password is tapped', () => {
-    render(<AccountSecurity visible />);
+    renderWithProviders(<AccountSecurity visible />);
     fireEvent.press(screen.getByText('Change Password'));
     screen.getByTestId('current-password');
   });
 
   it('does not render when visible is false', () => {
-    const { toJSON } = render(<AccountSecurity visible={false} />);
+    const { toJSON } = renderWithProviders(<AccountSecurity visible={false} />);
     expect(toJSON()).toBeNull();
   });
 });

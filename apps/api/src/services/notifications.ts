@@ -5,7 +5,7 @@
 // ---------------------------------------------------------------------------
 
 import { and, desc, eq } from 'drizzle-orm';
-import type { ConsentType } from '@eduagent/schemas';
+import type { ConsentType, NotificationPayload } from '@eduagent/schemas';
 import {
   familyLinks,
   profiles,
@@ -21,31 +21,6 @@ import {
 import { createLogger } from './logger';
 
 const logger = createLogger();
-
-export interface NotificationPayload {
-  profileId: string;
-  title: string;
-  body: string;
-  type:
-    | 'review_reminder'
-    | 'daily_reminder'
-    | 'trial_expiry'
-    | 'consent_request'
-    | 'consent_reminder'
-    | 'consent_warning'
-    | 'consent_expired'
-    | 'consent_archived'
-    | 'subscribe_request'
-    | 'recall_nudge'
-    | 'weekly_progress'
-    | 'monthly_report'
-    | 'progress_refresh'
-    | 'struggle_noticed'
-    | 'struggle_flagged'
-    | 'struggle_resolved'
-    | 'dictation_review'
-    | 'session_filing_failed';
-}
 
 export interface NotificationResult {
   sent: boolean;
@@ -95,7 +70,7 @@ export async function sendPushNotification(
   // [BUG-856] When the caller already reserved the rate-limit slot via
   // checkAndLogRateLimitInternal, set skipRateLimitLog to true so we do not
   // double-count this push toward the daily cap or per-type rate limit.
-  options?: { skipRateLimitLog?: boolean },
+  options?: { skipRateLimitLog?: boolean; skipDailyCap?: boolean },
 ): Promise<NotificationResult> {
   // 1. Get push token
   const token = await getPushToken(db, payload.profileId);
@@ -109,9 +84,11 @@ export async function sendPushNotification(
   }
 
   // 3. Check daily cap
-  const dailyCount = await getDailyNotificationCount(db, payload.profileId);
-  if (dailyCount >= MAX_DAILY_PUSH) {
-    return { sent: false, reason: 'daily_cap_exceeded' };
+  if (!options?.skipDailyCap) {
+    const dailyCount = await getDailyNotificationCount(db, payload.profileId);
+    if (dailyCount >= MAX_DAILY_PUSH) {
+      return { sent: false, reason: 'daily_cap_exceeded' };
+    }
   }
 
   // 4. Send via Expo Push API
@@ -127,7 +104,7 @@ export async function sendPushNotification(
         title: payload.title,
         body: payload.body,
         sound: 'default',
-        data: { type: payload.type },
+        data: { type: payload.type, ...(payload.data ?? {}) },
       }),
     });
 

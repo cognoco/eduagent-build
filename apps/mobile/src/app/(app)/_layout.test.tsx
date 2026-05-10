@@ -662,13 +662,14 @@ describe('AppLayout', () => {
 });
 
 describe('computeVisibleTabs', () => {
-  it('includes family for owners with at least one linked child', () => {
+  it('shows base tabs for owners with linked children (family tab removed)', () => {
     const tabs = computeVisibleTabs(true);
     expect(tabs.has('home')).toBe(true);
     expect(tabs.has('library')).toBe(true);
     expect(tabs.has('progress')).toBe(true);
     expect(tabs.has('more')).toBe(true);
-    expect(tabs.has('family')).toBe(true);
+    // Parent Home is now the family-facing surface.
+    expect(tabs.has('family')).toBe(false);
   });
 
   it('hides family for solo adult owners (no linked children)', () => {

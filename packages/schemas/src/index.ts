@@ -56,3 +56,6 @@ export * from './stream-fallback';
 
 // Feedback (in-app feedback + shake-to-report)
 export * from './feedback';
+
+// Notifications & Nudges
+export * from './notifications';

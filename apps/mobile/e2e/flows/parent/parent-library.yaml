@@ -10,7 +10,7 @@
 #
 # testIDs verified against:
 #   - apps/mobile/src/app/(app)/_layout.tsx (tab-library, tab-home)
-#   - apps/mobile/src/app/(app)/family.tsx (dashboard-scroll)
+#   - apps/mobile/src/components/home/ParentHomeScreen.tsx (parent-home-screen)
 #   - apps/mobile/src/app/(app)/library.tsx (3-tab Library)
 #   - apps/mobile/src/components/library/LibraryTabs.tsx (library-tab-shelves, library-tab-books)
 #   - apps/mobile/src/components/library/ShelvesTab.tsx (shelves-list)
@@ -29,16 +29,18 @@ tags:
       SEED_SCENARIO: "parent-with-children"
       API_URL: ${API_URL}
 
-# 2. Parent owners land on LearnerScreen; enter the Family dashboard.
-- runFlow:
-    file: ../_setup/open-family-dashboard.yaml
+# 2. Parent owners land on parent Home.
+- extendedWaitUntil:
+    visible:
+      id: "parent-home-screen"
+    timeout: 15000
 
-# 3. Verify we're on the Family dashboard
+# 3. Verify we're on parent Home
 - assertVisible:
-    text: "Family"
+    id: "parent-home-screen"
 
-# 4. Screenshot: parent dashboard before navigating
-- takeScreenshot: parent-library-01-dashboard
+# 4. Screenshot: parent Home before navigating
+- takeScreenshot: parent-library-01-home
 
 # 5. Tap Library tab (BUG-10: use accessibility label, not truncated text)
 - tapOn: "Library Tab"
@@ -72,10 +74,10 @@ tags:
 # 12. Navigate back to Home tab (use accessibility label to avoid matching heading)
 - tapOn: "Home Tab"
 
-# 13. Verify dashboard is visible again
+# 13. Verify parent Home is visible again
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: "parent-home-screen"
     timeout: 10000
 
 # 14. Final screenshot

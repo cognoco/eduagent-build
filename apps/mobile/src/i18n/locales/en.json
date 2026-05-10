@@ -147,6 +147,23 @@
     "childCard": {
       "title": "Children",
       "accessibilityLabel": "Open Family"
+    },
+    "parent": {
+      "greeting": "Hey {{displayName}}",
+      "intentHeader": "What do you need right now?",
+      "encouragementNote": "Nudges are gentle one-way encouragements.",
+      "transitionNotice": "You're a parent now too. This is your home - kids' progress and your own learning, all in one place.",
+      "cards": {
+        "checkChild": "See how {{childName}} is doing",
+        "checkChildFallback": "Tap to see this week's progress",
+        "weeklyReport": "Read {{childName}}'s weekly report",
+        "weeklyReportSubtitle": "Catch up on the latest summary",
+        "sendNudge": "Send {{childName}} a nudge",
+        "sendNudgeSubtitle": "Choose a short encouragement",
+        "continueOwn": "Continue your own learning",
+        "continueOwnSubtitle": "Pick up {{topicTitle}} in {{subjectName}}",
+        "continueOwnEmptySubtitle": "Pick up where you left off"
+      }
     }
   },
   "dashboard": {
@@ -2114,6 +2131,30 @@
       "title": "This conversation was archived on {{date}}.",
       "intro": "Here's what you covered:",
       "continueCta": "Continue this topic"
+    }
+  },
+  "nudge": {
+    "sheet": {
+      "title": "Send {{childName}} a nudge",
+      "subtitle": "Pick one short encouragement."
+    },
+    "templates": {
+      "you_got_this": "You got this",
+      "proud_of_you": "Proud of you",
+      "quick_session": "Want to do a quick session?",
+      "thinking_of_you": "Just thinking of you"
+    },
+    "toast": {
+      "sent": "Nudge sent"
+    },
+    "error": {
+      "rateLimit": "You've sent enough encouragement for now - {{childName}} will see it next time they open the app.",
+      "consentPending": "{{childName}}'s consent is pending - encouragement will work once they're set up."
+    },
+    "banner": {
+      "title": "{{fromDisplayName}} sent you a nudge",
+      "unreadCount": "{{count}} new",
+      "modalTitle": "New nudges"
     }
   }
 }

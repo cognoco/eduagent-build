@@ -1,6 +1,12 @@
 import '../../global.css';
 import { ensureI18nReady } from '../i18n';
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from 'react';
 import {
   Platform,
   Pressable,
@@ -40,8 +46,7 @@ import {
   resetAuthExpiredGuard,
 } from '../lib/api-client';
 import { markSessionExpired } from '../lib/auth-expiry';
-import { clearTransitionState } from '../lib/auth-transition';
-import { clearPendingAuthRedirect } from '../lib/pending-auth-redirect';
+import { signOutWithCleanup } from '../lib/sign-out';
 import { sanitizeSecureStoreKey } from '../lib/secure-storage';
 import { ErrorBoundary, OfflineBanner } from '../components/common';
 import { OutboxDrainProvider } from '../providers/OutboxDrainProvider';
@@ -104,8 +109,13 @@ const queryClient = new QueryClient({
 const ACCENT_STORE_PREFIX = 'accentPreset_';
 
 function ThemedApp() {
-  const { activeProfile } = useProfile();
+  const { activeProfile, profiles } = useProfile();
   const { signOut } = useClerk();
+  // Keep the latest profile list in a ref so the auth-expired callback
+  // (registered once at mount) can pass current ids into signOutWithCleanup
+  // without re-registering on every profile change.
+  const profilesRef = useRef(profiles);
+  profilesRef.current = profiles;
   // Always follow the phone's system color scheme (light/dark).
   const systemColorScheme = useColorScheme();
   const colorScheme: ColorScheme =
@@ -149,24 +159,19 @@ function ThemedApp() {
         console.warn(
           '[AUTH-DEBUG] onAuthExpired FIRED — clearing queries + signing out',
         );
-      // BM-03: clear cached query data before sign-out to prevent the next
-      // user from seeing stale data from the previous session.
+      // BM-03 surface: tag the cache as session-expired so downstream UI can
+      // distinguish "user signed out" from "user signed out due to an
+      // expired token". signOutWithCleanup performs the actual cache clear,
+      // SecureStore wipe, redirect cleanup, and Clerk signOut.
       markSessionExpired();
-      queryClient.clear();
-      void SecureStore.deleteItemAsync('hasSignedInBefore').catch(
-        () => undefined,
-      );
-      // [I-18] Clear auth-transition timestamp so a force-sign-out within
-      // the 8s window doesn't leave the sign-in screen stuck on the
-      // "Signing you in…" spinner instead of showing the login form.
-      clearTransitionState();
-      // [I-12] Clear pending redirect so user-A's saved path can't redirect
-      // user-B after a sign-out and re-sign-in in the same process.
-      clearPendingAuthRedirect();
-      // [BUG-630 / I-2] Reset the auth-expired guard *after* signOut resolves
-      // (success or failure). Without this, _authExpiredFiring stays true
-      // forever and any subsequent 401 is silently swallowed.
-      void signOut()
+      // [BUG-630 / I-2] resetAuthExpiredGuard runs in finally so a failed
+      // signOut still releases the guard — otherwise a subsequent 401 is
+      // silently swallowed.
+      void signOutWithCleanup({
+        clerkSignOut: signOut,
+        queryClient,
+        profileIds: profilesRef.current.map((p) => p.id),
+      })
         .catch(() => {
           platformAlert(
             'Could not sign you out',

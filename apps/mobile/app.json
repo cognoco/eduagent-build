@@ -86,7 +86,7 @@
         {
           "organization": "zwizzly",
           "project": "mentomate-mobile",
-          "uploadSourceMaps": false
+          "uploadSourceMaps": true
         }
       ],
       [

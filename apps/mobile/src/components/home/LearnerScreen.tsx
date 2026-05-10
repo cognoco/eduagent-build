@@ -15,9 +15,9 @@ import {
   useOverallProgress,
   useReviewSummary,
 } from '../../hooks/use-progress';
-import { useDashboard } from '../../hooks/use-dashboard';
 import { useSubjects } from '../../hooks/use-subjects';
 import { getGreeting } from '../../lib/greeting';
+import { useHasLinkedChildren } from '../../lib/profile';
 import {
   LEARNER_HOME_HREF,
   LEARNER_HOME_RETURN_TO,
@@ -34,10 +34,11 @@ import { getSubjectTint } from '../../lib/subject-tints';
 import { useTheme } from '../../lib/theme';
 import { useThemeColors } from '../../lib/theme';
 import { WithdrawalCountdownBanner } from '../family/WithdrawalCountdownBanner';
-import { ChildCard } from './ChildCard';
+import { NudgeBanner } from '../nudge/NudgeBanner';
 import { CoachBand } from './CoachBand';
 import { ChildQuotaLine } from './ChildQuotaLine';
 import { EarlyAdopterCard } from './EarlyAdopterCard';
+import { ParentHomeScreen } from './ParentHomeScreen';
 import { SubjectCard } from './SubjectCard';
 
 const HOME_RETURN_PARAMS = { returnTo: LEARNER_HOME_RETURN_TO } as const;
@@ -95,12 +96,14 @@ export interface LearnerScreenProps {
   profiles: Profile[];
   activeProfile: Profile | null;
   now?: Date;
+  showParentHome?: boolean;
 }
 
 export function LearnerScreen({
   profiles,
   activeProfile,
   now,
+  showParentHome = true,
 }: LearnerScreenProps): React.ReactElement {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -111,12 +114,8 @@ export function LearnerScreen({
   const { data: reviewSummary } = useReviewSummary();
   const { data: overallProgress } = useOverallProgress();
   const { data: quizDiscovery } = useQuizDiscoveryCard();
-  const {
-    data: dashboard,
-    isError: isDashboardError,
-    refetch: refetchDashboard,
-  } = useDashboard();
   const markQuizDiscoverySurfaced = useMarkQuizDiscoverySurfaced();
+  const hasLinkedChildren = useHasLinkedChildren();
   const [recoveryMarker, setRecoveryMarker] =
     useState<SessionRecoveryMarker | null>(null);
   const [dismissedQuizDiscoveryId, setDismissedQuizDiscoveryId] = useState<
@@ -125,18 +124,6 @@ export function LearnerScreen({
   const isParentProxy = Boolean(
     activeProfile && !activeProfile.isOwner && profiles.some((p) => p.isOwner),
   );
-  const linkedChildren = useMemo(
-    () =>
-      activeProfile?.isOwner === true
-        ? profiles.filter(
-            (profile) => profile.id !== activeProfile.id && !profile.isOwner,
-          )
-        : [],
-    [activeProfile?.id, activeProfile?.isOwner, profiles],
-  );
-  const showChildCard =
-    activeProfile?.isOwner === true && linkedChildren.length > 0;
-
   const [coachBandDismissed, setCoachBandDismissed] = useState(false);
 
   const dismissCoachBand = useCallback(() => {
@@ -443,6 +430,10 @@ export function LearnerScreen({
   const showCoachBand =
     FEATURE_FLAGS.COACH_BAND_ENABLED && coachBand && !coachBandDismissed;
 
+  if (showParentHome && !isParentProxy && hasLinkedChildren) {
+    return <ParentHomeScreen activeProfile={activeProfile} now={now} />;
+  }
+
   return (
     <View className="flex-1 bg-background" testID="learner-screen">
       <View className="px-5" style={{ paddingTop: insets.top + 16 }}>
@@ -454,7 +445,7 @@ export function LearnerScreen({
             <Text className="text-body-sm text-text-secondary mt-0.5">
               {subtitle}
             </Text>
-            {!isParentProxy && !showChildCard ? <ChildQuotaLine /> : null}
+            {!isParentProxy ? <ChildQuotaLine /> : null}
           </View>
         </View>
       </View>
@@ -465,6 +456,7 @@ export function LearnerScreen({
         showsVerticalScrollIndicator={false}
       >
         <EarlyAdopterCard />
+        {!isParentProxy ? <NudgeBanner /> : null}
 
         {showCoachBand && (
           <View>
@@ -484,37 +476,7 @@ export function LearnerScreen({
           <WithdrawalCountdownBanner />
         </View>
 
-        {showChildCard ? (
-          isDashboardError && !dashboard ? (
-            <View
-              className="mx-5 mt-4 rounded-card bg-surface-elevated border border-border px-5 py-5 items-center"
-              testID="home-child-card-error"
-            >
-              <Text className="text-body text-text-secondary text-center mb-3">
-                {t('dashboard.errorTitle')}
-              </Text>
-              <Pressable
-                onPress={() => void refetchDashboard()}
-                className="min-h-[44px] px-6 items-center justify-center bg-primary rounded-button"
-                accessibilityRole="button"
-                accessibilityLabel={t('dashboard.retryLoadingLabel')}
-                testID="home-child-card-retry"
-              >
-                <Text className="text-body font-semibold text-text-inverse">
-                  {t('recovery.tryAgain')}
-                </Text>
-              </Pressable>
-            </View>
-          ) : (
-            <ChildCard linkedChildren={linkedChildren} dashboard={dashboard} />
-          )
-        ) : null}
-
-        {/* Intent actions are the learner's own homepage. For parents with
-            linked children, the ChildCard above is the home surface and the
-            intent block is suppressed — they reach their own learning via
-            other tabs (library, etc.). */}
-        {!isParentProxy && !showChildCard && (
+        {!isParentProxy && (
           <View className={showCoachBand ? 'mt-1' : 'mt-5'}>
             <Text className="text-h3 font-bold text-text-primary px-5 mb-2">
               {t('home.learner.intentHeading')}

@@ -22,6 +22,7 @@ import { getApiUrl } from './api';
 import {
   BadRequestError,
   ConflictError,
+  ConsentRequiredError,
   ForbiddenError,
   NetworkError,
   NotFoundError,
@@ -35,6 +36,7 @@ import type { QuotaExceededDetails } from './api-errors';
 export {
   BadRequestError,
   ConflictError,
+  ConsentRequiredError,
   ForbiddenError,
   NetworkError,
   NotFoundError,
@@ -257,6 +259,9 @@ export function useApiClient(): ApiClient {
         // [BUG-100] Also preserve the server's error code (e.g. SUBJECT_INACTIVE)
         // so errorHasCode() and formatApiError() can classify the specific reason.
         if (res.status === 403) {
+          if (code === 'CONSENT_REQUIRED') {
+            throw new ConsentRequiredError(apiMessage ?? undefined, code);
+          }
           throw new ForbiddenError(apiMessage ?? undefined, code ?? undefined);
         }
 

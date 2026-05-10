@@ -58,6 +58,8 @@ export const PER_PROFILE_KEYS: ReadonlyArray<(profileId: string) => string> = [
   // Was previously hidden from registry enforcement because _layout.tsx was
   // file-scoped in REGISTRY_EXCEPTIONS for its Clerk tokenCache callsite.
   (id) => sanitizeSecureStoreKey(`accentPreset_${id}`),
+  // ParentTransitionNotice.tsx — show the parent-home orientation cue once per profile.
+  (id) => sanitizeSecureStoreKey(`mentomate_parent_home_seen_${id}`),
 ];
 
 // AsyncStorage keys cleared at sign-out (account-scoped, not device-scoped).

@@ -147,6 +147,23 @@
     "childCard": {
       "title": "Kinder",
       "accessibilityLabel": "Familie öffnen"
+    },
+    "parent": {
+      "greeting": "Hallo {{displayName}}",
+      "intentHeader": "Was brauchst du gerade?",
+      "encouragementNote": "Nudges sind sanfte Ermutigungen in eine Richtung.",
+      "transitionNotice": "Du bist jetzt auch Elternteil. Das ist dein Zuhause - Fortschritt der Kinder und dein eigenes Lernen an einem Ort.",
+      "cards": {
+        "checkChild": "Schau nach, wie es {{childName}} geht",
+        "checkChildFallback": "Tippe, um den Fortschritt dieser Woche zu sehen",
+        "weeklyReport": "Lies den Wochenbericht von {{childName}}",
+        "weeklyReportSubtitle": "Hol dir die neueste Zusammenfassung",
+        "sendNudge": "Sende {{childName}} einen Nudge",
+        "sendNudgeSubtitle": "Wähle eine kurze Ermutigung",
+        "continueOwn": "Mit deinem eigenen Lernen weitermachen",
+        "continueOwnSubtitle": "Mach mit {{topicTitle}} in {{subjectName}} weiter",
+        "continueOwnEmptySubtitle": "Mach dort weiter, wo du aufgehört hast"
+      }
     }
   },
   "dashboard": {
@@ -2114,6 +2131,30 @@
       "title": "Diese Unterhaltung wurde am {{date}} archiviert.",
       "intro": "Das habt ihr behandelt:",
       "continueCta": "Mit diesem Thema fortfahren"
+    }
+  },
+  "nudge": {
+    "sheet": {
+      "title": "Sende {{childName}} einen Nudge",
+      "subtitle": "Wähle eine kurze Ermutigung."
+    },
+    "templates": {
+      "you_got_this": "Du schaffst das",
+      "proud_of_you": "Ich bin stolz auf dich",
+      "quick_session": "Lust auf eine kurze Sitzung?",
+      "thinking_of_you": "Ich denke an dich"
+    },
+    "toast": {
+      "sent": "Nudge gesendet"
+    },
+    "error": {
+      "rateLimit": "Du hast fürs Erste genug Ermutigung gesendet - {{childName}} sieht sie beim nächsten Öffnen der App.",
+      "consentPending": "Die Zustimmung für {{childName}} steht noch aus - Ermutigungen funktionieren, sobald alles eingerichtet ist."
+    },
+    "banner": {
+      "title": "{{fromDisplayName}} hat dir einen Nudge gesendet",
+      "unreadCount": "{{count}} neu",
+      "modalTitle": "Neue Nudges"
     }
   }
 }

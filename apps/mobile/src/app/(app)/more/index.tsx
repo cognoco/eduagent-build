@@ -1,4 +1,11 @@
-import { View, Text, Platform, Pressable, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  Platform,
+  Pressable,
+  ScrollView,
+  Switch,
+} from 'react-native';
 import { useState, useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -24,14 +31,15 @@ import {
 } from '../../../hooks/use-subscription';
 import {
   useCelebrationLevel,
+  useFamilyPoolBreakdownSharing,
   useUpdateCelebrationLevel,
+  useUpdateFamilyPoolBreakdownSharing,
 } from '../../../hooks/use-settings';
 import { ACCOMMODATION_OPTIONS } from '../../../lib/accommodation-options';
 import { track } from '../../../lib/analytics';
-import { clearTransitionState } from '../../../lib/auth-transition';
 import { FAMILY_HOME_PATH } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
-import { clearProfileSecureStorageOnSignOut } from '../../../lib/sign-out-cleanup';
+import { signOutWithCleanup } from '../../../lib/sign-out';
 import {
   LearningModeOption,
   SectionHeader,
@@ -69,6 +77,12 @@ export default function MoreScreen() {
   const { data: celebrationLevel = 'big_only', isLoading: celebrationLoading } =
     useCelebrationLevel();
   const updateCelebrationLevel = useUpdateCelebrationLevel();
+  const {
+    data: familyPoolBreakdownSharing,
+    isLoading: breakdownSharingLoading,
+  } = useFamilyPoolBreakdownSharing();
+  const updateFamilyPoolBreakdownSharing =
+    useUpdateFamilyPoolBreakdownSharing();
   const {
     data: learnerProfile,
     isError: learnerProfileError,
@@ -375,6 +389,40 @@ export default function MoreScreen() {
                 {t('more.family.addChildDescription')}
               </Text>
             </Pressable>
+            {linkedChildren.length > 0 ? (
+              <View
+                className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3 mb-2"
+                testID="family-breakdown-sharing-toggle"
+              >
+                <View className="flex-1 pr-3">
+                  <Text className="text-body text-text-primary">
+                    {t('more.family.breakdownSharingTitle')}
+                  </Text>
+                  <Text className="text-body-sm text-text-secondary mt-1">
+                    {t('more.family.breakdownSharingDescription')}
+                  </Text>
+                </View>
+                <Switch
+                  value={familyPoolBreakdownSharing ?? false}
+                  onValueChange={(value) => {
+                    updateFamilyPoolBreakdownSharing.mutate(value, {
+                      onError: () => {
+                        platformAlert(
+                          t('more.errors.couldNotSaveSetting'),
+                          t('more.family.breakdownSharingError'),
+                        );
+                      },
+                    });
+                  }}
+                  disabled={
+                    breakdownSharingLoading ||
+                    updateFamilyPoolBreakdownSharing.isPending
+                  }
+                  accessibilityLabel={t('more.family.breakdownSharingTitle')}
+                  testID="family-breakdown-sharing-toggle-switch"
+                />
+              </View>
+            ) : null}
           </>
         ) : null}
 
@@ -411,18 +459,17 @@ export default function MoreScreen() {
               if (isSigningOut) return;
               setIsSigningOut(true);
               try {
-                clearTransitionState();
-                // [BUG-723 / SEC-7] Wipe per-profile + global SecureStore keys
-                // before signing out so the next signed-in user on a shared
-                // device does not inherit bookmark prompts, dictation prefs,
-                // rating-prompt counters, etc. Includes all known profileIds
-                // (owner + linked children) so child-profile keys are cleared
-                // too. Best-effort: per-key failure is swallowed inside the
-                // helper so cleanup never blocks sign-out.
-                await clearProfileSecureStorageOnSignOut(
-                  profiles.map((p) => p.id),
-                );
-                await signOut();
+                // [BUG-723 / SEC-7] Centralized cleanup wipes per-profile +
+                // global SecureStore keys AND clears the TanStack Query cache
+                // before Clerk signOut, so the next signed-in user on a
+                // shared device cannot inherit bookmark prompts, dictation
+                // prefs, rating-prompt counters, or — via cached query data —
+                // a previous user's profile id leaking into `X-Profile-Id`.
+                await signOutWithCleanup({
+                  clerkSignOut: signOut,
+                  queryClient,
+                  profileIds: profiles.map((p) => p.id),
+                });
               } catch {
                 platformAlert(
                   t('more.account.couldNotSignOut'),

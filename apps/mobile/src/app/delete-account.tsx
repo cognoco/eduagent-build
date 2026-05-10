@@ -11,11 +11,14 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/clerk-expo';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useQueryClient } from '@tanstack/react-query';
 import { useDeleteAccount, useCancelDeletion } from '../hooks/use-account';
 import { useThemeColors } from '../lib/theme';
 import { goBackOrReplace } from '../lib/navigation';
 import { formatApiError } from '../lib/format-api-error';
 import { platformAlert } from '../lib/platform-alert';
+import { signOutWithCleanup } from '../lib/sign-out';
+import { useProfile } from '../lib/profile';
 
 // [BUG-910] The exact phrase a user must type to confirm. Kept as a constant
 // so tests and accessibility labels stay in sync.
@@ -29,6 +32,8 @@ export default function DeleteAccountScreen() {
   const colors = useThemeColors();
   const { t } = useTranslation();
   const { signOut } = useAuth();
+  const queryClient = useQueryClient();
+  const { profiles } = useProfile();
   const deleteAccount = useDeleteAccount();
   const cancelDeletion = useCancelDeletion();
 
@@ -171,7 +176,11 @@ export default function DeleteAccountScreen() {
             <Pressable
               onPress={() =>
                 // UX-DE-H2: surface signOut failure
-                void signOut().catch(() => {
+                void signOutWithCleanup({
+                  clerkSignOut: signOut,
+                  queryClient,
+                  profileIds: profiles.map((p) => p.id),
+                }).catch(() => {
                   platformAlert(
                     t('account.signOutFailedTitle'),
                     t('account.signOutFailedMessage'),

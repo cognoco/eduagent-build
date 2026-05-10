@@ -157,6 +157,10 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
     }
     const profile = await getProfile(db, profileIdHeader, account.id);
     if (!profile) {
+      logger.warn('profile_scope.ownership_mismatch', {
+        accountId: account.id,
+        requestedProfileId: profileIdHeader,
+      });
       return forbidden(c, 'Profile does not belong to this account');
     }
     c.set('profileId', profile.id);

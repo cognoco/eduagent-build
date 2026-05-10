@@ -36,7 +36,7 @@ import { projectAiResponseContent } from './llm/project-response';
 
 export async function generateExport(
   db: Database,
-  accountId: string
+  accountId: string,
 ): Promise<DataExport> {
   const account = await db.query.accounts.findFirst({
     where: eq(accounts.id, accountId),
@@ -77,7 +77,7 @@ export async function generateExport(
     [...latestConsentByProfileId.entries()].map(([pid, { status }]) => [
       pid,
       status as ConsentStatus,
-    ])
+    ]),
   );
 
   // --- GDPR Article 15: query all profile-scoped personal data ---
@@ -205,7 +205,7 @@ export async function generateExport(
       ? await db.query.familyLinks.findMany({
           where: or(
             inArray(familyLinks.parentProfileId, profileIds),
-            inArray(familyLinks.childProfileId, profileIds)
+            inArray(familyLinks.childProfileId, profileIds),
           ),
         })
       : [];
@@ -259,6 +259,7 @@ export async function generateExport(
         row.conversationLanguage as Profile['conversationLanguage'],
       pronouns: row.pronouns ?? null,
       consentStatus: consentStatusByProfileId.get(row.id) ?? null,
+      linkCreatedAt: null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     })),
@@ -286,7 +287,7 @@ export async function generateExport(
           ...(row as Record<string, unknown>),
           content: projectAiResponseContent(
             (row as Record<string, unknown>)['content'] as string,
-            { silent: true }
+            { silent: true },
           ),
         };
       }

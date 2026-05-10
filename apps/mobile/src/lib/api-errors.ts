@@ -15,6 +15,7 @@ import type { QuotaExceeded } from '@eduagent/schemas';
 import {
   BadRequestError,
   ConflictError,
+  ConsentRequiredError,
   ForbiddenError,
   NotFoundError,
   RateLimitedError,
@@ -39,6 +40,7 @@ export class QuotaExceededError extends Error {
 export {
   BadRequestError,
   ConflictError,
+  ConsentRequiredError,
   ForbiddenError,
   NotFoundError,
   RateLimitedError,

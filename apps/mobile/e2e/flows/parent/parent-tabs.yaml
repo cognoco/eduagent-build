@@ -1,14 +1,14 @@
-# Flow P4: Parent Tab Navigation — Dashboard, Library, More
-# Validates: parent can navigate between the three bottom tabs and each
+# Flow P4: Parent Tab Navigation - Home, Library, Progress, More
+# Validates: parent can navigate between the four bottom tabs and each
 # screen renders its expected content.
 # Tags: nightly, parent
 #
 # Journey: UX Journey 4 (Parent Oversight)
 # Tab bar:
-#   "Home"          → LearnerScreen    (testID: learner-screen)
-#   "Family"        → family.tsx       (testID: dashboard-scroll)
-#   "Library"       → library.tsx      (testID: shelves-list)
-#   "More"          → more.tsx         (testID: sign-out-button)
+#   "Home"          -> ParentHomeScreen (testID: parent-home-screen)
+#   "Library"       -> library.tsx      (testID: shelves-list)
+#   "Progress"      -> progress/index   (testID: progress-screen)
+#   "More"          -> more.tsx         (testID: sign-out-button)
 appId: com.mentomate.app
 tags:
   - nightly
@@ -21,32 +21,18 @@ tags:
       SEED_SCENARIO: "parent-with-children"
       API_URL: ${API_URL}
 
-# 2. Wait for parent Home gateway
+# 2. Wait for parent Home
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: "parent-home-screen"
     timeout: 15000
 
-# 3. Verify Home gateway content
+# 3. Verify Home content
 - assertVisible:
-    id: "home-child-card"
+    id: "parent-home-check-child-${CHILD_PROFILE_ID}"
 
-# 4. Screenshot: Home tab (gateway)
+# 4. Screenshot: Home tab
 - takeScreenshot: parent-tabs-01-home
-
-# ---------- Family tab ----------
-
-- tapOn: "Family Tab"
-
-- extendedWaitUntil:
-    visible:
-      id: "dashboard-scroll"
-    timeout: 15000
-
-- assertVisible:
-    text: "Family"
-
-- takeScreenshot: parent-tabs-02-family
 
 # ---------- Library tab ----------
 
@@ -61,7 +47,18 @@ tags:
     optional: true
 
 # 7. Screenshot: Library tab
-- takeScreenshot: parent-tabs-03-library
+- takeScreenshot: parent-tabs-02-library
+
+# ---------- Progress tab ----------
+
+- tapOn: "Progress Tab"
+
+- extendedWaitUntil:
+    visible:
+      id: "progress-screen"
+    timeout: 15000
+
+- takeScreenshot: parent-tabs-03-progress
 
 # ---------- More tab ----------
 
@@ -101,14 +98,14 @@ tags:
 
 # ---------- Back to Home tab ----------
 
-# 15. Tap "Home" tab to return to dashboard
+# 15. Tap "Home" tab to return to parent Home
 #     Use accessibility label (not text) to avoid matching "Home" heading
 - tapOn: "Home Tab"
 
-# 16. Verify Home gateway is visible again
+# 16. Verify parent Home is visible again
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: "parent-home-screen"
     timeout: 10000
 
 # 17. Final screenshot: back on Home tab

@@ -49,7 +49,8 @@ export class ProfileLimitError extends Error {
 
 function mapProfileRow(
   row: typeof profiles.$inferSelect,
-  consentStatus: Profile['consentStatus'] = null
+  consentStatus: Profile['consentStatus'] = null,
+  linkCreatedAt: Date | null = null,
 ): Profile {
   return {
     id: row.id,
@@ -67,6 +68,7 @@ function mapProfileRow(
       row.conversationLanguage as Profile['conversationLanguage'],
     pronouns: row.pronouns ?? null,
     consentStatus,
+    linkCreatedAt: linkCreatedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -81,16 +83,29 @@ function mapProfileRow(
  */
 export async function listProfiles(
   db: Database,
-  accountId: string
+  accountId: string,
 ): Promise<Profile[]> {
   const rows = await db.query.profiles.findMany({
     where: and(eq(profiles.accountId, accountId), isNull(profiles.archivedAt)),
   });
+  const ownerRow = rows.find((row) => row.isOwner);
+  const links = ownerRow
+    ? await db.query.familyLinks.findMany({
+        where: eq(familyLinks.parentProfileId, ownerRow.id),
+      })
+    : [];
+  const linkCreatedAtByChildId = new Map(
+    links.map((link) => [link.childProfileId, link.createdAt]),
+  );
   const mapped = await Promise.all(
     rows.map(async (row) => {
       const status = await getConsentStatus(db, row.id);
-      return mapProfileRow(row, status);
-    })
+      return mapProfileRow(
+        row,
+        status,
+        linkCreatedAtByChildId.get(row.id) ?? null,
+      );
+    }),
   );
   return mapped;
 }
@@ -106,14 +121,14 @@ export async function listProfiles(
  */
 export async function findOwnerProfile(
   db: Database,
-  accountId: string
+  accountId: string,
 ): Promise<Profile | null> {
   // Targeted query: owner profile directly
   const ownerRow = await db.query.profiles.findFirst({
     where: and(
       eq(profiles.accountId, accountId),
       eq(profiles.isOwner, true),
-      isNull(profiles.archivedAt)
+      isNull(profiles.archivedAt),
     ),
   });
 
@@ -128,7 +143,7 @@ export async function findOwnerProfile(
     '[findOwnerProfile] No owner profile for account, falling back to oldest profile',
     {
       accountId,
-    }
+    },
   );
   const fallbackRow = await db.query.profiles.findFirst({
     where: and(eq(profiles.accountId, accountId), isNull(profiles.archivedAt)),
@@ -158,7 +173,7 @@ export async function createProfile(
   accountId: string,
   input: ProfileCreateInput,
   isOwner?: boolean,
-  parentProfileId?: string
+  parentProfileId?: string,
 ): Promise<Profile> {
   const birthYear = input.birthYear;
 
@@ -170,7 +185,7 @@ export async function createProfile(
     throw new ProfileValidationError(
       'CHILD_AGE_VIOLATION',
       'birthYear',
-      'Users must be at least 11 years old to create a profile'
+      'Users must be at least 11 years old to create a profile',
     );
   }
 
@@ -200,14 +215,14 @@ export async function createProfile(
         db,
         row.id,
         consentCheck.consentType,
-        parentProfileId
+        parentProfileId,
       );
       consentStatus = state.status;
     } else {
       const state = await createPendingConsentState(
         db,
         row.id,
-        consentCheck.consentType
+        consentCheck.consentType,
       );
       consentStatus = state.status;
     }
@@ -226,7 +241,7 @@ export async function createProfile(
 export async function createProfileWithLimitCheck(
   db: Database,
   accountId: string,
-  input: ProfileCreateInput
+  input: ProfileCreateInput,
 ): Promise<Profile> {
   return db.transaction(async (tx) => {
     const txDb = tx as unknown as Database;
@@ -240,7 +255,9 @@ export async function createProfileWithLimitCheck(
     const [countRow] = await txDb
       .select({ count: sql<number>`COUNT(*)::int` })
       .from(profiles)
-      .where(and(eq(profiles.accountId, accountId), isNull(profiles.archivedAt)));
+      .where(
+        and(eq(profiles.accountId, accountId), isNull(profiles.archivedAt)),
+      );
     const profileCount = countRow?.count ?? 0;
     const isFirstProfile = profileCount === 0;
 
@@ -265,7 +282,7 @@ export async function createProfileWithLimitCheck(
         where: and(
           eq(profiles.accountId, accountId),
           eq(profiles.isOwner, true),
-          isNull(profiles.archivedAt)
+          isNull(profiles.archivedAt),
         ),
         columns: { id: true },
       });
@@ -279,7 +296,7 @@ export async function createProfileWithLimitCheck(
       accountId,
       input,
       isFirstProfile,
-      parentProfileId
+      parentProfileId,
     );
   });
 }
@@ -293,13 +310,13 @@ export async function createProfileWithLimitCheck(
 export async function getProfile(
   db: Database,
   profileId: string,
-  accountId: string
+  accountId: string,
 ): Promise<Profile | null> {
   const row = await db.query.profiles.findFirst({
     where: and(
       eq(profiles.id, profileId),
       eq(profiles.accountId, accountId),
-      isNull(profiles.archivedAt)
+      isNull(profiles.archivedAt),
     ),
   });
   if (!row) return null;
@@ -316,7 +333,7 @@ export async function updateProfile(
   db: Database,
   profileId: string,
   accountId: string,
-  input: ProfileUpdateInput
+  input: ProfileUpdateInput,
 ): Promise<Profile | null> {
   const rows = await db
     .update(profiles)
@@ -339,13 +356,13 @@ export async function updateProfile(
 export async function switchProfile(
   db: Database,
   profileId: string,
-  accountId: string
+  accountId: string,
 ): Promise<{ profileId: string } | null> {
   const row = await db.query.profiles.findFirst({
     where: and(
       eq(profiles.id, profileId),
       eq(profiles.accountId, accountId),
-      isNull(profiles.archivedAt)
+      isNull(profiles.archivedAt),
     ),
   });
   return row ? { profileId: row.id } : null;
@@ -357,7 +374,7 @@ export async function switchProfile(
  */
 export async function getProfileAge(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<number> {
   const profile = await db.query.profiles.findFirst({
     where: eq(profiles.id, profileId),
@@ -376,7 +393,7 @@ export async function getProfileAge(
  */
 export async function loadProfileRowById(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<typeof profiles.$inferSelect | null> {
   const row = await db.query.profiles.findFirst({
     where: eq(profiles.id, profileId),
@@ -390,7 +407,7 @@ export async function loadProfileRowById(
  */
 export async function getProfileDisplayName(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<string | undefined> {
   const profile = await db.query.profiles.findFirst({
     where: eq(profiles.id, profileId),
@@ -405,7 +422,7 @@ export async function getProfileDisplayName(
  */
 export async function getProfileAgeBracket(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<AgeBracket> {
   const profile = await db.query.profiles.findFirst({
     where: eq(profiles.id, profileId),
@@ -426,7 +443,7 @@ export type ProfileRole = 'guardian' | 'self_learner';
  */
 export async function resolveProfileRole(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<ProfileRole> {
   const childLink = await db.query.familyLinks.findFirst({
     where: eq(familyLinks.parentProfileId, profileId),

@@ -19,9 +19,11 @@ tags:
       SEED_SCENARIO: "parent-with-children"
       API_URL: ${API_URL}
 
-# 2. Parent owners land on LearnerScreen; enter the Family dashboard.
-- runFlow:
-    file: ../_setup/open-family-dashboard.yaml
+# 2. Parent owners land on parent Home.
+- extendedWaitUntil:
+    visible:
+      id: "parent-home-screen"
+    timeout: 15000
 
 # ── Visual integrity: parent tab bar ───────────────────────────────────
 - assertVisible:
@@ -29,31 +31,30 @@ tags:
 - assertVisible:
     id: "tab-library"
 - assertVisible:
+    id: "tab-progress"
+- assertVisible:
     id: "tab-more"
-- assertVisible:
-    id: "tab-family"
 
-# ── Visual integrity: dashboard heading ────────────────────────────────
-# Family dashboard shows the Family heading + hub subtitle.
+# ── Visual integrity: parent Home heading ──────────────────────────────
 - assertVisible:
-    text: "Family"
+    id: "parent-home-screen"
 - assertVisible:
-    text: "Everyone you're learning alongside."
+    text: "What do you need right now?"
 
-# 3. Verify children list is visible — wait for API data to load
+# 3. Verify child intent card is visible — wait for API data to load
 - extendedWaitUntil:
     visible:
       text: "Test Teen"
     timeout: 10000
 
-# 4. Look for child card element via per-child testID (dashboard-child-${profileId})
+# 4. Look for child card element via per-child parent Home testID
 # CHILD_PROFILE_ID is injected by the seed-and-sign-in helper
 - assertVisible:
-    id: "dashboard-child-${CHILD_PROFILE_ID}"
+    id: "parent-home-check-child-${CHILD_PROFILE_ID}"
 
 # 5. Tap on child card to view detail
 - tapOn:
-    id: "dashboard-child-${CHILD_PROFILE_ID}"
+    id: "parent-home-check-child-${CHILD_PROFILE_ID}"
 
 # 6. Fallback: tap on child name text
 # optional: only fires if testID-based tap in step 5 did not navigate (e.g. testID not rendered)
@@ -71,7 +72,7 @@ tags:
 - assertVisible:
     text: "sessions"
 
-# 9. Navigate back to dashboard
+# 9. Navigate back to parent Home
 # optional: back button only present if we navigated into child detail (step 7)
 - tapOn:
     id: "back-button"

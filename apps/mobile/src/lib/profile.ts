@@ -108,6 +108,27 @@ export function useProfile(): ProfileContextValue {
   return useContext(ProfileContext);
 }
 
+export function useLinkedChildren(): Profile[] {
+  const { activeProfile, profiles } = useProfile();
+
+  return useMemo(() => {
+    if (activeProfile?.isOwner !== true) return [];
+
+    return profiles
+      .filter((profile) => profile.id !== activeProfile.id && !profile.isOwner)
+      .slice()
+      .sort((a, b) => {
+        const aLink = a.linkCreatedAt ?? a.createdAt;
+        const bLink = b.linkCreatedAt ?? b.createdAt;
+        return aLink.localeCompare(bLink);
+      });
+  }, [activeProfile?.id, activeProfile?.isOwner, profiles]);
+}
+
+export function useHasLinkedChildren(): boolean {
+  return useLinkedChildren().length > 0;
+}
+
 export function ProfileProvider({
   children,
 }: {

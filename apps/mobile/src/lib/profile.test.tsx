@@ -16,7 +16,7 @@ jest.mock('./secure-storage', () => ({
 }));
 
 jest.mock('@clerk/clerk-expo', () => ({
-  useAuth: () => ({ isSignedIn: true }),
+  useAuth: () => ({ isSignedIn: true, userId: 'clerk-user-test' }),
 }));
 
 const mockFetch = jest.fn();
@@ -137,6 +137,129 @@ describe('ProfileProvider', () => {
       'mentomate_active_profile_id',
       'owner-id',
     );
+  });
+
+  // [BREAK] Cross-account leak regression. Real-world scenario: User A signs
+  // out via a path that does NOT call clearProfileSecureStorageOnSignOut
+  // (5 of 6 sign-out call sites as of 2026-05-10), so mentomate_active_profile_id
+  // survives. User B then signs in with their own Clerk credentials. The
+  // api-client must NEVER receive User A's profile id — even transiently —
+  // because attaching it as X-Profile-Id on any request would either return
+  // User A's data (if a family link existed) or 403, and any
+  // activeProfile.id-keyed cache read would render User A's UI to User B.
+  //
+  // Symptom that triggered this test: a real account's monthly usage counter
+  // incremented while the owner was not using the app — wife had signed in on
+  // his phone after his sign-out, and her API calls were attributed to his
+  // profileId server-side.
+  it('[BREAK] never pushes a SecureStore-restored profile id that the current account does not own', async () => {
+    (SecureStore.getItemAsync as jest.Mock).mockImplementation((key: string) =>
+      Promise.resolve(
+        key === 'mentomate_active_profile_id' ? 'userA-profile-id' : null,
+      ),
+    );
+
+    const { result } = renderHook(() => useProfile(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(result.current.activeProfile?.id).toBe('owner-id');
+
+    const pushedIds = (pushProfileIdToApiClient as jest.Mock).mock.calls.map(
+      (call) => call[0],
+    );
+    expect(pushedIds).not.toContain('userA-profile-id');
+
+    expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
+      'mentomate_active_profile_id',
+      'owner-id',
+    );
+  });
+
+  // [BREAK] Cache-leak half of the cross-account bug. The ['profiles'] query
+  // key is NOT scoped by Clerk userId — so when sign-out doesn't call
+  // queryClient.clear() (5 of 6 call sites today), User A's profiles list
+  // survives in the cache. When User B signs in, useProfiles serves the stale
+  // list immediately, savedExists matches against User A's ids, and
+  // pushProfileIdToApiClient fires with a profileId User B does not own.
+  // Every subsequent fetch then carries X-Profile-Id: <userA-id>.
+  //
+  // This test pre-seeds ['profiles'] with User A's list and asserts that
+  // User A's id is never propagated to the api-client even during the
+  // refetch window. Fix is one of: scope the query key by Clerk userId,
+  // call queryClient.clear() on every sign-out path, or refetchOnMount: 'always'
+  // for the profiles query.
+  it('[BREAK] cache leak: stale [profiles] cache from previous user does not leak profile id to api-client', async () => {
+    const userAProfiles: Profile[] = [
+      {
+        ...mockProfiles[0]!,
+        id: 'userA-owner',
+        accountId: 'userA-account',
+        displayName: 'Previous User',
+      },
+    ];
+
+    (SecureStore.getItemAsync as jest.Mock).mockImplementation((key: string) =>
+      Promise.resolve(
+        key === 'mentomate_active_profile_id' ? 'userA-owner' : null,
+      ),
+    );
+
+    // Gate the network fetch so the test can observe the window where
+    // useProfiles is serving stale cache data BEFORE the refetch resolves
+    // with the new user's profiles. Without this gate, the mocked fetch
+    // resolves so fast the leak window collapses and the bug is hidden.
+    mockFetch.mockReset();
+    let resolveFetch: (value: Response) => void = () => undefined;
+    mockFetch.mockReturnValue(
+      new Promise<Response>((resolve) => {
+        resolveFetch = resolve;
+      }),
+    );
+
+    const wrapper = createWrapper();
+    const { result } = renderHook(() => useProfile(), { wrapper });
+
+    // Seed BOTH the unscoped legacy key and a foreign-userId key. The first
+    // models a pre-fix cache entry left over after an in-place upgrade; the
+    // second models the cache an earlier signed-in user would have written
+    // with the post-fix code. The current consumer's scoped key
+    // ['profiles', 'clerk-user-test'] must match neither.
+    await act(async () => {
+      queryClient.setQueryData(['profiles'], userAProfiles);
+      queryClient.setQueryData(['profiles', 'clerk-userA'], userAProfiles);
+    });
+
+    // The leak window the pre-fix code exposed cannot exist with the scoped
+    // query key — activeProfile must never resolve to the previous user's id
+    // even before the network refetch settles.
+    expect(result.current.activeProfile?.id).not.toBe('userA-owner');
+
+    // Resolve the refetch with the current user's actual profiles.
+    await act(async () => {
+      resolveFetch(
+        new Response(JSON.stringify({ profiles: mockProfiles }), {
+          status: 200,
+        }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(result.current.activeProfile?.id).toBe('owner-id');
+    });
+
+    // Contract: no profile id from a previous account should ever have been
+    // pushed to the api-client — any value pushed here ends up as
+    // X-Profile-Id on subsequent fetches and was the mechanism that
+    // attributed wife's API calls to husband's profileId server-side.
+    const pushedIds = (pushProfileIdToApiClient as jest.Mock).mock.calls.map(
+      (call) => call[0],
+    );
+    expect(pushedIds).not.toContain('userA-owner');
   });
 
   it('switchProfile updates active profile and persists to SecureStore', async () => {
@@ -272,8 +395,11 @@ describe('ProfileProvider', () => {
       queryClient.getQueryData(['book-suggestions', 'subject-1']),
     ).toBeUndefined();
 
-    // Profiles query must survive (not reset) to avoid blank screen
-    expect(queryClient.getQueryData(['profiles'])).toBeTruthy();
+    // Profiles query must survive (not reset) to avoid blank screen. The
+    // query is scoped by Clerk userId — see useProfiles in hooks/use-profiles.ts.
+    expect(
+      queryClient.getQueryData(['profiles', 'clerk-user-test']),
+    ).toBeTruthy();
   });
 
   // [BREAK / BUG-828] If SecureStore.setItemAsync rejects (e.g., Keychain

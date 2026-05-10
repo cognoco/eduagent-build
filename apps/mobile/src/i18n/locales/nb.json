@@ -147,6 +147,23 @@
     "childCard": {
       "title": "Barn",
       "accessibilityLabel": "Åpne Familie"
+    },
+    "parent": {
+      "greeting": "Hei {{displayName}}",
+      "intentHeader": "Hva trenger du akkurat nå?",
+      "encouragementNote": "Nudger er korte, milde oppmuntringer en vei.",
+      "transitionNotice": "Du er forelder nå også. Dette er hjemmet ditt - barnas fremgang og din egen læring samlet på ett sted.",
+      "cards": {
+        "checkChild": "Se hvordan det går med {{childName}}",
+        "checkChildFallback": "Trykk for å se ukens fremgang",
+        "weeklyReport": "Les ukerapporten til {{childName}}",
+        "weeklyReportSubtitle": "Få med deg den siste oppsummeringen",
+        "sendNudge": "Send {{childName}} en nudge",
+        "sendNudgeSubtitle": "Velg en kort oppmuntring",
+        "continueOwn": "Fortsett din egen læring",
+        "continueOwnSubtitle": "Fortsett med {{topicTitle}} i {{subjectName}}",
+        "continueOwnEmptySubtitle": "Fortsett der du slapp"
+      }
     }
   },
   "dashboard": {
@@ -2114,6 +2131,30 @@
       "title": "Denne samtalen ble arkivert {{date}}.",
       "intro": "Dette gikk dere gjennom:",
       "continueCta": "Fortsett med dette temaet"
+    }
+  },
+  "nudge": {
+    "sheet": {
+      "title": "Send {{childName}} en nudge",
+      "subtitle": "Velg en kort oppmuntring."
+    },
+    "templates": {
+      "you_got_this": "Dette klarer du",
+      "proud_of_you": "Jeg er stolt av deg",
+      "quick_session": "Vil du ta en kort økt?",
+      "thinking_of_you": "Tenker på deg"
+    },
+    "toast": {
+      "sent": "Nudge sendt"
+    },
+    "error": {
+      "rateLimit": "Du har sendt nok oppmuntring for nå - {{childName}} ser den neste gang appen åpnes.",
+      "consentPending": "Samtykket til {{childName}} venter fortsatt - oppmuntringer fungerer når kontoen er klar."
+    },
+    "banner": {
+      "title": "{{fromDisplayName}} sendte deg en nudge",
+      "unreadCount": "{{count}} nye",
+      "modalTitle": "Nye nudger"
     }
   }
 }

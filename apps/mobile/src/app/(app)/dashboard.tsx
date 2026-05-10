@@ -3,9 +3,9 @@ import { Redirect, useLocalSearchParams } from 'expo-router';
 import type { Href } from 'expo-router';
 
 /**
- * /(app)/dashboard is preserved as an indefinite redirect to /(app)/family.
+ * /(app)/dashboard is preserved as an indefinite redirect to parent Home.
  * Deep links, notifications, and old bookmarks continue to land on the
- * canonical Family route while preserving returnTo for contextual back.
+ * canonical parent surface while preserving returnTo for contextual back.
  */
 export default function DashboardRedirect(): React.ReactElement {
   const { returnTo } = useLocalSearchParams<{
@@ -14,8 +14,8 @@ export default function DashboardRedirect(): React.ReactElement {
   const returnToValue = Array.isArray(returnTo) ? returnTo[0] : returnTo;
 
   const href: Href = returnToValue
-    ? { pathname: '/(app)/family', params: { returnTo: returnToValue } }
-    : '/(app)/family';
+    ? { pathname: '/(app)/home', params: { returnTo: returnToValue } }
+    : '/(app)/home';
 
   return <Redirect href={href} />;
 }

@@ -34,6 +34,7 @@ const parentProfile = {
   conversationLanguage: 'en',
   pronouns: null,
   consentStatus: null,
+  linkCreatedAt: null,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 } satisfies Profile;
@@ -163,13 +164,13 @@ describe('ChildCard', () => {
     screen.getByText('-');
   });
 
-  it('navigates to Family when pressed', () => {
+  it('navigates to Home when pressed', () => {
     const emma = child('child-1', 'Emma');
 
     render(<ChildCard linkedChildren={[emma]} dashboard={undefined} />);
 
     fireEvent.press(screen.getByTestId('home-child-card'));
 
-    expect(mockPush).toHaveBeenCalledWith('/(app)/family');
+    expect(mockPush).toHaveBeenCalledWith('/(app)/home');
   });
 });

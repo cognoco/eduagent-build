@@ -278,7 +278,11 @@ export default function ProgressScreen(): React.ReactElement {
     : null;
 
   return (
-    <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
+    <View
+      className="flex-1 bg-background"
+      style={{ paddingTop: insets.top }}
+      testID="progress-screen"
+    >
       <ScrollView
         className="flex-1 px-5"
         contentContainerStyle={{ paddingBottom: insets.bottom + 28 }}

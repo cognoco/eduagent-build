@@ -1,0 +1,104 @@
+# Flow: Sign-in / Sign-out Loop Stress Test
+# Validates: repeated email/password sign-in and sign-out cycles do not leave
+#   the app in a stuck state (orphaned spinners, stale auth-transition,
+#   unmounted SecureStore writes, [object ErrorEvent] from /v1/subjects, etc.).
+# Tags: regression, auth, stress
+#
+# Usage:
+#   EMAIL=test@example.com PASSWORD=... maestro test \
+#     apps/mobile/e2e/flows/auth/sign-in-out-loop.yaml
+#
+#   Or via the seed-and-run script which already sets EMAIL / PASSWORD:
+#     ./apps/mobile/e2e/scripts/seed-and-run-release.sh \
+#       apps/mobile/e2e/flows/auth/sign-in-out-loop.yaml
+#
+#   To change iteration count, override at the CLI:
+#     maestro test -e ITERATIONS=10 apps/mobile/e2e/flows/auth/sign-in-out-loop.yaml
+#
+# Prerequisite: a seeded Clerk test user matching $EMAIL / $PASSWORD must exist.
+#
+# What this catches:
+#   - Stuck OAuth/sign-in spinner that survives across iterations
+#   - Auth-transition timeout false positives (SESSION_TRANSITION_MS leakage)
+#   - SecureStore key leakage on sign-out
+#   - Network/profile race causing post-sign-in API calls to fail (Sentry
+#     "[object ErrorEvent]" pattern)
+#
+# testIDs verified against:
+#   apps/mobile/src/app/(auth)/sign-in.tsx (sign-in-screen, sign-in-email,
+#   sign-in-password, sign-in-button)
+#   apps/mobile/src/app/(app)/home (learner-screen)
+#   _setup/sign-out.yaml (sign-out-button)
+appId: com.mentomate.app
+tags:
+  - regression
+  - auth
+  - stress
+env:
+  ITERATIONS: 5
+---
+# Wait for the sign-in screen on first launch.
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-screen"
+    timeout: 120000
+
+- takeScreenshot: signinout-00-initial
+
+- repeat:
+    times: ${ITERATIONS}
+    commands:
+      # ── Sign in ──────────────────────────────────────────────────────────
+      - extendedWaitUntil:
+          visible:
+            id: "sign-in-email"
+          timeout: 15000
+
+      - tapOn:
+          id: "sign-in-email"
+      - inputText: ${EMAIL}
+
+      # Dismiss keyboard so the password field is not covered.
+      - hideKeyboard
+
+      - tapOn:
+          id: "sign-in-password"
+      - inputText: ${PASSWORD}
+
+      - hideKeyboard
+
+      # Scroll the submit button into view (small phones may push it below the fold).
+      - scrollUntilVisible:
+          element:
+            id: "sign-in-button"
+          direction: DOWN
+          timeout: 5000
+
+      - tapOn:
+          id: "sign-in-button"
+
+      # ── Land on home ─────────────────────────────────────────────────────
+      # Generous timeout — covers slow Clerk setActive + auth-layout redirect
+      # + first /v1/subjects fetch. If this fails the underlying bug is
+      # exactly the kind of stuck state this flow exists to detect.
+      - extendedWaitUntil:
+          visible:
+            id: "learner-screen"
+          timeout: 45000
+
+      # ── Sign out ─────────────────────────────────────────────────────────
+      - runFlow: ../_setup/sign-out.yaml
+
+      # Confirm we're back on the sign-in screen and not stuck on a transition.
+      - extendedWaitUntil:
+          visible:
+            id: "sign-in-screen"
+          timeout: 15000
+
+      # Sanity: no orphaned "Signing you in…" spinner from a previous activation.
+      - assertNotVisible:
+          id: "sign-in-transitioning"
+      - assertNotVisible:
+          id: "sign-in-transitioning-stuck"
+
+- takeScreenshot: signinout-99-final

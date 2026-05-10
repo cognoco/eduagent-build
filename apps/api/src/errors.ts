@@ -14,6 +14,7 @@ export {
   NotFoundError,
   ForbiddenError,
   ConflictError,
+  ConsentRequiredError,
   RateLimitedError,
   SafetyFilterError,
   UpstreamLlmError,
