@@ -88,7 +88,7 @@ export function CelebrationAnimation({
     // Center circle pops
     centerScale.value = withSequence(
       withSpring(1.2, { damping: 8, stiffness: 200 }),
-      withTiming(1, { duration: 150 })
+      withTiming(1, { duration: 150 }),
     );
 
     // Fade out after burst
@@ -98,7 +98,7 @@ export function CelebrationAnimation({
         if (finished && onCompleteRef.current) {
           runOnJS(onCompleteRef.current)();
         }
-      })
+      }),
     );
     // onComplete intentionally omitted — stabilised via ref
   }, [reduceMotion, progress, opacity, centerScale]);

@@ -77,7 +77,7 @@ function getWordCount(text: string): number {
 
 function buildGateMetrics(
   text: string,
-  confidence?: number
+  confidence?: number,
 ): {
   tokens: number;
   words: number;
@@ -122,8 +122,8 @@ async function recognizeText(imageUri: string): Promise<RecognizedTextResult> {
     new Promise<never>((_, reject) =>
       setTimeout(
         () => reject(new Error('On-device text recognition timed out')),
-        OCR_DEVICE_TIMEOUT_MS
-      )
+        OCR_DEVICE_TIMEOUT_MS,
+      ),
     ),
   ]);
   const text = result.text?.trim();
@@ -141,7 +141,7 @@ async function recognizeTextServerSide(
   imageUri: string,
   token: string | null,
   profileId?: string,
-  externalSignal?: AbortSignal
+  externalSignal?: AbortSignal,
 ): Promise<RecognizedTextResult> {
   const uploadUri = await resizeImage(imageUri);
   const formData = new FormData();
@@ -240,7 +240,7 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
   const resolveSuccess = useCallback(
     (
       recognized: RecognizedTextResult,
-      source: HomeworkOcrGateSource
+      source: HomeworkOcrGateSource,
     ): boolean => {
       if (!recognized.text) {
         return false;
@@ -250,7 +250,7 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
       if (!isLikelyHomework(recognized.text, recognized.confidence)) {
         const droppedCount = splitHomeworkProblems(
           recognized.text,
-          recognized.confidence
+          recognized.confidence,
         ).dropped;
         trackHomeworkOcrGateRejected({
           source,
@@ -266,13 +266,13 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
       trackHomeworkOcrGateAccepted({ source, ...metrics });
       return true;
     },
-    []
+    [],
   );
 
   const tryServerFallback = useCallback(
     async (
       uri: string,
-      signal?: AbortSignal
+      signal?: AbortSignal,
     ): Promise<RecognizedTextResult | null> => {
       try {
         const token = await getToken();
@@ -280,7 +280,7 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
           uri,
           token ?? null,
           activeProfile?.id,
-          signal
+          signal,
         );
       } catch (err) {
         // [BUG-681] Distinguish user-initiated cancel from a real failure so
@@ -292,7 +292,7 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
         return null;
       }
     },
-    [activeProfile?.id, getToken]
+    [activeProfile?.id, getToken],
   );
 
   const runOcr = useCallback(
@@ -315,7 +315,7 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
       if (!isTextRecognitionAvailable()) {
         console.error(
           '[OCR] ML Kit TextRecognition native module is not linked. ' +
-            'Rebuild the app with EAS to include @react-native-ml-kit/text-recognition.'
+            'Rebuild the app with EAS to include @react-native-ml-kit/text-recognition.',
         );
         const serverResult = await tryServerFallback(uri, controller.signal);
         // [BUG-681] After every await, drop the result if cancel() fired
@@ -332,7 +332,7 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
         finishAsError(
           Platform.OS === 'android'
             ? 'Text recognition is not available in this build. A new app build is required.'
-            : 'Text recognition is not available. Please rebuild the app.'
+            : 'Text recognition is not available. Please rebuild the app.',
         );
         return;
       }
@@ -348,7 +348,7 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
           }
           const rejectedMetrics = buildGateMetrics(
             recognized.text,
-            recognized.confidence
+            recognized.confidence,
           );
           trackHomeworkOcrGateShortcircuit(rejectedMetrics);
           finishAsError(NON_HOMEWORK_ERROR_MESSAGE);
@@ -381,11 +381,11 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
           return;
         }
         finishAsError(
-          "We couldn't read that clearly. Try taking the photo again with better lighting."
+          "We couldn't read that clearly. Try taking the photo again with better lighting.",
         );
       }
     },
-    [finishAsError, resolveSuccess, tryServerFallback]
+    [finishAsError, resolveSuccess, tryServerFallback],
   );
 
   const process = useCallback(
@@ -402,7 +402,7 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
       currentUriRef.current = stableUri;
       await runOcr(stableUri, false);
     },
-    [runOcr]
+    [runOcr],
   );
 
   const retry = useCallback(async () => {

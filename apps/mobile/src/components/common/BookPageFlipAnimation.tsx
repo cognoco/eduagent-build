@@ -291,18 +291,18 @@ export function BookPageFlipAnimation({
     isoX.value = withRepeat(
       withSequence(
         withTiming(46, { duration: ISO_HALF_MS, easing: ease }),
-        withTiming(42, { duration: ISO_HALF_MS, easing: ease })
+        withTiming(42, { duration: ISO_HALF_MS, easing: ease }),
       ),
       -1,
-      false
+      false,
     );
     isoY.value = withRepeat(
       withSequence(
         withTiming(4, { duration: ISO_HALF_MS, easing: ease }),
-        withTiming(6, { duration: ISO_HALF_MS, easing: ease })
+        withTiming(6, { duration: ISO_HALF_MS, easing: ease }),
       ),
       -1,
-      false
+      false,
     );
 
     // Page flips (staggered, each page has own cycle for organic drift)
@@ -314,10 +314,10 @@ export function BookPageFlipAnimation({
           withTiming(-140, { duration: FLIP_SEG_MS, easing: ease }),
           withTiming(-180, { duration: FLIP_SEG_MS, easing: ease }),
           withTiming(-180, { duration: FLIP_SEG_MS }),
-          withTiming(0, { duration: FLIP_SEG_MS, easing: ease })
+          withTiming(0, { duration: FLIP_SEG_MS, easing: ease }),
         ),
         -1,
-        false
+        false,
       );
 
     const mkShadow = (delay: number) =>
@@ -328,10 +328,10 @@ export function BookPageFlipAnimation({
           withTiming(0.5, { duration: FLIP_SEG_MS }),
           withTiming(0.15, { duration: FLIP_SEG_MS }),
           withTiming(0, { duration: FLIP_SEG_MS }),
-          withTiming(0, { duration: FLIP_SEG_MS })
+          withTiming(0, { duration: FLIP_SEG_MS }),
         ),
         -1,
-        false
+        false,
       );
 
     flip1.value = mkFlip(0);
@@ -351,42 +351,42 @@ export function BookPageFlipAnimation({
         withTiming(0.1, {
           duration: FLIP_SEG_MS * 3,
           easing: ease,
-        })
+        }),
       ),
       -1,
-      false
+      false,
     );
 
     // Dust motes
     mote1.value = withRepeat(
       withSequence(
         withTiming(1, { duration: MOTE_PERIOD_MS }),
-        withTiming(0, { duration: 0 })
+        withTiming(0, { duration: 0 }),
       ),
       -1,
-      false
+      false,
     );
     mote2.value = withRepeat(
       withSequence(
         withDelay(
           MOTE_PERIOD_MS * 0.35,
-          withTiming(1, { duration: MOTE_PERIOD_MS * 1.1 })
+          withTiming(1, { duration: MOTE_PERIOD_MS * 1.1 }),
         ),
-        withTiming(0, { duration: 0 })
+        withTiming(0, { duration: 0 }),
       ),
       -1,
-      false
+      false,
     );
     mote3.value = withRepeat(
       withSequence(
         withDelay(
           MOTE_PERIOD_MS * 0.65,
-          withTiming(1, { duration: MOTE_PERIOD_MS * 0.9 })
+          withTiming(1, { duration: MOTE_PERIOD_MS * 0.9 }),
         ),
-        withTiming(0, { duration: 0 })
+        withTiming(0, { duration: 0 }),
       ),
       -1,
-      false
+      false,
     );
 
     return () => {

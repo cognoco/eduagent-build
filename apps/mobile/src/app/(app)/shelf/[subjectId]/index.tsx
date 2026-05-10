@@ -137,8 +137,8 @@ export default function ShelfScreen() {
   const failedQuery = booksQuery.isError
     ? booksQuery
     : subjectsQuery.isError
-    ? subjectsQuery
-    : null;
+      ? subjectsQuery
+      : null;
   const isError = failedQuery !== null;
 
   const handleRetry = (): void => {
@@ -170,7 +170,7 @@ export default function ShelfScreen() {
   const totalTopics = books.reduce((sum, b) => sum + (b.topicCount ?? 0), 0);
   const completedTopics = books.reduce(
     (sum, b) => sum + (b.completedTopicCount ?? 0),
-    0
+    0,
   );
   const showProgress = totalTopics > 0;
   const showBrowseAllSuggestions = bookSuggestions.length > 2;
@@ -180,7 +180,7 @@ export default function ShelfScreen() {
     : t('library.shelf.addAnotherBook');
 
   const renderChooseBookButton = (
-    className = 'mx-4 mb-4 border border-dashed border-border rounded-xl py-3 items-center justify-center flex-row gap-2'
+    className = 'mx-4 mb-4 border border-dashed border-border rounded-xl py-3 items-center justify-center flex-row gap-2',
   ) => (
     <Pressable
       onPress={() =>
@@ -304,7 +304,7 @@ export default function ShelfScreen() {
                   style={{
                     backgroundColor: shelfTint.solid,
                     width: `${Math.round(
-                      (completedTopics / totalTopics) * 100
+                      (completedTopics / totalTopics) * 100,
                     )}%`,
                   }}
                   testID="shelf-progress-bar"
@@ -383,7 +383,7 @@ export default function ShelfScreen() {
           showAddBookFooter ? (
             <View className="pt-1">
               {renderChooseBookButton(
-                'mb-4 border border-dashed border-border rounded-xl py-3 items-center justify-center flex-row gap-2'
+                'mb-4 border border-dashed border-border rounded-xl py-3 items-center justify-center flex-row gap-2',
               )}
             </View>
           ) : null

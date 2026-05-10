@@ -31,7 +31,7 @@ describe('message-outbox', () => {
       'profile-1',
       'session',
       'entry-1',
-      'network'
+      'network',
     );
     expect(failed?.failureReason).toBe('network');
 
@@ -55,7 +55,7 @@ describe('message-outbox', () => {
       'profile-1',
       'session',
       'entry-2',
-      'timeout'
+      'timeout',
     );
 
     expect(failed?.status).toBe('permanently-failed');

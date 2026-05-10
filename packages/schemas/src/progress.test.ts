@@ -148,7 +148,7 @@ describe('CoachingCard schemas', () => {
         expiresAt: '2025-12-31T23:59:59.999Z',
       };
       expect(streakCardSchema.parse(card).expiresAt).toBe(
-        '2025-12-31T23:59:59.999Z'
+        '2025-12-31T23:59:59.999Z',
       );
     });
   });

@@ -49,11 +49,11 @@ const REFLECTION_STARTERS = {
 
 export type ReflectionStarterLanguage = keyof typeof REFLECTION_STARTERS;
 export type ReflectionStarterSessionType =
-  | keyof (typeof REFLECTION_STARTERS)['en'];
+  keyof (typeof REFLECTION_STARTERS)['en'];
 
 export function getReflectionStarters(
   sessionType: ReflectionStarterSessionType,
-  language?: string | null
+  language?: string | null,
 ): readonly string[] {
   const normalizedLanguage = language?.toLowerCase() === 'cs' ? 'cs' : 'en';
 

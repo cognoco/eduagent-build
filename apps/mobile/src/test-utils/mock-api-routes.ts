@@ -10,7 +10,7 @@
 
 type RouteHandler = (
   url: string,
-  init?: RequestInit
+  init?: RequestInit,
 ) => unknown | Promise<unknown>;
 
 type RouteEntry = unknown | RouteHandler;
@@ -20,7 +20,7 @@ export interface RoutedMockFetch extends jest.Mock {
 }
 
 export function createRoutedMockFetch(
-  routes: Record<string, RouteEntry> = {}
+  routes: Record<string, RouteEntry> = {},
 ): RoutedMockFetch {
   const routeMap = new Map(Object.entries(routes));
 
@@ -29,14 +29,14 @@ export function createRoutedMockFetch(
     .mockImplementation(
       async (
         input: RequestInfo | URL,
-        init?: RequestInit
+        init?: RequestInit,
       ): Promise<Response> => {
         const url =
           typeof input === 'string'
             ? input
             : input instanceof URL
-            ? input.toString()
-            : (input as Request).url;
+              ? input.toString()
+              : (input as Request).url;
 
         for (const [pattern, handler] of routeMap) {
           if (url.includes(pattern)) {
@@ -58,7 +58,7 @@ export function createRoutedMockFetch(
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         });
-      }
+      },
     ) as RoutedMockFetch;
 
   mockFn.setRoute = (pattern: string, handler: RouteEntry) => {
@@ -103,7 +103,7 @@ export function mockApiClientFactory(mockFetch: jest.Mock) {
 
 export function fetchCallsMatching(
   mockFetch: jest.Mock,
-  pattern: string
+  pattern: string,
 ): Array<{ url: string; init?: RequestInit }> {
   return (mockFetch.mock.calls as [RequestInfo | URL, RequestInit?][])
     .map(([input, init]) => ({
@@ -111,8 +111,8 @@ export function fetchCallsMatching(
         typeof input === 'string'
           ? input
           : input instanceof URL
-          ? input.toString()
-          : (input as Request).url,
+            ? input.toString()
+            : (input as Request).url,
       init,
     }))
     .filter(({ url }) => url.includes(pattern));

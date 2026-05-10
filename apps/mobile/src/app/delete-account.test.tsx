@@ -62,7 +62,7 @@ function advanceToConfirmedState(phrase = 'DELETE') {
   fireEvent.press(screen.getByTestId('delete-account-confirm'));
   fireEvent.changeText(
     screen.getByTestId('delete-account-confirm-input'),
-    phrase
+    phrase,
   );
 }
 
@@ -182,7 +182,7 @@ describe('DeleteAccountScreen', () => {
       () =>
         new Promise((resolve) => {
           resolveMutation = resolve;
-        })
+        }),
     );
 
     render(<DeleteAccountScreen />, { wrapper: Wrapper });
@@ -226,7 +226,7 @@ describe('DeleteAccountScreen', () => {
       expect(screen.getByTestId('delete-account-family-warning')).toBeTruthy();
       screen.getByText(/linked child profiles/i);
       expect(
-        screen.getByText(/permanently deleted along with your account/i)
+        screen.getByText(/permanently deleted along with your account/i),
       ).toBeTruthy();
     });
 
@@ -235,7 +235,7 @@ describe('DeleteAccountScreen', () => {
       fireEvent.press(screen.getByTestId('delete-account-confirm'));
 
       expect(
-        screen.getByTestId('delete-account-subscription-warning')
+        screen.getByTestId('delete-account-subscription-warning'),
       ).toBeTruthy();
       screen.getByText(/App Store or Play Store/i);
       screen.getByText(/not.*automatically cancelled/i);
@@ -252,21 +252,21 @@ describe('DeleteAccountScreen', () => {
       // Wrong text → still disabled.
       fireEvent.changeText(
         screen.getByTestId('delete-account-confirm-input'),
-        'delete'
+        'delete',
       );
       expect(finalBtn.props.accessibilityState.disabled).toBe(true);
 
       // Wrong text (typo) → still disabled.
       fireEvent.changeText(
         screen.getByTestId('delete-account-confirm-input'),
-        'DELET'
+        'DELET',
       );
       expect(finalBtn.props.accessibilityState.disabled).toBe(true);
 
       // Exact match → enabled.
       fireEvent.changeText(
         screen.getByTestId('delete-account-confirm-input'),
-        'DELETE'
+        'DELETE',
       );
       expect(finalBtn.props.accessibilityState.disabled).toBe(false);
     });
@@ -278,7 +278,7 @@ describe('DeleteAccountScreen', () => {
       // Type a near-miss.
       fireEvent.changeText(
         screen.getByTestId('delete-account-confirm-input'),
-        'delete'
+        'delete',
       );
 
       // Pressing a disabled Pressable in RN test renderer still fires
@@ -309,7 +309,7 @@ describe('DeleteAccountScreen', () => {
 
       fireEvent.changeText(
         screen.getByTestId('delete-account-confirm-input'),
-        'DELETE'
+        'DELETE',
       );
       fireEvent.press(screen.getByTestId('delete-account-back-to-warning'));
       fireEvent.press(screen.getByTestId('delete-account-confirm'));
@@ -317,11 +317,11 @@ describe('DeleteAccountScreen', () => {
       // Re-entering the confirming stage starts fresh — input is empty,
       // final button disabled.
       expect(
-        screen.getByTestId('delete-account-confirm-input').props.value
+        screen.getByTestId('delete-account-confirm-input').props.value,
       ).toBe('');
       expect(
         screen.getByTestId('delete-account-confirm-final').props
-          .accessibilityState.disabled
+          .accessibilityState.disabled,
       ).toBe(true);
     });
   });

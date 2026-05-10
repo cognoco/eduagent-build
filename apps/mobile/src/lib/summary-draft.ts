@@ -25,7 +25,7 @@ function getDraftKey(profileId: string, sessionId: string): string {
 
 function reportDraftFailure(
   scope: 'read' | 'write' | 'clear',
-  err: unknown
+  err: unknown,
 ): void {
   console.warn(`[SummaryDraft] SecureStore ${scope} failed:`, err);
   Sentry.captureException(err, {
@@ -36,7 +36,7 @@ function reportDraftFailure(
 export async function writeSummaryDraft(
   profileId: string,
   sessionId: string,
-  content: string
+  content: string,
 ): Promise<void> {
   const payload: SummaryDraft = {
     profileId,
@@ -47,7 +47,7 @@ export async function writeSummaryDraft(
   try {
     await SecureStore.setItemAsync(
       getDraftKey(profileId, sessionId),
-      JSON.stringify(payload)
+      JSON.stringify(payload),
     );
   } catch (err) {
     reportDraftFailure('write', err);
@@ -57,7 +57,7 @@ export async function writeSummaryDraft(
 export async function readSummaryDraft(
   profileId: string,
   sessionId: string,
-  now = Date.now()
+  now = Date.now(),
 ): Promise<SummaryDraft | null> {
   let raw: string | null;
   try {
@@ -97,7 +97,7 @@ export async function readSummaryDraft(
 
 export async function clearSummaryDraft(
   profileId: string,
-  sessionId: string
+  sessionId: string,
 ): Promise<void> {
   try {
     await SecureStore.deleteItemAsync(getDraftKey(profileId, sessionId));

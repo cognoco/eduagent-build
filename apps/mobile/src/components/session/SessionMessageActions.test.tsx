@@ -29,7 +29,7 @@ const defaultProps: SessionMessageActionsProps = {
 describe('SessionMessageActions stage gating', () => {
   it('renders chips and feedback when stage is teaching', () => {
     const { queryByTestId } = render(
-      <SessionMessageActions {...defaultProps} stage="teaching" />
+      <SessionMessageActions {...defaultProps} stage="teaching" />,
     );
     // Quick chips render for a question-like message
     expect(queryByTestId('quick-chip-too_hard')).toBeTruthy();
@@ -45,7 +45,7 @@ describe('SessionMessageActions stage gating', () => {
         stage="teaching"
         bookmarkState={{ 'evt-1': null }}
         onToggleBookmark={jest.fn()}
-      />
+      />,
     );
 
     expect(queryByTestId('bookmark-toggle-evt-1')).toBeTruthy();
@@ -53,7 +53,7 @@ describe('SessionMessageActions stage gating', () => {
 
   it('hides chips and feedback when stage is greeting', () => {
     const { queryByTestId } = render(
-      <SessionMessageActions {...defaultProps} stage="greeting" />
+      <SessionMessageActions {...defaultProps} stage="greeting" />,
     );
     expect(queryByTestId('quick-chip-too_hard')).toBeNull();
     expect(queryByTestId('message-feedback-helpful-evt-1')).toBeNull();
@@ -61,7 +61,7 @@ describe('SessionMessageActions stage gating', () => {
 
   it('hides chips and feedback when stage is orienting', () => {
     const { queryByTestId } = render(
-      <SessionMessageActions {...defaultProps} stage="orienting" />
+      <SessionMessageActions {...defaultProps} stage="orienting" />,
     );
     expect(queryByTestId('quick-chip-too_hard')).toBeNull();
     expect(queryByTestId('message-feedback-helpful-evt-1')).toBeNull();
@@ -79,7 +79,7 @@ describe('SessionMessageActions stage gating', () => {
         {...defaultProps}
         message={reconnectMessage}
         stage="greeting"
-      />
+      />,
     );
     expect(queryByTestId('session-reconnect-reconnect-1')).toBeTruthy();
     expect(queryByTestId('message-feedback-helpful-reconnect-1')).toBeNull();
@@ -91,7 +91,7 @@ describe('SessionMessageActions stage gating', () => {
   describe('accessibility on chips and feedback buttons [BUG-874]', () => {
     it('quick-chip Pressables expose role=button + a11y label', () => {
       const { getByTestId } = render(
-        <SessionMessageActions {...defaultProps} stage="teaching" />
+        <SessionMessageActions {...defaultProps} stage="teaching" />,
       );
       const tooHard = getByTestId('quick-chip-too_hard');
       expect(tooHard.props.accessibilityRole).toBe('button');
@@ -110,7 +110,7 @@ describe('SessionMessageActions stage gating', () => {
           {...defaultProps}
           message={reconnectMessage}
           stage="greeting"
-        />
+        />,
       );
       const reconnect = getByTestId('session-reconnect-reconnect-1');
       expect(reconnect.props.accessibilityRole).toBe('button');
@@ -119,7 +119,7 @@ describe('SessionMessageActions stage gating', () => {
 
     it('helpful / not-helpful / incorrect feedback Pressables expose role=button + a11y label', () => {
       const { getByTestId } = render(
-        <SessionMessageActions {...defaultProps} stage="teaching" />
+        <SessionMessageActions {...defaultProps} stage="teaching" />,
       );
       for (const id of [
         'message-feedback-helpful-evt-1',
@@ -146,7 +146,7 @@ describe('SessionMessageActions stage gating', () => {
         message={quotaMessage}
         stage="greeting"
         quotaError={{ type: 'daily', limit: 10, resetAt: '2026-01-01' } as any}
-      />
+      />,
     );
     // QuotaExceededCard renders — we check it's not null (component has testID internally)
     expect(queryByTestId('quota-exceeded-card')).toBeTruthy();

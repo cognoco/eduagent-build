@@ -19,7 +19,7 @@ function topicMatchesNarrative(narrative: string, topic: string): boolean {
   const escaped = trimmed.replace(REGEX_METACHARACTERS, '\\$&');
   const pattern = new RegExp(
     `(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`,
-    'iu'
+    'iu',
   );
   return pattern.test(narrative);
 }
@@ -32,7 +32,7 @@ const narrativeMentionsTopic = (value: {
   value.topicsCovered.length === 0
     ? value.sessionState === 'auto-closed'
     : value.topicsCovered.some((topic) =>
-        topicMatchesNarrative(value.narrative, topic)
+        topicMatchesNarrative(value.narrative, topic),
       );
 
 const narrativeMentionsTopicOptions = {
@@ -43,7 +43,7 @@ const narrativeMentionsTopicOptions = {
 
 export const llmSummarySchema = llmSummaryBaseSchema.refine(
   narrativeMentionsTopic,
-  narrativeMentionsTopicOptions
+  narrativeMentionsTopicOptions,
 );
 export type LlmSummary = z.infer<typeof llmSummarySchema>;
 

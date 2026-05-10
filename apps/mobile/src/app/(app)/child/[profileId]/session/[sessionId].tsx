@@ -41,7 +41,7 @@ export default function SessionDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>(
-    'idle'
+    'idle',
   );
   const params = useLocalSearchParams<{
     profileId: string;
@@ -153,13 +153,13 @@ export default function SessionDetailScreen() {
   // parent-facing aggregate; wall-clock is a fallback for legacy rows that
   // never recorded active seconds.
   const duration = formatDuration(
-    session.durationSeconds ?? session.wallClockSeconds
+    session.durationSeconds ?? session.wallClockSeconds,
   );
   const hasRecap = Boolean(
     session.narrative ||
-      session.highlight ||
-      session.conversationPrompt ||
-      session.engagementSignal
+    session.highlight ||
+    session.conversationPrompt ||
+    session.engagementSignal,
   );
 
   // BUG-901: Build at least one always-visible CTA so the screen is never a
@@ -285,7 +285,7 @@ export default function SessionDetailScreen() {
                   className="rounded-full bg-background px-3 py-2"
                   accessibilityRole="button"
                   accessibilityLabel={t(
-                    'parentView.session.copyConversationPrompt'
+                    'parentView.session.copyConversationPrompt',
                   )}
                   testID="session-recap-copy-prompt"
                 >
@@ -293,8 +293,8 @@ export default function SessionDetailScreen() {
                     {copyState === 'copied'
                       ? t('parentView.session.copied')
                       : copyState === 'failed'
-                      ? t('parentView.session.copyFailed')
-                      : t('parentView.session.copy')}
+                        ? t('parentView.session.copyFailed')
+                        : t('parentView.session.copy')}
                   </Text>
                 </Pressable>
               </View>

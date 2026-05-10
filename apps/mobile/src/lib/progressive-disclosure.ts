@@ -29,7 +29,7 @@ export function isNewLearner(totalSessions: number | undefined): boolean {
  * Returns 0 if already past threshold or undefined.
  */
 export function sessionsUntilFullProgress(
-  totalSessions: number | undefined
+  totalSessions: number | undefined,
 ): number {
   if (totalSessions === undefined) return 0;
   return Math.max(0, PROGRESSIVE_DISCLOSURE_THRESHOLD - totalSessions);

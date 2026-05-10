@@ -109,7 +109,7 @@ describe('classifyApiError', () => {
       "You've hit the limit.",
       'RATE_LIMITED',
       undefined,
-      30
+      30,
     );
     const result = classifyApiError(err);
     expect(result.category).toBe('quota');
@@ -138,13 +138,13 @@ describe('classifyApiError', () => {
     const err = new UpstreamError(
       'Your subscription does not support additional profiles. Please upgrade to Family or Pro.',
       'PROFILE_LIMIT_EXCEEDED',
-      402
+      402,
     );
     const result = classifyApiError(err);
     expect(result.category).toBe('quota');
     expect(result.recovery).toBe('go-back');
     expect(result.message).toBe(
-      'Your subscription does not support additional profiles. Please upgrade to Family or Pro.'
+      'Your subscription does not support additional profiles. Please upgrade to Family or Pro.',
     );
     // Critical regression guard: the generic server fallback must NOT win here.
     expect(result.message).not.toMatch(/Something went wrong on our end/);
@@ -208,7 +208,7 @@ describe('classifyApiError', () => {
   it('classifies QuotaExceededError as quota / none', () => {
     const err = new QuotaExceededError(
       'You have exceeded your monthly question limit',
-      QUOTA_DETAILS
+      QUOTA_DETAILS,
     );
     const result = classifyApiError(err);
     expect(result.category).toBe('quota');
@@ -218,7 +218,7 @@ describe('classifyApiError', () => {
 
   it('classifies ForbiddenError as auth / sign-out', () => {
     const err = new ForbiddenError(
-      'You do not have permission to access this resource'
+      'You do not have permission to access this resource',
     );
     const result = classifyApiError(err);
     expect(result.category).toBe('auth');
@@ -228,7 +228,7 @@ describe('classifyApiError', () => {
   it('classifies ForbiddenError with SUBJECT_INACTIVE as not-found / go-back', () => {
     const err = new ForbiddenError(
       'Subject is paused — resume it before starting a session',
-      'SUBJECT_INACTIVE'
+      'SUBJECT_INACTIVE',
     );
     const result = classifyApiError(err);
     expect(result.category).toBe('not-found');
@@ -359,7 +359,7 @@ describe('classifyApiError', () => {
     // surfaces in the interview phase as "That reply took too long" and the
     // retry recovery converts the failed bubble into a reconnect_prompt.
     const err = new Error(
-      'The connection timed out while waiting for a reply'
+      'The connection timed out while waiting for a reply',
     ) as Error & { isTimeout: boolean };
     err.isTimeout = true;
 
@@ -367,7 +367,7 @@ describe('classifyApiError', () => {
     expect(result.category).toBe('network');
     expect(result.recovery).toBe('retry');
     expect(result.message).toBe(
-      'That reply took too long. Tap reconnect to try again.'
+      'That reply took too long. Tap reconnect to try again.',
     );
   });
 });
@@ -378,35 +378,35 @@ describe('formatApiError', () => {
   it('returns network message for TypeError containing "fetch"', () => {
     const err = new TypeError('Failed to fetch');
     expect(formatApiError(err)).toBe(
-      "Looks like you're offline or our servers can't be reached. Check your internet connection and try again."
+      "Looks like you're offline or our servers can't be reached. Check your internet connection and try again.",
     );
   });
 
   it('returns network message for TypeError containing "network"', () => {
     const err = new TypeError('A network error occurred');
     expect(formatApiError(err)).toBe(
-      "Looks like you're offline or our servers can't be reached. Check your internet connection and try again."
+      "Looks like you're offline or our servers can't be reached. Check your internet connection and try again.",
     );
   });
 
   it('returns network message for Error with "timeout" in message', () => {
     const err = new Error('Request timeout after 30000ms');
     expect(formatApiError(err)).toBe(
-      "Looks like you're offline or our servers can't be reached. Check your internet connection and try again."
+      "Looks like you're offline or our servers can't be reached. Check your internet connection and try again.",
     );
   });
 
   it('returns network message for Error with "network" in message', () => {
     const err = new Error('Network request failed');
     expect(formatApiError(err)).toBe(
-      "Looks like you're offline or our servers can't be reached. Check your internet connection and try again."
+      "Looks like you're offline or our servers can't be reached. Check your internet connection and try again.",
     );
   });
 
   it('returns network message for Error with "abort" in message', () => {
     const err = new Error('The operation was aborted');
     expect(formatApiError(err)).toBe(
-      "Looks like you're offline or our servers can't be reached. Check your internet connection and try again."
+      "Looks like you're offline or our servers can't be reached. Check your internet connection and try again.",
     );
   });
 
@@ -415,29 +415,29 @@ describe('formatApiError', () => {
   it('returns server message for API error 500', () => {
     const err = new Error('API error 500: Internal Server Error');
     expect(formatApiError(err)).toBe(
-      'Something went wrong on our end. Please try again in a moment.'
+      'Something went wrong on our end. Please try again in a moment.',
     );
   });
 
   it('returns server message for API error 502 with plain text body', () => {
     const err = new Error('API error 502: Bad Gateway');
     expect(formatApiError(err)).toBe(
-      'Something went wrong on our end. Please try again in a moment.'
+      'Something went wrong on our end. Please try again in a moment.',
     );
   });
 
   it('extracts JSON message from API error 502 body', () => {
     const err = new Error(
-      'API error 502: {"code":"INTERNAL_ERROR","message":"Consent email could not be delivered. Please check the email address and try again."}'
+      'API error 502: {"code":"INTERNAL_ERROR","message":"Consent email could not be delivered. Please check the email address and try again."}',
     );
     expect(formatApiError(err)).toBe(
-      'Consent email could not be delivered. Please check the email address and try again.'
+      'Consent email could not be delivered. Please check the email address and try again.',
     );
   });
 
   it('extracts JSON message from API error 400 body', () => {
     const err = new Error(
-      'API error 400: {"message":"Email is already registered"}'
+      'API error 400: {"message":"Email is already registered"}',
     );
     expect(formatApiError(err)).toBe('Email is already registered');
   });
@@ -450,7 +450,7 @@ describe('formatApiError', () => {
   it('returns input message for API error 400 with empty body', () => {
     const err = new Error('API error 400: ');
     expect(formatApiError(err)).toBe(
-      "That didn't work. Please check your input and try again."
+      "That didn't work. Please check your input and try again.",
     );
   });
 
@@ -466,22 +466,22 @@ describe('formatApiError', () => {
   it('returns friendly subject-inactive message when ForbiddenError carries SUBJECT_INACTIVE apiCode', () => {
     const err = new ForbiddenError(
       'Subject is paused — resume it before starting a session',
-      'SUBJECT_INACTIVE'
+      'SUBJECT_INACTIVE',
     );
     // classifyApiError catches SUBJECT_INACTIVE as a code-level check
     // (before ForbiddenError instanceof check) and applies friendlyMessage()
     // which matches the subject.*(paused|archived) pattern.
     expect(formatApiError(err)).toBe(
-      'This subject is on pause right now. You can resume it from your subjects list.'
+      'This subject is on pause right now. You can resume it from your subjects list.',
     );
   });
 
   it('passes through ForbiddenError message when apiCode is not a special code', () => {
     const err = new ForbiddenError(
-      'You do not have permission to access this resource'
+      'You do not have permission to access this resource',
     );
     expect(formatApiError(err)).toBe(
-      'You do not have permission to access this resource'
+      'You do not have permission to access this resource',
     );
   });
 
@@ -490,10 +490,10 @@ describe('formatApiError', () => {
   it('passes through QuotaExceededError message', () => {
     const err = new QuotaExceededError(
       'You have exceeded your monthly question limit',
-      QUOTA_DETAILS
+      QUOTA_DETAILS,
     );
     expect(formatApiError(err)).toBe(
-      'You have exceeded your monthly question limit'
+      'You have exceeded your monthly question limit',
     );
   });
 
@@ -502,21 +502,21 @@ describe('formatApiError', () => {
   it('passes through short, user-facing error messages', () => {
     const err = new Error('Profile name must be at least 2 characters');
     expect(formatApiError(err)).toBe(
-      'Profile name must be at least 2 characters'
+      'Profile name must be at least 2 characters',
     );
   });
 
   it('returns default for long technical messages', () => {
     const err = new Error('a'.repeat(250));
     expect(formatApiError(err)).toBe(
-      'Something unexpected happened. Please try again.'
+      'Something unexpected happened. Please try again.',
     );
   });
 
   it('returns default for error messages with stack-like content', () => {
     const err = new Error('Cannot read property at Object.something');
     expect(formatApiError(err)).toBe(
-      'Something unexpected happened. Please try again.'
+      'Something unexpected happened. Please try again.',
     );
   });
 
@@ -524,31 +524,31 @@ describe('formatApiError', () => {
 
   it('returns default for null', () => {
     expect(formatApiError(null)).toBe(
-      'Something unexpected happened. Please try again.'
+      'Something unexpected happened. Please try again.',
     );
   });
 
   it('returns default for undefined', () => {
     expect(formatApiError(undefined)).toBe(
-      'Something unexpected happened. Please try again.'
+      'Something unexpected happened. Please try again.',
     );
   });
 
   it('returns default for string error', () => {
     expect(formatApiError('something failed')).toBe(
-      'Something unexpected happened. Please try again.'
+      'Something unexpected happened. Please try again.',
     );
   });
 
   it('returns default for number error', () => {
     expect(formatApiError(42)).toBe(
-      'Something unexpected happened. Please try again.'
+      'Something unexpected happened. Please try again.',
     );
   });
 
   it('returns default for empty object', () => {
     expect(formatApiError({})).toBe(
-      'Something unexpected happened. Please try again.'
+      'Something unexpected happened. Please try again.',
     );
   });
 
@@ -558,7 +558,7 @@ describe('formatApiError', () => {
     // is what surfaces "That reply took too long" in the interview UI.
     const err = new Error('The connection timed out while waiting for a reply');
     expect(formatApiError(err)).toBe(
-      'That reply took too long. Tap reconnect to try again.'
+      'That reply took too long. Tap reconnect to try again.',
     );
   });
 });
@@ -587,7 +587,7 @@ describe('recoveryActions', () => {
   it('maps go-back to Go Back primary + Go Home secondary', () => {
     const result = recoveryActions(
       { ...base, recovery: 'go-back' },
-      allHandlers
+      allHandlers,
     );
     expect(result.primary?.label).toBe('Go Back');
     expect(result.primary?.testID).toBe('recovery-go-back');
@@ -599,7 +599,7 @@ describe('recoveryActions', () => {
   it('maps sign-out to Sign Out primary + Go Home secondary', () => {
     const result = recoveryActions(
       { ...base, recovery: 'sign-out' },
-      allHandlers
+      allHandlers,
     );
     expect(result.primary?.label).toBe('Sign Out');
     expect(result.primary?.testID).toBe('recovery-sign-out');
@@ -657,19 +657,19 @@ describe('classifyApiError — runtime-error leak guard', () => {
       expect(formatted.toLowerCase()).not.toContain('crypto');
       expect(formatted.toLowerCase()).not.toContain('referenceerror');
       expect(formatted.toLowerCase()).not.toContain('typeerror');
-    }
+    },
   );
 
   it('still passes through short user-friendly messages', () => {
     const formatted = formatApiError(
-      new Error('Profile name must be 1 to 80 characters.')
+      new Error('Profile name must be 1 to 80 characters.'),
     );
     expect(formatted).toBe('Profile name must be 1 to 80 characters.');
   });
 
   it('classifies a Hermes-style ReferenceError as unknown/retry', () => {
     const result = classifyApiError(
-      new Error("Property 'crypto' doesn't exist")
+      new Error("Property 'crypto' doesn't exist"),
     );
     expect(result.category).toBe('unknown');
     expect(result.recovery).toBe('retry');

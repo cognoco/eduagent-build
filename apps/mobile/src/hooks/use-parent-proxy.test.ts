@@ -75,7 +75,7 @@ describe('useParentProxy', () => {
       expect(setProxyMode).toHaveBeenCalledWith(true);
       expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
         'parent-proxy-active',
-        'true'
+        'true',
       );
     });
   });
@@ -91,7 +91,7 @@ describe('useParentProxy', () => {
     await waitFor(() => {
       expect(setProxyMode).toHaveBeenCalledWith(false);
       expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(
-        'parent-proxy-active'
+        'parent-proxy-active',
       );
     });
   });

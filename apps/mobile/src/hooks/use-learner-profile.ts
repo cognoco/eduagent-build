@@ -64,7 +64,7 @@ export function useLearnerProfile(): UseQueryResult<LearningProfile> {
       try {
         const res = await client['learner-profile'].$get(
           {},
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         const data = (await res.json()) as { profile: LearningProfile };
@@ -78,7 +78,7 @@ export function useLearnerProfile(): UseQueryResult<LearningProfile> {
 }
 
 export function useChildLearnerProfile(
-  childProfileId: string | undefined
+  childProfileId: string | undefined,
 ): UseQueryResult<LearningProfile> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -91,7 +91,7 @@ export function useChildLearnerProfile(
       try {
         const res = await client['learner-profile'][':profileId'].$get(
           { param: { profileId: childProfileId } },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         const data = (await res.json()) as { profile: LearningProfile };

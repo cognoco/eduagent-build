@@ -45,7 +45,7 @@ describe('ParkingLotModal accessibility (BUG-647 [ACC-3])', () => {
     const { getByTestId } = render(<ParkingLotModal {...noopProps} />);
     const input = getByTestId('parking-lot-input');
     expect(input.props.accessibilityHint).toBe(
-      'Type a question or idea you want to come back to later'
+      'Type a question or idea you want to come back to later',
     );
   });
 });

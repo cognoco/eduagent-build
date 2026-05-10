@@ -30,7 +30,7 @@ export function createTimeoutSignal(ms: number = DEFAULT_QUERY_TIMEOUT_MS): {
  */
 export function combinedSignal(
   querySignal: AbortSignal | undefined,
-  timeoutMs: number = DEFAULT_QUERY_TIMEOUT_MS
+  timeoutMs: number = DEFAULT_QUERY_TIMEOUT_MS,
 ): { signal: AbortSignal; cleanup: () => void } {
   const combined = new AbortController();
   const { signal: timeout, cleanup: cleanupTimeout } =

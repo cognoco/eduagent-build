@@ -69,7 +69,7 @@ describe('getReconciliationLine', () => {
     const retentionInfo = getParentRetentionInfo('fading', 2, 'completed');
 
     expect(getReconciliationLine(80, retentionInfo)).toBe(
-      'Understood well in-session, now due for a quick review.'
+      'Understood well in-session, now due for a quick review.',
     );
   });
 

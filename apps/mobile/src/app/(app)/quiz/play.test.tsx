@@ -141,7 +141,7 @@ describe('QuizPlayScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('quiz-free-text-field'),
-      'Bratislava'
+      'Bratislava',
     );
     fireEvent.press(screen.getByTestId('quiz-free-text-submit'));
 
@@ -303,7 +303,7 @@ describe('QuizPlayScreen — answerGiven matches rendered option text (BUG-924)'
           answerMode: 'multiple_choice',
         });
       });
-    }
+    },
   );
 });
 
@@ -396,7 +396,7 @@ describe('QuizPlayScreen — handleAnswer questionIndex stability', () => {
       () =>
         new Promise((resolve) => {
           resolveCheck = resolve;
-        })
+        }),
     );
 
     render(<QuizPlayScreen />);
@@ -696,7 +696,7 @@ describe('QuizPlayScreen — tap-to-continue synchronous reset (BUG-929)', () =>
     // Type an answer in Q1's free-text field and submit it.
     fireEvent.changeText(
       screen.getByTestId('quiz-free-text-field'),
-      'Bratislava'
+      'Bratislava',
     );
     fireEvent.press(screen.getByTestId('quiz-free-text-submit'));
 
@@ -839,7 +839,7 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
     await waitFor(() => {
       expect(mockPlatformAlert).toHaveBeenCalledWith(
         "Couldn't check your answer",
-        'Network unreachable'
+        'Network unreachable',
       );
     });
     expect(mockSentryCapture).toHaveBeenCalledTimes(1);
@@ -856,7 +856,7 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
       // formatApiError stub returns 'Unknown error' for non-Error shapes.
       expect(mockPlatformAlert).toHaveBeenCalledWith(
         "Couldn't check your answer",
-        'Unknown error'
+        'Unknown error',
       );
     });
   });
@@ -907,7 +907,7 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
       expect(mockCompleteRoundMutate).toHaveBeenCalled();
     });
     expect(mockSentryCapture).toHaveBeenCalledWith(
-      expect.objectContaining({ message: 'Round save failed: 500' })
+      expect.objectContaining({ message: 'Round save failed: 500' }),
     );
   });
 
@@ -931,7 +931,7 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
     expect(mockPlatformAlert).not.toHaveBeenCalledWith(
       'Quit this round?',
       expect.any(String),
-      expect.any(Array)
+      expect.any(Array),
     );
     expect(mockCompleteRoundMutate).not.toHaveBeenCalled();
   });
@@ -955,7 +955,7 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
     expect(mockPlatformAlert).not.toHaveBeenCalledWith(
       'Quit this round?',
       expect.any(String),
-      expect.any(Array)
+      expect.any(Array),
     );
   });
 
@@ -970,7 +970,11 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
     // in the tree, but the Modal host reports visible=false. Verify via the
     // backdrop's ancestor (RCTModalHostView) or UNSAFE_queryByProps.
     expect(
-      screen.UNSAFE_queryByProps({ visible: false, animationType: 'fade', transparent: true })
+      screen.UNSAFE_queryByProps({
+        visible: false,
+        animationType: 'fade',
+        transparent: true,
+      }),
     ).not.toBeNull();
     expect(mockGoBackOrReplace).not.toHaveBeenCalled();
   });
@@ -983,7 +987,7 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
 
     expect(mockGoBackOrReplace).toHaveBeenCalledWith(
       expect.anything(),
-      '/(app)/quiz'
+      '/(app)/quiz',
     );
   });
 });

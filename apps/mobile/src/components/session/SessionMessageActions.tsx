@@ -26,11 +26,11 @@ export interface SessionMessageActionsProps {
   stage: ConversationStage;
   handleQuickChip: (
     chip: QuickChipId,
-    sourceMessageId?: string
+    sourceMessageId?: string,
   ) => Promise<void>;
   handleMessageFeedback: (
     message: ChatMessage,
-    action: MessageFeedbackState
+    action: MessageFeedbackState,
   ) => Promise<void>;
   onToggleBookmark?: (message: ChatMessage) => Promise<void> | void;
   handleReconnect: (messageId: string) => Promise<void>;

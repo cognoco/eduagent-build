@@ -197,7 +197,7 @@ export const sessionAnalysisOutputSchema = z.object({
         topic: z.string(),
         subject: z.string().nullable(),
         source: memorySourceSchema.optional(),
-      })
+      }),
     )
     .nullable(),
   struggles: z
@@ -206,7 +206,7 @@ export const sessionAnalysisOutputSchema = z.object({
         topic: z.string(),
         subject: z.string().nullable(),
         source: memorySourceSchema.optional(),
-      })
+      }),
     )
     .nullable(),
   resolvedTopics: z
@@ -214,7 +214,7 @@ export const sessionAnalysisOutputSchema = z.object({
       z.object({
         topic: z.string(),
         subject: z.string().nullable(),
-      })
+      }),
     )
     .nullable(),
   communicationNotes: z.array(z.string()).nullable(),

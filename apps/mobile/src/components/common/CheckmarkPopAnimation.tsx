@@ -83,7 +83,7 @@ export function CheckmarkPopAnimation({
       withTiming(0, {
         duration: CHECK_DRAW_MS,
         easing: Easing.bezier(0.25, 1, 0.5, 1),
-      })
+      }),
     );
 
     // Phase 3: Scale bounce + fire onComplete
@@ -95,8 +95,8 @@ export function CheckmarkPopAnimation({
           if (finished && onComplete) {
             runOnJS(onComplete)();
           }
-        })
-      )
+        }),
+      ),
     );
   }, [reduceMotion, circleOffset, checkOffset, scale, onComplete]);
 

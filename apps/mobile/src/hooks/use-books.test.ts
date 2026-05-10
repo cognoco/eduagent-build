@@ -106,7 +106,7 @@ describe('useBooks', () => {
 
   it('returns books from API', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ books: mockBooks }), { status: 200 })
+      new Response(JSON.stringify({ books: mockBooks }), { status: 200 }),
     );
 
     const { result } = renderHook(() => useBooks('subject-1'), {
@@ -133,7 +133,7 @@ describe('useBooks', () => {
 
   it('handles API error (500)', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response('Internal Server Error', { status: 500 })
+      new Response('Internal Server Error', { status: 500 }),
     );
 
     const { result } = renderHook(() => useBooks('subject-1'), {
@@ -151,8 +151,8 @@ describe('useBooks', () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
         JSON.stringify({ code: 'NOT_FOUND', message: 'Subject not found' }),
-        { status: 404 }
-      )
+        { status: 404 },
+      ),
     );
 
     const { result } = renderHook(() => useBooks('nonexistent'), {
@@ -213,12 +213,12 @@ describe('useBookWithTopics', () => {
 
   it('returns book with topics from API', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify(mockBookWithTopics), { status: 200 })
+      new Response(JSON.stringify(mockBookWithTopics), { status: 200 }),
     );
 
     const { result } = renderHook(
       () => useBookWithTopics('subject-1', 'book-1'),
-      { wrapper: createWrapper() }
+      { wrapper: createWrapper() },
     );
 
     await waitFor(() => {
@@ -231,7 +231,7 @@ describe('useBookWithTopics', () => {
   it('is disabled when subjectId is undefined', async () => {
     const { result } = renderHook(
       () => useBookWithTopics(undefined, 'book-1'),
-      { wrapper: createWrapper() }
+      { wrapper: createWrapper() },
     );
 
     expect(result.current.fetchStatus).toBe('idle');
@@ -241,7 +241,7 @@ describe('useBookWithTopics', () => {
   it('is disabled when bookId is undefined', async () => {
     const { result } = renderHook(
       () => useBookWithTopics('subject-1', undefined),
-      { wrapper: createWrapper() }
+      { wrapper: createWrapper() },
     );
 
     expect(result.current.fetchStatus).toBe('idle');
@@ -253,7 +253,7 @@ describe('useBookWithTopics', () => {
 
     const { result } = renderHook(
       () => useBookWithTopics('subject-1', 'nonexistent'),
-      { wrapper: createWrapper() }
+      { wrapper: createWrapper() },
     );
 
     await waitFor(() => {
@@ -280,12 +280,12 @@ describe('useGenerateBookTopics', () => {
 
   it('calls POST to generate book topics', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify(mockBookWithTopics), { status: 200 })
+      new Response(JSON.stringify(mockBookWithTopics), { status: 200 }),
     );
 
     const { result } = renderHook(
       () => useGenerateBookTopics('subject-1', 'book-1'),
-      { wrapper: createWrapper() }
+      { wrapper: createWrapper() },
     );
 
     await act(async () => {
@@ -302,12 +302,12 @@ describe('useGenerateBookTopics', () => {
 
   it('passes priorKnowledge in the request body', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify(mockBookWithTopics), { status: 200 })
+      new Response(JSON.stringify(mockBookWithTopics), { status: 200 }),
     );
 
     const { result } = renderHook(
       () => useGenerateBookTopics('subject-1', 'book-1'),
-      { wrapper: createWrapper() }
+      { wrapper: createWrapper() },
     );
 
     await act(async () => {
@@ -324,12 +324,12 @@ describe('useGenerateBookTopics', () => {
   it('throws when subjectId is undefined', async () => {
     const { result } = renderHook(
       () => useGenerateBookTopics(undefined, 'book-1'),
-      { wrapper: createWrapper() }
+      { wrapper: createWrapper() },
     );
 
     await act(async () => {
       await expect(result.current.mutateAsync(undefined)).rejects.toThrow(
-        'subjectId and bookId are required'
+        'subjectId and bookId are required',
       );
     });
   });
@@ -337,12 +337,12 @@ describe('useGenerateBookTopics', () => {
   it('throws when bookId is undefined', async () => {
     const { result } = renderHook(
       () => useGenerateBookTopics('subject-1', undefined),
-      { wrapper: createWrapper() }
+      { wrapper: createWrapper() },
     );
 
     await act(async () => {
       await expect(result.current.mutateAsync(undefined)).rejects.toThrow(
-        'subjectId and bookId are required'
+        'subjectId and bookId are required',
       );
     });
   });
@@ -354,13 +354,13 @@ describe('useGenerateBookTopics', () => {
           code: 'UPSTREAM_ERROR',
           message: 'LLM service unavailable',
         }),
-        { status: 503 }
-      )
+        { status: 503 },
+      ),
     );
 
     const { result } = renderHook(
       () => useGenerateBookTopics('subject-1', 'book-1'),
-      { wrapper: createWrapper() }
+      { wrapper: createWrapper() },
     );
 
     await act(async () => {
@@ -370,7 +370,7 @@ describe('useGenerateBookTopics', () => {
 
   it('invalidates related queries on success', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify(mockBookWithTopics), { status: 200 })
+      new Response(JSON.stringify(mockBookWithTopics), { status: 200 }),
     );
 
     const wrapper = createWrapper();
@@ -378,7 +378,7 @@ describe('useGenerateBookTopics', () => {
 
     const { result } = renderHook(
       () => useGenerateBookTopics('subject-1', 'book-1'),
-      { wrapper }
+      { wrapper },
     );
 
     await act(async () => {
@@ -391,20 +391,20 @@ describe('useGenerateBookTopics', () => {
 
     // Should invalidate books, book detail, and curriculum queries
     expect(invalidateSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ queryKey: ['books', 'subject-1'] })
+      expect.objectContaining({ queryKey: ['books', 'subject-1'] }),
     );
     expect(invalidateSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ queryKey: ['book', 'subject-1', 'book-1'] })
+      expect.objectContaining({ queryKey: ['book', 'subject-1', 'book-1'] }),
     );
     expect(invalidateSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ queryKey: ['curriculum', 'subject-1'] })
+      expect.objectContaining({ queryKey: ['curriculum', 'subject-1'] }),
     );
   });
 
   // BUG-123: stale closure — onSuccess must read the latest ref values [BUG-123]
   it('onSuccess invalidates using the latest subjectId and bookId when they change after mount', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify(mockBookWithTopics), { status: 200 })
+      new Response(JSON.stringify(mockBookWithTopics), { status: 200 }),
     );
 
     const wrapper = createWrapper();
@@ -416,7 +416,7 @@ describe('useGenerateBookTopics', () => {
 
     const { result, rerender } = renderHook(
       () => useGenerateBookTopics(subjectId, bookId),
-      { wrapper }
+      { wrapper },
     );
 
     // Simulate route param change before mutation completes
@@ -434,13 +434,13 @@ describe('useGenerateBookTopics', () => {
 
     // Should invalidate using the LATEST IDs (subject-2, book-2), not stale ones
     expect(invalidateSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ queryKey: ['books', 'subject-2'] })
+      expect.objectContaining({ queryKey: ['books', 'subject-2'] }),
     );
     expect(invalidateSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ queryKey: ['book', 'subject-2', 'book-2'] })
+      expect.objectContaining({ queryKey: ['book', 'subject-2', 'book-2'] }),
     );
     expect(invalidateSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ queryKey: ['curriculum', 'subject-2'] })
+      expect.objectContaining({ queryKey: ['curriculum', 'subject-2'] }),
     );
   });
 });

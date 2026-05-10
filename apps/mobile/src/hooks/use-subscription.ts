@@ -47,7 +47,7 @@ type ApiClient = ReturnType<typeof useApiClient>;
 /** Fetch current usage data — shared by useUsage and top-up polling. */
 export async function fetchUsageData(
   client: ApiClient,
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<UsageData> {
   const res = await client.usage.$get({}, { init: { signal } });
   await assertOk(res);
@@ -99,7 +99,7 @@ export function useUsage(): UseQueryResult<UsageData> {
 }
 
 export function useFamilySubscription(
-  enabled = true
+  enabled = true,
 ): UseQueryResult<FamilySubscription | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -161,7 +161,7 @@ export function useSubscriptionStatus(): UseQueryResult<SubscriptionStatusData> 
       try {
         const res = await client.subscription.status.$get(
           {},
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         const data = await res.json();

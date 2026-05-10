@@ -33,10 +33,10 @@ describe('checkContractDrift', () => {
     });
     await freshModule().checkContractDrift();
     expect(infoSpy).toHaveBeenCalledWith(
-      expect.stringContaining('no DEPLOY_SHA')
+      expect.stringContaining('no DEPLOY_SHA'),
     );
     expect(warnSpy).not.toHaveBeenCalledWith(
-      expect.stringContaining('CONTRACT DRIFT')
+      expect.stringContaining('CONTRACT DRIFT'),
     );
   });
 
@@ -44,12 +44,11 @@ describe('checkContractDrift', () => {
     process.env.EXPO_PUBLIC_GIT_SHA = 'aabbccdd1234';
     globalThis.fetch = jest.fn().mockResolvedValue({
       ok: true,
-      json: () =>
-        Promise.resolve({ status: 'ok', deploySha: '11223344' }),
+      json: () => Promise.resolve({ status: 'ok', deploySha: '11223344' }),
     });
     await freshModule().checkContractDrift();
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('CONTRACT DRIFT DETECTED')
+      expect.stringContaining('CONTRACT DRIFT DETECTED'),
     );
   });
 
@@ -57,25 +56,22 @@ describe('checkContractDrift', () => {
     process.env.EXPO_PUBLIC_GIT_SHA = 'aabbccdd1234';
     globalThis.fetch = jest.fn().mockResolvedValue({
       ok: true,
-      json: () =>
-        Promise.resolve({ status: 'ok', deploySha: 'aabbccdd' }),
+      json: () => Promise.resolve({ status: 'ok', deploySha: 'aabbccdd' }),
     });
     await freshModule().checkContractDrift();
     expect(infoSpy).toHaveBeenCalledWith(
-      expect.stringContaining('same commit')
+      expect.stringContaining('same commit'),
     );
     expect(warnSpy).not.toHaveBeenCalledWith(
-      expect.stringContaining('CONTRACT DRIFT')
+      expect.stringContaining('CONTRACT DRIFT'),
     );
   });
 
   it('swallows fetch errors silently', async () => {
     globalThis.fetch = jest.fn().mockRejectedValue(new Error('offline'));
-    await expect(
-      freshModule().checkContractDrift()
-    ).resolves.toBeUndefined();
+    await expect(freshModule().checkContractDrift()).resolves.toBeUndefined();
     expect(warnSpy).not.toHaveBeenCalledWith(
-      expect.stringContaining('CONTRACT DRIFT')
+      expect.stringContaining('CONTRACT DRIFT'),
     );
   });
 

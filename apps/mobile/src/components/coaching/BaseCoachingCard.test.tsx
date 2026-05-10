@@ -47,7 +47,7 @@ describe('BaseCoachingCard', () => {
         secondaryLabel="Skip"
         onSecondary={onSecondary}
         testID="card"
-      />
+      />,
     );
 
     screen.getByText('Skip');
@@ -66,7 +66,7 @@ describe('BaseCoachingCard', () => {
       <BaseCoachingCard
         {...defaultProps}
         metadata={<Text>Custom metadata</Text>}
-      />
+      />,
     );
 
     screen.getByText('Custom metadata');
@@ -77,7 +77,7 @@ describe('BaseCoachingCard', () => {
       <BaseCoachingCard
         {...defaultProps}
         footer={<Text>Footer content</Text>}
-      />
+      />,
     );
 
     screen.getByText('Footer content');
@@ -99,7 +99,7 @@ describe('BaseCoachingCard', () => {
   it('wraps in Pressable when onPress is provided', () => {
     const onPress = jest.fn();
     render(
-      <BaseCoachingCard {...defaultProps} onPress={onPress} testID="card" />
+      <BaseCoachingCard {...defaultProps} onPress={onPress} testID="card" />,
     );
 
     fireEvent.press(screen.getByTestId('card'));

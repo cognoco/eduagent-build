@@ -68,7 +68,7 @@ export default function QuizPlayScreen(): React.ReactElement {
   const [answerCheckFailed, setAnswerCheckFailed] = useState(false);
   // [BUG-469] Track which question indices the user has disputed
   const [disputedIndices, setDisputedIndices] = useState<Set<number>>(
-    new Set()
+    new Set(),
   );
   // [BUG-892] Quit confirmation rendered as an in-app Modal so web doesn't
   // hit window.confirm via Alert.alert mapping (which blocks the renderer).
@@ -99,7 +99,7 @@ export default function QuizPlayScreen(): React.ReactElement {
   const continueEnabledAtRef = useRef(0);
   const prefetchTriggeredRef = useRef(false);
   const continueHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null
+    null,
   );
   const answerSubmittedRef = useRef(false);
   // [F-Q-07] Tracks whether correctAnswer was captured via handleCheckGuessWhoAnswer
@@ -172,7 +172,7 @@ export default function QuizPlayScreen(): React.ReactElement {
       { activityType, subjectId: subjectId ?? undefined },
       {
         onSuccess: (data) => setPrefetchedRoundId(data.id),
-      }
+      },
     );
     // [BUG-542] Use extracted .mutate local (stable ref) instead of whole
     // mutation result or member-access expression in the dep array.
@@ -244,7 +244,7 @@ export default function QuizPlayScreen(): React.ReactElement {
         return false;
       }
     },
-    [roundId, checkAnswerMutateAsync, currentIndex, setAnswerCheckFailed]
+    [roundId, checkAnswerMutateAsync, currentIndex, setAnswerCheckFailed],
   );
 
   // [BUG-542] Extract onResolved from inline JSX to a stable useCallback.
@@ -307,7 +307,7 @@ export default function QuizPlayScreen(): React.ReactElement {
           });
       }
     },
-    [checkAnswerMutateAsync, currentIndex, roundId]
+    [checkAnswerMutateAsync, currentIndex, roundId],
   );
 
   if (!round || !currentQuestion) {
@@ -425,7 +425,7 @@ export default function QuizPlayScreen(): React.ReactElement {
     setDisputedIndices((prev) => new Set(prev).add(currentIndex));
     // Also update the stored result for this question
     resultsRef.current = resultsRef.current.map((r) =>
-      r.questionIndex === currentIndex ? { ...r, disputed: true } : r
+      r.questionIndex === currentIndex ? { ...r, disputed: true } : r,
     );
     hapticLight();
   }
@@ -450,7 +450,7 @@ export default function QuizPlayScreen(): React.ReactElement {
           setCompleteError(formatApiError(err));
           Sentry.captureException(err);
         },
-      }
+      },
     );
   }
 
@@ -459,7 +459,7 @@ export default function QuizPlayScreen(): React.ReactElement {
   // the network round-trip.
   async function handleAnswer(
     answer: string,
-    answerMode: 'free_text' | 'multiple_choice' = 'multiple_choice'
+    answerMode: 'free_text' | 'multiple_choice' = 'multiple_choice',
   ) {
     if (answerState !== 'unanswered' || answerSubmittedRef.current) return;
     answerSubmittedRef.current = true;
@@ -649,14 +649,14 @@ export default function QuizPlayScreen(): React.ReactElement {
                 index < currentIndex
                   ? 'past'
                   : index === currentIndex
-                  ? 'current'
-                  : 'future';
+                    ? 'current'
+                    : 'future';
               const dotClass =
                 state === 'past'
                   ? 'h-2 w-2 rounded-full bg-primary opacity-60'
                   : state === 'current'
-                  ? 'h-2.5 w-2.5 rounded-full bg-primary'
-                  : 'h-2 w-2 rounded-full bg-surface-elevated';
+                    ? 'h-2.5 w-2.5 rounded-full bg-primary'
+                    : 'h-2 w-2 rounded-full bg-surface-elevated';
               return <View key={index} className={dotClass} />;
             })}
           </View>
@@ -670,7 +670,7 @@ export default function QuizPlayScreen(): React.ReactElement {
           className="text-body-sm font-semibold text-text-secondary text-right"
           style={{ minWidth: 36 }}
           accessibilityLabel={`Elapsed time: ${Math.floor(
-            elapsedMs / 1000
+            elapsedMs / 1000,
           )} seconds`}
           testID="quiz-play-elapsed"
         >
@@ -778,7 +778,7 @@ export default function QuizPlayScreen(): React.ReactElement {
                   onPress={() => handleAnswer(option, 'multiple_choice')}
                   disabled={answerState !== 'unanswered'}
                   className={`min-h-[64px] items-center justify-center rounded-card px-5 py-4 ${getOptionContainerClass(
-                    option
+                    option,
                   )}`}
                   accessibilityRole="button"
                   accessibilityLabel={option}
@@ -790,7 +790,7 @@ export default function QuizPlayScreen(): React.ReactElement {
                 >
                   <Text
                     className={`text-body font-semibold ${getOptionTextClass(
-                      option
+                      option,
                     )}`}
                   >
                     {option}
@@ -850,8 +850,8 @@ export default function QuizPlayScreen(): React.ReactElement {
               {showContinueHint
                 ? 'Tap anywhere to continue'
                 : answerState === 'correct'
-                ? 'Correct'
-                : 'Not quite'}
+                  ? 'Correct'
+                  : 'Not quite'}
             </Text>
             {/* [BUG-469] Dispute button — lets user flag LLM's judgment as wrong */}
             {/* [BUG-927] Only surface dispute UI on incorrect answers. There's

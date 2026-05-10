@@ -103,7 +103,7 @@ export function ReportsListCard({
             }
             accessibilityRole={interactive ? 'button' : undefined}
             accessibilityLabel={`${t(
-              'parentView.reports.weekOf'
+              'parentView.reports.weekOf',
             )} ${formatDateOnly(report.reportWeek, {
               month: 'short',
               day: 'numeric',

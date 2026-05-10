@@ -22,14 +22,14 @@ export function WithdrawalCountdownBanner(): React.ReactElement | null {
   const { data } = useDashboard();
   const restoreConsent = useRestoreConsent();
   const [pendingChildId, setPendingChildId] = React.useState<string | null>(
-    null
+    null,
   );
   const [restoredName, setRestoredName] = React.useState<string | null>(null);
 
   const children = (data?.children ?? []) as Child[];
   const inGrace = children.filter(
     (child) =>
-      child.consentStatus === 'WITHDRAWN' && isInGracePeriod(child.respondedAt)
+      child.consentStatus === 'WITHDRAWN' && isInGracePeriod(child.respondedAt),
   );
 
   if (inGrace.length === 0) return null;
@@ -47,13 +47,13 @@ export function WithdrawalCountdownBanner(): React.ReactElement | null {
         onError: () => {
           platformAlert(
             t('family.withdrawal.restoreErrorTitle'),
-            t('family.withdrawal.restoreErrorBody')
+            t('family.withdrawal.restoreErrorBody'),
           );
         },
         onSettled: () => {
           setPendingChildId(null);
         },
-      }
+      },
     );
   };
 
@@ -74,7 +74,7 @@ export function WithdrawalCountdownBanner(): React.ReactElement | null {
         const daysWord = t(
           daysLeft === 1
             ? 'family.withdrawal.daysOne'
-            : 'family.withdrawal.daysOther'
+            : 'family.withdrawal.daysOther',
         );
         const isPending =
           restoreConsent.isPending && pendingChildId === child.profileId;
@@ -110,7 +110,7 @@ export function WithdrawalCountdownBanner(): React.ReactElement | null {
                   {t(
                     isMulti
                       ? 'family.withdrawal.bannerCtaShort'
-                      : 'family.withdrawal.bannerCta'
+                      : 'family.withdrawal.bannerCta',
                   )}
                 </Text>
               )}

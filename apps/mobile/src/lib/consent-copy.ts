@@ -177,7 +177,7 @@ const learnerConsentWithdrawn: ConsentWithdrawnCopy = {
 };
 
 export function getConsentWithdrawnCopy(
-  persona: Persona
+  persona: Persona,
 ): ConsentWithdrawnCopy {
   return persona === 'learner'
     ? learnerConsentWithdrawn

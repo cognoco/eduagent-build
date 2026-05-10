@@ -6,7 +6,7 @@ describe('IntentCard', () => {
     const onPress = jest.fn();
 
     render(
-      <IntentCard title="Learn something" onPress={onPress} testID="card" />
+      <IntentCard title="Learn something" onPress={onPress} testID="card" />,
     );
 
     screen.getByText('Learn something');
@@ -20,11 +20,11 @@ describe('IntentCard', () => {
         title="Help with assignment?"
         subtitle="Take a picture and we'll look at it together"
         onPress={jest.fn()}
-      />
+      />,
     );
 
     expect(
-      screen.getByText("Take a picture and we'll look at it together")
+      screen.getByText("Take a picture and we'll look at it together"),
     ).toBeTruthy();
   });
 
@@ -41,7 +41,7 @@ describe('IntentCard', () => {
         badge={6}
         onPress={jest.fn()}
         testID="card"
-      />
+      />,
     );
 
     screen.getByTestId('card-badge');
@@ -55,11 +55,11 @@ describe('IntentCard', () => {
         onPress={jest.fn()}
         icon="book-outline"
         testID="card"
-      />
+      />,
     );
 
     expect(
-      screen.getByTestId('card-icon', { includeHiddenElements: true })
+      screen.getByTestId('card-icon', { includeHiddenElements: true }),
     ).toBeTruthy();
   });
 
@@ -76,7 +76,7 @@ describe('IntentCard', () => {
         variant="highlight"
         onPress={jest.fn()}
         testID="card"
-      />
+      />,
     );
 
     const card = screen.getByTestId('card');
@@ -85,7 +85,7 @@ describe('IntentCard', () => {
 
   it('sets accessibility role and label', () => {
     render(
-      <IntentCard title="Pick a subject" onPress={jest.fn()} testID="card" />
+      <IntentCard title="Pick a subject" onPress={jest.fn()} testID="card" />,
     );
 
     const card = screen.getByTestId('card');
@@ -100,14 +100,14 @@ describe('IntentCard', () => {
         onPress={jest.fn()}
         icon="book-outline"
         testID="card"
-      />
+      />,
     );
     const iconWrapper = screen.getByTestId('card-icon', {
       includeHiddenElements: true,
     });
     expect(iconWrapper.props.accessibilityElementsHidden).toBe(true);
     expect(iconWrapper.props.importantForAccessibility).toBe(
-      'no-hide-descendants'
+      'no-hide-descendants',
     );
   });
 
@@ -127,7 +127,7 @@ describe('IntentCard', () => {
         onPress={jest.fn()}
         onDismiss={jest.fn()}
         testID="card"
-      />
+      />,
     );
     const chevron = screen.getByTestId('card-chevron', {
       includeHiddenElements: true,
@@ -151,7 +151,7 @@ describe('IntentCard', () => {
         onPress={onPress}
         onDismiss={onDismiss}
         testID="card"
-      />
+      />,
     );
 
     fireEvent.press(screen.getByTestId('card-dismiss'));

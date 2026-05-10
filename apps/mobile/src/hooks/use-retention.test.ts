@@ -58,8 +58,8 @@ describe('useRetentionTopics', () => {
           ],
           reviewDueCount: 0,
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useRetentionTopics('sub-1'), {
@@ -77,7 +77,7 @@ describe('useRetentionTopics', () => {
 
   it('handles API errors', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response('Network error', { status: 500 })
+      new Response('Network error', { status: 500 }),
     );
 
     const { result } = renderHook(() => useRetentionTopics('sub-1'), {
@@ -114,8 +114,8 @@ describe('useTopicRetention', () => {
             failureCount: 0,
           },
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useTopicRetention('topic-1'), {
@@ -132,7 +132,7 @@ describe('useTopicRetention', () => {
 
   it('returns null when no card exists', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ card: null }), { status: 200 })
+      new Response(JSON.stringify({ card: null }), { status: 200 }),
     );
 
     const { result } = renderHook(() => useTopicRetention('topic-1'), {
@@ -169,8 +169,8 @@ describe('useEvaluateEligibility', () => {
           easeFactor: 2.7,
           repetitions: 5,
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useEvaluateEligibility('topic-1'), {
@@ -197,8 +197,8 @@ describe('useEvaluateEligibility', () => {
           repetitions: 0,
           reason: 'No successful reviews yet',
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useEvaluateEligibility('topic-1'), {
@@ -235,8 +235,8 @@ describe('useSubmitRecallTest', () => {
             failureAction: 'feedback_only',
           },
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useSubmitRecallTest(), {
@@ -284,8 +284,8 @@ describe('useTeachingPreference', () => {
             nativeLanguage: null,
           },
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useTeachingPreference('sub-1'), {

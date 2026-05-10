@@ -28,7 +28,7 @@ jest.mock('react-i18next', () => {
     const template = TRANSLATIONS[key] ?? key;
     if (!opts) return template;
     return template.replace(/\{\{(\w+)\}\}/g, (_: string, k: string) =>
-      String(opts[k] ?? `{{${k}}}`)
+      String(opts[k] ?? `{{${k}}}`),
     );
   };
   return { useTranslation: () => ({ t }) };
@@ -132,7 +132,7 @@ describe('QuizRoundDetailScreen — hint reveal', () => {
     // prompt, so the same text now exists twice (once in the row prompt,
     // once in the expanded clues list). Both occurrences are intentional.
     expect(
-      screen.getAllByText('Born in Croatia in 1856.').length
+      screen.getAllByText('Born in Croatia in 1856.').length,
     ).toBeGreaterThanOrEqual(1);
     screen.getByText('He could speak eight languages.');
   });

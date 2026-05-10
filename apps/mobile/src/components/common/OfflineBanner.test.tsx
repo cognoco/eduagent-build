@@ -28,7 +28,7 @@ describe('OfflineBanner', () => {
   it('has assertive live region for screen readers', () => {
     const { getByTestId } = render(<OfflineBanner />);
     expect(getByTestId('offline-banner').props.accessibilityLiveRegion).toBe(
-      'assertive'
+      'assertive',
     );
   });
 });

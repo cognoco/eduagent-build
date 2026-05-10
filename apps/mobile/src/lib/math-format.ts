@@ -96,12 +96,12 @@ function formatExpression(expr: string): string {
   const braceGroup = '([^{}]*(?:\\{[^{}]*\\}[^{}]*)*)';
   result = result.replace(
     new RegExp(`\\\\frac\\{${braceGroup}\\}\\{${braceGroup}\\}`, 'g'),
-    '$1/$2'
+    '$1/$2',
   );
 
   // Superscripts: x^{2n} or x^2
   result = result.replace(/\^{([^}]+)}/g, (_, exp: string) =>
-    toSuperscript(exp)
+    toSuperscript(exp),
   );
   result = result.replace(/\^(\d)/g, (_, exp: string) => toSuperscript(exp));
 
@@ -123,10 +123,10 @@ function formatExpression(expr: string): string {
 export function formatMathContent(text: string): string {
   // Process display math ($$...$$) first, then inline ($...$)
   let result = text.replace(/\$\$([^$]+)\$\$/g, (_, expr: string) =>
-    formatExpression(expr)
+    formatExpression(expr),
   );
   result = result.replace(/\$([^$]+)\$/g, (_, expr: string) =>
-    formatExpression(expr)
+    formatExpression(expr),
   );
 
   return result;

@@ -67,14 +67,14 @@ export function usePrefetchRound(): UseMutationResult<
       // without escalation is banned on quota paths.
       Sentry.captureMessage(
         `[quiz] prefetch failed: ${err.message}`,
-        'warning'
+        'warning',
       );
     },
   });
 }
 
 export function useFetchRound(
-  roundId: string | null
+  roundId: string | null,
 ): UseQueryResult<QuizRoundResponse> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -91,7 +91,7 @@ export function useFetchRound(
       try {
         const res = await client.quiz.rounds[':id'].$get(
           { param: { id: roundId } },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         return (await res.json()) as QuizRoundResponse;
@@ -167,7 +167,7 @@ export function useRecentRounds(): UseQueryResult<RecentRound[]> {
       try {
         const res = await client.quiz.rounds.recent.$get(
           {},
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         return (await res.json()) as RecentRound[];
@@ -180,7 +180,7 @@ export function useRecentRounds(): UseQueryResult<RecentRound[]> {
 }
 
 export function useRoundDetail(
-  roundId: string | undefined
+  roundId: string | undefined,
 ): UseQueryResult<QuizRoundResponse> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -193,7 +193,7 @@ export function useRoundDetail(
       try {
         const res = await client.quiz.rounds[':id'].$get(
           { param: { id: roundId } },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         return (await res.json()) as QuizRoundResponse;

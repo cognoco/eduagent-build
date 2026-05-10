@@ -3,7 +3,7 @@ import { assertOk, type ApiResponseError } from './assert-ok';
 function makeResponse(
   status: number,
   body: string | object,
-  init: { contentType?: string } = {}
+  init: { contentType?: string } = {},
 ): Response {
   const text = typeof body === 'string' ? body : JSON.stringify(body);
   return new Response(text, {

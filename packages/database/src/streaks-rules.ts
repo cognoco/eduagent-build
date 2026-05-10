@@ -46,7 +46,7 @@ export interface StreakDecayState {
  */
 export function isStreakDecayed(
   state: StreakDecayState,
-  today: string
+  today: string,
 ): boolean {
   if (!state.lastActivityDate) return false;
   const gap = daysBetween(state.lastActivityDate, today);
@@ -64,7 +64,7 @@ export function isStreakDecayed(
  */
 export function applyStreakDecay(
   row: StreakDecayState | null,
-  today: string
+  today: string,
 ): {
   currentStreak: number;
   longestStreak: number;

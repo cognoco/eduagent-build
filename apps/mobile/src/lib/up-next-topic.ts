@@ -14,10 +14,10 @@ export function computeUpNextTopic<T extends UpNextTopic>(
   topics: T[],
   doneIds: Set<string>,
   inProgressIds: Set<string>,
-  sessions: UpNextSession[]
+  sessions: UpNextSession[],
 ): T | null {
   const unstartedTopics = topics.filter(
-    (topic) => !doneIds.has(topic.id) && !inProgressIds.has(topic.id)
+    (topic) => !doneIds.has(topic.id) && !inProgressIds.has(topic.id),
   );
 
   if (unstartedTopics.length === 0) {
@@ -34,7 +34,7 @@ export function computeUpNextTopic<T extends UpNextTopic>(
 
   const earliestIn = (chapterTopics: T[]): T =>
     chapterTopics.reduce((best, topic) =>
-      topic.sortOrder < best.sortOrder ? topic : best
+      topic.sortOrder < best.sortOrder ? topic : best,
     );
 
   const sortedSessions = [...sessions]
@@ -73,7 +73,7 @@ export function computeUpNextTopic<T extends UpNextTopic>(
     }
 
     const doneCount = chapterTopics.filter((topic) =>
-      doneIds.has(topic.id)
+      doneIds.has(topic.id),
     ).length;
     const totalCount = chapterTopics.length;
 
@@ -86,7 +86,7 @@ export function computeUpNextTopic<T extends UpNextTopic>(
     // sort-orders as call arguments risks a stack overflow on low-end devices.
     const minSortOrder = chapterTopics.reduce(
       (min, topic) => (topic.sortOrder < min ? topic.sortOrder : min),
-      Number.POSITIVE_INFINITY
+      Number.POSITIVE_INFINITY,
     );
 
     if (
@@ -112,7 +112,7 @@ export function computeUpNextTopic<T extends UpNextTopic>(
   for (const [key, chapterTopics] of byChapter.entries()) {
     const minSortOrder = chapterTopics.reduce(
       (min, topic) => (topic.sortOrder < min ? topic.sortOrder : min),
-      Number.POSITIVE_INFINITY
+      Number.POSITIVE_INFINITY,
     );
     if (minSortOrder < earliestChapterSortOrder) {
       earliestChapterSortOrder = minSortOrder;

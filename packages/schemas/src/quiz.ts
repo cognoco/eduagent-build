@@ -132,7 +132,7 @@ export const generateRoundInputSchema = z
       .max(100)
       .regex(
         /^[\p{L}\p{N} ,.'!?_-]+$/u,
-        'Theme must contain only letters, numbers, spaces, and basic punctuation'
+        'Theme must contain only letters, numbers, spaces, and basic punctuation',
       )
       .optional(),
     subjectId: z.string().uuid().optional(),
@@ -336,7 +336,7 @@ export const completedRoundQuestionSchema = z.intersection(
   z.object({
     correctAnswer: z.string(),
     acceptedAliases: z.array(z.string()).optional(),
-  })
+  }),
 );
 export type CompletedRoundQuestion = z.infer<
   typeof completedRoundQuestionSchema

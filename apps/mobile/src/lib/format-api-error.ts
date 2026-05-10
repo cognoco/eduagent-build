@@ -152,7 +152,7 @@ const FRIENDLY_MESSAGE_MAP: Array<{
 function isTechnicalMessage(msg: string): boolean {
   return (
     /\bLLM\b|structured output|upstream|provider|JSON|malformed|parse error/i.test(
-      msg
+      msg,
     ) ||
     // JSON fragment or object literal in the message
     /\{"|\{\\"|^\[/.test(msg) ||
@@ -281,7 +281,7 @@ export function recoveryActions(
     goBack?: () => void;
     goHome?: () => void;
     signOut?: () => void;
-  }
+  },
 ): { primary?: RecoveryAction; secondary?: RecoveryAction } {
   const goHome = handlers.goHome
     ? {
@@ -432,7 +432,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
     const passThrough = shouldPassThroughUserMessage(msg);
     return {
       message: passThrough
-        ? friendlyMessage(msg) ?? msg
+        ? (friendlyMessage(msg) ?? msg)
         : i18next.t('errors.badRequest'),
       category: 'unknown',
       recovery: 'retry',
@@ -549,7 +549,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
       if (code === 'SUBJECT_INACTIVE') {
         const userMsg =
           apiMessage && apiMessage.length < 200
-            ? friendlyMessage(apiMessage) ?? apiMessage
+            ? (friendlyMessage(apiMessage) ?? apiMessage)
             : i18next.t('friendlyErrors.subjectPaused');
         return { message: userMsg, category: 'not-found', recovery: 'go-back' };
       }
@@ -557,7 +557,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
       if (status === 401 || status === 403) {
         const userMsg =
           apiMessage && apiMessage.length < 200
-            ? friendlyMessage(apiMessage) ?? apiMessage
+            ? (friendlyMessage(apiMessage) ?? apiMessage)
             : i18next.t('errors.forbidden');
         return { message: userMsg, category: 'auth', recovery: 'sign-out' };
       }
@@ -565,7 +565,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
       if (status === 404) {
         const userMsg =
           apiMessage && apiMessage.length < 200
-            ? friendlyMessage(apiMessage) ?? apiMessage
+            ? (friendlyMessage(apiMessage) ?? apiMessage)
             : i18next.t('errors.notFound');
         return { message: userMsg, category: 'not-found', recovery: 'go-back' };
       }
@@ -573,7 +573,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
       if (status === 429) {
         const userMsg =
           apiMessage && apiMessage.length < 200
-            ? friendlyMessage(apiMessage) ?? apiMessage
+            ? (friendlyMessage(apiMessage) ?? apiMessage)
             : i18next.t('errors.rateLimited');
         return { message: userMsg, category: 'quota', recovery: 'retry' };
       }
@@ -586,7 +586,7 @@ export function classifyApiError(error: unknown): FormattedApiError {
           !isTechnicalMessage(apiMessage);
         return {
           message: hasUsefulMsg
-            ? friendlyMessage(apiMessage) ?? apiMessage
+            ? (friendlyMessage(apiMessage) ?? apiMessage)
             : SERVER_MESSAGE(),
           category: 'server',
           recovery: 'retry',

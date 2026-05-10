@@ -77,7 +77,7 @@ function renderWithFlow(input: SeedInput): void {
     <QuizFlowProvider>
       <Seed {...input} />
       <QuizResultsScreen />
-    </QuizFlowProvider>
+    </QuizFlowProvider>,
   );
 }
 
@@ -304,7 +304,7 @@ describe('QuizResultsScreen — [F-040] missed-question cards', () => {
       <QuizFlowProvider>
         <MountThenSwap />
         <QuizResultsScreen />
-      </QuizFlowProvider>
+      </QuizFlowProvider>,
     );
 
     // Both missed-card prompts must still resolve — even though indexes 2

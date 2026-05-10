@@ -121,7 +121,7 @@ describe('ProfilesScreen', () => {
 
     screen.getByText('No profiles yet');
     expect(
-      screen.getByText('Create your first profile to get started')
+      screen.getByText('Create your first profile to get started'),
     ).toBeTruthy();
     screen.getByTestId('profiles-create-first');
   });
@@ -311,7 +311,7 @@ describe('ProfilesScreen', () => {
 
     expect(mockMutate).toHaveBeenCalledWith(
       { profileId: 'child-id', displayName: 'Alexander' },
-      expect.objectContaining({ onSuccess: expect.any(Function) })
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
     );
   });
 
@@ -343,7 +343,7 @@ describe('ProfilesScreen', () => {
     await waitFor(() => {
       expect(mockPlatformAlert).toHaveBeenCalledWith(
         'Could not switch profiles',
-        'Network unreachable'
+        'Network unreachable',
       );
     });
 
@@ -375,7 +375,7 @@ describe('ProfilesScreen', () => {
     await waitFor(() => {
       expect(mockPlatformAlert).toHaveBeenCalledWith(
         'Could not switch profiles',
-        'Unknown error'
+        'Unknown error',
       );
     });
   });

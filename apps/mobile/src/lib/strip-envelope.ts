@@ -48,7 +48,7 @@ const REQUIRED_ENVELOPE_SIBLINGS = new Set(['signals', 'ui_hints']);
  */
 function stripMarkdownFence(text: string): string {
   const match = text.match(/^```(?:[a-z]*)?\s*([\s\S]*?)```\s*$/);
-  return match ? match[1]?.trim() ?? text : text;
+  return match ? (match[1]?.trim() ?? text) : text;
 }
 
 /**

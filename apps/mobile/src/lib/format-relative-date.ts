@@ -17,15 +17,15 @@ export function formatRelativeDate(isoDate: string): string {
   const startOfToday = new Date(
     now.getFullYear(),
     now.getMonth(),
-    now.getDate()
+    now.getDate(),
   );
   const startOfThen = new Date(
     then.getFullYear(),
     then.getMonth(),
-    then.getDate()
+    then.getDate(),
   );
   const diffDays = Math.round(
-    (startOfToday.getTime() - startOfThen.getTime()) / (1000 * 60 * 60 * 24)
+    (startOfToday.getTime() - startOfThen.getTime()) / (1000 * 60 * 60 * 24),
   );
 
   if (diffDays === 0) return 'Today';

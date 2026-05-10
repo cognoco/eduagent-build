@@ -51,7 +51,7 @@ export function useRatingPrompt(): {
     const id = activeProfile.id;
     void migrateSecureStoreKey(
       LEGACY_RECALL_COUNT_KEY(id),
-      RECALL_COUNT_KEY(id)
+      RECALL_COUNT_KEY(id),
     );
     void migrateSecureStoreKey(LEGACY_LAST_PROMPT_KEY(id), LAST_PROMPT_KEY(id));
   }, [activeProfile]);
@@ -88,7 +88,7 @@ export function useRatingPrompt(): {
       if (activeProfile.createdAt) {
         const daysSinceCreation = Math.floor(
           (Date.now() - new Date(activeProfile.createdAt).getTime()) /
-            (24 * 60 * 60 * 1000)
+            (24 * 60 * 60 * 1000),
         );
         if (daysSinceCreation < MIN_DAYS_SINCE_CREATION) return;
       }
@@ -99,7 +99,7 @@ export function useRatingPrompt(): {
       if (lastPromptStr) {
         const daysSincePrompt = Math.floor(
           (Date.now() - new Date(lastPromptStr).getTime()) /
-            (24 * 60 * 60 * 1000)
+            (24 * 60 * 60 * 1000),
         );
         if (daysSincePrompt < MIN_DAYS_BETWEEN_PROMPTS) return;
       }

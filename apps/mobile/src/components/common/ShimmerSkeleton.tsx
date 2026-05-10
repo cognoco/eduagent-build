@@ -69,7 +69,7 @@ export function ShimmerSkeleton({
     translateX.value = withRepeat(
       withTiming(end, { duration, easing: Easing.linear }),
       -1,
-      false
+      false,
     );
 
     // BR-01: cancel animation on unmount to prevent leaked UI-thread work

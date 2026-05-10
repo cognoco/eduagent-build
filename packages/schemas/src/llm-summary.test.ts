@@ -21,7 +21,7 @@ describe('llmSummarySchema', () => {
 
   it('rejects short narrative content', () => {
     expect(
-      llmSummarySchema.safeParse({ ...valid, narrative: 'too short' }).success
+      llmSummarySchema.safeParse({ ...valid, narrative: 'too short' }).success,
     ).toBe(false);
   });
 
@@ -30,7 +30,7 @@ describe('llmSummarySchema', () => {
       llmSummarySchema.safeParse({
         ...valid,
         narrative: 'x'.repeat(1501),
-      }).success
+      }).success,
     ).toBe(false);
   });
 
@@ -39,7 +39,7 @@ describe('llmSummarySchema', () => {
       llmSummarySchema.safeParse({
         ...valid,
         sessionState: 'pending',
-      }).success
+      }).success,
     ).toBe(false);
   });
 
@@ -48,7 +48,7 @@ describe('llmSummarySchema', () => {
       llmSummarySchema.safeParse({
         ...valid,
         topicsCovered: Array.from({ length: 21 }, () => 'topic'),
-      }).success
+      }).success,
     ).toBe(false);
   });
 
@@ -57,7 +57,7 @@ describe('llmSummarySchema', () => {
       llmSummarySchema.safeParse({
         ...valid,
         reEntryRecommendation: 'short',
-      }).success
+      }).success,
     ).toBe(false);
   });
 
@@ -67,7 +67,7 @@ describe('llmSummarySchema', () => {
         ...valid,
         narrative:
           'We talked about something abstract today and reviewed the rule together carefully.',
-      }).success
+      }).success,
     ).toBe(false);
   });
 
@@ -77,7 +77,7 @@ describe('llmSummarySchema', () => {
         ...valid,
         narrative:
           'We revisited LONG DIVISION and checked how each remainder changes the next step.',
-      }).success
+      }).success,
     ).toBe(true);
   });
 
@@ -88,7 +88,7 @@ describe('llmSummarySchema', () => {
         topicsCovered: ['animal'],
         narrative:
           'We discussed animalistic behaviours in stories without naming any specific creature today.',
-      }).success
+      }).success,
     ).toBe(false);
   });
 
@@ -99,7 +99,7 @@ describe('llmSummarySchema', () => {
         topicsCovered: ['příroda'],
         narrative:
           'Dnes jsme mluvili o tématu příroda a o tom, jak rostliny rostou v různých prostředích.',
-      }).success
+      }).success,
     ).toBe(true);
   });
 
@@ -109,7 +109,7 @@ describe('llmSummarySchema', () => {
         ...valid,
         topicsCovered: [],
         sessionState: 'auto-closed' as const,
-      }).success
+      }).success,
     ).toBe(true);
   });
 
@@ -119,7 +119,7 @@ describe('llmSummarySchema', () => {
         ...valid,
         topicsCovered: [],
         sessionState: 'completed' as const,
-      }).success
+      }).success,
     ).toBe(false);
   });
 });
@@ -141,7 +141,7 @@ describe('transcriptResponseSchema', () => {
             'Today you connected division and remainders with more confidence.',
           topicId: null,
         },
-      }).success
+      }).success,
     ).toBe(true);
   });
 
@@ -166,7 +166,7 @@ describe('transcriptResponseSchema', () => {
             timestamp: '2026-03-12T10:00:05.000Z',
           },
         ],
-      }).success
+      }).success,
     ).toBe(true);
   });
 });

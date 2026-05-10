@@ -14,7 +14,7 @@ const secureStore: Record<string, string> = {};
 
 jest.mock('../lib/secure-storage', () => ({
   getItemAsync: jest.fn((key: string) =>
-    Promise.resolve(secureStore[key] ?? null)
+    Promise.resolve(secureStore[key] ?? null),
   ),
   setItemAsync: jest.fn((key: string, value: string) => {
     secureStore[key] = value;
@@ -78,7 +78,7 @@ describe('useRatingPrompt', () => {
   it('does not prompt when prompted recently (within 90 days)', async () => {
     secureStore['rating-recall-success-count-profile-1'] = '10';
     secureStore['rating-last-prompt-profile-1'] = new Date(
-      Date.now() - 30 * 24 * 60 * 60 * 1000
+      Date.now() - 30 * 24 * 60 * 60 * 1000,
     ).toISOString(); // 30 days ago
 
     const { result } = renderHook(() => useRatingPrompt());
@@ -112,7 +112,7 @@ describe('useRatingPrompt', () => {
 
   it('does not prompt for new profiles (< 7 days old)', async () => {
     mockProfile.createdAt = new Date(
-      Date.now() - 3 * 24 * 60 * 60 * 1000
+      Date.now() - 3 * 24 * 60 * 60 * 1000,
     ).toISOString(); // 3 days ago
     secureStore['rating-recall-success-count-profile-1'] = '10';
 
@@ -124,7 +124,7 @@ describe('useRatingPrompt', () => {
     expect(mockRequestReview).not.toHaveBeenCalled();
     // restore
     mockProfile.createdAt = new Date(
-      Date.now() - 30 * 24 * 60 * 60 * 1000
+      Date.now() - 30 * 24 * 60 * 60 * 1000,
     ).toISOString();
   });
 });

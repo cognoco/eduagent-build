@@ -16,7 +16,7 @@ describe('BookPageFlipAnimation', () => {
 
   it('accepts custom size and color props', () => {
     const { getByTestId } = render(
-      <BookPageFlipAnimation testID="book" size={80} color="#3b82f6" />
+      <BookPageFlipAnimation testID="book" size={80} color="#3b82f6" />,
     );
     getByTestId('book');
   });

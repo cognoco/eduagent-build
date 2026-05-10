@@ -33,7 +33,7 @@ import { customType } from 'drizzle-orm/pg-core';
 // could silently delete the guard. See callsite: customType.fromDriver below.
 export function parseNumericFromDriver(
   value: string | null | undefined,
-  columnName: string
+  columnName: string,
 ): number {
   // Reject null/undefined explicitly. Number(null) === 0 and Number.isFinite(0)
   // is true, so without this guard a null driver value would silently coerce
@@ -41,7 +41,7 @@ export function parseNumericFromDriver(
   if (value === null || value === undefined) {
     throw new Error(
       `numericAsNumber: received ${value === null ? 'null' : 'undefined'} ` +
-        `for column "${columnName}" — expected numeric string`
+        `for column "${columnName}" — expected numeric string`,
     );
   }
   // Same trap class as null: Number('') === 0 and Number(' \t\n') === 0, both
@@ -51,15 +51,15 @@ export function parseNumericFromDriver(
   if (typeof value === 'string' && value.trim() === '') {
     throw new Error(
       `numericAsNumber: received empty/whitespace string for column ` +
-        `"${columnName}" — expected numeric string`
+        `"${columnName}" — expected numeric string`,
     );
   }
   const result = Number(value);
   if (!Number.isFinite(result)) {
     throw new Error(
       `numericAsNumber: corrupt value ${JSON.stringify(
-        value
-      )} for column "${columnName}" — expected numeric string, got ${typeof value}`
+        value,
+      )} for column "${columnName}" — expected numeric string, got ${typeof value}`,
     );
   }
   return result;
@@ -67,7 +67,7 @@ export function parseNumericFromDriver(
 
 export const numericAsNumber = (
   name: string,
-  config: { precision: number; scale: number }
+  config: { precision: number; scale: number },
 ) =>
   customType<{ data: number; driverData: string }>({
     dataType() {

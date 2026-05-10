@@ -47,7 +47,7 @@ describe('ProfileSwitcher', () => {
         profiles={[profiles[0]!]}
         activeProfileId="p1"
         onSwitch={onSwitch}
-      />
+      />,
     );
 
     expect(toJSON()).toBeNull();
@@ -59,7 +59,7 @@ describe('ProfileSwitcher', () => {
         profiles={profiles}
         activeProfileId="p1"
         onSwitch={onSwitch}
-      />
+      />,
     );
 
     screen.getByText('Alex');
@@ -72,7 +72,7 @@ describe('ProfileSwitcher', () => {
         profiles={profiles}
         activeProfileId="p2"
         onSwitch={onSwitch}
-      />
+      />,
     );
 
     // "Sam Jones" -> "SJ"
@@ -85,7 +85,7 @@ describe('ProfileSwitcher', () => {
         profiles={profiles}
         activeProfileId="p1"
         onSwitch={onSwitch}
-      />
+      />,
     );
 
     expect(screen.queryByTestId('profile-switcher-menu')).toBeNull();
@@ -97,7 +97,7 @@ describe('ProfileSwitcher', () => {
         profiles={profiles}
         activeProfileId="p1"
         onSwitch={onSwitch}
-      />
+      />,
     );
 
     fireEvent.press(screen.getByTestId('profile-switcher-chip'));
@@ -110,7 +110,7 @@ describe('ProfileSwitcher', () => {
         profiles={profiles}
         activeProfileId="p1"
         onSwitch={onSwitch}
-      />
+      />,
     );
 
     fireEvent.press(screen.getByTestId('profile-switcher-chip'));
@@ -124,7 +124,7 @@ describe('ProfileSwitcher', () => {
         profiles={profiles}
         activeProfileId="p1"
         onSwitch={onSwitch}
-      />
+      />,
     );
 
     fireEvent.press(screen.getByTestId('profile-switcher-chip'));
@@ -143,7 +143,7 @@ describe('ProfileSwitcher', () => {
         profiles={profiles}
         activeProfileId="p1"
         onSwitch={onSwitch}
-      />
+      />,
     );
 
     fireEvent.press(screen.getByTestId('profile-switcher-chip'));
@@ -162,7 +162,7 @@ describe('ProfileSwitcher', () => {
         profiles={profiles}
         activeProfileId="p1"
         onSwitch={onSwitch}
-      />
+      />,
     );
 
     fireEvent.press(screen.getByTestId('profile-switcher-chip'));
@@ -178,7 +178,7 @@ describe('ProfileSwitcher', () => {
         profiles={profiles}
         activeProfileId="p1"
         onSwitch={onSwitch}
-      />
+      />,
     );
 
     fireEvent.press(screen.getByTestId('profile-switcher-chip'));
@@ -198,7 +198,7 @@ describe('ProfileSwitcher', () => {
         profiles={profiles}
         activeProfileId="p1"
         onSwitch={onSwitch}
-      />
+      />,
     );
 
     fireEvent.press(screen.getByTestId('profile-switcher-chip'));

@@ -92,7 +92,7 @@ function calculateAge(birthYear: number): number {
  */
 export function evaluateSentryForProfile(
   birthYear: number | null,
-  consentStatus: string | null
+  consentStatus: string | null,
 ): void {
   if (!getSentryDsn()) return;
 

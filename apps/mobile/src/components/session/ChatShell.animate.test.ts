@@ -21,7 +21,7 @@ function collectStream(response: string) {
   let doneCalled = false;
 
   const setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>> = (
-    updater
+    updater,
   ) => {
     const next =
       typeof updater === 'function'

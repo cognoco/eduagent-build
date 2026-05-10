@@ -85,7 +85,7 @@ describe('useCurriculum', () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ curriculum: mockCurriculum }), {
         status: 200,
-      })
+      }),
     );
 
     const { result } = renderHook(() => useCurriculum('subject-1'), {
@@ -102,7 +102,7 @@ describe('useCurriculum', () => {
 
   it('returns null when no curriculum exists', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ curriculum: null }), { status: 200 })
+      new Response(JSON.stringify({ curriculum: null }), { status: 200 }),
     );
 
     const { result } = renderHook(() => useCurriculum('subject-1'), {
@@ -118,7 +118,7 @@ describe('useCurriculum', () => {
 
   it('handles API errors', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response('Network error', { status: 500 })
+      new Response('Network error', { status: 500 }),
     );
 
     const { result } = renderHook(() => useCurriculum('subject-1'), {
@@ -155,7 +155,7 @@ describe('useSkipTopic', () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ message: 'Topic skipped' }), {
         status: 200,
-      })
+      }),
     );
 
     const { result } = renderHook(() => useSkipTopic('subject-1'), {
@@ -188,7 +188,7 @@ describe('useUnskipTopic', () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ message: 'Topic restored' }), {
         status: 200,
-      })
+      }),
     );
 
     const { result } = renderHook(() => useUnskipTopic('subject-1'), {
@@ -221,7 +221,7 @@ describe('useChallengeCurriculum', () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ curriculum: mockCurriculum }), {
         status: 200,
-      })
+      }),
     );
 
     const { result } = renderHook(() => useChallengeCurriculum('subject-1'), {
@@ -261,8 +261,8 @@ describe('useAddCurriculumTopic', () => {
             estimatedMinutes: 35,
           },
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useAddCurriculumTopic('subject-1'), {
@@ -302,7 +302,7 @@ describe('useExplainTopic', () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ explanation: 'This topic covers...' }), {
         status: 200,
-      })
+      }),
     );
 
     const { result } = renderHook(() => useExplainTopic('subject-1'), {

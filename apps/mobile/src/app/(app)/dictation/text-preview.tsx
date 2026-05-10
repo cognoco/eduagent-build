@@ -47,7 +47,7 @@ export default function TextPreviewScreen(): React.ReactElement {
     if (!text.trim()) {
       platformAlert(
         t('dictation.textPreview.noTextTitle'),
-        t('dictation.textPreview.noTextMessage')
+        t('dictation.textPreview.noTextMessage'),
       );
       return;
     }
@@ -83,7 +83,7 @@ export default function TextPreviewScreen(): React.ReactElement {
             onPress: () => void handleStartDictation(),
           },
           { text: t('common.goBack'), style: 'cancel' },
-        ]
+        ],
       );
     }
   };

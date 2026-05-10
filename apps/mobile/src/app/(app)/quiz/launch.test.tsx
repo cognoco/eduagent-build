@@ -37,7 +37,7 @@ jest.mock('react-i18next', () => {
     const template = TRANSLATIONS[key] ?? key;
     if (!opts) return template;
     return template.replace(/\{\{(\w+)\}\}/g, (_: string, k: string) =>
-      String(opts[k] ?? `{{${k}}}`)
+      String(opts[k] ?? `{{${k}}}`),
     );
   };
   return { useTranslation: () => ({ t }) };
@@ -60,7 +60,7 @@ jest.mock('../../../i18n', () => {
     const template = TRANSLATIONS[key] ?? key;
     if (!opts) return template;
     return template.replace(/\{\{(\w+)\}\}/g, (_: string, k: string) =>
-      String(opts[k] ?? `{{${k}}}`)
+      String(opts[k] ?? `{{${k}}}`),
     );
   };
   return { __esModule: true, i18next: { t } };
@@ -163,10 +163,10 @@ describe('QuizLaunchScreen', () => {
     mockMutate.mockImplementation(
       (
         _input: unknown,
-        options?: { onSuccess?: (round: typeof challengeRound) => void }
+        options?: { onSuccess?: (round: typeof challengeRound) => void },
       ) => {
         options?.onSuccess?.(challengeRound);
-      }
+      },
     );
   });
 
@@ -177,7 +177,7 @@ describe('QuizLaunchScreen', () => {
       screen.getByTestId('quiz-challenge-banner');
     });
     screen.getByText(
-      "Your mentor's making this harder — you've been crushing it."
+      "Your mentor's making this harder — you've been crushing it.",
     );
 
     expect(mockReplace).not.toHaveBeenCalled();

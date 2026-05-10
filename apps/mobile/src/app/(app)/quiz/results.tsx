@@ -219,8 +219,8 @@ export default function QuizResultsScreen(): React.ReactElement {
                   qr.answerGiven && qr.answerGiven !== '[skipped]'
                     ? `You said ${qr.answerGiven}`
                     : qr.answerGiven === '[skipped]'
-                    ? 'You skipped this question'
-                    : "You didn't answer"
+                      ? 'You skipped this question'
+                      : "You didn't answer"
                 }. Correct answer ${qr.correctAnswer}.`}
               >
                 <Text className="text-body-sm text-text-secondary">

@@ -63,20 +63,20 @@ export function LivingBook({
       // Page flip: rotate 15° then back
       pageFlip.value = withSequence(
         withTiming(1, { duration: 200 }),
-        withTiming(0, { duration: 300 })
+        withTiming(0, { duration: 300 }),
       );
 
       // Subtle scale bump
       bookScale.value = withSequence(
         withSpring(1.15, { damping: 8, stiffness: 200 }),
-        withSpring(1, { damping: 10, stiffness: 150 })
+        withSpring(1, { damping: 10, stiffness: 150 }),
       );
 
       // Sparkle (learner only)
       if (isExpressive) {
         sparkleOpacity.value = withSequence(
           withTiming(1, { duration: 150 }),
-          withTiming(0, { duration: 400 })
+          withTiming(0, { duration: 400 }),
         );
       }
     }
@@ -96,12 +96,12 @@ export function LivingBook({
         withTiming(1, { duration: 300 }),
         withTiming(0.4, { duration: 600 }),
         withTiming(1, { duration: 300 }),
-        withTiming(0, { duration: 800 })
+        withTiming(0, { duration: 800 }),
       );
 
       bookScale.value = withSequence(
         withSpring(1.25, { damping: 6, stiffness: 180 }),
-        withSpring(1, { damping: 10, stiffness: 150 })
+        withSpring(1, { damping: 10, stiffness: 150 }),
       );
     }
   }, [isComplete, completionGlow, bookScale]);

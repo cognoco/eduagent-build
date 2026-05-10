@@ -107,7 +107,7 @@ describe('useApiClient header snapshot [BUG-631 / I-3]', () => {
     mockGetToken.mockReturnValueOnce(
       new Promise<string>((r) => {
         resolveToken = r;
-      })
+      }),
     );
 
     const { result } = renderHook(() => useApiClient());
@@ -189,7 +189,7 @@ describe('useApiClient 402 error classification [CR-API-402-04]', () => {
         new Response('Payment required', {
           status: 402,
           statusText: 'Payment Required',
-        })
+        }),
     ) as unknown as typeof globalThis.fetch;
 
     const client = makeClient();
@@ -209,8 +209,8 @@ describe('useApiClient 402 error classification [CR-API-402-04]', () => {
             code: 'SUBSCRIPTION_EXPIRED',
             message: 'Subscribe to continue',
           }),
-          { status: 402, headers: { 'Content-Type': 'application/json' } }
-        )
+          { status: 402, headers: { 'Content-Type': 'application/json' } },
+        ),
     ) as unknown as typeof globalThis.fetch;
 
     const client = makeClient();
@@ -242,7 +242,7 @@ describe('useApiClient 402 error classification [CR-API-402-04]', () => {
         new Response(JSON.stringify(quotaBody), {
           status: 402,
           headers: { 'Content-Type': 'application/json' },
-        })
+        }),
     ) as unknown as typeof globalThis.fetch;
 
     const client = makeClient();

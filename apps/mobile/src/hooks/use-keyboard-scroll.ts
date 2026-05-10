@@ -39,14 +39,14 @@ export function useKeyboardScroll(): KeyboardScrollResult {
         scrollTimerRef.current = null;
       }
     },
-    []
+    [],
   );
 
   const onFieldLayout = useCallback(
     (name: string) => (e: LayoutChangeEvent) => {
       positions.current[name] = e.nativeEvent.layout.y;
     },
-    []
+    [],
   );
 
   const onFieldFocus = useCallback(
@@ -71,7 +71,7 @@ export function useKeyboardScroll(): KeyboardScrollResult {
         }
       }, 300);
     },
-    []
+    [],
   );
 
   return { scrollRef, onFieldLayout, onFieldFocus };

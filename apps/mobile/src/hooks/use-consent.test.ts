@@ -88,8 +88,8 @@ describe('useRequestConsent', () => {
           message: 'Consent request sent to parent',
           consentType: 'GDPR',
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useRequestConsent(), {
@@ -125,7 +125,7 @@ describe('useChildConsentStatus', () => {
       consentType: 'GDPR',
     };
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify(statusData), { status: 200 })
+      new Response(JSON.stringify(statusData), { status: 200 }),
     );
 
     const childId = '550e8400-e29b-41d4-a716-446655440000';
@@ -169,8 +169,8 @@ describe('useRevokeConsent', () => {
             'Consent revoked. Data will be deleted after 7-day grace period.',
           consentStatus: 'WITHDRAWN',
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const childId = '550e8400-e29b-41d4-a716-446655440000';
@@ -205,8 +205,8 @@ describe('useRestoreConsent', () => {
           message: 'Consent restored. Deletion cancelled.',
           consentStatus: 'CONSENTED',
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const childId = '550e8400-e29b-41d4-a716-446655440000';

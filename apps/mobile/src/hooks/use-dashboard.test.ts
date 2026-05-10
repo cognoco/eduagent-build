@@ -62,7 +62,7 @@ describe('useDashboard', () => {
       ],
     };
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify(dashboardData), { status: 200 })
+      new Response(JSON.stringify(dashboardData), { status: 200 }),
     );
 
     const { result } = renderHook(() => useDashboard(), {
@@ -84,10 +84,10 @@ describe('useDashboard', () => {
 
     mockFetch
       .mockResolvedValueOnce(
-        new Response(JSON.stringify(emptyResponse), { status: 200 })
+        new Response(JSON.stringify(emptyResponse), { status: 200 }),
       )
       .mockResolvedValueOnce(
-        new Response(JSON.stringify(demoData), { status: 200 })
+        new Response(JSON.stringify(demoData), { status: 200 }),
       );
 
     const { result } = renderHook(() => useDashboard(), {
@@ -105,7 +105,7 @@ describe('useDashboard', () => {
 
   it('handles API errors', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response('Internal Server Error', { status: 500 })
+      new Response('Internal Server Error', { status: 500 }),
     );
 
     const { result } = renderHook(() => useDashboard(), {
@@ -155,7 +155,7 @@ describe('useChildDetail', () => {
       },
     };
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify(childData), { status: 200 })
+      new Response(JSON.stringify(childData), { status: 200 }),
     );
 
     const { result } = renderHook(() => useChildDetail('child-1'), {
@@ -206,12 +206,12 @@ describe('useChildSubjectTopics', () => {
       ],
     };
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify(topicData), { status: 200 })
+      new Response(JSON.stringify(topicData), { status: 200 }),
     );
 
     const { result } = renderHook(
       () => useChildSubjectTopics('child-1', 'subject-1'),
-      { wrapper: createWrapper() }
+      { wrapper: createWrapper() },
     );
 
     await waitFor(() => {
@@ -224,7 +224,7 @@ describe('useChildSubjectTopics', () => {
   it('does not fetch when params are missing', () => {
     const { result } = renderHook(
       () => useChildSubjectTopics(undefined, undefined),
-      { wrapper: createWrapper() }
+      { wrapper: createWrapper() },
     );
 
     expect(result.current.fetchStatus).toBe('idle');

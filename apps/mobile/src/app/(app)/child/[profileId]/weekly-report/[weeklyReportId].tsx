@@ -138,7 +138,7 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
                 router,
                 profileId
                   ? (`/(app)/child/${profileId}/reports` as const)
-                  : FAMILY_HOME_PATH
+                  : FAMILY_HOME_PATH,
               )
             }
             className="me-3 py-2 pe-2"
@@ -261,7 +261,7 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
                   'parentView.weeklyReport.openChildProfile',
                   {
                     name: report.reportData.childName,
-                  }
+                  },
                 )}
                 testID="child-weekly-report-open-child"
               >
@@ -280,7 +280,7 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
                 className="rounded-button px-4 py-3 items-center min-h-[48px] justify-center mt-2"
                 accessibilityRole="button"
                 accessibilityLabel={t(
-                  'parentView.weeklyReport.backToAllReports'
+                  'parentView.weeklyReport.backToAllReports',
                 )}
                 testID="child-weekly-report-back-to-reports"
               >

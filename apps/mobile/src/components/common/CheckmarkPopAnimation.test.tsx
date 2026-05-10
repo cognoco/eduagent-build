@@ -4,14 +4,14 @@ import { CheckmarkPopAnimation } from './CheckmarkPopAnimation';
 describe('CheckmarkPopAnimation', () => {
   it('renders without crashing', () => {
     const { getByTestId } = render(
-      <CheckmarkPopAnimation testID="checkmark" />
+      <CheckmarkPopAnimation testID="checkmark" />,
     );
     getByTestId('checkmark');
   });
 
   it('applies accessibility attributes', () => {
     const { getByTestId } = render(
-      <CheckmarkPopAnimation testID="checkmark" />
+      <CheckmarkPopAnimation testID="checkmark" />,
     );
     const el = getByTestId('checkmark');
     expect(el.props.accessibilityLabel).toBe('Success');
@@ -25,7 +25,7 @@ describe('CheckmarkPopAnimation', () => {
         size={60}
         color="#ff0000"
         strokeWidth={4}
-      />
+      />,
     );
     getByTestId('checkmark');
   });

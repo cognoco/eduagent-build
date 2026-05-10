@@ -3,7 +3,7 @@ export const GRACE_PERIOD_DAYS = 7;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 export function getGracePeriodDaysRemaining(
-  respondedAt: string | Date | null
+  respondedAt: string | Date | null,
 ): number {
   if (!respondedAt) return 0;
 

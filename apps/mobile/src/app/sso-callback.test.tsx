@@ -23,7 +23,7 @@ jest.mock('react-i18next', () => {
   };
   function resolveDotPath(
     obj: Record<string, unknown>,
-    path: string
+    path: string,
   ): string | undefined {
     return path
       .split('.')
@@ -32,7 +32,7 @@ jest.mock('react-i18next', () => {
           acc && typeof acc === 'object'
             ? (acc as Record<string, unknown>)[k]
             : undefined,
-        obj
+        obj,
       ) as string | undefined;
   }
   return {

@@ -9,7 +9,7 @@ import type { DictationPace } from '@eduagent/schemas';
 // fail in production without flooding the breadcrumb stream with noise.
 function reportSecureStoreFailure(
   scope: 'pace' | 'punctuation',
-  err: unknown
+  err: unknown,
 ): void {
   console.warn(`[Dictation] SecureStore write failed (${scope}):`, err);
   Sentry.captureException(err, {
@@ -40,7 +40,7 @@ function nextPace(prev: DictationPace): DictationPace {
 }
 
 export function useDictationPreferences(
-  profileId: string | undefined
+  profileId: string | undefined,
 ): DictationPreferences {
   const [pace, setPaceState] = useState<DictationPace>('slow');
   const [punctuationReadAloud, setPunctState] = useState(true);
@@ -55,7 +55,7 @@ export function useDictationPreferences(
         }
       })
       .catch((err) =>
-        Sentry.captureException(err, { tags: { feature: 'dictation_prefs' } })
+        Sentry.captureException(err, { tags: { feature: 'dictation_prefs' } }),
       );
 
     void SecureStore.getItemAsync(getPunctKey(profileId))
@@ -65,7 +65,7 @@ export function useDictationPreferences(
         }
       })
       .catch((err) =>
-        Sentry.captureException(err, { tags: { feature: 'dictation_prefs' } })
+        Sentry.captureException(err, { tags: { feature: 'dictation_prefs' } }),
       );
   }, [profileId]);
 
@@ -74,11 +74,11 @@ export function useDictationPreferences(
       setPaceState(next);
       if (profileId) {
         void SecureStore.setItemAsync(getPaceKey(profileId), next).catch(
-          (err) => reportSecureStoreFailure('pace', err)
+          (err) => reportSecureStoreFailure('pace', err),
         );
       }
     },
-    [profileId]
+    [profileId],
   );
 
   const togglePunctuation = useCallback(() => {
@@ -87,7 +87,7 @@ export function useDictationPreferences(
       if (profileId) {
         void SecureStore.setItemAsync(
           getPunctKey(profileId),
-          String(next)
+          String(next),
         ).catch((err) => reportSecureStoreFailure('punctuation', err));
       }
       return next;
@@ -99,7 +99,7 @@ export function useDictationPreferences(
       const next = nextPace(prev);
       if (profileId) {
         void SecureStore.setItemAsync(getPaceKey(profileId), next).catch(
-          (err) => reportSecureStoreFailure('pace', err)
+          (err) => reportSecureStoreFailure('pace', err),
         );
       }
       return next;

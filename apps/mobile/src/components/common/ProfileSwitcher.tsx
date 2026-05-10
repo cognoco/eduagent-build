@@ -9,7 +9,7 @@ import { platformAlert } from '../../lib/platform-alert';
  * Everyone else (including adult self-learners) shows as "Student". */
 function roleLabel(
   profile: { isOwner: boolean },
-  allProfiles: ReadonlyArray<{ isOwner: boolean }>
+  allProfiles: ReadonlyArray<{ isOwner: boolean }>,
 ): string {
   return isGuardianProfile(profile, allProfiles) ? 'Parent' : 'Student';
 }
@@ -65,7 +65,7 @@ export function ProfileSwitcher({
         setSwitching(false);
       }
     },
-    [activeProfileId, onSwitch]
+    [activeProfileId, onSwitch],
   );
 
   if (profiles.length <= 1) return null;
@@ -152,7 +152,7 @@ export function ProfileSwitcher({
                   accessibilityRole="menuitem"
                   accessibilityLabel={`${profile.displayName}, ${roleLabel(
                     profile,
-                    profiles
+                    profiles,
                   )}${isActive ? ', active' : ''}`}
                   accessibilityState={{ selected: isActive }}
                   testID={`profile-option-${profile.id}`}

@@ -47,7 +47,7 @@ interface VerifyOptions {
 async function verifyTokenViaWebCrypto(
   token: string,
   jwk: JWK,
-  options?: VerifyOptions
+  options?: VerifyOptions,
 ): Promise<Record<string, unknown>> {
   const parts = token.split('.');
   if (parts.length !== 3) throw new Error('Invalid JWT: expected 3 segments');
@@ -55,7 +55,7 @@ async function verifyTokenViaWebCrypto(
   const [headerB64, payloadB64, signatureB64] = parts as [
     string,
     string,
-    string
+    string,
   ];
 
   const cryptoKey = await crypto.subtle.importKey(
@@ -63,7 +63,7 @@ async function verifyTokenViaWebCrypto(
     { kty: jwk.kty, n: jwk.n, e: jwk.e, alg: 'RS256', ext: true } as JsonWebKey,
     { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
     false,
-    ['verify']
+    ['verify'],
   );
 
   const data = new TextEncoder().encode(`${headerB64}.${payloadB64}`);
@@ -73,7 +73,7 @@ async function verifyTokenViaWebCrypto(
     'RSASSA-PKCS1-v1_5',
     cryptoKey,
     signature,
-    data
+    data,
   );
   if (!valid) throw new Error('Invalid JWT: signature verification failed');
 
@@ -120,7 +120,7 @@ describe('signTestJwt', () => {
     const token = signTestJwt({});
     const payloadB64 = token.split('.')[1]!;
     const payload = JSON.parse(
-      Buffer.from(payloadB64, 'base64url').toString('utf8')
+      Buffer.from(payloadB64, 'base64url').toString('utf8'),
     );
     expect(payload.sub).toBe('user_test');
     expect(payload.email).toBe('test@example.com');
@@ -130,7 +130,7 @@ describe('signTestJwt', () => {
     const token = signTestJwt({ sub: 'user_custom', email: 'custom@test.com' });
     const payloadB64 = token.split('.')[1]!;
     const payload = JSON.parse(
-      Buffer.from(payloadB64, 'base64url').toString('utf8')
+      Buffer.from(payloadB64, 'base64url').toString('utf8'),
     );
     expect(payload.sub).toBe('user_custom');
     expect(payload.email).toBe('custom@test.com');
@@ -183,7 +183,7 @@ describe('expired token', () => {
     const token = signTestJwt({ exp: past });
     const jwk = getTestPublicJwk();
     await expect(verifyTokenViaWebCrypto(token, jwk)).rejects.toThrow(
-      /expired/i
+      /expired/i,
     );
   });
 });
@@ -197,13 +197,13 @@ describe('tampered signature', () => {
     const token = signTestJwt({});
     const [h, p] = token.split('.');
     const fakeSignature = Buffer.from('thisisnotavalidsignature').toString(
-      'base64url'
+      'base64url',
     );
     const tamperedToken = `${h}.${p}.${fakeSignature}`;
 
     const jwk = getTestPublicJwk();
     await expect(verifyTokenViaWebCrypto(tamperedToken, jwk)).rejects.toThrow(
-      /signature verification failed/i
+      /signature verification failed/i,
     );
   });
 });

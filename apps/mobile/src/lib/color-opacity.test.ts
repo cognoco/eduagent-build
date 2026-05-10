@@ -15,13 +15,13 @@ describe('withOpacity', () => {
 
   it('converts rgb(...) to rgba(...)', () => {
     expect(withOpacity('rgb(13, 148, 136)', 0.5)).toBe(
-      'rgba(13, 148, 136, 0.5)'
+      'rgba(13, 148, 136, 0.5)',
     );
   });
 
   it('rewrites alpha in rgba(...)', () => {
     expect(withOpacity('rgba(13, 148, 136, 0.9)', 0.1)).toBe(
-      'rgba(13, 148, 136, 0.1)'
+      'rgba(13, 148, 136, 0.1)',
     );
   });
 

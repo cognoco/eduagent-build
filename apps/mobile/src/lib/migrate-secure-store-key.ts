@@ -13,7 +13,7 @@ import * as SecureStore from './secure-storage';
  */
 export async function migrateSecureStoreKey(
   oldKey: string,
-  newKey: string
+  newKey: string,
 ): Promise<void> {
   try {
     // Don't overwrite if new key already has data

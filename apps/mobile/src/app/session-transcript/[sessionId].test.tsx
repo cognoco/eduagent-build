@@ -223,7 +223,7 @@ describe('SessionTranscriptScreen [BUG-889]', () => {
     fireEvent.press(screen.getByTestId('session-transcript-back'));
     expect(mockGoBackOrReplace).toHaveBeenCalledWith(
       expect.anything(),
-      '/(app)/library'
+      '/(app)/library',
     );
   });
 
@@ -245,7 +245,7 @@ describe('SessionTranscriptScreen [BUG-889]', () => {
         content: string;
         timestamp: string;
         isSystemPrompt?: boolean;
-      }[]
+      }[],
     ) {
       return {
         data: {

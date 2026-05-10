@@ -22,7 +22,7 @@ const ROUND_GENERATION_TIMEOUT_MS = 30_000;
 // message over 60 chars — those are almost always raw API payloads.
 export function friendlyErrorMessage(
   code: string | undefined,
-  fallback: string
+  fallback: string,
 ): string {
   switch (code) {
     case 'UPSTREAM_ERROR':
@@ -75,7 +75,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
       setChallengeRound(null);
       router.replace('/(app)/quiz/play' as never);
     },
-    [router, setRound]
+    [router, setRound],
   );
 
   // [ASSUMP-F1] Single entry point so retry gets the same onSuccess handler
@@ -94,7 +94,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
           }
           enterPlay(round);
         },
-      }
+      },
     );
     // [BUG-542] Use .mutate (stable ref) instead of whole mutation result
   }, [activityType, enterPlay, generateRoundMutate, subjectId]);
@@ -112,7 +112,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
   useEffect(() => {
     const interval = setInterval(() => {
       setLoadingMessageIndex(
-        (current) => (current + 1) % LOADING_MESSAGE_KEYS.length
+        (current) => (current + 1) % LOADING_MESSAGE_KEYS.length,
       );
     }, 1500);
 
@@ -140,7 +140,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
     }
     const timer = setTimeout(
       () => setHardTimedOut(true),
-      ROUND_GENERATION_TIMEOUT_MS
+      ROUND_GENERATION_TIMEOUT_MS,
     );
     return () => clearTimeout(timer);
   }, [generateRound.isPending]);
@@ -289,7 +289,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
       <ActivityIndicator size="large" color={colors.primary} />
       <Text className="mt-4 text-body text-text-secondary">
         {t(
-          LOADING_MESSAGE_KEYS[loadingMessageIndex] ?? LOADING_MESSAGE_KEYS[0]
+          LOADING_MESSAGE_KEYS[loadingMessageIndex] ?? LOADING_MESSAGE_KEYS[0],
         )}
       </Text>
       {timedOut ? (

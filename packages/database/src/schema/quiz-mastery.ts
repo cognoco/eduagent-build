@@ -42,12 +42,12 @@ export const quizMasteryItems = pgTable(
     unique('uq_quiz_mastery_profile_activity_key').on(
       table.profileId,
       table.activityType,
-      table.itemKey
+      table.itemKey,
     ),
     index('idx_quiz_mastery_due').on(
       table.profileId,
       table.activityType,
-      table.nextReviewAt
+      table.nextReviewAt,
     ),
-  ]
+  ],
 );

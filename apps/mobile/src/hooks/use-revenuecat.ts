@@ -196,7 +196,7 @@ export function usePurchase(): UseMutationResult<
 
   return useMutation({
     mutationFn: async (
-      aPackage: PurchasesPackage
+      aPackage: PurchasesPackage,
     ): Promise<MakePurchaseResult> => {
       const result = await Purchases.purchasePackage(aPackage);
       return result;

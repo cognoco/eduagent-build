@@ -113,13 +113,13 @@ describe('SessionDetailScreen (summary-only)', () => {
 
     expect(
       screen.getByText(
-        'They compared equivalent fractions and fixed one shaky step.'
-      )
+        'They compared equivalent fractions and fixed one shaky step.',
+      ),
     ).toBeTruthy();
     screen.getByText('Practiced equivalent fractions');
     screen.getByText('Focused');
     expect(
-      screen.getByText('Which fraction felt easiest to compare today?')
+      screen.getByText('Which fraction felt easiest to compare today?'),
     ).toBeTruthy();
   });
 
@@ -138,7 +138,7 @@ describe('SessionDetailScreen (summary-only)', () => {
     // The bare "No summary available for this session." string is replaced
     // by an explanation + pointer to the always-on CTAs at the bottom.
     expect(
-      screen.queryByText('No summary available for this session.')
+      screen.queryByText('No summary available for this session.'),
     ).toBeNull();
   });
 
@@ -174,7 +174,7 @@ describe('SessionDetailScreen (summary-only)', () => {
 
     fireEvent.press(cta);
     expect(mockPush).toHaveBeenCalledWith(
-      '/(app)/child/child-profile-001/topic/topic-1'
+      '/(app)/child/child-profile-001/topic/topic-1',
     );
   });
 
@@ -233,7 +233,7 @@ describe('SessionDetailScreen (summary-only)', () => {
 
     screen.getByText('Helped with fractions');
     expect(
-      screen.getByText('Walked through fraction simplification step by step')
+      screen.getByText('Walked through fraction simplification step by step'),
     ).toBeTruthy();
   });
 
@@ -274,7 +274,7 @@ describe('SessionDetailScreen (summary-only)', () => {
 
     await waitFor(() => screen.getByTestId('session-recap-copy-prompt-toast'));
     expect(Clipboard.setStringAsync).toHaveBeenCalledWith(
-      'Can you teach this back to me?'
+      'Can you teach this back to me?',
     );
   });
 });

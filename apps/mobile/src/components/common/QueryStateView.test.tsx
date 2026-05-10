@@ -9,7 +9,7 @@ describe('QueryStateView', () => {
     const { getByText, queryByTestId } = render(
       <QueryStateView isLoading={false} retry={{ onPress: noop }}>
         <Text>ready content</Text>
-      </QueryStateView>
+      </QueryStateView>,
     );
     getByText('ready content');
     expect(queryByTestId('spinner')).toBeNull();
@@ -19,7 +19,7 @@ describe('QueryStateView', () => {
     const { getByTestId, queryByText } = render(
       <QueryStateView isLoading retry={{ onPress: noop }} testID="spinner">
         <Text>ready content</Text>
-      </QueryStateView>
+      </QueryStateView>,
     );
     getByTestId('spinner');
     expect(queryByText('ready content')).toBeNull();
@@ -34,7 +34,7 @@ describe('QueryStateView', () => {
         back={{ onPress: noop }}
       >
         <Text>ready content</Text>
-      </QueryStateView>
+      </QueryStateView>,
     );
     getByText('Retry');
     getByText('Go Back');
@@ -48,7 +48,7 @@ describe('QueryStateView', () => {
         retry={{ onPress: noop }}
       >
         <Text>ready content</Text>
-      </QueryStateView>
+      </QueryStateView>,
     );
     // Error branch renders the Retry button; success children are not shown.
     getByText('Retry');
@@ -64,7 +64,7 @@ describe('QueryStateView', () => {
         retry={{ onPress: onRetry, testID: 'retry-btn' }}
       >
         <Text>ready content</Text>
-      </QueryStateView>
+      </QueryStateView>,
     );
     fireEvent.press(getByTestId('retry-btn'));
     expect(onRetry).toHaveBeenCalledTimes(1);
@@ -80,7 +80,7 @@ describe('QueryStateView', () => {
         back={{ onPress: onBack, testID: 'back-btn' }}
       >
         <Text>ready content</Text>
-      </QueryStateView>
+      </QueryStateView>,
     );
     fireEvent.press(getByTestId('back-btn'));
     expect(onBack).toHaveBeenCalledTimes(1);
@@ -95,7 +95,7 @@ describe('QueryStateView', () => {
         back={{ label: 'Home', onPress: noop }}
       >
         <Text>ready content</Text>
-      </QueryStateView>
+      </QueryStateView>,
     );
     getByText('Try again');
     getByText('Home');
@@ -111,7 +111,7 @@ describe('QueryStateView', () => {
         errorMessage="Please try again in a moment"
       >
         <Text>ready content</Text>
-      </QueryStateView>
+      </QueryStateView>,
     );
     getByText('Something happened');
     getByText('Please try again in a moment');

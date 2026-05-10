@@ -112,28 +112,28 @@ export function BrandCelebration({
     // 50ms — Path ZIPS across
     pathDraw.value = withDelay(
       50,
-      withTiming(1, { duration: 250, easing: Easing.bezier(0.22, 1, 0.36, 1) })
+      withTiming(1, { duration: 250, easing: Easing.bezier(0.22, 1, 0.36, 1) }),
     );
 
     // 100ms — Dot 1 (pink) EXPLODES
     dot1R.value = withDelay(100, withSpring(4, slam));
     spark1.value = withDelay(
       100,
-      withTiming(1, { duration: 350, easing: sparkEase })
+      withTiming(1, { duration: 350, easing: sparkEase }),
     );
 
     // 150ms — Dot 2 (violet) EXPLODES
     dot2R.value = withDelay(150, withSpring(5, slam));
     spark2.value = withDelay(
       150,
-      withTiming(1, { duration: 350, easing: sparkEase })
+      withTiming(1, { duration: 350, easing: sparkEase }),
     );
 
     // 200ms — Dot 3 (mint) EXPLODES
     dot3R.value = withDelay(200, withSpring(6, slam));
     spark3.value = withDelay(
       200,
-      withTiming(1, { duration: 350, easing: sparkEase })
+      withTiming(1, { duration: 350, easing: sparkEase }),
     );
 
     // 250ms — Mentor node SLAMS in
@@ -145,8 +145,8 @@ export function BrandCelebration({
       300,
       withSequence(
         withTiming(0.6, { duration: 100 }),
-        withTiming(0.18, { duration: 250 })
-      )
+        withTiming(0.18, { duration: 250 }),
+      ),
     );
 
     // 400ms — Happy bounce (both nodes pulse)
@@ -154,8 +154,8 @@ export function BrandCelebration({
       400,
       withSequence(
         withTiming(0.92, { duration: 80 }),
-        withSpring(1, { damping: 6, stiffness: 300 })
-      )
+        withSpring(1, { damping: 6, stiffness: 300 }),
+      ),
     );
 
     // 700ms — Done
@@ -163,7 +163,7 @@ export function BrandCelebration({
       700,
       withTiming(1, { duration: 1 }, (finished) => {
         if (finished) runOnJS(done)();
-      })
+      }),
     );
     // Reanimated SharedValues have stable identity across renders, so listing
     // them satisfies the linter without changing when this effect actually

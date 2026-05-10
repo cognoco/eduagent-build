@@ -144,7 +144,7 @@ export function signTestJwt(payload: Partial<JWTPayload> = {}): string {
   const signature = sign(
     'sha256',
     Buffer.from(signingInput, 'ascii'),
-    privateKey
+    privateKey,
   );
 
   return `${signingInput}.${base64UrlEncode(signature)}`;

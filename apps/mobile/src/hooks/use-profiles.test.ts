@@ -73,7 +73,7 @@ describe('useProfiles', () => {
     ];
 
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ profiles }), { status: 200 })
+      new Response(JSON.stringify({ profiles }), { status: 200 }),
     );
 
     const { result } = renderHook(() => useProfiles(), {
@@ -90,7 +90,7 @@ describe('useProfiles', () => {
 
   it('returns empty array when no profiles exist', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ profiles: [] }), { status: 200 })
+      new Response(JSON.stringify({ profiles: [] }), { status: 200 }),
     );
 
     const { result } = renderHook(() => useProfiles(), {
@@ -106,7 +106,7 @@ describe('useProfiles', () => {
 
   it('handles API errors', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response('Network error', { status: 500 })
+      new Response('Network error', { status: 500 }),
     );
 
     const { result } = renderHook(() => useProfiles(), {
@@ -157,7 +157,9 @@ describe('useUpdateProfileName', () => {
     };
 
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ profile: updatedProfile }), { status: 200 })
+      new Response(JSON.stringify({ profile: updatedProfile }), {
+        status: 200,
+      }),
     );
 
     const wrapper = createWrapper();

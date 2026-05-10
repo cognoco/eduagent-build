@@ -14,7 +14,7 @@ describe('firstParam', () => {
   // with the array, which was coerced to "uri1,uri2" and failed silently.
   it('[BUG-635] returns the first element of a string[] from Expo Router', () => {
     expect(firstParam(['file:///photo-1.jpg', 'file:///photo-2.jpg'])).toBe(
-      'file:///photo-1.jpg'
+      'file:///photo-1.jpg',
     );
   });
 

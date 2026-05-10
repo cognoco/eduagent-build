@@ -32,7 +32,7 @@ export function showNoteContextMenu({
               style: 'destructive',
               onPress: () => onDelete(noteId),
             },
-          ]
+          ],
         );
       },
     },

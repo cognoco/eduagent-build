@@ -25,7 +25,7 @@ export function usePrepareHomework() {
 
   return useMutation({
     mutationFn: async (
-      input: PrepareHomeworkInput
+      input: PrepareHomeworkInput,
     ): Promise<PrepareHomeworkOutput> => {
       const res = await client.dictation['prepare-homework'].$post({
         json: input,
@@ -53,7 +53,7 @@ export function useReviewDictation() {
 
   return useMutation({
     mutationFn: async (
-      input: DictationReviewInput
+      input: DictationReviewInput,
     ): Promise<DictationReviewResult> => {
       const res = await client.dictation.review.$post({ json: input });
       await assertOk(res);

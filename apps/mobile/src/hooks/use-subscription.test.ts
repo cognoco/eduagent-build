@@ -79,8 +79,8 @@ describe('useSubscription', () => {
             remainingQuestions: 658,
           },
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useSubscription(), {
@@ -110,8 +110,8 @@ describe('useSubscription', () => {
             remainingQuestions: 100,
           },
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useSubscription(), {
@@ -128,7 +128,7 @@ describe('useSubscription', () => {
 
   it('handles API errors', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response('Network error', { status: 500 })
+      new Response('Network error', { status: 500 }),
     );
 
     const { result } = renderHook(() => useSubscription(), {
@@ -170,8 +170,8 @@ describe('useUsage', () => {
             cycleResetAt: '2026-03-01T00:00:00Z',
           },
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useUsage(), {
@@ -200,8 +200,8 @@ describe('useUsage', () => {
             cycleResetAt: '2026-03-01T00:00:00Z',
           },
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useUsage(), {
@@ -251,8 +251,8 @@ describe('useFamilySubscription', () => {
             ],
           },
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useFamilySubscription(), {
@@ -318,8 +318,8 @@ describe('useRemoveFamilyProfile', () => {
           message: 'Profile removed from family subscription',
           removedProfileId: '550e8400-e29b-41d4-a716-446655440000',
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useRemoveFamilyProfile(), {
@@ -342,7 +342,7 @@ describe('useRemoveFamilyProfile', () => {
       profileId: '550e8400-e29b-41d4-a716-446655440000',
     });
     expect(result.current.data?.removedProfileId).toBe(
-      '550e8400-e29b-41d4-a716-446655440000'
+      '550e8400-e29b-41d4-a716-446655440000',
     );
   });
 
@@ -351,7 +351,7 @@ describe('useRemoveFamilyProfile', () => {
       new Response('Forbidden', {
         status: 403,
         statusText: 'Forbidden',
-      })
+      }),
     );
 
     const { result } = renderHook(() => useRemoveFamilyProfile(), {
@@ -391,8 +391,8 @@ describe('useCreateCheckout', () => {
           checkoutUrl: 'https://checkout.stripe.com/cs_test_123',
           sessionId: 'cs_test_123',
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useCreateCheckout(), {
@@ -409,7 +409,7 @@ describe('useCreateCheckout', () => {
 
     expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data?.checkoutUrl).toBe(
-      'https://checkout.stripe.com/cs_test_123'
+      'https://checkout.stripe.com/cs_test_123',
     );
   });
 });
@@ -436,8 +436,8 @@ describe('useCancelSubscription', () => {
             'Subscription cancelled. Access continues until end of billing period.',
           currentPeriodEnd: '2026-03-18T00:00:00Z',
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useCancelSubscription(), {
@@ -477,8 +477,8 @@ describe('useCreatePortalSession', () => {
         JSON.stringify({
           portalUrl: 'https://billing.stripe.com/p/session_123',
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useCreatePortalSession(), {
@@ -495,7 +495,7 @@ describe('useCreatePortalSession', () => {
 
     expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data?.portalUrl).toBe(
-      'https://billing.stripe.com/p/session_123'
+      'https://billing.stripe.com/p/session_123',
     );
   });
 });
@@ -524,8 +524,8 @@ describe('usePurchaseTopUp', () => {
             paymentIntentId: 'pi_test_123',
           },
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => usePurchaseTopUp(), {
@@ -566,8 +566,8 @@ describe('useJoinByokWaitlist', () => {
           message: 'Added to BYOK waitlist',
           email: 'user@example.com',
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useJoinByokWaitlist(), {
@@ -591,7 +591,7 @@ describe('useJoinByokWaitlist', () => {
       new Response('API error 422', {
         status: 422,
         statusText: 'Unprocessable Entity',
-      })
+      }),
     );
 
     const { result } = renderHook(() => useJoinByokWaitlist(), {

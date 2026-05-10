@@ -204,7 +204,7 @@ export const quotaExceededSchema = z.object({
         tier: z.enum(['plus', 'family', 'pro']),
         monthlyQuota: z.number().int(),
         priceMonthly: z.number(),
-      })
+      }),
     ),
   }),
 });

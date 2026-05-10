@@ -49,7 +49,7 @@ export default function PickBookScreen(): React.ReactElement {
   // enough to register even when suggestions resolve from cache.
   const showSuggestionsLoading = useStickyLoading(
     suggestionsQuery.isLoading,
-    800
+    800,
   );
 
   // BUG-361: Synchronous mutex — filing.isPending has React batching delay,
@@ -166,7 +166,7 @@ export default function PickBookScreen(): React.ReactElement {
             onPress: () => void handlePickSuggestion(suggestion),
           },
           { text: 'Go back', onPress: handleBack },
-        ]
+        ],
       );
     }
   };

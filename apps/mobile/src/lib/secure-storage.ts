@@ -35,7 +35,7 @@ function getWebStorage(): Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> {
 
 export async function getItemAsync(
   key: string,
-  options?: GetOptions
+  options?: GetOptions,
 ): Promise<string | null> {
   if (Platform.OS === 'web') {
     return getWebStorage().getItem(key);
@@ -49,7 +49,7 @@ export async function getItemAsync(
 export async function setItemAsync(
   key: string,
   value: string,
-  options?: SetOptions
+  options?: SetOptions,
 ): Promise<void> {
   if (Platform.OS === 'web') {
     getWebStorage().setItem(key, value);
@@ -65,7 +65,7 @@ export async function setItemAsync(
 
 export async function deleteItemAsync(
   key: string,
-  options?: DeleteOptions
+  options?: DeleteOptions,
 ): Promise<void> {
   if (Platform.OS === 'web') {
     getWebStorage().removeItem(key);

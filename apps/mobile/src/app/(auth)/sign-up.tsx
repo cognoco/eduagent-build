@@ -80,7 +80,7 @@ export default function SignUpScreen() {
   const activateCreatedSession = useCallback(
     async (
       sessionId: string | null,
-      context: 'oauth' | 'verification'
+      context: 'oauth' | 'verification',
     ): Promise<boolean> => {
       if (!sessionId || !setActive) {
         setError('No session was created. Please try again.');
@@ -99,7 +99,7 @@ export default function SignUpScreen() {
         return false;
       }
     },
-    [clearActivationFailure, setActive]
+    [clearActivationFailure, setActive],
   );
 
   const retrySessionActivation = useCallback(async () => {
@@ -116,7 +116,7 @@ export default function SignUpScreen() {
     try {
       await activateCreatedSession(
         pendingSessionActivationId,
-        activationFailureContext
+        activationFailureContext,
       );
     } finally {
       setLoading(false);
@@ -159,7 +159,7 @@ export default function SignUpScreen() {
               ` | signUp.status=${ssoSignUp?.status ?? 'null'}` +
               ` | signUp.createdSessionId=${
                 ssoSignUp?.createdSessionId ?? 'null'
-              }`
+              }`,
           );
 
         // Session ID may be on top level or on signUp for new OAuth users
@@ -179,7 +179,7 @@ export default function SignUpScreen() {
           console.warn(
             `[AUTH-DEBUG] sign-up SSO: no session created.` +
               ` signIn.status=${ssoSignIn?.status ?? 'null'}` +
-              ` signUp.status=${ssoSignUp?.status ?? 'null'}`
+              ` signUp.status=${ssoSignUp?.status ?? 'null'}`,
           );
         setError('Sign-up could not be completed. Please try again.');
       } catch (err: unknown) {
@@ -189,7 +189,7 @@ export default function SignUpScreen() {
         setOauthLoading(null);
       }
     },
-    [activateCreatedSession, clearActivationFailure, isLoaded, startSSOFlow]
+    [activateCreatedSession, clearActivationFailure, isLoaded, startSSOFlow],
   );
 
   const onSignUpPress = useCallback(async () => {
@@ -202,13 +202,13 @@ export default function SignUpScreen() {
     try {
       if (__DEV__)
         console.log(
-          `[AUTH-DEBUG] signUp.create → email=${emailAddress.trim()}`
+          `[AUTH-DEBUG] signUp.create → email=${emailAddress.trim()}`,
         );
       await signUp.create({ emailAddress, password });
       if (__DEV__)
         console.log(
           `[AUTH-DEBUG] signUp.create → status=${signUp.status}` +
-            ` | createdSessionId=${signUp.createdSessionId ?? 'null'}`
+            ` | createdSessionId=${signUp.createdSessionId ?? 'null'}`,
         );
       await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
       if (__DEV__)
@@ -243,7 +243,7 @@ export default function SignUpScreen() {
       if (signUpAttempt.status === 'complete') {
         const activated = await activateCreatedSession(
           signUpAttempt.createdSessionId,
-          'verification'
+          'verification',
         );
         if (!activated) {
           return;
@@ -254,7 +254,7 @@ export default function SignUpScreen() {
       }
     } catch (err: unknown) {
       setError(
-        extractClerkError(err, 'Invalid verification code. Please try again.')
+        extractClerkError(err, 'Invalid verification code. Please try again.'),
       );
     } finally {
       setLoading(false);

@@ -172,7 +172,7 @@ export function AnimatedSplash({ onComplete }: AnimatedSplashProps) {
     if (__DEV__)
       console.log(
         '[Splash] choreography useEffect fired, reduceMotion=',
-        reduceMotion
+        reduceMotion,
       );
 
     // If Reanimated native init failed, skip animation entirely.
@@ -206,28 +206,28 @@ export function AnimatedSplash({ onComplete }: AnimatedSplashProps) {
     // 300ms — path draws itself
     pathDraw.value = withDelay(
       300,
-      withTiming(1, { duration: 900, easing: ease })
+      withTiming(1, { duration: 900, easing: ease }),
     );
 
     // 550ms — dot 1 (pink) bursts + sparks fly
     dot1R.value = withDelay(550, withSpring(4, pop));
     spark1.value = withDelay(
       550,
-      withTiming(1, { duration: 450, easing: sparkEase })
+      withTiming(1, { duration: 450, easing: sparkEase }),
     );
 
     // 750ms — dot 2 (violet) bursts
     dot2R.value = withDelay(750, withSpring(5, pop));
     spark2.value = withDelay(
       750,
-      withTiming(1, { duration: 450, easing: sparkEase })
+      withTiming(1, { duration: 450, easing: sparkEase }),
     );
 
     // 950ms — dot 3 (mint) bursts
     dot3R.value = withDelay(950, withSpring(6, pop));
     spark3.value = withDelay(
       950,
-      withTiming(1, { duration: 450, easing: sparkEase })
+      withTiming(1, { duration: 450, easing: sparkEase }),
     );
 
     // 1100ms — mentor node
@@ -239,8 +239,8 @@ export function AnimatedSplash({ onComplete }: AnimatedSplashProps) {
       1300,
       withSequence(
         withTiming(0.35, { duration: 300 }),
-        withTiming(0.18, { duration: 400 })
-      )
+        withTiming(0.18, { duration: 400 }),
+      ),
     );
 
     // 1500ms — wordmark fades in
@@ -251,7 +251,7 @@ export function AnimatedSplash({ onComplete }: AnimatedSplashProps) {
       2500,
       withTiming(0, { duration: 300 }, (finished) => {
         if (finished) runOnJS(done)();
-      })
+      }),
     );
     // The reanimated SharedValues below are listed for the linter; their
     // identity is stable across renders (useSharedValue), so including them

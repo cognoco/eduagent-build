@@ -116,7 +116,7 @@ describe('createScopedRepository → curriculumTopics', () => {
       const rows = await repo.curriculumTopics.findMatchingInSubject(
         's1',
         ['photo'],
-        3
+        3,
       );
       expect(rows).toEqual([{ id: 't1', title: 'Photosynthesis' }]);
       expect(calls.innerJoin).toHaveLength(2);
@@ -135,7 +135,7 @@ describe('createScopedRepository → curriculumTopics', () => {
       const rows = await repo.curriculumTopics.findMatchingInSubject(
         's1',
         [],
-        3
+        3,
       );
       expect(rows).toEqual([]);
       // Proof we short-circuited — none of the chain methods were called.
@@ -150,7 +150,7 @@ describe('createScopedRepository → invariant', () => {
   it('throws when profileId is empty or blank', () => {
     expect(() => createScopedRepository({} as never, '')).toThrow(/profileId/i);
     expect(() => createScopedRepository({} as never, '   ')).toThrow(
-      /profileId/i
+      /profileId/i,
     );
   });
 });

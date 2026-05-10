@@ -86,9 +86,9 @@ export const assessments = pgTable(
     index('assessments_topic_id_idx').on(table.topicId),
     check(
       'assessments_mastery_score_range',
-      sql`${table.masteryScore} IS NULL OR (${table.masteryScore} >= 0 AND ${table.masteryScore} <= 1)`
+      sql`${table.masteryScore} IS NULL OR (${table.masteryScore} >= 0 AND ${table.masteryScore} <= 1)`,
     ),
-  ]
+  ],
 );
 
 export const retentionCards = pgTable(
@@ -124,14 +124,14 @@ export const retentionCards = pgTable(
   (table) => [
     unique('retention_cards_profile_topic_unique').on(
       table.profileId,
-      table.topicId
+      table.topicId,
     ),
     index('retention_cards_review_idx').on(table.profileId, table.nextReviewAt),
     check(
       'retention_cards_interval_days_positive',
-      sql`${table.intervalDays} >= 1`
+      sql`${table.intervalDays} >= 1`,
     ),
-  ]
+  ],
 );
 
 export const needsDeepeningTopics = pgTable(
@@ -163,10 +163,10 @@ export const needsDeepeningTopics = pgTable(
   (table) => [
     index('needs_deepening_profile_topic_idx').on(
       table.profileId,
-      table.topicId
+      table.topicId,
     ),
     index('needs_deepening_topic_id_idx').on(table.topicId),
-  ]
+  ],
 );
 
 export const analogyDomainEnum = pgEnum('analogy_domain', [
@@ -203,7 +203,7 @@ export const teachingPreferences = pgTable(
   (table) => [
     unique('teaching_preferences_profile_subject_unique').on(
       table.profileId,
-      table.subjectId
+      table.subjectId,
     ),
-  ]
+  ],
 );

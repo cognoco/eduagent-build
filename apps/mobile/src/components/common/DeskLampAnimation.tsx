@@ -94,7 +94,7 @@ function StarMote({ seed, scale }: { seed: StarSeed; scale: number }) {
         easing: Easing.linear,
       }),
       -1,
-      false
+      false,
     );
     return () => cancelAnimation(progress);
   }, [progress, seed.period]);
@@ -170,7 +170,7 @@ export function DeskLampAnimation({
         easing: Easing.inOut(Easing.ease),
       }),
       -1,
-      true
+      true,
     );
     return () => cancelAnimation(pulse);
   }, [reduceMotion, pulse]);

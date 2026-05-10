@@ -64,7 +64,7 @@ function looksLikeNeon(url: string): boolean {
 export function createDatabase(
   databaseUrl: string,
   // options parameter kept for backward-compatibility; currently unused
-  _options: CreateDatabaseOptions = {}
+  _options: CreateDatabaseOptions = {},
 ) {
   if (looksLikeNeon(databaseUrl)) {
     const pool = new NeonPool({ connectionString: databaseUrl });

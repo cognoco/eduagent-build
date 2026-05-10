@@ -43,7 +43,7 @@ jest.mock('../lib/api-client', () => ({
   getProxyMode: jest.fn().mockReturnValue(false),
   withIdempotencyKey: (
     headers: Record<string, string>,
-    key: string | undefined
+    key: string | undefined,
   ) => (key ? { ...headers, 'X-Idempotency-Key': key } : headers),
 }));
 
@@ -98,8 +98,8 @@ describe('useStartSession', () => {
             durationSeconds: null,
           },
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useStartSession('subject-1'), {
@@ -145,15 +145,15 @@ describe('useStartSession', () => {
             durationSeconds: null,
           },
         }),
-        { status: 201 }
-      )
+        { status: 201 },
+      ),
     );
 
     const { result } = renderHook(
       () => useStartFirstCurriculumSession('subject-1'),
       {
         wrapper: createWrapper(),
-      }
+      },
     );
 
     await act(async () => {
@@ -194,8 +194,8 @@ describe('useStartSession', () => {
             durationSeconds: null,
           },
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useStartSession('subject-1'), {
@@ -248,8 +248,8 @@ describe('useStartSession', () => {
             durationSeconds: null,
           },
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useStartSession('subject-1'), {
@@ -287,8 +287,8 @@ describe('useSendMessage', () => {
           isUnderstandingCheck: false,
           exchangeCount: 1,
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useSendMessage('session-1'), {
@@ -325,8 +325,8 @@ describe('useCloseSession', () => {
           message: 'Session closed',
           sessionId: 'session-1',
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useCloseSession('session-1'), {
@@ -352,8 +352,8 @@ describe('useCloseSession', () => {
           sessionId: 'session-1',
           wallClockSeconds: 600,
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useCloseSession('session-1'), {
@@ -393,8 +393,8 @@ describe('useSyncHomeworkState', () => {
             problems: [],
           },
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useSyncHomeworkState('session-1'), {
@@ -447,8 +447,8 @@ describe('useSetSessionInputMode', () => {
             inputMode: 'voice',
           },
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useSetSessionInputMode('session-1'), {
@@ -487,8 +487,8 @@ describe('useSessionSummary', () => {
             status: 'accepted',
           },
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useSessionSummary('session-1'), {
@@ -506,7 +506,7 @@ describe('useSessionSummary', () => {
 
   it('returns null when no summary exists', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ summary: null }), { status: 200 })
+      new Response(JSON.stringify({ summary: null }), { status: 200 }),
     );
 
     const { result } = renderHook(() => useSessionSummary('session-1'), {
@@ -543,8 +543,8 @@ describe('useSubmitSummary', () => {
             status: 'accepted',
           },
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useSubmitSummary('session-1'), {
@@ -561,7 +561,7 @@ describe('useSubmitSummary', () => {
 
     expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data?.summary.aiFeedback).toBe(
-      'Clear and accurate summary.'
+      'Clear and accurate summary.',
     );
     expect(result.current.data?.summary.status).toBe('accepted');
   });
@@ -571,7 +571,7 @@ describe('useSubmitSummary', () => {
       new Response('API error 422', {
         status: 422,
         statusText: 'Unprocessable Entity',
-      })
+      }),
     );
 
     const { result } = renderHook(() => useSubmitSummary('session-1'), {
@@ -613,8 +613,8 @@ describe('useSkipSummary', () => {
           },
           consecutiveSummarySkips: 1,
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useSkipSummary('session-1'), {
@@ -710,7 +710,7 @@ describe('useStreamMessage', () => {
       expect.objectContaining({
         exchangeCount: 1,
         escalationRung: 1,
-      })
+      }),
     );
   });
 
@@ -743,7 +743,7 @@ describe('useStreamMessage', () => {
 
     const [, init] = streamSSEViaXHR.mock.calls[0] as [
       string,
-      { headers: Record<string, string> }
+      { headers: Record<string, string> },
     ];
     expect(init.headers['X-Proxy-Mode']).toBe('true');
   });
@@ -771,7 +771,7 @@ describe('useStreamMessage', () => {
     clerk.useAuth = () =>
       ({
         getToken: jest.fn(() => tokenPromise),
-      } as never);
+      }) as never;
 
     try {
       const { streamSSEViaXHR } = require('../lib/sse') as {
@@ -795,7 +795,7 @@ describe('useStreamMessage', () => {
           'hi',
           jest.fn(),
           jest.fn(),
-          'session-x'
+          'session-x',
         );
         // Yield so the synchronous prefix (snapshot) executes.
         await Promise.resolve();
@@ -812,7 +812,7 @@ describe('useStreamMessage', () => {
 
       const [, init] = streamSSEViaXHR.mock.calls[0] as [
         string,
-        { headers: Record<string, string> }
+        { headers: Record<string, string> },
       ];
       expect(init.headers['X-Proxy-Mode']).toBe('true');
     } finally {
@@ -915,15 +915,15 @@ describe('useTopicParkingLot', () => {
           ],
           count: 1,
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(
       () => useTopicParkingLot('subject-1', 'topic-1'),
       {
         wrapper: createWrapper(),
-      }
+      },
     );
 
     await waitFor(() => {
@@ -932,7 +932,7 @@ describe('useTopicParkingLot', () => {
 
     expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data?.[0]?.question).toBe(
-      'Why does factoring help here?'
+      'Why does factoring help here?',
     );
   });
 });

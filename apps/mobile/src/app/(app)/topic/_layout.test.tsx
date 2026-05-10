@@ -44,10 +44,10 @@ describe('topic/_layout.tsx', () => {
 
     const screen = capturedScreens.find((s) => s.name === '[topicId]')!;
     expect(screen.getId!({ params: { topicId: 'topic-linear-eq' } })).toBe(
-      'topic-linear-eq'
+      'topic-linear-eq',
     );
     expect(screen.getId!({ params: { topicId: 'topic-quadratics' } })).toBe(
-      'topic-quadratics'
+      'topic-quadratics',
     );
   });
 

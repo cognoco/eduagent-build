@@ -30,10 +30,10 @@ describe('isGuessWhoFuzzyMatch', () => {
 
   it('matches exact canonical name case-insensitively', () => {
     expect(isGuessWhoFuzzyMatch('Isaac Newton', 'Isaac Newton', aliases)).toBe(
-      true
+      true,
     );
     expect(isGuessWhoFuzzyMatch('isaac newton', 'Isaac Newton', aliases)).toBe(
-      true
+      true,
     );
   });
 
@@ -48,19 +48,19 @@ describe('isGuessWhoFuzzyMatch', () => {
 
   it('accepts fuzzy match within scaled distance', () => {
     expect(
-      isGuessWhoFuzzyMatch('Einstien', 'Albert Einstein', ['Einstein'])
+      isGuessWhoFuzzyMatch('Einstien', 'Albert Einstein', ['Einstein']),
     ).toBe(true);
   });
 
   it('accepts 1-edit substitution for short names', () => {
     expect(
-      isGuessWhoFuzzyMatch('Bash', 'Johann Sebastian Bach', ['Bach'])
+      isGuessWhoFuzzyMatch('Bash', 'Johann Sebastian Bach', ['Bach']),
     ).toBe(true);
   });
 
   it('rejects 2-edit typo for short names', () => {
     expect(
-      isGuessWhoFuzzyMatch('Bahc', 'Johann Sebastian Bach', ['Bach'])
+      isGuessWhoFuzzyMatch('Bahc', 'Johann Sebastian Bach', ['Bach']),
     ).toBe(false);
   });
 
@@ -68,7 +68,7 @@ describe('isGuessWhoFuzzyMatch', () => {
     expect(
       isGuessWhoFuzzyMatch('Tchaikovski', 'Pyotr Ilyich Tchaikovsky', [
         'Tchaikovsky',
-      ])
+      ]),
     ).toBe(true);
   });
 
@@ -78,13 +78,13 @@ describe('isGuessWhoFuzzyMatch', () => {
 
   it('rejects answers exceeding the distance threshold', () => {
     expect(isGuessWhoFuzzyMatch('Noton', 'Isaac Newton', ['Newton'])).toBe(
-      false
+      false,
     );
   });
 
   it('accepts insertion typos within the threshold', () => {
     expect(isGuessWhoFuzzyMatch('Newtron', 'Isaac Newton', ['Newton'])).toBe(
-      true
+      true,
     );
   });
 });

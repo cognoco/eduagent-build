@@ -1,6 +1,6 @@
 export function normalizeRedirectPath(
   value: string | undefined,
-  fallback = '/home'
+  fallback = '/home',
 ): string {
   const safeFallback = fallback.startsWith('/') ? fallback : '/home';
 
@@ -14,7 +14,7 @@ export function normalizeRedirectPath(
 
 export function toInternalAppRedirectPath(
   value: string | undefined,
-  fallback = '/(app)/home'
+  fallback = '/(app)/home',
 ): string {
   const normalized = normalizeRedirectPath(value, '/home');
   const target = normalized === '/' ? '/home' : normalized;

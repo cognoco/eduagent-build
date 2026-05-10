@@ -67,7 +67,7 @@ describe('withProfileScope', () => {
     await expect(
       withProfileScope(db, UUID_C, async () => {
         throw new Error('callback error');
-      })
+      }),
     ).rejects.toThrow('callback error');
   });
 
@@ -75,18 +75,18 @@ describe('withProfileScope', () => {
     const db = createMockDb();
 
     (db.transaction as jest.Mock).mockRejectedValue(
-      new Error('transaction failed')
+      new Error('transaction failed'),
     );
 
     await expect(
-      withProfileScope(db, UUID_D, async () => 'unreachable')
+      withProfileScope(db, UUID_D, async () => 'unreachable'),
     ).rejects.toThrow('transaction failed');
   });
 
   it('rejects non-UUID profileIds', async () => {
     const db = createMockDb();
     await expect(
-      withProfileScope(db, 'not-a-uuid', async () => 'unreachable')
+      withProfileScope(db, 'not-a-uuid', async () => 'unreachable'),
     ).rejects.toThrow('profileId must be a UUID');
   });
 });

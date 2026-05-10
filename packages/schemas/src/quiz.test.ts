@@ -38,7 +38,7 @@ describe('quiz schemas', () => {
 
     it('accepts a valid question', () => {
       expect(capitalsQuestionSchema.parse(validQuestion)).toEqual(
-        validQuestion
+        validQuestion,
       );
     });
 
@@ -47,7 +47,7 @@ describe('quiz schemas', () => {
         capitalsQuestionSchema.parse({
           ...validQuestion,
           distractors: ['Berlin', 'Madrid'],
-        })
+        }),
       ).toThrow();
     });
   });
@@ -66,7 +66,7 @@ describe('quiz schemas', () => {
 
     it('accepts a valid vocabulary question', () => {
       expect(vocabularyQuestionSchema.parse(validQuestion)).toEqual(
-        validQuestion
+        validQuestion,
       );
     });
 
@@ -75,7 +75,7 @@ describe('quiz schemas', () => {
         vocabularyQuestionSchema.parse({
           ...validQuestion,
           distractors: ['cat', 'bird'],
-        })
+        }),
       ).toThrow();
     });
 
@@ -84,7 +84,7 @@ describe('quiz schemas', () => {
         vocabularyQuestionSchema.parse({
           ...validQuestion,
           acceptedAnswers: [],
-        })
+        }),
       ).toThrow();
     });
   });
@@ -100,7 +100,7 @@ describe('quiz schemas', () => {
           distractors: ['Berlin', 'Madrid', 'Rome'],
           funFact: 'Fact.',
           isLibraryItem: false,
-        }).type
+        }).type,
       ).toBe('capitals');
     });
 
@@ -116,7 +116,7 @@ describe('quiz schemas', () => {
           cefrLevel: 'A1',
           isLibraryItem: true,
           vocabularyId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-        }).type
+        }).type,
       ).toBe('vocabulary');
     });
 
@@ -125,7 +125,7 @@ describe('quiz schemas', () => {
         quizQuestionSchema.parse({
           type: 'flashcard',
           question: 'test',
-        })
+        }),
       ).toThrow();
     });
   });
@@ -138,7 +138,7 @@ describe('quiz schemas', () => {
           correct: true,
           answerGiven: 'Paris',
           timeMs: 3200,
-        })
+        }),
       ).toBeTruthy();
     });
 
@@ -149,7 +149,7 @@ describe('quiz schemas', () => {
           correct: true,
           answerGiven: 'Paris',
           timeMs: -1,
-        })
+        }),
       ).toThrow();
     });
   });
@@ -159,7 +159,7 @@ describe('quiz schemas', () => {
       expect(
         generateRoundInputSchema.parse({
           activityType: 'capitals',
-        })
+        }),
       ).toEqual({ activityType: 'capitals' });
     });
 
@@ -168,7 +168,7 @@ describe('quiz schemas', () => {
         generateRoundInputSchema.parse({
           activityType: 'capitals',
           themePreference: 'Central Europe',
-        })
+        }),
       ).toEqual({
         activityType: 'capitals',
         themePreference: 'Central Europe',
@@ -180,7 +180,7 @@ describe('quiz schemas', () => {
         generateRoundInputSchema.parse({
           activityType: 'vocabulary',
           subjectId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-        })
+        }),
       ).toEqual({
         activityType: 'vocabulary',
         subjectId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
@@ -191,7 +191,7 @@ describe('quiz schemas', () => {
       expect(() =>
         generateRoundInputSchema.parse({
           activityType: 'vocabulary',
-        })
+        }),
       ).toThrow(/subjectId/);
     });
   });
@@ -260,7 +260,7 @@ describe('quiz schemas', () => {
 
     it('accepts valid guess_who question', () => {
       expect(guessWhoQuestionSchema.parse(validGuessWho)).toEqual(
-        validGuessWho
+        validGuessWho,
       );
     });
 
@@ -269,7 +269,7 @@ describe('quiz schemas', () => {
         guessWhoQuestionSchema.parse({
           ...validGuessWho,
           clues: ['Clue 1', 'Clue 2', 'Clue 3'],
-        })
+        }),
       ).toThrow();
     });
 
@@ -278,7 +278,7 @@ describe('quiz schemas', () => {
         guessWhoQuestionSchema.parse({
           ...validGuessWho,
           mcFallbackOptions: ['A', 'B'],
-        })
+        }),
       ).toThrow();
     });
 
@@ -287,7 +287,7 @@ describe('quiz schemas', () => {
         guessWhoQuestionSchema.parse({
           ...validGuessWho,
           acceptedAliases: [],
-        })
+        }),
       ).toThrow();
     });
 
@@ -296,7 +296,7 @@ describe('quiz schemas', () => {
         guessWhoQuestionSchema.parse({
           ...validGuessWho,
           correctAnswer: 'Wrong Name',
-        })
+        }),
       ).toThrow();
     });
   });
@@ -359,7 +359,7 @@ describe('quiz schemas', () => {
           answerGiven: 'X',
           timeMs: 1000,
           cluesUsed: -1,
-        })
+        }),
       ).toThrow();
       expect(() =>
         questionResultSchema.parse({
@@ -368,7 +368,7 @@ describe('quiz schemas', () => {
           answerGiven: 'X',
           timeMs: 1000,
           cluesUsed: 6,
-        })
+        }),
       ).toThrow();
     });
 
@@ -380,7 +380,7 @@ describe('quiz schemas', () => {
           answerGiven: 'X',
           timeMs: 1000,
           answerMode: 'voice',
-        })
+        }),
       ).toThrow();
     });
   });
@@ -407,7 +407,7 @@ describe('quiz schemas', () => {
         guessWhoLlmOutputSchema.parse({
           theme: 'X',
           questions: [],
-        })
+        }),
       ).toThrow();
     });
   });

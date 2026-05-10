@@ -26,7 +26,7 @@ import { assertOk } from '../lib/assert-ok';
 
 export function useBookNotes(
   subjectId: string | undefined,
-  bookId: string | undefined
+  bookId: string | undefined,
 ): UseQueryResult<BookNotesResponse> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -57,7 +57,7 @@ export function useBookNotes(
 
 export function useGetTopicNote(
   subjectId: string | undefined,
-  topicId: string | undefined
+  topicId: string | undefined,
 ): UseQueryResult<{
   note: {
     id: string;
@@ -111,7 +111,7 @@ export function useNoteTopicIds(): UseQueryResult<{ topicIds: string[] }> {
       try {
         const res = await client.notes['topic-ids'].$get(
           {},
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         return (await res.json()) as { topicIds: string[] };
@@ -129,7 +129,7 @@ export function useNoteTopicIds(): UseQueryResult<{ topicIds: string[] }> {
 
 export function useTopicNotes(
   subjectId: string | undefined,
-  topicId: string | undefined
+  topicId: string | undefined,
 ): UseQueryResult<TopicNotesResponse> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -156,7 +156,7 @@ export function useTopicNotes(
 
 export function useCreateNote(
   subjectId: string | undefined,
-  bookId: string | undefined
+  bookId: string | undefined,
 ): UseMutationResult<
   { note: NoteResponse },
   Error,

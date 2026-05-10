@@ -75,7 +75,7 @@ describe('EarlyAdopterCard', () => {
   it('renders feedback CTA and dismiss button', async () => {
     renderCard();
     expect(
-      await screen.findByTestId('early-adopter-feedback-cta')
+      await screen.findByTestId('early-adopter-feedback-cta'),
     ).toBeTruthy();
     expect(await screen.findByTestId('early-adopter-dismiss')).toBeTruthy();
   });
@@ -90,7 +90,7 @@ describe('EarlyAdopterCard', () => {
     });
     expect(iconWrapper.props.accessibilityElementsHidden).toBe(true);
     expect(iconWrapper.props.importantForAccessibility).toBe(
-      'no-hide-descendants'
+      'no-hide-descendants',
     );
   });
 
@@ -108,7 +108,7 @@ describe('EarlyAdopterCard', () => {
     });
     expect(iconWrapper.props.accessibilityElementsHidden).toBe(true);
     expect(iconWrapper.props.importantForAccessibility).toBe(
-      'no-hide-descendants'
+      'no-hide-descendants',
     );
   });
 

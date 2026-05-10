@@ -9,7 +9,7 @@ describe('LightBulbAnimation', () => {
 
   it('renders at 64px (default size)', () => {
     const { getByTestId } = render(
-      <LightBulbAnimation testID="bulb" size={64} />
+      <LightBulbAnimation testID="bulb" size={64} />,
     );
     const el = getByTestId('bulb');
     // width: size = 64
@@ -18,7 +18,7 @@ describe('LightBulbAnimation', () => {
 
   it('renders at 96px (custom size)', () => {
     const { getByTestId } = render(
-      <LightBulbAnimation testID="bulb" size={96} />
+      <LightBulbAnimation testID="bulb" size={96} />,
     );
     const el = getByTestId('bulb');
     expect(el.props.style).toMatchObject({ width: 96 });

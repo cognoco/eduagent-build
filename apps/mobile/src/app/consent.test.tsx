@@ -143,7 +143,7 @@ describe('ConsentScreen', () => {
     screen.getByTestId('consent-child-view');
     screen.getByText('Almost there!');
     screen.getByText(
-      "We need your parent or guardian to say it's OK. Enter their email and we'll send them a quick link."
+      "We need your parent or guardian to say it's OK. Enter their email and we'll send them a quick link.",
     );
     screen.getByTestId('consent-handoff-button');
   });
@@ -166,7 +166,7 @@ describe('ConsentScreen', () => {
 
     const button = screen.getByTestId('consent-submit');
     expect(
-      button.props.accessibilityState?.disabled ?? button.props.disabled
+      button.props.accessibilityState?.disabled ?? button.props.disabled,
     ).toBeTruthy();
   });
 
@@ -177,7 +177,7 @@ describe('ConsentScreen', () => {
 
     const button = screen.getByTestId('consent-submit');
     expect(
-      button.props.accessibilityState?.disabled ?? button.props.disabled
+      button.props.accessibilityState?.disabled ?? button.props.disabled,
     ).toBeTruthy();
   });
 
@@ -186,12 +186,12 @@ describe('ConsentScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('consent-email'),
-      'parent@example.com'
+      'parent@example.com',
     );
 
     const button = screen.getByTestId('consent-submit');
     expect(
-      button.props.accessibilityState?.disabled ?? button.props.disabled
+      button.props.accessibilityState?.disabled ?? button.props.disabled,
     ).toBeFalsy();
   });
 
@@ -201,13 +201,13 @@ describe('ConsentScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('consent-email'),
-      'child@example.com'
+      'child@example.com',
     );
 
     screen.getByTestId('consent-same-email-warning');
     const button = screen.getByTestId('consent-submit');
     expect(
-      button.props.accessibilityState?.disabled ?? button.props.disabled
+      button.props.accessibilityState?.disabled ?? button.props.disabled,
     ).toBeTruthy();
   });
 
@@ -222,7 +222,7 @@ describe('ConsentScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('consent-email'),
-      'parent@example.com'
+      'parent@example.com',
     );
     fireEvent.press(screen.getByTestId('consent-submit'));
 
@@ -252,7 +252,7 @@ describe('ConsentScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('consent-email'),
-      'mum@example.com'
+      'mum@example.com',
     );
     fireEvent.press(screen.getByTestId('consent-submit'));
 
@@ -277,7 +277,7 @@ describe('ConsentScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('consent-email'),
-      'parent@example.com'
+      'parent@example.com',
     );
     fireEvent.press(screen.getByTestId('consent-submit'));
 
@@ -348,7 +348,7 @@ describe('ConsentScreen', () => {
 
     const button = screen.getByTestId('consent-submit');
     expect(
-      button.props.accessibilityState?.disabled ?? button.props.disabled
+      button.props.accessibilityState?.disabled ?? button.props.disabled,
     ).toBeTruthy();
   });
 
@@ -361,7 +361,7 @@ describe('ConsentScreen', () => {
 
     const button = screen.getByTestId('consent-submit');
     expect(
-      button.props.accessibilityState?.disabled ?? button.props.disabled
+      button.props.accessibilityState?.disabled ?? button.props.disabled,
     ).toBeTruthy();
   });
 
@@ -372,12 +372,12 @@ describe('ConsentScreen', () => {
     flushFadeAnimation();
     fireEvent.changeText(
       screen.getByTestId('consent-email'),
-      'parent@example.com'
+      'parent@example.com',
     );
 
     const button = screen.getByTestId('consent-submit');
     expect(
-      button.props.accessibilityState?.disabled ?? button.props.disabled
+      button.props.accessibilityState?.disabled ?? button.props.disabled,
     ).toBeFalsy();
   });
 
@@ -399,7 +399,7 @@ describe('ConsentScreen', () => {
     // Fill email and submit
     fireEvent.changeText(
       screen.getByTestId('consent-email'),
-      'parent@example.com'
+      'parent@example.com',
     );
     fireEvent.press(screen.getByTestId('consent-submit'));
 
@@ -435,7 +435,7 @@ describe('ConsentScreen', () => {
     flushFadeAnimation();
     fireEvent.changeText(
       screen.getByTestId('consent-email'),
-      'parent@example.com'
+      'parent@example.com',
     );
     fireEvent.press(screen.getByTestId('consent-submit'));
 
@@ -462,7 +462,7 @@ describe('ConsentScreen', () => {
     flushFadeAnimation();
     fireEvent.changeText(
       screen.getByTestId('consent-email'),
-      'parent@example.com'
+      'parent@example.com',
     );
     fireEvent.press(screen.getByTestId('consent-submit'));
 
@@ -490,7 +490,7 @@ describe('ConsentScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('consent-email'),
-      'parent@example.com'
+      'parent@example.com',
     );
     fireEvent.press(screen.getByTestId('consent-submit'));
 
@@ -518,7 +518,7 @@ describe('ConsentScreen', () => {
     flushFadeAnimation();
     fireEvent.changeText(
       screen.getByTestId('consent-email'),
-      'parent@example.com'
+      'parent@example.com',
     );
     fireEvent.press(screen.getByTestId('consent-submit'));
 
@@ -544,7 +544,7 @@ describe('ConsentScreen', () => {
     flushFadeAnimation();
     fireEvent.changeText(
       screen.getByTestId('consent-email'),
-      'parent@example.com'
+      'parent@example.com',
     );
     fireEvent.press(screen.getByTestId('consent-submit'));
 
@@ -606,7 +606,7 @@ describe('ConsentScreen', () => {
       // Fill email and submit
       fireEvent.changeText(
         screen.getByTestId('consent-email'),
-        'parent@example.com'
+        'parent@example.com',
       );
       fireEvent.press(screen.getByTestId('consent-submit'));
 
@@ -646,12 +646,12 @@ describe('ConsentScreen', () => {
       render(<ConsentScreen />, { wrapper: Wrapper });
       fireEvent.changeText(
         screen.getByTestId('consent-email'),
-        'parent@example.com'
+        'parent@example.com',
       );
 
       const button = screen.getByTestId('consent-submit');
       expect(
-        button.props.accessibilityState?.disabled ?? button.props.disabled
+        button.props.accessibilityState?.disabled ?? button.props.disabled,
       ).toBeTruthy();
     });
 
@@ -661,12 +661,12 @@ describe('ConsentScreen', () => {
       flushFadeAnimation();
       fireEvent.changeText(
         screen.getByTestId('consent-email'),
-        'parent@example.com'
+        'parent@example.com',
       );
 
       const button = screen.getByTestId('consent-submit');
       expect(
-        button.props.accessibilityState?.disabled ?? button.props.disabled
+        button.props.accessibilityState?.disabled ?? button.props.disabled,
       ).toBeTruthy();
     });
 
@@ -674,7 +674,7 @@ describe('ConsentScreen', () => {
       render(<ConsentScreen />, { wrapper: Wrapper });
       fireEvent.changeText(
         screen.getByTestId('consent-email'),
-        'parent@example.com'
+        'parent@example.com',
       );
       fireEvent.press(screen.getByTestId('consent-submit'));
 

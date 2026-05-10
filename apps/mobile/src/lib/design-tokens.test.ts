@@ -15,7 +15,7 @@ function hexToRgb(hex: string): [number, number, number] {
 
 function rgbaToRgb(rgba: string): [number, number, number] {
   const match = rgba.match(
-    /^rgba\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*0?\.\d+\s*\)$/
+    /^rgba\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*0?\.\d+\s*\)$/,
   );
   if (!match) {
     throw new Error(`Expected rgba color, received "${rgba}"`);
@@ -97,7 +97,7 @@ describe('accent preset merging', () => {
 
     // Non-accent vars should be unchanged
     expect(mergedVars['--color-background']).toBe(
-      baseVars['--color-background']
+      baseVars['--color-background'],
     );
     expect(mergedVars['--color-success']).toBe(baseVars['--color-success']);
     expect(mergedVars['--color-danger']).toBe(baseVars['--color-danger']);
@@ -120,7 +120,7 @@ describe('accent preset merging', () => {
     for (const preset of accentPresets) {
       for (const scheme of schemes) {
         expect(rgbaToRgb(preset[scheme].primarySoft)).toEqual(
-          hexToRgb(preset[scheme].primary)
+          hexToRgb(preset[scheme].primary),
         );
       }
     }

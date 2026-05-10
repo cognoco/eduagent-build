@@ -15,7 +15,7 @@
  * comma-joined string and fail at the OS layer with no useful error.
  */
 export function firstParam(
-  value: string | string[] | undefined
+  value: string | string[] | undefined,
 ): string | undefined {
   if (Array.isArray(value)) return value[0];
   return value;

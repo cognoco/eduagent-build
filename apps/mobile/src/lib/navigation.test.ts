@@ -22,7 +22,7 @@ describe('homeHrefForReturnTo', () => {
 
   it('uses the first param when given an array', () => {
     expect(homeHrefForReturnTo([LEARNER_HOME_RETURN_TO, 'other'])).toBe(
-      LEARNER_HOME_HREF
+      LEARNER_HOME_HREF,
     );
   });
 
@@ -97,7 +97,7 @@ describe('pushLearningResumeTarget [BUG-977]', () => {
           subjectId: 'subj-1',
           subjectName: 'Math',
         }),
-      })
+      }),
     );
   });
 
@@ -136,7 +136,7 @@ describe('pushLearningResumeTarget [BUG-977]', () => {
           resumeFromSessionId: 's-prev',
           returnTo: 'learner-home',
         },
-      })
+      }),
     );
   });
 });

@@ -10,7 +10,8 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockReplace }),
 }));
 
-jest.mock('../../hooks/use-active-profile-role', () => ({ // gc1-allow: ParentOnly's purpose is to test role-based branching; mocking the role hook is the unit boundary.
+jest.mock('../../hooks/use-active-profile-role', () => ({
+  // gc1-allow: ParentOnly's purpose is to test role-based branching; mocking the role hook is the unit boundary.
   useActiveProfileRole: () => mockUseRole(),
 }));
 
@@ -25,7 +26,7 @@ describe('ParentOnly', () => {
     const { getByText } = render(
       <ParentOnly>
         <Text>Inner</Text>
-      </ParentOnly>
+      </ParentOnly>,
     );
 
     expect(getByText('Inner')).toBeTruthy();
@@ -37,7 +38,7 @@ describe('ParentOnly', () => {
     render(
       <ParentOnly>
         <Text>Inner</Text>
-      </ParentOnly>
+      </ParentOnly>,
     );
 
     expect(mockReplace).toHaveBeenCalledWith('/');
@@ -48,7 +49,7 @@ describe('ParentOnly', () => {
     render(
       <ParentOnly>
         <Text>Inner</Text>
-      </ParentOnly>
+      </ParentOnly>,
     );
 
     expect(mockReplace).toHaveBeenCalledWith('/');
@@ -59,7 +60,7 @@ describe('ParentOnly', () => {
     const { queryByText } = render(
       <ParentOnly>
         <Text>Inner</Text>
-      </ParentOnly>
+      </ParentOnly>,
     );
 
     expect(queryByText('Inner')).toBeNull();

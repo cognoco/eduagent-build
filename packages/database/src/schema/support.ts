@@ -38,7 +38,7 @@ export const supportMessages = pgTable(
     index('support_messages_profile_idx').on(table.profileId),
     uniqueIndex('support_messages_profile_client_id_uniq').on(
       table.profileId,
-      table.clientId
+      table.clientId,
     ),
-  ]
+  ],
 );

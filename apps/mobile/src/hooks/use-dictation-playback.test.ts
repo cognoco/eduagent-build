@@ -99,7 +99,7 @@ describe('splitIntoChunks', () => {
 
   it('splits sentences with more than 4 words', () => {
     expect(
-      splitIntoChunks('The little rabbit ran through the forest.', 3)
+      splitIntoChunks('The little rabbit ran through the forest.', 3),
     ).toEqual(['The little rabbit', 'ran through the', 'forest.']);
   });
 
@@ -129,7 +129,7 @@ describe('useDictationPlayback', () => {
         pace: 'slow',
         punctuationReadAloud: false,
         language: 'en',
-      })
+      }),
     );
 
     expect(result.current.state).toBe('idle');
@@ -143,7 +143,7 @@ describe('useDictationPlayback', () => {
         pace: 'slow',
         punctuationReadAloud: false,
         language: 'en',
-      })
+      }),
     );
 
     act(() => {
@@ -160,7 +160,7 @@ describe('useDictationPlayback', () => {
         pace: 'slow',
         punctuationReadAloud: false,
         language: 'en',
-      })
+      }),
     );
 
     act(() => {
@@ -191,7 +191,7 @@ describe('useDictationPlayback', () => {
         pace: 'slow',
         punctuationReadAloud: true,
         language: 'en',
-      })
+      }),
     );
 
     act(() => {
@@ -205,7 +205,7 @@ describe('useDictationPlayback', () => {
     // With chunkSize default 3, "First sentence period" (3 words) fits in one chunk
     expect(mockSpeak).toHaveBeenCalledWith(
       'First sentence period',
-      expect.objectContaining({ language: 'en' })
+      expect.objectContaining({ language: 'en' }),
     );
   });
 
@@ -216,7 +216,7 @@ describe('useDictationPlayback', () => {
         pace: 'slow',
         punctuationReadAloud: false,
         language: 'en',
-      })
+      }),
     );
 
     act(() => {
@@ -229,7 +229,7 @@ describe('useDictationPlayback', () => {
     // "First sentence." (2 words) fits in one chunk with default chunkSize=3
     expect(mockSpeak).toHaveBeenCalledWith(
       'First sentence.',
-      expect.objectContaining({ language: 'en' })
+      expect.objectContaining({ language: 'en' }),
     );
   });
 
@@ -247,7 +247,7 @@ describe('useDictationPlayback', () => {
         punctuationReadAloud: false,
         language: 'en',
         chunkSize: 3,
-      })
+      }),
     );
 
     act(() => {
@@ -260,7 +260,7 @@ describe('useDictationPlayback', () => {
     // First chunk: "The little rabbit" (3 words)
     expect(mockSpeak).toHaveBeenLastCalledWith(
       'The little rabbit',
-      expect.objectContaining({ language: 'en' })
+      expect.objectContaining({ language: 'en' }),
     );
 
     // Complete the first chunk
@@ -279,7 +279,7 @@ describe('useDictationPlayback', () => {
     // Second chunk: "ran through the"
     expect(mockSpeak).toHaveBeenLastCalledWith(
       'ran through the',
-      expect.objectContaining({ language: 'en' })
+      expect.objectContaining({ language: 'en' }),
     );
   });
 
@@ -296,7 +296,7 @@ describe('useDictationPlayback', () => {
         punctuationReadAloud: false,
         language: 'en',
         chunkSize: 3,
-      })
+      }),
     );
 
     act(() => {
@@ -325,7 +325,7 @@ describe('useDictationPlayback', () => {
     // Should re-speak the same chunk
     expect(mockSpeak).toHaveBeenCalledWith(
       'ran through the',
-      expect.objectContaining({ language: 'en' })
+      expect.objectContaining({ language: 'en' }),
     );
   });
 
@@ -337,7 +337,7 @@ describe('useDictationPlayback', () => {
         punctuationReadAloud: false,
         language: 'en',
         chunkSize: 3,
-      })
+      }),
     );
 
     act(() => {
@@ -370,7 +370,7 @@ describe('useDictationPlayback', () => {
         pace: 'fast',
         punctuationReadAloud: false,
         language: 'en',
-      })
+      }),
     );
 
     act(() => {
@@ -403,7 +403,7 @@ describe('useDictationPlayback', () => {
           punctuationReadAloud: false,
           language: 'en',
         }),
-      { initialProps: { pace: 'slow' as 'slow' | 'normal' | 'fast' } }
+      { initialProps: { pace: 'slow' as 'slow' | 'normal' | 'fast' } },
     );
 
     act(() => {
@@ -440,7 +440,7 @@ describe('useDictationPlayback', () => {
         pace: 'slow',
         punctuationReadAloud: false,
         language: 'en',
-      })
+      }),
     );
 
     act(() => {
@@ -463,7 +463,7 @@ describe('useDictationPlayback', () => {
         pace: 'normal',
         punctuationReadAloud: false,
         language: 'en',
-      })
+      }),
     );
 
     expect(result.current.totalSentences).toBe(3);
@@ -482,7 +482,7 @@ describe('useDictationPlayback', () => {
         punctuationReadAloud: false,
         language: 'en',
         chunkSize: 3,
-      })
+      }),
     );
 
     act(() => {
@@ -505,7 +505,7 @@ describe('useDictationPlayback', () => {
     });
     expect(mockSpeak).toHaveBeenLastCalledWith(
       'ran through the',
-      expect.objectContaining({ language: 'en' })
+      expect.objectContaining({ language: 'en' }),
     );
     expect(result.current.currentIndex).toBe(0); // Still sentence 0
 
@@ -518,7 +518,7 @@ describe('useDictationPlayback', () => {
     });
     expect(mockSpeak).toHaveBeenLastCalledWith(
       'forest.',
-      expect.objectContaining({ language: 'en' })
+      expect.objectContaining({ language: 'en' }),
     );
     expect(result.current.currentIndex).toBe(0); // Still sentence 0
 
@@ -545,7 +545,7 @@ describe('useDictationPlayback', () => {
         punctuationReadAloud: false,
         language: 'en',
         chunkSize: 3, // should be ignored — pre-computed chunks take priority
-      })
+      }),
     );
 
     act(() => {
@@ -558,7 +558,7 @@ describe('useDictationPlayback', () => {
     // First chunk should be the natural phrase, not a 3-word mechanical split
     expect(mockSpeak).toHaveBeenLastCalledWith(
       'A black cat',
-      expect.objectContaining({ language: 'en' })
+      expect.objectContaining({ language: 'en' }),
     );
 
     // Complete chunk 0 → chunk pause (3 words × 2000ms = 6000ms) → chunk 1
@@ -571,7 +571,7 @@ describe('useDictationPlayback', () => {
 
     expect(mockSpeak).toHaveBeenLastCalledWith(
       'that I usually see out of window',
-      expect.objectContaining({ language: 'en' })
+      expect.objectContaining({ language: 'en' }),
     );
 
     // Complete chunk 1 → chunk pause (7 words × 2000ms = 14000ms) → chunk 2
@@ -584,7 +584,7 @@ describe('useDictationPlayback', () => {
 
     expect(mockSpeak).toHaveBeenLastCalledWith(
       'is not there today.',
-      expect.objectContaining({ language: 'en' })
+      expect.objectContaining({ language: 'en' }),
     );
   });
 
@@ -600,7 +600,7 @@ describe('useDictationPlayback', () => {
         pace: 'normal',
         punctuationReadAloud: true,
         language: 'en',
-      })
+      }),
     );
 
     act(() => {
@@ -613,7 +613,7 @@ describe('useDictationPlayback', () => {
     // First chunk same in both variants (no punctuation in it)
     expect(mockSpeak).toHaveBeenLastCalledWith(
       'A black cat',
-      expect.objectContaining({ language: 'en' })
+      expect.objectContaining({ language: 'en' }),
     );
 
     // Complete chunk 0 → pause (3 words × 2000ms) → chunk 1
@@ -635,7 +635,7 @@ describe('useDictationPlayback', () => {
     // Last chunk uses spoken punctuation: "period" instead of "."
     expect(mockSpeak).toHaveBeenLastCalledWith(
       'is not there today period',
-      expect.objectContaining({ language: 'en' })
+      expect.objectContaining({ language: 'en' }),
     );
   });
 
@@ -651,7 +651,7 @@ describe('useDictationPlayback', () => {
         punctuationReadAloud: false,
         language: 'en',
         chunkSize: 3,
-      })
+      }),
     );
 
     act(() => {
@@ -664,7 +664,7 @@ describe('useDictationPlayback', () => {
     // Should fall back to mechanical 3-word splitting
     expect(mockSpeak).toHaveBeenCalledWith(
       'The little rabbit',
-      expect.objectContaining({ language: 'en' })
+      expect.objectContaining({ language: 'en' }),
     );
   });
 });

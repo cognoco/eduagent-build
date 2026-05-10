@@ -50,7 +50,7 @@ function getDisplayName(code: string): string | null {
   try {
     return (
       new Intl.DisplayNames(['en'], { type: 'language' }).of(
-        code.toLowerCase()
+        code.toLowerCase(),
       ) ?? null
     );
   } catch {
@@ -68,7 +68,7 @@ function getDisplayName(code: string): string | null {
  * is end-of-string.
  */
 export function extractLanguageFromTheme(
-  theme: string | null | undefined
+  theme: string | null | undefined,
 ): string | null {
   if (!theme) return null;
   const trimmed = theme.trim();

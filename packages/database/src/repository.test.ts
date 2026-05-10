@@ -40,7 +40,7 @@ function createMockDb() {
         get(_target, _prop) {
           return { findMany, findFirst };
         },
-      }
+      },
     );
 
   return {
@@ -266,7 +266,7 @@ describe('createScopedRepository', () => {
               findFirst,
               findMany: jest.fn().mockResolvedValue([]),
             }),
-          }
+          },
         ),
       } as unknown as Database;
 
@@ -301,7 +301,7 @@ describe('createScopedRepository', () => {
               findFirst,
               findMany: jest.fn().mockResolvedValue([]),
             }),
-          }
+          },
         ),
       } as unknown as Database;
 
@@ -332,7 +332,7 @@ describe('createScopedRepository', () => {
               findFirst,
               findMany: jest.fn().mockResolvedValue([]),
             }),
-          }
+          },
         ),
       } as unknown as Database;
 

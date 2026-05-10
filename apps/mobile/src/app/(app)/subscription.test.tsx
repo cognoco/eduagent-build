@@ -25,21 +25,21 @@ const mockUseActiveProfileRole = jest.fn();
 // [F-029] Mock platformAlert to spy on it via Alert.alert, so existing
 // test assertions continue working after the Alert → platformAlert migration.
 const mockPlatformAlert = jest.fn((...args: Parameters<typeof Alert.alert>) =>
-  Alert.alert(...args)
+  Alert.alert(...args),
 );
 jest.mock(
   '../../lib/platform-alert',
   /* gc1-allow: alert boundary */ () => ({
     platformAlert: (...args: unknown[]) =>
       mockPlatformAlert(...(args as Parameters<typeof Alert.alert>)),
-  })
+  }),
 );
 
 // Resolves t('common.ok') → 'OK' (from en.json) so existing assertions on the
 // rendered button label keep matching after the alert sweep.
 jest.mock(
   'react-i18next',
-  () => require('../../test-utils/mock-i18n').i18nMock
+  () => require('../../test-utils/mock-i18n').i18nMock,
 );
 
 jest.mock('expo-router', () => ({
@@ -71,7 +71,7 @@ jest.mock('../../lib/theme', () => ({
 const mockFetch = createRoutedMockFetch();
 
 jest.mock('../../lib/api-client', () =>
-  require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch)
+  require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
 );
 
 jest.mock('../../lib/profile', () => ({
@@ -84,7 +84,7 @@ jest.mock(
   '../../hooks/use-active-profile-role',
   /* gc1-allow: active role */ () => ({
     useActiveProfileRole: () => mockUseActiveProfileRole(),
-  })
+  }),
 );
 
 jest.mock('../../lib/analytics', () => ({
@@ -208,7 +208,7 @@ function createWrapper(opts?: { seedCache?: boolean }) {
   if (opts?.seedCache) {
     queryClient.setQueryData(
       ['subscription', mockActiveProfile.id],
-      DEFAULT_SUBSCRIPTION
+      DEFAULT_SUBSCRIPTION,
     );
     queryClient.setQueryData(['usage', mockActiveProfile.id], DEFAULT_USAGE);
   }
@@ -216,7 +216,7 @@ function createWrapper(opts?: { seedCache?: boolean }) {
     return React.createElement(
       QueryClientProvider,
       { client: queryClient },
-      children
+      children,
     );
   };
 }
@@ -280,7 +280,7 @@ function makeMockOfferings(packages: ReturnType<typeof makeMockPackage>[]) {
         monthly:
           packages.find(
             (p: ReturnType<typeof makeMockPackage>) =>
-              p.packageType === 'MONTHLY'
+              p.packageType === 'MONTHLY',
           ) || null,
         weekly: null,
         webCheckoutUrl: null,
@@ -298,7 +298,8 @@ function makeMockOfferings(packages: ReturnType<typeof makeMockPackage>[]) {
       twoMonth: null,
       monthly:
         packages.find(
-          (p: ReturnType<typeof makeMockPackage>) => p.packageType === 'MONTHLY'
+          (p: ReturnType<typeof makeMockPackage>) =>
+            p.packageType === 'MONTHLY',
         ) || null,
       weekly: null,
       webCheckoutUrl: null,
@@ -371,13 +372,13 @@ describe('SubscriptionScreen', () => {
             message: 'Profile removed from family subscription',
             removedProfileId: 'p2',
           }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
     );
     mockFetch.setRoute(
       '/subscription/family',
       () =>
-        new Response(JSON.stringify({ error: 'Not Found' }), { status: 404 })
+        new Response(JSON.stringify({ error: 'Not Found' }), { status: 404 }),
     );
     mockFetch.setRoute(
       '/subscription',
@@ -385,7 +386,7 @@ describe('SubscriptionScreen', () => {
         new Response(JSON.stringify({ subscription: DEFAULT_SUBSCRIPTION }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
-        })
+        }),
     );
     mockFetch.setRoute(
       '/usage',
@@ -393,7 +394,7 @@ describe('SubscriptionScreen', () => {
         new Response(JSON.stringify({ usage: DEFAULT_USAGE }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
-        })
+        }),
     );
     mockFetch.setRoute(
       '/xp',
@@ -401,7 +402,7 @@ describe('SubscriptionScreen', () => {
         new Response(JSON.stringify({ xp: null }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
-        })
+        }),
     );
     mockFetch.setRoute(
       '/byok-waitlist',
@@ -411,8 +412,8 @@ describe('SubscriptionScreen', () => {
             message: 'Added to BYOK waitlist',
             email: 'user@example.com',
           }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
     );
     mockFetch.setRoute(
       '/settings/notify-parent-subscribe',
@@ -420,7 +421,7 @@ describe('SubscriptionScreen', () => {
         new Response(JSON.stringify({ sent: true, rateLimited: false }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
-        })
+        }),
     );
   });
 
@@ -490,7 +491,7 @@ describe('SubscriptionScreen', () => {
       () =>
         new Response(JSON.stringify({ message: 'Server error' }), {
           status: 500,
-        })
+        }),
     );
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
@@ -546,7 +547,7 @@ describe('SubscriptionScreen', () => {
     // plan cards — pick one direction. We keep the cards as informational
     // tier comparison and rephrase the disclaimer to not contradict.
     expect(
-      screen.queryByText(/Subscription plans will be available soon/)
+      screen.queryByText(/Subscription plans will be available soon/),
     ).toBeNull();
     screen.getByText(/store purchasing isn't available on this device yet/i);
     // BUG-899: only Free and Plus are approved per pricing_dual_cap.md.
@@ -576,8 +577,8 @@ describe('SubscriptionScreen', () => {
               status: 'active',
             },
           }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
     );
     mockFetch.setRoute(
       '/subscription/family',
@@ -596,8 +597,8 @@ describe('SubscriptionScreen', () => {
               ],
             },
           }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
     );
     mockOfferings = null; // force the no-offerings static fallback path
 
@@ -630,8 +631,8 @@ describe('SubscriptionScreen', () => {
               status: 'active',
             },
           }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
     );
     mockOfferings = null;
 
@@ -659,8 +660,8 @@ describe('SubscriptionScreen', () => {
               status: 'active',
             },
           }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
     );
     mockOfferings = null; // force the no-offerings static fallback path
 
@@ -692,8 +693,8 @@ describe('SubscriptionScreen', () => {
               status: 'active',
             },
           }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
     );
     mockOfferings = null;
 
@@ -722,8 +723,8 @@ describe('SubscriptionScreen', () => {
               status: 'active',
             },
           }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
     );
     mockOfferings = makeMockOfferings([makeMockPackage()]);
     mockCustomerInfo = makeMockCustomerInfo({
@@ -755,8 +756,8 @@ describe('SubscriptionScreen', () => {
               currentPeriodEnd: '2026-05-18T00:00:00Z',
             },
           }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
     );
     mockOfferings = null;
     mockCustomerInfo = makeMockCustomerInfo(); // no active entitlements
@@ -786,8 +787,8 @@ describe('SubscriptionScreen', () => {
               trialEndsAt: '2026-05-10T00:00:00.000Z',
             },
           }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
     );
     mockOfferings = makeMockOfferings([makeMockPackage()]);
 
@@ -818,8 +819,8 @@ describe('SubscriptionScreen', () => {
               trialEndsAt: null,
             },
           }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
     );
     mockOfferings = makeMockOfferings([makeMockPackage()]);
 
@@ -846,8 +847,8 @@ describe('SubscriptionScreen', () => {
               status: 'active',
             },
           }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
     );
     mockOfferings = makeMockOfferings([makeMockPackage()]);
 
@@ -872,8 +873,8 @@ describe('SubscriptionScreen', () => {
               status: 'active',
             },
           }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
     );
     mockOfferings = makeMockOfferings([makeMockPackage()]);
 
@@ -944,8 +945,8 @@ describe('SubscriptionScreen', () => {
           JSON.stringify({
             subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'plus' },
           }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
     );
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
@@ -960,17 +961,17 @@ describe('SubscriptionScreen', () => {
         expect(mockMutateAsyncPurchase).toHaveBeenCalledWith(monthlyPkg);
         // With real hooks, refetch calls back to mockFetch for /subscription and /usage
         expect(
-          fetchCallsMatching(mockFetch, '/subscription').length
+          fetchCallsMatching(mockFetch, '/subscription').length,
         ).toBeGreaterThanOrEqual(1);
         expect(
-          fetchCallsMatching(mockFetch, '/usage').length
+          fetchCallsMatching(mockFetch, '/usage').length,
         ).toBeGreaterThanOrEqual(1);
         expect(Alert.alert).toHaveBeenCalledWith(
           'Success',
-          'Your subscription is now active!'
+          'Your subscription is now active!',
         );
       },
-      { timeout: 5000 }
+      { timeout: 5000 },
     );
   });
 
@@ -1026,7 +1027,7 @@ describe('SubscriptionScreen', () => {
     await waitFor(() => {
       expect(Alert.alert).toHaveBeenCalledWith(
         'Network error',
-        'Please check your internet connection and try again.'
+        'Please check your internet connection and try again.',
       );
     });
   });
@@ -1059,7 +1060,7 @@ describe('SubscriptionScreen', () => {
         expect.arrayContaining([
           expect.objectContaining({ text: 'Restore purchases' }),
           expect.objectContaining({ text: 'Cancel' }),
-        ])
+        ]),
       );
     });
   });
@@ -1088,7 +1089,7 @@ describe('SubscriptionScreen', () => {
     await waitFor(() => {
       expect(Alert.alert).toHaveBeenCalledWith(
         'Purchase failed',
-        'Something unexpected happened with your purchase. Please try again.'
+        'Something unexpected happened with your purchase. Please try again.',
       );
     });
   });
@@ -1120,8 +1121,8 @@ describe('SubscriptionScreen', () => {
           JSON.stringify({
             subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'plus' },
           }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
     );
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
@@ -1145,11 +1146,11 @@ describe('SubscriptionScreen', () => {
     await waitFor(() => {
       expect(Alert.alert).toHaveBeenCalledWith(
         'Restored',
-        'Your subscription has been restored.'
+        'Your subscription has been restored.',
       );
     });
     expect(
-      fetchCallsMatching(mockFetch, '/usage').length
+      fetchCallsMatching(mockFetch, '/usage').length,
     ).toBeGreaterThanOrEqual(1);
     jest.useRealTimers();
   });
@@ -1166,8 +1167,8 @@ describe('SubscriptionScreen', () => {
           JSON.stringify({
             subscription: { ...DEFAULT_SUBSCRIPTION, tier: 'free' },
           }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
     );
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
@@ -1194,7 +1195,7 @@ describe('SubscriptionScreen', () => {
       expect(Alert.alert).toHaveBeenCalledWith(
         'No subscriptions found',
         'We could not find any previous purchases to restore.',
-        expect.any(Array)
+        expect.any(Array),
       );
     });
     jest.useRealTimers();
@@ -1216,7 +1217,7 @@ describe('SubscriptionScreen', () => {
     });
     expect(Alert.alert).toHaveBeenCalledWith(
       'Restore failed',
-      'Could not restore purchases. Please try again.'
+      'Could not restore purchases. Please try again.',
     );
   });
 
@@ -1280,7 +1281,7 @@ describe('SubscriptionScreen', () => {
 
     await waitFor(() => {
       expect(Linking.openURL).toHaveBeenCalledWith(
-        'https://apps.apple.com/account/subscriptions'
+        'https://apps.apple.com/account/subscriptions',
       );
     });
 
@@ -1305,7 +1306,7 @@ describe('SubscriptionScreen', () => {
 
     await waitFor(() => {
       expect(Linking.openURL).toHaveBeenCalledWith(
-        'https://play.google.com/store/account/subscriptions'
+        'https://play.google.com/store/account/subscriptions',
       );
     });
 
@@ -1331,7 +1332,7 @@ describe('SubscriptionScreen', () => {
       screen.getByTestId('manage-billing-web-info');
     });
     expect(
-      screen.getByText('Subscription is managed on your mobile device')
+      screen.getByText('Subscription is managed on your mobile device'),
     ).toBeTruthy();
     // No interactive Pressable on web — no misleading Google Play copy.
     expect(screen.queryByTestId('manage-billing-button')).toBeNull();
@@ -1383,8 +1384,8 @@ describe('SubscriptionScreen', () => {
               status: 'active',
             },
           }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
     );
     mockFetch.setRoute(
       '/subscription/family',
@@ -1405,8 +1406,8 @@ describe('SubscriptionScreen', () => {
               ],
             },
           }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
     );
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
@@ -1435,8 +1436,8 @@ describe('SubscriptionScreen', () => {
               status: 'active',
             },
           }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
     );
     mockFetch.setRoute(
       '/subscription/family',
@@ -1456,8 +1457,8 @@ describe('SubscriptionScreen', () => {
               ],
             },
           }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
     );
     mockFetch.setRoute(
       '/subscription/family/remove',
@@ -1467,8 +1468,8 @@ describe('SubscriptionScreen', () => {
             message: 'Profile removed from family subscription',
             removedProfileId: 'p2',
           }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
     );
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
@@ -1482,7 +1483,7 @@ describe('SubscriptionScreen', () => {
       | Array<{ text: string; onPress?: () => void }>
       | undefined;
     const removeButton = confirmButtons?.find(
-      (button) => button.text === 'Remove'
+      (button) => button.text === 'Remove',
     );
     expect(removeButton).toBeDefined();
 
@@ -1492,12 +1493,12 @@ describe('SubscriptionScreen', () => {
 
     await waitFor(() => {
       expect(
-        fetchCallsMatching(mockFetch, '/subscription/family/remove').length
+        fetchCallsMatching(mockFetch, '/subscription/family/remove').length,
       ).toBeGreaterThanOrEqual(1);
     });
     expect(Alert.alert).toHaveBeenCalledWith(
       'Family updated',
-      'Alex was removed from your family plan.'
+      'Alex was removed from your family plan.',
     );
   });
 
@@ -1511,13 +1512,13 @@ describe('SubscriptionScreen', () => {
 
     await waitFor(() => {
       expect(
-        fetchCallsMatching(mockFetch, '/byok-waitlist').length
+        fetchCallsMatching(mockFetch, '/byok-waitlist').length,
       ).toBeGreaterThanOrEqual(1);
     });
 
     expect(Alert.alert).toHaveBeenCalledWith(
       'Waitlist',
-      'You have been added to the BYOK waitlist.'
+      'You have been added to the BYOK waitlist.',
     );
   });
 
@@ -1527,7 +1528,7 @@ describe('SubscriptionScreen', () => {
       () =>
         new Response(JSON.stringify({ message: 'Server error' }), {
           status: 500,
-        })
+        }),
     );
 
     render(<SubscriptionScreen />, { wrapper: createWrapper() });
@@ -1540,7 +1541,7 @@ describe('SubscriptionScreen', () => {
     await waitFor(() => {
       expect(Alert.alert).toHaveBeenCalledWith(
         'Error',
-        'Could not join waitlist. Try again.'
+        'Could not join waitlist. Try again.',
       );
     });
   });
@@ -1562,8 +1563,8 @@ describe('SubscriptionScreen', () => {
             JSON.stringify({
               subscription: { ...DEFAULT_SUBSCRIPTION, status: 'expired' },
             }),
-            { status: 200, headers: { 'Content-Type': 'application/json' } }
-          )
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
       );
     });
 
@@ -1614,7 +1615,7 @@ describe('SubscriptionScreen', () => {
           new Response(JSON.stringify({ xp: null }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
-          })
+          }),
       );
 
       render(<SubscriptionScreen />, { wrapper: createWrapper() });
@@ -1623,7 +1624,7 @@ describe('SubscriptionScreen', () => {
         screen.getByTestId('child-paywall');
       });
       expect(
-        screen.getByText("You've been exploring and learning — great start!")
+        screen.getByText("You've been exploring and learning — great start!"),
       ).toBeTruthy();
     });
 
@@ -1642,8 +1643,8 @@ describe('SubscriptionScreen', () => {
                 topicsVerified: 3,
               },
             }),
-            { status: 200, headers: { 'Content-Type': 'application/json' } }
-          )
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
       );
 
       render(<SubscriptionScreen />, { wrapper: createWrapper() });
@@ -1652,7 +1653,9 @@ describe('SubscriptionScreen', () => {
         screen.getByTestId('child-paywall');
       });
       expect(
-        screen.getByText('You learned 5 topics and earned 250 XP — great work!')
+        screen.getByText(
+          'You learned 5 topics and earned 250 XP — great work!',
+        ),
       ).toBeTruthy();
     });
 
@@ -1671,8 +1674,8 @@ describe('SubscriptionScreen', () => {
                 topicsVerified: 1,
               },
             }),
-            { status: 200, headers: { 'Content-Type': 'application/json' } }
-          )
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
       );
 
       render(<SubscriptionScreen />, { wrapper: createWrapper() });
@@ -1681,7 +1684,7 @@ describe('SubscriptionScreen', () => {
         screen.getByTestId('child-paywall');
       });
       expect(
-        screen.getByText('You learned 1 topic and earned 50 XP — great work!')
+        screen.getByText('You learned 1 topic and earned 50 XP — great work!'),
       ).toBeTruthy();
     });
   });
@@ -1708,8 +1711,8 @@ describe('SubscriptionScreen', () => {
                 status: 'active',
               },
             }),
-            { status: 200, headers: { 'Content-Type': 'application/json' } }
-          )
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
       );
       mockOfferings = makeMockOfferings([makeMockPackage(), topUpPkg]);
     }
@@ -1747,7 +1750,7 @@ describe('SubscriptionScreen', () => {
       });
 
       expect(screen.getAllByTestId('package-option-$rc_monthly')).toHaveLength(
-        1
+        1,
       );
     });
 
@@ -1763,8 +1766,8 @@ describe('SubscriptionScreen', () => {
                 status: 'active',
               },
             }),
-            { status: 200, headers: { 'Content-Type': 'application/json' } }
-          )
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
       );
       mockOfferings = makeMockOfferings([makeMockPackage()]);
 
@@ -1782,7 +1785,7 @@ describe('SubscriptionScreen', () => {
           expect.arrayContaining([
             expect.objectContaining({ text: 'Retry' }),
             expect.objectContaining({ text: 'OK' }),
-          ])
+          ]),
         );
       });
     });
@@ -1799,8 +1802,8 @@ describe('SubscriptionScreen', () => {
                 status: 'active',
               },
             }),
-            { status: 200, headers: { 'Content-Type': 'application/json' } }
-          )
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
       );
       mockOfferings = null;
       mockOfferingsError = true;
@@ -1816,7 +1819,7 @@ describe('SubscriptionScreen', () => {
         expect(Alert.alert).toHaveBeenCalledWith(
           'Connection error',
           "Couldn't load purchase options. Check your connection and try again.",
-          expect.arrayContaining([expect.objectContaining({ text: 'Retry' })])
+          expect.arrayContaining([expect.objectContaining({ text: 'Retry' })]),
         );
       });
     });
@@ -1868,7 +1871,7 @@ describe('SubscriptionScreen', () => {
       await waitFor(() => {
         expect(Alert.alert).toHaveBeenCalledWith(
           'Network error',
-          'Please check your internet connection and try again.'
+          'Please check your internet connection and try again.',
         );
       });
     });
@@ -1895,7 +1898,7 @@ describe('SubscriptionScreen', () => {
       await waitFor(() => {
         expect(Alert.alert).toHaveBeenCalledWith(
           'Purchase failed',
-          'Something unexpected happened with your purchase. Please try again.'
+          'Something unexpected happened with your purchase. Please try again.',
         );
       });
     });

@@ -158,7 +158,7 @@ export interface TopicSwitcherModalProps {
   handleTopicSwitch: (
     topicId: string,
     subjectId: string,
-    subjectName: string
+    subjectName: string,
   ) => Promise<void>;
   insetsBottom: number;
   isSwitching?: boolean;
@@ -219,7 +219,7 @@ export function TopicSwitcherModal({
                   accessibilityRole="button"
                   accessibilityLabel={t(
                     'session.topicSwitcher.filterBySubjectLabel',
-                    { name: subject.name }
+                    { name: subject.name },
                   )}
                   accessibilityState={{ selected: isSelected }}
                 >
@@ -247,7 +247,7 @@ export function TopicSwitcherModal({
                 .filter((topic) => !topic.skipped)
                 .map((topic) => {
                   const subjectForTopic = availableSubjects.find(
-                    (subject) => subject.id === switcherSubjectId
+                    (subject) => subject.id === switcherSubjectId,
                   );
                   if (!subjectForTopic) return null;
                   return (
@@ -257,7 +257,7 @@ export function TopicSwitcherModal({
                         handleTopicSwitch(
                           topic.id,
                           subjectForTopic.id,
-                          subjectForTopic.name
+                          subjectForTopic.name,
                         )
                       }
                       disabled={isSwitching}

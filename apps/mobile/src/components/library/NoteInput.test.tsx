@@ -25,7 +25,7 @@ jest.mock('../../hooks/use-speech-recognition', () => ({
 describe('NoteInput', () => {
   it('renders text input and buttons', () => {
     const { getByTestId, getByText } = render(
-      <NoteInput onSave={jest.fn()} onCancel={jest.fn()} />
+      <NoteInput onSave={jest.fn()} onCancel={jest.fn()} />,
     );
     getByTestId('note-text-input');
     getByText('Save');
@@ -35,11 +35,11 @@ describe('NoteInput', () => {
   it('calls onSave with text content', () => {
     const onSave = jest.fn();
     const { getByTestId, getByText } = render(
-      <NoteInput onSave={onSave} onCancel={jest.fn()} />
+      <NoteInput onSave={onSave} onCancel={jest.fn()} />,
     );
     fireEvent.changeText(
       getByTestId('note-text-input'),
-      'My note about pyramids'
+      'My note about pyramids',
     );
     fireEvent.press(getByText('Save'));
     expect(onSave).toHaveBeenCalledWith('My note about pyramids');
@@ -48,7 +48,7 @@ describe('NoteInput', () => {
   it('calls onCancel when cancel pressed', () => {
     const onCancel = jest.fn();
     const { getByText } = render(
-      <NoteInput onSave={jest.fn()} onCancel={onCancel} />
+      <NoteInput onSave={jest.fn()} onCancel={onCancel} />,
     );
     fireEvent.press(getByText('Cancel'));
     expect(onCancel).toHaveBeenCalled();
@@ -60,7 +60,7 @@ describe('NoteInput', () => {
         onSave={jest.fn()}
         onCancel={jest.fn()}
         initialValue="Existing note"
-      />
+      />,
     );
     expect(getByTestId('note-text-input').props.value).toBe('Existing note');
   });
@@ -68,7 +68,7 @@ describe('NoteInput', () => {
   it('shows character count nudge near limit', () => {
     const longText = 'a'.repeat(4600);
     const { getByTestId, getByText } = render(
-      <NoteInput onSave={jest.fn()} onCancel={jest.fn()} />
+      <NoteInput onSave={jest.fn()} onCancel={jest.fn()} />,
     );
     fireEvent.changeText(getByTestId('note-text-input'), longText);
     getByText(/getting long/i);

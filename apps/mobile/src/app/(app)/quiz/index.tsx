@@ -58,7 +58,7 @@ function LanguageVocabCard({
     ? t('quiz.index.vocabStarterSubtitle', {
         threshold: PERSONAL_VOCAB_QUIZ_THRESHOLD,
       })
-    : playedSubtitle ?? t('quiz.index.vocabPlayedSubtitleDefault');
+    : (playedSubtitle ?? t('quiz.index.vocabPlayedSubtitleDefault'));
 
   return (
     <IntentCard
@@ -71,14 +71,14 @@ function LanguageVocabCard({
 }
 
 function getLanguageDisplayName(
-  code: string | null | undefined
+  code: string | null | undefined,
 ): string | null {
   if (!code) return null;
 
   try {
     return (
       new Intl.DisplayNames(['en'], { type: 'language' }).of(
-        code.toLowerCase()
+        code.toLowerCase(),
       ) ?? null
     );
   } catch {
@@ -116,7 +116,7 @@ export default function QuizIndexScreen(): React.ReactElement {
       (subject) =>
         subject.pedagogyMode === 'four_strands' &&
         subject.languageCode &&
-        subject.status === 'active'
+        subject.status === 'active',
     ) ?? [];
 
   const capitalsStats = stats?.find((stat) => stat.activityType === 'capitals');
@@ -130,11 +130,11 @@ export default function QuizIndexScreen(): React.ReactElement {
           played: capitalsStats.roundsPlayed,
         })
       : capitalsStats
-      ? t('quiz.index.played', { played: capitalsStats.roundsPlayed })
-      : t('quiz.index.capitalsDefaultSubtitle');
+        ? t('quiz.index.played', { played: capitalsStats.roundsPlayed })
+        : t('quiz.index.capitalsDefaultSubtitle');
 
   const guessWhoStats = stats?.find(
-    (stat) => stat.activityType === 'guess_who'
+    (stat) => stat.activityType === 'guess_who',
   );
   const guessWhoSubtitle =
     guessWhoStats &&
@@ -146,8 +146,8 @@ export default function QuizIndexScreen(): React.ReactElement {
           played: guessWhoStats.roundsPlayed,
         })
       : guessWhoStats
-      ? t('quiz.index.played', { played: guessWhoStats.roundsPlayed })
-      : t('quiz.index.guessWhoDefaultSubtitle');
+        ? t('quiz.index.played', { played: guessWhoStats.roundsPlayed })
+        : t('quiz.index.guessWhoDefaultSubtitle');
 
   const handleSelectVocabulary = (subjectId: string, languageName: string) => {
     setActivityType('vocabulary');
@@ -258,7 +258,7 @@ export default function QuizIndexScreen(): React.ReactElement {
             const langStat = stats?.find(
               (s) =>
                 s.activityType === 'vocabulary' &&
-                s.languageCode === subject.languageCode
+                s.languageCode === subject.languageCode,
             );
             return (
               <LanguageVocabCard
@@ -275,8 +275,10 @@ export default function QuizIndexScreen(): React.ReactElement {
                         played: langStat.roundsPlayed,
                       })
                     : langStat
-                    ? t('quiz.index.played', { played: langStat.roundsPlayed })
-                    : null
+                      ? t('quiz.index.played', {
+                          played: langStat.roundsPlayed,
+                        })
+                      : null
                 }
                 onSelect={() =>
                   handleSelectVocabulary(subject.id, displayLanguage)

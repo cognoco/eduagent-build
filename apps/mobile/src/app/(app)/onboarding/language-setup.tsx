@@ -37,7 +37,7 @@ const NATIVE_LANGUAGE_OPTIONS = [
 ];
 
 const NATIVE_LANGUAGE_CODES = new Set(
-  NATIVE_LANGUAGE_OPTIONS.map((o) => o.code).filter((c) => c !== 'other')
+  NATIVE_LANGUAGE_OPTIONS.map((o) => o.code).filter((c) => c !== 'other'),
 );
 
 /** Derive a pre-selected native language from the device locale.
@@ -102,13 +102,13 @@ export default function LanguageSetup() {
     }>();
   const configureLanguageSubject = useConfigureLanguageSubject();
   const startFirstCurriculumSession = useStartFirstCurriculumSession(
-    subjectId ?? ''
+    subjectId ?? '',
   );
   const isContinuing =
     configureLanguageSubject.isPending || startFirstCurriculumSession.isPending;
   const colors = useThemeColors(); // [BUG-118]
   const [nativeLanguage, setNativeLanguage] = useState<string>(() =>
-    getDeviceNativeLanguage()
+    getDeviceNativeLanguage(),
   );
   const [customLanguage, setCustomLanguage] = useState('');
   const [startingLevel, setStartingLevel] = useState<CefrLevel>('A1');
@@ -119,7 +119,7 @@ export default function LanguageSetup() {
 
   const safeLanguageName = useMemo(
     () => languageName?.trim() || 'this language',
-    [languageName]
+    [languageName],
   );
 
   const effectiveNativeLanguage =
@@ -305,7 +305,7 @@ export default function LanguageSetup() {
                     value={customLanguage}
                     onChangeText={setCustomLanguage}
                     placeholder={t(
-                      'onboarding.languageSetup.nativeLanguagePlaceholder'
+                      'onboarding.languageSetup.nativeLanguagePlaceholder',
                     )}
                     placeholderTextColor={colors.textSecondary}
                     className="rounded-card border border-primary bg-surface px-4 py-3 text-body text-text-primary"
@@ -347,7 +347,7 @@ export default function LanguageSetup() {
                 </Text>
                 <Text className="text-body-sm text-text-secondary mt-2">
                   {t(
-                    `onboarding.languageSetup.levels.${option.level}.description`
+                    `onboarding.languageSetup.levels.${option.level}.description`,
                   )}
                 </Text>
               </Pressable>

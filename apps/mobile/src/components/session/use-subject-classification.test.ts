@@ -58,7 +58,7 @@ describe('useSubjectClassification — greeting guard', () => {
     expect(animateResponse).toHaveBeenCalledWith(
       'Hi! Ask me anything.',
       opts.setMessages,
-      opts.setIsStreaming
+      opts.setIsStreaming,
     );
     expect(opts.classifySubject.mutateAsync).not.toHaveBeenCalled();
     expect(opts.continueWithMessage).not.toHaveBeenCalled();
@@ -76,7 +76,7 @@ describe('useSubjectClassification — greeting guard', () => {
     expect(animateResponse).toHaveBeenCalledWith(
       'Hey again — what are you curious about?',
       opts.setMessages,
-      opts.setIsStreaming
+      opts.setIsStreaming,
     );
   });
 
@@ -182,7 +182,7 @@ describe('useSubjectClassification — greeting guard', () => {
     // Classification or continueWithMessage must have been called
     expect(
       opts.classifySubject.mutateAsync.mock.calls.length +
-        opts.continueWithMessage.mock.calls.length
+        opts.continueWithMessage.mock.calls.length,
     ).toBeGreaterThan(0);
   });
 
@@ -279,7 +279,7 @@ describe('useSubjectClassification — freeform fallback removal [F-1]', () => {
         originalText: 'what is the quadratic formula?',
         prompt: "I couldn't figure out the subject. Which one fits?",
         candidates: [{ subjectId: 's1', subjectName: 'Math' }],
-      })
+      }),
     );
     // Must NOT call continueWithMessage — we returned early
     expect(opts.continueWithMessage).not.toHaveBeenCalled();
@@ -310,7 +310,7 @@ describe('useSubjectClassification — freeform fallback removal [F-1]', () => {
           { subjectId: 's1', subjectName: 'Math' },
           { subjectId: 's2', subjectName: 'History' },
         ]),
-      })
+      }),
     );
     expect(opts.continueWithMessage).not.toHaveBeenCalled();
   });
@@ -345,17 +345,17 @@ describe('C7 subject classification ack is tentative (copy sweep 2026-04-19)', (
       if (typeof updater !== 'function') return false;
       const next = updater([]) as Array<{ content?: string }>;
       return next.some(
-        (m) => typeof m.content === 'string' && m.content.includes('Geography')
+        (m) => typeof m.content === 'string' && m.content.includes('Geography'),
       );
     });
     expect(ackCall).not.toBeUndefined();
 
     const updater = ackCall![0] as (
-      prev: Array<{ content?: string }>
+      prev: Array<{ content?: string }>,
     ) => Array<{ content?: string }>;
     const appended = updater([]);
     const ackMessage = appended.find(
-      (m) => typeof m.content === 'string' && m.content.includes('Geography')
+      (m) => typeof m.content === 'string' && m.content.includes('Geography'),
     );
     expect(ackMessage?.content).toBe('Looks like Geography.');
     // Tentative phrasing — no confident "Got it" prefix, no declarative "is about"

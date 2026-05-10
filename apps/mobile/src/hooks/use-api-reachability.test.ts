@@ -43,7 +43,7 @@ describe('useApiReachability', () => {
       () =>
         new Promise<Response>((res) => {
           resolveFetch = res;
-        })
+        }),
     );
 
     const { result } = renderHook(() => useApiReachability());

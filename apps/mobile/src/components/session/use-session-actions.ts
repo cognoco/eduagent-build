@@ -89,12 +89,12 @@ export interface UseSessionActionsOptions {
   // Functions from other hooks
   handleSend: (
     text: string,
-    opts?: { isAutoSent?: boolean; imageUri?: string }
+    opts?: { isAutoSent?: boolean; imageUri?: string },
   ) => Promise<void>;
   syncHomeworkMetadata: (
     sessionId: string,
     problems: HomeworkProblem[],
-    problemIndex: number
+    problemIndex: number,
   ) => Promise<void>;
   fetchFastCelebrations: () => Promise<PendingCelebration[]>;
   showConfirmation: (message: string) => void;
@@ -158,9 +158,9 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
       if (activeProfileId) {
         void SecureStore.setItemAsync(
           getInputModeKey(activeProfileId),
-          nextInputMode
+          nextInputMode,
         ).catch((err) =>
-          console.warn('[Session] Failed to persist input mode:', err)
+          console.warn('[Session] Failed to persist input mode:', err),
         );
       }
 
@@ -181,7 +181,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
       setInputMode,
       setSessionInputMode,
       showConfirmation,
-    ]
+    ],
   );
 
   const handleNextProblem = useCallback(async () => {
@@ -214,7 +214,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
         await syncHomeworkMetadata(
           activeSessionId,
           updatedProblems,
-          nextProblemIndex
+          nextProblemIndex,
         );
       } catch (err) {
         console.warn('[Session] Homework metadata sync failed:', err);
@@ -255,8 +255,8 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
             effectiveMode === 'homework'
               ? 'homework'
               : effectiveMode === 'freeform'
-              ? 'freeform'
-              : 'learning',
+                ? 'freeform'
+                : 'learning',
           ...(filedSubjectId ? { filedSubjectId } : {}),
           ...(filedBookId ? { filedBookId } : {}),
         },
@@ -273,14 +273,14 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
       milestonesReached,
       effectiveMode,
       closedSessionRef,
-    ]
+    ],
   );
 
   const navigateToSummary = useCallback(
     (
       sessionId: string,
       wallClockSeconds: number,
-      fastCelebrations: PendingCelebration[]
+      fastCelebrations: PendingCelebration[],
     ) => {
       router.replace({
         pathname: `/session-summary/${sessionId}`,
@@ -297,8 +297,8 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
             effectiveMode === 'homework'
               ? 'homework'
               : effectiveMode === 'freeform'
-              ? 'freeform'
-              : 'learning',
+                ? 'freeform'
+                : 'learning',
         },
       } as never);
     },
@@ -311,7 +311,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
       topicId,
       milestonesReached,
       effectiveMode,
-    ]
+    ],
   );
 
   const handleEndSession = useCallback(async () => {
@@ -340,8 +340,8 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
               const timeoutPromise = new Promise<never>((_, reject) =>
                 setTimeout(
                   () => reject(new Error('Session close timed out')),
-                  CLOSE_TIMEOUT_MS
-                )
+                  CLOSE_TIMEOUT_MS,
+                ),
               );
               const result = await Promise.race([
                 closeSession.mutateAsync({
@@ -369,7 +369,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
                 navigateToSummary(
                   activeSessionId,
                   result.wallClockSeconds,
-                  fastCelebrations
+                  fastCelebrations,
                 );
               }
             } catch (err: unknown) {
@@ -400,13 +400,13 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
               platformAlert(
                 'Could not end this session cleanly',
                 classified.message,
-                buttons
+                buttons,
               );
             }
           },
         },
       ],
-      { cancelable: true, onDismiss: () => setIsClosing(false) }
+      { cancelable: true, onDismiss: () => setIsClosing(false) },
     );
   }, [
     activeSessionId,
@@ -448,7 +448,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
         if (!activeSessionId) {
           platformAlert(
             'Start the conversation first',
-            'Send one message so this session has somewhere to save your parking lot.'
+            'Send one message so this session has somewhere to save your parking lot.',
           );
           return;
         }
@@ -481,7 +481,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
         } catch (err) {
           console.warn(
             '[Session] Quick-chip system prompt failed to persist:',
-            err
+            err,
           );
           // Best effort only. The visible prompt still continues below.
         }
@@ -508,7 +508,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
       setShowTopicSwitcher,
       setShowParkingLot,
       setConsumedQuickChipMessageId,
-    ]
+    ],
   );
 
   const handleMessageFeedback = useCallback(
@@ -565,8 +565,8 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
           action === 'helpful'
             ? 'Keeping this pace.'
             : action === 'not_helpful'
-            ? 'Adjusting the explanation.'
-            : "I'll correct that."
+              ? 'Adjusting the explanation.'
+              : "I'll correct that.",
         );
 
         const followUpPrompt = followUpPromptByAction[action];
@@ -586,14 +586,14 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
       recordSystemPrompt,
       showConfirmation,
       setMessageFeedback,
-    ]
+    ],
   );
 
   const handleSaveParkingLot = useCallback(async () => {
     if (!activeSessionId) {
       platformAlert(
         'Start the conversation first',
-        'Send one message so this session has somewhere to save your parking lot.'
+        'Send one message so this session has somewhere to save your parking lot.',
       );
       return;
     }
@@ -607,7 +607,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
     } catch (err: unknown) {
       platformAlert(
         'Could not save parking lot item',
-        classifyApiError(err).message
+        classifyApiError(err).message,
       );
     }
   }, [
@@ -622,7 +622,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
     async (
       nextTopicId: string,
       nextSubjectId: string,
-      nextSubjectName: string
+      nextSubjectName: string,
     ) => {
       try {
         setIsClosing(true);
@@ -659,7 +659,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
       setIsClosing,
       setShowWrongSubjectChip,
       setShowTopicSwitcher,
-    ]
+    ],
   );
 
   return {

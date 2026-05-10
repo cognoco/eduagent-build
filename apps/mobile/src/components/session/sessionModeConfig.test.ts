@@ -17,7 +17,7 @@ describe('getOpeningMessage', () => {
       'Fractions',
       undefined,
       undefined,
-      'We covered numerators and denominators.'
+      'We covered numerators and denominators.',
     );
 
     expect(msg).toContain('Last time you learned about Fractions');
@@ -29,21 +29,21 @@ describe('getOpeningMessage', () => {
     const msg = getOpeningMessage('relearn', 2, undefined, 'Fractions');
 
     expect(msg).toBe(
-      "Let's approach Fractions from a fresh angle. What do you remember about it?"
+      "Let's approach Fractions from a fresh angle. What do you remember about it?",
     );
   });
 
   it('returns problem-text override regardless of experience', () => {
     const msg = getOpeningMessage('homework', 0, 'Solve 2+2');
     expect(msg).toBe(
-      "Got it — I can see your problem. Want me to walk you through how to solve it, or have you got an answer you'd like me to check?"
+      "Got it — I can see your problem. Want me to walk you through how to solve it, or have you got an answer you'd like me to check?",
     );
   });
 
   it('returns problem-text override for experienced users too', () => {
     const msg = getOpeningMessage('learning', 10, 'Help with this');
     expect(msg).toBe(
-      "Got it — I can see your problem. Want me to walk you through how to solve it, or have you got an answer you'd like me to check?"
+      "Got it — I can see your problem. Want me to walk you through how to solve it, or have you got an answer you'd like me to check?",
     );
   });
 
@@ -53,7 +53,7 @@ describe('getOpeningMessage', () => {
       expect(
         msg.includes('Welcome') ||
           msg.includes('Hey there') ||
-          msg.includes('Hi!')
+          msg.includes('Hi!'),
       ).toBe(true);
     });
 
@@ -99,7 +99,7 @@ describe('getOpeningMessage', () => {
         const msg = getOpeningMessage(mode, 5);
         const config = getModeConfig(mode);
         expect(msg).toBe(config.openingMessage);
-      }
+      },
     );
 
     it('uses standard message for very high experience', () => {
@@ -116,7 +116,7 @@ describe('getOpeningMessage', () => {
 
     it('maps practice opening copy to review opening copy for persisted sessions', () => {
       expect(getOpeningMessage('practice', 5)).toBe(
-        getOpeningMessage('review', 5)
+        getOpeningMessage('review', 5),
       );
     });
   });
@@ -131,14 +131,14 @@ describe('getOpeningMessage', () => {
     it('uses a calibration opener for review sessions with a topic', () => {
       const msg = getOpeningMessage('review', 0, undefined, 'The Nile River');
       expect(msg).toBe(
-        'Let\'s review "The Nile River". What do you remember about it in your own words?'
+        'Let\'s review "The Nile River". What do you remember about it in your own words?',
       );
     });
 
     it('uses the review calibration opener for legacy practice sessions with a topic', () => {
       const msg = getOpeningMessage('practice', 0, undefined, 'The Nile River');
       expect(msg).toBe(
-        getOpeningMessage('review', 0, undefined, 'The Nile River')
+        getOpeningMessage('review', 0, undefined, 'The Nile River'),
       );
     });
 
@@ -152,7 +152,7 @@ describe('getOpeningMessage', () => {
         'learning',
         10,
         undefined,
-        'The Nile River'
+        'The Nile River',
       );
       expect(msg).toContain('The Nile River');
     });
@@ -162,7 +162,7 @@ describe('getOpeningMessage', () => {
         'homework',
         0,
         'Solve 2+2',
-        'The Nile River'
+        'The Nile River',
       );
       expect(msg).not.toContain('The Nile River');
       expect(msg).toContain('walk you through');
@@ -176,7 +176,7 @@ describe('getOpeningMessage', () => {
         0,
         undefined,
         undefined,
-        'Biology — Botany'
+        'Biology — Botany',
       );
       expect(msg).toContain('Biology — Botany');
     });
@@ -187,7 +187,7 @@ describe('getOpeningMessage', () => {
         1,
         undefined,
         undefined,
-        'Biology — Botany'
+        'Biology — Botany',
       );
       expect(msg).toContain('Biology — Botany');
     });
@@ -198,7 +198,7 @@ describe('getOpeningMessage', () => {
         10,
         undefined,
         undefined,
-        'Biology — Botany'
+        'Biology — Botany',
       );
       expect(msg).toContain('Biology — Botany');
     });
@@ -209,7 +209,7 @@ describe('getOpeningMessage', () => {
         0,
         undefined,
         'Photosynthesis',
-        'Biology — Botany'
+        'Biology — Botany',
       );
       expect(msg).toContain('Photosynthesis');
       expect(msg).not.toContain('Biology — Botany');
@@ -221,7 +221,7 @@ describe('getOpeningMessage', () => {
         0,
         'Solve 2+2',
         undefined,
-        'Biology — Botany'
+        'Biology — Botany',
       );
       expect(msg).not.toContain('Biology — Botany');
       expect(msg).toContain('walk you through');
@@ -236,7 +236,7 @@ describe('getOpeningMessage', () => {
         undefined,
         'Tea & caffeine',
         'Botany',
-        'tea'
+        'tea',
       );
       expect(msg).toContain('tea');
     });
@@ -248,7 +248,7 @@ describe('getOpeningMessage', () => {
         undefined,
         undefined,
         undefined,
-        'tea'
+        'tea',
       );
       expect(msg).toContain('tea');
     });
@@ -260,7 +260,7 @@ describe('getOpeningMessage', () => {
         'solve x+2=5',
         'Algebra',
         'Math',
-        'help with homework'
+        'help with homework',
       );
       expect(msg).not.toContain('homework');
       expect(msg).toContain('walk you through');
@@ -289,31 +289,31 @@ describe('freeform greeting revert guards (copy sweep 2026-04-19)', () => {
 
   it('C2: freeform base openingMessage leverages entry-card context', () => {
     expect(SESSION_MODE_CONFIGS.freeform?.openingMessage).toBe(
-      'Hi! Ask me anything.'
+      'Hi! Ask me anything.',
     );
   });
 
   it('C3: EARLY_SESSIONS freeform greeting is the curiosity phrasing', () => {
     expect(EARLY_SESSIONS.freeform).toBe(
-      'Hey again — what are you curious about?'
+      'Hey again — what are you curious about?',
     );
   });
 
   it('C4: FAMILIAR_SESSIONS freeform greeting matches C3 (consolidated)', () => {
     expect(FAMILIAR_SESSIONS.freeform).toBe(
-      'Hey again — what are you curious about?'
+      'Hey again — what are you curious about?',
     );
   });
 
   it('does not fall back to the old passive phrasings', () => {
     expect(SESSION_MODE_CONFIGS.freeform?.placeholder).not.toBe(
-      "What's on your mind?"
+      "What's on your mind?",
     );
     expect(EARLY_SESSIONS.freeform).not.toBe(
-      "Hey again! What's on your mind today?"
+      "Hey again! What's on your mind today?",
     );
     expect(FAMILIAR_SESSIONS.freeform).not.toBe(
-      "What's on your mind? I'm ready when you are."
+      "What's on your mind? I'm ready when you are.",
     );
   });
 });

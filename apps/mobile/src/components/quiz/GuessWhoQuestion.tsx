@@ -37,7 +37,7 @@ function shuffle<T>(items: T[]): T[] {
 
 function getHintMessage(
   nextClueCount: number,
-  usedWrongGuess: boolean
+  usedWrongGuess: boolean,
 ): string {
   if (nextClueCount >= 3) {
     return usedWrongGuess
@@ -113,7 +113,7 @@ export function GuessWhoQuestion({
 
       const nextClueCount = Math.min(
         question.clues.length,
-        visibleClueCount + 1
+        visibleClueCount + 1,
       );
       setVisibleClueCount(nextClueCount);
       setGuess('');
@@ -124,7 +124,7 @@ export function GuessWhoQuestion({
       } else {
         const nextClueCount = Math.min(
           question.clues.length,
-          visibleClueCount + 1
+          visibleClueCount + 1,
         );
         setVisibleClueCount(nextClueCount);
         setGuess('');

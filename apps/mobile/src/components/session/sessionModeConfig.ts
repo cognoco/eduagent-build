@@ -139,7 +139,7 @@ export function getOpeningMessage(
   topicName?: string,
   subjectName?: string,
   rawInput?: string,
-  recap?: string
+  recap?: string,
 ): string {
   // Two zones in this function:
   //   - Early-return branches below use `mode` (raw) — only check literals

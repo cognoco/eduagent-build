@@ -103,7 +103,7 @@ export default function ConsentScreen() {
         });
       });
     },
-    [fadeAnim, reduceMotion]
+    [fadeAnim, reduceMotion],
   );
 
   // Hand-off copy uses learner variant (consent screen is always shown to children).

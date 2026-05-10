@@ -26,7 +26,7 @@ describe('StudyCTA', () => {
         label="Start Study Session"
         variant="primary"
         onPress={onPress}
-      />
+      />,
     );
     screen.getByText('Start Study Session');
   });
@@ -43,7 +43,7 @@ describe('StudyCTA', () => {
         variant="primary"
         onPress={onPress}
         testID="custom-cta"
-      />
+      />,
     );
     expect(screen.getByTestId('custom-cta')).toBeTruthy();
   });
@@ -62,7 +62,7 @@ describe('StudyCTA', () => {
 
   it('does not call onPress when disabled', () => {
     render(
-      <StudyCTA label="Study" variant="primary" onPress={onPress} disabled />
+      <StudyCTA label="Study" variant="primary" onPress={onPress} disabled />,
     );
     fireEvent.press(screen.getByTestId('study-cta'));
     expect(onPress).not.toHaveBeenCalled();
@@ -80,7 +80,7 @@ describe('StudyCTA', () => {
         label="Start Study Session"
         variant="primary"
         onPress={onPress}
-      />
+      />,
     );
     const btn = screen.getByTestId('study-cta');
     expect(btn.props.accessibilityLabel).toBe('Start Study Session');
@@ -88,7 +88,7 @@ describe('StudyCTA', () => {
 
   it('marks disabled state in accessibilityState', () => {
     render(
-      <StudyCTA label="Study" variant="primary" onPress={onPress} disabled />
+      <StudyCTA label="Study" variant="primary" onPress={onPress} disabled />,
     );
     const btn = screen.getByTestId('study-cta');
     expect(btn.props.accessibilityState).toEqual({ disabled: true });

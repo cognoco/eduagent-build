@@ -69,7 +69,7 @@ export function useDashboard(): UseQueryResult<DashboardData> {
         if (data.children.length === 0) {
           const demoRes = await client.dashboard.demo.$get(
             {},
-            { init: { signal } }
+            { init: { signal } },
           );
           await assertOk(demoRes);
           return (await demoRes.json()) as DashboardData;
@@ -120,7 +120,7 @@ export function useAckNotice(): UseMutationResult<
 }
 
 export function useChildDetail(
-  childProfileId: string | undefined
+  childProfileId: string | undefined,
 ): UseQueryResult<DashboardChild | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -133,7 +133,7 @@ export function useChildDetail(
       try {
         const res = await client.dashboard.children[':profileId'].$get(
           { param: { profileId: childProfileId } },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         const data = await res.json();
@@ -149,7 +149,7 @@ export function useChildDetail(
 
 export function useChildSubjectTopics(
   childProfileId: string | undefined,
-  subjectId: string | undefined
+  subjectId: string | undefined,
 ): UseQueryResult<TopicProgress[]> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -165,7 +165,7 @@ export function useChildSubjectTopics(
           ':subjectId'
         ].$get(
           { param: { profileId: childProfileId, subjectId: subjectId } },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         const data = await res.json();
@@ -194,7 +194,7 @@ export function useChildSessions(childProfileId: string | undefined) {
       try {
         const res = await client.dashboard.children[':profileId'].sessions.$get(
           { param: { profileId: childProfileId } },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         const data = await res.json();
@@ -210,7 +210,7 @@ export function useChildSessions(childProfileId: string | undefined) {
 
 export function useChildSessionDetail(
   childProfileId: string | undefined,
-  sessionId: string | undefined
+  sessionId: string | undefined,
 ) {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -231,7 +231,7 @@ export function useChildSessionDetail(
               sessionId,
             },
           },
-          { init: { signal } }
+          { init: { signal } },
         );
         if (res.status === 404) return null;
         await assertOk(res);
@@ -261,7 +261,7 @@ export function useChildMemory(childProfileId: string | undefined) {
       try {
         const res = await client.dashboard.children[':profileId'].memory.$get(
           { param: { profileId: childProfileId } },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         const data = await res.json();

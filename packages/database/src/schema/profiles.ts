@@ -25,7 +25,7 @@ export const consentStatusEnum = pgEnum('consent_status', [
 ]);
 export const withdrawalArchivePreferenceEnum = pgEnum(
   'withdrawal_archive_preference',
-  ['auto', 'always', 'never']
+  ['auto', 'always', 'never'],
 );
 
 export const accounts = pgTable('accounts', {
@@ -90,16 +90,16 @@ export const profiles = pgTable(
     }).onDelete('set null'),
     check(
       'profiles_conversation_language_check',
-      sql`${table.conversationLanguage} IN ('en','cs','es','fr','de','it','pt','pl','ja','nb')`
+      sql`${table.conversationLanguage} IN ('en','cs','es','fr','de','it','pt','pl','ja','nb')`,
     ),
     // [BUG-978 / CCR-PR123-DB-1] DB-layer enforcement of the 32-char pronouns
     // cap. The Zod validator is primary; this CHECK closes the gap for any
     // path that bypasses the API layer (raw SQL, seed scripts, admin tools).
     check(
       'profiles_pronouns_length_check',
-      sql`${table.pronouns} IS NULL OR char_length(${table.pronouns}) <= 32`
+      sql`${table.pronouns} IS NULL OR char_length(${table.pronouns}) <= 32`,
     ),
-  ]
+  ],
 );
 
 export const withdrawalArchivePreferences = pgTable(
@@ -124,9 +124,9 @@ export const withdrawalArchivePreferences = pgTable(
   },
   (table) => [
     index('withdrawal_archive_preferences_owner_profile_id_idx').on(
-      table.ownerProfileId
+      table.ownerProfileId,
     ),
-  ]
+  ],
 );
 
 export const familyPreferences = pgTable(
@@ -151,7 +151,7 @@ export const familyPreferences = pgTable(
   },
   (table) => [
     index('family_preferences_owner_profile_id_idx').on(table.ownerProfileId),
-  ]
+  ],
 );
 
 export type FamilyPreferences = typeof familyPreferences.$inferSelect;
@@ -176,13 +176,13 @@ export const pendingNotices = pgTable(
   (table) => [
     index('pending_notices_owner_unseen_idx').on(
       table.ownerProfileId,
-      table.seenAt
+      table.seenAt,
     ),
     check(
       'pending_notices_type_check',
-      sql`${table.type} in ('consent_deleted', 'consent_archived')`
+      sql`${table.type} in ('consent_deleted', 'consent_archived')`,
     ),
-  ]
+  ],
 );
 
 export const familyLinks = pgTable(
@@ -205,13 +205,13 @@ export const familyLinks = pgTable(
     index('family_links_child_profile_id_idx').on(table.childProfileId),
     unique('family_links_parent_child_unique').on(
       table.parentProfileId,
-      table.childProfileId
+      table.childProfileId,
     ),
     check(
       'family_links_no_self_link',
-      sql`${table.parentProfileId} != ${table.childProfileId}`
+      sql`${table.parentProfileId} != ${table.childProfileId}`,
     ),
-  ]
+  ],
 );
 
 export const consentStates = pgTable(
@@ -243,7 +243,7 @@ export const consentStates = pgTable(
   (table) => [
     unique('consent_states_profile_type_unique').on(
       table.profileId,
-      table.consentType
+      table.consentType,
     ),
-  ]
+  ],
 );

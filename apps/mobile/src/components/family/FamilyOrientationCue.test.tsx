@@ -33,7 +33,7 @@ describe('FamilyOrientationCue', () => {
     mockGetItem.mockReturnValue(
       new Promise<string | null>((r) => {
         resolve = r;
-      })
+      }),
     );
 
     render(<FamilyOrientationCue />);
@@ -76,7 +76,7 @@ describe('FamilyOrientationCue', () => {
     await waitFor(() => {
       expect(mockSetItem).toHaveBeenCalledWith(
         'family_orientation_cue_dismissed_v1',
-        'true'
+        'true',
       );
       expect(screen.queryByTestId('family-orientation-cue')).toBeNull();
     });

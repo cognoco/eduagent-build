@@ -9,7 +9,7 @@ const STORAGE_KEY = 'family_orientation_cue_dismissed_v1';
 export function FamilyOrientationCue(): React.ReactElement | null {
   const { t } = useTranslation();
   const [state, setState] = React.useState<'pending' | 'show' | 'hide'>(
-    'pending'
+    'pending',
   );
 
   React.useEffect(() => {

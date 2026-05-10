@@ -55,10 +55,10 @@ export const quizRounds = pgTable(
   (table) => [
     index('idx_quiz_rounds_profile_activity').on(
       table.profileId,
-      table.activityType
+      table.activityType,
     ),
     index('idx_quiz_rounds_profile_status').on(table.profileId, table.status),
-  ]
+  ],
 );
 
 export const quizMissedItems = pgTable(
@@ -86,7 +86,7 @@ export const quizMissedItems = pgTable(
     index('idx_quiz_missed_items_profile').on(
       table.profileId,
       table.activityType,
-      table.surfaced
+      table.surfaced,
     ),
-  ]
+  ],
 );

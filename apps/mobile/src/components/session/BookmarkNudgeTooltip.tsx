@@ -8,7 +8,7 @@ const KEY_PREFIX = 'bookmark-nudge-shown';
 
 function getBookmarkNudgeKey(profileId: string | undefined): string {
   return sanitizeSecureStoreKey(
-    profileId ? `${KEY_PREFIX}:${profileId}` : KEY_PREFIX
+    profileId ? `${KEY_PREFIX}:${profileId}` : KEY_PREFIX,
   );
 }
 
@@ -49,7 +49,7 @@ export function BookmarkNudgeTooltip({
     setVisible(false);
     if (!profileId) return;
     void SecureStore.setItemAsync(getBookmarkNudgeKey(profileId), 'true').catch(
-      () => undefined
+      () => undefined,
     );
   }, [profileId]);
 

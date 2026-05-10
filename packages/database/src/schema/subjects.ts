@@ -80,7 +80,7 @@ export const subjects = pgTable(
     // DO NOT add a uniqueIndex(...) here — it would be a different, weaker
     // index and would not enforce the dedup contract. The migration is the
     // source of truth; this comment is a pointer.
-  ]
+  ],
 );
 
 export const curricula = pgTable(
@@ -106,9 +106,9 @@ export const curricula = pgTable(
   (table) => [
     uniqueIndex('curricula_subject_version_idx').on(
       table.subjectId,
-      table.version
+      table.version,
     ),
-  ]
+  ],
 );
 
 export const curriculumBooks = pgTable(
@@ -135,7 +135,7 @@ export const curriculumBooks = pgTable(
   (table) => [
     uniqueIndex('curriculum_books_subject_sort_order_uq').on(
       table.subjectId,
-      table.sortOrder
+      table.sortOrder,
     ),
     // [CR-FIL-DEDUP-INDEX-12-FOLLOWUP] Concurrent-write dedup for book creation.
     // Defined in migration 0044_shelf_book_dedup_unique_indexes.sql as
@@ -146,7 +146,7 @@ export const curriculumBooks = pgTable(
     // uniqueIndex(...) here; it would be a different index and would not
     // enforce the dedup contract. The migration is the source of truth;
     // this comment is a pointer.
-  ]
+  ],
 );
 
 export const curriculumTopics = pgTable(
@@ -189,7 +189,7 @@ export const curriculumTopics = pgTable(
     uniqueIndex('curriculum_topics_book_sort_order_uq').on(
       table.curriculumId,
       table.bookId,
-      table.sortOrder
+      table.sortOrder,
     ),
     index('curriculum_topics_book_id_idx').on(table.bookId),
     // [CR-FIL-DEDUP-INDEX-12] Concurrent-write dedup. Defined in migration
@@ -201,7 +201,7 @@ export const curriculumTopics = pgTable(
     // a uniqueIndex(...) here without the lower() expression; it would
     // be a different index and would not enforce the dedup contract.
     // The migration is the source of truth; this comment is a pointer.
-  ]
+  ],
 );
 
 export const topicConnections = pgTable('topic_connections', {
@@ -259,7 +259,7 @@ export const bookSuggestions = pgTable(
       .defaultNow(),
     pickedAt: timestamp('picked_at', { withTimezone: true }),
   },
-  (table) => [index('book_suggestions_subject_id_idx').on(table.subjectId)]
+  (table) => [index('book_suggestions_subject_id_idx').on(table.subjectId)],
 );
 
 export const topicSuggestions = pgTable(
@@ -277,5 +277,5 @@ export const topicSuggestions = pgTable(
       .defaultNow(),
     usedAt: timestamp('used_at', { withTimezone: true }),
   },
-  (table) => [index('topic_suggestions_book_id_idx').on(table.bookId)]
+  (table) => [index('topic_suggestions_book_id_idx').on(table.bookId)],
 );

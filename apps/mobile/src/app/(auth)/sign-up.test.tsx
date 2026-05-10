@@ -100,7 +100,7 @@ describe('SignUpScreen', () => {
 
     await waitFor(() => {
       expect(mockStartSSOFlow).toHaveBeenCalledWith(
-        expect.objectContaining({ strategy: 'oauth_google' })
+        expect.objectContaining({ strategy: 'oauth_google' }),
       );
     });
 
@@ -120,7 +120,7 @@ describe('SignUpScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('sign-up-email'),
-      'new@example.com'
+      'new@example.com',
     );
     fireEvent.changeText(screen.getByTestId('sign-up-password'), 'secure123');
     fireEvent.press(screen.getByTestId('sign-up-button'));
@@ -158,7 +158,7 @@ describe('SignUpScreen', () => {
     // Phase 1: sign-up
     fireEvent.changeText(
       screen.getByTestId('sign-up-email'),
-      'new@example.com'
+      'new@example.com',
     );
     fireEvent.changeText(screen.getByTestId('sign-up-password'), 'secure123');
     fireEvent.press(screen.getByTestId('sign-up-button'));
@@ -196,7 +196,7 @@ describe('SignUpScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('sign-up-email'),
-      'existing@example.com'
+      'existing@example.com',
     );
     fireEvent.changeText(screen.getByTestId('sign-up-password'), 'password');
     fireEvent.press(screen.getByTestId('sign-up-button'));
@@ -218,7 +218,7 @@ describe('SignUpScreen', () => {
     // Get to phase 2
     fireEvent.changeText(
       screen.getByTestId('sign-up-email'),
-      'new@example.com'
+      'new@example.com',
     );
     fireEvent.changeText(screen.getByTestId('sign-up-password'), 'secure123');
     fireEvent.press(screen.getByTestId('sign-up-button'));
@@ -246,7 +246,7 @@ describe('SignUpScreen', () => {
 
     await waitFor(() => {
       expect(mockStartSSOFlow).toHaveBeenCalledWith(
-        expect.objectContaining({ strategy: 'oauth_custom_openai' })
+        expect.objectContaining({ strategy: 'oauth_custom_openai' }),
       );
     });
 

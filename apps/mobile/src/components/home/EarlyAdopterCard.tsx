@@ -44,7 +44,7 @@ export function EarlyAdopterCard(): React.ReactElement | null {
       void SecureStore.setItemAsync(DISMISSED_KEY(profileId), 'true').catch(
         () => {
           /* non-fatal */
-        }
+        },
       );
     }
   }, [profileId]);

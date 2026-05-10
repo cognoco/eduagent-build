@@ -54,7 +54,7 @@ describe('VoicePlaybackBar', () => {
 
   it('shows pause icon when speaking and not paused', () => {
     render(
-      <VoicePlaybackBar {...defaultProps} isSpeaking={true} isPaused={false} />
+      <VoicePlaybackBar {...defaultProps} isSpeaking={true} isPaused={false} />,
     );
 
     screen.getByTestId('voice-pause-resume-button');
@@ -63,7 +63,7 @@ describe('VoicePlaybackBar', () => {
 
   it('shows play icon when paused', () => {
     render(
-      <VoicePlaybackBar {...defaultProps} isSpeaking={true} isPaused={true} />
+      <VoicePlaybackBar {...defaultProps} isSpeaking={true} isPaused={true} />,
     );
 
     screen.getByLabelText('Resume speaking');
@@ -77,7 +77,7 @@ describe('VoicePlaybackBar', () => {
         isSpeaking={true}
         isPaused={false}
         onPause={onPause}
-      />
+      />,
     );
 
     fireEvent.press(screen.getByTestId('voice-pause-resume-button'));
@@ -93,7 +93,7 @@ describe('VoicePlaybackBar', () => {
         isSpeaking={true}
         isPaused={true}
         onResume={onResume}
-      />
+      />,
     );
 
     fireEvent.press(screen.getByTestId('voice-pause-resume-button'));
@@ -103,7 +103,7 @@ describe('VoicePlaybackBar', () => {
 
   it('shows stop button when paused', () => {
     render(
-      <VoicePlaybackBar {...defaultProps} isSpeaking={true} isPaused={true} />
+      <VoicePlaybackBar {...defaultProps} isSpeaking={true} isPaused={true} />,
     );
 
     screen.getByTestId('voice-stop-button');
@@ -121,7 +121,7 @@ describe('VoicePlaybackBar', () => {
   it('calls onStop when stop is pressed', () => {
     const onStop = jest.fn();
     render(
-      <VoicePlaybackBar {...defaultProps} isSpeaking={true} onStop={onStop} />
+      <VoicePlaybackBar {...defaultProps} isSpeaking={true} onStop={onStop} />,
     );
 
     fireEvent.press(screen.getByTestId('voice-stop-button'));
@@ -136,7 +136,7 @@ describe('VoicePlaybackBar', () => {
         {...defaultProps}
         rate={1.0}
         onRateChange={onRateChange}
-      />
+      />,
     );
 
     fireEvent.press(screen.getByTestId('voice-rate-button'));
@@ -151,7 +151,7 @@ describe('VoicePlaybackBar', () => {
         {...defaultProps}
         rate={1.25}
         onRateChange={onRateChange}
-      />
+      />,
     );
 
     fireEvent.press(screen.getByTestId('voice-rate-button'));
@@ -166,7 +166,7 @@ describe('VoicePlaybackBar', () => {
         {...defaultProps}
         rate={0.75}
         onRateChange={onRateChange}
-      />
+      />,
     );
 
     fireEvent.press(screen.getByTestId('voice-rate-button'));
@@ -182,7 +182,7 @@ describe('VoicePlaybackBar', () => {
 
   it('disables replay while speaking and not paused', () => {
     render(
-      <VoicePlaybackBar {...defaultProps} isSpeaking={true} isPaused={false} />
+      <VoicePlaybackBar {...defaultProps} isSpeaking={true} isPaused={false} />,
     );
 
     const replay = screen.getByTestId('voice-replay-button');
@@ -191,7 +191,7 @@ describe('VoicePlaybackBar', () => {
 
   it('enables replay when paused', () => {
     render(
-      <VoicePlaybackBar {...defaultProps} isSpeaking={true} isPaused={true} />
+      <VoicePlaybackBar {...defaultProps} isSpeaking={true} isPaused={true} />,
     );
 
     const replay = screen.getByTestId('voice-replay-button');
@@ -211,7 +211,7 @@ describe('VoicePlaybackBar', () => {
     });
     expect(iconWrapper.props.accessibilityElementsHidden).toBe(true);
     expect(iconWrapper.props.importantForAccessibility).toBe(
-      'no-hide-descendants'
+      'no-hide-descendants',
     );
   });
 
@@ -222,7 +222,7 @@ describe('VoicePlaybackBar', () => {
 
   it('marks the pause/resume icon wrapper as accessibility-hidden [a11y sweep]', () => {
     render(
-      <VoicePlaybackBar {...defaultProps} isSpeaking={true} isPaused={false} />
+      <VoicePlaybackBar {...defaultProps} isSpeaking={true} isPaused={false} />,
     );
     const iconWrapper = screen.getByTestId('voice-pause-resume-icon', {
       includeHiddenElements: true,
@@ -232,7 +232,7 @@ describe('VoicePlaybackBar', () => {
 
   it('marks the stop icon wrapper as accessibility-hidden [a11y sweep]', () => {
     render(
-      <VoicePlaybackBar {...defaultProps} isSpeaking={true} isPaused={false} />
+      <VoicePlaybackBar {...defaultProps} isSpeaking={true} isPaused={false} />,
     );
     const iconWrapper = screen.getByTestId('voice-stop-icon', {
       includeHiddenElements: true,

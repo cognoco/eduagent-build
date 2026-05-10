@@ -40,7 +40,7 @@ export function levenshteinDistance(a: string, b: string): number {
 export function isGuessWhoFuzzyMatch(
   input: string,
   canonicalName: string,
-  acceptedAliases: string[]
+  acceptedAliases: string[],
 ): boolean {
   const normalizedInput = input.trim().toLowerCase();
   if (!normalizedInput) return false;

@@ -23,7 +23,7 @@ describe('SubjectCard', () => {
   it('fires onPress when tapped', () => {
     const onPress = jest.fn();
     const { getByTestId } = render(
-      <SubjectCard {...baseProps} onPress={onPress} />
+      <SubjectCard {...baseProps} onPress={onPress} />,
     );
     fireEvent.press(getByTestId('home-subject-card-abc-123'));
     expect(onPress).toHaveBeenCalledTimes(1);

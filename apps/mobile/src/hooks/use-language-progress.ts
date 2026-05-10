@@ -16,7 +16,7 @@ export function useLanguageProgress(subjectId: string) {
       try {
         const res = await client.subjects[':subjectId']['cefr-progress'].$get(
           { param: { subjectId } },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         return (await res.json()) as LanguageProgress;

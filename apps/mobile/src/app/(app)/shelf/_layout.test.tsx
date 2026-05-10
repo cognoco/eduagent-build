@@ -45,10 +45,10 @@ describe('shelf/_layout.tsx', () => {
 
     const screen = capturedScreens.find((s) => s.name === '[subjectId]')!;
     expect(screen.getId!({ params: { subjectId: 'history-123' } })).toBe(
-      'history-123'
+      'history-123',
     );
     expect(screen.getId!({ params: { subjectId: 'geography-456' } })).toBe(
-      'geography-456'
+      'geography-456',
     );
   });
 

@@ -25,7 +25,7 @@ function validateEmbedding(embedding: number[]): void {
   for (let i = 0; i < embedding.length; i++) {
     if (typeof embedding[i] !== 'number' || !Number.isFinite(embedding[i])) {
       throw new Error(
-        `Embedding contains invalid value at index ${i}: ${embedding[i]}`
+        `Embedding contains invalid value at index ${i}: ${embedding[i]}`,
       );
     }
   }
@@ -35,7 +35,7 @@ export async function findSimilarTopics(
   db: Database,
   embedding: number[],
   limit = 5,
-  profileId?: string
+  profileId?: string,
 ): Promise<SimilarTopic[]> {
   validateEmbedding(embedding);
   const vectorStr = `[${embedding.join(',')}]`;
@@ -69,7 +69,7 @@ export async function findSimilarTopics(
 
 export async function storeEmbedding(
   db: Database,
-  data: EmbeddingInsert
+  data: EmbeddingInsert,
 ): Promise<void> {
   validateEmbedding(data.embedding);
   await db.insert(sessionEmbeddings).values({

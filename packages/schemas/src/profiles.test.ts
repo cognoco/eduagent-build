@@ -98,7 +98,7 @@ describe('onboardingPronounsPatchSchema', () => {
 
   it('[BKT-C.1] rejects body with pronouns > 32 chars', () => {
     expect(() =>
-      onboardingPronounsPatchSchema.parse({ pronouns: 'x'.repeat(33) })
+      onboardingPronounsPatchSchema.parse({ pronouns: 'x'.repeat(33) }),
     ).toThrow();
   });
 });
@@ -183,13 +183,13 @@ describe('interestsArraySchema forward-compat', () => {
     // Per the picker contract: one-line rendering, picker caps at 12 entries.
     // A 60-char cap keeps layout predictable.
     expect(() =>
-      interestsArraySchema.parse([{ label: 'x'.repeat(61), context: 'both' }])
+      interestsArraySchema.parse([{ label: 'x'.repeat(61), context: 'both' }]),
     ).toThrow();
   });
 
   it('[BKT-C.2] rejects entries with invalid context enum value', () => {
     expect(() =>
-      interestEntrySchema.parse({ label: 'chess', context: 'mixed' })
+      interestEntrySchema.parse({ label: 'chess', context: 'mixed' }),
     ).toThrow();
   });
 });

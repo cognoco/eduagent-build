@@ -60,7 +60,7 @@ describe('CelestialCelebration', () => {
         color="#f7c948"
         accentColor="#fce588"
         testID="test-celebration"
-      />
+      />,
     );
 
     const element = screen.getByTestId('test-celebration');
@@ -74,7 +74,7 @@ describe('CelestialCelebration', () => {
         color="#f7c948"
         accentColor="#fce588"
         testID="test-celebration"
-      />
+      />,
     );
 
     // Component should render without throwing
@@ -91,7 +91,7 @@ describe('CelestialCelebration', () => {
         accentColor="#fce588"
         onComplete={onComplete}
         testID="test-celebration"
-      />
+      />,
     );
 
     // With reduced motion, onComplete fires immediately in the useEffect
@@ -108,7 +108,7 @@ describe('CelestialCelebration', () => {
         accentColor="#fce588"
         onComplete={onComplete}
         testID="test-celebration"
-      />
+      />,
     );
 
     // In the test mock, withSequence/withTiming are pass-through, so the
@@ -123,7 +123,7 @@ describe('CelestialCelebration', () => {
         color="#f7c948"
         accentColor="#fce588"
         testID="test-celebration"
-      />
+      />,
     );
 
     const element = screen.getByTestId('test-celebration');
@@ -131,7 +131,7 @@ describe('CelestialCelebration', () => {
     expect(styles).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ pointerEvents: 'none' }),
-      ])
+      ]),
     );
   });
 });

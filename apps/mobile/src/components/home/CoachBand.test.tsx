@@ -23,7 +23,7 @@ describe('CoachBand', () => {
 
   it('renders nothing when headline is null', () => {
     const { queryByTestId } = render(
-      <CoachBand {...baseProps} headline={null} />
+      <CoachBand {...baseProps} headline={null} />,
     );
     expect(queryByTestId('home-coach-band')).toBeNull();
   });
@@ -37,7 +37,7 @@ describe('CoachBand', () => {
   it('fires onContinue when Continue is tapped', () => {
     const onContinue = jest.fn();
     const { getByTestId } = render(
-      <CoachBand {...baseProps} onContinue={onContinue} />
+      <CoachBand {...baseProps} onContinue={onContinue} />,
     );
     fireEvent.press(getByTestId('home-coach-band-continue'));
     expect(onContinue).toHaveBeenCalledTimes(1);
@@ -46,7 +46,7 @@ describe('CoachBand', () => {
   it('fires onDismiss when dismiss is tapped', () => {
     const onDismiss = jest.fn();
     const { getByTestId } = render(
-      <CoachBand {...baseProps} onDismiss={onDismiss} />
+      <CoachBand {...baseProps} onDismiss={onDismiss} />,
     );
     fireEvent.press(getByTestId('home-coach-band-dismiss'));
     expect(onDismiss).toHaveBeenCalledTimes(1);
@@ -63,19 +63,19 @@ describe('CoachBand', () => {
     const evening = new Date('2026-05-03T20:00:00');
 
     const { unmount, getByText } = render(
-      <CoachBand {...baseProps} eyebrow={undefined} now={morning} />
+      <CoachBand {...baseProps} eyebrow={undefined} now={morning} />,
     );
     expect(getByText(/THIS MORNING/)).toBeTruthy();
     unmount();
 
     const { unmount: u2, getByText: g2 } = render(
-      <CoachBand {...baseProps} eyebrow={undefined} now={afternoon} />
+      <CoachBand {...baseProps} eyebrow={undefined} now={afternoon} />,
     );
     expect(g2(/THIS AFTERNOON/)).toBeTruthy();
     u2();
 
     const { getByText: g3 } = render(
-      <CoachBand {...baseProps} eyebrow={undefined} now={evening} />
+      <CoachBand {...baseProps} eyebrow={undefined} now={evening} />,
     );
     expect(g3(/TONIGHT/)).toBeTruthy();
   });

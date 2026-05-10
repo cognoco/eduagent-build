@@ -27,7 +27,7 @@ function nextHomeworkProblemId(): string {
 
 export function createHomeworkProblem(
   text: string,
-  options?: Partial<HomeworkProblem>
+  options?: Partial<HomeworkProblem>,
 ): HomeworkProblem {
   return {
     id: options?.id ?? nextHomeworkProblemId(),
@@ -87,7 +87,7 @@ export function hasAcceptableShape(text: string): boolean {
 
 export function isLikelyHomework(
   text: string,
-  blockConfidence?: number
+  blockConfidence?: number,
 ): boolean {
   if (blockConfidence != null && blockConfidence < MIN_BLOCK_CONFIDENCE) {
     return false;
@@ -112,7 +112,7 @@ export function isLikelyHomework(
 
 export function filterHomeworkProblems(
   problems: HomeworkProblem[],
-  blockConfidence?: number
+  blockConfidence?: number,
 ): SplitHomeworkProblemsResult {
   const keptProblems: HomeworkProblem[] = [];
   const droppedProblems: HomeworkProblem[] = [];
@@ -134,7 +134,7 @@ export function filterHomeworkProblems(
 
 export function splitHomeworkProblems(
   rawText: string,
-  blockConfidence?: number
+  blockConfidence?: number,
 ): SplitHomeworkProblemsResult {
   const normalizedText = rawText.replace(/\r\n/g, '\n').trim();
   if (!normalizedText) {
@@ -181,7 +181,7 @@ export function splitHomeworkProblems(
           createHomeworkProblem(group, {
             source: 'ocr',
             originalText: group,
-          })
+          }),
         );
 
   return filterHomeworkProblems(problems, blockConfidence);
@@ -197,7 +197,7 @@ export function serializeHomeworkProblems(problems: HomeworkProblem[]): string {
 
 export function parseHomeworkProblems(
   serializedProblems?: string | string[] | null,
-  fallbackProblemText?: string | null
+  fallbackProblemText?: string | null,
 ): HomeworkProblem[] {
   const rawValue = Array.isArray(serializedProblems)
     ? serializedProblems[0]
@@ -226,7 +226,7 @@ export function parseHomeworkProblems(
 
 export function withProblemStatus(
   problems: HomeworkProblem[],
-  currentProblemIndex: number
+  currentProblemIndex: number,
 ): HomeworkProblem[] {
   return problems.map((problem, index) => ({
     ...problem,
@@ -234,20 +234,20 @@ export function withProblemStatus(
       index < currentProblemIndex
         ? 'completed'
         : index === currentProblemIndex
-        ? 'active'
-        : 'pending',
+          ? 'active'
+          : 'pending',
   }));
 }
 
 export function withProblemMode(
   problems: HomeworkProblem[],
   problemId: string,
-  mode: HomeworkMode | undefined
+  mode: HomeworkMode | undefined,
 ): HomeworkProblem[] {
   return problems.map((problem) =>
     problem.id === problemId
       ? { ...problem, selectedMode: mode ?? null }
-      : problem
+      : problem,
   );
 }
 
@@ -255,7 +255,7 @@ export function buildHomeworkSessionMetadata(
   problems: HomeworkProblem[],
   currentProblemIndex: number,
   ocrText?: string,
-  source?: HomeworkCaptureSource
+  source?: HomeworkCaptureSource,
 ): HomeworkSessionMetadata {
   return {
     problemCount: problems.length,

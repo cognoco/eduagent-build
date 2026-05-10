@@ -9,7 +9,7 @@ import { showNoteContextMenu } from './NoteContextMenu';
 function getButtonPress(
   alertSpy: jest.SpyInstance,
   callIndex: number,
-  buttonText: string
+  buttonText: string,
 ): (() => void) | undefined {
   const buttons: Array<{ text: string; onPress?: () => void }> =
     alertSpy.mock.calls[callIndex][2];

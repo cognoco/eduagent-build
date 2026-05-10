@@ -44,10 +44,10 @@ describe('shelf/[subjectId]/_layout.tsx', () => {
 
     const screen = capturedScreens.find((s) => s.name === 'book/[bookId]')!;
     expect(screen.getId!({ params: { bookId: 'algebra-101' } })).toBe(
-      'algebra-101'
+      'algebra-101',
     );
     expect(screen.getId!({ params: { bookId: 'geometry-202' } })).toBe(
-      'geometry-202'
+      'geometry-202',
     );
   });
 

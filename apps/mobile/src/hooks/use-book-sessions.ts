@@ -18,7 +18,7 @@ interface BookSessionsResponse {
 
 export function useBookSessions(
   subjectId: string | undefined,
-  bookId: string | undefined
+  bookId: string | undefined,
 ): UseQueryResult<BookSession[]> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
