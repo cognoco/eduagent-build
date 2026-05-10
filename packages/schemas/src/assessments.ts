@@ -98,12 +98,12 @@ export const assessmentAnswerSchema = z.object({
 });
 export type AssessmentAnswerInput = z.infer<typeof assessmentAnswerSchema>;
 
-// Quick check response
+// Quick check request — the learner's answer submission (not an HTTP response)
 
-export const quickCheckResponseSchema = z.object({
+export const quickCheckRequestSchema = z.object({
   answer: z.string().min(1).max(5000),
 });
-export type QuickCheckResponseInput = z.infer<typeof quickCheckResponseSchema>;
+export type QuickCheckRequestInput = z.infer<typeof quickCheckRequestSchema>;
 
 // Verification type — standard, evaluate (Devil's Advocate), teach_back (Feynman)
 
