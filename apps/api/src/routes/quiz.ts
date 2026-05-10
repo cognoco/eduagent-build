@@ -53,7 +53,7 @@ type QuizRouteEnv = {
     user: AuthUser;
     db: Database;
     profileId: string | undefined;
-    profileMeta: ProfileMeta;
+    profileMeta: ProfileMeta | undefined;
   };
 };
 
@@ -213,6 +213,9 @@ async function generateRoundFromInput(
   const profileId = requireProfileId(c.get('profileId'));
   const db = c.get('db');
   const profileMeta = c.get('profileMeta');
+  if (!profileMeta) {
+    throw new Error('profileMeta not set — profile middleware must run first');
+  }
 
   try {
     const round = await buildAndGenerateRound(

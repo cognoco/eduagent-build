@@ -281,7 +281,7 @@ export default function PickBookScreen(): React.ReactElement {
   // For the two common recovery shapes we want a Retry + Go Back pair on this
   // screen, so build the actions directly rather than delegating to
   // recoveryActions (which defaults secondary to Go Home for retry cases).
-  if (suggestionsQuery.isError) {
+  if (suggestionsQuery.isError && !suggestionsQuery.data) {
     const classified = classifyApiError(suggestionsQuery.error);
     const canRetry = classified.recovery === 'retry';
 

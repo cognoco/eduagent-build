@@ -88,7 +88,7 @@ export default function SessionDetailScreen() {
     );
   }
 
-  if (isError) {
+  if (isError && !session) {
     return (
       <View className="flex-1 items-center justify-center bg-background px-6">
         <Text className="text-text-secondary mb-4 text-center">

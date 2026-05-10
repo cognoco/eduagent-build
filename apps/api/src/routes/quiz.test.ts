@@ -27,6 +27,7 @@ jest.mock('inngest/hono', () => ({
 }));
 
 jest.mock('../inngest/client', () => ({
+  // gc1-allow: route-level test isolates Inngest event bus to prevent side-effects
   inngest: {
     send: jest.fn().mockResolvedValue(undefined),
     createFunction: jest.fn().mockReturnValue(jest.fn()),

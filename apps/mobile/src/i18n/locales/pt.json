@@ -783,6 +783,7 @@
       "bookTopics": "{{progress}} tópicos",
       "shelfSubtitle_one": "{{count}} livro · {{progress}} tópicos",
       "shelfSubtitle_other": "{{count}} livros · {{progress}} tópicos",
+      "shelfSubtitleUnstarted": "Começar a aprender",
       "shelfEmpty": "Nenhum livro nesta matéria ainda. Estude um tópico e ele será arquivado aqui.",
       "bookAccessibilityLabel": "{{title}}, {{progress}} tópicos{{retentionSuffix}}{{notesSuffix}}",
       "bookRetentionSuffix": ", retenção {{status}}",

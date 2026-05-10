@@ -810,6 +810,7 @@
       "bookTopics": "{{progress}}トピック",
       "shelfSubtitle_one": "{{count}}冊の本・{{progress}}トピック",
       "shelfSubtitle_other": "{{count}}冊の本・{{progress}}トピック",
+      "shelfSubtitleUnstarted": "学習を始める",
       "shelfEmpty": "この科目にはまだ本がありません。トピックを学習すると、ここに整理されます。",
       "bookAccessibilityLabel": "{{title}}、{{progress}}トピック{{retentionSuffix}}{{notesSuffix}}",
       "bookRetentionSuffix": "、定着度{{status}}",

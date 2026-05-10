@@ -774,7 +774,7 @@
       "updateErrorTitle": "Could not update subject"
     },
     "row": {
-      "review": "Review",
+      "review": "Keep it fresh",
       "finished": "Finished",
       "notStarted": "not started",
       "paused": "Paused",
@@ -783,6 +783,7 @@
       "bookTopics": "{{progress}} topics",
       "shelfSubtitle_one": "{{count}} book · {{progress}} topics",
       "shelfSubtitle_other": "{{count}} books · {{progress}} topics",
+      "shelfSubtitleUnstarted": "Start learning",
       "shelfEmpty": "No books in this subject yet. Study a topic and it'll be filed here.",
       "bookAccessibilityLabel": "{{title}}, {{progress}} topics{{retentionSuffix}}{{notesSuffix}}",
       "bookRetentionSuffix": ", retention {{status}}",

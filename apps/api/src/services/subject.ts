@@ -3,7 +3,7 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, gte, lte, notInArray, sql } from 'drizzle-orm';
+import { eq, and, gte, notInArray, sql } from 'drizzle-orm';
 import {
   subjects,
   curriculumBooks,
@@ -79,12 +79,9 @@ function mapSubjectRow(
   };
 }
 
-const STUCK_BOOK_THRESHOLD_MS = 2 * 60 * 1000;
-
 async function getSubjectCurriculumStatus(
   db: Database,
   subjectId: string,
-  profileId?: string,
 ): Promise<SubjectCurriculumStatus> {
   const readyBook = await db.query.curriculumBooks.findFirst({
     where: and(
@@ -98,29 +95,6 @@ async function getSubjectCurriculumStatus(
     where: eq(bookSuggestions.subjectId, subjectId),
   });
   if (bookSuggestion) return 'ready';
-
-  if (profileId) {
-    const stuckThreshold = new Date(Date.now() - STUCK_BOOK_THRESHOLD_MS);
-    const stuckBooks = await db.query.curriculumBooks.findMany({
-      where: and(
-        eq(curriculumBooks.subjectId, subjectId),
-        eq(curriculumBooks.topicsGenerated, false),
-        lte(curriculumBooks.createdAt, stuckThreshold),
-      ),
-    });
-    for (const book of stuckBooks) {
-      dispatchCurriculumRetry({
-        subjectId,
-        profileId,
-        bookId: book.id,
-      }).catch((err: unknown) => {
-        captureException(err, {
-          profileId,
-          extra: { subjectId, phase: 'auto_retry_dispatch' },
-        });
-      });
-    }
-  }
 
   return 'preparing';
 }
@@ -227,7 +201,7 @@ export async function listSubjects(
       mapSubjectRow(
         row,
         row.status === 'active'
-          ? await getSubjectCurriculumStatus(db, row.id, profileId)
+          ? await getSubjectCurriculumStatus(db, row.id)
           : undefined,
       ),
     ),

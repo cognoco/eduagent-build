@@ -1,15 +1,19 @@
 const { join } = require('path');
 
+// Integration tests share a real Neon database. Run serially (maxWorkers: 1)
+// to prevent concurrent worker connections from exhausting the Neon WebSocket
+// pool and causing FK violations between test suites.
+//
+// Run via: pnpm exec nx run api:test-integration
+// (equivalent to: pnpm exec jest --config apps/api/jest.integration.config.cjs)
+
 module.exports = {
-  displayName: '@eduagent/api',
+  displayName: '@eduagent/api:integration',
   rootDir: '../..',
   testEnvironment: 'node',
   transform: {
     '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/apps/api/tsconfig.app.json' }],
   },
-  // Swap Neon HTTP driver for standard pg when DATABASE_URL points at
-  // localhost (CI container). Unit tests override with their own jest.mock.
-  // File lives outside apps/api/ to avoid NX module-boundary lint cascade.
   setupFilesAfterEnv: [join(__dirname, '../../tests/integration/api-setup.ts')],
   passWithNoTests: true,
   moduleNameMapper: {
@@ -22,14 +26,8 @@ module.exports = {
   modulePathIgnorePatterns: ['\\.claude/worktrees'],
   moduleFileExtensions: ['ts', 'js'],
   testMatch: [
-    '<rootDir>/apps/api/src/**/*.test.ts',
-    '<rootDir>/apps/api/eval-llm/**/*.test.ts',
-  ],
-  // Integration tests share a real Neon database and must run serially.
-  // They live in jest.integration.config.cjs → `api:test-integration` target.
-  testPathIgnorePatterns: [
-    '/node_modules/',
-    '\\.integration\\.test\\.ts$',
+    '<rootDir>/apps/api/src/**/*.integration.test.ts',
   ],
   coverageDirectory: '<rootDir>/coverage/apps/api',
+  maxWorkers: 1,
 };

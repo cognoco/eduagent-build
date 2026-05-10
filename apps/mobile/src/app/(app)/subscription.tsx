@@ -1171,7 +1171,7 @@ function SubscriptionContent(): React.ReactElement {
   // ---------------------------------------------------------------------------
 
   const isChild = activeProfile ? !activeProfile.isOwner : false;
-  const hasLoadError = subError || usageError;
+  const hasLoadError = (subError && !subscription) || (usageError && !usage);
   const trialOrExpired =
     !hasLoadError &&
     (subscription?.status === 'expired' ||

@@ -302,7 +302,7 @@ export default function ProgressScreen(): React.ReactElement {
 
         {isLoading ? (
           <LoadingBlock />
-        ) : isError ? (
+        ) : isError && !inventory ? (
           <ErrorFallback
             title={t('progress.error.loadTitle')}
             message={
@@ -533,7 +533,7 @@ export default function ProgressScreen(): React.ReactElement {
               ) : null}
             </View>
             {/* UX-DE-M8: isError branch — network failure shows compact error card, not empty guidance */}
-            {milestonesQuery.isError ? (
+            {milestonesQuery.isError && !milestonesQuery.data ? (
               <ErrorFallback
                 variant="card"
                 message={classifyApiError(milestonesQuery.error).message}

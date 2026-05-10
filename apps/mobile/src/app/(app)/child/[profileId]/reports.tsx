@@ -110,7 +110,7 @@ export default function ChildReportsScreen(): React.ReactElement {
               {t('parentView.reports.loadingWeeklySnapshots')}
             </Text>
           </View>
-        ) : weeklyError ? (
+        ) : weeklyError && !weeklyReports ? (
           <View
             className="bg-surface rounded-card p-4 mt-4"
             testID="weekly-reports-error"
@@ -220,7 +220,7 @@ export default function ChildReportsScreen(): React.ReactElement {
               {t('parentView.reports.loadingReports')}
             </Text>
           </View>
-        ) : isError ? (
+        ) : isError && !reports ? (
           // [EP15-I3] Prior version destructured only `data, isLoading`.
           // On API failure users saw the "no reports yet" empty state and
           // thought their child had no learning activity, when really the

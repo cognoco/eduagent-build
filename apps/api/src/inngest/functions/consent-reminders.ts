@@ -63,7 +63,7 @@ export const consentReminder = inngest.createFunction(
 
     /** Builds the direct consent page URL from a token. */
     function buildTokenUrl(token: string): string {
-      return `${getStepAppUrl()}/v1/consent-page?token=${token}`;
+      return `${getStepAppUrl()}/v1/consent-page?token=${encodeURIComponent(token)}`;
     }
 
     // Day 7 reminder
@@ -79,9 +79,9 @@ export const consentReminder = inngest.createFunction(
           parentEmail,
           'your child',
           23,
-          buildTokenUrl(consentToken)
+          buildTokenUrl(consentToken),
         ),
-        emailOpts('day-7')
+        emailOpts('day-7'),
       );
     });
 
@@ -98,9 +98,9 @@ export const consentReminder = inngest.createFunction(
           parentEmail,
           'your child',
           16,
-          buildTokenUrl(consentToken)
+          buildTokenUrl(consentToken),
         ),
-        emailOpts('day-14')
+        emailOpts('day-14'),
       );
     });
 
@@ -120,7 +120,7 @@ export const consentReminder = inngest.createFunction(
           body: `Without your consent, your child's account and data will be automatically removed in 5 days.`,
           type: 'consent_warning',
         },
-        emailOpts('day-25-final')
+        emailOpts('day-25-final'),
       );
     });
 
@@ -143,5 +143,5 @@ export const consentReminder = inngest.createFunction(
       // FK cascades remove all child records (subjects, sessions, consent_states, etc.).
       await deleteProfileIfNoConsent(db, profileId);
     });
-  }
+  },
 );

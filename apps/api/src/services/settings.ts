@@ -4,6 +4,7 @@
 // ---------------------------------------------------------------------------
 
 import { eq, and, gte, sql } from 'drizzle-orm';
+import { NotFoundError } from '../errors';
 import {
   notificationPreferences,
   notificationLog,
@@ -278,7 +279,7 @@ export async function upsertChildCelebrationLevel(
     where: eq(learningProfiles.profileId, childProfileId),
   });
   if (!existing) {
-    return { celebrationLevel: 'big_only' };
+    throw new NotFoundError('Learning profile not found');
   }
   await db
     .update(learningProfiles)

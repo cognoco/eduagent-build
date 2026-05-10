@@ -9,7 +9,7 @@
  * - Expo Push API (mockExpoPush)
  */
 
-import { eq } from 'drizzle-orm';
+import { and, eq, gte, lte } from 'drizzle-orm';
 import {
   accounts,
   notificationPreferences,
@@ -166,6 +166,31 @@ beforeEach(async () => {
     emails: [JUST_EXPIRED_EMAIL, EXTENDED_EMAIL, WARNING_EMAIL],
     clerkUserIds: [JUST_EXPIRED_USER_ID, EXTENDED_USER_ID, WARNING_USER_ID],
   });
+
+  // The trial-expiry function queries ALL subscriptions in the DB matching
+  // date-range criteria. Orphaned subscriptions from crashed/interrupted runs
+  // (whose accounts were deleted but whose subscriptions somehow survived) can
+  // inflate the counts. Clean up any orphaned extended-expired subscriptions
+  // that fall in the same date window this test seeds for EXTENDED_USER_ID.
+  const db = createIntegrationDb();
+  const now = new Date();
+  const targetDate = new Date(now);
+  targetDate.setUTCDate(targetDate.getUTCDate() - 14);
+  const dayStart = new Date(
+    targetDate.toISOString().slice(0, 10) + 'T00:00:00.000Z',
+  );
+  const dayEnd = new Date(
+    targetDate.toISOString().slice(0, 10) + 'T23:59:59.999Z',
+  );
+  await db
+    .delete(subscriptions)
+    .where(
+      and(
+        eq(subscriptions.status, 'expired'),
+        gte(subscriptions.trialEndsAt, dayStart),
+        lte(subscriptions.trialEndsAt, dayEnd),
+      ),
+    );
 });
 
 afterAll(async () => {
@@ -245,20 +270,20 @@ describe('Integration: trial-expiry Inngest function', () => {
         extendedExpiredCount: 1,
         warningsSent: 1,
         softLandingSent: 2,
-      })
+      }),
     );
 
     const updatedExpiredSubscription = await loadSubscription(
-      justExpiredSeed.subscription.id
+      justExpiredSeed.subscription.id,
     );
     expect(updatedExpiredSubscription!.status).toBe('expired');
     expect(updatedExpiredSubscription!.tier).toBe('free');
 
     const updatedExpiredQuota = await loadQuotaPool(
-      justExpiredSeed.quotaPool.id
+      justExpiredSeed.quotaPool.id,
     );
     expect(updatedExpiredQuota!.monthlyLimit).toBe(
-      EXTENDED_TRIAL_MONTHLY_EQUIVALENT
+      EXTENDED_TRIAL_MONTHLY_EQUIVALENT,
     );
     expect(updatedExpiredQuota!.usedThisMonth).toBe(0);
     expect(updatedExpiredQuota!.usedToday).toBe(0);
@@ -279,7 +304,7 @@ describe('Integration: trial-expiry Inngest function', () => {
     // Warning notification
     const warningPush = pushPayloads.find(
       (p: { to: string }) =>
-        p.to === `ExponentPushToken[test-${WARNING_USER_ID}]`
+        p.to === `ExponentPushToken[test-${WARNING_USER_ID}]`,
     );
     expect(warningPush).not.toBeUndefined();
     expect(warningPush.title).toBe('Trial ending soon');
@@ -288,7 +313,7 @@ describe('Integration: trial-expiry Inngest function', () => {
     // Expired notification (soft landing for justExpired)
     const expiredPush = pushPayloads.find(
       (p: { to: string }) =>
-        p.to === `ExponentPushToken[test-${JUST_EXPIRED_USER_ID}]`
+        p.to === `ExponentPushToken[test-${JUST_EXPIRED_USER_ID}]`,
     );
     expect(expiredPush).not.toBeUndefined();
     expect(expiredPush.title).toBe('Your trial has ended');
@@ -296,7 +321,7 @@ describe('Integration: trial-expiry Inngest function', () => {
     // Extended-expired notification (soft landing for extended)
     const extendedPush = pushPayloads.find(
       (p: { to: string }) =>
-        p.to === `ExponentPushToken[test-${EXTENDED_USER_ID}]`
+        p.to === `ExponentPushToken[test-${EXTENDED_USER_ID}]`,
     );
     expect(extendedPush).not.toBeUndefined();
     expect(extendedPush.title).toBe('Your trial has ended');

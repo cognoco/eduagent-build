@@ -168,7 +168,7 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
               {t('parentView.weeklyReport.loadingReport')}
             </Text>
           </View>
-        ) : isError ? (
+        ) : isError && !report ? (
           // UX-DE-M6: distinct error state — network failures must not silently render as the gone state
           <ErrorFallback
             variant="card"

@@ -375,7 +375,7 @@ export default function RelearnScreen() {
     );
   }
 
-  if (!directEntry && overdueTopics.isError) {
+  if (!directEntry && overdueTopics.isError && !overdueTopics.data) {
     return (
       <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
         {renderHeader()}

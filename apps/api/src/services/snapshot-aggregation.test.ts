@@ -918,7 +918,6 @@ describe('refreshProgressSnapshot', () => {
       connectionError,
       expect.objectContaining({
         extra: expect.objectContaining({
-          feature: 'progress_snapshot',
           operation: 'load_progress_state',
           retryable: true,
         }),

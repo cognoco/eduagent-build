@@ -60,10 +60,20 @@ export const consentMiddleware = createMiddleware<ConsentEnv>(
       return;
     }
 
-    // Exempt paths always pass through
+    // Exempt paths always pass through — except /v1/support/ for
+    // WITHDRAWN profiles: they have no active sessions so there is
+    // nothing to spill over. GDPR Art. 7(3) forbids new data
+    // processing after consent withdrawal.
     if (isExempt(c.req.path)) {
-      await next();
-      return;
+      if (
+        c.req.path.startsWith('/v1/support/') &&
+        meta.consentStatus === 'WITHDRAWN'
+      ) {
+        // Fall through to the WITHDRAWN block below
+      } else {
+        await next();
+        return;
+      }
     }
 
     // Check if consent is required for this profile's age (GDPR-everywhere)
@@ -86,7 +96,7 @@ export const consentMiddleware = createMiddleware<ConsentEnv>(
             'Parental consent is required before accessing this resource',
           details: { consentType },
         },
-        403
+        403,
       );
     }
 
@@ -99,11 +109,11 @@ export const consentMiddleware = createMiddleware<ConsentEnv>(
             'Consent has been withdrawn. Account data deletion is pending.',
           details: { consentType },
         },
-        403
+        403,
       );
     }
 
     await next();
     return;
-  }
+  },
 );

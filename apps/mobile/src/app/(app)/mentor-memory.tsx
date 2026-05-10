@@ -260,7 +260,7 @@ export default function MentorMemoryScreen() {
     );
   }
 
-  if (isError) {
+  if (isError && !profile) {
     return (
       <View
         testID="mentor-memory-error"

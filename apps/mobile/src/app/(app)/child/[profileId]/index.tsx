@@ -291,7 +291,7 @@ export default function ChildDetailScreen() {
     );
   }
 
-  if ((!isLoading && child === null) || isError) {
+  if ((!isLoading && child === null) || (isError && !child)) {
     return (
       <View
         className="flex-1 bg-background items-center justify-center px-6"

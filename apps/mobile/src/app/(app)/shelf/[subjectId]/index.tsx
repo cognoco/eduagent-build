@@ -134,11 +134,12 @@ export default function ShelfScreen() {
 
   const isLoading = booksQuery.isLoading || subjectsQuery.isLoading;
 
-  const failedQuery = booksQuery.isError
-    ? booksQuery
-    : subjectsQuery.isError
-      ? subjectsQuery
-      : null;
+  const failedQuery =
+    booksQuery.isError && !booksQuery.data
+      ? booksQuery
+      : subjectsQuery.isError && !subjectsQuery.data
+        ? subjectsQuery
+        : null;
   const isError = failedQuery !== null;
 
   const handleRetry = (): void => {

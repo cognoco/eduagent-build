@@ -61,7 +61,7 @@ export default function AssessmentPickerScreen(): React.ReactElement {
         </View>
       </View>
 
-      {isError ? (
+      {isError && topics.length === 0 ? (
         <ErrorFallback
           variant="card"
           message={t('assessment.pickerLoadError')}

@@ -6,6 +6,7 @@ const mockPush = jest.fn();
 const mockTrack = jest.fn();
 const mockAccommodationMutate = jest.fn();
 const mockCelebrationLevelMutate = jest.fn();
+const mockPlatformAlert = jest.fn();
 let mockSubscription: { tier: string } | null = { tier: 'family' };
 let mockFamilySubscription: {
   profileCount: number;
@@ -106,6 +107,13 @@ jest.mock(
 jest.mock('../../../lib/analytics' /* gc1-allow: unit test boundary */, () => ({
   track: (...args: unknown[]) => mockTrack(...args),
 }));
+
+jest.mock(
+  '../../../lib/platform-alert' /* gc1-allow: unit test boundary */,
+  () => ({
+    platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
+  }),
+);
 
 jest.mock('@clerk/clerk-expo', () => ({
   useAuth: () => ({ signOut: jest.fn() }),
@@ -261,5 +269,55 @@ describe('MoreScreen landing', () => {
     render(<MoreScreen />, { wrapper: createWrapper() });
 
     expect(screen.queryByTestId('sign-out-button')).toBeNull();
+  });
+
+  it('shows upgrade-required alert when tier is free', () => {
+    mockSubscription = { tier: 'free' };
+
+    render(<MoreScreen />, { wrapper: createWrapper() });
+    fireEvent.press(screen.getByTestId('add-child-link'));
+
+    expect(mockPlatformAlert).toHaveBeenCalledWith(
+      'Upgrade required',
+      'Adding child profiles requires a Family or Pro subscription.',
+      expect.arrayContaining([
+        expect.objectContaining({ text: 'View plans' }),
+        expect.objectContaining({ text: 'Cancel', style: 'cancel' }),
+      ]),
+    );
+    expect(mockPush).not.toHaveBeenCalledWith('/create-profile?for=child');
+  });
+
+  it('shows profile-limit alert when family-tier is at max', () => {
+    mockSubscription = { tier: 'family' };
+    mockFamilySubscription = { profileCount: 4, maxProfiles: 4 };
+
+    render(<MoreScreen />, { wrapper: createWrapper() });
+    fireEvent.press(screen.getByTestId('add-child-link'));
+
+    expect(mockPlatformAlert).toHaveBeenCalledWith(
+      'Profile limit reached',
+      'Your Family plan supports up to 4 profiles.',
+      expect.arrayContaining([
+        expect.objectContaining({ text: 'View plans' }),
+        expect.objectContaining({ text: 'Cancel', style: 'cancel' }),
+      ]),
+    );
+    expect(mockPush).not.toHaveBeenCalledWith('/create-profile?for=child');
+  });
+
+  it('shows profile-limit alert when pro-tier is at max', () => {
+    mockSubscription = { tier: 'pro' };
+    mockFamilySubscription = { profileCount: 4, maxProfiles: 4 };
+
+    render(<MoreScreen />, { wrapper: createWrapper() });
+    fireEvent.press(screen.getByTestId('add-child-link'));
+
+    expect(mockPlatformAlert).toHaveBeenCalledWith(
+      'Profile limit reached',
+      'Your Pro plan supports up to 4 profiles.',
+      [expect.objectContaining({ text: 'OK' })],
+    );
+    expect(mockPush).not.toHaveBeenCalledWith('/create-profile?for=child');
   });
 });

@@ -53,7 +53,7 @@ export default function QuizHistoryScreen() {
   }
 
   // [H7] Show actionable error state instead of falling through to empty.
-  if (isError) {
+  if (isError && !rounds) {
     return (
       <ErrorFallback
         variant="centered"

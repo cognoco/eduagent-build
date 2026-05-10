@@ -783,6 +783,7 @@
       "bookTopics": "{{progress}} tematów",
       "shelfSubtitle_one": "{{count}} książka · {{progress}} tematów",
       "shelfSubtitle_other": "{{count}} książek · {{progress}} tematów",
+      "shelfSubtitleUnstarted": "Rozpocznij naukę",
       "shelfEmpty": "Brak książek w tym przedmiocie. Ucz się tematu, a zostanie on tutaj zapisany.",
       "bookAccessibilityLabel": "{{title}}, {{progress}} tematów{{retentionSuffix}}{{notesSuffix}}",
       "bookRetentionSuffix": ", zapamiętanie {{status}}",

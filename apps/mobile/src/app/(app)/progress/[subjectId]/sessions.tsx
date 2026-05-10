@@ -65,7 +65,7 @@ export default function SubjectSessionsScreen(): React.ReactElement {
               />
             ))}
           </View>
-        ) : sessionsQuery.isError ? (
+        ) : sessionsQuery.isError && !sessionsQuery.data ? (
           <View className="mt-6">
             <ErrorFallback
               variant="card"

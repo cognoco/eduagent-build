@@ -783,6 +783,7 @@
       "bookTopics": "{{progress}} temas",
       "shelfSubtitle_one": "{{count}} libro · {{progress}} temas",
       "shelfSubtitle_other": "{{count}} libros · {{progress}} temas",
+      "shelfSubtitleUnstarted": "Empezar a aprender",
       "shelfEmpty": "Aún no hay libros en esta materia. Estudia un tema y se archivará aquí.",
       "bookAccessibilityLabel": "{{title}}, {{progress}} temas{{retentionSuffix}}{{notesSuffix}}",
       "bookRetentionSuffix": ", retención {{status}}",

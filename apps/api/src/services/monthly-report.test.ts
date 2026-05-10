@@ -12,6 +12,7 @@ jest.mock('./sentry', () => ({
 
 import type { Database } from '@eduagent/database';
 import type { ProgressMetrics, MonthlyReportData } from '@eduagent/schemas';
+import { ForbiddenError } from '@eduagent/schemas';
 import { routeAndCall } from './llm';
 import {
   generateMonthlyReportData,
@@ -1240,5 +1241,39 @@ describe('markMonthlyReportViewed', () => {
       expect.objectContaining({ viewedAt: expect.any(Date) }),
     );
     expect(mockWhere).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// IDOR break tests — assertParentAccess rejects when parent has no family link
+// ---------------------------------------------------------------------------
+
+describe('listMonthlyReportsForParentChild — IDOR rejection', () => {
+  it('throws ForbiddenError when parent has no family link to child', async () => {
+    const db = createMockDb({ hasParentLink: false });
+
+    await expect(
+      listMonthlyReportsForParentChild(db, UUID.parent, UUID.child),
+    ).rejects.toThrow(ForbiddenError);
+  });
+});
+
+describe('getMonthlyReportForParentChild — IDOR rejection', () => {
+  it('throws ForbiddenError when parent has no family link to child', async () => {
+    const db = createMockDb({ hasParentLink: false });
+
+    await expect(
+      getMonthlyReportForParentChild(db, UUID.parent, UUID.child, UUID.report),
+    ).rejects.toThrow(ForbiddenError);
+  });
+});
+
+describe('markMonthlyReportViewed — IDOR rejection', () => {
+  it('throws ForbiddenError when parent has no family link to child', async () => {
+    const db = createMockDb({ hasParentLink: false });
+
+    await expect(
+      markMonthlyReportViewed(db, UUID.parent, UUID.child, UUID.report),
+    ).rejects.toThrow(ForbiddenError);
   });
 });

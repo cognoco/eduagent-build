@@ -19,6 +19,7 @@ jest.mock('inngest/hono', () => ({
 }));
 
 jest.mock('../inngest/client', () => ({
+  // gc1-allow: route-level test isolates Inngest event bus to prevent side-effects
   inngest: {
     send: jest.fn().mockResolvedValue(undefined),
     createFunction: jest.fn().mockReturnValue(jest.fn()),
@@ -26,6 +27,7 @@ jest.mock('../inngest/client', () => ({
 }));
 
 jest.mock('../services/sentry', () => ({
+  // gc1-allow: route-level test suppresses Sentry to avoid external noise
   captureException: jest.fn(),
   addBreadcrumb: jest.fn(),
 }));
@@ -37,6 +39,7 @@ const mockDatabaseModule = createDatabaseModuleMock({ includeActual: true });
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 jest.mock('../services/account', () => ({
+  // gc1-allow: route-level test stubs account lookup to control auth identity
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
     clerkUserId: 'user_test',

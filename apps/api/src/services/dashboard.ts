@@ -255,11 +255,7 @@ function redactedConsentSummary(
 }
 
 function hiddenWeeklyHeadline(): DashboardChild['weeklyHeadline'] {
-  return {
-    label: '',
-    value: 0,
-    comparison: 'consent_redacted',
-  };
+  return undefined;
 }
 
 function emptyProgressMetrics(): ProgressMetrics {

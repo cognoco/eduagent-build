@@ -213,7 +213,7 @@ export default function VocabularyListScreen() {
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
-      ) : vocabularyQuery.isError ? (
+      ) : vocabularyQuery.isError && !vocabularyQuery.data ? (
         <View className="flex-1 items-center justify-center px-6">
           <Text className="text-body text-text-secondary text-center mb-4">
             {t('vocabulary.loadError')}

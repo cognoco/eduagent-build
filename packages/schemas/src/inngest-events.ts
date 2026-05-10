@@ -98,6 +98,12 @@ export type TopicProbeRequestedEvent = z.infer<
   typeof topicProbeRequestedEventSchema
 >;
 
+export const streakRecordEventSchema = z.object({
+  profileId: z.string().uuid(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
+export type StreakRecordEvent = z.infer<typeof streakRecordEventSchema>;
+
 // ---------------------------------------------------------------------------
 // Retention SLO monitoring events (BUG-991 / BUG-992 / BUG-993 / BUG-994)
 // ---------------------------------------------------------------------------

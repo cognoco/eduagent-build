@@ -154,6 +154,9 @@ function isTechnicalMessage(msg: string): boolean {
     /\bLLM\b|structured output|upstream|provider|JSON|malformed|parse error/i.test(
       msg,
     ) ||
+    // Cloudflare Worker error codes (e.g. "error code: 1102") — infrastructure
+    // errors that should never reach users.
+    /\berror code:\s*\d+/i.test(msg) ||
     // JSON fragment or object literal in the message
     /\{"|\{\\"|^\[/.test(msg) ||
     // Stack trace indicators

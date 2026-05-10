@@ -383,7 +383,10 @@ export default function TopicDetailScreen() {
     );
   }
 
-  if ((progressError || retentionError) && !isCriticalLoading) {
+  if (
+    ((progressError && !topicProgress) || (retentionError && !retentionCard)) &&
+    !isCriticalLoading
+  ) {
     return (
       <View className="flex-1 bg-background items-center justify-center px-8">
         <Text className="text-h3 font-semibold text-text-primary text-center mb-2">

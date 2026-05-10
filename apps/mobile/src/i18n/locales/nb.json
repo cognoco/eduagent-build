@@ -810,6 +810,7 @@
       "bookTopics": "{{progress}} temaer",
       "shelfSubtitle_one": "{{count}} bok · {{progress}} temaer",
       "shelfSubtitle_other": "{{count}} bøker · {{progress}} temaer",
+      "shelfSubtitleUnstarted": "Start å lære",
       "shelfEmpty": "Ingen bøker i dette emnet ennå. Studer et tema, så blir det arkivert her.",
       "bookAccessibilityLabel": "{{title}}, {{progress}} temaer{{retentionSuffix}}{{notesSuffix}}",
       "bookRetentionSuffix": ", bevaring {{status}}",

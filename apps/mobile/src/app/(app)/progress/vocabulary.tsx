@@ -158,7 +158,7 @@ export default function VocabularyBrowserScreen(): React.ReactElement {
             <SkeletonRow />
             <SkeletonRow />
           </>
-        ) : isError ? (
+        ) : isError && !inventory ? (
           <View testID="vocab-browser-error">
             <ErrorFallback
               title={t('progress.vocabulary.errorTitle')}

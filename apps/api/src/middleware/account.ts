@@ -6,6 +6,7 @@
 import { createMiddleware } from 'hono/factory';
 import { ERROR_CODES } from '@eduagent/schemas';
 import { findOrCreateAccount, type Account } from '../services/account';
+import { withTransientDatabaseRetry } from '../services/transient-db-retry';
 import type { AuthUser } from './auth';
 import type { Database } from '@eduagent/database';
 
@@ -31,13 +32,17 @@ export const accountMiddleware = createMiddleware<AccountEnv>(
           message:
             'Email not available in session. Please verify your email and try again.',
         },
-        401
+        401,
       );
     }
 
     const db = c.get('db');
-    const account = await findOrCreateAccount(db, user.userId, user.email);
+    const email = user.email; // narrowed: !user.email guard above ensures this is defined
+    const account = await withTransientDatabaseRetry(
+      'accountMiddleware.findOrCreateAccount',
+      () => findOrCreateAccount(db, user.userId, email),
+    );
     c.set('account', account);
     return next();
-  }
+  },
 );

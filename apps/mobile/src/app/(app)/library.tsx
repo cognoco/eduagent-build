@@ -501,7 +501,10 @@ export default function LibraryScreen() {
       return renderShimmerSkeleton();
     }
 
-    if (subjectsQuery.isError || progressQuery.isError) {
+    if (
+      (subjectsQuery.isError && !subjectsQuery.data) ||
+      (progressQuery.isError && !progressQuery.data)
+    ) {
       const libraryLoadError = subjectsQuery.error ?? progressQuery.error;
       return (
         <View

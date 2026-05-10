@@ -100,7 +100,7 @@ export default function SessionTranscriptScreen() {
     );
   }
 
-  if (transcript.isError) {
+  if (transcript.isError && !transcript.data) {
     return (
       <View className="flex-1 bg-background" testID="session-transcript-error">
         <ErrorFallback

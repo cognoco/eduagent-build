@@ -99,18 +99,25 @@ describe('ShelfRow', () => {
     screen.getByText('1 book · 18/32 topics');
   });
 
+  it('renders "Start learning" when subject has no books or topics', () => {
+    render(<ShelfRow {...defaultProps} bookCount={0} topicProgress="0/0" />);
+
+    screen.getByText('Start learning');
+    expect(screen.queryByText(/books/)).toBeNull();
+  });
+
   it('renders Review pill when reviewDueCount is positive', () => {
     render(<ShelfRow {...defaultProps} reviewDueCount={1} />);
 
     screen.getByTestId('shelf-row-review-sub-math');
-    screen.getByText('Review');
+    screen.getByText('Keep it fresh');
   });
 
   it('does not render Review pill when no topics are overdue', () => {
     render(<ShelfRow {...defaultProps} reviewDueCount={0} />);
 
     expect(screen.queryByTestId('shelf-row-review-sub-math')).toBeNull();
-    expect(screen.queryByText('Review')).toBeNull();
+    expect(screen.queryByText('Keep it fresh')).toBeNull();
   });
 
   it('renders Finished pill when the shelf is finished and no topics are overdue', () => {
