@@ -156,7 +156,7 @@ describe('MoreScreen landing', () => {
 
     screen.getByTestId('learning-accommodation-section-header');
     screen.getByTestId('mentor-memory-link');
-    expect(screen.queryByTestId('add-child-link')).toBeNull();
+    screen.getByTestId('add-child-link');
     screen.getByTestId('more-row-notifications');
     screen.getByTestId('more-row-account');
     screen.getByTestId('more-row-privacy');
@@ -207,17 +207,36 @@ describe('MoreScreen landing', () => {
     );
   });
 
-  it('does not render Add a child from More', () => {
+  it('hides Add a child for minor owners and unknown birth years', () => {
     mockActiveProfile = {
       id: 'profile-1',
       displayName: 'Alex',
       isOwner: true,
-      birthYear: 1990,
+      birthYear: new Date().getFullYear() - 17,
     };
     mockProfiles = [mockActiveProfile];
-    render(<MoreScreen />, { wrapper: createWrapper() });
+    const { rerender } = render(<MoreScreen />, { wrapper: createWrapper() });
 
     expect(screen.queryByTestId('add-child-link')).toBeNull();
+
+    mockActiveProfile = {
+      id: 'profile-1',
+      displayName: 'Alex',
+      isOwner: true,
+      birthYear: null as unknown as number,
+    };
+    mockProfiles = [mockActiveProfile];
+    rerender(<MoreScreen />);
+
+    expect(screen.queryByTestId('add-child-link')).toBeNull();
+  });
+
+  it('navigates to create-profile when Add a child is pressed', () => {
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    fireEvent.press(screen.getByTestId('add-child-link'));
+
+    expect(mockPush).toHaveBeenCalledWith('/create-profile?for=child');
   });
 
   it('keeps child preference cross-links for owner profiles with children', () => {

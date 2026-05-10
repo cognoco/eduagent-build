@@ -56,10 +56,14 @@ const BASE_VISIBLE_TABS: ReadonlySet<string> = new Set([
 ]);
 
 export function computeVisibleTabs(
+  hasFamily: boolean,
   role: ActiveProfileRole | null = 'owner',
 ): Set<string> {
   const next = new Set<string>(BASE_VISIBLE_TABS);
-  if (role === 'owner') next.add('family');
+  // Family tab is only meaningful for an owner who has at least one linked
+  // child; solo adults have nothing to manage there. The Add-child entry
+  // for solo adults lives under More.
+  if (hasFamily && role === 'owner') next.add('family');
   return next;
 }
 
@@ -1266,6 +1270,7 @@ export default function AppLayout() {
   const pathname = usePathname();
   const currentAppPath = toInternalAppRedirectPath(pathname);
   const {
+    profiles,
     activeProfile,
     isLoading: isProfileLoading,
     profileLoadError,
@@ -1276,7 +1281,20 @@ export default function AppLayout() {
   useMentorLanguageSync();
   const { isParentProxy, childProfile, parentProfile } = useParentProxy();
   const role = useActiveProfileRole();
-  const visibleTabs = React.useMemo(() => computeVisibleTabs(role), [role]);
+  // hasFamily: the active profile is an owner AND at least one *other*
+  // (non-owner) profile is linked to the account. Solo adults are owners
+  // with no linked children → Family tab hidden, Add-child entry lives in
+  // More instead.
+  const hasFamily = React.useMemo(
+    () =>
+      activeProfile?.isOwner === true &&
+      profiles.some((p) => p.id !== activeProfile.id && !p.isOwner),
+    [activeProfile?.id, activeProfile?.isOwner, profiles],
+  );
+  const visibleTabs = React.useMemo(
+    () => computeVisibleTabs(hasFamily, role),
+    [hasFamily, role],
+  );
 
   // Sync Clerk auth state with RevenueCat identity (runs on auth change)
   useRevenueCatIdentity();

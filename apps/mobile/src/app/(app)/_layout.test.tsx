@@ -662,8 +662,8 @@ describe('AppLayout', () => {
 });
 
 describe('computeVisibleTabs', () => {
-  it('includes family for all owner accounts including those with no children', () => {
-    const tabs = computeVisibleTabs();
+  it('includes family for owners with at least one linked child', () => {
+    const tabs = computeVisibleTabs(true);
     expect(tabs.has('home')).toBe(true);
     expect(tabs.has('library')).toBe(true);
     expect(tabs.has('progress')).toBe(true);
@@ -671,13 +671,20 @@ describe('computeVisibleTabs', () => {
     expect(tabs.has('family')).toBe(true);
   });
 
+  it('hides family for solo adult owners (no linked children)', () => {
+    const tabs = computeVisibleTabs(false);
+    expect(tabs.has('family')).toBe(false);
+    // The single Add-child entry path lives in More for solo adults.
+    expect(tabs.has('more')).toBe(true);
+  });
+
   it('does not include family for child role', () => {
-    const tabs = computeVisibleTabs('child');
+    const tabs = computeVisibleTabs(true, 'child');
     expect(tabs.has('family')).toBe(false);
   });
 
   it('does not include family while impersonating a child', () => {
-    const tabs = computeVisibleTabs('impersonated-child');
+    const tabs = computeVisibleTabs(true, 'impersonated-child');
     expect(tabs.has('family')).toBe(false);
   });
 });

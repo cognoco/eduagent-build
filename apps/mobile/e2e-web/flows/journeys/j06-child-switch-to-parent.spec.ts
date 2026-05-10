@@ -31,5 +31,4 @@ test('J-06 child switches back to parent profile → learner screen', async ({
   await expect(page.getByTestId('learner-screen')).toBeVisible({
     timeout: 30_000,
   });
-  await expect(page.getByTestId('learner-screen')).toHaveCount(0);
 });

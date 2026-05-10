@@ -482,7 +482,11 @@ export function LearnerScreen({
           <ChildCard linkedChildren={linkedChildren} dashboard={dashboard} />
         ) : null}
 
-        {!isParentProxy && (
+        {/* Intent actions are the learner's own homepage. For parents with
+            linked children, the ChildCard above is the home surface and the
+            intent block is suppressed — they reach their own learning via
+            other tabs (library, etc.). */}
+        {!isParentProxy && !showChildCard && (
           <View className={showCoachBand ? 'mt-1' : 'mt-5'}>
             <Text className="text-h3 font-bold text-text-primary px-5 mb-2">
               {t('home.learner.intentHeading')}

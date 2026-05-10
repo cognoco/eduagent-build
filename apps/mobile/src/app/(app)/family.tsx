@@ -1,4 +1,3 @@
-import { useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,7 +8,6 @@ import {
   Switch,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { isAdultOwner } from '@eduagent/schemas';
 import type { Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,10 +22,6 @@ import {
   useFamilyPoolBreakdownSharing,
   useUpdateFamilyPoolBreakdownSharing,
 } from '../../hooks/use-settings';
-import {
-  useFamilySubscription,
-  useSubscription,
-} from '../../hooks/use-subscription';
 import { goBackOrReplace } from '../../lib/navigation';
 import { platformAlert } from '../../lib/platform-alert';
 import { useProfile } from '../../lib/profile';
@@ -205,10 +199,6 @@ function FamilyContent(): React.ReactElement {
     refetch,
     isRefetching,
   } = useDashboard();
-  const { data: subscription } = useSubscription();
-  const { data: familyData } = useFamilySubscription(
-    subscription?.tier === 'family' || subscription?.tier === 'pro',
-  );
   const {
     data: familyPoolBreakdownSharing,
     isLoading: breakdownSharingLoading,
@@ -219,7 +209,6 @@ function FamilyContent(): React.ReactElement {
   const isDemo = dashboard?.demoMode === true;
   const hasChildren = (dashboard?.children?.length ?? 0) > 0;
   const showFamilyManagement = !isDemo && hasChildren;
-  const showAddChild = isAdultOwner(activeProfile);
 
   const handleDrillDown = (profileId: string): void => {
     if (isDemo) {
@@ -235,50 +224,6 @@ function FamilyContent(): React.ReactElement {
       params: { profileId },
     } as never);
   };
-
-  const handleAddChild = useCallback(() => {
-    if (!subscription) {
-      return;
-    }
-
-    const tier = subscription.tier;
-    if (tier !== 'family' && tier !== 'pro') {
-      platformAlert(
-        t('more.family.upgradeRequiredTitle'),
-        t('more.family.upgradeRequiredMessage'),
-        [
-          {
-            text: t('more.family.viewPlans'),
-            onPress: () => router.push('/(app)/subscription' as never),
-          },
-          { text: t('common.cancel'), style: 'cancel' },
-        ],
-      );
-      return;
-    }
-
-    if (familyData && familyData.profileCount >= familyData.maxProfiles) {
-      platformAlert(
-        t('more.family.profileLimitTitle'),
-        t('more.family.profileLimitMessage', {
-          plan: tier === 'pro' ? 'Pro' : 'Family',
-          max: familyData.maxProfiles,
-        }),
-        tier === 'family'
-          ? [
-              {
-                text: t('more.family.viewPlans'),
-                onPress: () => router.push('/(app)/subscription' as never),
-              },
-              { text: t('common.cancel'), style: 'cancel' },
-            ]
-          : [{ text: t('common.ok') }],
-      );
-      return;
-    }
-
-    router.push('/create-profile?for=child' as never);
-  }, [familyData, router, subscription, t]);
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
@@ -411,22 +356,10 @@ function FamilyContent(): React.ReactElement {
                 />
               </>
             ) : null}
-            {!isDemo && showAddChild ? (
-              <Pressable
-                onPress={handleAddChild}
-                className="bg-surface rounded-card px-4 py-3.5 mb-2 mt-2"
-                accessibilityLabel={t('more.family.addChildAccessLabel')}
-                accessibilityRole="button"
-                testID="family-add-child-link"
-              >
-                <Text className="text-body font-semibold text-text-primary">
-                  {t('more.family.addChild')}
-                </Text>
-                <Text className="text-body-sm text-text-secondary mt-1">
-                  {t('more.family.addChildDescription')}
-                </Text>
-              </Pressable>
-            ) : null}
+            {/* Add-child entry intentionally lives in More, not here. The
+                Family tab is only visible to owners who already have linked
+                children, so the entry point here is redundant; the global
+                path is /more → "Add a child". */}
             {isDemo && (
               <Pressable
                 onPress={() => router.push('/(app)/more' as never)}
