@@ -5,7 +5,7 @@ import {
   type Database,
   type ScopedRepository,
 } from '@eduagent/database';
-import { learnerRecapResponseSchema } from '@eduagent/schemas';
+import { learnerRecapLlmOutputSchema } from '@eduagent/schemas';
 import { extractFirstJsonObject, routeAndCall } from './llm';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
 import { projectAiResponseContent } from './llm/project-response';
@@ -59,7 +59,7 @@ export function getAgeVoiceTierLabel(birthYear: number | null): string {
  * smuggle a directive out of the data section. [PROMPT-INJECT-3]
  */
 export function buildRecapTranscriptText(
-  events: ReadonlyArray<{ eventType: string; content: string }>
+  events: ReadonlyArray<{ eventType: string; content: string }>,
 ): string {
   return events
     .map((event) => {
@@ -76,7 +76,7 @@ export function buildRecapTranscriptText(
 
 export function buildRecapPrompt(
   ageVoiceTier: string,
-  nextTopicTitle: string | null
+  nextTopicTitle: string | null,
 ): string {
   const basePrompt = [
     'You are reviewing a completed tutoring session transcript for a learner.',
@@ -107,7 +107,7 @@ export function buildRecapPrompt(
   if (!nextTopicTitle) {
     basePrompt.push(
       '',
-      'Set nextTopicReason to null because no next topic is provided.'
+      'Set nextTopicReason to null because no next topic is provided.',
     );
     return basePrompt.join('\n');
   }
@@ -122,7 +122,7 @@ export function buildRecapPrompt(
     `A likely next topic is <next_topic>${safeTitle}</next_topic>.`,
     'If the connection is genuinely clear, set nextTopicReason to one sentence explaining why it follows from this session.',
     'If the connection is weak or unclear, set nextTopicReason to null.',
-    'Max 120 characters for nextTopicReason.'
+    'Max 120 characters for nextTopicReason.',
   );
 
   return basePrompt.join('\n');
@@ -130,7 +130,7 @@ export function buildRecapPrompt(
 
 export async function resolveNextTopic(
   repo: ScopedRepository,
-  topicId: string
+  topicId: string,
 ): Promise<TopicSuggestion | null> {
   const currentTopic = await repo.curriculumTopics.findById(topicId);
   if (!currentTopic) {
@@ -157,10 +157,10 @@ export async function resolveNextTopic(
   const sameBookCandidates = await repo.curriculumTopics.findLaterInBook(
     currentTopic.bookId,
     currentTopic.sortOrder,
-    MAX_NEXT_TOPIC_CANDIDATES
+    MAX_NEXT_TOPIC_CANDIDATES,
   );
   const sameBookHit = sameBookCandidates.find(
-    (candidate) => !completedTopicIds.has(candidate.id)
+    (candidate) => !completedTopicIds.has(candidate.id),
   );
   if (sameBookHit) return sameBookHit;
 
@@ -172,11 +172,11 @@ export async function resolveNextTopic(
     await repo.curriculumTopics.findEarliestInLaterBooks(
       currentTopic.subjectId,
       currentTopic.bookSortOrder,
-      MAX_NEXT_TOPIC_CANDIDATES
+      MAX_NEXT_TOPIC_CANDIDATES,
     );
   return (
     nextBookCandidates.find(
-      (candidate) => !completedTopicIds.has(candidate.id)
+      (candidate) => !completedTopicIds.has(candidate.id),
     ) ?? null
   );
 }
@@ -194,7 +194,7 @@ export async function resolveNextTopic(
 export async function matchFreeformTopic(
   repo: ScopedRepository,
   subjectId: string,
-  takeaways: string[]
+  takeaways: string[],
 ): Promise<TopicSuggestion | null> {
   // Filler/function words that survive the length>=4 filter but carry no
   // topic signal for curriculum matching. Tokens under 4 chars (the, and,
@@ -280,7 +280,7 @@ export async function matchFreeformTopic(
       takeaways
         .flatMap((takeaway) => takeaway.split(/\s+/))
         .map((word) => word.toLowerCase().replace(/[^a-z0-9]/g, ''))
-        .filter((word) => word.length >= 4 && !stopWords.has(word))
+        .filter((word) => word.length >= 4 && !stopWords.has(word)),
     ),
   ].slice(0, 5);
 
@@ -289,7 +289,7 @@ export async function matchFreeformTopic(
   const matches = await repo.curriculumTopics.findMatchingInSubject(
     subjectId,
     keywords,
-    MAX_FREEFORM_MATCHES
+    MAX_FREEFORM_MATCHES,
   );
 
   // Only return a match when the keyword set resolves unambiguously to one
@@ -302,7 +302,7 @@ export async function matchFreeformTopic(
 
 export async function generateLearnerRecap(
   db: Database,
-  input: RecapInput
+  input: RecapInput,
 ): Promise<LearnerRecapResult | null> {
   if (input.exchangeCount < 3) {
     return null;
@@ -311,7 +311,7 @@ export async function generateLearnerRecap(
   const transcriptEvents = await db.query.sessionEvents.findMany({
     where: and(
       eq(sessionEvents.sessionId, input.sessionId),
-      eq(sessionEvents.profileId, input.profileId)
+      eq(sessionEvents.profileId, input.profileId),
     ),
     // [BUG-913 sweep] Tie-break by id when created_at collides — see
     // session-crud.ts getSessionTranscript for the full rationale.
@@ -324,7 +324,7 @@ export async function generateLearnerRecap(
 
   const transcriptTurns = transcriptEvents.filter(
     (event) =>
-      event.eventType === 'user_message' || event.eventType === 'ai_response'
+      event.eventType === 'user_message' || event.eventType === 'ai_response',
   );
 
   if (transcriptTurns.length < 4) {
@@ -341,14 +341,14 @@ export async function generateLearnerRecap(
   // Pure content-generation flow: the LLM returns only recap text + next-topic
   // reason for UI rendering. No envelope signals (close, escalate, widgets) drive
   // any state machine here — session termination already happened. We therefore
-  // validate against learnerRecapResponseSchema directly instead of parseEnvelope.
+  // validate against learnerRecapLlmOutputSchema directly instead of parseEnvelope.
   const result = await routeAndCall(
     [
       {
         role: 'system',
         content: buildRecapPrompt(
           getAgeVoiceTierLabel(input.birthYear),
-          nextTopic?.title ?? null
+          nextTopic?.title ?? null,
         ),
       },
       {
@@ -359,7 +359,7 @@ export async function generateLearnerRecap(
         content: `<transcript>\n${transcriptText}\n</transcript>`,
       },
     ],
-    1
+    1,
   );
 
   const jsonObject = extractFirstJsonObject(result.response);
@@ -383,7 +383,7 @@ export async function generateLearnerRecap(
     return null;
   }
 
-  const validated = learnerRecapResponseSchema.safeParse(parsed);
+  const validated = learnerRecapLlmOutputSchema.safeParse(parsed);
   if (!validated.success) {
     logger.warn('Learner recap schema validation failed', {
       sessionId: input.sessionId,
@@ -402,6 +402,6 @@ export async function generateLearnerRecap(
     closingLine,
     learnerRecap: takeaways.map((takeaway) => `- ${takeaway}`).join('\n'),
     nextTopicId: nextTopic?.id ?? null,
-    nextTopicReason: input.topicId ? nextTopicReason ?? null : null,
+    nextTopicReason: input.topicId ? (nextTopicReason ?? null) : null,
   };
 }

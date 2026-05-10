@@ -62,14 +62,14 @@ const topicRefSchema = z.object({
   description: z.string().min(1).max(500),
 });
 
-export const filingResponseSchema = z.object({
+export const filingLlmOutputSchema = z.object({
   extracted: z.string().max(500).optional(),
   shelf: shelfRefSchema,
   book: bookRefSchema,
   chapter: chapterRefSchema,
   topic: topicRefSchema,
 });
-export type FilingResponse = z.infer<typeof filingResponseSchema>;
+export type FilingLlmOutput = z.infer<typeof filingLlmOutputSchema>;
 
 // --- Library index (condensed structure for LLM prompt) ---
 

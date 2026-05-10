@@ -21,10 +21,10 @@ import {
   createScopedRepository,
 } from '@eduagent/database';
 import {
-  filingResponseSchema,
+  filingLlmOutputSchema,
   type FiledFrom,
   type FilingRequest,
-  type FilingResponse,
+  type FilingLlmOutput,
   type FilingResult,
   type LibraryIndex,
 } from '@eduagent/schemas';
@@ -41,11 +41,11 @@ const MAX_TOPIC_SUMMARIES = 50;
 
 export async function buildLibraryIndex(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<LibraryIndex> {
   const repo = createScopedRepository(db, profileId);
   const activeSubjects = await repo.subjects.findMany(
-    eq(subjects.status, 'active')
+    eq(subjects.status, 'active'),
   );
 
   if (activeSubjects.length === 0) {
@@ -107,7 +107,7 @@ export async function buildLibraryIndex(
         const chapterTopics = chapterMap.get(chapterName);
         if (!chapterTopics)
           throw new Error(
-            `Chapter map entry missing for chapter: ${chapterName}`
+            `Chapter map entry missing for chapter: ${chapterName}`,
           );
         chapterTopics.push({
           title: topic.title,
@@ -139,11 +139,11 @@ export async function buildLibraryIndex(
       const shelfTopicCount = shelf.books.reduce(
         (sum, b) =>
           sum + b.chapters.reduce((cSum, c) => cSum + c.topics.length, 0),
-        0
+        0,
       );
       const shelfBudget = Math.max(
         1,
-        Math.round(MAX_TOPIC_SUMMARIES * (shelfTopicCount / totalTopics))
+        Math.round(MAX_TOPIC_SUMMARIES * (shelfTopicCount / totalTopics)),
       );
 
       let shelfKept = 0;
@@ -169,9 +169,9 @@ function countTopics(shelves: LibraryIndex['shelves']): number {
       s.books.reduce(
         (bSum, b) =>
           bSum + b.chapters.reduce((cSum, c) => cSum + c.topics.length, 0),
-        0
+        0,
       ),
-    0
+    0,
   );
 }
 
@@ -202,7 +202,7 @@ export function formatLibraryIndexForPrompt(index: LibraryIndex): string {
 
 export type LLMCaller = (
   messages: ChatMessage[],
-  rung?: number
+  rung?: number,
 ) => Promise<RouteResult>;
 
 const SEED_TAXONOMY = `When the learner's library is empty or sparse, prefer these standard
@@ -216,7 +216,7 @@ export function buildPreSessionPrompt(
   rawInput: string,
   selectedSuggestion: string | null | undefined,
   libraryText: string,
-  isSparse: boolean
+  isSparse: boolean,
 ): string {
   const seedBlock = isSparse ? `\n\n${SEED_TAXONOMY}` : '';
 
@@ -252,7 +252,7 @@ Return ONLY valid JSON:
 export function buildPostSessionPrompt(
   sessionTranscript: string,
   libraryText: string,
-  isSparse: boolean
+  isSparse: boolean,
 ): string {
   const seedBlock = isSparse ? `\n\n${SEED_TAXONOMY}` : '';
 
@@ -284,8 +284,8 @@ export async function fileToLibrary(
     'rawInput' | 'selectedSuggestion' | 'sessionTranscript' | 'sessionMode'
   >,
   libraryIndex: LibraryIndex,
-  routeAndCall: LLMCaller
-): Promise<FilingResponse> {
+  routeAndCall: LLMCaller,
+): Promise<FilingLlmOutput> {
   const libraryText = formatLibraryIndexForPrompt(libraryIndex);
   const totalTopics = countTopics(libraryIndex.shelves);
   const isSparse = totalTopics < 5;
@@ -307,7 +307,7 @@ export async function fileToLibrary(
       request.rawInput,
       request.selectedSuggestion,
       libraryText,
-      isSparse
+      isSparse,
     );
   } else {
     throw new Error('Filing requires either rawInput or sessionTranscript');
@@ -349,7 +349,7 @@ export async function fileToLibrary(
     throw err;
   }
 
-  const result = filingResponseSchema.safeParse(parsed);
+  const result = filingLlmOutputSchema.safeParse(parsed);
   if (!result.success) {
     captureException(result.error, {
       extra: {
@@ -383,7 +383,7 @@ const MAX_BOOK_NAME_LENGTH = 200;
 
 function pickFallbackBookName(
   selectedSuggestion: string | null | undefined,
-  rawInput: string
+  rawInput: string,
 ): { name: string; isSpecific: boolean } {
   const candidates = [selectedSuggestion, rawInput];
   for (const candidate of candidates) {
@@ -401,11 +401,11 @@ function pickFallbackBookName(
 export function buildFallbackFilingResponse(
   subjectId: string,
   rawInput: string,
-  selectedSuggestion?: string | null
-): FilingResponse {
+  selectedSuggestion?: string | null,
+): FilingLlmOutput {
   const { name: bookName, isSpecific } = pickFallbackBookName(
     selectedSuggestion,
-    rawInput
+    rawInput,
   );
   return {
     shelf: { id: subjectId },
@@ -430,14 +430,14 @@ export function buildFallbackFilingResponse(
 
 interface ResolveFilingInput {
   profileId: string;
-  filingResponse: FilingResponse;
+  filingResponse: FilingLlmOutput;
   filedFrom: FiledFrom;
   sessionId?: string;
 }
 
 export async function resolveFilingResult(
   db: Database,
-  input: ResolveFilingInput
+  input: ResolveFilingInput,
 ): Promise<FilingResult> {
   const { profileId, filingResponse, filedFrom, sessionId } = input;
 
@@ -455,7 +455,7 @@ export async function resolveFilingResult(
       const existing = await txDb.query.subjects.findFirst({
         where: and(
           eq(subjects.id, filingResponse.shelf.id),
-          eq(subjects.profileId, profileId)
+          eq(subjects.profileId, profileId),
         ),
       });
       if (!existing)
@@ -478,8 +478,8 @@ export async function resolveFilingResult(
           and(
             eq(subjects.profileId, profileId),
             sql`lower(${subjects.name}) = lower(${filingResponse.shelf.name})`,
-            eq(subjects.status, 'active')
-          )
+            eq(subjects.status, 'active'),
+          ),
         )
         .limit(1);
       if (existing) {
@@ -514,7 +514,7 @@ export async function resolveFilingResult(
             where: and(
               eq(subjects.profileId, profileId),
               sql`lower(${subjects.name}) = lower(${filingResponse.shelf.name})`,
-              eq(subjects.status, 'active')
+              eq(subjects.status, 'active'),
             ),
             columns: { id: true, name: true },
           });
@@ -523,7 +523,7 @@ export async function resolveFilingResult(
             // so a row with that key MUST exist. Surface as an error rather
             // than silently continuing.
             throw new Error(
-              `[CR-FIL-DEDUP-INDEX-12-FOLLOWUP] Shelf insert hit unique-index conflict but no matching row found on re-find. profileId=${profileId} name=${filingResponse.shelf.name}`
+              `[CR-FIL-DEDUP-INDEX-12-FOLLOWUP] Shelf insert hit unique-index conflict but no matching row found on re-find. profileId=${profileId} name=${filingResponse.shelf.name}`,
             );
           }
           shelfId = racedExisting.id;
@@ -557,7 +557,7 @@ export async function resolveFilingResult(
       const existing = await txDb.query.curriculumBooks.findFirst({
         where: and(
           eq(curriculumBooks.id, filingResponse.book.id),
-          eq(curriculumBooks.subjectId, shelfId)
+          eq(curriculumBooks.subjectId, shelfId),
         ),
       });
       if (!existing)
@@ -580,8 +580,8 @@ export async function resolveFilingResult(
         .where(
           and(
             eq(curriculumBooks.subjectId, shelfId),
-            sql`lower(${curriculumBooks.title}) = lower(${filingResponse.book.name})`
-          )
+            sql`lower(${curriculumBooks.title}) = lower(${filingResponse.book.name})`,
+          ),
         )
         .limit(1);
       if (existing) {
@@ -593,7 +593,7 @@ export async function resolveFilingResult(
         });
         const maxOrder = allBooks.reduce(
           (max, b) => Math.max(max, b.sortOrder),
-          -1
+          -1,
         );
 
         const newId = generateUUIDv7();
@@ -628,7 +628,7 @@ export async function resolveFilingResult(
           const racedExisting = await txDb.query.curriculumBooks.findFirst({
             where: and(
               eq(curriculumBooks.subjectId, shelfId),
-              sql`lower(${curriculumBooks.title}) = lower(${filingResponse.book.name})`
+              sql`lower(${curriculumBooks.title}) = lower(${filingResponse.book.name})`,
             ),
             columns: { id: true, title: true },
           });
@@ -637,7 +637,7 @@ export async function resolveFilingResult(
             // so a row with that key MUST exist. Surface as an error rather
             // than silently continuing.
             throw new Error(
-              `[CR-FIL-DEDUP-INDEX-12-FOLLOWUP] Book insert hit unique-index conflict but no matching row found on re-find. subjectId=${shelfId} title=${filingResponse.book.name}`
+              `[CR-FIL-DEDUP-INDEX-12-FOLLOWUP] Book insert hit unique-index conflict but no matching row found on re-find. subjectId=${shelfId} title=${filingResponse.book.name}`,
             );
           }
           bookId = racedExisting.id;
@@ -657,7 +657,7 @@ export async function resolveFilingResult(
       const existingTopic = await txDb.query.curriculumTopics.findFirst({
         where: and(
           eq(curriculumTopics.bookId, bookId),
-          sql`lower(${curriculumTopics.chapter}) = lower(${filingResponse.chapter.name})`
+          sql`lower(${curriculumTopics.chapter}) = lower(${filingResponse.chapter.name})`,
         ),
       });
       chapterName = filingResponse.chapter.name;
@@ -679,7 +679,7 @@ export async function resolveFilingResult(
       where: eq(curriculumTopics.bookId, bookId),
     });
     const existingDuplicate = existingTopics.find(
-      (t) => t.title.toLowerCase() === filingResponse.topic.title.toLowerCase()
+      (t) => t.title.toLowerCase() === filingResponse.topic.title.toLowerCase(),
     );
     let topicId: string;
     if (existingDuplicate) {
@@ -688,7 +688,7 @@ export async function resolveFilingResult(
       const newTopicId = generateUUIDv7();
       const maxTopicOrder = existingTopics.reduce(
         (max, t) => Math.max(max, t.sortOrder),
-        -1
+        -1,
       );
       // [CR-FIL-DEDUP-INDEX-12] onConflictDoNothing + .returning() lets us
       // detect when the unique index suppressed our insert (race lost) so
@@ -723,7 +723,7 @@ export async function resolveFilingResult(
         const racedExisting = await txDb.query.curriculumTopics.findFirst({
           where: and(
             eq(curriculumTopics.bookId, bookId),
-            sql`lower(${curriculumTopics.title}) = lower(${filingResponse.topic.title})`
+            sql`lower(${curriculumTopics.title}) = lower(${filingResponse.topic.title})`,
           ),
           columns: { id: true },
         });
@@ -733,7 +733,7 @@ export async function resolveFilingResult(
           // else is wrong (unrelated constraint, transaction visibility
           // anomaly) — surface as an error rather than silently continue.
           throw new Error(
-            `[CR-FIL-DEDUP-INDEX-12] Topic insert hit unique-index conflict but no matching row found on re-find. bookId=${bookId} title=${filingResponse.topic.title}`
+            `[CR-FIL-DEDUP-INDEX-12] Topic insert hit unique-index conflict but no matching row found on re-find. bookId=${bookId} title=${filingResponse.topic.title}`,
           );
         }
         topicId = racedExisting.id;
@@ -751,8 +751,8 @@ export async function resolveFilingResult(
         .where(
           and(
             eq(learningSessions.id, sessionId),
-            eq(learningSessions.profileId, profileId)
-          )
+            eq(learningSessions.profileId, profileId),
+          ),
         );
     }
 
