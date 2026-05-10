@@ -79,9 +79,35 @@ if ! command -v jq >/dev/null 2>&1; then
     exit 1
 fi
 
-NOTION_API_KEY="$(doppler secrets get NOTION_API_KEY --plain -p mentomate -c dev 2>/dev/null || true)"
-if [[ -z "$NOTION_API_KEY" ]]; then
-    echo "ERROR: NOTION_API_KEY not retrievable from Doppler (project=mentomate config=dev)." >&2
+# Capture Doppler stderr and exit code so the failure mode (auth, rate limit,
+# network blip, wrong project) is visible. The filer is itself the postmortem
+# path — if WE go silent, the upstream failure that triggered us is invisible
+# to the human. We still exit 1 on failure: the caller (e.g.
+# cleanup-scope-guard.sh) already handles non-zero filer exit gracefully via
+# its `|| echo "WARNING: filer failed..."` fallback, so upstream surfacing
+# (scope-violation.md, stderr report) is preserved.
+doppler_err="$(mktemp)"
+response=""
+trap 'rm -f "$doppler_err" "$response"' EXIT
+if NOTION_API_KEY="$(doppler secrets get NOTION_API_KEY --plain -p mentomate -c dev 2>"$doppler_err")"; then
+    doppler_rc=0
+else
+    doppler_rc=$?
+fi
+if (( doppler_rc != 0 )) || [[ -z "$NOTION_API_KEY" ]]; then
+    {
+        echo "ERROR: NOTION_API_KEY not retrievable from Doppler (project=mentomate config=dev)."
+        echo "  doppler exit: ${doppler_rc}"
+        echo "  doppler stderr:"
+        sed 's/^/    /' < "$doppler_err"
+    } >&2
+    # Best-effort: persist for postmortem if the workflow gave us an artifacts dir.
+    # Intentional no `|| true` here: we already confirmed the dir exists, so a cp
+    # failure indicates something deeply wrong (permissions, disk full) and set -e
+    # should propagate.
+    if [[ -n "${ARTIFACTS_DIR:-}" && -d "${ARTIFACTS_DIR}" ]]; then
+        cp "$doppler_err" "${ARTIFACTS_DIR}/notion-filer-doppler-error.txt"
+    fi
     exit 1
 fi
 
@@ -142,7 +168,7 @@ payload="$(jq -nc \
     }')"
 
 response="$(mktemp)"
-trap 'rm -f "$response"' EXIT
+# EXIT trap was set earlier (line ~84) to clean up both $doppler_err and $response.
 
 http_code="$(curl -sS -o "$response" -w '%{http_code}' \
     -X POST "https://api.notion.com/v1/pages" \
