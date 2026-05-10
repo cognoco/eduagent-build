@@ -404,9 +404,7 @@ describe('ChildDetailScreen — new sections', () => {
         totalXp: 0,
         progress: null,
         subjects: [],
-        currentlyWorkingOn: [
-          { topicId: 't1', topicTitle: 'Algebra', subjectName: 'Math' },
-        ],
+        currentlyWorkingOn: ['Algebra'],
       },
       isLoading: false,
       isError: false,

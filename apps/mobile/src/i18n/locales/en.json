@@ -56,7 +56,8 @@
   "errorBoundary": {
     "title": "Something went wrong",
     "message": "An unexpected error occurred. You can try again or go back to the home screen.",
-    "sessionCrashTitle": "Session screen crashed"
+    "sessionCrashTitle": "Session screen crashed",
+    "logged": "We've logged this automatically."
   },
   "recovery": {
     "tryAgain": "Try Again",
@@ -144,7 +145,8 @@
       "consentDeletedBody": "The withdrawal grace period has ended."
     },
     "childCard": {
-      "title": "Children"
+      "title": "Children",
+      "accessibilityLabel": "Open Family"
     }
   },
   "dashboard": {

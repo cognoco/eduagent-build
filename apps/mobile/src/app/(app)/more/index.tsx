@@ -208,9 +208,7 @@ export default function MoreScreen() {
         {activeProfile?.isOwner && linkedChildren.length === 1 ? (
           <Pressable
             onPress={() => {
-              const childId = linkedChildren[0]?.id;
-              if (!childId) return;
-              handleChildProgressNavigation(`/(app)/child/${childId}`);
+              handleChildProgressNavigation(FAMILY_HOME_PATH);
             }}
             className="self-start mb-3"
             accessibilityRole="button"

@@ -1,9 +1,5 @@
 import { and, desc, eq } from 'drizzle-orm';
-import {
-  createScopedRepository,
-  monthlyReports,
-  type Database,
-} from '@eduagent/database';
+import { monthlyReports, type Database } from '@eduagent/database';
 import type {
   MonthlyReportData,
   MonthlyReportRecord,
@@ -15,6 +11,7 @@ import {
   monthlyReportRecordSchema,
   monthlyReportSummarySchema,
 } from '@eduagent/schemas';
+import { assertParentAccess } from './family-access';
 import { routeAndCall, type ChatMessage } from './llm';
 import { captureException } from './sentry';
 
@@ -241,6 +238,7 @@ export async function listMonthlyReportsForParentChild(
   parentProfileId: string,
   childProfileId: string,
 ): Promise<MonthlyReportSummary[]> {
+  await assertParentAccess(db, parentProfileId, childProfileId);
   const rows = await db.query.monthlyReports.findMany({
     where: and(
       eq(monthlyReports.profileId, parentProfileId),
@@ -274,10 +272,10 @@ export async function listMonthlyReportsForProfile(
   db: Database,
   profileId: string,
 ): Promise<MonthlyReportSummary[]> {
-  const scoped = createScopedRepository(db, profileId);
-  const rows = await scoped.monthlyReports.findMany(
-    eq(monthlyReports.childProfileId, profileId),
-  );
+  const rows = await db.query.monthlyReports.findMany({
+    where: eq(monthlyReports.childProfileId, profileId),
+    orderBy: desc(monthlyReports.reportMonth),
+  });
 
   return rows.map((row) =>
     monthlyReportSummarySchema.parse({
@@ -306,6 +304,7 @@ export async function getMonthlyReportForParentChild(
   childProfileId: string,
   reportId: string,
 ): Promise<MonthlyReportRecord | null> {
+  await assertParentAccess(db, parentProfileId, childProfileId);
   const row = await db.query.monthlyReports.findFirst({
     where: and(
       eq(monthlyReports.id, reportId),
@@ -323,6 +322,7 @@ export async function markMonthlyReportViewed(
   childProfileId: string,
   reportId: string,
 ): Promise<void> {
+  await assertParentAccess(db, parentProfileId, childProfileId);
   await db
     .update(monthlyReports)
     .set({ viewedAt: new Date() })

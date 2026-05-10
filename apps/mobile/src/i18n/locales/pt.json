@@ -56,7 +56,8 @@
   "errorBoundary": {
     "title": "Algo deu errado",
     "message": "Ocorreu um erro inesperado. Você pode tentar novamente ou voltar para a tela inicial.",
-    "sessionCrashTitle": "A tela da sessão travou"
+    "sessionCrashTitle": "A tela da sessão travou",
+    "logged": "Registramos isso automaticamente."
   },
   "recovery": {
     "tryAgain": "Tentar novamente",
@@ -144,7 +145,8 @@
       "consentDeletedBody": "The withdrawal grace period has ended."
     },
     "childCard": {
-      "title": "Crianças"
+      "title": "Crianças",
+      "accessibilityLabel": "Abrir Família"
     }
   },
   "dashboard": {

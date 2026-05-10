@@ -252,7 +252,7 @@ describe('MoreScreen landing', () => {
     expect(mockTrack).toHaveBeenCalledWith('child_progress_navigated', {
       source: 'more_preferences_link',
     });
-    expect(mockPush).toHaveBeenCalledWith('/(app)/child/child-1');
+    expect(mockPush).toHaveBeenCalledWith('/(app)/family');
   });
 
   it('hides sign out in impersonation', () => {

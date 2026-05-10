@@ -56,7 +56,8 @@
   "errorBoundary": {
     "title": "Algo salió mal",
     "message": "Ocurrió un error inesperado. Puedes intentarlo de nuevo o volver a la pantalla de inicio.",
-    "sessionCrashTitle": "La pantalla de sesión falló"
+    "sessionCrashTitle": "La pantalla de sesión falló",
+    "logged": "Lo hemos registrado automáticamente."
   },
   "recovery": {
     "tryAgain": "Intentar de nuevo",
@@ -144,7 +145,8 @@
       "consentDeletedBody": "The withdrawal grace period has ended."
     },
     "childCard": {
-      "title": "Niños"
+      "title": "Niños",
+      "accessibilityLabel": "Abrir Familia"
     }
   },
   "dashboard": {

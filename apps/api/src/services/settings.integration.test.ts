@@ -20,13 +20,16 @@ import { eq, inArray, and, count, gte } from 'drizzle-orm';
 import {
   accounts,
   profiles,
+  familyLinks,
+  learningProfiles,
   notificationLog,
   createDatabase,
 } from '@eduagent/database';
+import { ForbiddenError } from '@eduagent/schemas';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { resolve } from 'path';
 
-import { checkAndLogRateLimit } from './settings';
+import { checkAndLogRateLimit, getChildCelebrationLevel } from './settings';
 
 // ---------------------------------------------------------------------------
 // DB setup — real connection
@@ -38,7 +41,7 @@ function requireDatabaseUrl(): string {
   const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error(
-      'DATABASE_URL is not set. Create .env.test.local or .env.development.local.'
+      'DATABASE_URL is not set. Create .env.test.local or .env.development.local.',
     );
   }
   return url;
@@ -123,7 +126,7 @@ describe('[BUG-861] checkAndLogRateLimit concurrent cap enforcement (integration
         profile.id,
         account.id,
         NOTIFICATION_TYPE,
-        { hours: HOURS, maxCount: MAX_COUNT }
+        { hours: HOURS, maxCount: MAX_COUNT },
       );
       expect(rateLimited).toBe(false);
     }
@@ -137,8 +140,8 @@ describe('[BUG-861] checkAndLogRateLimit concurrent cap enforcement (integration
         and(
           eq(notificationLog.profileId, profile.id),
           eq(notificationLog.type, NOTIFICATION_TYPE),
-          gte(notificationLog.sentAt, since)
-        )
+          gte(notificationLog.sentAt, since),
+        ),
       );
     expect(before!.n).toBe(MAX_COUNT - 1);
 
@@ -150,8 +153,8 @@ describe('[BUG-861] checkAndLogRateLimit concurrent cap enforcement (integration
         checkAndLogRateLimit(db, profile.id, account.id, NOTIFICATION_TYPE, {
           hours: HOURS,
           maxCount: MAX_COUNT,
-        })
-      )
+        }),
+      ),
     );
 
     // None should throw
@@ -160,7 +163,7 @@ describe('[BUG-861] checkAndLogRateLimit concurrent cap enforcement (integration
 
     // Count how many calls were NOT rate-limited (i.e., logged an entry)
     const allowed = results.filter(
-      (r) => r.status === 'fulfilled' && r.value === false
+      (r) => r.status === 'fulfilled' && r.value === false,
     );
 
     // Final notification count must equal MAX_COUNT exactly — the advisory lock
@@ -175,8 +178,8 @@ describe('[BUG-861] checkAndLogRateLimit concurrent cap enforcement (integration
         and(
           eq(notificationLog.profileId, profile.id),
           eq(notificationLog.type, NOTIFICATION_TYPE),
-          gte(notificationLog.sentAt, sinceNow)
-        )
+          gte(notificationLog.sentAt, sinceNow),
+        ),
       );
 
     // Hard invariant: exactly 1 of the concurrent calls must have been allowed,
@@ -200,7 +203,7 @@ describe('[BUG-861] checkAndLogRateLimit concurrent cap enforcement (integration
         profile.id,
         account.id,
         NOTIFICATION_TYPE,
-        { hours: HOURS, maxCount: MAX_COUNT }
+        { hours: HOURS, maxCount: MAX_COUNT },
       );
       expect(limited).toBe(false);
     }
@@ -211,7 +214,7 @@ describe('[BUG-861] checkAndLogRateLimit concurrent cap enforcement (integration
       profile.id,
       account.id,
       NOTIFICATION_TYPE,
-      { hours: HOURS, maxCount: MAX_COUNT }
+      { hours: HOURS, maxCount: MAX_COUNT },
     );
     expect(rateLimited).toBe(true);
 
@@ -224,9 +227,125 @@ describe('[BUG-861] checkAndLogRateLimit concurrent cap enforcement (integration
         and(
           eq(notificationLog.profileId, profile.id),
           eq(notificationLog.type, NOTIFICATION_TYPE),
-          gte(notificationLog.sentAt, since)
-        )
+          gte(notificationLog.sentAt, since),
+        ),
       );
     expect(row!.n).toBe(MAX_COUNT);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getChildCelebrationLevel — authorization boundary (integration)
+// ---------------------------------------------------------------------------
+
+const CELEB_PREFIX = 'integration-settings-celeb';
+const CELEB_PARENT_A = {
+  clerkUserId: `${CELEB_PREFIX}-parentA`,
+  email: `${CELEB_PREFIX}-parentA@integration.test`,
+};
+const CELEB_PARENT_B = {
+  clerkUserId: `${CELEB_PREFIX}-parentB`,
+  email: `${CELEB_PREFIX}-parentB@integration.test`,
+};
+
+async function seedCelebrationFixture() {
+  const db = createIntegrationDb();
+
+  const [accountA] = await db
+    .insert(accounts)
+    .values({
+      clerkUserId: CELEB_PARENT_A.clerkUserId,
+      email: CELEB_PARENT_A.email,
+    })
+    .returning();
+  const [profileA] = await db
+    .insert(profiles)
+    .values({
+      accountId: accountA!.id,
+      displayName: 'Parent A',
+      birthYear: 1985,
+      isOwner: true,
+    })
+    .returning();
+
+  const [accountB] = await db
+    .insert(accounts)
+    .values({
+      clerkUserId: CELEB_PARENT_B.clerkUserId,
+      email: CELEB_PARENT_B.email,
+    })
+    .returning();
+  const [profileB] = await db
+    .insert(profiles)
+    .values({
+      accountId: accountB!.id,
+      displayName: 'Parent B',
+      birthYear: 1986,
+      isOwner: true,
+    })
+    .returning();
+
+  // Child profile belongs to parent A's account
+  const [childProfile] = await db
+    .insert(profiles)
+    .values({
+      accountId: accountA!.id,
+      displayName: 'Child',
+      birthYear: 2014,
+      isOwner: false,
+    })
+    .returning();
+
+  // Link child only to parent A
+  await db.insert(familyLinks).values({
+    parentProfileId: profileA!.id,
+    childProfileId: childProfile!.id,
+  });
+
+  return {
+    parentA: profileA!,
+    parentB: profileB!,
+    child: childProfile!,
+  };
+}
+
+async function cleanupCelebration() {
+  const db = createIntegrationDb();
+  const found = await db.query.accounts.findMany({
+    where: inArray(accounts.email, [
+      CELEB_PARENT_A.email,
+      CELEB_PARENT_B.email,
+    ]),
+  });
+  const ids = found.map((a) => a.id);
+  if (ids.length > 0) {
+    await db.delete(accounts).where(inArray(accounts.id, ids));
+  }
+}
+
+describe('getChildCelebrationLevel authorization boundary (integration)', () => {
+  beforeEach(async () => {
+    await cleanupCelebration();
+  });
+
+  afterAll(async () => {
+    await cleanupCelebration();
+  });
+
+  it('returns the default celebration level for a linked child', async () => {
+    const { parentA, child } = await seedCelebrationFixture();
+    const db = createIntegrationDb();
+
+    const level = await getChildCelebrationLevel(db, parentA.id, child.id);
+    expect(level).toBe('big_only');
+  });
+
+  it('rejects access when the caller is not the linked parent', async () => {
+    const { parentB, child } = await seedCelebrationFixture();
+    const db = createIntegrationDb();
+
+    await expect(
+      getChildCelebrationLevel(db, parentB.id, child.id),
+    ).rejects.toThrow(ForbiddenError);
   });
 });

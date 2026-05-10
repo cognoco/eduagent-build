@@ -330,7 +330,7 @@ export const dashboardChildSchema = z.object({
   guidedVsImmediateRatio: z.number().min(0).max(1),
   retentionTrend: z.enum(['improving', 'declining', 'stable']),
   totalSessions: z.number().int(),
-  weeklyHeadline: monthlyReportHeadlineSchema,
+  weeklyHeadline: monthlyReportHeadlineSchema.optional(),
   currentlyWorkingOn: z.array(z.string()).default([]),
   progress: dashboardChildProgressSchema.nullable().optional(),
   currentStreak: z.number().int().default(0),

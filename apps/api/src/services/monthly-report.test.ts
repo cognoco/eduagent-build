@@ -138,12 +138,18 @@ function createMockDb({
   findFirstResult = undefined as
     | ReturnType<typeof makeMonthlyReportRow>
     | undefined,
+  hasParentLink = true,
 } = {}): Database {
   return {
     query: {
       monthlyReports: {
         findMany: jest.fn().mockResolvedValue(findManyResult),
         findFirst: jest.fn().mockResolvedValue(findFirstResult),
+      },
+      familyLinks: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValue(hasParentLink ? { id: 'link-1' } : undefined),
       },
     },
     update: jest.fn().mockReturnValue({
@@ -1218,7 +1224,14 @@ describe('markMonthlyReportViewed', () => {
     const mockSet = jest.fn().mockReturnValue({ where: mockWhere });
     const mockUpdate = jest.fn().mockReturnValue({ set: mockSet });
 
-    const db = { update: mockUpdate } as unknown as Database;
+    const db = {
+      query: {
+        familyLinks: {
+          findFirst: jest.fn().mockResolvedValue({ id: 'link-1' }),
+        },
+      },
+      update: mockUpdate,
+    } as unknown as Database;
 
     await markMonthlyReportViewed(db, UUID.parent, UUID.child, UUID.report);
 

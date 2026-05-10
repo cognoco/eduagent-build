@@ -56,7 +56,8 @@
   "errorBoundary": {
     "title": "問題が発生しました",
     "message": "予期しないエラーが発生しました。再試行するか、ホーム画面に戻ることができます。",
-    "sessionCrashTitle": "セッション画面がクラッシュしました"
+    "sessionCrashTitle": "セッション画面がクラッシュしました",
+    "logged": "このエラーは自動的に記録されました。"
   },
   "recovery": {
     "tryAgain": "再試行",
@@ -144,7 +145,8 @@
       "consentDeletedBody": "The withdrawal grace period has ended."
     },
     "childCard": {
-      "title": "子ども"
+      "title": "子ども",
+      "accessibilityLabel": "ファミリーを開く"
     }
   },
   "dashboard": {

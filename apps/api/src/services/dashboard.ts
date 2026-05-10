@@ -39,6 +39,7 @@ import {
 } from '@eduagent/schemas';
 import type {
   DashboardChild,
+  DemoDashboardData,
   EngagementSignal,
   HomeworkSummary,
   KnowledgeInventory,
@@ -255,9 +256,9 @@ function redactedConsentSummary(
 
 function hiddenWeeklyHeadline(): DashboardChild['weeklyHeadline'] {
   return {
-    label: 'Progress',
+    label: '',
     value: 0,
-    comparison: 'Learning metrics are hidden until consent is active.',
+    comparison: 'consent_redacted',
   };
 }
 
@@ -1625,4 +1626,115 @@ export async function markChildReportViewed(
   await assertParentAccess(db, parentProfileId, childProfileId);
   await assertChildDashboardDataVisible(db, childProfileId);
   await markMonthlyReportViewed(db, parentProfileId, childProfileId, reportId);
+}
+
+export function buildDemoDashboard(): DemoDashboardData {
+  const alexThisWeek: ProgressMetrics = {
+    ...emptyProgressMetrics(),
+    totalSessions: 12,
+    totalActiveMinutes: 180,
+    topicsMastered: 2,
+    vocabularyTotal: 17,
+    subjects: [
+      {
+        subjectId: 'demo-math',
+        subjectName: 'Mathematics',
+        pedagogyMode: 'four_strands',
+        topicsAttempted: 5,
+        topicsMastered: 2,
+        topicsTotal: 10,
+        topicsExplored: 3,
+        vocabularyTotal: 17,
+        vocabularyMastered: 10,
+        sessionsCount: 4,
+        activeMinutes: 180,
+        wallClockMinutes: 180,
+        lastSessionAt: null,
+      },
+    ],
+  };
+  const alexLastWeek: ProgressMetrics = {
+    ...emptyProgressMetrics(),
+    totalSessions: 8,
+    totalActiveMinutes: 90,
+    topicsMastered: 1,
+    vocabularyTotal: 5,
+  };
+  const alexReport = generateWeeklyReportData(
+    'Alex',
+    '2026-01-06',
+    alexThisWeek,
+    alexLastWeek,
+  );
+
+  const samThisWeek = emptyProgressMetrics();
+  const samLastWeek = emptyProgressMetrics();
+  const samReport = generateWeeklyReportData(
+    'Sam',
+    '2026-01-06',
+    samThisWeek,
+    samLastWeek,
+  );
+
+  return {
+    demoMode: true,
+    pendingNotices: [],
+    children: [
+      {
+        profileId: 'demo-child-1',
+        displayName: 'Alex',
+        consentStatus: null,
+        respondedAt: null,
+        // [BUG-876] Demo summary must mention every subject by its canonical
+        // name so the dashboard, library, and shelf all read the same word.
+        // generateChildSummary only surfaces fading/weak subjects, so we
+        // hardcode the showcase summary here.
+        summary:
+          'Alex: Mathematics — 5 problems, 3 guided. Science fading. 4 sessions this week (↑ from 2 last week).',
+        sessionsThisWeek: 4,
+        sessionsLastWeek: 2,
+        totalTimeThisWeek: 180,
+        totalTimeLastWeek: 90,
+        exchangesThisWeek: 0,
+        exchangesLastWeek: 0,
+        trend: 'up',
+        subjects: [
+          { name: 'Mathematics', retentionStatus: 'strong' },
+          { name: 'Science', retentionStatus: 'fading' },
+        ],
+        guidedVsImmediateRatio: 0.6,
+        retentionTrend: 'stable',
+        totalSessions: 12,
+        weeklyHeadline: alexReport.headlineStat,
+        currentlyWorkingOn: ['Fractions', 'Cell structure'],
+        currentStreak: 3,
+        longestStreak: 7,
+        totalXp: 450,
+      },
+      {
+        profileId: 'demo-child-2',
+        displayName: 'Sam',
+        consentStatus: null,
+        respondedAt: null,
+        summary:
+          'Sam: English — steady progress. 3 sessions this week (→ same as last week).',
+        sessionsThisWeek: 3,
+        sessionsLastWeek: 3,
+        totalTimeThisWeek: 120,
+        totalTimeLastWeek: 115,
+        exchangesThisWeek: 0,
+        exchangesLastWeek: 0,
+        trend: 'stable',
+        subjects: [{ name: 'English', retentionStatus: 'strong' }],
+        guidedVsImmediateRatio: 0.3,
+        retentionTrend: 'improving',
+        totalSessions: 8,
+        weeklyHeadline: samReport.headlineStat,
+        currentlyWorkingOn: ['Essay structure'],
+        currentStreak: 1,
+        longestStreak: 5,
+        totalXp: 280,
+      },
+    ],
+  };
 }

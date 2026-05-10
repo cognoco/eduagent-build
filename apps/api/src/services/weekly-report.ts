@@ -4,11 +4,7 @@
 // ---------------------------------------------------------------------------
 
 import { and, desc, eq } from 'drizzle-orm';
-import {
-  createScopedRepository,
-  weeklyReports,
-  type Database,
-} from '@eduagent/database';
+import { weeklyReports, type Database } from '@eduagent/database';
 import type {
   WeeklyReportData,
   WeeklyReportRecord,
@@ -31,19 +27,19 @@ export function generateWeeklyReportData(
   childName: string,
   weekStart: string,
   thisWeek: ProgressMetrics,
-  lastWeek: ProgressMetrics | null
+  lastWeek: ProgressMetrics | null,
 ): WeeklyReportData {
   const topicsMasteredDelta = safeDelta(
     thisWeek.topicsMastered,
-    lastWeek?.topicsMastered
+    lastWeek?.topicsMastered,
   );
   const topicsExploredDelta = safeDelta(
     sumTopicsExplored(thisWeek),
-    lastWeek ? sumTopicsExplored(lastWeek) : undefined
+    lastWeek ? sumTopicsExplored(lastWeek) : undefined,
   );
   const vocabularyDelta = safeDelta(
     thisWeek.vocabularyTotal,
-    lastWeek?.vocabularyTotal
+    lastWeek?.vocabularyTotal,
   );
 
   // BUG-903: When the headline metric is zero AND last week's value is also
@@ -66,34 +62,34 @@ export function generateWeeklyReportData(
           : 'A first week is for warming up.',
       }
     : vocabularyDelta > topicsMasteredDelta
-    ? {
-        label: 'Words learned',
-        value: vocabularyDelta,
-        comparison: lastWeek
-          ? vocabularyDelta === 0 && lastWeek.vocabularyTotal === 0
-            ? "No new words this week — that's OK."
-            : `up from ${lastWeek.vocabularyTotal} last week`
-          : 'in a first week',
-      }
-    : topicsExploredDelta > topicsMasteredDelta
-    ? {
-        label: 'Topics explored',
-        value: topicsExploredDelta,
-        comparison: lastWeek
-          ? topicsExploredDelta === 0
-            ? "No new topics this week — that's OK."
-            : `${topicsExploredDelta} new this week`
-          : 'in a first week',
-      }
-    : {
-        label: 'Topics mastered',
-        value: topicsMasteredDelta,
-        comparison: lastWeek
-          ? topicsMasteredDelta === 0 && lastWeek.topicsMastered === 0
-            ? "No new topics mastered — that's OK."
-            : `up from ${lastWeek.topicsMastered} last week`
-          : 'in a first week',
-      };
+      ? {
+          label: 'Words learned',
+          value: vocabularyDelta,
+          comparison: lastWeek
+            ? vocabularyDelta === 0 && lastWeek.vocabularyTotal === 0
+              ? "No new words this week — that's OK."
+              : `up from ${lastWeek.vocabularyTotal} last week`
+            : 'in a first week',
+        }
+      : topicsExploredDelta > topicsMasteredDelta
+        ? {
+            label: 'Topics explored',
+            value: topicsExploredDelta,
+            comparison: lastWeek
+              ? topicsExploredDelta === 0
+                ? "No new topics this week — that's OK."
+                : `${topicsExploredDelta} new this week`
+              : 'in a first week',
+          }
+        : {
+            label: 'Topics mastered',
+            value: topicsMasteredDelta,
+            comparison: lastWeek
+              ? topicsMasteredDelta === 0 && lastWeek.topicsMastered === 0
+                ? "No new topics mastered — that's OK."
+                : `up from ${lastWeek.topicsMastered} last week`
+              : 'in a first week',
+          };
 
   // thisWeek stores incremental deltas (not absolute values) except for
   // vocabularyTotal (cumulative) and streakBest (absolute). Callers reading
@@ -105,7 +101,7 @@ export function generateWeeklyReportData(
       totalSessions: safeDelta(thisWeek.totalSessions, lastWeek?.totalSessions),
       totalActiveMinutes: safeDelta(
         thisWeek.totalActiveMinutes,
-        lastWeek?.totalActiveMinutes
+        lastWeek?.totalActiveMinutes,
       ),
       topicsMastered: topicsMasteredDelta,
       topicsExplored: topicsExploredDelta,
@@ -127,7 +123,7 @@ export function generateWeeklyReportData(
 }
 
 function mapWeeklyReportRow(
-  row: typeof weeklyReports.$inferSelect
+  row: typeof weeklyReports.$inferSelect,
 ): WeeklyReportRecord {
   return weeklyReportRecordSchema.parse({
     id: row.id,
@@ -143,13 +139,13 @@ function mapWeeklyReportRow(
 export async function listWeeklyReportsForParentChild(
   db: Database,
   parentProfileId: string,
-  childProfileId: string
+  childProfileId: string,
 ): Promise<WeeklyReportSummary[]> {
   await assertParentAccess(db, parentProfileId, childProfileId);
   const rows = await db.query.weeklyReports.findMany({
     where: and(
       eq(weeklyReports.profileId, parentProfileId),
-      eq(weeklyReports.childProfileId, childProfileId)
+      eq(weeklyReports.childProfileId, childProfileId),
     ),
     orderBy: desc(weeklyReports.reportWeek),
     limit: 12,
@@ -166,19 +162,19 @@ export async function listWeeklyReportsForParentChild(
         value: 0,
         comparison: '',
       },
-    })
+    }),
   );
 }
 
 export async function listWeeklyReportsForProfile(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<WeeklyReportSummary[]> {
-  const scoped = createScopedRepository(db, profileId);
-  const rows = await scoped.weeklyReports.findMany(
-    eq(weeklyReports.childProfileId, profileId),
-    { limit: 12 }
-  );
+  const rows = await db.query.weeklyReports.findMany({
+    where: eq(weeklyReports.childProfileId, profileId),
+    orderBy: desc(weeklyReports.reportWeek),
+    limit: 12,
+  });
 
   return rows.map((row) =>
     weeklyReportSummarySchema.parse({
@@ -191,7 +187,7 @@ export async function listWeeklyReportsForProfile(
         value: 0,
         comparison: '',
       },
-    })
+    }),
   );
 }
 
@@ -199,14 +195,14 @@ export async function getWeeklyReportForParentChild(
   db: Database,
   parentProfileId: string,
   childProfileId: string,
-  reportId: string
+  reportId: string,
 ): Promise<WeeklyReportRecord | null> {
   await assertParentAccess(db, parentProfileId, childProfileId);
   const row = await db.query.weeklyReports.findFirst({
     where: and(
       eq(weeklyReports.id, reportId),
       eq(weeklyReports.profileId, parentProfileId),
-      eq(weeklyReports.childProfileId, childProfileId)
+      eq(weeklyReports.childProfileId, childProfileId),
     ),
   });
 
@@ -217,7 +213,7 @@ export async function markWeeklyReportViewed(
   db: Database,
   parentProfileId: string,
   childProfileId: string,
-  reportId: string
+  reportId: string,
 ): Promise<void> {
   await assertParentAccess(db, parentProfileId, childProfileId);
   await db
@@ -227,7 +223,7 @@ export async function markWeeklyReportViewed(
       and(
         eq(weeklyReports.id, reportId),
         eq(weeklyReports.profileId, parentProfileId),
-        eq(weeklyReports.childProfileId, childProfileId)
-      )
+        eq(weeklyReports.childProfileId, childProfileId),
+      ),
     );
 }
