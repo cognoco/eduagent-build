@@ -23,7 +23,7 @@ import {
 } from './helpers';
 import { buildAuthHeaders } from './test-keys';
 import { mockResendEmail } from './external-mocks';
-import { mockInngestEvents } from './mocks';
+import { getCapturedInngestEvents, mockInngestEvents } from './mocks';
 import { getFetchCalls, clearFetchCalls } from './fetch-interceptor';
 
 import { app } from '../../apps/api/src/index';
@@ -118,6 +118,19 @@ describe('Integration: Consent email delivery', () => {
     expect(emailBody.to).toContain(PARENT_EMAIL);
     expect(emailBody.from).toBe('test@mentomate.test');
     expect(emailBody.subject).toContain('consent');
+
+    const inngestEvents = getCapturedInngestEvents();
+    expect(inngestEvents).toEqual([
+      expect.objectContaining({
+        name: 'app/consent.requested',
+        data: expect.objectContaining({
+          profileId: childProfileId,
+          consentType: 'GDPR',
+          timestamp: expect.any(String),
+        }),
+      }),
+    ]);
+    expect(inngestEvents[0].data).not.toHaveProperty('parentEmail');
   });
 
   it('returns emailStatus "failed" when RESEND_API_KEY is missing from env', async () => {
