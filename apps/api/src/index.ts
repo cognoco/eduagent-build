@@ -33,7 +33,6 @@ import type { AuthUser } from './middleware/auth';
 import type { Account } from './services/account';
 
 import { health } from './routes/health';
-import { auth } from './routes/auth';
 import { profileRoutes } from './routes/profiles';
 import { consentRoutes } from './routes/consent';
 import { consentWebRoutes } from './routes/consent-web';
@@ -201,7 +200,6 @@ api.use('*', llmMiddleware);
 // across project-reference boundaries where declaration emit is used.
 const routes = api
   .route('/', health)
-  .route('/', auth)
   .route('/', profileRoutes)
   .route('/', consentRoutes)
   .route('/', consentWebRoutes)
