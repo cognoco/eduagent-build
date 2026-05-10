@@ -123,6 +123,7 @@ jest.mock('../../../../hooks/use-learner-profile', () => ({
 }));
 
 jest.mock('../../../../hooks/use-settings', () => ({
+  // gc1-allow: query-hook stub at unit-test boundary; running real hooks would require a QueryClientProvider + API client wiring
   useChildCelebrationLevel: () => ({ data: 'big_only' }),
   useUpdateChildCelebrationLevel: () => ({
     mutate: jest.fn(),

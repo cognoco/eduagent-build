@@ -3,6 +3,7 @@ import { MonthlyReportCard } from './MonthlyReportCard';
 import { useProfileReports } from '../../hooks/use-progress';
 
 jest.mock('../../hooks/use-progress', () => ({
+  // gc1-allow: query-hook stub at unit-test boundary; real useProfileReports requires QueryClientProvider + API client wiring
   useProfileReports: jest.fn(),
 }));
 
