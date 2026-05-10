@@ -52,6 +52,7 @@ describe('child/[profileId]/_layout.tsx', () => {
     ['report/[reportId]', 'reportId'],
     ['subjects/[subjectId]', 'subjectId'],
     ['topic/[topicId]', 'topicId'],
+    ['weekly-report/[weeklyReportId]', 'weeklyReportId'],
   ])('declares %s with getId returning %s from params', (name, paramKey) => {
     render(<ChildDetailLayout />);
     const screen = capturedScreens.find((s) => s.name === name);
