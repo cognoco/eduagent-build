@@ -1,6 +1,7 @@
+import { useMemo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import type { DashboardData, Profile } from '@eduagent/schemas';
 
@@ -37,17 +38,22 @@ export function ChildCard({
   const { t } = useTranslation();
   const colors = useThemeColors();
 
+  const dashboardByChildId = useMemo(
+    () =>
+      new Map(
+        (dashboard?.children ?? []).map((child) => [child.profileId, child]),
+      ),
+    [dashboard?.children],
+  );
+
   if (linkedChildren.length === 0) return null;
 
-  const dashboardByChildId = new Map(
-    (dashboard?.children ?? []).map((child) => [child.profileId, child]),
-  );
   const isSingle = linkedChildren.length === 1;
 
   return (
     <Pressable
       testID="home-child-card"
-      onPress={() => router.push(FAMILY_HOME_PATH as never)}
+      onPress={() => router.push(FAMILY_HOME_PATH as Href)}
       accessibilityRole="button"
       accessibilityLabel="Open Family"
       className="mx-5 mt-4 rounded-card bg-surface-elevated border border-border px-5 py-5 active:opacity-80"

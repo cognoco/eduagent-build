@@ -57,7 +57,10 @@ describe('selectCurrentlyWorkingOn', () => {
     ).toEqual(['Fractions', 'Decimals']);
   });
 
-  it('excludes stale, low-confidence, and malformed entries', () => {
+  it('excludes stale, low-confidence single-shot, and malformed entries', () => {
+    // The low-confidence filter only drops single-shot signals (attempts < 2).
+    // A topic practiced 2+ times that remains tagged low confidence reflects
+    // a genuine struggle and is still surfaced.
     expect(
       selectCurrentlyWorkingOn(
         [
@@ -66,12 +69,21 @@ describe('selectCurrentlyWorkingOn', () => {
             topic: 'Old',
             lastSeen: '2026-03-01T12:00:00.000Z',
           }),
-          entry({ topic: 'Low confidence', confidence: 'low' }),
+          entry({
+            topic: 'Single shot low',
+            confidence: 'low',
+            attempts: 1,
+          }),
+          entry({
+            topic: 'Repeated low',
+            confidence: 'low',
+            attempts: 3,
+          }),
           { topic: 'Legacy' },
         ],
         now,
       ),
-    ).toEqual(['Fresh']);
+    ).toEqual(['Fresh', 'Repeated low']);
   });
 
   it('strips negative prefixes at the API edge', () => {

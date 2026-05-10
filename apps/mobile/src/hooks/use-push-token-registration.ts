@@ -29,9 +29,15 @@ function capturePushRegistrationFailure(
 function isMissingAndroidFirebaseAppError(err: unknown): boolean {
   if (Platform.OS !== 'android' || !(err instanceof Error)) return false;
 
+  // Match the canonical Expo error string for missing Android Firebase config.
+  // The full docs URL is part of Expo's hard-coded error, not a generic path —
+  // anchoring on the full URL avoids matching unrelated errors that happen to
+  // mention the trailing path fragment.
   return (
     err.message.includes('Default FirebaseApp is not initialized') ||
-    err.message.includes('/push-notifications/fcm-credentials/')
+    err.message.includes(
+      'https://docs.expo.dev/push-notifications/fcm-credentials/',
+    )
   );
 }
 

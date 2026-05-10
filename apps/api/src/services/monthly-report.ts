@@ -22,6 +22,14 @@ function safeDelta(current: number, previous: number | undefined): number {
   return Math.max(0, current - (previous ?? 0));
 }
 
+// Coerce a JSONB-stored unknown value into a string[] safely. Mirrors the
+// element-level guard used by generateReportHighlights when validating LLM
+// output: bad rows produce an empty list rather than throwing on parse.
+function coerceStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((entry): entry is string => typeof entry === 'string');
+}
+
 function subjectExploredTotal(metrics: ProgressMetrics): number {
   return metrics.subjects.reduce(
     (sum, subject) => sum + (subject.topicsExplored ?? 0),
@@ -252,13 +260,12 @@ export async function listMonthlyReportsForParentChild(
         value: 0,
         comparison: '',
       },
-      highlights: (
-        (row.reportData as MonthlyReportData).highlights ?? []
+      highlights: coerceStringArray(
+        (row.reportData as { highlights?: unknown }).highlights,
       ).slice(0, 3),
-      nextSteps: ((row.reportData as MonthlyReportData).nextSteps ?? []).slice(
-        0,
-        2,
-      ),
+      nextSteps: coerceStringArray(
+        (row.reportData as { nextSteps?: unknown }).nextSteps,
+      ).slice(0, 2),
     }),
   );
 }
@@ -283,13 +290,12 @@ export async function listMonthlyReportsForProfile(
         value: 0,
         comparison: '',
       },
-      highlights: (
-        (row.reportData as MonthlyReportData).highlights ?? []
+      highlights: coerceStringArray(
+        (row.reportData as { highlights?: unknown }).highlights,
       ).slice(0, 3),
-      nextSteps: ((row.reportData as MonthlyReportData).nextSteps ?? []).slice(
-        0,
-        2,
-      ),
+      nextSteps: coerceStringArray(
+        (row.reportData as { nextSteps?: unknown }).nextSteps,
+      ).slice(0, 2),
     }),
   );
 }

@@ -1148,7 +1148,11 @@ export function selectCurrentlyWorkingOn(
     if (!parsed.success) continue;
 
     const entry = parsed.data;
-    if (entry.confidence === 'low') continue;
+    // Drop low-confidence single-shot signals only. A topic practiced 2+
+    // times that remains tagged low-confidence reflects a genuine struggle
+    // worth surfacing, even if the model is uncertain. (Family-tab spec
+    // step 0; matches the rationale in Progress D-PT-6.)
+    if (entry.confidence === 'low' && entry.attempts < 2) continue;
     if (new Date(entry.lastSeen).getTime() < cutoffMs) continue;
 
     const label = cleanCurrentlyWorkingOnLabel(entry.topic);

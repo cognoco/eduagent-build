@@ -216,6 +216,11 @@ export async function getCelebrationLevel(
     where: eq(learningModes.profileId, profileId),
   });
 
+  // Default 'all' for the active-profile path: historical default for the
+  // self-celebrations channel. Note: the per-child column on
+  // learning_profiles has a different default ('big_only') — see
+  // getChildCelebrationLevel below. The two read from different tables and
+  // serve different surfaces (self-session vs. parent control).
   return (row?.celebrationLevel as CelebrationLevel | undefined) ?? 'all';
 }
 
@@ -229,6 +234,11 @@ export async function getChildCelebrationLevel(
     where: eq(learningProfiles.profileId, childProfileId),
   });
 
+  // Default 'big_only' for the parent-controlled per-child setting
+  // (deliberately quieter than the self-default of 'all' returned by
+  // getCelebrationLevel above). Asymmetric on purpose: parents tuning a
+  // child's experience usually want a calmer baseline than the child
+  // would self-select, and the column has its own default in the schema.
   return (row?.celebrationLevel as CelebrationLevel | undefined) ?? 'big_only';
 }
 

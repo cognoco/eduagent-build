@@ -1,6 +1,6 @@
 import { View, Text, Pressable, ScrollView, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, type Href } from 'expo-router';
 import { platformAlert } from '../../../../lib/platform-alert';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -318,7 +318,7 @@ export default function ChildDetailScreen() {
           </Pressable>
         )}
         <Pressable
-          onPress={() => router.replace(FAMILY_HOME_PATH as never)}
+          onPress={() => router.replace(FAMILY_HOME_PATH as Href)}
           className="bg-surface rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
           accessibilityRole="button"
           accessibilityLabel={t('parentView.index.backToDashboard')}

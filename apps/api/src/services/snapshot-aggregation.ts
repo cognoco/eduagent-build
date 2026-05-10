@@ -819,11 +819,18 @@ export async function buildKnowledgeInventory(
     currentlyWorkingOn,
     thisWeekMini: {
       sessions: weeklyReportData.thisWeek.totalSessions,
-      wordsLearned: Math.max(
-        0,
-        weeklyReportData.thisWeek.vocabularyTotal -
-          (weeklyReportData.lastWeek?.vocabularyTotal ?? 0),
-      ),
+      // vocabularyTotal is cumulative (lifetime), not a weekly delta — see
+      // weekly-report.ts:99-112. Only treat (this − last) as a weekly delta
+      // when lastWeek is present; otherwise we'd report the learner's entire
+      // lifetime vocabulary as "this week" for brand-new accounts and any
+      // user whose previous-week snapshot is missing.
+      wordsLearned: weeklyReportData.lastWeek
+        ? Math.max(
+            0,
+            weeklyReportData.thisWeek.vocabularyTotal -
+              weeklyReportData.lastWeek.vocabularyTotal,
+          )
+        : 0,
       topicsTouched: weeklyReportData.thisWeek.topicsExplored,
     },
     global: {

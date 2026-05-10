@@ -51,25 +51,21 @@ export async function readSessionRecoveryMarker(
   try {
     const parsed = JSON.parse(effectiveRaw) as SessionRecoveryMarker;
     if (!parsed.sessionId || !parsed.updatedAt) return null;
-    // Reject only when both profileIds are present and differ — prevents
-    // surfacing another profile's session on a shared device.
-    // Unscoped legacy markers (no profileId field) pass through to the
-    // migration block below, which rewrites them under the scoped key.
-    if (
-      profileId &&
-      parsed.profileId !== undefined &&
-      parsed.profileId !== profileId
-    ) {
+    // Drop any marker that is not explicitly scoped to the active profile.
+    // This rejects two cases:
+    //   1. scoped marker for a different profile (cross-profile contamination)
+    //   2. unscoped legacy marker with no profileId field — on a shared
+    //      device, profile A's legacy marker would otherwise be silently
+    //      claimed (and migrated) by profile B on first read.
+    // The one-time UX cost of legacy markers being lost on upgrade is
+    // accepted; security on shared devices is non-negotiable.
+    if (profileId && parsed.profileId !== profileId) {
+      // Best-effort: drop the unscoped legacy key so this rejection path
+      // only fires once per device/upgrade.
+      if (!raw) {
+        await SecureStore.deleteItemAsync(RECOVERY_KEY).catch(() => undefined);
+      }
       return null;
-    }
-
-    // Migrate: if we read from the legacy key, rewrite under the scoped key
-    // and clean up the old one so this fallback only fires once.
-    if (!raw && profileId) {
-      await writeSessionRecoveryMarker(parsed, profileId).catch(
-        () => undefined,
-      );
-      await SecureStore.deleteItemAsync(RECOVERY_KEY).catch(() => undefined);
     }
 
     return parsed;

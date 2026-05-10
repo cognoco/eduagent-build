@@ -232,3 +232,9 @@ apps/api/.notion-*.json
 .scratch/
 .claude/logs/diagnostics.jsonl
 .gstack/
+
+# Native build credentials — provisioned via EAS / CI build secrets, never committed.
+# Per CLAUDE.md the Doppler-only secrets policy applies; google-services.json and
+# GoogleService-Info.plist also carry project identifiers that should not live in repo.
+apps/mobile/google-services.json
+apps/mobile/GoogleService-Info.plist
