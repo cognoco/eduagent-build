@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useRouter, useSegments } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 import type { TopicProgress } from '@eduagent/schemas';
 import { useChildSubjectTopics } from '../../hooks/use-dashboard';
@@ -47,6 +47,8 @@ export function AccordionTopicList({
   expanded,
 }: AccordionTopicListProps): React.ReactElement | null {
   const router = useRouter();
+  const segments = useSegments();
+  const isInsideChildStack = segments.includes('child');
   const {
     data: topics,
     isLoading,
@@ -54,7 +56,7 @@ export function AccordionTopicList({
     refetch,
   } = useChildSubjectTopics(
     expanded ? childProfileId : undefined,
-    expanded ? subjectId : undefined
+    expanded ? subjectId : undefined,
   );
 
   if (!expanded) {
@@ -90,6 +92,12 @@ export function AccordionTopicList({
             key={topic.topicId}
             onPress={(event) => {
               event?.stopPropagation?.();
+              if (!isInsideChildStack) {
+                router.push({
+                  pathname: '/(app)/child/[profileId]',
+                  params: { profileId: childProfileId },
+                } as never);
+              }
               router.push({
                 pathname: '/(app)/child/[profileId]/topic/[topicId]',
                 params: {
