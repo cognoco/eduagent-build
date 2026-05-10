@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "112077240193",
+    "project_id": "mentomate-9d02f",
+    "storage_bucket": "mentomate-9d02f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:112077240193:android:8242d9264230658d349a80",
+        "android_client_info": {
+          "package_name": "com.mentomate.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBzQccUhVjqPaox8Rtg37WGvtdLi9rMwH4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
