@@ -39,7 +39,6 @@ import { ErrorFallback, GateContent } from '../../components/common';
 import { goBackOrReplace } from '../../lib/navigation';
 import { useSubjects } from '../../hooks/use-subjects';
 import { useParentProxy } from '../../hooks/use-parent-proxy';
-import { useFamilyPresence } from '../../hooks/use-family-presence';
 import {
   useActiveProfileRole,
   type ActiveProfileRole,
@@ -57,11 +56,10 @@ const BASE_VISIBLE_TABS: ReadonlySet<string> = new Set([
 ]);
 
 export function computeVisibleTabs(
-  hasFamily: boolean,
   role: ActiveProfileRole | null = 'owner',
 ): Set<string> {
   const next = new Set<string>(BASE_VISIBLE_TABS);
-  if (hasFamily && role === 'owner') next.add('family');
+  if (role === 'owner') next.add('family');
   return next;
 }
 
@@ -1277,12 +1275,8 @@ export default function AppLayout() {
   } = useProfile();
   useMentorLanguageSync();
   const { isParentProxy, childProfile, parentProfile } = useParentProxy();
-  const { hasFamily } = useFamilyPresence();
   const role = useActiveProfileRole();
-  const visibleTabs = React.useMemo(
-    () => computeVisibleTabs(hasFamily, role),
-    [hasFamily, role],
-  );
+  const visibleTabs = React.useMemo(() => computeVisibleTabs(role), [role]);
 
   // Sync Clerk auth state with RevenueCat identity (runs on auth change)
   useRevenueCatIdentity();

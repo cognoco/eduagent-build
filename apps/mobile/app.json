@@ -35,6 +35,7 @@
     },
     "android": {
       "package": "com.mentomate.app",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#1a1a3e"

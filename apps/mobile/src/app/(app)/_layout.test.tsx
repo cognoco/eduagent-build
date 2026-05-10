@@ -662,27 +662,22 @@ describe('AppLayout', () => {
 });
 
 describe('computeVisibleTabs', () => {
-  it('does not include family when no linked children are present', () => {
-    const tabs = computeVisibleTabs(false);
+  it('includes family for all owner accounts including those with no children', () => {
+    const tabs = computeVisibleTabs();
     expect(tabs.has('home')).toBe(true);
     expect(tabs.has('library')).toBe(true);
     expect(tabs.has('progress')).toBe(true);
     expect(tabs.has('more')).toBe(true);
-    expect(tabs.has('family')).toBe(false);
-  });
-
-  it('includes family when linked children are present', () => {
-    const tabs = computeVisibleTabs(true);
     expect(tabs.has('family')).toBe(true);
   });
 
-  it('does not include family for child role even when linked children are present', () => {
-    const tabs = computeVisibleTabs(true, 'child');
+  it('does not include family for child role', () => {
+    const tabs = computeVisibleTabs('child');
     expect(tabs.has('family')).toBe(false);
   });
 
   it('does not include family while impersonating a child', () => {
-    const tabs = computeVisibleTabs(true, 'impersonated-child');
+    const tabs = computeVisibleTabs('impersonated-child');
     expect(tabs.has('family')).toBe(false);
   });
 });

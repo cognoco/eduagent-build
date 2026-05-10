@@ -23,16 +23,16 @@ tags:
 
 - takeScreenshot: bug239-01-parent-home-loaded
 
-# 3. Navigate to More tab
+# 3. Navigate to Family tab
 - tapOn:
-    id: "tab-more"
+    id: "tab-family"
 
 - extendedWaitUntil:
     visible:
-      text: "Family"
+      id: "dashboard-scroll"
     timeout: 10000
 
-- takeScreenshot: bug239-02-more-tab
+- takeScreenshot: bug239-02-family-tab
 
 # 4. Tap "Add a child"
 - tapOn:

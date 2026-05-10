@@ -110,7 +110,7 @@ describe('ChildCard', () => {
     screen.getByTestId('home-child-card');
     screen.getByTestId('home-child-card-row-child-1');
     screen.getByText('Emma');
-    screen.getByText('12 words learned - up from 5 last week');
+    screen.getByText('12 words learned — up from 5 last week');
   });
 
   it('renders multiple children as stacked rows', () => {

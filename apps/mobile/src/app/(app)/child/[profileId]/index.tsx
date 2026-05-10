@@ -47,6 +47,7 @@ import {
 } from '../../../../lib/accommodation-options';
 import { getGracePeriodDaysRemaining } from '../../../../lib/consent-grace';
 import { FAMILY_HOME_PATH, goBackOrReplace } from '../../../../lib/navigation';
+import { useThemeColors } from '../../../../lib/theme';
 
 function SubjectSkeleton(): React.ReactNode {
   return (
@@ -113,6 +114,7 @@ function isRestrictedConsentStatus(status: string | null | undefined): boolean {
 export default function ChildDetailScreen() {
   const { t } = useTranslation();
   const router = useRouter();
+  const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const { profiles } = useProfile();
   const { profileId: rawProfileId } = useLocalSearchParams<{
@@ -528,7 +530,7 @@ export default function ChildDetailScreen() {
         <Ionicons
           name={showAccommodationGuide ? 'chevron-up' : 'chevron-down'}
           size={14}
-          color="#6b7280"
+          color={colors.textSecondary}
         />
         <Text className="text-body-sm text-text-secondary ms-1">
           {t('parentView.index.notSureWhichToPick')}

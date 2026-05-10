@@ -27,7 +27,7 @@ function formatHeadline(
     return null;
   }
   const value = `${headline.value} ${headline.label.toLowerCase()}`;
-  return headline.comparison ? `${value} - ${headline.comparison}` : value;
+  return headline.comparison ? `${value} — ${headline.comparison}` : value;
 }
 
 export function ChildCard({

@@ -1,5 +1,5 @@
 # Flow: Add-First-Child Gate — Parent owner with no children can add a child
-# Validates: solo parent (owner, no children) sees the Family section in More,
+# Validates: solo parent (owner, no children) sees the Family tab,
 #            taps "Add a child" row, and lands on the create-profile screen.
 # Tags: weekly, parent
 #
@@ -10,17 +10,17 @@
 #
 # Seed analysis (test-seed.ts):
 #   parent-solo: isOwner=true, no children → hasLinkedChildren()=false →
-#   home renders LearnerScreen (not LearnerScreen). The "add first child"
-#   entry point lives in More → Family section → add-child-link Pressable,
-#   which calls handleAddChild() → router.push('/create-profile?for=child').
+#   home renders LearnerScreen. The "add first child" entry point lives in
+#   the Family tab → family-add-child-link Pressable (visible for all adult
+#   owners via isAdultOwner check, regardless of existing children count).
 #
 # testID mapping:
-#   more.tsx:
-#     - add-child-link                  -> "Add a child" Pressable in Family section
+#   family.tsx:
+#     - family-add-child-link           -> "Add a child" Pressable
 #   create-profile.tsx:
 #     - create-profile-name             -> child name input (confirms navigation)
 #   _layout.tsx tabs:
-#     - tab-more                        -> More tab bar button
+#     - tab-family                      -> Family tab bar button
 appId: com.mentomate.app
 tags:
   - weekly
@@ -41,21 +41,20 @@ tags:
 
 - takeScreenshot: add-first-child-01-home
 
-# ── Part 1: Navigate to More tab ─────────────────────────────────────
-# BUG-15: use text, not testID for the tab bar (tab label text is reliable).
+# ── Part 1: Navigate to Family tab ───────────────────────────────────
 - tapOn:
-    text: "More"
+    id: "tab-family"
 
 - extendedWaitUntil:
     visible:
-      id: "learning-accommodation-section-header"
+      id: "dashboard-scroll"
     timeout: 10000
 
-- takeScreenshot: add-first-child-02-more-screen
+- takeScreenshot: add-first-child-02-family-screen
 
-# ── Part 2: Assert Family section with add-child-link ─────────────────
-# The Family section is conditional on activeProfile.isOwner — parent-solo
-# is the account owner so this section always renders.
+# ── Part 2: Assert add-child-link in Family tab ───────────────────────
+# family-add-child-link is visible whenever isAdultOwner=true — parent-solo
+# is an adult owner so this button always renders, even with no children yet.
 - scrollUntilVisible:
     element:
       id: "family-add-child-link"

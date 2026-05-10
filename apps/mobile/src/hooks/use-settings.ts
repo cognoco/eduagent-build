@@ -127,7 +127,7 @@ export function useChildCelebrationLevel(
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
         const res = await client.settings['celebration-level'].$get(
-          { query: { childProfileId: childProfileId ?? '' } },
+          { query: childProfileId ? { childProfileId } : {} },
           { init: { signal } },
         );
         await assertOk(res);
