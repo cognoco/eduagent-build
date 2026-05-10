@@ -26,6 +26,39 @@ if [[ -z "$allowed_files" ]]; then
     exit 1
 fi
 
+# Validate may legitimately commit test-infrastructure fixes outside the
+# work-order's claimed files (e.g., hardening a related test against
+# cross-suite pollution exposed by --findRelatedTests). cleanup-validate.md
+# Phase 3 writes those paths to .validate-allowed-extras; we union them in,
+# but ONLY for files matching test-file patterns.
+#
+# MECHANICAL FILTER (not prompt-trust): we require the file name shape to
+# prove the file is a test. If validate ever stages a production source
+# file, scope-guard will still reject it — that forces a conversation
+# rather than silently broadening trust through a prompt update.
+#
+# TRUST BOUNDARY: this union trusts validate's commit (filtered), NOT
+# fix-locally's. fix-locally only fixes CRITICAL/HIGH reviewer findings,
+# and reviewers only see the implement diff — so any legitimate
+# fix-locally edit is already on a claimed file. If fix-locally trips
+# scope-guard, that's a real signal of scope drift and we want it to
+# surface. Do not extend this union to fix-locally without explicit
+# discussion.
+extras_file="${artifacts_dir}/.validate-allowed-extras"
+if [[ -f "$extras_file" ]]; then
+    extras="$(grep -v '^$' "$extras_file" \
+        | grep -E '\.(test|spec)\.(ts|tsx)$' \
+        | sort -u || true)"
+    if [[ -n "$extras" ]]; then
+        extras_count="$(echo "$extras" | wc -l | tr -d ' ')"
+        allowed_files="$(printf '%s\n%s\n' "$allowed_files" "$extras" | sort -u)"
+        echo "Scope guard: unioned ${extras_count} validate-fix test file(s) into allowed list"
+    fi
+    # Non-test entries in .validate-allowed-extras are intentionally dropped here;
+    # if validate committed a non-test file, scope-guard will reject it on the
+    # diff pass below.
+fi
+
 allowed_count="$(echo "$allowed_files" | wc -l | tr -d ' ')"
 
 # Determine the base ref for the diff.

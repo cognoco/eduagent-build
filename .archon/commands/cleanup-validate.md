@@ -39,9 +39,20 @@ Confirm all phases completed.
 CLAUDE.md is already loaded into your system prompt — do not re-read it. Use the
 "Handy Commands" section for exact validation commands.
 
+### 1.4 Record Validation Baseline
+
+```bash
+# Captured at validate start so cleanup-scope-guard.sh can compute the exact
+# set of files validate's FIX AND COMMIT phase committed. The post-fix
+# scope-guard unions these (subject to a test-file pattern filter) into the
+# work-order's allowed list.
+git rev-parse HEAD > "$ARTIFACTS_DIR/.pre-validate-sha"
+```
+
 **PHASE_1_CHECKPOINT:**
 - [ ] Touched packages identified
 - [ ] All phases confirmed complete
+- [ ] Pre-validate SHA recorded
 
 ---
 
@@ -164,6 +175,13 @@ Post-implementation validation fixes.
 Co-Authored-By: Archon <archon@anthropic.com>
 CMSG
 git commit -F "$ARTIFACTS_DIR/commit-msg.txt"
+
+# Record exactly what validate committed (not just what was staged) so
+# cleanup-scope-guard.sh can union legitimate test-infrastructure fixes into
+# the work-order's allowed list. Scope-guard applies a test-file pattern
+# filter — production-source extras still trip the guard.
+git diff --name-only "$(cat "$ARTIFACTS_DIR/.pre-validate-sha")..HEAD" \
+    > "$ARTIFACTS_DIR/.validate-allowed-extras"
 ```
 
 ---
