@@ -974,20 +974,22 @@ export async function upsertProgressSnapshot(
   snapshotDate: string,
   metrics: ProgressMetrics,
 ): Promise<void> {
-  await db
-    .insert(progressSnapshots)
-    .values({
-      profileId,
-      snapshotDate,
-      metrics,
-    })
-    .onConflictDoUpdate({
-      target: [progressSnapshots.profileId, progressSnapshots.snapshotDate],
-      set: {
+  await withTransientDatabaseRetry('upsertProgressSnapshot', () =>
+    db
+      .insert(progressSnapshots)
+      .values({
+        profileId,
+        snapshotDate,
         metrics,
-        updatedAt: new Date(),
-      },
-    });
+      })
+      .onConflictDoUpdate({
+        target: [progressSnapshots.profileId, progressSnapshots.snapshotDate],
+        set: {
+          metrics,
+          updatedAt: new Date(),
+        },
+      }),
+  );
 }
 
 // [F-043] Session thresholds that should have fired a milestone on session
