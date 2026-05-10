@@ -255,6 +255,7 @@ required manual release step.
 | Migration | Column | Code that fails without it |
 |-----------|--------|---------------------------|
 | `0006_watery_birth_year.sql` | `profiles.birth_year` | `profileScopeMiddleware` → `ProfileMeta.birthYear`, LLM context injection, Sentry age-gating, consent checks |
+| `0069_learning_profile_celebration_level.sql` | `learning_profiles.celebration_level` | `getChildCelebrationLevel`, `upsertChildCelebrationLevel` in `services/settings.ts` — parent-controlled per-child celebration preference |
 
 ---
 

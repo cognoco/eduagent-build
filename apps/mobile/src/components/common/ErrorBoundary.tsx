@@ -72,21 +72,30 @@ function ErrorFallbackView({
         }}
         testID="error-boundary-fallback"
       />
-      <View
-        className="mt-6 mx-4 rounded-card border border-border bg-surface p-4"
-        testID="error-boundary-debug"
-      >
-        <Text className="text-caption font-bold uppercase text-text-secondary mb-2">
-          Debug details (screenshot this)
-        </Text>
-        <Text
-          selectable
-          className="text-body-sm text-text-primary"
-          style={{ fontFamily: 'monospace' }}
+      {__DEV__ ? (
+        <View
+          className="mt-6 mx-4 rounded-card border border-border bg-surface p-4"
+          testID="error-boundary-debug"
         >
-          {debugBody}
+          <Text className="text-caption font-bold uppercase text-text-secondary mb-2">
+            Debug details (screenshot this)
+          </Text>
+          <Text
+            selectable
+            className="text-body-sm text-text-primary"
+            style={{ fontFamily: 'monospace' }}
+          >
+            {debugBody}
+          </Text>
+        </View>
+      ) : (
+        <Text
+          className="mt-6 mx-4 text-caption text-text-secondary text-center"
+          testID="error-boundary-logged"
+        >
+          {t('errorBoundary.logged')}
         </Text>
-      </View>
+      )}
     </ScrollView>
   );
 }

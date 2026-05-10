@@ -274,13 +274,16 @@ export async function upsertChildCelebrationLevel(
   celebrationLevel: CelebrationLevel,
 ): Promise<{ celebrationLevel: CelebrationLevel }> {
   await assertParentAccess(db, parentProfileId, childProfileId);
+  const existing = await db.query.learningProfiles.findFirst({
+    where: eq(learningProfiles.profileId, childProfileId),
+  });
+  if (!existing) {
+    return { celebrationLevel: 'big_only' };
+  }
   await db
-    .insert(learningProfiles)
-    .values({ profileId: childProfileId, celebrationLevel })
-    .onConflictDoUpdate({
-      target: learningProfiles.profileId,
-      set: { celebrationLevel, updatedAt: new Date() },
-    });
+    .update(learningProfiles)
+    .set({ celebrationLevel, updatedAt: new Date() })
+    .where(eq(learningProfiles.profileId, childProfileId));
 
   return { celebrationLevel };
 }

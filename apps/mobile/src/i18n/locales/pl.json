@@ -56,7 +56,8 @@
   "errorBoundary": {
     "title": "Coś poszło nie tak",
     "message": "Wystąpił nieoczekiwany błąd. Możesz spróbować ponownie lub wrócić do ekranu głównego.",
-    "sessionCrashTitle": "Ekran sesji uległ awarii"
+    "sessionCrashTitle": "Ekran sesji uległ awarii",
+    "logged": "Zarejestrowaliśmy to automatycznie."
   },
   "recovery": {
     "tryAgain": "Ponów próbę",
@@ -144,7 +145,8 @@
       "consentDeletedBody": "The withdrawal grace period has ended."
     },
     "childCard": {
-      "title": "Dzieci"
+      "title": "Dzieci",
+      "accessibilityLabel": "Otwórz Rodzinę"
     }
   },
   "dashboard": {

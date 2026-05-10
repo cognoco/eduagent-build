@@ -52,7 +52,7 @@ afterAll(async () => {
 
 async function createProfileFor(
   user: { userId: string; email: string },
-  displayName: string
+  displayName: string,
 ) {
   return createProfileViaRoute({
     app,
@@ -84,7 +84,7 @@ describe('Integration: settings routes', () => {
           email: SETTINGS_USER.email,
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -107,7 +107,7 @@ describe('Integration: settings routes', () => {
         method: 'PUT',
         headers: buildAuthHeaders(
           { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
-          profile.id
+          profile.id,
         ),
         body: JSON.stringify({
           reviewReminders: false,
@@ -116,7 +116,7 @@ describe('Integration: settings routes', () => {
           pushEnabled: true,
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -152,13 +152,13 @@ describe('Integration: settings routes', () => {
         method: 'PUT',
         headers: buildAuthHeaders(
           { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
-          profile.id
+          profile.id,
         ),
         body: JSON.stringify({
           reviewReminders: 'yes',
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -173,10 +173,10 @@ describe('Integration: settings routes', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
-          profile.id
+          profile.id,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -192,11 +192,11 @@ describe('Integration: settings routes', () => {
         method: 'PUT',
         headers: buildAuthHeaders(
           { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
-          profile.id
+          profile.id,
         ),
         body: JSON.stringify({ mode: 'serious' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -218,11 +218,11 @@ describe('Integration: settings routes', () => {
         method: 'PUT',
         headers: buildAuthHeaders(
           { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
-          profile.id
+          profile.id,
         ),
         body: JSON.stringify({ mode: 'speedrun' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -242,10 +242,10 @@ describe('Integration: settings routes', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
-          profile.id
+          profile.id,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(getRes.status).toBe(200);
@@ -257,11 +257,11 @@ describe('Integration: settings routes', () => {
         method: 'PUT',
         headers: buildAuthHeaders(
           { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
-          profile.id
+          profile.id,
         ),
         body: JSON.stringify({ celebrationLevel: 'big_only' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(putRes.status).toBe(200);
@@ -274,6 +274,54 @@ describe('Integration: settings routes', () => {
     expect(saved?.celebrationLevel).toBe('big_only');
   });
 
+  it('rejects GET child celebration level when caller is not the parent', async () => {
+    const callerProfile = await createProfileFor(SETTINGS_USER, 'Not Parent');
+    const childProfile = await createProfileFor(
+      OTHER_SETTINGS_USER,
+      'Unrelated Child',
+    );
+
+    const res = await app.request(
+      `/v1/settings/celebration-level?childProfileId=${childProfile.id}`,
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
+          callerProfile.id,
+        ),
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects PUT child celebration level when caller is not the parent', async () => {
+    const callerProfile = await createProfileFor(SETTINGS_USER, 'Not Parent');
+    const childProfile = await createProfileFor(
+      OTHER_SETTINGS_USER,
+      'Unrelated Child',
+    );
+
+    const res = await app.request(
+      '/v1/settings/celebration-level',
+      {
+        method: 'PUT',
+        headers: buildAuthHeaders(
+          { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
+          callerProfile.id,
+        ),
+        body: JSON.stringify({
+          childProfileId: childProfile.id,
+          celebrationLevel: 'off',
+        }),
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(403);
+  });
+
   it('gets and updates the analogy domain for an owned subject', async () => {
     const profile = await createProfileFor(SETTINGS_USER, 'Settings Learner');
     const subject = await seedSubject(profile.id, 'Math');
@@ -284,10 +332,10 @@ describe('Integration: settings routes', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
-          profile.id
+          profile.id,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(initialRes.status).toBe(200);
@@ -299,11 +347,11 @@ describe('Integration: settings routes', () => {
         method: 'PUT',
         headers: buildAuthHeaders(
           { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
-          profile.id
+          profile.id,
         ),
         body: JSON.stringify({ analogyDomain: 'sports' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(updateRes.status).toBe(200);
@@ -315,11 +363,11 @@ describe('Integration: settings routes', () => {
         method: 'PUT',
         headers: buildAuthHeaders(
           { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
-          profile.id
+          profile.id,
         ),
         body: JSON.stringify({ analogyDomain: null }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(clearRes.status).toBe(200);
@@ -329,7 +377,7 @@ describe('Integration: settings routes', () => {
     const saved = await db.query.teachingPreferences.findFirst({
       where: and(
         eq(teachingPreferences.profileId, profile.id),
-        eq(teachingPreferences.subjectId, subject.id)
+        eq(teachingPreferences.subjectId, subject.id),
       ),
     });
     expect(saved?.analogyDomain).toBeNull();
@@ -346,11 +394,11 @@ describe('Integration: settings routes', () => {
         method: 'PUT',
         headers: buildAuthHeaders(
           { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
-          profile.id
+          profile.id,
         ),
         body: JSON.stringify({ analogyDomain: 'gaming' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(404);
@@ -366,11 +414,11 @@ describe('Integration: settings routes', () => {
         method: 'PUT',
         headers: buildAuthHeaders(
           { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
-          profile.id
+          profile.id,
         ),
         body: JSON.stringify({ analogyDomain: 'invalid' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
     expect(invalidBodyRes.status).toBe(400);
 
@@ -380,11 +428,11 @@ describe('Integration: settings routes', () => {
         method: 'PUT',
         headers: buildAuthHeaders(
           { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
-          profile.id
+          profile.id,
         ),
         body: JSON.stringify({ analogyDomain: 'sports' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
     expect(invalidSubjectRes.status).toBe(400);
   });
@@ -404,10 +452,10 @@ describe('Integration: settings routes', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
-          profile.id
+          profile.id,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(initialRes.status).toBe(200);
@@ -419,11 +467,11 @@ describe('Integration: settings routes', () => {
         method: 'PUT',
         headers: buildAuthHeaders(
           { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
-          profile.id
+          profile.id,
         ),
         body: JSON.stringify({ nativeLanguage: 'en' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(updateRes.status).toBe(200);
@@ -433,7 +481,7 @@ describe('Integration: settings routes', () => {
     const savedAfterSet = await db.query.teachingPreferences.findFirst({
       where: and(
         eq(teachingPreferences.profileId, profile.id),
-        eq(teachingPreferences.subjectId, subject.id)
+        eq(teachingPreferences.subjectId, subject.id),
       ),
     });
     expect(savedAfterSet?.nativeLanguage).toBe('en');
@@ -444,11 +492,11 @@ describe('Integration: settings routes', () => {
         method: 'PUT',
         headers: buildAuthHeaders(
           { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
-          profile.id
+          profile.id,
         ),
         body: JSON.stringify({ nativeLanguage: null }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(clearRes.status).toBe(200);
@@ -466,11 +514,11 @@ describe('Integration: settings routes', () => {
         method: 'PUT',
         headers: buildAuthHeaders(
           { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
-          profile.id
+          profile.id,
         ),
         body: JSON.stringify({ nativeLanguage: 'en' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(404);
@@ -486,11 +534,11 @@ describe('Integration: settings routes', () => {
         method: 'PUT',
         headers: buildAuthHeaders(
           { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
-          profile.id
+          profile.id,
         ),
         body: JSON.stringify({ nativeLanguage: '' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
     expect(invalidBodyRes.status).toBe(400);
 
@@ -500,18 +548,18 @@ describe('Integration: settings routes', () => {
         method: 'PUT',
         headers: buildAuthHeaders(
           { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
-          profile.id
+          profile.id,
         ),
         body: JSON.stringify({ nativeLanguage: 'en' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
     expect(invalidSubjectRes.status).toBe(400);
 
     const unauthorizedRes = await app.request(
       '/v1/settings/notifications',
       { method: 'GET' },
-      TEST_ENV
+      TEST_ENV,
     );
     expect(unauthorizedRes.status).toBe(401);
   });

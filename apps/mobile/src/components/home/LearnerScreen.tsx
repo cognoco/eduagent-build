@@ -111,7 +111,11 @@ export function LearnerScreen({
   const { data: reviewSummary } = useReviewSummary();
   const { data: overallProgress } = useOverallProgress();
   const { data: quizDiscovery } = useQuizDiscoveryCard();
-  const { data: dashboard } = useDashboard();
+  const {
+    data: dashboard,
+    isError: isDashboardError,
+    refetch: refetchDashboard,
+  } = useDashboard();
   const markQuizDiscoverySurfaced = useMarkQuizDiscoverySurfaced();
   const [recoveryMarker, setRecoveryMarker] =
     useState<SessionRecoveryMarker | null>(null);
@@ -479,7 +483,29 @@ export function LearnerScreen({
         </View>
 
         {showChildCard ? (
-          <ChildCard linkedChildren={linkedChildren} dashboard={dashboard} />
+          isDashboardError && !dashboard ? (
+            <View
+              className="mx-5 mt-4 rounded-card bg-surface-elevated border border-border px-5 py-5 items-center"
+              testID="home-child-card-error"
+            >
+              <Text className="text-body text-text-secondary text-center mb-3">
+                {t('dashboard.errorTitle')}
+              </Text>
+              <Pressable
+                onPress={() => void refetchDashboard()}
+                className="min-h-[44px] px-6 items-center justify-center bg-primary rounded-button"
+                accessibilityRole="button"
+                accessibilityLabel={t('dashboard.retryLoadingLabel')}
+                testID="home-child-card-retry"
+              >
+                <Text className="text-body font-semibold text-text-inverse">
+                  {t('recovery.tryAgain')}
+                </Text>
+              </Pressable>
+            </View>
+          ) : (
+            <ChildCard linkedChildren={linkedChildren} dashboard={dashboard} />
+          )
         ) : null}
 
         {/* Intent actions are the learner's own homepage. For parents with

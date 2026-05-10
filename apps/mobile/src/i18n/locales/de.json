@@ -56,7 +56,8 @@
   "errorBoundary": {
     "title": "Etwas ist schiefgelaufen",
     "message": "Ein unerwarteter Fehler ist aufgetreten. Du kannst es erneut versuchen oder zum Startbildschirm zurückkehren.",
-    "sessionCrashTitle": "Sitzungsbildschirm abgestürzt"
+    "sessionCrashTitle": "Sitzungsbildschirm abgestürzt",
+    "logged": "Wir haben das automatisch protokolliert."
   },
   "recovery": {
     "tryAgain": "Erneut versuchen",
@@ -144,7 +145,8 @@
       "consentDeletedBody": "The withdrawal grace period has ended."
     },
     "childCard": {
-      "title": "Kinder"
+      "title": "Kinder",
+      "accessibilityLabel": "Familie öffnen"
     }
   },
   "dashboard": {

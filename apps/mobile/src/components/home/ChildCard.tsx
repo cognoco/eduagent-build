@@ -16,9 +16,6 @@ interface ChildCardProps {
 function formatHeadline(
   child: NonNullable<DashboardData['children'][number]>,
 ): string | null {
-  // weeklyHeadline is required by the schema, but a stale API deployment can
-  // omit it (contract drift). Fall back to a neutral placeholder rather than
-  // crashing the whole home screen.
   const headline = child.weeklyHeadline;
   if (
     !headline ||
@@ -55,7 +52,7 @@ export function ChildCard({
       testID="home-child-card"
       onPress={() => router.push(FAMILY_HOME_PATH as Href)}
       accessibilityRole="button"
-      accessibilityLabel="Open Family"
+      accessibilityLabel={t('home.childCard.accessibilityLabel')}
       className="mx-5 mt-4 rounded-card bg-surface-elevated border border-border px-5 py-5 active:opacity-80"
     >
       <View className="flex-row items-center justify-between">

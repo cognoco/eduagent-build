@@ -56,7 +56,8 @@
   "errorBoundary": {
     "title": "Noe gikk galt",
     "message": "En uventet feil oppstod. Du kan prøve igjen eller gå tilbake til startskjermen.",
-    "sessionCrashTitle": "Øktskjermen krasjet"
+    "sessionCrashTitle": "Øktskjermen krasjet",
+    "logged": "Vi har logget dette automatisk."
   },
   "recovery": {
     "tryAgain": "Prøv igjen",
@@ -144,7 +145,8 @@
       "consentDeletedBody": "Angreretten er utløpt."
     },
     "childCard": {
-      "title": "Barn"
+      "title": "Barn",
+      "accessibilityLabel": "Åpne Familie"
     }
   },
   "dashboard": {

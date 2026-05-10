@@ -32,6 +32,7 @@ import {
   getChildSessions,
   getChildSessionDetail,
   assertChildDashboardDataVisible,
+  buildDemoDashboard,
 } from '../services/dashboard';
 import { listPendingNotices } from '../services/notices';
 import {
@@ -342,75 +343,5 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
 
   // Get demo mode fixture data
   .get('/dashboard/demo', async (c) => {
-    return c.json(
-      demoDashboardDataSchema.parse({
-        demoMode: true,
-        pendingNotices: [],
-        children: [
-          {
-            profileId: 'demo-child-1',
-            displayName: 'Alex',
-            consentStatus: null,
-            respondedAt: null,
-            // [BUG-876] Subject names must match the `subjects[]` array below
-            // exactly so the dashboard summary, the subjects list, the library,
-            // the shelf, and progress all read as the same canonical word.
-            summary:
-              'Alex: Mathematics \u2014 5 problems, 3 guided. Science fading. 4 sessions this week (\u2191 from 2 last week).',
-            sessionsThisWeek: 4,
-            sessionsLastWeek: 2,
-            totalTimeThisWeek: 180,
-            totalTimeLastWeek: 90,
-            exchangesThisWeek: 0,
-            exchangesLastWeek: 0,
-            trend: 'up',
-            subjects: [
-              { name: 'Mathematics', retentionStatus: 'strong' },
-              { name: 'Science', retentionStatus: 'fading' },
-            ],
-            guidedVsImmediateRatio: 0.6,
-            retentionTrend: 'stable',
-            totalSessions: 12,
-            weeklyHeadline: {
-              label: 'Words learned',
-              value: 12,
-              comparison: 'up from 5 last week',
-            },
-            currentlyWorkingOn: ['Fractions', 'Cell structure'],
-            currentStreak: 3,
-            longestStreak: 7,
-            totalXp: 450,
-          },
-          {
-            profileId: 'demo-child-2',
-            displayName: 'Sam',
-            consentStatus: null,
-            respondedAt: null,
-            summary:
-              'Sam: English \u2014 steady progress. 3 sessions this week (\u2192 same as last week).',
-            sessionsThisWeek: 3,
-            sessionsLastWeek: 3,
-            totalTimeThisWeek: 120,
-            totalTimeLastWeek: 115,
-            exchangesThisWeek: 0,
-            exchangesLastWeek: 0,
-            trend: 'stable',
-            subjects: [{ name: 'English', retentionStatus: 'strong' }],
-            guidedVsImmediateRatio: 0.3,
-            retentionTrend: 'improving',
-            totalSessions: 8,
-            weeklyHeadline: {
-              label: 'Topics mastered',
-              value: 0,
-              comparison:
-                "No activity this week - that's OK. A nudge can help.",
-            },
-            currentlyWorkingOn: ['Essay structure'],
-            currentStreak: 1,
-            longestStreak: 5,
-            totalXp: 280,
-          },
-        ],
-      }),
-    );
+    return c.json(demoDashboardDataSchema.parse(buildDemoDashboard()));
   });
