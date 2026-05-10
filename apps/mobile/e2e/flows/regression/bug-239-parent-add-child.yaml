@@ -23,20 +23,28 @@ tags:
 
 - takeScreenshot: bug239-01-parent-home-loaded
 
-# 3. Navigate to Family tab
+# 3. Navigate to More tab. The Add-child entry lives only in More now —
+#    Family tab is reserved for owners-with-kids and the entry was
+#    consolidated into More for both solo adults and existing parents.
 - tapOn:
-    id: "tab-family"
+    id: "tab-more"
 
 - extendedWaitUntil:
     visible:
-      id: "dashboard-scroll"
+      id: "learning-accommodation-section-header"
     timeout: 10000
 
-- takeScreenshot: bug239-02-family-tab
+- takeScreenshot: bug239-02-more-tab
 
 # 4. Tap "Add a child"
+- scrollUntilVisible:
+    element:
+      id: "add-child-link"
+    direction: DOWN
+    timeout: 10000
+
 - tapOn:
-    id: "family-add-child-link"
+    id: "add-child-link"
 
 # 5. Wait for create-profile form
 - extendedWaitUntil:
