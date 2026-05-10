@@ -10,7 +10,7 @@ export interface QuotaExceededCardProps {
 
 /**
  * Shown in-chat when the API returns a 402 QuotaExceededError.
- * Persona-unaware: uses semantic tokens only. isOwner controls variant.
+ * Uses semantic tokens only. isOwner controls variant.
  */
 export function QuotaExceededCard({
   details,

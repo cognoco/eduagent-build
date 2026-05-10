@@ -22,7 +22,7 @@ type MentomateLogoProps = {
  * (logo-icon-light.svg, logo-icon-dark.svg) and AnimatedSplash.
  *
  * These are hardcoded so the brand identity stays consistent
- * regardless of persona or accent preset.
+ * regardless of active theme or accent preset.
  */
 const BRAND = {
   light: {
