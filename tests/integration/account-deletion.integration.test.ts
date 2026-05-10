@@ -35,26 +35,11 @@ import {
 } from './helpers';
 import { buildAuthHeaders } from './test-keys';
 import { executeDeletion } from '../../apps/api/src/services/deletion';
-
-// --- Inngest transport mock (external boundary) ---
-const mockInngestSend = jest.fn().mockResolvedValue({ ids: [] });
-const mockInngestCreateFunction = jest.fn().mockImplementation((config) => {
-  const id = config?.id ?? 'mock-inngest-function';
-  const fn = jest.fn();
-  (fn as { getConfig: () => unknown[] }).getConfig = () => [
-    { id, name: id, triggers: [], steps: {} },
-  ];
-  return fn;
-});
-
-jest.mock('../../apps/api/src/inngest/client', () => ({
-  inngest: {
-    send: mockInngestSend,
-    createFunction: mockInngestCreateFunction,
-  },
-}));
-
+import { inngest } from '../../apps/api/src/inngest/client';
 import { app } from '../../apps/api/src/index';
+
+// --- Inngest transport spy (external boundary) ---
+let inngestSendSpy: jest.SpyInstance;
 
 const TEST_ENV = buildIntegrationEnv();
 
@@ -80,7 +65,7 @@ async function createOwnerProfileRecord(): Promise<{
         birthYear: 2000,
       }),
     },
-    TEST_ENV
+    TEST_ENV,
   );
 
   expect(res.status).toBe(201);
@@ -100,7 +85,7 @@ async function createOwnerProfileRecord(): Promise<{
 }
 
 beforeEach(async () => {
-  jest.clearAllMocks();
+  inngestSendSpy = jest.spyOn(inngest, 'send').mockResolvedValue({ ids: [] });
   await cleanupAccounts({
     emails: [AUTH_EMAIL],
     clerkUserIds: [AUTH_USER_ID],
@@ -128,7 +113,7 @@ describe('Integration: POST /v1/account/delete (P0-004)', () => {
         method: 'POST',
         headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -162,7 +147,7 @@ describe('Integration: POST /v1/account/delete (P0-004)', () => {
         method: 'POST',
         headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     // After deletion: scheduledAt is set
@@ -181,17 +166,17 @@ describe('Integration: POST /v1/account/delete (P0-004)', () => {
         method: 'POST',
         headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
-    expect(mockInngestSend).toHaveBeenCalledWith(
+    expect(inngestSendSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         name: 'app/account.deletion-scheduled',
         data: expect.objectContaining({
           profileIds: expect.arrayContaining([profileId]),
           timestamp: expect.any(String),
         }),
-      })
+      }),
     );
   });
 
@@ -199,11 +184,11 @@ describe('Integration: POST /v1/account/delete (P0-004)', () => {
     const res = await app.request(
       '/v1/account/delete',
       { method: 'POST' },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(401);
-    expect(mockInngestSend).not.toHaveBeenCalled();
+    expect(inngestSendSpy).not.toHaveBeenCalled();
   });
 });
 
@@ -222,7 +207,7 @@ describe('Integration: POST /v1/account/cancel-deletion (P0-004)', () => {
         method: 'POST',
         headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     const res = await app.request(
@@ -231,7 +216,7 @@ describe('Integration: POST /v1/account/cancel-deletion (P0-004)', () => {
         method: 'POST',
         headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -249,7 +234,7 @@ describe('Integration: POST /v1/account/cancel-deletion (P0-004)', () => {
         method: 'POST',
         headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
     await app.request(
       '/v1/account/cancel-deletion',
@@ -257,7 +242,7 @@ describe('Integration: POST /v1/account/cancel-deletion (P0-004)', () => {
         method: 'POST',
         headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     const db = createIntegrationDb();
@@ -268,7 +253,7 @@ describe('Integration: POST /v1/account/cancel-deletion (P0-004)', () => {
     expect(row!.deletionCancelledAt).not.toBeNull();
     // Cancelled timestamp should be after scheduled timestamp
     expect(row!.deletionCancelledAt!.getTime()).toBeGreaterThan(
-      row!.deletionScheduledAt!.getTime()
+      row!.deletionScheduledAt!.getTime(),
     );
   });
 
@@ -276,7 +261,7 @@ describe('Integration: POST /v1/account/cancel-deletion (P0-004)', () => {
     const res = await app.request(
       '/v1/account/cancel-deletion',
       { method: 'POST' },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(401);
@@ -297,7 +282,7 @@ describe('Integration: GET /v1/account/export', () => {
         method: 'GET',
         headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -306,7 +291,7 @@ describe('Integration: GET /v1/account/export', () => {
     expect(Array.isArray(body.profiles)).toBe(true);
     expect(body.profiles.length).toBeGreaterThanOrEqual(1);
     expect(body.profiles.some((p: { id: string }) => p.id === profileId)).toBe(
-      true
+      true,
     );
   });
 });
@@ -376,17 +361,17 @@ describe('Integration: account deletion cascade', () => {
     await executeDeletion(db, accountId);
 
     const summaries = await db.execute(
-      sql`SELECT count(*)::int AS c FROM session_summaries WHERE profile_id = ${profileId}`
+      sql`SELECT count(*)::int AS c FROM session_summaries WHERE profile_id = ${profileId}`,
     );
     expect((summaries.rows as Array<{ c: number }>)[0].c).toBe(0);
 
     const embeddings = await db.execute(
-      sql`SELECT count(*)::int AS c FROM session_embeddings WHERE profile_id = ${profileId}`
+      sql`SELECT count(*)::int AS c FROM session_embeddings WHERE profile_id = ${profileId}`,
     );
     expect((embeddings.rows as Array<{ c: number }>)[0].c).toBe(0);
 
     const events = await db.execute(
-      sql`SELECT count(*)::int AS c FROM session_events WHERE profile_id = ${profileId}`
+      sql`SELECT count(*)::int AS c FROM session_events WHERE profile_id = ${profileId}`,
     );
     expect((events.rows as Array<{ c: number }>)[0].c).toBe(0);
   });

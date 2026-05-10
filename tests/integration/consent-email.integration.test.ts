@@ -16,7 +16,6 @@
 
 import { consentStates } from '@eduagent/database';
 import { eq } from 'drizzle-orm';
-import { inngestClientMock } from './mocks';
 import {
   buildIntegrationEnv,
   cleanupAccounts,
@@ -25,10 +24,7 @@ import {
 import { buildAuthHeaders } from './test-keys';
 import { mockResendEmail } from './external-mocks';
 import { getFetchCalls, clearFetchCalls } from './fetch-interceptor';
-
-// --- Mock boundaries ---
-jest.mock('../../apps/api/src/inngest/client', () => inngestClientMock());
-
+import { inngest } from '../../apps/api/src/inngest/client';
 import { app } from '../../apps/api/src/index';
 
 // --- Constants ---
@@ -49,7 +45,7 @@ async function createChildProfile(): Promise<string> {
         birthYear: CHILD_BIRTH_YEAR,
       }),
     },
-    buildIntegrationEnv()
+    buildIntegrationEnv(),
   );
 
   expect(res.status).toBe(201);
@@ -60,8 +56,10 @@ async function createChildProfile(): Promise<string> {
 // --- Tests ---
 describe('Integration: Consent email delivery', () => {
   let childProfileId: string;
+  let inngestSendSpy: jest.SpyInstance;
 
   beforeAll(async () => {
+    inngestSendSpy = jest.spyOn(inngest, 'send').mockResolvedValue({ ids: [] });
     mockResendEmail();
     await cleanupAccounts({
       emails: [CONSENT_EMAIL],
@@ -71,6 +69,7 @@ describe('Integration: Consent email delivery', () => {
   });
 
   afterAll(async () => {
+    inngestSendSpy.mockRestore();
     await cleanupAccounts({
       emails: [CONSENT_EMAIL],
       clerkUserIds: [CONSENT_USER_ID],
@@ -94,7 +93,7 @@ describe('Integration: Consent email delivery', () => {
         method: 'POST',
         headers: buildAuthHeaders(
           { sub: CONSENT_USER_ID, email: CONSENT_EMAIL },
-          childProfileId
+          childProfileId,
         ),
         body: JSON.stringify({
           childProfileId,
@@ -102,7 +101,7 @@ describe('Integration: Consent email delivery', () => {
           consentType: 'GDPR',
         }),
       },
-      env
+      env,
     );
 
     expect(res.status).toBe(201);
@@ -138,7 +137,7 @@ describe('Integration: Consent email delivery', () => {
         method: 'POST',
         headers: buildAuthHeaders(
           { sub: CONSENT_USER_ID, email: CONSENT_EMAIL },
-          childProfileId
+          childProfileId,
         ),
         body: JSON.stringify({
           childProfileId,
@@ -146,7 +145,7 @@ describe('Integration: Consent email delivery', () => {
           consentType: 'GDPR',
         }),
       },
-      env
+      env,
     );
 
     expect(res.status).toBe(201);

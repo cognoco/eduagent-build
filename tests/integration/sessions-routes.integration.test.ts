@@ -21,6 +21,7 @@ import {
   seedLearningSession,
   seedSubject,
 } from './route-fixtures';
+import { inngest } from '../../apps/api/src/inngest/client';
 import { app } from '../../apps/api/src/index';
 
 const TEST_ENV = buildIntegrationEnv();
@@ -34,29 +35,16 @@ const USER_B = {
   email: 'integration-sessions-b@integration.test',
 };
 
-// jest.mock is hoisted; capture the send spy via module.__esModule access
-// rather than a closure to avoid TDZ. Tests that need to assert on send
-// can import the mocked module directly.
-jest.mock('../../apps/api/src/inngest/client', () => ({ // gc1-allow: Inngest is an external async boundary for this route integration break test; DB and route code remain real.
-  inngest: {
-    send: jest.fn(),
-    createFunction: jest.fn().mockImplementation((config: { id?: string }) => {
-      const id = config?.id ?? 'mock-inngest-function';
-      const fn = jest.fn();
-      (fn as unknown as { getConfig: () => unknown[] }).getConfig = () => [
-        { id, name: id, triggers: [], steps: {} },
-      ];
-      return fn;
-    }),
-  },
-}));
-
 beforeEach(async () => {
-  jest.clearAllMocks();
+  jest.spyOn(inngest, 'send').mockResolvedValue({ ids: [] });
   await cleanupAccounts({
     emails: [USER_A.email, USER_B.email],
     clerkUserIds: [USER_A.userId, USER_B.userId],
   });
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
 });
 
 afterAll(async () => {
@@ -105,10 +93,10 @@ describe('PATCH /v1/sessions/:sessionId/clear-continuation-depth', () => {
         method: 'PATCH',
         headers: buildAuthHeaders(
           { sub: USER_A.userId, email: USER_A.email },
-          profileA.id
+          profileA.id,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(404);
