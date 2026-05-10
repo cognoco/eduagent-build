@@ -4,6 +4,7 @@
 
 const mockCaptureException = jest.fn();
 jest.mock('../../services/sentry', () => ({
+  // gc1-allow: observability test isolates Sentry to verify logger calls without external noise
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 

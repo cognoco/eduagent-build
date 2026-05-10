@@ -4,6 +4,7 @@ import {
 } from './transient-db-retry';
 
 jest.mock('./sentry', () => ({
+  // gc1-allow: transient-retry unit test suppresses Sentry to avoid external calls
   captureException: jest.fn(),
 }));
 
