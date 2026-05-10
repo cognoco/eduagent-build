@@ -217,6 +217,10 @@ beforeEach(async () => {
   await cleanupSeededAccounts();
 });
 
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
 afterAll(async () => {
   await cleanupSeededAccounts();
 });

@@ -92,6 +92,10 @@ beforeEach(async () => {
   });
 });
 
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
 afterAll(async () => {
   await cleanupAccounts({
     emails: [AUTH_EMAIL],
