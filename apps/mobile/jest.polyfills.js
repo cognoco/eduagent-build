@@ -49,6 +49,24 @@ if (typeof globalThis.structuredClone === 'function') {
   });
 }
 
+// RN's polyfillGlobal('FormData', ...) in setUpXHR.js overwrites global.FormData
+// with RN's FormData, which crashes in Node.js test environments when append() is
+// called with a plain-object file reference { uri, name, type } — resulting in
+// "TypeError: Cannot read properties of undefined (reading 'push')".
+// Pre-claim FormData as non-configurable so polyfillGlobal's Object.defineProperty
+// call is a no-op, leaving Node.js's built-in FormData in place. Node's FormData
+// converts plain objects via toString() without crashing; the fetch body content
+// is irrelevant since tests use mockFetch.
+if (typeof globalThis.FormData === 'function') {
+  const nativeFormData = globalThis.FormData;
+  Object.defineProperty(global, 'FormData', {
+    value: nativeFormData,
+    configurable: false,
+    writable: false,
+    enumerable: false,
+  });
+}
+
 if (typeof global.__fbBatchedBridgeConfig === 'undefined') {
   global.__fbBatchedBridgeConfig = {
     remoteModuleConfig: [],

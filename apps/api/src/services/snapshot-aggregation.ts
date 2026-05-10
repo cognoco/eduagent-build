@@ -88,8 +88,8 @@ interface RefreshSnapshotResult {
   milestones: MilestoneRecord[];
 }
 
-const TRANSIENT_DB_RETRY_ATTEMPTS = 2;
-const TRANSIENT_DB_RETRY_DELAY_MS = 100;
+const TRANSIENT_DB_RETRY_ATTEMPTS = 3;
+const TRANSIENT_DB_RETRY_DELAY_MS = 300;
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

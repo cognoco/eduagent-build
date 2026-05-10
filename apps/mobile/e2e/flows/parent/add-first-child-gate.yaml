@@ -58,18 +58,18 @@ tags:
 # is the account owner so this section always renders.
 - scrollUntilVisible:
     element:
-      id: "add-child-link"
+      id: "family-add-child-link"
     direction: DOWN
     timeout: 10000
 
 - assertVisible:
-    id: "add-child-link"
+    id: "family-add-child-link"
 
 - takeScreenshot: add-first-child-03-family-section
 
 # ── Part 3: Tap add-child CTA → create-profile ────────────────────────
 - tapOn:
-    id: "add-child-link"
+    id: "family-add-child-link"
 
 # handleAddChild() checks tier (family/pro allowed) then pushes /create-profile?for=child.
 # parent-solo has a family-tier active subscription so no gate alert fires.

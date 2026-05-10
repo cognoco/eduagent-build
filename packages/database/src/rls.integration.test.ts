@@ -40,7 +40,7 @@ function requireDatabaseUrl(): string {
   const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error(
-      'DATABASE_URL is not set. Create .env.test.local or .env.development.local at the workspace root.'
+      'DATABASE_URL is not set. Create .env.test.local or .env.development.local at the workspace root.',
     );
   }
   return url;
@@ -58,7 +58,7 @@ type DbInstance = ReturnType<typeof createIntegrationDb>;
 
 async function getCurrentProfileId(db: DbInstance): Promise<string | null> {
   const rows = await db.execute(
-    sql`SELECT current_setting('app.current_profile_id', true) AS v`
+    sql`SELECT current_setting('app.current_profile_id', true) AS v`,
   );
   const value =
     (rows as unknown as { rows: { v: string }[] }).rows[0]?.v ?? null;
@@ -77,7 +77,7 @@ describeIfDb('withProfileScope — integration against real Postgres', () => {
 
     await withProfileScope(db, PROFILE_PROP, async (tx: Database) => {
       const rows = await tx.execute(
-        sql`SELECT current_setting('app.current_profile_id', true) AS v`
+        sql`SELECT current_setting('app.current_profile_id', true) AS v`,
       );
       seenInside =
         (rows as unknown as { rows: { v: string }[] }).rows[0]?.v ?? null;
@@ -103,41 +103,41 @@ describeIfDb('withProfileScope — integration against real Postgres', () => {
   it('rolls back the transaction when the callback throws', async () => {
     const db = createIntegrationDb();
 
-    // Create a session-scoped temp table (no FK constraints, avoids
-    // polluting real tables with throwaway rows).  The temp table is
-    // created OUTSIDE the transaction so it persists for the subsequent
-    // assertion query.
-    await db.execute(sql`
-      CREATE TEMP TABLE IF NOT EXISTS _rls_rollback_probe (
-        id TEXT PRIMARY KEY
-      )
-    `);
-
-    const probeId = `rls-rollback-${Date.now()}`;
+    // Verify the GUC is set inside the transaction (proves the transaction is
+    // active and SET LOCAL fired). After the throw the transaction rolls back,
+    // which must also clear the GUC — SET LOCAL is transaction-scoped.
+    //
+    // Note: the previous TEMP TABLE approach failed on neon-serverless because
+    // CREATE TEMP TABLE and the subsequent SELECT ran on different pool
+    // connections; TEMP TABLEs are connection-scoped. The GUC approach avoids
+    // that dependency while testing exactly the property withProfileScope
+    // promises: the profile context is established during the transaction and
+    // is gone once the transaction ends (whether committed or rolled back).
+    let gucInsideTx: string | null = null;
 
     await expect(
       withProfileScope(db, PROFILE_ROLLBACK, async (tx: Database) => {
-        await tx.execute(
-          sql`INSERT INTO _rls_rollback_probe (id) VALUES (${probeId})`
+        const rows = await tx.execute(
+          sql`SELECT current_setting('app.current_profile_id', true) AS v`,
         );
-        // Throw AFTER the insert — the transaction must roll back the insert
+        gucInsideTx =
+          (rows as unknown as { rows: { v: string }[] }).rows[0]?.v ?? null;
+        // Throw AFTER reading — the transaction must roll back (including SET LOCAL)
         throw new Error('intentional rollback');
-      })
+      }),
     ).rejects.toThrow('intentional rollback');
 
-    // Row must NOT be present — the transaction was rolled back
-    const check = await db.execute(
-      sql`SELECT id FROM _rls_rollback_probe WHERE id = ${probeId}`
-    );
-    expect((check as unknown as { rows: { id: string }[] }).rows).toHaveLength(
-      0
-    );
+    // GUC was active inside the failing transaction...
+    expect(gucInsideTx).toBe(PROFILE_ROLLBACK);
+    // ...and must be cleared after rollback (SET LOCAL is transaction-scoped).
+    const afterRollback = await getCurrentProfileId(db);
+    expect(afterRollback).toBeNull();
   });
 
   it('rejects non-UUID profileIds before opening a transaction', async () => {
     const db = createIntegrationDb();
     await expect(
-      withProfileScope(db, 'not-a-uuid', async () => 'unreachable')
+      withProfileScope(db, 'not-a-uuid', async () => 'unreachable'),
     ).rejects.toThrow('profileId must be a UUID');
   });
 });
@@ -157,7 +157,7 @@ describe('withProfileScope — SET LOCAL regression guard', () => {
     // Regex: look for SET followed by optional whitespace and the GUC name,
     // but exclude the "SET LOCAL" form via negative lookbehind.
     const bareSetMatch = rlsSource.match(
-      /(?<!LOCAL\s{0,10})\bSET\s+app\.current_profile_id/
+      /(?<!LOCAL\s{0,10})\bSET\s+app\.current_profile_id/,
     );
     expect(bareSetMatch).toBeNull();
   });

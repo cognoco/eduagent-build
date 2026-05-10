@@ -14,8 +14,18 @@ interface ChildCardProps {
 
 function formatHeadline(
   child: NonNullable<DashboardData['children'][number]>,
-): string {
+): string | null {
+  // weeklyHeadline is required by the schema, but a stale API deployment can
+  // omit it (contract drift). Fall back to a neutral placeholder rather than
+  // crashing the whole home screen.
   const headline = child.weeklyHeadline;
+  if (
+    !headline ||
+    typeof headline.value !== 'number' ||
+    typeof headline.label !== 'string'
+  ) {
+    return null;
+  }
   const value = `${headline.value} ${headline.label.toLowerCase()}`;
   return headline.comparison ? `${value} - ${headline.comparison}` : value;
 }
@@ -56,7 +66,8 @@ export function ChildCard({
       <View className="mt-3">
         {linkedChildren.map((child, index) => {
           const dashboardChild = dashboardByChildId.get(child.id);
-          const signal = dashboardChild ? formatHeadline(dashboardChild) : '-';
+          const signal =
+            (dashboardChild ? formatHeadline(dashboardChild) : null) ?? '-';
 
           return (
             <View

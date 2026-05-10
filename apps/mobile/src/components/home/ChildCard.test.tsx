@@ -142,6 +142,24 @@ describe('ChildCard', () => {
     screen.getByText('-');
   });
 
+  it('falls back to skeleton signal when API omits weeklyHeadline (contract drift)', () => {
+    // Stale API deployments can return a child entry without weeklyHeadline
+    // even though the schema requires it. Crashing the whole home screen on
+    // contract drift is unacceptable — fall through to the skeleton instead.
+    const emma = child('child-1', 'Emma');
+    const partial = dashboardChild('child-1', 'Emma');
+    // Cast through unknown so the test can simulate the malformed shape that
+    // the runtime actually receives (ts-only field, runtime is plain JSON).
+    delete (partial as unknown as { weeklyHeadline?: unknown }).weeklyHeadline;
+
+    render(
+      <ChildCard linkedChildren={[emma]} dashboard={dashboard([partial])} />,
+    );
+
+    screen.getByText('Emma');
+    screen.getByText('-');
+  });
+
   it('navigates to Family when pressed', () => {
     const emma = child('child-1', 'Emma');
 
