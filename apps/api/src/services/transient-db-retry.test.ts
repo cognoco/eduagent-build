@@ -3,10 +3,10 @@ import {
   withTransientDatabaseRetry,
 } from './transient-db-retry';
 
-jest.mock('./sentry', () => ({
-  // gc1-allow: transient-retry unit test suppresses Sentry to avoid external calls
-  captureException: jest.fn(),
-}));
+jest.mock(
+  './sentry' /* gc1-allow: transient-retry unit test suppresses Sentry */,
+  () => ({ captureException: jest.fn() }),
+);
 
 const { captureException } = jest.requireMock('./sentry') as {
   captureException: jest.Mock;

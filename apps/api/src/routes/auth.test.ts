@@ -18,19 +18,20 @@ jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
 }));
 
-jest.mock('../inngest/client', () => ({
-  // gc1-allow: route-level test isolates Inngest event bus to prevent side-effects
-  inngest: {
-    send: jest.fn().mockResolvedValue(undefined),
-    createFunction: jest.fn().mockReturnValue(jest.fn()),
-  },
-}));
+jest.mock(
+  '../inngest/client' /* gc1-allow: route-level test isolates Inngest event bus */,
+  () => ({
+    inngest: {
+      send: jest.fn().mockResolvedValue(undefined),
+      createFunction: jest.fn().mockReturnValue(jest.fn()),
+    },
+  }),
+);
 
-jest.mock('../services/sentry', () => ({
-  // gc1-allow: route-level test suppresses Sentry to avoid external noise
-  captureException: jest.fn(),
-  addBreadcrumb: jest.fn(),
-}));
+jest.mock(
+  '../services/sentry' /* gc1-allow: route-level test suppresses Sentry */,
+  () => ({ captureException: jest.fn(), addBreadcrumb: jest.fn() }),
+);
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
 
@@ -38,16 +39,18 @@ const mockDatabaseModule = createDatabaseModuleMock({ includeActual: true });
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-jest.mock('../services/account', () => ({
-  // gc1-allow: route-level test stubs account lookup to control auth identity
-  findOrCreateAccount: jest.fn().mockResolvedValue({
-    id: 'test-account-id',
-    clerkUserId: 'user_test',
-    email: 'test@example.com',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+jest.mock(
+  '../services/account' /* gc1-allow: route-level test stubs account lookup */,
+  () => ({
+    findOrCreateAccount: jest.fn().mockResolvedValue({
+      id: 'test-account-id',
+      clerkUserId: 'user_test',
+      email: 'test@example.com',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }),
   }),
-}));
+);
 
 // ---------------------------------------------------------------------------
 

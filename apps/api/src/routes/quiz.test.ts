@@ -26,13 +26,15 @@ jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
 }));
 
-jest.mock('../inngest/client', () => ({
-  // gc1-allow: route-level test isolates Inngest event bus to prevent side-effects
-  inngest: {
-    send: jest.fn().mockResolvedValue(undefined),
-    createFunction: jest.fn().mockReturnValue(jest.fn()),
-  },
-}));
+jest.mock(
+  '../inngest/client' /* gc1-allow: route-level test isolates Inngest event bus */,
+  () => ({
+    inngest: {
+      send: jest.fn().mockResolvedValue(undefined),
+      createFunction: jest.fn().mockReturnValue(jest.fn()),
+    },
+  }),
+);
 
 jest.mock('../services/account' /* gc1-allow: unit test boundary */, () => ({
   findOrCreateAccount: jest.fn().mockResolvedValue({
