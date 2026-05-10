@@ -46,6 +46,19 @@ The current implementation replaced the picker with the mixed dashboard, which t
 - The deep child-management screens (`child/[profileId]/index.tsx`, `mentor-memory`, `reports`, `weekly-report`, `subjects`, `topic`, `session`) — unchanged. They continue to be reached from the parent's Home (formerly Family) tab.
 - Library, Progress, More tabs — unchanged.
 - Boot order — boot to Home as today; the difference is what Home means per user type.
+- The visual design of the parent dashboard contents — confirmed clean after reviewing screenshots on 2026-05-10. The per-child card (`ParentDashboardSummary`), orientation cue, and family-pool toggle stay as-is structurally. Only copy and framing tweaks (next section).
+
+### Tweaks for the Home variant
+
+The current `family.tsx` content is substantively the right surface for the parent's primary Home. These tweaks reframe it from "Family sub-page" to "your home":
+
+1. **Drop the `← Back` button** in the parent Home variant. Home is a tab destination, nothing to navigate back to. The `returnTo` query-param logic is irrelevant when Home is the leftmost tab. Keep the existing `goBackOrReplace` helper available for any deeper screens that still push from Home.
+2. **Replace the `family.title` ("Family") with a greeting.** Use a parent-context greeting matching the student-home style (e.g. `"Hey {{displayName}}"`). New i18n key: `home.parent.greeting` with the same locale coverage as the existing `home.greeting`.
+3. **Replace the `family.subtitle` ("Everyone you're learning alongside").** The current copy implies the parent is also learning — wrong framing for the parent's primary surface. Suggested: *"Your children's learning at a glance."* New i18n key: `home.parent.subtitle`.
+4. **Update the `FamilyOrientationCue` copy** from "This is your family hub / Children, their progress, and family settings live here." to a Home-framed version: *"This is your home — children, their progress, and family settings live here."* Same component, copy-only change. Existing dismissal behavior (SecureStore-persisted) unchanged.
+5. **Drop the `more.family.sectionHeader` ("Family") label** above the breakdown-sharing toggle. The full tab is now the parent's home; a "Family" subsection header is redundant chrome. The toggle's own title and description carry enough context.
+
+No layout, hierarchy, or new components required. Five copy/structure tweaks, all reachable through i18n key updates plus a small JSX delete (the back button and section header).
 
 ### Discoverability of "you can also learn"
 
