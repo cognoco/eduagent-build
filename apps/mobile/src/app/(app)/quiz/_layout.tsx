@@ -8,6 +8,10 @@ import type {
 import { useThemeColors } from '../../../lib/theme';
 import { useParentProxy } from '../../../hooks/use-parent-proxy';
 
+export const unstable_settings = {
+  initialRouteName: 'index',
+};
+
 interface QuizFlowState {
   activityType: QuizActivityType | null;
   subjectId: string | null;
@@ -70,13 +74,13 @@ export function QuizFlowProvider({
     (prefetchedRoundId: string | null) => {
       setState((current) => ({ ...current, prefetchedRoundId }));
     },
-    []
+    [],
   );
   const setCompletionResult = useCallback(
     (completionResult: CompleteRoundResponse | null) => {
       setState((current) => ({ ...current, completionResult }));
     },
-    []
+    [],
   );
   const clear = useCallback(() => {
     setState(INITIAL_STATE);
