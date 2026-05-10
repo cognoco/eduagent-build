@@ -2,7 +2,7 @@
  * Integration: Sessions routes — security break tests
  *
  * Exercises the real session routes through the full app + real database.
- * JWT verification and Inngest are the only mocked boundaries.
+ * JWT verification uses the global fetch mock; Inngest uses a HTTP-boundary stub.
  *
  * C5 break test: PATCH /v1/sessions/:sessionId/clear-continuation-depth
  * must return 404 when the sessionId belongs to a different profile.
@@ -14,6 +14,7 @@ import { eq } from 'drizzle-orm';
 import { learningSessions } from '@eduagent/database';
 
 import { buildIntegrationEnv, cleanupAccounts } from './helpers';
+import { mockInngestEvents } from './mocks';
 import {
   buildAuthHeaders,
   createProfileViaRoute,
@@ -34,22 +35,9 @@ const USER_B = {
   email: 'integration-sessions-b@integration.test',
 };
 
-// jest.mock is hoisted; capture the send spy via module.__esModule access
-// rather than a closure to avoid TDZ. Tests that need to assert on send
-// can import the mocked module directly.
-jest.mock('../../apps/api/src/inngest/client', () => ({ // gc1-allow: Inngest is an external async boundary for this route integration break test; DB and route code remain real.
-  inngest: {
-    send: jest.fn(),
-    createFunction: jest.fn().mockImplementation((config: { id?: string }) => {
-      const id = config?.id ?? 'mock-inngest-function';
-      const fn = jest.fn();
-      (fn as unknown as { getConfig: () => unknown[] }).getConfig = () => [
-        { id, name: id, triggers: [], steps: {} },
-      ];
-      return fn;
-    }),
-  },
-}));
+beforeAll(() => {
+  mockInngestEvents();
+});
 
 beforeEach(async () => {
   jest.clearAllMocks();
@@ -105,10 +93,10 @@ describe('PATCH /v1/sessions/:sessionId/clear-continuation-depth', () => {
         method: 'PATCH',
         headers: buildAuthHeaders(
           { sub: USER_A.userId, email: USER_A.email },
-          profileA.id
+          profileA.id,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(404);

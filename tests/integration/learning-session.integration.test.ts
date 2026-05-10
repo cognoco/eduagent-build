@@ -6,7 +6,7 @@
  *
  * Mocked boundaries:
  * - JWT verification (Clerk JWKS — via fetch interceptor in setup.ts)
- * - Inngest transport bootstrapping / send
+ * - Inngest event HTTP API — via fetch interceptor
  * - LLM provider — via registerProvider (real routeAndCall dispatch, mock chat fn)
  */
 
@@ -32,6 +32,8 @@ import {
   createIntegrationDb,
 } from './helpers';
 import { buildAuthHeaders } from './test-keys';
+import { getCapturedInngestEvents, mockInngestEvents } from './mocks';
+import { clearFetchCalls } from './fetch-interceptor';
 import { registerProvider } from '../../apps/api/src/services/llm';
 
 // Controllable mock provider — overrides the default mock registered in setup.ts.
@@ -45,29 +47,13 @@ const mockChat = jest
       hasUnderstandingGaps: false,
       gapAreas: [],
       isAccepted: true,
-    })
+    }),
   );
-
-const mockInngestSend = jest.fn();
-const mockInngestCreateFunction = jest.fn().mockImplementation((config) => {
-  const id = config?.id ?? 'mock-inngest-function';
-  const fn = jest.fn();
-  (fn as { getConfig: () => unknown[] }).getConfig = () => [
-    { id, name: id, triggers: [], steps: {} },
-  ];
-  return fn;
-});
-
-jest.mock('../../apps/api/src/inngest/client', () => ({
-  inngest: {
-    send: mockInngestSend,
-    createFunction: mockInngestCreateFunction,
-  },
-}));
 
 // Register once — overrides setup.ts default so tests control the LLM response
 // without bypassing the real routeAndCall dispatch path.
 beforeAll(() => {
+  mockInngestEvents();
   registerProvider({
     id: 'gemini',
     chat: mockChat,
@@ -103,7 +89,7 @@ async function createOwnerProfile(): Promise<string> {
         birthYear: 2000,
       }),
     },
-    TEST_ENV
+    TEST_ENV,
   );
 
   expect(res.status).toBe(201);
@@ -123,7 +109,7 @@ async function seedSubject(
   overrides: Partial<{
     name: string;
     status: 'active' | 'paused' | 'archived';
-  }> = {}
+  }> = {},
 ) {
   const db = createIntegrationDb();
   const [subject] = await db
@@ -141,7 +127,7 @@ async function seedSubject(
 
 async function seedCurriculum(
   subjectId: string,
-  topicTitles: string[] = ['Photosynthesis']
+  topicTitles: string[] = ['Photosynthesis'],
 ) {
   const db = createIntegrationDb();
   const [curriculum] = await db
@@ -167,7 +153,7 @@ async function seedCurriculum(
         description: `${title} description`,
         sortOrder: index + 1,
         estimatedMinutes: 15,
-      }))
+      })),
     )
     .returning();
 
@@ -187,14 +173,14 @@ async function seedRetentionCards(profileId: string, topicIds: string[]) {
       intervalDays: 3,
       nextReviewAt: new Date(Date.now() - (index + 1) * 60 * 60 * 1000),
       consecutiveSuccesses: index + 1,
-    }))
+    })),
   );
 }
 
 async function startSession(
   profileId: string,
   subjectId: string,
-  input?: Record<string, unknown>
+  input?: Record<string, unknown>,
 ) {
   const res = await app.request(
     `/v1/subjects/${subjectId}/sessions`,
@@ -202,14 +188,14 @@ async function startSession(
       method: 'POST',
       headers: buildAuthHeaders(
         { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-        profileId
+        profileId,
       ),
       body: JSON.stringify({
         subjectId,
         ...(input ?? {}),
       }),
     },
-    TEST_ENV
+    TEST_ENV,
   );
 
   expect(res.status).toBe(201);
@@ -267,8 +253,7 @@ async function loadSubscriptionAndQuota() {
 }
 
 beforeEach(async () => {
-  mockInngestSend.mockReset();
-  mockInngestSend.mockResolvedValue({ ids: [] });
+  clearFetchCalls();
   await cleanupAccounts({
     emails: [AUTH_EMAIL],
     clerkUserIds: [AUTH_USER_ID],
@@ -294,11 +279,11 @@ describe('Integration: Learning Session Lifecycle', () => {
           method: 'POST',
           headers: buildAuthHeaders(
             { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-            profileId
+            profileId,
           ),
           body: JSON.stringify({ subjectId: subject.id }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(201);
@@ -325,11 +310,11 @@ describe('Integration: Learning Session Lifecycle', () => {
           method: 'POST',
           headers: buildAuthHeaders(
             { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-            profileId
+            profileId,
           ),
           body: JSON.stringify({ subjectId: subject.id }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(403);
@@ -345,7 +330,7 @@ describe('Integration: Learning Session Lifecycle', () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ subjectId: UNKNOWN_ID }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -364,10 +349,10 @@ describe('Integration: Learning Session Lifecycle', () => {
           method: 'GET',
           headers: buildAuthHeaders(
             { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-            profileId
+            profileId,
           ),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -386,10 +371,10 @@ describe('Integration: Learning Session Lifecycle', () => {
           method: 'GET',
           headers: buildAuthHeaders(
             { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-            profileId
+            profileId,
           ),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(404);
@@ -410,11 +395,11 @@ describe('Integration: Learning Session Lifecycle', () => {
           method: 'POST',
           headers: buildAuthHeaders(
             { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-            profileId
+            profileId,
           ),
           body: JSON.stringify({ message: 'What is photosynthesis?' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -431,12 +416,16 @@ describe('Integration: Learning Session Lifecycle', () => {
       const quota = await loadSubscriptionAndQuota();
       expect(quota.subscription.id).toBe(before.subscription.id);
       expect(quota.quotaPool.usedThisMonth).toBe(
-        before.quotaPool.usedThisMonth + 1
+        before.quotaPool.usedThisMonth + 1,
       );
 
       const events = await loadSessionEvents(session.id);
       expect(events.map((event) => event.eventType)).toEqual(
-        expect.arrayContaining(['session_start', 'user_message', 'ai_response'])
+        expect.arrayContaining([
+          'session_start',
+          'user_message',
+          'ai_response',
+        ]),
       );
     });
 
@@ -451,11 +440,11 @@ describe('Integration: Learning Session Lifecycle', () => {
           method: 'POST',
           headers: buildAuthHeaders(
             { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-            profileId
+            profileId,
           ),
           body: JSON.stringify({}),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -474,11 +463,11 @@ describe('Integration: Learning Session Lifecycle', () => {
           method: 'POST',
           headers: buildAuthHeaders(
             { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-            profileId
+            profileId,
           ),
           body: JSON.stringify({ message: 'Explain gravity' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -496,7 +485,11 @@ describe('Integration: Learning Session Lifecycle', () => {
 
       const events = await loadSessionEvents(session.id);
       expect(events.map((event) => event.eventType)).toEqual(
-        expect.arrayContaining(['session_start', 'user_message', 'ai_response'])
+        expect.arrayContaining([
+          'session_start',
+          'user_message',
+          'ai_response',
+        ]),
       );
     });
   });
@@ -513,11 +506,11 @@ describe('Integration: Learning Session Lifecycle', () => {
           method: 'POST',
           headers: buildAuthHeaders(
             { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-            profileId
+            profileId,
           ),
           body: JSON.stringify({}),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -525,7 +518,7 @@ describe('Integration: Learning Session Lifecycle', () => {
       expect(body.sessionId).toBe(session.id);
       expect(body.summaryStatus).toBe('pending');
       expect(body.wallClockSeconds).toBeDefined();
-      expect(mockInngestSend).not.toHaveBeenCalled();
+      expect(getCapturedInngestEvents()).toHaveLength(0);
 
       const persistedSession = await loadSession(session.id);
       expect(persistedSession!.status).toBe('completed');
@@ -540,10 +533,10 @@ describe('Integration: Learning Session Lifecycle', () => {
           method: 'GET',
           headers: buildAuthHeaders(
             { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-            profileId
+            profileId,
           ),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(summaryRes.status).toBe(200);
@@ -564,11 +557,11 @@ describe('Integration: Learning Session Lifecycle', () => {
           method: 'POST',
           headers: buildAuthHeaders(
             { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-            profileId
+            profileId,
           ),
           body: JSON.stringify({}),
         },
-        TEST_ENV
+        TEST_ENV,
       );
       expect(closeRes.status).toBe(200);
 
@@ -578,14 +571,14 @@ describe('Integration: Learning Session Lifecycle', () => {
           method: 'POST',
           headers: buildAuthHeaders(
             { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-            profileId
+            profileId,
           ),
           body: JSON.stringify({
             content:
               'I learned that plants use sunlight to turn water and carbon dioxide into food.',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -599,7 +592,7 @@ describe('Integration: Learning Session Lifecycle', () => {
       expect(summary!.status).toBe('accepted');
       expect(summary!.content).toContain('sunlight');
 
-      expect(mockInngestSend).toHaveBeenCalledWith(
+      expect(getCapturedInngestEvents()).toEqual([
         expect.objectContaining({
           name: 'app/session.completed',
           data: expect.objectContaining({
@@ -610,8 +603,8 @@ describe('Integration: Learning Session Lifecycle', () => {
             qualityRating: 4,
             summaryTrackingHandled: true,
           }),
-        })
-      );
+        }),
+      ]);
     });
   });
 
@@ -627,14 +620,14 @@ describe('Integration: Learning Session Lifecycle', () => {
           method: 'POST',
           headers: buildAuthHeaders(
             { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-            profileId
+            profileId,
           ),
           body: JSON.stringify({
             eventId: FLAG_EVENT_ID,
             reason: 'Incorrect information',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -661,7 +654,7 @@ describe('Integration: Learning Session Lifecycle', () => {
       ]);
       await seedRetentionCards(
         profileId,
-        topics.map((topic) => topic.id)
+        topics.map((topic) => topic.id),
       );
 
       const res = await app.request(
@@ -670,11 +663,11 @@ describe('Integration: Learning Session Lifecycle', () => {
           method: 'POST',
           headers: buildAuthHeaders(
             { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-            profileId
+            profileId,
           ),
           body: JSON.stringify({ subjectId: subject.id, topicCount: 2 }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(201);
@@ -682,7 +675,7 @@ describe('Integration: Learning Session Lifecycle', () => {
       expect(body.sessionId).toEqual(expect.any(String));
       expect(body.topics).toHaveLength(2);
       expect(
-        body.topics.map((topic: { topicId: string }) => topic.topicId)
+        body.topics.map((topic: { topicId: string }) => topic.topicId),
       ).toEqual(expect.arrayContaining(topics.map((topic) => topic.id)));
 
       const session = await loadSession(body.sessionId);
@@ -694,8 +687,8 @@ describe('Integration: Learning Session Lifecycle', () => {
             expect.objectContaining({
               topicId: topic.id,
               subjectId: subject.id,
-            })
-          )
+            }),
+          ),
         ),
       });
     });
@@ -711,11 +704,11 @@ describe('Integration: Learning Session Lifecycle', () => {
           method: 'POST',
           headers: buildAuthHeaders(
             { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-            profileId
+            profileId,
           ),
           body: JSON.stringify({ subjectId: subject.id }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -740,11 +733,11 @@ describe('Integration: Learning Session Lifecycle', () => {
           method: 'POST',
           headers: buildAuthHeaders(
             { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-            profileId
+            profileId,
           ),
           body: JSON.stringify({}),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -765,11 +758,11 @@ describe('Integration: Learning Session Lifecycle', () => {
           method: 'POST',
           headers: buildAuthHeaders(
             { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-            profileId
+            profileId,
           ),
           body: JSON.stringify({}),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -786,11 +779,11 @@ describe('Integration: Learning Session Lifecycle', () => {
           method: 'POST',
           headers: buildAuthHeaders(
             { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-            profileId
+            profileId,
           ),
           body: JSON.stringify({}),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(404);
