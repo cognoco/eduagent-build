@@ -78,6 +78,11 @@ function makeMockDb(bookOverrides?: Record<string, unknown>) {
       curriculumBooks: {
         findFirst: jest.fn().mockResolvedValue(book),
       },
+      subjects: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValue({ id: SUBJECT_ID, profileId: PROFILE_ID }),
+      },
     },
     select: jest.fn(),
   };
@@ -190,6 +195,17 @@ describe('subjectRetryCurriculum', () => {
     const mockDb = makeMockDb({
       subjectId: 'a0000000-0000-4000-8000-000000000099',
     });
+    mockGetStepDatabase.mockReturnValue(mockDb);
+    const step = createMockStep();
+
+    await expect(
+      handler({ event: { data: validPayload() }, step }),
+    ).rejects.toThrow(NonRetriableError);
+  });
+
+  it('throws NonRetriableError when subject does not belong to profile', async () => {
+    const mockDb = makeMockDb();
+    mockDb.query.subjects.findFirst.mockResolvedValue(null);
     mockGetStepDatabase.mockReturnValue(mockDb);
     const step = createMockStep();
 

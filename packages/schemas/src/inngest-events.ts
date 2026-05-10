@@ -51,6 +51,17 @@ export type SubjectCurriculumPrewarmRequestedEvent = z.infer<
   typeof subjectCurriculumPrewarmRequestedEventSchema
 >;
 
+export const subjectCurriculumRetryRequestedEventSchema = z.object({
+  version: z.literal(1),
+  subjectId: z.string().uuid(),
+  profileId: z.string().uuid(),
+  bookId: z.string().uuid(),
+  timestamp: z.string().datetime(),
+});
+export type SubjectCurriculumRetryRequestedEvent = z.infer<
+  typeof subjectCurriculumRetryRequestedEventSchema
+>;
+
 export const orphanPersistFailedEventSchema = z.object({
   profileId: z.string().uuid(),
   draftId: z.string().uuid(),

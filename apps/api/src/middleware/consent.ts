@@ -79,6 +79,21 @@ export const consentMiddleware = createMiddleware<ConsentEnv>(
     // Check if consent is required for this profile's age (GDPR-everywhere)
     const { required, consentType } = checkConsentRequired(meta.birthYear);
 
+    // GDPR Art. 7(3): block WITHDRAWN profiles regardless of age — must come
+    // before the !required guard so adult profiles with WITHDRAWN status are
+    // also enforced (not bypassed by the age check).
+    if (meta.consentStatus === 'WITHDRAWN') {
+      return c.json(
+        {
+          code: ERROR_CODES.CONSENT_WITHDRAWN,
+          message:
+            'Consent has been withdrawn. Account data deletion is pending.',
+          details: { consentType },
+        },
+        403,
+      );
+    }
+
     if (!required) {
       await next();
       return;
@@ -94,19 +109,6 @@ export const consentMiddleware = createMiddleware<ConsentEnv>(
           code: ERROR_CODES.CONSENT_REQUIRED,
           message:
             'Parental consent is required before accessing this resource',
-          details: { consentType },
-        },
-        403,
-      );
-    }
-
-    // Block if consent has been withdrawn (GDPR Art. 7(3) — 7-day grace period)
-    if (meta.consentStatus === 'WITHDRAWN') {
-      return c.json(
-        {
-          code: ERROR_CODES.CONSENT_WITHDRAWN,
-          message:
-            'Consent has been withdrawn. Account data deletion is pending.',
           details: { consentType },
         },
         403,

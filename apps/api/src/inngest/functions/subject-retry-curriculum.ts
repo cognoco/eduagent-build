@@ -1,7 +1,7 @@
 import { NonRetriableError } from 'inngest';
 import { eq, and } from 'drizzle-orm';
-import { curriculumBooks, type Database } from '@eduagent/database';
-import { subjectCurriculumPrewarmRequestedEventSchema } from '@eduagent/schemas';
+import { curriculumBooks, subjects, type Database } from '@eduagent/database';
+import { subjectCurriculumRetryRequestedEventSchema } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import { generateBookTopics } from '../../services/book-generation';
@@ -11,6 +11,7 @@ import { captureException } from '../../services/sentry';
 
 async function loadBook(
   db: Database,
+  profileId: string,
   subjectId: string,
   bookId: string,
 ): Promise<typeof curriculumBooks.$inferSelect> {
@@ -22,6 +23,13 @@ async function loadBook(
   }
   if (book.subjectId !== subjectId) {
     throw new NonRetriableError('book-subject-mismatch');
+  }
+  // Verify the subject belongs to profileId (parent-chain ownership check per CLAUDE.md)
+  const subject = await db.query.subjects.findFirst({
+    where: and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
+  });
+  if (!subject) {
+    throw new NonRetriableError('book-profile-mismatch');
   }
   return book;
 }
@@ -35,7 +43,7 @@ export const subjectRetryCurriculum = inngest.createFunction(
   },
   { event: 'app/subject.curriculum-retry-requested' },
   async ({ event, step }) => {
-    const parsed = subjectCurriculumPrewarmRequestedEventSchema.safeParse(
+    const parsed = subjectCurriculumRetryRequestedEventSchema.safeParse(
       event.data,
     );
     if (!parsed.success) {
@@ -45,7 +53,7 @@ export const subjectRetryCurriculum = inngest.createFunction(
 
     const context = await step.run('load-retry-context', async () => {
       const db = getStepDatabase();
-      const book = await loadBook(db, subjectId, bookId);
+      const book = await loadBook(db, profileId, subjectId, bookId);
       if (book.topicsGenerated) {
         return { status: 'already-generated' as const };
       }
@@ -63,7 +71,7 @@ export const subjectRetryCurriculum = inngest.createFunction(
 
     await step.run('retry-generate-and-persist', async () => {
       const db = getStepDatabase();
-      const book = await loadBook(db, subjectId, bookId);
+      const book = await loadBook(db, profileId, subjectId, bookId);
       if (book.topicsGenerated) return;
 
       const result = await generateBookTopics(
