@@ -97,8 +97,8 @@ for pid in "${phase_ids[@]}"; do
     files=()
     while IFS= read -r _f; do
         [[ -n "$_f" ]] && files+=("$_f")
-    done < <(echo "$p_files" | grep -oE '`[^`]+`' | tr -d '`' | grep -E '/.*\.[a-zA-Z]+' || true)
-    for f in "${files[@]}"; do
+    done < <(echo "$p_files" | grep -oE '`[^`]+`' | tr -d '`' | grep -E '\.[a-zA-Z][a-zA-Z0-9]*$' || true)
+    for f in ${files[@]+"${files[@]}"}; do
         all_files_claimed+=("$f")
     done
 
@@ -112,7 +112,7 @@ for pid in "${phase_ids[@]}"; do
 **Description**: ${p_desc}
 **Status**: ${p_status}
 **Files**:
-$(for f in "${files[@]}"; do echo "- \`$f\`"; done)
+$(for f in ${files[@]+"${files[@]}"}; do echo "- \`$f\`"; done)
 
 **Verification command**:
 \`\`\`bash
@@ -185,7 +185,7 @@ ${deps_section}
 
 | File | Phase |
 |------|-------|
-$(for f in "${all_files_claimed[@]}"; do
+$(for f in ${all_files_claimed[@]+"${all_files_claimed[@]}"}; do
     phase_for_file="$(echo "$phase_details" | grep -B5 "\`$f\`" | grep -oE 'Phase P[0-9]+' | head -1 | sed 's/Phase //' || echo "?")"
     echo "| \`$f\` | ${phase_for_file} |"
 done)
@@ -208,7 +208,7 @@ echo "Wrote: $ARTIFACTS_DIR/work-order.md"
     echo "don't (do NOT create new test files — defer via filer)."
     echo ""
 
-    for f in "${all_files_claimed[@]}"; do
+    for f in ${all_files_claimed[@]+"${all_files_claimed[@]}"}; do
         echo "## \`$f\`"
         if [[ -f "$f" ]]; then
             # Find sibling test file
@@ -255,7 +255,7 @@ echo "Wrote: $ARTIFACTS_DIR/patterns.md"
 
 # Determine touched packages from file paths
 touched_pkgs=""
-for f in "${all_files_claimed[@]}"; do
+for f in ${all_files_claimed[@]+"${all_files_claimed[@]}"}; do
     case "$f" in
         apps/api/*) touched_pkgs+=" api" ;;
         apps/mobile/*) touched_pkgs+=" mobile" ;;
