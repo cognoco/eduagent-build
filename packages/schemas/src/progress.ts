@@ -355,13 +355,6 @@ export const pendingNoticeSchema = z.object({
 });
 export type PendingNotice = z.infer<typeof pendingNoticeSchema>;
 
-export const coachingCardCelebrationResponseSchema = z.object({
-  pendingCelebrations: z.array(pendingCelebrationSchema),
-});
-export type CoachingCardCelebrationResponse = z.infer<
-  typeof coachingCardCelebrationResponseSchema
->;
-
 // Dashboard data — parent view wrapper
 
 export const dashboardDataSchema = z.object({
