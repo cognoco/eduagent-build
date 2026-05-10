@@ -325,8 +325,8 @@ describe('ProgressScreen — progressive disclosure', () => {
     render(<ProgressScreen />);
 
     expect(screen.queryByTestId('progress-new-learner-teaser')).toBeNull();
-    // heroCopy: topicsMastered < 20 && vocabularyTotal === 0 → "You're building your knowledge"
-    screen.getByText("You're building your knowledge");
+    // heroCopy: 5 sessions + low mastery (3 topics, 0 vocab) → leads with sessions
+    screen.getByText('5 sessions completed');
   });
 
   it('renders weekly delta chips when the learner has prior-week deltas', () => {
@@ -376,7 +376,7 @@ describe('ProgressScreen — progressive disclosure', () => {
     ).toBeNull();
   });
 
-  it('renders zero weekly delta chips after a baseline exists', () => {
+  it('hides zero weekly delta chips — no discouraging "+0" pills', () => {
     mockHooks({
       inventory: {
         global: {
@@ -393,9 +393,15 @@ describe('ProgressScreen — progressive disclosure', () => {
 
     render(<ProgressScreen />);
 
-    screen.getByText('+0 topics this week');
-    screen.getByText('+0 words this week');
-    screen.getByText('+0 topics explored this week');
+    expect(
+      screen.queryByTestId('progress-weekly-delta-topicsMastered'),
+    ).toBeNull();
+    expect(
+      screen.queryByTestId('progress-weekly-delta-vocabularyTotal'),
+    ).toBeNull();
+    expect(
+      screen.queryByTestId('progress-weekly-delta-topicsExplored'),
+    ).toBeNull();
   });
 
   it('shows full view when totalSessions is 3', () => {

@@ -5,19 +5,21 @@ export interface SubjectCardProps {
   subjectId: string;
   name: string;
   hint: string;
+  isPreparing?: boolean;
   progress: number;
   topicsCompleted?: number;
   topicsTotal?: number;
   tintSolid: string;
   tintSoft: string;
   icon: React.ComponentProps<typeof Ionicons>['name'];
-  onPress: () => void;
+  onPress?: () => void;
   testID: string;
 }
 
 export function SubjectCard({
   name,
   hint,
+  isPreparing,
   progress,
   topicsCompleted = 0,
   topicsTotal = 0,
@@ -31,6 +33,7 @@ export function SubjectCard({
     <Pressable
       testID={testID}
       onPress={onPress}
+      disabled={!onPress}
       accessibilityLabel={
         topicsTotal > 0
           ? `${name}. ${hint}. ${topicsCompleted}/${topicsTotal} topics`
@@ -38,7 +41,7 @@ export function SubjectCard({
       }
       accessibilityRole="button"
       className="w-[142px] rounded-2xl bg-surface border border-border p-3.5 pb-4"
-      style={{ gap: 10 }}
+      style={[{ gap: 10 }, isPreparing && { opacity: 0.7 }]}
     >
       <View
         testID={`${testID}-icon`}

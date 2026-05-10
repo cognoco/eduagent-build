@@ -8,6 +8,7 @@ import type { ChatMessage, MessagePart } from '../llm';
 import { sanitizeXmlValue } from '../llm/sanitize';
 import { UpstreamLlmError } from '../../errors';
 import { captureException } from '../sentry';
+import { extractFirstJsonObject } from '../llm/extract-json';
 
 // ---------------------------------------------------------------------------
 // Dictation Review Service
@@ -34,7 +35,7 @@ export interface BuildReviewSystemPromptParams {
 }
 
 function buildExplanationStyleGuidance(
-  params: BuildReviewSystemPromptParams
+  params: BuildReviewSystemPromptParams,
 ): string {
   const { ageYears, preferredExplanations = [], recentStruggles } = params;
 
@@ -45,17 +46,17 @@ function buildExplanationStyleGuidance(
     if (ageYears <= 11) {
       parts.push(
         'Use very simple, encouraging language — short sentences, everyday words, no grammar jargon. ' +
-          'Say "you wrote X but it should be Y because…" not "this is a spelling error of type…".'
+          'Say "you wrote X but it should be Y because…" not "this is a spelling error of type…".',
       );
     } else if (ageYears <= 14) {
       parts.push(
         'Use clear, direct explanations suitable for a middle-schooler. ' +
-          'You can name grammar concepts (e.g. "silent letter", "comma splice") but keep it brief.'
+          'You can name grammar concepts (e.g. "silent letter", "comma splice") but keep it brief.',
       );
     } else {
       parts.push(
         'You may use precise grammar and punctuation terminology. ' +
-          'Keep explanations concise — the learner can handle technical language.'
+          'Keep explanations concise — the learner can handle technical language.',
       );
     }
   }
@@ -63,17 +64,17 @@ function buildExplanationStyleGuidance(
   // Style preferences
   if (preferredExplanations.includes('humor')) {
     parts.push(
-      'Add a touch of gentle, age-appropriate humour to explanations where it fits naturally — a playful tone helps the mistake stick in memory without feeling like a scolding.'
+      'Add a touch of gentle, age-appropriate humour to explanations where it fits naturally — a playful tone helps the mistake stick in memory without feeling like a scolding.',
     );
   }
   if (preferredExplanations.includes('step-by-step')) {
     parts.push(
-      'Structure each explanation as a numbered 1–2–3 breakdown: (1) what the mistake was, (2) the rule, (3) the correct version.'
+      'Structure each explanation as a numbered 1–2–3 breakdown: (1) what the mistake was, (2) the rule, (3) the correct version.',
     );
   }
   if (preferredExplanations.includes('stories')) {
     parts.push(
-      'Where it fits, frame the correction as a tiny memorable story or mnemonic rather than a dry rule.'
+      'Where it fits, frame the correction as a tiny memorable story or mnemonic rather than a dry rule.',
     );
   }
 
@@ -88,7 +89,7 @@ function buildExplanationStyleGuidance(
   const struggleHint =
     safeStruggles.length > 0
       ? `\nThe learner has recently struggled with: ${safeStruggles.join(
-          ', '
+          ', ',
         )}. When reviewing their dictation, pay extra attention to errors related to these areas and provide targeted feedback.`
       : '';
 
@@ -99,7 +100,7 @@ function buildExplanationStyleGuidance(
 }
 
 export function buildReviewSystemPrompt(
-  params: BuildReviewSystemPromptParams = {}
+  params: BuildReviewSystemPromptParams = {},
 ): string {
   const styleGuidance = buildExplanationStyleGuidance(params);
 
@@ -155,7 +156,7 @@ export interface ReviewDictationInput {
 }
 
 export async function reviewDictation(
-  input: ReviewDictationInput
+  input: ReviewDictationInput,
 ): Promise<DictationReviewResult> {
   const {
     sentences,
@@ -199,33 +200,33 @@ export async function reviewDictation(
 
   if (!result.response || result.response.trim() === '') {
     const err = new UpstreamLlmError(
-      'LLM returned empty response in review-dictation'
+      'LLM returned empty response in review-dictation',
     );
     captureException(err, { requestPath: 'services/dictation/review' });
     throw err;
   }
 
-  const jsonMatch = result.response.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
+  const jsonStr = extractFirstJsonObject(result.response);
+  if (!jsonStr) {
     const err = new UpstreamLlmError(
-      'LLM returned no JSON in review-dictation response'
+      'LLM returned no JSON in review-dictation response',
     );
     captureException(err, { requestPath: 'services/dictation/review' });
     throw err;
   }
 
   try {
-    const parsed = JSON.parse(jsonMatch[0]);
+    const parsed = JSON.parse(jsonStr);
     return dictationReviewResultSchema.parse(parsed);
   } catch (parseErr) {
     captureException(
       parseErr instanceof Error
         ? parseErr
         : new Error('Dictation review parse failed'),
-      { requestPath: 'services/dictation/review' }
+      { requestPath: 'services/dictation/review' },
     );
     throw new UpstreamLlmError(
-      'Dictation review LLM returned invalid structured output'
+      'Dictation review LLM returned invalid structured output',
     );
   }
 }

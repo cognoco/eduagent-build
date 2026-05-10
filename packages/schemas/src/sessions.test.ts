@@ -1,6 +1,7 @@
 import {
   extractedInterviewSignalsSchema,
   firstCurriculumSessionStartSchema,
+  learnerRecapResponseSchema,
   sessionMessageSchema,
 } from './sessions.js';
 
@@ -108,5 +109,108 @@ describe('extractedInterviewSignalsSchema — fast-path fields', () => {
       currentKnowledge: '',
     });
     expect(parsed.success).toBe(true);
+  });
+});
+
+describe('learnerRecapResponseSchema [BUG-1011]', () => {
+  const validRecap = {
+    closingLine: 'Great session today!',
+    takeaways: ['Learned about loops', 'Practiced recursion'],
+    nextTopicReason: 'Builds on recursion concepts',
+  };
+
+  it('accepts a valid recap with closingLine, takeaways, and nextTopicReason', () => {
+    const result = learnerRecapResponseSchema.safeParse(validRecap);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts nullable nextTopicReason', () => {
+    const result = learnerRecapResponseSchema.safeParse({
+      ...validRecap,
+      nextTopicReason: null,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts 1 takeaway (minimum)', () => {
+    const result = learnerRecapResponseSchema.safeParse({
+      ...validRecap,
+      takeaways: ['Single takeaway'],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts 4 takeaways (maximum)', () => {
+    const result = learnerRecapResponseSchema.safeParse({
+      ...validRecap,
+      takeaways: ['One', 'Two', 'Three', 'Four'],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects empty closingLine', () => {
+    const result = learnerRecapResponseSchema.safeParse({
+      ...validRecap,
+      closingLine: '',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects closingLine exceeding 150 characters', () => {
+    const result = learnerRecapResponseSchema.safeParse({
+      ...validRecap,
+      closingLine: 'x'.repeat(151),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects 0 takeaways (too few)', () => {
+    const result = learnerRecapResponseSchema.safeParse({
+      ...validRecap,
+      takeaways: [],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects more than 4 takeaways', () => {
+    const result = learnerRecapResponseSchema.safeParse({
+      ...validRecap,
+      takeaways: ['One', 'Two', 'Three', 'Four', 'Five'],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a takeaway exceeding 200 characters', () => {
+    const result = learnerRecapResponseSchema.safeParse({
+      ...validRecap,
+      takeaways: ['y'.repeat(201)],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects an empty takeaway string', () => {
+    const result = learnerRecapResponseSchema.safeParse({
+      ...validRecap,
+      takeaways: [''],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects nextTopicReason exceeding 120 characters', () => {
+    const result = learnerRecapResponseSchema.safeParse({
+      ...validRecap,
+      nextTopicReason: 'z'.repeat(121),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects missing required fields', () => {
+    expect(learnerRecapResponseSchema.safeParse({}).success).toBe(false);
+    expect(
+      learnerRecapResponseSchema.safeParse({ closingLine: 'Hi' }).success,
+    ).toBe(false);
+    expect(
+      learnerRecapResponseSchema.safeParse({ takeaways: ['A'] }).success,
+    ).toBe(false);
   });
 });

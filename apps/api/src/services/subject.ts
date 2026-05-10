@@ -3,7 +3,7 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, gte, notInArray, sql } from 'drizzle-orm';
+import { eq, and, gte, lte, notInArray, sql } from 'drizzle-orm';
 import {
   subjects,
   curriculumBooks,
@@ -79,9 +79,12 @@ function mapSubjectRow(
   };
 }
 
+const STUCK_BOOK_THRESHOLD_MS = 2 * 60 * 1000;
+
 async function getSubjectCurriculumStatus(
   db: Database,
   subjectId: string,
+  profileId?: string,
 ): Promise<SubjectCurriculumStatus> {
   const readyBook = await db.query.curriculumBooks.findFirst({
     where: and(
@@ -95,6 +98,29 @@ async function getSubjectCurriculumStatus(
     where: eq(bookSuggestions.subjectId, subjectId),
   });
   if (bookSuggestion) return 'ready';
+
+  if (profileId) {
+    const stuckThreshold = new Date(Date.now() - STUCK_BOOK_THRESHOLD_MS);
+    const stuckBooks = await db.query.curriculumBooks.findMany({
+      where: and(
+        eq(curriculumBooks.subjectId, subjectId),
+        eq(curriculumBooks.topicsGenerated, false),
+        lte(curriculumBooks.createdAt, stuckThreshold),
+      ),
+    });
+    for (const book of stuckBooks) {
+      dispatchCurriculumRetry({
+        subjectId,
+        profileId,
+        bookId: book.id,
+      }).catch((err: unknown) => {
+        captureException(err, {
+          profileId,
+          extra: { subjectId, phase: 'auto_retry_dispatch' },
+        });
+      });
+    }
+  }
 
   return 'preparing';
 }
@@ -127,6 +153,58 @@ async function dispatchCurriculumPrewarm(args: {
   }
 }
 
+async function dispatchCurriculumRetry(args: {
+  subjectId: string;
+  profileId: string;
+  bookId: string;
+}): Promise<void> {
+  const data = subjectCurriculumPrewarmRequestedEventSchema.parse({
+    version: 1,
+    ...args,
+    timestamp: new Date().toISOString(),
+  });
+
+  try {
+    await inngest.send({
+      name: 'app/subject.curriculum-retry-requested',
+      data,
+    });
+  } catch (err) {
+    captureException(err, {
+      profileId: args.profileId,
+      extra: {
+        subjectId: args.subjectId,
+        bookId: args.bookId,
+        phase: 'subject_retry_dispatch',
+      },
+    });
+  }
+}
+
+export async function retryCurriculumForSubject(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+): Promise<number> {
+  const repo = createScopedRepository(db, profileId);
+  const subjectRow = await repo.subjects.findFirst(eq(subjects.id, subjectId));
+  if (!subjectRow) throw new SubjectNotFoundError();
+
+  const stuckBooks = await db.query.curriculumBooks.findMany({
+    where: and(
+      eq(curriculumBooks.subjectId, subjectId),
+      eq(curriculumBooks.topicsGenerated, false),
+    ),
+  });
+
+  let dispatched = 0;
+  for (const book of stuckBooks) {
+    await dispatchCurriculumRetry({ subjectId, profileId, bookId: book.id });
+    dispatched++;
+  }
+  return dispatched;
+}
+
 // ---------------------------------------------------------------------------
 // Core functions
 // ---------------------------------------------------------------------------
@@ -149,7 +227,7 @@ export async function listSubjects(
       mapSubjectRow(
         row,
         row.status === 'active'
-          ? await getSubjectCurriculumStatus(db, row.id)
+          ? await getSubjectCurriculumStatus(db, row.id, profileId)
           : undefined,
       ),
     ),

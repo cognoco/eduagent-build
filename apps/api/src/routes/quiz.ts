@@ -42,8 +42,7 @@ import {
   getDueMasteryItems,
   shouldApplyDifficultyBump,
 } from '../services/quiz';
-import { recordSessionActivity } from '../services/streaks';
-import { captureException } from '../services/sentry';
+import { inngest } from '../inngest/client';
 
 type QuizRouteEnv = {
   Bindings: {
@@ -78,7 +77,7 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 function toClientSafeQuestions(
-  questions: QuizQuestion[]
+  questions: QuizQuestion[],
 ): ClientQuizQuestion[] {
   return questions.map((q): ClientQuizQuestion => {
     if (q.type === 'capitals') {
@@ -125,12 +124,12 @@ async function buildAndGenerateRound(
   db: Database,
   profileId: string,
   profileMeta: ProfileMeta,
-  input: GenerateRoundInput
+  input: GenerateRoundInput,
 ) {
   const recentAnswers = await getRecentAnswers(
     db,
     profileId,
-    input.activityType
+    input.activityType,
   );
   let languageCode: string | undefined;
   let cefrCeiling: CefrLevel | undefined;
@@ -148,14 +147,14 @@ async function buildAndGenerateRound(
   if (input.activityType === 'vocabulary') {
     if (!input.subjectId) {
       throw new VocabularyContextError(
-        'subjectId is required for vocabulary rounds'
+        'subjectId is required for vocabulary rounds',
       );
     }
 
     const context = await getVocabularyRoundContext(
       db,
       profileId,
-      input.subjectId
+      input.subjectId,
     );
     languageCode = context.languageCode;
     cefrCeiling = context.cefrCeiling;
@@ -173,7 +172,7 @@ async function buildAndGenerateRound(
     db,
     profileId,
     input.activityType,
-    3
+    3,
   );
   const completedForBump = recentForBump
     .filter((r) => r.status === 'completed')
@@ -209,7 +208,7 @@ async function buildAndGenerateRound(
  */
 async function generateRoundFromInput(
   c: import('hono').Context<QuizRouteEnv>,
-  input: GenerateRoundInput
+  input: GenerateRoundInput,
 ) {
   const profileId = requireProfileId(c.get('profileId'));
   const db = c.get('db');
@@ -220,7 +219,7 @@ async function generateRoundFromInput(
       db,
       profileId,
       profileMeta,
-      input
+      input,
     );
     return { round, input };
   } catch (error) {
@@ -239,7 +238,7 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
       if (result.success) return;
       return validationError(
         c,
-        `Invalid input: ${result.error.issues[0]?.message ?? 'unknown'}`
+        `Invalid input: ${result.error.issues[0]?.message ?? 'unknown'}`,
       );
     }),
     async (c) => {
@@ -254,14 +253,14 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
           activityType: result.input.activityType,
           theme: result.round.theme,
           questions: toClientSafeQuestions(
-            result.round.questions as QuizQuestion[]
+            result.round.questions as QuizQuestion[],
           ),
           total: result.round.total,
           difficultyBump: result.round.difficultyBump,
         }),
-        200
+        200,
       );
-    }
+    },
   )
   // [BUG-833] zValidator middleware replaces manual c.req.json() + safeParse.
   .post(
@@ -270,7 +269,7 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
       if (result.success) return;
       return validationError(
         c,
-        `Invalid input: ${result.error.issues[0]?.message ?? 'unknown'}`
+        `Invalid input: ${result.error.issues[0]?.message ?? 'unknown'}`,
       );
     }),
     async (c) => {
@@ -281,9 +280,9 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
 
       return c.json(
         prefetchRoundResponseSchema.parse({ id: result.round.id }),
-        200
+        200,
       );
-    }
+    },
   )
   .get('/quiz/rounds/recent', async (c) => {
     const profileId = requireProfileId(c.get('profileId'));
@@ -303,9 +302,9 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
           xpEarned: round.xpEarned ?? 0,
           completedAt:
             round.completedAt?.toISOString() ?? round.createdAt.toISOString(),
-        })
+        }),
       ),
-      200
+      200,
     );
   })
   .get('/quiz/rounds/:id', async (c) => {
@@ -340,7 +339,7 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
             const base = toClientSafeQuestions([q])[0];
             if (base == null)
               throw new Error(
-                'toClientSafeQuestions returned empty array for a single question'
+                'toClientSafeQuestions returned empty array for a single question',
               );
             return {
               ...base,
@@ -349,13 +348,13 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
                 q.type === 'vocabulary'
                   ? q.acceptedAnswers
                   : 'acceptedAliases' in q
-                  ? q.acceptedAliases
-                  : undefined,
+                    ? q.acceptedAliases
+                    : undefined,
             };
           }),
           results: round.results,
         }),
-        200
+        200,
       );
     }
 
@@ -368,7 +367,7 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
         questions: toClientSafeQuestions(questions),
         total: round.total,
       }),
-      200
+      200,
     );
   })
   .post(
@@ -387,7 +386,7 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
         roundId,
         questionIndex,
         answerGiven,
-        answerMode
+        answerMode,
       );
       // [F-Q-02/F-Q-07] Reveal correctAnswer only on wrong submissions so the
       // client can highlight the right option and show the person's name.
@@ -396,9 +395,9 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
           correct: result.correct,
           ...(result.correct ? {} : { correctAnswer: result.correctAnswer }),
         }),
-        200
+        200,
       );
-    }
+    },
   )
   .post(
     '/quiz/rounds/:id/complete',
@@ -412,25 +411,14 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
 
       const result = await completeQuizRound(db, profileId, roundId, results);
 
-      // Record streak activity — quiz round counts as daily learning activity.
-      // [C2] Fire-and-forget: streak failure must not block the quiz completion
-      // response. Scoring and mastery updates already succeeded, so the user
-      // should see their results without waiting for the streak write round-trip.
       const today = new Date().toISOString().slice(0, 10);
-      recordSessionActivity(db, profileId, today).catch((err) => {
-        captureException(err, {
-          profileId,
-          extra: {
-            route: 'quiz/rounds/:id/complete',
-            phase: 'streak_recording',
-            roundId,
-            date: today,
-          },
-        });
+      await inngest.send({
+        name: 'app/streak.record',
+        data: { profileId, date: today },
       });
 
       return c.json(completeRoundResponseSchema.parse(result), 200);
-    }
+    },
   )
   // [BUG-833] zValidator middleware replaces manual c.req.json() + safeParse.
   .post(
@@ -439,7 +427,7 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
       if (result.success) return;
       return validationError(
         c,
-        `Invalid input: ${result.error.issues[0]?.message ?? 'unknown'}`
+        `Invalid input: ${result.error.issues[0]?.message ?? 'unknown'}`,
       );
     }),
     async (c) => {
@@ -451,11 +439,11 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
       const markedCount = await markMissedItemsSurfaced(
         db,
         profileId,
-        activityType
+        activityType,
       );
 
       return c.json(markSurfacedResponseSchema.parse({ markedCount }), 200);
-    }
+    },
   )
   .get('/quiz/stats', async (c) => {
     const profileId = requireProfileId(c.get('profileId'));

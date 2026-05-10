@@ -85,7 +85,7 @@ describe('sm2', () => {
     expect(() => new Date(result.card.lastReviewedAt)).not.toThrow();
     expect(() => new Date(result.card.nextReviewAt)).not.toThrow();
     expect(new Date(result.card.nextReviewAt).getTime()).toBeGreaterThan(
-      new Date(result.card.lastReviewedAt).getTime()
+      new Date(result.card.lastReviewedAt).getTime(),
     );
   });
 
@@ -120,6 +120,76 @@ describe('sm2', () => {
     expect(result.card.interval).toBe(1);
     expect(Number.isFinite(result.card.easeFactor)).toBe(true);
     expect(result.card.easeFactor).toBeGreaterThanOrEqual(1.3);
+  });
+
+  it('overdue card: nextReviewAt anchored to due date, not review time', () => {
+    const fourteenDaysAgo = new Date();
+    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+
+    const card: RetentionCard = {
+      easeFactor: 2.5,
+      interval: 6,
+      repetitions: 2,
+      lastReviewedAt: new Date(
+        fourteenDaysAgo.getTime() - 6 * 86_400_000,
+      ).toISOString(),
+      nextReviewAt: fourteenDaysAgo.toISOString(),
+    };
+
+    // reps=2, ease=2.5, quality=4 → newInterval = round(6 * 2.5) = 15
+    // Anchored to 14 days ago + 15 = ~1 day from now (not 15 days from now)
+    const result = sm2({ quality: 4, card });
+    const nextReview = new Date(result.card.nextReviewAt);
+    const now = new Date();
+    const daysFromNow = (nextReview.getTime() - now.getTime()) / 86_400_000;
+
+    expect(daysFromNow).toBeLessThan(result.card.interval);
+    expect(daysFromNow).toBeGreaterThan(0);
+  });
+
+  it('severely overdue card: nextReviewAt clamped to tomorrow, not in past', () => {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const card: RetentionCard = {
+      easeFactor: 2.5,
+      interval: 6,
+      repetitions: 2,
+      lastReviewedAt: new Date(
+        thirtyDaysAgo.getTime() - 6 * 86_400_000,
+      ).toISOString(),
+      nextReviewAt: thirtyDaysAgo.toISOString(),
+    };
+
+    // reps=2, ease=2.5, quality=4 → interval 15, but 30 days ago + 15 = -15 days (past)
+    // Should clamp to ~1 day from now
+    const result = sm2({ quality: 4, card });
+    const nextReview = new Date(result.card.nextReviewAt);
+    const now = new Date();
+
+    expect(nextReview.getTime()).toBeGreaterThan(now.getTime());
+  });
+
+  it('on-time card: nextReviewAt still anchored to now', () => {
+    const twoDaysFromNow = new Date();
+    twoDaysFromNow.setDate(twoDaysFromNow.getDate() + 2);
+
+    const card: RetentionCard = {
+      easeFactor: 2.5,
+      interval: 6,
+      repetitions: 2,
+      lastReviewedAt: new Date().toISOString(),
+      nextReviewAt: twoDaysFromNow.toISOString(),
+    };
+
+    // Reviewing early — nextReviewAt is in the future, so anchor to now
+    const result = sm2({ quality: 4, card });
+    const nextReview = new Date(result.card.nextReviewAt);
+    const now = new Date();
+    const daysFromNow = (nextReview.getTime() - now.getTime()) / 86_400_000;
+
+    // Should be approximately the full interval from now
+    expect(daysFromNow).toBeGreaterThanOrEqual(result.card.interval - 0.1);
   });
 
   it('undefined quality coerced treats as 0, produces valid card', () => {

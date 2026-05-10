@@ -198,12 +198,12 @@ export default function LibraryScreen() {
   const [subjectsLoadTimedOut, setSubjectsLoadTimedOut] = useState(false);
   useEffect(() => {
     if (!isSubjectsLoading) {
-      setSubjectsLoadTimedOut(false);
+      if (subjectsLoadTimedOut) setSubjectsLoadTimedOut(false);
       return;
     }
     const t = setTimeout(() => setSubjectsLoadTimedOut(true), 15_000);
     return () => clearTimeout(t);
-  }, [isSubjectsLoading]);
+  }, [isSubjectsLoading, subjectsLoadTimedOut]);
 
   const updateSubject = useUpdateSubject();
   const allBooksQuery = useAllBooks();

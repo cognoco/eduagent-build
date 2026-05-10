@@ -33,7 +33,7 @@ export function sm2(input: SM2Input): SM2Result {
   const raw = Number.isFinite(input.quality) ? input.quality : 0;
   // Clamp quality to valid 0-5 range (out-of-range values would produce wrong ease factors)
   const quality = Math.max(0, Math.min(5, Math.round(raw)));
-  const now = new Date().toISOString();
+  const reviewedAt = new Date();
   const wasSuccessful = quality >= 3;
 
   const prevEase = card?.easeFactor ?? DEFAULT_EASE;
@@ -66,15 +66,20 @@ export function sm2(input: SM2Input): SM2Result {
     newInterval = Math.round((card?.interval ?? 6) * newEase);
   }
 
-  const nextReviewDate = new Date();
+  const dueDate = card?.nextReviewAt ? new Date(card.nextReviewAt) : null;
+  const anchor = dueDate && dueDate < reviewedAt ? dueDate : reviewedAt;
+  const nextReviewDate = new Date(anchor);
   nextReviewDate.setDate(nextReviewDate.getDate() + newInterval);
+  if (nextReviewDate <= reviewedAt) {
+    nextReviewDate.setTime(reviewedAt.getTime() + 86_400_000);
+  }
 
   return {
     card: {
       easeFactor: Math.round(newEase * 100) / 100,
       interval: newInterval,
       repetitions: newReps,
-      lastReviewedAt: now,
+      lastReviewedAt: reviewedAt.toISOString(),
       nextReviewAt: nextReviewDate.toISOString(),
     },
     wasSuccessful,

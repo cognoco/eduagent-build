@@ -15,7 +15,7 @@ export function WeeklyDeltaChip({
 }): React.ReactElement | null {
   const { t } = useTranslation();
 
-  if (value === null) {
+  if (value === null || value <= 0) {
     return null;
   }
 

@@ -22,6 +22,7 @@ import {
   configureLanguageSubject,
   getSubject,
   updateSubject,
+  retryCurriculumForSubject,
   SubjectNotLanguageLearningError,
 } from '../services/subject';
 import { resolveSubjectName } from '../services/subject-resolve';
@@ -52,7 +53,7 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
       const { rawInput } = c.req.valid('json');
       const result = await resolveSubjectName(rawInput);
       return c.json(subjectResolveResultSchema.parse(result));
-    }
+    },
   )
   .post(
     '/subjects/classify',
@@ -63,7 +64,7 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
       const profileId = requireProfileId(c.get('profileId'));
       const result = await classifySubject(db, profileId, text);
       return c.json(subjectClassifyResultSchema.parse(result));
-    }
+    },
   )
   .get('/subjects', async (c) => {
     const db = c.get('db');
@@ -94,7 +95,7 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
           db,
           profileId,
           c.req.param('id'),
-          c.req.valid('json')
+          c.req.valid('json'),
         );
         return c.json(subjectResponseSchema.parse({ subject }));
       } catch (err) {
@@ -108,8 +109,25 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
         }
         throw err;
       }
-    }
+    },
   )
+  .post('/subjects/:id/retry-curriculum', async (c) => {
+    const db = c.get('db');
+    const profileId = requireProfileId(c.get('profileId'));
+    try {
+      const dispatched = await retryCurriculumForSubject(
+        db,
+        profileId,
+        c.req.param('id'),
+      );
+      return c.json({ dispatched });
+    } catch (err) {
+      if (err instanceof SubjectNotFoundError) {
+        return notFound(c, err.message);
+      }
+      throw err;
+    }
+  })
   .get('/subjects/:id', async (c) => {
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
@@ -128,9 +146,9 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
         db,
         profileId,
         c.req.param('id'),
-        input
+        input,
       );
       if (!subject) return notFound(c, 'Subject not found');
       return c.json(subjectResponseSchema.parse({ subject }));
-    }
+    },
   );

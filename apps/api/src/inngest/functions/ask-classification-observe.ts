@@ -17,29 +17,14 @@
 
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
+import { captureException } from '../../services/sentry';
+import {
+  classificationCompletedEventSchema,
+  classificationSkippedEventSchema,
+  classificationFailedEventSchema,
+} from '@eduagent/schemas';
 
 const logger = createLogger();
-
-interface ClassificationCompletedData {
-  sessionId?: string;
-  exchangeCount?: number;
-  subjectId?: string;
-  subjectName?: string;
-  confidence?: number;
-}
-
-interface ClassificationSkippedData {
-  sessionId?: string;
-  exchangeCount?: number;
-  reason?: string;
-  topConfidence?: number;
-}
-
-interface ClassificationFailedData {
-  sessionId?: string;
-  exchangeCount?: number;
-  error?: string;
-}
 
 export const askClassificationCompletedObserve = inngest.createFunction(
   {
@@ -48,7 +33,20 @@ export const askClassificationCompletedObserve = inngest.createFunction(
   },
   { event: 'app/ask.classification_completed' },
   async ({ event }) => {
-    const data = event.data as ClassificationCompletedData;
+    const parsed = classificationCompletedEventSchema.safeParse(event.data);
+    if (!parsed.success) {
+      logger.warn('ask.classification_completed.invalid_payload', {
+        issues: parsed.error.issues,
+      });
+      captureException(
+        new Error(
+          '[ask-classification-completed] invalid event payload — schema drift or bad event',
+        ),
+        { extra: { issues: parsed.error.issues, rawData: event.data } },
+      );
+      return { status: 'skipped' as const, reason: 'invalid_payload' };
+    }
+    const data = parsed.data;
     logger.info('ask.classification_completed.received', {
       sessionId: data.sessionId ?? 'unknown',
       exchangeCount: data.exchangeCount ?? 0,
@@ -61,7 +59,7 @@ export const askClassificationCompletedObserve = inngest.createFunction(
       sessionId: data.sessionId ?? null,
       analyticsDeferred: 'pending_classification_analytics_pipeline',
     };
-  }
+  },
 );
 
 export const askClassificationSkippedObserve = inngest.createFunction(
@@ -71,7 +69,20 @@ export const askClassificationSkippedObserve = inngest.createFunction(
   },
   { event: 'app/ask.classification_skipped' },
   async ({ event }) => {
-    const data = event.data as ClassificationSkippedData;
+    const parsed = classificationSkippedEventSchema.safeParse(event.data);
+    if (!parsed.success) {
+      logger.warn('ask.classification_skipped.invalid_payload', {
+        issues: parsed.error.issues,
+      });
+      captureException(
+        new Error(
+          '[ask-classification-skipped] invalid event payload — schema drift or bad event',
+        ),
+        { extra: { issues: parsed.error.issues, rawData: event.data } },
+      );
+      return { status: 'skipped' as const, reason: 'invalid_payload' };
+    }
+    const data = parsed.data;
     logger.info('ask.classification_skipped.received', {
       sessionId: data.sessionId ?? 'unknown',
       exchangeCount: data.exchangeCount ?? 0,
@@ -84,7 +95,7 @@ export const askClassificationSkippedObserve = inngest.createFunction(
       reason: data.reason ?? 'unknown',
       analyticsDeferred: 'pending_classification_analytics_pipeline',
     };
-  }
+  },
 );
 
 export const askClassificationFailedObserve = inngest.createFunction(
@@ -94,7 +105,20 @@ export const askClassificationFailedObserve = inngest.createFunction(
   },
   { event: 'app/ask.classification_failed' },
   async ({ event }) => {
-    const data = event.data as ClassificationFailedData;
+    const parsed = classificationFailedEventSchema.safeParse(event.data);
+    if (!parsed.success) {
+      logger.error('ask.classification_failed.invalid_payload', {
+        issues: parsed.error.issues,
+      });
+      captureException(
+        new Error(
+          '[ask-classification-failed] invalid event payload — schema drift or bad event',
+        ),
+        { extra: { issues: parsed.error.issues, rawData: event.data } },
+      );
+      return { status: 'skipped' as const, reason: 'invalid_payload' };
+    }
+    const data = parsed.data;
     // Error-level so a future on-call rule can page on rate spikes — this
     // is the terminal-failure escalation channel, the most consequential
     // of the three signals.
@@ -109,5 +133,5 @@ export const askClassificationFailedObserve = inngest.createFunction(
       error: data.error ?? 'unknown',
       escalationDeferred: 'pending_classification_failure_alerting',
     };
-  }
+  },
 );

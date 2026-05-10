@@ -112,6 +112,24 @@ describe('reviewDictation', () => {
     await expect(reviewDictation(BASE_INPUT)).rejects.toThrow();
   });
 
+  it('[CCR-PR120-NEW-4] extracts first balanced JSON even when trailing braces exist', async () => {
+    const validJson = JSON.stringify({
+      totalSentences: 2,
+      correctCount: 2,
+      mistakes: [],
+    });
+    mockRouteAndCall.mockResolvedValueOnce({
+      response: `Here is my analysis:\n${validJson}\nNote: the child wrote "day}" with an extra brace}`,
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+      latencyMs: 100,
+    });
+
+    const result = await reviewDictation(BASE_INPUT);
+    expect(result.totalSentences).toBe(2);
+    expect(result.correctCount).toBe(2);
+  });
+
   it('calls routeAndCall with rung 2 for vision capability', async () => {
     mockRouteAndCall.mockResolvedValueOnce({
       response: JSON.stringify({
@@ -148,14 +166,14 @@ describe('reviewDictation', () => {
     });
 
     const [messages] = mockRouteAndCall.mock.calls[0] as [
-      Array<{ role: string; content: unknown }>
+      Array<{ role: string; content: unknown }>,
     ];
     const systemContent = messages.find((m) => m.role === 'system')
       ?.content as string;
     expect(systemContent).toContain('EXPLANATION STYLE');
     // 15+ register — precise terminology
     expect(systemContent).toContain(
-      'precise grammar and punctuation terminology'
+      'precise grammar and punctuation terminology',
     );
     // step-by-step preference included
     expect(systemContent).toContain('numbered 1');
@@ -176,7 +194,7 @@ describe('reviewDictation', () => {
     await reviewDictation({ ...BASE_INPUT, ageYears: 11 });
 
     const [messages] = mockRouteAndCall.mock.calls[0] as [
-      Array<{ role: string; content: unknown }>
+      Array<{ role: string; content: unknown }>,
     ];
     const systemContent = messages.find((m) => m.role === 'system')
       ?.content as string;
@@ -203,7 +221,7 @@ describe('reviewDictation', () => {
     });
 
     const [messages] = mockRouteAndCall.mock.calls[0] as [
-      Array<{ role: string; content: unknown }>
+      Array<{ role: string; content: unknown }>,
     ];
     const systemContent = messages.find((m) => m.role === 'system')
       ?.content as string;
@@ -227,7 +245,7 @@ describe('reviewDictation', () => {
     await reviewDictation({ ...BASE_INPUT, recentStruggles: [] });
 
     const [messages] = mockRouteAndCall.mock.calls[0] as [
-      Array<{ role: string; content: unknown }>
+      Array<{ role: string; content: unknown }>,
     ];
     const systemContent = messages.find((m) => m.role === 'system')
       ?.content as string;
@@ -249,7 +267,7 @@ describe('reviewDictation', () => {
     await reviewDictation(BASE_INPUT);
 
     const [messages] = mockRouteAndCall.mock.calls[0] as [
-      Array<{ role: string; content: unknown }>
+      Array<{ role: string; content: unknown }>,
     ];
     const userMsg = messages.find((m) => m.role === 'user');
     expect(Array.isArray(userMsg?.content)).toBe(true);

@@ -439,6 +439,19 @@ export interface ParsedExchangeEnvelope {
   readyToFinish: boolean;
 }
 
+const EMPTY_PARSED_ENVELOPE: ParsedExchangeEnvelope = {
+  cleanResponse: '',
+  understandingCheck: false,
+  partialProgress: false,
+  needsDeepening: false,
+  notePrompt: false,
+  notePromptPostSession: false,
+  fluencyDrill: null,
+  confidence: undefined,
+  retrievalScore: undefined,
+  readyToFinish: false,
+};
+
 // ExchangeFallback + ExchangeFallbackReason are imported from
 // @eduagent/schemas so the wire contract for the SSE `fallback` frame is
 // shared with the mobile client. Do not redefine them here.
@@ -460,10 +473,9 @@ export interface ClassifiedExchangeOutcome {
 // Update this set when a new marker handler is wired. Adding a key here
 // without wiring the handler will silently suppress the orphan_marker
 // fallback — guard with an integration test that exercises the dispatch.
-const HANDLED_MARKER_KEYS: ReadonlySet<string> = new Set([
-  'notePrompt',
-  'fluencyDrill',
-]);
+export type HandledMarkerKey = 'notePrompt' | 'fluencyDrill';
+export const HANDLED_MARKER_KEYS: ReadonlySet<string> =
+  new Set<HandledMarkerKey>(['notePrompt', 'fluencyDrill']);
 
 const DEFAULT_FALLBACK_TEXT = "I didn't have a reply — tap to try again.";
 
@@ -585,17 +597,7 @@ function envelopeToParsedExchange(
 // Pulls handled-marker values out of a bare-marker payload (no `reply`).
 // Only reads HANDLED_MARKER_KEYS so an unexpected key never sneaks through.
 function parseHandledMarker(response: string): ParsedExchangeEnvelope {
-  const base: ParsedExchangeEnvelope = {
-    cleanResponse: '',
-    understandingCheck: false,
-    partialProgress: false,
-    needsDeepening: false,
-    notePrompt: false,
-    notePromptPostSession: false,
-    fluencyDrill: null,
-    confidence: undefined,
-    readyToFinish: false,
-  };
+  const base: ParsedExchangeEnvelope = { ...EMPTY_PARSED_ENVELOPE };
   const jsonStr = extractFirstJsonObject(response);
   if (!jsonStr) return base;
   let parsed: unknown;
@@ -714,20 +716,8 @@ export function classifyExchangeOutcome(
   // Anything else is genuine garbage (malformed_envelope).
   const replyCandidate = extractReplyCandidate(rawResponse);
   if (replyCandidate !== undefined && replyCandidate.trim().length === 0) {
-    const emptyReplyParsed: ParsedExchangeEnvelope = {
-      cleanResponse: '',
-      understandingCheck: false,
-      partialProgress: false,
-      needsDeepening: false,
-      notePrompt: false,
-      notePromptPostSession: false,
-      fluencyDrill: null,
-      confidence: undefined,
-      retrievalScore: undefined,
-      readyToFinish: false,
-    };
     return {
-      parsed: emptyReplyParsed,
+      parsed: { ...EMPTY_PARSED_ENVELOPE },
       fallback: {
         reason: 'empty_reply',
         fallbackText: DEFAULT_FALLBACK_TEXT,
@@ -745,22 +735,9 @@ export function classifyExchangeOutcome(
     return { parsed: parseHandledMarker(rawResponse) };
   }
 
-  const emptyParsed: ParsedExchangeEnvelope = {
-    cleanResponse: '',
-    understandingCheck: false,
-    partialProgress: false,
-    needsDeepening: false,
-    notePrompt: false,
-    notePromptPostSession: false,
-    fluencyDrill: null,
-    confidence: undefined,
-    retrievalScore: undefined,
-    readyToFinish: false,
-  };
-
   if (markerKey === null) {
     return {
-      parsed: emptyParsed,
+      parsed: { ...EMPTY_PARSED_ENVELOPE },
       fallback: {
         reason: 'malformed_envelope',
         fallbackText: DEFAULT_FALLBACK_TEXT,
@@ -771,7 +748,7 @@ export function classifyExchangeOutcome(
   // Marker-shaped but no live handler — orphan. Surfaces missing wiring
   // loudly so a new marker key without a UI consumer can't ship silently.
   return {
-    parsed: emptyParsed,
+    parsed: { ...EMPTY_PARSED_ENVELOPE },
     fallback: {
       reason: 'orphan_marker',
       fallbackText: DEFAULT_FALLBACK_TEXT,

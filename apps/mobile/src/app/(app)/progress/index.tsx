@@ -67,8 +67,14 @@ function heroCopy(
     };
   }
 
-  // [F-043] User has sessions but nothing mastered yet — show encouragement
-  if (topicsMastered === 0 && vocabularyTotal === 0 && totalSessions > 0) {
+  // [F-043] Lead with session effort when mastery numbers are still low.
+  // Prevents "1 words and counting" for a user with 28 sessions.
+  const zeroMastery = topicsMastered === 0 && vocabularyTotal === 0;
+  const lowMastery = topicsMastered < 5 && vocabularyTotal < 5;
+  if (
+    totalSessions > 0 &&
+    (zeroMastery || (totalSessions >= 5 && lowMastery))
+  ) {
     return {
       title: t('progress.hero.sessionsCompleted', { count: totalSessions }),
       subtitle: t('progress.hero.sessionsCompletedSubtitle'),

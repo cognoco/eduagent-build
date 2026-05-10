@@ -53,7 +53,7 @@ export interface VocabularyRoundContext {
 export async function getRecentAnswers(
   db: Database,
   profileId: string,
-  activityType: QuizActivityType
+  activityType: QuizActivityType,
 ): Promise<string[]> {
   const repo = createScopedRepository(db, profileId);
   const perActivity =
@@ -67,7 +67,7 @@ export async function getRecentAnswers(
 
   const recentRounds = await repo.quizRounds.findRecentByActivity(
     activityType,
-    limit
+    limit,
   );
 
   return recentRounds
@@ -88,7 +88,7 @@ export async function getRecentAnswers(
 export async function getRoundById(
   db: Database,
   profileId: string,
-  roundId: string
+  roundId: string,
 ) {
   const repo = createScopedRepository(db, profileId);
   return repo.quizRounds.findById(roundId);
@@ -102,7 +102,7 @@ export async function getRoundById(
 export async function getRoundByIdOrThrow(
   db: Database,
   profileId: string,
-  roundId: string
+  roundId: string,
 ) {
   const round = await getRoundById(db, profileId, roundId);
   if (!round) throw new NotFoundError('Round');
@@ -113,7 +113,7 @@ export async function getRoundByIdOrThrow(
 export async function listRecentCompletedRounds(
   db: Database,
   profileId: string,
-  limit = 10
+  limit = 10,
 ) {
   const repo = createScopedRepository(db, profileId);
   return repo.quizRounds.findCompletedRecent(limit);
@@ -132,9 +132,8 @@ export async function computeRoundStats(db: Database, profileId: string) {
   // Compute bestConsecutive per (activityType, languageCode) by scanning
   // results arrays. [BUG-926] Key on the composite to keep per-language
   // vocabulary streaks separate from each other.
-  const allCompleted = await repo.quizRounds.findMany(
-    eq(quizRounds.status, 'completed')
-  );
+  // [CCR-PR120-M1] Cap at 1000 most-recent rounds to bound memory usage.
+  const allCompleted = await repo.quizRounds.findCompletedForStreaks(1000);
 
   // Composite key: "activityType|languageCode" (languageCode may be null).
   const consecutiveByKey = new Map<string, number>();
@@ -162,7 +161,7 @@ export async function computeRoundStats(db: Database, profileId: string) {
 export async function getVocabularyRoundContext(
   db: Database,
   profileId: string,
-  subjectId: string
+  subjectId: string,
 ): Promise<VocabularyRoundContext> {
   const repo = createScopedRepository(db, profileId);
   const subject = await repo.subjects.findFirst(eq(subjects.id, subjectId));
@@ -183,7 +182,7 @@ export async function getVocabularyRoundContext(
   }
 
   const allVocabularyRows = await repo.vocabulary.findMany(
-    eq(vocabulary.subjectId, subjectId)
+    eq(vocabulary.subjectId, subjectId),
   );
   const vocabularyIds = allVocabularyRows.map((row) => row.id);
   // [IMP-4] Safe cross-table inArray: vocabularyIds were fetched from
@@ -194,10 +193,10 @@ export async function getVocabularyRoundContext(
     vocabularyIds.length === 0
       ? []
       : await repo.vocabularyRetentionCards.findMany(
-          inArray(vocabularyRetentionCards.vocabularyId, vocabularyIds)
+          inArray(vocabularyRetentionCards.vocabularyId, vocabularyIds),
         );
   const cardByVocabularyId = new Map(
-    cardRows.map((card) => [card.vocabularyId, card] as const)
+    cardRows.map((card) => [card.vocabularyId, card] as const),
   );
   const now = new Date();
   const allVocabulary = allVocabularyRows.map((row) => ({
@@ -205,7 +204,7 @@ export async function getVocabularyRoundContext(
     translation: row.translation,
   }));
   const distinctTranslationCount = new Set(
-    allVocabulary.map((entry) => entry.translation.trim().toLowerCase())
+    allVocabulary.map((entry) => entry.translation.trim().toLowerCase()),
   ).size;
   const libraryItems =
     distinctTranslationCount < 4
@@ -223,7 +222,7 @@ export async function getVocabularyRoundContext(
                 answer: row.translation,
                 vocabularyId: row.id,
                 cefrLevel: row.cefrLevel,
-              } satisfies LibraryItem)
+              }) satisfies LibraryItem,
           );
 
   if (distinctTranslationCount < 4 && allVocabularyRows.length > 0) {
@@ -240,7 +239,7 @@ export async function getVocabularyRoundContext(
       allVocabularyRows.map((row) => ({
         cefrLevel: row.cefrLevel,
         repetitions: cardByVocabularyId.get(row.id)?.repetitions ?? null,
-      }))
+      })),
     ),
     allVocabulary,
     libraryItems,
@@ -257,7 +256,7 @@ export interface GuessWhoRoundContext {
  */
 export async function getGuessWhoRoundContext(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<GuessWhoRoundContext> {
   const topics = await db
     .select({ title: curriculumTopics.title })
@@ -267,8 +266,8 @@ export async function getGuessWhoRoundContext(
     .where(
       and(
         eq(subjects.profileId, profileId),
-        eq(curriculumTopics.skipped, false)
-      )
+        eq(curriculumTopics.skipped, false),
+      ),
     )
     .orderBy(desc(curriculumTopics.createdAt))
     .limit(30);
@@ -284,7 +283,7 @@ export async function getRecentCompletedByActivity(
   db: Database,
   profileId: string,
   activityType: QuizActivityType,
-  limit: number
+  limit: number,
 ) {
   const repo = createScopedRepository(db, profileId);
   return repo.quizRounds.findRecentByActivity(activityType, limit);
@@ -300,7 +299,7 @@ export async function getRecentCompletedByActivity(
 export async function markMissedItemsSurfaced(
   db: Database,
   profileId: string,
-  activityType: QuizActivityType
+  activityType: QuizActivityType,
 ): Promise<number> {
   const repo = createScopedRepository(db, profileId);
   return repo.quizMissedItems.markSurfaced(activityType);
@@ -315,7 +314,7 @@ export async function getRecentMissedItems(
   db: Database,
   profileId: string,
   activityType: QuizActivityType,
-  limit = 8
+  limit = 8,
 ): Promise<Array<{ questionText: string; correctAnswer: string }>> {
   try {
     const repo = createScopedRepository(db, profileId);
@@ -323,8 +322,8 @@ export async function getRecentMissedItems(
       and(
         eq(quizMissedItems.activityType, activityType),
         eq(quizMissedItems.surfaced, false),
-        eq(quizMissedItems.convertedToTopic, false)
-      )
+        eq(quizMissedItems.convertedToTopic, false),
+      ),
     );
     return rows.slice(0, limit).map((r) => ({
       questionText: r.questionText,
@@ -346,7 +345,7 @@ export async function getRecentMissedItems(
 export async function getDueMasteryItems(
   db: Database,
   profileId: string,
-  activityType: 'capitals' | 'guess_who'
+  activityType: 'capitals' | 'guess_who',
 ): Promise<LibraryItem[]> {
   const repo = createScopedRepository(db, profileId);
   const rows = await repo.quizMasteryItems.findDueByActivity(activityType, 20);
@@ -374,13 +373,13 @@ export async function getDueMasteryItems(
  */
 export async function abandonStaleQuizRounds(
   db: Database,
-  cutoff: Date
+  cutoff: Date,
 ): Promise<number> {
   const result = await db
     .update(quizRounds)
     .set({ status: 'abandoned' })
     .where(
-      and(eq(quizRounds.status, 'active'), lt(quizRounds.createdAt, cutoff))
+      and(eq(quizRounds.status, 'active'), lt(quizRounds.createdAt, cutoff)),
     )
     .returning({ id: quizRounds.id });
   return result.length;

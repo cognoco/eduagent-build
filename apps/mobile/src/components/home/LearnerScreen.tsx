@@ -216,19 +216,20 @@ export function LearnerScreen({
         const total = progress?.topicsTotal ?? 0;
         const completed = progress?.topicsCompleted ?? 0;
 
-        let hint = s.curriculumStatus === 'preparing' ? 'Preparing...' : 'Open';
+        const isPreparing = s.curriculumStatus === 'preparing';
+        let hint = isPreparing ? `Setting up ${s.name}...` : 'Open';
         if (
-          s.curriculumStatus !== 'preparing' &&
+          !isPreparing &&
           resumeTarget?.subjectId === s.id &&
           ['active_session', 'paused_session'].includes(resumeTarget.resumeKind)
         ) {
           hint = `Continue ${resumeTarget.topicTitle ?? s.name}`;
         } else if (
-          s.curriculumStatus !== 'preparing' &&
+          !isPreparing &&
           reviewSummary?.nextReviewTopic?.subjectId === s.id
         ) {
           hint = `Quiz: ${reviewSummary.nextReviewTopic.topicTitle}`;
-        } else if (s.curriculumStatus !== 'preparing' && completed > 0) {
+        } else if (!isPreparing && completed > 0) {
           hint = `Practice: ${s.name}`;
         }
 
@@ -236,6 +237,7 @@ export function LearnerScreen({
           subjectId: s.id,
           name: s.name,
           hint,
+          isPreparing,
           progress: total > 0 ? completed / total : 0,
           topicsCompleted: completed,
           topicsTotal: total,
@@ -580,17 +582,21 @@ export function LearnerScreen({
                     key={card.subjectId}
                     {...card}
                     testID={`home-subject-card-${card.subjectId}`}
-                    onPress={() => {
-                      // Two-push pattern (CLAUDE.md cross-tab rule):
-                      // unstable_settings only seeds one level deep, so push
-                      // the progress index first then the subject child to
-                      // keep router.back() landing on the progress tab root.
-                      router.push('/(app)/progress' as never);
-                      router.push({
-                        pathname: '/(app)/progress/[subjectId]',
-                        params: { subjectId: card.subjectId },
-                      } as never);
-                    }}
+                    onPress={
+                      card.isPreparing
+                        ? undefined
+                        : () => {
+                            // Two-push pattern (CLAUDE.md cross-tab rule):
+                            // unstable_settings only seeds one level deep, so push
+                            // the progress index first then the subject child to
+                            // keep router.back() landing on the progress tab root.
+                            router.push('/(app)/progress' as never);
+                            router.push({
+                              pathname: '/(app)/progress/[subjectId]',
+                              params: { subjectId: card.subjectId },
+                            } as never);
+                          }
+                    }
                   />
                 ))}
                 {!isParentProxy && (

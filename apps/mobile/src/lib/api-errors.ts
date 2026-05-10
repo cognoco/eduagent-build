@@ -18,6 +18,7 @@ import {
   ForbiddenError,
   NotFoundError,
   RateLimitedError,
+  ResourceGoneError,
 } from '@eduagent/schemas';
 
 export type QuotaExceededDetails = QuotaExceeded['details'];
@@ -41,29 +42,8 @@ export {
   ForbiddenError,
   NotFoundError,
   RateLimitedError,
+  ResourceGoneError,
 };
-
-/**
- * Thrown when a 410 Gone response is received — the resource existed but has
- * been permanently removed. Callers should navigate away rather than retry.
- */
-export class ResourceGoneError extends Error {
-  readonly errorCode = 'RESOURCE_GONE' as const;
-  readonly code: string | undefined;
-  readonly details: unknown;
-
-  constructor(
-    message = 'This resource is no longer available.',
-    code?: string,
-    details?: unknown
-  ) {
-    super(message);
-    this.name = 'ResourceGoneError';
-    this.code = code;
-    this.details = details;
-    Object.setPrototypeOf(this, ResourceGoneError.prototype);
-  }
-}
 
 /**
  * Thrown when `fetch` itself rejects (no HTTP response received).
@@ -75,7 +55,7 @@ export class NetworkError extends Error {
 
   constructor(
     message = "Looks like you're offline or our servers can't be reached. Check your internet connection and try again.",
-    cause?: unknown
+    cause?: unknown,
   ) {
     super(message);
     this.name = 'NetworkError';

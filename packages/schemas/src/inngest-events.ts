@@ -148,3 +148,37 @@ export const summaryReconciliationRequeuedEventSchema = z.object({
 export type SummaryReconciliationRequeuedEvent = z.infer<
   typeof summaryReconciliationRequeuedEventSchema
 >;
+
+// ---------------------------------------------------------------------------
+// Ask-classification observability events (CCR-PR126-NEW-2)
+// ---------------------------------------------------------------------------
+
+export const classificationCompletedEventSchema = z.object({
+  sessionId: z.string().optional(),
+  exchangeCount: z.number().optional(),
+  subjectId: z.string().optional(),
+  subjectName: z.string().optional(),
+  confidence: z.number().optional(),
+});
+export type ClassificationCompletedEvent = z.infer<
+  typeof classificationCompletedEventSchema
+>;
+
+export const classificationSkippedEventSchema = z.object({
+  sessionId: z.string().optional(),
+  exchangeCount: z.number().optional(),
+  reason: z.string().optional(),
+  topConfidence: z.number().optional(),
+});
+export type ClassificationSkippedEvent = z.infer<
+  typeof classificationSkippedEventSchema
+>;
+
+export const classificationFailedEventSchema = z.object({
+  sessionId: z.string().optional(),
+  exchangeCount: z.number().optional(),
+  error: z.string().optional(),
+});
+export type ClassificationFailedEvent = z.infer<
+  typeof classificationFailedEventSchema
+>;

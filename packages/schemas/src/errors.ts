@@ -129,6 +129,24 @@ export class BadRequestError extends Error {
   }
 }
 
+export class ResourceGoneError extends Error {
+  readonly errorCode = 'RESOURCE_GONE' as const;
+  readonly code: string | undefined;
+  readonly details: unknown;
+
+  constructor(
+    message = 'This resource is no longer available.',
+    code?: string,
+    details?: unknown,
+  ) {
+    super(message);
+    this.name = 'ResourceGoneError';
+    this.code = code;
+    this.details = details;
+    Object.setPrototypeOf(this, ResourceGoneError.prototype);
+  }
+}
+
 export class LlmStreamError extends Error {
   readonly errorCode = 'LLM_STREAM_ERROR' as const;
   constructor(
@@ -212,7 +230,6 @@ export const ERROR_CODES = {
   CONFLICT: 'CONFLICT',
   GONE: 'GONE',
   SESSION_ARCHIVED: 'SESSION_ARCHIVED',
-  NOT_IMPLEMENTED: 'NOT_IMPLEMENTED',
   ENV_VALIDATION_ERROR: 'ENV_VALIDATION_ERROR',
   UPSTREAM_ERROR: 'UPSTREAM_ERROR',
   // Subset of UPSTREAM_ERROR specifically for LLM provider outages so the

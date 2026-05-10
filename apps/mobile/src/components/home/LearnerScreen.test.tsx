@@ -350,7 +350,7 @@ describe('LearnerScreen', () => {
     await waitFor(() => {
       screen.getByTestId('home-subject-card-sub-preparing');
       screen.getByText('Ancient History');
-      screen.getByText('Preparing...');
+      screen.getByText('Setting up Ancient History...');
       expect(screen.queryByText('Open')).toBeNull();
     });
   });

@@ -120,7 +120,7 @@ const testProfileId = '00000000-0000-4000-8000-000000000001';
 const testSessionId = '00000000-0000-4000-8000-000000000002';
 
 async function executeSteps(
-  eventData: Record<string, unknown>
+  eventData: Record<string, unknown>,
 ): Promise<{ result: unknown; mockStep: Record<string, unknown> }> {
   const mockStep = {
     run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
@@ -137,7 +137,7 @@ async function executeSteps(
 }
 
 function createEventData(
-  overrides: Record<string, unknown> = {}
+  overrides: Record<string, unknown> = {},
 ): Record<string, unknown> {
   return {
     profileId: testProfileId,
@@ -178,7 +178,7 @@ describe('freeformFilingRetry', () => {
     expect(triggers).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ event: 'app/filing.retry' }),
-      ])
+      ]),
     );
   });
 
@@ -194,7 +194,7 @@ describe('freeformFilingRetry', () => {
 
     it('throws an error so Inngest retries rather than silently filing into wrong profile [M8a]', async () => {
       await expect(executeSteps(createEventData())).rejects.toThrow(
-        /Session not found or does not belong to profile/
+        /Session not found or does not belong to profile/,
       );
     });
 
@@ -211,7 +211,7 @@ describe('freeformFilingRetry', () => {
   describe('when sessionTranscript is provided in event.data', () => {
     it('uses provided transcript without fetching from DB', async () => {
       const { result } = await executeSteps(
-        createEventData({ sessionTranscript: 'Learner: What is gravity?' })
+        createEventData({ sessionTranscript: 'Learner: What is gravity?' }),
       );
 
       expect(mockGetSessionTranscript).not.toHaveBeenCalled();
@@ -220,7 +220,7 @@ describe('freeformFilingRetry', () => {
           sessionTranscript: 'Learner: What is gravity?',
         }),
         expect.anything(),
-        expect.anything()
+        expect.anything(),
       );
       expect(result).toMatchObject({ status: 'completed', bookId: 'book-001' });
     });
@@ -263,7 +263,7 @@ describe('freeformFilingRetry', () => {
       expect(mockGetSessionTranscript).toHaveBeenCalledWith(
         expect.anything(),
         testProfileId,
-        testSessionId
+        testSessionId,
       );
       expect(mockFileToLibrary).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -271,25 +271,33 @@ describe('freeformFilingRetry', () => {
             'Learner: What is gravity?\nTutor: Gravity is a force.',
         }),
         expect.anything(),
-        expect.anything()
+        expect.anything(),
       );
       expect(result).toMatchObject({ status: 'completed' });
     });
 
-    it('proceeds with undefined transcript when DB returns null (filing may still succeed with no transcript)', async () => {
+    it('throws NonRetriableError when DB returns null transcript (unresolvable — no retry)', async () => {
       mockGetSessionTranscript.mockResolvedValue(null);
 
-      // fileToLibrary may still succeed (e.g., rawInput path); we just verify
-      // the function doesn't crash and calls filing without a transcript
-      const { result } = await executeSteps(createEventData());
+      await expect(executeSteps(createEventData())).rejects.toThrow(
+        /Cannot file session: transcript unavailable/,
+      );
 
       expect(mockGetSessionTranscript).toHaveBeenCalled();
-      expect(mockFileToLibrary).toHaveBeenCalledWith(
-        expect.objectContaining({ sessionTranscript: undefined }),
-        expect.anything(),
-        expect.anything()
+      expect(mockFileToLibrary).not.toHaveBeenCalled();
+    });
+
+    it('throws NonRetriableError when session has archived transcript', async () => {
+      mockGetSessionTranscript.mockResolvedValue({
+        archived: true,
+        exchanges: [],
+      });
+
+      await expect(executeSteps(createEventData())).rejects.toThrow(
+        /Cannot file session: transcript unavailable/,
       );
-      expect(result).toMatchObject({ status: 'completed' });
+
+      expect(mockFileToLibrary).not.toHaveBeenCalled();
     });
   });
 
@@ -300,7 +308,10 @@ describe('freeformFilingRetry', () => {
   it('fires app/filing.completed event after successful filing', async () => {
     mockGetSessionTranscript.mockResolvedValue({
       session: { sessionId: 'session-001' },
-      exchanges: [],
+      exchanges: [
+        { role: 'user', content: 'Hello', timestamp: '2026-01-01T00:00:00Z' },
+        { role: 'assistant', content: 'Hi', timestamp: '2026-01-01T00:00:01Z' },
+      ],
     });
 
     const { mockStep } = await executeSteps(createEventData());
@@ -314,11 +325,19 @@ describe('freeformFilingRetry', () => {
           sessionId: testSessionId,
           profileId: testProfileId,
         }),
-      })
+      }),
     );
   });
 
   it('fires app/filing.retry_completed event after successful retry filing', async () => {
+    mockGetSessionTranscript.mockResolvedValue({
+      session: { sessionId: 'session-001' },
+      exchanges: [
+        { role: 'user', content: 'Hello', timestamp: '2026-01-01T00:00:00Z' },
+        { role: 'assistant', content: 'Hi', timestamp: '2026-01-01T00:00:01Z' },
+      ],
+    });
+
     const { mockStep } = await executeSteps(createEventData());
 
     expect(mockStep.sendEvent).toHaveBeenCalledWith(
@@ -329,7 +348,7 @@ describe('freeformFilingRetry', () => {
           sessionId: testSessionId,
           profileId: testProfileId,
         }),
-      })
+      }),
     );
   });
 
@@ -368,7 +387,7 @@ describe('freeformFilingRetry', () => {
       const { mockStep } = await executeSteps(createEventData());
 
       const completedCall = (mockStep.sendEvent as jest.Mock).mock.calls.find(
-        (c: unknown[]) => (c[0] as string) === 'notify-filing-completed'
+        (c: unknown[]) => (c[0] as string) === 'notify-filing-completed',
       );
       expect(completedCall).not.toBeUndefined();
       const payload = (completedCall as unknown[])[1] as {
@@ -396,7 +415,7 @@ describe('freeformFilingRetry', () => {
       const { mockStep } = await executeSteps(createEventData());
 
       const completedCall = (mockStep.sendEvent as jest.Mock).mock.calls.find(
-        (c: unknown[]) => (c[0] as string) === 'notify-filing-completed'
+        (c: unknown[]) => (c[0] as string) === 'notify-filing-completed',
       );
       const payload = (completedCall as unknown[])[1] as {
         data: Record<string, unknown>;
@@ -431,7 +450,7 @@ describe('freeformFilingRetry', () => {
       const { mockStep } = await executeSteps(createEventData());
 
       const completedCall = (mockStep.sendEvent as jest.Mock).mock.calls.find(
-        (c: unknown[]) => (c[0] as string) === 'notify-filing-completed'
+        (c: unknown[]) => (c[0] as string) === 'notify-filing-completed',
       );
       const payload = (completedCall as unknown[])[1] as {
         data: Record<string, unknown>;
