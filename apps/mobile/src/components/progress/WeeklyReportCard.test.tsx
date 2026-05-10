@@ -2,10 +2,12 @@ import { render, screen } from '@testing-library/react-native';
 import { WeeklyReportCard } from './WeeklyReportCard';
 import { useProfileWeeklyReports } from '../../hooks/use-progress';
 
-jest.mock('../../hooks/use-progress', () => ({
-  // gc1-allow: query-hook stub at unit-test boundary; real useProfileWeeklyReports requires QueryClientProvider + API client wiring
-  useProfileWeeklyReports: jest.fn(),
-}));
+jest.mock(
+  '../../hooks/use-progress' /* gc1-allow: query-hook stub at unit-test boundary; real useProfileWeeklyReports needs QueryClientProvider + API client */,
+  () => ({
+    useProfileWeeklyReports: jest.fn(),
+  }),
+);
 
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({

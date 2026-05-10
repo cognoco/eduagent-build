@@ -13,10 +13,12 @@ jest.mock(
   () => require('../../test-utils/mock-i18n').i18nMock,
 );
 
-jest.mock('../../lib/theme', () => ({
-  // gc1-allow: theme provider stub at unit-test boundary; real theme requires native vars + persona wiring not present in jsdom
-  useThemeColors: () => ({ textSecondary: '#94a3b8' }),
-}));
+jest.mock(
+  '../../lib/theme' /* gc1-allow: theme provider stub at unit-test boundary; real theme needs native vars + persona context absent in jsdom */,
+  () => ({
+    useThemeColors: () => ({ textSecondary: '#94a3b8' }),
+  }),
+);
 
 const { ChildCard } = require('./ChildCard');
 

@@ -122,14 +122,16 @@ jest.mock('../../../../hooks/use-learner-profile', () => ({
     mockUseUpdateAccommodationMode(...args),
 }));
 
-jest.mock('../../../../hooks/use-settings', () => ({
-  // gc1-allow: query-hook stub at unit-test boundary; running real hooks would require a QueryClientProvider + API client wiring
-  useChildCelebrationLevel: () => ({ data: 'big_only' }),
-  useUpdateChildCelebrationLevel: () => ({
-    mutate: jest.fn(),
-    isPending: false,
+jest.mock(
+  '../../../../hooks/use-settings' /* gc1-allow: query-hook stub at unit-test boundary; real hooks need QueryClientProvider + API client */,
+  () => ({
+    useChildCelebrationLevel: () => ({ data: 'big_only' }),
+    useUpdateChildCelebrationLevel: () => ({
+      mutate: jest.fn(),
+      isPending: false,
+    }),
   }),
-}));
+);
 
 // ---------------------------------------------------------------------------
 // Progress components (avoid rendering complex chart internals)
