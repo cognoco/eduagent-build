@@ -34,13 +34,10 @@ cat $ARTIFACTS_DIR/progress.md
 
 Confirm all phases completed.
 
-### 1.3 Read CLAUDE.md
+### 1.3 Codebase Rules
 
-```bash
-cat CLAUDE.md
-```
-
-Note the "Handy Commands" section for exact validation commands.
+CLAUDE.md is already loaded into your system prompt — do not re-read it. Use the
+"Handy Commands" section for exact validation commands.
 
 **PHASE_1_CHECKPOINT:**
 - [ ] Touched packages identified
@@ -96,11 +93,59 @@ after all phases are combined:
 {phase-specific verify command from work order}
 ```
 
+### 2.5 CI-Parity Ratchet Checks
+
+The pre-commit hooks DO NOT replicate CI's ratchet checks. These run only in the
+GitHub Actions `main` job and have failed cleanup PRs in the past — replicate
+them locally before push so we never ship a known-broken branch.
+
+#### 2.5.1 GC1 — No new internal `jest.mock()`
+
+Mirror the recipe from `.github/workflows/ci.yml` ("GC1 — no new internal jest.mock"
+step). Fails on any new line that adds a relative-path `jest.mock('./...')` or
+`jest.mock('../...')` in a `*.test.ts` / `*.test.tsx` file unless the same line
+carries a `// gc1-allow: <reason>` opt-out.
+
+```bash
+BASE_REF="${BASE_REF:-main}"
+# Separate the diff call from the grep pipeline so a ref-resolution failure
+# (e.g. CI runner without origin/main fetched) is fatal, not silently "clean".
+if ! diff_output=$(git diff "origin/${BASE_REF}...HEAD" -- '*.test.ts' '*.test.tsx'); then
+    echo "GC1 check failed: could not diff against origin/${BASE_REF}" >&2
+    exit 1
+fi
+violations=$(printf '%s\n' "$diff_output" \
+    | grep -E '^\+[^+]' \
+    | grep -E "jest\.mock\(['\"\`]\.\.?/" \
+    | grep -iv 'gc1-allow' \
+    || true)
+if [ -n "$violations" ]; then
+    echo "GC1 VIOLATION: New internal jest.mock() call(s) detected." >&2
+    echo "$violations" >&2
+    echo "" >&2
+    echo "Fix: use jest.requireActual() with targeted overrides instead." >&2
+    echo "Canonical pattern:" >&2
+    echo "  apps/api/src/inngest/functions/interview-persist-curriculum.integration.test.ts" >&2
+    echo "If genuinely external-boundary, append '// gc1-allow: <reason>' on the same line." >&2
+    echo "See CLAUDE.md → 'No new internal jest.mock()'." >&2
+    exit 1
+fi
+echo "GC1 ratchet: clean."
+```
+
+If this exits non-zero, treat it like any other validation failure: rewrite the
+test using `jest.requireActual(...)` with targeted overrides (canonical example
+above), or — if the offending mock was added by the implement loop on a NEW test
+file — delete the test and file the missing-coverage gap as a follow-up via
+`./.archon/scripts/append-followup.sh` instead. Do NOT add `// gc1-allow:` to
+silence it without genuine external-boundary justification.
+
 **PHASE_2_CHECKPOINT:**
 - [ ] TypeCheck passes
 - [ ] Lint passes
 - [ ] Related tests pass
 - [ ] Phase-specific verifications pass
+- [ ] GC1 ratchet check passes
 
 ---
 
@@ -116,7 +161,7 @@ fix: address validation failures in cleanup PR
 
 Post-implementation validation fixes.
 
-Co-Authored-By: Claude <noreply@anthropic.com>
+Co-Authored-By: Archon <archon@anthropic.com>
 CMSG
 git commit -F "$ARTIFACTS_DIR/commit-msg.txt"
 ```

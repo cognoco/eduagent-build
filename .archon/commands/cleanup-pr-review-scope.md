@@ -103,13 +103,11 @@ git diff --name-only origin/main...HEAD
 - Configuration (`.json`, `.yaml`, `.toml`)
 - Types/interfaces
 
-### 3.3 Check for CLAUDE.md
+### 3.3 CLAUDE.md Rules
 
-```bash
-cat CLAUDE.md 2>/dev/null | head -100
-```
-
-Note key rules that reviewers should check against.
+CLAUDE.md is already loaded into your system prompt — do not re-read it.
+Note the key rules that the parallel review agents should check the diff against
+(captured later in the scope manifest's "CLAUDE.md Rules to Check" section).
 
 ### 3.4 Identify New Abstractions
 
@@ -153,6 +151,59 @@ If the work order references resolved decisions (D-XXX), those are also in scope
 **PHASE_3.5_CHECKPOINT:**
 - [ ] Work order loaded
 - [ ] Scope limits noted (phases + files-claimed)
+
+---
+
+## Phase 3.6: PRE-FLAG CHECK — Verify Against `origin/main`
+
+**Why this exists:** A previous review-scope run flagged a phase as "P1 incomplete"
+because an invariant the work order required wasn't visible in the diff — but
+the invariant already existed at `origin/main:<file>` and the diff simply didn't
+touch that line. False-positive. This rule prevents the recurrence.
+
+### 3.6.1 The Rule
+
+Before adding any claim to the scope manifest of the form:
+- "Phase N appears incomplete: <invariant> missing from <file>"
+- "<file> does not enforce <invariant> as the work order requires"
+- "Removed: <line/check/import>" — when the diff does NOT actually delete that line
+
+…you MUST first verify the invariant's state on `origin/main`. If the invariant
+exists there and the diff does not delete or modify the line(s) that establish
+it, the work order's expectation is already met; do NOT flag.
+
+### 3.6.2 The Check
+
+For any candidate "missing invariant" claim:
+
+```bash
+# Verify what the file looks like at origin/main
+git show "origin/main:<file>" 2>/dev/null | rg -n '<expected pattern>' || \
+    echo "INVARIANT NOT IN origin/main — flag is legitimate"
+
+# Verify the diff did not remove it
+git diff origin/main...HEAD -- '<file>' | rg '^-[^-].*<expected pattern>' || \
+    echo "DIFF DOES NOT REMOVE the invariant"
+```
+
+Decision matrix:
+
+| origin/main has invariant? | diff removes it? | Action |
+|---|---|---|
+| yes | no | DO NOT flag — work order already satisfied |
+| yes | yes | flag legitimately — diff regresses an existing invariant |
+| no | (n/a) | flag legitimately — work order asks for new invariant not yet present |
+
+### 3.6.3 Apply To Every Such Claim
+
+Run the check above for EVERY invariant-missing / phase-incomplete claim before
+including it in the scope manifest. The cost is a few `git show` / `git diff`
+calls; the benefit is eliminating a class of false positives that derail
+fix-locally.
+
+**PHASE_3.6_CHECKPOINT:**
+- [ ] Every invariant-missing claim verified against origin/main
+- [ ] False-positive candidates suppressed
 
 ---
 
