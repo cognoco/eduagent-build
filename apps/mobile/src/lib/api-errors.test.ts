@@ -9,6 +9,10 @@
  * - Spoofed `.name` strings do NOT pass `instanceof` checks.
  */
 import {
+  QuotaExceededError as SchemasQuotaExceededError,
+  ResourceGoneError as SchemasResourceGoneError,
+} from '@eduagent/schemas';
+import {
   BadRequestError,
   NetworkError,
   NotFoundError,
@@ -47,6 +51,10 @@ describe('NotFoundError', () => {
 });
 
 describe('ResourceGoneError', () => {
+  it('re-exports ResourceGoneError from @eduagent/schemas', () => {
+    expect(ResourceGoneError).toBe(SchemasResourceGoneError);
+  });
+
   it('is instanceof ResourceGoneError and Error', () => {
     const err = new ResourceGoneError('Gone', 'GONE', { extra: true });
     expect(err).toBeInstanceOf(ResourceGoneError);
@@ -125,6 +133,10 @@ describe('BadRequestError', () => {
 });
 
 describe('QuotaExceededError', () => {
+  it('re-exports QuotaExceededError from @eduagent/schemas', () => {
+    expect(QuotaExceededError).toBe(SchemasQuotaExceededError);
+  });
+
   it('carries code and details', () => {
     const err = new QuotaExceededError('Quota exceeded', QUOTA_DETAILS);
     expect(err).toBeInstanceOf(QuotaExceededError);

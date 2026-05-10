@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { QuotaExceeded } from './billing';
 
 /**
  * Shared typed error class hierarchy.
@@ -126,6 +127,22 @@ export class BadRequestError extends Error {
     super(message);
     this.name = 'BadRequestError';
     Object.setPrototypeOf(this, BadRequestError.prototype);
+  }
+}
+
+export type QuotaExceededDetails = QuotaExceeded['details'];
+export type UpgradeOption = QuotaExceededDetails['upgradeOptions'][number];
+
+export class QuotaExceededError extends Error {
+  readonly code = 'QUOTA_EXCEEDED' as const;
+  readonly errorCode = 'QUOTA_EXCEEDED' as const;
+  readonly details: QuotaExceededDetails;
+
+  constructor(message: string, details: QuotaExceededDetails) {
+    super(message);
+    this.name = 'QuotaExceededError';
+    this.details = details;
+    Object.setPrototypeOf(this, QuotaExceededError.prototype);
   }
 }
 
