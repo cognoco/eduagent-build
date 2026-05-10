@@ -3,9 +3,11 @@ import { AccordionTopicList } from './AccordionTopicList';
 
 const mockPush = jest.fn();
 const mockUseChildSubjectTopics = jest.fn();
+let mockSegments = ['(app)', 'progress'];
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
+  useSegments: () => mockSegments,
 }));
 
 jest.mock('../../hooks/use-dashboard', () => ({
@@ -26,6 +28,7 @@ jest.mock('./RetentionSignal', () => {
 describe('AccordionTopicList', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSegments = ['(app)', 'progress'];
     mockUseChildSubjectTopics.mockReturnValue({
       data: [],
       isLoading: false,
@@ -41,13 +44,13 @@ describe('AccordionTopicList', () => {
         subjectId="subject-1"
         subjectName="Mathematics"
         expanded={false}
-      />
+      />,
     );
 
     expect(screen.queryByText('No topics yet')).toBeNull();
     expect(mockUseChildSubjectTopics).toHaveBeenCalledWith(
       undefined,
-      undefined
+      undefined,
     );
   });
 
@@ -65,13 +68,13 @@ describe('AccordionTopicList', () => {
         subjectId="subject-1"
         subjectName="Mathematics"
         expanded
-      />
+      />,
     );
 
     expect(screen.getAllByTestId('accordion-topic-skeleton')).toHaveLength(3);
     expect(mockUseChildSubjectTopics).toHaveBeenCalledWith(
       'child-1',
-      'subject-1'
+      'subject-1',
     );
   });
 
@@ -90,20 +93,20 @@ describe('AccordionTopicList', () => {
         subjectId="subject-1"
         subjectName="Mathematics"
         expanded
-      />
+      />,
     );
 
     fireEvent.press(screen.getByTestId('accordion-topics-retry'));
 
     expect(
       screen.getByText(
-        'Could not load topics. Tap to retry, or close the subject card to dismiss.'
-      )
+        'Could not load topics. Tap to retry, or close the subject card to dismiss.',
+      ),
     ).toBeTruthy();
     expect(refetch).toHaveBeenCalled();
   });
 
-  it('renders topic labels and navigates to topic details', () => {
+  it('renders topic labels and pushes the child parent chain before topic details from another stack', () => {
     mockUseChildSubjectTopics.mockReturnValue({
       data: [
         {
@@ -166,7 +169,7 @@ describe('AccordionTopicList', () => {
         subjectId="subject-1"
         subjectName="Mathematics"
         expanded
-      />
+      />,
     );
 
     screen.getByText('Started');
@@ -177,7 +180,12 @@ describe('AccordionTopicList', () => {
 
     fireEvent.press(screen.getByTestId('accordion-topic-topic-1'));
 
-    expect(mockPush).toHaveBeenCalledWith(
+    expect(mockPush).toHaveBeenNthCalledWith(1, {
+      pathname: '/(app)/child/[profileId]',
+      params: { profileId: 'child-1' },
+    });
+    expect(mockPush).toHaveBeenNthCalledWith(
+      2,
       expect.objectContaining({
         pathname: '/(app)/child/[profileId]/topic/[topicId]',
         params: expect.objectContaining({
@@ -187,7 +195,52 @@ describe('AccordionTopicList', () => {
           topicId: 'topic-1',
           totalSessions: '3',
         }),
-      })
+      }),
+    );
+  });
+
+  it('pushes only topic details when already rendered inside the child stack', () => {
+    mockSegments = ['(app)', 'child', '[profileId]', 'index'];
+    mockUseChildSubjectTopics.mockReturnValue({
+      data: [
+        {
+          topicId: 'topic-1',
+          title: 'Fractions',
+          description: 'Desc',
+          completionStatus: 'in_progress',
+          retentionStatus: null,
+          struggleStatus: 'normal',
+          masteryScore: 0.4,
+          summaryExcerpt: null,
+          xpStatus: 'pending',
+          totalSessions: 3,
+        },
+      ],
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(
+      <AccordionTopicList
+        childProfileId="child-1"
+        subjectId="subject-1"
+        subjectName="Mathematics"
+        expanded
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('accordion-topic-topic-1'));
+
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(mockPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/(app)/child/[profileId]/topic/[topicId]',
+        params: expect.objectContaining({
+          profileId: 'child-1',
+          topicId: 'topic-1',
+        }),
+      }),
     );
   });
 
@@ -205,7 +258,7 @@ describe('AccordionTopicList', () => {
         subjectId="subject-1"
         subjectName="Mathematics"
         expanded
-      />
+      />,
     );
 
     screen.getByText('No topics yet');
@@ -225,7 +278,7 @@ describe('AccordionTopicList', () => {
         subjectId="subject-1"
         subjectName="Mathematics"
         expanded
-      />
+      />,
     );
 
     screen.getByTestId('accordion-topics-empty');

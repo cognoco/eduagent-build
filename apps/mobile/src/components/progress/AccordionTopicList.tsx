@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useRouter, useSegments } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 import type { TopicProgress } from '@eduagent/schemas';
 import { useChildSubjectTopics } from '../../hooks/use-dashboard';
@@ -40,6 +40,11 @@ function getTopicStatusLabel(topic: TopicProgress): string {
   return 'Covered';
 }
 
+function isInChildProfileStack(segments: readonly string[]): boolean {
+  const childIndex = segments.indexOf('child');
+  return childIndex >= 0 && segments[childIndex + 1] === '[profileId]';
+}
+
 export function AccordionTopicList({
   childProfileId,
   subjectId,
@@ -47,6 +52,8 @@ export function AccordionTopicList({
   expanded,
 }: AccordionTopicListProps): React.ReactElement | null {
   const router = useRouter();
+  const segments = useSegments();
+  const shouldPushParentChain = !isInChildProfileStack(segments);
   const {
     data: topics,
     isLoading,
@@ -54,7 +61,7 @@ export function AccordionTopicList({
     refetch,
   } = useChildSubjectTopics(
     expanded ? childProfileId : undefined,
-    expanded ? subjectId : undefined
+    expanded ? subjectId : undefined,
   );
 
   if (!expanded) {
@@ -90,6 +97,12 @@ export function AccordionTopicList({
             key={topic.topicId}
             onPress={(event) => {
               event?.stopPropagation?.();
+              if (shouldPushParentChain) {
+                router.push({
+                  pathname: '/(app)/child/[profileId]',
+                  params: { profileId: childProfileId },
+                } as never);
+              }
               router.push({
                 pathname: '/(app)/child/[profileId]/topic/[topicId]',
                 params: {
