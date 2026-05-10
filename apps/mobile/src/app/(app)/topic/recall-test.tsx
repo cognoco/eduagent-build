@@ -50,7 +50,6 @@ export default function RecallTestScreen() {
   const [inputDisabled, setInputDisabled] = useState(false);
   const [dontRememberCount, setDontRememberCount] = useState(0);
   const [remediationData, setRemediationData] = useState<{
-    failureCount: number;
     cooldownEndsAt?: string;
     retentionStatus: RetentionStatus;
   } | null>(null);
@@ -99,7 +98,6 @@ export default function RecallTestScreen() {
                 () => {
                   setInputDisabled(true);
                   setRemediationData({
-                    failureCount: result.failureCount,
                     cooldownEndsAt: result.remediation?.cooldownEndsAt,
                     retentionStatus: deriveStatus(
                       result.remediation?.retentionStatus,
@@ -166,7 +164,6 @@ export default function RecallTestScreen() {
               () => {
                 setInputDisabled(true);
                 setRemediationData({
-                  failureCount: result.failureCount,
                   cooldownEndsAt: result.remediation?.cooldownEndsAt,
                   retentionStatus: deriveStatus(
                     result.remediation?.retentionStatus,
@@ -213,11 +210,9 @@ export default function RecallTestScreen() {
   const footer = remediationData ? (
     <RemediationCard
       retentionStatus={remediationData.retentionStatus}
-      failureCount={remediationData.failureCount}
       cooldownEndsAt={remediationData.cooldownEndsAt}
       onReviewRetest={handleReviewRetest}
       onRelearnTopic={handleRelearnTopic}
-      isLearner
       onBookPress={() => router.push('/(app)/library')}
     />
   ) : inputDisabled ? (
