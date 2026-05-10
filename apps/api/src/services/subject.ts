@@ -127,6 +127,58 @@ async function dispatchCurriculumPrewarm(args: {
   }
 }
 
+async function dispatchCurriculumRetry(args: {
+  subjectId: string;
+  profileId: string;
+  bookId: string;
+}): Promise<void> {
+  const data = subjectCurriculumPrewarmRequestedEventSchema.parse({
+    version: 1,
+    ...args,
+    timestamp: new Date().toISOString(),
+  });
+
+  try {
+    await inngest.send({
+      name: 'app/subject.curriculum-retry-requested',
+      data,
+    });
+  } catch (err) {
+    captureException(err, {
+      profileId: args.profileId,
+      extra: {
+        subjectId: args.subjectId,
+        bookId: args.bookId,
+        phase: 'subject_retry_dispatch',
+      },
+    });
+  }
+}
+
+export async function retryCurriculumForSubject(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+): Promise<number> {
+  const repo = createScopedRepository(db, profileId);
+  const subjectRow = await repo.subjects.findFirst(eq(subjects.id, subjectId));
+  if (!subjectRow) throw new SubjectNotFoundError();
+
+  const stuckBooks = await db.query.curriculumBooks.findMany({
+    where: and(
+      eq(curriculumBooks.subjectId, subjectId),
+      eq(curriculumBooks.topicsGenerated, false),
+    ),
+  });
+
+  let dispatched = 0;
+  for (const book of stuckBooks) {
+    await dispatchCurriculumRetry({ subjectId, profileId, bookId: book.id });
+    dispatched++;
+  }
+  return dispatched;
+}
+
 // ---------------------------------------------------------------------------
 // Core functions
 // ---------------------------------------------------------------------------

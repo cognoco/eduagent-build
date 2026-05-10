@@ -74,6 +74,14 @@ const ADULT_META: ProfileMeta = {
   isOwner: true,
 };
 
+const WITHDRAWN_ADULT_META: ProfileMeta = {
+  birthYear: new Date().getFullYear() - 25,
+  location: null,
+  consentStatus: 'WITHDRAWN',
+  hasPremiumLlm: false,
+  isOwner: true,
+};
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -208,7 +216,7 @@ describe('consentMiddleware', () => {
     expect(res.status).toBe(200);
   });
 
-  it('allows /v1/support/ paths even with withdrawn consent', async () => {
+  it('blocks /v1/support/ for WITHDRAWN profiles — no active sessions to spill [BUG-TEMP-21]', async () => {
     const app = createApp({
       profileId: 'p-1',
       profileMeta: WITHDRAWN_CHILD_META,
@@ -217,6 +225,33 @@ describe('consentMiddleware', () => {
     const res = await app.request('/v1/support/outbox-spillover', {
       method: 'POST',
     });
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.code).toBe('CONSENT_WITHDRAWN');
+  });
+
+  it('blocks /v1/support/ for WITHDRAWN adult profiles (GDPR Art. 7(3) applies regardless of age)', async () => {
+    const app = createApp({
+      profileId: 'p-1',
+      profileMeta: WITHDRAWN_ADULT_META,
+      routePath: '/v1/support/outbox-spillover',
+    });
+    const res = await app.request('/v1/support/outbox-spillover', {
+      method: 'POST',
+    });
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.code).toBe('CONSENT_WITHDRAWN');
+  });
+
+  it('blocks non-exempt paths for WITHDRAWN adult profiles', async () => {
+    const app = createApp({
+      profileId: 'p-1',
+      profileMeta: WITHDRAWN_ADULT_META,
+    });
+    const res = await app.request('/v1/subjects');
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.code).toBe('CONSENT_WITHDRAWN');
   });
 });

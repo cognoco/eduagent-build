@@ -23,7 +23,7 @@ describe('database/client.ts — silent transaction fallback regression guard', 
   it('does not import drizzle-orm/neon-http (fallback driver was removed)', () => {
     expect(clientSource).not.toMatch(/from\s+['"]drizzle-orm\/neon-http['"]/);
     expect(clientSource).not.toMatch(
-      /from\s+['"]@neondatabase\/serverless['"]\s*;.*neon\(/s
+      /from\s+['"]@neondatabase\/serverless['"]\s*;.*neon\(/s,
     );
   });
 

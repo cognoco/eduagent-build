@@ -40,7 +40,7 @@ export function useBookmarks(options?: {
               ...(options?.limit ? { limit: String(options.limit) } : {}),
             },
           },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         return (await res.json()) as BookmarkListResponse;
@@ -54,7 +54,7 @@ export function useBookmarks(options?: {
 }
 
 export function useSessionBookmarks(
-  sessionId: string | undefined
+  sessionId: string | undefined,
 ): UseQueryResult<SessionBookmark[]> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -66,7 +66,7 @@ export function useSessionBookmarks(
       try {
         const res = await client.bookmarks.session.$get(
           { query: { sessionId: sessionId ?? '' } },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         const data = (await res.json()) as SessionBookmarkListResponse;

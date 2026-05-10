@@ -15,25 +15,25 @@ describe('shouldShowBookLink', () => {
     // Opening greeting is seeded as messages[0]; a user message bumps the
     // length to 2.
     expect(shouldShowBookLink({ ...baseParams, messagesLength: 2 })).toBe(
-      false
+      false,
     );
   });
 
   it('[BUG-919] hides once the conversation has multiple turns', () => {
     expect(shouldShowBookLink({ ...baseParams, messagesLength: 5 })).toBe(
-      false
+      false,
     );
   });
 
   it('hides for homework sessions regardless of state', () => {
     expect(
-      shouldShowBookLink({ ...baseParams, effectiveMode: 'homework' })
+      shouldShowBookLink({ ...baseParams, effectiveMode: 'homework' }),
     ).toBe(false);
   });
 
   it('hides when learner has no completed topics', () => {
     expect(shouldShowBookLink({ ...baseParams, totalTopicsCompleted: 0 })).toBe(
-      false
+      false,
     );
   });
 

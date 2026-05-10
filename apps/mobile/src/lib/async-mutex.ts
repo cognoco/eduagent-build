@@ -2,7 +2,7 @@ const locks = new Map<string, Promise<void>>();
 
 export async function withLock<T>(
   key: string,
-  work: () => Promise<T> | T
+  work: () => Promise<T> | T,
 ): Promise<T> {
   const previous = locks.get(key) ?? Promise.resolve();
 
@@ -14,8 +14,8 @@ export async function withLock<T>(
     key,
     previous.then(
       () => current,
-      () => current
-    )
+      () => current,
+    ),
   );
 
   await previous;

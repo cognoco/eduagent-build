@@ -7,7 +7,7 @@ const MILESTONE_COPY: Record<
     icon: string;
     label: (
       threshold: number,
-      metadata?: Record<string, unknown> | null
+      metadata?: Record<string, unknown> | null,
     ) => string;
   }
 > = {
@@ -54,7 +54,7 @@ const MILESTONE_COPY: Record<
     icon: '🧠',
     label: (threshold, metadata) =>
       `Explored ${threshold} topics in ${String(
-        metadata?.['subjectName'] ?? 'a subject'
+        metadata?.['subjectName'] ?? 'a subject',
       )}`,
   },
 };

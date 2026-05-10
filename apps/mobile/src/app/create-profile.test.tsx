@@ -102,7 +102,7 @@ describe('CreateProfileScreen', () => {
     screen.getByTestId('create-profile-submit');
     // Birth date explanatory copy is visible
     expect(
-      screen.getByText(/personalise how your mentor talks to you/)
+      screen.getByText(/personalise how your mentor talks to you/),
     ).toBeTruthy();
     // Persona picker buttons are hidden (auto-detected from birth date)
     expect(screen.queryByTestId('persona-teen')).toBeNull();
@@ -124,11 +124,11 @@ describe('CreateProfileScreen', () => {
     it('uses child-referent copy on the explanatory line', () => {
       render(<CreateProfileScreen />, { wrapper: Wrapper });
       expect(
-        screen.getByText(/personalise how their mentor talks to them/)
+        screen.getByText(/personalise how their mentor talks to them/),
       ).toBeTruthy();
       // Original first-person copy must NOT appear when adding a child
       expect(
-        screen.queryByText(/personalise how your mentor talks to you/)
+        screen.queryByText(/personalise how your mentor talks to you/),
       ).toBeNull();
     });
 
@@ -147,7 +147,7 @@ describe('CreateProfileScreen', () => {
       render(<CreateProfileScreen />, { wrapper: Wrapper });
       screen.getByText("Child's display name");
       expect(
-        screen.getByPlaceholderText("Enter your child's name")
+        screen.getByPlaceholderText("Enter your child's name"),
       ).toBeTruthy();
     });
   });
@@ -160,10 +160,10 @@ describe('CreateProfileScreen', () => {
     screen.getByText('Add a child');
     screen.getByText("Child's display name");
     expect(
-      screen.getByText(/personalise how their mentor talks to them/)
+      screen.getByText(/personalise how their mentor talks to them/),
     ).toBeTruthy();
     expect(
-      screen.queryByText(/personalise how your mentor talks to you/)
+      screen.queryByText(/personalise how your mentor talks to you/),
     ).toBeNull();
   });
 
@@ -172,7 +172,7 @@ describe('CreateProfileScreen', () => {
 
     const button = screen.getByTestId('create-profile-submit');
     expect(
-      button.props.accessibilityState?.disabled ?? button.props.disabled
+      button.props.accessibilityState?.disabled ?? button.props.disabled,
     ).toBeTruthy();
   });
 
@@ -183,7 +183,7 @@ describe('CreateProfileScreen', () => {
 
     const button = screen.getByTestId('create-profile-submit');
     expect(
-      button.props.accessibilityState?.disabled ?? button.props.disabled
+      button.props.accessibilityState?.disabled ?? button.props.disabled,
     ).toBeTruthy();
   });
 
@@ -212,12 +212,12 @@ describe('CreateProfileScreen', () => {
       fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Sam');
       fireEvent.changeText(
         screen.getByTestId('create-profile-birthdate-input'),
-        '2010-06-15'
+        '2010-06-15',
       );
 
       const button = screen.getByTestId('create-profile-submit');
       expect(
-        button.props.accessibilityState?.disabled ?? button.props.disabled
+        button.props.accessibilityState?.disabled ?? button.props.disabled,
       ).toBeFalsy();
     } finally {
       if (originalOs) {
@@ -242,7 +242,7 @@ describe('CreateProfileScreen', () => {
     };
 
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ profile: newProfile }), { status: 200 })
+      new Response(JSON.stringify({ profile: newProfile }), { status: 200 }),
     );
 
     render(<CreateProfileScreen />, { wrapper: Wrapper });
@@ -286,7 +286,7 @@ describe('CreateProfileScreen', () => {
     };
 
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ profile: newProfile }), { status: 200 })
+      new Response(JSON.stringify({ profile: newProfile }), { status: 200 }),
     );
 
     render(<CreateProfileScreen />, { wrapper: Wrapper });
@@ -332,7 +332,7 @@ describe('CreateProfileScreen', () => {
       new Response('API error: 422', {
         status: 422,
         statusText: 'Unprocessable Entity',
-      })
+      }),
     );
 
     render(<CreateProfileScreen />, { wrapper: Wrapper });
@@ -374,7 +374,7 @@ describe('CreateProfileScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('create-profile-name'),
-      'Test Child'
+      'Test Child',
     );
     fireEvent.press(screen.getByTestId('create-profile-birthdate'));
     await act(() => {
@@ -431,7 +431,7 @@ describe('CreateProfileScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('create-profile-name'),
-      'Test Child'
+      'Test Child',
     );
     fireEvent.press(screen.getByTestId('create-profile-birthdate'));
     await act(() => {
@@ -531,7 +531,7 @@ describe('CreateProfileScreen', () => {
       // enabled again (loading=false, name + date still set).
       const button = screen.getByTestId('create-profile-submit');
       expect(
-        button.props.accessibilityState?.disabled ?? button.props.disabled
+        button.props.accessibilityState?.disabled ?? button.props.disabled,
       ).toBeFalsy();
     });
 
@@ -606,7 +606,9 @@ describe('CreateProfileScreen', () => {
 
     it('shows confirmation alert and does NOT switch profile when parent adds child', async () => {
       mockFetch.mockResolvedValueOnce(
-        new Response(JSON.stringify({ profile: childProfile }), { status: 200 })
+        new Response(JSON.stringify({ profile: childProfile }), {
+          status: 200,
+        }),
       );
 
       render(<CreateProfileScreen />, { wrapper: Wrapper });
@@ -628,7 +630,7 @@ describe('CreateProfileScreen', () => {
           'Profile created',
           "Lily's profile is ready. You can switch to it from the Profiles screen.",
           undefined,
-          undefined
+          undefined,
         );
       });
 
@@ -641,7 +643,9 @@ describe('CreateProfileScreen', () => {
     it('navigates home when parent adds child and no back history', async () => {
       mockCanGoBack.mockReturnValue(false);
       mockFetch.mockResolvedValueOnce(
-        new Response(JSON.stringify({ profile: childProfile }), { status: 200 })
+        new Response(JSON.stringify({ profile: childProfile }), {
+          status: 200,
+        }),
       );
 
       render(<CreateProfileScreen />, { wrapper: Wrapper });
@@ -665,7 +669,7 @@ describe('CreateProfileScreen', () => {
         new Response('Server error', {
           status: 500,
           statusText: 'Internal Server Error',
-        })
+        }),
       );
 
       render(<CreateProfileScreen />, { wrapper: Wrapper });

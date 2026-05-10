@@ -22,7 +22,7 @@ describe('SuggestionCard', () => {
 
   it('renders with null emoji gracefully', () => {
     render(
-      <SuggestionCard title="Volcanoes" emoji={null} onPress={jest.fn()} />
+      <SuggestionCard title="Volcanoes" emoji={null} onPress={jest.fn()} />,
     );
     screen.getByText('Volcanoes');
   });
@@ -33,7 +33,7 @@ describe('SuggestionCard', () => {
         title="Rivers"
         description="Learn about major rivers"
         onPress={jest.fn()}
-      />
+      />,
     );
     screen.getByText('Rivers');
     screen.getByText('Learn about major rivers');
@@ -45,7 +45,7 @@ describe('SuggestionCard', () => {
         title="Forests"
         onPress={jest.fn()}
         testID="suggestion-forests"
-      />
+      />,
     );
     screen.getByTestId('suggestion-forests');
   });
@@ -61,7 +61,7 @@ describe('SuggestionCard', () => {
           solid: '#047857',
           soft: 'rgba(4,120,87,0.14)',
         }}
-      />
+      />,
     );
 
     const card = screen.getByTestId('suggestion-forests');
@@ -69,7 +69,7 @@ describe('SuggestionCard', () => {
       expect.objectContaining({
         borderColor: '#047857',
         backgroundColor: 'rgba(4,120,87,0.14)',
-      })
+      }),
     );
   });
 });

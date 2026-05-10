@@ -26,7 +26,7 @@ describe('CollapsibleChapter (Later section)', () => {
         chapterState="partial"
         initiallyExpanded={false}
         onTopicPress={onTopicPress}
-      />
+      />,
     );
 
     getByText('Green Factories');
@@ -42,7 +42,7 @@ describe('CollapsibleChapter (Later section)', () => {
         chapterState="untouched"
         initiallyExpanded={false}
         onTopicPress={onTopicPress}
-      />
+      />,
     );
 
     getByText('○');
@@ -57,7 +57,7 @@ describe('CollapsibleChapter (Later section)', () => {
         chapterState="partial"
         initiallyExpanded={false}
         onTopicPress={onTopicPress}
-      />
+      />,
     );
 
     getByText('◐');
@@ -72,7 +72,7 @@ describe('CollapsibleChapter (Later section)', () => {
         chapterState="untouched"
         initiallyExpanded={false}
         onTopicPress={onTopicPress}
-      />
+      />,
     );
 
     expect(queryByText('Cell Walls')).toBeNull();
@@ -87,7 +87,7 @@ describe('CollapsibleChapter (Later section)', () => {
         chapterState="untouched"
         initiallyExpanded={false}
         onTopicPress={onTopicPress}
-      />
+      />,
     );
 
     fireEvent.press(getByTestId('chapter-header-Chapter D'));
@@ -106,7 +106,7 @@ describe('CollapsibleChapter (Later section)', () => {
         chapterState="untouched"
         initiallyExpanded
         onTopicPress={onTopicPress}
-      />
+      />,
     );
 
     fireEvent.press(getByText('Cell Walls'));
@@ -122,7 +122,7 @@ describe('CollapsibleChapter (Later section)', () => {
         chapterState="untouched"
         initiallyExpanded
         onTopicPress={onTopicPress}
-      />
+      />,
     );
 
     getByText('Cell Walls');

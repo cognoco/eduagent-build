@@ -71,7 +71,7 @@ const clerkPublishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 if (!clerkPublishableKey) {
   throw new Error(
     'EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY is missing. ' +
-      'Add it to your .env.development.local file.'
+      'Add it to your .env.development.local file.',
   );
 }
 
@@ -111,7 +111,7 @@ function ThemedApp() {
   const colorScheme: ColorScheme =
     (systemColorScheme as ColorScheme) ?? 'light';
   const [accentPresetId, setAccentPresetIdState] = useState<string | null>(
-    null
+    null,
   );
 
   // BM-08: Load accent preset from SecureStore when profile changes.
@@ -125,7 +125,7 @@ function ThemedApp() {
     setAccentPresetIdState(null); // reset immediately
     // [I-4] Sanitize profileId before constructing the SecureStore key.
     const key = sanitizeSecureStoreKey(
-      `${ACCENT_STORE_PREFIX}${activeProfile.id}`
+      `${ACCENT_STORE_PREFIX}${activeProfile.id}`,
     );
     (async () => {
       try {
@@ -147,14 +147,14 @@ function ThemedApp() {
     setOnAuthExpired(() => {
       if (__DEV__)
         console.warn(
-          '[AUTH-DEBUG] onAuthExpired FIRED — clearing queries + signing out'
+          '[AUTH-DEBUG] onAuthExpired FIRED — clearing queries + signing out',
         );
       // BM-03: clear cached query data before sign-out to prevent the next
       // user from seeing stale data from the previous session.
       markSessionExpired();
       queryClient.clear();
       void SecureStore.deleteItemAsync('hasSignedInBefore').catch(
-        () => undefined
+        () => undefined,
       );
       // [I-18] Clear auth-transition timestamp so a force-sign-out within
       // the 8s window doesn't leave the sign-in screen stuck on the
@@ -170,7 +170,7 @@ function ThemedApp() {
         .catch(() => {
           platformAlert(
             'Could not sign you out',
-            'Please close and reopen the app, then sign in again.'
+            'Please close and reopen the app, then sign in again.',
           );
         })
         .finally(() => {
@@ -186,7 +186,7 @@ function ThemedApp() {
       if (!activeProfile?.id) return;
       // [I-4] Sanitize profileId before constructing the SecureStore key.
       const key = sanitizeSecureStoreKey(
-        `${ACCENT_STORE_PREFIX}${activeProfile.id}`
+        `${ACCENT_STORE_PREFIX}${activeProfile.id}`,
       );
       if (id) {
         SecureStore.setItemAsync(key, id).catch(Sentry.captureException);
@@ -194,7 +194,7 @@ function ThemedApp() {
         SecureStore.deleteItemAsync(key).catch(Sentry.captureException);
       }
     },
-    [activeProfile?.id]
+    [activeProfile?.id],
   );
 
   // No-op setColorScheme — color scheme always follows system.
@@ -208,7 +208,7 @@ function ThemedApp() {
       accentPresetId,
       setAccentPresetId,
     }),
-    [colorScheme, setColorScheme, accentPresetId, setAccentPresetId]
+    [colorScheme, setColorScheme, accentPresetId, setAccentPresetId],
   );
 
   return (
@@ -367,7 +367,7 @@ function ClerkGate({
             onPress={() =>
               platformAlert(
                 'Please restart',
-                'Close the app completely and reopen it.'
+                'Close the app completely and reopen it.',
               )
             }
             style={{
@@ -411,7 +411,7 @@ class SplashErrorBoundary extends React.Component<
     console.error(
       '[AnimatedSplash] crashed:',
       error.message,
-      info.componentStack
+      info.componentStack,
     );
     Sentry.captureException(error, { tags: { component: 'AnimatedSplash' } });
     this.props.onError();
@@ -482,7 +482,7 @@ export default function RootLayout() {
     if (animDone) return;
     const primary = setTimeout(() => {
       console.warn(
-        '[Splash] Animation DISMISSED by primary timeout (3.5s) — callback never fired'
+        '[Splash] Animation DISMISSED by primary timeout (3.5s) — callback never fired',
       );
       setAnimDone(true);
     }, 3500);
@@ -505,7 +505,7 @@ export default function RootLayout() {
     if (clerkReady) return;
     const timeout = setTimeout(() => {
       console.warn(
-        '[Splash] Clerk DISMISSED by failsafe timeout (12s) — Clerk not loaded'
+        '[Splash] Clerk DISMISSED by failsafe timeout (12s) — Clerk not loaded',
       );
       setClerkTimedOut(true);
       setClerkReady(true);
@@ -521,7 +521,7 @@ export default function RootLayout() {
       // deployed API is on a different commit than the local mobile build.
       if (__DEV__) {
         import('../lib/contract-drift-check').then((m) =>
-          m.checkContractDrift()
+          m.checkContractDrift(),
         );
       }
     }

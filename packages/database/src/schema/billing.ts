@@ -85,9 +85,9 @@ export const quotaPools = pgTable(
   (table) => [
     check(
       'quota_pools_used_this_month_non_negative',
-      sql`${table.usedThisMonth} >= 0`
+      sql`${table.usedThisMonth} >= 0`,
     ),
-  ]
+  ],
 );
 
 export const usageEvents = pgTable(
@@ -110,14 +110,14 @@ export const usageEvents = pgTable(
   (table) => [
     index('usage_events_subscription_occurred_idx').on(
       table.subscriptionId,
-      table.occurredAt
+      table.occurredAt,
     ),
     index('usage_events_profile_occurred_idx').on(
       table.profileId,
-      table.occurredAt
+      table.occurredAt,
     ),
     check('usage_events_delta_range', sql`${table.delta} IN (1, -1)`),
-  ]
+  ],
 ).enableRLS();
 
 export const topUpCredits = pgTable(
@@ -143,13 +143,13 @@ export const topUpCredits = pgTable(
   (table) => [
     index('top_up_credits_subscription_id_idx').on(table.subscriptionId),
     uniqueIndex('top_up_credits_rc_txn_id_idx').on(
-      table.revenuecatTransactionId
+      table.revenuecatTransactionId,
     ),
     check(
       'top_up_credits_remaining_non_negative',
-      sql`${table.remaining} >= 0`
+      sql`${table.remaining} >= 0`,
     ),
-  ]
+  ],
 );
 
 export const byokWaitlist = pgTable('byok_waitlist', {

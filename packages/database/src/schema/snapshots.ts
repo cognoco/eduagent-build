@@ -35,13 +35,13 @@ export const progressSnapshots = pgTable(
   (table) => [
     uniqueIndex('progress_snapshots_profile_date_uq').on(
       table.profileId,
-      table.snapshotDate
+      table.snapshotDate,
     ),
     index('progress_snapshots_profile_date_idx').on(
       table.profileId,
-      table.snapshotDate
+      table.snapshotDate,
     ),
-  ]
+  ],
 );
 
 export const milestones = pgTable(
@@ -73,13 +73,13 @@ export const milestones = pgTable(
       table.milestoneType,
       table.threshold,
       sql`coalesce(${table.subjectId}, '00000000-0000-0000-0000-000000000000'::uuid)`,
-      sql`coalesce(${table.bookId}, '00000000-0000-0000-0000-000000000000'::uuid)`
+      sql`coalesce(${table.bookId}, '00000000-0000-0000-0000-000000000000'::uuid)`,
     ),
     index('milestones_profile_created_idx').on(
       table.profileId,
-      table.createdAt
+      table.createdAt,
     ),
-  ]
+  ],
 );
 
 // [BUG-524] Weekly reports — mirrors monthlyReports, keyed by report_week
@@ -107,13 +107,13 @@ export const weeklyReports = pgTable(
     uniqueIndex('weekly_reports_parent_child_week_uq').on(
       table.profileId,
       table.childProfileId,
-      table.reportWeek
+      table.reportWeek,
     ),
     index('weekly_reports_child_week_idx').on(
       table.childProfileId,
-      table.reportWeek
+      table.reportWeek,
     ),
-  ]
+  ],
 );
 
 export const monthlyReports = pgTable(
@@ -139,11 +139,11 @@ export const monthlyReports = pgTable(
     uniqueIndex('monthly_reports_parent_child_month_uq').on(
       table.profileId,
       table.childProfileId,
-      table.reportMonth
+      table.reportMonth,
     ),
     index('monthly_reports_child_month_idx').on(
       table.childProfileId,
-      table.reportMonth
+      table.reportMonth,
     ),
-  ]
+  ],
 );

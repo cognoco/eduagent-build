@@ -203,7 +203,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
   }
 
   // [EP15-C6] Error state — query failure gets a retry + go back.
-  if (inventoryQuery.isError) {
+  if (inventoryQuery.isError && !inventoryQuery.data) {
     return (
       <View
         className="flex-1 bg-background"

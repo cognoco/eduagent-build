@@ -255,7 +255,7 @@ describe('E2E testID integrity', () => {
         `${missingIds.length} Maestro id selector(s) have no matching testID in source:\n${report}\n\n` +
           'Either the testID was removed/renamed in source (add it back) or ' +
           'the Maestro flow needs updating. If this is pre-existing drift, ' +
-          'add it to KNOWN_DRIFT with a comment explaining when it will be fixed.'
+          'add it to KNOWN_DRIFT with a comment explaining when it will be fixed.',
       );
     }
   });
@@ -263,14 +263,14 @@ describe('E2E testID integrity', () => {
   // Shrink-wrap: alert when a KNOWN_DRIFT entry is fixed (testID re-added)
   // so the entry can be removed from the allowlist.
   const resolvedDrift = [...KNOWN_DRIFT].filter(
-    (id) => staticIds.has(id) || dynamicPrefixes.some((p) => id.startsWith(p))
+    (id) => staticIds.has(id) || dynamicPrefixes.some((p) => id.startsWith(p)),
   );
 
   it('KNOWN_DRIFT entries should be removed once fixed', () => {
     if (resolvedDrift.length > 0) {
       throw new Error(
         `${resolvedDrift.length} KNOWN_DRIFT entry/entries now have matching testIDs in source — remove them from the allowlist:\n` +
-          resolvedDrift.map((id) => `  "${id}"`).join('\n')
+          resolvedDrift.map((id) => `  "${id}"`).join('\n'),
       );
     }
   });

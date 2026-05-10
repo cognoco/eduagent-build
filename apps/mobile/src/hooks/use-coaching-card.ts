@@ -27,7 +27,7 @@ export function useCoachingCard(): UseQueryResult<CoachingCardResponse> {
       try {
         const res = await client['coaching-card'].$get(
           {},
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         return (await res.json()) as CoachingCardResponse;

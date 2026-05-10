@@ -34,7 +34,7 @@ function storageKey(profileId: string, flow: OutboxFlow): string {
 
 async function readEntries(
   profileId: string,
-  flow: OutboxFlow
+  flow: OutboxFlow,
 ): Promise<OutboxEntry[]> {
   const raw = await AsyncStorage.getItem(storageKey(profileId, flow));
   if (!raw) {
@@ -52,17 +52,17 @@ async function readEntries(
 async function writeEntries(
   profileId: string,
   flow: OutboxFlow,
-  entries: OutboxEntry[]
+  entries: OutboxEntry[],
 ): Promise<void> {
   await AsyncStorage.setItem(
     storageKey(profileId, flow),
-    JSON.stringify(entries)
+    JSON.stringify(entries),
   );
 }
 
 export async function listEntries(
   profileId: string,
-  flow: OutboxFlow
+  flow: OutboxFlow,
 ): Promise<OutboxEntry[]> {
   return withLock(storageKey(profileId, flow), async () => {
     const entries = await readEntries(profileId, flow);
@@ -72,7 +72,7 @@ export async function listEntries(
 
 export async function listPending(
   profileId: string,
-  flow: OutboxFlow
+  flow: OutboxFlow,
 ): Promise<OutboxEntry[]> {
   const entries = await listEntries(profileId, flow);
   return entries.filter((entry) => entry.status === 'pending');
@@ -80,7 +80,7 @@ export async function listPending(
 
 export async function listPermanentlyFailed(
   profileId: string,
-  flow: OutboxFlow
+  flow: OutboxFlow,
 ): Promise<OutboxEntry[]> {
   const entries = await listEntries(profileId, flow);
   return entries.filter((entry) => entry.status === 'permanently-failed');
@@ -89,7 +89,7 @@ export async function listPermanentlyFailed(
 export async function getOutboxEntry(
   profileId: string,
   flow: OutboxFlow,
-  id: string
+  id: string,
 ): Promise<OutboxEntry | null> {
   const entries = await listEntries(profileId, flow);
   return entries.find((entry) => entry.id === id) ?? null;
@@ -131,7 +131,7 @@ export async function enqueue(input: EnqueueInput): Promise<OutboxEntry> {
 export async function beginAttempt(
   profileId: string,
   flow: OutboxFlow,
-  id: string
+  id: string,
 ): Promise<OutboxEntry | null> {
   return withLock(storageKey(profileId, flow), async () => {
     const entries = await readEntries(profileId, flow);
@@ -142,7 +142,7 @@ export async function beginAttempt(
             attempts: entry.attempts + 1,
             lastAttemptAt: new Date().toISOString(),
           }
-        : entry
+        : entry,
     );
     await writeEntries(profileId, flow, nextEntries);
     return nextEntries.find((entry) => entry.id === id) ?? null;
@@ -152,14 +152,14 @@ export async function beginAttempt(
 export async function markConfirmed(
   profileId: string,
   flow: OutboxFlow,
-  id: string
+  id: string,
 ): Promise<void> {
   await withLock(storageKey(profileId, flow), async () => {
     const entries = await readEntries(profileId, flow);
     await writeEntries(
       profileId,
       flow,
-      entries.filter((entry) => entry.id !== id)
+      entries.filter((entry) => entry.id !== id),
     );
   });
 }
@@ -168,7 +168,7 @@ export async function recordFailure(
   profileId: string,
   flow: OutboxFlow,
   id: string,
-  reason: string
+  reason: string,
 ): Promise<OutboxEntry | null> {
   return withLock(storageKey(profileId, flow), async () => {
     const entries = await readEntries(profileId, flow);
@@ -182,7 +182,7 @@ export async function recordFailure(
                 ? ('permanently-failed' as const)
                 : entry.status,
           }
-        : entry
+        : entry,
     );
     await writeEntries(profileId, flow, nextEntries);
     return nextEntries.find((entry) => entry.id === id) ?? null;
@@ -192,14 +192,14 @@ export async function recordFailure(
 export async function deletePermanentlyFailed(
   profileId: string,
   flow: OutboxFlow,
-  id: string
+  id: string,
 ): Promise<void> {
   await withLock(storageKey(profileId, flow), async () => {
     const entries = await readEntries(profileId, flow);
     await writeEntries(
       profileId,
       flow,
-      entries.filter((entry) => entry.id !== id)
+      entries.filter((entry) => entry.id !== id),
     );
   });
 }
@@ -207,7 +207,7 @@ export async function deletePermanentlyFailed(
 export async function drain(
   profileId: string,
   flow: OutboxFlow,
-  handler: (entry: OutboxEntry) => Promise<void>
+  handler: (entry: OutboxEntry) => Promise<void>,
 ): Promise<number> {
   const entries = await listPending(profileId, flow);
   for (const entry of entries) {
@@ -236,7 +236,7 @@ export async function escalate(
       firstAttemptedAt: string;
       failureReason?: string;
     }>;
-  }) => Promise<void>
+  }) => Promise<void>,
 ): Promise<{ escalated: number }> {
   const failed = await listPermanentlyFailed(profileId, flow);
   if (failed.length === 0) {

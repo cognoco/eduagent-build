@@ -29,7 +29,7 @@ function SubjectVocabSection({
   const { t } = useTranslation();
   const router = useRouter();
   const cefrEntries = sortCefrEntries(
-    Object.entries(subject.vocabulary.byCefrLevel)
+    Object.entries(subject.vocabulary.byCefrLevel),
   );
 
   return (
@@ -120,8 +120,8 @@ export default function VocabularyBrowserScreen(): React.ReactElement {
           subject: existingLanguageSubjects[0],
         })
       : existingLanguageSubjects.length > 1
-      ? t('progress.vocabulary.emptyMessageMany')
-      : t('progress.vocabulary.emptyMessageNone');
+        ? t('progress.vocabulary.emptyMessageMany')
+        : t('progress.vocabulary.emptyMessageNone');
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
@@ -158,7 +158,7 @@ export default function VocabularyBrowserScreen(): React.ReactElement {
             <SkeletonRow />
             <SkeletonRow />
           </>
-        ) : isError ? (
+        ) : isError && !inventory ? (
           <View testID="vocab-browser-error">
             <ErrorFallback
               title={t('progress.vocabulary.errorTitle')}

@@ -89,7 +89,7 @@ describe('ChildReportsScreen', () => {
       fireEvent.press(button);
       expect(mockGoBackOrReplace).toHaveBeenCalledWith(
         expect.anything(),
-        '/(app)/child/child-001'
+        '/(app)/child/child-001',
       );
     });
 
@@ -103,16 +103,16 @@ describe('ChildReportsScreen', () => {
       // Push-notification claim removed
       expect(
         screen.queryByText(
-          "You'll get a push notification when the report is ready."
-        )
+          "You'll get a push notification when the report is ready.",
+        ),
       ).toBeNull();
       // Long "Reports are generated on the 1st…" preamble removed
       expect(
-        screen.queryByText(/Reports are generated on the 1st of each month/)
+        screen.queryByText(/Reports are generated on the 1st of each month/),
       ).toBeNull();
       // Single body sentence remains — testID survives so other tests can find it
       expect(
-        screen.getByTestId('child-reports-empty-time-context')
+        screen.getByTestId('child-reports-empty-time-context'),
       ).toBeTruthy();
     });
 
@@ -120,7 +120,7 @@ describe('ChildReportsScreen', () => {
       render(<ChildReportsScreen />);
 
       expect(
-        screen.getByTestId('child-reports-empty-time-context')
+        screen.getByTestId('child-reports-empty-time-context'),
       ).toBeTruthy();
     });
 
@@ -130,7 +130,7 @@ describe('ChildReportsScreen', () => {
       render(<ChildReportsScreen />);
 
       screen.getByText(
-        'parentView.reports.seeProgressNow:{"name":"parentView.index.yourChild"}'
+        'parentView.reports.seeProgressNow:{"name":"parentView.index.yourChild"}',
       );
     });
   });
@@ -171,7 +171,7 @@ describe('ChildReportsScreen', () => {
       fireEvent.press(screen.getByTestId('child-reports-error-back'));
       expect(mockGoBackOrReplace).toHaveBeenCalledWith(
         expect.anything(),
-        '/(app)/child/child-001'
+        '/(app)/child/child-001',
       );
     });
   });
@@ -295,7 +295,7 @@ describe('ChildReportsScreen', () => {
       fireEvent.press(screen.getByTestId('child-reports-back'));
       expect(mockGoBackOrReplace).toHaveBeenCalledWith(
         expect.anything(),
-        '/(app)/child/child-001'
+        '/(app)/child/child-001',
       );
     });
   });

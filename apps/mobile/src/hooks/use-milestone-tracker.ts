@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import type { CelebrationName, CelebrationReason } from '@eduagent/schemas';
 
 export function celebrationForReason(
-  reason: CelebrationReason
+  reason: CelebrationReason,
 ): CelebrationName {
   switch (reason) {
     case 'deep_diver':
@@ -76,12 +76,12 @@ export const INITIAL_MILESTONE_TRACKER_STATE: MilestoneTrackerState = {
 };
 
 export function normalizeMilestoneTrackerState(
-  value: unknown
+  value: unknown,
 ): MilestoneTrackerState {
   const raw = value as Partial<MilestoneTrackerState> | null | undefined;
   const milestonesReached = Array.isArray(raw?.milestonesReached)
     ? raw.milestonesReached.filter(
-        (reason): reason is CelebrationReason => typeof reason === 'string'
+        (reason): reason is CelebrationReason => typeof reason === 'string',
       )
     : [];
 
@@ -101,7 +101,7 @@ export function normalizeMilestoneTrackerState(
 }
 
 export function createMilestoneTrackerStateFromMilestones(
-  milestonesReached: CelebrationReason[]
+  milestonesReached: CelebrationReason[],
 ): MilestoneTrackerState {
   return {
     ...INITIAL_MILESTONE_TRACKER_STATE,
@@ -114,7 +114,7 @@ export function advanceMilestoneTracker(
   input: {
     userMessage: string;
     escalationRung: number;
-  }
+  },
 ): {
   triggered: CelebrationReason[];
   trackerState: MilestoneTrackerState;
@@ -179,7 +179,7 @@ export function advanceMilestoneTracker(
 
 export function useMilestoneTracker() {
   const [state, setState] = useState<MilestoneTrackerState>(
-    INITIAL_MILESTONE_TRACKER_STATE
+    INITIAL_MILESTONE_TRACKER_STATE,
   );
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -191,7 +191,7 @@ export function useMilestoneTracker() {
       setState(result.trackerState);
       return result;
     },
-    []
+    [],
   );
 
   const reset = useCallback(() => {

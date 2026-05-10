@@ -19,7 +19,7 @@ export default function SubjectSessionsScreen(): React.ReactElement {
   const sessionsQuery = useSubjectSessions(subjectId);
 
   const subject = inventoryQuery.data?.subjects.find(
-    (entry) => entry.subjectId === subjectId
+    (entry) => entry.subjectId === subjectId,
   );
   const sessions = sessionsQuery.data ?? [];
 
@@ -34,7 +34,7 @@ export default function SubjectSessionsScreen(): React.ReactElement {
             onPress={() =>
               goBackOrReplace(
                 router,
-                `/(app)/progress/${subjectId ?? ''}` as never
+                `/(app)/progress/${subjectId ?? ''}` as never,
               )
             }
             className="me-3 py-2 pe-2"
@@ -65,7 +65,7 @@ export default function SubjectSessionsScreen(): React.ReactElement {
               />
             ))}
           </View>
-        ) : sessionsQuery.isError ? (
+        ) : sessionsQuery.isError && !sessionsQuery.data ? (
           <View className="mt-6">
             <ErrorFallback
               variant="card"
@@ -80,7 +80,7 @@ export default function SubjectSessionsScreen(): React.ReactElement {
                 onPress: () =>
                   goBackOrReplace(
                     router,
-                    `/(app)/progress/${subjectId ?? ''}` as never
+                    `/(app)/progress/${subjectId ?? ''}` as never,
                   ),
                 testID: 'subject-sessions-error-back',
               }}
@@ -119,7 +119,7 @@ export default function SubjectSessionsScreen(): React.ReactElement {
                 accessibilityRole="button"
                 accessibilityLabel={t(
                   'progress.subjectSessions.openSessionFrom',
-                  { date: formatRelativeDate(session.createdAt) }
+                  { date: formatRelativeDate(session.createdAt) },
                 )}
                 testID={`subject-session-${session.id}`}
               >

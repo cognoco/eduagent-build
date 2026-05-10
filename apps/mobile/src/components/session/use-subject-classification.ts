@@ -43,7 +43,7 @@ export interface UseSubjectClassificationOptions {
   // Functions from other hooks
   continueWithMessage: (
     text: string,
-    options?: { sessionSubjectId?: string; sessionSubjectName?: string }
+    options?: { sessionSubjectId?: string; sessionSubjectName?: string },
   ) => Promise<void>;
   createLocalMessageId: (prefix: 'user' | 'ai') => string;
   showConfirmation: (message: string) => void;
@@ -53,7 +53,7 @@ export interface UseSubjectClassificationOptions {
     response: string,
     setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>,
     setIsStreaming: React.Dispatch<React.SetStateAction<boolean>>,
-    onDone?: () => void
+    onDone?: () => void,
   ) => () => void;
   userMessageCount: number;
   sessionExperience: number;
@@ -62,7 +62,7 @@ export interface UseSubjectClassificationOptions {
 }
 
 export function useSubjectClassification(
-  opts: UseSubjectClassificationOptions
+  opts: UseSubjectClassificationOptions,
 ) {
   const {
     isStreaming,
@@ -104,15 +104,15 @@ export function useSubjectClassification(
         name: string;
         description: string;
         focus?: string;
-      }>
+      }>,
     ) => {
       const dedupedCandidates = candidates.filter(
         (candidate, index, all) =>
           all.findIndex(
             (entry) =>
               entry.subjectId === candidate.subjectId &&
-              entry.subjectName === candidate.subjectName
-          ) === index
+              entry.subjectName === candidate.subjectName,
+          ) === index,
       );
 
       setPendingSubjectResolution({
@@ -123,7 +123,7 @@ export function useSubjectClassification(
         resolveSuggestions,
       });
     },
-    [setPendingSubjectResolution]
+    [setPendingSubjectResolution],
   );
 
   const handleResolveSubject = useCallback(
@@ -159,7 +159,7 @@ export function useSubjectClassification(
       setMessages,
       setPendingSubjectResolution,
       setShowWrongSubjectChip,
-    ]
+    ],
   );
 
   // Create a new subject from a resolve API suggestion
@@ -200,7 +200,7 @@ export function useSubjectClassification(
         });
       } catch {
         showConfirmation(
-          `Could not create ${suggestion.name}. Please try again or pick an existing subject.`
+          `Could not create ${suggestion.name}. Please try again or pick an existing subject.`,
         );
       }
     },
@@ -216,7 +216,7 @@ export function useSubjectClassification(
       setPendingSubjectResolution,
       setShowWrongSubjectChip,
       showConfirmation,
-    ]
+    ],
   );
 
   // BUG-233: Create a new subject from the classifier's suggestion
@@ -259,7 +259,7 @@ export function useSubjectClassification(
       });
     } catch {
       showConfirmation(
-        `Could not create ${suggestedName}. Please try again or pick an existing subject.`
+        `Could not create ${suggestedName}. Please try again or pick an existing subject.`,
       );
     }
   }, [
@@ -279,7 +279,7 @@ export function useSubjectClassification(
   const handleSend = useCallback(
     async (
       text: string,
-      opts?: { isAutoSent?: boolean; imageUri?: string }
+      opts?: { isAutoSent?: boolean; imageUri?: string },
     ) => {
       // CR-1: Guard on quotaError so programmatic callers (quick chips, homework
       // auto-send, queued problems) can't bypass the UI-disabled input guard.
@@ -317,7 +317,7 @@ export function useSubjectClassification(
         animationCleanupRef.current = animateResponse(
           greetingResponse,
           setMessages,
-          setIsStreaming
+          setIsStreaming,
         );
         return;
       }
@@ -387,7 +387,7 @@ export function useSubjectClassification(
                 text,
                 promptMessage,
                 freeformCandidates,
-                result.suggestedSubjectName
+                result.suggestedSubjectName,
               );
               return;
             }
@@ -454,13 +454,13 @@ export function useSubjectClassification(
                   resolvePrompt,
                   subjectCandidates,
                   null,
-                  suggestions
+                  suggestions,
                 );
               } catch {
                 openSubjectResolution(
                   text,
                   "I couldn't figure out the subject. You can create a new one below.",
-                  subjectCandidates
+                  subjectCandidates,
                 );
               }
               return;
@@ -475,7 +475,7 @@ export function useSubjectClassification(
               text,
               promptMessage,
               subjectCandidates,
-              suggested
+              suggested,
             );
             return;
           }
@@ -489,7 +489,7 @@ export function useSubjectClassification(
               openSubjectResolution(
                 text,
                 "I couldn't figure out the subject. Which one fits?",
-                fallbackCandidates
+                fallbackCandidates,
               );
               return;
             }
@@ -502,12 +502,12 @@ export function useSubjectClassification(
 
             if (fallbackCandidates.length > 0) {
               setClassifyError(
-                "Could not identify the subject automatically. Pick one below and we'll keep going."
+                "Could not identify the subject automatically. Pick one below and we'll keep going.",
               );
               openSubjectResolution(
                 text,
                 'Pick the subject that fits best:',
-                fallbackCandidates
+                fallbackCandidates,
               );
             } else {
               // No enrolled subjects — try resolve for suggestions
@@ -521,16 +521,16 @@ export function useSubjectClassification(
                     'Pick a subject that fits, or create your own.',
                   [],
                   null,
-                  resolveResult.suggestions ?? []
+                  resolveResult.suggestions ?? [],
                 );
               } catch {
                 setClassifyError(
-                  'Could not identify the subject. Create a new subject to get started.'
+                  'Could not identify the subject. Create a new subject to get started.',
                 );
                 openSubjectResolution(
                   text,
                   "I couldn't figure out the subject. You can create a new one below.",
-                  []
+                  [],
                 );
               }
             }
@@ -574,7 +574,7 @@ export function useSubjectClassification(
       sessionExperience,
       animationCleanupRef,
       setIsStreaming,
-    ]
+    ],
   );
 
   return {

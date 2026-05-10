@@ -38,7 +38,7 @@ describe('useDeleteAccount', () => {
       gracePeriodEnds: '2026-02-24T00:00:00.000Z',
     };
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify(response), { status: 200 })
+      new Response(JSON.stringify(response), { status: 200 }),
     );
 
     const { result } = renderHook(() => useDeleteAccount(), {
@@ -61,8 +61,8 @@ describe('useDeleteAccount', () => {
           code: 'INTERNAL_ERROR',
           message: 'Unable to schedule deletion',
         }),
-        { status: 500 }
-      )
+        { status: 500 },
+      ),
     );
 
     const { result } = renderHook(() => useDeleteAccount(), {
@@ -71,7 +71,7 @@ describe('useDeleteAccount', () => {
 
     await act(async () => {
       await expect(result.current.mutateAsync()).rejects.toThrow(
-        'Unable to schedule deletion'
+        'Unable to schedule deletion',
       );
     });
   });
@@ -90,7 +90,7 @@ describe('useCancelDeletion', () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ message: 'Deletion cancelled' }), {
         status: 200,
-      })
+      }),
     );
 
     const { result } = renderHook(() => useCancelDeletion(), {
@@ -113,8 +113,8 @@ describe('useCancelDeletion', () => {
           code: 'FORBIDDEN',
           message: 'Unable to cancel deletion',
         }),
-        { status: 403 }
-      )
+        { status: 403 },
+      ),
     );
 
     const { result } = renderHook(() => useCancelDeletion(), {
@@ -123,7 +123,7 @@ describe('useCancelDeletion', () => {
 
     await act(async () => {
       await expect(result.current.mutateAsync()).rejects.toThrow(
-        'Unable to cancel deletion'
+        'Unable to cancel deletion',
       );
     });
   });
@@ -146,7 +146,7 @@ describe('useExportData', () => {
       exportedAt: '2026-02-17T00:00:00Z',
     };
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify(exportData), { status: 200 })
+      new Response(JSON.stringify(exportData), { status: 200 }),
     );
 
     const { result } = renderHook(() => useExportData(), {
@@ -169,8 +169,8 @@ describe('useExportData', () => {
           code: 'INTERNAL_ERROR',
           message: 'Unable to export data',
         }),
-        { status: 500 }
-      )
+        { status: 500 },
+      ),
     );
 
     const { result } = renderHook(() => useExportData(), {
@@ -179,7 +179,7 @@ describe('useExportData', () => {
 
     await act(async () => {
       await expect(result.current.mutateAsync()).rejects.toThrow(
-        'Unable to export data'
+        'Unable to export data',
       );
     });
   });

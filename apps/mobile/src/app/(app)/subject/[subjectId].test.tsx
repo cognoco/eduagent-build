@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 jest.mock(
   'react-i18next',
-  () => require('../../../test-utils/mock-i18n').i18nMock
+  () => require('../../../test-utils/mock-i18n').i18nMock,
 );
 
 const mockBack = jest.fn();
@@ -74,7 +74,7 @@ function createWrapper() {
     return React.createElement(
       QueryClientProvider,
       { client: queryClient },
-      children
+      children,
     );
   };
 }
@@ -109,7 +109,7 @@ describe('SubjectSettingsScreen', () => {
     render(<SubjectSettingsScreen />, { wrapper: createWrapper() });
 
     screen.getByText(
-      "Choose a domain for analogies. The mentor will prefer analogies from this world when explaining concepts, but won't force them when a direct explanation is clearer."
+      "Choose a domain for analogies. The mentor will prefer analogies from this world when explaining concepts, but won't force them when a direct explanation is clearer.",
     );
   });
 
@@ -165,7 +165,7 @@ describe('SubjectSettingsScreen', () => {
     // UX-DE-L9: mutate now includes onError to surface failures
     expect(mockUpdateAnalogyDomain).toHaveBeenCalledWith(
       'sports',
-      expect.objectContaining({ onError: expect.any(Function) })
+      expect.objectContaining({ onError: expect.any(Function) }),
     );
   });
 
@@ -177,7 +177,7 @@ describe('SubjectSettingsScreen', () => {
     fireEvent.press(screen.getByTestId('analogy-domain-none'));
     expect(mockUpdateAnalogyDomain).toHaveBeenCalledWith(
       null,
-      expect.objectContaining({ onError: expect.any(Function) })
+      expect.objectContaining({ onError: expect.any(Function) }),
     );
   });
 
@@ -213,7 +213,7 @@ describe('SubjectSettingsScreen', () => {
       expect(screen.queryByText('Analogy Preference')).toBeNull();
       expect(screen.queryByTestId('analogy-domain-picker')).toBeNull();
       expect(
-        screen.getByTestId('subject-settings-language-empty')
+        screen.getByTestId('subject-settings-language-empty'),
       ).toBeTruthy();
     });
 
@@ -226,7 +226,7 @@ describe('SubjectSettingsScreen', () => {
 
       screen.getByText('Analogy Preference');
       expect(
-        screen.queryByTestId('subject-settings-language-empty')
+        screen.queryByTestId('subject-settings-language-empty'),
       ).toBeNull();
     });
 

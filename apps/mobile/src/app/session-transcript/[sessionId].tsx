@@ -57,7 +57,7 @@ export default function SessionTranscriptScreen() {
       transcript.data?.archived === false
         ? transcript.data.exchanges.filter(isVisibleExchange)
         : [],
-    [transcript.data]
+    [transcript.data],
   );
 
   if (!sessionId) {
@@ -100,7 +100,7 @@ export default function SessionTranscriptScreen() {
     );
   }
 
-  if (transcript.isError) {
+  if (transcript.isError && !transcript.data) {
     return (
       <View className="flex-1 bg-background" testID="session-transcript-error">
         <ErrorFallback
@@ -136,7 +136,7 @@ export default function SessionTranscriptScreen() {
             if (transcript.data?.archived !== true) return;
             if (!transcript.data.summary.topicId) return;
             router.push(
-              `/(app)/session/start?topicId=${transcript.data.summary.topicId}`
+              `/(app)/session/start?topicId=${transcript.data.summary.topicId}`,
             );
           }}
         />

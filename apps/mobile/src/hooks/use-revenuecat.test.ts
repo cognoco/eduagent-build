@@ -204,7 +204,7 @@ describe('useRevenueCatIdentity', () => {
 
   it('does not crash on logIn error', async () => {
     (Purchases.logIn as jest.Mock).mockRejectedValueOnce(
-      new Error('Network error')
+      new Error('Network error'),
     );
     mockUseAuth.mockReturnValue({
       isSignedIn: true,
@@ -284,7 +284,7 @@ describe('useOfferings', () => {
 
   it('handles getOfferings error', async () => {
     (Purchases.getOfferings as jest.Mock).mockRejectedValueOnce(
-      new Error('Network error')
+      new Error('Network error'),
     );
 
     const { result } = renderHook(() => useOfferings(), {
@@ -396,13 +396,13 @@ describe('usePurchase', () => {
 
     expect(Purchases.purchasePackage).toHaveBeenCalledWith(mockPackage);
     expect(result.current.data?.productIdentifier).toBe(
-      'com.eduagent.plus.monthly'
+      'com.eduagent.plus.monthly',
     );
   });
 
   it('handles purchase error (user cancellation)', async () => {
     (Purchases.purchasePackage as jest.Mock).mockRejectedValueOnce(
-      new Error('User cancelled')
+      new Error('User cancelled'),
     );
 
     const mockPackage = {
@@ -467,7 +467,7 @@ describe('useRestorePurchases', () => {
 
   it('handles restore error', async () => {
     (Purchases.restorePurchases as jest.Mock).mockRejectedValueOnce(
-      new Error('Restore failed')
+      new Error('Restore failed'),
     );
 
     const { result } = renderHook(() => useRestorePurchases(), {

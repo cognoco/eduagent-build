@@ -16,7 +16,7 @@ export function ProgressBar({
   const safeMax = Math.max(1, max);
   const widthPct = Math.max(
     0,
-    Math.min(100, Math.round((value / safeMax) * 100))
+    Math.min(100, Math.round((value / safeMax) * 100)),
   );
 
   return (

@@ -38,7 +38,7 @@ function loadFromDoppler(): boolean {
         encoding: 'utf-8',
         timeout: 15_000,
         stdio: ['ignore', 'pipe', 'ignore'],
-      }
+      },
     );
 
     const secrets = JSON.parse(json) as Record<string, string>;
@@ -92,6 +92,6 @@ export function loadDatabaseEnv(workspaceRoot: string): void {
   console.warn(
     `⚠️  DATABASE_URL is unset and Doppler CLI unavailable.\n` +
       `   Integration tests requiring a real database will fail.\n` +
-      `   Fix: run tests via \`pnpm test\` or ensure Doppler is configured.`
+      `   Fix: run tests via \`pnpm test\` or ensure Doppler is configured.`,
   );
 }

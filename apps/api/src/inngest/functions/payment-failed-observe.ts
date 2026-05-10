@@ -76,8 +76,10 @@ export const paymentFailedObserve = inngest.createFunction(
       status: 'logged' as const,
       source,
       subscriptionId: data.subscriptionId ?? null,
+      stripeSubscriptionId: data.stripeSubscriptionId ?? null,
       accountId: data.accountId ?? null,
+      attempt: data.attempt ?? null,
       retryDeferred: 'pending_payment_failed_retry_strategy',
     };
-  }
+  },
 );

@@ -22,11 +22,11 @@ export function useParentProxy(): ParentProxyState {
 
   const parentProfile = useMemo(
     () => profiles.find((profile) => profile.isOwner) ?? null,
-    [profiles]
+    [profiles],
   );
 
   const isParentProxy = Boolean(
-    activeProfile && !activeProfile.isOwner && parentProfile
+    activeProfile && !activeProfile.isOwner && parentProfile,
   );
   const childProfile = isParentProxy ? activeProfile : null;
 
@@ -43,11 +43,11 @@ export function useParentProxy(): ParentProxyState {
     // rule (console.warn alone is insufficient).
     if (isParentProxy) {
       SecureStore.setItemAsync(PARENT_PROXY_KEY, 'true').catch(
-        Sentry.captureException
+        Sentry.captureException,
       );
     } else {
       SecureStore.deleteItemAsync(PARENT_PROXY_KEY).catch(
-        Sentry.captureException
+        Sentry.captureException,
       );
     }
   }, [activeProfile, isParentProxy]);

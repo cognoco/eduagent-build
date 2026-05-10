@@ -6,7 +6,7 @@ describe('getSubjectTint', () => {
     expect(tint).toHaveProperty('solid');
     expect(tint).toHaveProperty('soft');
     expect(SUBJECT_TINT_PALETTE.dark).toContainEqual(
-      expect.objectContaining({ solid: tint.solid })
+      expect.objectContaining({ solid: tint.solid }),
     );
   });
 
@@ -27,7 +27,7 @@ describe('getSubjectTint', () => {
       'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
         const r = (Math.random() * 16) | 0;
         return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
-      })
+      }),
     );
     const tints = ids.map((id) => getSubjectTint(id, 'dark'));
     const uniqueSolids = new Set(tints.map((t) => t.solid));

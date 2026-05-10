@@ -37,7 +37,7 @@ export const topicNotes = pgTable(
     index('topic_notes_session_id_idx').on(t.sessionId),
     index('topic_notes_content_trgm_idx').using(
       'gin',
-      sql`${t.content} gin_trgm_ops`
+      sql`${t.content} gin_trgm_ops`,
     ),
-  ]
+  ],
 );

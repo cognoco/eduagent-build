@@ -8,7 +8,7 @@ jest.mock('../../lib/theme', () => ({
 describe('PasswordInput', () => {
   it('hides password by default', () => {
     const { getByTestId } = render(
-      <PasswordInput value="secret" onChangeText={jest.fn()} testID="pw" />
+      <PasswordInput value="secret" onChangeText={jest.fn()} testID="pw" />,
     );
     const input = getByTestId('pw');
     expect(input.props.secureTextEntry).toBe(true);
@@ -16,7 +16,7 @@ describe('PasswordInput', () => {
 
   it('toggles password visibility on Show/Hide press', () => {
     const { getByTestId } = render(
-      <PasswordInput value="secret" onChangeText={jest.fn()} testID="pw" />
+      <PasswordInput value="secret" onChangeText={jest.fn()} testID="pw" />,
     );
     const toggle = getByTestId('pw-toggle');
     expect(toggle).toBeTruthy();
@@ -38,7 +38,7 @@ describe('PasswordInput', () => {
         onChangeText={jest.fn()}
         testID="pw"
         showRequirements
-      />
+      />,
     );
     const hint = getByTestId('pw-hint');
     expect(hint.props.children).toBe('At least 8 characters');
@@ -46,7 +46,7 @@ describe('PasswordInput', () => {
 
   it('does not show requirements hint by default', () => {
     const { queryByTestId } = render(
-      <PasswordInput value="short" onChangeText={jest.fn()} testID="pw" />
+      <PasswordInput value="short" onChangeText={jest.fn()} testID="pw" />,
     );
     expect(queryByTestId('pw-hint')).toBeNull();
   });
@@ -54,7 +54,7 @@ describe('PasswordInput', () => {
   it('calls onChangeText when typing', () => {
     const onChange = jest.fn();
     const { getByTestId } = render(
-      <PasswordInput value="" onChangeText={onChange} testID="pw" />
+      <PasswordInput value="" onChangeText={onChange} testID="pw" />,
     );
     fireEvent.changeText(getByTestId('pw'), 'hello');
     expect(onChange).toHaveBeenCalledWith('hello');

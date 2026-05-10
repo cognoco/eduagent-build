@@ -59,7 +59,7 @@ describe('progress/_layout.tsx', () => {
     const screen = capturedScreens.find((s) => s.name === '[subjectId]')!;
     expect(screen.getId!({ params: { subjectId: 'math-1' } })).toBe('math-1');
     expect(screen.getId!({ params: { subjectId: 'science-2' } })).toBe(
-      'science-2'
+      'science-2',
     );
   });
 });

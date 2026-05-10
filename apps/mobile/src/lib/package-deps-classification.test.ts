@@ -20,7 +20,7 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
 const pkg = JSON.parse(
-  readFileSync(resolve(__dirname, '../../package.json'), 'utf8')
+  readFileSync(resolve(__dirname, '../../package.json'), 'utf8'),
 ) as {
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;

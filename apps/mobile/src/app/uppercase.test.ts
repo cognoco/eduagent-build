@@ -36,11 +36,11 @@ describe('user-facing Text stays sentence case in app routes', () => {
       }
 
       expect(source).not.toMatch(
-        /<Text[\s\S]*?className=\{?["'`][^"'`]*\buppercase\b[^"'`]*["'`]\}?[\s\S]*?>/m
+        /<Text[\s\S]*?className=\{?["'`][^"'`]*\buppercase\b[^"'`]*["'`]\}?[\s\S]*?>/m,
       );
       expect(source).not.toMatch(
-        /<Text[\s\S]*?style=\{\{[\s\S]*?textTransform:\s*['"]uppercase['"][\s\S]*?\}\}/m
+        /<Text[\s\S]*?style=\{\{[\s\S]*?textTransform:\s*['"]uppercase['"][\s\S]*?\}\}/m,
       );
-    }
+    },
   );
 });

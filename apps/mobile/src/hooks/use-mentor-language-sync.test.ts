@@ -5,9 +5,7 @@ import { useMentorLanguageSync } from './use-mentor-language-sync';
 
 const mockMutate = jest.fn();
 let mockIsPending = false;
-let mockActiveProfile:
-  | { id: string; conversationLanguage: string }
-  | null = {
+let mockActiveProfile: { id: string; conversationLanguage: string } | null = {
   id: 'p1',
   conversationLanguage: 'en',
 };
@@ -46,7 +44,7 @@ describe('useMentorLanguageSync', () => {
     renderHook(() => useMentorLanguageSync());
 
     await waitFor(() =>
-      expect(mockMutate).toHaveBeenCalledWith({ conversationLanguage: 'nb' })
+      expect(mockMutate).toHaveBeenCalledWith({ conversationLanguage: 'nb' }),
     );
   });
 
@@ -56,7 +54,7 @@ describe('useMentorLanguageSync', () => {
     await i18next.changeLanguage('ja');
 
     await waitFor(() =>
-      expect(mockMutate).toHaveBeenCalledWith({ conversationLanguage: 'ja' })
+      expect(mockMutate).toHaveBeenCalledWith({ conversationLanguage: 'ja' }),
     );
   });
 

@@ -105,7 +105,7 @@ export function FluencyDrillStrip({
       testID="fluency-drill-timer"
       accessibilityRole="timer"
       accessibilityLabel={`Fluency drill: ${formatCountdown(
-        remaining
+        remaining,
       )} remaining`}
     >
       <View className="flex-row items-center gap-2">

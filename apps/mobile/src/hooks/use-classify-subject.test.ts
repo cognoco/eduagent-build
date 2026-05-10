@@ -36,7 +36,7 @@ describe('useClassifySubject', () => {
       suggestedName: 'Mathematics',
     };
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify(classifyResult), { status: 200 })
+      new Response(JSON.stringify(classifyResult), { status: 200 }),
     );
 
     const { result } = renderHook(() => useClassifySubject(), {
@@ -60,8 +60,8 @@ describe('useClassifySubject', () => {
         JSON.stringify({
           error: { message: 'Server error', code: 'INTERNAL_ERROR' },
         }),
-        { status: 500 }
-      )
+        { status: 500 },
+      ),
     );
 
     const { result } = renderHook(() => useClassifySubject(), {
@@ -70,7 +70,7 @@ describe('useClassifySubject', () => {
 
     await act(async () => {
       await expect(
-        result.current.mutateAsync({ text: 'test' })
+        result.current.mutateAsync({ text: 'test' }),
       ).rejects.toThrow();
     });
   });

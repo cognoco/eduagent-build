@@ -5,18 +5,18 @@ type JsonTree = ReturnType<ReturnType<typeof render>['toJSON']>;
 
 function hasNodeWithProps(
   node: JsonTree,
-  expected: Record<string, unknown>
+  expected: Record<string, unknown>,
 ): boolean {
   if (!node || typeof node !== 'object') return false;
   if ('props' in node) {
     const matches = Object.entries(expected).every(
-      ([key, value]) => node.props?.[key] === value
+      ([key, value]) => node.props?.[key] === value,
     );
     if (matches) return true;
   }
   if ('children' in node && Array.isArray(node.children)) {
     return node.children.some((child: unknown) =>
-      hasNodeWithProps(child as JsonTree, expected)
+      hasNodeWithProps(child as JsonTree, expected),
     );
   }
   return false;
@@ -37,7 +37,7 @@ describe('DeskLampAnimation', () => {
 
   it('accepts custom size and color props', () => {
     const { getByTestId } = render(
-      <DeskLampAnimation testID="lamp" size={80} color="#3b82f6" />
+      <DeskLampAnimation testID="lamp" size={80} color="#3b82f6" />,
     );
     getByTestId('lamp');
   });
@@ -48,7 +48,7 @@ describe('DeskLampAnimation', () => {
       hasNodeWithProps(toJSON(), {
         stroke: '#f0c97c',
         strokeOpacity: 0.9,
-      })
+      }),
     ).toBe(true);
   });
 
@@ -58,7 +58,7 @@ describe('DeskLampAnimation', () => {
       hasNodeWithProps(toJSON(), {
         stroke: '#8b6a2e',
         strokeOpacity: 0.55,
-      })
+      }),
     ).toBe(true);
   });
 

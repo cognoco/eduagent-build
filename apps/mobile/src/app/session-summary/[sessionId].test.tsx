@@ -36,7 +36,7 @@ jest.mock('react-native-safe-area-context', () => ({
 
 jest.mock(
   'react-i18next',
-  () => require('../../test-utils/mock-i18n').i18nMock
+  () => require('../../test-utils/mock-i18n').i18nMock,
 );
 
 jest.mock('@expo/vector-icons', () => ({
@@ -213,7 +213,7 @@ const mockFetch = createRoutedMockFetch({
       // Default: no result configured — return error state
       return new Response(
         JSON.stringify({ message: 'Not configured', code: 'TEST_ERROR' }),
-        { status: 500 }
+        { status: 500 },
       );
     }
     // GET /sessions/:id/summary → persisted summary lookup.
@@ -239,7 +239,7 @@ const mockFetch = createRoutedMockFetch({
 });
 
 jest.mock('../../lib/api-client', () =>
-  require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch)
+  require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
 );
 
 // Create a fresh QueryClient per test to prevent cross-test query cache
@@ -316,7 +316,7 @@ describe('SessionSummaryScreen', () => {
       () =>
         new Response(JSON.stringify({ message: 'not homework' }), {
           status: 404,
-        })
+        }),
     );
     // Reset sessions route to default — tests like [BUG-800] call setRoute('sessions', ...)
     // to inject error responses. Without resetting, the override bleeds into subsequent
@@ -327,7 +327,7 @@ describe('SessionSummaryScreen', () => {
         if (mockSubmitResult !== null) return mockSubmitResult;
         return new Response(
           JSON.stringify({ message: 'Not configured', code: 'TEST_ERROR' }),
-          { status: 500 }
+          { status: 500 },
         );
       }
       if (url.includes('/summary')) {
@@ -424,7 +424,7 @@ describe('SessionSummaryScreen', () => {
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
       const cue = await screen.findByTestId(
-        'session-summary-mentor-memory-cue'
+        'session-summary-mentor-memory-cue',
       );
       screen.getByText('What your tutor knows about you.');
       screen.getByText('Tap to review or change.');
@@ -449,7 +449,7 @@ describe('SessionSummaryScreen', () => {
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
       fireEvent.press(
-        await screen.findByTestId('session-summary-mentor-memory-cue')
+        await screen.findByTestId('session-summary-mentor-memory-cue'),
       );
 
       expect(mockPush).toHaveBeenCalledWith({
@@ -469,9 +469,9 @@ describe('SessionSummaryScreen', () => {
           expect(screen.queryByTestId('session-takeaways')).not.toBeNull();
         });
         expect(
-          screen.queryByTestId('session-summary-mentor-memory-cue')
+          screen.queryByTestId('session-summary-mentor-memory-cue'),
         ).toBeNull();
-      }
+      },
     );
 
     it('hides the cue in parent-proxy mode without consent', async () => {
@@ -492,7 +492,7 @@ describe('SessionSummaryScreen', () => {
         expect(screen.queryByTestId('session-takeaways')).not.toBeNull();
       });
       expect(
-        screen.queryByTestId('session-summary-mentor-memory-cue')
+        screen.queryByTestId('session-summary-mentor-memory-cue'),
       ).toBeNull();
     });
   });
@@ -504,7 +504,7 @@ describe('SessionSummaryScreen', () => {
 
     const button = screen.getByTestId('submit-summary-button');
     expect(
-      button.props.accessibilityState?.disabled ?? button.props.disabled
+      button.props.accessibilityState?.disabled ?? button.props.disabled,
     ).toBeTruthy();
   });
 
@@ -523,7 +523,7 @@ describe('SessionSummaryScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('summary-input'),
-      'I learned about quadratic equations and how to solve them'
+      'I learned about quadratic equations and how to solve them',
     );
     fireEvent.press(screen.getByTestId('submit-summary-button'));
 
@@ -549,7 +549,7 @@ describe('SessionSummaryScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('summary-input'),
-      'I learned about quadratic equations and factoring methods'
+      'I learned about quadratic equations and factoring methods',
     );
     fireEvent.press(screen.getByTestId('submit-summary-button'));
 
@@ -593,7 +593,7 @@ describe('SessionSummaryScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('summary-input'),
-      'I explained how factoring helps solve quadratic equations'
+      'I explained how factoring helps solve quadratic equations',
     );
     fireEvent.press(screen.getByTestId('submit-summary-button'));
 
@@ -640,7 +640,7 @@ describe('SessionSummaryScreen', () => {
       expect(platformAlert).toHaveBeenCalledWith(
         'Summaries help you learn',
         'Students who reflect remember 2x more. Try it next time!',
-        expect.arrayContaining([expect.objectContaining({ text: 'Got it' })])
+        expect.arrayContaining([expect.objectContaining({ text: 'Got it' })]),
       );
     });
     expect(mockReplace).not.toHaveBeenCalled();
@@ -711,7 +711,7 @@ describe('SessionSummaryScreen', () => {
       if (url.includes('/summary') && init?.method === 'POST') {
         return new Response(
           JSON.stringify({ message: 'Network error', code: 'NETWORK_ERROR' }),
-          { status: 500 }
+          { status: 500 },
         );
       }
       if (url.includes('/summary')) {
@@ -724,7 +724,7 @@ describe('SessionSummaryScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('summary-input'),
-      'I learned about photosynthesis and how plants make food'
+      'I learned about photosynthesis and how plants make food',
     );
     fireEvent.press(screen.getByTestId('submit-summary-button'));
 
@@ -748,7 +748,7 @@ describe('SessionSummaryScreen', () => {
             message: 'Reflection too short — needs at least 30 characters',
             code: 'VALIDATION_ERROR',
           }),
-          { status: 400 }
+          { status: 400 },
         );
       }
       if (url.includes('/summary')) {
@@ -761,14 +761,14 @@ describe('SessionSummaryScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('summary-input'),
-      'I learned about photosynthesis and chlorophyll absorption'
+      'I learned about photosynthesis and chlorophyll absorption',
     );
     fireEvent.press(screen.getByTestId('submit-summary-button'));
 
     await waitFor(() => {
       expect(platformAlert).toHaveBeenCalledWith(
         'Could not save',
-        'Reflection too short — needs at least 30 characters'
+        'Reflection too short — needs at least 30 characters',
       );
     });
   });
@@ -778,7 +778,7 @@ describe('SessionSummaryScreen', () => {
       if (url.includes('/summary') && init?.method === 'POST') {
         return new Response(
           JSON.stringify({ code: 'WORD_LIMIT', maxWords: 200 }),
-          { status: 400 }
+          { status: 400 },
         );
       }
       if (url.includes('/summary')) {
@@ -791,7 +791,7 @@ describe('SessionSummaryScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('summary-input'),
-      'I explored gravity and Newtons three laws of motion today'
+      'I explored gravity and Newtons three laws of motion today',
     );
     fireEvent.press(screen.getByTestId('submit-summary-button'));
 
@@ -800,7 +800,7 @@ describe('SessionSummaryScreen', () => {
       // → assertOk throws Error('Request failed (400)') → stub returns that.
       expect(platformAlert).toHaveBeenCalledWith(
         'Could not save',
-        expect.any(String)
+        expect.any(String),
       );
     });
   });
@@ -824,7 +824,7 @@ describe('SessionSummaryScreen', () => {
       fireEvent.press(screen.getByText('Today I learned that...'));
 
       expect(screen.getByTestId('summary-input').props.value).toBe(
-        'Today I learned that...'
+        'Today I learned that...',
       );
     });
 
@@ -835,7 +835,7 @@ describe('SessionSummaryScreen', () => {
       fireEvent.press(screen.getByText('The most interesting thing was...'));
 
       expect(screen.getByTestId('summary-input').props.value).toBe(
-        'The most interesting thing was...'
+        'The most interesting thing was...',
       );
     });
 
@@ -860,7 +860,7 @@ describe('SessionSummaryScreen', () => {
 
       fireEvent.changeText(
         screen.getByTestId('summary-input'),
-        'I learned about equations and how to solve them today'
+        'I learned about equations and how to solve them today',
       );
       fireEvent.press(screen.getByTestId('submit-summary-button'));
 
@@ -875,12 +875,12 @@ describe('SessionSummaryScreen', () => {
   it('renders milestone recap and fast celebrations when provided', () => {
     mockParams.wallClockSeconds = '900';
     mockParams.milestones = encodeURIComponent(
-      JSON.stringify(['polar_star', 'persistent'])
+      JSON.stringify(['polar_star', 'persistent']),
     );
     mockParams.fastCelebrations = encodeURIComponent(
       JSON.stringify([
         { reason: 'topic_mastered', detail: 'Quadratic Equations' },
-      ])
+      ]),
     );
 
     render(<SessionSummaryScreen />, { wrapper: Wrapper });
@@ -899,7 +899,7 @@ describe('SessionSummaryScreen', () => {
   it('[BREAK / BUG-825] filters out non-string milestone values', () => {
     mockParams.wallClockSeconds = '900';
     mockParams.milestones = encodeURIComponent(
-      JSON.stringify([1, 2, 'polar_star', null, { foo: 'bar' }, 'persistent'])
+      JSON.stringify([1, 2, 'polar_star', null, { foo: 'bar' }, 'persistent']),
     );
 
     render(<SessionSummaryScreen />, { wrapper: Wrapper });
@@ -986,7 +986,7 @@ describe('SessionSummaryScreen', () => {
         screen.getByTestId('summary-submitted');
       });
       screen.getByText(
-        'African landscapes vary hugely — from the Sahara to savannah to rainforest.'
+        'African landscapes vary hugely — from the Sahara to savannah to rainforest.',
       );
       screen.getByText('Nice connection between geography and climate zones.');
       // Input form and chips must not be rendered for a persisted summary.
@@ -1012,7 +1012,7 @@ describe('SessionSummaryScreen', () => {
         screen.getByTestId('summary-submitted');
       });
       screen.getByText(
-        'I learned about the Atlas Mountains and the Great Rift Valley.'
+        'I learned about the Atlas Mountains and the Great Rift Valley.',
       );
       expect(screen.queryByTestId('summary-input')).toBeNull();
     });
@@ -1114,7 +1114,7 @@ describe('SessionSummaryScreen', () => {
 
       fireEvent.changeText(
         screen.getByTestId('summary-input'),
-        'I learned about plants making their own food'
+        'I learned about plants making their own food',
       );
 
       await waitFor(
@@ -1122,10 +1122,10 @@ describe('SessionSummaryScreen', () => {
           expect(mockWriteSummaryDraft).toHaveBeenCalledWith(
             expect.any(String),
             '660e8400-e29b-41d4-a716-446655440000',
-            'I learned about plants making their own food'
+            'I learned about plants making their own food',
           );
         },
-        { timeout: 1500 }
+        { timeout: 1500 },
       );
     });
 
@@ -1141,7 +1141,7 @@ describe('SessionSummaryScreen', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId('summary-input').props.value).toBe(
-          'unfinished thought about autotrophs'
+          'unfinished thought about autotrophs',
         );
       });
     });
@@ -1151,7 +1151,7 @@ describe('SessionSummaryScreen', () => {
 
       fireEvent.changeText(
         screen.getByTestId('summary-input'),
-        'Some partial reflection text that is long enough'
+        'Some partial reflection text that is long enough',
       );
 
       fireEvent.press(screen.getByTestId('summary-close-button'));
@@ -1167,7 +1167,7 @@ describe('SessionSummaryScreen', () => {
 
       fireEvent.changeText(
         screen.getByTestId('summary-input'),
-        'Some partial reflection text that is long enough'
+        'Some partial reflection text that is long enough',
       );
       fireEvent.press(screen.getByTestId('summary-close-button'));
 
@@ -1177,7 +1177,7 @@ describe('SessionSummaryScreen', () => {
 
       const [, , buttons] = (platformAlert as jest.Mock).mock.calls[0];
       const discard = buttons.find(
-        (b: { text: string }) => b.text === 'Discard'
+        (b: { text: string }) => b.text === 'Discard',
       );
       await discard.onPress();
 
@@ -1194,7 +1194,7 @@ describe('SessionSummaryScreen', () => {
 
       fireEvent.changeText(
         screen.getByTestId('summary-input'),
-        'Some partial reflection text that is long enough'
+        'Some partial reflection text that is long enough',
       );
       fireEvent.press(screen.getByTestId('summary-close-button'));
 
@@ -1204,7 +1204,7 @@ describe('SessionSummaryScreen', () => {
 
       const [, , buttons] = (platformAlert as jest.Mock).mock.calls[0];
       const keep = buttons.find(
-        (b: { text: string }) => b.text === 'Keep writing'
+        (b: { text: string }) => b.text === 'Keep writing',
       );
       await keep.onPress();
 
@@ -1228,7 +1228,7 @@ describe('SessionSummaryScreen', () => {
 
       fireEvent.changeText(
         screen.getByTestId('summary-input'),
-        'Some partial reflection text that is long enough'
+        'Some partial reflection text that is long enough',
       );
       fireEvent.press(screen.getByTestId('summary-close-button'));
 
@@ -1238,7 +1238,7 @@ describe('SessionSummaryScreen', () => {
 
       const [, , buttons] = (platformAlert as jest.Mock).mock.calls[0];
       const submit = buttons.find(
-        (b: { text: string }) => b.text === 'Submit now'
+        (b: { text: string }) => b.text === 'Submit now',
       );
       await submit.onPress();
 
@@ -1281,7 +1281,7 @@ describe('SessionSummaryScreen', () => {
       });
       expect(screen.queryByTestId('summary-skipped-state')).toBeNull();
       expect(screen.getByTestId('summary-input').props.value).toBe(
-        'text I started last time but never submitted'
+        'text I started last time but never submitted',
       );
     });
 

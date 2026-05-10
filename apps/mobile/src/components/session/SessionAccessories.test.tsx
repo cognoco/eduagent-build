@@ -10,7 +10,7 @@ describe('SessionToolAccessory stage gating', () => {
         isStreaming={false}
         handleQuickChip={handleQuickChip}
         stage="teaching"
-      />
+      />,
     );
     expect(queryByTestId('quick-chip-switch_topic')).toBeTruthy();
     expect(queryByTestId('quick-chip-park')).toBeTruthy();
@@ -22,7 +22,7 @@ describe('SessionToolAccessory stage gating', () => {
         isStreaming={false}
         handleQuickChip={handleQuickChip}
         stage="greeting"
-      />
+      />,
     );
     expect(queryByTestId('quick-chip-switch_topic')).toBeNull();
     expect(queryByTestId('quick-chip-park')).toBeNull();
@@ -34,7 +34,7 @@ describe('SessionToolAccessory stage gating', () => {
         isStreaming={false}
         handleQuickChip={handleQuickChip}
         stage="orienting"
-      />
+      />,
     );
     expect(queryByTestId('quick-chip-switch_topic')).toBeNull();
     expect(queryByTestId('quick-chip-park')).toBeNull();
@@ -63,7 +63,7 @@ describe('HomeworkModeChips M6: zero-problems fallback action', () => {
   it('End session button calls handleEndSession [M6]', () => {
     const handleEndSession = jest.fn();
     const { getByTestId } = render(
-      <HomeworkModeChips {...baseProps} handleEndSession={handleEndSession} />
+      <HomeworkModeChips {...baseProps} handleEndSession={handleEndSession} />,
     );
     fireEvent.press(getByTestId('homework-no-problems-end-btn'));
     expect(handleEndSession).toHaveBeenCalledTimes(1);

@@ -45,12 +45,12 @@ export default function AuthRoutesLayout() {
     browserRedirectTarget ?? localRedirectTarget ?? globalRedirectTarget;
   const resolvedRedirectTarget = toInternalAppRedirectPath(
     redirectTarget ?? undefined,
-    '/(app)/home'
+    '/(app)/home',
   );
   const redirectTargetRef = useRef(
     redirectTarget
       ? rememberPendingAuthRedirect(resolvedRedirectTarget)
-      : peekPendingAuthRedirect() ?? resolvedRedirectTarget
+      : (peekPendingAuthRedirect() ?? resolvedRedirectTarget),
   );
   const lastRedirectedPathRef = useRef<string | null>(null);
 
@@ -59,7 +59,7 @@ export default function AuthRoutesLayout() {
     // Expo Router clears auth-route search params during the handoff, and
     // falling back to /home here breaks W-03 deep-link restoration on web.
     redirectTargetRef.current = rememberPendingAuthRedirect(
-      resolvedRedirectTarget
+      resolvedRedirectTarget,
     );
   }
 

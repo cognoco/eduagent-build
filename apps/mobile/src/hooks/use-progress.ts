@@ -54,7 +54,7 @@ export interface ReviewSummary {
 export type { OverdueTopic, OverdueSubject, OverdueTopicsResponse };
 
 export function useSubjectProgress(
-  subjectId: string
+  subjectId: string,
 ): UseQueryResult<SubjectProgress> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -66,7 +66,7 @@ export function useSubjectProgress(
       try {
         const res = await client.subjects[':subjectId'].progress.$get(
           { param: { subjectId } },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         const data = (await res.json()) as { progress: SubjectProgress };
@@ -105,7 +105,7 @@ export function useOverallProgress(): UseQueryResult<OverallProgressResponse> {
       try {
         const res = await client.progress.overview.$get(
           {},
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         return (await res.json()) as OverallProgressResponse;
@@ -128,7 +128,7 @@ export function useContinueSuggestion() {
       try {
         const res = await client.progress.continue.$get(
           {},
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         const data = await res.json();
@@ -144,27 +144,27 @@ export function useContinueSuggestion() {
 export async function fetchLearningResumeTarget(
   client: ReturnType<typeof useApiClient>,
   scope: LearningResumeScope = {},
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<LearningResumeTarget | null> {
   const query = Object.fromEntries(
     Object.entries(scope).filter(
       (entry): entry is [string, string] =>
-        typeof entry[1] === 'string' && entry[1].length > 0
-    )
+        typeof entry[1] === 'string' && entry[1].length > 0,
+    ),
   );
   const resumeTargetClient = (
     client.progress as unknown as {
       'resume-target': {
         $get: (
           args: { query: Record<string, string> },
-          options?: { init?: RequestInit }
+          options?: { init?: RequestInit },
         ) => Promise<Response>;
       };
     }
   )['resume-target'];
   const res = await resumeTargetClient.$get(
     { query },
-    { init: signal ? { signal } : undefined }
+    { init: signal ? { signal } : undefined },
   );
   await assertOk(res);
   const data = (await res.json()) as { target: LearningResumeTarget | null };
@@ -172,7 +172,7 @@ export async function fetchLearningResumeTarget(
 }
 
 export function useLearningResumeTarget(
-  scope: LearningResumeScope = {}
+  scope: LearningResumeScope = {},
 ): UseQueryResult<LearningResumeTarget | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -210,7 +210,7 @@ export function useResumeNudge() {
       try {
         const res = await client.sessions['resume-nudge'].$get(
           {},
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         return (await res.json()) as {
@@ -270,7 +270,7 @@ export function useResolveTopicSubject(topicId: string | undefined) {
       try {
         const res = await client.topics[':topicId'].resolve.$get(
           { param: { topicId: topicId ?? '' } },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         return (await res.json()) as {
@@ -297,7 +297,7 @@ export function useReviewSummary(): UseQueryResult<ReviewSummary> {
       try {
         const res = await client.progress['review-summary'].$get(
           {},
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         return (await res.json()) as ReviewSummary;
@@ -320,7 +320,7 @@ export function useOverdueTopics(): UseQueryResult<OverdueTopicsResponse> {
       try {
         const res = await client.progress['overdue-topics'].$get(
           {},
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         return (await res.json()) as OverdueTopicsResponse;
@@ -334,7 +334,7 @@ export function useOverdueTopics(): UseQueryResult<OverdueTopicsResponse> {
 
 export function useTopicProgress(
   subjectId: string,
-  topicId: string
+  topicId: string,
 ): UseQueryResult<TopicProgress> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -348,7 +348,7 @@ export function useTopicProgress(
           ':topicId'
         ].progress.$get(
           { param: { subjectId, topicId } },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         const data = (await res.json()) as { topic: TopicProgress };
@@ -372,7 +372,7 @@ export function useProgressInventory(): UseQueryResult<KnowledgeInventory> {
       try {
         const res = await client.progress.inventory.$get(
           {},
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         return (await res.json()) as KnowledgeInventory;
@@ -387,7 +387,7 @@ export function useProgressInventory(): UseQueryResult<KnowledgeInventory> {
 }
 
 export function useProgressHistory(
-  query?: ProgressHistoryQuery
+  query?: ProgressHistoryQuery,
 ): UseQueryResult<ProgressHistory> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -405,7 +405,7 @@ export function useProgressHistory(
               ...(query?.granularity ? { granularity: query.granularity } : {}),
             },
           },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         return (await res.json()) as ProgressHistory;
@@ -420,7 +420,7 @@ export function useProgressHistory(
 }
 
 export function useProgressMilestones(
-  limit = 5
+  limit = 5,
 ): UseQueryResult<MilestoneRecord[]> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -432,7 +432,7 @@ export function useProgressMilestones(
       try {
         const res = await client.progress.milestones.$get(
           { query: { limit: String(limit) } },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         const data = (await res.json()) as { milestones: MilestoneRecord[] };
@@ -448,7 +448,7 @@ export function useProgressMilestones(
 }
 
 export function useProfileSessions(
-  profileId: string | undefined
+  profileId: string | undefined,
 ): UseQueryResult<ChildSession[]> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -463,7 +463,7 @@ export function useProfileSessions(
           ? await client.progress.sessions.$get({}, { init: { signal } })
           : await client.dashboard.children[':profileId'].sessions.$get(
               { param: { profileId: profileId ?? '' } },
-              { init: { signal } }
+              { init: { signal } },
             );
         await assertOk(res);
         const data = childSessionsResponseSchema.parse(await res.json());
@@ -480,7 +480,7 @@ export function useProfileSessions(
 }
 
 export function useProfileReports(
-  profileId: string | undefined
+  profileId: string | undefined,
 ): UseQueryResult<MonthlyReportSummary[]> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -495,7 +495,7 @@ export function useProfileReports(
           ? await client.progress.reports.$get({}, { init: { signal } })
           : await client.dashboard.children[':profileId'].reports.$get(
               { param: { profileId: profileId ?? '' } },
-              { init: { signal } }
+              { init: { signal } },
             );
         await assertOk(res);
         const data = childReportsResponseSchema.parse(await res.json());
@@ -512,7 +512,7 @@ export function useProfileReports(
 }
 
 export function useProfileWeeklyReports(
-  profileId: string | undefined
+  profileId: string | undefined,
 ): UseQueryResult<WeeklyReportSummary[]> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -532,13 +532,13 @@ export function useProfileWeeklyReports(
         const res = isActiveProfile
           ? await client.progress['weekly-reports'].$get(
               {},
-              { init: { signal } }
+              { init: { signal } },
             )
           : await client.dashboard.children[':profileId'][
               'weekly-reports'
             ].$get(
               { param: { profileId: profileId ?? '' } },
-              { init: { signal } }
+              { init: { signal } },
             );
         await assertOk(res);
         const data = weeklyReportsResponseSchema.parse(await res.json());
@@ -588,7 +588,7 @@ export function useRefreshProgressSnapshot(): UseMutationResult<
 
 export function useChildInventory(
   childProfileId: string | undefined,
-  options?: { enabled?: boolean }
+  options?: { enabled?: boolean },
 ): UseQueryResult<KnowledgeInventory | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -602,7 +602,7 @@ export function useChildInventory(
           ':profileId'
         ].inventory.$get(
           { param: { profileId: childProfileId ?? '' } },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         const data = (await res.json()) as {
@@ -624,7 +624,7 @@ export function useChildInventory(
 export function useChildProgressHistory(
   childProfileId: string | undefined,
   query?: ProgressHistoryQuery,
-  options?: { enabled?: boolean }
+  options?: { enabled?: boolean },
 ): UseQueryResult<ProgressHistory | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -645,7 +645,7 @@ export function useChildProgressHistory(
               ...(query?.granularity ? { granularity: query.granularity } : {}),
             },
           },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         const data = (await res.json()) as { history: ProgressHistory | null };
@@ -663,7 +663,7 @@ export function useChildProgressHistory(
 }
 
 export function useChildReports(
-  childProfileId: string | undefined
+  childProfileId: string | undefined,
 ): UseQueryResult<MonthlyReportSummary[]> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -675,7 +675,7 @@ export function useChildReports(
       try {
         const res = await client.dashboard.children[':profileId'].reports.$get(
           { param: { profileId: childProfileId ?? '' } },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         const data = (await res.json()) as { reports: MonthlyReportSummary[] };
@@ -691,7 +691,7 @@ export function useChildReports(
 
 export function useChildReportDetail(
   childProfileId: string | undefined,
-  reportId: string | undefined
+  reportId: string | undefined,
 ): UseQueryResult<MonthlyReportRecord | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -710,7 +710,7 @@ export function useChildReportDetail(
               reportId: reportId ?? '',
             },
           },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         const data = (await res.json()) as {
@@ -771,7 +771,7 @@ export function useMarkChildReportViewed(): UseMutationResult<
 // ---------------------------------------------------------------------------
 
 export function useChildWeeklyReports(
-  childProfileId: string | undefined
+  childProfileId: string | undefined,
 ): UseQueryResult<WeeklyReportSummary[]> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -785,7 +785,7 @@ export function useChildWeeklyReports(
           'weekly-reports'
         ].$get(
           { param: { profileId: childProfileId ?? '' } },
-          { init: { signal } }
+          { init: { signal } },
         );
         // [BUG-549] New child profiles may return 403 (no family link yet)
         // or 404. Treat these as "no data yet" rather than a hard error so
@@ -793,7 +793,7 @@ export function useChildWeeklyReports(
         // [IMP-7] Log the status so silent 403s don't mask real ACL bugs.
         if (res.status === 403 || res.status === 404) {
           console.warn(
-            `[useChildWeeklyReports] ${res.status} for child ${childProfileId} — returning empty`
+            `[useChildWeeklyReports] ${res.status} for child ${childProfileId} — returning empty`,
           );
           return [];
         }
@@ -815,7 +815,7 @@ export function useChildWeeklyReports(
 
 export function useChildWeeklyReportDetail(
   childProfileId: string | undefined,
-  reportId: string | undefined
+  reportId: string | undefined,
 ): UseQueryResult<WeeklyReportRecord | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -834,7 +834,7 @@ export function useChildWeeklyReportDetail(
               reportId: reportId ?? '',
             },
           },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         const data = (await res.json()) as {

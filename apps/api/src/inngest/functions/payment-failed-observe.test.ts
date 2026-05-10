@@ -16,7 +16,7 @@ jest.mock('../client', () => ({
           trigger: _trigger,
           fn,
         });
-      }
+      },
     ),
   },
 }));
@@ -67,7 +67,9 @@ describe('paymentFailedObserve [AUDIT-INNGEST-1]', () => {
       status: 'logged',
       source: 'stripe',
       subscriptionId: 'sub_local_1',
+      stripeSubscriptionId: 'sub_stripe_1',
       accountId: 'acct_1',
+      attempt: 2,
       retryDeferred: 'pending_payment_failed_retry_strategy',
     });
   });
@@ -84,7 +86,9 @@ describe('paymentFailedObserve [AUDIT-INNGEST-1]', () => {
       status: 'logged',
       source: 'revenuecat',
       subscriptionId: 'sub_local_2',
+      stripeSubscriptionId: null,
       accountId: 'acct_2',
+      attempt: null,
       retryDeferred: 'pending_payment_failed_retry_strategy',
     });
   });

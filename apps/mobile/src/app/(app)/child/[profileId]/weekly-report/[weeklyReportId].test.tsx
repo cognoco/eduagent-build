@@ -76,7 +76,7 @@ function makeReport(
       vocabularyTotal: number;
     };
     headlineStat: { label: string; value: number; comparison: string };
-  }>
+  }>,
 ) {
   return {
     id: 'wr-001',
@@ -123,16 +123,16 @@ describe('ChildWeeklyReportDetailScreen', () => {
 
     screen.getByTestId('child-weekly-report-hero');
     expect(
-      screen.getByTestId('child-weekly-report-metric-sessions')
+      screen.getByTestId('child-weekly-report-metric-sessions'),
     ).toBeTruthy();
     expect(
-      screen.getByTestId('child-weekly-report-metric-minutes')
+      screen.getByTestId('child-weekly-report-metric-minutes'),
     ).toBeTruthy();
     expect(
-      screen.getByTestId('child-weekly-report-metric-topics')
+      screen.getByTestId('child-weekly-report-metric-topics'),
     ).toBeTruthy();
     expect(
-      screen.getByTestId('child-weekly-report-metric-vocabulary')
+      screen.getByTestId('child-weekly-report-metric-vocabulary'),
     ).toBeTruthy();
   });
 

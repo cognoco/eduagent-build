@@ -63,6 +63,8 @@ function subjectUpdateRetryDelay(attemptIndex: number, error: unknown): number {
   return Math.min(500 * 2 ** attemptIndex, 3000);
 }
 
+const PREPARING_POLL_MS = 3000;
+
 export function useSubjects(
   options: UseSubjectsOptions = {},
 ): UseQueryResult<Subject[]> {
@@ -70,7 +72,7 @@ export function useSubjects(
   const { activeProfile } = useProfile();
   const { includeInactive = false, enabled: callerEnabled } = options;
 
-  return useQuery({
+  const result = useQuery({
     queryKey: ['subjects', activeProfile?.id, includeInactive],
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
@@ -91,7 +93,17 @@ export function useSubjects(
       }
     },
     enabled: !!activeProfile && callerEnabled !== false,
+    refetchInterval: (query) => {
+      const subjects = query.state.data;
+      if (!subjects) return false;
+      const hasPreparing = subjects.some(
+        (s) => s.curriculumStatus === 'preparing',
+      );
+      return hasPreparing ? PREPARING_POLL_MS : false;
+    },
   });
+
+  return result;
 }
 
 export function useCreateSubject(): UseMutationResult<

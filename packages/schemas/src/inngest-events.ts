@@ -51,6 +51,17 @@ export type SubjectCurriculumPrewarmRequestedEvent = z.infer<
   typeof subjectCurriculumPrewarmRequestedEventSchema
 >;
 
+export const subjectCurriculumRetryRequestedEventSchema = z.object({
+  version: z.literal(1),
+  subjectId: z.string().uuid(),
+  profileId: z.string().uuid(),
+  bookId: z.string().uuid(),
+  timestamp: z.string().datetime(),
+});
+export type SubjectCurriculumRetryRequestedEvent = z.infer<
+  typeof subjectCurriculumRetryRequestedEventSchema
+>;
+
 export const orphanPersistFailedEventSchema = z.object({
   profileId: z.string().uuid(),
   draftId: z.string().uuid(),
@@ -97,6 +108,12 @@ export const topicProbeRequestedEventSchema = z.object({
 export type TopicProbeRequestedEvent = z.infer<
   typeof topicProbeRequestedEventSchema
 >;
+
+export const streakRecordEventSchema = z.object({
+  profileId: z.string().uuid(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
+export type StreakRecordEvent = z.infer<typeof streakRecordEventSchema>;
 
 // ---------------------------------------------------------------------------
 // Retention SLO monitoring events (BUG-991 / BUG-992 / BUG-993 / BUG-994)
@@ -147,4 +164,38 @@ export const summaryReconciliationRequeuedEventSchema = z.object({
 });
 export type SummaryReconciliationRequeuedEvent = z.infer<
   typeof summaryReconciliationRequeuedEventSchema
+>;
+
+// ---------------------------------------------------------------------------
+// Ask-classification observability events (CCR-PR126-NEW-2)
+// ---------------------------------------------------------------------------
+
+export const classificationCompletedEventSchema = z.object({
+  sessionId: z.string().optional(),
+  exchangeCount: z.number().optional(),
+  subjectId: z.string().optional(),
+  subjectName: z.string().optional(),
+  confidence: z.number().optional(),
+});
+export type ClassificationCompletedEvent = z.infer<
+  typeof classificationCompletedEventSchema
+>;
+
+export const classificationSkippedEventSchema = z.object({
+  sessionId: z.string().optional(),
+  exchangeCount: z.number().optional(),
+  reason: z.string().optional(),
+  topConfidence: z.number().optional(),
+});
+export type ClassificationSkippedEvent = z.infer<
+  typeof classificationSkippedEventSchema
+>;
+
+export const classificationFailedEventSchema = z.object({
+  sessionId: z.string().optional(),
+  exchangeCount: z.number().optional(),
+  error: z.string().optional(),
+});
+export type ClassificationFailedEvent = z.infer<
+  typeof classificationFailedEventSchema
 >;

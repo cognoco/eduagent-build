@@ -251,8 +251,8 @@ describe('[CR-SECURESTORE-REGISTRY-11] sign-out cleanup registry enforcement', (
     // checked against the registry.
     const exceptionCallsites = new Set(
       REGISTRY_EXCEPTIONS.map(
-        (e: { file: string; line: number }) => `${e.file}:${e.line}`
-      )
+        (e: { file: string; line: number }) => `${e.file}:${e.line}`,
+      ),
     );
 
     const unregistered: Callsite[] = [];
@@ -267,7 +267,7 @@ describe('[CR-SECURESTORE-REGISTRY-11] sign-out cleanup registry enforcement', (
       const lines = unregistered
         .map(
           (cs) =>
-            `  ${cs.relPath}:${cs.line}\n    setItemAsync key: ${cs.rawArg}`
+            `  ${cs.relPath}:${cs.line}\n    setItemAsync key: ${cs.rawArg}`,
         )
         .join('\n\n');
       throw new Error(
@@ -276,7 +276,7 @@ describe('[CR-SECURESTORE-REGISTRY-11] sign-out cleanup registry enforcement', (
           `in REGISTRY_EXCEPTIONS. Either register the key in ` +
           `apps/mobile/src/lib/sign-out-cleanup.ts, or add a justified ` +
           `entry to REGISTRY_EXCEPTIONS. Do not disable this test.\n\n` +
-          `Unregistered callsites:\n${lines}`
+          `Unregistered callsites:\n${lines}`,
       );
     }
   });
@@ -296,7 +296,7 @@ describe('[CR-SECURESTORE-REGISTRY-11] sign-out cleanup registry enforcement', (
     // that the callsite is present in REGISTRY_EXCEPTIONS and its file exists.
     const clerkException = REGISTRY_EXCEPTIONS.find(
       (e: { file: string; line: number }) =>
-        e.file === 'apps/mobile/src/app/_layout.tsx' && e.line === 55
+        e.file === 'apps/mobile/src/app/_layout.tsx' && e.line === 55,
     );
     expect(clerkException).not.toBeUndefined();
     const abs = path.resolve(
@@ -305,7 +305,7 @@ describe('[CR-SECURESTORE-REGISTRY-11] sign-out cleanup registry enforcement', (
       '..',
       '..',
       '..',
-      clerkException!.file
+      clerkException!.file,
     );
     expect(fs.existsSync(abs)).toBe(true);
   });
@@ -317,8 +317,8 @@ describe('[CR-SECURESTORE-REGISTRY-11] sign-out cleanup registry enforcement', (
     // silently ignored; with callsite-scoped exceptions it must be flagged.
     const exceptionCallsites = new Set(
       REGISTRY_EXCEPTIONS.map(
-        (e: { file: string; line: number }) => `${e.file}:${e.line}`
-      )
+        (e: { file: string; line: number }) => `${e.file}:${e.line}`,
+      ),
     );
 
     // Pick any file that has at least one exception entry.
@@ -334,7 +334,7 @@ describe('[CR-SECURESTORE-REGISTRY-11] sign-out cleanup registry enforcement', (
     };
 
     const isExcepted = exceptionCallsites.has(
-      `${simulatedCallsite.relPath}:${simulatedCallsite.line}`
+      `${simulatedCallsite.relPath}:${simulatedCallsite.line}`,
     );
     expect(isExcepted).toBe(false);
 

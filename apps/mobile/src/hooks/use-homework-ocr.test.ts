@@ -88,7 +88,7 @@ describe('useHomeworkOcr', () => {
         source: 'local',
         tokens: expect.any(Number),
         words: expect.any(Number),
-      })
+      }),
     );
   });
 
@@ -119,7 +119,7 @@ describe('useHomeworkOcr', () => {
     expect(mockManipulateAsync).toHaveBeenCalledWith(
       expect.stringMatching(/^file:\/\/\/cache\/homework-\d+\.jpg$/),
       [{ resize: { width: 1600 } }],
-      { format: 'jpeg', compress: 0.9 }
+      { format: 'jpeg', compress: 0.9 },
     );
   });
 
@@ -142,13 +142,13 @@ describe('useHomeworkOcr', () => {
       expect.objectContaining({
         source: 'local',
         droppedCount: 1,
-      })
+      }),
     );
     expect(mockTrackHomeworkOcrGateShortcircuit).toHaveBeenCalledWith(
       expect.objectContaining({
         tokens: expect.any(Number),
         words: expect.any(Number),
-      })
+      }),
     );
   });
 
@@ -160,8 +160,8 @@ describe('useHomeworkOcr', () => {
           text: 'Server-side OCR rescue text',
           confidence: 0.93,
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useHomeworkOcr());
@@ -176,7 +176,7 @@ describe('useHomeworkOcr', () => {
       expect.objectContaining({
         source: 'server',
         confidence: 0.93,
-      })
+      }),
     );
   });
 
@@ -188,8 +188,8 @@ describe('useHomeworkOcr', () => {
           text: 'Solve 2x + 5 = 13',
           confidence: 0.2,
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useHomeworkOcr());
@@ -204,7 +204,7 @@ describe('useHomeworkOcr', () => {
       expect.objectContaining({
         source: 'server',
         confidence: 0.2,
-      })
+      }),
     );
     expect(mockTrackHomeworkOcrGateShortcircuit).not.toHaveBeenCalled();
   });
@@ -217,8 +217,8 @@ describe('useHomeworkOcr', () => {
         JSON.stringify({ text: 'Uploaded OCR text', confidence: 0.89 }),
         {
           status: 200,
-        }
-      )
+        },
+      ),
     );
 
     const { result } = renderHook(() => useHomeworkOcr());
@@ -247,7 +247,7 @@ describe('useHomeworkOcr', () => {
 
     expect(result.current.status).toBe('error');
     expect(result.current.error).toBe(
-      "We couldn't read that clearly. Try taking the photo again with better lighting."
+      "We couldn't read that clearly. Try taking the photo again with better lighting.",
     );
   });
 
@@ -370,7 +370,7 @@ describe('useHomeworkOcr', () => {
       (_url: string, init: { signal?: AbortSignal }) => {
         capturedSignal = init.signal;
         return fetchPromise;
-      }
+      },
     );
 
     const { result } = renderHook(() => useHomeworkOcr());

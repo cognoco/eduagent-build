@@ -36,7 +36,7 @@ describe('useResolveSubject', () => {
       isNew: true,
     };
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify(resolveResult), { status: 200 })
+      new Response(JSON.stringify(resolveResult), { status: 200 }),
     );
 
     const { result } = renderHook(() => useResolveSubject(), {
@@ -58,8 +58,8 @@ describe('useResolveSubject', () => {
         JSON.stringify({
           error: { message: 'Bad request', code: 'VALIDATION_ERROR' },
         }),
-        { status: 400 }
-      )
+        { status: 400 },
+      ),
     );
 
     const { result } = renderHook(() => useResolveSubject(), {
@@ -68,7 +68,7 @@ describe('useResolveSubject', () => {
 
     await act(async () => {
       await expect(
-        result.current.mutateAsync({ rawInput: '' })
+        result.current.mutateAsync({ rawInput: '' }),
       ).rejects.toThrow();
     });
   });

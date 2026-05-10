@@ -58,18 +58,18 @@ export const memoryFacts = pgTable(
     }).onDelete('set null'),
     index('memory_facts_profile_category_idx').on(
       table.profileId,
-      table.category
+      table.category,
     ),
     index('memory_facts_profile_created_idx').on(
       table.profileId,
-      table.createdAt
+      table.createdAt,
     ),
     index('memory_facts_active_idx')
       .on(table.profileId, table.category)
       .where(sql`${table.supersededBy} IS NULL`),
     index('memory_facts_profile_text_normalized_idx').on(
       table.profileId,
-      table.textNormalized
+      table.textNormalized,
     ),
     index('memory_facts_embedding_hnsw_idx')
       .using('hnsw', table.embedding.op('vector_cosine_ops'))
@@ -80,8 +80,8 @@ export const memoryFacts = pgTable(
         table.category,
         sql`COALESCE(${table.metadata}->>'subject', '')`,
         sql`COALESCE(${table.metadata}->>'context', '')`,
-        table.textNormalized
+        table.textNormalized,
       )
       .where(sql`${table.supersededBy} IS NULL`),
-  ]
+  ],
 );

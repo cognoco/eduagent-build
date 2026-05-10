@@ -38,7 +38,7 @@ export const initialCameraState: CameraState = {
 
 export function cameraReducer(
   state: CameraState,
-  action: CameraAction
+  action: CameraAction,
 ): CameraState {
   switch (action.type) {
     case 'PERMISSION_GRANTED':

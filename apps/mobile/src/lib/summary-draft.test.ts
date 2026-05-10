@@ -60,7 +60,7 @@ describe('summary-draft', () => {
         sessionId: SESSION,
         content: 'partial reflection',
         updatedAt: new Date().toISOString(),
-      })
+      }),
     );
 
     const draft = await readSummaryDraft(PROFILE, SESSION);
@@ -74,7 +74,7 @@ describe('summary-draft', () => {
         sessionId: SESSION,
         content: 'leaked text',
         updatedAt: new Date().toISOString(),
-      })
+      }),
     );
 
     await expect(readSummaryDraft(PROFILE, SESSION)).resolves.toBeNull();
@@ -89,7 +89,7 @@ describe('summary-draft', () => {
         sessionId: SESSION,
         content: 'stale text',
         updatedAt: stale,
-      })
+      }),
     );
 
     const draft = await readSummaryDraft(PROFILE, SESSION, now);
@@ -111,7 +111,7 @@ describe('summary-draft', () => {
   it('swallows SecureStore write errors (never throws into caller)', async () => {
     mockSet.mockRejectedValue(new Error('keychain locked'));
     await expect(
-      writeSummaryDraft(PROFILE, SESSION, 'x')
+      writeSummaryDraft(PROFILE, SESSION, 'x'),
     ).resolves.toBeUndefined();
   });
 });

@@ -46,7 +46,7 @@ export async function getStoredLanguage(): Promise<string | null> {
 }
 
 export async function setStoredLanguage(
-  lang: SupportedLanguage
+  lang: SupportedLanguage,
 ): Promise<void> {
   await AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, lang);
 }
@@ -68,7 +68,7 @@ function getDeviceLanguage(): string {
 
 export function resolveLanguage(
   stored: string | null,
-  deviceLang: string
+  deviceLang: string,
 ): SupportedLanguage {
   if (stored && (SUPPORTED_LANGUAGES as readonly string[]).includes(stored)) {
     return stored as SupportedLanguage;

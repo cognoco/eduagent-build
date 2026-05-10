@@ -30,14 +30,14 @@ export function vectorNullableToDriver(value: number[] | null): string | null {
 }
 
 export function vectorNullableFromDriver(
-  value: string | null
+  value: string | null,
 ): number[] | null {
   return value === null ? null : vectorFromDriver(value);
 }
 
 /** Custom pgvector type for Drizzle ORM. Apply `.notNull()` per column. */
 export const vector = customType<{ data: number[]; driverData: string }>(
-  vectorConfig
+  vectorConfig,
 );
 
 /** Nullable pgvector column with the same SQL type and nullable TS inference. */

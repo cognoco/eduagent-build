@@ -23,5 +23,5 @@ export const memoryDedupDecisions = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (table) => [primaryKey({ columns: [table.profileId, table.pairKey] })]
+  (table) => [primaryKey({ columns: [table.profileId, table.pairKey] })],
 );

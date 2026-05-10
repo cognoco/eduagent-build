@@ -56,6 +56,7 @@ import {
 import { feedbackDeliveryFailed } from './functions/feedback-delivery-failed';
 import { orphanPersistFailed } from './functions/orphan-persist-failed';
 import { subjectPrewarmCurriculum } from './functions/subject-prewarm-curriculum';
+import { subjectRetryCurriculum } from './functions/subject-retry-curriculum';
 import { notificationSuppressedObserve } from './functions/notification-suppressed-observe';
 import {
   learnerRecapRegenerate,
@@ -72,6 +73,7 @@ import { memoryFactsBackfill } from './functions/memory-facts-backfill';
 import { memoryFactsEmbedBackfill } from './functions/memory-facts-embed-backfill';
 import { reviewCalibrationGrade } from './functions/review-calibration-grade';
 import { topicProbeExtract } from './functions/topic-probe-extract';
+import { streakRecord } from './functions/streak-record';
 
 export {
   inngest,
@@ -116,6 +118,7 @@ export {
   askSilentClassifyOnFailure,
   orphanPersistFailed,
   subjectPrewarmCurriculum,
+  subjectRetryCurriculum,
   notificationSuppressedObserve,
   sessionSummaryCreate,
   sessionSummaryRegenerate,
@@ -128,6 +131,7 @@ export {
   memoryFactsEmbedBackfill,
   reviewCalibrationGrade,
   topicProbeExtract,
+  streakRecord,
 };
 
 // All Inngest functions to register with the serve handler
@@ -174,6 +178,7 @@ export const functions = [
   askSilentClassifyOnFailure,
   orphanPersistFailed,
   subjectPrewarmCurriculum,
+  subjectRetryCurriculum,
   notificationSuppressedObserve,
   sessionSummaryCreate,
   sessionSummaryRegenerate,
@@ -186,4 +191,5 @@ export const functions = [
   memoryFactsEmbedBackfill,
   reviewCalibrationGrade,
   topicProbeExtract,
+  streakRecord,
 ];

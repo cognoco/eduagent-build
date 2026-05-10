@@ -5,6 +5,7 @@ import type { ChatMessage } from '../llm';
 import { escapeXml } from '../llm/sanitize';
 import { UpstreamLlmError } from '../../errors';
 import { captureException } from '../sentry';
+import { extractFirstJsonObject } from '../llm/extract-json';
 
 // ---------------------------------------------------------------------------
 // Prepare-Homework Dictation Service
@@ -60,7 +61,7 @@ RESPOND WITH ONLY valid JSON in this exact format:
 }`;
 
 export async function prepareHomework(
-  text: string
+  text: string,
 ): Promise<PrepareHomeworkOutput> {
   // [PROMPT-INJECT-3] text is untrusted free-text homework content pasted
   // or captured by a parent/learner. Wrap in a named tag and entity-encode
@@ -76,10 +77,10 @@ export async function prepareHomework(
 
   const result = await routeAndCall(messages, 1);
 
-  const jsonMatch = result.response.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
+  const jsonStr = extractFirstJsonObject(result.response);
+  if (!jsonStr) {
     const err = new UpstreamLlmError(
-      'LLM returned no JSON in prepare-homework response'
+      'LLM returned no JSON in prepare-homework response',
     );
     captureException(err, {
       requestPath: 'services/dictation/prepare-homework',
@@ -88,17 +89,17 @@ export async function prepareHomework(
   }
 
   try {
-    const parsed = JSON.parse(jsonMatch[0]);
+    const parsed = JSON.parse(jsonStr);
     return prepareHomeworkOutputSchema.parse(parsed);
   } catch (parseErr) {
     captureException(
       parseErr instanceof Error
         ? parseErr
         : new Error('Prepare-homework parse failed'),
-      { requestPath: 'services/dictation/prepare-homework' }
+      { requestPath: 'services/dictation/prepare-homework' },
     );
     throw new UpstreamLlmError(
-      'Prepare-homework LLM returned invalid structured output'
+      'Prepare-homework LLM returned invalid structured output',
     );
   }
 }

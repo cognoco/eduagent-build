@@ -18,7 +18,7 @@ describe('NoteDisplay', () => {
         content="Pyramids are tombs for pharaohs"
         onEdit={jest.fn()}
         onDelete={jest.fn()}
-      />
+      />,
     );
     getByText('Pyramids are tombs for pharaohs');
   });
@@ -29,7 +29,7 @@ describe('NoteDisplay', () => {
         content="Some note"
         onEdit={jest.fn()}
         onDelete={jest.fn()}
-      />
+      />,
     );
     getByTestId('note-edit-button');
     getByTestId('note-delete-button');
@@ -37,7 +37,7 @@ describe('NoteDisplay', () => {
 
   it('hides edit/delete in read-only mode', () => {
     const { queryByTestId } = render(
-      <NoteDisplay content="Some note" readOnly />
+      <NoteDisplay content="Some note" readOnly />,
     );
     expect(queryByTestId('note-edit-button')).toBeNull();
     expect(queryByTestId('note-delete-button')).toBeNull();
@@ -57,14 +57,14 @@ describe('NoteDisplay', () => {
         content="Test note"
         onEdit={jest.fn()}
         onDelete={jest.fn()}
-      />
+      />,
     );
     const iconWrapper = getByTestId('note-edit-icon', {
       includeHiddenElements: true,
     });
     expect(iconWrapper.props.accessibilityElementsHidden).toBe(true);
     expect(iconWrapper.props.importantForAccessibility).toBe(
-      'no-hide-descendants'
+      'no-hide-descendants',
     );
   });
 
@@ -74,7 +74,7 @@ describe('NoteDisplay', () => {
         content="Test note"
         onEdit={jest.fn()}
         onDelete={jest.fn()}
-      />
+      />,
     );
     expect(queryByTestId('note-edit-icon')).toBeNull();
   });
@@ -85,14 +85,14 @@ describe('NoteDisplay', () => {
         content="Test note"
         onEdit={jest.fn()}
         onDelete={jest.fn()}
-      />
+      />,
     );
     const iconWrapper = getByTestId('note-delete-icon', {
       includeHiddenElements: true,
     });
     expect(iconWrapper.props.accessibilityElementsHidden).toBe(true);
     expect(iconWrapper.props.importantForAccessibility).toBe(
-      'no-hide-descendants'
+      'no-hide-descendants',
     );
   });
 });

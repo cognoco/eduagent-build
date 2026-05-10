@@ -51,7 +51,7 @@ export type AccountRepository = ReturnType<typeof createAccountRepository>;
 /** Find a subscription by its primary key. */
 export async function findSubscriptionById(
   db: Database,
-  subscriptionId: string
+  subscriptionId: string,
 ) {
   return db.query.subscriptions.findFirst({
     where: eq(subscriptions.id, subscriptionId),
@@ -61,7 +61,7 @@ export async function findSubscriptionById(
 /** Find a subscription by its Stripe subscription ID. */
 export async function findSubscriptionByStripeId(
   db: Database,
-  stripeSubscriptionId: string
+  stripeSubscriptionId: string,
 ) {
   return db.query.subscriptions.findFirst({
     where: eq(subscriptions.stripeSubscriptionId, stripeSubscriptionId),
@@ -78,7 +78,7 @@ export async function findQuotaPool(db: Database, subscriptionId: string) {
 /** Find a top-up credit by its RevenueCat transaction ID. */
 export async function findTopUpByTransactionId(
   db: Database,
-  transactionId: string
+  transactionId: string,
 ) {
   return db.query.topUpCredits.findFirst({
     where: eq(topUpCredits.revenuecatTransactionId, transactionId),

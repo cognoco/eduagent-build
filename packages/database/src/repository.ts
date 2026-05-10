@@ -66,12 +66,12 @@ type QuizActivityType = 'capitals' | 'vocabulary' | 'guess_who';
 export function createScopedRepository(db: Database, profileId: string) {
   if (!profileId || profileId.trim() === '') {
     throw new Error(
-      'createScopedRepository: profileId must be a non-empty string'
+      'createScopedRepository: profileId must be a non-empty string',
     );
   }
   function scopedWhere(
     table: { profileId: Column },
-    extraWhere?: SQL
+    extraWhere?: SQL,
   ): SQL | undefined {
     const profileFilter = eq(table.profileId, profileId);
     return extraWhere ? and(profileFilter, extraWhere) : profileFilter;
@@ -123,8 +123,8 @@ export function createScopedRepository(db: Database, profileId: string) {
               eq(learningSessions.profileId, profileId),
               sql`${learningSessions.topicId} IS NOT NULL`,
               inArray(learningSessions.status, ['completed', 'auto_closed']),
-              gte(learningSessions.exchangeCount, 3)
-            )
+              gte(learningSessions.exchangeCount, 3),
+            ),
           );
         return rows
           .map((row) => row.topicId)
@@ -161,7 +161,7 @@ export function createScopedRepository(db: Database, profileId: string) {
     retentionCards: {
       async findMany(
         extraWhere?: SQL,
-        options?: { limit?: number; orderBy?: 'nextReviewAtAsc' }
+        options?: { limit?: number; orderBy?: 'nextReviewAtAsc' },
       ) {
         return db.query.retentionCards.findMany({
           where: scopedWhere(retentionCards, extraWhere),
@@ -200,9 +200,9 @@ export function createScopedRepository(db: Database, profileId: string) {
               eq(retentionCards.profileId, profileId),
               or(
                 gt(retentionCards.repetitions, 0),
-                isNotNull(retentionCards.lastReviewedAt)
-              )
-            )
+                isNotNull(retentionCards.lastReviewedAt),
+              ),
+            ),
           );
         return rows
           .map((row) => row.topicId)
@@ -416,7 +416,7 @@ export function createScopedRepository(db: Database, profileId: string) {
             memoryFacts,
             extraWhere
               ? and(sql`${memoryFacts.supersededBy} IS NULL`, extraWhere)
-              : sql`${memoryFacts.supersededBy} IS NULL`
+              : sql`${memoryFacts.supersededBy} IS NULL`,
           ),
           orderBy: [asc(memoryFacts.createdAt), asc(memoryFacts.id)],
         });
@@ -427,7 +427,7 @@ export function createScopedRepository(db: Database, profileId: string) {
             memoryFacts,
             extraWhere
               ? and(sql`${memoryFacts.supersededBy} IS NULL`, extraWhere)
-              : sql`${memoryFacts.supersededBy} IS NULL`
+              : sql`${memoryFacts.supersededBy} IS NULL`,
           ),
           orderBy: [asc(memoryFacts.createdAt), asc(memoryFacts.id)],
         });
@@ -439,8 +439,8 @@ export function createScopedRepository(db: Database, profileId: string) {
             and(
               sql`${memoryFacts.supersededBy} IS NULL`,
               sql`${memoryFacts.embedding} IS NOT NULL`,
-              sql`${memoryFacts.category} <> 'suppressed'`
-            )
+              sql`${memoryFacts.category} <> 'suppressed'`,
+            ),
           ),
           orderBy: [asc(memoryFacts.createdAt), asc(memoryFacts.id)],
         });
@@ -462,7 +462,7 @@ export function createScopedRepository(db: Database, profileId: string) {
       async findRelevant(
         queryEmbedding: number[],
         k: number,
-        extraWhere?: SQL
+        extraWhere?: SQL,
       ) {
         if (
           queryEmbedding.length !== VECTOR_DIM ||
@@ -476,11 +476,11 @@ export function createScopedRepository(db: Database, profileId: string) {
         const queryLiteral = sql`${`[${queryEmbedding.join(',')}]`}::vector`;
         const defaultFilters = and(
           sql`${memoryFacts.supersededBy} IS NULL`,
-          sql`${memoryFacts.category} <> 'suppressed'`
+          sql`${memoryFacts.category} <> 'suppressed'`,
         );
         const baseWhere = scopedWhere(
           memoryFacts,
-          extraWhere ? and(defaultFilters, extraWhere) : defaultFilters
+          extraWhere ? and(defaultFilters, extraWhere) : defaultFilters,
         );
 
         return db
@@ -575,7 +575,7 @@ export function createScopedRepository(db: Database, profileId: string) {
         const subject = await db.query.subjects.findFirst({
           where: and(
             eq(subjects.id, subjectId),
-            eq(subjects.profileId, profileId)
+            eq(subjects.profileId, profileId),
           ),
         });
         if (!subject) return [];
@@ -593,7 +593,7 @@ export function createScopedRepository(db: Database, profileId: string) {
         const subject = await db.query.subjects.findFirst({
           where: and(
             eq(subjects.id, book.subjectId),
-            eq(subjects.profileId, profileId)
+            eq(subjects.profileId, profileId),
           ),
         });
         if (!subject) return [];
@@ -624,14 +624,14 @@ export function createScopedRepository(db: Database, profileId: string) {
           .from(curriculumTopics)
           .innerJoin(
             curriculumBooks,
-            eq(curriculumBooks.id, curriculumTopics.bookId)
+            eq(curriculumBooks.id, curriculumTopics.bookId),
           )
           .innerJoin(subjects, eq(subjects.id, curriculumBooks.subjectId))
           .where(
             and(
               eq(curriculumTopics.id, topicId),
-              eq(subjects.profileId, profileId)
-            )
+              eq(subjects.profileId, profileId),
+            ),
           )
           .limit(1);
         return row ?? null;
@@ -652,14 +652,14 @@ export function createScopedRepository(db: Database, profileId: string) {
       async findLaterInBook(
         bookId: string,
         minSortOrder: number,
-        limit: number
+        limit: number,
       ): Promise<Array<{ id: string; title: string }>> {
         return db
           .select({ id: curriculumTopics.id, title: curriculumTopics.title })
           .from(curriculumTopics)
           .innerJoin(
             curriculumBooks,
-            eq(curriculumBooks.id, curriculumTopics.bookId)
+            eq(curriculumBooks.id, curriculumTopics.bookId),
           )
           .innerJoin(subjects, eq(subjects.id, curriculumBooks.subjectId))
           .where(
@@ -667,8 +667,8 @@ export function createScopedRepository(db: Database, profileId: string) {
               eq(curriculumTopics.bookId, bookId),
               gt(curriculumTopics.sortOrder, minSortOrder),
               eq(curriculumTopics.skipped, false),
-              eq(subjects.profileId, profileId)
-            )
+              eq(subjects.profileId, profileId),
+            ),
           )
           .orderBy(asc(curriculumTopics.sortOrder), asc(curriculumTopics.id))
           .limit(limit);
@@ -688,14 +688,14 @@ export function createScopedRepository(db: Database, profileId: string) {
       async findEarliestInLaterBooks(
         subjectId: string,
         currentBookSortOrder: number,
-        limit: number
+        limit: number,
       ): Promise<Array<{ id: string; title: string }>> {
         return db
           .select({ id: curriculumTopics.id, title: curriculumTopics.title })
           .from(curriculumTopics)
           .innerJoin(
             curriculumBooks,
-            eq(curriculumBooks.id, curriculumTopics.bookId)
+            eq(curriculumBooks.id, curriculumTopics.bookId),
           )
           .innerJoin(subjects, eq(subjects.id, curriculumBooks.subjectId))
           .where(
@@ -703,13 +703,13 @@ export function createScopedRepository(db: Database, profileId: string) {
               eq(curriculumBooks.subjectId, subjectId),
               gt(curriculumBooks.sortOrder, currentBookSortOrder),
               eq(curriculumTopics.skipped, false),
-              eq(subjects.profileId, profileId)
-            )
+              eq(subjects.profileId, profileId),
+            ),
           )
           .orderBy(
             asc(curriculumBooks.sortOrder),
             asc(curriculumTopics.sortOrder),
-            asc(curriculumTopics.id)
+            asc(curriculumTopics.id),
           )
           .limit(limit);
       },
@@ -727,7 +727,7 @@ export function createScopedRepository(db: Database, profileId: string) {
       async findMatchingInSubject(
         subjectId: string,
         keywords: string[],
-        limit: number
+        limit: number,
       ): Promise<Array<{ id: string; title: string }>> {
         if (keywords.length === 0) return [];
         return db
@@ -735,7 +735,7 @@ export function createScopedRepository(db: Database, profileId: string) {
           .from(curriculumTopics)
           .innerJoin(
             curriculumBooks,
-            eq(curriculumBooks.id, curriculumTopics.bookId)
+            eq(curriculumBooks.id, curriculumTopics.bookId),
           )
           .innerJoin(subjects, eq(subjects.id, curriculumBooks.subjectId))
           .where(
@@ -744,10 +744,10 @@ export function createScopedRepository(db: Database, profileId: string) {
               eq(subjects.profileId, profileId),
               or(
                 ...keywords.map((keyword) =>
-                  ilike(curriculumTopics.title, `%${keyword}%`)
-                )
-              )
-            )
+                  ilike(curriculumTopics.title, `%${keyword}%`),
+                ),
+              ),
+            ),
           )
           .limit(limit);
       },
@@ -795,12 +795,12 @@ export function createScopedRepository(db: Database, profileId: string) {
       },
       async findRecentByActivity(
         activityType: (typeof quizRounds.$inferSelect)['activityType'],
-        limit: number
+        limit: number,
       ) {
         return db.query.quizRounds.findMany({
           where: scopedWhere(
             quizRounds,
-            eq(quizRounds.activityType, activityType)
+            eq(quizRounds.activityType, activityType),
           ),
           orderBy: [desc(quizRounds.createdAt)],
           limit,
@@ -820,6 +820,18 @@ export function createScopedRepository(db: Database, profileId: string) {
             xpEarned: true,
             createdAt: true,
             completedAt: true,
+          },
+        });
+      },
+      async findCompletedForStreaks(limit: number) {
+        return db.query.quizRounds.findMany({
+          where: scopedWhere(quizRounds, eq(quizRounds.status, 'completed')),
+          orderBy: [desc(quizRounds.completedAt)],
+          limit,
+          columns: {
+            activityType: true,
+            languageCode: true,
+            results: true,
           },
         });
       },
@@ -855,8 +867,8 @@ export function createScopedRepository(db: Database, profileId: string) {
           .where(
             and(
               eq(quizRounds.profileId, profileId),
-              eq(quizRounds.status, 'completed')
-            )
+              eq(quizRounds.status, 'completed'),
+            ),
           )
           .groupBy(quizRounds.activityType, quizRounds.languageCode);
 
@@ -892,7 +904,7 @@ export function createScopedRepository(db: Database, profileId: string) {
           score: number;
           xpEarned: number;
           completedAt: Date;
-        }
+        },
       ) {
         const rows = await db
           .update(quizRounds)
@@ -907,8 +919,8 @@ export function createScopedRepository(db: Database, profileId: string) {
             and(
               eq(quizRounds.id, roundId),
               eq(quizRounds.profileId, profileId),
-              eq(quizRounds.status, 'active')
-            )
+              eq(quizRounds.status, 'active'),
+            ),
           )
           .returning({ id: quizRounds.id });
         return rows[0];
@@ -927,7 +939,7 @@ export function createScopedRepository(db: Database, profileId: string) {
         });
       },
       async insertMany(
-        values: Array<Omit<typeof quizMissedItems.$inferInsert, 'profileId'>>
+        values: Array<Omit<typeof quizMissedItems.$inferInsert, 'profileId'>>,
       ) {
         if (values.length === 0) return [];
         return db
@@ -936,7 +948,7 @@ export function createScopedRepository(db: Database, profileId: string) {
           .returning({ id: quizMissedItems.id });
       },
       async markSurfaced(
-        activityType: (typeof quizMissedItems.$inferSelect)['activityType']
+        activityType: (typeof quizMissedItems.$inferSelect)['activityType'],
       ) {
         const rows = await db
           .update(quizMissedItems)
@@ -945,8 +957,8 @@ export function createScopedRepository(db: Database, profileId: string) {
             and(
               eq(quizMissedItems.profileId, profileId),
               eq(quizMissedItems.activityType, activityType),
-              eq(quizMissedItems.surfaced, false)
-            )
+              eq(quizMissedItems.surfaced, false),
+            ),
           )
           .returning({ id: quizMissedItems.id });
         return rows.length;
@@ -960,8 +972,8 @@ export function createScopedRepository(db: Database, profileId: string) {
             quizMasteryItems,
             and(
               eq(quizMasteryItems.activityType, activityType),
-              lte(quizMasteryItems.nextReviewAt, new Date())
-            )
+              lte(quizMasteryItems.nextReviewAt, new Date()),
+            ),
           ),
           orderBy: [quizMasteryItems.nextReviewAt],
           limit,
@@ -1007,7 +1019,7 @@ export function createScopedRepository(db: Database, profileId: string) {
           interval: number;
           repetitions: number;
           nextReviewAt: Date;
-        }
+        },
       ) {
         return db
           .update(quizMasteryItems)
@@ -1022,8 +1034,8 @@ export function createScopedRepository(db: Database, profileId: string) {
             and(
               eq(quizMasteryItems.profileId, profileId),
               eq(quizMasteryItems.activityType, activityType),
-              eq(quizMasteryItems.itemKey, itemKey)
-            )
+              eq(quizMasteryItems.itemKey, itemKey),
+            ),
           )
           .returning({ id: quizMasteryItems.id });
       },
@@ -1034,15 +1046,15 @@ export function createScopedRepository(db: Database, profileId: string) {
             quizMasteryItems,
             and(
               eq(quizMasteryItems.activityType, activityType),
-              eq(quizMasteryItems.itemKey, itemKey)
-            )
+              eq(quizMasteryItems.itemKey, itemKey),
+            ),
           ),
         });
       },
 
       async incrementMcSuccessCount(
         itemKey: string,
-        activityType: QuizActivityType
+        activityType: QuizActivityType,
       ) {
         return db
           .update(quizMasteryItems)
@@ -1054,8 +1066,8 @@ export function createScopedRepository(db: Database, profileId: string) {
             and(
               eq(quizMasteryItems.profileId, profileId),
               eq(quizMasteryItems.activityType, activityType),
-              eq(quizMasteryItems.itemKey, itemKey)
-            )
+              eq(quizMasteryItems.itemKey, itemKey),
+            ),
           )
           .returning({
             id: quizMasteryItems.id,
@@ -1066,7 +1078,7 @@ export function createScopedRepository(db: Database, profileId: string) {
       async resetMcSuccessCount(
         itemKey: string,
         activityType: QuizActivityType,
-        resetTo: number
+        resetTo: number,
       ) {
         return db
           .update(quizMasteryItems)
@@ -1078,8 +1090,8 @@ export function createScopedRepository(db: Database, profileId: string) {
             and(
               eq(quizMasteryItems.profileId, profileId),
               eq(quizMasteryItems.activityType, activityType),
-              eq(quizMasteryItems.itemKey, itemKey)
-            )
+              eq(quizMasteryItems.itemKey, itemKey),
+            ),
           )
           .returning({ id: quizMasteryItems.id });
       },

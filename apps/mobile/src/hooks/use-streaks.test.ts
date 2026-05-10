@@ -58,7 +58,7 @@ describe('useStreaks', () => {
     };
 
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ streak: streakData }), { status: 200 })
+      new Response(JSON.stringify({ streak: streakData }), { status: 200 }),
     );
 
     const { result } = renderHook(() => useStreaks(), {
@@ -75,7 +75,7 @@ describe('useStreaks', () => {
 
   it('handles API errors', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response('Network error', { status: 500 })
+      new Response('Network error', { status: 500 }),
     );
 
     const { result } = renderHook(() => useStreaks(), {
@@ -115,7 +115,7 @@ describe('useXpSummary', () => {
     };
 
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ xp: xpData }), { status: 200 })
+      new Response(JSON.stringify({ xp: xpData }), { status: 200 }),
     );
 
     const { result } = renderHook(() => useXpSummary(), {
@@ -134,7 +134,7 @@ describe('useXpSummary', () => {
 
   it('handles API errors', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response('Server error', { status: 500 })
+      new Response('Server error', { status: 500 }),
     );
 
     const { result } = renderHook(() => useXpSummary(), {

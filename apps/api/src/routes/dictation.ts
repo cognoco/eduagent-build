@@ -54,7 +54,7 @@ type DictationRouteEnv = {
     db: Database;
     account: Account;
     profileId: string | undefined;
-    profileMeta: ProfileMeta;
+    profileMeta: ProfileMeta | undefined;
   };
 };
 
@@ -94,7 +94,7 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
       if (result.success) return;
       return validationError(
         c,
-        'text is required and must be between 1 and 10000 characters'
+        'text is required and must be between 1 and 10000 characters',
       );
     }),
     async (c) => {
@@ -102,7 +102,7 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
       const { text } = c.req.valid('json');
       const result = await prepareHomework(text);
       return c.json(prepareHomeworkOutputSchema.parse(result), 200);
-    }
+    },
   )
 
   // -------------------------------------------------------------------------
@@ -118,7 +118,7 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
     const ctx = await fetchGenerateContext(
       db,
       profileId,
-      profileMeta?.birthYear ?? null
+      profileMeta?.birthYear ?? null,
     );
     const result = await generateDictation(ctx);
 
@@ -136,7 +136,7 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
       if (result.success) return;
       return validationError(
         c,
-        'Invalid input: localDate, sentenceCount, and mode are required'
+        'Invalid input: localDate, sentenceCount, and mode are required',
       );
     }),
     async (c) => {
@@ -161,9 +161,9 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
 
       return c.json(
         recordDictationResultResponseSchema.parse({ result: row }),
-        201
+        201,
       );
-    }
+    },
   )
 
   // -------------------------------------------------------------------------
@@ -178,7 +178,7 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
       if (result.success) return;
       return validationError(
         c,
-        'imageBase64 (max 2MB), imageMimeType (jpeg/png/webp), sentences (min 1), and language are required'
+        'imageBase64 (max 2MB), imageMimeType (jpeg/png/webp), sentences (min 1), and language are required',
       );
     }),
     async (c) => {
@@ -199,14 +199,14 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
         profileId,
         account.id,
         'dictation_review',
-        { hours: 1 / 60, maxCount: 10 }
+        { hours: 1 / 60, maxCount: 10 },
       );
       if (rateLimited) {
         return apiError(
           c,
           429,
           ERROR_CODES.RATE_LIMITED,
-          'Dictation review is limited to 10 requests per minute.'
+          'Dictation review is limited to 10 requests per minute.',
         );
       }
 
@@ -228,7 +228,7 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
               (entry): entry is { topic: string; confidence?: string } =>
                 typeof entry === 'object' &&
                 entry !== null &&
-                typeof (entry as { topic?: unknown }).topic === 'string'
+                typeof (entry as { topic?: unknown }).topic === 'string',
             )
             .filter((entry) => entry.confidence !== 'low')
             .slice(0, 10)
@@ -248,7 +248,7 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
       });
 
       return c.json(dictationReviewResultSchema.parse(result), 200);
-    }
+    },
   )
 
   // -------------------------------------------------------------------------

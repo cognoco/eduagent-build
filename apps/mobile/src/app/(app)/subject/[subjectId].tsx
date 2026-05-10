@@ -42,7 +42,7 @@ export default function SubjectSettingsScreen() {
       onError: (err) =>
         platformAlert(
           t('subject.settings.updateErrorTitle'),
-          classifyApiError(err).message
+          classifyApiError(err).message,
         ),
     });
   };

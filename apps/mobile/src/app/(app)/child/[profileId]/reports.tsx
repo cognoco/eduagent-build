@@ -24,10 +24,10 @@ export function getNextReportInfo(now = new Date()): {
 
   // Next run is the 1st of next month at 10:00 UTC
   const nextRun = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 10, 0, 0)
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 10, 0, 0),
   );
   const daysUntil = Math.ceil(
-    (nextRun.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+    (nextRun.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
   );
   const formattedDate = nextRun.toLocaleDateString(undefined, {
     month: 'long',
@@ -82,7 +82,7 @@ export default function ChildReportsScreen(): React.ReactElement {
                 router,
                 profileId
                   ? (`/(app)/child/${profileId}` as const)
-                  : FAMILY_HOME_PATH
+                  : FAMILY_HOME_PATH,
               )
             }
             className="me-3 py-2 pe-2"
@@ -110,7 +110,7 @@ export default function ChildReportsScreen(): React.ReactElement {
               {t('parentView.reports.loadingWeeklySnapshots')}
             </Text>
           </View>
-        ) : weeklyError ? (
+        ) : weeklyError && !weeklyReports ? (
           <View
             className="bg-surface rounded-card p-4 mt-4"
             testID="weekly-reports-error"
@@ -155,9 +155,9 @@ export default function ChildReportsScreen(): React.ReactElement {
                 }
                 accessibilityRole="button"
                 accessibilityLabel={`${t(
-                  'parentView.reports.weekOf'
+                  'parentView.reports.weekOf',
                 )} ${new Date(
-                  `${report.reportWeek}T00:00:00Z`
+                  `${report.reportWeek}T00:00:00Z`,
                 ).toLocaleDateString(undefined, {
                   month: 'short',
                   day: 'numeric',
@@ -170,7 +170,7 @@ export default function ChildReportsScreen(): React.ReactElement {
                     <Text className="text-body font-semibold text-text-primary">
                       {t('parentView.reports.weekOf')}{' '}
                       {new Date(
-                        `${report.reportWeek}T00:00:00Z`
+                        `${report.reportWeek}T00:00:00Z`,
                       ).toLocaleDateString(undefined, {
                         month: 'short',
                         day: 'numeric',
@@ -220,7 +220,7 @@ export default function ChildReportsScreen(): React.ReactElement {
               {t('parentView.reports.loadingReports')}
             </Text>
           </View>
-        ) : isError ? (
+        ) : isError && !reports ? (
           // [EP15-I3] Prior version destructured only `data, isLoading`.
           // On API failure users saw the "no reports yet" empty state and
           // thought their child had no learning activity, when really the
@@ -253,7 +253,7 @@ export default function ChildReportsScreen(): React.ReactElement {
                     router,
                     profileId
                       ? (`/(app)/child/${profileId}` as const)
-                      : FAMILY_HOME_PATH
+                      : FAMILY_HOME_PATH,
                   )
                 }
                 className="bg-background rounded-button px-4 py-3 items-center flex-1 min-h-[48px] justify-center"
@@ -289,7 +289,7 @@ export default function ChildReportsScreen(): React.ReactElement {
                 <View className="flex-1 me-3">
                   <Text className="text-body font-semibold text-text-primary">
                     {new Date(
-                      `${report.reportMonth}T00:00:00Z`
+                      `${report.reportMonth}T00:00:00Z`,
                     ).toLocaleDateString(undefined, {
                       month: 'long',
                       year: 'numeric',
@@ -342,7 +342,7 @@ export default function ChildReportsScreen(): React.ReactElement {
                   router,
                   profileId
                     ? (`/(app)/child/${profileId}` as const)
-                    : FAMILY_HOME_PATH
+                    : FAMILY_HOME_PATH,
                 )
               }
               className="bg-primary rounded-button px-5 py-3 mt-4 min-h-[48px] justify-center"

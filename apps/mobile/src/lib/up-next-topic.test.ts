@@ -39,7 +39,7 @@ describe('computeUpNextTopic', () => {
         topics,
         new Set(['go-1', 'go-2', 'go-3']),
         new Set<string>(),
-        [session('go-3')]
+        [session('go-3')],
       );
 
       expect(result?.id).toBe('go-4');
@@ -62,7 +62,7 @@ describe('computeUpNextTopic', () => {
         topics,
         new Set(['go-1', 'go-2', 'gf-1', 'gf-2']),
         new Set<string>(),
-        [session('go-2', 2_000), session('gf-1', 1_000)]
+        [session('go-2', 2_000), session('gf-1', 1_000)],
       );
 
       expect(result?.id).toBe('go-3');
@@ -85,7 +85,7 @@ describe('computeUpNextTopic', () => {
         topics,
         new Set(['go-1', 'go-2', 'gf-1', 'gf-2']),
         new Set<string>(),
-        [session('go-2', 1_000), session('gf-2', 2_000)]
+        [session('go-2', 1_000), session('gf-2', 2_000)],
       );
 
       expect(result?.id).toBe('gf-3');
@@ -108,7 +108,7 @@ describe('computeUpNextTopic', () => {
         topics,
         new Set(['go-1', 'go-2', 'go-3', 'go-4', 'go-5', 'gf-1']),
         new Set<string>(),
-        [session('go-5')]
+        [session('go-5')],
       );
 
       expect(result?.id).toBe('gf-2');
@@ -133,7 +133,7 @@ describe('computeUpNextTopic', () => {
         topics,
         new Set(['go-1', 'go-2', 'go-3', 'gf-1']),
         new Set<string>(),
-        []
+        [],
       );
 
       expect(result?.id).toBe('go-4');
@@ -148,7 +148,7 @@ describe('computeUpNextTopic', () => {
         topics,
         new Set<string>(),
         new Set<string>(),
-        []
+        [],
       );
 
       expect(result?.id).toBe('go-1');
@@ -166,7 +166,7 @@ describe('computeUpNextTopic', () => {
         topics,
         new Set<string>(),
         new Set<string>(),
-        [session('orphan-a')]
+        [session('orphan-a')],
       );
 
       expect(result?.id).toBe('orphan-a');
@@ -179,7 +179,7 @@ describe('computeUpNextTopic', () => {
         [go(1), go(2)],
         new Set(['go-1', 'go-2']),
         new Set<string>(),
-        []
+        [],
       );
 
       expect(result).toBeNull();
@@ -190,7 +190,7 @@ describe('computeUpNextTopic', () => {
         [go(1), go(2), go(3)],
         new Set<string>(),
         new Set(['go-1']),
-        [session('go-1')]
+        [session('go-1')],
       );
 
       expect(result?.id).toBe('go-2');
@@ -201,7 +201,7 @@ describe('computeUpNextTopic', () => {
         [go(1), go(2)],
         new Set(['go-1']),
         new Set(['go-2']),
-        []
+        [],
       );
 
       expect(result).toBeNull();

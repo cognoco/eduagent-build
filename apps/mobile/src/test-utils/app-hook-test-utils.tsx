@@ -14,7 +14,7 @@ process.env.EXPO_PUBLIC_API_URL ??= 'http://localhost:8787';
 
 // QueryClient-only wrapper for hook tests that already mock `../lib/profile`.
 export function createQueryWrapper(
-  options: { queryClientOptions?: QueryClientConfig } = {}
+  options: { queryClientOptions?: QueryClientConfig } = {},
 ) {
   const userOpts = options.queryClientOptions ?? {};
   const queryClient = new QueryClient({
@@ -33,7 +33,7 @@ export function createQueryWrapper(
     return createElement(
       QueryClientProvider,
       { client: queryClient },
-      children
+      children,
     );
   }
 
@@ -94,8 +94,8 @@ export function createHookWrapper(options: CreateHookWrapperOptions = {}) {
       createElement(
         ProfileContext.Provider,
         { value: profileContextValue },
-        children
-      )
+        children,
+      ),
     );
   }
 
@@ -115,21 +115,21 @@ export function getRequestUrl(mockFetch: MockFetch, callIndex = 0): string {
 
 export function getRequestInit(
   mockFetch: MockFetch,
-  callIndex = 0
+  callIndex = 0,
 ): RequestInit | undefined {
   return mockFetch.mock.calls[callIndex]?.[1] as RequestInit | undefined;
 }
 
 export function getRequestHeaders(
   mockFetch: MockFetch,
-  callIndex = 0
+  callIndex = 0,
 ): Headers {
   return new Headers(getRequestInit(mockFetch, callIndex)?.headers);
 }
 
 export function getRequestJsonBody<T>(
   mockFetch: MockFetch,
-  callIndex = 0
+  callIndex = 0,
 ): T | undefined {
   const body = getRequestInit(mockFetch, callIndex)?.body;
   if (typeof body !== 'string') {

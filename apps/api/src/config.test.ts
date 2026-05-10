@@ -24,7 +24,7 @@ describe('validateProductionKeys', () => {
 
   it('returns empty array for development environment', () => {
     expect(
-      validateProductionKeys({ ...BASE_ENV, ENVIRONMENT: 'development' })
+      validateProductionKeys({ ...BASE_ENV, ENVIRONMENT: 'development' }),
     ).toEqual([]);
   });
 
@@ -51,7 +51,7 @@ describe('validateProductionKeys', () => {
         CLERK_SECRET_KEY: 'sk_test_xxx',
         CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
         CLERK_AUDIENCE: 'eduagent-api-staging',
-      })
+      }),
     ).toEqual([]);
   });
 
@@ -67,6 +67,7 @@ describe('validateProductionKeys', () => {
     expect(missing).toContain('GEMINI_API_KEY');
     expect(missing).toContain('VOYAGE_API_KEY');
     expect(missing).toContain('RESEND_API_KEY');
+    expect(missing).toContain('RESEND_WEBHOOK_SECRET');
     // API_ORIGIN is provided by BASE_ENV (non-optional in schema)
     expect(missing).not.toContain('API_ORIGIN');
     // Stripe secrets are optional — dormant until web client added
@@ -75,7 +76,7 @@ describe('validateProductionKeys', () => {
     // OPENAI_API_KEY is optional — alternative to GEMINI_API_KEY
     expect(missing).not.toContain('OPENAI_API_KEY');
     expect(missing).toContain('REVENUECAT_WEBHOOK_SECRET');
-    expect(missing).toHaveLength(7);
+    expect(missing).toHaveLength(8);
   });
 
   it('returns empty array for production with all required secrets present', () => {
@@ -88,6 +89,7 @@ describe('validateProductionKeys', () => {
       GEMINI_API_KEY: 'gemini-key',
       VOYAGE_API_KEY: 'voyage-key',
       RESEND_API_KEY: 're_xxx',
+      RESEND_WEBHOOK_SECRET: 'whsec_resend_xxx',
       API_ORIGIN: 'https://api.mentomate.com',
       REVENUECAT_WEBHOOK_SECRET: 'whsec_xxx',
       // Stripe secrets omitted — optional (dormant until web client)
@@ -126,6 +128,7 @@ describe('validateProductionKeys', () => {
     expect(missing).toEqual([
       'VOYAGE_API_KEY',
       'RESEND_API_KEY',
+      'RESEND_WEBHOOK_SECRET',
       'REVENUECAT_WEBHOOK_SECRET',
     ]);
   });
@@ -150,7 +153,7 @@ describe('validateEnv', () => {
     expect(() =>
       validateEnv({
         ENVIRONMENT: 'development',
-      })
+      }),
     ).toThrow('Invalid environment');
   });
 
@@ -173,7 +176,7 @@ describe('validateEnv', () => {
       validateEnv({
         ENVIRONMENT: 'staging',
         DATABASE_URL: 'postgresql://staging/db',
-      })
+      }),
     ).toThrow('Production environment missing required keys');
   });
 
@@ -183,7 +186,7 @@ describe('validateEnv', () => {
         ENVIRONMENT: 'production',
         DATABASE_URL: 'postgresql://prod/db',
         API_ORIGIN: 'https://api.mentomate.com',
-      })
+      }),
     ).toThrow('Production environment missing required keys');
   });
 
@@ -198,6 +201,7 @@ describe('validateEnv', () => {
       OPENAI_API_KEY: 'openai-key',
       VOYAGE_API_KEY: 'voyage-key',
       RESEND_API_KEY: 're_xxx',
+      RESEND_WEBHOOK_SECRET: 'whsec_resend_xxx',
       API_ORIGIN: 'https://api.mentomate.com',
       REVENUECAT_WEBHOOK_SECRET: 'whsec_xxx',
       // Stripe secrets omitted — optional (dormant until web client)
@@ -232,7 +236,7 @@ describe('validateEnv', () => {
         ENVIRONMENT: 'development',
         DATABASE_URL: 'postgresql://localhost/test',
         EMPTY_REPLY_GUARD_ENABLED: 'yes',
-      })
+      }),
     ).toThrow('Invalid environment');
   });
 
@@ -304,7 +308,7 @@ describe('validateEnv', () => {
     });
     expect(env.MEMORY_FACTS_DEDUP_ENABLED).toBe('false');
     expect(isMemoryFactsDedupEnabled(env.MEMORY_FACTS_DEDUP_ENABLED)).toBe(
-      false
+      false,
     );
   });
 
@@ -374,17 +378,17 @@ describe('validateEnv', () => {
 describe('isProfileInDedupRollout', () => {
   it('returns false at 0% and true at 100%', () => {
     expect(
-      isProfileInDedupRollout('00000000-0000-0000-0000-000000000001', 0)
+      isProfileInDedupRollout('00000000-0000-0000-0000-000000000001', 0),
     ).toBe(false);
     expect(
-      isProfileInDedupRollout('00000000-0000-0000-0000-000000000001', 100)
+      isProfileInDedupRollout('00000000-0000-0000-0000-000000000001', 100),
     ).toBe(true);
   });
 
   it('is deterministic and monotonic for the same profile', () => {
     const id = '12345678-1234-1234-1234-123456789012';
     expect(isProfileInDedupRollout(id, 50)).toBe(
-      isProfileInDedupRollout(id, 50)
+      isProfileInDedupRollout(id, 50),
     );
     for (let pct = 0; pct < 100; pct++) {
       if (isProfileInDedupRollout(id, pct)) {

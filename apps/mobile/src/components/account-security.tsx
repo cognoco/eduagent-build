@@ -4,7 +4,7 @@ import { useUser } from '@clerk/clerk-expo';
 import { ChangePassword } from './change-password';
 
 function getSsoProviderLabel(
-  externalAccounts: Array<{ provider: string }>
+  externalAccounts: Array<{ provider: string }>,
 ): string {
   const provider = externalAccounts[0]?.provider ?? 'your provider';
   if (provider === 'google' || provider === 'oauth_google') return 'Google';

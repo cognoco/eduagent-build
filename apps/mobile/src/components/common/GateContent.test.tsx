@@ -37,7 +37,7 @@ describe('GateContent', () => {
     render(
       <GateContent testID="gate-content">
         <Text>child</Text>
-      </GateContent>
+      </GateContent>,
     );
 
     expect(gateStyle().maxWidth).toBe(GATE_WEB_MAX_WIDTH);
@@ -48,7 +48,7 @@ describe('GateContent', () => {
     render(
       <GateContent testID="gate-content">
         <Text>child</Text>
-      </GateContent>
+      </GateContent>,
     );
 
     expect(gateStyle().maxWidth).toBeUndefined();
@@ -59,7 +59,7 @@ describe('GateContent', () => {
     render(
       <GateContent testID="gate-content">
         <Text>child</Text>
-      </GateContent>
+      </GateContent>,
     );
 
     expect(gateStyle().maxWidth).toBeUndefined();
@@ -70,7 +70,7 @@ describe('GateContent', () => {
     render(
       <GateContent testID="gate-content">
         <View testID="inner-child" />
-      </GateContent>
+      </GateContent>,
     );
 
     screen.getByTestId('gate-content');

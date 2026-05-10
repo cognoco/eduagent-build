@@ -60,7 +60,7 @@ describe('useDictationPreferences', () => {
 
     expect(mockSet).toHaveBeenCalledWith(
       'dictation-pace-profile-123',
-      'normal'
+      'normal',
     );
     expect(result.current.pace).toBe('normal');
   });
@@ -80,7 +80,7 @@ describe('useDictationPreferences', () => {
     expect(result.current.punctuationReadAloud).toBe(false);
     expect(mockSet).toHaveBeenCalledWith(
       'dictation-punctuation-profile-123',
-      'false'
+      'false',
     );
   });
 

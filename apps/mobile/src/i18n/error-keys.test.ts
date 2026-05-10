@@ -3,7 +3,7 @@ import { getLocalizedErrorKey } from './error-keys';
 describe('getLocalizedErrorKey', () => {
   it('maps QUOTA_EXCEEDED to errors.quotaExhausted', () => {
     expect(getLocalizedErrorKey('QUOTA_EXCEEDED')).toBe(
-      'errors.quotaExhausted'
+      'errors.quotaExhausted',
     );
   });
 

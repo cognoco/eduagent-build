@@ -17,7 +17,7 @@ type ConsentEnv = {
     db: Database;
     account: Account;
     profileId: string;
-    profileMeta: ProfileMeta;
+    profileMeta: ProfileMeta | undefined;
   };
 };
 
@@ -34,10 +34,6 @@ const EXEMPT_PREFIXES = [
   '/v1/inngest',
   '/v1/__test/',
   '/v1/maintenance/',
-  // Outbox spillover is a durability safety-net — failed messages must be
-  // escalatable even when a profile's consent is pending or withdrawn.
-  // Blocking this path would lose irrecoverable user data in the outbox.
-  '/v1/support/',
 ];
 
 function isExempt(path: string): boolean {
@@ -60,14 +56,39 @@ export const consentMiddleware = createMiddleware<ConsentEnv>(
       return;
     }
 
-    // Exempt paths always pass through
     if (isExempt(c.req.path)) {
+      await next();
+      return;
+    }
+
+    // /v1/support/ (outbox) is exempt for all non-WITHDRAWN consent states —
+    // failed messages must be escalatable when consent is pending.
+    // GDPR Art. 7(3) forbids new data processing after withdrawal.
+    if (
+      c.req.path.startsWith('/v1/support/') &&
+      meta.consentStatus !== 'WITHDRAWN'
+    ) {
       await next();
       return;
     }
 
     // Check if consent is required for this profile's age (GDPR-everywhere)
     const { required, consentType } = checkConsentRequired(meta.birthYear);
+
+    // GDPR Art. 7(3): block WITHDRAWN profiles regardless of age — must come
+    // before the !required guard so adult profiles with WITHDRAWN status are
+    // also enforced (not bypassed by the age check).
+    if (meta.consentStatus === 'WITHDRAWN') {
+      return c.json(
+        {
+          code: ERROR_CODES.CONSENT_WITHDRAWN,
+          message:
+            'Consent has been withdrawn. Account data deletion is pending.',
+          details: { consentType },
+        },
+        403,
+      );
+    }
 
     if (!required) {
       await next();
@@ -86,24 +107,11 @@ export const consentMiddleware = createMiddleware<ConsentEnv>(
             'Parental consent is required before accessing this resource',
           details: { consentType },
         },
-        403
-      );
-    }
-
-    // Block if consent has been withdrawn (GDPR Art. 7(3) — 7-day grace period)
-    if (meta.consentStatus === 'WITHDRAWN') {
-      return c.json(
-        {
-          code: ERROR_CODES.CONSENT_WITHDRAWN,
-          message:
-            'Consent has been withdrawn. Account data deletion is pending.',
-          details: { consentType },
-        },
-        403
+        403,
       );
     }
 
     await next();
     return;
-  }
+  },
 );

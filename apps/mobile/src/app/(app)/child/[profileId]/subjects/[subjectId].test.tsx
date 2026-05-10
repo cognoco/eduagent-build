@@ -108,7 +108,7 @@ describe('SubjectTopicsScreen', () => {
         params: expect.objectContaining({
           totalSessions: '3',
         }),
-      })
+      }),
     );
   });
 });

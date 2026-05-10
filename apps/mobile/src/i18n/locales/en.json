@@ -774,7 +774,7 @@
       "updateErrorTitle": "Could not update subject"
     },
     "row": {
-      "review": "Review",
+      "review": "Keep it fresh",
       "finished": "Finished",
       "notStarted": "not started",
       "paused": "Paused",
@@ -783,6 +783,7 @@
       "bookTopics": "{{progress}} topics",
       "shelfSubtitle_one": "{{count}} book · {{progress}} topics",
       "shelfSubtitle_other": "{{count}} books · {{progress}} topics",
+      "shelfSubtitleUnstarted": "Start learning",
       "shelfEmpty": "No books in this subject yet. Study a topic and it'll be filed here.",
       "bookAccessibilityLabel": "{{title}}, {{progress}} topics{{retentionSuffix}}{{notesSuffix}}",
       "bookRetentionSuffix": ", retention {{status}}",
@@ -1122,11 +1123,13 @@
       "sessionsCompleted_other": "{{count}} sessions completed",
       "sessionsCompletedSubtitle": "Topics mastered and vocabulary will appear as you progress.",
       "buildingLanguage": "You're building your language",
-      "buildingLanguageSubtitle": "{{count}} words and counting.",
+      "buildingLanguageSubtitle_one": "{{count}} word and counting.",
+      "buildingLanguageSubtitle_other": "{{count}} words and counting.",
       "knowWords": "You know {{count}} words",
       "knowWordsSubtitle": "That knowledge is yours now.",
       "buildingKnowledge": "You're building your knowledge",
-      "buildingKnowledgeSubtitle": "{{count}} topics and counting.",
+      "buildingKnowledgeSubtitle_one": "{{count}} topic and counting.",
+      "buildingKnowledgeSubtitle_other": "{{count}} topics and counting.",
       "masteredTopics": "You've mastered {{count}} topics",
       "masteredTopicsSubtitle": "Your progress keeps stacking up.",
       "masteredTopicsAndWords": "And you know {{words}} words across your subjects."

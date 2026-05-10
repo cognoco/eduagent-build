@@ -38,9 +38,9 @@ export async function lookupAssistantTurnState(params: {
     const userRow = await repo.sessionEvents.findFirst(
       and(
         eq(sessionEvents.eventType, 'user_message'),
-        eq(sessionEvents.clientId, key)
+        eq(sessionEvents.clientId, key),
       ),
-      [desc(sessionEvents.createdAt), desc(sessionEvents.id)]
+      [desc(sessionEvents.createdAt), desc(sessionEvents.id)],
     );
 
     if (!userRow) {
@@ -51,9 +51,9 @@ export async function lookupAssistantTurnState(params: {
       and(
         eq(sessionEvents.sessionId, userRow.sessionId),
         eq(sessionEvents.eventType, 'ai_response'),
-        gte(sessionEvents.createdAt, userRow.createdAt)
+        gte(sessionEvents.createdAt, userRow.createdAt),
       ),
-      [asc(sessionEvents.createdAt), asc(sessionEvents.id)]
+      [asc(sessionEvents.createdAt), asc(sessionEvents.id)],
     );
 
     return {
@@ -81,7 +81,9 @@ export async function lookupAssistantTurnState(params: {
         name: 'app/idempotency.assistant_turn_lookup_failed',
         data: { profileId, flow },
       })
-      .catch(Function.prototype as () => void);
+      .catch(() => {
+        // Fire-and-forget: best-effort event; failure is non-fatal.
+      });
     return SAFE_ASSISTANT_TURN_STATE;
   }
 }

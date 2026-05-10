@@ -45,7 +45,7 @@ function formatDuration(seconds: number | null): string {
 
 function formatTimeOnApp(
   seconds: number | null,
-  t: (key: string, opts?: Record<string, unknown>) => string
+  t: (key: string, opts?: Record<string, unknown>) => string,
 ): string {
   const duration = formatDuration(seconds);
   return duration === '--'
@@ -203,13 +203,13 @@ export default function TopicDetailScreen() {
             const retentionInfo = getParentRetentionInfo(
               retentionStatus,
               totalSessions,
-              completionStatus ?? ''
+              completionStatus ?? '',
             );
             if (!retentionInfo) return null;
 
             const reconciliation = getReconciliationLine(
               masteryPercent ?? 0,
-              retentionInfo
+              retentionInfo,
             );
 
             return (
@@ -308,7 +308,7 @@ export default function TopicDetailScreen() {
               <Text className="text-caption text-text-secondary">
                 {formatTimeOnApp(
                   session.wallClockSeconds ?? session.durationSeconds,
-                  t
+                  t,
                 )}
               </Text>
             </Pressable>

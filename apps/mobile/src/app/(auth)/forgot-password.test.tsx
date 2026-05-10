@@ -78,7 +78,7 @@ describe('ForgotPasswordScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('forgot-password-email'),
-      'test@example.com'
+      'test@example.com',
     );
     fireEvent.press(screen.getByTestId('send-reset-code-button'));
 
@@ -97,7 +97,7 @@ describe('ForgotPasswordScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('forgot-password-email'),
-      'test@example.com'
+      'test@example.com',
     );
     fireEvent.press(screen.getByTestId('send-reset-code-button'));
 
@@ -121,7 +121,7 @@ describe('ForgotPasswordScreen', () => {
     // Phase 1: send code
     fireEvent.changeText(
       screen.getByTestId('forgot-password-email'),
-      'test@example.com'
+      'test@example.com',
     );
     fireEvent.press(screen.getByTestId('send-reset-code-button'));
 
@@ -133,7 +133,7 @@ describe('ForgotPasswordScreen', () => {
     fireEvent.changeText(screen.getByTestId('reset-code'), '123456');
     fireEvent.changeText(
       screen.getByTestId('reset-new-password'),
-      'newPassword123'
+      'newPassword123',
     );
     fireEvent.press(screen.getByTestId('reset-password-button'));
 
@@ -164,7 +164,7 @@ describe('ForgotPasswordScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('forgot-password-email'),
-      'nobody@example.com'
+      'nobody@example.com',
     );
     fireEvent.press(screen.getByTestId('send-reset-code-button'));
 
@@ -183,7 +183,7 @@ describe('ForgotPasswordScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('forgot-password-email'),
-      'test@example.com'
+      'test@example.com',
     );
     fireEvent.press(screen.getByTestId('send-reset-code-button'));
 
@@ -194,7 +194,7 @@ describe('ForgotPasswordScreen', () => {
     fireEvent.changeText(screen.getByTestId('reset-code'), '000000');
     fireEvent.changeText(
       screen.getByTestId('reset-new-password'),
-      'newPass123'
+      'newPass123',
     );
     fireEvent.press(screen.getByTestId('reset-password-button'));
 

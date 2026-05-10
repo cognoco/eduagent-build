@@ -48,7 +48,7 @@ type FilingStatus =
   | undefined;
 
 export function computeFilingRefetchInterval(
-  filingStatus: FilingStatus
+  filingStatus: FilingStatus,
 ): number | false {
   return filingStatus === 'filing_pending' ? 15_000 : false;
 }
@@ -142,7 +142,7 @@ export function useStartSession(subjectId: string): UseMutationResult<
 }
 
 export function useStartFirstCurriculumSession(
-  subjectId: string
+  subjectId: string,
 ): UseMutationResult<
   SessionStartResult,
   Error,
@@ -181,7 +181,7 @@ export function useStartFirstCurriculumSession(
 }
 
 export function useSetSessionInputMode(
-  sessionId: string
+  sessionId: string,
 ): UseMutationResult<SessionStartResult, Error, { inputMode: InputMode }> {
   const client = useApiClient();
   const queryClient = useQueryClient();
@@ -205,7 +205,7 @@ export function useSetSessionInputMode(
 }
 
 export function useClearContinuationDepth(
-  sessionId: string
+  sessionId: string,
 ): UseMutationResult<SessionStartResult, Error, void> {
   const client = useApiClient();
   const queryClient = useQueryClient();
@@ -228,7 +228,7 @@ export function useClearContinuationDepth(
 }
 
 export function useSyncHomeworkState(
-  sessionId: string
+  sessionId: string,
 ): UseMutationResult<
   { metadata: HomeworkSessionMetadata },
   Error,
@@ -253,7 +253,7 @@ export function useSyncHomeworkState(
 }
 
 export function useSendMessage(
-  sessionId: string
+  sessionId: string,
 ): UseMutationResult<MessageResult, Error, { message: string }> {
   const client = useApiClient();
 
@@ -326,7 +326,7 @@ export function useStreamMessage(sessionId: string): {
       imageMimeType?: 'image/jpeg' | 'image/png' | 'image/webp';
       idempotencyKey?: string;
       onReplay?: (result: IdempotencyReplayBody) => void;
-    }
+    },
   ) => Promise<void>;
   isStreaming: boolean;
 } {
@@ -369,7 +369,7 @@ export function useStreamMessage(sessionId: string): {
         imageMimeType?: string;
         idempotencyKey?: string;
         onReplay?: (result: IdempotencyReplayBody) => void;
-      }
+      },
     ): Promise<void> => {
       const effectiveSessionId = overrideSessionId ?? sessionIdRef.current;
       if (isStreamingRef.current || !effectiveSessionId) return;
@@ -397,7 +397,7 @@ export function useStreamMessage(sessionId: string): {
         if (proxyMode) headers['X-Proxy-Mode'] = 'true';
         const finalHeaders = withIdempotencyKey(
           headers,
-          options?.idempotencyKey
+          options?.idempotencyKey,
         );
 
         const url = `${getApiUrl()}/v1/sessions/${effectiveSessionId}/stream`;
@@ -474,14 +474,14 @@ export function useStreamMessage(sessionId: string): {
 
     // all mutable values accessed via refs (sessionIdRef, getTokenRef,
     // profileIdRef, abortRef) to avoid stale closures.
-    []
+    [],
   );
 
   return { stream, isStreaming };
 }
 
 export function useSessionTranscript(
-  sessionId: string
+  sessionId: string,
 ): UseQueryResult<TranscriptResponse | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -493,7 +493,7 @@ export function useSessionTranscript(
       try {
         const res = await client.sessions[':sessionId'].transcript.$get(
           { param: { sessionId } },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         const raw = await res.json();
@@ -514,7 +514,7 @@ export function useSessionTranscript(
 }
 
 export function useSession(
-  sessionId: string
+  sessionId: string,
 ): UseQueryResult<LearningSession | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -526,7 +526,7 @@ export function useSession(
       try {
         const res = await client.sessions[':sessionId'].$get(
           { param: { sessionId } },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         const data = (await res.json()) as { session: LearningSession };
@@ -547,7 +547,7 @@ export function useSession(
 }
 
 export function useRecordSystemPrompt(
-  sessionId: string
+  sessionId: string,
 ): UseMutationResult<
   { ok: boolean },
   Error,
@@ -574,7 +574,7 @@ export function useRecordSystemPrompt(
 }
 
 export function useRecordSessionEvent(
-  sessionId: string
+  sessionId: string,
 ): UseMutationResult<{ ok: boolean }, Error, SessionAnalyticsEventInput> {
   const client = useApiClient();
 
@@ -591,7 +591,7 @@ export function useRecordSessionEvent(
 }
 
 export function useFlagSessionContent(
-  sessionId: string
+  sessionId: string,
 ): UseMutationResult<{ message: string }, Error, ContentFlagInput> {
   const client = useApiClient();
 
@@ -608,7 +608,7 @@ export function useFlagSessionContent(
 }
 
 export function useParkingLot(
-  sessionId: string
+  sessionId: string,
 ): UseQueryResult<ParkingLotItem[]> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -620,7 +620,7 @@ export function useParkingLot(
       try {
         const res = await client.sessions[':sessionId']['parking-lot'].$get(
           { param: { sessionId } },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         const data = (await res.json()) as { items: ParkingLotItem[] };
@@ -635,7 +635,7 @@ export function useParkingLot(
 
 export function useTopicParkingLot(
   subjectId: string,
-  topicId: string
+  topicId: string,
 ): UseQueryResult<ParkingLotItem[]> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -660,7 +660,7 @@ export function useTopicParkingLot(
 }
 
 export function useAddParkingLotItem(
-  sessionId: string
+  sessionId: string,
 ): UseMutationResult<{ item: ParkingLotItem }, Error, { question: string }> {
   const client = useApiClient();
   const queryClient = useQueryClient();
@@ -686,9 +686,9 @@ export function useSessionSummary(
   sessionId: string,
   options?: {
     refetchInterval?: (
-      data: SessionSummary | null | undefined
+      data: SessionSummary | null | undefined,
     ) => number | false;
-  }
+  },
 ): UseQueryResult<SessionSummary | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -700,7 +700,7 @@ export function useSessionSummary(
       try {
         const res = await client.sessions[':sessionId'].summary.$get(
           { param: { sessionId } },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         const data = await res.json();
@@ -717,7 +717,7 @@ export function useSessionSummary(
 }
 
 export function useSubmitSummary(
-  sessionId: string
+  sessionId: string,
 ): UseMutationResult<SubmitSummaryResult, Error, { content: string }> {
   const client = useApiClient();
   const queryClient = useQueryClient();
@@ -740,7 +740,7 @@ export function useSubmitSummary(
 }
 
 export function useSkipSummary(
-  sessionId: string
+  sessionId: string,
 ): UseMutationResult<SkipSummaryResult, Error, void> {
   const client = useApiClient();
   const queryClient = useQueryClient();
@@ -762,7 +762,7 @@ export function useSkipSummary(
 }
 
 export function useRecallBridge(
-  sessionId: string
+  sessionId: string,
 ): UseMutationResult<RecallBridgeResult, Error, void> {
   const client = useApiClient();
 

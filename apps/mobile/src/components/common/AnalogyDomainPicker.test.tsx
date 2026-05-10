@@ -99,7 +99,7 @@ describe('AnalogyDomainPicker', () => {
 
   it('shows loading indicator when isLoading is true', () => {
     render(
-      <AnalogyDomainPicker value={null} onSelect={mockOnSelect} isLoading />
+      <AnalogyDomainPicker value={null} onSelect={mockOnSelect} isLoading />,
     );
 
     screen.getByTestId('analogy-domain-loading');
@@ -108,7 +108,7 @@ describe('AnalogyDomainPicker', () => {
 
   it('does not call onSelect when disabled', () => {
     render(
-      <AnalogyDomainPicker value={null} onSelect={mockOnSelect} disabled />
+      <AnalogyDomainPicker value={null} onSelect={mockOnSelect} disabled />,
     );
 
     fireEvent.press(screen.getByTestId('analogy-domain-cooking'));

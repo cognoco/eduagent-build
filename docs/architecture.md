@@ -391,14 +391,14 @@ One mobile client, one error handling path. RFC 7807 overengineered for this. Bo
 **Route structure:**
 
 ```
-# Authoritative source: `apps/api/src/index.ts` route mountings (41 route files as of 2026-05-01).
+# Authoritative source: `apps/api/src/index.ts` route mountings (43 route files as of 2026-05-10).
 # When this list and the source disagree, the source wins — update this table.
 
 /v1/sessions/*              # Learning sessions, exchanges, session events
 /v1/profiles/*              # Profile management, persona, preferences
 /v1/curriculum/*            # Curriculum generation, topics, learning paths
 /v1/assessments/*           # Quizzes, recall tests, mastery scores
-/v1/auth/*                  # Auth helpers (Clerk-adjacent)
+/v1/auth/*                  # Auth helpers (Clerk-adjacent; all 501 stubs — Clerk handles auth)
 /v1/billing/*               # Billing, quota, top-ups
 /v1/subjects/*              # Subject management
 /v1/progress/*              # Progress tracking, coaching card, Library
@@ -415,12 +415,16 @@ One mobile client, one error handling path. RFC 7807 overengineered for this. Bo
 /v1/health                  # Liveness probe
 /v1/language-progress/*     # Language learning progress
 /v1/learner-profile/*       # Learner profile details
+/v1/library/*               # Library search
+/v1/maintenance/*           # Maintenance operations (admin-gated)
 /v1/notes/*                 # Session notes
+/v1/notices/*               # Notice read tracking
 /v1/onboarding/*            # Onboarding flow endpoints
 /v1/quiz/*                  # Quiz lifecycle (separate from /v1/assessments)
 /v1/resend-webhook          # Resend (email) webhook handler
 /v1/revenuecat-webhook      # RevenueCat IAP webhook handler (primary billing path)
 /v1/snapshot-progress/*     # Progress snapshot data
+/v1/support/*               # Support operations (outbox spillover)
 /v1/topic-suggestions/*     # Topic suggestion generation
 /v1/vocabulary/*            # Vocabulary management
 /v1/dashboard/*             # Parent dashboard
@@ -429,7 +433,6 @@ One mobile client, one error handling path. RFC 7807 overengineered for this. Bo
 /v1/consent/*               # GDPR consent flows
 /v1/streaks/*               # Streak tracking
 /v1/retention/*             # Retention data
-/v1/interview/*             # Onboarding interview
 /v1/parking-lot/*           # Parking lot topics
 /v1/stripe-webhook          # Stripe webhook handler (dormant — future web billing)
 /v1/test-seed/*             # E2E test seeding (gated; not public)
@@ -466,9 +469,10 @@ src/app/
 │   ├── progress/
 │   ├── pick-book/
 │   ├── session/               # Active learning session
-│   ├── onboarding/            # Subject creation → interview → curriculum
+│   ├── onboarding/            # Subject creation → language setup → curriculum
 │   │   ├── _layout.tsx
-│   │   └── interview.tsx
+│   │   ├── language-setup.tsx
+│   │   └── pronouns.tsx
 │   ├── homework/
 │   ├── shelf/[subjectId]/
 │   ├── subject/[subjectId]/
@@ -871,7 +875,8 @@ eduagent/
 │   │   │   │   │   ├── mentor-memory.tsx
 │   │   │   │   │   ├── onboarding/
 │   │   │   │   │   │   ├── _layout.tsx
-│   │   │   │   │   │   └── interview.tsx     # Conversational goal/background assessment
+│   │   │   │   │   │   ├── language-setup.tsx  # Four-strands language setup
+│   │   │   │   │   │   └── pronouns.tsx
 │   │   │   │   │   ├── session/
 │   │   │   │   │   │   └── index.tsx         # Active learning session
 │   │   │   │   │   ├── shelf/[subjectId]/    # Subject shelf view
@@ -920,7 +925,6 @@ eduagent/
 │   │   │   │   ├── use-curriculum.ts
 │   │   │   │   ├── use-filing.ts
 │   │   │   │   ├── use-homework-ocr.ts
-│   │   │   │   ├── use-interview.ts
 │   │   │   │   ├── use-subjects.ts
 │   │   │   │   ├── use-progress.ts
 │   │   │   │   ├── use-retention.ts
@@ -973,7 +977,6 @@ eduagent/
 │       │   │   ├── settings.ts            # /v1/settings/* — user settings
 │       │   │   ├── account.ts             # /v1/account/* — account management
 │       │   │   ├── consent.ts             # /v1/consent/* — GDPR consent flows
-│       │   │   ├── interview.ts           # /v1/interview/* — onboarding interview
 │       │   │   ├── streaks.ts             # /v1/streaks/* — streak tracking
 │       │   │   ├── retention.ts           # /v1/retention/* — retention data
 │       │   │   ├── parking-lot.ts         # /v1/parking-lot/* — parking lot topics
@@ -1040,7 +1043,6 @@ eduagent/
 │       │   │   ├── consent.ts       # Consent management
 │       │   │   ├── deletion.ts      # Account deletion orchestrator
 │       │   │   ├── export.ts        # GDPR data export
-│       │   │   ├── interview.ts     # Onboarding interview logic
 │       │   │   ├── prior-learning.ts # Prior learning context
 │       │   │   ├── summaries.ts     # Session summaries + createPendingSessionSummary
 │       │   │   ├── parking-lot.ts   # Parking lot topic management
@@ -1364,7 +1366,6 @@ There is no `packages/factory/` package — test factories are co-located with t
 | `/v1/subjects/*` | Subject management | — | Clerk JWT |
 | `/v1/streaks/*` | Streak tracking | — | Clerk JWT |
 | `/v1/retention/*` | Retention data | — | Clerk JWT |
-| `/v1/interview/*` | Onboarding interview | LLM providers (via orchestrator) | Clerk JWT |
 | `/v1/settings/*` | User settings | — | Clerk JWT |
 | `/v1/parking-lot/*` | Parking lot topics | — | Clerk JWT |
 | `/v1/stripe-webhook` | Stripe event processing | Stripe | Webhook signing secret |

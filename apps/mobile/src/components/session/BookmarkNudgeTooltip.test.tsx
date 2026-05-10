@@ -9,7 +9,7 @@ import {
 const secureStore: Record<string, string> = {};
 jest.mock('../../lib/secure-storage', () => ({
   getItemAsync: jest.fn((key: string) =>
-    Promise.resolve(secureStore[key] ?? null)
+    Promise.resolve(secureStore[key] ?? null),
   ),
   setItemAsync: jest.fn((key: string, value: string) => {
     secureStore[key] = value;
@@ -38,7 +38,7 @@ describe('BookmarkNudgeTooltip', () => {
         aiResponseCount={5}
         isFirstSession
         profileId={undefined}
-      />
+      />,
     );
     expect(screen.queryByTestId('bookmark-nudge-tooltip')).toBeNull();
   });
@@ -49,21 +49,29 @@ describe('BookmarkNudgeTooltip', () => {
         aiResponseCount={5}
         isFirstSession={false}
         profileId="p1"
-      />
+      />,
     );
     expect(screen.queryByTestId('bookmark-nudge-tooltip')).toBeNull();
   });
 
   it('renders nothing before threshold of 3 AI responses', () => {
     render(
-      <BookmarkNudgeTooltip aiResponseCount={2} isFirstSession profileId="p1" />
+      <BookmarkNudgeTooltip
+        aiResponseCount={2}
+        isFirstSession
+        profileId="p1"
+      />,
     );
     expect(screen.queryByTestId('bookmark-nudge-tooltip')).toBeNull();
   });
 
   it('renders tooltip when first session reaches 3 responses and no prior dismissal', async () => {
     render(
-      <BookmarkNudgeTooltip aiResponseCount={3} isFirstSession profileId="p1" />
+      <BookmarkNudgeTooltip
+        aiResponseCount={3}
+        isFirstSession
+        profileId="p1"
+      />,
     );
 
     await waitFor(() => {
@@ -76,7 +84,11 @@ describe('BookmarkNudgeTooltip', () => {
     secureStore['bookmark-nudge-shown_p1'] = 'true';
 
     render(
-      <BookmarkNudgeTooltip aiResponseCount={3} isFirstSession profileId="p1" />
+      <BookmarkNudgeTooltip
+        aiResponseCount={3}
+        isFirstSession
+        profileId="p1"
+      />,
     );
 
     await act(async () => {
@@ -88,7 +100,11 @@ describe('BookmarkNudgeTooltip', () => {
 
   it('dismiss press hides tooltip and persists per-profile flag', async () => {
     render(
-      <BookmarkNudgeTooltip aiResponseCount={3} isFirstSession profileId="p1" />
+      <BookmarkNudgeTooltip
+        aiResponseCount={3}
+        isFirstSession
+        profileId="p1"
+      />,
     );
 
     const dismissBtn = await screen.findByTestId('bookmark-nudge-dismiss');
@@ -104,7 +120,11 @@ describe('BookmarkNudgeTooltip', () => {
   // L3: onBookmarkNow prop tests
   it('secondary bookmark-now button is absent when onBookmarkNow is not provided [L3]', async () => {
     render(
-      <BookmarkNudgeTooltip aiResponseCount={3} isFirstSession profileId="p1" />
+      <BookmarkNudgeTooltip
+        aiResponseCount={3}
+        isFirstSession
+        profileId="p1"
+      />,
     );
 
     await waitFor(() => {
@@ -121,7 +141,7 @@ describe('BookmarkNudgeTooltip', () => {
         isFirstSession
         profileId="p1"
         onBookmarkNow={jest.fn()}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -137,11 +157,11 @@ describe('BookmarkNudgeTooltip', () => {
         isFirstSession
         profileId="p1"
         onBookmarkNow={onBookmarkNow}
-      />
+      />,
     );
 
     const bookmarkBtn = await screen.findByTestId(
-      'bookmark-nudge-bookmark-now'
+      'bookmark-nudge-bookmark-now',
     );
     fireEvent.press(bookmarkBtn);
 

@@ -28,7 +28,7 @@ function buildChartA11yLabel(
   title: string,
   data: GrowthChartDatum[],
   register: CopyRegister,
-  t: TFunction
+  t: TFunction,
 ): string {
   const points = data
     .map((item) => {
@@ -42,7 +42,7 @@ function buildChartA11yLabel(
           ? ` ${item.secondaryValue} ${t(
               register === 'child'
                 ? 'progress.growthChart.a11y.wordsAdded'
-                : 'progress.growthChart.a11y.vocabularyGrowth'
+                : 'progress.growthChart.a11y.vocabularyGrowth',
             )}`
           : '';
       return `${item.label}: ${primary}${secondary}`;
@@ -62,7 +62,7 @@ export function GrowthChart({
   const colors = useThemeColors();
   const maxValue = Math.max(
     1,
-    ...data.flatMap((item) => [item.value, item.secondaryValue ?? 0])
+    ...data.flatMap((item) => [item.value, item.secondaryValue ?? 0]),
   );
 
   return (
@@ -100,13 +100,13 @@ export function GrowthChart({
               {data.map((item) => {
                 const primaryHeight = Math.max(
                   10,
-                  Math.round((item.value / maxValue) * 96)
+                  Math.round((item.value / maxValue) * 96),
                 );
                 const secondaryHeight =
                   item.secondaryValue != null
                     ? Math.max(
                         6,
-                        Math.round((item.secondaryValue / maxValue) * 72)
+                        Math.round((item.secondaryValue / maxValue) * 72),
                       )
                     : 0;
 

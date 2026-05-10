@@ -22,7 +22,7 @@ describe('BookCard', () => {
           soft: 'rgba(4,120,87,0.14)',
         }}
         onPress={jest.fn()}
-      />
+      />,
     );
 
     const card = screen.getByTestId('book-card-book-1');
@@ -32,14 +32,14 @@ describe('BookCard', () => {
       expect.objectContaining({
         borderColor: 'rgba(4,120,87,0.14)',
         borderWidth: 1,
-      })
+      }),
     );
     expect(icon.props.style).toEqual(
       expect.objectContaining({
         backgroundColor: 'rgba(4,120,87,0.14)',
         borderColor: '#047857',
         borderWidth: 1,
-      })
+      }),
     );
   });
 });

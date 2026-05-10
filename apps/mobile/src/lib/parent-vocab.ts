@@ -24,7 +24,7 @@ export function getUnderstandingLabel(scorePercent: number): string {
 export function getParentRetentionInfo(
   retentionStatus: string | null | undefined,
   totalSessions: number,
-  completionStatus: string
+  completionStatus: string,
 ): ParentRetentionInfo | null {
   if (
     !retentionStatus ||
@@ -53,7 +53,7 @@ export function getParentRetentionInfo(
 
 export function getReconciliationLine(
   scorePercent: number,
-  retentionInfo: ParentRetentionInfo | null
+  retentionInfo: ParentRetentionInfo | null,
 ): string | null {
   if (!retentionInfo) return null;
   if (scorePercent >= 61 && retentionInfo.colorKey !== 'retentionStrong') {

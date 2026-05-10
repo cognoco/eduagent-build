@@ -8,10 +8,11 @@ jest.mock('../inngest/client', () => ({
   },
 }));
 
+const mockLoggerWarn = jest.fn();
 jest.mock('../services/logger', () => ({
   createLogger: () => ({
     info: jest.fn(),
-    warn: jest.fn(),
+    warn: mockLoggerWarn,
     error: jest.fn(),
     debug: jest.fn(),
   }),
@@ -35,7 +36,7 @@ async function signPayload(
   rawBody: string,
   webhookId: string,
   timestamp: string,
-  secret: string = TEST_SECRET
+  secret: string = TEST_SECRET,
 ): Promise<string> {
   const stripped = secret.startsWith('whsec_') ? secret.slice(6) : secret;
   const b64 = stripped.replace(/-/g, '+').replace(/_/g, '/');
@@ -51,7 +52,7 @@ async function signPayload(
     bytes,
     { name: 'HMAC', hash: 'SHA-256' },
     false,
-    ['sign']
+    ['sign'],
   );
 
   const signedContent = `${webhookId}.${timestamp}.${rawBody}`;
@@ -59,7 +60,7 @@ async function signPayload(
   const signatureBuffer = await crypto.subtle.sign(
     'HMAC',
     key,
-    encoder.encode(signedContent)
+    encoder.encode(signedContent),
   );
 
   const sigBytes = new Uint8Array(signatureBuffer);
@@ -93,7 +94,7 @@ async function makeRequest(
     'svix-signature': string;
   }> = {},
   env: Record<string, unknown> = TEST_ENV,
-  customBody?: string
+  customBody?: string,
 ) {
   const rawBody = customBody ?? JSON.stringify(body);
   const webhookId = 'msg_test_' + Math.random().toString(36).slice(2);
@@ -114,7 +115,7 @@ async function makeRequest(
       headers,
       body: rawBody,
     },
-    env
+    env,
   );
 }
 
@@ -146,7 +147,7 @@ describe('verifyResendSignature', () => {
       id,
       ts,
       'v1,invalidsignaturevalue==',
-      TEST_SECRET
+      TEST_SECRET,
     );
     expect(result).toBe(false);
   });
@@ -162,7 +163,7 @@ describe('verifyResendSignature', () => {
       id,
       staleTs,
       sig,
-      TEST_SECRET
+      TEST_SECRET,
     );
     expect(result).toBe(false);
   });
@@ -174,7 +175,7 @@ describe('verifyResendSignature', () => {
       'msg_test_004',
       'not-a-number',
       'v1,anysig==',
-      TEST_SECRET
+      TEST_SECRET,
     );
     expect(result).toBe(false);
   });
@@ -217,7 +218,7 @@ describe('verifyResendSignature', () => {
         id,
         ts,
         'v1,abcdefgh',
-        TEST_SECRET
+        TEST_SECRET,
       );
       expect(result).toBe(false);
     });
@@ -233,7 +234,7 @@ describe('verifyResendSignature', () => {
         id,
         ts,
         `v1,${overLong}`,
-        TEST_SECRET
+        TEST_SECRET,
       );
       expect(result).toBe(false);
     });
@@ -248,7 +249,7 @@ describe('verifyResendSignature', () => {
         id,
         ts,
         'v1,',
-        TEST_SECRET
+        TEST_SECRET,
       );
       expect(result).toBe(false);
     });
@@ -265,7 +266,7 @@ describe('verifyResendSignature', () => {
         id,
         ts,
         'v1,!!not~~base64!!',
-        TEST_SECRET
+        TEST_SECRET,
       );
       expect(result).toBe(false);
     });
@@ -282,7 +283,7 @@ describe('verifyResendSignature', () => {
         id,
         ts,
         `v1,${sameLength}`,
-        TEST_SECRET
+        TEST_SECRET,
       );
       expect(result).toBe(false);
     });
@@ -318,7 +319,7 @@ describe('POST /webhooks/resend — authentication', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'email.delivered', data: {} }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -330,7 +331,7 @@ describe('POST /webhooks/resend — authentication', () => {
     const res = await makeRequest(
       { type: 'email.delivered', data: { to: 'test@example.com' } },
       {},
-      {} // no RESEND_WEBHOOK_SECRET
+      {}, // no RESEND_WEBHOOK_SECRET
     );
 
     expect(res.status).toBe(500);
@@ -355,7 +356,7 @@ describe('POST /webhooks/resend — authentication', () => {
         },
         body: rawBody,
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(401);
@@ -393,7 +394,7 @@ describe('POST /webhooks/resend — authentication', () => {
         },
         body: rawBody,
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(401);
@@ -453,6 +454,26 @@ describe('email.bounced', () => {
         emailId: 'email_def456',
       }),
     });
+  });
+
+  it('[BUG-25] logs correct event type for complaints (not hardcoded email.bounced)', async () => {
+    mockLoggerWarn.mockClear();
+
+    await makeRequest({
+      type: 'email.complained',
+      data: {
+        email_id: 'email_complaint_001',
+        to: 'complainant@example.com',
+      },
+    });
+
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
+      '[resend] Email delivery failure',
+      expect.objectContaining({
+        event: 'email.complained',
+        type: 'email.complained',
+      }),
+    );
   });
 
   // [SEC-6 / BUG-722] Break test — explicit guarantee that no Inngest event
@@ -572,7 +593,7 @@ describe('malformed payload', () => {
         },
         body: rawInvalidBody,
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);

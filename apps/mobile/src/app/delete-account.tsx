@@ -174,7 +174,7 @@ export default function DeleteAccountScreen() {
                 void signOut().catch(() => {
                   platformAlert(
                     t('account.signOutFailedTitle'),
-                    t('account.signOutFailedMessage')
+                    t('account.signOutFailedMessage'),
                   );
                 })
               }

@@ -20,7 +20,7 @@ export interface RetentionInput {
  *   else → weak
  */
 export function deriveRetentionStatus(
-  card: RetentionInput | null | undefined
+  card: RetentionInput | null | undefined,
 ): RetentionStatus {
   if (!card) return 'weak';
   if ((card.failureCount ?? 0) >= 3 || card.xpStatus === 'decayed')

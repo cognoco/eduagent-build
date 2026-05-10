@@ -7,7 +7,7 @@ import { assertOk } from '../lib/assert-ok';
 
 export function useTopicSuggestions(
   subjectId: string | undefined,
-  bookId: string | undefined
+  bookId: string | undefined,
 ): UseQueryResult<TopicSuggestion[]> {
   const client = useApiClient();
   const { activeProfile } = useProfile();

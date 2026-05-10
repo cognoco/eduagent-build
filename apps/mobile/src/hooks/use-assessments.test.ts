@@ -52,8 +52,8 @@ describe('useAssessment', () => {
             createdAt: '2026-02-15T10:00:00.000Z',
           },
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useAssessment('assess-1'), {
@@ -105,13 +105,13 @@ describe('useCreateAssessment', () => {
             createdAt: '2026-02-15T10:00:00.000Z',
           },
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(
       () => useCreateAssessment('sub-1', 'topic-1'),
-      { wrapper: createWrapper() }
+      { wrapper: createWrapper() },
     );
 
     await act(async () => {
@@ -147,8 +147,8 @@ describe('useSubmitAnswer', () => {
           },
           status: 'passed',
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useSubmitAnswer('assess-1'), {
@@ -180,8 +180,8 @@ describe('useSubmitAnswer', () => {
           },
           status: 'passed',
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useSubmitAnswer(''), {
@@ -204,14 +204,14 @@ describe('useSubmitAnswer', () => {
       typeof request === 'string'
         ? request
         : request instanceof URL
-        ? request.toString()
-        : request.url;
+          ? request.toString()
+          : request.url;
     expect(requestUrl).toContain('/assessments/created-assess-1/answer');
   });
 
   it('handles submission errors', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response('Submission failed', { status: 500 })
+      new Response('Submission failed', { status: 500 }),
     );
 
     const { result } = renderHook(() => useSubmitAnswer('assess-1'), {

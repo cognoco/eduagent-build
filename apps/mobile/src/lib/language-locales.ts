@@ -15,7 +15,7 @@ const LANGUAGE_LOCALES: Record<string, string> = {
 };
 
 export function getVoiceLocaleForLanguage(
-  languageCode?: string | null
+  languageCode?: string | null,
 ): string {
   if (!languageCode) {
     return 'en-US';

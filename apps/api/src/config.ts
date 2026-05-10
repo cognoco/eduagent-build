@@ -96,7 +96,7 @@ export function isMemoryFactsReadEnabled(value: string | undefined): boolean {
 }
 
 export function isMemoryFactsRelevanceEnabled(
-  value: string | undefined
+  value: string | undefined,
 ): boolean {
   return value === 'true';
 }
@@ -111,7 +111,7 @@ export function isMemoryFactsDedupEnabled(value: string | undefined): boolean {
  */
 export function isProfileInDedupRollout(
   profileId: string,
-  pct: number
+  pct: number,
 ): boolean {
   if (pct <= 0) return false;
   if (pct >= 100) return true;
@@ -126,7 +126,7 @@ export function isProfileInDedupRollout(
 }
 
 export function isTopicIntentMatcherEnabled(
-  value: string | undefined
+  value: string | undefined,
 ): boolean {
   return value === 'true';
 }
@@ -155,6 +155,7 @@ const PRODUCTION_REQUIRED_KEYS: readonly (keyof Env)[] = [
   'GEMINI_API_KEY',
   'VOYAGE_API_KEY',
   'RESEND_API_KEY',
+  'RESEND_WEBHOOK_SECRET',
   'API_ORIGIN',
   'REVENUECAT_WEBHOOK_SECRET',
 ] as const;
@@ -198,7 +199,7 @@ export function validateEnv(raw: Record<string, string | undefined>): Env {
   if (!result.success) {
     const formatted = result.error.flatten();
     throw new Error(
-      `Invalid environment: ${JSON.stringify(formatted.fieldErrors)}`
+      `Invalid environment: ${JSON.stringify(formatted.fieldErrors)}`,
     );
   }
 
@@ -206,7 +207,7 @@ export function validateEnv(raw: Record<string, string | undefined>): Env {
   const missingKeys = validateProductionKeys(env);
   if (missingKeys.length > 0) {
     throw new Error(
-      `Production environment missing required keys: ${missingKeys.join(', ')}`
+      `Production environment missing required keys: ${missingKeys.join(', ')}`,
     );
   }
 

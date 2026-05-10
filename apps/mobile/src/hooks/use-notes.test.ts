@@ -72,7 +72,7 @@ describe('useBookNotes', () => {
 
   it('fetches and returns notes for a book', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify(mockBookNotesResponse), { status: 200 })
+      new Response(JSON.stringify(mockBookNotesResponse), { status: 200 }),
     );
 
     const { result } = renderHook(() => useBookNotes('subject-1', 'book-1'), {
@@ -112,13 +112,13 @@ describe('useBookNotes', () => {
         JSON.stringify({ code: 'NOT_FOUND', message: 'Book not found' }),
         {
           status: 404,
-        }
-      )
+        },
+      ),
     );
 
     const { result } = renderHook(
       () => useBookNotes('subject-1', 'nonexistent'),
-      { wrapper: createWrapper() }
+      { wrapper: createWrapper() },
     );
 
     await waitFor(() => {
@@ -167,7 +167,7 @@ describe('useCreateNote', () => {
       updatedAt: '2026-01-01T00:00:00.000Z',
     };
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ note: mockNote }), { status: 200 })
+      new Response(JSON.stringify({ note: mockNote }), { status: 200 }),
     );
 
     const wrapper = createWrapper();
@@ -192,7 +192,7 @@ describe('useCreateNote', () => {
     expect(invalidateSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         queryKey: ['book-notes', 'subject-1', 'book-1', 'test-profile-id'],
-      })
+      }),
     );
   });
 
@@ -206,7 +206,7 @@ describe('useCreateNote', () => {
       updatedAt: '2026-01-01T00:00:00.000Z',
     };
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ note: mockNote }), { status: 200 })
+      new Response(JSON.stringify({ note: mockNote }), { status: 200 }),
     );
 
     const { result } = renderHook(() => useCreateNote('subject-1', 'book-1'), {
@@ -234,7 +234,7 @@ describe('useCreateNote', () => {
 
     await act(async () => {
       await expect(
-        result.current.mutateAsync({ topicId: 'topic-1', content: 'test' })
+        result.current.mutateAsync({ topicId: 'topic-1', content: 'test' }),
       ).rejects.toThrow('subjectId and topicId are required');
     });
   });
@@ -248,8 +248,8 @@ describe('useCreateNote', () => {
         }),
         {
           status: 422,
-        }
-      )
+        },
+      ),
     );
 
     const { result } = renderHook(() => useCreateNote('subject-1', 'book-1'), {
@@ -258,7 +258,7 @@ describe('useCreateNote', () => {
 
     await act(async () => {
       await expect(
-        result.current.mutateAsync({ topicId: 'topic-1', content: 'test' })
+        result.current.mutateAsync({ topicId: 'topic-1', content: 'test' }),
       ).rejects.toThrow();
     });
   });
@@ -282,8 +282,8 @@ describe('useNoteTopicIds', () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
         JSON.stringify({ topicIds: ['topic-1', 'topic-2', 'topic-3'] }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useNoteTopicIds(), {
@@ -304,7 +304,7 @@ describe('useNoteTopicIds', () => {
 
   it('handles API error', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response('Internal Server Error', { status: 500 })
+      new Response('Internal Server Error', { status: 500 }),
     );
 
     const { result } = renderHook(() => useNoteTopicIds(), {

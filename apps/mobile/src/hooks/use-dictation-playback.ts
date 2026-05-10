@@ -156,7 +156,7 @@ export function useDictationPlayback(config: PlaybackConfig): PlaybackControls {
             nextActionRef.current = action;
             pauseTimerRef.current = setTimeout(
               action,
-              paceConfig.sentencePause
+              paceConfig.sentencePause,
             );
           } else {
             // Chunk boundary — writing pause proportional to chunk word count
@@ -183,7 +183,7 @@ export function useDictationPlayback(config: PlaybackConfig): PlaybackControls {
       });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
+    [],
   );
 
   const start = useCallback(() => {

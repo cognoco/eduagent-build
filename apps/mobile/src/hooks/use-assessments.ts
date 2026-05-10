@@ -18,7 +18,7 @@ import { assertOk } from '../lib/assert-ok';
 export const assessmentEligibleTopicsQueryKey = ['assessments', 'eligible'];
 
 export function useAssessment(
-  assessmentId: string
+  assessmentId: string,
 ): UseQueryResult<Assessment> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -30,7 +30,7 @@ export function useAssessment(
       try {
         const res = await client.assessments[':assessmentId'].$get(
           { param: { assessmentId } },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         const data = (await res.json()) as { assessment: Assessment };
@@ -79,7 +79,7 @@ export function useAssessmentEligibleTopics(): UseQueryResult<
       try {
         const res = await client.retention['assessment-eligible'].$get(
           {},
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         const data = (await res.json()) as {
@@ -105,7 +105,7 @@ export function useSubmitAnswer(assessmentId: string) {
 
   return useMutation({
     mutationFn: async (
-      input: SubmitAnswerInput
+      input: SubmitAnswerInput,
     ): Promise<{
       evaluation: AssessmentEvaluation;
       status: AssessmentStatus;

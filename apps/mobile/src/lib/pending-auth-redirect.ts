@@ -27,7 +27,7 @@ function getSessionStorage(): StorageLike | null {
 }
 
 function isFreshRecord(
-  record: PendingAuthRedirectRecord | null
+  record: PendingAuthRedirectRecord | null,
 ): record is PendingAuthRedirectRecord {
   return !!record && Date.now() - record.savedAt < PENDING_AUTH_REDIRECT_TTL_MS;
 }

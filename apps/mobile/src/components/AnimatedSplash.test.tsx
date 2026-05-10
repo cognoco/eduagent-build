@@ -10,7 +10,7 @@ beforeEach(() => {
   reanimated.withTiming = (
     value: unknown,
     _options?: unknown,
-    callback?: (finished: boolean) => void
+    callback?: (finished: boolean) => void,
   ) => {
     callback?.(true);
     return value;

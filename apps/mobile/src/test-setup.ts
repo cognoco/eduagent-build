@@ -30,7 +30,7 @@ jest.mock('@sentry/react-native', () => ({
   getCurrentScope: jest.fn(() => ({ clear: jest.fn() })),
   getClient: jest.fn(() => null),
   withScope: jest.fn((cb: (scope: unknown) => void) =>
-    cb({ setExtra: jest.fn() })
+    cb({ setExtra: jest.fn() }),
   ),
   Severity: { Error: 'error', Warning: 'warning', Info: 'info' },
 }));

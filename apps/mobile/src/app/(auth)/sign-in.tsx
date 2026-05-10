@@ -165,7 +165,7 @@ function hasSSOProviders(factors: unknown[] | null | undefined): boolean {
       f !== null &&
       'strategy' in f &&
       typeof (f as Record<string, unknown>).strategy === 'string' &&
-      ((f as Record<string, unknown>).strategy as string).startsWith('oauth_')
+      ((f as Record<string, unknown>).strategy as string).startsWith('oauth_'),
   );
 }
 
@@ -192,14 +192,14 @@ function formatUnsupportedVerificationMessage(strategies: string[]): string {
   const [first] = strategies;
   if (strategies.length === 1 && first) {
     return `This account requires ${describeVerificationStrategy(
-      first
+      first,
     )} which isn't available on mobile yet.`;
   }
 
   const described = strategies.map(describeVerificationStrategy);
   const last = described.pop();
   return `This account requires ${described.join(
-    ', '
+    ', ',
   )} or ${last} which isn't available on mobile yet.`;
 }
 
@@ -217,17 +217,17 @@ export default function SignInScreen() {
   const browserRedirectTarget = readWebSearchParam('redirectTo');
   const requestedRedirectTarget = toInternalAppRedirectPath(
     localRedirectTarget ?? browserRedirectTarget ?? undefined,
-    peekPendingAuthRedirect() ?? '/(app)/home'
+    peekPendingAuthRedirect() ?? '/(app)/home',
   );
   const requestedRedirectRef = useRef(
     localRedirectTarget || browserRedirectTarget
       ? rememberPendingAuthRedirect(requestedRedirectTarget)
-      : requestedRedirectTarget
+      : requestedRedirectTarget,
   );
 
   if (localRedirectTarget || browserRedirectTarget) {
     requestedRedirectRef.current = rememberPendingAuthRedirect(
-      requestedRedirectTarget
+      requestedRedirectTarget,
     );
   }
 
@@ -265,7 +265,7 @@ export default function SignInScreen() {
   >(null);
   // Survives remounts: if setActive() just fired, show spinner not empty form
   const [isTransitioning, setIsTransitioning] = useState(
-    isWithinTransitionWindow
+    isWithinTransitionWindow,
   );
   // True when SESSION_TRANSITION_MS has elapsed but the auth guard still hasn't
   // redirected — show ErrorFallback instead of bare spinner.
@@ -295,13 +295,13 @@ export default function SignInScreen() {
     if (!isTransitioning) return;
     const remaining = Math.max(
       100,
-      SESSION_TRANSITION_MS - getTransitionElapsed()
+      SESSION_TRANSITION_MS - getTransitionElapsed(),
     );
     // Phase 1: SESSION_TRANSITION_MS elapsed → show ErrorFallback ("stuck")
     const phase1 = setTimeout(() => {
       if (__DEV__)
         console.warn(
-          `[AUTH-DEBUG] transitioning phase-1 TIMEOUT after ${SESSION_TRANSITION_MS}ms — showing stuck fallback`
+          `[AUTH-DEBUG] transitioning phase-1 TIMEOUT after ${SESSION_TRANSITION_MS}ms — showing stuck fallback`,
         );
       setTransitionStuck(true);
     }, remaining);
@@ -309,13 +309,13 @@ export default function SignInScreen() {
     const phase2 = setTimeout(() => {
       if (__DEV__)
         console.warn(
-          '[AUTH-DEBUG] transitioning phase-2 TIMEOUT — falling back to sign-in form'
+          '[AUTH-DEBUG] transitioning phase-2 TIMEOUT — falling back to sign-in form',
         );
       clearTransitionState();
       setTransitionStuck(false);
       setIsTransitioning(false);
       setError(
-        'Sign-in is taking longer than expected. Please try signing in again.'
+        'Sign-in is taking longer than expected. Please try signing in again.',
       );
     }, remaining + 15_000);
     return () => {
@@ -345,7 +345,7 @@ export default function SignInScreen() {
         setError('');
       }
     },
-    [setError]
+    [setError],
   );
 
   useEffect(() => {
@@ -418,7 +418,7 @@ export default function SignInScreen() {
 
       return null;
     },
-    [emailAddress]
+    [emailAddress],
   );
 
   const startVerificationFlow = useCallback(
@@ -454,7 +454,7 @@ export default function SignInScreen() {
       setPendingVerification(step);
       setCode('');
     },
-    [signIn]
+    [signIn],
   );
 
   const handleIncompleteSignIn = useCallback(
@@ -468,7 +468,7 @@ export default function SignInScreen() {
             nextVerificationStep
               ? `${nextVerificationStep.stage}/${nextVerificationStep.strategy}`
               : 'null'
-          }`
+          }`,
         );
       if (nextVerificationStep) {
         // Auto-send the verification code instead of showing the passive
@@ -490,7 +490,7 @@ export default function SignInScreen() {
 
       if (attempt.status === 'needs_new_password') {
         setError(
-          'Your password needs to be updated before you can sign in. Use Forgot password? to reset it.'
+          'Your password needs to be updated before you can sign in. Use Forgot password? to reset it.',
         );
         return;
       }
@@ -502,7 +502,7 @@ export default function SignInScreen() {
         const unsupportedStrategies = getFactorStrategies(
           attempt.status === 'needs_first_factor'
             ? attempt.supportedFirstFactors
-            : attempt.supportedSecondFactors
+            : attempt.supportedSecondFactors,
         );
         const ssoAvailable = hasSSOProviders(attempt.supportedFirstFactors);
         setUnsupportedVerificationStrategies(unsupportedStrategies);
@@ -513,7 +513,7 @@ export default function SignInScreen() {
 
       setError('Sign-in could not be completed. Please try again.');
     },
-    [clearVerificationFlow, getVerificationStep, startVerificationFlow]
+    [clearVerificationFlow, getVerificationStep, startVerificationFlow],
   );
 
   const onContactSupport = useCallback(async () => {
@@ -527,14 +527,14 @@ export default function SignInScreen() {
     try {
       await Linking.openURL(
         `mailto:support@mentomate.app?subject=${encodeURIComponent(
-          'Unsupported sign-in verification'
+          'Unsupported sign-in verification',
         )}&body=${encodeURIComponent(
-          `Hi, I need help signing in on mobile because my account requires ${describedMethods}.`
-        )}`
+          `Hi, I need help signing in on mobile because my account requires ${describedMethods}.`,
+        )}`,
       );
     } catch {
       setError(
-        `We couldn't open your email app. Please contact support@mentomate.app and mention ${describedMethods}.`
+        `We couldn't open your email app. Please contact support@mentomate.app and mention ${describedMethods}.`,
       );
     }
   }, [unsupportedVerificationStrategies]);
@@ -542,7 +542,7 @@ export default function SignInScreen() {
   const activateSession = useCallback(
     async (
       sessionId: string | null,
-      context: 'oauth' | 'password' | 'verification'
+      context: 'oauth' | 'password' | 'verification',
     ): Promise<boolean> => {
       if (!isMountedRef.current) return false;
       if (!sessionId) {
@@ -558,7 +558,7 @@ export default function SignInScreen() {
         rememberPendingAuthRedirect(requestedRedirectRef.current);
         if (__DEV__)
           console.log(
-            `[AUTH-DEBUG] activateSession → calling setActive(${sessionId}) context=${context}`
+            `[AUTH-DEBUG] activateSession → calling setActive(${sessionId}) context=${context}`,
           );
         await setActive({ session: sessionId });
         if (__DEV__)
@@ -594,7 +594,7 @@ export default function SignInScreen() {
       // flips, sees !isSignedIn, and bounces back to sign-in.
       return true;
     },
-    [setActive]
+    [setActive],
   );
 
   const onSSOPress = useCallback(
@@ -627,7 +627,7 @@ export default function SignInScreen() {
               ` | signUp.status=${ssoSignUp?.status ?? 'null'}` +
               ` | signUp.createdSessionId=${
                 ssoSignUp?.createdSessionId ?? 'null'
-              }`
+              }`,
           );
 
         // Session ID may be on the top level, or on signUp for new users
@@ -653,9 +653,9 @@ export default function SignInScreen() {
               `[AUTH-DEBUG] SSO signIn incomplete: status=${ssoSignIn.status}`,
               JSON.stringify(
                 ssoSignIn.supportedFirstFactors?.map(
-                  (f: Record<string, unknown>) => f.strategy
-                )
-              )
+                  (f: Record<string, unknown>) => f.strategy,
+                ),
+              ),
             );
           await handleIncompleteSignIn(ssoSignIn);
           return;
@@ -666,13 +666,13 @@ export default function SignInScreen() {
             console.warn(
               `[AUTH-DEBUG] SSO signUp incomplete: status=${ssoSignUp.status}` +
                 ` | missingFields=${JSON.stringify(
-                  ssoSignUp.missingFields ?? []
-                )}`
+                  ssoSignUp.missingFields ?? [],
+                )}`,
             );
           setError(
             `Sign-up via ${
               strategy === 'oauth_google' ? 'Google' : 'SSO'
-            } needs additional information. Please sign up with email instead.`
+            } needs additional information. Please sign up with email instead.`,
           );
           return;
         }
@@ -691,7 +691,7 @@ export default function SignInScreen() {
       handleIncompleteSignIn,
       isLoaded,
       startSSOFlow,
-    ]
+    ],
   );
 
   const retrySessionActivation = useCallback(async () => {
@@ -709,7 +709,7 @@ export default function SignInScreen() {
     try {
       await activateSession(
         pendingSessionActivationId,
-        activationFailureContext
+        activationFailureContext,
       );
     } finally {
       setLoading(false);
@@ -744,9 +744,9 @@ export default function SignInScreen() {
             signInAttempt.createdSessionId ?? 'null'
           } | firstFactors=${JSON.stringify(
             (signInAttempt.supportedFirstFactors ?? []).map(
-              (f: Record<string, unknown>) => f.strategy
-            )
-          )}`
+              (f: Record<string, unknown>) => f.strategy,
+            ),
+          )}`,
         );
 
       if (signInAttempt.status === 'complete') {
@@ -792,8 +792,8 @@ export default function SignInScreen() {
       setError(
         extractClerkError(
           err,
-          'We could not start verification. Please try signing in again.'
-        )
+          'We could not start verification. Please try signing in again.',
+        ),
       );
     } finally {
       setLoading(false);
@@ -810,7 +810,7 @@ export default function SignInScreen() {
     try {
       if (__DEV__)
         console.log(
-          `[AUTH-DEBUG] onVerifyPress → attempting ${pendingVerification.stage} / ${pendingVerification.strategy}`
+          `[AUTH-DEBUG] onVerifyPress → attempting ${pendingVerification.stage} / ${pendingVerification.strategy}`,
         );
       const result =
         pendingVerification.stage === 'first_factor'
@@ -829,7 +829,7 @@ export default function SignInScreen() {
         console.log(
           `[AUTH-DEBUG] onVerifyPress → result.status=${
             result.status
-          } | sessionId=${result.createdSessionId ?? 'null'}`
+          } | sessionId=${result.createdSessionId ?? 'null'}`,
         );
 
       if (result.status === 'complete') {
@@ -837,14 +837,14 @@ export default function SignInScreen() {
       } else {
         if (__DEV__)
           console.warn(
-            `[AUTH-DEBUG] onVerifyPress → NOT complete, calling handleIncompleteSignIn`
+            `[AUTH-DEBUG] onVerifyPress → NOT complete, calling handleIncompleteSignIn`,
           );
         await handleIncompleteSignIn(result);
       }
     } catch (err: unknown) {
       if (__DEV__) console.warn('[AUTH-DEBUG] onVerifyPress → THREW', err);
       setError(
-        extractClerkError(err, 'Invalid verification code. Please try again.')
+        extractClerkError(err, 'Invalid verification code. Please try again.'),
       );
     } finally {
       setLoading(false);
@@ -977,8 +977,8 @@ export default function SignInScreen() {
             {pendingVerification.strategy === 'totp'
               ? 'Enter authenticator code'
               : pendingVerification.strategy === 'backup_code'
-              ? 'Enter a backup code'
-              : 'Enter verification code'}
+                ? 'Enter a backup code'
+                : 'Enter verification code'}
           </Text>
           <Text className="text-body-sm text-text-secondary mb-6">
             {pendingVerification.strategy === 'totp' ? (
@@ -1116,15 +1116,15 @@ export default function SignInScreen() {
               isReturningUser === null
                 ? 'sign-in-welcome-loading'
                 : isReturningUser
-                ? 'sign-in-welcome-returning'
-                : 'sign-in-welcome-first-time'
+                  ? 'sign-in-welcome-returning'
+                  : 'sign-in-welcome-first-time'
             }
           >
             {isReturningUser === null
               ? 'Welcome'
               : isReturningUser
-              ? 'Welcome back'
-              : 'Welcome to MentoMate'}
+                ? 'Welcome back'
+                : 'Welcome to MentoMate'}
           </Text>
           <Text
             className="text-body-sm text-text-secondary mb-2 text-center"
@@ -1132,15 +1132,15 @@ export default function SignInScreen() {
               isReturningUser === null
                 ? 'sign-in-subtitle-loading'
                 : isReturningUser
-                ? 'sign-in-subtitle-returning'
-                : 'sign-in-subtitle-first-time'
+                  ? 'sign-in-subtitle-returning'
+                  : 'sign-in-subtitle-first-time'
             }
           >
             {isReturningUser === null
               ? 'Sign in to get started'
               : isReturningUser
-              ? 'Sign in to continue learning'
-              : 'Sign in to start learning'}
+                ? 'Sign in to continue learning'
+                : 'Sign in to start learning'}
           </Text>
 
           {error !== '' && (
@@ -1303,8 +1303,8 @@ export default function SignInScreen() {
               {emailAddress.trim() === ''
                 ? 'Enter your email to continue'
                 : password === ''
-                ? 'Enter your password to continue'
-                : ''}
+                  ? 'Enter your password to continue'
+                  : ''}
             </Text>
           )}
 

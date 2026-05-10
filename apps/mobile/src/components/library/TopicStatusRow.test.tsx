@@ -27,7 +27,7 @@ describe('TopicStatusRow', () => {
         chapterName="Grand Overview"
         onPress={onPress}
         testID="row-continue"
-      />
+      />,
     );
 
     fireEvent.press(getByTestId('row-continue'));
@@ -42,7 +42,7 @@ describe('TopicStatusRow', () => {
         chapterName="Green Factories"
         sessionCount={3}
         onPress={onPress}
-      />
+      />,
     );
 
     getByText('Photosynthesis');
@@ -58,7 +58,7 @@ describe('TopicStatusRow', () => {
         chapterName="Biology Basics"
         onPress={onPress}
         testID="row-up-next"
-      />
+      />,
     );
 
     getByTestId('row-up-next');
@@ -73,7 +73,7 @@ describe('TopicStatusRow', () => {
         chapterName="Biology Basics"
         onPress={onPress}
         testID="row-up-next-hero"
-      />
+      />,
     );
 
     getByTestId('row-up-next-hero');
@@ -86,7 +86,7 @@ describe('TopicStatusRow', () => {
         title="Algebra Basics"
         chapterName="Chapter 1"
         onPress={onPress}
-      />
+      />,
     );
 
     getByText('Algebra Basics');
@@ -101,7 +101,7 @@ describe('TopicStatusRow', () => {
         chapterName="Chapter"
         sessionCount={1}
         onPress={onPress}
-      />
+      />,
     );
 
     getByText('1 session');

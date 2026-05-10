@@ -25,7 +25,7 @@ export function useRequestConsent(): UseMutationResult<
 
   return useMutation({
     mutationFn: async (
-      input: ConsentRequest
+      input: ConsentRequest,
     ): Promise<ConsentRequestResult> => {
       const res = await client.consent.request.$post({ json: input });
       await assertOk(res);
@@ -67,7 +67,7 @@ export function useConsentStatus(): UseQueryResult<ConsentStatusData> {
       try {
         const res = await client.consent['my-status'].$get(
           {},
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         return (await res.json()) as ConsentStatusData;
@@ -116,7 +116,7 @@ export interface ChildConsentData {
  * Includes `respondedAt` for grace-period countdown calculation.
  */
 export function useChildConsentStatus(
-  childProfileId: string | undefined
+  childProfileId: string | undefined,
 ): UseQueryResult<ChildConsentData> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -131,7 +131,7 @@ export function useChildConsentStatus(
       try {
         const res = await client.consent[':childProfileId'].status.$get(
           { param: { childProfileId } },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         return (await res.json()) as ChildConsentData;
@@ -153,7 +153,7 @@ interface RevokeConsentResult {
  * Invalidates child consent status and dashboard queries on success.
  */
 export function useRevokeConsent(
-  childProfileId: string | undefined
+  childProfileId: string | undefined,
 ): UseMutationResult<RevokeConsentResult, Error, void> {
   const client = useApiClient();
   const queryClient = useQueryClient();
@@ -208,7 +208,7 @@ interface RestoreConsentResult {
  * Invalidates child consent status and dashboard queries on success.
  */
 export function useRestoreConsent(
-  childProfileId: string | undefined
+  childProfileId: string | undefined,
 ): UseMutationResult<RestoreConsentResult, Error, void> {
   const client = useApiClient();
   const queryClient = useQueryClient();

@@ -33,7 +33,7 @@ export function createMockDb(): unknown {
           if (prop === 'then') return undefined; // prevent auto-await
           return chainFn();
         },
-      }
+      },
     );
   }
 
@@ -47,7 +47,7 @@ export function createMockDb(): unknown {
           findMany: jest.fn().mockResolvedValue([]),
         };
       },
-    }
+    },
   );
 
   return {

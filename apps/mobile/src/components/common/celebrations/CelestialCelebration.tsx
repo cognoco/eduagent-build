@@ -49,16 +49,16 @@ export function CelestialCelebration({
           if (finished && onCompleteRef.current) {
             runOnJS(onCompleteRef.current)();
           }
-        }
-      )
+        },
+      ),
     );
     scale.value = withSequence(
       withTiming(1.06, { duration: 220 }),
-      withTiming(1, { duration: 200 })
+      withTiming(1, { duration: 200 }),
     );
     translateY.value = withSequence(
       withTiming(-6, { duration: 220 }),
-      withTiming(0, { duration: 200 })
+      withTiming(0, { duration: 200 }),
     );
   }, [opacity, reduceMotion, scale, translateY]);
 

@@ -12,7 +12,7 @@ jest.mock('./AccordionTopicList', () => {
 });
 
 function makeSubject(
-  overrides: Partial<SubjectInventory> = {}
+  overrides: Partial<SubjectInventory> = {},
 ): SubjectInventory {
   return {
     subjectId: 'sub-1',
@@ -52,7 +52,7 @@ describe('SubjectCard headline', () => {
           sessionsCount: 5,
         })}
         testID="card"
-      />
+      />,
     );
 
     // startedCount = inProgress(1) + mastered(2) = 3
@@ -76,7 +76,7 @@ describe('SubjectCard headline', () => {
           sessionsCount: 2,
         })}
         testID="card"
-      />
+      />,
     );
 
     // startedCount = inProgress(2) + mastered(0) = 2
@@ -97,7 +97,7 @@ describe('SubjectCard headline', () => {
           wallClockMinutes: 69,
         })}
         testID="card"
-      />
+      />,
     );
 
     screen.getByText('0 topics started · 0 mastered');
@@ -123,7 +123,7 @@ describe('SubjectCard headline', () => {
           wallClockMinutes: 80,
         })}
         testID="card"
-      />
+      />,
     );
 
     // startedCount = inProgress(2) + mastered(1) = 3
@@ -158,7 +158,7 @@ describe('SubjectCard accordion mode', () => {
         childProfileId="child-1"
         subjectId="sub-1"
         testID="card"
-      />
+      />,
     );
 
     screen.getByText('▾ See topics');
@@ -190,7 +190,7 @@ describe('SubjectCard accordion mode', () => {
         childProfileId="child-1"
         subjectId="sub-1"
         testID="card"
-      />
+      />,
     );
 
     const card = screen.getByTestId('card');
@@ -205,7 +205,7 @@ describe('SubjectCard accordion mode', () => {
         childProfileId="child-1"
         subjectId="sub-1"
         testID="card"
-      />
+      />,
     );
 
     expect(screen.queryByText('▾ See topics')).toBeNull();
@@ -222,7 +222,7 @@ describe('SubjectCard accordion mode', () => {
         })}
         onPress={onPress}
         testID="card"
-      />
+      />,
     );
 
     fireEvent.press(screen.getByTestId('card'));
@@ -237,7 +237,7 @@ describe('SubjectCard action label [IMP-1]', () => {
   it('shows "Explore" for an untouched subject with zero activity', () => {
     const onAction = jest.fn();
     render(
-      <SubjectCard subject={makeSubject()} onAction={onAction} testID="card" />
+      <SubjectCard subject={makeSubject()} onAction={onAction} testID="card" />,
     );
 
     screen.getByText('Explore');
@@ -261,7 +261,7 @@ describe('SubjectCard action label [IMP-1]', () => {
         })}
         onAction={onAction}
         testID="card"
-      />
+      />,
     );
 
     screen.getByText('Continue');
@@ -284,7 +284,7 @@ describe('SubjectCard action label [IMP-1]', () => {
         })}
         onAction={onAction}
         testID="card"
-      />
+      />,
     );
 
     screen.getByText('Explore');
@@ -311,8 +311,8 @@ describe('hasSubjectActivity', () => {
             inProgress: 0,
             notStarted: 12,
           },
-        })
-      )
+        }),
+      ),
     ).toBe(true);
   });
 
@@ -327,8 +327,8 @@ describe('hasSubjectActivity', () => {
             inProgress: 1,
             notStarted: 12,
           },
-        })
-      )
+        }),
+      ),
     ).toBe(true);
   });
 });

@@ -156,10 +156,10 @@ export function LightBulbAnimation({
         withTiming(0.35, {
           duration: PULSE_BASE_MS / 2,
           easing: Easing.inOut(Easing.ease),
-        })
+        }),
       ),
       -1,
-      false
+      false,
     );
 
     // Secondary modulating wave (different period → irregular envelope)
@@ -172,10 +172,10 @@ export function LightBulbAnimation({
         withTiming(0.55, {
           duration: PULSE_MOD_MS / 2,
           easing: Easing.inOut(Easing.quad),
-        })
+        }),
       ),
       -1,
-      false
+      false,
     );
 
     // "Idea!" flash: bright spike every ~2-3 seconds
@@ -187,15 +187,15 @@ export function LightBulbAnimation({
           withTiming(1.4, {
             duration: FLASH_ON_MS,
             easing: Easing.out(Easing.ease),
-          })
+          }),
         ),
         withTiming(1.0, {
           duration: FLASH_OFF_MS,
           easing: Easing.in(Easing.ease),
-        })
+        }),
       ),
       -1,
-      false
+      false,
     );
 
     // Glow: breathes in/out in sync with base pulse (not just fades up)
@@ -208,10 +208,10 @@ export function LightBulbAnimation({
         withTiming(0.25, {
           duration: GLOW_MS / 2,
           easing: Easing.inOut(Easing.ease),
-        })
+        }),
       ),
       -1,
-      false
+      false,
     );
 
     glowScale.value = withRepeat(
@@ -223,10 +223,10 @@ export function LightBulbAnimation({
         withTiming(0.92, {
           duration: GLOW_MS / 2,
           easing: Easing.inOut(Easing.ease),
-        })
+        }),
       ),
       -1,
-      false
+      false,
     );
 
     // Sway: gentle pendulum ±2deg, 1500ms period
@@ -239,10 +239,10 @@ export function LightBulbAnimation({
         withTiming(-2, {
           duration: SWAY_MS / 2,
           easing: Easing.inOut(Easing.ease),
-        })
+        }),
       ),
       -1,
-      false
+      false,
     );
 
     return () => {

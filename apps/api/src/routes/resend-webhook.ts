@@ -37,7 +37,7 @@ export async function verifyResendSignature(
   webhookId: string,
   webhookTimestamp: string,
   webhookSignature: string,
-  secret: string
+  secret: string,
 ): Promise<boolean> {
   // Decode the secret — Svix secrets are base64url-encoded after the "whsec_" prefix
   const secretBytes = decodeBase64Secret(secret);
@@ -58,7 +58,7 @@ export async function verifyResendSignature(
     secretBytes.buffer as ArrayBuffer,
     { name: 'HMAC', hash: 'SHA-256' },
     false,
-    ['sign']
+    ['sign'],
   );
 
   // Compute expected signature
@@ -66,7 +66,7 @@ export async function verifyResendSignature(
   const signatureBuffer = await crypto.subtle.sign(
     'HMAC',
     key,
-    encoder.encode(signedContent)
+    encoder.encode(signedContent),
   );
   const expectedSig = bufferToBase64(signatureBuffer);
 
@@ -181,10 +181,10 @@ function maskEmail(email: string | undefined): string {
 /** email.bounced or email.complained — emit Inngest event for observability */
 async function handleEmailBounced(
   eventType: 'email.bounced' | 'email.complained',
-  data: ResendEmailEventData
+  data: ResendEmailEventData,
 ): Promise<void> {
   logger.warn('[resend] Email delivery failure', {
-    event: 'email.bounced',
+    event: eventType,
     type: eventType,
     to: maskEmail(data.to),
     emailId: data.email_id,
@@ -252,20 +252,20 @@ export const resendWebhookRoute = new Hono<{
       c,
       400,
       ERROR_CODES.MISSING_SIGNATURE,
-      'Missing Svix signature headers'
+      'Missing Svix signature headers',
     );
   }
 
   const webhookSecret = c.env.RESEND_WEBHOOK_SECRET;
   if (!webhookSecret) {
     logger.error(
-      '[resend] RESEND_WEBHOOK_SECRET not configured — rejecting unverified webhook'
+      '[resend] RESEND_WEBHOOK_SECRET not configured — rejecting unverified webhook',
     );
     return apiError(
       c,
       500,
       ERROR_CODES.INTERNAL_ERROR,
-      'Webhook signature verification not configured'
+      'Webhook signature verification not configured',
     );
   }
 
@@ -277,7 +277,7 @@ export const resendWebhookRoute = new Hono<{
     webhookId,
     webhookTimestamp,
     webhookSignature,
-    webhookSecret
+    webhookSecret,
   );
 
   if (!isValid) {
@@ -286,7 +286,7 @@ export const resendWebhookRoute = new Hono<{
       c,
       401,
       ERROR_CODES.UNAUTHORIZED,
-      'Invalid webhook signature'
+      'Invalid webhook signature',
     );
   }
 
@@ -299,7 +299,7 @@ export const resendWebhookRoute = new Hono<{
       c,
       400,
       ERROR_CODES.VALIDATION_ERROR,
-      'Invalid JSON payload'
+      'Invalid JSON payload',
     );
   }
 

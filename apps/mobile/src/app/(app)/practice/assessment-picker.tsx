@@ -12,7 +12,7 @@ type TranslationFn = (key: string, options?: Record<string, unknown>) => string;
 
 function formatStudiedAt(isoDate: string, t: TranslationFn): string {
   const diffDays = Math.floor(
-    (Date.now() - new Date(isoDate).getTime()) / (1000 * 60 * 60 * 24)
+    (Date.now() - new Date(isoDate).getTime()) / (1000 * 60 * 60 * 24),
   );
   if (diffDays <= 0) return t('assessment.studiedToday');
   if (diffDays === 1) return t('assessment.studiedYesterday');
@@ -61,7 +61,7 @@ export default function AssessmentPickerScreen(): React.ReactElement {
         </View>
       </View>
 
-      {isError ? (
+      {isError && topics.length === 0 ? (
         <ErrorFallback
           variant="card"
           message={t('assessment.pickerLoadError')}

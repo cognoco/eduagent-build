@@ -20,7 +20,7 @@ jest.mock('../../hooks/use-retry-filing', () => ({
 function makeSession(
   filingStatus: 'filing_pending' | 'filing_failed' | 'filing_recovered' | null,
   filingRetryCount = 0,
-  id = 'session-1'
+  id = 'session-1',
 ) {
   return { id, filingStatus, filingRetryCount };
 }
@@ -61,7 +61,7 @@ describe('FilingFailedBanner', () => {
 
   it('calls retry mutation and shows ConflictError inline message on conflict', async () => {
     mockMutateAsync.mockRejectedValueOnce(
-      new ConflictError('Retry already in progress.')
+      new ConflictError('Retry already in progress.'),
     );
 
     render(<FilingFailedBanner session={makeSession('filing_failed', 0)} />);
@@ -74,7 +74,7 @@ describe('FilingFailedBanner', () => {
 
   it('shows RateLimitedError inline message when rate limited', async () => {
     mockMutateAsync.mockRejectedValueOnce(
-      new RateLimitedError('Retry limit reached for this session.')
+      new RateLimitedError('Retry limit reached for this session.'),
     );
 
     render(<FilingFailedBanner session={makeSession('filing_failed', 0)} />);
@@ -82,7 +82,7 @@ describe('FilingFailedBanner', () => {
     fireEvent.press(screen.getByTestId('filing-retry-button'));
 
     expect(
-      await screen.findByText('Retry limit reached. Please try again later.')
+      await screen.findByText('Retry limit reached. Please try again later.'),
     ).toBeTruthy();
   });
 

@@ -34,7 +34,7 @@ interface UseTextToSpeechOptions {
  * (3) manual play button. Requires physical device testing. See FR149.
  */
 export function useTextToSpeech(
-  options?: UseTextToSpeechOptions
+  options?: UseTextToSpeechOptions,
 ): UseTextToSpeechResult {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -85,7 +85,7 @@ export function useTextToSpeech(
         },
       });
     },
-    [options?.language]
+    [options?.language],
   );
 
   const stop = useCallback(() => {

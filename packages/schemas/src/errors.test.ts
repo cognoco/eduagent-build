@@ -15,6 +15,7 @@ import {
   ForbiddenError,
   NotFoundError,
   RateLimitedError,
+  ResourceGoneError,
   SafetyFilterError,
   UpstreamLlmError,
   VocabularyContextError,
@@ -73,6 +74,25 @@ describe('typed error classes [BUG-644]', () => {
     expect(err).toBeInstanceOf(SafetyFilterError);
     expect(err.name).toBe('SafetyFilterError');
     expect(err.errorCode).toBe('SAFETY_FILTER');
+  });
+
+  it('ResourceGoneError exposes stable errorCode and optional code/details [BUG-1010]', () => {
+    const err = new ResourceGoneError('Session deleted', 'SESSION_ARCHIVED', {
+      id: 'sess_123',
+    });
+    expect(err).toBeInstanceOf(Error);
+    expect(err).toBeInstanceOf(ResourceGoneError);
+    expect(err.name).toBe('ResourceGoneError');
+    expect(err.errorCode).toBe('RESOURCE_GONE');
+    expect(err.code).toBe('SESSION_ARCHIVED');
+    expect(err.details).toEqual({ id: 'sess_123' });
+    expect(err.message).toBe('Session deleted');
+
+    const defaults = new ResourceGoneError();
+    expect(defaults.errorCode).toBe('RESOURCE_GONE');
+    expect(defaults.message).toBe('This resource is no longer available.');
+    expect(defaults.code).toBeUndefined();
+    expect(defaults.details).toBeUndefined();
   });
 
   it('VocabularyContextError accepts a cause via ErrorOptions', () => {

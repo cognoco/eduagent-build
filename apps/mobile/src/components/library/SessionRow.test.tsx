@@ -24,7 +24,7 @@ describe('SessionRow', () => {
 
   it('hides note indicator when hasNote is false', () => {
     const { queryByTestId } = render(
-      <SessionRow {...baseProps} hasNote={false} />
+      <SessionRow {...baseProps} hasNote={false} />,
     );
     expect(queryByTestId('session-note-indicator')).toBeNull();
   });
@@ -32,7 +32,7 @@ describe('SessionRow', () => {
   it('calls onPress when tapped', () => {
     const onPress = jest.fn();
     const { getByTestId } = render(
-      <SessionRow {...baseProps} onPress={onPress} testID="session-row" />
+      <SessionRow {...baseProps} onPress={onPress} testID="session-row" />,
     );
     fireEvent.press(getByTestId('session-row'));
     expect(onPress).toHaveBeenCalledTimes(1);
@@ -45,7 +45,7 @@ describe('SessionRow', () => {
         {...baseProps}
         onLongPress={onLongPress}
         testID="session-row"
-      />
+      />,
     );
     fireEvent(getByTestId('session-row'), 'onLongPress');
     expect(onLongPress).toHaveBeenCalledTimes(1);

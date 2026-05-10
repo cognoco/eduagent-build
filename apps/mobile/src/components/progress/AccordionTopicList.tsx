@@ -54,7 +54,7 @@ export function AccordionTopicList({
     refetch,
   } = useChildSubjectTopics(
     expanded ? childProfileId : undefined,
-    expanded ? subjectId : undefined
+    expanded ? subjectId : undefined,
   );
 
   if (!expanded) {

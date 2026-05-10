@@ -29,7 +29,7 @@ export function useShakeDetector(onShake: () => void): {
     if (!Accelerometer) {
       if (__DEV__) {
         console.warn(
-          '[ShakeDetector] Accelerometer module not available - shake-to-feedback disabled'
+          '[ShakeDetector] Accelerometer module not available - shake-to-feedback disabled',
         );
       }
       return;
@@ -45,7 +45,7 @@ export function useShakeDetector(onShake: () => void): {
       if (!available) {
         if (__DEV__) {
           console.warn(
-            '[ShakeDetector] Accelerometer sensor not supported on this device - shake-to-feedback disabled'
+            '[ShakeDetector] Accelerometer sensor not supported on this device - shake-to-feedback disabled',
           );
         }
         return;

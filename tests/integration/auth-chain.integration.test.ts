@@ -7,13 +7,14 @@
  * interceptor (setup.ts) to return test RSA public keys.
  *
  * Validates:
- * 1. Public paths (/v1/health, /v1/inngest, /v1/auth/*, /v1/stripe/*, /v1/consent/respond) skip auth
+ * 1. Public paths (/v1/health, /v1/inngest, /v1/stripe/*, /v1/consent/respond) skip auth
  * 2. Protected paths without Authorization header → 401 UNAUTHORIZED
  * 3. Protected paths with non-Bearer auth → 401
  * 4. Protected paths with invalid/malformed JWT → 401
  * 5. Protected paths with expired JWT → 401
  * 6. Protected paths with valid JWT → passes auth (not 401)
  * 7. Missing CLERK_JWKS_URL → 401 (config error caught gracefully)
+ * Note: /v1/auth/* is NOT in PUBLIC_PATHS — auth is required [BUG-1007]
  */
 
 import { buildIntegrationEnv, cleanupAccounts } from './helpers';
@@ -63,20 +64,23 @@ describe('Integration: Auth chain — public paths', () => {
     }
   });
 
-  it('/v1/auth/* paths skip authentication', async () => {
+  // [BUG-1007] /v1/auth/* is NOT public — auth middleware requires a valid
+  // token. This was a deliberate security decision: stub auth endpoints must
+  // not be reachable without authentication.
+  it('/v1/auth/* paths require authentication [BUG-1007]', async () => {
     const res = await app.request(
-      '/v1/auth/status',
-      { method: 'GET' },
-      TEST_ENV
+      '/v1/auth/register',
+      { method: 'POST' },
+      TEST_ENV,
     );
-    expect(res.status).not.toBe(401);
+    expect(res.status).toBe(401);
   });
 
   it('/v1/consent/respond skips authentication', async () => {
     const res = await app.request(
       '/v1/consent/respond?token=test',
       { method: 'GET' },
-      TEST_ENV
+      TEST_ENV,
     );
     expect(res.status).not.toBe(401);
   });
@@ -117,7 +121,7 @@ describe('Integration: Auth chain — protected paths', () => {
         method: 'GET',
         headers: { Authorization: 'Basic dXNlcjpwYXNz' },
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(401);
@@ -133,7 +137,7 @@ describe('Integration: Auth chain — protected paths', () => {
         method: 'GET',
         headers: { Authorization: 'Bearer invalid.jwt.token' },
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(401);
@@ -156,7 +160,7 @@ describe('Integration: Auth chain — protected paths', () => {
           'Content-Type': 'application/json',
         },
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(401);
@@ -174,7 +178,7 @@ describe('Integration: Auth chain — protected paths', () => {
           email: AUTH_EMAIL,
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     // Auth middleware passed — real JWT verified via Web Crypto
@@ -194,7 +198,7 @@ describe('Integration: Auth chain — protected paths', () => {
           email: AUTH_EMAIL,
         }),
       },
-      buildIntegrationEnv({ CLERK_JWKS_URL: '' })
+      buildIntegrationEnv({ CLERK_JWKS_URL: '' }),
     );
 
     expect(res.status).toBe(401);
@@ -217,13 +221,13 @@ describe('Integration: Auth chain — middleware ordering', () => {
           'Access-Control-Request-Headers': 'Authorization, Content-Type',
         },
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     // CORS handles OPTIONS before auth middleware runs
     expect(res.status).toBeLessThan(400);
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe(
-      'http://localhost:8081'
+      'http://localhost:8081',
     );
   });
 });

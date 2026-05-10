@@ -47,7 +47,7 @@ describe('stripEnvelopeJson', () => {
       const envelope =
         '{"reply":"Very close! The letters \'gi\' together make a \'j\' sound, like in \'jungle\'. So it\'s \'Buon-JOR-noh\'. Try saying \'Buongiorno\' one more time.","signals":{"partial_progress":true,"needs_deepening":false,"understanding_check":false},"ui_hints":{"note_prompt":{"show":false,"post_session":false},"fluency_drill":{"active":false,"duration_s":0,"score":{"correct":0,"total":0}}}}';
       expect(stripEnvelopeJson(envelope)).toBe(
-        "Very close! The letters 'gi' together make a 'j' sound, like in 'jungle'. So it's 'Buon-JOR-noh'. Try saying 'Buongiorno' one more time."
+        "Very close! The letters 'gi' together make a 'j' sound, like in 'jungle'. So it's 'Buon-JOR-noh'. Try saying 'Buongiorno' one more time.",
       );
     });
 

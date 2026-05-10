@@ -6,7 +6,7 @@ import { assertOk } from '../lib/assert-ok';
 import type { LibrarySearchResult } from '@eduagent/schemas';
 
 export function useLibrarySearch(
-  query: string
+  query: string,
 ): UseQueryResult<LibrarySearchResult> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -19,7 +19,7 @@ export function useLibrarySearch(
       try {
         const res = await client.library.search.$get(
           { query: { q: trimmed } },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         return (await res.json()) as LibrarySearchResult;

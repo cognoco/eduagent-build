@@ -157,7 +157,7 @@ describe('LanguageSetup', () => {
     render(<LanguageSetup />);
 
     expect(
-      screen.getByText(/Looks like you're learning Spanish!/i)
+      screen.getByText(/Looks like you're learning Spanish!/i),
     ).toBeTruthy();
   });
 
@@ -175,7 +175,7 @@ describe('LanguageSetup', () => {
     fireEvent.press(screen.getByTestId('language-setup-back'));
     expect(mockGoBackOrReplace).toHaveBeenCalledWith(
       expect.anything(),
-      '/(app)/home'
+      '/(app)/home',
     );
   });
 
@@ -187,7 +187,7 @@ describe('LanguageSetup', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/Please type your native language\./i)
+        screen.getByText(/Please type your native language\./i),
       ).toBeTruthy();
     });
     expect(mockMutateAsync).not.toHaveBeenCalled();
@@ -242,11 +242,11 @@ describe('LanguageSetup', () => {
     fireEvent.press(screen.getByTestId('language-setup-back'));
     expect(mockGoBackOrReplace).toHaveBeenCalledWith(
       expect.anything(),
-      '/(app)/more'
+      '/(app)/more',
     );
     expect(mockGoBackOrReplace).not.toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ pathname: '/(app)/session' })
+      expect.objectContaining({ pathname: '/(app)/session' }),
     );
   });
 
@@ -259,7 +259,7 @@ describe('LanguageSetup', () => {
     await waitFor(() => {
       expect(mockGoBackOrReplace).toHaveBeenCalledWith(
         expect.anything(),
-        '/(app)/more'
+        '/(app)/more',
       );
     });
     expect(mockReplace).not.toHaveBeenCalled();
@@ -271,7 +271,7 @@ describe('LanguageSetup', () => {
     mockMutateAsync.mockReturnValue(
       new Promise<{ subject: { id: string } }>((resolve) => {
         resolveMutation = resolve;
-      })
+      }),
     );
 
     render(<LanguageSetup />);
@@ -294,7 +294,7 @@ describe('LanguageSetup', () => {
     expect(mockGoBackOrReplace).toHaveBeenCalledTimes(1);
     expect(mockGoBackOrReplace).toHaveBeenCalledWith(
       expect.anything(),
-      '/(app)/home'
+      '/(app)/home',
     );
   });
 
@@ -307,7 +307,7 @@ describe('LanguageSetup', () => {
     mockStartFirstCurriculumMutateAsync.mockReturnValue(
       new Promise<{ session: { id: string; topicId: string } }>((resolve) => {
         resolveSession = resolve;
-      })
+      }),
     );
 
     render(<LanguageSetup />);

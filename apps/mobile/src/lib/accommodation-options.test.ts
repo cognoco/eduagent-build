@@ -11,7 +11,7 @@ describe('ACCOMMODATION_GUIDE', () => {
 
   it('each row has a recommendation that is a valid ACCOMMODATION_OPTIONS mode', () => {
     const validModes = new Set<AccommodationMode>(
-      ACCOMMODATION_OPTIONS.map((o) => o.mode)
+      ACCOMMODATION_OPTIONS.map((o) => o.mode),
     );
     for (const row of ACCOMMODATION_GUIDE) {
       expect(validModes.has(row.recommendation)).toBe(true);
@@ -20,7 +20,7 @@ describe('ACCOMMODATION_GUIDE', () => {
 
   it('covers all four accommodation modes', () => {
     const recommendedModes = new Set(
-      ACCOMMODATION_GUIDE.map((row) => row.recommendation)
+      ACCOMMODATION_GUIDE.map((row) => row.recommendation),
     );
     expect(recommendedModes.has('none')).toBe(true);
     expect(recommendedModes.has('short-burst')).toBe(true);

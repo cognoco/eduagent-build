@@ -67,8 +67,8 @@ export function getStruggleProgress(entry: StruggleEntry): {
     entry.confidence === 'high'
       ? 'Showing up a lot lately'
       : entry.confidence === 'medium'
-      ? 'Repeated pattern'
-      : 'Early signal';
+        ? 'Repeated pattern'
+        : 'Early signal';
 
   return {
     progressLabel: `${confidenceLabel} - ${attemptsLabel}`,
@@ -246,7 +246,7 @@ export function InterestContextRow({
 }) {
   const { t } = useTranslation();
   const [selectedContext, setSelectedContext] = useState<InterestContext>(
-    interest.context
+    interest.context,
   );
 
   useEffect(() => {

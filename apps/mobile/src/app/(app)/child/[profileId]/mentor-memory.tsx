@@ -45,7 +45,7 @@ import { useUpdateInterestsContext } from '../../../../hooks/use-onboarding-dime
 
 function confidenceDetail(
   confidence: 'low' | 'medium' | 'high' | undefined,
-  t: (key: string) => string
+  t: (key: string) => string,
 ): string | undefined {
   if (!confidence) return undefined;
   return t(`parentView.mentorMemory.confidence.${confidence}`);
@@ -75,7 +75,7 @@ export default function ChildMentorMemoryScreen() {
   const [correctionText, setCorrectionText] = useState('');
   // [BUG-533] Toast state for save confirmation — same pattern as session screen.
   const [confirmationToast, setConfirmationToast] = useState<string | null>(
-    null
+    null,
   );
 
   useEffect(() => {
@@ -93,11 +93,11 @@ export default function ChildMentorMemoryScreen() {
       } catch {
         platformAlert(
           t('parentView.mentorMemory.couldNotDeleteItem'),
-          t('parentView.mentorMemory.pleaseTryAgain')
+          t('parentView.mentorMemory.pleaseTryAgain'),
         );
       }
     },
-    [deleteItem, t]
+    [deleteItem, t],
   );
 
   const safeUnsuppress = useCallback(
@@ -107,11 +107,11 @@ export default function ChildMentorMemoryScreen() {
       } catch {
         platformAlert(
           t('parentView.mentorMemory.couldNotRestoreItem'),
-          t('parentView.mentorMemory.pleaseTryAgain')
+          t('parentView.mentorMemory.pleaseTryAgain'),
         );
       }
     },
-    [unsuppress, t]
+    [unsuppress, t],
   );
 
   const handleDeleteAll = useCallback(() => {
@@ -130,12 +130,12 @@ export default function ChildMentorMemoryScreen() {
             } catch {
               platformAlert(
                 t('parentView.mentorMemory.couldNotClearMemory'),
-                t('parentView.mentorMemory.pleaseTryAgain')
+                t('parentView.mentorMemory.pleaseTryAgain'),
               );
             }
           },
         },
-      ]
+      ],
     );
   }, [childProfileId, deleteAll, t]);
 
@@ -150,12 +150,12 @@ export default function ChildMentorMemoryScreen() {
       });
       setDraft('');
       setConfirmationToast(
-        result.message || t('parentView.mentorMemory.savedMentorWillRemember')
+        result.message || t('parentView.mentorMemory.savedMentorWillRemember'),
       );
     } catch {
       platformAlert(
         t('parentView.mentorMemory.couldNotSaveThat'),
-        t('parentView.mentorMemory.pleaseTryAgain')
+        t('parentView.mentorMemory.pleaseTryAgain'),
       );
     }
   }, [childProfileId, draft, tellMentor, t]);
@@ -172,12 +172,12 @@ export default function ChildMentorMemoryScreen() {
         } catch {
           platformAlert(
             t('parentView.mentorMemory.couldNotUpdateMemory'),
-            t('parentView.mentorMemory.pleaseTryAgain')
+            t('parentView.mentorMemory.pleaseTryAgain'),
           );
         }
       })();
     },
-    [childProfileId, toggleCollection, t]
+    [childProfileId, toggleCollection, t],
   );
 
   const handleToggleInjection = useCallback(
@@ -192,12 +192,12 @@ export default function ChildMentorMemoryScreen() {
         } catch {
           platformAlert(
             t('parentView.mentorMemory.couldNotUpdateMemory'),
-            t('parentView.mentorMemory.pleaseTryAgain')
+            t('parentView.mentorMemory.pleaseTryAgain'),
           );
         }
       })();
     },
-    [childProfileId, toggleInjection, t]
+    [childProfileId, toggleInjection, t],
   );
 
   const handleInterestContextChange = useCallback(
@@ -211,13 +211,13 @@ export default function ChildMentorMemoryScreen() {
         await updateInterestsContext.mutateAsync({
           childProfileId,
           interests: interests.map((interest) =>
-            interest.label === label ? { ...interest, context } : interest
+            interest.label === label ? { ...interest, context } : interest,
           ),
         });
       } catch (err) {
         platformAlert(
           t('parentView.mentorMemory.couldNotUpdateMemory'),
-          t('parentView.mentorMemory.pleaseTryAgain')
+          t('parentView.mentorMemory.pleaseTryAgain'),
         );
         throw err;
       }
@@ -228,7 +228,7 @@ export default function ChildMentorMemoryScreen() {
       profile?.memoryConsentStatus,
       t,
       updateInterestsContext,
-    ]
+    ],
   );
 
   const handleExport = useCallback(() => {
@@ -282,7 +282,7 @@ export default function ChildMentorMemoryScreen() {
       } catch {
         platformAlert(
           t('parentView.mentorMemory.couldNotExportMemory'),
-          t('parentView.mentorMemory.pleaseTryAgain')
+          t('parentView.mentorMemory.pleaseTryAgain'),
         );
       }
     })();
@@ -357,7 +357,7 @@ export default function ChildMentorMemoryScreen() {
                   } catch {
                     platformAlert(
                       'Could not enable memory',
-                      'Please try again.'
+                      'Please try again.',
                     );
                   }
                 })()
@@ -372,7 +372,7 @@ export default function ChildMentorMemoryScreen() {
                   } catch {
                     platformAlert(
                       'Could not save preference',
-                      'Please try again.'
+                      'Please try again.',
                     );
                   }
                 })()
@@ -431,7 +431,7 @@ export default function ChildMentorMemoryScreen() {
           <MemorySection
             title={t('session.mentorMemory.sections.interests')}
             description={t(
-              'session.mentorMemory.sections.interestsContextHint'
+              'session.mentorMemory.sections.interestsContextHint',
             )}
             testID="child-mentor-memory-interests-section"
           >
@@ -522,7 +522,7 @@ export default function ChildMentorMemoryScreen() {
             className="bg-surface rounded-card px-4 py-3 mb-2"
             accessibilityRole="button"
             accessibilityLabel={t(
-              'parentView.mentorMemory.exportMemorySummary'
+              'parentView.mentorMemory.exportMemorySummary',
             )}
           >
             <Text className="text-body font-semibold text-text-primary">
@@ -598,12 +598,12 @@ export default function ChildMentorMemoryScreen() {
                       setCorrectionText('');
                       setConfirmationToast(
                         result.message ||
-                          t('parentView.mentorMemory.correctionNoted')
+                          t('parentView.mentorMemory.correctionNoted'),
                       );
                     } catch {
                       platformAlert(
                         t('parentView.mentorMemory.couldNotSaveCorrection'),
-                        t('parentView.mentorMemory.pleaseTryAgain')
+                        t('parentView.mentorMemory.pleaseTryAgain'),
                       );
                     }
                   })()

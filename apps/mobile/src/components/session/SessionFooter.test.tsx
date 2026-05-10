@@ -96,7 +96,7 @@ describe('SessionFooter', () => {
       });
       expect(props.navigateToSessionSummary).toHaveBeenCalledWith(
         'shelf-1',
-        'book-1'
+        'book-1',
       );
     });
   });
@@ -123,7 +123,7 @@ describe('SessionFooter', () => {
 
     fireEvent.changeText(
       screen.getByTestId('note-text-input'),
-      'My note content'
+      'My note content',
     );
     fireEvent.press(screen.getByText('Save'));
 
@@ -136,7 +136,7 @@ describe('SessionFooter', () => {
       expect.objectContaining({
         onSuccess: expect.any(Function),
         onError: expect.any(Function),
-      })
+      }),
     );
   });
 });

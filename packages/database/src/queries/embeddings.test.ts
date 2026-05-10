@@ -42,7 +42,7 @@ describe('findSimilarTopics', () => {
       db,
       TEST_EMBEDDING,
       5,
-      TEST_PROFILE_ID
+      TEST_PROFILE_ID,
     );
 
     expect(execute).toHaveBeenCalledTimes(1);
@@ -139,7 +139,7 @@ describe('storeEmbedding', () => {
 
     expect(insert).toHaveBeenCalledTimes(1);
     expect(values).toHaveBeenCalledWith(
-      expect.objectContaining({ topicId: null })
+      expect.objectContaining({ topicId: null }),
     );
   });
 });

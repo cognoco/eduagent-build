@@ -24,14 +24,14 @@ jest.mock(
   '../../../../lib/platform-alert',
   /* gc1-allow: alert boundary */ () => ({
     platformAlert: jest.fn(),
-  })
+  }),
 );
 
 jest.mock(
   '../../../../lib/navigation',
   /* gc1-allow: navigation boundary */ () => ({
     goBackOrReplace: jest.fn(),
-  })
+  }),
 );
 
 jest.mock(
@@ -40,7 +40,7 @@ jest.mock(
     useApiClient: () => ({
       learnerProfile: {},
     }),
-  })
+  }),
 );
 
 jest.mock(
@@ -49,14 +49,14 @@ jest.mock(
     useProfile: () => ({
       profiles: [{ id: 'child-001' }],
     }),
-  })
+  }),
 );
 
 jest.mock(
   '../../../../components/tell-mentor-input',
   /* gc1-allow: child component */ () => ({
     TellMentorInput: () => null,
-  })
+  }),
 );
 
 const mockUseChildDetail = jest.fn();
@@ -67,7 +67,7 @@ jest.mock(
   /* gc1-allow: dashboard query state */ () => ({
     useChildDetail: (...args: unknown[]) => mockUseChildDetail(...args),
     useChildMemory: (...args: unknown[]) => mockUseChildMemory(...args),
-  })
+  }),
 );
 
 const mockUseChildLearnerProfile = jest.fn();
@@ -96,7 +96,7 @@ jest.mock(
       mockUseToggleMemoryInjection(...args),
     useUnsuppressInference: (...args: unknown[]) =>
       mockUseUnsuppressInference(...args),
-  })
+  }),
 );
 
 const mockUpdateInterestsContextMutateAsync = jest.fn();
@@ -108,7 +108,7 @@ jest.mock(
       mutateAsync: mockUpdateInterestsContextMutateAsync,
       isPending: false,
     }),
-  })
+  }),
 );
 
 const ChildMentorMemoryScreen = require('./mentor-memory').default;
@@ -130,7 +130,7 @@ const childProfileBase = {
 };
 
 function setupDefaultMocks(
-  profileOverrides: Record<string, unknown> = {}
+  profileOverrides: Record<string, unknown> = {},
 ): void {
   mockUseChildDetail.mockReturnValue({
     data: { displayName: 'Emma', profileId: 'child-001' },
@@ -187,7 +187,7 @@ describe('ChildMentorMemoryScreen — interest context rows', () => {
     screen.getByText('Astronomy');
     expect(
       screen.getByTestId('interest-context-Football-free_time').props
-        .accessibilityState?.selected
+        .accessibilityState?.selected,
     ).toBe(true);
   });
 
@@ -207,7 +207,7 @@ describe('ChildMentorMemoryScreen — interest context rows', () => {
     });
     expect(
       screen.getByTestId('interest-context-Football-both').props
-        .accessibilityState?.selected
+        .accessibilityState?.selected,
     ).toBe(true);
   });
 
@@ -217,7 +217,7 @@ describe('ChildMentorMemoryScreen — interest context rows', () => {
     render(<ChildMentorMemoryScreen />);
 
     expect(
-      screen.queryByTestId('child-mentor-memory-interests-section')
+      screen.queryByTestId('child-mentor-memory-interests-section'),
     ).toBeNull();
   });
 });

@@ -16,7 +16,7 @@ describe('getConversationStage', () => {
     // don't render warmup UI. Mirrors `normalizeModeForConfig` in
     // sessionModeConfig.ts — both files normalize in the same direction.
     expect(getConversationStage(0, false, 'practice' as never)).toBe(
-      'teaching'
+      'teaching',
     );
   });
 
@@ -105,7 +105,7 @@ describe('errorHasCode', () => {
   it('matches .apiCode property from ForbiddenError', () => {
     const err = Object.assign(
       new Error('Subject is paused — resume it before starting a session'),
-      { code: 'FORBIDDEN', apiCode: 'SUBJECT_INACTIVE' }
+      { code: 'FORBIDDEN', apiCode: 'SUBJECT_INACTIVE' },
     );
     expect(errorHasCode(err, 'SUBJECT_INACTIVE')).toBe(true);
   });
@@ -128,7 +128,11 @@ describe('isReconnectableSessionError', () => {
   it('returns false for ForbiddenError with SUBJECT_INACTIVE apiCode', () => {
     const err = Object.assign(
       new Error('Subject is paused — resume it before starting a session'),
-      { name: 'ForbiddenError', code: 'FORBIDDEN', apiCode: 'SUBJECT_INACTIVE' }
+      {
+        name: 'ForbiddenError',
+        code: 'FORBIDDEN',
+        apiCode: 'SUBJECT_INACTIVE',
+      },
     );
     expect(isReconnectableSessionError(err)).toBe(false);
   });

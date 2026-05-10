@@ -68,7 +68,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
       return () => {
         reviewCancelledRef.current = true;
       };
-    }, [])
+    }, []),
   );
 
   // [F-020] If a user lands on /dictation/complete via a deep link, back
@@ -117,7 +117,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
   const isE2E = process.env.EXPO_PUBLIC_E2E === '1';
 
   const handleCheckWriting = async (
-    source: 'camera' | 'gallery' = 'camera'
+    source: 'camera' | 'gallery' = 'camera',
   ) => {
     // [BUG-692] Reset the cancelled flag at the start of each new attempt.
     reviewCancelledRef.current = false;
@@ -150,7 +150,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
       platformAlert(
         t('dictation.complete.cameraErrorTitle'),
         t('dictation.complete.cameraErrorMessage'),
-        [{ text: t('common.ok') }]
+        [{ text: t('common.ok') }],
       );
       return;
     }
@@ -181,7 +181,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
       platformAlert(
         t('dictation.complete.photoErrorTitle'),
         t('dictation.complete.photoErrorMessage'),
-        [{ text: t('common.ok') }]
+        [{ text: t('common.ok') }],
       );
       return;
     }
@@ -296,7 +296,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
                 className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center mb-3"
                 accessibilityRole="button"
                 accessibilityLabel={t(
-                  'dictation.complete.retryCheckingWriting'
+                  'dictation.complete.retryCheckingWriting',
                 )}
                 testID="review-timeout-retry"
               >

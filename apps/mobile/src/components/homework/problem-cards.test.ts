@@ -115,7 +115,7 @@ describe('homework OCR guard helpers', () => {
 describe('splitHomeworkProblems', () => {
   it('splits numbered worksheet problems into separate cards', () => {
     const result = splitHomeworkProblems(
-      '1. Solve 2x + 5 = 17\n2. Factor x^2 + 3x + 2\n3. Find the slope of y = 2x + 1'
+      '1. Solve 2x + 5 = 17\n2. Factor x^2 + 3x + 2\n3. Find the slope of y = 2x + 1',
     );
 
     expect(result.problems).toHaveLength(3);
@@ -127,7 +127,7 @@ describe('splitHomeworkProblems', () => {
 
   it('preserves all valid problems from typical homework OCR', () => {
     const result = splitHomeworkProblems(
-      '1. Solve 2x + 5 = 17\nShow your work.\n\n2. Explain why the slope is negative.\nUse one sentence.'
+      '1. Solve 2x + 5 = 17\nShow your work.\n\n2. Explain why the slope is negative.\nUse one sentence.',
     );
 
     expect(result.problems).toHaveLength(2);
@@ -146,7 +146,7 @@ describe('splitHomeworkProblems', () => {
 
   it('splitHomeworkProblems returns dropped count', () => {
     const result = splitHomeworkProblems(
-      '1. Solve 2x + 5 = 17\n\n??\n\n2. Factor x^2 + 3x + 2'
+      '1. Solve 2x + 5 = 17\n\n??\n\n2. Factor x^2 + 3x + 2',
     );
 
     expect(result.problems).toHaveLength(2);
@@ -165,7 +165,7 @@ describe('splitHomeworkProblems', () => {
 describe('problem card helpers', () => {
   it('serializes and parses problem cards', () => {
     const problems = splitHomeworkProblems(
-      '1. Add 2 + 2\n2. Add 3 + 3'
+      '1. Add 2 + 2\n2. Add 3 + 3',
     ).problems;
     const serialized = serializeHomeworkProblems(problems);
     const parsed = parseHomeworkProblems(serialized);
@@ -176,7 +176,7 @@ describe('problem card helpers', () => {
 
   it('applies per-problem status from the current index', () => {
     const problems = splitHomeworkProblems(
-      '1. Add 2 + 2\n2. Add 3 + 3'
+      '1. Add 2 + 2\n2. Add 3 + 3',
     ).problems;
     const updated = withProblemStatus(problems, 1);
 
@@ -186,7 +186,7 @@ describe('problem card helpers', () => {
 
   it('stores the selected homework mode on the active problem', () => {
     const problems = splitHomeworkProblems(
-      '1. Add 2 + 2\n2. Add 3 + 3'
+      '1. Add 2 + 2\n2. Add 3 + 3',
     ).problems;
     const updated = withProblemMode(problems, problems[0]!.id, 'help_me');
 
@@ -196,13 +196,13 @@ describe('problem card helpers', () => {
 
   it('builds homework metadata for the API', () => {
     const problems = splitHomeworkProblems(
-      '1. Add 2 + 2\n2. Add 3 + 3'
+      '1. Add 2 + 2\n2. Add 3 + 3',
     ).problems;
     const metadata = buildHomeworkSessionMetadata(
       problems,
       0,
       'raw OCR text',
-      'gallery'
+      'gallery',
     );
 
     expect(metadata.problemCount).toBe(2);

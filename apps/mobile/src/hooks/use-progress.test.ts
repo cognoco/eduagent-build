@@ -70,8 +70,8 @@ describe('useSubjectProgress', () => {
             lastSessionAt: null,
           },
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useSubjectProgress('sub-1'), {
@@ -89,7 +89,7 @@ describe('useSubjectProgress', () => {
 
   it('handles API errors', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response('Network error', { status: 500 })
+      new Response('Network error', { status: 500 }),
     );
 
     const { result } = renderHook(() => useSubjectProgress('sub-1'), {
@@ -133,8 +133,8 @@ describe('useOverallProgress', () => {
           totalTopicsCompleted: 2,
           totalTopicsVerified: 1,
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useOverallProgress(), {
@@ -171,8 +171,8 @@ describe('useContinueSuggestion', () => {
             topicTitle: 'Algebra',
           },
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useContinueSuggestion(), {
@@ -189,7 +189,7 @@ describe('useContinueSuggestion', () => {
 
   it('returns null when no suggestion', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ suggestion: null }), { status: 200 })
+      new Response(JSON.stringify({ suggestion: null }), { status: 200 }),
     );
 
     const { result } = renderHook(() => useContinueSuggestion(), {
@@ -230,8 +230,8 @@ describe('useLearningResumeTarget', () => {
             reason: 'Pick up Photosynthesis',
           },
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(
@@ -239,7 +239,7 @@ describe('useLearningResumeTarget', () => {
         useLearningResumeTarget({
           subjectId: '550e8400-e29b-41d4-a716-446655440000',
         }),
-      { wrapper: createWrapper() }
+      { wrapper: createWrapper() },
     );
 
     await waitFor(() => {
@@ -265,7 +265,7 @@ describe('useReviewSummary', () => {
 
   it('fetches review summary from API', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ totalOverdue: 6 }), { status: 200 })
+      new Response(JSON.stringify({ totalOverdue: 6 }), { status: 200 }),
     );
 
     const { result } = renderHook(() => useReviewSummary(), {
@@ -312,8 +312,8 @@ describe('useOverdueTopics', () => {
             },
           ],
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useOverdueTopics(), {
@@ -355,8 +355,8 @@ describe('useTopicProgress', () => {
             xpStatus: 'pending',
           },
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useTopicProgress('sub-1', 'topic-1'), {

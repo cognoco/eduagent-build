@@ -4,6 +4,7 @@ import {
   registerSchema,
   passwordResetRequestSchema,
   passwordResetSchema,
+  ERROR_CODES,
 } from '@eduagent/schemas';
 
 export const auth = new Hono()
@@ -11,11 +12,11 @@ export const auth = new Hono()
     // Registration is handled by Clerk — this server-side stub is not implemented.
     return c.json(
       {
-        code: 'NOT_IMPLEMENTED',
+        code: ERROR_CODES.NOT_IMPLEMENTED,
         message:
           'Registration is handled by Clerk — this endpoint is not implemented',
       },
-      501
+      501,
     );
   })
   .post(
@@ -25,13 +26,13 @@ export const auth = new Hono()
       // Password reset requests are handled by Clerk — this stub is not implemented.
       return c.json(
         {
-          code: 'NOT_IMPLEMENTED',
+          code: ERROR_CODES.NOT_IMPLEMENTED,
           message:
             'Password reset is handled by Clerk — this endpoint is not implemented',
         },
-        501
+        501,
       );
-    }
+    },
   )
   .post(
     '/auth/password-reset',
@@ -40,11 +41,11 @@ export const auth = new Hono()
       // Password reset token verification is handled by Clerk — this stub is not implemented.
       return c.json(
         {
-          code: 'NOT_IMPLEMENTED',
+          code: ERROR_CODES.NOT_IMPLEMENTED,
           message:
             'Password reset is handled by Clerk — this endpoint is not implemented',
         },
-        501
+        501,
       );
-    }
+    },
   );

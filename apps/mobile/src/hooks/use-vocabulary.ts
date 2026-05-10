@@ -20,7 +20,7 @@ export function useVocabulary(subjectId: string) {
       try {
         const res = await client.subjects[':subjectId'].vocabulary.$get(
           { param: { subjectId } },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         const data = (await res.json()) as { vocabulary: Vocabulary[] };

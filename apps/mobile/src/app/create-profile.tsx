@@ -37,7 +37,7 @@ const MAX_DATE = new Date();
 const MIN_DATE = new Date(
   MAX_DATE.getFullYear() - 100,
   MAX_DATE.getMonth(),
-  MAX_DATE.getDate()
+  MAX_DATE.getDate(),
 );
 
 function formatDateForDisplay(date: Date): string {
@@ -102,7 +102,7 @@ export default function CreateProfileScreen() {
     const timer = setTimeout(() => {
       setLoading(false);
       setError(
-        'Creating your profile is taking too long. Check your connection and try again.'
+        'Creating your profile is taking too long. Check your connection and try again.',
       );
     }, PROFILE_CREATE_TIMEOUT_MS);
     return () => clearTimeout(timer);
@@ -123,7 +123,7 @@ export default function CreateProfileScreen() {
         setBirthDate(selectedDate);
       }
     },
-    []
+    [],
   );
 
   const onWebBirthDateChange = useCallback(
@@ -132,7 +132,7 @@ export default function CreateProfileScreen() {
       setBirthDate(parseWebBirthDate(value));
       if (error) setError('');
     },
-    [error]
+    [error],
   );
 
   const canSubmit =
@@ -171,7 +171,7 @@ export default function CreateProfileScreen() {
       // be null briefly, which remounts CreateProfileGate and flashes the
       // welcome screen again.
       queryClient.setQueryData<Profile[]>(['profiles'], (old) =>
-        old ? [...old, result.profile] : [result.profile]
+        old ? [...old, result.profile] : [result.profile],
       );
       await queryClient.invalidateQueries({ queryKey: ['profiles'] });
 
@@ -184,7 +184,7 @@ export default function CreateProfileScreen() {
         // Show confirmation — parent stays on their own profile
         platformAlert(
           'Profile created',
-          `${trimmedName}'s profile is ready. You can switch to it from the Profiles screen.`
+          `${trimmedName}'s profile is ready. You can switch to it from the Profiles screen.`,
         );
         return;
       }
@@ -203,7 +203,7 @@ export default function CreateProfileScreen() {
         platformAlert(
           'Profile created',
           switchResult.error ??
-            'We created the profile, but could not switch to it automatically. You can switch from the Profiles screen.'
+            'We created the profile, but could not switch to it automatically. You can switch from the Profiles screen.',
         );
       }
 
@@ -243,7 +243,7 @@ export default function CreateProfileScreen() {
               text: 'See plans',
               onPress: () => router.push('/(app)/subscription'),
             },
-          ]
+          ],
         );
         setError('');
       } else {
@@ -381,8 +381,8 @@ export default function CreateProfileScreen() {
               {birthDate
                 ? formatDateForDisplay(birthDate)
                 : isAddingChild
-                ? "Select your child's date of birth"
-                : 'Select date of birth'}
+                  ? "Select your child's date of birth"
+                  : 'Select date of birth'}
             </Text>
           </Pressable>
         )}

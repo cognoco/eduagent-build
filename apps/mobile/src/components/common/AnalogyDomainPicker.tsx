@@ -77,7 +77,7 @@ export function AnalogyDomainPicker({
         onSelect(domain);
       }
     },
-    [onSelect, disabled]
+    [onSelect, disabled],
   );
 
   if (isLoading) {

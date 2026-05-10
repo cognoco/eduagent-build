@@ -20,7 +20,7 @@ jest.mock('react-i18next', () => ({
       if (!opts) return template;
       return Object.entries(opts).reduce(
         (acc, [k, v]) => acc.replace(`{{${k}}}`, String(v)),
-        template
+        template,
       );
     },
   }),

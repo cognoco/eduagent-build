@@ -52,7 +52,7 @@ function getProfileScopedTables(): string[] {
       const nextTableMatch = content.indexOf('pgTable(', tableStart + 1);
       const tableBlock = content.slice(
         tableStart,
-        nextTableMatch === -1 ? undefined : nextTableMatch
+        nextTableMatch === -1 ? undefined : nextTableMatch,
       );
 
       if (/profile_id/.test(tableBlock)) {
@@ -68,7 +68,7 @@ function getRlsEnabledTables(): Set<string> {
   if (!fs.existsSync(MIGRATIONS_DIR)) {
     throw new Error(
       `Migrations directory not found at ${MIGRATIONS_DIR}. ` +
-        'This test expects the standard monorepo layout.'
+        'This test expects the standard monorepo layout.',
     );
   }
 
@@ -84,7 +84,7 @@ function getRlsEnabledTables(): Set<string> {
     // Match: ALTER TABLE "table_name" ENABLE ROW LEVEL SECURITY
     // or:   ALTER TABLE table_name ENABLE ROW LEVEL SECURITY
     const matches = content.matchAll(
-      /ALTER\s+TABLE\s+"?([a-z_]+)"?\s+ENABLE\s+ROW\s+LEVEL\s+SECURITY/gi
+      /ALTER\s+TABLE\s+"?([a-z_]+)"?\s+ENABLE\s+ROW\s+LEVEL\s+SECURITY/gi,
     );
 
     for (const match of matches) {
@@ -115,7 +115,7 @@ describe('RLS coverage invariant', () => {
           `ENABLE ROW LEVEL SECURITY in migrations:\n` +
           missing.map((t) => `  - ${t}`).join('\n') +
           '\n\nAdd them to an existing or new migration, or add an entry ' +
-          'to RLS_EXCEPTIONS in this test with a documented reason.'
+          'to RLS_EXCEPTIONS in this test with a documented reason.',
       );
     }
   });

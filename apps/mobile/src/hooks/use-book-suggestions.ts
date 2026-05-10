@@ -6,7 +6,7 @@ import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 
 export function useBookSuggestions(
-  subjectId: string | undefined
+  subjectId: string | undefined,
 ): UseQueryResult<BookSuggestion[]> {
   const client = useApiClient();
   const { activeProfile } = useProfile();

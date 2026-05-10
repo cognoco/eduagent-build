@@ -15,13 +15,13 @@ describe('OnboardingStepIndicator', () => {
     render(<OnboardingStepIndicator step={2} totalSteps={4} />);
 
     expect(screen.getByTestId('step-dot-1').props.className).toContain(
-      'bg-primary'
+      'bg-primary',
     );
     expect(screen.getByTestId('step-dot-2').props.className).toContain(
-      'bg-primary'
+      'bg-primary',
     );
     expect(screen.getByTestId('step-dot-3').props.className).toContain(
-      'bg-muted'
+      'bg-muted',
     );
   });
 
@@ -36,7 +36,7 @@ describe('OnboardingStepIndicator', () => {
           'Support options',
           'Your plan',
         ]}
-      />
+      />,
     );
 
     screen.getByText('Step 2 of 4');
@@ -61,7 +61,7 @@ describe('OnboardingStepIndicator', () => {
           'Support options',
           'Your plan',
         ]}
-      />
+      />,
     );
 
     screen.getByText('Your plan');

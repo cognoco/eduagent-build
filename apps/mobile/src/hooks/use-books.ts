@@ -16,7 +16,7 @@ import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 
 export function useBooks(
-  subjectId: string | undefined
+  subjectId: string | undefined,
 ): UseQueryResult<CurriculumBook[]> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -29,7 +29,7 @@ export function useBooks(
       try {
         const res = await client.subjects[':subjectId'].books.$get(
           { param: { subjectId } },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         const data = (await res.json()) as { books: CurriculumBook[] };
@@ -53,7 +53,7 @@ export function useBooks(
 
 export function useBookWithTopics(
   subjectId: string | undefined,
-  bookId: string | undefined
+  bookId: string | undefined,
 ): UseQueryResult<BookWithTopics | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -67,7 +67,7 @@ export function useBookWithTopics(
       try {
         const res = await client.subjects[':subjectId'].books[':bookId'].$get(
           { param: { subjectId, bookId } },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         return (await res.json()) as BookWithTopics;
@@ -93,7 +93,7 @@ interface GenerateBookTopicsVars {
 
 export function useGenerateBookTopics(
   subjectId: string | undefined,
-  bookId: string | undefined
+  bookId: string | undefined,
 ): UseMutationResult<
   BookWithTopics,
   Error,
@@ -157,26 +157,26 @@ export function useGenerateBookTopics(
     ...publicMutation,
     mutate: (
       input: BookTopicGenerateInput | undefined,
-      options?: Parameters<typeof publicMutation.mutate>[1]
+      options?: Parameters<typeof publicMutation.mutate>[1],
     ) => {
       if (!subjectId || !bookId) return;
       internalMutation.mutate(
         { subjectId, bookId, input },
-        options as Parameters<typeof internalMutation.mutate>[1]
+        options as Parameters<typeof internalMutation.mutate>[1],
       );
     },
     mutateAsync: async (
       input: BookTopicGenerateInput | undefined,
-      options?: Parameters<typeof publicMutation.mutateAsync>[1]
+      options?: Parameters<typeof publicMutation.mutateAsync>[1],
     ) => {
       if (!subjectId || !bookId) {
         throw new Error(
-          'Cannot generate topics: subjectId and bookId are required'
+          'Cannot generate topics: subjectId and bookId are required',
         );
       }
       return internalMutation.mutateAsync(
         { subjectId, bookId, input },
-        options as Parameters<typeof internalMutation.mutateAsync>[1]
+        options as Parameters<typeof internalMutation.mutateAsync>[1],
       );
     },
   } as UseMutationResult<

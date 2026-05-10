@@ -70,13 +70,13 @@ export function QuizFlowProvider({
     (prefetchedRoundId: string | null) => {
       setState((current) => ({ ...current, prefetchedRoundId }));
     },
-    []
+    [],
   );
   const setCompletionResult = useCallback(
     (completionResult: CompleteRoundResponse | null) => {
       setState((current) => ({ ...current, completionResult }));
     },
-    []
+    [],
   );
   const clear = useCallback(() => {
     setState(INITIAL_STATE);

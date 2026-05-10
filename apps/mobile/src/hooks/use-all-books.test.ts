@@ -69,7 +69,7 @@ function makeLibraryBooksResponse(subjects: SubjectFixture[]) {
         })),
       })),
     }),
-    { status: 200 }
+    { status: 200 },
   );
 }
 
@@ -115,7 +115,7 @@ describe('useAllBooks', () => {
           subjectName: 'Science',
           books: [{ id: 'b3', title: 'Physics', topicsGenerated: true }],
         },
-      ])
+      ]),
     );
 
     const { result } = renderHook(() => useAllBooks(), {
@@ -161,7 +161,7 @@ describe('useAllBooks', () => {
             { id: 'b3', title: 'Also Not Built', topicsGenerated: false },
           ],
         },
-      ])
+      ]),
     );
 
     const { result } = renderHook(() => useAllBooks(), {
@@ -176,10 +176,10 @@ describe('useAllBooks', () => {
     expect(result.current.books[0]!.book.id).toBe('b1');
     // Unbuilt books are excluded from the count
     expect(
-      result.current.books.find((b) => b.book.id === 'b2')
+      result.current.books.find((b) => b.book.id === 'b2'),
     ).toBeUndefined();
     expect(
-      result.current.books.find((b) => b.book.id === 'b3')
+      result.current.books.find((b) => b.book.id === 'b3'),
     ).toBeUndefined();
   });
 
@@ -202,7 +202,7 @@ describe('useAllBooks', () => {
     mockFetch.mockResolvedValueOnce(
       makeLibraryBooksResponse([
         { subjectId: 's1', subjectName: 'Math', books: [] },
-      ])
+      ]),
     );
 
     const { result } = renderHook(() => useAllBooks(), {
@@ -219,7 +219,7 @@ describe('useAllBooks', () => {
 
   it('sets isError when the library books query fails', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response('Server error', { status: 500 })
+      new Response('Server error', { status: 500 }),
     );
 
     const { result } = renderHook(() => useAllBooks(), {
@@ -239,7 +239,7 @@ describe('useAllBooks', () => {
           subjectName: 'Math',
           books: [{ id: 'b1', title: 'Algebra', topicsGenerated: true }],
         },
-      ])
+      ]),
     );
 
     const { result } = renderHook(() => useAllBooks(), {
@@ -279,7 +279,7 @@ describe('useAllBooks', () => {
           subjectName: 'Math',
           books: [{ id: 'b1', title: 'Algebra', topicsGenerated: true }],
         },
-      ])
+      ]),
     );
 
     renderHook(() => useAllBooks(), {

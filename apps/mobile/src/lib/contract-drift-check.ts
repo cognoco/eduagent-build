@@ -34,7 +34,7 @@ export async function checkContractDrift(): Promise<void> {
     if (!body.deploySha) {
       console.info(
         '[contract-drift] API has no DEPLOY_SHA — cannot detect drift. ' +
-          'This is normal for local wrangler dev.'
+          'This is normal for local wrangler dev.',
       );
       return;
     }
@@ -43,14 +43,14 @@ export async function checkContractDrift(): Promise<void> {
     if (!localSha) {
       console.info(
         `[contract-drift] API deployed from ${body.deploySha}. ` +
-          'Set EXPO_PUBLIC_GIT_SHA in your env to enable drift detection.'
+          'Set EXPO_PUBLIC_GIT_SHA in your env to enable drift detection.',
       );
       return;
     }
 
     if (body.deploySha === localSha.slice(0, 8)) {
       console.info(
-        `[contract-drift] API and mobile on same commit (${body.deploySha}) OK`
+        `[contract-drift] API and mobile on same commit (${body.deploySha}) OK`,
       );
       return;
     }
@@ -70,7 +70,7 @@ export async function checkContractDrift(): Promise<void> {
         '║                                                            ║\n' +
         '║  Fix: merge and deploy your branch, or point mobile at     ║\n' +
         '║  a local wrangler dev server that has your changes.        ║\n' +
-        '╚══════════════════════════════════════════════════════════════╝\n'
+        '╚══════════════════════════════════════════════════════════════╝\n',
     );
   } catch {
     // Network failure during drift check is not actionable — swallow silently.

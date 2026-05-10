@@ -48,7 +48,7 @@ export type MeteringEnv = {
     db: Database;
     account: Account;
     profileId: string | undefined;
-    profileMeta: ProfileMeta;
+    profileMeta: ProfileMeta | undefined;
     subscriptionId: string;
     llmTier: LLMTier;
   };
@@ -143,7 +143,7 @@ function buildUpgradeOptions(currentTier: SubscriptionTier): Array<{
 // `event` field is the metric name; downstream log pipeline aggregates by it.
 async function safeReadKV(
   kv: KVNamespace,
-  accountId: string
+  accountId: string,
 ): Promise<CachedSubscriptionStatus | null> {
   try {
     return await readSubscriptionStatus(kv, accountId);
@@ -160,7 +160,7 @@ async function safeReadKV(
 async function safeWriteKV(
   kv: KVNamespace,
   accountId: string,
-  status: CachedSubscriptionStatus
+  status: CachedSubscriptionStatus,
 ): Promise<void> {
   try {
     await writeSubscriptionStatus(kv, accountId, status);
@@ -192,7 +192,7 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     if (!account) {
       return c.json(
         { code: 'UNAUTHORIZED', message: 'Authentication required' },
-        401
+        401,
       );
     }
 
@@ -265,7 +265,7 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     // 2. Query actual top-up credits for accurate quota check
     const topUpCreditsRemaining = await getTopUpCreditsRemaining(
       db,
-      subscriptionId
+      subscriptionId,
     );
 
     // 3. Check quota using pure business logic (checks both daily + monthly)
@@ -298,7 +298,7 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
             upgradeOptions: buildUpgradeOptions(tier),
           },
         },
-        402
+        402,
       );
     }
 
@@ -326,7 +326,7 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
             upgradeOptions: buildUpgradeOptions(tier),
           },
         },
-        402
+        402,
       );
     }
 
@@ -376,5 +376,5 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
 
     await next();
     return;
-  }
+  },
 );

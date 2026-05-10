@@ -73,7 +73,7 @@ describe('useVocabulary', () => {
       ],
     };
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify(vocabularyData), { status: 200 })
+      new Response(JSON.stringify(vocabularyData), { status: 200 }),
     );
 
     const { result } = renderHook(() => useVocabulary('sub-1'), {
@@ -92,7 +92,7 @@ describe('useVocabulary', () => {
 
   it('returns empty array when no vocabulary exists', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ vocabulary: [] }), { status: 200 })
+      new Response(JSON.stringify({ vocabulary: [] }), { status: 200 }),
     );
 
     const { result } = renderHook(() => useVocabulary('sub-1'), {
@@ -108,7 +108,7 @@ describe('useVocabulary', () => {
 
   it('handles API errors', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response('Internal server error', { status: 500 })
+      new Response('Internal server error', { status: 500 }),
     );
 
     const { result } = renderHook(() => useVocabulary('sub-1'), {
@@ -149,7 +149,7 @@ describe('useCreateVocabulary', () => {
       },
     };
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify(createdVocab), { status: 200 })
+      new Response(JSON.stringify(createdVocab), { status: 200 }),
     );
 
     const { result } = renderHook(() => useCreateVocabulary('sub-1'), {
@@ -178,8 +178,8 @@ describe('useCreateVocabulary', () => {
           code: 'VALIDATION_ERROR',
           message: 'Validation failed',
         }),
-        { status: 400 }
-      )
+        { status: 400 },
+      ),
     );
 
     const { result } = renderHook(() => useCreateVocabulary('sub-1'), {
@@ -192,7 +192,7 @@ describe('useCreateVocabulary', () => {
           term: '',
           translation: 'hello',
           type: 'word',
-        })
+        }),
       ).rejects.toThrow('Validation failed');
     });
   });
@@ -211,7 +211,7 @@ describe('useReviewVocabulary', () => {
   it('submits a vocabulary review', async () => {
     const reviewResult = { success: true };
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify(reviewResult), { status: 200 })
+      new Response(JSON.stringify(reviewResult), { status: 200 }),
     );
 
     const { result } = renderHook(() => useReviewVocabulary('sub-1'), {
@@ -232,8 +232,8 @@ describe('useReviewVocabulary', () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
         JSON.stringify({ code: 'NOT_FOUND', message: 'Vocabulary not found' }),
-        { status: 404 }
-      )
+        { status: 404 },
+      ),
     );
 
     const { result } = renderHook(() => useReviewVocabulary('sub-1'), {
@@ -245,7 +245,7 @@ describe('useReviewVocabulary', () => {
         result.current.mutateAsync({
           vocabularyId: 'vocab-nonexistent',
           input: { quality: 3 },
-        })
+        }),
       ).rejects.toThrow('Vocabulary not found');
     });
   });
@@ -255,7 +255,7 @@ describe('useReviewVocabulary', () => {
     const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
 
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ success: true }), { status: 200 })
+      new Response(JSON.stringify({ success: true }), { status: 200 }),
     );
 
     const { result } = renderHook(() => useReviewVocabulary('sub-1'), {
@@ -273,10 +273,10 @@ describe('useReviewVocabulary', () => {
     // is set to immediate in test-setup.ts), so invalidateQueries should already
     // have been called by the time mutateAsync resolves.
     expect(invalidateSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ queryKey: ['vocabulary'] })
+      expect.objectContaining({ queryKey: ['vocabulary'] }),
     );
     expect(invalidateSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ queryKey: ['language-progress'] })
+      expect.objectContaining({ queryKey: ['language-progress'] }),
     );
 
     invalidateSpy.mockRestore();

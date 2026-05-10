@@ -131,7 +131,7 @@ export interface IdempotencyReplayBody {
 
 export function withIdempotencyKey(
   headers: Record<string, string>,
-  key?: string
+  key?: string,
 ): Record<string, string> {
   if (!key) {
     return headers;
@@ -215,20 +215,20 @@ export function useApiClient(): ApiClient {
                 token ? 'present' : 'null'
               } | onAuthExpired=${!!_onAuthExpired} | alreadyFiring=${_authExpiredFiring} | url=${
                 typeof input === 'string' ? input : (input as Request).url
-              }`
+              }`,
             );
           }
           if (token && _onAuthExpired && !_authExpiredFiring) {
             if (__DEV__) {
               console.warn(
-                '[AUTH-DEBUG] >>> FIRING onAuthExpired — will sign out'
+                '[AUTH-DEBUG] >>> FIRING onAuthExpired — will sign out',
               );
             }
             _authExpiredFiring = true;
             _onAuthExpired();
           }
           throw new Error(
-            token ? 'Session expired — signing out' : 'Auth token not ready'
+            token ? 'Session expired — signing out' : 'Auth token not ready',
           );
         }
 
@@ -240,7 +240,7 @@ export function useApiClient(): ApiClient {
           if (code === 'QUOTA_EXCEEDED' && parsed?.details) {
             throw new QuotaExceededError(
               apiMessage ?? 'Quota exceeded',
-              parsed.details as QuotaExceededDetails
+              parsed.details as QuotaExceededDetails,
             );
           }
           // [CR-API-402-04] Non-quota 402 — preserve status code so callers
@@ -248,7 +248,7 @@ export function useApiClient(): ApiClient {
           throw new UpstreamError(
             apiMessage ?? (errBody || res.statusText),
             code ?? 'PAYMENT_REQUIRED',
-            402
+            402,
           );
         }
 
@@ -262,13 +262,13 @@ export function useApiClient(): ApiClient {
 
         if (res.status === 404) {
           throw new NotFoundError(
-            apiMessage ?? (errBody || 'Resource not found')
+            apiMessage ?? (errBody || 'Resource not found'),
           );
         }
 
         if (res.status === 409) {
           throw new ConflictError(
-            apiMessage ?? 'Request conflicts with current state'
+            apiMessage ?? 'Request conflicts with current state',
           );
         }
 
@@ -276,7 +276,7 @@ export function useApiClient(): ApiClient {
           throw new ResourceGoneError(
             apiMessage ?? undefined,
             code ?? undefined,
-            parsed?.details
+            parsed?.details,
           );
         }
 
@@ -288,7 +288,7 @@ export function useApiClient(): ApiClient {
             apiMessage ?? undefined,
             code ?? undefined,
             undefined,
-            Number.isFinite(retryAfter) ? retryAfter : undefined
+            Number.isFinite(retryAfter) ? retryAfter : undefined,
           );
         }
 
@@ -298,11 +298,11 @@ export function useApiClient(): ApiClient {
           throw new UpstreamError(
             apiMessage ?? (errBody || res.statusText),
             code,
-            res.status
+            res.status,
           );
         }
         throw new Error(
-          `API error ${res.status}: ${errBody || res.statusText}`
+          `API error ${res.status}: ${errBody || res.statusText}`,
         );
       }
 

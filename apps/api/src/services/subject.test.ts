@@ -94,6 +94,7 @@ function createMockDb({
     query: {
       curriculumBooks: {
         findFirst: jest.fn().mockResolvedValue(readyBook),
+        findMany: jest.fn().mockResolvedValue([]),
       },
       bookSuggestions: {
         findFirst: jest.fn().mockResolvedValue(bookSuggestion),

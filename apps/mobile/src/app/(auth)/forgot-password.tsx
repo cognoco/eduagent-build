@@ -88,7 +88,7 @@ export default function ForgotPasswordScreen() {
           markSessionActivated();
         } catch {
           setError(
-            'Could not activate your session. Please try signing in again.'
+            'Could not activate your session. Please try signing in again.',
           );
           return;
         }

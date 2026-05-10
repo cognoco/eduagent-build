@@ -23,8 +23,13 @@ module.exports = {
   moduleFileExtensions: ['ts', 'js'],
   testMatch: [
     '<rootDir>/apps/api/src/**/*.test.ts',
-    '<rootDir>/apps/api/src/**/*.integration.test.ts',
     '<rootDir>/apps/api/eval-llm/**/*.test.ts',
+  ],
+  // Integration tests share a real Neon database and must run serially.
+  // They live in jest.integration.config.cjs → `api:test-integration` target.
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '\\.integration\\.test\\.ts$',
   ],
   coverageDirectory: '<rootDir>/coverage/apps/api',
 };

@@ -1,3 +1,4 @@
+import { NonRetriableError } from 'inngest';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import { eq } from 'drizzle-orm';
@@ -37,7 +38,7 @@ export const freeformFilingRetry = inngest.createFunction(
       // CLAUDE.md: "Reads must use createScopedRepository(profileId)."
       const repo = createScopedRepository(db, profileId);
       const row = await repo.sessions.findFirst(
-        eq(learningSessions.id, sessionId)
+        eq(learningSessions.id, sessionId),
       );
 
       // [M8a] A missing row means the session does not exist for this profileId —
@@ -47,7 +48,7 @@ export const freeformFilingRetry = inngest.createFunction(
       // app/filing.completed for a session they don't own.
       if (!row) {
         throw new Error(
-          `Session not found or does not belong to profile: sessionId=${sessionId} profileId=${profileId}`
+          `Session not found or does not belong to profile: sessionId=${sessionId} profileId=${profileId}`,
         );
       }
 
@@ -144,11 +145,17 @@ export const freeformFilingRetry = inngest.createFunction(
         if (!transcript || transcript.archived) return null;
         return transcript.exchanges
           .map(
-            (e) => `${e.role === 'user' ? 'Learner' : 'Tutor'}: ${e.content}`
+            (e) => `${e.role === 'user' ? 'Learner' : 'Tutor'}: ${e.content}`,
           )
           .join('\n');
       });
       sessionTranscript = fetched ?? undefined;
+    }
+
+    if (!sessionTranscript) {
+      throw new NonRetriableError(
+        `Cannot file session: transcript unavailable (sessionId=${sessionId}, profileId=${profileId})`,
+      );
     }
 
     const result = await step.run('retry-filing', async () => {
@@ -157,7 +164,7 @@ export const freeformFilingRetry = inngest.createFunction(
       const filingResponse = await fileToLibrary(
         { sessionTranscript, sessionMode },
         libraryIndex,
-        routeAndCall
+        routeAndCall,
       );
       return resolveFilingResult(db, {
         profileId,
@@ -193,5 +200,5 @@ export const freeformFilingRetry = inngest.createFunction(
       ...result,
       timestamp,
     };
-  }
+  },
 );

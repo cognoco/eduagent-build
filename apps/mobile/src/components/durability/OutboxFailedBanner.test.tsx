@@ -74,8 +74,8 @@ describe('OutboxFailedBanner', () => {
     screen.getByText('Some messages could not be sent');
     expect(
       screen.getByText(
-        "Copy them or send them to support so your progress isn't lost."
-      )
+        "Copy them or send them to support so your progress isn't lost.",
+      ),
     ).toBeTruthy();
     screen.getByText('Hello world');
     screen.getByTestId('outbox-copy-e-1');
@@ -102,7 +102,7 @@ describe('OutboxFailedBanner', () => {
     expect(mockDeletePermanentlyFailed).toHaveBeenCalledWith(
       'p-1',
       'session',
-      'e-1'
+      'e-1',
     );
 
     await waitFor(() => {
@@ -118,7 +118,7 @@ describe('OutboxFailedBanner', () => {
         profileId="p-1"
         flow="session"
         onEscalate={jest.fn().mockResolvedValue(undefined)}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -147,7 +147,7 @@ describe('OutboxFailedBanner', () => {
         profileId="p-1"
         flow="session"
         onEscalate={onEscalate}
-      />
+      />,
     );
 
     await waitFor(() => {

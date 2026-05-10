@@ -34,7 +34,7 @@ export function usePendingCelebrations(options?: {
                 ? { 'X-Profile-Id': targetProfileId }
                 : undefined,
             },
-          }
+          },
         );
         await assertOk(res);
         const data = await res.json();
@@ -70,7 +70,7 @@ export function useMarkCelebrationsSeen(): UseMutationResult<
           init: {
             headers: profileId ? { 'X-Profile-Id': profileId } : undefined,
           },
-        }
+        },
       );
       await assertOk(res);
       return (await res.json()) as { ok: boolean };

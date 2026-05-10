@@ -38,7 +38,7 @@ export const bookmarks = pgTable(
     index('bookmarks_session_id_idx').on(table.sessionId),
     uniqueIndex('bookmarks_profile_event_unique').on(
       table.profileId,
-      table.eventId
+      table.eventId,
     ),
-  ]
+  ],
 );

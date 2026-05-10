@@ -5,24 +5,28 @@ import { WithdrawalCountdownBanner } from './WithdrawalCountdownBanner';
 const mockUseDashboard = jest.fn();
 const mockMutate = jest.fn();
 
-jest.mock('../../hooks/use-dashboard', () => ({ // gc1-allow: WithdrawalCountdownBanner reads dashboard data; mocking isolates banner rendering from real API calls.
-  useDashboard: () => mockUseDashboard(),
-}));
+jest.mock(
+  '../../hooks/use-dashboard' /* gc1-allow: banner test isolates dashboard hook from real API calls */,
+  () => ({ useDashboard: () => mockUseDashboard() }),
+);
 
-jest.mock('../../hooks/use-restore-consent', () => ({ // gc1-allow: restore-consent mutation is a network side effect; mocking lets tests verify CTA wiring without real API calls.
-  useRestoreConsent: () => ({
-    mutate: mockMutate,
-    isPending: false,
+jest.mock(
+  '../../hooks/use-restore-consent' /* gc1-allow: restore-consent is a network side effect; mocked for CTA wiring tests */,
+  () => ({
+    useRestoreConsent: () => ({ mutate: mockMutate, isPending: false }),
   }),
+);
+
+jest.mock('react-i18next', () => ({
+  // gc1-allow: i18next is an external library boundary; mocking gives stable translation output for snapshot assertions.
+  useTranslation: () =>
+    require('../../test-utils/mock-i18n').i18nMock.useTranslation(),
 }));
 
-jest.mock('react-i18next', () => ({ // gc1-allow: i18next is an external library boundary; mocking gives stable translation output for snapshot assertions.
-  useTranslation: () => require('../../test-utils/mock-i18n').i18nMock.useTranslation(),
-}));
-
-jest.mock('../../lib/platform-alert', () => ({ // gc1-allow: platformAlert is a native display side effect; mocking lets the banner test assert CTA feedback safely.
-  platformAlert: jest.fn(),
-}));
+jest.mock(
+  '../../lib/platform-alert' /* gc1-allow: platformAlert is a native display side effect; mocked for safe CTA assertions */,
+  () => ({ platformAlert: jest.fn() }),
+);
 
 describe('WithdrawalCountdownBanner', () => {
   const respondedAt = '2026-05-06T10:00:00.000Z';
@@ -73,9 +77,7 @@ describe('WithdrawalCountdownBanner', () => {
 
     render(<WithdrawalCountdownBanner />);
 
-    expect(
-      screen.getByText("Liam's account closes in 6 days")
-    ).toBeTruthy();
+    expect(screen.getByText("Liam's account closes in 6 days")).toBeTruthy();
     expect(screen.getByText('Reverse')).toBeTruthy();
   });
 
@@ -129,7 +131,7 @@ describe('WithdrawalCountdownBanner', () => {
         onError: expect.any(Function),
         onSettled: expect.any(Function),
         onSuccess: expect.any(Function),
-      })
+      }),
     );
   });
 

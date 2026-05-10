@@ -52,7 +52,7 @@ function createTrackingMockDb() {
         get(_target, _prop) {
           return { findMany, findFirst };
         },
-      }
+      },
     );
 
   return {
@@ -161,7 +161,7 @@ describe('Profile Isolation (R-005)', () => {
         // Verify the where clause contains CHILD_PROFILE_ID
         const call = findFirst.mock.calls[0][0];
         expect(call.where).not.toBeNull();
-      }
+      },
     );
 
     it.each(domains.filter((d) => d.hasFindMany))(
@@ -179,7 +179,7 @@ describe('Profile Isolation (R-005)', () => {
 
         const call = findMany.mock.calls[0][0];
         expect(call.where).not.toBeNull();
-      }
+      },
     );
   });
 

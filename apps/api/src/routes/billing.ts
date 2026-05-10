@@ -91,7 +91,7 @@ function getTimeZoneOffsetMs(instant: Date, timeZone: string): number {
   const values = Object.fromEntries(
     parts
       .filter((part) => part.type !== 'literal')
-      .map((part) => [part.type, part.value])
+      .map((part) => [part.type, part.value]),
   );
   const localAsUtc = Date.UTC(
     Number(values.year),
@@ -99,7 +99,7 @@ function getTimeZoneOffsetMs(instant: Date, timeZone: string): number {
     Number(values.day),
     Number(values.hour),
     Number(values.minute),
-    Number(values.second)
+    Number(values.second),
   );
   return localAsUtc - instant.getTime();
 }
@@ -114,16 +114,16 @@ function getStartOfTodayInTimeZone(now: Date, timeZone: string): Date {
   const values = Object.fromEntries(
     parts
       .filter((part) => part.type !== 'literal')
-      .map((part) => [part.type, part.value])
+      .map((part) => [part.type, part.value]),
   );
   const localMidnightAsUtc = Date.UTC(
     Number(values.year),
     Number(values.month) - 1,
-    Number(values.day)
+    Number(values.day),
   );
   let start = new Date(
     localMidnightAsUtc -
-      getTimeZoneOffsetMs(new Date(localMidnightAsUtc), timeZone)
+      getTimeZoneOffsetMs(new Date(localMidnightAsUtc), timeZone),
   );
   start = new Date(localMidnightAsUtc - getTimeZoneOffsetMs(start, timeZone));
   return start;
@@ -135,7 +135,7 @@ function getStartOfTodayInTimeZone(now: Date, timeZone: string): Date {
 function resolvePriceId(
   env: BillingRouteEnv['Bindings'],
   tier: 'plus' | 'family' | 'pro',
-  interval: 'monthly' | 'yearly'
+  interval: 'monthly' | 'yearly',
 ): string | undefined {
   const key =
     `STRIPE_PRICE_${tier.toUpperCase()}_${interval.toUpperCase()}` as keyof typeof env;
@@ -168,7 +168,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
             usedToday: 0,
             dailyRemainingQuestions: freeTier.dailyLimit,
           },
-        })
+        }),
       );
     }
 
@@ -201,7 +201,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
           usedToday,
           dailyRemainingQuestions,
         },
-      })
+      }),
     );
   })
 
@@ -229,7 +229,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
           c,
           400,
           ERROR_CODES.VALIDATION_ERROR,
-          `No price configured for ${tier}/${interval}`
+          `No price configured for ${tier}/${interval}`,
         );
       }
 
@@ -269,7 +269,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
           c,
           500,
           ERROR_CODES.INTERNAL_ERROR,
-          'Stripe returned no checkout URL'
+          'Stripe returned no checkout URL',
         );
       }
 
@@ -277,9 +277,9 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         checkoutResponseSchema.parse({
           checkoutUrl: session.url,
           sessionId: session.id,
-        })
+        }),
       );
-    }
+    },
   )
 
   // Cancel subscription (set cancel_at_period_end)
@@ -303,7 +303,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     const stripe = createStripeClient(stripeKey);
     const updated = await stripe.subscriptions.update(
       subscription.stripeSubscriptionId,
-      { cancel_at_period_end: true }
+      { cancel_at_period_end: true },
     );
 
     // BUG-51 (re-apply 1C.8): Read subscription-level current_period_end first,
@@ -322,7 +322,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         '[billing] Subscription returned no current_period_end — falling back to current timestamp',
         {
           stripeSubscriptionId: subscription.stripeSubscriptionId,
-        }
+        },
       );
     }
     const currentPeriodEnd = periodEndTs
@@ -337,7 +337,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         message:
           'Subscription cancelled. Access continues until end of billing period.',
         currentPeriodEnd,
-      })
+      }),
     );
   })
 
@@ -362,7 +362,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
           c,
           403,
           ERROR_CODES.FORBIDDEN,
-          'Top-up credits are not available on the Free tier. Upgrade to Plus or higher.'
+          'Top-up credits are not available on the Free tier. Upgrade to Plus or higher.',
         );
       }
 
@@ -406,9 +406,9 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
             clientSecret: paymentIntent.client_secret,
             paymentIntentId: paymentIntent.id,
           },
-        })
+        }),
       );
-    }
+    },
   )
 
   // Get current usage/quota status
@@ -433,7 +433,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
             usedToday: 0,
             dailyRemainingQuestions: freeTier.dailyLimit,
           },
-        })
+        }),
       );
     }
 
@@ -444,7 +444,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     const usedToday = quota?.usedToday ?? 0;
     const topUpCreditsRemaining = await getTopUpCreditsRemaining(
       db,
-      subscription.id
+      subscription.id,
     );
     const remaining = calculateRemainingQuestions({
       monthlyLimit,
@@ -461,7 +461,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     const cycleStartAt =
       subscription.currentPeriodStart ??
       new Date(
-        Date.UTC(resetDate.getUTCFullYear(), resetDate.getUTCMonth() - 1, 1)
+        Date.UTC(resetDate.getUTCFullYear(), resetDate.getUTCMonth() - 1, 1),
       ).toISOString();
     // Day start in account timezone (defaults to UTC). Used to scope today's
     // per-profile usage so non-owner viewers don't see family-wide aggregates.
@@ -469,12 +469,12 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       try {
         return getStartOfTodayInTimeZone(
           new Date(),
-          account.timezone ?? 'UTC'
+          account.timezone ?? 'UTC',
         ).toISOString();
       } catch {
         const now = new Date();
         return new Date(
-          Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+          Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
         ).toISOString();
       }
     })();
@@ -489,7 +489,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       : null;
     const visibleUsedThisMonth =
       usageBreakdown && !usageBreakdown.isOwnerBreakdownViewer
-        ? usageBreakdown.selfUsedThisMonth ?? 0
+        ? (usageBreakdown.selfUsedThisMonth ?? 0)
         : usedThisMonth;
     const visibleRemaining = remaining;
     const visibleWarningLevel = usageBreakdown?.isOwnerBreakdownViewer
@@ -500,7 +500,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     // child infer siblings' activity. Owners and non-family accounts see raw.
     const visibleUsedToday =
       usageBreakdown && !usageBreakdown.isOwnerBreakdownViewer
-        ? usageBreakdown.selfUsedToday ?? 0
+        ? (usageBreakdown.selfUsedToday ?? 0)
         : usedToday;
     const visibleDailyRemainingQuestions =
       dailyLimit !== null ? Math.max(0, dailyLimit - visibleUsedToday) : null;
@@ -532,7 +532,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
               }
             : labels),
         },
-      })
+      }),
     );
   })
 
@@ -586,7 +586,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
               dailyLimit: cached.dailyLimit,
               usedToday: cached.usedToday,
             },
-          })
+          }),
         );
       }
     }
@@ -604,7 +604,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
             dailyLimit: freeTier.dailyLimit,
             usedToday: 0,
           },
-        })
+        }),
       );
     }
 
@@ -620,7 +620,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
           dailyLimit: quota?.dailyLimit ?? null,
           usedToday: quota?.usedToday ?? 0,
         },
-      })
+      }),
     );
   })
 
@@ -647,7 +647,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
           ...poolStatus,
           members,
         },
-      })
+      }),
     );
   })
 
@@ -668,7 +668,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       const result = await addProfileToSubscription(
         db,
         subscription.id,
-        profileId
+        profileId,
       );
 
       if (!result) {
@@ -676,7 +676,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
           c,
           403,
           ERROR_CODES.FORBIDDEN,
-          'Cannot add profile. Subscription tier does not support additional profiles or profile limit reached.'
+          'Cannot add profile. Subscription tier does not support additional profiles or profile limit reached.',
         );
       }
 
@@ -684,9 +684,9 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         familyAddResponseSchema.parse({
           message: 'Profile added to family subscription',
           profileCount: result.profileCount,
-        })
+        }),
       );
-    }
+    },
   )
 
   // Remove a same-account child profile from the family subscription.
@@ -705,7 +705,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
           c,
           403,
           ERROR_CODES.FORBIDDEN,
-          'Only the family owner can remove a profile from the family subscription.'
+          'Only the family owner can remove a profile from the family subscription.',
         );
       }
 
@@ -719,15 +719,15 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         result = await removeProfileFromSubscription(
           db,
           subscription.id,
-          profileId
+          profileId,
         );
       } catch (err) {
         if (err instanceof ProfileRemovalNotImplementedError) {
           return apiError(
             c,
             422,
-            ERROR_CODES.NOT_IMPLEMENTED,
-            'Cross-account profile removal requires an invite/claim flow.'
+            ERROR_CODES.CONFLICT,
+            'Cross-account profile removal requires an invite/claim flow.',
           );
         }
         throw err;
@@ -738,7 +738,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
           c,
           403,
           ERROR_CODES.FORBIDDEN,
-          'Cannot remove profile. Profile not found, not in this family, or is the subscription owner.'
+          'Cannot remove profile. Profile not found, not in this family, or is the subscription owner.',
         );
       }
 
@@ -746,9 +746,9 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         familyRemoveResponseSchema.parse({
           message: 'Profile removed from family subscription',
           removedProfileId: result.removedProfileId,
-        })
+        }),
       );
-    }
+    },
   )
 
   // Join BYOK waitlist
@@ -765,7 +765,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         message: 'Added to BYOK waitlist',
         email,
       }),
-      201
+      201,
     );
   })
 
@@ -826,7 +826,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     <a href="https://www.mentomate.com" class="btn btn-secondary">Back to homepage</a>
   </div>
 </body>
-</html>`
+</html>`,
     );
   })
 
@@ -880,6 +880,6 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     <a href="https://www.mentomate.com" class="btn btn-secondary">Back to homepage</a>
   </div>
 </body>
-</html>`
+</html>`,
     );
   });

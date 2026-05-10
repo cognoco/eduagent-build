@@ -31,7 +31,9 @@ export function BookCard({
   tint,
   onPress,
 }: BookCardProps): React.ReactElement {
-  const progressLabel = book.topicsGenerated ? 'Ready to open' : 'Build this book';
+  const progressLabel = book.topicsGenerated
+    ? 'Ready to open'
+    : 'Build this book';
 
   return (
     <Pressable

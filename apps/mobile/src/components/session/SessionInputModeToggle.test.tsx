@@ -79,7 +79,7 @@ describe('SessionInputModeToggle', () => {
     });
     expect(iconWrapper.props.accessibilityElementsHidden).toBe(true);
     expect(iconWrapper.props.importantForAccessibility).toBe(
-      'no-hide-descendants'
+      'no-hide-descendants',
     );
   });
 
@@ -95,7 +95,7 @@ describe('SessionInputModeToggle', () => {
     });
     expect(iconWrapper.props.accessibilityElementsHidden).toBe(true);
     expect(iconWrapper.props.importantForAccessibility).toBe(
-      'no-hide-descendants'
+      'no-hide-descendants',
     );
   });
 });

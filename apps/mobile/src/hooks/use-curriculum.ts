@@ -26,7 +26,7 @@ export function useCurriculum(
      * Pass `false` or omit to disable polling (default).
      */
     refetchInterval?: number | false;
-  }
+  },
 ): UseQueryResult<Curriculum | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -38,7 +38,7 @@ export function useCurriculum(
       try {
         const res = await client.subjects[':subjectId'].curriculum.$get(
           { param: { subjectId } },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         const data = (await res.json()) as { curriculum: Curriculum | null };
@@ -53,7 +53,7 @@ export function useCurriculum(
 }
 
 export function useSkipTopic(
-  subjectId: string
+  subjectId: string,
 ): UseMutationResult<{ message: string }, Error, string> {
   const client = useApiClient();
   const queryClient = useQueryClient();
@@ -76,7 +76,7 @@ export function useSkipTopic(
 }
 
 export function useUnskipTopic(
-  subjectId: string
+  subjectId: string,
 ): UseMutationResult<{ message: string }, Error, string> {
   const client = useApiClient();
   const queryClient = useQueryClient();
@@ -99,14 +99,14 @@ export function useUnskipTopic(
 }
 
 export function useChallengeCurriculum(
-  subjectId: string
+  subjectId: string,
 ): UseMutationResult<{ curriculum: Curriculum }, Error, string> {
   const client = useApiClient();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (
-      feedback: string
+      feedback: string,
     ): Promise<{ curriculum: Curriculum }> => {
       const res = await client.subjects[
         ':subjectId'
@@ -126,7 +126,7 @@ export function useChallengeCurriculum(
 }
 
 export function useAddCurriculumTopic(
-  subjectId: string
+  subjectId: string,
 ): UseMutationResult<
   CurriculumTopicAddResponse,
   Error,
@@ -137,7 +137,7 @@ export function useAddCurriculumTopic(
 
   return useMutation({
     mutationFn: async (
-      input: CurriculumTopicAddInput
+      input: CurriculumTopicAddInput,
     ): Promise<CurriculumTopicAddResponse> => {
       const res = await client.subjects[':subjectId'].curriculum.topics.$post({
         param: { subjectId },
@@ -157,7 +157,7 @@ export function useAddCurriculumTopic(
 }
 
 export function useExplainTopic(
-  subjectId: string
+  subjectId: string,
 ): UseMutationResult<string, Error, string> {
   const client = useApiClient();
 
@@ -176,14 +176,14 @@ export function useExplainTopic(
 }
 
 export function useAdaptCurriculum(
-  subjectId: string
+  subjectId: string,
 ): UseMutationResult<CurriculumAdaptResponse, Error, CurriculumAdaptRequest> {
   const client = useApiClient();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (
-      input: CurriculumAdaptRequest
+      input: CurriculumAdaptRequest,
     ): Promise<CurriculumAdaptResponse> => {
       const res = await client.subjects[':subjectId'].curriculum.adapt.$post({
         param: { subjectId },

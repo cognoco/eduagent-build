@@ -49,7 +49,7 @@ export default function PickBookScreen(): React.ReactElement {
   // enough to register even when suggestions resolve from cache.
   const showSuggestionsLoading = useStickyLoading(
     suggestionsQuery.isLoading,
-    800
+    800,
   );
 
   // BUG-361: Synchronous mutex — filing.isPending has React batching delay,
@@ -166,7 +166,7 @@ export default function PickBookScreen(): React.ReactElement {
             onPress: () => void handlePickSuggestion(suggestion),
           },
           { text: 'Go back', onPress: handleBack },
-        ]
+        ],
       );
     }
   };
@@ -281,7 +281,7 @@ export default function PickBookScreen(): React.ReactElement {
   // For the two common recovery shapes we want a Retry + Go Back pair on this
   // screen, so build the actions directly rather than delegating to
   // recoveryActions (which defaults secondary to Go Home for retry cases).
-  if (suggestionsQuery.isError) {
+  if (suggestionsQuery.isError && !suggestionsQuery.data) {
     const classified = classifyApiError(suggestionsQuery.error);
     const canRetry = classified.recovery === 'retry';
 

@@ -143,7 +143,7 @@ describe('formatMathContent', () => {
 
     it('converts expression with subscript and superscript', () => {
       expect(formatMathContent('$a_{1} + a_{2} = a_{3}$')).toBe(
-        'a\u2081 + a\u2082 = a\u2083'
+        'a\u2081 + a\u2082 = a\u2083',
       );
     });
   });
@@ -159,7 +159,7 @@ describe('formatMathContent', () => {
       const input = 'We know $a^2$ and $b^2$ so $a^2 + b^2 = c^2$';
       const result = formatMathContent(input);
       expect(result).toBe(
-        'We know a\u00B2 and b\u00B2 so a\u00B2 + b\u00B2 = c\u00B2'
+        'We know a\u00B2 and b\u00B2 so a\u00B2 + b\u00B2 = c\u00B2',
       );
     });
 

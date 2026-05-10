@@ -46,7 +46,7 @@ describe('ArchivedTranscriptCard', () => {
       <ArchivedTranscriptCard
         {...props}
         summary={{ ...props.summary, topicId: null }}
-      />
+      />,
     );
     expect(queryByTestId('archived-continue-topic-cta')).toBeNull();
   });
@@ -60,7 +60,7 @@ describe('ArchivedTranscriptCard', () => {
           topicsCovered: [],
           sessionState: 'auto-closed',
         }}
-      />
+      />,
     );
     expect(queryByText("Here's what you covered:")).toBeNull();
     expect(queryAllByTestId('archived-topic-chip')).toHaveLength(0);

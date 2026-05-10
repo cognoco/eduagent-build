@@ -8,7 +8,7 @@ export { SUBJECT_TINT_PALETTE };
 
 export function getSubjectTint(
   subjectId: string,
-  colorScheme: ColorScheme
+  colorScheme: ColorScheme,
 ): SubjectTint {
   const palette = SUBJECT_TINT_PALETTE[colorScheme];
   const hex = subjectId.replace(/-/g, '');

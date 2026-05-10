@@ -52,6 +52,7 @@ describe('ResourceGoneError', () => {
     expect(err).toBeInstanceOf(ResourceGoneError);
     expect(err).toBeInstanceOf(Error);
     expect(err.message).toBe('Gone');
+    expect(err.errorCode).toBe('RESOURCE_GONE');
     expect(err.code).toBe('GONE');
     expect(err.details).toEqual({ extra: true });
     expect(err.name).toBe('ResourceGoneError');
@@ -99,7 +100,7 @@ describe('RateLimitedError', () => {
       'slow down',
       'RATE_LIMITED',
       undefined,
-      30
+      30,
     );
     expect(err).toBeInstanceOf(RateLimitedError);
     expect(err.retryAfter).toBe(30);

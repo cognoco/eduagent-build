@@ -9,7 +9,7 @@ import type {
 } from '@eduagent/schemas';
 
 export function useSubjectSessions(
-  subjectId: string | undefined
+  subjectId: string | undefined,
 ): UseQueryResult<SubjectSession[]> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -22,7 +22,7 @@ export function useSubjectSessions(
       try {
         const res = await client.subjects[':subjectId'].sessions.$get(
           { param: { subjectId } },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         const data = (await res.json()) as GetSubjectSessionsResponse;

@@ -33,7 +33,6 @@ export type AuthEnv = {
 const PUBLIC_PATHS = [
   '/v1/health',
   '/v1/inngest',
-  '/v1/auth/',
   '/v1/stripe/',
   '/v1/revenuecat/webhook',
   '/v1/consent/respond',
@@ -54,7 +53,7 @@ function isPublicPath(path: string): boolean {
   return PUBLIC_PATHS.some((p) =>
     p.endsWith('/')
       ? path.startsWith(p)
-      : path === p || path.startsWith(p + '/')
+      : path === p || path.startsWith(p + '/'),
   );
 }
 
@@ -73,7 +72,7 @@ function deriveIssuerFromJwksUrl(jwksUrl: string): string {
 async function verifyClerkJWT(
   token: string,
   jwksUrl: string | undefined,
-  audience: string | undefined
+  audience: string | undefined,
 ): Promise<{ sub: string; email?: string }> {
   if (!jwksUrl) {
     throw new Error('CLERK_JWKS_URL is not configured');
@@ -88,7 +87,7 @@ async function verifyClerkJWT(
   // also hard-fails at startup for staging+production to catch this earlier.
   if (!audience) {
     throw new Error(
-      'CLERK_AUDIENCE is not configured — JWT audience validation is disabled'
+      'CLERK_AUDIENCE is not configured — JWT audience validation is disabled',
     );
   }
 
@@ -131,7 +130,7 @@ export const authMiddleware = createMiddleware<AuthEnv>(async (c, next) => {
         code: ERROR_CODES.UNAUTHORIZED,
         message: 'Missing or invalid authorization header',
       },
-      401
+      401,
     );
   }
 
@@ -141,7 +140,7 @@ export const authMiddleware = createMiddleware<AuthEnv>(async (c, next) => {
     const result = await verifyClerkJWT(
       token,
       c.env.CLERK_JWKS_URL,
-      c.env.CLERK_AUDIENCE
+      c.env.CLERK_AUDIENCE,
     );
     c.set('user', {
       userId: result.sub,
@@ -166,7 +165,7 @@ export const authMiddleware = createMiddleware<AuthEnv>(async (c, next) => {
 
     return c.json(
       { code: ERROR_CODES.UNAUTHORIZED, message: 'Invalid or expired token' },
-      401
+      401,
     );
   }
 });

@@ -49,7 +49,7 @@ describe('useTextToSpeech', () => {
         onDone: expect.any(Function),
         onStopped: expect.any(Function),
         onError: expect.any(Function),
-      })
+      }),
     );
   });
 
@@ -67,7 +67,7 @@ describe('useTextToSpeech', () => {
 
     expect(mockSpeak).toHaveBeenCalledWith(
       'Fast speech',
-      expect.objectContaining({ rate: 1.25 })
+      expect.objectContaining({ rate: 1.25 }),
     );
   });
 
@@ -80,7 +80,7 @@ describe('useTextToSpeech', () => {
 
     expect(mockSpeak).toHaveBeenCalledWith(
       'Hola',
-      expect.objectContaining({ language: 'es-ES' })
+      expect.objectContaining({ language: 'es-ES' }),
     );
   });
 
@@ -156,7 +156,7 @@ describe('useTextToSpeech', () => {
 
     expect(mockSpeak).toHaveBeenCalledWith(
       'Original text',
-      expect.objectContaining({ rate: 1.0 })
+      expect.objectContaining({ rate: 1.0 }),
     );
   });
 

@@ -32,7 +32,7 @@ export function withOpacity(color: string, alpha: number): string {
   }
 
   const rgbMatch = trimmed.match(
-    /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*[\d.]+)?\s*\)$/i
+    /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*[\d.]+)?\s*\)$/i,
   );
   if (rgbMatch) {
     const [, r, g, b] = rgbMatch;

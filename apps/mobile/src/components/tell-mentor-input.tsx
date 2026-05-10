@@ -16,7 +16,7 @@ interface TellMentorInputProps {
 function getCopy(
   audience: TellMentorAudience,
   birthYear?: number | null,
-  childName?: string
+  childName?: string,
 ): {
   title: string;
   description: string;

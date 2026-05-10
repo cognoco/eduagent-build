@@ -118,7 +118,7 @@ export function RecentSessionsList({
             ) : null}
             <Text className="text-caption text-text-secondary">
               {formatDuration(
-                session.wallClockSeconds ?? session.durationSeconds
+                session.wallClockSeconds ?? session.durationSeconds,
               )}
             </Text>
           </Pressable>

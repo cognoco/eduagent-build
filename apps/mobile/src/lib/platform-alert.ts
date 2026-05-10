@@ -37,7 +37,7 @@ export function platformAlert(
   title: string,
   message?: string,
   buttons?: AlertButton[],
-  options?: AlertOptions
+  options?: AlertOptions,
 ): void {
   if (Platform.OS !== 'web') {
     Alert.alert(title, message, buttons, options);

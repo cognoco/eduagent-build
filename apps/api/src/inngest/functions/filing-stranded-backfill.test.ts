@@ -75,7 +75,7 @@ function uuid(prefix: string, i: number): string {
 }
 function makeStrandedRows(
   count: number,
-  createdAt = new Date('2026-04-20T00:00:00Z')
+  createdAt = new Date('2026-04-20T00:00:00Z'),
 ) {
   return Array.from({ length: count }, (_, i) => ({
     id: uuid('aaaaaaaa', i),
@@ -97,6 +97,15 @@ function getHandler(): HandlerFn {
 describe('filingStrandedBackfill', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  it('has concurrency limit of 1 to prevent duplicate concurrent backfill runs [BUG-TEMP-42]', () => {
+    const config = (
+      filingStrandedBackfill as unknown as {
+        _config: { concurrency: { limit: number } };
+      }
+    )._config;
+    expect(config.concurrency).toEqual(expect.objectContaining({ limit: 1 }));
   });
 
   it('dispatches one synthetic-timeout event per stranded session', async () => {
@@ -124,10 +133,10 @@ describe('filingStrandedBackfill', () => {
     expect(step.sleep).not.toHaveBeenCalled();
     // 499 synthetic-timeout sends; no continue-stranded-backfill
     const eventNames = step.sendEvent.mock.calls.map(
-      (call: unknown[]) => (call[1] as { name: string }).name
+      (call: unknown[]) => (call[1] as { name: string }).name,
     );
     expect(eventNames).not.toContain(
-      'app/maintenance.filing_stranded_backfill'
+      'app/maintenance.filing_stranded_backfill',
     );
   });
 
@@ -151,7 +160,7 @@ describe('filingStrandedBackfill', () => {
       const continueCall = step.sendEvent.mock.calls.find(
         (call: unknown[]) =>
           (call[1] as { name: string }).name ===
-          'app/maintenance.filing_stranded_backfill'
+          'app/maintenance.filing_stranded_backfill',
       );
       expect(continueCall).not.toBeUndefined();
       expect(step.sleep).toHaveBeenCalledTimes(1);
@@ -222,20 +231,20 @@ describe('filingStrandedBackfill', () => {
       // Extract dispatched session IDs from both runs.
       const idsRun1 = step1.sendEvent.mock.calls
         .filter((c: unknown[]) =>
-          (c[0] as string).startsWith('synthetic-timeout-')
+          (c[0] as string).startsWith('synthetic-timeout-'),
         )
         .map(
           (c: unknown[]) =>
-            (c[1] as { data: { sessionId: string } }).data.sessionId
+            (c[1] as { data: { sessionId: string } }).data.sessionId,
         );
 
       const idsRun2 = step2.sendEvent.mock.calls
         .filter((c: unknown[]) =>
-          (c[0] as string).startsWith('synthetic-timeout-')
+          (c[0] as string).startsWith('synthetic-timeout-'),
         )
         .map(
           (c: unknown[]) =>
-            (c[1] as { data: { sessionId: string } }).data.sessionId
+            (c[1] as { data: { sessionId: string } }).data.sessionId,
         );
 
       // Same order across both runs — deterministic.
@@ -253,7 +262,7 @@ describe('filingStrandedBackfill', () => {
       const continueCall = step.sendEvent.mock.calls.find(
         (call: unknown[]) =>
           (call[1] as { name: string }).name ===
-          'app/maintenance.filing_stranded_backfill'
+          'app/maintenance.filing_stranded_backfill',
       );
       expect(continueCall).not.toBeUndefined();
       const eventData = (
@@ -261,7 +270,7 @@ describe('filingStrandedBackfill', () => {
       ).data;
       const lastRow = rows[499];
       expect(eventData.lastCreatedAt).toBe(
-        new Date(lastRow.createdAt).toISOString()
+        new Date(lastRow.createdAt).toISOString(),
       );
       expect(eventData.lastId).toBe(lastRow.id);
     });

@@ -106,7 +106,7 @@ describe('VoiceToggle', () => {
 
   it('re-renders correctly when isVoiceEnabled changes from false to true', () => {
     const { rerender } = render(
-      <VoiceToggle isVoiceEnabled={false} onToggle={jest.fn()} />
+      <VoiceToggle isVoiceEnabled={false} onToggle={jest.fn()} />,
     );
 
     screen.getByText('volume-mute');
@@ -120,7 +120,7 @@ describe('VoiceToggle', () => {
 
   it('re-renders correctly when isVoiceEnabled changes from true to false', () => {
     const { rerender } = render(
-      <VoiceToggle isVoiceEnabled={true} onToggle={jest.fn()} />
+      <VoiceToggle isVoiceEnabled={true} onToggle={jest.fn()} />,
     );
 
     screen.getByText('volume-high');

@@ -21,7 +21,7 @@ export interface SessionFooterProps {
   setFilingDismissed: React.Dispatch<React.SetStateAction<boolean>>;
   navigateToSessionSummary: (
     filedSubjectId?: string,
-    filedBookId?: string
+    filedBookId?: string,
   ) => void;
   router: Router;
   sessionExpired: boolean;
@@ -122,7 +122,7 @@ export function SessionFooter({
               if (!topicId) {
                 platformAlert(
                   t('session.notePrompt.cannotSaveTitle'),
-                  t('session.notePrompt.cannotSaveMessage')
+                  t('session.notePrompt.cannotSaveMessage'),
                 );
                 return;
               }
@@ -140,10 +140,10 @@ export function SessionFooter({
                   onError: (error) => {
                     platformAlert(
                       t('session.notePrompt.saveFailedTitle'),
-                      formatApiError(error)
+                      formatApiError(error),
                     );
                   },
-                }
+                },
               );
             }}
             onCancel={() => setShowNoteInput(false)}
@@ -174,7 +174,7 @@ function StandardFilingPrompt({
   setFilingDismissed: React.Dispatch<React.SetStateAction<boolean>>;
   navigateToSessionSummary: (
     filedSubjectId?: string,
-    filedBookId?: string
+    filedBookId?: string,
   ) => void;
 }) {
   const { t } = useTranslation();
@@ -215,7 +215,7 @@ function StandardFilingPrompt({
                       navigateToSessionSummary();
                     },
                   },
-                ]
+                ],
               );
             }
           }}

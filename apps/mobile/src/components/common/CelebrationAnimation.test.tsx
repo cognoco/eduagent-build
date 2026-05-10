@@ -69,7 +69,7 @@ describe('CelebrationAnimation', () => {
 
     const onComplete = jest.fn();
     render(
-      <CelebrationAnimation onComplete={onComplete} testID="test-burst" />
+      <CelebrationAnimation onComplete={onComplete} testID="test-burst" />,
     );
 
     // With reduced motion, onComplete fires immediately in the useEffect
@@ -81,7 +81,7 @@ describe('CelebrationAnimation', () => {
 
     const onComplete = jest.fn();
     render(
-      <CelebrationAnimation onComplete={onComplete} testID="test-burst" />
+      <CelebrationAnimation onComplete={onComplete} testID="test-burst" />,
     );
 
     // In the mock, withDelay + withTiming pass values through and runOnJS
@@ -104,7 +104,7 @@ describe('CelebrationAnimation', () => {
 
   it('renders the SVG with correct viewBox dimensions', () => {
     const { toJSON } = render(
-      <CelebrationAnimation size={160} testID="test-burst" />
+      <CelebrationAnimation size={160} testID="test-burst" />,
     );
 
     // SVG is rendered as a child of the animated container
@@ -116,13 +116,13 @@ describe('CelebrationAnimation', () => {
     function findNodeWithProp(
       node: ReturnType<typeof toJSON>,
       propName: string,
-      value: unknown
+      value: unknown,
     ): boolean {
       if (!node || typeof node !== 'object') return false;
       if ('props' in node && node.props?.[propName] === value) return true;
       if ('children' in node && Array.isArray(node.children)) {
         return node.children.some((child: unknown) =>
-          findNodeWithProp(child as ReturnType<typeof toJSON>, propName, value)
+          findNodeWithProp(child as ReturnType<typeof toJSON>, propName, value),
         );
       }
       return false;
@@ -158,7 +158,7 @@ describe('CelebrationAnimation', () => {
 
   it('uses custom color for particles', () => {
     const { toJSON } = render(
-      <CelebrationAnimation color="#ff0000" testID="test-burst" />
+      <CelebrationAnimation color="#ff0000" testID="test-burst" />,
     );
 
     const tree = toJSON();
@@ -169,7 +169,7 @@ describe('CelebrationAnimation', () => {
       if ('props' in node && node.props?.fill === fill) return true;
       if ('children' in node && Array.isArray(node.children)) {
         return node.children.some((child: unknown) =>
-          findFill(child as ReturnType<typeof toJSON>, fill)
+          findFill(child as ReturnType<typeof toJSON>, fill),
         );
       }
       return false;
@@ -184,7 +184,7 @@ describe('CelebrationAnimation', () => {
         color="#22c55e"
         accentColor="#a78bfa"
         testID="test-burst"
-      />
+      />,
     );
 
     const tree = toJSON();

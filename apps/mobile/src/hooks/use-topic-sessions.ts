@@ -13,7 +13,7 @@ export interface TopicSession {
 
 export function useTopicSessions(
   subjectId: string | undefined,
-  topicId: string | undefined
+  topicId: string | undefined,
 ): UseQueryResult<TopicSession[]> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -29,7 +29,7 @@ export function useTopicSessions(
           ':topicId'
         ].sessions.$get(
           { param: { subjectId, topicId } },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         const data = (await res.json()) as { sessions: TopicSession[] };

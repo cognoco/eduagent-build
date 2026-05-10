@@ -61,7 +61,7 @@ describe('useLanguageProgress', () => {
       },
     };
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify(progressData), { status: 200 })
+      new Response(JSON.stringify(progressData), { status: 200 }),
     );
 
     const { result } = renderHook(() => useLanguageProgress('sub-1'), {
@@ -77,11 +77,11 @@ describe('useLanguageProgress', () => {
     expect(result.current.data?.languageCode).toBe('es');
     expect(result.current.data?.currentLevel).toBe('A1');
     expect(result.current.data?.currentMilestone?.milestoneTitle).toBe(
-      'Basic Greetings'
+      'Basic Greetings',
     );
     expect(result.current.data?.currentMilestone?.milestoneProgress).toBe(0.5);
     expect(result.current.data?.nextMilestone?.milestoneTitle).toBe(
-      'Daily Routines'
+      'Daily Routines',
     );
   });
 
@@ -96,7 +96,7 @@ describe('useLanguageProgress', () => {
       nextMilestone: null,
     };
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify(progressData), { status: 200 })
+      new Response(JSON.stringify(progressData), { status: 200 }),
     );
 
     const { result } = renderHook(() => useLanguageProgress('sub-1'), {
@@ -114,7 +114,7 @@ describe('useLanguageProgress', () => {
 
   it('handles API errors', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response('Internal server error', { status: 500 })
+      new Response('Internal server error', { status: 500 }),
     );
 
     const { result } = renderHook(() => useLanguageProgress('sub-1'), {
@@ -138,8 +138,8 @@ describe('useLanguageProgress', () => {
           currentMilestone: null,
           nextMilestone: null,
         }),
-        { status: 200 }
-      )
+        { status: 200 },
+      ),
     );
 
     const { result } = renderHook(() => useLanguageProgress('sub-1'), {

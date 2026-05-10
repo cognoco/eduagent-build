@@ -275,7 +275,7 @@ function FamilyContent(): React.ReactElement {
             <CardSkeleton />
             <CardSkeleton />
           </>
-        ) : isError ? (
+        ) : isError && !dashboard ? (
           <View className="items-center justify-center py-12 px-4">
             <Text className="text-h3 font-semibold text-text-primary mb-2">
               {t('dashboard.errorTitle')}

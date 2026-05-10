@@ -25,14 +25,14 @@ interface DictationDataContextType {
 }
 
 const DictationDataContext = createContext<DictationDataContextType | null>(
-  null
+  null,
 );
 
 export function useDictationData(): DictationDataContextType {
   const ctx = useContext(DictationDataContext);
   if (!ctx) {
     throw new Error(
-      'useDictationData must be used within DictationDataProvider'
+      'useDictationData must be used within DictationDataProvider',
     );
   }
   return ctx;

@@ -84,7 +84,7 @@ describe('useMilestoneTracker', () => {
     });
 
     expect(triggered).toEqual(
-      expect.arrayContaining(['polar_star', 'comet', 'persistent'])
+      expect.arrayContaining(['polar_star', 'comet', 'persistent']),
     );
     expect(result.current.milestonesReached).toEqual(
       expect.arrayContaining([
@@ -94,7 +94,7 @@ describe('useMilestoneTracker', () => {
         'orions_belt',
         'deep_diver',
         'persistent',
-      ])
+      ]),
     );
   });
 
@@ -124,7 +124,7 @@ describe('useMilestoneTracker', () => {
     expect(nextTriggered).not.toContain('polar_star');
     expect(nextTriggered).not.toContain('twin_stars');
     expect(result.current.milestonesReached).toEqual(
-      expect.arrayContaining(['polar_star', 'twin_stars'])
+      expect.arrayContaining(['polar_star', 'twin_stars']),
     );
   });
 });

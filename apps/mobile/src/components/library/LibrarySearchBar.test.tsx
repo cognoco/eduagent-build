@@ -15,7 +15,7 @@ describe('LibrarySearchBar', () => {
         value=""
         onChangeText={jest.fn()}
         placeholder="Search shelves..."
-      />
+      />,
     );
     screen.getByTestId('library-search-input');
     expect(screen.getByPlaceholderText('Search shelves...')).toBeTruthy();
@@ -28,7 +28,7 @@ describe('LibrarySearchBar', () => {
         value=""
         onChangeText={onChangeText}
         placeholder="Search..."
-      />
+      />,
     );
     fireEvent.changeText(screen.getByTestId('library-search-input'), 'math');
     expect(onChangeText).toHaveBeenCalledWith('math');
@@ -41,7 +41,7 @@ describe('LibrarySearchBar', () => {
         value="math"
         onChangeText={onChangeText}
         placeholder="Search..."
-      />
+      />,
     );
     screen.getByTestId('library-search-clear');
     fireEvent.press(screen.getByTestId('library-search-clear'));
@@ -54,7 +54,7 @@ describe('LibrarySearchBar', () => {
         value=""
         onChangeText={jest.fn()}
         placeholder="Search..."
-      />
+      />,
     );
     expect(screen.queryByTestId('library-search-clear')).toBeNull();
   });
@@ -67,14 +67,14 @@ describe('LibrarySearchBar', () => {
         value="math"
         onChangeText={jest.fn()}
         placeholder="Search..."
-      />
+      />,
     );
     const iconWrapper = getByTestId('library-search-clear-icon', {
       includeHiddenElements: true,
     });
     expect(iconWrapper.props.accessibilityElementsHidden).toBe(true);
     expect(iconWrapper.props.importantForAccessibility).toBe(
-      'no-hide-descendants'
+      'no-hide-descendants',
     );
   });
 
@@ -84,7 +84,7 @@ describe('LibrarySearchBar', () => {
         value="math"
         onChangeText={jest.fn()}
         placeholder="Search..."
-      />
+      />,
     );
     expect(queryByTestId('library-search-clear-icon')).toBeNull();
   });

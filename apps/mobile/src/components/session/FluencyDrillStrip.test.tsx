@@ -77,7 +77,7 @@ describe('FluencyDrillStrip', () => {
         drill={drill}
         onDismissScore={jest.fn()}
         onSkipDrill={jest.fn()}
-      />
+      />,
     );
     screen.getByTestId('fluency-drill-skip');
   });
@@ -90,7 +90,7 @@ describe('FluencyDrillStrip', () => {
         drill={drill}
         onDismissScore={jest.fn()}
         onSkipDrill={onSkipDrill}
-      />
+      />,
     );
     fireEvent.press(screen.getByTestId('fluency-drill-skip'));
     expect(onSkipDrill).toHaveBeenCalledTimes(1);

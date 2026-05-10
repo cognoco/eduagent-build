@@ -55,7 +55,7 @@ function getTopicHeadline(subject: SubjectInventory): {
     subject.sessionsCount === 1 ? 'session' : 'sessions'
   }`;
   const displayMinutes = formatMinutes(
-    subject.wallClockMinutes || subject.activeMinutes
+    subject.wallClockMinutes || subject.activeMinutes,
   );
   const subline = `${displayMinutes} · ${sessionsLabel}`;
 

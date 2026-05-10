@@ -27,7 +27,7 @@ describe('numericAsNumber', () => {
 
     const builder: any = col;
     const fromDriver = builder.config.customTypeParams.fromDriver as (
-      v: string
+      v: string,
     ) => number;
     expect(fromDriver('2.50')).toBe(2.5);
     expect(fromDriver('1.30')).toBe(1.3);
@@ -39,7 +39,7 @@ describe('numericAsNumber', () => {
 
     const builder: any = col;
     const toDriver = builder.config.customTypeParams.toDriver as (
-      v: number
+      v: number,
     ) => string;
     expect(toDriver(2.5)).toBe('2.5');
     expect(toDriver(1.3)).toBe('1.3');
@@ -50,10 +50,10 @@ describe('numericAsNumber', () => {
 
     const builder: any = col;
     const fromDriver = builder.config.customTypeParams.fromDriver as (
-      v: string
+      v: string,
     ) => number;
     const toDriver = builder.config.customTypeParams.toDriver as (
-      v: number
+      v: number,
     ) => string;
 
     // Mastery 0..1 (precision 3, scale 2) and ease 1.30..9.99 (precision 4,
@@ -88,16 +88,16 @@ describe('parseNumericFromDriver — NaN guard [BUG-980]', () => {
 
   it('[BREAK] throws on a non-numeric corrupt value instead of returning NaN', () => {
     expect(() =>
-      parseNumericFromDriver('not-a-number', 'mastery_score')
+      parseNumericFromDriver('not-a-number', 'mastery_score'),
     ).toThrow(/corrupt value "not-a-number" for column "mastery_score"/);
   });
 
   it('[BREAK] throws on Infinity-producing strings', () => {
     expect(() => parseNumericFromDriver('Infinity', 'ease_factor')).toThrow(
-      /corrupt value/
+      /corrupt value/,
     );
     expect(() => parseNumericFromDriver('-Infinity', 'ease_factor')).toThrow(
-      /corrupt value/
+      /corrupt value/,
     );
   });
 
@@ -107,13 +107,13 @@ describe('parseNumericFromDriver — NaN guard [BUG-980]', () => {
     // pass validation. Today's columns are notNull(), but a future nullable
     // numeric column would corrupt data invisibly through this helper.
     expect(() =>
-      parseNumericFromDriver(null as unknown as string, 'mastery_score')
+      parseNumericFromDriver(null as unknown as string, 'mastery_score'),
     ).toThrow(/null.*for column "mastery_score"/);
   });
 
   it('[BREAK] throws on undefined for the same reason', () => {
     expect(() =>
-      parseNumericFromDriver(undefined as unknown as string, 'ease_factor')
+      parseNumericFromDriver(undefined as unknown as string, 'ease_factor'),
     ).toThrow(/undefined.*for column "ease_factor"/);
   });
 
@@ -124,7 +124,7 @@ describe('parseNumericFromDriver — NaN guard [BUG-980]', () => {
     // null case did. Pin the boundary so a future refactor can't regress it.
     for (const blank of ['', ' ', '\t', '\n', '   \t\n']) {
       expect(() => parseNumericFromDriver(blank, 'mastery_score')).toThrow(
-        /empty\/whitespace string for column "mastery_score"/
+        /empty\/whitespace string for column "mastery_score"/,
       );
     }
   });
@@ -143,7 +143,7 @@ describe('parseNumericFromDriver — NaN guard [BUG-980]', () => {
     const col = numericAsNumber('mastery_score', { precision: 3, scale: 2 });
     const builder: any = col;
     const fromDriver = builder.config.customTypeParams.fromDriver as (
-      v: string
+      v: string,
     ) => number;
     expect(() => fromDriver('garbage')).toThrow(/corrupt value/);
   });

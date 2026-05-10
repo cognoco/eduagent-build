@@ -36,11 +36,11 @@ export const sessionEmbeddings = pgTable(
   (table) => [
     uniqueIndex('session_embeddings_session_profile_uq').on(
       table.sessionId,
-      table.profileId
+      table.profileId,
     ),
     index('embeddings_hnsw_idx').using(
       'hnsw',
-      table.embedding.op('vector_cosine_ops')
+      table.embedding.op('vector_cosine_ops'),
     ),
-  ]
+  ],
 );

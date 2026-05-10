@@ -3,19 +3,19 @@ import type { ChatMessage } from '../session';
 import { sanitizeSecureStoreKey } from '../../lib/secure-storage';
 
 export function computePaceMultiplier(
-  history: Array<{ actualSeconds: number; expectedMinutes: number }>
+  history: Array<{ actualSeconds: number; expectedMinutes: number }>,
 ): number {
   if (history.length < 3) return 1;
   const ratios = history
     .map(
-      (entry) => entry.actualSeconds / Math.max(60, entry.expectedMinutes * 60)
+      (entry) => entry.actualSeconds / Math.max(60, entry.expectedMinutes * 60),
     )
     .sort((a, b) => a - b);
   const middle = Math.floor(ratios.length / 2);
   const median =
     ratios.length % 2 === 0
       ? ((ratios[middle - 1] ?? 0) + (ratios[middle] ?? 0)) / 2
-      : ratios[middle] ?? 0;
+      : (ratios[middle] ?? 0);
   return Math.min(3, Math.max(0.5, Number(median.toFixed(2))));
 }
 
@@ -29,7 +29,7 @@ export function serializeMilestones(milestones: string[]): string {
 }
 
 export function serializeCelebrations(
-  celebrations: PendingCelebration[]
+  celebrations: PendingCelebration[],
 ): string {
   return encodeURIComponent(JSON.stringify(celebrations));
 }
@@ -263,7 +263,7 @@ export function isReconnectableSessionError(error: unknown): boolean {
 }
 
 export function getContextualQuickChips(
-  message: ChatMessage | undefined
+  message: ChatMessage | undefined,
 ): ContextualQuickChipId[] {
   if (!message) return [];
 
@@ -286,7 +286,7 @@ export type ConversationStage = 'greeting' | 'orienting' | 'teaching';
 export function getConversationStage(
   userMessageCount: number,
   hasSubject: boolean,
-  effectiveMode: string
+  effectiveMode: string,
 ): ConversationStage {
   // Review, relearn, and homework already present assessable content
   // on the first AI response. Skip warmup stages.
@@ -295,7 +295,7 @@ export function getConversationStage(
   // path, matching `normalizeModeForConfig` in sessionModeConfig.ts.
   if (
     ['review', 'practice', 'relearn', 'homework', 'recitation'].includes(
-      effectiveMode
+      effectiveMode,
     )
   ) {
     return 'teaching';

@@ -6,12 +6,13 @@ const mockUseUsage = jest.fn();
 
 jest.mock(
   'react-i18next',
-  () => require('../../test-utils/mock-i18n').i18nMock
+  () => require('../../test-utils/mock-i18n').i18nMock,
 );
 
-jest.mock('../../hooks/use-subscription', () => ({ // gc1-allow: ChildQuotaLine renders quota data; mocking the quota hook keeps the test focused on rendering logic without hitting real network calls.
-  useUsage: () => mockUseUsage(),
-}));
+jest.mock(
+  '../../hooks/use-subscription' /* gc1-allow: ChildQuotaLine renders quota data; hook mocked to isolate rendering from network */,
+  () => ({ useUsage: () => mockUseUsage() }),
+);
 
 function mockUseChildQuota(
   data:
@@ -20,7 +21,7 @@ function mockUseChildQuota(
         remainingQuestions: number;
         monthlyLimit: number | null;
       }
-    | undefined
+    | undefined,
 ): void {
   mockUseUsage.mockReturnValue({ data });
 }

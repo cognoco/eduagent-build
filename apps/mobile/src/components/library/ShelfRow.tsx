@@ -59,13 +59,13 @@ export function ShelfRow({
           }
         : null;
 
-  // i18next pluralization picks shelfSubtitle_one vs shelfSubtitle_other based
-  // on count, so the singular/plural form moves with the locale's plural rules
-  // (e.g. Polish/Russian use multiple plural buckets — a hardcoded pair is wrong).
-  const subtitle = t('library.row.shelfSubtitle', {
-    count: bookCount,
-    progress: topicProgress,
-  });
+  const isUnstarted = bookCount === 0;
+  const subtitle = isUnstarted
+    ? t('library.row.shelfSubtitleUnstarted')
+    : t('library.row.shelfSubtitle', {
+        count: bookCount,
+        progress: topicProgress,
+      });
 
   const needsReview = reviewDueCount > 0;
   const showFinished = isFinished && !needsReview;
@@ -124,7 +124,12 @@ export function ShelfRow({
             {name}
           </Text>
           <Text
-            style={{ fontSize: 12, color: colors.textSecondary, marginTop: 1 }}
+            style={{
+              fontSize: 12,
+              color: isUnstarted ? tint.solid : colors.textSecondary,
+              fontWeight: isUnstarted ? '500' : 'normal',
+              marginTop: 1,
+            }}
             numberOfLines={1}
           >
             {subtitle}
@@ -169,7 +174,7 @@ export function ShelfRow({
               }}
             >
               <Ionicons
-                name="alert-circle"
+                name="refresh-circle"
                 size={12}
                 color={colors.retentionWeak}
               />

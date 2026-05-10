@@ -342,7 +342,7 @@ export function HomeworkModeChips({
                 testID="finish-homework-chip"
                 accessibilityRole="button"
                 accessibilityLabel={t(
-                  'session.accessories.finishHomeworkLabel'
+                  'session.accessories.finishHomeworkLabel',
                 )}
               >
                 <Text className="text-body-sm font-semibold text-success">
@@ -425,8 +425,7 @@ export function HomeworkModeChips({
 // Combines SubjectResolutionAccessory and HomeworkModeChips
 
 export interface SessionAccessoryProps
-  extends SubjectResolutionAccessoryProps,
-    HomeworkModeChipsProps {}
+  extends SubjectResolutionAccessoryProps, HomeworkModeChipsProps {}
 
 export function SessionAccessory(props: SessionAccessoryProps) {
   return (

@@ -25,20 +25,20 @@ const UUID_RE =
 export async function withProfileScope<T>(
   db: Database,
   profileId: string,
-  fn: (tx: Database) => Promise<T>
+  fn: (tx: Database) => Promise<T>,
 ): Promise<T> {
   if (!UUID_RE.test(profileId)) {
     throw new Error(
       `withProfileScope: profileId must be a UUID, got: ${JSON.stringify(
-        profileId
-      )}`
+        profileId,
+      )}`,
     );
   }
   return db.transaction(async (tx) => {
     // SET LOCAL does not accept parameterized values ($1). The profileId is
     // validated as a UUID above so inlining it here is safe.
     await tx.execute(
-      sql.raw(`SET LOCAL app.current_profile_id = '${profileId}'`)
+      sql.raw(`SET LOCAL app.current_profile_id = '${profileId}'`),
     );
     return fn(tx as unknown as Database);
   });

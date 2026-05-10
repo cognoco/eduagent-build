@@ -15,7 +15,7 @@ describe('useStickyLoading', () => {
       ({ active }) => useStickyLoading(active, 1000),
       {
         initialProps: { active: true },
-      }
+      },
     );
     expect(result.current).toBe(true);
   });
@@ -25,7 +25,7 @@ describe('useStickyLoading', () => {
       ({ active }) => useStickyLoading(active, 1000),
       {
         initialProps: { active: false },
-      }
+      },
     );
     expect(result.current).toBe(false);
   });
@@ -33,7 +33,7 @@ describe('useStickyLoading', () => {
   it('keeps sticky=true for the minimum duration after active flips off', () => {
     const { result, rerender } = renderHook(
       ({ active }) => useStickyLoading(active, 1000),
-      { initialProps: { active: true } }
+      { initialProps: { active: true } },
     );
     expect(result.current).toBe(true);
 
@@ -57,7 +57,7 @@ describe('useStickyLoading', () => {
   it('drops immediately if the minimum duration has already elapsed', () => {
     const { result, rerender } = renderHook(
       ({ active }) => useStickyLoading(active, 500),
-      { initialProps: { active: true } }
+      { initialProps: { active: true } },
     );
 
     act(() => {
@@ -70,7 +70,7 @@ describe('useStickyLoading', () => {
   it('cancels the timer if active flips back on within the sticky window', () => {
     const { result, rerender } = renderHook(
       ({ active }) => useStickyLoading(active, 1000),
-      { initialProps: { active: true } }
+      { initialProps: { active: true } },
     );
 
     act(() => {
@@ -88,7 +88,7 @@ describe('useStickyLoading', () => {
   it('clears the timer on unmount', () => {
     const { result, rerender, unmount } = renderHook(
       ({ active }) => useStickyLoading(active, 1000),
-      { initialProps: { active: true } }
+      { initialProps: { active: true } },
     );
     rerender({ active: false });
     expect(result.current).toBe(true);

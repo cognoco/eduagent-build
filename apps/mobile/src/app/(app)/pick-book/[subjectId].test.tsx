@@ -337,10 +337,15 @@ describe('PickBookScreen', () => {
       wrapper: TestWrapper,
     });
 
-    await waitFor(() => {
-      // BUG-318: When suggestions load empty, custom input auto-opens
-      getByTestId('pick-book-custom-input');
-    });
+    // useStickyLoading holds the loading view for 800ms after the query resolves.
+    // The full-suite environment adds ~200ms of overhead; 3s gives safe headroom.
+    await waitFor(
+      () => {
+        // BUG-318: When suggestions load empty, custom input auto-opens
+        getByTestId('pick-book-custom-input');
+      },
+      { timeout: 3000 },
+    );
   });
 
   it('back button replaces shelf without relying on back history', async () => {

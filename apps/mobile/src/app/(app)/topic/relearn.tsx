@@ -100,7 +100,7 @@ type SelectedTopic = {
 
 function buildSelectedTopic(
   subject: OverdueSubject,
-  topic: OverdueTopic
+  topic: OverdueTopic,
 ): SelectedTopic {
   return {
     topicId: topic.topicId,
@@ -138,7 +138,7 @@ export default function RelearnScreen() {
 
   const [phase, setPhase] = useState<Phase>(directEntry ? 'method' : 'topics');
   const [selectedSubject, setSelectedSubject] = useState<OverdueSubject | null>(
-    null
+    null,
   );
   const [selectedTopic, setSelectedTopic] = useState<SelectedTopic | null>(
     directEntry && routeTopicId && routeSubjectId
@@ -148,7 +148,7 @@ export default function RelearnScreen() {
           subjectId: routeSubjectId,
           subjectName: routeSubjectName,
         }
-      : null
+      : null,
   );
   const [isReady, setIsReady] = useState(directEntry);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -157,7 +157,7 @@ export default function RelearnScreen() {
 
   const allSubjects = useMemo(
     () => overdueTopics.data?.subjects ?? [],
-    [overdueTopics.data?.subjects]
+    [overdueTopics.data?.subjects],
   );
   const shouldStartAtSubjects =
     (overdueTopics.data?.totalOverdue ?? 0) > 10 && allSubjects.length > 1;
@@ -184,7 +184,7 @@ export default function RelearnScreen() {
     setPhase(
       (overdueTopics.data?.totalOverdue ?? 0) > 10 && subjects.length > 1
         ? 'subjects'
-        : 'topics'
+        : 'topics',
     );
     setIsReady(true);
   }, [
@@ -235,7 +235,7 @@ export default function RelearnScreen() {
       setError(null);
       setPhase('method');
     },
-    []
+    [],
   );
 
   const handleStartMethod = useCallback(
@@ -306,7 +306,7 @@ export default function RelearnScreen() {
       router,
       selectedTopic,
       startRelearn,
-    ]
+    ],
   );
 
   const topicsToRender = useMemo(() => {
@@ -375,7 +375,7 @@ export default function RelearnScreen() {
     );
   }
 
-  if (!directEntry && overdueTopics.isError) {
+  if (!directEntry && overdueTopics.isError && !overdueTopics.data) {
     return (
       <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
         {renderHeader()}

@@ -36,5 +36,5 @@ export const dictationResults = pgTable(
   },
   (table) => [
     index('idx_dictation_results_profile_date').on(table.profileId, table.date),
-  ]
+  ],
 );

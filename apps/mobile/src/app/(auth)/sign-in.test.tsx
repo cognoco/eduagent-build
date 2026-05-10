@@ -164,7 +164,7 @@ describe('SignInScreen', () => {
 
     const button = screen.getByTestId('sign-in-button');
     expect(
-      button.props.accessibilityState?.disabled ?? button.props.disabled
+      button.props.accessibilityState?.disabled ?? button.props.disabled,
     ).toBeTruthy();
   });
 
@@ -179,7 +179,7 @@ describe('SignInScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('sign-in-email'),
-      'test@example.com'
+      'test@example.com',
     );
     fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
     fireEvent.press(screen.getByTestId('sign-in-button'));
@@ -211,7 +211,7 @@ describe('SignInScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('sign-in-email'),
-      'test@example.com'
+      'test@example.com',
     );
     fireEvent.changeText(screen.getByTestId('sign-in-password'), 'wrong');
     fireEvent.press(screen.getByTestId('sign-in-button'));
@@ -243,7 +243,7 @@ describe('SignInScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('sign-in-email'),
-      'test@example.com'
+      'test@example.com',
     );
     fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
     fireEvent.press(screen.getByTestId('sign-in-button'));
@@ -286,7 +286,7 @@ describe('SignInScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('sign-in-email'),
-      'test@example.com'
+      'test@example.com',
     );
     fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
     fireEvent.press(screen.getByTestId('sign-in-button'));
@@ -331,14 +331,14 @@ describe('SignInScreen', () => {
     });
     // Auto-send fails (e.g. rate limited)
     mockPrepareFirstFactor.mockRejectedValueOnce(
-      new Error('Too many requests')
+      new Error('Too many requests'),
     );
 
     render(<SignInScreen />);
 
     fireEvent.changeText(
       screen.getByTestId('sign-in-email'),
-      'test@example.com'
+      'test@example.com',
     );
     fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
     fireEvent.press(screen.getByTestId('sign-in-button'));
@@ -387,7 +387,7 @@ describe('SignInScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('sign-in-email'),
-      'test@example.com'
+      'test@example.com',
     );
     fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
     fireEvent.press(screen.getByTestId('sign-in-button'));
@@ -441,7 +441,7 @@ describe('SignInScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('sign-in-email'),
-      'test@example.com'
+      'test@example.com',
     );
     fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
     fireEvent.press(screen.getByTestId('sign-in-button'));
@@ -477,7 +477,7 @@ describe('SignInScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('sign-in-email'),
-      'test@example.com'
+      'test@example.com',
     );
     fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
     fireEvent.press(screen.getByTestId('sign-in-button'));
@@ -526,7 +526,7 @@ describe('SignInScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('sign-in-email'),
-      'test@example.com'
+      'test@example.com',
     );
     fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
     fireEvent.press(screen.getByTestId('sign-in-button'));
@@ -550,14 +550,14 @@ describe('SignInScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('sign-in-email'),
-      'test@example.com'
+      'test@example.com',
     );
     fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
     fireEvent.press(screen.getByTestId('sign-in-button'));
 
     await waitFor(() => {
       screen.getByText(
-        "This account requires a security key or passkey which isn't available on mobile yet."
+        "This account requires a security key or passkey which isn't available on mobile yet.",
       );
     });
 
@@ -576,7 +576,7 @@ describe('SignInScreen', () => {
     render(<SignInScreen />);
     fireEvent.changeText(
       screen.getByTestId('sign-in-email'),
-      'test@example.com'
+      'test@example.com',
     );
     fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
     fireEvent.press(screen.getByTestId('sign-in-button'));
@@ -603,7 +603,7 @@ describe('SignInScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('sign-in-email'),
-      'test@example.com'
+      'test@example.com',
     );
     fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
     fireEvent.press(screen.getByTestId('sign-in-button'));
@@ -613,7 +613,7 @@ describe('SignInScreen', () => {
     });
 
     screen.getByText(
-      'Enter one of the backup codes you saved when you set up two-factor authentication.'
+      'Enter one of the backup codes you saved when you set up two-factor authentication.',
     );
 
     // No "Resend code" button for backup_code
@@ -621,7 +621,7 @@ describe('SignInScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('sign-in-verify-code'),
-      'ABCD-1234'
+      'ABCD-1234',
     );
     fireEvent.press(screen.getByTestId('sign-in-verify-button'));
 
@@ -653,7 +653,7 @@ describe('SignInScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('sign-in-email'),
-      'test@example.com'
+      'test@example.com',
     );
     fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
     fireEvent.press(screen.getByTestId('sign-in-button'));
@@ -680,7 +680,7 @@ describe('SignInScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('sign-in-email'),
-      'test@example.com'
+      'test@example.com',
     );
     fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
     fireEvent.press(screen.getByTestId('sign-in-button'));
@@ -704,7 +704,7 @@ describe('SignInScreen', () => {
 
     fireEvent.changeText(
       screen.getByTestId('sign-in-email'),
-      'test@example.com'
+      'test@example.com',
     );
     fireEvent.changeText(screen.getByTestId('sign-in-password'), 'password123');
     fireEvent.press(screen.getByTestId('sign-in-button'));
@@ -717,7 +717,7 @@ describe('SignInScreen', () => {
 
     await waitFor(() => {
       expect(Linking.openURL).toHaveBeenCalledWith(
-        expect.stringContaining('mailto:support@mentomate.app')
+        expect.stringContaining('mailto:support@mentomate.app'),
       );
     });
   });
@@ -729,7 +729,7 @@ describe('SignInScreen', () => {
 
     await waitFor(() => {
       screen.getByText(
-        'Your session expired. Sign in again to continue learning.'
+        'Your session expired. Sign in again to continue learning.',
       );
     });
   });
@@ -754,7 +754,7 @@ describe('SignInScreen', () => {
 
     await waitFor(() => {
       expect(mockStartSSOFlow).toHaveBeenCalledWith(
-        expect.objectContaining({ strategy: 'oauth_google' })
+        expect.objectContaining({ strategy: 'oauth_google' }),
       );
     });
 
@@ -779,7 +779,7 @@ describe('SignInScreen', () => {
 
     await waitFor(() => {
       expect(mockStartSSOFlow).toHaveBeenCalledWith(
-        expect.objectContaining({ strategy: 'oauth_apple' })
+        expect.objectContaining({ strategy: 'oauth_apple' }),
       );
     });
 
@@ -839,7 +839,7 @@ describe('SignInScreen', () => {
 
     await waitFor(() => {
       expect(mockStartSSOFlow).toHaveBeenCalledWith(
-        expect.objectContaining({ strategy: 'oauth_custom_openai' })
+        expect.objectContaining({ strategy: 'oauth_custom_openai' }),
       );
     });
 
@@ -901,7 +901,7 @@ describe('SignInScreen', () => {
       await waitFor(() =>
         expect(mockSetActive).toHaveBeenCalledWith({
           session: 'sess_nav_first',
-        })
+        }),
       );
     }
 
@@ -919,7 +919,7 @@ describe('SignInScreen', () => {
       fireEvent.press(screen.getByTestId('sign-in-button'));
 
       await waitFor(() =>
-        expect(mockSetActive).toHaveBeenCalledWith({ session: 'sess_pw' })
+        expect(mockSetActive).toHaveBeenCalledWith({ session: 'sess_pw' }),
       );
 
       expect(mockReplace).not.toHaveBeenCalled();
@@ -966,7 +966,7 @@ describe('SignInScreen', () => {
       await waitFor(() =>
         expect(mockSetActive).toHaveBeenCalledWith({
           session: 'sess_nav_second',
-        })
+        }),
       );
 
       expect(mockReplace).not.toHaveBeenCalled();
@@ -999,7 +999,7 @@ describe('SignInScreen', () => {
       await waitFor(() =>
         expect(mockSetActive).toHaveBeenCalledWith({
           session: 'sess_nav_totp',
-        })
+        }),
       );
 
       expect(mockReplace).not.toHaveBeenCalled();
@@ -1023,7 +1023,7 @@ describe('SignInScreen', () => {
       await waitFor(() =>
         expect(mockSetActive).toHaveBeenCalledWith({
           session: 'sess_nav_google',
-        })
+        }),
       );
 
       expect(mockReplace).not.toHaveBeenCalled();
@@ -1042,7 +1042,7 @@ describe('SignInScreen', () => {
       await waitFor(() =>
         expect(mockSetActive).toHaveBeenCalledWith({
           session: 'sess_nav_apple',
-        })
+        }),
       );
 
       expect(mockReplace).not.toHaveBeenCalled();

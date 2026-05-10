@@ -11,7 +11,7 @@ import {
 
 jest.mock(
   'react-i18next',
-  () => require('../../../test-utils/mock-i18n').i18nMock
+  () => require('../../../test-utils/mock-i18n').i18nMock,
 );
 
 // Mock expo-router
@@ -39,7 +39,7 @@ jest.mock('expo-camera', () => {
         testID?: string;
         [key: string]: unknown;
       },
-      _ref: unknown
+      _ref: unknown,
     ) {
       return (
         <View testID={testID ?? 'camera-view'} {...props}>
@@ -160,7 +160,9 @@ const mockFetch = createRoutedMockFetch({
 });
 
 jest.mock('../../../lib/api-client', () =>
-  require('../../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch)
+  require('../../../test-utils/mock-api-routes').mockApiClientFactory(
+    mockFetch,
+  ),
 );
 
 // CameraScreen is required AFTER jest.mock and mockFetch are initialized,
@@ -215,7 +217,7 @@ jest
       return { remove: mockRemove } as ReturnType<
         typeof AppState.addEventListener
       >;
-    }
+    },
   );
 
 beforeEach(() => {
@@ -252,7 +254,7 @@ beforeEach(() => {
       if (mockClassifyResult instanceof Error) throw mockClassifyResult;
       if (mockClassifyResult instanceof Response) return mockClassifyResult;
       return mockClassifyResult;
-    }
+    },
   );
   mockCreateSubjectResult = { subject: { id: 'sub-created', name: 'Biology' } };
   (useLocalSearchParams as jest.Mock).mockReturnValue({
@@ -305,8 +307,8 @@ describe('CameraScreen', () => {
     // New first-person, outcome-first copy is present
     expect(
       getByText(
-        /Snap a picture of your homework and I'll help you solve it step by step/i
-      )
+        /Snap a picture of your homework and I'll help you solve it step by step/i,
+      ),
     ).toBeTruthy();
     // Old jargon phrasings are gone
     expect(queryByText(/AI tutor/i)).toBeNull();
@@ -412,7 +414,7 @@ describe('CameraScreen', () => {
       .spyOn(console, 'error')
       .mockImplementation(jest.fn());
     mockLaunchImageLibraryAsync.mockRejectedValueOnce(
-      new Error('Picker crashed')
+      new Error('Picker crashed'),
     );
 
     const { getByTestId } = render(<CameraScreen />, {
@@ -426,7 +428,7 @@ describe('CameraScreen', () => {
         "Couldn't open your photos",
         'Please try again or use the camera instead.',
         undefined,
-        undefined
+        undefined,
       );
     });
 
@@ -496,7 +498,7 @@ describe('CameraScreen', () => {
       getByText(/type it out/i);
       getByTestId('manual-input');
       expect(
-        getByText(/couldn't find a clear homework problem in this photo/i)
+        getByText(/couldn't find a clear homework problem in this photo/i),
       ).toBeTruthy();
     });
   });
@@ -520,7 +522,7 @@ describe('CameraScreen', () => {
       getByText(/type it out/i);
       getByTestId('manual-input');
       expect(
-        getByText(/couldn't find a clear homework problem in this photo/i)
+        getByText(/couldn't find a clear homework problem in this photo/i),
       ).toBeTruthy();
     });
   });
@@ -555,7 +557,7 @@ describe('CameraScreen', () => {
           subjectName: 'Mathematics',
           problemText: 'x^2 + 3x - 10 = 0',
         }),
-      })
+      }),
     );
 
     // Manual flow should NOT include imageUri
@@ -583,7 +585,7 @@ describe('CameraScreen', () => {
       () => {
         getByTestId('confirm-button');
       },
-      { timeout: 5_000 }
+      { timeout: 5_000 },
     );
 
     fireEvent.press(getByTestId('confirm-button'));
@@ -599,7 +601,7 @@ describe('CameraScreen', () => {
           homeworkProblems: expect.any(String),
           ocrText: 'Solve for x: 2x + 5 = 13',
         }),
-      })
+      }),
     );
   }, 15_000);
 
@@ -679,16 +681,16 @@ describe('CameraScreen', () => {
     await waitFor(() => {
       const allCalls = fetchCallsMatching(mockFetch, 'subjects');
       const createCall = allCalls.find(
-        (c) => c.init?.method === 'POST' && !c.url.includes('classify')
+        (c) => c.init?.method === 'POST' && !c.url.includes('classify'),
       );
       const body = extractJsonBody<{ name: string; rawInput: string }>(
-        createCall?.init
+        createCall?.init,
       );
       expect(body).toEqual(
         expect.objectContaining({
           name: 'Biology',
           rawInput: 'Biology',
-        })
+        }),
       );
     });
 
@@ -699,7 +701,7 @@ describe('CameraScreen', () => {
           subjectId: 'sub-created',
           subjectName: 'Biology',
         }),
-      })
+      }),
     );
   });
 
@@ -716,7 +718,7 @@ describe('CameraScreen', () => {
       () =>
         new Promise<Response>(() => {
           /* never resolves */
-        })
+        }),
     );
     // Classify throws → picker opens with no candidates; subjects still loading
     mockClassifyResult = new Error('classification down');
@@ -759,7 +761,7 @@ describe('CameraScreen', () => {
       () =>
         new Promise<Response>(() => {
           /* never resolves */
-        })
+        }),
     );
     (useHomeworkOcr as jest.Mock).mockReturnValue({
       text: null,
@@ -898,7 +900,7 @@ describe('CameraScreen', () => {
         message: 'Quota exceeded — too many subjects',
         code: 'QUOTA',
       }),
-      { status: 500 }
+      { status: 500 },
     );
     (useHomeworkOcr as jest.Mock).mockReturnValue({
       text: 'Photosynthesis worksheet question',
@@ -1003,7 +1005,7 @@ describe('CameraScreen', () => {
 
     await waitFor(() => {
       expect(fetchCallsMatching(mockFetch, 'subjects/classify')).toHaveLength(
-        1
+        1,
       );
     });
 
@@ -1040,7 +1042,7 @@ describe('CameraScreen', () => {
     // We assert classify was called (the regression guards the OPPOSITE: a
     // stuck ref preventing a fresh classify on the second image).
     expect(
-      fetchCallsMatching(mockFetch, 'subjects/classify').length
+      fetchCallsMatching(mockFetch, 'subjects/classify').length,
     ).toBeGreaterThan(0);
   });
 

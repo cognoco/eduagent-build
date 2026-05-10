@@ -7,6 +7,7 @@ import { ERROR_CODES, LlmStreamError } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 
 import { captureException } from './services/sentry';
+import { isTransientDatabaseError } from './services/transient-db-retry';
 import {
   ForbiddenError,
   NotFoundError,
@@ -112,7 +113,7 @@ type Variables = {
   db: Database;
   account: Account;
   profileId: string;
-  profileMeta: ProfileMeta;
+  profileMeta: ProfileMeta | undefined;
   subscriptionId: string;
   llmTier: LLMTier;
 };
@@ -165,7 +166,7 @@ api.use(
     ],
     credentials: true,
     maxAge: 3600,
-  })
+  }),
 );
 
 // Request logging — runs before auth so every request (including public) is logged
@@ -281,7 +282,7 @@ app.onError((err, c) => {
     }
     return c.json(
       { code: ERROR_CODES.RATE_LIMITED, message: err.message },
-      429
+      429,
     );
   }
   // [BUG-STALE-OPTIONS] 400 for domain-level bad-request conditions (e.g.
@@ -289,7 +290,7 @@ app.onError((err, c) => {
   if (err instanceof BadRequestError) {
     return c.json(
       { code: ERROR_CODES.VALIDATION_ERROR, message: err.message },
-      400
+      400,
     );
   }
   if (err instanceof UpstreamLlmError) {
@@ -301,7 +302,7 @@ app.onError((err, c) => {
     });
     return c.json(
       { code: ERROR_CODES.UPSTREAM_ERROR, message: err.message },
-      502
+      502,
     );
   }
 
@@ -319,7 +320,7 @@ app.onError((err, c) => {
       });
       return c.json(
         { code: ERROR_CODES.UPSTREAM_ERROR, message: cause.message },
-        502
+        502,
       );
     }
     captureException(err, {
@@ -336,7 +337,24 @@ app.onError((err, c) => {
             ? 'AI service temporarily unavailable'
             : `${err.message}: ${cause.message}`,
       },
-      503
+      503,
+    );
+  }
+
+  if (isTransientDatabaseError(err)) {
+    captureException(err, {
+      userId: c.get('user')?.userId,
+      profileId: c.get('profileId'),
+      requestPath: c.req.path,
+      extra: { transient: true },
+    });
+    c.header('Retry-After', '1');
+    return c.json(
+      {
+        code: ERROR_CODES.SERVICE_UNAVAILABLE,
+        message: 'Database temporarily unavailable — please retry',
+      },
+      503,
     );
   }
 
@@ -360,7 +378,7 @@ app.onError((err, c) => {
           ? 'Internal server error'
           : err.message || 'Internal server error',
     },
-    500
+    500,
   );
 });
 
@@ -380,5 +398,5 @@ export default Sentry.withSentry(
   }),
   // Hono's app.fetch signature is compatible but not structurally identical
   // to ExportedHandler — cast via unknown to bridge the gap.
-  { fetch: app.fetch } as unknown as ExportedHandler
+  { fetch: app.fetch } as unknown as ExportedHandler,
 );

@@ -33,7 +33,7 @@ const sentryMock = require('../services/sentry') as {
 jest.mock('./jwt', () =>
   require('../test-utils/auth-fixture').createJwtModuleMock({
     payload: { sub: 'user_default' },
-  })
+  }),
 );
 
 const jwtMock = require('./jwt') as {
@@ -104,11 +104,25 @@ describe('authMiddleware', () => {
       const res = await app.request(
         '/v1/inngest/webhook',
         { method: 'POST' },
-        TEST_ENV
+        TEST_ENV,
       );
 
       // Route exists and middleware did not block it
       expect(res.status).toBe(200);
+      expect(jwtMock.verifyJWT).not.toHaveBeenCalled();
+    });
+
+    it('requires auth for /v1/auth/* paths — must never be in PUBLIC_PATHS [BUG-1007]', async () => {
+      const app = createTestApp();
+      app.post('/auth/register', (c) => c.json({ ok: true }));
+
+      const res = await app.request(
+        '/v1/auth/register',
+        { method: 'POST', headers: { 'Content-Type': 'application/json' } },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(401);
       expect(jwtMock.verifyJWT).not.toHaveBeenCalled();
     });
   });
@@ -131,7 +145,7 @@ describe('authMiddleware', () => {
         {
           headers: { Authorization: 'Basic dXNlcjpwYXNz' },
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -150,7 +164,7 @@ describe('authMiddleware', () => {
         {
           headers: { Authorization: 'Bearer invalid.jwt.token' },
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -175,7 +189,7 @@ describe('authMiddleware', () => {
           headers: { Authorization: 'Bearer valid.jwt.token' },
         },
         // No CLERK_AUDIENCE — audience validation must reject
-        { CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json' }
+        { CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json' },
       );
 
       expect(res.status).toBe(401);
@@ -199,7 +213,7 @@ describe('authMiddleware', () => {
         {
           headers: { Authorization: 'Bearer valid.jwt.token' },
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -210,14 +224,14 @@ describe('authMiddleware', () => {
   describe('error classification: JWKS/network failures vs. token validation failures', () => {
     it('calls captureException when verifyJWT rejects with a JWKS fetch error', async () => {
       jwtMock.verifyJWT.mockRejectedValueOnce(
-        new Error('Failed to fetch JWKS: 503 Service Unavailable')
+        new Error('Failed to fetch JWKS: 503 Service Unavailable'),
       );
 
       const app = createTestApp();
       await app.request(
         '/v1/me',
         { headers: { Authorization: 'Bearer some.jwt.token' } },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(sentryMock.captureException).toHaveBeenCalledTimes(1);
@@ -227,7 +241,7 @@ describe('authMiddleware', () => {
     it('calls captureException when verifyJWT rejects with an AbortError (timeout)', async () => {
       const abortError = new DOMException(
         'The user aborted a request.',
-        'AbortError'
+        'AbortError',
       );
       jwtMock.verifyJWT.mockRejectedValueOnce(abortError);
 
@@ -235,7 +249,7 @@ describe('authMiddleware', () => {
       await app.request(
         '/v1/me',
         { headers: { Authorization: 'Bearer some.jwt.token' } },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(sentryMock.captureException).toHaveBeenCalledTimes(1);
@@ -244,14 +258,14 @@ describe('authMiddleware', () => {
 
     it('does NOT call captureException for normal token validation failures', async () => {
       jwtMock.verifyJWT.mockRejectedValueOnce(
-        new Error('Invalid JWT: expired')
+        new Error('Invalid JWT: expired'),
       );
 
       const app = createTestApp();
       const res = await app.request(
         '/v1/me',
         { headers: { Authorization: 'Bearer some.jwt.token' } },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -261,14 +275,14 @@ describe('authMiddleware', () => {
 
     it('always returns 401 regardless of error type', async () => {
       jwtMock.verifyJWT.mockRejectedValueOnce(
-        new Error('Failed to fetch JWKS: network error')
+        new Error('Failed to fetch JWKS: network error'),
       );
 
       const app = createTestApp();
       const res = await app.request(
         '/v1/me',
         { headers: { Authorization: 'Bearer some.jwt.token' } },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -292,7 +306,7 @@ describe('authMiddleware', () => {
         {
           headers: { Authorization: 'Bearer valid.jwt.token' },
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -313,7 +327,7 @@ describe('authMiddleware', () => {
         {
           headers: { Authorization: 'Bearer valid.jwt.token' },
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);

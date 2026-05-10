@@ -52,7 +52,7 @@ export function useRetentionTopics(subjectId: string) {
       try {
         const res = await client.subjects[':subjectId'].retention.$get(
           { param: { subjectId } },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         return await res.json();
@@ -65,7 +65,7 @@ export function useRetentionTopics(subjectId: string) {
 }
 
 export function useTopicRetention(
-  topicId: string
+  topicId: string,
 ): UseQueryResult<RetentionCardResponse | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -77,7 +77,7 @@ export function useTopicRetention(
       try {
         const res = await client.topics[':topicId'].retention.$get(
           { param: { topicId } },
-          { init: { signal } }
+          { init: { signal } },
         );
         await assertOk(res);
         const data = (await res.json()) as {
@@ -104,7 +104,7 @@ interface EvaluateEligibility {
 }
 
 export function useEvaluateEligibility(
-  topicId: string
+  topicId: string,
 ): UseQueryResult<EvaluateEligibility> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -177,7 +177,7 @@ export function useStartRelearn() {
 }
 
 export function useTeachingPreference(
-  subjectId: string | undefined
+  subjectId: string | undefined,
 ): UseQueryResult<TeachingPreference | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();

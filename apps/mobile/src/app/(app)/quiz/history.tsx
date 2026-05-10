@@ -16,7 +16,7 @@ function formatDateHeader(isoDate: string): string {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const diffDays = Math.round(
-    (today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24)
+    (today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24),
   );
 
   if (diffDays === 0) return i18next.t('quiz.history.dateToday');
@@ -53,7 +53,7 @@ export default function QuizHistoryScreen() {
   }
 
   // [H7] Show actionable error state instead of falling through to empty.
-  if (isError) {
+  if (isError && !rounds) {
     return (
       <ErrorFallback
         variant="centered"

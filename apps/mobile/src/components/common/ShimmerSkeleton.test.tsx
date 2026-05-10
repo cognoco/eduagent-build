@@ -9,7 +9,7 @@ describe('ShimmerSkeleton', () => {
     const { getByText } = render(
       <ShimmerSkeleton>
         <Text>Placeholder</Text>
-      </ShimmerSkeleton>
+      </ShimmerSkeleton>,
     );
     getByText('Placeholder');
   });
@@ -18,7 +18,7 @@ describe('ShimmerSkeleton', () => {
     const { getByTestId } = render(
       <ShimmerSkeleton testID="skel">
         <View />
-      </ShimmerSkeleton>
+      </ShimmerSkeleton>,
     );
     getByTestId('skel');
   });
@@ -27,7 +27,7 @@ describe('ShimmerSkeleton', () => {
     const { getByTestId } = render(
       <ShimmerSkeleton testID="skel">
         <View />
-      </ShimmerSkeleton>
+      </ShimmerSkeleton>,
     );
     const container = getByTestId('skel');
     expect(container.props.style).not.toBeNull();
@@ -41,7 +41,7 @@ describe('ShimmerSkeleton', () => {
     const { getByTestId, queryByTestId } = render(
       <ShimmerSkeleton testID="skel">
         <Text>Content</Text>
-      </ShimmerSkeleton>
+      </ShimmerSkeleton>,
     );
 
     getByTestId('skel');
@@ -54,7 +54,7 @@ describe('ShimmerSkeleton', () => {
     const { getByText } = render(
       <ShimmerSkeleton duration={2000}>
         <Text>Fast shimmer</Text>
-      </ShimmerSkeleton>
+      </ShimmerSkeleton>,
     );
     getByText('Fast shimmer');
   });
@@ -69,7 +69,7 @@ describe('ShimmerSkeleton', () => {
     const { unmount, getByTestId } = render(
       <ShimmerSkeleton testID="skel">
         <View />
-      </ShimmerSkeleton>
+      </ShimmerSkeleton>,
     );
 
     // Simulate a layout event so containerWidth > 0, triggering the animation effect

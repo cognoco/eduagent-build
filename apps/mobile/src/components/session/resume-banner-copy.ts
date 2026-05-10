@@ -12,7 +12,7 @@
  * @param topicName - Topic title from the active session route params, if any.
  */
 export function getResumeBannerCopy(
-  topicName: string | null | undefined
+  topicName: string | null | undefined,
 ): string {
   if (topicName && topicName.trim().length > 0) {
     return `Welcome back — you were exploring ${topicName}. Keep going?`;

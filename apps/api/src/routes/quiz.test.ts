@@ -22,6 +22,20 @@ const mockDatabaseModule = createDatabaseModuleMock({
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
+jest.mock('inngest/hono', () => ({
+  serve: jest.fn().mockReturnValue(jest.fn()),
+}));
+
+jest.mock(
+  '../inngest/client' /* gc1-allow: route-level test isolates Inngest event bus */,
+  () => ({
+    inngest: {
+      send: jest.fn().mockResolvedValue(undefined),
+      createFunction: jest.fn().mockReturnValue(jest.fn()),
+    },
+  }),
+);
+
 jest.mock('../services/account' /* gc1-allow: unit test boundary */, () => ({
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
@@ -124,6 +138,9 @@ import { app } from '../index';
 import { routeAndCall, CircuitOpenError } from '../services/llm';
 import { UpstreamLlmError } from '../errors';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
+import { inngest } from '../inngest/client';
+
+const mockInngestSend = inngest.send as jest.Mock;
 
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
@@ -884,6 +901,16 @@ describe('Quiz routes', () => {
       expect(body.questionResults[0]).toHaveProperty('answerGiven');
       expect(body.questionResults[0].answerGiven).toBe('Vienna');
       expect(body.questionResults[1].answerGiven).toBe('Munich');
+
+      expect(mockInngestSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'app/streak.record',
+          data: expect.objectContaining({
+            profileId: 'test-profile-id',
+            date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+          }),
+        }),
+      );
     });
 
     it('returns 400 for empty results', async () => {

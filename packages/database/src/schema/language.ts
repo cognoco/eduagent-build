@@ -50,13 +50,13 @@ export const vocabulary = pgTable(
     unique('vocabulary_profile_subject_term_unique').on(
       table.profileId,
       table.subjectId,
-      table.termNormalized
+      table.termNormalized,
     ),
     index('vocabulary_profile_subject_idx').on(
       table.profileId,
-      table.subjectId
+      table.subjectId,
     ),
-  ]
+  ],
 );
 
 export const vocabularyRetentionCards = pgTable(
@@ -91,11 +91,11 @@ export const vocabularyRetentionCards = pgTable(
     unique('vocab_retention_cards_vocabulary_unique').on(table.vocabularyId),
     index('vocab_retention_cards_review_idx').on(
       table.profileId,
-      table.nextReviewAt
+      table.nextReviewAt,
     ),
     check(
       'vocab_retention_cards_interval_days_positive',
-      sql`${table.intervalDays} >= 1`
+      sql`${table.intervalDays} >= 1`,
     ),
-  ]
+  ],
 );

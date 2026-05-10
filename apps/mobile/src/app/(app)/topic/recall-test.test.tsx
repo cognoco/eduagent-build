@@ -9,7 +9,7 @@ import { Alert } from 'react-native';
 
 jest.mock(
   'react-i18next',
-  () => require('../../../test-utils/mock-i18n').i18nMock
+  () => require('../../../test-utils/mock-i18n').i18nMock,
 );
 
 jest.mock('expo-localization', () => ({
@@ -54,7 +54,7 @@ jest.mock('../../../components/session/ChatShell', () => {
         View,
         { testID: 'mock-chat-shell' },
         messages.map((message) =>
-          ReactReq.createElement(Text, { key: message.id }, message.content)
+          ReactReq.createElement(Text, { key: message.id }, message.content),
         ),
         ReactReq.isValidElement(inputAccessory) ? inputAccessory : null,
         ReactReq.isValidElement(footer) ? footer : null,
@@ -65,9 +65,9 @@ jest.mock('../../../components/session/ChatShell', () => {
                 testID: 'mock-send-button',
                 onPress: () => onSend('I remember this topic well'),
               },
-              ReactReq.createElement(Text, null, 'Send')
+              ReactReq.createElement(Text, null, 'Send'),
             )
-          : null
+          : null,
       ),
     animateResponse: (
       content: string,
@@ -77,7 +77,7 @@ jest.mock('../../../components/session/ChatShell', () => {
         >
       >,
       setIsStreaming: React.Dispatch<React.SetStateAction<boolean>>,
-      onComplete?: () => void
+      onComplete?: () => void,
     ) => {
       setIsStreaming(false);
       setMessages((prev) => [
@@ -98,7 +98,7 @@ jest.mock('../../../components/progress', () => {
       ReactReq.createElement(
         View,
         { testID: 'remediation-card' },
-        ReactReq.createElement(Text, null, 'Remediation ready')
+        ReactReq.createElement(Text, null, 'Remediation ready'),
       ),
   };
 });
@@ -115,7 +115,7 @@ describe('RecallTestScreen', () => {
         options?: {
           onSuccess?: (value: Record<string, unknown>) => void;
           onError?: (error: Error) => void;
-        }
+        },
       ) => {
         const next = queuedRecallResults.shift();
         if (next instanceof Error) {
@@ -125,7 +125,7 @@ describe('RecallTestScreen', () => {
         if (next) {
           options?.onSuccess?.(next);
         }
-      }
+      },
     );
   });
 
@@ -160,13 +160,13 @@ describe('RecallTestScreen', () => {
         expect.objectContaining({
           onSuccess: expect.any(Function),
           onError: expect.any(Function),
-        })
+        }),
       );
     });
 
     await waitFor(() => {
       expect(
-        screen.getByText('Try remembering the central definition first.')
+        screen.getByText('Try remembering the central definition first.'),
       ).toBeTruthy();
     });
 
@@ -224,7 +224,7 @@ describe('RecallTestScreen', () => {
         expect.objectContaining({
           onSuccess: expect.any(Function),
           onError: expect.any(Function),
-        })
+        }),
       );
     });
 
