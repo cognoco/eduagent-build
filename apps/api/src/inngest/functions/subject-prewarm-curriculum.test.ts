@@ -2,6 +2,7 @@ const mockDb: Record<string, any> = {
   query: {
     curriculumBooks: { findFirst: jest.fn().mockResolvedValue(null) },
     profiles: { findFirst: jest.fn().mockResolvedValue(null) },
+    subjects: { findFirst: jest.fn().mockResolvedValue(null) },
   },
 };
 
@@ -19,6 +20,7 @@ const mockDatabaseModule = createDatabaseModuleMock({
       topicsGenerated: col('topicsGenerated'),
     },
     profiles: { id: col('id'), birthYear: col('birthYear') },
+    subjects: { id: col('id'), profileId: col('profileId') },
   },
 });
 
@@ -116,6 +118,10 @@ describe('subjectPrewarmCurriculum', () => {
       id: profileId,
       birthYear: new Date().getUTCFullYear() - 12,
     });
+    mockDb.query.subjects.findFirst.mockReset().mockResolvedValue({
+      id: subjectId,
+      profileId,
+    });
     process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
   });
 
@@ -149,7 +155,7 @@ describe('subjectPrewarmCurriculum', () => {
         status: 'already-generated',
         subjectId,
         bookId,
-      })
+      }),
     );
     expect(generateBookTopicsSpy).not.toHaveBeenCalled();
     expect(persistBookTopicsSpy).not.toHaveBeenCalled();
@@ -166,12 +172,25 @@ describe('subjectPrewarmCurriculum', () => {
 
   it('throws NonRetriableError when the book belongs to a different subject', async () => {
     mockDb.query.curriculumBooks.findFirst.mockResolvedValueOnce(
-      createBook({ subjectId: '550e8400-e29b-41d4-a716-446655440099' })
+      createBook({ subjectId: '550e8400-e29b-41d4-a716-446655440099' }),
     );
 
     await expect(execute(createEventData())).rejects.toThrow(
-      'book-subject-mismatch'
+      'book-subject-mismatch',
     );
+  });
+
+  // Break test (HIGH-1): crafted event with attacker profileId + victim subjectId/bookId
+  // must be rejected before book content is exposed in Inngest run context.
+  it('throws NonRetriableError when the subject does not belong to the profile (IDOR break test)', async () => {
+    mockDb.query.curriculumBooks.findFirst.mockResolvedValueOnce(createBook());
+    mockDb.query.subjects.findFirst.mockResolvedValueOnce(null);
+
+    await expect(
+      execute(
+        createEventData({ profileId: '550e8400-e29b-41d4-a716-446655440099' }),
+      ),
+    ).rejects.toThrow('book-profile-mismatch');
   });
 
   it('generates and persists topics for a pending book', async () => {
@@ -183,12 +202,12 @@ describe('subjectPrewarmCurriculum', () => {
     const { result, step } = await execute(createEventData());
 
     expect(result).toEqual(
-      expect.objectContaining({ status: 'completed', subjectId, bookId })
+      expect.objectContaining({ status: 'completed', subjectId, bookId }),
     );
     expect(generateBookTopicsSpy).toHaveBeenCalledWith(
       'Tea',
       'The tea plant and drink',
-      12
+      12,
     );
     expect(persistBookTopicsSpy).toHaveBeenCalledWith(
       mockDb,
@@ -198,7 +217,7 @@ describe('subjectPrewarmCurriculum', () => {
       expect.arrayContaining([
         expect.objectContaining({ title: 'Tea Plant Basics' }),
       ]),
-      []
+      [],
     );
     expect(step.sendEvent).toHaveBeenCalledWith('emit-topics-generated', {
       name: 'app/book.topics-generated',
@@ -215,7 +234,7 @@ describe('subjectPrewarmCurriculum', () => {
     const { result, step } = await execute(createEventData());
 
     expect(result).toEqual(
-      expect.objectContaining({ status: 'pending', subjectId, bookId })
+      expect.objectContaining({ status: 'pending', subjectId, bookId }),
     );
     expect(generateBookTopicsSpy).not.toHaveBeenCalled();
     expect(persistBookTopicsSpy).not.toHaveBeenCalled();
@@ -235,7 +254,7 @@ describe('subjectPrewarmCurriculum', () => {
     });
 
     await expect(execute(createEventData())).rejects.toThrow(
-      'prewarm-empty-topics'
+      'prewarm-empty-topics',
     );
 
     expect(persistBookTopicsSpy).not.toHaveBeenCalled();

@@ -110,7 +110,7 @@ beforeAll(async () => {
   const databaseUrl = process.env['DATABASE_URL'];
   if (!databaseUrl) {
     throw new Error(
-      'DATABASE_URL is not set for subject-prewarm-curriculum integration tests'
+      'DATABASE_URL is not set for subject-prewarm-curriculum integration tests',
     );
   }
   db = createDatabase(databaseUrl);
@@ -136,6 +136,33 @@ describe('subject-prewarm-curriculum integration', () => {
 
   afterEach(() => {
     routeAndCallSpy.mockRestore();
+  });
+
+  it('rejects a cross-profile event with book-profile-mismatch (IDOR break test)', async () => {
+    const { accountId: acctA } = await seedAccount();
+    const { profileId: profileIdA } = await seedProfile(acctA);
+
+    const { accountId: acctB } = await seedAccount();
+    const { profileId: profileIdB } = await seedProfile(acctB);
+    const { subjectId: subjectIdB } = await seedSubject(profileIdB);
+    const { bookId: bookIdB } = await seedFocusedBook(subjectIdB);
+
+    const step = makeStep();
+
+    await expect(
+      getHandler()({
+        event: {
+          data: {
+            version: 1,
+            profileId: profileIdA,
+            subjectId: subjectIdB,
+            bookId: bookIdB,
+            timestamp: new Date().toISOString(),
+          },
+        },
+        step,
+      }),
+    ).rejects.toThrow('book-profile-mismatch');
   });
 
   it('persists topics and marks the focused book generated', async () => {

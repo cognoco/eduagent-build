@@ -34,10 +34,6 @@ const EXEMPT_PREFIXES = [
   '/v1/inngest',
   '/v1/__test/',
   '/v1/maintenance/',
-  // Outbox spillover is a durability safety-net — failed messages must be
-  // escalatable even when a profile's consent is pending or withdrawn.
-  // Blocking this path would lose irrecoverable user data in the outbox.
-  '/v1/support/',
 ];
 
 function isExempt(path: string): boolean {
@@ -60,20 +56,20 @@ export const consentMiddleware = createMiddleware<ConsentEnv>(
       return;
     }
 
-    // Exempt paths always pass through — except /v1/support/ for
-    // WITHDRAWN profiles: they have no active sessions so there is
-    // nothing to spill over. GDPR Art. 7(3) forbids new data
-    // processing after consent withdrawal.
     if (isExempt(c.req.path)) {
-      if (
-        c.req.path.startsWith('/v1/support/') &&
-        meta.consentStatus === 'WITHDRAWN'
-      ) {
-        // Fall through to the WITHDRAWN block below
-      } else {
-        await next();
-        return;
-      }
+      await next();
+      return;
+    }
+
+    // /v1/support/ (outbox) is exempt for all non-WITHDRAWN consent states —
+    // failed messages must be escalatable when consent is pending.
+    // GDPR Art. 7(3) forbids new data processing after withdrawal.
+    if (
+      c.req.path.startsWith('/v1/support/') &&
+      meta.consentStatus !== 'WITHDRAWN'
+    ) {
+      await next();
+      return;
     }
 
     // Check if consent is required for this profile's age (GDPR-everywhere)

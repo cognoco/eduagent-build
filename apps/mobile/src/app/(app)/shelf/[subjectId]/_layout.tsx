@@ -13,6 +13,7 @@ export default function SubjectShelfLayout() {
   const colors = useThemeColors();
   return (
     <Stack
+      initialRouteName="index"
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: colors.background },

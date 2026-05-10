@@ -59,7 +59,7 @@ export function ShelfRow({
           }
         : null;
 
-  const isUnstarted = bookCount === 0 && topicProgress === '0/0';
+  const isUnstarted = bookCount === 0;
   const subtitle = isUnstarted
     ? t('library.row.shelfSubtitleUnstarted')
     : t('library.row.shelfSubtitle', {

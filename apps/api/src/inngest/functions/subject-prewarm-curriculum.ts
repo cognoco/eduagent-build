@@ -1,6 +1,6 @@
 import { NonRetriableError } from 'inngest';
 import { eq, and } from 'drizzle-orm';
-import { curriculumBooks, type Database } from '@eduagent/database';
+import { curriculumBooks, subjects, type Database } from '@eduagent/database';
 import { subjectCurriculumPrewarmRequestedEventSchema } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
@@ -29,8 +29,9 @@ type PrewarmContext =
 
 async function loadBook(
   db: Database,
+  profileId: string,
   subjectId: string,
-  bookId: string
+  bookId: string,
 ): Promise<typeof curriculumBooks.$inferSelect> {
   const book = await db.query.curriculumBooks.findFirst({
     where: eq(curriculumBooks.id, bookId),
@@ -40,6 +41,12 @@ async function loadBook(
   }
   if (book.subjectId !== subjectId) {
     throw new NonRetriableError('book-subject-mismatch');
+  }
+  const subject = await db.query.subjects.findFirst({
+    where: and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
+  });
+  if (!subject) {
+    throw new NonRetriableError('book-profile-mismatch');
   }
   return book;
 }
@@ -55,7 +62,7 @@ export const subjectPrewarmCurriculum = inngest.createFunction(
   { event: 'app/subject.curriculum-prewarm-requested' },
   async ({ event, step }) => {
     const parsed = subjectCurriculumPrewarmRequestedEventSchema.safeParse(
-      event.data
+      event.data,
     );
     if (!parsed.success) {
       throw new NonRetriableError('invalid-subject-prewarm-payload');
@@ -66,7 +73,7 @@ export const subjectPrewarmCurriculum = inngest.createFunction(
       'load-prewarm-context',
       async (): Promise<PrewarmContext> => {
         const db = getStepDatabase();
-        const book = await loadBook(db, subjectId, bookId);
+        const book = await loadBook(db, profileId, subjectId, bookId);
         if (book.topicsGenerated) {
           return {
             status: 'already-generated',
@@ -86,7 +93,7 @@ export const subjectPrewarmCurriculum = inngest.createFunction(
           bookDescription: book.description ?? '',
           learnerAge: await getProfileAge(db, profileId),
         };
-      }
+      },
     );
 
     const generated = await step.run(
@@ -97,7 +104,7 @@ export const subjectPrewarmCurriculum = inngest.createFunction(
         }
 
         const db = getStepDatabase();
-        const book = await loadBook(db, subjectId, bookId);
+        const book = await loadBook(db, profileId, subjectId, bookId);
         if (book.topicsGenerated) {
           return false;
         }
@@ -105,7 +112,7 @@ export const subjectPrewarmCurriculum = inngest.createFunction(
         const result = await generateBookTopics(
           context.bookTitle,
           context.bookDescription,
-          context.learnerAge
+          context.learnerAge,
         );
         if (result.topics.length === 0) {
           const err = new NonRetriableError('prewarm-empty-topics');
@@ -128,10 +135,10 @@ export const subjectPrewarmCurriculum = inngest.createFunction(
           subjectId,
           bookId,
           result.topics,
-          result.connections
+          result.connections,
         );
         return true;
-      }
+      },
     );
 
     const shouldEmit = await step.run('confirm-topics-generated', async () => {
@@ -139,7 +146,7 @@ export const subjectPrewarmCurriculum = inngest.createFunction(
       const book = await db.query.curriculumBooks.findFirst({
         where: and(
           eq(curriculumBooks.id, bookId),
-          eq(curriculumBooks.subjectId, subjectId)
+          eq(curriculumBooks.subjectId, subjectId),
         ),
       });
       return book?.topicsGenerated === true;
@@ -158,5 +165,5 @@ export const subjectPrewarmCurriculum = inngest.createFunction(
       bookId,
       timestamp: new Date().toISOString(),
     };
-  }
+  },
 );

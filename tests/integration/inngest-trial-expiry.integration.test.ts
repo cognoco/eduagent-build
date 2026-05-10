@@ -9,7 +9,7 @@
  * - Expo Push API (mockExpoPush)
  */
 
-import { and, eq, gte, lte } from 'drizzle-orm';
+import { and, eq, gte, inArray, lte } from 'drizzle-orm';
 import {
   accounts,
   notificationPreferences,
@@ -182,15 +182,29 @@ beforeEach(async () => {
   const dayEnd = new Date(
     targetDate.toISOString().slice(0, 10) + 'T23:59:59.999Z',
   );
-  await db
-    .delete(subscriptions)
+  const testAccounts = await db
+    .select({ id: accounts.id })
+    .from(accounts)
     .where(
+      inArray(accounts.clerkUserId, [
+        JUST_EXPIRED_USER_ID,
+        EXTENDED_USER_ID,
+        WARNING_USER_ID,
+      ]),
+    );
+  if (testAccounts.length > 0) {
+    await db.delete(subscriptions).where(
       and(
+        inArray(
+          subscriptions.accountId,
+          testAccounts.map((a) => a.id),
+        ),
         eq(subscriptions.status, 'expired'),
         gte(subscriptions.trialEndsAt, dayStart),
         lte(subscriptions.trialEndsAt, dayEnd),
       ),
     );
+  }
 });
 
 afterAll(async () => {

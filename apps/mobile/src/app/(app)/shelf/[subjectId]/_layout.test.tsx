@@ -12,9 +12,19 @@ interface ScreenProps {
 }
 
 const capturedScreens: ScreenProps[] = [];
+let capturedStackProps: { initialRouteName?: string } | null = null;
 
 jest.mock('expo-router', () => {
-  const MockStack = ({ children }: { children?: React.ReactNode }) => children;
+  const MockStack = ({
+    children,
+    ...props
+  }: {
+    children?: React.ReactNode;
+    initialRouteName?: string;
+  }) => {
+    capturedStackProps = props;
+    return children;
+  };
   MockStack.Screen = (props: ScreenProps) => {
     capturedScreens.push(props);
     return null;
@@ -29,6 +39,7 @@ jest.mock('expo-router', () => {
 describe('shelf/[subjectId]/_layout.tsx', () => {
   beforeEach(() => {
     capturedScreens.length = 0;
+    capturedStackProps = null;
   });
 
   it('declares a Stack.Screen for book/[bookId] with getId', () => {
@@ -66,5 +77,11 @@ describe('shelf/[subjectId]/_layout.tsx', () => {
   // to the shelf instead of falling through to the Tabs first-route.
   it('exports unstable_settings.initialRouteName = "index"', () => {
     expect(unstable_settings).toEqual({ initialRouteName: 'index' });
+  });
+
+  it('sets Stack initialRouteName = "index"', () => {
+    render(<SubjectShelfLayout />);
+
+    expect(capturedStackProps?.initialRouteName).toBe('index');
   });
 });
