@@ -49,7 +49,7 @@ export type ProfileScopeEnv = {
     db: Database;
     account: Account;
     profileId: string | undefined;
-    profileMeta: ProfileMeta;
+    profileMeta: ProfileMeta | undefined;
   };
 };
 
@@ -76,7 +76,7 @@ export function requireProfileId(profileId: string | undefined): string {
  *   `const account = requireAccount(c.get('account'));`
  */
 export function requireAccount<T extends { id: string }>(
-  account: T | undefined
+  account: T | undefined,
 ): T {
   if (!account) {
     throw new HTTPException(401, {
@@ -152,7 +152,7 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
           code: 'UNAUTHORIZED',
           message: 'Authentication required to use X-Profile-Id',
         },
-        401
+        401,
       );
     }
     const profile = await getProfile(db, profileIdHeader, account.id);
@@ -170,5 +170,5 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
     });
     await next();
     return;
-  }
+  },
 );

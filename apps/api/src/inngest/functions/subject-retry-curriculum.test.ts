@@ -8,22 +8,27 @@ const mockGetProfileAge = jest.fn();
 const mockCaptureException = jest.fn();
 
 jest.mock('../helpers', () => ({
+  // gc1-allow: Inngest step runtime requires mocking helper abstractions
   getStepDatabase: () => mockGetStepDatabase(),
 }));
 
 jest.mock('../../services/book-generation', () => ({
+  // gc1-allow: Inngest step runtime requires mocking service abstractions
   generateBookTopics: (...args: unknown[]) => mockGenerateBookTopics(...args),
 }));
 
 jest.mock('../../services/curriculum', () => ({
+  // gc1-allow: Inngest step runtime requires mocking service abstractions
   persistBookTopics: (...args: unknown[]) => mockPersistBookTopics(...args),
 }));
 
 jest.mock('../../services/profile', () => ({
+  // gc1-allow: Inngest step runtime requires mocking service abstractions
   getProfileAge: (...args: unknown[]) => mockGetProfileAge(...args),
 }));
 
 jest.mock('../../services/sentry', () => ({
+  // gc1-allow: Inngest step runtime requires mocking service abstractions
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 

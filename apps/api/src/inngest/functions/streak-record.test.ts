@@ -5,10 +5,12 @@ const mockGetStepDatabase = jest.fn();
 const mockRecordSessionActivity = jest.fn();
 
 jest.mock('../helpers', () => ({
+  // gc1-allow: Inngest step runtime requires mocking helper abstractions
   getStepDatabase: () => mockGetStepDatabase(),
 }));
 
 jest.mock('../../services/streaks', () => ({
+  // gc1-allow: Inngest step runtime requires mocking service abstractions
   recordSessionActivity: (...args: unknown[]) =>
     mockRecordSessionActivity(...args),
 }));

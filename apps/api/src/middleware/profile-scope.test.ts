@@ -183,6 +183,19 @@ describe('profileScopeMiddleware', () => {
     errorSpy.mockRestore();
   });
 
+  it('leaves profileMeta unset when findOwnerProfile returns null (new account) [BUG-TEMP-28]', async () => {
+    const { findOwnerProfile } = jest.requireMock('../services/profile');
+    findOwnerProfile.mockResolvedValueOnce(null);
+
+    const app = createApp();
+    const res = await app.request('/test');
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.profileId).toBeNull();
+    expect(body.profileMeta).toBeNull();
+  });
+
   it('skips auto-resolution and calls next when db or account is missing', async () => {
     const app = new Hono();
     // Do NOT set db or account — simulate no prior middleware

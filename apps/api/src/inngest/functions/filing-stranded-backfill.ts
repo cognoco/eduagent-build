@@ -40,6 +40,7 @@ export const filingStrandedBackfill = inngest.createFunction(
   {
     id: 'filing-stranded-backfill',
     name: 'One-shot backfill of stranded filing sessions',
+    concurrency: { key: '"filing-stranded-backfill"', limit: 1 },
   },
   { event: 'app/maintenance.filing_stranded_backfill' },
   async ({ event, step }) => {
@@ -63,8 +64,8 @@ export const filingStrandedBackfill = inngest.createFunction(
             gt(learningSessions.createdAt, new Date(cursor.lastCreatedAt)),
             and(
               eq(learningSessions.createdAt, new Date(cursor.lastCreatedAt)),
-              gt(learningSessions.id, cursor.lastId)
-            )
+              gt(learningSessions.id, cursor.lastId),
+            ),
           )
         : undefined;
 
@@ -76,7 +77,7 @@ export const filingStrandedBackfill = inngest.createFunction(
           inArray(learningSessions.sessionType, ['learning', 'homework']),
           inArray(learningSessions.status, ['completed', 'auto_closed']),
           gte(learningSessions.createdAt, cutoff),
-          cursorFilter
+          cursorFilter,
         ),
         columns: {
           id: true,
@@ -152,5 +153,5 @@ export const filingStrandedBackfill = inngest.createFunction(
     }
 
     return { dispatched: stranded.length, capped, selfReinvoked };
-  }
+  },
 );

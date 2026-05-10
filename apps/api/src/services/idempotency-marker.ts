@@ -15,7 +15,7 @@ export type IdempotencyFlow = 'session';
 export function buildIdempotencyCacheKey(
   profileId: string,
   flow: IdempotencyFlow,
-  key: string
+  key: string,
 ): string {
   return `idem:${profileId}:${flow}:${key}`;
 }
@@ -35,7 +35,7 @@ export async function markPersisted(params: {
     addBreadcrumb(
       'idempotency mark skipped: profile missing',
       'idempotency',
-      'warning'
+      'warning',
     );
     logger.warn('[idempotency] mark skipped: profile missing', {
       event: 'idempotency.mark_skipped_no_profile',
@@ -48,7 +48,7 @@ export async function markPersisted(params: {
     addBreadcrumb(
       'idempotency mark skipped: binding missing',
       'idempotency',
-      'warning'
+      'warning',
     );
     logger.warn('[idempotency] mark skipped: KV binding missing', {
       event: 'idempotency.mark_skipped_no_binding',
@@ -83,6 +83,8 @@ export async function markPersisted(params: {
         name: 'app/idempotency.mark_failed',
         data: { profileId, flow },
       })
-      .catch(Function.prototype as () => void);
+      .catch(() => {
+        // Fire-and-forget: best-effort event; failure is non-fatal.
+      });
   }
 }

@@ -17,7 +17,7 @@ type ConsentEnv = {
     db: Database;
     account: Account;
     profileId: string;
-    profileMeta: ProfileMeta;
+    profileMeta: ProfileMeta | undefined;
   };
 };
 
