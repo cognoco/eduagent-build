@@ -39,12 +39,35 @@ describe('session-recovery', () => {
     );
   });
 
-  it('rejects legacy unscoped markers that do not carry the active profile id', async () => {
+  it('rejects unscoped legacy markers and clears the legacy key', async () => {
+    // Shared-device protection: an unscoped legacy marker (no profileId
+    // field) could belong to any prior profile, so it must NOT be claimed
+    // by the currently active profile. The unscoped key is also deleted so
+    // the rejection path only fires once per device.
     mockGet.mockImplementation(async (key: string) => {
       if (key === 'session-recovery-marker-profile-2') return null;
       if (key === 'session-recovery-marker') {
         return JSON.stringify({
           sessionId: 'session-from-another-profile',
+          updatedAt: new Date().toISOString(),
+        });
+      }
+      return null;
+    });
+
+    await expect(readSessionRecoveryMarker('profile-2')).resolves.toBeNull();
+    expect(mockSet).not.toHaveBeenCalled();
+    expect(mockDelete).toHaveBeenCalledWith('session-recovery-marker');
+  });
+
+  it('rejects a scoped marker belonging to a different profile', async () => {
+    // A marker that explicitly carries a different profileId is rejected
+    // (cross-profile contamination guard).
+    mockGet.mockImplementation(async (key: string) => {
+      if (key === 'session-recovery-marker-profile-2') {
+        return JSON.stringify({
+          sessionId: 'session-from-profile-1',
+          profileId: 'profile-1',
           updatedAt: new Date().toISOString(),
         });
       }

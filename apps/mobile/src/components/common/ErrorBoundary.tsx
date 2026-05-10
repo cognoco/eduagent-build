@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { ScrollView, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ErrorFallback } from './ErrorFallback';
@@ -25,37 +26,68 @@ interface ErrorBoundaryState {
  * values, which is acceptable for this rarely-seen crash screen.
  */
 function ErrorFallbackView({
+  error,
+  componentStack,
   onRetry,
   onGoHome,
 }: {
+  error: Error | null;
+  componentStack: string | null;
   onRetry: () => void;
   onGoHome: () => void;
 }): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
+  const debugBody = error
+    ? `${error.name ?? 'Error'}: ${error.message ?? '(no message)'}\n\n` +
+      `STACK:\n${error.stack ?? '(no stack)'}\n\n` +
+      `COMPONENT STACK:${componentStack ?? '\n(no component stack)'}`
+    : '(no error captured)';
+
   return (
-    <ErrorFallback
-      variant="centered"
-      title={t('errorBoundary.title')}
-      message={t('errorBoundary.message')}
-      primaryAction={{
-        label: t('recovery.tryAgain'),
-        onPress: onRetry,
-        testID: 'error-boundary-retry',
-      }}
-      secondaryAction={{
-        label: t('recovery.goHome'),
-        onPress: () => {
-          // Reset the boundary BEFORE navigating — otherwise hasError stays
-          // true and the fallback renders over whatever Home resolves to,
-          // making the button appear to do nothing.
-          onGoHome();
-          router.replace('/(app)/home' as never);
-        },
-        testID: 'error-boundary-go-home',
-      }}
-      testID="error-boundary-fallback"
-    />
+    <ScrollView
+      className="flex-1 bg-background"
+      contentContainerStyle={{ flexGrow: 1, padding: 16 }}
+      testID="error-boundary-scroll"
+    >
+      <ErrorFallback
+        variant="centered"
+        title={t('errorBoundary.title')}
+        message={t('errorBoundary.message')}
+        primaryAction={{
+          label: t('recovery.tryAgain'),
+          onPress: onRetry,
+          testID: 'error-boundary-retry',
+        }}
+        secondaryAction={{
+          label: t('recovery.goHome'),
+          onPress: () => {
+            // Reset the boundary BEFORE navigating — otherwise hasError stays
+            // true and the fallback renders over whatever Home resolves to,
+            // making the button appear to do nothing.
+            onGoHome();
+            router.replace('/(app)/home' as never);
+          },
+          testID: 'error-boundary-go-home',
+        }}
+        testID="error-boundary-fallback"
+      />
+      <View
+        className="mt-6 mx-4 rounded-card border border-border bg-surface p-4"
+        testID="error-boundary-debug"
+      >
+        <Text className="text-caption font-bold uppercase text-text-secondary mb-2">
+          Debug details (screenshot this)
+        </Text>
+        <Text
+          selectable
+          className="text-body-sm text-text-primary"
+          style={{ fontFamily: 'monospace' }}
+        >
+          {debugBody}
+        </Text>
+      </View>
+    </ScrollView>
   );
 }
 
@@ -79,7 +111,7 @@ export class ErrorBoundary extends Component<
       '\nStack:',
       error.stack,
       '\nComponent stack:',
-      errorInfo.componentStack
+      errorInfo.componentStack,
     );
     this.setState({ componentStack: errorInfo.componentStack ?? null });
     Sentry.captureException(error, {
@@ -95,6 +127,8 @@ export class ErrorBoundary extends Component<
     if (this.state.hasError) {
       return (
         <ErrorFallbackView
+          error={this.state.error}
+          componentStack={this.state.componentStack}
           onRetry={this.handleRetry}
           onGoHome={this.handleRetry}
         />

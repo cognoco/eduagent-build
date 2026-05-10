@@ -29,7 +29,7 @@ tags:
     env:
       SEED_SCENARIO: "parent-session-with-recap"
 
-# 2. Parent owners land on ParentGateway; enter the Family dashboard.
+# 2. Parent owners land on LearnerScreen; enter the Family dashboard.
 - runFlow:
     file: ../_setup/open-family-dashboard.yaml
 

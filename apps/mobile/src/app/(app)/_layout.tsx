@@ -39,7 +39,6 @@ import { ErrorFallback, GateContent } from '../../components/common';
 import { goBackOrReplace } from '../../lib/navigation';
 import { useSubjects } from '../../hooks/use-subjects';
 import { useParentProxy } from '../../hooks/use-parent-proxy';
-import { useFamilyPresence } from '../../hooks/use-family-presence';
 import {
   useActiveProfileRole,
   type ActiveProfileRole,
@@ -61,6 +60,9 @@ export function computeVisibleTabs(
   role: ActiveProfileRole | null = 'owner',
 ): Set<string> {
   const next = new Set<string>(BASE_VISIBLE_TABS);
+  // Family tab is only meaningful for an owner who has at least one linked
+  // child; solo adults have nothing to manage there. The Add-child entry
+  // for solo adults lives under More.
   if (hasFamily && role === 'owner') next.add('family');
   return next;
 }
@@ -1268,6 +1270,7 @@ export default function AppLayout() {
   const pathname = usePathname();
   const currentAppPath = toInternalAppRedirectPath(pathname);
   const {
+    profiles,
     activeProfile,
     isLoading: isProfileLoading,
     profileLoadError,
@@ -1277,8 +1280,17 @@ export default function AppLayout() {
   } = useProfile();
   useMentorLanguageSync();
   const { isParentProxy, childProfile, parentProfile } = useParentProxy();
-  const { hasFamily } = useFamilyPresence();
   const role = useActiveProfileRole();
+  // hasFamily: the active profile is an owner AND at least one *other*
+  // (non-owner) profile is linked to the account. Solo adults are owners
+  // with no linked children → Family tab hidden, Add-child entry lives in
+  // More instead.
+  const hasFamily = React.useMemo(
+    () =>
+      activeProfile?.isOwner === true &&
+      profiles.some((p) => p.id !== activeProfile.id && !p.isOwner),
+    [activeProfile?.id, activeProfile?.isOwner, profiles],
+  );
   const visibleTabs = React.useMemo(
     () => computeVisibleTabs(hasFamily, role),
     [hasFamily, role],
@@ -1526,7 +1538,7 @@ export default function AppLayout() {
   }
 
   // Linked-parent accounts intentionally enter through /(app)/home now.
-  // home.tsx renders ParentGateway for owners with child profiles and routes
+  // home.tsx renders LearnerScreen for owners with child profiles and routes
   // them to /(app)/family only when they explicitly choose progress
   // management. That keeps the adaptive home flow reachable.
 

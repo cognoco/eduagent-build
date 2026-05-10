@@ -10,5 +10,4 @@ test('J-01 seeded learner lands on learner home @smoke', async ({ page }) => {
   await expect(page.getByTestId('home-action-study-new')).toBeVisible();
   await expect(page.getByTestId('home-action-homework')).toBeVisible();
   await expect(page.getByTestId('home-action-practice')).toBeVisible();
-  await expect(page.getByTestId('parent-gateway')).toHaveCount(0);
 });

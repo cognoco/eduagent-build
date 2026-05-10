@@ -344,6 +344,9 @@ function createSnapshotDb({
           .fn()
           .mockResolvedValue({ id: profileId, birthYear: 2012 }),
       },
+      learningProfiles: {
+        findFirst: jest.fn().mockResolvedValue({ struggles: [] }),
+      },
     },
     insert: jest.fn().mockReturnValue({
       values: jest.fn().mockReturnValue({
@@ -415,6 +418,9 @@ function createMilestonesDb({
         findFirst: jest
           .fn()
           .mockResolvedValue({ id: profileId, birthYear: 2012 }),
+      },
+      learningProfiles: {
+        findFirst: jest.fn().mockResolvedValue({ struggles: [] }),
       },
     },
     insert: jest.fn().mockReturnValue({
@@ -682,6 +688,38 @@ describe('buildKnowledgeInventory', () => {
     expect(result.global.weeklyDeltaTopicsMastered).toBe(3);
     expect(result.global.weeklyDeltaVocabularyTotal).toBe(4);
     expect(result.global.weeklyDeltaTopicsExplored).toBe(3);
+    expect(result.currentlyWorkingOn).toEqual([]);
+    expect(result.thisWeekMini).toEqual({
+      sessions: 0,
+      wordsLearned: 4,
+      topicsTouched: 3,
+    });
+  });
+
+  it('includes currently working on entries from the learning profile', async () => {
+    const latest = makeSnapshotRow({
+      snapshotDate: TODAY,
+      metrics: makeMetrics({ totalSessions: 2 }),
+    });
+    const db = createSnapshotDb({ findFirst: latest, findMany: [latest] });
+    (
+      db.query as Record<string, { findFirst: jest.Mock }>
+    ).learningProfiles.findFirst.mockResolvedValue({
+      profileId,
+      struggles: [
+        {
+          subject: 'Math',
+          topic: 'struggling with fractions',
+          lastSeen: new Date().toISOString(),
+          attempts: 2,
+          confidence: 'medium',
+        },
+      ],
+    });
+
+    const result = await buildKnowledgeInventory(db, profileId);
+
+    expect(result.currentlyWorkingOn).toEqual(['fractions']);
   });
 });
 

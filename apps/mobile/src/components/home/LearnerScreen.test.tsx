@@ -29,6 +29,11 @@ const mockFetch = createRoutedMockFetch({
     totalTopicsCompleted: 0,
     totalTopicsVerified: 0,
   },
+  '/dashboard': {
+    children: [],
+    pendingNotices: [],
+    demoMode: false,
+  },
   '/subjects': { subjects: [] },
   '/usage': {
     usage: {
@@ -170,6 +175,11 @@ describe('LearnerScreen', () => {
       totalTopicsCompleted: 0,
       totalTopicsVerified: 0,
     });
+    mockFetch.setRoute('/dashboard', {
+      children: [],
+      pendingNotices: [],
+      demoMode: false,
+    });
     mockFetch.setRoute('/subjects', { subjects: [] });
     mockFetch.setRoute('/usage', {
       usage: {
@@ -225,6 +235,65 @@ describe('LearnerScreen', () => {
 
     await waitFor(() => {
       screen.getByText(/7 questions left today.*84 left this month/);
+    });
+  });
+
+  it('shows child card and hides quota line for owner with linked children', async () => {
+    mockFetch.setRoute('/dashboard', {
+      children: [
+        {
+          profileId: 'child-id',
+          displayName: 'Emma',
+          consentStatus: null,
+          respondedAt: null,
+          summary: 'Emma: steady progress.',
+          sessionsThisWeek: 2,
+          sessionsLastWeek: 1,
+          totalTimeThisWeek: 24,
+          totalTimeLastWeek: 12,
+          exchangesThisWeek: 8,
+          exchangesLastWeek: 4,
+          trend: 'up',
+          subjects: [],
+          guidedVsImmediateRatio: 0,
+          retentionTrend: 'stable',
+          totalSessions: 4,
+          weeklyHeadline: {
+            label: 'Words learned',
+            value: 12,
+            comparison: 'up from 5 last week',
+          },
+          currentlyWorkingOn: [],
+          progress: null,
+          currentStreak: 0,
+          longestStreak: 0,
+          totalXp: 0,
+        },
+      ],
+      pendingNotices: [],
+      demoMode: false,
+    });
+
+    render(
+      <LearnerScreen
+        profiles={[
+          { id: 'owner-id', displayName: 'Parent', isOwner: true },
+          { id: 'child-id', displayName: 'Emma', isOwner: false },
+        ]}
+        activeProfile={{
+          id: 'owner-id',
+          displayName: 'Parent',
+          isOwner: true,
+        }}
+      />,
+      { wrapper: Wrapper },
+    );
+
+    await waitFor(() => {
+      screen.getByTestId('home-child-card');
+      screen.getByText('Emma');
+      screen.getByText('12 words learned — up from 5 last week');
+      expect(screen.queryByText(/questions left today/)).toBeNull();
     });
   });
 
@@ -496,19 +565,7 @@ describe('LearnerScreen', () => {
     });
   });
 
-  it('shows back button when onBack is provided', async () => {
-    const onBack = jest.fn();
-
-    render(<LearnerScreen {...defaultProps} onBack={onBack} />, {
-      wrapper: Wrapper,
-    });
-
-    await waitFor(() => screen.getByTestId('learner-back'));
-    fireEvent.press(screen.getByTestId('learner-back'));
-    expect(onBack).toHaveBeenCalledTimes(1);
-  });
-
-  it('hides back button when onBack is not provided', async () => {
+  it('does not render a gateway back button', async () => {
     render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
 
     await waitFor(() => screen.getByTestId('home-action-study-new'));
@@ -637,6 +694,48 @@ describe('LearnerScreen', () => {
     await waitFor(() => screen.getByTestId('home-add-first-subject'));
     fireEvent.press(screen.getByTestId('home-add-first-subject'));
     expect(mockPush).toHaveBeenCalledWith('/create-subject');
+  });
+
+  it('shows withdrawal-countdown-banner when a child has withdrawn consent within the grace period', async () => {
+    const respondedAt = new Date(
+      Date.now() - 2 * 24 * 60 * 60 * 1000,
+    ).toISOString();
+    mockFetch.setRoute('/dashboard', {
+      children: [
+        {
+          profileId: 'child-id',
+          displayName: 'Emma',
+          consentStatus: 'WITHDRAWN',
+          respondedAt,
+          summary: '',
+          sessionsThisWeek: 0,
+          sessionsLastWeek: 0,
+          totalTimeThisWeek: 0,
+          totalTimeLastWeek: 0,
+          exchangesThisWeek: 0,
+          exchangesLastWeek: 0,
+          trend: 'stable',
+          subjects: [],
+          guidedVsImmediateRatio: 0,
+          retentionTrend: 'stable',
+          totalSessions: 0,
+          weeklyHeadline: null,
+          currentlyWorkingOn: [],
+          progress: null,
+          currentStreak: 0,
+          longestStreak: 0,
+          totalXp: 0,
+        },
+      ],
+      pendingNotices: [],
+      demoMode: false,
+    });
+
+    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      screen.getByTestId('withdrawal-countdown-banner');
+    });
   });
 
   it('navigates to create-subject on carousel New subject tile', async () => {

@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { View, ActivityIndicator, Text, Pressable } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { ParentGateway, LearnerScreen } from '../../components/home';
+import { LearnerScreen } from '../../components/home';
 import { useCelebration } from '../../hooks/use-celebration';
 import {
   useMarkCelebrationsSeen,
@@ -13,23 +13,9 @@ import { useLearnerProfile } from '../../hooks/use-learner-profile';
 import { useAckNotice, useDashboard } from '../../hooks/use-dashboard';
 import { useProfile } from '../../lib/profile';
 
-/** True when the active user is the account owner AND has at least one child profile. */
-function hasLinkedChildren(
-  activeProfile: { id: string; isOwner: boolean } | null,
-  profiles: ReadonlyArray<{ id: string; isOwner: boolean }>,
-): boolean {
-  return (
-    activeProfile?.isOwner === true &&
-    profiles.some(
-      (profile) => profile.id !== activeProfile.id && !profile.isOwner,
-    )
-  );
-}
-
 export default function HomeScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
-  const { view } = useLocalSearchParams<{ view?: string }>();
   const { profiles, activeProfile, isLoading } = useProfile();
   const { data: celebrationLevel = 'all' } = useCelebrationLevel();
   const { data: learnerProfile } = useLearnerProfile();
@@ -59,8 +45,6 @@ export default function HomeScreen(): React.ReactElement {
 
   // BUG-306: Add timeout so the loading spinner doesn't hang forever
   const [loadingTimedOut, setLoadingTimedOut] = useState(false);
-  const isParentGatewayEligible = hasLinkedChildren(activeProfile, profiles);
-  const [showLearnerView, setShowLearnerView] = useState(false);
   const firstNotice = isOwner ? dashboard?.pendingNotices?.[0] : undefined;
   const [visibleNoticeId, setVisibleNoticeId] = useState<string | null>(null);
 
@@ -79,17 +63,6 @@ export default function HomeScreen(): React.ReactElement {
     return () => clearTimeout(timer);
   }, [isLoading]);
 
-  // Reset learner view when profile changes (parent switches back to their own profile)
-  useEffect(() => {
-    setShowLearnerView(false);
-  }, [activeProfile?.id]);
-
-  useEffect(() => {
-    if (view === 'learner' && isParentGatewayEligible) {
-      setShowLearnerView(true);
-    }
-  }, [isParentGatewayEligible, view]);
-
   useEffect(() => {
     if (!firstNotice || visibleNoticeId !== firstNotice.id) return;
     const timer = setTimeout(() => {
@@ -99,8 +72,7 @@ export default function HomeScreen(): React.ReactElement {
     return () => clearTimeout(timer);
   }, [ackNotice, firstNotice, visibleNoticeId]);
 
-  // Neutral placeholder while profiles load — prevents flash of wrong content
-  // (e.g. parent briefly seeing LearnerScreen before ParentGateway renders).
+  // Neutral placeholder while profiles load — prevents flash of wrong content.
   if (isLoading && !loadingTimedOut) {
     return (
       <View className="flex-1 bg-background items-center justify-center">
@@ -156,26 +128,9 @@ export default function HomeScreen(): React.ReactElement {
     );
   }
 
-  const showParentGateway = isParentGatewayEligible && !showLearnerView;
-
   return (
     <View className="flex-1">
-      {showParentGateway ? (
-        <ParentGateway
-          activeProfile={activeProfile}
-          onLearn={() => setShowLearnerView(true)}
-        />
-      ) : (
-        <LearnerScreen
-          profiles={profiles}
-          activeProfile={activeProfile}
-          onBack={
-            isParentGatewayEligible
-              ? () => setShowLearnerView(false)
-              : undefined
-          }
-        />
-      )}
+      <LearnerScreen profiles={profiles} activeProfile={activeProfile} />
       {CelebrationOverlay}
       {firstNotice && visibleNoticeId === firstNotice.id ? (
         <View

@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { readSeedData } from '../../helpers/seed-data';
 import { waitForScreenDismissingPostApproval } from '../../helpers/post-approval';
 
-test('J-06 child switches back to parent profile → parent gateway', async ({
+test('J-06 child switches back to parent profile → learner screen', async ({
   page,
 }) => {
   const seed = await readSeedData('owner-with-children');
@@ -27,9 +27,8 @@ test('J-06 child switches back to parent profile → parent gateway', async ({
   });
   await page.getByTestId('proxy-banner-switch-back').click();
 
-  // Parent gateway is back
-  await expect(page.getByTestId('parent-gateway')).toBeVisible({
+  // Learner screen is back
+  await expect(page.getByTestId('learner-screen')).toBeVisible({
     timeout: 30_000,
   });
-  await expect(page.getByTestId('learner-screen')).toHaveCount(0);
 });

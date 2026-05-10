@@ -1,14 +1,13 @@
 # Open the Family dashboard from the current parent landing surface.
 #
-# Parent owners now land on ParentGateway (id: parent-gateway) after sign-in.
+# Parent owners now land on LearnerScreen (id: learner-screen) after sign-in.
 # Flows that inspect child progress/cards must explicitly enter the Family
 # dashboard before asserting dashboard content.
 appId: com.mentomate.app
 ---
 # Preferred path from the parent Home gateway.
 - tapOn:
-    id: "gateway-check-progress"
-    optional: true
+    id: "home-child-card"
 
 # Fallback path when the tab bar is already available and the gateway card was
 # not present or did not handle the tap.

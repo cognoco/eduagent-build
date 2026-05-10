@@ -137,20 +137,14 @@
         }
       }
     },
-    "parentGateway": {
-      "seeHowTheyAreDoing": "Se hvordan det går med dem",
-      "practicedThisWeek": "{{name}} har øvd i {{minutes}} min denne uken",
-      "notPracticedThisWeek": "{{name}} har ikke øvd denne uken",
-      "checkProgress": "Sjekk barnets fremgang",
-      "learnSomething": "Lær noe",
-      "dashboardError": "Vi kunne ikke laste dashbordet",
-      "reviewHealth": "Gjennomgå helse"
-    },
     "notices": {
       "consentArchivedTitle": "{{name}}s konto ble arkivert",
       "consentArchivedBody": "Data beholdes i 30 dager og slettes deretter.",
       "consentDeletedTitle": "{{name}}s konto ble slettet",
       "consentDeletedBody": "Angreretten er utløpt."
+    },
+    "childCard": {
+      "title": "Barn"
     }
   },
   "dashboard": {
@@ -1146,7 +1140,9 @@
         "retentionFading": "Verdt en liten oppfriskning.",
         "retentionWeak": "Verdt å komme tilbake til.",
         "growthPrimaryLegend": "Temaer lært",
-        "growthSecondaryLegend": "Ord lagt til"
+        "growthSecondaryLegend": "Ord lagt til",
+        "currentlyWorkingOnTitle": "Det du jobber med akkurat nå",
+        "currentlyWorkingOnDetected": "Oppdaget i de siste øktene dine"
       },
       "adult": {
         "weekTitle": "Ukesrapport",
@@ -1158,7 +1154,35 @@
         "retentionFading": "Begynner å glippe – en rask gjennomgang vil hjelpe.",
         "retentionWeak": "Trenger en rask oppfriskning.",
         "growthPrimaryLegend": "Temaer mestret",
-        "growthSecondaryLegend": "Vokabularvekst"
+        "growthSecondaryLegend": "Vokabularvekst",
+        "currentlyWorkingOnTitle": "Jobber med nå",
+        "currentlyWorkingOnDetected": "Oppdaget i nylige økter"
+      }
+    },
+    "currentlyWorkingOn": {
+      "andNMore": "og {{count}} til"
+    },
+    "weeklyReport": {
+      "thisWeekSoFar": "Denne uken så langt",
+      "mini": {
+        "sessions": "{{count}} økt",
+        "sessions_other": "{{count}} økter",
+        "words": "{{count}} ord",
+        "words_other": "{{count}} ord",
+        "topics": "{{count}} tema berørt",
+        "topics_other": "{{count}} temaer berørt"
+      },
+      "empty": {
+        "child": "Din første ukesoppsummering er på vei.",
+        "adult": "Din første ukesoppsummering kommer etter en hel uke med læring."
+      }
+    },
+    "monthlyReport": {
+      "highlightsTitle": "Høydepunkter",
+      "nextStepsTitle": "Hva nå",
+      "empty": {
+        "child": "Din første månedsoppsummering kommer ved slutten av {{month}}.",
+        "adult": "Din første månedsoppsummering kommer ved slutten av {{month}}."
       }
     },
     "newLearner": {

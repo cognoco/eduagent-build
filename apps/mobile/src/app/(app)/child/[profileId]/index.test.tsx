@@ -70,12 +70,14 @@ jest.mock('../../../../hooks/use-dashboard', () => ({
 const mockUseChildInventory = jest.fn();
 const mockUseChildProgressHistory = jest.fn();
 const mockUseChildReports = jest.fn();
+const mockUseProfileReports = jest.fn();
 
 jest.mock('../../../../hooks/use-progress', () => ({
   useChildInventory: (...args: unknown[]) => mockUseChildInventory(...args),
   useChildProgressHistory: (...args: unknown[]) =>
     mockUseChildProgressHistory(...args),
   useChildReports: (...args: unknown[]) => mockUseChildReports(...args),
+  useProfileReports: (...args: unknown[]) => mockUseProfileReports(...args),
 }));
 
 // ---------------------------------------------------------------------------
@@ -120,12 +122,27 @@ jest.mock('../../../../hooks/use-learner-profile', () => ({
     mockUseUpdateAccommodationMode(...args),
 }));
 
+jest.mock(
+  '../../../../hooks/use-settings' /* gc1-allow: query-hook stub at unit-test boundary; real hooks need QueryClientProvider + API client */,
+  () => ({
+    useChildCelebrationLevel: () => ({ data: 'big_only' }),
+    useUpdateChildCelebrationLevel: () => ({
+      mutate: jest.fn(),
+      isPending: false,
+    }),
+  }),
+);
+
 // ---------------------------------------------------------------------------
 // Progress components (avoid rendering complex chart internals)
 // ---------------------------------------------------------------------------
 
+const mockCurrentlyWorkingOnCard = jest.fn();
+
 jest.mock('../../../../components/progress', () => ({
   GrowthChart: () => null,
+  CurrentlyWorkingOnCard: (...args: unknown[]) =>
+    mockCurrentlyWorkingOnCard(...args),
   RecentSessionsList: () => null,
   ReportsListCard: () => null,
   RetentionSignal: () => null,
@@ -170,6 +187,7 @@ function setupDefaultMocks() {
   mockUseChildInventory.mockReturnValue({ data: undefined });
   mockUseChildProgressHistory.mockReturnValue({ data: undefined });
   mockUseChildReports.mockReturnValue({ data: [] });
+  mockUseProfileReports.mockReturnValue({ data: [] });
 
   mockUseChildConsentStatus.mockReturnValue({
     data: { consentStatus: 'CONSENTED', respondedAt: null },
@@ -197,6 +215,7 @@ function setupDefaultMocks() {
     mutate: jest.fn(),
     isPending: false,
   });
+  mockCurrentlyWorkingOnCard.mockReturnValue(null);
 }
 
 // ---------------------------------------------------------------------------
@@ -302,6 +321,139 @@ describe('ChildDetailScreen — accommodation guide', () => {
 
     fireEvent.press(screen.getByTestId('accommodation-guide-toggle'));
     expect(screen.queryByTestId('accommodation-guide-content')).toBeNull();
+  });
+});
+
+describe('ChildDetailScreen — new sections', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setupDefaultMocks();
+  });
+
+  // Weekly headline card
+  it('shows child-weekly-headline-card when weeklyHeadline is set', () => {
+    mockUseChildDetail.mockReturnValue({
+      data: {
+        displayName: 'Emma',
+        summary: 'Year 6',
+        currentStreak: 0,
+        totalXp: 0,
+        progress: null,
+        subjects: [],
+        weeklyHeadline: {
+          label: 'Topics mastered',
+          value: 5,
+          comparison: 'up from 3 last week',
+        },
+        currentlyWorkingOn: [],
+      },
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(<ChildDetailScreen />);
+
+    expect(screen.getByTestId('child-weekly-headline-card')).toBeTruthy();
+  });
+
+  it('hides child-weekly-headline-card when weeklyHeadline is absent', () => {
+    render(<ChildDetailScreen />);
+
+    expect(screen.queryByTestId('child-weekly-headline-card')).toBeNull();
+  });
+
+  // Monthly highlights card
+  it('shows child-latest-monthly-card when a monthly report exists', () => {
+    mockUseProfileReports.mockReturnValue({
+      data: [
+        {
+          id: 'report-1',
+          reportMonth: '2026-04-01',
+          viewedAt: null,
+          createdAt: '2026-04-30T00:00:00Z',
+          headlineStat: {
+            label: 'Topics mastered',
+            value: 5,
+            comparison: 'up from 3 last month',
+          },
+          highlights: ['Made great progress this month!'],
+          nextSteps: ['Try the next chapter.'],
+        },
+      ],
+    });
+
+    render(<ChildDetailScreen />);
+
+    expect(screen.getByTestId('child-latest-monthly-card')).toBeTruthy();
+  });
+
+  it('hides child-latest-monthly-card when no reports exist', () => {
+    render(<ChildDetailScreen />);
+
+    expect(screen.queryByTestId('child-latest-monthly-card')).toBeNull();
+  });
+
+  // Currently-working-on card
+  it('mounts CurrentlyWorkingOnCard with child-currently-working-on testID when items exist', () => {
+    mockUseChildDetail.mockReturnValue({
+      data: {
+        displayName: 'Emma',
+        summary: 'Year 6',
+        currentStreak: 0,
+        totalXp: 0,
+        progress: null,
+        subjects: [],
+        currentlyWorkingOn: [
+          { topicId: 't1', topicTitle: 'Algebra', subjectName: 'Math' },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(<ChildDetailScreen />);
+
+    expect(mockCurrentlyWorkingOnCard).toHaveBeenCalledWith(
+      expect.objectContaining({ testID: 'child-currently-working-on' }),
+      undefined,
+    );
+  });
+
+  it('does not mount CurrentlyWorkingOnCard when currentlyWorkingOn is empty', () => {
+    render(<ChildDetailScreen />);
+
+    expect(mockCurrentlyWorkingOnCard).not.toHaveBeenCalled();
+  });
+
+  // Celebration follow-up
+  it('shows celebration follow-up when accommodationMode is short-burst', () => {
+    mockUseChildLearnerProfile.mockReturnValue({
+      data: {
+        accommodationMode: 'short-burst',
+        memoryConsentStatus: 'granted',
+        updatedAt: null,
+      },
+    });
+
+    render(<ChildDetailScreen />);
+
+    expect(
+      screen.getByTestId('child-celebration-followup-short-burst'),
+    ).toBeTruthy();
+  });
+
+  it('hides celebration follow-up when accommodationMode is none', () => {
+    render(<ChildDetailScreen />);
+
+    expect(screen.queryByTestId('child-celebration-followup-none')).toBeNull();
+    expect(
+      screen.queryByTestId('child-celebration-followup-short-burst'),
+    ).toBeNull();
+    expect(
+      screen.queryByTestId('child-celebration-followup-predictable'),
+    ).toBeNull();
   });
 });
 

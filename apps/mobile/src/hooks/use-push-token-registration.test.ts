@@ -1,9 +1,10 @@
 import { createElement, type ReactNode } from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import * as Notifications from 'expo-notifications';
-import { AppState, type AppStateStatus } from 'react-native';
+import { AppState, Platform, type AppStateStatus } from 'react-native';
 import { usePushTokenRegistration } from './use-push-token-registration';
 import { createTestProfile } from '../test-utils/app-hook-test-utils';
+import { Sentry } from '../lib/sentry';
 import {
   ProfileContext,
   type Profile,
@@ -55,9 +56,14 @@ function createProfileWrapper() {
 
 describe('usePushTokenRegistration', () => {
   let appStateListeners: Array<(state: AppStateStatus) => void>;
+  const originalPlatformOS = Platform.OS;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    Object.defineProperty(Platform, 'OS', {
+      configurable: true,
+      value: originalPlatformOS,
+    });
     mockActiveProfile = createTestProfile({ id: 'profile-1' });
     appStateListeners = [];
     jest
@@ -233,6 +239,32 @@ describe('usePushTokenRegistration', () => {
     expect(Notifications.getPermissionsAsync).not.toHaveBeenCalled();
     expect(mockMutateAsync).not.toHaveBeenCalled();
     expect(result.current.status).toBe('idle');
+  });
+
+  it('does not capture the local Android Firebase setup error in development', async () => {
+    Object.defineProperty(Platform, 'OS', {
+      configurable: true,
+      value: 'android',
+    });
+    (Notifications.getExpoPushTokenAsync as jest.Mock).mockRejectedValue(
+      new Error(
+        'Make sure to complete the guide at https://docs.expo.dev/push-notifications/fcm-credentials/ : Default FirebaseApp is not initialized in this process com.mentomate.app.',
+      ),
+    );
+
+    const { result } = renderHook(() => usePushTokenRegistration(), {
+      wrapper: createProfileWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current).toEqual({
+        status: 'failed',
+        reason: 'expo_token_unavailable',
+      });
+    });
+
+    expect(mockMutateAsync).not.toHaveBeenCalled();
+    expect(Sentry.captureException).not.toHaveBeenCalled();
   });
 
   it('does not crash on registration error', async () => {

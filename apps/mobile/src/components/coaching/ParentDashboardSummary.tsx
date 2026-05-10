@@ -37,6 +37,8 @@ interface ParentDashboardSummaryProps {
   consentStatus?: ConsentStatus | null;
   retentionTrend?: 'improving' | 'declining' | 'stable';
   totalSessions?: number;
+  weeklyHeadline?: { label: string; value: number; comparison: string };
+  currentlyWorkingOn?: string[];
   progress?: {
     topicsMastered: number;
     vocabularyTotal: number;
@@ -223,6 +225,8 @@ export function ParentDashboardSummary({
   consentStatus,
   retentionTrend,
   totalSessions,
+  weeklyHeadline,
+  currentlyWorkingOn = [],
   progress,
   onDrillDown,
   isLoading,
@@ -241,6 +245,11 @@ export function ParentDashboardSummary({
     : t('coaching.parentDashboard.viewDetails');
   const exchangeDelta = exchangesThisWeek - exchangesLastWeek;
   const guidedPercent = Math.round(guidedVsImmediateRatio * 100);
+  const visibleFocusAreas = currentlyWorkingOn.slice(0, 3);
+  const remainingFocusAreas = Math.max(
+    0,
+    currentlyWorkingOn.length - visibleFocusAreas.length,
+  );
 
   const trendText = `${sessionsThisWeek} ${sessionWord(
     sessionsThisWeek,
@@ -285,6 +294,55 @@ export function ParentDashboardSummary({
           </Text>
         </View>
       ) : null}
+      {showFullSignals && !hasRestrictedConsent && (
+        <>
+          {weeklyHeadline ? (
+            <View
+              className="bg-background rounded-card px-4 py-3 mt-1 mb-3"
+              testID="weekly-headline"
+            >
+              <Text className="text-caption font-semibold text-text-secondary">
+                {t('progress.weeklyReport.thisWeekSoFar')}
+              </Text>
+              <Text className="text-h3 font-semibold text-text-primary mt-1">
+                {weeklyHeadline.value} {weeklyHeadline.label}
+              </Text>
+              <Text className="text-caption text-text-secondary mt-1">
+                {weeklyHeadline.comparison}
+              </Text>
+            </View>
+          ) : null}
+          {visibleFocusAreas.length > 0 ? (
+            <View className="mb-3" testID="dashboard-currently-working-on">
+              <Text className="text-caption font-semibold text-text-secondary mb-2">
+                {t('progress.register.adult.currentlyWorkingOnTitle')}
+              </Text>
+              <View className="flex-row flex-wrap gap-2">
+                {visibleFocusAreas.map((item) => (
+                  <View
+                    key={item}
+                    className="bg-background rounded-full px-3 py-1.5"
+                  >
+                    <Text className="text-caption font-semibold text-text-primary">
+                      {item}
+                    </Text>
+                  </View>
+                ))}
+                {remainingFocusAreas > 0 ? (
+                  <View className="bg-background rounded-full px-3 py-1.5">
+                    <Text className="text-caption font-semibold text-primary">
+                      {t('progress.currentlyWorkingOn.andNMore', {
+                        count: remainingFocusAreas,
+                      })}
+                      {' >'}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            </View>
+          ) : null}
+        </>
+      )}
       {showFullSignals && !hasRestrictedConsent && (
         <View className="flex-row flex-wrap gap-2 mt-1.5">
           {progress ? (

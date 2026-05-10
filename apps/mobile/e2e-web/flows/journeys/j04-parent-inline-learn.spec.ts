@@ -1,25 +1,15 @@
 import { expect, test } from '@playwright/test';
 
-test('J-04 parent taps Learn → sees learner view → back to parent gateway', async ({
-  page,
-}) => {
+test('J-04 parent taps child card to navigate to Family', async ({ page }) => {
   await page.goto('/home', { waitUntil: 'commit' });
 
-  // Start on parent gateway
-  await expect(page.getByTestId('parent-gateway')).toBeVisible({
+  await expect(page.getByTestId('learner-screen')).toBeVisible({
     timeout: 60_000,
   });
+  await expect(page.getByTestId('home-child-card')).toBeVisible();
 
-  // Tap "Learn something" — renders inline learner view (no route change)
-  await page.getByTestId('gateway-learn').click();
-  await expect(page.getByTestId('learner-screen')).toBeVisible({
-    timeout: 30_000,
-  });
-  await expect(page.getByTestId('home-action-study-new')).toBeVisible();
-
-  // Tap back — returns to parent gateway
-  await page.getByTestId('learner-back').click();
-  await expect(page.getByTestId('parent-gateway')).toBeVisible({
+  await page.getByTestId('home-child-card').click();
+  await expect(page.getByTestId('dashboard-scroll')).toBeVisible({
     timeout: 30_000,
   });
 });

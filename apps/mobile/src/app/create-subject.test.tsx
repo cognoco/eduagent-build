@@ -825,7 +825,7 @@ describe('CreateSubjectScreen', () => {
 
     fireEvent.press(screen.getByTestId('create-subject-cancel'));
 
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/home?view=learner');
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
     expect(mockBack).not.toHaveBeenCalled();
   });
 

@@ -250,7 +250,7 @@ describe('MoreScreen landing', () => {
     fireEvent.press(screen.getByTestId('accommodation-mode-child-link'));
 
     expect(mockTrack).toHaveBeenCalledWith('child_progress_navigated', {
-      source: 'more_section',
+      source: 'more_preferences_link',
     });
     expect(mockPush).toHaveBeenCalledWith('/(app)/child/child-1');
   });

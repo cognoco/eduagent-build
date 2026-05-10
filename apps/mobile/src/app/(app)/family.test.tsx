@@ -1,5 +1,4 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { platformAlert } from '../../lib/platform-alert';
 
 const mockReplace = jest.fn();
 const mockBack = jest.fn();
@@ -271,7 +270,10 @@ describe('FamilyScreen', () => {
     render(<FamilyScreen />);
 
     screen.getByTestId('family-breakdown-sharing-toggle');
-    screen.getByTestId('family-add-child-link');
+    // Add-child entry intentionally NOT here — single global path lives in
+    // More tab (see more/index.test.tsx). Family tab is owner-with-kids only,
+    // so an "add another child" CTA right next to existing kids is redundant.
+    expect(screen.queryByTestId('family-add-child-link')).toBeNull();
   });
 
   it('updates family pool breakdown sharing from the Family hub', () => {
@@ -312,146 +314,9 @@ describe('FamilyScreen', () => {
     );
   });
 
-  it('navigates to child profile creation from the Family hub', () => {
-    mockDashboard = {
-      demoMode: false,
-      children: [
-        {
-          profileId: 'child-1',
-          displayName: 'Mia',
-          summary: 'Making progress',
-          sessionsThisWeek: 2,
-          sessionsLastWeek: 1,
-          totalTimeThisWeek: 30,
-          totalTimeLastWeek: 20,
-          exchangesThisWeek: 12,
-          exchangesLastWeek: 8,
-          guidedVsImmediateRatio: 0.7,
-          trend: 'up',
-          currentStreak: 3,
-          totalXp: 120,
-          consentStatus: 'CONSENTED',
-          subjects: [],
-        },
-      ],
-    };
-
-    render(<FamilyScreen />);
-
-    fireEvent.press(screen.getByTestId('family-add-child-link'));
-
-    expect(mockPush).toHaveBeenCalledWith('/create-profile?for=child');
-  });
-
-  it('blocks Add Child with upgrade alert when subscription tier is insufficient', () => {
-    mockSubscription = { tier: 'individual' };
-    mockDashboard = {
-      demoMode: false,
-      children: [
-        {
-          profileId: 'child-1',
-          displayName: 'Mia',
-          summary: '',
-          sessionsThisWeek: 0,
-          sessionsLastWeek: 0,
-          totalTimeThisWeek: 0,
-          totalTimeLastWeek: 0,
-          exchangesThisWeek: 0,
-          exchangesLastWeek: 0,
-          guidedVsImmediateRatio: 0,
-          trend: 'stable',
-          currentStreak: 0,
-          totalXp: 0,
-          consentStatus: null,
-          subjects: [],
-        },
-      ],
-    };
-
-    render(<FamilyScreen />);
-    fireEvent.press(screen.getByTestId('family-add-child-link'));
-
-    expect(platformAlert).toHaveBeenCalledWith(
-      'Upgrade required',
-      'Adding child profiles requires a Family or Pro subscription.',
-      expect.any(Array),
-    );
-    expect(mockPush).not.toHaveBeenCalledWith('/create-profile?for=child');
-  });
-
-  it('shows profile limit alert for family-tier users at max capacity', () => {
-    mockSubscription = { tier: 'family' };
-    mockFamilySubscription = { profileCount: 4, maxProfiles: 4 };
-    mockDashboard = {
-      demoMode: false,
-      children: [
-        {
-          profileId: 'child-1',
-          displayName: 'Mia',
-          summary: '',
-          sessionsThisWeek: 0,
-          sessionsLastWeek: 0,
-          totalTimeThisWeek: 0,
-          totalTimeLastWeek: 0,
-          exchangesThisWeek: 0,
-          exchangesLastWeek: 0,
-          guidedVsImmediateRatio: 0,
-          trend: 'stable',
-          currentStreak: 0,
-          totalXp: 0,
-          consentStatus: null,
-          subjects: [],
-        },
-      ],
-    };
-
-    render(<FamilyScreen />);
-    fireEvent.press(screen.getByTestId('family-add-child-link'));
-
-    expect(platformAlert).toHaveBeenCalledWith(
-      'Profile limit reached',
-      expect.any(String),
-      expect.arrayContaining([expect.objectContaining({ text: 'View plans' })]),
-    );
-    expect(mockPush).not.toHaveBeenCalledWith('/create-profile?for=child');
-  });
-
-  it('shows OK-only profile limit alert for pro-tier users at max capacity', () => {
-    mockSubscription = { tier: 'pro' };
-    mockFamilySubscription = { profileCount: 4, maxProfiles: 4 };
-    mockDashboard = {
-      demoMode: false,
-      children: [
-        {
-          profileId: 'child-1',
-          displayName: 'Mia',
-          summary: '',
-          sessionsThisWeek: 0,
-          sessionsLastWeek: 0,
-          totalTimeThisWeek: 0,
-          totalTimeLastWeek: 0,
-          exchangesThisWeek: 0,
-          exchangesLastWeek: 0,
-          guidedVsImmediateRatio: 0,
-          trend: 'stable',
-          currentStreak: 0,
-          totalXp: 0,
-          consentStatus: null,
-          subjects: [],
-        },
-      ],
-    };
-
-    render(<FamilyScreen />);
-    fireEvent.press(screen.getByTestId('family-add-child-link'));
-
-    const call = (platformAlert as jest.Mock).mock.calls[0]!;
-    const buttons: { text: string }[] = call[2];
-    expect(call[0]).toBe('Profile limit reached');
-    expect(buttons).toHaveLength(1);
-    expect(buttons[0]!.text).toBe('OK');
-    expect(mockPush).not.toHaveBeenCalledWith('/create-profile?for=child');
-  });
+  // Add-child navigation, upgrade-required, and profile-limit alert tests
+  // moved to apps/mobile/src/app/(app)/more/index.test.tsx — handleAddChild
+  // now lives in More since the Family tab is owner-with-kids only.
 
   it('disables breakdown sharing toggle while mutation is pending', () => {
     mockBreakdownSharingPending = true;

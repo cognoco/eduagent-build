@@ -58,7 +58,7 @@ jest.mock('../../../lib/profile', () => ({
 jest.mock('../../../lib/navigation', () => ({
   goBackOrReplace: (...args: unknown[]) => mockBack(...args),
   homeHrefForReturnTo: (returnTo: string | undefined) =>
-    returnTo === 'learner-home' ? '/(app)/home?view=learner' : '/(app)/home',
+    returnTo === 'learner-home' ? '/(app)/home' : '/(app)/home',
 }));
 
 const RelearnScreen = require('./relearn').default;
@@ -209,14 +209,14 @@ describe('RelearnScreen', () => {
             recap: string | null;
           }) => void;
           onSettled?: () => void;
-        }
+        },
       ) => {
         callbacks?.onSuccess?.({
           sessionId: 'sess-1',
           recap: 'You reviewed variables and equations.',
         });
         callbacks?.onSettled?.();
-      }
+      },
     );
 
     render(<RelearnScreen />);
@@ -226,7 +226,7 @@ describe('RelearnScreen', () => {
     await waitFor(() => {
       expect(mockMutate).toHaveBeenCalledWith(
         { topicId: 'topic-1', method: 'same' },
-        expect.any(Object)
+        expect.any(Object),
       );
       expect(mockPush).toHaveBeenCalledWith({
         pathname: '/(app)/session',

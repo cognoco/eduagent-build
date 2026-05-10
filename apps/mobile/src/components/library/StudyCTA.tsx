@@ -1,6 +1,5 @@
 import { Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useThemeColors } from '../../lib/theme';
 
 interface StudyCTAProps {
   label: string;
@@ -17,25 +16,13 @@ export function StudyCTA({
   disabled = false,
   testID = 'study-cta',
 }: StudyCTAProps) {
-  const colors = useThemeColors();
   const insets = useSafeAreaInsets();
-
   const isPrimary = variant === 'primary';
 
   return (
     <View
-      style={{
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: colors.background,
-        borderTopWidth: 1,
-        borderTopColor: colors.border,
-        paddingHorizontal: 20,
-        paddingTop: 12,
-        paddingBottom: 12 + insets.bottom,
-      }}
+      className="absolute bottom-0 left-0 right-0 bg-background border-t border-border px-5 pt-3"
+      style={{ paddingBottom: 12 + insets.bottom }}
     >
       <Pressable
         testID={testID}
@@ -44,23 +31,17 @@ export function StudyCTA({
         accessibilityRole="button"
         accessibilityLabel={label}
         accessibilityState={{ disabled }}
+        className={`h-[52px] rounded-xl items-center justify-center ${
+          isPrimary ? 'bg-primary' : 'border-[1.5px] border-primary'
+        }`}
         style={({ pressed }) => ({
-          height: 52,
-          borderRadius: 12,
-          alignItems: 'center',
-          justifyContent: 'center',
           opacity: pressed || disabled ? 0.6 : 1,
-          backgroundColor: isPrimary ? colors.primary : 'transparent',
-          borderWidth: isPrimary ? 0 : 1.5,
-          borderColor: isPrimary ? undefined : colors.primary,
         })}
       >
         <Text
-          style={{
-            fontSize: 16,
-            fontWeight: '600',
-            color: isPrimary ? colors.textInverse : colors.primary,
-          }}
+          className={`text-base font-semibold ${
+            isPrimary ? 'text-text-inverse' : 'text-primary'
+          }`}
         >
           {label}
         </Text>

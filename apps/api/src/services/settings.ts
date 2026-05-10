@@ -8,6 +8,7 @@ import {
   notificationPreferences,
   notificationLog,
   learningModes,
+  learningProfiles,
   profiles,
   withdrawalArchivePreferences,
   familyPreferences,
@@ -20,6 +21,7 @@ import type {
   WithdrawalArchivePreference,
 } from '@eduagent/schemas';
 import { ForbiddenError } from '@eduagent/schemas';
+import { assertParentAccess } from './family-access';
 import type { NotificationPayload } from './notifications';
 
 // ---------------------------------------------------------------------------
@@ -214,7 +216,30 @@ export async function getCelebrationLevel(
     where: eq(learningModes.profileId, profileId),
   });
 
+  // Default 'all' for the active-profile path: historical default for the
+  // self-celebrations channel. Note: the per-child column on
+  // learning_profiles has a different default ('big_only') — see
+  // getChildCelebrationLevel below. The two read from different tables and
+  // serve different surfaces (self-session vs. parent control).
   return (row?.celebrationLevel as CelebrationLevel | undefined) ?? 'all';
+}
+
+export async function getChildCelebrationLevel(
+  db: Database,
+  parentProfileId: string,
+  childProfileId: string,
+): Promise<CelebrationLevel> {
+  await assertParentAccess(db, parentProfileId, childProfileId);
+  const row = await db.query.learningProfiles.findFirst({
+    where: eq(learningProfiles.profileId, childProfileId),
+  });
+
+  // Default 'big_only' for the parent-controlled per-child setting
+  // (deliberately quieter than the self-default of 'all' returned by
+  // getCelebrationLevel above). Asymmetric on purpose: parents tuning a
+  // child's experience usually want a calmer baseline than the child
+  // would self-select, and the column has its own default in the schema.
+  return (row?.celebrationLevel as CelebrationLevel | undefined) ?? 'big_only';
 }
 
 export async function upsertCelebrationLevel(
@@ -238,6 +263,24 @@ export async function upsertCelebrationLevel(
       .insert(learningModes)
       .values({ profileId, celebrationLevel, mode: 'serious' });
   }
+
+  return { celebrationLevel };
+}
+
+export async function upsertChildCelebrationLevel(
+  db: Database,
+  parentProfileId: string,
+  childProfileId: string,
+  celebrationLevel: CelebrationLevel,
+): Promise<{ celebrationLevel: CelebrationLevel }> {
+  await assertParentAccess(db, parentProfileId, childProfileId);
+  await db
+    .insert(learningProfiles)
+    .values({ profileId: childProfileId, celebrationLevel })
+    .onConflictDoUpdate({
+      target: learningProfiles.profileId,
+      set: { celebrationLevel, updatedAt: new Date() },
+    });
 
   return { celebrationLevel };
 }

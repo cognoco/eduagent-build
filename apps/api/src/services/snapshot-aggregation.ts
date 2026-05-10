@@ -34,6 +34,7 @@ import {
 } from '@eduagent/schemas';
 import { queueCelebration } from './celebrations';
 import { getCurrentLanguageProgress } from './language-curriculum';
+import { getCurrentlyWorkingOn } from './learner-profile';
 // [EP15-I7] Static import of milestone-detection. No circular dependency
 // (milestone-detection does not import snapshot-aggregation), so the prior
 // dynamic `await import()` added per-call module-resolution overhead on a
@@ -41,6 +42,7 @@ import { getCurrentLanguageProgress } from './language-curriculum';
 import { detectMilestones, storeMilestones } from './milestone-detection';
 import { computeWeeklyDeltas } from './progress-helpers';
 import { captureException } from './sentry';
+import { generateWeeklyReportData } from './weekly-report';
 
 type SubjectRow = typeof subjects.$inferSelect;
 type TopicRow = typeof curriculumTopics.$inferSelect;
@@ -86,8 +88,8 @@ interface RefreshSnapshotResult {
   milestones: MilestoneRecord[];
 }
 
-const TRANSIENT_DB_RETRY_ATTEMPTS = 2;
-const TRANSIENT_DB_RETRY_DELAY_MS = 100;
+const TRANSIENT_DB_RETRY_ATTEMPTS = 3;
+const TRANSIENT_DB_RETRY_DELAY_MS = 300;
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -195,6 +197,10 @@ function mondayKey(input: string): string {
   const day = date.getUTCDay() || 7;
   date.setUTCDate(date.getUTCDate() - day + 1);
   return isoDate(date);
+}
+
+function currentWeekStart(): string {
+  return mondayKey(isoDate(new Date()));
 }
 
 function mapCefrLabel(
@@ -799,10 +805,34 @@ export async function buildKnowledgeInventory(
     previousWeeklySnapshot?.metrics ?? null,
     metrics,
   );
+  const weeklyReportData = generateWeeklyReportData(
+    'Learner',
+    currentWeekStart(),
+    metrics,
+    previousWeeklySnapshot?.metrics ?? null,
+  );
+  const currentlyWorkingOn = await getCurrentlyWorkingOn(db, profileId);
 
   return knowledgeInventorySchema.parse({
     profileId,
     snapshotDate: latestSnapshot?.snapshotDate ?? isoDate(new Date()),
+    currentlyWorkingOn,
+    thisWeekMini: {
+      sessions: weeklyReportData.thisWeek.totalSessions,
+      // vocabularyTotal is cumulative (lifetime), not a weekly delta — see
+      // weekly-report.ts:99-112. Only treat (this − last) as a weekly delta
+      // when lastWeek is present; otherwise we'd report the learner's entire
+      // lifetime vocabulary as "this week" for brand-new accounts and any
+      // user whose previous-week snapshot is missing.
+      wordsLearned: weeklyReportData.lastWeek
+        ? Math.max(
+            0,
+            weeklyReportData.thisWeek.vocabularyTotal -
+              weeklyReportData.lastWeek.vocabularyTotal,
+          )
+        : 0,
+      topicsTouched: weeklyReportData.thisWeek.topicsExplored,
+    },
     global: {
       topicsAttempted: metrics.topicsAttempted,
       topicsMastered: metrics.topicsMastered,
@@ -951,20 +981,22 @@ export async function upsertProgressSnapshot(
   snapshotDate: string,
   metrics: ProgressMetrics,
 ): Promise<void> {
-  await db
-    .insert(progressSnapshots)
-    .values({
-      profileId,
-      snapshotDate,
-      metrics,
-    })
-    .onConflictDoUpdate({
-      target: [progressSnapshots.profileId, progressSnapshots.snapshotDate],
-      set: {
+  await withTransientDatabaseRetry('upsertProgressSnapshot', () =>
+    db
+      .insert(progressSnapshots)
+      .values({
+        profileId,
+        snapshotDate,
         metrics,
-        updatedAt: new Date(),
-      },
-    });
+      })
+      .onConflictDoUpdate({
+        target: [progressSnapshots.profileId, progressSnapshots.snapshotDate],
+        set: {
+          metrics,
+          updatedAt: new Date(),
+        },
+      }),
+  );
 }
 
 // [F-043] Session thresholds that should have fired a milestone on session

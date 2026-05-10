@@ -94,7 +94,7 @@ export function useCelebrationLevel(): UseQueryResult<CelebrationLevel> {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
         const res = await client.settings['celebration-level'].$get(
-          {},
+          { query: {} },
           { init: { signal } },
         );
         await assertOk(res);
@@ -107,6 +107,39 @@ export function useCelebrationLevel(): UseQueryResult<CelebrationLevel> {
       }
     },
     enabled: !!activeProfile,
+  });
+}
+
+export function useChildCelebrationLevel(
+  childProfileId: string | undefined,
+): UseQueryResult<CelebrationLevel> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: [
+      'settings',
+      'celebration-level',
+      activeProfile?.id,
+      childProfileId,
+    ],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.settings['celebration-level'].$get(
+          { query: childProfileId ? { childProfileId } : {} },
+          { init: { signal } },
+        );
+        await assertOk(res);
+        const data = (await res.json()) as {
+          celebrationLevel: CelebrationLevel;
+        };
+        return data.celebrationLevel as CelebrationLevel;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled: !!activeProfile?.isOwner && !!childProfileId,
   });
 }
 
@@ -249,6 +282,37 @@ export function useUpdateCelebrationLevel(): UseMutationResult<
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ['settings', 'celebration-level', activeProfile?.id],
+      });
+    },
+  });
+}
+
+export function useUpdateChildCelebrationLevel(): UseMutationResult<
+  CelebrationLevel,
+  Error,
+  { childProfileId: string; celebrationLevel: CelebrationLevel }
+> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+  const { activeProfile } = useProfile();
+
+  return useMutation({
+    mutationFn: async ({ childProfileId, celebrationLevel }) => {
+      const res = await client.settings['celebration-level'].$put({
+        json: { childProfileId, celebrationLevel },
+      });
+      await assertOk(res);
+      const data = await res.json();
+      return data.celebrationLevel as CelebrationLevel;
+    },
+    onSuccess: (_level, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: [
+          'settings',
+          'celebration-level',
+          activeProfile?.id,
+          variables.childProfileId,
+        ],
       });
     },
   });

@@ -22,5 +22,5 @@ test('J-05 parent switches to child profile → child learner home', async ({
 
   // Wait for menu to close and child's learner screen (or post-approval first)
   await waitForScreenDismissingPostApproval(page, 'learner-screen');
-  await expect(page.getByTestId('home-action-study-new')).toBeVisible();
+  await expect(page.getByTestId('intent-proxy-placeholder')).toBeVisible();
 });

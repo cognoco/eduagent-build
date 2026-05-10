@@ -5,11 +5,12 @@ import { createRoutedMockFetch } from '../../test-utils/mock-api-routes';
 
 const mockFetch = createRoutedMockFetch({
   '/celebrations/pending': { pendingCelebrations: [] },
+  '/learner-profile': { profile: { accommodationMode: 'none' } },
   '/settings/celebration-level': { celebrationLevel: 'all' },
 });
 
 jest.mock('../../lib/api-client', () =>
-  require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch)
+  require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
 );
 
 type MockProfile = {
@@ -44,8 +45,6 @@ let mockProfiles: MockProfile[] = [];
 let mockActiveProfile: MockActiveProfile | null = null;
 let mockIsLoading = false;
 let mockOnAllComplete: (() => void) | null = null;
-let mockSearchParams: Record<string, string> = {};
-
 jest.mock('../../lib/profile', () => ({
   useProfile: () => ({
     profiles: mockProfiles,
@@ -77,18 +76,11 @@ const mockRouterPush = jest.fn();
 const mockRouterReplace = jest.fn();
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockRouterPush, replace: mockRouterReplace }),
-  useLocalSearchParams: () => mockSearchParams,
 }));
 
 jest.mock('../../components/home', () => {
   const { Text, View } = require('react-native');
   return {
-    ParentGateway: () => (
-      <View testID="parent-gateway">
-        <View testID="withdrawal-countdown-banner" />
-        <Text>ParentGateway</Text>
-      </View>
-    ),
     LearnerScreen: () => (
       <View testID="learner-screen">
         <Text>LearnerScreen</Text>
@@ -103,7 +95,6 @@ describe('HomeScreen intent router', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockIsLoading = false;
-    mockSearchParams = {};
     mockOnAllComplete = null;
   });
 
@@ -117,49 +108,19 @@ describe('HomeScreen intent router', () => {
     // BUG-522: owners without children always see LearnerScreen — no forced
     // add-child gate regardless of subscription tier
     screen.getByTestId('learner-screen');
-    expect(screen.queryByTestId('parent-gateway')).toBeNull();
   });
 
-  it('renders ParentGateway for owner with linked children', () => {
+  it('renders LearnerScreen directly for owner with linked children', () => {
     mockProfiles = [
       { id: 'p1', displayName: 'Maria', isOwner: true },
       { id: 'c1', displayName: 'Emma', isOwner: false },
     ];
     mockActiveProfile = makeActiveProfile(mockProfiles[0]!);
-    const Wrapper = createWrapper();
-
-    render(<HomeScreen />, { wrapper: Wrapper });
-
-    screen.getByTestId('parent-gateway');
-    expect(screen.queryByTestId('learner-screen')).toBeNull();
-  });
-
-  it('renders WithdrawalCountdownBanner for parent gateway', () => {
-    mockProfiles = [
-      { id: 'p1', displayName: 'Maria', isOwner: true },
-      { id: 'c1', displayName: 'Emma', isOwner: false },
-    ];
-    mockActiveProfile = makeActiveProfile(mockProfiles[0]!);
-    const Wrapper = createWrapper();
-
-    render(<HomeScreen />, { wrapper: Wrapper });
-
-    expect(screen.getByTestId('withdrawal-countdown-banner')).toBeTruthy();
-  });
-
-  it('restores the parent learner view when view=learner is in the route', () => {
-    mockProfiles = [
-      { id: 'p1', displayName: 'Maria', isOwner: true },
-      { id: 'c1', displayName: 'Emma', isOwner: false },
-    ];
-    mockActiveProfile = makeActiveProfile(mockProfiles[0]!);
-    mockSearchParams = { view: 'learner' };
     const Wrapper = createWrapper();
 
     render(<HomeScreen />, { wrapper: Wrapper });
 
     screen.getByTestId('learner-screen');
-    expect(screen.queryByTestId('parent-gateway')).toBeNull();
   });
 
   it('renders LearnerScreen when active profile is a child (non-owner)', () => {
@@ -173,7 +134,6 @@ describe('HomeScreen intent router', () => {
     render(<HomeScreen />, { wrapper: Wrapper });
 
     screen.getByTestId('learner-screen');
-    expect(screen.queryByTestId('parent-gateway')).toBeNull();
   });
 
   it('renders loading placeholder when profiles are still loading', () => {
@@ -185,7 +145,6 @@ describe('HomeScreen intent router', () => {
     render(<HomeScreen />, { wrapper: Wrapper });
 
     expect(screen.queryByTestId('learner-screen')).toBeNull();
-    expect(screen.queryByTestId('parent-gateway')).toBeNull();
   });
 });
 
@@ -195,7 +154,6 @@ describe('HomeScreen 3B.11: timeout error state secondary navigation', () => {
   beforeEach(() => {
     jest.useFakeTimers();
     jest.clearAllMocks();
-    mockSearchParams = {};
     mockIsLoading = true;
     mockProfiles = [];
     mockActiveProfile = null;
@@ -262,7 +220,6 @@ describe('HomeScreen SF-1: markCelebrationsSeen error handling', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockIsLoading = false;
-    mockSearchParams = {};
     mockProfiles = [{ id: 'p1', displayName: 'Alex', isOwner: true }];
     mockActiveProfile = makeActiveProfile(mockProfiles[0]!);
     mockOnAllComplete = null;
@@ -275,7 +232,10 @@ describe('HomeScreen SF-1: markCelebrationsSeen error handling', () => {
       .mockImplementation(() => {});
     // Make the /celebrations/seen endpoint return a server error so the real
     // useMarkCelebrationsSeen mutation rejects.
-    mockFetch.setRoute('/celebrations/seen', new Response('{}', { status: 500 }));
+    mockFetch.setRoute(
+      '/celebrations/seen',
+      new Response('{}', { status: 500 }),
+    );
     const Wrapper = createWrapper();
 
     render(<HomeScreen />, { wrapper: Wrapper });
@@ -289,7 +249,7 @@ describe('HomeScreen SF-1: markCelebrationsSeen error handling', () => {
     // The error must be logged — not silently swallowed
     expect(consoleSpy).toHaveBeenCalledWith(
       '[Celebrations] Failed to mark as seen, will retry on next visit:',
-      expect.any(Error)
+      expect.any(Error),
     );
 
     consoleSpy.mockRestore();

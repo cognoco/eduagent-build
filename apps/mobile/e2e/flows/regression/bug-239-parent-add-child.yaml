@@ -23,18 +23,26 @@ tags:
 
 - takeScreenshot: bug239-01-parent-home-loaded
 
-# 3. Navigate to More tab
+# 3. Navigate to More tab. The Add-child entry lives only in More now —
+#    Family tab is reserved for owners-with-kids and the entry was
+#    consolidated into More for both solo adults and existing parents.
 - tapOn:
     id: "tab-more"
 
 - extendedWaitUntil:
     visible:
-      text: "Family"
+      id: "learning-accommodation-section-header"
     timeout: 10000
 
 - takeScreenshot: bug239-02-more-tab
 
 # 4. Tap "Add a child"
+- scrollUntilVisible:
+    element:
+      id: "add-child-link"
+    direction: DOWN
+    timeout: 10000
+
 - tapOn:
     id: "add-child-link"
 

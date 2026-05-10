@@ -19,10 +19,10 @@ tags:
       SEED_SCENARIO: "parent-with-children"
       API_URL: ${API_URL}
 
-# 2. Wait for home screen — parent-with-children lands on parent-gateway (BUG-566)
+# 2. Wait for home screen — parent-with-children lands on learner-screen (BUG-566)
 - extendedWaitUntil:
     visible:
-      id: "parent-gateway"
+      id: "learner-screen"
     timeout: 10000
     optional: true
 

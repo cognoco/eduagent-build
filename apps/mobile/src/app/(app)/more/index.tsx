@@ -95,9 +95,18 @@ export default function MoreScreen() {
     [learnerProfile?.accommodationMode, updateAccommodation, t],
   );
 
+  const handleChildProgressNavigation = useCallback(
+    (href: string) => {
+      track('child_progress_navigated', { source: 'more_preferences_link' });
+      router.push(href as never);
+    },
+    [router],
+  );
+
   const handleAddChild = useCallback(() => {
     if (!subscription) {
-      // Query still loading — don't block with a false 'Upgrade required'
+      // Subscription query still loading — surface a non-blocking notice
+      // rather than asserting an upgrade gate the user might not actually hit.
       platformAlert(t('common.loading'), t('more.errors.tryAgainMoment'));
       return;
     }
@@ -141,22 +150,17 @@ export default function MoreScreen() {
     router.push('/create-profile?for=child');
   }, [subscription, familyData, router, t]);
 
-  const handleChildProgressNavigation = useCallback(
-    (href: string) => {
-      track('child_progress_navigated', { source: 'more_section' });
-      router.push(href as never);
-    },
-    [router],
-  );
-
   const linkedChildren = activeProfile?.isOwner
     ? profiles.filter((p) => p.id !== activeProfile.id && !p.isOwner)
     : [];
+  // Add-child entry is the single global path to add a child profile.
+  // Solo adults reach it here (Family tab is hidden for them); existing
+  // parents reach it here too. Gated on isAdultOwner so under-18s and
+  // non-owner profiles never see it.
   const showAddChild = isAdultOwner({
     role,
     birthYear: activeProfile?.birthYear,
   });
-
   const displayName =
     activeProfile?.displayName ??
     user?.fullName ??
@@ -203,11 +207,11 @@ export default function MoreScreen() {
         </Text>
         {activeProfile?.isOwner && linkedChildren.length === 1 ? (
           <Pressable
-            onPress={() =>
-              handleChildProgressNavigation(
-                `/(app)/child/${linkedChildren[0]?.id ?? ''}`,
-              )
-            }
+            onPress={() => {
+              const childId = linkedChildren[0]?.id;
+              if (!childId) return;
+              handleChildProgressNavigation(`/(app)/child/${childId}`);
+            }}
             className="self-start mb-3"
             accessibilityRole="button"
             accessibilityLabel={t(
@@ -273,7 +277,7 @@ export default function MoreScreen() {
                 onPress={() => void refetchLearnerProfile()}
                 className="self-start mb-3"
                 accessibilityRole="button"
-                testID="accommodation-mode-retry"
+                testID="accommodation-mode-retry-stale"
               >
                 <Text className="text-caption font-semibold text-primary">
                   {t('common.retry')}

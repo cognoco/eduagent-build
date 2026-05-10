@@ -3,14 +3,14 @@ import type { LearningResumeTarget } from '@eduagent/schemas';
 
 export const FAMILY_HOME_PATH = '/(app)/family';
 export const LEARNER_HOME_RETURN_TO = 'learner-home';
-export const LEARNER_HOME_HREF = '/(app)/home?view=learner';
+export const LEARNER_HOME_HREF = '/(app)/home';
 
 function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
 export function homeHrefForReturnTo(
-  returnTo: string | string[] | undefined
+  returnTo: string | string[] | undefined,
 ): Href {
   return firstParam(returnTo) === LEARNER_HOME_RETURN_TO
     ? (LEARNER_HOME_HREF as Href)
@@ -19,7 +19,7 @@ export function homeHrefForReturnTo(
 
 export function goBackOrReplace(
   router: Pick<Router, 'back' | 'canGoBack' | 'replace'>,
-  fallbackHref: Href
+  fallbackHref: Href,
 ): void {
   if (router.canGoBack()) {
     router.back();
@@ -32,7 +32,7 @@ export function goBackOrReplace(
 export function pushLearningResumeTarget(
   router: Pick<Router, 'push'>,
   target: LearningResumeTarget,
-  returnTo?: string
+  returnTo?: string,
 ): void {
   // [BUG-977 / CCR-PR126-M-2] Replace the previous `as never` cast (which
   // silenced the typed Href system entirely) with `as Href`. The Expo Router

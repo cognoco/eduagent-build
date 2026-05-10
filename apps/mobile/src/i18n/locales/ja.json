@@ -137,20 +137,14 @@
         }
       }
     },
-    "parentGateway": {
-      "seeHowTheyAreDoing": "お子様の様子を見る",
-      "practicedThisWeek": "{{name}}さんは今週{{minutes}}分練習しました",
-      "notPracticedThisWeek": "{{name}}さんは今週練習していません",
-      "checkProgress": "お子様の進捗を確認",
-      "learnSomething": "何かを学ぶ",
-      "dashboardError": "ダッシュボードを読み込めませんでした",
-      "reviewHealth": "健康状態を確認"
-    },
     "notices": {
       "consentArchivedTitle": "{{name}}'s account was archived",
       "consentArchivedBody": "Data is retained for 30 days, then deleted.",
       "consentDeletedTitle": "{{name}}'s account was deleted",
       "consentDeletedBody": "The withdrawal grace period has ended."
+    },
+    "childCard": {
+      "title": "子ども"
     }
   },
   "dashboard": {
@@ -1146,7 +1140,9 @@
         "retentionFading": "Worth a quick refresh.",
         "retentionWeak": "Worth coming back to.",
         "growthPrimaryLegend": "Topics learned",
-        "growthSecondaryLegend": "Words added"
+        "growthSecondaryLegend": "Words added",
+        "currentlyWorkingOnTitle": "今取り組んでいること",
+        "currentlyWorkingOnDetected": "最近のセッションから見つかりました"
       },
       "adult": {
         "weekTitle": "Weekly report",
@@ -1158,7 +1154,35 @@
         "retentionFading": "Getting fuzzy — a quick review will help.",
         "retentionWeak": "Needs a quick refresh.",
         "growthPrimaryLegend": "Topics mastered",
-        "growthSecondaryLegend": "Vocabulary growth"
+        "growthSecondaryLegend": "Vocabulary growth",
+        "currentlyWorkingOnTitle": "現在取り組み中",
+        "currentlyWorkingOnDetected": "最近のセッションから検出"
+      }
+    },
+    "currentlyWorkingOn": {
+      "andNMore": "ほか{{count}}件"
+    },
+    "weeklyReport": {
+      "thisWeekSoFar": "今週ここまで",
+      "mini": {
+        "sessions": "{{count}}セッション",
+        "sessions_other": "{{count}}セッション",
+        "words": "{{count}}語",
+        "words_other": "{{count}}語",
+        "topics": "{{count}}トピックに触れました",
+        "topics_other": "{{count}}トピックに触れました"
+      },
+      "empty": {
+        "child": "最初の週間まとめはもうすぐ届きます。",
+        "adult": "最初の週間まとめは、1週間の学習後に届きます。"
+      }
+    },
+    "monthlyReport": {
+      "highlightsTitle": "ハイライト",
+      "nextStepsTitle": "次にすること",
+      "empty": {
+        "child": "最初の月間まとめは{{month}}の終わりに届きます。",
+        "adult": "最初の月間まとめは{{month}}の終わりに届きます。"
       }
     },
     "newLearner": {

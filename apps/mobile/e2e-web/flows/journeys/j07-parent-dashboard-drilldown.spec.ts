@@ -9,13 +9,13 @@ test('J-07 parent → dashboard → child detail → back to dashboard', async (
 
   await page.goto('/home', { waitUntil: 'commit' });
 
-  // Start on parent gateway
-  await expect(page.getByTestId('parent-gateway')).toBeVisible({
+  // Start on learner screen
+  await expect(page.getByTestId('learner-screen')).toBeVisible({
     timeout: 60_000,
   });
 
   // Navigate to dashboard
-  await page.getByTestId('gateway-check-progress').click();
+  await page.getByTestId('home-child-card').click();
   await expect(page.getByTestId('dashboard-scroll')).toBeVisible({
     timeout: 30_000,
   });

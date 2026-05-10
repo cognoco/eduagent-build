@@ -81,6 +81,14 @@ export type SubjectInventory = z.infer<typeof subjectInventorySchema>;
 export const knowledgeInventorySchema = z.object({
   profileId: z.string().uuid(),
   snapshotDate: z.string(),
+  currentlyWorkingOn: z.array(z.string()).default([]),
+  thisWeekMini: z
+    .object({
+      sessions: z.number().int(),
+      wordsLearned: z.number().int(),
+      topicsTouched: z.number().int(),
+    })
+    .default({ sessions: 0, wordsLearned: 0, topicsTouched: 0 }),
   global: z.object({
     topicsAttempted: z.number().int(),
     topicsMastered: z.number().int(),
@@ -220,6 +228,8 @@ export const monthlyReportSummarySchema = z.object({
   viewedAt: z.string().datetime().nullable().optional(),
   createdAt: z.string().datetime(),
   headlineStat: monthlyReportHeadlineSchema,
+  highlights: z.array(z.string()).default([]),
+  nextSteps: z.array(z.string()).default([]),
 });
 export type MonthlyReportSummary = z.infer<typeof monthlyReportSummarySchema>;
 
