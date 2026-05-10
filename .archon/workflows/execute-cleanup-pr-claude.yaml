@@ -82,6 +82,18 @@ nodes:
         Read and execute the instructions in `.archon/commands/cleanup-implement-phase.md`.
         The artifacts directory is: $ARTIFACTS_DIR
       until: ALL_PHASES_COMPLETE
+      until_bash: |
+        work_order_phases=$(rg --no-filename -oP '^### Phase \K[A-Z0-9]+(?=:)' \
+          "$ARTIFACTS_DIR/work-order.md" | sort -u)
+        done_phases=$(
+            rg --no-filename -oP '^## Phase \K[A-Z0-9]+(?=:)' \
+              "$ARTIFACTS_DIR/progress.md" 2>/dev/null
+            rg --no-filename -oP '^## BLOCKED:\K[A-Z0-9]+$' \
+              "$ARTIFACTS_DIR/blocked.md" 2>/dev/null
+        )
+        done_phases=$(echo "$done_phases" | sort -u)
+        remaining=$(comm -23 <(echo "$work_order_phases") <(echo "$done_phases"))
+        [[ -z "$remaining" ]]
       max_iterations: 15
       fresh_context: true
 

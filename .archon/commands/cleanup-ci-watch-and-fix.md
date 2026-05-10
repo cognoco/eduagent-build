@@ -120,10 +120,21 @@ Only fall into the blocking watch when at least one check is still pending. Boun
 ```bash
 watch_rc=0
 if [[ "$has_pending" -eq 1 ]]; then
-    # `gh pr checks --watch` blocks until all checks finish; cap with `timeout`.
-    # Exit codes: 0 all green, 8 any failure, 124 timeout (per `timeout(1)`).
+    # `gh pr checks --watch` blocks until all checks finish; cap via a portable
+    # alarm wrapper (GNU `timeout` isn't on macOS by default and coreutils isn't
+    # a documented Archon prereq). Uses /usr/bin/perl (ships with macOS and every
+    # major Linux distro). Exit codes preserved: 0 all green, 8 any failure,
+    # 124 = our alarm fired (-> ci-frozen giveup branch below).
     set +e
-    timeout 1500 gh pr checks "$PR" --watch --interval 30 > "$log_file" 2>&1
+    perl -e '
+        my $secs = shift;
+        my $pid = fork // die "fork failed: $!";
+        if ($pid == 0) { exec @ARGV; die "exec failed: $!" }
+        local $SIG{ALRM} = sub { kill TERM => $pid; sleep 1; kill KILL => $pid; exit 124 };
+        alarm $secs;
+        waitpid $pid, 0;
+        exit $? >> 8;
+    ' 1500 gh pr checks "$PR" --watch --interval 30 > "$log_file" 2>&1
     watch_rc=$?
     set -e
 
