@@ -14,7 +14,8 @@
  * 5. Protected paths with expired JWT → 401
  * 6. Protected paths with valid JWT → passes auth (not 401)
  * 7. Missing CLERK_JWKS_URL → 401 (config error caught gracefully)
- * Note: /v1/auth/* is NOT in PUBLIC_PATHS — auth is required [BUG-1007]
+ * Note: /v1/auth/* is not mounted; unauthenticated requests are rejected by
+ * auth middleware, while authenticated requests fall through to 404.
  */
 
 import { buildIntegrationEnv, cleanupAccounts } from './helpers';
@@ -64,16 +65,26 @@ describe('Integration: Auth chain — public paths', () => {
     }
   });
 
-  // [BUG-1007] /v1/auth/* is NOT public — auth middleware requires a valid
-  // token. This was a deliberate security decision: stub auth endpoints must
-  // not be reachable without authentication.
-  it('/v1/auth/* paths require authentication [BUG-1007]', async () => {
-    const res = await app.request(
+  it('POST /v1/auth/register returns 401 without auth and 404 with auth after stub deletion', async () => {
+    const unauthenticated = await app.request(
       '/v1/auth/register',
       { method: 'POST' },
       TEST_ENV,
     );
-    expect(res.status).toBe(401);
+    expect(unauthenticated.status).toBe(401);
+
+    const authenticated = await app.request(
+      '/v1/auth/register',
+      {
+        method: 'POST',
+        headers: buildAuthHeaders({
+          sub: AUTH_CLERK_USER_ID,
+          email: AUTH_EMAIL,
+        }),
+      },
+      TEST_ENV,
+    );
+    expect(authenticated.status).toBe(404);
   });
 
   it('/v1/consent/respond skips authentication', async () => {

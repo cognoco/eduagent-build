@@ -4,7 +4,6 @@ export * from './errors';
 export * from './age';
 
 // Auth & Profiles
-export * from './auth';
 export * from './profiles';
 export * from './consent';
 export * from './account';
