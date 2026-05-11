@@ -103,7 +103,7 @@ export const profileSchema = z.object({
   conversationLanguage: conversationLanguageSchema.default('en'),
   pronouns: pronounsSchema.nullable().default(null),
   consentStatus: consentStatusSchema.nullable(),
-  linkCreatedAt: z.string().datetime().nullable().optional(),
+  linkCreatedAt: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });

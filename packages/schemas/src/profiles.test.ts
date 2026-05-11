@@ -117,6 +117,7 @@ describe('profileSchema forward-compat', () => {
     location: null,
     isOwner: true,
     consentStatus: null,
+    linkCreatedAt: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
