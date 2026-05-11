@@ -670,7 +670,7 @@ describe('AppLayout', () => {
 });
 
 describe('computeVisibleTabs', () => {
-  it('returns all tabs for guardian shape', () => {
+  it('returns all 5 tabs for guardian shape', () => {
     const tabs = computeVisibleTabs('guardian');
     expect(tabs).toEqual(
       new Set(['home', 'own-learning', 'library', 'progress', 'more']),
@@ -681,37 +681,32 @@ describe('computeVisibleTabs', () => {
     expect(computeVisibleTabs()).toEqual(computeVisibleTabs('guardian'));
   });
 
-  it('returns home + library + progress + more for solo learner (no own-learning)', () => {
-    const tabs = computeVisibleTabs('soloLearner');
+  it('returns 4 tabs for learner shape (no own-learning)', () => {
+    const tabs = computeVisibleTabs('learner');
     expect(tabs).toEqual(new Set(['home', 'library', 'progress', 'more']));
     expect(tabs.has('own-learning')).toBe(false);
-  });
-
-  it('returns only home for child shape', () => {
-    const tabs = computeVisibleTabs('child');
-    expect(tabs).toEqual(new Set(['home']));
   });
 });
 
 describe('resolveTabShape', () => {
-  it('returns soloLearner for an owner with no linked profiles', () => {
+  it('returns learner for a solo owner with no linked profiles', () => {
     expect(
       resolveTabShape({
         activeProfile: { isOwner: true },
         profiles: [{ isOwner: true }],
         isParentProxy: false,
       }),
-    ).toBe('soloLearner');
+    ).toBe('learner');
   });
 
-  it('returns child for a non-owner profile', () => {
+  it('returns learner for a child on a parent account', () => {
     expect(
       resolveTabShape({
         activeProfile: { isOwner: false },
         profiles: [{ isOwner: true }, { isOwner: false }],
         isParentProxy: false,
       }),
-    ).toBe('child');
+    ).toBe('learner');
   });
 
   it('returns guardian for an owner with linked children', () => {
