@@ -40,6 +40,11 @@ function getTopicStatusLabel(topic: TopicProgress): string {
   return 'Covered';
 }
 
+function isInChildProfileStack(segments: readonly string[]): boolean {
+  const childIndex = segments.indexOf('child');
+  return childIndex >= 0 && segments[childIndex + 1] === '[profileId]';
+}
+
 export function AccordionTopicList({
   childProfileId,
   subjectId,
@@ -48,7 +53,7 @@ export function AccordionTopicList({
 }: AccordionTopicListProps): React.ReactElement | null {
   const router = useRouter();
   const segments = useSegments();
-  const isInsideChildStack = segments.includes('child');
+  const shouldPushParentChain = !isInChildProfileStack(segments);
   const {
     data: topics,
     isLoading,
@@ -92,7 +97,7 @@ export function AccordionTopicList({
             key={topic.topicId}
             onPress={(event) => {
               event?.stopPropagation?.();
-              if (!isInsideChildStack) {
+              if (shouldPushParentChain) {
                 router.push({
                   pathname: '/(app)/child/[profileId]',
                   params: { profileId: childProfileId },
