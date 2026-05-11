@@ -9,17 +9,11 @@ import { resolve } from 'node:path';
 // prompt drift, envelope contract drift, and shape-of-response bugs.
 //
 // This guard fails if ANY new *.integration.test.ts file adds a jest.mock for
-// the internal LLM router (`./llm`, `../llm`, `services/llm`). Two pre-
-// existing offenders are listed in KNOWN_OFFENDERS pending migration to
-// HTTP-boundary mocking (see weekly-progress-push.integration.test.ts for
-// the right pattern — intercept globalThis.fetch instead).
+// the internal LLM router (`./llm`, `../llm`, `services/llm`). The right
+// pattern is to intercept globalThis.fetch for HTTP SDKs, or register a
+// provider in the LLM provider registry when the service boundary is the router.
 
-const KNOWN_OFFENDERS = new Set<string>([
-  // BUG-743 follow-up: migrate to HTTP-boundary mocking (see Expo Push pattern
-  // in src/inngest/functions/weekly-progress-push.integration.test.ts).
-  'apps/api/src/services/session-summary.integration.test.ts',
-  'apps/api/src/services/quiz/vocabulary.integration.test.ts',
-]);
+const KNOWN_OFFENDERS = new Set<string>();
 
 function listIntegrationTests(): string[] {
   const repoRoot = resolve(__dirname, '../../../../..');
@@ -62,12 +56,12 @@ describe('integration tests — BUG-743 internal LLM mock guard', () => {
 
   it('does not introduce NEW jest.mock(...llm) calls outside the known offender allowlist', () => {
     const offenders = files.filter((f) =>
-      fileMocksInternalLlm(resolve(repoRoot, f))
+      fileMocksInternalLlm(resolve(repoRoot, f)),
     );
     // Normalize separators so the test passes on Windows + POSIX.
     const offendersNormalized = offenders.map((f) => f.replace(/\\/g, '/'));
     const newOffenders = offendersNormalized.filter(
-      (f) => !KNOWN_OFFENDERS.has(f)
+      (f) => !KNOWN_OFFENDERS.has(f),
     );
     if (newOffenders.length > 0) {
       throw new Error(
@@ -76,7 +70,7 @@ describe('integration tests — BUG-743 internal LLM mock guard', () => {
           `\n\nIntegration tests must mock at the HTTP boundary (intercept ` +
           `globalThis.fetch for provider URLs) — not jest.mock internal ` +
           `services. See weekly-progress-push.integration.test.ts for the ` +
-          `right pattern.`
+          `right pattern.`,
       );
     }
   });
@@ -88,7 +82,7 @@ describe('integration tests — BUG-743 internal LLM mock guard', () => {
     const stillOffending = Array.from(KNOWN_OFFENDERS).filter((f) =>
       files.some((g) => g.replace(/\\/g, '/') === f)
         ? fileMocksInternalLlm(resolve(repoRoot, f))
-        : false
+        : false,
     );
     expect(stillOffending.sort()).toEqual(Array.from(KNOWN_OFFENDERS).sort());
   });

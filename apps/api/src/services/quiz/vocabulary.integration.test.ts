@@ -1,10 +1,3 @@
-// EXTERNAL boundary mock — routeAndCall is the LLM provider HTTP call. Per C1 D-MOCK-1 this is the formalized LLM external boundary.
-const mockRouteAndCall = jest.fn();
-jest.mock('../llm', () => ({
-  ...(jest.requireActual('../llm') as Record<string, unknown>),
-  routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
-}));
-
 import { and, eq, inArray } from 'drizzle-orm';
 import {
   accounts,
@@ -24,6 +17,8 @@ import { completeQuizRound } from './complete-round';
 import { generateQuizRound } from './generate-round';
 import { getVocabularyRoundContext } from './queries';
 import { QUIZ_CONFIG } from './config';
+import type { ChatMessage, LLMProvider, ModelConfig } from '../llm';
+import { _clearProviders, _resetCircuits, registerProvider } from '../llm';
 
 // [CR-758] Single source of truth for the expected vocabulary round size.
 // Previously the test asserted `toHaveLength(6)` and `total).toBe(6)` with
@@ -35,11 +30,30 @@ const VOCAB_ROUND_SIZE = QUIZ_CONFIG.perActivity.vocabulary.roundSize;
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
 
+let llmResponse = '';
+const llmProviderCalls: Array<{
+  messages: ChatMessage[];
+  config: ModelConfig;
+}> = [];
+
+function createVocabularyProvider(): LLMProvider {
+  return {
+    id: 'gemini',
+    async chat(messages, config) {
+      llmProviderCalls.push({ messages, config });
+      return { content: llmResponse, stopReason: 'stop' };
+    },
+    chatStream() {
+      throw new Error('vocabulary integration test does not stream');
+    },
+  };
+}
+
 function requireDatabaseUrl(): string {
   const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error(
-      'DATABASE_URL is not set. Create .env.test.local or .env.development.local.'
+      'DATABASE_URL is not set. Create .env.test.local or .env.development.local.',
     );
   }
   return url;
@@ -65,8 +79,8 @@ async function cleanupTestAccounts() {
     await db.delete(accounts).where(
       inArray(
         accounts.id,
-        rows.map((row) => row.id)
-      )
+        rows.map((row) => row.id),
+      ),
     );
   }
 }
@@ -183,12 +197,17 @@ beforeEach(async () => {
   // in CI's PostgreSQL service container. The SM-2 assertions use the
   // same sm2() function as the production code, so both sides compute
   // from the same real Date and the assertions still match.
-  jest.clearAllMocks();
+  llmProviderCalls.length = 0;
+  _clearProviders();
+  _resetCircuits();
+  registerProvider(createVocabularyProvider());
   await cleanupTestAccounts();
 });
 
 afterAll(async () => {
   await cleanupTestAccounts();
+  _clearProviders();
+  _resetCircuits();
 });
 
 describe('vocabulary quiz round lifecycle (integration)', () => {
@@ -198,40 +217,35 @@ describe('vocabulary quiz round lifecycle (integration)', () => {
     const { db, profile, subject } = await seedProfileAndSubject();
     await seedVocabularyBank(profile.id, subject.id);
 
-    mockRouteAndCall.mockResolvedValue({
-      response: JSON.stringify({
-        theme: 'German Animals',
-        targetLanguage: 'German',
-        questions: [
-          {
-            term: 'das Schwein',
-            correctAnswer: 'pig',
-            acceptedAnswers: ['pig'],
-            distractors: ['dog', 'cat', 'bird'],
-            funFact: 'Schwein also appears in some lucky sayings.',
-            cefrLevel: 'A1',
-          },
-          {
-            term: 'der Bär',
-            correctAnswer: 'bear',
-            acceptedAnswers: ['bear'],
-            distractors: ['horse', 'cow', 'fish'],
-            funFact: 'Bär is common in fairy tales.',
-            cefrLevel: 'A2',
-          },
-          {
-            term: 'der Frosch',
-            correctAnswer: 'frog',
-            acceptedAnswers: ['frog'],
-            distractors: ['duck', 'rabbit', 'mouse'],
-            funFact: 'Frosch shows up in many beginner stories.',
-            cefrLevel: 'A1',
-          },
-        ],
-      }),
-      provider: 'mock',
-      model: 'mock',
-      latencyMs: 25,
+    llmResponse = JSON.stringify({
+      theme: 'German Animals',
+      targetLanguage: 'German',
+      questions: [
+        {
+          term: 'das Schwein',
+          correctAnswer: 'pig',
+          acceptedAnswers: ['pig'],
+          distractors: ['dog', 'cat', 'bird'],
+          funFact: 'Schwein also appears in some lucky sayings.',
+          cefrLevel: 'A1',
+        },
+        {
+          term: 'der Bär',
+          correctAnswer: 'bear',
+          acceptedAnswers: ['bear'],
+          distractors: ['horse', 'cow', 'fish'],
+          funFact: 'Bär is common in fairy tales.',
+          cefrLevel: 'A2',
+        },
+        {
+          term: 'der Frosch',
+          correctAnswer: 'frog',
+          acceptedAnswers: ['frog'],
+          distractors: ['duck', 'rabbit', 'mouse'],
+          funFact: 'Frosch shows up in many beginner stories.',
+          cefrLevel: 'A1',
+        },
+      ],
     });
 
     const context = await getVocabularyRoundContext(db, profile.id, subject.id);
@@ -258,8 +272,8 @@ describe('vocabulary quiz round lifecycle (integration)', () => {
     // bare stub, the real prompt builder no longer runs, and these
     // content/shape assertions fail. A simple `toHaveBeenCalledTimes(1)`
     // would pass even with a full barrel mock — these don't.
-    expect(mockRouteAndCall).toHaveBeenCalledTimes(1);
-    expect(mockRouteAndCall).toHaveBeenCalledWith(
+    expect(llmProviderCalls).toHaveLength(1);
+    expect(llmProviderCalls[0]?.messages).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           role: 'system',
@@ -270,30 +284,32 @@ describe('vocabulary quiz round lifecycle (integration)', () => {
           content: 'Generate the quiz round.',
         }),
       ]),
-      1,
-      expect.objectContaining({ ageBracket: expect.any(String) })
     );
-    const [systemPrompt] = mockRouteAndCall.mock.calls[0][0] as Array<{
+    expect(llmProviderCalls[0]!.config.model).toBe('gemini-2.5-flash');
+    const [systemPrompt] = llmProviderCalls[0]!.messages as Array<{
       role: string;
       content: string;
     }>;
     expect(systemPrompt.content).toContain(
-      `Maximum CEFR level: ${context.cefrCeiling}`
+      'You are an educational AI assistant for young learners.',
+    );
+    expect(systemPrompt.content).toContain(
+      `Maximum CEFR level: ${context.cefrCeiling}`,
     );
     const masteryQuestions = round.questions.filter(
       (question): question is Extract<QuizQuestion, { type: 'vocabulary' }> =>
-        question.type === 'vocabulary' && question.isLibraryItem
+        question.type === 'vocabulary' && question.isLibraryItem,
     );
     expect(masteryQuestions).toHaveLength(3);
 
     const masteryIds = masteryQuestions.map(
-      (question) => question.vocabularyId!
+      (question) => question.vocabularyId!,
     );
     const beforeCards = await db.query.vocabularyRetentionCards.findMany({
       where: inArray(vocabularyRetentionCards.vocabularyId, masteryIds),
     });
     const beforeById = new Map(
-      beforeCards.map((card) => [card.vocabularyId, card] as const)
+      beforeCards.map((card) => [card.vocabularyId, card] as const),
     );
 
     let wrongDiscoveryRecorded = false;
@@ -331,7 +347,7 @@ describe('vocabulary quiz round lifecycle (integration)', () => {
       db,
       profile.id,
       round.id,
-      results
+      results,
     );
     expect(completion.total).toBe(VOCAB_ROUND_SIZE);
 
@@ -363,17 +379,17 @@ describe('vocabulary quiz round lifecycle (integration)', () => {
       // Date assertions use day-level precision — the production and test
       // sm2() calls run milliseconds apart, so exact ISO match is fragile.
       expect(card.lastReviewedAt?.toISOString().slice(0, 10)).toBe(
-        expected.card.lastReviewedAt.slice(0, 10)
+        expected.card.lastReviewedAt.slice(0, 10),
       );
       expect(card.nextReviewAt?.toISOString().slice(0, 10)).toBe(
-        expected.card.nextReviewAt.slice(0, 10)
+        expected.card.nextReviewAt.slice(0, 10),
       );
     }
 
     const storedRound = await db.query.quizRounds.findFirst({
       where: and(
         eq(quizRounds.id, round.id),
-        eq(quizRounds.profileId, profile.id)
+        eq(quizRounds.profileId, profile.id),
       ),
     });
     expect(storedRound?.status).toBe('completed');
@@ -383,7 +399,7 @@ describe('vocabulary quiz round lifecycle (integration)', () => {
     });
     expect(missedItems.length).toBeGreaterThanOrEqual(1);
     expect(
-      missedItems.some((item) => item.questionText.startsWith('Translate: '))
+      missedItems.some((item) => item.questionText.startsWith('Translate: ')),
     ).toBe(true);
   }, 15_000);
 });
