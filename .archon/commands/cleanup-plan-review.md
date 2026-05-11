@@ -155,6 +155,7 @@ For each basename, run from the repo root:
 rg --fixed-strings --files-with-matches "$basename" \
     --glob '!.archon/**' \
     --glob '!docs/**' \
+    --glob '!plans/**' \
     --glob '!node_modules/**' \
     --glob '!dist/**' \
     --glob '!.next/**' \
@@ -163,6 +164,8 @@ rg --fixed-strings --files-with-matches "$basename" \
     --glob '!pnpm-lock.yaml' \
     2>/dev/null || true
 ```
+
+`plans/` is excluded for the same reason `docs/` is: plan documents and fix notes legitimately quote claimed basenames in their narrative, and surfacing the plan doc as a "cross-cutting reference" is a self-fulfilling false positive.
 
 From the resulting paths, subtract:
 
