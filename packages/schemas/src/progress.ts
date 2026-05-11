@@ -534,12 +534,6 @@ export const homeCardSchema = z.object({
 });
 export type HomeCard = z.infer<typeof homeCardSchema>;
 
-export const homeCardsResponseSchema = z.object({
-  cards: z.array(homeCardSchema),
-  coldStart: z.boolean(),
-});
-export type HomeCardsResponse = z.infer<typeof homeCardsResponseSchema>;
-
 export const homeCardInteractionTypeSchema = z.enum(['tap', 'dismiss']);
 export type HomeCardInteractionType = z.infer<
   typeof homeCardInteractionTypeSchema

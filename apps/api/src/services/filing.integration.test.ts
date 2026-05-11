@@ -28,7 +28,7 @@ import {
   fileToLibrary,
   resolveFilingResult,
 } from './filing';
-import type { FilingResponse, LibraryIndex } from '@eduagent/schemas';
+import type { FilingLlmOutput, LibraryIndex } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
 // DB setup — real connection
@@ -40,7 +40,7 @@ function requireDatabaseUrl(): string {
   const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error(
-      'DATABASE_URL is not set. Create .env.test.local or .env.development.local.'
+      'DATABASE_URL is not set. Create .env.test.local or .env.development.local.',
     );
   }
   return url;
@@ -118,7 +118,7 @@ describe('resolveFilingResult (integration)', () => {
     const { profile } = await seedAccountAndProfile();
     const db = createIntegrationDb();
 
-    const filingResponse: FilingResponse = {
+    const filingResponse: FilingLlmOutput = {
       shelf: { name: 'Geography' },
       book: { name: 'Europe', emoji: '🌍', description: 'European geography' },
       chapter: { name: 'Rivers' },
@@ -188,7 +188,7 @@ describe('resolveFilingResult (integration)', () => {
       })
       .returning();
 
-    const filingResponse: FilingResponse = {
+    const filingResponse: FilingLlmOutput = {
       shelf: { id: existingSubject!.id },
       book: {
         name: 'Chemistry',
@@ -227,7 +227,7 @@ describe('resolveFilingResult (integration)', () => {
       .returning();
 
     // File with "science" (lowercase) — should reuse, not create new
-    const filingResponse: FilingResponse = {
+    const filingResponse: FilingLlmOutput = {
       shelf: { name: 'science' },
       book: { name: 'Biology', emoji: '🧬', description: 'Living things' },
       chapter: { name: 'Cells' },
@@ -278,7 +278,7 @@ describe('resolveFilingResult (integration)', () => {
       .returning();
 
     // File with "physics" (lowercase) — should reuse existing book
-    const filingResponse: FilingResponse = {
+    const filingResponse: FilingLlmOutput = {
       shelf: { id: subject!.id },
       book: { name: 'physics', emoji: '⚛️', description: 'Physical science' },
       chapter: { name: 'Mechanics' },
@@ -328,7 +328,7 @@ describe('resolveFilingResult (integration)', () => {
       })
       .returning();
 
-    const filingResponse: FilingResponse = {
+    const filingResponse: FilingLlmOutput = {
       shelf: { id: subject!.id },
       book: { id: existingBook!.id },
       chapter: { name: 'WW2' },
@@ -373,7 +373,7 @@ describe('resolveFilingResult (integration)', () => {
       })
       .returning();
 
-    const filingResponse: FilingResponse = {
+    const filingResponse: FilingLlmOutput = {
       shelf: { name: 'Art' },
       book: {
         name: 'Painting',
@@ -424,7 +424,7 @@ describe('resolveFilingResult (integration)', () => {
           title: `Concurrent Topic ${topicSuffix}`,
           description: 'Race test topic',
         },
-      } satisfies FilingResponse,
+      } satisfies FilingLlmOutput,
       filedFrom: 'session_filing' as const,
     });
 
@@ -444,8 +444,8 @@ describe('resolveFilingResult (integration)', () => {
       .where(
         and(
           eq(subjects.profileId, profile.id),
-          sql`lower(${subjects.name}) = lower(${'ConcurrentShelf'})`
-        )
+          sql`lower(${subjects.name}) = lower(${'ConcurrentShelf'})`,
+        ),
       );
     expect(rows).toHaveLength(1);
   });
@@ -488,7 +488,7 @@ describe('resolveFilingResult (integration)', () => {
           title: `Concurrent Topic ${topicSuffix}`,
           description: 'Race test topic',
         },
-      } satisfies FilingResponse,
+      } satisfies FilingLlmOutput,
       filedFrom: 'session_filing' as const,
     });
 
@@ -508,8 +508,8 @@ describe('resolveFilingResult (integration)', () => {
       .where(
         and(
           eq(curriculumBooks.subjectId, subject!.id),
-          sql`lower(${curriculumBooks.title}) = lower(${'ConcurrentBook'})`
-        )
+          sql`lower(${curriculumBooks.title}) = lower(${'ConcurrentBook'})`,
+        ),
       );
     expect(rows).toHaveLength(1);
   });
@@ -554,7 +554,7 @@ describe('resolveFilingResult (integration)', () => {
       where: eq(curriculumTopics.bookId, first.bookId),
     });
     const matchingTopics = allTopics.filter(
-      (t) => t.title.toLowerCase() === 'light reactions'
+      (t) => t.title.toLowerCase() === 'light reactions',
     );
     expect(matchingTopics).toHaveLength(1);
   });
@@ -628,7 +628,7 @@ describe('resolveFilingResult (integration)', () => {
           topic: { title: 'Fail', description: 'This should not work' },
         },
         filedFrom: 'session_filing',
-      })
+      }),
     ).rejects.toThrow('Shelf not found');
   });
 });
@@ -665,7 +665,7 @@ describe('buildLibraryIndex after filing (integration)', () => {
     expect(index.shelves[0]!.books[0]!.chapters[0]!.name).toBe('Basics');
     expect(index.shelves[0]!.books[0]!.chapters[0]!.topics).toHaveLength(1);
     expect(index.shelves[0]!.books[0]!.chapters[0]!.topics[0]!.title).toBe(
-      'Variables'
+      'Variables',
     );
   });
 });
@@ -693,7 +693,7 @@ describe('fileToLibrary (LLM mock, schema validation)', () => {
     const result = await fileToLibrary(
       { rawInput: 'hydrogen' },
       emptyIndex,
-      mockRouteAndCall
+      mockRouteAndCall,
     );
 
     expect(result.shelf).toEqual({ name: 'Science' });
@@ -733,7 +733,7 @@ describe('fileToLibrary (LLM mock, schema validation)', () => {
         sessionMode: 'freeform',
       },
       emptyIndex,
-      mockRouteAndCall
+      mockRouteAndCall,
     );
 
     expect(result.extracted).toBe('Photosynthesis in plants');
@@ -796,7 +796,7 @@ describe('fileToLibrary (LLM mock, schema validation)', () => {
     const result = await fileToLibrary(
       { rawInput: 'hydrogen' },
       existingIndex,
-      mockRouteAndCall
+      mockRouteAndCall,
     );
 
     expect(result.shelf).toEqual({
@@ -824,7 +824,7 @@ describe('fileToLibrary (LLM mock, schema validation)', () => {
     const result = await fileToLibrary(
       { rawInput: 'variables' },
       emptyIndex,
-      mockRouteAndCall
+      mockRouteAndCall,
     );
 
     expect(result.topic.title).toBe('Variables');
@@ -841,7 +841,7 @@ describe('fileToLibrary (LLM mock, schema validation)', () => {
     });
 
     await expect(
-      fileToLibrary({ rawInput: 'hydrogen' }, emptyIndex, mockRouteAndCall)
+      fileToLibrary({ rawInput: 'hydrogen' }, emptyIndex, mockRouteAndCall),
     ).rejects.toThrow();
   });
 
@@ -850,7 +850,7 @@ describe('fileToLibrary (LLM mock, schema validation)', () => {
     const mockRouteAndCall = jest.fn();
 
     await expect(
-      fileToLibrary({}, emptyIndex, mockRouteAndCall)
+      fileToLibrary({}, emptyIndex, mockRouteAndCall),
     ).rejects.toThrow('Filing requires either rawInput or sessionTranscript');
   });
 });

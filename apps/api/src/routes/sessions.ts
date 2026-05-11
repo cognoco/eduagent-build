@@ -18,6 +18,7 @@ import {
   LlmStreamError,
   RateLimitedError,
   SafetyFilterError,
+  streamErrorFrameSchema,
   streamFallbackFrameSchema,
   UpstreamLlmError,
   getSubjectSessionsResponseSchema,
@@ -572,12 +573,14 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
               return 'unknown_error';
             })();
             await sseStream.writeSSE({
-              data: JSON.stringify({
-                type: 'error',
-                code: errorCode,
-                message:
-                  'Something went wrong while generating a reply. Please try again.',
-              }),
+              data: JSON.stringify(
+                streamErrorFrameSchema.parse({
+                  type: 'error',
+                  code: errorCode,
+                  message:
+                    'Something went wrong while generating a reply. Please try again.',
+                }),
+              ),
             });
             return;
           }
@@ -741,10 +744,12 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
               }
             }
             await sseStream.writeSSE({
-              data: JSON.stringify({
-                type: 'error',
-                message: 'Failed to save session progress. Please try again.',
-              }),
+              data: JSON.stringify(
+                streamErrorFrameSchema.parse({
+                  type: 'error',
+                  message: 'Failed to save session progress. Please try again.',
+                }),
+              ),
             });
           }
         });
