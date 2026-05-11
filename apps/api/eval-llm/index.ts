@@ -34,6 +34,7 @@ import { exchangesFlow } from './flows/exchanges';
 import { topicProbeSignalsFlow } from './flows/topic-probe-signals';
 import { topicIntentMatcherFlow } from './flows/topic-intent-matcher';
 import { probesFlow } from './flows/probes';
+import { bookSuggestionRegenerationFlow } from './flows/book-suggestion-regeneration';
 import {
   listFlows,
   parseCliArgs,
@@ -82,6 +83,7 @@ const FLOWS: FlowDefinition[] = [
   topicProbeSignalsFlow as FlowDefinition,
   topicIntentMatcherFlow as FlowDefinition,
   probesFlow as FlowDefinition,
+  bookSuggestionRegenerationFlow as FlowDefinition,
 ];
 
 async function main(): Promise<void> {
@@ -102,7 +104,7 @@ async function main(): Promise<void> {
   console.log(
     `\nEval-LLM harness — tier ${
       options.live ? '2 (live LLM calls)' : '1 (prompt snapshots only)'
-    }\n`
+    }\n`,
   );
 
   const summary: RunSummary = await runHarness(FLOWS, options);
@@ -129,7 +131,7 @@ async function main(): Promise<void> {
   if (options.updateBaseline || options.checkBaseline) {
     if (!options.live) {
       console.error(
-        '--check-baseline / --update-baseline require --live (envelope metrics are only collected from live LLM responses)'
+        '--check-baseline / --update-baseline require --live (envelope metrics are only collected from live LLM responses)',
       );
       process.exit(2);
     }
@@ -146,7 +148,7 @@ async function main(): Promise<void> {
     const baseline = await readBaseline();
     if (!baseline) {
       console.error(
-        `No baseline found at ${BASELINE_PATH} — run with --update-baseline first to seed it.`
+        `No baseline found at ${BASELINE_PATH} — run with --update-baseline first to seed it.`,
       );
       process.exit(2);
     }
@@ -155,11 +157,11 @@ async function main(): Promise<void> {
     const drifts = compareAgainstBaseline(
       summary.envelopeMetrics,
       baseline,
-      tolerance
+      tolerance,
     );
     if (drifts.length === 0) {
       console.log(
-        `Baseline check passed (tolerance: ${(tolerance * 100).toFixed(1)}pp).`
+        `Baseline check passed (tolerance: ${(tolerance * 100).toFixed(1)}pp).`,
       );
       return;
     }
@@ -167,8 +169,8 @@ async function main(): Promise<void> {
     console.error('');
     console.error(
       `Baseline tolerance: ${(tolerance * 100).toFixed(
-        1
-      )}pp. Inspect the drift above, then run with --update-baseline if the shift is intentional.`
+        1,
+      )}pp. Inspect the drift above, then run with --update-baseline if the shift is intentional.`,
     );
     process.exit(1);
   }

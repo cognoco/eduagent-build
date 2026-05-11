@@ -159,9 +159,15 @@ export async function generateCategorizedBookSuggestions(
     }
 
     const blockedTitles = [...existingBookTitles, ...existingSuggestionTitles];
-    const filtered = parsed.suggestions.filter(
-      (s) => !blockedTitles.some((b) => areEquivalentBookTitles(b, s.title)),
-    );
+    const seen = new Set<string>();
+    const filtered = parsed.suggestions.filter((s) => {
+      if (blockedTitles.some((b) => areEquivalentBookTitles(b, s.title)))
+        return false;
+      const lower = s.title.toLowerCase();
+      if (seen.has(lower)) return false;
+      seen.add(lower);
+      return true;
+    });
     if (filtered.length === 0) return;
 
     try {
@@ -181,7 +187,7 @@ export async function generateCategorizedBookSuggestions(
   });
 }
 
-function buildPrompt(args: {
+export function buildPrompt(args: {
   subjectName: string;
   existingBookTitles: string[];
   existingSuggestionTitles: string[];

@@ -126,6 +126,7 @@ const makeProfile = (overrides: Partial<Profile> = {}): Profile => ({
   isOwner: true,
   hasPremiumLlm: false,
   consentStatus: null,
+  linkCreatedAt: null,
   conversationLanguage: 'en',
   pronouns: null,
   birthYear: 1985,

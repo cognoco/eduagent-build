@@ -164,6 +164,11 @@
         "continueOwn": "Mit deinem eigenen Lernen weitermachen",
         "continueOwnSubtitle": "Mach mit {{topicTitle}} in {{subjectName}} weiter",
         "continueOwnEmptySubtitle": "Mach dort weiter, wo du aufgehört hast"
+      },
+      "snapshot": {
+        "noActivity": "Keine Aktivität diese Woche",
+        "sessions_one": "{{count}} Sitzung diese Woche",
+        "sessions_other": "{{count}} Sitzungen diese Woche"
       }
     }
   },
@@ -193,9 +198,9 @@
     "demoAlertMessage": "Verknüpfe das Konto deines Kindes, um echte Daten zu sehen."
   },
   "family": {
-    "orientationCueBody": "Kinder, ihr Fortschritt und Familieneinstellungen findest du hier.",
+    "orientationCueBody": "Fortschritt der Kinder und dein eigenes Lernen an einem Ort.",
     "orientationCueDismiss": "Verstanden",
-    "orientationCueTitle": "Das ist dein Familien-Hub",
+    "orientationCueTitle": "Das ist dein Zuhause",
     "subtitle": "Alle, mit denen du gemeinsam lernst.",
     "title": "Familie",
     "withdrawal": {

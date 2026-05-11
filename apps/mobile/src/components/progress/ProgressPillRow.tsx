@@ -1,4 +1,3 @@
-import { useEffect, useRef } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { Profile } from '@eduagent/schemas';
@@ -17,14 +16,6 @@ export function ProgressPillRow({
   onSelect,
 }: ProgressPillRowProps): React.ReactElement | null {
   const { t } = useTranslation();
-  const scrollRef = useRef<ScrollView>(null);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      scrollRef.current?.scrollTo({ x: 0, animated: false });
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [selectedProfileId]);
 
   if (!ownProfileId || childrenProfiles.length === 0) return null;
 
@@ -39,7 +30,6 @@ export function ProgressPillRow({
   return (
     <View className="mb-4" testID="progress-parent-pill-row">
       <ScrollView
-        ref={scrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{ gap: 8, paddingRight: 24 }}

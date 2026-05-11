@@ -298,15 +298,16 @@ describe('PATCH /v1/nudges/:id/read', () => {
     );
   });
 
-  it('returns count 0 when nudge not found', async () => {
+  it('returns 404 when nudge not found', async () => {
     mockMarkNudgeRead.mockResolvedValue(0);
     const res = await app.request(
       '/v1/nudges/nudge-missing/read',
       { method: 'PATCH', headers: PARENT_HEADERS },
       TEST_ENV,
     );
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ success: true, count: 0 });
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.code).toBe('NOT_FOUND');
   });
 });
 

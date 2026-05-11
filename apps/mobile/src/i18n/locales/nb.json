@@ -164,6 +164,11 @@
         "continueOwn": "Fortsett din egen læring",
         "continueOwnSubtitle": "Fortsett med {{topicTitle}} i {{subjectName}}",
         "continueOwnEmptySubtitle": "Fortsett der du slapp"
+      },
+      "snapshot": {
+        "noActivity": "Ingen aktivitet denne uken",
+        "sessions_one": "{{count}} økt denne uken",
+        "sessions_other": "{{count}} økter denne uken"
       }
     }
   },
@@ -193,9 +198,9 @@
     "demoAlertMessage": "Koble til barnets konto for å se ekte data."
   },
   "family": {
-    "orientationCueBody": "Barn, fremgangen deres og familieinnstillinger finner du her.",
+    "orientationCueBody": "Barnas fremgang og din egen læring, alt på ett sted.",
     "orientationCueDismiss": "Skjønner",
-    "orientationCueTitle": "Dette er familienavet ditt",
+    "orientationCueTitle": "Dette er hjemmet ditt",
     "subtitle": "Alle du lærer sammen med.",
     "title": "Familie",
     "withdrawal": {

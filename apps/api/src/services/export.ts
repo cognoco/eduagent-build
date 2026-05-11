@@ -210,6 +210,10 @@ export async function generateExport(
         })
       : [];
 
+  const linkCreatedAtByChildId = new Map(
+    familyLinkRows.map((link) => [link.childProfileId, link.createdAt]),
+  );
+
   const learningProfileRows =
     profileIds.length > 0
       ? await db.query.learningProfiles.findMany({
@@ -259,7 +263,7 @@ export async function generateExport(
         row.conversationLanguage as Profile['conversationLanguage'],
       pronouns: row.pronouns ?? null,
       consentStatus: consentStatusByProfileId.get(row.id) ?? null,
-      linkCreatedAt: null,
+      linkCreatedAt: linkCreatedAtByChildId.get(row.id)?.toISOString() ?? null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     })),

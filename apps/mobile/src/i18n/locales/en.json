@@ -164,6 +164,11 @@
         "continueOwn": "Continue your own learning",
         "continueOwnSubtitle": "Pick up {{topicTitle}} in {{subjectName}}",
         "continueOwnEmptySubtitle": "Pick up where you left off"
+      },
+      "snapshot": {
+        "noActivity": "No activity this week",
+        "sessions_one": "{{count}} session this week",
+        "sessions_other": "{{count}} sessions this week"
       }
     }
   },
@@ -193,9 +198,9 @@
     "demoAlertMessage": "Link your child's account to see real data."
   },
   "family": {
-    "orientationCueBody": "Children, their progress, and family settings live here.",
+    "orientationCueBody": "Kids' progress and your own learning, all in one place.",
     "orientationCueDismiss": "Got it",
-    "orientationCueTitle": "This is your family hub",
+    "orientationCueTitle": "This is your home",
     "subtitle": "Everyone you're learning alongside.",
     "title": "Family",
     "withdrawal": {

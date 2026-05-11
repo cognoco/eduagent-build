@@ -27,7 +27,16 @@ const SUBJECT_ID = 'subject-1';
 const subjectRow = { id: SUBJECT_ID, profileId: PROFILE_ID };
 
 function makeSuggestion(id: string) {
-  return { id, subjectId: SUBJECT_ID, pickedAt: null };
+  return {
+    id,
+    subjectId: SUBJECT_ID,
+    title: `Book ${id}`,
+    emoji: null,
+    description: null,
+    category: null,
+    createdAt: new Date('2026-01-01T00:00:00Z'),
+    pickedAt: null,
+  };
 }
 
 /**

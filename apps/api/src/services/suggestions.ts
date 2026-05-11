@@ -18,6 +18,21 @@ import {
 } from '@eduagent/database';
 import type { BookSuggestion } from '@eduagent/schemas';
 
+function mapBookSuggestion(
+  row: typeof bookSuggestions.$inferSelect,
+): BookSuggestion {
+  return {
+    id: row.id,
+    subjectId: row.subjectId,
+    title: row.title,
+    emoji: row.emoji,
+    description: row.description,
+    category: row.category,
+    createdAt: row.createdAt.toISOString(),
+    pickedAt: row.pickedAt?.toISOString() ?? null,
+  };
+}
+
 export async function getUnpickedBookSuggestions(
   db: Database,
   profileId: string,
@@ -162,7 +177,7 @@ export async function getUnpickedBookSuggestionsEnvelope(
   const curriculumBookCount = bookCountRows[0]?.count ?? 0;
 
   return {
-    suggestions: unpicked as unknown as BookSuggestion[],
+    suggestions: unpicked.map(mapBookSuggestion),
     curriculumBookCount,
   };
 }
@@ -209,7 +224,7 @@ export async function getUnpickedBookSuggestionsWithTopup(
   const curriculumBookCount = bookCountRows[0]?.count ?? 0;
 
   return {
-    suggestions: unpicked as unknown as BookSuggestion[],
+    suggestions: unpicked.map(mapBookSuggestion),
     curriculumBookCount,
   };
 }

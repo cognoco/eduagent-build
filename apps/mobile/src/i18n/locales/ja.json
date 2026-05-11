@@ -164,6 +164,11 @@
         "continueOwn": "自分の学習を続ける",
         "continueOwnSubtitle": "{{subjectName}}の{{topicTitle}}を続ける",
         "continueOwnEmptySubtitle": "前回の続きから始める"
+      },
+      "snapshot": {
+        "noActivity": "今週の活動はありません",
+        "sessions_one": "今週 {{count}} セッション",
+        "sessions_other": "今週 {{count}} セッション"
       }
     }
   },
@@ -193,9 +198,9 @@
     "demoAlertMessage": "お子様のアカウントをリンクして、実際のデータを確認しましょう。"
   },
   "family": {
-    "orientationCueBody": "お子さま、その学習の進捗、家族の設定はここにあります。",
+    "orientationCueBody": "お子さまの進捗とあなた自身の学習を、ひとつの場所で。",
     "orientationCueDismiss": "OK",
-    "orientationCueTitle": "ここはあなたの家族ハブです",
+    "orientationCueTitle": "ここがあなたのホームです",
     "subtitle": "一緒に学んでいるみんな。",
     "title": "家族",
     "withdrawal": {

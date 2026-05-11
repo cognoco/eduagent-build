@@ -34,6 +34,7 @@ function formatChildSnapshot(
   child: Profile,
   dashboard: DashboardData | undefined,
   fallback: string,
+  t: (key: string, opts?: Record<string, unknown>) => string,
 ): string {
   const dashboardChild = dashboard?.children.find(
     (entry) => entry.profileId === child.id,
@@ -50,9 +51,11 @@ function formatChildSnapshot(
     return headline.comparison ? `${value} — ${headline.comparison}` : value;
   }
 
-  if (dashboardChild.sessionsThisWeek === 0) return 'No activity this week';
-  if (dashboardChild.sessionsThisWeek === 1) return '1 session this week';
-  return `${dashboardChild.sessionsThisWeek} sessions this week`;
+  if (dashboardChild.sessionsThisWeek === 0)
+    return t('home.parent.snapshot.noActivity');
+  return t('home.parent.snapshot.sessions', {
+    count: dashboardChild.sessionsThisWeek,
+  });
 }
 
 export function ParentHomeScreen({
@@ -190,6 +193,7 @@ export function ParentHomeScreen({
                 t('home.parent.cards.checkChildFallback', {
                   childName: child.displayName,
                 }),
+                t,
               )}
               icon="stats-chart-outline"
               variant={index === 0 ? 'highlight' : 'default'}

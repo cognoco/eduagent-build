@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Pressable,
   RefreshControl,
@@ -203,6 +203,16 @@ export default function ProgressScreen(): React.ReactElement {
   const [selectedProfileId, setSelectedProfileId] = useState<string>(
     () => (hasLinked ? linkedChildren[0]?.id : activeProfile?.id) ?? '',
   );
+
+  // Re-seed when linked children load after mount (query-cache race).
+  const mountedWithoutChildren = useRef(!hasLinked);
+  useEffect(() => {
+    if (mountedWithoutChildren.current && hasLinked && linkedChildren[0]?.id) {
+      mountedWithoutChildren.current = false;
+      setSelectedProfileId(linkedChildren[0].id);
+    }
+  }, [hasLinked, linkedChildren]);
+
   const isViewingSelf = !hasLinked || selectedProfileId === activeProfile?.id;
 
   const ownInventoryQuery = useProgressInventory();

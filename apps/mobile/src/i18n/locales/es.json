@@ -164,6 +164,11 @@
         "continueOwn": "Continuar tu propio aprendizaje",
         "continueOwnSubtitle": "Sigue con {{topicTitle}} en {{subjectName}}",
         "continueOwnEmptySubtitle": "Retoma donde lo dejaste"
+      },
+      "snapshot": {
+        "noActivity": "Sin actividad esta semana",
+        "sessions_one": "{{count}} sesión esta semana",
+        "sessions_other": "{{count}} sesiones esta semana"
       }
     }
   },
@@ -193,9 +198,9 @@
     "demoAlertMessage": "Vincula la cuenta de tu hijo para ver datos reales."
   },
   "family": {
-    "orientationCueBody": "Aquí están los niños, su progreso y la configuración familiar.",
+    "orientationCueBody": "El progreso de tus hijos y tu propio aprendizaje, todo en un solo lugar.",
     "orientationCueDismiss": "Entendido",
-    "orientationCueTitle": "Este es tu centro familiar",
+    "orientationCueTitle": "Este es tu hogar",
     "subtitle": "Todos con los que estás aprendiendo.",
     "title": "Familia",
     "withdrawal": {

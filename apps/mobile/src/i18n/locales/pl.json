@@ -164,6 +164,11 @@
         "continueOwn": "Kontynuuj własną naukę",
         "continueOwnSubtitle": "Wróć do {{topicTitle}} w {{subjectName}}",
         "continueOwnEmptySubtitle": "Wróć tam, gdzie przerwano"
+      },
+      "snapshot": {
+        "noActivity": "Brak aktywności w tym tygodniu",
+        "sessions_one": "{{count}} sesja w tym tygodniu",
+        "sessions_other": "{{count}} sesji w tym tygodniu"
       }
     }
   },
@@ -217,9 +222,9 @@
     "demoAlertMessage": "Połącz konto swojego dziecka, aby zobaczyć prawdziwe dane."
   },
   "family": {
-    "orientationCueBody": "Dzieci, ich postępy i ustawienia rodzinne znajdziesz tutaj.",
+    "orientationCueBody": "Postępy dzieci i Twoja własna nauka w jednym miejscu.",
     "orientationCueDismiss": "Rozumiem",
-    "orientationCueTitle": "To jest Twoje centrum rodziny",
+    "orientationCueTitle": "To jest Twój dom",
     "subtitle": "Wszyscy, z którymi się uczysz.",
     "title": "Rodzina",
     "withdrawal": {
