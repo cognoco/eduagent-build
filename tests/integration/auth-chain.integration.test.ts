@@ -14,7 +14,7 @@
  * 5. Protected paths with expired JWT → 401
  * 6. Protected paths with valid JWT → passes auth (not 401)
  * 7. Missing CLERK_JWKS_URL → 401 (config error caught gracefully)
- * Note: /v1/auth/* is NOT in PUBLIC_PATHS — auth is required [BUG-1007]
+ * 8. Deleted auth stub routes → 401 unauthenticated, 404 authenticated
  */
 
 import { buildIntegrationEnv, cleanupAccounts } from './helpers';
@@ -64,16 +64,30 @@ describe('Integration: Auth chain — public paths', () => {
     }
   });
 
-  // [BUG-1007] /v1/auth/* is NOT public — auth middleware requires a valid
-  // token. This was a deliberate security decision: stub auth endpoints must
-  // not be reachable without authentication.
-  it('/v1/auth/* paths require authentication [BUG-1007]', async () => {
+  // Auth stub routes were deleted (D-C1-2). Unauthenticated → 401 (auth
+  // middleware rejects before routing); authenticated → 404 (route gone).
+  it('POST /v1/auth/register returns 401 without token (route deleted)', async () => {
     const res = await app.request(
       '/v1/auth/register',
       { method: 'POST' },
       TEST_ENV,
     );
     expect(res.status).toBe(401);
+  });
+
+  it('POST /v1/auth/register returns 404 with valid token (route deleted)', async () => {
+    const res = await app.request(
+      '/v1/auth/register',
+      {
+        method: 'POST',
+        headers: buildAuthHeaders({
+          sub: 'auth-stub-test-user',
+          email: 'stub@test.test',
+        }),
+      },
+      TEST_ENV,
+    );
+    expect(res.status).toBe(404);
   });
 
   it('/v1/consent/respond skips authentication', async () => {
