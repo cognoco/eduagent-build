@@ -3,7 +3,7 @@
 //
 // Unit tests for createNudge, listUnreadNudges, markNudgeRead,
 // markAllNudgesRead. Security-critical paths:
-//   - Rate limiting (max 4 nudges / 24h per sender-recipient pair)
+//   - Rate limiting (max 4 nudges / 24h per child, shared across all senders)
 //   - Consent gating (must be CONSENTED)
 //   - Parent access guard (family link required)
 //   - Quiet hours (21:00–07:00 in recipient tz → suppress push, still insert)
@@ -125,8 +125,11 @@ interface MakeDbOptions {
   /** toProfile returned by db.query.profiles.findFirst.
    *  Pass NO_PROFILE to simulate a missing row (findFirst returns undefined). */
   toProfile?: { displayName: string; accountId: string } | null;
-  /** Account timezone returned by db.query.accounts.findFirst */
+  /** Account timezone returned by db.query.accounts.findFirst (child/recipient) */
   accountTimezone?: string | null;
+  /** Account timezone for the parent (sender). When set, child and parent get
+   *  separate timezone values; otherwise both share accountTimezone. */
+  parentAccountTimezone?: string;
   /** Rows returned by the list query (innerJoin chain) */
   listRows?: ReturnType<typeof makeInsertedRow>[];
   /** Rows returned by update().returning() */
@@ -139,6 +142,7 @@ function makeDb({
   fromProfile = { displayName: 'Parent Name', accountId: ACCOUNT_ID },
   toProfile = { displayName: 'Child Name', accountId: ACCOUNT_ID },
   accountTimezone = 'UTC',
+  parentAccountTimezone,
   listRows = [],
   updateRows = [],
 }: MakeDbOptions = {}): Database {
@@ -191,11 +195,18 @@ function makeDb({
     .mockResolvedValueOnce(fromProfile ?? undefined)
     .mockResolvedValueOnce(toProfile ?? undefined);
 
-  const accountsFindFirst = jest
-    .fn()
-    .mockResolvedValue(
+  const accountsFindFirst = jest.fn();
+  if (parentAccountTimezone !== undefined) {
+    accountsFindFirst
+      .mockResolvedValueOnce(
+        accountTimezone !== null ? { timezone: accountTimezone } : undefined,
+      )
+      .mockResolvedValueOnce({ timezone: parentAccountTimezone });
+  } else {
+    accountsFindFirst.mockResolvedValue(
       accountTimezone !== null ? { timezone: accountTimezone } : undefined,
     );
+  }
 
   // ── transaction wrapper ───────────────────────────────────────────────────
   // createNudge wraps count-check + insert in db.transaction(). The tx object
@@ -619,6 +630,26 @@ describe('createNudge', () => {
 
       expect(result.pushSent).toBe(false);
       expect(mockSendPushNotification).not.toHaveBeenCalled();
+    });
+
+    it('sends push when parent is in quiet hours but child is not (child-only check)', async () => {
+      // 12:00 UTC = noon in UTC (child → not quiet)
+      // 12:00 UTC = 00:00 NZST in Pacific/Auckland (parent → quiet)
+      // Push should still be sent because only the child's timezone matters.
+      const db = makeDb({
+        accountTimezone: 'UTC',
+        parentAccountTimezone: 'Pacific/Auckland',
+      });
+
+      const result = await createNudge(db, {
+        fromProfileId: FROM_PROFILE_ID,
+        toProfileId: TO_PROFILE_ID,
+        template: 'you_got_this',
+        now: BASE_NOW, // 12:00 UTC
+      });
+
+      expect(result.pushSent).toBe(true);
+      expect(mockSendPushNotification).toHaveBeenCalled();
     });
 
     it('defaults to UTC when no account record is found (toProfile has no accountId)', async () => {

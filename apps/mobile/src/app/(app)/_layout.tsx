@@ -1243,10 +1243,10 @@ function ConsentPendingGate(): React.ReactElement {
             className="py-3.5 px-8 items-center mb-3 w-full"
             testID="consent-switch-profile"
             accessibilityRole="button"
-            accessibilityLabel="Switch profile"
+            accessibilityLabel={t('tabs.consentGate.switchProfile')}
           >
             <Text className="text-body font-semibold text-text-secondary">
-              Switch profile
+              {t('tabs.consentGate.switchProfile')}
             </Text>
           </Pressable>
         )}
@@ -1256,9 +1256,11 @@ function ConsentPendingGate(): React.ReactElement {
           className="py-3.5 px-8 items-center w-full"
           testID="consent-sign-out"
           accessibilityRole="button"
-          accessibilityLabel="Sign out"
+          accessibilityLabel={t('tabs.consentGate.signOut')}
         >
-          <Text className="text-body font-semibold text-primary">Sign out</Text>
+          <Text className="text-body font-semibold text-primary">
+            {t('tabs.consentGate.signOut')}
+          </Text>
         </Pressable>
       </GateContent>
     </ScrollView>

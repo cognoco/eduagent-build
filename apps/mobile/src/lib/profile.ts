@@ -298,6 +298,7 @@ export function ProfileProvider({
         'book',
         'book-suggestions',
         'all-books',
+        'nudges',
       ];
       await queryClient.resetQueries({
         predicate: (query) =>
