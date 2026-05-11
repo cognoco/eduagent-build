@@ -1,13 +1,18 @@
+import { useEffect, useRef } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Sentry from '@sentry/react-native';
 import { useTranslation } from 'react-i18next';
 import { ErrorFallback } from '../../../../components/common';
 import { MetricCard } from '../../../../components/progress';
 import { classifyApiError } from '../../../../lib/format-api-error';
 import { formatMinutes } from '../../../../lib/format-relative-date';
 import { goBackOrReplace } from '../../../../lib/navigation';
-import { useProfileWeeklyReportDetail } from '../../../../hooks/use-progress';
+import {
+  useProfileWeeklyReportDetail,
+  useMarkProfileWeeklyReportViewed,
+} from '../../../../hooks/use-progress';
 
 function formatWeeklyReportRange(weekStart: string): string {
   const start = new Date(`${weekStart}T00:00:00Z`);
@@ -45,6 +50,23 @@ export default function ProgressWeeklyReportDetail(): React.ReactElement {
     error,
     refetch,
   } = useProfileWeeklyReportDetail(reportId);
+
+  const markViewed = useMarkProfileWeeklyReportViewed();
+  const markViewedRef = useRef(markViewed);
+  markViewedRef.current = markViewed;
+  const viewedRef = useRef(false);
+
+  useEffect(() => {
+    if (!reportId || !report || report.viewedAt) return;
+    if (viewedRef.current) return;
+    viewedRef.current = true;
+    markViewedRef.current.mutateAsync({ reportId }).catch((err: unknown) => {
+      Sentry.captureException(err, {
+        tags: { feature: 'weekly_report', action: 'mark_viewed_self' },
+        extra: { reportId },
+      });
+    });
+  }, [reportId, report]);
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>

@@ -273,7 +273,8 @@
       "viewAndManage": "表示・管理",
       "screenTitle": "学習サポート設定",
       "notSureWhichToPick": "どれを選べばいいかわからない？",
-      "guideActive": "アクティブ"
+      "guideActive": "アクティブ",
+      "childScreenTitle": "{{name}}の学習サポート"
     },
     "learningPreferences": {
       "rowLabel": "学習設定",

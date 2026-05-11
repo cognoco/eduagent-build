@@ -21,10 +21,14 @@ jest.mock(
   }),
 );
 
+const mockMarkViewed = {
+  mutateAsync: jest.fn().mockResolvedValue({ viewed: true }),
+};
 jest.mock(
   '../../../../hooks/use-progress' /* gc1-allow: query-hook stub at unit-test boundary; real useProfileWeeklyReportDetail needs QueryClientProvider + API client */,
   () => ({
     useProfileWeeklyReportDetail: () => mockUseProfileWeeklyReportDetail(),
+    useMarkProfileWeeklyReportViewed: () => mockMarkViewed,
   }),
 );
 
@@ -38,6 +42,10 @@ jest.mock(
     }),
   }),
 );
+
+jest.mock('@sentry/react-native', () => ({
+  captureException: jest.fn(),
+}));
 
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({

@@ -21,12 +21,20 @@ jest.mock(
   }),
 );
 
+const mockMarkViewed = {
+  mutateAsync: jest.fn().mockResolvedValue({ viewed: true }),
+};
 jest.mock(
   '../../../../hooks/use-progress' /* gc1-allow: query-hook stub at unit-test boundary; real useProfileReportDetail needs QueryClientProvider + API client */,
   () => ({
     useProfileReportDetail: () => mockUseProfileReportDetail(),
+    useMarkProfileReportViewed: () => mockMarkViewed,
   }),
 );
+
+jest.mock('@sentry/react-native', () => ({
+  captureException: jest.fn(),
+}));
 
 jest.mock(
   '../../../../lib/format-api-error' /* gc1-allow: classifyApiError is error-classification boundary; unit test stubs classified output, not implementation detail */,

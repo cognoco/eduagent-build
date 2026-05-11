@@ -273,7 +273,8 @@
       "viewAndManage": "Vis og administrer",
       "screenTitle": "Læringstilpasning",
       "notSureWhichToPick": "Ikke sikker på hvilken du skal velge?",
-      "guideActive": "Aktiv"
+      "guideActive": "Aktiv",
+      "childScreenTitle": "{{name}}s læringstilpasning"
     },
     "learningPreferences": {
       "rowLabel": "Læringsinnstillinger",

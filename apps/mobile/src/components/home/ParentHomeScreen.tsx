@@ -27,8 +27,8 @@ import { useThemeColors } from '../../lib/theme';
 import { MentomateLogo } from '../MentomateLogo';
 import { WithdrawalCountdownBanner } from '../family/WithdrawalCountdownBanner';
 import { NudgeActionSheet } from '../nudge/NudgeActionSheet';
-import { ChildAccommodationSection } from './ChildAccommodationSection';
-import { ChildQuotaLine } from './ChildQuotaLine';
+import { useChildLearnerProfile } from '../../hooks/use-learner-profile';
+import { ACCOMMODATION_OPTIONS } from '../../lib/accommodation-options';
 import { ParentTransitionNotice } from './ParentTransitionNotice';
 
 const MAX_TONIGHT_PROMPTS = 3;
@@ -341,6 +341,52 @@ function ChildCommandCard({
   );
 }
 
+function ChildAccommodationRow({
+  childProfileId,
+  childName,
+}: {
+  childProfileId: string;
+  childName: string;
+}): React.ReactElement {
+  const { t } = useTranslation();
+  const colors = useThemeColors();
+  const router = useRouter();
+  const { data: learnerProfile } = useChildLearnerProfile(childProfileId);
+
+  const activeOption = ACCOMMODATION_OPTIONS.find(
+    (o) => o.mode === (learnerProfile?.accommodationMode ?? 'none'),
+  );
+
+  return (
+    <Pressable
+      onPress={() =>
+        router.push(
+          `/(app)/more/accommodation?childProfileId=${childProfileId}`,
+        )
+      }
+      className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3.5 mb-2"
+      style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
+      accessibilityRole="button"
+      accessibilityLabel={t('more.accommodation.childScreenTitle', {
+        name: childName,
+      })}
+      testID={`child-accommodation-row-${childProfileId}`}
+    >
+      <View className="flex-1 pr-3">
+        <Text className="text-body font-semibold text-text-primary">
+          {t('more.accommodation.childScreenTitle', { name: childName })}
+        </Text>
+        {activeOption ? (
+          <Text className="text-body-sm text-text-secondary mt-0.5">
+            {activeOption.title} — {activeOption.description}
+          </Text>
+        ) : null}
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+    </Pressable>
+  );
+}
+
 export function ParentHomeScreen({
   activeProfile,
   now,
@@ -452,7 +498,6 @@ export function ParentHomeScreen({
         <Text className="text-body-sm text-text-secondary mt-0.5">
           {subtitle}
         </Text>
-        <ChildQuotaLine />
       </View>
 
       <ScrollView
@@ -552,7 +597,7 @@ export function ParentHomeScreen({
           ))}
 
           {linkedChildren.map((child) => (
-            <ChildAccommodationSection
+            <ChildAccommodationRow
               key={`accommodation-${child.id}`}
               childProfileId={child.id}
               childName={child.displayName}

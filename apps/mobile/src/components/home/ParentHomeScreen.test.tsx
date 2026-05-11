@@ -110,14 +110,12 @@ jest.mock(
   }),
 );
 
-jest.mock('./ChildQuotaLine' /* gc1-allow: has own test suite */, () => ({
-  ChildQuotaLine: () => null,
-}));
-
 jest.mock(
-  './ChildAccommodationSection' /* gc1-allow: has own hook tree (useChildLearnerProfile, useUpdateAccommodationMode) — tested separately */,
+  '../../hooks/use-learner-profile' /* gc1-allow: external hook boundary — wraps TanStack query that requires QueryClient */,
   () => ({
-    ChildAccommodationSection: () => null,
+    useChildLearnerProfile: () => ({
+      data: { accommodationMode: 'none' },
+    }),
   }),
 );
 

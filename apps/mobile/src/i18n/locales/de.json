@@ -273,7 +273,8 @@
       "viewAndManage": "Anzeigen & verwalten",
       "screenTitle": "Lernanpassung",
       "notSureWhichToPick": "Nicht sicher, welche du wählen sollst?",
-      "guideActive": "Aktiv"
+      "guideActive": "Aktiv",
+      "childScreenTitle": "{{name}}s Lernanpassung"
     },
     "learningPreferences": {
       "rowLabel": "Lernpräferenzen",

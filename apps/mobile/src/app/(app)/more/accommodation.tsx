@@ -2,25 +2,27 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useCallback, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import type { AccommodationMode, CelebrationLevel } from '@eduagent/schemas';
 
 import { useProfile } from '../../../lib/profile';
 import {
+  useChildLearnerProfile,
   useLearnerProfile,
   useUpdateAccommodationMode,
 } from '../../../hooks/use-learner-profile';
 import {
   useCelebrationLevel,
+  useChildCelebrationLevel,
   useUpdateCelebrationLevel,
+  useUpdateChildCelebrationLevel,
 } from '../../../hooks/use-settings';
 import {
   ACCOMMODATION_GUIDE,
   ACCOMMODATION_OPTIONS,
 } from '../../../lib/accommodation-options';
-import { track } from '../../../lib/analytics';
-import { FAMILY_HOME_PATH, goBackOrReplace } from '../../../lib/navigation';
+import { goBackOrReplace } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
 import { useThemeColors } from '../../../lib/theme';
 import { LearningModeOption } from '../../../components/more/settings-rows';
@@ -30,23 +32,44 @@ export default function AccommodationScreen(): React.ReactElement {
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const { activeProfile, profiles } = useProfile();
+  const { profiles } = useProfile();
   const [showGuide, setShowGuide] = useState(false);
 
+  const { childProfileId } = useLocalSearchParams<{
+    childProfileId?: string;
+  }>();
+  const isChildMode = !!childProfileId;
+
+  const childProfile = isChildMode
+    ? profiles.find((p) => p.id === childProfileId)
+    : undefined;
+  const childName = childProfile?.displayName;
+
+  const selfLearner = useLearnerProfile();
+  const childLearner = useChildLearnerProfile(
+    isChildMode ? childProfileId : undefined,
+  );
+  const learnerQuery = isChildMode ? childLearner : selfLearner;
   const {
     data: learnerProfile,
     isError: learnerProfileError,
     refetch: refetchLearnerProfile,
-  } = useLearnerProfile();
+  } = learnerQuery;
+
   const updateAccommodation = useUpdateAccommodationMode();
+
+  const selfCelebration = useCelebrationLevel();
+  const childCelebration = useChildCelebrationLevel(
+    isChildMode ? childProfileId : undefined,
+  );
+  const celebrationQuery = isChildMode ? childCelebration : selfCelebration;
   const { data: celebrationLevel = 'big_only', isLoading: celebrationLoading } =
-    useCelebrationLevel();
-  const updateCelebrationLevel = useUpdateCelebrationLevel();
+    celebrationQuery;
+
+  const updateSelfCelebration = useUpdateCelebrationLevel();
+  const updateChildCelebration = useUpdateChildCelebrationLevel();
 
   const currentMode = learnerProfile?.accommodationMode ?? 'none';
-  const linkedChildren = activeProfile?.isOwner
-    ? profiles.filter((p) => p.id !== activeProfile.id && !p.isOwner)
-    : [];
 
   const handleBack = useCallback(() => {
     goBackOrReplace(router, '/(app)/more/learning-preferences' as const);
@@ -56,7 +79,7 @@ export default function AccommodationScreen(): React.ReactElement {
     (mode: AccommodationMode) => {
       if (mode === currentMode) return;
       updateAccommodation.mutate(
-        { accommodationMode: mode },
+        { accommodationMode: mode, ...(isChildMode ? { childProfileId } : {}) },
         {
           onError: () => {
             platformAlert(
@@ -67,28 +90,42 @@ export default function AccommodationScreen(): React.ReactElement {
         },
       );
     },
-    [currentMode, updateAccommodation, t],
+    [currentMode, updateAccommodation, t, isChildMode, childProfileId],
   );
 
   const handleSelectCelebrationLevel = (next: CelebrationLevel): void => {
     if (celebrationLevel === next) return;
-    updateCelebrationLevel.mutate(next, {
-      onError: () => {
-        platformAlert(
-          t('more.errors.couldNotSaveSetting'),
-          t('more.errors.tryAgain'),
-        );
-      },
-    });
+    if (isChildMode) {
+      updateChildCelebration.mutate(
+        { childProfileId, celebrationLevel: next },
+        {
+          onError: () => {
+            platformAlert(
+              t('more.errors.couldNotSaveSetting'),
+              t('more.errors.tryAgain'),
+            );
+          },
+        },
+      );
+    } else {
+      updateSelfCelebration.mutate(next, {
+        onError: () => {
+          platformAlert(
+            t('more.errors.couldNotSaveSetting'),
+            t('more.errors.tryAgain'),
+          );
+        },
+      });
+    }
   };
 
-  const handleChildProgressNavigation = useCallback(
-    (href: string) => {
-      track('child_progress_navigated', { source: 'accommodation_screen' });
-      router.push(href as never);
-    },
-    [router],
-  );
+  const celebrationPending = isChildMode
+    ? updateChildCelebration.isPending
+    : updateSelfCelebration.isPending;
+
+  const title = isChildMode
+    ? t('more.accommodation.childScreenTitle', { name: childName })
+    : t('more.accommodation.sectionHeader');
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
@@ -102,8 +139,11 @@ export default function AccommodationScreen(): React.ReactElement {
         >
           <Text className="text-primary text-body font-semibold">{'←'}</Text>
         </Pressable>
-        <Text className="text-h1 font-bold text-text-primary">
-          {t('more.accommodation.screenTitle')}
+        <Text
+          className="text-h2 font-bold text-text-primary flex-1"
+          numberOfLines={1}
+        >
+          {title}
         </Text>
       </View>
 
@@ -113,52 +153,6 @@ export default function AccommodationScreen(): React.ReactElement {
         keyboardShouldPersistTaps="handled"
         testID="accommodation-scroll"
       >
-        <Text
-          className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6"
-          testID="accommodation-section-header"
-        >
-          {t('more.accommodation.sectionHeader')}
-        </Text>
-
-        {activeProfile?.isOwner && linkedChildren.length === 1 ? (
-          <Pressable
-            onPress={() => handleChildProgressNavigation(FAMILY_HOME_PATH)}
-            className="self-start mb-3"
-            accessibilityRole="button"
-            accessibilityLabel={t(
-              'more.learningMode.childPreferencesAccessLabel',
-              {
-                name:
-                  linkedChildren[0]?.displayName ?? t('more.family.yourChild'),
-              },
-            )}
-            testID="accommodation-mode-child-link"
-          >
-            <Text className="text-caption font-semibold text-primary">
-              {t('more.learningMode.childPreferencesLink', {
-                name:
-                  linkedChildren[0]?.displayName ?? t('more.family.yourChild'),
-              })}
-            </Text>
-          </Pressable>
-        ) : null}
-
-        {activeProfile?.isOwner && linkedChildren.length >= 2 ? (
-          <Pressable
-            onPress={() => handleChildProgressNavigation(FAMILY_HOME_PATH)}
-            className="self-start mb-3"
-            accessibilityRole="button"
-            accessibilityLabel={t(
-              'more.family.openFamilyPreferencesAccessLabel',
-            )}
-            testID="accommodation-mode-family-link"
-          >
-            <Text className="text-caption font-semibold text-primary">
-              {t('more.learningMode.familyPreferencesLink')}
-            </Text>
-          </Pressable>
-        ) : null}
-
         {!learnerProfile ? (
           learnerProfileError ? (
             <View className="bg-surface rounded-card px-4 py-4 mb-2">
@@ -225,9 +219,7 @@ export default function AccommodationScreen(): React.ReactElement {
                         title={t('more.celebrations.allTitle')}
                         description={t('more.celebrations.allDescription')}
                         selected={celebrationLevel === 'all'}
-                        disabled={
-                          celebrationLoading || updateCelebrationLevel.isPending
-                        }
+                        disabled={celebrationLoading || celebrationPending}
                         onPress={() => handleSelectCelebrationLevel('all')}
                         testID="celebration-level-all"
                       />
@@ -235,9 +227,7 @@ export default function AccommodationScreen(): React.ReactElement {
                         title={t('more.celebrations.bigOnlyTitle')}
                         description={t('more.celebrations.bigOnlyDescription')}
                         selected={celebrationLevel === 'big_only'}
-                        disabled={
-                          celebrationLoading || updateCelebrationLevel.isPending
-                        }
+                        disabled={celebrationLoading || celebrationPending}
                         onPress={() => handleSelectCelebrationLevel('big_only')}
                         testID="celebration-level-big-only"
                       />
@@ -245,9 +235,7 @@ export default function AccommodationScreen(): React.ReactElement {
                         title={t('more.celebrations.offTitle')}
                         description={t('more.celebrations.offDescription')}
                         selected={celebrationLevel === 'off'}
-                        disabled={
-                          celebrationLoading || updateCelebrationLevel.isPending
-                        }
+                        disabled={celebrationLoading || celebrationPending}
                         onPress={() => handleSelectCelebrationLevel('off')}
                         testID="celebration-level-off"
                       />
@@ -280,7 +268,7 @@ export default function AccommodationScreen(): React.ReactElement {
               >
                 {ACCOMMODATION_GUIDE.map((row) => {
                   const isActive = row.recommendation === currentMode;
-                  const title =
+                  const guideTitle =
                     ACCOMMODATION_OPTIONS.find(
                       (o) => o.mode === row.recommendation,
                     )?.title ?? row.recommendation;
@@ -300,7 +288,7 @@ export default function AccommodationScreen(): React.ReactElement {
                         {row.condition}
                       </Text>
                       <Text className="text-primary text-body-sm font-semibold">
-                        {title}
+                        {guideTitle}
                         {isActive
                           ? ` · ${t('more.accommodation.guideActive')}`
                           : ''}

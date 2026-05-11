@@ -298,7 +298,8 @@
       "viewAndManage": "Ver e gerenciar",
       "screenTitle": "Acomodação de aprendizagem",
       "notSureWhichToPick": "Não tem certeza de qual escolher?",
-      "guideActive": "Ativo"
+      "guideActive": "Ativo",
+      "childScreenTitle": "Acomodação de {{name}}"
     },
     "learningPreferences": {
       "rowLabel": "Preferências de aprendizagem",

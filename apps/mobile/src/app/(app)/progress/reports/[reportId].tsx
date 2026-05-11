@@ -1,26 +1,51 @@
+import { useEffect, useRef } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Sentry from '@sentry/react-native';
 import { useTranslation } from 'react-i18next';
 import { ErrorFallback } from '../../../../components/common';
 import { MetricCard } from '../../../../components/progress';
 import { classifyApiError } from '../../../../lib/format-api-error';
 import { formatMinutes } from '../../../../lib/format-relative-date';
 import { goBackOrReplace } from '../../../../lib/navigation';
-import { useProfileReportDetail } from '../../../../hooks/use-progress';
+import {
+  useProfileReportDetail,
+  useMarkProfileReportViewed,
+} from '../../../../hooks/use-progress';
 
 export default function ProgressMonthlyReportDetail(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { reportId } = useLocalSearchParams<{ reportId: string }>();
+  const resolvedReportId = Array.isArray(reportId) ? reportId[0] : reportId;
   const {
     data: report,
     isLoading,
     isError,
     error,
     refetch,
-  } = useProfileReportDetail(Array.isArray(reportId) ? reportId[0] : reportId);
+  } = useProfileReportDetail(resolvedReportId);
+
+  const markViewed = useMarkProfileReportViewed();
+  const markViewedRef = useRef(markViewed);
+  markViewedRef.current = markViewed;
+  const viewedRef = useRef(false);
+
+  useEffect(() => {
+    if (!resolvedReportId || !report || report.viewedAt) return;
+    if (viewedRef.current) return;
+    viewedRef.current = true;
+    markViewedRef.current
+      .mutateAsync({ reportId: resolvedReportId })
+      .catch((err: unknown) => {
+        Sentry.captureException(err, {
+          tags: { feature: 'monthly_report', action: 'mark_viewed_self' },
+          extra: { reportId: resolvedReportId },
+        });
+      });
+  }, [resolvedReportId, report]);
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>

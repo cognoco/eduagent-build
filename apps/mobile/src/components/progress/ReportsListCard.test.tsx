@@ -82,13 +82,23 @@ describe('ReportsListCard', () => {
     screen.getByText('May 2026');
   });
 
-  it('routes self-view rows to progress report paths', () => {
+  it('routes self-view weekly rows to progress weekly-report path', () => {
     render(<ReportsListCard profileId="profile-1" interactive selfView />);
 
     fireEvent.press(screen.getByTestId('weekly-report-card-weekly-1'));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/progress/weekly-report/[weeklyReportId]',
       params: { weeklyReportId: 'weekly-1' },
+    });
+  });
+
+  it('routes self-view monthly rows to progress reports path', () => {
+    render(<ReportsListCard profileId="profile-1" interactive selfView />);
+
+    fireEvent.press(screen.getByTestId('report-card-monthly-1'));
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/progress/reports/[reportId]',
+      params: { reportId: 'monthly-1' },
     });
   });
 });

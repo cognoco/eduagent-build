@@ -4,10 +4,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mockPush = jest.fn();
 const mockNavigate = jest.fn();
+const mockReplace = jest.fn();
+const mockBack = jest.fn();
+const mockCanGoBack = jest.fn();
 const mockAccommodationMutate = jest.fn();
 const mockCelebrationLevelMutate = jest.fn();
+const mockChildCelebrationLevelMutate = jest.fn();
 const mockPlatformAlert = jest.fn();
-const mockTrack = jest.fn();
 
 let mockActiveProfile = {
   id: 'profile-1',
@@ -24,17 +27,25 @@ let mockProfiles: Array<{
 let mockLearnerProfile: { accommodationMode?: string } | null = {
   accommodationMode: 'none',
 };
+let mockChildLearnerProfile: { accommodationMode?: string } | null = null;
 let mockLearnerProfileError = false;
+let mockChildLearnerProfileError = false;
 let mockCelebrationLevel: 'all' | 'big_only' | 'off' | undefined = 'big_only';
+let mockChildCelebrationLevel: 'all' | 'big_only' | 'off' | undefined =
+  'big_only';
 const mockLearnerProfileRefetch = jest.fn();
+const mockChildLearnerProfileRefetch = jest.fn();
+let mockSearchParams: Record<string, string | undefined> = {};
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     push: mockPush,
     navigate: mockNavigate,
-    replace: jest.fn(),
-    back: jest.fn(),
+    replace: mockReplace,
+    back: mockBack,
+    canGoBack: mockCanGoBack,
   }),
+  useLocalSearchParams: () => mockSearchParams,
 }));
 
 jest.mock('@expo/vector-icons/Ionicons', () => {
@@ -67,6 +78,11 @@ jest.mock(
       isError: mockLearnerProfileError,
       refetch: mockLearnerProfileRefetch,
     }),
+    useChildLearnerProfile: () => ({
+      data: mockChildLearnerProfile,
+      isError: mockChildLearnerProfileError,
+      refetch: mockChildLearnerProfileRefetch,
+    }),
     useUpdateAccommodationMode: () => ({
       mutate: mockAccommodationMutate,
       isPending: false,
@@ -85,12 +101,16 @@ jest.mock(
       mutate: mockCelebrationLevelMutate,
       isPending: false,
     }),
+    useChildCelebrationLevel: () => ({
+      data: mockChildCelebrationLevel,
+      isLoading: false,
+    }),
+    useUpdateChildCelebrationLevel: () => ({
+      mutate: mockChildCelebrationLevelMutate,
+      isPending: false,
+    }),
   }),
 );
-
-jest.mock('../../../lib/analytics' /* gc1-allow: unit test boundary */, () => ({
-  track: (...args: unknown[]) => mockTrack(...args),
-}));
 
 jest.mock(
   '../../../lib/platform-alert' /* gc1-allow: unit test boundary */,
@@ -125,8 +145,12 @@ describe('AccommodationScreen', () => {
     };
     mockProfiles = [mockActiveProfile];
     mockLearnerProfile = { accommodationMode: 'none' };
+    mockChildLearnerProfile = null;
     mockLearnerProfileError = false;
+    mockChildLearnerProfileError = false;
     mockCelebrationLevel = 'big_only';
+    mockChildCelebrationLevel = 'big_only';
+    mockSearchParams = {};
   });
 
   it('renders all four accommodation mode cards', () => {
@@ -179,35 +203,6 @@ describe('AccommodationScreen', () => {
     );
   });
 
-  it('shows child cross-link for an owner with one linked child', () => {
-    mockProfiles = [
-      mockActiveProfile,
-      { id: 'child-1', displayName: 'Mia', isOwner: false, birthYear: 2014 },
-    ];
-
-    render(<AccommodationScreen />, { wrapper: createWrapper() });
-
-    fireEvent.press(screen.getByTestId('accommodation-mode-child-link'));
-
-    expect(mockTrack).toHaveBeenCalledWith('child_progress_navigated', {
-      source: 'accommodation_screen',
-    });
-    expect(mockPush).toHaveBeenCalledWith('/(app)/home');
-  });
-
-  it('shows family cross-link for an owner with multiple linked children', () => {
-    mockProfiles = [
-      mockActiveProfile,
-      { id: 'child-1', displayName: 'Mia', isOwner: false, birthYear: 2014 },
-      { id: 'child-2', displayName: 'Sam', isOwner: false, birthYear: 2016 },
-    ];
-
-    render(<AccommodationScreen />, { wrapper: createWrapper() });
-
-    screen.getByTestId('accommodation-mode-family-link');
-    expect(screen.queryByTestId('accommodation-mode-child-link')).toBeNull();
-  });
-
   it('renders an error block with retry when the learner profile fails to load', () => {
     mockLearnerProfile = null;
     mockLearnerProfileError = true;
@@ -252,5 +247,75 @@ describe('AccommodationScreen', () => {
     fireEvent.press(screen.getByTestId('accommodation-guide-toggle'));
 
     expect(screen.getByText(/Audio-First · Active/)).toBeTruthy();
+  });
+
+  describe('child mode (childProfileId param)', () => {
+    beforeEach(() => {
+      mockProfiles = [
+        mockActiveProfile,
+        {
+          id: 'child-1',
+          displayName: 'Mia',
+          isOwner: false,
+          birthYear: 2014,
+        },
+      ];
+      mockSearchParams = { childProfileId: 'child-1' };
+      mockChildLearnerProfile = { accommodationMode: 'none' };
+    });
+
+    it('shows the child name in the title', () => {
+      render(<AccommodationScreen />, { wrapper: createWrapper() });
+
+      expect(screen.getByText(/Mia's accommodation/)).toBeTruthy();
+    });
+
+    it('passes childProfileId when changing accommodation mode', () => {
+      render(<AccommodationScreen />, { wrapper: createWrapper() });
+
+      fireEvent.press(screen.getByTestId('accommodation-mode-short-burst'));
+
+      expect(mockAccommodationMutate).toHaveBeenCalledWith(
+        { accommodationMode: 'short-burst', childProfileId: 'child-1' },
+        expect.objectContaining({ onError: expect.any(Function) }),
+      );
+    });
+
+    it('uses child celebration level hooks in child mode', () => {
+      mockChildLearnerProfile = { accommodationMode: 'predictable' };
+      render(<AccommodationScreen />, { wrapper: createWrapper() });
+
+      fireEvent.press(screen.getByTestId('celebration-level-off'));
+
+      expect(mockChildCelebrationLevelMutate).toHaveBeenCalledWith(
+        { childProfileId: 'child-1', celebrationLevel: 'off' },
+        expect.objectContaining({ onError: expect.any(Function) }),
+      );
+      expect(mockCelebrationLevelMutate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('back navigation', () => {
+    it('calls router.back() when back stack exists', () => {
+      mockCanGoBack.mockReturnValue(true);
+      render(<AccommodationScreen />, { wrapper: createWrapper() });
+
+      fireEvent.press(screen.getByTestId('accommodation-back'));
+
+      expect(mockBack).toHaveBeenCalled();
+      expect(mockReplace).not.toHaveBeenCalled();
+    });
+
+    it('replaces to learning-preferences when no back stack', () => {
+      mockCanGoBack.mockReturnValue(false);
+      render(<AccommodationScreen />, { wrapper: createWrapper() });
+
+      fireEvent.press(screen.getByTestId('accommodation-back'));
+
+      expect(mockReplace).toHaveBeenCalledWith(
+        '/(app)/more/learning-preferences',
+      );
+      expect(mockBack).not.toHaveBeenCalled();
+    });
   });
 });

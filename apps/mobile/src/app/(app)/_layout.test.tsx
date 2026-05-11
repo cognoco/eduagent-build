@@ -264,11 +264,19 @@ describe('AppLayout', () => {
     jest.useRealTimers();
   });
 
-  it('keeps linked-parent accounts in the learner tab shell for adaptive home', () => {
+  it('renders guardian tab shell for accounts with linked children', () => {
     renderLayout();
 
     screen.getByTestId('tabs');
     expect(screen.queryByTestId('redirect')).toBeNull();
+
+    const shape = resolveTabShape({
+      activeProfile: { isOwner: true },
+      profiles: [{ isOwner: true }, { isOwner: false }],
+      isParentProxy: false,
+    });
+    expect(shape).toBe('guardian');
+    expect(computeVisibleTabs(shape).has('own-learning')).toBe(true);
   });
 
   // [BUG-923] AUTH-DEBUG must log only on auth state transitions, not on

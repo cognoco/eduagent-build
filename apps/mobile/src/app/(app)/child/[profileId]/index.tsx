@@ -33,9 +33,10 @@ import {
   useRestoreConsent,
 } from '../../../../hooks/use-consent';
 import { useChildLearnerProfile } from '../../../../hooks/use-learner-profile';
-import { ChildAccommodationSection } from '../../../../components/home/ChildAccommodationSection';
+import { ACCOMMODATION_OPTIONS } from '../../../../lib/accommodation-options';
 import { getGracePeriodDaysRemaining } from '../../../../lib/consent-grace';
 import { FAMILY_HOME_PATH, goBackOrReplace } from '../../../../lib/navigation';
+import { buildGrowthData, formatMonthLabel } from '../../../../lib/progress';
 import { useThemeColors } from '../../../../lib/theme';
 
 function SubjectSkeleton(): React.ReactNode {
@@ -45,55 +46,6 @@ function SubjectSkeleton(): React.ReactNode {
       <View className="bg-border rounded h-4 w-1/3" />
     </View>
   );
-}
-
-function formatWeekLabel(iso: string): string {
-  const d = new Date(`${iso}T00:00:00Z`);
-  return d.toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-  });
-}
-
-function formatMonthLabel(iso: string): string {
-  return new Date(`${iso}T00:00:00Z`).toLocaleDateString(undefined, {
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
-}
-
-function buildGrowthData(
-  history:
-    | {
-        dataPoints: Array<{
-          date: string;
-          topicsMastered: number;
-          vocabularyTotal: number;
-        }>;
-      }
-    | null
-    | undefined,
-) {
-  const points = history?.dataPoints ?? [];
-
-  return points.slice(-8).map((point, index) => {
-    const previous = points[index - 1];
-    return {
-      label: formatWeekLabel(point.date),
-      value: Math.max(
-        0,
-        point.topicsMastered - (previous?.topicsMastered ?? 0),
-      ),
-      secondaryValue:
-        point.vocabularyTotal > 0
-          ? Math.max(
-              0,
-              point.vocabularyTotal - (previous?.vocabularyTotal ?? 0),
-            )
-          : undefined,
-    };
-  });
 }
 
 function isRestrictedConsentStatus(status: string | null | undefined): boolean {
@@ -290,7 +242,7 @@ export default function ChildDetailScreen() {
           {t('parentView.index.noAccessToProfile')}
         </Text>
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
+          onPress={() => goBackOrReplace(router, FAMILY_HOME_PATH)}
           className="bg-primary rounded-button px-6 py-3"
           accessibilityRole="button"
         >
@@ -435,7 +387,7 @@ export default function ChildDetailScreen() {
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
+          onPress={() => goBackOrReplace(router, FAMILY_HOME_PATH)}
           className="me-3 py-2 pe-2"
           accessibilityLabel={t('common.goBack')}
           accessibilityRole="button"
@@ -569,10 +521,38 @@ export default function ChildDetailScreen() {
         ) : null}
 
         {profileId && child?.displayName ? (
-          <ChildAccommodationSection
-            childProfileId={profileId}
-            childName={child.displayName}
-          />
+          <Pressable
+            onPress={() =>
+              router.push(
+                `/(app)/more/accommodation?childProfileId=${profileId}` as Href,
+              )
+            }
+            className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3.5 mt-4"
+            accessibilityRole="button"
+            accessibilityLabel={t('more.accommodation.childScreenTitle', {
+              name: child.displayName,
+            })}
+            testID={`child-accommodation-row-${profileId}`}
+          >
+            <View className="flex-1 pr-3">
+              <Text className="text-body font-semibold text-text-primary">
+                {t('more.accommodation.childScreenTitle', {
+                  name: child.displayName,
+                })}
+              </Text>
+              <Text className="text-body-sm text-text-secondary mt-0.5">
+                {ACCOMMODATION_OPTIONS.find(
+                  (o) =>
+                    o.mode === (learnerProfile?.accommodationMode ?? 'none'),
+                )?.title ?? ''}
+              </Text>
+            </View>
+            <Ionicons
+              name="chevron-forward"
+              size={18}
+              color={colors.textSecondary}
+            />
+          </Pressable>
         ) : null}
 
         {/* Progress snapshot card — only shown once a snapshot exists */}

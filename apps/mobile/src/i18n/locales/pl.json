@@ -298,7 +298,8 @@
       "viewAndManage": "Wyświetl i zarządzaj",
       "screenTitle": "Dostosowanie nauki",
       "notSureWhichToPick": "Nie wiesz, które wybrać?",
-      "guideActive": "Aktywny"
+      "guideActive": "Aktywny",
+      "childScreenTitle": "Dostosowanie nauki — {{name}}"
     },
     "learningPreferences": {
       "rowLabel": "Preferencje nauki",

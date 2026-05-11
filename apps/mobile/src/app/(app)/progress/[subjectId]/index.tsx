@@ -19,7 +19,10 @@ import { useLanguageProgress } from '../../../../hooks/use-language-progress';
 import { formatMinutes } from '../../../../lib/format-relative-date';
 import { useUpdateSubject } from '../../../../hooks/use-subjects';
 import { platformAlert } from '../../../../lib/platform-alert';
-import { formatApiError } from '../../../../lib/format-api-error';
+import {
+  classifyApiError,
+  formatApiError,
+} from '../../../../lib/format-api-error';
 import { copyRegisterFor } from '../../../../lib/copy-register';
 
 function StatCard({
@@ -222,9 +225,9 @@ export default function ProgressSubjectScreen(): React.ReactElement {
           variant="centered"
           title={t('progress.subject.errorTitle')}
           message={
-            inventoryQuery.error?.message?.includes('API error')
-              ? t('progress.subject.errorMessageServer')
-              : t('progress.subject.errorMessageNetwork')
+            classifyApiError(inventoryQuery.error).category === 'network'
+              ? t('progress.subject.errorMessageNetwork')
+              : t('progress.subject.errorMessageServer')
           }
           primaryAction={{
             label: t('common.tryAgain'),

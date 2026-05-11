@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import { WeeklyReportCard } from './WeeklyReportCard';
 import { useProfileWeeklyReports } from '../../hooks/use-progress';
 
@@ -123,5 +123,22 @@ describe('WeeklyReportCard', () => {
     );
 
     screen.getByText('Your first weekly summary is on its way.');
+  });
+
+  it('shows a retry button on error that calls refetch', () => {
+    const refetch = jest.fn();
+    (useProfileWeeklyReports as jest.Mock).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      refetch,
+    });
+
+    render(<WeeklyReportCard profileId="profile-1" />);
+
+    screen.getByTestId('weekly-report-error');
+    const retryButton = screen.getByTestId('weekly-report-retry');
+    fireEvent.press(retryButton);
+    expect(refetch).toHaveBeenCalled();
   });
 });

@@ -41,7 +41,7 @@ import {
 import { pushLearningResumeTarget } from '../../../lib/navigation';
 import { copyRegisterFor, type CopyRegister } from '../../../lib/copy-register';
 import { useLinkedChildren, useProfile } from '../../../lib/profile';
-import { isProfileStale } from '../../../lib/progress';
+import { buildGrowthData, isProfileStale } from '../../../lib/progress';
 import { bucketAccountAge, hashProfileId, track } from '../../../lib/analytics';
 
 function heroCopy(
@@ -120,43 +120,6 @@ function heroCopy(
       words: vocabularyTotal,
     }),
   };
-}
-
-function formatWeekLabel(iso: string): string {
-  const date = new Date(`${iso}T00:00:00Z`);
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
-
-function buildGrowthData(
-  history:
-    | {
-        dataPoints: Array<{
-          date: string;
-          topicsMastered: number;
-          vocabularyTotal: number;
-        }>;
-      }
-    | undefined,
-) {
-  const points = history?.dataPoints ?? [];
-
-  return points.slice(-8).map((point, index) => {
-    const previous = points[index - 1];
-    return {
-      label: formatWeekLabel(point.date),
-      value: Math.max(
-        0,
-        point.topicsMastered - (previous?.topicsMastered ?? 0),
-      ),
-      secondaryValue:
-        point.vocabularyTotal > 0
-          ? Math.max(
-              0,
-              point.vocabularyTotal - (previous?.vocabularyTotal ?? 0),
-            )
-          : undefined,
-    };
-  });
 }
 
 const MILESTONE_THRESHOLDS = [1, 3, 5, 10, 25, 50, 100];
@@ -379,9 +342,9 @@ export default function ProgressScreen(): React.ReactElement {
           <ErrorFallback
             title={t('progress.error.loadTitle')}
             message={
-              inventoryQuery.error?.message?.includes('API error')
-                ? t('progress.error.loadMessageServer')
-                : t('progress.error.loadMessageNetwork')
+              classifyApiError(inventoryQuery.error).category === 'network'
+                ? t('progress.error.loadMessageNetwork')
+                : t('progress.error.loadMessageServer')
             }
             primaryAction={{
               label: t('common.tryAgain'),

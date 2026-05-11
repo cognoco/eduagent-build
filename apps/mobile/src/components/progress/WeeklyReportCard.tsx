@@ -1,4 +1,4 @@
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useProfileWeeklyReports } from '../../hooks/use-progress';
 import { formatMinutes } from '../../lib/format-relative-date';
@@ -65,9 +65,22 @@ export function WeeklyReportCard({
           {t('parentView.reports.loadingWeeklySnapshots')}
         </Text>
       ) : reportsQuery.isError ? (
-        <Text className="text-body-sm text-text-secondary mt-2">
-          {t('parentView.reports.couldNotLoadWeeklySnapshots')}
-        </Text>
+        <View className="py-4 items-center" testID="weekly-report-error">
+          <Text className="text-body-sm text-text-secondary text-center mb-3">
+            {t('parentView.reports.couldNotLoadWeeklySnapshots')}
+          </Text>
+          <Pressable
+            onPress={() => void reportsQuery.refetch()}
+            className="bg-surface rounded-button px-5 py-3 min-h-[48px] items-center justify-center"
+            accessibilityRole="button"
+            accessibilityLabel={t('common.retry')}
+            testID="weekly-report-retry"
+          >
+            <Text className="text-body font-semibold text-text-primary">
+              {t('common.retry')}
+            </Text>
+          </Pressable>
+        </View>
       ) : latest ? (
         <View className="bg-background rounded-card p-3 mt-3">
           <Text className="text-caption text-text-secondary">

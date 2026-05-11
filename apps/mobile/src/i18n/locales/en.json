@@ -273,7 +273,8 @@
       "viewAndManage": "View & manage",
       "screenTitle": "Learning accommodation",
       "notSureWhichToPick": "Not sure which to pick?",
-      "guideActive": "Active"
+      "guideActive": "Active",
+      "childScreenTitle": "{{name}}'s accommodation"
     },
     "learningPreferences": {
       "rowLabel": "Your learning preferences",

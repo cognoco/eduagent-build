@@ -37,6 +37,8 @@ const EXEMPT_SCREENS: string[] = [
   '(app)/dashboard.tsx',
   // Onboarding entry — pure <Redirect /> to /(app)/onboarding/pronouns; no UI
   '(app)/onboarding/index.tsx',
+  // Weekly-report index — pure <Redirect /> to /(app)/progress/reports; no UI
+  '(app)/progress/weekly-report/index.tsx',
   // Tab screens — bottom tab navigation provides navigation
   '(app)/home.tsx',
   '(app)/own-learning.tsx', // Visible bottom tab (parent's "My Learning" tab)
