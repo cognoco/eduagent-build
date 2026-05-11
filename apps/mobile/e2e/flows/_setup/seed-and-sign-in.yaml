@@ -106,11 +106,11 @@ appId: com.mentomate.app
     timeout: 5000
     optional: true
 
-# BUG-566: parent-with-children lands on LearnerScreen, not learner-screen
-# or dashboard-scroll. Recognize it as a valid home screen.
+# BUG-566: parent-with-children lands on ParentHomeScreen (testID: parent-home-screen),
+# not learner-screen or dashboard-scroll. Recognize it as a valid home screen.
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: "parent-home-screen"
     timeout: 5000
     optional: true
 
@@ -145,11 +145,18 @@ appId: com.mentomate.app
     file: return-to-home-safe.yaml
 
 # After all dismiss/return logic, wait for home screen (optional — parent
-# scenarios route to dashboard-scroll which was already handled above).
+# scenarios route to dashboard-scroll or parent-home-screen, already handled above).
 - extendedWaitUntil:
     visible:
       id: "learner-screen"
     timeout: 10000
+    optional: true
+
+# Accept parent-home-screen as a valid post-auth landing for parent-with-children users.
+- extendedWaitUntil:
+    visible:
+      id: "parent-home-screen"
+    timeout: 5000
     optional: true
 
 # Visual audit: post-auth screen (home, dashboard, or post-landing)

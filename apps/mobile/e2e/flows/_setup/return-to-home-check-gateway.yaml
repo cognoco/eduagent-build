@@ -1,7 +1,8 @@
-# BUG-566: Second guard in the return-to-home chain.
+# Third guard in the return-to-home chain (previously second).
 # Only press Back if learner-screen is ALSO not visible.
-# parent-with-children scenario lands on LearnerScreen (testID: learner-screen),
-# which is neither learner-screen nor dashboard-scroll.
+# parent-with-children scenario lands on ParentHomeScreen (testID: parent-home-screen).
+# parent-home-screen is guarded by return-to-home-check-parent-home.yaml (the step
+# before this one in the chain). This file handles the learner-screen guard.
 appId: com.mentomate.app
 ---
 - runFlow:

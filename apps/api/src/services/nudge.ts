@@ -16,7 +16,7 @@ import { sendPushNotification } from './notifications';
 
 const logger = createLogger();
 
-const NUDGE_RATE_LIMIT = 3;
+const NUDGE_RATE_LIMIT = 4;
 const NUDGE_WINDOW_HOURS = 24;
 const QUIET_HOURS_START = 21;
 const QUIET_HOURS_END = 7;
@@ -85,7 +85,7 @@ export async function createNudge(
   const inserted = await db.transaction(async (tx) => {
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtextextended(${
-        'nudge-rate:' + params.toProfileId
+        'nudge-rate:' + params.fromProfileId + ':' + params.toProfileId
       }, 0))`,
     );
 
@@ -94,6 +94,7 @@ export async function createNudge(
       .from(nudges)
       .where(
         and(
+          eq(nudges.fromProfileId, params.fromProfileId),
           eq(nudges.toProfileId, params.toProfileId),
           gt(nudges.createdAt, windowStart),
         ),

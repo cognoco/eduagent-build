@@ -141,13 +141,10 @@ export function ParentHomeScreen({
   }
 
   function pushChildReports(childProfileId: string): void {
-    pushChildDetail(childProfileId);
-    setTimeout(() => {
-      router.push({
-        pathname: '/(app)/child/[profileId]/reports',
-        params: { profileId: childProfileId },
-      } as never);
-    }, 0);
+    router.push({
+      pathname: '/(app)/child/[profileId]/reports',
+      params: { profileId: childProfileId },
+    } as never);
   }
 
   return (

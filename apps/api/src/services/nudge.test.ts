@@ -3,7 +3,7 @@
 //
 // Unit tests for createNudge, listUnreadNudges, markNudgeRead,
 // markAllNudgesRead. Security-critical paths:
-//   - Rate limiting (max 3 nudges / 24h per recipient)
+//   - Rate limiting (max 4 nudges / 24h per sender-recipient pair)
 //   - Consent gating (must be CONSENTED)
 //   - Parent access guard (family link required)
 //   - Quiet hours (21:00–07:00 in recipient tz → suppress push, still insert)
@@ -454,8 +454,8 @@ describe('createNudge', () => {
   // ── Rate limiting ─────────────────────────────────────────────────────────
 
   describe('rate limiting', () => {
-    it('[BREAK] throws RateLimitedError when nudge count has reached the limit (3)', async () => {
-      const db = makeDb({ nudgeCount: 3 });
+    it('[BREAK] throws RateLimitedError when nudge count has reached the limit (4)', async () => {
+      const db = makeDb({ nudgeCount: 4 });
 
       await expect(
         createNudge(db, {
@@ -481,7 +481,7 @@ describe('createNudge', () => {
     });
 
     it('error carries the expected code NUDGE_RATE_LIMITED', async () => {
-      const db = makeDb({ nudgeCount: 3 });
+      const db = makeDb({ nudgeCount: 4 });
 
       await expect(
         createNudge(db, {
@@ -493,8 +493,8 @@ describe('createNudge', () => {
       ).rejects.toMatchObject({ code: 'NUDGE_RATE_LIMITED' });
     });
 
-    it('succeeds when nudge count is exactly 2 (one below limit)', async () => {
-      const db = makeDb({ nudgeCount: 2 });
+    it('succeeds when nudge count is exactly 3 (one below limit)', async () => {
+      const db = makeDb({ nudgeCount: 3 });
 
       await expect(
         createNudge(db, {
@@ -507,7 +507,7 @@ describe('createNudge', () => {
     });
 
     it('does not insert when rate limit is exceeded', async () => {
-      const db = makeDb({ nudgeCount: 3 });
+      const db = makeDb({ nudgeCount: 4 });
 
       await expect(
         createNudge(db, {
@@ -661,7 +661,7 @@ describe('createNudge', () => {
     it('checks consent before rate limit', async () => {
       // Both consent and rate-limit fail — consent is checked first.
       mockGetConsentStatus.mockResolvedValue('PENDING');
-      const db = makeDb({ nudgeCount: 3 });
+      const db = makeDb({ nudgeCount: 4 });
 
       await expect(
         createNudge(db, {

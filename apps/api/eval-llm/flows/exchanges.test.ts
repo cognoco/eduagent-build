@@ -18,12 +18,12 @@ describe('exchangesFlow', () => {
   }
 
   describe('enumerateScenarios', () => {
-    it('returns 13 scenario inputs for a general (non-language) profile', () => {
+    it('returns 14 scenario inputs for a general (non-language) profile', () => {
       const scenarios =
         exchangesFlow.enumerateScenarios?.(generalProfile) ?? [];
-      expect(scenarios).toHaveLength(13);
+      expect(scenarios).toHaveLength(14);
       expect(scenarios.map((s) => s.scenarioId)).not.toContain(
-        'S7-language-fluency'
+        'S7-language-fluency',
       );
       expect(scenarios.map((s) => s.scenarioId)).toEqual(
         expect.arrayContaining([
@@ -33,6 +33,7 @@ describe('exchangesFlow', () => {
           'S12-first-encounter-topic-turn3',
           'S13-first-session-subject-turn0',
           'S14-returning-topic-turn0',
+          'S15-review-mode-opener',
           'S2-rung2-revisit',
           'S3-rung3-evaluate',
           'S4-rung4-teach-back',
@@ -40,16 +41,16 @@ describe('exchangesFlow', () => {
           'S6-homework-help',
           'S8-casual-freeform',
           'S9-correct-streak',
-        ])
+        ]),
       );
     });
 
-    it('returns 14 scenarios for a language-learning profile (includes S7 + S9)', () => {
+    it('returns 15 scenarios for a language-learning profile (includes S7 + S9)', () => {
       const scenarios =
         exchangesFlow.enumerateScenarios?.(languageProfile) ?? [];
-      expect(scenarios).toHaveLength(14);
+      expect(scenarios).toHaveLength(15);
       expect(scenarios.map((s) => s.scenarioId)).toContain(
-        'S7-language-fluency'
+        'S7-language-fluency',
       );
       expect(scenarios.map((s) => s.scenarioId)).toContain('S9-correct-streak');
     });
@@ -83,7 +84,7 @@ describe('exchangesFlow', () => {
       const scenarios =
         exchangesFlow.enumerateScenarios?.(generalProfile) ?? [];
       const byId = Object.fromEntries(
-        scenarios.map((s) => [s.scenarioId, s.input.context.exchangeCount])
+        scenarios.map((s) => [s.scenarioId, s.input.context.exchangeCount]),
       );
       expect(byId['S1-rung1-teach-new']).toBe(0);
       expect(byId['S2-rung2-revisit']).toBe(2);
@@ -105,7 +106,7 @@ describe('exchangesFlow', () => {
         exchangesFlow.enumerateScenarios?.(generalProfile) ?? [];
       const s5 = scenarios.find((s) => s.scenarioId === 'S5-rung5-exit');
       const userMsg = s5?.input.context.exchangeHistory.find(
-        (t) => t.role === 'user'
+        (t) => t.role === 'user',
       );
       expect(userMsg?.content).toContain('long division');
       const joined = s5?.input.context.exchangeHistory
@@ -155,7 +156,7 @@ describe('exchangesFlow', () => {
         'Science',
         'Mesozoic era',
         null,
-        []
+        [],
       );
       expect(block.text.length).toBeGreaterThan(0);
       expect(block.entries.length).toBeGreaterThan(0);
@@ -215,34 +216,48 @@ describe('exchangesFlow', () => {
       const scenarios =
         exchangesFlow.enumerateScenarios?.(generalProfile) ?? [];
       const firstEncounter = scenarios.find(
-        (s) => s.scenarioId === 'S10-first-encounter-topic-turn0'
+        (s) => s.scenarioId === 'S10-first-encounter-topic-turn0',
       );
       const subjectOpener = scenarios.find(
-        (s) => s.scenarioId === 'S13-first-session-subject-turn0'
+        (s) => s.scenarioId === 'S13-first-session-subject-turn0',
       );
       const returning = scenarios.find(
-        (s) => s.scenarioId === 'S14-returning-topic-turn0'
+        (s) => s.scenarioId === 'S14-returning-topic-turn0',
       );
       if (!firstEncounter || !subjectOpener || !returning) {
         throw new Error('first-encounter eval scenarios missing');
       }
 
       const firstEncounterPrompt = exchangesFlow.buildPrompt(
-        firstEncounter.input
+        firstEncounter.input,
       ).system;
       const subjectOpenerPrompt = exchangesFlow.buildPrompt(
-        subjectOpener.input
+        subjectOpener.input,
       ).system;
       const returningPrompt = exchangesFlow.buildPrompt(returning.input).system;
 
       expect(firstEncounterPrompt).toContain('FIRST-ENCOUNTER TOPIC RULE');
       expect(firstEncounterPrompt).toContain(
-        'end with exactly one focused follow-up question'
+        'end with exactly one focused follow-up question',
       );
       expect(subjectOpenerPrompt).toContain('SUBJECT OPENER');
       expect(subjectOpenerPrompt).not.toContain('FIRST-ENCOUNTER TOPIC RULE:');
       expect(returningPrompt).toContain('exactly one learner action');
       expect(returningPrompt).not.toContain('FIRST-ENCOUNTER TOPIC RULE');
+    });
+
+    it('S15 review-mode opener contains calibration prompt and not the first-turn teaching rule', () => {
+      const scenarios =
+        exchangesFlow.enumerateScenarios?.(generalProfile) ?? [];
+      const s15 = scenarios.find(
+        (s) => s.scenarioId === 'S15-review-mode-opener',
+      );
+      if (!s15) throw new Error('S15 missing');
+
+      const messages = exchangesFlow.buildPrompt(s15.input);
+      expect(messages.system).toContain('REVIEW (calibrated relearning)');
+      expect(messages.system).toMatch(/calibration question/i);
+      expect(messages.system).not.toContain('FIRST TURN RULE');
     });
   });
 
@@ -322,7 +337,7 @@ describe('exchangesFlow', () => {
 
       const [chatMessages] = mockRunHarnessLlm.mock.calls[0];
       const userTurns = chatMessages.filter(
-        (m: { role: string }) => m.role === 'user'
+        (m: { role: string }) => m.role === 'user',
       );
       for (const turn of userTurns) {
         expect(turn.content).not.toMatch(/<\/?server_note/i);
@@ -337,21 +352,21 @@ describe('exchangesFlow', () => {
       const messages = exchangesFlow.buildPrompt(s1.input);
 
       expect(messages.user).toContain(
-        `Start a learning session about ${s1.input.context.topicTitle}`
+        `Start a learning session about ${s1.input.context.topicTitle}`,
       );
 
       await expect(
         exchangesFlow.runLive?.(s1.input, {
           system: messages.system,
           user: undefined,
-        })
+        }),
       ).rejects.toThrow(/messages\.user is undefined/);
       expect(mockRunHarnessLlm).not.toHaveBeenCalled();
     });
 
     it('returns the LLM response string verbatim', async () => {
       mockRunHarnessLlm.mockResolvedValue(
-        '{"reply":"hi","signals":{},"ui_hints":{}}'
+        '{"reply":"hi","signals":{},"ui_hints":{}}',
       );
       const scenarios =
         exchangesFlow.enumerateScenarios?.(generalProfile) ?? [];
@@ -375,28 +390,28 @@ describe('exchangesFlow', () => {
 
     it('only language profiles get S7', () => {
       const languageIds = PROFILES.filter(
-        (p) => p.targetLanguage && p.cefrLevel
+        (p) => p.targetLanguage && p.cefrLevel,
       ).map((p) => p.id);
       const nonLanguageIds = PROFILES.filter(
-        (p) => !p.targetLanguage || !p.cefrLevel
+        (p) => !p.targetLanguage || !p.cefrLevel,
       ).map((p) => p.id);
 
       for (const id of languageIds) {
         const profile = getProfile(id);
         const scenarios = profile
-          ? exchangesFlow.enumerateScenarios?.(profile) ?? []
+          ? (exchangesFlow.enumerateScenarios?.(profile) ?? [])
           : [];
         expect(scenarios.map((s) => s.scenarioId)).toContain(
-          'S7-language-fluency'
+          'S7-language-fluency',
         );
       }
       for (const id of nonLanguageIds) {
         const profile = getProfile(id);
         const scenarios = profile
-          ? exchangesFlow.enumerateScenarios?.(profile) ?? []
+          ? (exchangesFlow.enumerateScenarios?.(profile) ?? [])
           : [];
         expect(scenarios.map((s) => s.scenarioId)).not.toContain(
-          'S7-language-fluency'
+          'S7-language-fluency',
         );
       }
     });

@@ -14,12 +14,14 @@ test('J-17 parent opens a session recap and copies the conversation prompt', asy
   const sessionId = seed.ids.session1Id;
 
   await page.goto('/home', { waitUntil: 'commit' });
-  await expect(page.getByTestId('learner-screen')).toBeVisible({
+  await expect(page.getByTestId('parent-home-screen')).toBeVisible({
     timeout: 60_000,
   });
 
-  await page.getByTestId('home-child-card').click();
-  await page.getByTestId(`dashboard-child-${childProfileId}-primary`).click();
+  await page.getByTestId(`parent-home-check-child-${childProfileId}`).click();
+  await expect(page.getByTestId('child-detail-scroll')).toBeVisible({
+    timeout: 30_000,
+  });
   await page.getByTestId(`subject-card-${subjectId}`).click();
   await page
     .getByRole('link', { name: /view mathematics topic 1 details/i })

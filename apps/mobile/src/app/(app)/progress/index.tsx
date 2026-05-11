@@ -213,6 +213,13 @@ export default function ProgressScreen(): React.ReactElement {
     }
   }, [hasLinked, linkedChildren]);
 
+  // Re-seed when activeProfile loads after mount (no linked children path).
+  useEffect(() => {
+    if (!hasLinked && !selectedProfileId && activeProfile?.id) {
+      setSelectedProfileId(activeProfile.id);
+    }
+  }, [hasLinked, selectedProfileId, activeProfile?.id]);
+
   const isViewingSelf = !hasLinked || selectedProfileId === activeProfile?.id;
 
   const ownInventoryQuery = useProgressInventory();

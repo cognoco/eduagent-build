@@ -15,7 +15,7 @@ tags:
     file: ../_setup/open-family-dashboard.yaml
 
 - tapOn:
-    id: "dashboard-child-${CHILD_PROFILE_ID}-primary"
+    id: "parent-home-check-child-${CHILD_PROFILE_ID}"
 
 - extendedWaitUntil:
     visible:

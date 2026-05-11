@@ -37,12 +37,11 @@ tags:
 # 3. Screenshot: parent dashboard
 - takeScreenshot: raw-input-audit-01-dashboard
 
-# 4. Tap "View details" on child card (single tap only — double-tap causes
-#    double router.push past child detail, see consent-management fix)
-#    dashboard-child-${CHILD_PROFILE_ID}-primary is the primary action on
-#    the ParentDashboardSummary card (BaseCoachingCard testID-primary pattern).
+# 4. Tap child card (single tap only — double-tap causes double router.push
+#    past child detail, see consent-management fix).
+#    parent-home-check-child-${CHILD_PROFILE_ID} is the IntentCard on ParentHomeScreen.
 - tapOn:
-    id: "dashboard-child-${CHILD_PROFILE_ID}-primary"
+    id: "parent-home-check-child-${CHILD_PROFILE_ID}"
 
 # 5. Wait for child detail screen
 - extendedWaitUntil:

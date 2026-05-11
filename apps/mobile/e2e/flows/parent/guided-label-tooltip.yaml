@@ -33,11 +33,10 @@ tags:
 - runFlow:
     file: ../_setup/open-family-dashboard.yaml
 
-# 3. Tap "View details" on child card (single tap — double-tap causes double navigation)
-#    dashboard-child-${CHILD_PROFILE_ID}-primary is the primary action button
-#    on ParentDashboardSummary (BaseCoachingCard testID-primary pattern).
+# 3. Tap child card (single tap — double-tap causes double navigation).
+#    parent-home-check-child-${CHILD_PROFILE_ID} is the IntentCard on ParentHomeScreen.
 - tapOn:
-    id: "dashboard-child-${CHILD_PROFILE_ID}-primary"
+    id: "parent-home-check-child-${CHILD_PROFILE_ID}"
 
 # 4. Wait for child detail screen
 - extendedWaitUntil:

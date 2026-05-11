@@ -4,6 +4,9 @@
 # is NOT visible after PostApprovalLanding dismiss. The coaching card may
 # have auto-navigated to a Practice Session (tab bar hidden).
 # Back key returns to the home screen from the session.
+#
+# After Back, accept either learner-screen (most users) or parent-home-screen
+# (parent-with-children users whose ParentHomeScreen replaced learner-screen).
 appId: com.mentomate.app
 ---
 - pressKey: Back
@@ -11,3 +14,9 @@ appId: com.mentomate.app
     visible:
       id: "learner-screen"
     timeout: 15000
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "parent-home-screen"
+    timeout: 5000
+    optional: true

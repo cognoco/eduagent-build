@@ -43,7 +43,7 @@ export function useSendNudge(): UseMutationResult<
 }
 
 export function useMarkNudgeRead(): UseMutationResult<
-  { success: true; count: number },
+  { success: true; count: number; profileId: string | undefined },
   Error,
   string
 > {
@@ -52,23 +52,25 @@ export function useMarkNudgeRead(): UseMutationResult<
   const { activeProfile } = useProfile();
 
   return useMutation({
-    mutationFn: async (nudgeId) => {
+    mutationFn: async (nudgeId: string) => {
+      const profileId = activeProfile?.id;
       const res = await client.nudges[':id'].read.$patch({
         param: { id: nudgeId },
       });
       await assertOk(res);
-      return (await res.json()) as { success: true; count: number };
+      const data = (await res.json()) as { success: true; count: number };
+      return { ...data, profileId };
     },
-    onSuccess: () => {
+    onSuccess: (_data, _nudgeId, _context) => {
       void queryClient.invalidateQueries({
-        queryKey: ['nudges', 'unread', activeProfile?.id],
+        queryKey: ['nudges', 'unread', _data.profileId],
       });
     },
   });
 }
 
 export function useMarkAllNudgesRead(): UseMutationResult<
-  { success: true; count: number },
+  { success: true; count: number; profileId: string | undefined },
   Error,
   void
 > {
@@ -78,13 +80,15 @@ export function useMarkAllNudgesRead(): UseMutationResult<
 
   return useMutation({
     mutationFn: async () => {
+      const profileId = activeProfile?.id;
       const res = await client.nudges['mark-read'].$post();
       await assertOk(res);
-      return (await res.json()) as { success: true; count: number };
+      const data = (await res.json()) as { success: true; count: number };
+      return { ...data, profileId };
     },
-    onSuccess: () => {
+    onSuccess: (_data) => {
       void queryClient.invalidateQueries({
-        queryKey: ['nudges', 'unread', activeProfile?.id],
+        queryKey: ['nudges', 'unread', _data.profileId],
       });
     },
   });

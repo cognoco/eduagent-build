@@ -1,0 +1,12 @@
+# Second guard in the return-to-home chain.
+# Only proceed to return-to-home-check-gateway.yaml if parent-home-screen
+# is ALSO not visible. parent-with-children users land on ParentHomeScreen
+# (testID: parent-home-screen) after the parent home redesign — pressing Back
+# from there would navigate away from home incorrectly.
+appId: com.mentomate.app
+---
+- runFlow:
+    when:
+      notVisible:
+        id: "parent-home-screen"
+    file: return-to-home-check-gateway.yaml

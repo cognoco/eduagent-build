@@ -8,12 +8,11 @@
 #               (scenario: parent-with-children)
 #
 # Screen chain:
-#   dashboard.tsx  →  child/[profileId]/index.tsx  →  child/[profileId]/subjects/[subjectId].tsx
-#                 →  child/[profileId]/topic/[topicId].tsx  →  child/[profileId]/session/[sessionId].tsx
+#   ParentHomeScreen  →  child/[profileId]/index.tsx  →  child/[profileId]/subjects/[subjectId].tsx
+#                     →  child/[profileId]/topic/[topicId].tsx  →  child/[profileId]/session/[sessionId].tsx
 #
 # testIDs verified against:
-#   - apps/mobile/src/components/coaching/ParentDashboardSummary.tsx (dashboard-child-${profileId})
-#   - apps/mobile/src/components/coaching/BaseCoachingCard.tsx (${testID}-primary)
+#   - apps/mobile/src/components/home/ParentHomeScreen.tsx (parent-home-check-child-${profileId})
 #   - apps/mobile/src/app/(app)/child/[profileId]/index.tsx (child-detail-scroll, session-card-*)
 #   - apps/mobile/src/app/(app)/child/[profileId]/session/[sessionId].tsx (session-metadata)
 appId: com.mentomate.app
@@ -33,23 +32,23 @@ tags:
     file: ../_setup/open-family-dashboard.yaml
 
 # 3. Verify a child summary card rendered.
-#    dashboard-child-${CHILD_PROFILE_ID} is the testID pattern from ParentDashboardSummary.
+#    parent-home-check-child-${CHILD_PROFILE_ID} is the IntentCard testID on ParentHomeScreen.
 #    CHILD_PROFILE_ID is injected by the seed-and-sign-in helper.
 - extendedWaitUntil:
     visible:
-      id: "dashboard-child-${CHILD_PROFILE_ID}"
+      id: "parent-home-check-child-${CHILD_PROFILE_ID}"
     timeout: 10000
     optional: true
 
-# 4. Screenshot: parent dashboard with child cards
+# 4. Screenshot: parent home with child cards
 - takeScreenshot: parent-drill-down-01-dashboard
 
-# 5. Tap "View details" on the child card to drill into child detail.
-#    -primary suffix comes from BaseCoachingCard: testID={`${testID}-primary`}.
-#    NOTE: Do NOT also tap the card body — double-tap causes double
-#    router.push, navigating past child detail (BUG-70 consent-management fix).
+# 5. Tap the child check card to drill into child detail.
+#    parent-home-check-child-${CHILD_PROFILE_ID} is the IntentCard on ParentHomeScreen.
+#    NOTE: Do NOT double-tap — double router.push navigates past child detail
+#    (BUG-70 consent-management fix).
 - tapOn:
-    id: "dashboard-child-${CHILD_PROFILE_ID}-primary"
+    id: "parent-home-check-child-${CHILD_PROFILE_ID}"
 
 # 6. Wait for child detail screen
 - extendedWaitUntil:
@@ -185,7 +184,7 @@ tags:
 - runFlow:
     when:
       visible:
-        id: "dashboard-scroll"
+        id: "parent-home-screen"
     file: ../_setup/switch-to-child.yaml
     env:
       CHILD_NAME: "Proxy Child"

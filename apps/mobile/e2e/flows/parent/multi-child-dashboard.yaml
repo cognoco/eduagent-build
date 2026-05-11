@@ -24,11 +24,12 @@ tags:
 - runFlow:
     file: ../_setup/open-family-dashboard.yaml
 
-# ── Visual integrity: dashboard heading ────────────────────────────────
+# ── Visual integrity: parent home screen ───────────────────────────────
 - assertVisible:
-    text: "Family"
+    id: "parent-home-screen"
+
 - assertVisible:
-    text: "Everyone you're learning alongside."
+    text: "What do you need right now?"
 
 - takeScreenshot: multi-child-01-dashboard
 
@@ -36,20 +37,20 @@ tags:
 # Child 1: Emma (teen, Mathematics, 10 exchanges completed)
 - extendedWaitUntil:
     visible:
-      text: "Emma"
+      id: "parent-home-check-child-${CHILD1_PROFILE_ID}"
     timeout: 10000
 
 # Child 2: Lucas (learner, Science, 5 exchanges completed)
 - scrollUntilVisible:
     element:
-      text: "Lucas"
+      id: "parent-home-check-child-${CHILD2_PROFILE_ID}"
     direction: DOWN
     timeout: 10000
 
 # Child 3: Sofia (teen, History, no sessions yet)
 - scrollUntilVisible:
     element:
-      text: "Sofia"
+      id: "parent-home-check-child-${CHILD3_PROFILE_ID}"
     direction: DOWN
     timeout: 10000
 
@@ -58,12 +59,12 @@ tags:
 # ── Drill into Child 1 (Emma) ─────────────────────────────────────────
 - scrollUntilVisible:
     element:
-      text: "Emma"
+      id: "parent-home-check-child-${CHILD1_PROFILE_ID}"
     direction: UP
     timeout: 10000
 
 - tapOn:
-    text: "Emma"
+    id: "parent-home-check-child-${CHILD1_PROFILE_ID}"
 
 # Wait for child detail screen
 - extendedWaitUntil:
@@ -77,25 +78,25 @@ tags:
 
 - takeScreenshot: multi-child-03-emma-detail
 
-# Navigate back to dashboard
-# Use pressKey:back only — tapOn back-button + pressKey = double-back exits dashboard
+# Navigate back to parent home
+# Use pressKey:back only — tapOn back-button + pressKey = double-back exits home
 - pressKey: back
 
-# Wait for dashboard to reload
+# Wait for parent home to reload
 - extendedWaitUntil:
     visible:
-      id: "dashboard-scroll"
+      id: "parent-home-screen"
     timeout: 10000
 
 # ── Drill into Child 2 (Lucas) ────────────────────────────────────────
 - scrollUntilVisible:
     element:
-      text: "Lucas"
+      id: "parent-home-check-child-${CHILD2_PROFILE_ID}"
     direction: DOWN
     timeout: 10000
 
 - tapOn:
-    text: "Lucas"
+    id: "parent-home-check-child-${CHILD2_PROFILE_ID}"
 
 - extendedWaitUntil:
     visible:
@@ -109,23 +110,23 @@ tags:
 - takeScreenshot: multi-child-04-lucas-detail
 
 # Navigate back
-# Use pressKey:back only — tapOn back-button + pressKey = double-back exits dashboard
+# Use pressKey:back only — tapOn back-button + pressKey = double-back exits home
 - pressKey: back
 
 - extendedWaitUntil:
     visible:
-      id: "dashboard-scroll"
+      id: "parent-home-screen"
     timeout: 10000
 
 # ── Drill into Child 3 (Sofia — no sessions) ─────────────────────────
 - scrollUntilVisible:
     element:
-      text: "Sofia"
+      id: "parent-home-check-child-${CHILD3_PROFILE_ID}"
     direction: DOWN
     timeout: 10000
 
 - tapOn:
-    text: "Sofia"
+    id: "parent-home-check-child-${CHILD3_PROFILE_ID}"
 
 - extendedWaitUntil:
     visible:
@@ -139,12 +140,12 @@ tags:
 - takeScreenshot: multi-child-05-sofia-detail
 
 # Navigate back
-# Use pressKey:back only — tapOn back-button + pressKey = double-back exits dashboard
+# Use pressKey:back only — tapOn back-button + pressKey = double-back exits home
 - pressKey: back
 
 - extendedWaitUntil:
     visible:
-      id: "dashboard-scroll"
+      id: "parent-home-screen"
     timeout: 10000
 
 - takeScreenshot: multi-child-06-complete

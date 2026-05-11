@@ -8,7 +8,6 @@ let notificationHandlerInitialized = false;
 
 export function initNotificationHandler(): void {
   if (notificationHandlerInitialized) return;
-  notificationHandlerInitialized = false;
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowAlert: true,

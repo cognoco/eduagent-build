@@ -168,9 +168,8 @@ export default function MoreScreen() {
     ? profiles.filter((p) => p.id !== activeProfile.id && !p.isOwner)
     : [];
   // Add-child entry is the single global path to add a child profile.
-  // Solo adults reach it here (Family tab is hidden for them); existing
-  // parents reach it here too. Gated on isAdultOwner so under-18s and
-  // non-owner profiles never see it.
+  // All adults reach it here — the Family tab has been removed entirely.
+  // Gated on isAdultOwner so under-18s and non-owner profiles never see it.
   const showAddChild = isAdultOwner({
     role,
     birthYear: activeProfile?.birthYear,

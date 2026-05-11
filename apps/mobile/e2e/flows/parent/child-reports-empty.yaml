@@ -17,7 +17,7 @@ tags:
 - takeScreenshot: 01-parent-dashboard
 
 - tapOn:
-    id: "dashboard-child-${CHILD1_PROFILE_ID}-primary"
+    id: "parent-home-check-child-${CHILD1_PROFILE_ID}"
 
 - extendedWaitUntil:
     visible:

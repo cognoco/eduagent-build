@@ -3,7 +3,7 @@
  *
  * Covers:
  *   1. Happy-path end-to-end insert
- *   2. Rate-limit BREAK test: 4th createNudge from same parent throws RateLimitedError
+ *   2. Rate-limit BREAK test: 5th createNudge from same parent throws RateLimitedError
  *   3. Per-parent-per-child dimension: parent A at limit, parent B can still send
  *   4. Concurrency BREAK test: count=2, 5 concurrent calls, at most 1 succeeds
  *   5. IDOR BREAK: markNudgeRead with wrong profileId returns 0
@@ -235,8 +235,9 @@ describeIfDb('nudge service (integration)', () => {
 
   // ── 2. Rate-limit BREAK test ───────────────────────────────────────────────
 
-  it('[BREAK] throws RateLimitedError after 3 nudges from same parent to same child', async () => {
+  it('[BREAK] throws RateLimitedError after 4 nudges from same parent to same child', async () => {
     const now = new Date();
+    await seedNudgeRow(parentAProfileId, childXProfileId, now);
     await seedNudgeRow(parentAProfileId, childXProfileId, now);
     await seedNudgeRow(parentAProfileId, childXProfileId, now);
     await seedNudgeRow(parentAProfileId, childXProfileId, now);
@@ -261,13 +262,14 @@ describeIfDb('nudge service (integration)', () => {
           gt(nudges.createdAt, windowStart),
         ),
       );
-    expect(count).toHaveLength(3);
+    expect(count).toHaveLength(4);
   });
 
   // ── 3. Per-parent-per-child dimension (I1 dimension fix) ──────────────────
 
   it('[BREAK] parent B can send when parent A has hit the per-parent limit', async () => {
     const now = new Date();
+    await seedNudgeRow(parentAProfileId, childXProfileId, now);
     await seedNudgeRow(parentAProfileId, childXProfileId, now);
     await seedNudgeRow(parentAProfileId, childXProfileId, now);
     await seedNudgeRow(parentAProfileId, childXProfileId, now);
@@ -313,8 +315,9 @@ describeIfDb('nudge service (integration)', () => {
   //          transactions. At most 1 of the 5 succeeds; rows stays <= 3.
   //          Verified GREEN: all 6 integration tests pass (2026-05-11).
 
-  it('[BREAK] concurrency: at most 1 of 5 concurrent calls succeeds when count is 2', async () => {
+  it('[BREAK] concurrency: at most 1 of 5 concurrent calls succeeds when count is 3', async () => {
     const now = new Date();
+    await seedNudgeRow(parentAProfileId, childXProfileId, now);
     await seedNudgeRow(parentAProfileId, childXProfileId, now);
     await seedNudgeRow(parentAProfileId, childXProfileId, now);
 
@@ -344,7 +347,7 @@ describeIfDb('nudge service (integration)', () => {
           gt(nudges.createdAt, windowStart),
         ),
       );
-    expect(rows.length).toBeLessThanOrEqual(3);
+    expect(rows.length).toBeLessThanOrEqual(4);
   });
 
   // ── 5. IDOR BREAK test — markNudgeRead ────────────────────────────────────

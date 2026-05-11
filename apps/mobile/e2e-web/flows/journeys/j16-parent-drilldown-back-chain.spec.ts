@@ -13,16 +13,11 @@ test('J-16 parent drill-down reaches topic detail and unwinds cleanly', async ({
   const subjectId = seed.ids.subject1Id;
 
   await page.goto('/home', { waitUntil: 'commit' });
-  await expect(page.getByTestId('learner-screen')).toBeVisible({
+  await expect(page.getByTestId('parent-home-screen')).toBeVisible({
     timeout: 60_000,
   });
 
-  await page.getByTestId('home-child-card').click();
-  await expect(page.getByTestId('dashboard-scroll')).toBeVisible({
-    timeout: 30_000,
-  });
-
-  await page.getByTestId(`dashboard-child-${childProfileId}-primary`).click();
+  await page.getByTestId(`parent-home-check-child-${childProfileId}`).click();
   await expect(page.getByTestId('child-detail-scroll')).toBeVisible({
     timeout: 30_000,
   });
@@ -45,12 +40,7 @@ test('J-16 parent drill-down reaches topic detail and unwinds cleanly', async ({
     timeout: 30_000,
   });
   await page.goBack();
-  await expect(page.getByTestId('dashboard-scroll')).toBeVisible({
-    timeout: 30_000,
-  });
-  await expect(page.getByTestId('dashboard-back')).toBeEnabled();
-  await page.getByTestId('dashboard-back').click();
-  await expect(page.getByTestId('learner-screen')).toBeVisible({
+  await expect(page.getByTestId('parent-home-screen')).toBeVisible({
     timeout: 30_000,
   });
 });

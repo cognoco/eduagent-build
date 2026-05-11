@@ -17,7 +17,7 @@ test('J-14 profile loading resolves without dead-end', async ({ page }) => {
   // The app should resolve past profile-loading to a real screen.
   // Accept learner home, learner screen, or consent gate as valid states.
   const learnerScreen = page.getByTestId('learner-screen');
-  const parentHome = page.getByTestId('learner-screen');
+  const parentHome = page.getByTestId('parent-home-screen');
   const consentGate = page.getByTestId('consent-pending-gate');
   const profileLoading = page.getByTestId('profile-loading');
 

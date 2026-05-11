@@ -203,18 +203,22 @@ export async function getUnpickedBookSuggestionsWithTopup(
     );
 
   if (unpicked.length < 4) {
-    const { generateCategorizedBookSuggestions } =
-      await import('./book-suggestion-generation');
-    await generateCategorizedBookSuggestions(db, profileId, subjectId);
-    unpicked = await db
-      .select()
-      .from(bookSuggestions)
-      .where(
-        and(
-          eq(bookSuggestions.subjectId, subjectId),
-          isNull(bookSuggestions.pickedAt),
-        ),
-      );
+    try {
+      const { generateCategorizedBookSuggestions } =
+        await import('./book-suggestion-generation');
+      await generateCategorizedBookSuggestions(db, profileId, subjectId);
+      unpicked = await db
+        .select()
+        .from(bookSuggestions)
+        .where(
+          and(
+            eq(bookSuggestions.subjectId, subjectId),
+            isNull(bookSuggestions.pickedAt),
+          ),
+        );
+    } catch {
+      // LLM topup failed — return pre-topup suggestions rather than 500
+    }
   }
 
   const bookCountRows = await db

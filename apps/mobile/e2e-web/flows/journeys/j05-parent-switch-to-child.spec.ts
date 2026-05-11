@@ -1,26 +1,22 @@
 import { expect, test } from '@playwright/test';
 import { readSeedData } from '../../helpers/seed-data';
-import { waitForScreenDismissingPostApproval } from '../../helpers/post-approval';
 
-test('J-05 parent switches to child profile → child learner home', async ({
+test('J-05 parent switches to child profile → child detail (proxy mode)', async ({
   page,
 }) => {
   const seed = await readSeedData('owner-with-children');
   const childProfileId = seed.ids.child1ProfileId;
 
-  await page.goto('/family', { waitUntil: 'commit' });
+  await page.goto('/home', { waitUntil: 'commit' });
 
-  // Start on Family, where the profile switcher lives.
-  await expect(page.getByTestId('dashboard-scroll')).toBeVisible({
+  await expect(page.getByTestId('parent-home-screen')).toBeVisible({
     timeout: 60_000,
   });
 
-  // Open profile switcher and switch to child
-  await page.getByTestId('profile-switcher-chip').click();
-  await expect(page.getByTestId('profile-switcher-menu')).toBeVisible();
-  await page.getByTestId(`profile-option-${childProfileId}`).click();
+  await page.getByTestId(`parent-home-check-child-${childProfileId}`).click();
+  await expect(page.getByTestId('child-detail-scroll')).toBeVisible({
+    timeout: 30_000,
+  });
 
-  // Wait for menu to close and child's learner screen (or post-approval first)
-  await waitForScreenDismissingPostApproval(page, 'learner-screen');
-  await expect(page.getByTestId('intent-proxy-placeholder')).toBeVisible();
+  await expect(page.getByTestId('proxy-banner')).toBeVisible();
 });

@@ -29,7 +29,7 @@ tags:
 
 # 3. Tap primary action on the seeded child card
 - tapOn:
-    id: "dashboard-child-${CHILD_PROFILE_ID}-primary"
+    id: "parent-home-check-child-${CHILD_PROFILE_ID}"
 
 # 4. Wait for child detail scroll view
 - extendedWaitUntil:

@@ -302,6 +302,21 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
     },
     appliesTo: () => true,
   },
+  {
+    id: 'S15-review-mode-opener',
+    purpose:
+      'Review mode turn-0 — calibration opener prompt fires for effectiveMode=review',
+    history: [],
+    contextOverrides: {
+      escalationRung: 1,
+      sessionType: 'learning',
+      verificationType: 'standard',
+      exchangeCount: 0,
+      effectiveMode: 'review',
+      retentionStatus: { status: 'fading', daysSinceLastReview: 7 },
+    },
+    appliesTo: () => true,
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -346,7 +361,7 @@ function buildSyntheticMemoryBlock(profile: EvalProfile): string {
     currentSubject,
     currentTopic,
     null,
-    []
+    [],
   );
   return block.text;
 }
@@ -392,7 +407,7 @@ function inferSubjectFromTopic(topic: string): string {
   if (/philosoph|existentialis|camus/.test(lower)) return 'Philosophy';
   if (
     /biolog|body|cycle|animal|dinosaur|fossil|paleontolog|mesozoic|plate/.test(
-      lower
+      lower,
     )
   )
     return 'Science';
@@ -438,14 +453,14 @@ function buildBaseContext(profile: EvalProfile): ExchangeContext {
 
 function buildScenarioContext(
   profile: EvalProfile,
-  spec: ScenarioSpec
+  spec: ScenarioSpec,
 ): ExchangeContext {
   const base = buildBaseContext(profile);
   const topic = profile.libraryTopics[0] ?? 'this topic';
   const struggle = profile.struggles[0]?.topic ?? 'the tricky part';
 
   const history = substituteHistory(spec.history, { topic, struggle }).map(
-    (t) => ({ role: t.role, content: t.content })
+    (t) => ({ role: t.role, content: t.content }),
   );
 
   return {
@@ -472,7 +487,7 @@ export const exchangesFlow: FlowDefinition<ExchangeScenarioInput> = {
   },
 
   enumerateScenarios(
-    profile: EvalProfile
+    profile: EvalProfile,
   ): Array<Scenario<ExchangeScenarioInput>> {
     const scenarios: Array<Scenario<ExchangeScenarioInput>> = [];
     for (const spec of SCENARIO_SPECS) {
@@ -496,10 +511,10 @@ export const exchangesFlow: FlowDefinition<ExchangeScenarioInput> = {
       .find((t) => t.role === 'user');
     const firstTurnUser =
       input.context.exchangeCount === 0
-        ? input.context.rawInput ??
+        ? (input.context.rawInput ??
           `Start a learning session about ${
             input.context.topicTitle ?? input.context.subjectName
-          }.`
+          }.`)
         : undefined;
 
     return {
@@ -522,7 +537,7 @@ export const exchangesFlow: FlowDefinition<ExchangeScenarioInput> = {
   // Uses messages.system as-is — production adds buildOrphanSystemAddendum but the harness omits it so the live run validates the same prompt the Tier-1 snapshot displays.
   async runLive(
     input: ExchangeScenarioInput,
-    messages: PromptMessages
+    messages: PromptMessages,
   ): Promise<string> {
     const history = input.context.exchangeHistory;
     const lastUserIndex = (() => {
@@ -536,7 +551,7 @@ export const exchangesFlow: FlowDefinition<ExchangeScenarioInput> = {
 
     if (messages.user === undefined) {
       throw new Error(
-        `runLive: messages.user is undefined for scenario ${input.scenarioId} — buildPrompt must produce a user turn`
+        `runLive: messages.user is undefined for scenario ${input.scenarioId} — buildPrompt must produce a user turn`,
       );
     }
 
