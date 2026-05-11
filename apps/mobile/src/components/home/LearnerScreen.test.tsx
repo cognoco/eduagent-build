@@ -305,7 +305,7 @@ describe('LearnerScreen', () => {
       screen.getByTestId('parent-home-screen');
       screen.getByTestId('parent-home-check-child-child-id');
       screen.getByText('See how Emma is doing');
-      screen.getByText('2 sessions this week');
+      screen.getByText('12 words learned — up from 5 last week');
       screen.getByText(/7 questions left today.*84 left this month/);
     });
   });

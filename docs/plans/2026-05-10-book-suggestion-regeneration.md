@@ -24,16 +24,18 @@
 ### Modified
 - `packages/database/src/schema/subjects.ts` — add `bookSuggestionCategoryEnum`, add `category` to `bookSuggestions`, add `bookSuggestionsLastGenerationAttemptedAt` to `subjects`.
 - `packages/schemas/src/subjects.ts` — extend `bookSuggestionSchema` with `category`, replace `bookSuggestionsResponseSchema` with envelope object, add `bookSuggestionGenerationResultSchema`.
-- `apps/api/src/services/suggestions.ts` — new exported function `getUnpickedBookSuggestionsWithTopup` returning `{ suggestions, curriculumBookCount }`. Existing functions stay untouched (used by `/all` and tests).
-- `apps/api/src/routes/book-suggestions.ts` — `GET /subjects/:subjectId/book-suggestions` becomes a one-line delegation to the new service function. `/all` route untouched.
-- `apps/api/src/routes/book-suggestions.test.ts` — update fixtures and assertions for the envelope response shape.
-- `apps/mobile/src/hooks/use-book-suggestions.ts` — return type becomes `{ suggestions: BookSuggestion[]; curriculumBookCount: number }`.
-- `apps/mobile/src/app/(app)/pick-book/[subjectId].tsx` — derive `hasAnyBook` from envelope, split into `relatedSuggestions` / `exploreSuggestions` / `legacySuggestions`, render grouped headers when `hasAnyBook`. Update `LOADING_MESSAGES` and slow-loading hint timing.
-- `apps/mobile/src/app/(app)/pick-book/[subjectId].test.tsx` — extend to cover grouping rules.
+- `apps/api/src/services/suggestions.ts` — new exported functions: `getUnpickedBookSuggestionsWithTopup` (LLM top-up, returns envelope) and `getUnpickedBookSuggestionsEnvelope` (read-only, returns envelope). Existing functions stay untouched.
+- `apps/api/src/routes/book-suggestions.ts` — `GET /subjects/:subjectId/book-suggestions` gains a `?topup=1` query param. With param → delegates to `getUnpickedBookSuggestionsWithTopup` (LLM generation). Without → delegates to `getUnpickedBookSuggestionsEnvelope` (read-only). Both return the envelope shape. `/all` route untouched.
+- `apps/api/src/routes/book-suggestions.test.ts` — update fixtures and assertions for the envelope response shape; add tests for `?topup=1` vs no-param branching.
+- `apps/mobile/src/hooks/use-book-suggestions.ts` — return type becomes `BookSuggestionsResponse`; hook accepts optional `{ topup?: boolean }` option; query key includes `topup` flag for separate shelf/picker caches.
+- `apps/mobile/src/app/(app)/pick-book/[subjectId].tsx` — calls `useBookSuggestions(subjectId, { topup: true })`; derives `hasAnyBook` from envelope, split into `relatedSuggestions` / `exploreSuggestions` / `legacySuggestions`, render grouped headers when `hasAnyBook`. Update `LOADING_MESSAGES` and slow-loading hint timing.
+- `apps/mobile/src/app/(app)/pick-book/[subjectId].test.tsx` — extend to cover grouping rules; mock returns envelope shape.
+- `apps/mobile/src/app/(app)/shelf/[subjectId]/index.tsx` — unwrap `.suggestions` from envelope (`suggestionsData?.suggestions ?? []`).
+- `apps/mobile/src/app/(app)/shelf/[subjectId]/index.test.tsx` — update mock responses to envelope shape.
 
 ### Untouched
 - `apps/api/src/services/subject.ts` — broad-path seed in `subject.ts:396-403` continues inserting `category=null`. Renderable as legacy section.
-- `apps/api/src/routes/book-suggestions.ts` `/all` endpoint — still returns the legacy bare-array (used by shelf, not picker).
+- `apps/api/src/routes/book-suggestions.ts` `/all` endpoint — still returns the legacy bare-array. **Correction:** `/all` has zero mobile consumers (dead code). Both shelf and picker use `GET /book-suggestions` via `useBookSuggestions`. The `?topup=1` query param gates which code path runs.
 
 ---
 
@@ -1087,7 +1089,105 @@ Expected: PASS for all three new cases.
 
 ---
 
-### Task 10: Route handler — delegate to top-up service, return envelope
+### Task 9a: Read-only envelope service function (no LLM)
+
+> **Why:** The shelf screen also calls `GET /book-suggestions` (same hook as the picker). Without a read-only variant, the shelf would trigger LLM generation on every visit. This function returns the same envelope shape but without the generation trigger.
+
+**Files:**
+- Modify: `apps/api/src/services/suggestions.ts`
+- Modify: `apps/api/src/services/suggestions.test.ts`
+
+- [ ] **Step 1: Add failing test**
+
+Append to the test file from Task 9:
+
+```ts
+import { getUnpickedBookSuggestionsEnvelope } from './suggestions';
+
+describe('getUnpickedBookSuggestionsEnvelope', () => {
+  it('returns envelope without triggering generation', async () => {
+    const rows = [{ id: '1' }, { id: '2' }];
+    const db = {
+      query: { subjects: { findFirst: jest.fn().mockResolvedValue({ id: 's', profileId: 'p' }) } },
+      select: jest
+        .fn()
+        .mockImplementationOnce(() => ({ from: () => ({ where: () => Promise.resolve(rows) }) }))
+        .mockImplementationOnce(() => ({ from: () => ({ where: () => Promise.resolve([{ count: 3 }]) }) })),
+    } as never;
+
+    const result = await getUnpickedBookSuggestionsEnvelope(db, 'p', 's');
+
+    expect(generateMock).not.toHaveBeenCalled();
+    expect(result.suggestions).toHaveLength(2);
+    expect(result.curriculumBookCount).toBe(3);
+  });
+
+  it('returns empty envelope when subject does not belong to profile', async () => {
+    const db = {
+      query: { subjects: { findFirst: jest.fn().mockResolvedValue(undefined) } },
+      select: jest.fn(),
+    } as never;
+    const result = await getUnpickedBookSuggestionsEnvelope(db, 'p', 's');
+    expect(result).toEqual({ suggestions: [], curriculumBookCount: 0 });
+  });
+});
+```
+
+- [ ] **Step 2: Run and confirm FAIL**
+
+Run: `cd apps/api && pnpm exec jest src/services/suggestions.test.ts --no-coverage`
+Expected: FAIL — `getUnpickedBookSuggestionsEnvelope is not a function`.
+
+- [ ] **Step 3: Add the implementation**
+
+Below `getUnpickedBookSuggestionsWithTopup` in `suggestions.ts`:
+
+```ts
+export async function getUnpickedBookSuggestionsEnvelope(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+): Promise<{ suggestions: BookSuggestion[]; curriculumBookCount: number }> {
+  const subject = await db.query.subjects.findFirst({
+    where: and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
+  });
+  if (!subject) return { suggestions: [], curriculumBookCount: 0 };
+
+  const unpicked = await db
+    .select()
+    .from(bookSuggestions)
+    .where(
+      and(
+        eq(bookSuggestions.subjectId, subjectId),
+        isNull(bookSuggestions.pickedAt),
+      ),
+    );
+
+  const bookCountRows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(curriculumBooks)
+    .where(eq(curriculumBooks.subjectId, subjectId));
+  const curriculumBookCount = bookCountRows[0]?.count ?? 0;
+
+  return {
+    suggestions: unpicked as unknown as BookSuggestion[],
+    curriculumBookCount,
+  };
+}
+```
+
+- [ ] **Step 4: Run and confirm PASS**
+
+Run: `cd apps/api && pnpm exec jest src/services/suggestions.test.ts --no-coverage`
+Expected: PASS for all five test cases (3 from Task 9 + 2 from Task 9a).
+
+- [ ] **Step 5: Commit**
+
+`/commit` with body: `feat(api): read-only envelope for shelf (no LLM generation)`.
+
+---
+
+### Task 10: Route handler — `?topup=1` gates LLM generation, return envelope
 
 **Files:**
 - Modify: `apps/api/src/routes/book-suggestions.ts:21-32`
@@ -1095,26 +1195,11 @@ Expected: PASS for all three new cases.
 
 - [ ] **Step 1: Update existing route test to expect the envelope shape**
 
-Open `apps/api/src/routes/book-suggestions.test.ts`. Replace the `jest.mock('../services/suggestions', ...)` block to add the new function and keep the legacy ones (since `/all` still uses `getAllBookSuggestions`):
+Open `apps/api/src/routes/book-suggestions.test.ts`. Replace the `jest.mock('../services/suggestions', ...)` block to add both new functions and keep the legacy ones:
 
 ```ts
-jest.mock('../services/suggestions', () => ({
-  getUnpickedBookSuggestionsWithTopup: jest.fn().mockResolvedValue({
-    suggestions: [
-      {
-        id: TEST_BOOK_ID,
-        subjectId: 'a0000000-0000-4000-a000-000000000201',
-        title: 'Suggested Book',
-        emoji: '📖',
-        description: 'A suggested book',
-        category: null,
-        createdAt: '2024-01-01T00:00:00.000Z',
-        pickedAt: null,
-      },
-    ],
-    curriculumBookCount: 0,
-  }),
-  getAllBookSuggestions: jest.fn().mockResolvedValue([
+const ENVELOPE_FIXTURE = {
+  suggestions: [
     {
       id: TEST_BOOK_ID,
       subjectId: 'a0000000-0000-4000-a000-000000000201',
@@ -1125,15 +1210,21 @@ jest.mock('../services/suggestions', () => ({
       createdAt: '2024-01-01T00:00:00.000Z',
       pickedAt: null,
     },
-  ]),
+  ],
+  curriculumBookCount: 0,
+};
+
+jest.mock('../services/suggestions', () => ({
+  getUnpickedBookSuggestionsWithTopup: jest.fn().mockResolvedValue(ENVELOPE_FIXTURE),
+  getUnpickedBookSuggestionsEnvelope: jest.fn().mockResolvedValue(ENVELOPE_FIXTURE),
+  getAllBookSuggestions: jest.fn().mockResolvedValue(ENVELOPE_FIXTURE.suggestions),
 }));
 ```
 
-Find the test that asserts the GET picker response and update it to expect the envelope:
+Replace or add the GET picker test to cover both branches:
 
 ```ts
-it('returns envelope { suggestions, curriculumBookCount } from picker GET', async () => {
-  // ...existing setup...
+it('returns envelope without LLM when topup param is absent (shelf path)', async () => {
   const res = await app.request(`/subjects/${SUBJECT_ID}/book-suggestions`, {
     headers: { Authorization: `Bearer ${jwt}` },
   });
@@ -1145,10 +1236,23 @@ it('returns envelope { suggestions, curriculumBookCount } from picker GET', asyn
     ]),
     curriculumBookCount: 0,
   });
+  const { getUnpickedBookSuggestionsEnvelope } = await import('../services/suggestions');
+  expect(getUnpickedBookSuggestionsEnvelope).toHaveBeenCalled();
+});
+
+it('delegates to topup service when ?topup=1 (picker path)', async () => {
+  const res = await app.request(`/subjects/${SUBJECT_ID}/book-suggestions?topup=1`, {
+    headers: { Authorization: `Bearer ${jwt}` },
+  });
+  expect(res.status).toBe(200);
+  const body = await res.json();
+  expect(body).toEqual(expect.objectContaining({ curriculumBookCount: 0 }));
+  const { getUnpickedBookSuggestionsWithTopup } = await import('../services/suggestions');
+  expect(getUnpickedBookSuggestionsWithTopup).toHaveBeenCalled();
 });
 ```
 
-If the existing test asserts `expect(body).toEqual(expect.arrayContaining([...]))` directly, replace it with the envelope shape above. The `/all` test stays as-is.
+The `/all` test stays as-is.
 
 - [ ] **Step 2: Run the test and confirm it fails**
 
@@ -1161,11 +1265,14 @@ Edit `apps/api/src/routes/book-suggestions.ts`:
 
 ```ts
 import { Hono } from 'hono';
+import { zValidator } from '@hono/zod-validator';
+import { z } from 'zod';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import {
   getUnpickedBookSuggestionsWithTopup,
+  getUnpickedBookSuggestionsEnvelope,
   getAllBookSuggestions,
 } from '../services/suggestions';
 import {
@@ -1182,16 +1289,27 @@ type BookSuggestionsEnv = {
   };
 };
 
+const pickerQuerySchema = z.object({
+  topup: z.enum(['1']).optional(),
+});
+
 export const bookSuggestionRoutes = new Hono<BookSuggestionsEnv>()
-  .get('/subjects/:subjectId/book-suggestions', async (c) => {
-    const profileId = requireProfileId(c.get('profileId'));
-    const result = await getUnpickedBookSuggestionsWithTopup(
-      c.get('db'),
-      profileId,
-      c.req.param('subjectId'),
-    );
-    return c.json(bookSuggestionsResponseSchema.parse(result), 200);
-  })
+  .get(
+    '/subjects/:subjectId/book-suggestions',
+    zValidator('query', pickerQuerySchema),
+    async (c) => {
+      const profileId = requireProfileId(c.get('profileId'));
+      const db = c.get('db');
+      const subjectId = c.req.param('subjectId');
+      const { topup } = c.req.valid('query');
+
+      const result = topup === '1'
+        ? await getUnpickedBookSuggestionsWithTopup(db, profileId, subjectId)
+        : await getUnpickedBookSuggestionsEnvelope(db, profileId, subjectId);
+
+      return c.json(bookSuggestionsResponseSchema.parse(result), 200);
+    },
+  )
   .get('/subjects/:subjectId/book-suggestions/all', async (c) => {
     const profileId = requireProfileId(c.get('profileId'));
     const suggestions = await getAllBookSuggestions(
@@ -1203,7 +1321,7 @@ export const bookSuggestionRoutes = new Hono<BookSuggestionsEnv>()
   });
 ```
 
-The legacy `getUnpickedBookSuggestions` export in `services/suggestions.ts` stays for any other caller (none today) — leave it alone to keep the diff minimal.
+The legacy `getUnpickedBookSuggestions` export in `services/suggestions.ts` stays for any other caller — leave it alone to keep the diff minimal. The query-param gate ensures the shelf (no `?topup=1`) gets a pure read, and the picker (`?topup=1`) triggers LLM generation.
 
 - [ ] **Step 4: Run and confirm PASS**
 
@@ -1223,12 +1341,15 @@ Expected: both green. The legacy `bookSuggestionsResponseSchema` import in `rout
 
 `/commit` with body:
 ```
-feat(api): pick-book GET returns envelope and tops up the pool inline
+feat(api): book-suggestions GET returns envelope, ?topup=1 gates LLM
 
-- GET /subjects/:subjectId/book-suggestions delegates to
-  getUnpickedBookSuggestionsWithTopup, which fires the LLM only when
-  the unpicked pool drops below 4 (gated by cool-down + advisory lock).
-- /all keeps the legacy bare-array shape (used by shelf, not picker).
+- GET /subjects/:subjectId/book-suggestions always returns
+  { suggestions, curriculumBookCount } envelope.
+- Without ?topup=1: read-only via getUnpickedBookSuggestionsEnvelope
+  (used by shelf — no LLM generation).
+- With ?topup=1: delegates to getUnpickedBookSuggestionsWithTopup
+  (used by picker — fires LLM when pool < 4).
+- /all keeps the legacy bare-array shape (dead code, no mobile consumer).
 
 Refs spec docs/specs/2026-05-10-book-suggestion-regeneration.md (HIGH-2, CRITICAL-3)
 ```
@@ -1473,7 +1594,7 @@ Expected: PASS — the existing `findFirst` ownership check inside the service r
 
 ---
 
-### Task 13: Mobile hook — return envelope shape
+### Task 13: Mobile hook — return envelope shape with `topup` option
 
 **Files:**
 - Modify: `apps/mobile/src/hooks/use-book-suggestions.ts`
@@ -1492,19 +1613,27 @@ import { assertOk } from '../lib/assert-ok';
 
 export function useBookSuggestions(
   subjectId: string | undefined,
+  options?: { topup?: boolean },
 ): UseQueryResult<BookSuggestionsResponse> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const topup = options?.topup ?? false;
 
   return useQuery({
-    queryKey: ['book-suggestions', subjectId, activeProfile?.id],
+    queryKey: ['book-suggestions', subjectId, activeProfile?.id, topup],
     queryFn: async ({ signal: querySignal }) => {
       if (!subjectId) throw new Error('subjectId is required');
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
         const res = await client.subjects[':subjectId'][
           'book-suggestions'
-        ].$get({ param: { subjectId } }, { init: { signal } });
+        ].$get(
+          {
+            param: { subjectId },
+            query: topup ? { topup: '1' as const } : {},
+          },
+          { init: { signal } },
+        );
         await assertOk(res);
         return (await res.json()) as BookSuggestionsResponse;
       } finally {
@@ -1516,23 +1645,39 @@ export function useBookSuggestions(
 }
 ```
 
+The `topup` flag is included in the query key so the shelf (`topup: false`) and picker (`topup: true`) maintain separate TanStack Query caches. The existing `['book-suggestions']` prefix invalidation in `use-filing.ts` still clears both (prefix match).
+
 - [ ] **Step 2: Run mobile typecheck**
 
 Run: `cd apps/mobile && pnpm exec tsc --noEmit`
-Expected: errors at `pick-book/[subjectId].tsx:107` (`suggestions = suggestionsQuery.data ?? []`) — handled in Task 14.
+Expected: errors at `pick-book/[subjectId].tsx:107` and `shelf/[subjectId]/index.tsx:40-41` — both consumers need updating to unwrap the envelope. Handled in Task 14 (picker) and Task 19 (shelf).
 
 - [ ] **Step 3: Commit**
 
-`/commit` with body: `feat(mobile): use-book-suggestions returns envelope { suggestions, curriculumBookCount }`.
+`/commit` with body: `feat(mobile): use-book-suggestions returns envelope, accepts { topup } option`.
 
 ---
 
-### Task 14: Mobile picker — group by category when `hasAnyBook`
+### Task 14: Mobile picker — group by category when `hasAnyBook`, enable topup
 
 **Files:**
+- Modify: `apps/mobile/src/app/(app)/pick-book/[subjectId].tsx:38` (hook call — add `{ topup: true }`)
 - Modify: `apps/mobile/src/app/(app)/pick-book/[subjectId].tsx:107` and the suggestion-grid block at `:362-373`
 - Modify: `apps/mobile/src/app/(app)/pick-book/[subjectId].tsx:26-30` (loading messages)
 - Modify: `apps/mobile/src/app/(app)/pick-book/[subjectId].tsx:97-105` (slow-loading hint timing)
+
+- [ ] **Step 0: Enable topup on the hook call**
+
+At line 38, change:
+```ts
+const suggestionsQuery = useBookSuggestions(subjectId);
+```
+to:
+```ts
+const suggestionsQuery = useBookSuggestions(subjectId, { topup: true });
+```
+
+This is the only call site that triggers LLM generation. The shelf's call (no `topup` option) stays read-only.
 
 - [ ] **Step 1: Update LOADING_MESSAGES and slow-loading timing**
 
@@ -1990,6 +2135,89 @@ If any step revealed a regression, fix it as a new sub-task with TDD (red-green)
 
 ---
 
+### Task 19: Shelf consumer — unwrap envelope
+
+> **Why:** The shelf screen (`shelf/[subjectId]/index.tsx:40-41`) uses `useBookSuggestions` which now returns `BookSuggestionsResponse` (an object with `.suggestions` and `.curriculumBookCount`) instead of a bare `BookSuggestion[]`. Without this update, the `?? []` fallback passes the truthy object through, and downstream `.length` checks read `undefined`, silently hiding all suggestion UI on the shelf.
+
+**Files:**
+- Modify: `apps/mobile/src/app/(app)/shelf/[subjectId]/index.tsx:40-41`
+- Modify: `apps/mobile/src/app/(app)/shelf/[subjectId]/index.test.tsx` (update mock response shape)
+
+- [ ] **Step 1: Update shelf consumer**
+
+At lines 40-41, change:
+
+```ts
+const { data: rawBookSuggestions } = useBookSuggestions(subjectId);
+const bookSuggestions = rawBookSuggestions ?? [];
+```
+
+to:
+
+```ts
+const { data: suggestionsData } = useBookSuggestions(subjectId);
+const bookSuggestions = suggestionsData?.suggestions ?? [];
+```
+
+No other shelf code changes — the shelf does not pass `{ topup: true }`, so its call triggers no LLM generation.
+
+- [ ] **Step 2: Update shelf test mocks**
+
+In `shelf/[subjectId]/index.test.tsx`, update every `mockFetch.setRoute('/book-suggestions', ...)` call to return the envelope shape. Examples:
+
+```ts
+// Empty suggestions:
+mockFetch.setRoute('/book-suggestions', { suggestions: [], curriculumBookCount: 0 });
+
+// With suggestions:
+mockFetch.setRoute('/book-suggestions', {
+  suggestions: [
+    { id: 'sug-1', subjectId: 'sub-1', title: 'Algebra', emoji: '📐', description: 'desc', category: null, createdAt: '2024-01-01T00:00:00.000Z', pickedAt: null },
+  ],
+  curriculumBookCount: 1,
+});
+```
+
+- [ ] **Step 3: Run shelf tests**
+
+Run: `cd apps/mobile && pnpm exec jest "src/app/(app)/shelf/[subjectId]/index.test.tsx" --no-coverage`
+Expected: all existing shelf tests PASS with the envelope mocks.
+
+- [ ] **Step 4: Run mobile typecheck**
+
+Run: `cd apps/mobile && pnpm exec tsc --noEmit`
+Expected: no new type errors (the shelf now correctly destructures `.suggestions` from the envelope).
+
+- [ ] **Step 5: Commit**
+
+`/commit` with body: `fix(mobile): shelf unwraps .suggestions from book-suggestions envelope`.
+
+---
+
+### Task 20: Manual end-to-end — verify shelf does NOT trigger LLM
+
+> **Why:** The `?topup=1` gate is the primary defense against the shelf accidentally calling the LLM. This manual step verifies it end-to-end.
+
+**Files:** none changed
+
+- [ ] **Step 1: Open a subject shelf with < 4 unpicked suggestions**
+
+Use the dev API + mobile dev client (from Task 18 setup). Navigate to a subject shelf that has 0-3 unpicked suggestions remaining.
+
+- [ ] **Step 2: Verify no LLM call**
+
+Check the API server logs. Expected: no log line matching `book_suggestion_generation` or `generateCategorizedBookSuggestions`. The shelf's call to `/book-suggestions` (without `?topup=1`) should NOT trigger generation.
+
+- [ ] **Step 3: Open the picker for the same subject**
+
+Navigate to the pick-book screen for the same subject. Expected: the picker fires `?topup=1`, LLM generates fresh suggestions, and the pool refills.
+
+- [ ] **Step 4: No commit unless regression found**
+
+If the shelf incorrectly triggers LLM, investigate which code path sent `?topup=1` and fix. Otherwise this task closes without a commit.
+
+---
+
 ## Self-Review
 
 **Spec coverage check:**
@@ -2002,35 +2230,36 @@ If any step revealed a regression, fix it as a new sub-task with TDD (red-green)
 | Schema Change — `category` enum + column | Task 1, 2 |
 | Schema Change — partial unique index (HIGH-3) | Task 2, 11 |
 | Schema Change — cool-down column | Task 1, 2 |
-| Server Changes — response shape (HIGH-2) | Task 1, 9, 10, 13 |
-| Server Changes — top-up on GET endpoint | Task 9, 10 |
+| Server Changes — response shape (HIGH-2) | Task 1, 9, 9a, 10, 13 |
+| Server Changes — top-up on GET endpoint (picker only) | Task 9, 10, 14 |
+| Server Changes — read-only envelope (shelf) | Task 9a, 10 |
 | Server Changes — route stays free of business logic (CRITICAL-3) | Task 10 |
 | Server Changes — latency budget (HIGH-1) | Task 14 |
 | Server Changes — generation function | Task 3-8 |
 | Server Changes — LLM prompt shape | Task 3, 16 |
-| Mobile Changes — envelope hook | Task 13 |
+| Mobile Changes — envelope hook with `topup` option | Task 13 |
+| Mobile Changes — picker enables `topup: true` | Task 14 |
+| Mobile Changes — shelf unwraps envelope (no topup) | Task 19 |
 | Mobile Changes — grouped render | Task 14, 15 |
 | Mobile Changes — cache invalidation (MEDIUM-2) | Task 17 |
 | Mobile Changes — loader copy | Task 14 |
-| Tests — server unit | Task 3-8 |
+| Tests — server unit | Task 3-8, 9a |
 | Tests — server integration concurrency, cool-down, race-safe insert | Task 11 |
 | Tests — profile-scoping break test | Task 12 |
-| Tests — mobile unit | Task 15 |
+| Tests — mobile unit | Task 15, 19 |
 | Tests — LLM eval (MEDIUM-5) | Task 16 |
-| Failure Modes table — every row | Tasks 3-8 (unit) + Task 11 (integration) + Task 18 (manual) |
-| Out of Scope — no Inngest, no shelf prefetch, no rationale | (no task — verified by absence) |
+| Failure Modes table — every row | Tasks 3-8 (unit) + Task 11 (integration) + Task 18/20 (manual) |
+| Out of Scope — no Inngest, no shelf-side LLM | Tasks 9a, 10, 14 (`?topup=1` gate) + 19, 20 (verified) |
 | Rollback note (MEDIUM-3) | (documented in spec; migration is additive — no task) |
 
-No gaps.
+Gaps filled (2026-05-11 amendment): shelf consumer (Task 19), shelf-vs-picker LLM isolation (Tasks 9a, 10, 14, 20).
 
 ---
 
 ## Execution Handoff
 
-**Plan complete and saved to `docs/plans/2026-05-10-book-suggestion-regeneration.md`. Two execution options:**
+**Plan amended 2026-05-11 to fix two gaps (see Tasks 9a, 19, 20 and amendments to Tasks 10, 13, 14). Now 20 tasks total.**
 
-**1. Subagent-Driven (recommended)** — I dispatch a fresh subagent per task, review between tasks, fast iteration.
+**1. Subagent-Driven (recommended)** — dispatch a fresh subagent per task, review between tasks, fast iteration.
 
-**2. Inline Execution** — Execute tasks in this session using executing-plans, batch execution with checkpoints.
-
-**Which approach?**
+**2. Inline Execution** — execute tasks in this session using executing-plans, batch execution with checkpoints.

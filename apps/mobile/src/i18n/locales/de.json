@@ -152,7 +152,8 @@
       "greeting": "Hallo {{displayName}}",
       "intentHeader": "Was brauchst du gerade?",
       "encouragementNote": "Nudges sind sanfte Ermutigungen in eine Richtung.",
-      "transitionNotice": "Du bist jetzt auch Elternteil. Das ist dein Zuhause - Fortschritt der Kinder und dein eigenes Lernen an einem Ort.",
+      "transitionNoticeTitle": "Du bist jetzt auch Elternteil",
+      "transitionNoticeBody": "Das ist dein Zuhause – Fortschritt der Kinder und dein eigenes Lernen an einem Ort.",
       "cards": {
         "checkChild": "Schau nach, wie es {{childName}} geht",
         "checkChildFallback": "Tippe, um den Fortschritt dieser Woche zu sehen",
@@ -1131,6 +1132,7 @@
   "progress": {
     "pageTitle": "Meine Lernreise",
     "pageSubtitle": "Fortschritt, der widerspiegelt, was du wirklich weißt.",
+    "ownProfilePill": "Meins",
     "startLearning": "Lernen starten",
     "keepLearning": "Weiterlernen",
     "refreshFailedTitle": "Update fehlgeschlagen",

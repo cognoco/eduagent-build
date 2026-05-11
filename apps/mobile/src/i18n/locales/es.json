@@ -152,7 +152,8 @@
       "greeting": "Hola, {{displayName}}",
       "intentHeader": "Que necesitas ahora?",
       "encouragementNote": "Los nudges son animos suaves de una sola direccion.",
-      "transitionNotice": "Ahora tambien eres madre o padre. Este es tu inicio: el progreso de tus hijos y tu propio aprendizaje en un solo lugar.",
+      "transitionNoticeTitle": "Ahora también eres madre o padre",
+      "transitionNoticeBody": "Este es tu inicio: el progreso de tus hijos y tu propio aprendizaje en un solo lugar.",
       "cards": {
         "checkChild": "Ver como le va a {{childName}}",
         "checkChildFallback": "Toca para ver el progreso de esta semana",
@@ -1131,6 +1132,7 @@
   "progress": {
     "pageTitle": "Mi Viaje de Aprendizaje",
     "pageSubtitle": "Un progreso que refleja lo que realmente sabes.",
+    "ownProfilePill": "Lo mío",
     "startLearning": "Empezar a aprender",
     "keepLearning": "Seguir aprendiendo",
     "refreshFailedTitle": "Falló la actualización",

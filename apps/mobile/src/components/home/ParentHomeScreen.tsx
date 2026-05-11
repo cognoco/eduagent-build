@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import type { DashboardData, Profile } from '@eduagent/schemas';
@@ -32,24 +32,20 @@ function formatChildSnapshot(
     (entry) => entry.profileId === child.id,
   );
   if (!dashboardChild) return fallback;
+
+  const headline = dashboardChild.weeklyHeadline;
+  if (
+    headline &&
+    typeof headline.value === 'number' &&
+    typeof headline.label === 'string'
+  ) {
+    const value = `${headline.value} ${headline.label.toLowerCase()}`;
+    return headline.comparison ? `${value} — ${headline.comparison}` : value;
+  }
+
   if (dashboardChild.sessionsThisWeek === 0) return 'No activity this week';
   if (dashboardChild.sessionsThisWeek === 1) return '1 session this week';
   return `${dashboardChild.sessionsThisWeek} sessions this week`;
-}
-
-function pushChildDetail(childProfileId: string): void {
-  router.push({
-    pathname: '/(app)/child/[profileId]',
-    params: { profileId: childProfileId },
-  } as never);
-}
-
-function pushChildReports(childProfileId: string): void {
-  pushChildDetail(childProfileId);
-  router.push({
-    pathname: '/(app)/child/[profileId]/reports',
-    params: { profileId: childProfileId },
-  } as never);
 }
 
 export function ParentHomeScreen({
@@ -57,6 +53,7 @@ export function ParentHomeScreen({
   now,
 }: ParentHomeScreenProps): React.ReactElement {
   const { t } = useTranslation();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const linkedChildren = useLinkedChildren();
@@ -74,6 +71,21 @@ export function ParentHomeScreen({
       topicTitle: resumeTarget.topicTitle ?? resumeTarget.subjectName,
     });
   }, [resumeTarget, t]);
+
+  function pushChildDetail(childProfileId: string): void {
+    router.push({
+      pathname: '/(app)/child/[profileId]',
+      params: { profileId: childProfileId },
+    } as never);
+  }
+
+  function pushChildReports(childProfileId: string): void {
+    pushChildDetail(childProfileId);
+    router.push({
+      pathname: '/(app)/child/[profileId]/reports',
+      params: { profileId: childProfileId },
+    } as never);
+  }
 
   return (
     <View className="flex-1 bg-background" testID="parent-home-screen">

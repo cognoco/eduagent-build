@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import type { Profile } from '@eduagent/schemas';
 
 interface ProgressPillRowProps {
@@ -15,6 +16,7 @@ export function ProgressPillRow({
   ownProfileId,
   onSelect,
 }: ProgressPillRowProps): React.ReactElement | null {
+  const { t } = useTranslation();
   const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
@@ -31,7 +33,7 @@ export function ProgressPillRow({
       id: profile.id,
       label: profile.displayName,
     })),
-    { id: ownProfileId, label: 'Mine' },
+    { id: ownProfileId, label: t('progress.ownProfilePill') },
   ];
 
   return (

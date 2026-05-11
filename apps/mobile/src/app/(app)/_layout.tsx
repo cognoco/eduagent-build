@@ -55,14 +55,8 @@ const BASE_VISIBLE_TABS: ReadonlySet<string> = new Set([
   'more',
 ]);
 
-export function computeVisibleTabs(
-  hasFamily: boolean,
-  role: ActiveProfileRole | null = 'owner',
-): Set<string> {
-  void hasFamily;
-  void role;
-  const next = new Set<string>(BASE_VISIBLE_TABS);
-  return next;
+export function computeVisibleTabs(): Set<string> {
+  return new Set<string>(BASE_VISIBLE_TABS);
 }
 
 // Routes where the entire tab bar is hidden (immersive / full-screen UX).
@@ -1288,20 +1282,7 @@ export default function AppLayout() {
   useMentorLanguageSync();
   const { isParentProxy, childProfile, parentProfile } = useParentProxy();
   const role = useActiveProfileRole();
-  // hasFamily: the active profile is an owner AND at least one *other*
-  // (non-owner) profile is linked to the account. Solo adults are owners
-  // with no linked children → Family tab hidden, Add-child entry lives in
-  // More instead.
-  const hasFamily = React.useMemo(
-    () =>
-      activeProfile?.isOwner === true &&
-      profiles.some((p) => p.id !== activeProfile.id && !p.isOwner),
-    [activeProfile?.id, activeProfile?.isOwner, profiles],
-  );
-  const visibleTabs = React.useMemo(
-    () => computeVisibleTabs(hasFamily, role),
-    [hasFamily, role],
-  );
+  const visibleTabs = React.useMemo(() => computeVisibleTabs(), []);
 
   // Sync Clerk auth state with RevenueCat identity (runs on auth change)
   useRevenueCatIdentity();

@@ -152,7 +152,8 @@
       "greeting": "Hei {{displayName}}",
       "intentHeader": "Hva trenger du akkurat nå?",
       "encouragementNote": "Nudger er korte, milde oppmuntringer en vei.",
-      "transitionNotice": "Du er forelder nå også. Dette er hjemmet ditt - barnas fremgang og din egen læring samlet på ett sted.",
+      "transitionNoticeTitle": "Du er forelder nå også",
+      "transitionNoticeBody": "Dette er hjemmet ditt – barnas fremgang og din egen læring samlet på ett sted.",
       "cards": {
         "checkChild": "Se hvordan det går med {{childName}}",
         "checkChildFallback": "Trykk for å se ukens fremgang",
@@ -1131,6 +1132,7 @@
   "progress": {
     "pageTitle": "Min læringsreise",
     "pageSubtitle": "Fremgang som reflekterer hva du faktisk kan.",
+    "ownProfilePill": "Meg",
     "startLearning": "Start læring",
     "keepLearning": "Fortsett å lære",
     "refreshFailedTitle": "Oppdatering mislyktes",

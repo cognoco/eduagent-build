@@ -152,7 +152,8 @@
       "greeting": "Oi, {{displayName}}",
       "intentHeader": "O que voce precisa agora?",
       "encouragementNote": "Nudges sao incentivos breves e gentis, sem resposta obrigatoria.",
-      "transitionNotice": "Agora voce tambem e responsavel. Esta e a sua tela inicial - progresso das criancas e seu proprio aprendizado em um so lugar.",
+      "transitionNoticeTitle": "Agora você também é responsável",
+      "transitionNoticeBody": "Esta é a sua tela inicial – progresso das crianças e seu próprio aprendizado em um só lugar.",
       "cards": {
         "checkChild": "Ver como {{childName}} esta indo",
         "checkChildFallback": "Toque para ver o progresso desta semana",
@@ -1155,6 +1156,7 @@
   "progress": {
     "pageTitle": "Minha Jornada de Aprendizagem",
     "pageSubtitle": "Progresso que reflete o que você realmente sabe.",
+    "ownProfilePill": "Meu",
     "startLearning": "Começar a aprender",
     "keepLearning": "Continuar aprendendo",
     "refreshFailedTitle": "Falha na atualização",

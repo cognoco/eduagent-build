@@ -1,6 +1,8 @@
 import { render, screen } from '@testing-library/react-native';
 import {
   fetchLearningResumeTarget,
+  useChildInventory,
+  useChildProgressHistory,
   useLearningResumeTarget,
   useProgressInventory,
   useProgressHistory,
@@ -139,6 +141,7 @@ jest.mock('../../lib/profile', () => ({
     },
     profiles: [],
   }),
+  useLinkedChildren: () => [],
 }));
 jest.mock('../../lib/analytics', () => ({
   bucketAccountAge: jest.fn(() => '91+'),
@@ -288,6 +291,18 @@ function mockHooks(
     data: [],
     isLoading: false,
     isError: false,
+    refetch: jest.fn(),
+  });
+  (useChildInventory as jest.Mock).mockReturnValue({
+    data: null,
+    isLoading: false,
+    isError: false,
+    isRefetching: false,
+    refetch: jest.fn(),
+  });
+  (useChildProgressHistory as jest.Mock).mockReturnValue({
+    data: null,
+    isRefetching: false,
     refetch: jest.fn(),
   });
   (useLearningResumeTarget as jest.Mock).mockReturnValue({

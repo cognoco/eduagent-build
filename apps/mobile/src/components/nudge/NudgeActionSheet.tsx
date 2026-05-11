@@ -11,6 +11,7 @@ import {
   RateLimitedError,
 } from '../../lib/api-errors';
 import { platformAlert } from '../../lib/platform-alert';
+import { Sentry } from '../../lib/sentry';
 import { useThemeColors } from '../../lib/theme';
 
 const TEMPLATES: readonly NudgeTemplate[] = [
@@ -20,7 +21,7 @@ const TEMPLATES: readonly NudgeTemplate[] = [
   'thinking_of_you',
 ];
 
-type InlineError = 'rate' | 'consent' | 'network';
+type InlineError = 'rate' | 'consent' | 'network' | 'unknown';
 
 interface NudgeActionSheetProps {
   childName: string;
@@ -59,7 +60,10 @@ export function NudgeActionSheet({
       } else if (err instanceof NetworkError) {
         setInlineError('network');
       } else {
-        setInlineError('network');
+        Sentry.captureException(err, {
+          tags: { component: 'NudgeActionSheet' },
+        });
+        setInlineError('unknown');
       }
     } finally {
       setPendingTemplate(null);
@@ -73,7 +77,9 @@ export function NudgeActionSheet({
         ? t('nudge.error.consentPending', { childName })
         : inlineError === 'network'
           ? t('errors.networkError')
-          : null;
+          : inlineError === 'unknown'
+            ? t('errors.generic')
+            : null;
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>

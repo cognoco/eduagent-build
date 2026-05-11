@@ -29,3 +29,5 @@ CREATE INDEX "nudges_to_profile_read_at_idx"
 
 CREATE INDEX "nudges_from_to_created_at_idx"
   ON "nudges" USING btree ("from_profile_id", "to_profile_id", "created_at");
+
+ALTER TYPE "public"."notification_type" ADD VALUE 'nudge';

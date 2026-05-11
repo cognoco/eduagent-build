@@ -152,7 +152,8 @@
       "greeting": "Hey {{displayName}}",
       "intentHeader": "What do you need right now?",
       "encouragementNote": "Nudges are gentle one-way encouragements.",
-      "transitionNotice": "You're a parent now too. This is your home - kids' progress and your own learning, all in one place.",
+      "transitionNoticeTitle": "You're a parent now too",
+      "transitionNoticeBody": "This is your home – kids' progress and your own learning, all in one place.",
       "cards": {
         "checkChild": "See how {{childName}} is doing",
         "checkChildFallback": "Tap to see this week's progress",
@@ -1131,6 +1132,7 @@
   "progress": {
     "pageTitle": "My Learning Journey",
     "pageSubtitle": "Progress that reflects what you actually know.",
+    "ownProfilePill": "Mine",
     "startLearning": "Start learning",
     "keepLearning": "Keep learning",
     "refreshFailedTitle": "Refresh failed",

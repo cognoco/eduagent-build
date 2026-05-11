@@ -152,7 +152,8 @@
       "greeting": "こんにちは、{{displayName}}",
       "intentHeader": "今なにをしますか？",
       "encouragementNote": "ナッジは短い応援メッセージです。返信は必要ありません。",
-      "transitionNotice": "保護者としてのホームも使えるようになりました。お子さんの進み具合と自分の学習をここで見られます。",
+      "transitionNoticeTitle": "保護者としてのホームも使えるようになりました",
+      "transitionNoticeBody": "お子さんの進み具合と自分の学習をここで見られます。",
       "cards": {
         "checkChild": "{{childName}}さんの様子を見る",
         "checkChildFallback": "今週の進み具合を見る",
@@ -1131,6 +1132,7 @@
   "progress": {
     "pageTitle": "私の学習の旅",
     "pageSubtitle": "実際に知っていることを反映した進捗。",
+    "ownProfilePill": "自分",
     "startLearning": "学習を開始",
     "keepLearning": "学習を続ける",
     "refreshFailedTitle": "更新に失敗しました",

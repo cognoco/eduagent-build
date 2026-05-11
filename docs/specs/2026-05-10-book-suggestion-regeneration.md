@@ -101,21 +101,32 @@ export const bookSuggestionsResponseSchema = z.object({
 
 ### Top-up on the existing GET endpoint
 
-`apps/api/src/routes/book-suggestions.ts:21-32` — `GET /subjects/:subjectId/book-suggestions` becomes a one-line delegation to a new service function (CRITICAL-3 — route handlers stay free of business logic per CLAUDE.md G1/G5):
+`apps/api/src/routes/book-suggestions.ts:21-32` — `GET /subjects/:subjectId/book-suggestions` gains a `?topup=1` query parameter gating LLM generation (CRITICAL-3 — route handlers stay free of business logic per CLAUDE.md G1/G5):
 
 ```ts
-.get('/subjects/:subjectId/book-suggestions', async (c) => {
-  const profileId = requireProfileId(c.get('profileId'));
-  const result = await getUnpickedBookSuggestionsWithTopup(
-    c.get('db'),
-    profileId,
-    c.req.param('subjectId'),
-  );
-  return c.json(bookSuggestionsResponseSchema.parse(result), 200);
-})
+.get(
+  '/subjects/:subjectId/book-suggestions',
+  zValidator('query', z.object({ topup: z.enum(['1']).optional() })),
+  async (c) => {
+    const profileId = requireProfileId(c.get('profileId'));
+    const db = c.get('db');
+    const subjectId = c.req.param('subjectId');
+    const { topup } = c.req.valid('query');
+
+    const result = topup === '1'
+      ? await getUnpickedBookSuggestionsWithTopup(db, profileId, subjectId)
+      : await getUnpickedBookSuggestionsEnvelope(db, profileId, subjectId);
+
+    return c.json(bookSuggestionsResponseSchema.parse(result), 200);
+  },
+)
 ```
 
-`getUnpickedBookSuggestionsWithTopup` lives in `services/suggestions.ts` (or the new `book-suggestion-generation.ts`) and contains the count-branch + top-up + re-read flow. `/all` endpoint stays untouched (it's used by the shelf, not the picker).
+Both functions return the same envelope shape `{ suggestions, curriculumBookCount }`. `getUnpickedBookSuggestionsWithTopup` fires the LLM when pool < 4; `getUnpickedBookSuggestionsEnvelope` is a pure read. Both live in `services/suggestions.ts`.
+
+**Why the query param gate:** Both the shelf screen and the picker screen share the same `useBookSuggestions` hook calling this endpoint. The picker passes `{ topup: true }` (LLM generation on demand). The shelf calls without the param (read-only). Without this gate, every shelf visit would trigger LLM generation when the pool is low — violating the "no shelf-side prefetch" scope constraint.
+
+`/all` endpoint stays untouched. **Note:** `/all` has zero mobile consumers (dead code). Both shelf and picker use `GET /book-suggestions` via `useBookSuggestions`.
 
 ### Why GET-with-side-effect
 
@@ -182,7 +193,11 @@ Validate with a new `bookSuggestionGenerationResultSchema` in `@eduagent/schemas
 
 ## Mobile Changes
 
-`useBookSuggestions` (`apps/mobile/src/hooks/use-book-suggestions.ts`) returns the new envelope shape (HIGH-2): `{ suggestions: BookSuggestion[]; curriculumBookCount: number }`. The picker derives `hasAnyBook` from `curriculumBookCount > 0` — no extra hook, no second request.
+`useBookSuggestions` (`apps/mobile/src/hooks/use-book-suggestions.ts`) returns the new envelope shape (HIGH-2): `{ suggestions: BookSuggestion[]; curriculumBookCount: number }` and accepts an optional `{ topup?: boolean }` option. When `topup: true`, the hook appends `?topup=1` to the request URL; when absent, it omits the param. The query key includes the `topup` flag so the shelf and picker maintain separate TanStack Query caches.
+
+The picker calls `useBookSuggestions(subjectId, { topup: true })` and derives `hasAnyBook` from `curriculumBookCount > 0` — no extra hook, no second request.
+
+The shelf calls `useBookSuggestions(subjectId)` (no `topup`) and unwraps `suggestionsData?.suggestions ?? []` for its "Study next" cards. No LLM generation is triggered.
 
 `apps/mobile/src/app/(app)/pick-book/[subjectId].tsx:107` — replace `const suggestions = suggestionsQuery.data ?? [];` with:
 
@@ -221,11 +236,11 @@ The `BUG-318` auto-open-custom-input effect (`:112-124`) keeps its current trigg
 
 ## Out of Scope
 
-- No background pre-warming, no Inngest job, no shelf-side prefetch — explicit user constraint.
+- No background pre-warming, no Inngest job, no shelf-side LLM generation — enforced by the `?topup=1` query-param gate (only the picker sends it).
 - No per-suggestion rationale text ("Suggested because you studied X"). Just title/description/emoji + category header.
 - No "regenerate now" button — generation only runs as a side effect of pool depletion.
 - No change to topic suggestions (`topicSuggestions` table, narrow-path picker).
-- No change to `/all` endpoint (used by shelf, not picker).
+- No change to `/all` endpoint (dead code — no mobile consumer).
 - No language-subject handling — generation function returns early on `pedagogyMode='four_strands'`.
 
 ## Failure Modes

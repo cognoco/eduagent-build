@@ -152,7 +152,8 @@
       "greeting": "Cześć {{displayName}}",
       "intentHeader": "Czego teraz potrzebujesz?",
       "encouragementNote": "Zachęty to krótkie, łagodne wiadomości w jedną stronę.",
-      "transitionNotice": "Jesteś teraz także rodzicem. To jest twój ekran główny - postępy dzieci i twoja nauka w jednym miejscu.",
+      "transitionNoticeTitle": "Jesteś teraz także rodzicem",
+      "transitionNoticeBody": "To jest twój ekran główny – postępy dzieci i twoja nauka w jednym miejscu.",
       "cards": {
         "checkChild": "Sprawdź, jak idzie {{childName}}",
         "checkChildFallback": "Dotknij, aby zobaczyć postępy z tego tygodnia",
@@ -1155,6 +1156,7 @@
   "progress": {
     "pageTitle": "Moja podróż edukacyjna",
     "pageSubtitle": "Postępy, które odzwierciedlają to, co naprawdę wiesz.",
+    "ownProfilePill": "Moje",
     "startLearning": "Rozpocznij naukę",
     "keepLearning": "Kontynuuj naukę",
     "refreshFailedTitle": "Odświeżanie nie powiodło się",

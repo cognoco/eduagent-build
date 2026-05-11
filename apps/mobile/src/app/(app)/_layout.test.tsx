@@ -662,30 +662,13 @@ describe('AppLayout', () => {
 });
 
 describe('computeVisibleTabs', () => {
-  it('shows base tabs for owners with linked children (family tab removed)', () => {
-    const tabs = computeVisibleTabs(true);
-    expect(tabs.has('home')).toBe(true);
-    expect(tabs.has('library')).toBe(true);
-    expect(tabs.has('progress')).toBe(true);
-    expect(tabs.has('more')).toBe(true);
-    // Parent Home is now the family-facing surface.
-    expect(tabs.has('family')).toBe(false);
+  it('returns exactly the base visible tabs', () => {
+    const tabs = computeVisibleTabs();
+    expect(tabs).toEqual(new Set(['home', 'library', 'progress', 'more']));
   });
 
-  it('hides family for solo adult owners (no linked children)', () => {
-    const tabs = computeVisibleTabs(false);
-    expect(tabs.has('family')).toBe(false);
-    // The single Add-child entry path lives in More for solo adults.
-    expect(tabs.has('more')).toBe(true);
-  });
-
-  it('does not include family for child role', () => {
-    const tabs = computeVisibleTabs(true, 'child');
-    expect(tabs.has('family')).toBe(false);
-  });
-
-  it('does not include family while impersonating a child', () => {
-    const tabs = computeVisibleTabs(true, 'impersonated-child');
+  it('does not include family tab', () => {
+    const tabs = computeVisibleTabs();
     expect(tabs.has('family')).toBe(false);
   });
 });
