@@ -327,7 +327,8 @@ export default function ProgressScreen(): React.ReactElement {
     !!inventory &&
     !profileSessionsQuery.isLoading &&
     isProfileStale({ sessionCount, lastSessionAt });
-  const progressSurfaceState: 'empty' | 'awaiting' | 'ready' | 'ineligible' =
+  // TODO: D-RP-5 Phase 2 — add 'ineligible' once API provides the discriminator
+  const progressSurfaceState: 'empty' | 'awaiting' | 'ready' =
     isEmpty || isStale
       ? 'empty'
       : hasAnyReports

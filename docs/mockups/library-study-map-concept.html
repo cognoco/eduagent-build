@@ -1,0 +1,627 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Library Study Map Concept</title>
+    <style>
+      :root {
+        --page: #e7edf0;
+        --app: #f8faf8;
+        --surface: #ffffff;
+        --surface-soft: #eef5f2;
+        --surface-cool: #eef4fb;
+        --ink: #18201f;
+        --muted: #63706c;
+        --line: #d9e2de;
+        --teal: #0f8f82;
+        --blue: #2864c8;
+        --amber: #a76509;
+        --rose: #b23a64;
+        --green: #17834f;
+        --shadow: 0 24px 70px rgba(24, 32, 31, 0.16);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--page);
+        color: var(--ink);
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+
+      .canvas {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 28px;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 40px 24px;
+      }
+
+      .phone {
+        width: 390px;
+        min-height: 844px;
+        border: 10px solid #111;
+        border-radius: 34px;
+        overflow: hidden;
+        background: var(--app);
+        box-shadow: var(--shadow);
+      }
+
+      .screen {
+        min-height: 824px;
+        padding: 24px 20px 92px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 32px;
+        line-height: 1.08;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        font-size: 18px;
+        line-height: 1.2;
+        letter-spacing: 0;
+      }
+
+      h3 {
+        font-size: 15px;
+        line-height: 1.25;
+        letter-spacing: 0;
+      }
+
+      p {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .subtitle {
+        margin-top: 6px;
+      }
+
+      .manage {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--surface);
+        padding: 9px 12px;
+        color: var(--teal);
+        font-weight: 750;
+        font-size: 13px;
+        white-space: nowrap;
+      }
+
+      .search {
+        margin-top: 18px;
+        height: 48px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--surface);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 14px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .search.active {
+        border-color: rgba(15, 143, 130, 0.55);
+        box-shadow: 0 0 0 3px rgba(15, 143, 130, 0.09);
+        color: var(--ink);
+      }
+
+      .section {
+        margin-top: 22px;
+      }
+
+      .section-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 8px;
+      }
+
+      .link {
+        color: var(--teal);
+        font-weight: 750;
+        font-size: 13px;
+      }
+
+      .continue {
+        border-radius: 14px;
+        background: var(--surface-soft);
+        border: 1px solid #d7e8e1;
+        padding: 14px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .cover {
+        width: 48px;
+        height: 58px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        color: #fff;
+        font-weight: 900;
+        background: linear-gradient(135deg, #0f8f82, #2864c8);
+        flex: 0 0 auto;
+      }
+
+      .main {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .meta {
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 12px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .progress-track {
+        height: 6px;
+        border-radius: 999px;
+        background: rgba(15, 143, 130, 0.14);
+        margin-top: 10px;
+        overflow: hidden;
+      }
+
+      .progress-fill {
+        height: 100%;
+        width: 58%;
+        border-radius: inherit;
+        background: var(--teal);
+      }
+
+      .shelf-row,
+      .result-row,
+      .chapter-row {
+        min-height: 72px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .tile {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        display: grid;
+        place-items: center;
+        font-weight: 850;
+        flex: 0 0 auto;
+      }
+
+      .tile.teal {
+        color: var(--teal);
+        background: rgba(15, 143, 130, 0.12);
+      }
+
+      .tile.blue {
+        color: var(--blue);
+        background: rgba(40, 100, 200, 0.12);
+      }
+
+      .tile.amber {
+        color: var(--amber);
+        background: rgba(167, 101, 9, 0.13);
+      }
+
+      .tile.rose {
+        color: var(--rose);
+        background: rgba(178, 58, 100, 0.12);
+      }
+
+      .pill-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      .pill {
+        border-radius: 999px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        padding: 6px 9px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .pill.urgent {
+        color: var(--amber);
+        border-color: rgba(167, 101, 9, 0.22);
+        background: rgba(167, 101, 9, 0.08);
+      }
+
+      .pill.done {
+        color: var(--green);
+        border-color: rgba(23, 131, 79, 0.22);
+        background: rgba(23, 131, 79, 0.08);
+      }
+
+      .chev {
+        color: var(--muted);
+        font-weight: 850;
+      }
+
+      .filter-row {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+        overflow: hidden;
+      }
+
+      .filter {
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        padding: 8px 10px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 750;
+        white-space: nowrap;
+      }
+
+      .filter.active {
+        background: var(--teal);
+        border-color: var(--teal);
+        color: #fff;
+      }
+
+      .kind {
+        color: var(--teal);
+        font-size: 12px;
+        font-weight: 850;
+        text-transform: uppercase;
+        margin: 18px 0 4px;
+      }
+
+      .subject-hero {
+        margin-top: 18px;
+        border-radius: 16px;
+        border: 1px solid #d8e5ef;
+        background: var(--surface-cool);
+        padding: 16px;
+      }
+
+      .hero-line {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .primary {
+        width: 100%;
+        min-height: 46px;
+        border: 0;
+        border-radius: 12px;
+        background: var(--teal);
+        color: #fff;
+        font-weight: 850;
+        margin-top: 14px;
+      }
+
+      .tabs {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+        padding: 4px;
+        margin-top: 16px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--surface);
+      }
+
+      .tab {
+        border-radius: 10px;
+        padding: 8px 4px;
+        text-align: center;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .tab.active {
+        background: var(--surface-soft);
+        color: var(--ink);
+      }
+
+      .chapter-num {
+        width: 26px;
+        height: 26px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        background: var(--surface-soft);
+        color: var(--teal);
+        font-size: 12px;
+        font-weight: 850;
+        flex: 0 0 auto;
+      }
+
+      .bottom-nav {
+        height: 64px;
+        margin: 20px -20px -92px;
+        padding: 10px 26px;
+        display: flex;
+        justify-content: space-between;
+        background: rgba(255, 255, 255, 0.94);
+        border-top: 1px solid var(--line);
+      }
+
+      .nav-item {
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 750;
+        text-align: center;
+      }
+
+      .nav-item.active {
+        color: var(--teal);
+      }
+    </style>
+  </head>
+  <body>
+    <main class="canvas">
+      <section class="phone" aria-label="Library browse state">
+        <div class="screen">
+          <div class="top">
+            <div>
+              <h1>Library</h1>
+              <p class="subtitle">4 subjects, 68 topics</p>
+            </div>
+            <div class="manage">Manage</div>
+          </div>
+
+          <div class="search">⌕ Search notes, sessions, books</div>
+
+          <div class="section">
+            <div class="section-head">
+              <h2>Continue</h2>
+              <span class="link">See all</span>
+            </div>
+            <div class="continue">
+              <div class="cover">IT</div>
+              <div class="main">
+                <h3>Italian Beginner 1</h3>
+                <p class="meta">Chapter 3 · Ordering food · 58% complete</p>
+                <div class="progress-track">
+                  <div class="progress-fill"></div>
+                </div>
+              </div>
+              <div class="chev">›</div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-head">
+              <h2>Your shelves</h2>
+              <span class="link">Add</span>
+            </div>
+
+            <div class="shelf-row">
+              <div class="tile teal">L</div>
+              <div class="main">
+                <h3>Italian</h3>
+                <p class="meta">2 books · 18/32 topics</p>
+                <div class="pill-row">
+                  <span class="pill urgent">3 due</span>
+                  <span class="pill">Last studied today</span>
+                </div>
+              </div>
+              <div class="chev">›</div>
+            </div>
+
+            <div class="shelf-row">
+              <div class="tile blue">B</div>
+              <div class="main">
+                <h3>Biology</h3>
+                <p class="meta">1 book · 6/14 topics</p>
+                <div class="pill-row">
+                  <span class="pill">Cell division next</span>
+                </div>
+              </div>
+              <div class="chev">›</div>
+            </div>
+
+            <div class="shelf-row">
+              <div class="tile amber">H</div>
+              <div class="main">
+                <h3>History</h3>
+                <p class="meta">1 book · 10/10 topics</p>
+                <div class="pill-row">
+                  <span class="pill done">Finished</span>
+                </div>
+              </div>
+              <div class="chev">›</div>
+            </div>
+          </div>
+
+          <nav class="bottom-nav">
+            <div class="nav-item">Home</div>
+            <div class="nav-item active">Library</div>
+            <div class="nav-item">Progress</div>
+            <div class="nav-item">More</div>
+          </nav>
+        </div>
+      </section>
+
+      <section class="phone" aria-label="Library search state">
+        <div class="screen">
+          <div class="top">
+            <div>
+              <h1>Library</h1>
+              <p class="subtitle">Search across your learning</p>
+            </div>
+            <div class="manage">Clear</div>
+          </div>
+
+          <div class="search active">⌕ mitosis</div>
+          <div class="filter-row">
+            <div class="filter active">All</div>
+            <div class="filter">Topics</div>
+            <div class="filter">Notes</div>
+            <div class="filter">Sessions</div>
+          </div>
+
+          <div class="kind">Best matches</div>
+          <div class="result-row">
+            <div class="tile blue">T</div>
+            <div class="main">
+              <h3>Mitosis</h3>
+              <p class="meta">Biology · Cell Biology</p>
+            </div>
+            <div class="chev">›</div>
+          </div>
+
+          <div class="result-row">
+            <div class="tile rose">N</div>
+            <div class="main">
+              <h3>“Mitosis creates two identical cells…”</h3>
+              <p class="meta">Note · Mitosis · Jan 8</p>
+            </div>
+            <div class="chev">›</div>
+          </div>
+
+          <div class="kind">Sessions</div>
+          <div class="result-row">
+            <div class="tile amber">S</div>
+            <div class="main">
+              <h3>Cell cycle recap</h3>
+              <p class="meta">Session · Biology · 24 min · Jan 8</p>
+            </div>
+            <div class="chev">›</div>
+          </div>
+
+          <div class="kind">Books</div>
+          <div class="result-row">
+            <div class="tile blue">B</div>
+            <div class="main">
+              <h3>Cell Biology</h3>
+              <p class="meta">Biology · 14 topics</p>
+            </div>
+            <div class="chev">›</div>
+          </div>
+
+          <nav class="bottom-nav">
+            <div class="nav-item">Home</div>
+            <div class="nav-item active">Library</div>
+            <div class="nav-item">Progress</div>
+            <div class="nav-item">More</div>
+          </nav>
+        </div>
+      </section>
+
+      <section class="phone" aria-label="Subject drill-through state">
+        <div class="screen">
+          <div class="top">
+            <div>
+              <h1>Italian</h1>
+              <p class="subtitle">2 books, 32 topics</p>
+            </div>
+            <div class="manage">Edit</div>
+          </div>
+
+          <div class="subject-hero">
+            <div class="hero-line">
+              <div class="cover">IT</div>
+              <div class="main">
+                <h2>Keep going with food and cafés</h2>
+                <p class="meta">3 reviews due · 4 topics left in this book</p>
+              </div>
+            </div>
+            <button class="primary">Start next topic</button>
+          </div>
+
+          <div class="tabs">
+            <div class="tab active">Books</div>
+            <div class="tab">Review</div>
+            <div class="tab">Notes</div>
+          </div>
+
+          <div class="section">
+            <div class="section-head">
+              <h2>Italian Beginner 1</h2>
+              <span class="link">58%</span>
+            </div>
+            <div class="chapter-row">
+              <div class="chapter-num">1</div>
+              <div class="main">
+                <h3>Greetings and introductions</h3>
+                <p class="meta">Completed · 5 topics</p>
+              </div>
+              <span class="pill done">Done</span>
+            </div>
+            <div class="chapter-row">
+              <div class="chapter-num">2</div>
+              <div class="main">
+                <h3>Family and daily routines</h3>
+                <p class="meta">2 reviews due · 6 topics</p>
+              </div>
+              <span class="pill urgent">Review</span>
+            </div>
+            <div class="chapter-row">
+              <div class="chapter-num">3</div>
+              <div class="main">
+                <h3>Food and cafés</h3>
+                <p class="meta">Current · 4/8 topics</p>
+              </div>
+              <div class="chev">›</div>
+            </div>
+            <div class="chapter-row">
+              <div class="chapter-num">4</div>
+              <div class="main">
+                <h3>Travel basics</h3>
+                <p class="meta">Locked until chapter 3 starts</p>
+              </div>
+            </div>
+          </div>
+
+          <nav class="bottom-nav">
+            <div class="nav-item">Home</div>
+            <div class="nav-item active">Library</div>
+            <div class="nav-item">Progress</div>
+            <div class="nav-item">More</div>
+          </nav>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

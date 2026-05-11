@@ -79,7 +79,7 @@ export default function PracticeScreen(): React.ReactElement {
       ? `${formatTopicCount(reviewDueCount)} ready`
       : reviewSummary?.nextUpcomingReviewAt
         ? 'All caught up'
-        : 'Complete some topics first to unlock review';
+        : 'Complete a topic to start reviewing';
   // [F-034] Aggregate stats across ALL activity types so Guess Who / Vocabulary
   // players also see their stats on the Practice hub card.
   const bestActivity = quizStats
@@ -186,7 +186,7 @@ export default function PracticeScreen(): React.ReactElement {
 
       <View className="gap-6">
         <View className="gap-3">
-          <Text className="text-caption font-semibold uppercase text-text-secondary">
+          <Text className="text-caption font-semibold text-text-secondary">
             Best next step
           </Text>
           <Pressable
@@ -258,7 +258,7 @@ export default function PracticeScreen(): React.ReactElement {
                 </>
               ) : (
                 <Text className="text-body text-text-secondary">
-                  Complete some topics first to unlock review
+                  Complete a topic to start reviewing
                 </Text>
               )}
               <Pressable
@@ -305,7 +305,7 @@ export default function PracticeScreen(): React.ReactElement {
         </View>
 
         <View className="gap-3">
-          <Text className="text-caption font-semibold uppercase text-text-secondary">
+          <Text className="text-caption font-semibold text-text-secondary">
             Quiz
           </Text>
           <Pressable
@@ -371,7 +371,7 @@ export default function PracticeScreen(): React.ReactElement {
         </View>
 
         <View className="gap-3">
-          <Text className="text-caption font-semibold uppercase text-text-secondary">
+          <Text className="text-caption font-semibold text-text-secondary">
             Other practice
           </Text>
           <IntentCard
@@ -396,7 +396,7 @@ export default function PracticeScreen(): React.ReactElement {
         </View>
 
         <View className="gap-3">
-          <Text className="text-caption font-semibold uppercase text-text-secondary">
+          <Text className="text-caption font-semibold text-text-secondary">
             Recent progress
           </Text>
           <Pressable
