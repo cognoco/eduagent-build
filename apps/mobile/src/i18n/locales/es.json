@@ -149,6 +149,7 @@
     },
     "parent": {
       "greeting": "Hola, {{displayName}}",
+      "accountLink": "Abrir cuenta",
       "intentHeader": "¿Qué necesitas ahora?",
       "encouragementNote": "Los nudges son ánimos suaves de una sola dirección.",
       "transitionNoticeTitle": "Ahora guías a {{childNames}}",
@@ -170,16 +171,15 @@
         "sessions_other": "{{count}} sesiones esta semana"
       },
       "tonight": {
-        "title": "Tonight",
-        "titleMorning": "This morning",
-        "titleAfternoon": "This afternoon",
-        "titleEvening": "Tonight",
-        "promptWithTopic": "Ask {{childName}}: what made {{topic}} click today?",
-        "promptNoActivity": "Ask {{childName}}: what would make starting feel easy tonight?",
-        "promptFallback": "Ask {{childName}}: what felt easier today than yesterday?",
-        "promptTrickiestWithTopic": "Ask {{childName}}: what's the trickiest part of {{topic}} right now?",
-        "promptTomorrow": "Ask {{childName}}: what should we focus on tomorrow?",
-        "promptCurious": "Ask {{childName}}: what's something they're curious about?"
+        "titleMorning": "Esta mañana",
+        "titleAfternoon": "Esta tarde",
+        "titleEvening": "Esta noche",
+        "promptWithTopic": "Pregunta a {{childName}}: ¿qué hizo que {{topic}} tuviera sentido hoy?",
+        "promptNoActivity": "Pregunta a {{childName}}: ¿qué haría que empezar fuera fácil esta noche?",
+        "promptFallback": "Pregunta a {{childName}}: ¿qué se sintió más fácil hoy que ayer?",
+        "promptTrickiestWithTopic": "Pregunta a {{childName}}: ¿cuál es la parte más difícil de {{topic}} ahora mismo?",
+        "promptTomorrow": "Pregunta a {{childName}}: ¿en qué deberíamos enfocarnos mañana?",
+        "promptCurious": "Pregunta a {{childName}}: ¿hay algo que les genere curiosidad?"
       },
       "empty": {
         "title": "Your family dashboard starts here",

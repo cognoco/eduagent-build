@@ -58,7 +58,12 @@ initNotificationHandler();
 // ─── Tab visibility whitelist ────────────────────────────────────────
 // Only these routes render a visible tab button. Every other route in
 // (app)/ is auto-hidden — no manual Tabs.Screen entry required.
-const BASE_VISIBLE_TABS: ReadonlySet<string> = new Set([
+//
+// Three navigation shapes:
+//   guardian     — parent with linked children: all tabs including own-learning
+//   soloLearner — owner with no children: own-learning is redundant with home
+//   child       — non-owner child profile: home only
+const GUARDIAN_TABS: ReadonlySet<string> = new Set([
   'home',
   'own-learning',
   'library',
@@ -66,19 +71,18 @@ const BASE_VISIBLE_TABS: ReadonlySet<string> = new Set([
   'more',
 ]);
 
-const STUDENT_HOME_ONLY_TABS: ReadonlySet<string> = new Set(['home']);
+const SOLO_LEARNER_TABS: ReadonlySet<string> = new Set([
+  'home',
+  'library',
+  'progress',
+  'more',
+]);
 
-export function computeVisibleTabs({
-  studentHomeOnly = false,
-}: {
-  studentHomeOnly?: boolean;
-} = {}): Set<string> {
-  return new Set<string>(
-    studentHomeOnly ? STUDENT_HOME_ONLY_TABS : BASE_VISIBLE_TABS,
-  );
-}
+const CHILD_TABS: ReadonlySet<string> = new Set(['home']);
 
-export function shouldUseStudentHomeOnlyTabs({
+export type TabShape = 'guardian' | 'soloLearner' | 'child';
+
+export function resolveTabShape({
   activeProfile,
   profiles,
   isParentProxy,
@@ -86,10 +90,22 @@ export function shouldUseStudentHomeOnlyTabs({
   activeProfile: { isOwner: boolean } | null | undefined;
   profiles: ReadonlyArray<{ isOwner: boolean }>;
   isParentProxy: boolean;
-}): boolean {
-  if (!activeProfile || isParentProxy) return false;
-  if (activeProfile.isOwner) return false;
-  return !isGuardianProfile(activeProfile, profiles);
+}): TabShape {
+  if (!activeProfile || isParentProxy) return 'guardian';
+  if (!activeProfile.isOwner) return 'child';
+  if (isGuardianProfile(activeProfile, profiles)) return 'guardian';
+  return 'soloLearner';
+}
+
+export function computeVisibleTabs(shape: TabShape = 'guardian'): Set<string> {
+  switch (shape) {
+    case 'guardian':
+      return new Set(GUARDIAN_TABS);
+    case 'soloLearner':
+      return new Set(SOLO_LEARNER_TABS);
+    case 'child':
+      return new Set(CHILD_TABS);
+  }
 }
 
 // Routes where the entire tab bar is hidden (immersive / full-screen UX).
@@ -1318,14 +1334,10 @@ export default function AppLayout() {
   useMentorLanguageSync();
   const { isParentProxy, childProfile, parentProfile } = useParentProxy();
   const role = useActiveProfileRole();
-  const studentHomeOnlyTabs = shouldUseStudentHomeOnlyTabs({
-    activeProfile,
-    profiles,
-    isParentProxy,
-  });
+  const tabShape = resolveTabShape({ activeProfile, profiles, isParentProxy });
   const visibleTabs = React.useMemo(
-    () => computeVisibleTabs({ studentHomeOnly: studentHomeOnlyTabs }),
-    [studentHomeOnlyTabs],
+    () => computeVisibleTabs(tabShape),
+    [tabShape],
   );
 
   // Sync Clerk auth state with RevenueCat identity (runs on auth change)

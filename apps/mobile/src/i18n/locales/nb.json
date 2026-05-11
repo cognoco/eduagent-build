@@ -149,6 +149,7 @@
     },
     "parent": {
       "greeting": "Hei {{displayName}}",
+      "accountLink": "Åpne konto",
       "intentHeader": "Hva trenger du akkurat nå?",
       "encouragementNote": "Nudger er korte, milde oppmuntringer en vei.",
       "transitionNoticeTitle": "Du veileder nå {{childNames}}",
@@ -170,16 +171,15 @@
         "sessions_other": "{{count}} økter denne uken"
       },
       "tonight": {
-        "title": "Tonight",
-        "titleMorning": "This morning",
-        "titleAfternoon": "This afternoon",
-        "titleEvening": "Tonight",
-        "promptWithTopic": "Ask {{childName}}: what made {{topic}} click today?",
-        "promptNoActivity": "Ask {{childName}}: what would make starting feel easy tonight?",
-        "promptFallback": "Ask {{childName}}: what felt easier today than yesterday?",
-        "promptTrickiestWithTopic": "Ask {{childName}}: what's the trickiest part of {{topic}} right now?",
-        "promptTomorrow": "Ask {{childName}}: what should we focus on tomorrow?",
-        "promptCurious": "Ask {{childName}}: what's something they're curious about?"
+        "titleMorning": "I morges",
+        "titleAfternoon": "I ettermiddag",
+        "titleEvening": "I kveld",
+        "promptWithTopic": "Spør {{childName}}: hva gjorde at {{topic}} ga mening i dag?",
+        "promptNoActivity": "Spør {{childName}}: hva ville gjort det lett å starte i kveld?",
+        "promptFallback": "Spør {{childName}}: hva føltes lettere i dag enn i går?",
+        "promptTrickiestWithTopic": "Spør {{childName}}: hva er det vanskeligste med {{topic}} akkurat nå?",
+        "promptTomorrow": "Spør {{childName}}: hva bør vi fokusere på i morgen?",
+        "promptCurious": "Spør {{childName}}: er det noe de er nysgjerrige på?"
       },
       "empty": {
         "title": "Your family dashboard starts here",

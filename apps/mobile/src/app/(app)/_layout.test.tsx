@@ -145,10 +145,7 @@ jest.mock('../../components/feedback/FeedbackProvider', () => ({
 // Route: GET /subjects → { subjects: [] }
 
 const AppLayout = require('./_layout').default;
-const {
-  computeVisibleTabs,
-  shouldUseStudentHomeOnlyTabs,
-} = require('./_layout');
+const { computeVisibleTabs, resolveTabShape } = require('./_layout');
 
 describe('AppLayout', () => {
   let testQueryClient: QueryClient;
@@ -673,64 +670,78 @@ describe('AppLayout', () => {
 });
 
 describe('computeVisibleTabs', () => {
-  it('returns exactly the guardian visible tabs by default', () => {
-    const tabs = computeVisibleTabs();
+  it('returns all tabs for guardian shape', () => {
+    const tabs = computeVisibleTabs('guardian');
     expect(tabs).toEqual(
       new Set(['home', 'own-learning', 'library', 'progress', 'more']),
     );
   });
 
-  it('returns only home for pure student navigation', () => {
-    const tabs = computeVisibleTabs({ studentHomeOnly: true });
-
-    expect(tabs).toEqual(new Set(['home']));
+  it('defaults to guardian shape', () => {
+    expect(computeVisibleTabs()).toEqual(computeVisibleTabs('guardian'));
   });
 
-  it('does not include family tab', () => {
-    const tabs = computeVisibleTabs();
-    expect(tabs.has('family')).toBe(false);
+  it('returns home + library + progress + more for solo learner (no own-learning)', () => {
+    const tabs = computeVisibleTabs('soloLearner');
+    expect(tabs).toEqual(new Set(['home', 'library', 'progress', 'more']));
+    expect(tabs.has('own-learning')).toBe(false);
+  });
+
+  it('returns only home for child shape', () => {
+    const tabs = computeVisibleTabs('child');
+    expect(tabs).toEqual(new Set(['home']));
   });
 });
 
-describe('shouldUseStudentHomeOnlyTabs', () => {
-  it('gives full tabs to a solo learner (owner with no linked profiles)', () => {
+describe('resolveTabShape', () => {
+  it('returns soloLearner for an owner with no linked profiles', () => {
     expect(
-      shouldUseStudentHomeOnlyTabs({
+      resolveTabShape({
         activeProfile: { isOwner: true },
         profiles: [{ isOwner: true }],
         isParentProxy: false,
       }),
-    ).toBe(false);
+    ).toBe('soloLearner');
   });
 
-  it('uses Home-only tabs for a child profile', () => {
+  it('returns child for a non-owner profile', () => {
     expect(
-      shouldUseStudentHomeOnlyTabs({
+      resolveTabShape({
         activeProfile: { isOwner: false },
         profiles: [{ isOwner: true }, { isOwner: false }],
         isParentProxy: false,
       }),
-    ).toBe(true);
+    ).toBe('child');
   });
 
-  it('keeps the broader tab set for guardian accounts with linked children', () => {
+  it('returns guardian for an owner with linked children', () => {
     expect(
-      shouldUseStudentHomeOnlyTabs({
+      resolveTabShape({
         activeProfile: { isOwner: true },
         profiles: [{ isOwner: true }, { isOwner: false }],
         isParentProxy: false,
       }),
-    ).toBe(false);
+    ).toBe('guardian');
   });
 
-  it('keeps proxy sessions out of pure-student navigation', () => {
+  it('returns guardian during proxy sessions', () => {
     expect(
-      shouldUseStudentHomeOnlyTabs({
+      resolveTabShape({
         activeProfile: { isOwner: false },
         profiles: [{ isOwner: true }, { isOwner: false }],
         isParentProxy: true,
       }),
-    ).toBe(false);
+    ).toBe('guardian');
+  });
+
+  it('returns guardian when activeProfile is null', () => {
+    expect(
+      resolveTabShape({
+        activeProfile: null,
+        profiles: [],
+        isParentProxy: false,
+      }),
+    ).toBe('guardian');
   });
 });
 

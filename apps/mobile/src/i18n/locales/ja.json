@@ -149,6 +149,7 @@
     },
     "parent": {
       "greeting": "こんにちは、{{displayName}}",
+      "accountLink": "アカウントを開く",
       "intentHeader": "今なにをしますか？",
       "encouragementNote": "ナッジは短い応援メッセージです。返信は必要ありません。",
       "transitionNoticeTitle": "{{childNames}}のメンターになりました",
@@ -170,16 +171,15 @@
         "sessions_other": "今週 {{count}} セッション"
       },
       "tonight": {
-        "title": "Tonight",
-        "titleMorning": "This morning",
-        "titleAfternoon": "This afternoon",
-        "titleEvening": "Tonight",
-        "promptWithTopic": "Ask {{childName}}: what made {{topic}} click today?",
-        "promptNoActivity": "Ask {{childName}}: what would make starting feel easy tonight?",
-        "promptFallback": "Ask {{childName}}: what felt easier today than yesterday?",
-        "promptTrickiestWithTopic": "Ask {{childName}}: what's the trickiest part of {{topic}} right now?",
-        "promptTomorrow": "Ask {{childName}}: what should we focus on tomorrow?",
-        "promptCurious": "Ask {{childName}}: what's something they're curious about?"
+        "titleMorning": "今朝",
+        "titleAfternoon": "今日の午後",
+        "titleEvening": "今夜",
+        "promptWithTopic": "{{childName}}に聞いてみて：今日{{topic}}がわかった瞬間はいつだった？",
+        "promptNoActivity": "{{childName}}に聞いてみて：今夜始めやすくするには何があったらいい？",
+        "promptFallback": "{{childName}}に聞いてみて：昨日より楽に感じたことは何だった？",
+        "promptTrickiestWithTopic": "{{childName}}に聞いてみて：今{{topic}}で一番難しいところはどこ？",
+        "promptTomorrow": "{{childName}}に聞いてみて：明日は何に集中しようか？",
+        "promptCurious": "{{childName}}に聞いてみて：何か気になっていることはある？"
       },
       "empty": {
         "title": "Your family dashboard starts here",

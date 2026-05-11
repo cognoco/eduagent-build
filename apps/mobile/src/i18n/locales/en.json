@@ -149,9 +149,9 @@
     },
     "parent": {
       "greeting": "Hey {{displayName}}",
+      "accountLink": "Open account",
       "intentHeader": "What do you need right now?",
       "tonight": {
-        "title": "Tonight",
         "titleMorning": "This morning",
         "titleAfternoon": "This afternoon",
         "titleEvening": "Tonight",

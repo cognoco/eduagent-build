@@ -4,7 +4,6 @@ import { useRouter, useLocalSearchParams, type Href } from 'expo-router';
 import { platformAlert } from '../../../../lib/platform-alert';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { AccommodationMode, CelebrationLevel } from '@eduagent/schemas';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfile } from '../../../../lib/profile';
 import {
@@ -23,10 +22,6 @@ import {
   useChildProgressHistory,
   useProfileReports,
 } from '../../../../hooks/use-progress';
-import {
-  useChildCelebrationLevel,
-  useUpdateChildCelebrationLevel,
-} from '../../../../hooks/use-settings';
 import { useCelebration } from '../../../../hooks/use-celebration';
 import {
   useMarkCelebrationsSeen,
@@ -37,14 +32,8 @@ import {
   useRevokeConsent,
   useRestoreConsent,
 } from '../../../../hooks/use-consent';
-import {
-  useChildLearnerProfile,
-  useUpdateAccommodationMode,
-} from '../../../../hooks/use-learner-profile';
-import {
-  ACCOMMODATION_GUIDE,
-  ACCOMMODATION_OPTIONS,
-} from '../../../../lib/accommodation-options';
+import { useChildLearnerProfile } from '../../../../hooks/use-learner-profile';
+import { ChildAccommodationSection } from '../../../../components/home/ChildAccommodationSection';
 import { getGracePeriodDaysRemaining } from '../../../../lib/consent-grace';
 import { FAMILY_HOME_PATH, goBackOrReplace } from '../../../../lib/navigation';
 import { useThemeColors } from '../../../../lib/theme';
@@ -167,10 +156,6 @@ export default function ChildDetailScreen() {
   const { data: learnerProfile } = useChildLearnerProfile(profileId);
   const revokeConsent = useRevokeConsent(profileId);
   const restoreConsent = useRestoreConsent(profileId);
-  const updateAccommodation = useUpdateAccommodationMode();
-  const { data: childCelebrationLevel = 'big_only' } =
-    useChildCelebrationLevel(profileId);
-  const updateChildCelebrationLevel = useUpdateChildCelebrationLevel();
   const { CelebrationOverlay } = useCelebration({
     // Celebrations are best-effort — empty on error is acceptable [SQ-4]
     queue: pendingCelebrations.data ?? [],
@@ -197,7 +182,6 @@ export default function ChildDetailScreen() {
 
   // [BUG-553] Styled in-app modal replaces window.confirm() on web
   const [withdrawConfirmVisible, setWithdrawConfirmVisible] = useState(false);
-  const [showAccommodationGuide, setShowAccommodationGuide] = useState(false);
 
   const handleWithdrawConsent = useCallback(() => {
     setWithdrawConfirmVisible(true);
@@ -225,43 +209,6 @@ export default function ChildDetailScreen() {
       );
     }
   }, [restoreConsent, t]);
-
-  const handleAccommodationChange = useCallback(
-    (mode: AccommodationMode) => {
-      if (!profileId || mode === (learnerProfile?.accommodationMode ?? 'none'))
-        return;
-      updateAccommodation.mutate(
-        { childProfileId: profileId, accommodationMode: mode },
-        {
-          onError: () => {
-            platformAlert(
-              t('parentView.index.couldNotSaveSetting'),
-              t('parentView.index.pleaseTryAgain'),
-            );
-          },
-        },
-      );
-    },
-    [profileId, learnerProfile?.accommodationMode, updateAccommodation, t],
-  );
-
-  const handleChildCelebrationLevelChange = useCallback(
-    (celebrationLevel: CelebrationLevel) => {
-      if (!profileId || celebrationLevel === childCelebrationLevel) return;
-      updateChildCelebrationLevel.mutate(
-        { childProfileId: profileId, celebrationLevel },
-        {
-          onError: () => {
-            platformAlert(
-              t('parentView.index.couldNotSaveSetting'),
-              t('parentView.index.pleaseTryAgain'),
-            );
-          },
-        },
-      );
-    },
-    [childCelebrationLevel, profileId, t, updateChildCelebrationLevel],
-  );
 
   if (!profileId) {
     return (
@@ -483,177 +430,6 @@ export default function ChildDetailScreen() {
   }
 
   const latestMonthlyReport = monthlyReports.data?.[0];
-  const currentAccommodationMode = learnerProfile?.accommodationMode ?? 'none';
-  const showCelebrationFollowup =
-    currentAccommodationMode === 'short-burst' ||
-    currentAccommodationMode === 'predictable';
-  const celebrationOptions: Array<{
-    level: CelebrationLevel;
-    titleKey: string;
-    descriptionKey: string;
-  }> = [
-    {
-      level: 'all',
-      titleKey: 'more.celebrations.allTitle',
-      descriptionKey: 'more.celebrations.allDescription',
-    },
-    {
-      level: 'big_only',
-      titleKey: 'more.celebrations.bigOnlyTitle',
-      descriptionKey: 'more.celebrations.bigOnlyDescription',
-    },
-    {
-      level: 'off',
-      titleKey: 'more.celebrations.offTitle',
-      descriptionKey: 'more.celebrations.offDescription',
-    },
-  ];
-  const accommodationSettings = (
-    <View testID="child-settings-section">
-      <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2 mt-6">
-        {child?.displayName
-          ? t('parentView.index.learningAccommodationTitle', {
-              name: child.displayName,
-            })
-          : t('parentView.index.learningAccommodationTitleFallback')}
-      </Text>
-      <Text className="text-body-sm text-text-secondary mb-2">
-        {t('parentView.index.learningAccommodationDescription')}
-      </Text>
-      <Pressable
-        onPress={() => setShowAccommodationGuide((v) => !v)}
-        className="flex-row items-center mb-3"
-        accessibilityRole="button"
-        accessibilityLabel={t('parentView.index.toggleDecisionGuide')}
-        testID="accommodation-guide-toggle"
-      >
-        <Ionicons
-          name={showAccommodationGuide ? 'chevron-up' : 'chevron-down'}
-          size={14}
-          color={colors.textSecondary}
-        />
-        <Text className="text-body-sm text-text-secondary ms-1">
-          {t('parentView.index.notSureWhichToPick')}
-        </Text>
-      </Pressable>
-      {showAccommodationGuide && (
-        <View
-          className="bg-surface rounded-card px-4 py-3 mb-3"
-          testID="accommodation-guide-content"
-        >
-          {ACCOMMODATION_GUIDE.map((row) => {
-            const isActive = row.recommendation === currentAccommodationMode;
-            const recommendationTitle =
-              ACCOMMODATION_OPTIONS.find((o) => o.mode === row.recommendation)
-                ?.title ?? row.recommendation;
-            return (
-              <View
-                key={row.recommendation}
-                className="flex-row items-center justify-between py-2"
-              >
-                <Text className="text-body-sm text-text-secondary flex-1 me-3">
-                  {row.condition}
-                </Text>
-                <Pressable
-                  onPress={() => {
-                    handleAccommodationChange(row.recommendation);
-                    setShowAccommodationGuide(false);
-                  }}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('parentView.index.pickAccommodation', {
-                    mode: row.recommendation,
-                  })}
-                  accessibilityState={{ selected: isActive }}
-                  testID={`guide-pick-${row.recommendation}`}
-                >
-                  <Text className="text-primary text-body-sm font-semibold">
-                    {recommendationTitle}
-                    {isActive ? ` · ${t('parentView.index.active')}` : ''}
-                  </Text>
-                </Pressable>
-              </View>
-            );
-          })}
-        </View>
-      )}
-      {ACCOMMODATION_OPTIONS.map((opt) => (
-        <Pressable
-          key={opt.mode}
-          onPress={() => handleAccommodationChange(opt.mode)}
-          disabled={updateAccommodation.isPending}
-          className={`bg-surface rounded-card px-4 py-3.5 mb-2 ${
-            currentAccommodationMode === opt.mode
-              ? 'border-2 border-primary'
-              : 'border-2 border-transparent'
-          }`}
-          accessibilityLabel={`${opt.title}: ${opt.description}`}
-          accessibilityRole="radio"
-          accessibilityState={{
-            selected: currentAccommodationMode === opt.mode,
-            disabled: updateAccommodation.isPending,
-          }}
-          testID={`accommodation-mode-${opt.mode}`}
-        >
-          <View className="flex-row items-center justify-between">
-            <Text className="text-body font-semibold text-text-primary">
-              {opt.title}
-            </Text>
-            {currentAccommodationMode === opt.mode && (
-              <Text className="text-primary text-body font-semibold">
-                {t('parentView.index.active')}
-              </Text>
-            )}
-          </View>
-          <Text className="text-body-sm text-text-secondary mt-1">
-            {opt.description}
-          </Text>
-        </Pressable>
-      ))}
-      {showCelebrationFollowup ? (
-        <View
-          className="ml-4 mb-2 border-l-2 border-primary/30 pl-3"
-          testID={`child-celebration-followup-${currentAccommodationMode}`}
-        >
-          <Text className="text-caption font-semibold text-text-primary mb-2">
-            {t('more.celebrations.inlinePrompt')}
-          </Text>
-          {celebrationOptions.map((option) => (
-            <Pressable
-              key={option.level}
-              onPress={() => handleChildCelebrationLevelChange(option.level)}
-              disabled={updateChildCelebrationLevel.isPending}
-              className={`bg-surface rounded-card px-4 py-3.5 mb-2 ${
-                childCelebrationLevel === option.level
-                  ? 'border-2 border-primary'
-                  : 'border-2 border-transparent'
-              }`}
-              accessibilityRole="radio"
-              accessibilityState={{
-                selected: childCelebrationLevel === option.level,
-                disabled: updateChildCelebrationLevel.isPending,
-              }}
-              testID={`child-celebration-level-${option.level}`}
-            >
-              <Text className="text-body font-semibold text-text-primary">
-                {t(option.titleKey)}
-              </Text>
-              <Text className="text-body-sm text-text-secondary mt-1">
-                {t(option.descriptionKey)}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      ) : null}
-      <Text
-        className="text-caption text-text-secondary mt-1 mb-2"
-        testID="accommodation-try-it"
-      >
-        {t('parentView.index.accommodationTryIt', {
-          name: child?.displayName ?? t('parentView.index.yourChild'),
-        })}
-      </Text>
-    </View>
-  );
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
@@ -792,7 +568,12 @@ export default function ChildDetailScreen() {
           />
         ) : null}
 
-        {accommodationSettings}
+        {profileId && child?.displayName ? (
+          <ChildAccommodationSection
+            childProfileId={profileId}
+            childName={child.displayName}
+          />
+        ) : null}
 
         {/* Progress snapshot card — only shown once a snapshot exists */}
         {child?.progress ? (

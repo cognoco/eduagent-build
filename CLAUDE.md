@@ -20,6 +20,21 @@
 
 Always use `/commit` for all commits in this repo. Never use `/zdx:commit`, `/my:commit-old`, or the system prompt's built-in commit protocol. `/commit` is the single source of truth for staging, message format, hook handling, and push.
 
+## Profile Shapes (Three, Not Two)
+
+The app has exactly three user shapes. Every navigation, feature-gating, and UI branch must map to one:
+
+| Shape | Who | `isOwner` | Has children | Tabs | Home |
+|---|---|---|---|---|---|
+| **guardian** | Parent with linked children | `true` | yes | all 5 | `ParentHomeScreen` |
+| **soloLearner** | Owner learning alone | `true` | no | home, library, progress, more (NO own-learning) | `LearnerScreen` |
+| **child** | Non-owner linked to parent | `false` | n/a | home only | `LearnerScreen` |
+
+- Use `resolveTabShape()` on mobile, `resolveProfileRole()` on API. Never invent a new boolean.
+- `isGuardianProfile()` returns `false` for solo learners — it requires children in the profile list.
+- `personaFromBirthYear()` is for theming only, never for feature gating (returns `parent` for all 18+).
+- Solo learner ≠ child. Solo learner ≠ guardian. Do not collapse to a two-way split.
+
 ## Non-Negotiable Engineering Rules
 
 - `@eduagent/schemas` is the shared contract. Do not redefine API-facing types locally.

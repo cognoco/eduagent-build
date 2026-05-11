@@ -27,8 +27,8 @@ import { useThemeColors } from '../../lib/theme';
 import { MentomateLogo } from '../MentomateLogo';
 import { WithdrawalCountdownBanner } from '../family/WithdrawalCountdownBanner';
 import { NudgeActionSheet } from '../nudge/NudgeActionSheet';
+import { ChildAccommodationSection } from './ChildAccommodationSection';
 import { ChildQuotaLine } from './ChildQuotaLine';
-import { IntentCard } from './IntentCard';
 import { ParentTransitionNotice } from './ParentTransitionNotice';
 
 const MAX_TONIGHT_PROMPTS = 3;
@@ -551,20 +551,37 @@ export function ParentHomeScreen({
             />
           ))}
 
+          {linkedChildren.map((child) => (
+            <ChildAccommodationSection
+              key={`accommodation-${child.id}`}
+              childProfileId={child.id}
+              childName={child.displayName}
+            />
+          ))}
+
           {showAddChild ? (
-            <View className="mt-2">
-              <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2">
-                {t('home.parent.familyToolsHeader')}
-              </Text>
-              <IntentCard
-                testID="parent-home-add-child"
-                title={t('more.family.addChild')}
-                subtitle={t('more.family.addChildDescription')}
-                icon="person-add-outline"
-                variant="subtle"
-                onPress={handleAddChild}
+            <Pressable
+              onPress={handleAddChild}
+              className="flex-row items-center bg-surface rounded-card px-4 py-3 mt-4"
+              style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
+              accessibilityRole="button"
+              accessibilityLabel={t('more.family.addChild')}
+              testID="parent-home-add-child"
+            >
+              <Ionicons
+                name="person-add-outline"
+                size={20}
+                color={colors.textSecondary}
               />
-            </View>
+              <Text className="text-body font-semibold text-text-primary ms-3 flex-1">
+                {t('more.family.addChild')}
+              </Text>
+              <Ionicons
+                name="chevron-forward"
+                size={18}
+                color={colors.textSecondary}
+              />
+            </Pressable>
           ) : null}
         </View>
 

@@ -14,7 +14,7 @@ const shotDir = path.join(
 );
 
 async function capture(page: Page, name: string): Promise<void> {
-  await page.waitForTimeout(1500);
+  await page.waitForLoadState('networkidle');
   await page.screenshot({
     path: path.join(shotDir, `${name}.png`),
     fullPage: true,
