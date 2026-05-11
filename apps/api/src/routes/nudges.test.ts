@@ -267,7 +267,8 @@ describe('GET /v1/nudges', () => {
     expect(body.nudges[0].id).toBe(NUDGE_ID);
   });
 
-  it('returns empty array without ?unread=true', async () => {
+  it('returns unread nudges by default (no query param required)', async () => {
+    mockListUnreadNudges.mockResolvedValue([SAMPLE_NUDGE]);
     const res = await app.request(
       '/v1/nudges',
       { headers: PARENT_HEADERS },
@@ -275,8 +276,8 @@ describe('GET /v1/nudges', () => {
     );
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.nudges).toEqual([]);
-    expect(mockListUnreadNudges).not.toHaveBeenCalled();
+    expect(body.nudges).toHaveLength(1);
+    expect(mockListUnreadNudges).toHaveBeenCalled();
   });
 });
 

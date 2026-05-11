@@ -762,10 +762,19 @@ describe('markNudgeRead', () => {
     expect(count).toBe(1);
   });
 
-  it('returns 0 when the nudge does not exist or is already read', async () => {
+  it('returns 0 when the nudge does not exist for this profile', async () => {
     const db = makeDb({ updateRows: [] });
     const count = await markNudgeRead(db, TO_PROFILE_ID, 'nonexistent-id');
     expect(count).toBe(0);
+  });
+
+  it('returns 1 on retry of an already-read nudge (idempotent)', async () => {
+    // The row exists for this profile (matched by id+toProfileId), so the
+    // update returns 1 even though readAt was already set — clients retrying
+    // after a network failure should not see 404.
+    const db = makeDb({ updateRows: [{ id: NUDGE_ID }] });
+    const count = await markNudgeRead(db, TO_PROFILE_ID, NUDGE_ID);
+    expect(count).toBe(1);
   });
 
   it('calls db.update with the correct nudge id and profile id', async () => {

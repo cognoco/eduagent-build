@@ -11,8 +11,7 @@ import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { resolve } from 'path';
 
 const routeAndCallMock = jest.fn();
-jest.mock('./llm', () => ({
-  // gc1-allow: LLM external boundary
+jest.mock('./llm' /* gc1-allow: LLM external boundary */, () => ({
   routeAndCall: (...args: unknown[]) => routeAndCallMock(...args),
 }));
 

@@ -668,7 +668,9 @@ describe('AppLayout', () => {
 describe('computeVisibleTabs', () => {
   it('returns exactly the base visible tabs', () => {
     const tabs = computeVisibleTabs();
-    expect(tabs).toEqual(new Set(['home', 'library', 'progress', 'more']));
+    expect(tabs).toEqual(
+      new Set(['home', 'own-learning', 'library', 'progress', 'more']),
+    );
   });
 
   it('does not include family tab', () => {

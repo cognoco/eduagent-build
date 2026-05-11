@@ -285,25 +285,25 @@ describeIfDb('nudge service (integration)', () => {
 
   // ── 4. Concurrency BREAK test (I1 atomicity) ──────────────────────────────
   //
-  // With count at 2, fire 5 concurrent createNudge calls from parent A.
-  // The SERIALIZABLE transaction causes Postgres to detect the phantom-read
-  // conflict and abort concurrent transactions that would violate the
-  // serializable schedule.
+  // With count at 3, fire 5 concurrent createNudge calls from parent A.
+  // The pg_advisory_xact_lock at the top of the transaction serialises
+  // writers by recipient profile, so only one count-then-insert pair runs
+  // at a time and the rate limit is enforced atomically.
   //
   // RED/GREEN verification (run manually against Neon for reliable results):
   //
-  //   RED:  Remove { isolationLevel: 'serializable' } from the transaction
-  //         call in nudge.ts (leaving default READ COMMITTED).
+  //   RED:  Remove the `tx.execute(sql\`SELECT pg_advisory_xact_lock(...)\`)`
+  //         line at the top of the transaction body in nudge.ts so the
+  //         count + insert run under plain READ COMMITTED with no mutex.
   //         Against Neon (network latency widens the race window), this test
-  //         fails because multiple concurrent calls read count=2 before any
-  //         insert commits, and multiple inserts succeed (rows > 3).
+  //         fails because multiple concurrent calls read count=3 before any
+  //         insert commits, and multiple inserts succeed (rows > 4).
   //         Against local Postgres the window is narrow — the race may not
   //         manifest every run, but can be forced by inserting a pg_sleep in
   //         the transaction body between count and insert.
   //
-  //   GREEN: Restore { isolationLevel: 'serializable' }.
-  //          Postgres detects the serialization failure and aborts concurrent
-  //          transactions. At most 1 of the 5 succeeds; rows stays <= 3.
+  //   GREEN: Restore the pg_advisory_xact_lock call. At most 1 of the 5
+  //          succeeds; rows stays <= 4.
   //          Verified GREEN: all 6 integration tests pass (2026-05-11).
 
   it('[BREAK] concurrency: at most 1 of 5 concurrent calls succeeds when count is 3', async () => {
@@ -358,6 +358,22 @@ describeIfDb('nudge service (integration)', () => {
     });
     expect(row).toBeDefined();
     expect(row!.readAt).toBeNull();
+  });
+
+  it('markNudgeRead is idempotent: retry of already-read nudge returns 1', async () => {
+    // Network-failure retry path: route returns 404 if service returns 0, so
+    // the idempotency invariant lives at the service layer.
+    const { nudge } = await createNudge(db, {
+      fromProfileId: parentAProfileId,
+      toProfileId: childXProfileId,
+      template: 'you_got_this',
+    });
+
+    const first = await markNudgeRead(db, childXProfileId, nudge.id);
+    expect(first).toBe(1);
+
+    const second = await markNudgeRead(db, childXProfileId, nudge.id);
+    expect(second).toBe(1);
   });
 
   // ── 6. IDOR BREAK test — markAllNudgesRead ────────────────────────────────

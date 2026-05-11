@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # update-claude-md.sh — Update quantitative counts in CLAUDE.md from actual codebase state
 #
-# Updates: API tests, mobile tests, integration suites, route groups, mobile suites, Inngest function count.
-# Does NOT update: Inngest function name list, feature descriptions, or qualitative text.
+# Updates the Snapshot block (lines 5-7) plus the "Counts verified YYYY-MM-DD" line.
+# Patterns are line-anchored so the same number that appears twice in the file
+# (e.g. "43 route groups" and a different "43" elsewhere) cannot collide.
 #
 # Note: Uses GNU sed (-i with no backup suffix). On macOS, install GNU sed via `brew install gnu-sed`
 # and use `gsed` or adjust the sed calls to `sed -i ''`.
@@ -32,22 +33,31 @@ inngest=$(count_inngest_functions)
 api_fmt=$(format_number "$api")
 mobile_fmt=$(format_number "$mobile")
 
+today=$(date -u +%Y-%m-%d)
+
 changes=0
 
-# Helper: run sed replacement and report
-update_pattern() {
-  local label="$1" pattern="$2" replacement="$3"
+# Helper: line-anchored sed replacement. Scopes substitution to lines matching
+# $anchor, so the same numeric pattern elsewhere in the file is untouched.
+update_line() {
+  local label="$1" anchor="$2" pattern="$3" replacement="$4"
   local before after
 
-  before=$(grep -m1 "$pattern" "$TARGET" 2>/dev/null || true)
+  before=$(grep -m1 -- "$anchor" "$TARGET" 2>/dev/null || true)
   if [ -z "$before" ]; then
-    printf "  SKIP %-25s  (pattern not found)\n" "$label"
+    printf "  SKIP %-25s  (anchor not found: %s)\n" "$label" "$anchor"
     return
   fi
 
-  sed -i "s/${pattern}/${replacement}/" "$TARGET"
+  if ! echo "$before" | grep -qE -- "$pattern"; then
+    printf "  SKIP %-25s  (pattern not found on anchor line)\n" "$label"
+    return
+  fi
 
-  after=$(grep -m1 "$(echo "$replacement" | head -c 20)" "$TARGET" 2>/dev/null || true)
+  # `/anchor/ s/pat/repl/` — anchor scopes the substitution
+  sed -i "/$anchor/ s/$pattern/$replacement/" "$TARGET"
+
+  after=$(grep -m1 -- "$anchor" "$TARGET" 2>/dev/null || true)
 
   if [ "$before" != "$after" ]; then
     printf "  UPD  %-25s\n" "$label"
@@ -59,36 +69,46 @@ update_pattern() {
   fi
 }
 
-# API tests: "1,300 API tests" → "1,302 API tests"
-update_pattern "API tests" \
-  "[0-9][0-9,]* API tests" \
-  "${api_fmt} API tests"
+# Mobile line: "- Mobile: ~80 screens, 240 test suites, ~2,390 tests"
+update_line "Mobile suites" \
+  "^- Mobile:" \
+  "[0-9][0-9,]* test suites" \
+  "${suites} test suites"
 
-# Mobile tests: "331 mobile tests" → "315 mobile tests"
-update_pattern "Mobile tests" \
-  "[0-9][0-9,]* mobile tests" \
-  "${mobile_fmt} mobile tests"
+update_line "Mobile tests" \
+  "^- Mobile:" \
+  "~[0-9][0-9,]* tests$" \
+  "~${mobile_fmt} tests"
 
-# Integration suites: "3 integration test suites" → "8 integration test suites"
-update_pattern "Integration suites" \
-  "[0-9][0-9,]* integration test suites" \
-  "${integration} integration test suites"
+# API line: "- API: 43 route groups, 187 test suites, ~3,470 tests, 45 Inngest functions"
+update_line "Route groups" \
+  "^- API:" \
+  "[0-9][0-9,]* route groups" \
+  "${routes} route groups"
 
-# Route groups: "All 20 route groups" → "All 21 route groups"
-update_pattern "Route groups" \
-  "All [0-9][0-9,]* route groups" \
-  "All ${routes} route groups"
+# API tests use the "~N tests," shape (trailing comma distinguishes from "test suites")
+update_line "API tests" \
+  "^- API:" \
+  "~[0-9][0-9,]* tests," \
+  "~${api_fmt} tests,"
 
-# Mobile suites: "(41 test suites)" → "(41 test suites)"
-update_pattern "Mobile suites" \
-  "([0-9][0-9,]* test suites)" \
-  "(${suites} test suites)"
-
-# Inngest function count: "8 Inngest functions" → "9 Inngest functions"
-# Only update the line with a number (not "Inngest functions orchestrate steps")
-update_pattern "Inngest functions" \
+update_line "Inngest functions" \
+  "^- API:" \
   "[0-9][0-9,]* Inngest functions" \
   "${inngest} Inngest functions"
+
+# Cross-package integration line: "- Cross-package integration tests: 42 suites in `tests/integration/`, ~290 cases"
+update_line "Integration suites" \
+  "^- Cross-package integration tests:" \
+  "[0-9][0-9,]* suites" \
+  "${integration} suites"
+
+# "> Counts verified YYYY-MM-DD." — refresh date so reviewers see when the
+# counts were last re-snapshot.
+update_line "Verified date" \
+  "^> Counts verified " \
+  "Counts verified 20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]" \
+  "Counts verified ${today}"
 
 echo ""
 echo "==========================="

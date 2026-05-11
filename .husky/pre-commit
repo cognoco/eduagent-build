@@ -44,6 +44,38 @@ if [ -n "$I18N_EN_CHANGED" ]; then
   pnpm exec tsx scripts/check-i18n-staleness.ts || exit 1
 fi
 
+# GC1 ratchet (pre-commit mirror of CI): block staged test files that add a
+# new relative-path `jest.mock('./...')` / `jest.mock('../...')` without an
+# on-same-line `gc1-allow: <reason>` justification. This catches the common
+# mistake of putting `// gc1-allow` on the line *after* `jest.mock(` — the
+# CI grep is line-by-line, so a next-line comment does NOT pass. See
+# CLAUDE.md → "No new internal jest.mock() (GC1 ratchet)".
+STAGED_TESTS=$(git diff --cached --name-only --diff-filter=d -- '*.test.ts' '*.test.tsx')
+if [ -n "$STAGED_TESTS" ]; then
+  GC1_VIOLATIONS=$(echo "$STAGED_TESTS" \
+    | xargs -I{} git diff --cached --unified=0 -- {} \
+    | grep -E '^\+[^+]' \
+    | grep -E "jest\.mock\(['\"\`]\.\.?/" \
+    | grep -iv 'gc1-allow' || true)
+  if [ -n "$GC1_VIOLATIONS" ]; then
+    echo ""
+    echo "pre-commit: GC1 — new internal jest.mock() without same-line gc1-allow."
+    echo ""
+    echo "Offending added lines:"
+    echo "$GC1_VIOLATIONS" | sed 's/^/  /'
+    echo ""
+    echo "Fix one of two ways:"
+    echo "  1. Use jest.requireActual() + targeted overrides instead of mocking the module."
+    echo "  2. If it really is an external boundary (LLM, push, email, Stripe, etc.),"
+    echo "     put the comment on the SAME line as jest.mock(:"
+    echo "       jest.mock('./foo' /* gc1-allow: <reason> */, () => ({ ... }))"
+    echo "       jest.mock('./foo', () => ({ ... })); // gc1-allow: <reason>"
+    echo ""
+    echo "A comment on the line BELOW jest.mock( does NOT satisfy the check."
+    exit 1
+  fi
+fi
+
 # Full project-reference type-check (incremental via composite tsconfig).
 # Emits .d.ts to dist/ (gitignored) + .tsbuildinfo (gitignored) for incremental caching.
 # Skip if no .ts/.tsx files are staged — docs/config-only commits need no tsc.

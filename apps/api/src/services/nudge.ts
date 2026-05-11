@@ -130,23 +130,19 @@ export async function createNudge(
   ]);
   const parentName = fromProfile?.displayName ?? 'Your parent';
 
-  const [childAccount, parentAccount] = await Promise.all([
-    toProfile?.accountId
-      ? db.query.accounts.findFirst({
-          where: eq(accounts.id, toProfile.accountId),
-          columns: { timezone: true },
-        })
-      : null,
-    fromProfile?.accountId
-      ? db.query.accounts.findFirst({
-          where: eq(accounts.id, fromProfile.accountId),
-          columns: { timezone: true },
-        })
-      : null,
-  ]);
+  // Quiet hours follow the recipient's (child's) local time only — sending
+  // parents may be in a different zone, but it's the recipient we don't want
+  // to ping at 23:00. If the child has no timezone on file, isQuietHours
+  // defaults to UTC.
+  const childAccount = toProfile?.accountId
+    ? await db.query.accounts.findFirst({
+        where: eq(accounts.id, toProfile.accountId),
+        columns: { timezone: true },
+      })
+    : null;
 
   let pushSent = false;
-  if (isQuietHours(now, childAccount?.timezone ?? parentAccount?.timezone)) {
+  if (isQuietHours(now, childAccount?.timezone)) {
     logger.info('Nudge push suppressed by quiet hours', {
       event: 'notification.nudge.quiet_hours_suppressed',
       toProfileId: params.toProfileId,
@@ -213,16 +209,13 @@ export async function markNudgeRead(
   profileId: string,
   nudgeId: string,
 ): Promise<number> {
+  // Idempotent: matching id+profileId returns 1 even if already read so that
+  // client retries after network failure don't surface as 404. IDOR protection
+  // is preserved by the toProfileId match — wrong profile still returns 0.
   const rows = await db
     .update(nudges)
     .set({ readAt: new Date() })
-    .where(
-      and(
-        eq(nudges.id, nudgeId),
-        eq(nudges.toProfileId, profileId),
-        isNull(nudges.readAt),
-      ),
-    )
+    .where(and(eq(nudges.id, nudgeId), eq(nudges.toProfileId, profileId)))
     .returning({ id: nudges.id });
   return rows.length;
 }

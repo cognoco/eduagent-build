@@ -42,10 +42,8 @@ export const nudgeRoutes = new Hono<NudgeRouteEnv>()
     return c.json(nudgeCreateResponseSchema.parse(result));
   })
   .get('/nudges', async (c) => {
-    const unread = c.req.query('unread');
     const profileId = requireProfileId(c.get('profileId'));
-    const nudges =
-      unread === 'true' ? await listUnreadNudges(c.get('db'), profileId) : [];
+    const nudges = await listUnreadNudges(c.get('db'), profileId);
     return c.json(nudgeListResponseSchema.parse({ nudges }));
   })
   .patch('/nudges/:id/read', async (c) => {

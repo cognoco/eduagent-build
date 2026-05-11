@@ -56,6 +56,7 @@ initNotificationHandler();
 // (app)/ is auto-hidden — no manual Tabs.Screen entry required.
 const BASE_VISIBLE_TABS: ReadonlySet<string> = new Set([
   'home',
+  'own-learning',
   'library',
   'progress',
   'more',
@@ -87,6 +88,7 @@ const iconMap: Record<
   }
 > = {
   Home: { focused: 'home', default: 'home-outline' },
+  School: { focused: 'school', default: 'school-outline' },
   Book: { focused: 'book', default: 'book-outline' },
   Progress: { focused: 'stats-chart', default: 'stats-chart-outline' },
   More: { focused: 'menu', default: 'menu-outline' },
@@ -1642,6 +1644,17 @@ export default function AppLayout() {
               lazy: true,
               tabBarIcon: ({ focused }) => (
                 <TabIcon name="Home" focused={focused} />
+              ),
+            }}
+          />
+          <Tabs.Screen
+            name="own-learning"
+            options={{
+              title: t('tabs.myLearning'),
+              tabBarButtonTestID: 'tab-my-learning',
+              tabBarAccessibilityLabel: t('tabs.myLearningLabel'),
+              tabBarIcon: ({ focused }) => (
+                <TabIcon name="School" focused={focused} />
               ),
             }}
           />
