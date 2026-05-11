@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./out-tsc/jest",
+    "types": ["jest", "node"],
+    "noUncheckedIndexedAccess": false,
+    "noUnusedLocals": false
+  },
+  "include": ["jest.config.cjs", "src/**/*.test.ts", "eval-llm/**/*.test.ts"],
+  "references": [
+    {
+      "path": "./tsconfig.app.json"
+    }
+  ]
+}
