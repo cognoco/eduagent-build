@@ -15,6 +15,7 @@ import {
   useOverallProgress,
   useReviewSummary,
 } from '../../hooks/use-progress';
+import { useSubscription } from '../../hooks/use-subscription';
 import { useSubjects } from '../../hooks/use-subjects';
 import { getGreeting } from '../../lib/greeting';
 import { useHasLinkedChildren } from '../../lib/profile';
@@ -114,6 +115,7 @@ export function LearnerScreen({
   const { data: reviewSummary } = useReviewSummary();
   const { data: overallProgress } = useOverallProgress();
   const { data: quizDiscovery } = useQuizDiscoveryCard();
+  const { data: subscription } = useSubscription();
   const markQuizDiscoverySurfaced = useMarkQuizDiscoverySurfaced();
   const hasLinkedChildren = useHasLinkedChildren();
   const [recoveryMarker, setRecoveryMarker] =
@@ -430,7 +432,15 @@ export function LearnerScreen({
   const showCoachBand =
     FEATURE_FLAGS.COACH_BAND_ENABLED && coachBand && !coachBandDismissed;
 
-  if (showParentHome && !isParentProxy && hasLinkedChildren) {
+  const isFamilyPlanOwner =
+    activeProfile?.isOwner === true &&
+    (subscription?.tier === 'family' || subscription?.tier === 'pro');
+
+  if (
+    showParentHome &&
+    !isParentProxy &&
+    (hasLinkedChildren || isFamilyPlanOwner)
+  ) {
     return <ParentHomeScreen activeProfile={activeProfile} now={now} />;
   }
 

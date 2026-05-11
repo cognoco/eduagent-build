@@ -177,6 +177,11 @@
         "promptNoActivity": "Ask {{childName}}: what would make starting feel easy tonight?",
         "promptFallback": "Ask {{childName}}: what felt easier today than yesterday?"
       },
+      "empty": {
+        "title": "Your family dashboard starts here",
+        "body": "Add your first child profile and this screen will turn into tonight prompts, weekly recaps, nudges, and progress cards.",
+        "cta": "Add your first child"
+      },
       "childrenHeader": "Children",
       "familyToolsHeader": "Family tools",
       "childCard": {

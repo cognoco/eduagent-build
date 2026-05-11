@@ -20,6 +20,7 @@ let mockLinkedChildren: Array<{
   displayName: string;
   isOwner: boolean;
 }> = [];
+let mockSubscriptionTier = 'plus';
 
 const mockFetch = createRoutedMockFetch({
   '/coaching-card': { coldStart: false, card: null, fallback: null },
@@ -132,7 +133,7 @@ jest.mock(
 jest.mock(
   '../../hooks/use-subscription' /* gc1-allow: external hook boundary — wraps TanStack query that requires QueryClient */,
   () => ({
-    useSubscription: () => ({ data: { tier: 'family' } }),
+    useSubscription: () => ({ data: { tier: mockSubscriptionTier } }),
     useFamilySubscription: () => ({
       data: { profileCount: 2, maxProfiles: 5 },
     }),
@@ -236,6 +237,7 @@ describe('LearnerScreen', () => {
     mockClearSessionRecoveryMarker.mockResolvedValue(undefined);
     mockIsRecoveryMarkerFresh.mockReturnValue(true);
     mockLinkedChildren = [];
+    mockSubscriptionTier = 'plus';
     Wrapper = createWrapper();
   });
 
@@ -278,6 +280,7 @@ describe('LearnerScreen', () => {
   });
 
   it('shows parent Home for owner with linked children', async () => {
+    mockSubscriptionTier = 'family';
     mockLinkedChildren = [
       { id: 'child-id', displayName: 'Emma', isOwner: false },
     ];
@@ -339,6 +342,29 @@ describe('LearnerScreen', () => {
         '24 min this week · Ready to start · up from 5 last week',
       );
       screen.getByText(/7 questions left today.*84 left this month/);
+    });
+  });
+
+  it('shows add-first-child parent Home for family owners with no linked children', async () => {
+    mockSubscriptionTier = 'family';
+
+    render(
+      <LearnerScreen
+        profiles={[{ id: 'owner-id', displayName: 'Parent', isOwner: true }]}
+        activeProfile={{
+          id: 'owner-id',
+          displayName: 'Parent',
+          isOwner: true,
+        }}
+      />,
+      { wrapper: Wrapper },
+    );
+
+    await waitFor(() => {
+      screen.getByTestId('parent-home-screen');
+      screen.getByTestId('add-first-child-screen');
+      screen.getByTestId('add-first-child-cta');
+      screen.getByText('Your family dashboard starts here');
     });
   });
 

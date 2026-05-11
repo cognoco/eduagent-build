@@ -79,6 +79,13 @@ const KNOWN_DRIFT = new Set([
   // Library refactor in progress: empty-state component removed
   // (BookRow/LibraryEmptyState deletion). bug-237 Maestro flow needs update.
   'library-add-subject-empty',
+  // dashboard-scroll: legacy Family-dashboard testID. dashboard.tsx is now a
+  // <Redirect /> stub kept for old deep links (see screen-navigation
+  // EXEMPT_SCREENS). seed-and-sign-in.yaml + return-to-home-safe.yaml still
+  // reference it as an *optional/notVisible* fallback landing alongside
+  // learner-screen and parent-home-screen — safe to leave in place, but the
+  // Maestro flows can drop these branches in a follow-up cleanup.
+  'dashboard-scroll',
 ]);
 
 function collectFiles(dir: string, ext: string): string[] {

@@ -1,5 +1,12 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import {
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+  type GestureResponderEvent,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -140,9 +147,14 @@ function ChildActionButton({
   testID: string;
 }): React.ReactElement {
   const colors = useThemeColors();
+  const handlePress = (event?: GestureResponderEvent): void => {
+    event?.stopPropagation();
+    onPress();
+  };
+
   return (
     <Pressable
-      onPress={onPress}
+      onPress={handlePress}
       className="flex-1 bg-background rounded-button px-2 py-2.5 items-center justify-center min-h-[52px]"
       style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
       accessibilityRole="button"
@@ -386,6 +398,34 @@ export function ParentHomeScreen({
         </Text>
 
         <View style={{ gap: 10 }}>
+          {linkedChildren.length === 0 ? (
+            <View
+              className="bg-coaching-card rounded-card px-5 py-5"
+              testID="add-first-child-screen"
+            >
+              <Text className="text-h3 font-bold text-text-primary">
+                {t('home.parent.empty.title')}
+              </Text>
+              <Text className="text-body text-text-secondary mt-2">
+                {t('home.parent.empty.body')}
+              </Text>
+              <Pressable
+                onPress={handleAddChild}
+                className="bg-primary rounded-button px-4 py-3 mt-5 items-center min-h-[48px] justify-center"
+                style={
+                  Platform.OS === 'web' ? { cursor: 'pointer' } : undefined
+                }
+                accessibilityRole="button"
+                accessibilityLabel={t('home.parent.empty.cta')}
+                testID="add-first-child-cta"
+              >
+                <Text className="text-body font-semibold text-text-inverse">
+                  {t('home.parent.empty.cta')}
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
+
           {linkedChildren.map((child, index) => (
             <ChildCommandCard
               key={child.id}

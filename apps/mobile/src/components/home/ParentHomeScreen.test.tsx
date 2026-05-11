@@ -181,6 +181,20 @@ describe('ParentHomeScreen', () => {
     expect(screen.queryByText('Continue your own learning')).toBeNull();
   });
 
+  it('shows an add-first-child state when no children are linked', () => {
+    render(<ParentHomeScreen activeProfile={makeProfile()} />);
+
+    screen.getByTestId('add-first-child-screen');
+    screen.getByText('Your family dashboard starts here');
+    screen.getByText(
+      'Add your first child profile and this screen will turn into tonight prompts, weekly recaps, nudges, and progress cards.',
+    );
+
+    fireEvent.press(screen.getByTestId('add-first-child-cta'));
+
+    expect(mockPush).toHaveBeenCalledWith('/create-profile?for=child');
+  });
+
   it('shows tonight prompts and compact status from dashboard data', () => {
     mockLinkedChildren = [CHILD_A];
     mockDashboardData = {
