@@ -18,6 +18,7 @@
     "back": "Back",
     "search": "Search",
     "noResults": "No results found",
+    "and": "and",
     "retryHint": "Tap to retry",
     "usageMeter": {
       "questionsUsed": "{{used}} / {{limit}} questions used"
@@ -152,8 +153,8 @@
       "greeting": "Hey {{displayName}}",
       "intentHeader": "What do you need right now?",
       "encouragementNote": "Nudges are gentle one-way encouragements.",
-      "transitionNoticeTitle": "You're a parent now too",
-      "transitionNoticeBody": "This is your home – kids' progress and your own learning, all in one place.",
+      "transitionNoticeTitle": "You're now mentoring {{childNames}}",
+      "transitionNoticeBody": "Tap Home anytime to check in on their progress and your own learning.",
       "cards": {
         "checkChild": "See how {{childName}} is doing",
         "checkChildFallback": "Tap to see this week's progress",

@@ -47,17 +47,23 @@ const mockInngestCreateFunction = jest.fn().mockImplementation((config) => {
   return fn;
 });
 
-jest.mock('../../apps/api/src/inngest/client', () => ({
-  inngest: {
-    send: mockInngestSend,
-    createFunction: mockInngestCreateFunction,
-  },
-}));
+jest.mock(
+  '../../apps/api/src/inngest/client' /* gc1-allow: external Inngest transport boundary */,
+  () => ({
+    inngest: {
+      send: mockInngestSend,
+      createFunction: mockInngestCreateFunction,
+    },
+  }),
+);
 
 const mockCaptureException = jest.fn();
-jest.mock('../../apps/api/src/services/sentry', () => ({
-  captureException: (...args: unknown[]) => mockCaptureException(...args),
-}));
+jest.mock(
+  '../../apps/api/src/services/sentry' /* gc1-allow: external error-tracking boundary (Sentry SDK) */,
+  () => ({
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  }),
+);
 
 import { app } from '../../apps/api/src/index';
 import { handleReviewCalibrationGrade } from '../../apps/api/src/inngest/functions/review-calibration-grade';

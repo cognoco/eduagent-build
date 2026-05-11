@@ -1,9 +1,12 @@
 import {
   Platform,
   Pressable,
+  StyleSheet,
   Text,
   View,
   type GestureResponderEvent,
+  type StyleProp,
+  type ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors } from '../../lib/theme';
@@ -12,7 +15,7 @@ interface IntentCardProps {
   title: string;
   subtitle?: string;
   badge?: number;
-  variant?: 'default' | 'highlight' | 'subtle';
+  variant?: 'default' | 'highlight' | 'subtle' | 'accent';
   icon?: React.ComponentProps<typeof Ionicons>['name'];
   onPress?: () => void;
   onDismiss?: () => void;
@@ -34,7 +37,14 @@ export function IntentCard({
   const colors = useThemeColors();
   const isHighlight = variant === 'highlight';
   const isSubtle = variant === 'subtle';
-  const accentColor = isSubtle ? colors.textSecondary : colors.primary;
+  const isAccent = variant === 'accent';
+  const accentColor = isAccent
+    ? colors.secondary
+    : isSubtle
+      ? colors.textSecondary
+      : colors.primary;
+  const webPointerStyle: StyleProp<ViewStyle> =
+    Platform.OS === 'web' ? ({ cursor: 'pointer' } as ViewStyle) : undefined;
 
   function handleDismiss(event?: GestureResponderEvent) {
     event?.stopPropagation?.();
@@ -56,8 +66,6 @@ export function IntentCard({
         accessibilityRole: 'button' as const,
         accessibilityLabel: badge != null ? `${title}, ${badge} items` : title,
         accessibilityHint: 'Opens this activity',
-        style:
-          Platform.OS === 'web' ? ({ cursor: 'pointer' } as const) : undefined,
       }
     : {
         accessibilityLabel: badge != null ? `${title}, ${badge} items` : title,
@@ -67,7 +75,9 @@ export function IntentCard({
     <Wrapper
       {...wrapperProps}
       className={containerClassName}
-      style={{ borderLeftColor: accentColor }}
+      style={StyleSheet.compose(webPointerStyle, {
+        borderLeftColor: accentColor,
+      })}
       testID={testID}
     >
       <View className="flex-1 flex-row items-center">

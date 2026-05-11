@@ -18,6 +18,7 @@
     "back": "Atrás",
     "search": "Buscar",
     "noResults": "No se encontraron resultados",
+    "and": "y",
     "retryHint": "Toca para reintentar",
     "usageMeter": {
       "questionsUsed": "{{used}} / {{limit}} preguntas usadas"
@@ -152,8 +153,8 @@
       "greeting": "Hola, {{displayName}}",
       "intentHeader": "¿Qué necesitas ahora?",
       "encouragementNote": "Los nudges son ánimos suaves de una sola dirección.",
-      "transitionNoticeTitle": "Ahora también eres madre o padre",
-      "transitionNoticeBody": "Este es tu inicio: el progreso de tus hijos y tu propio aprendizaje en un solo lugar.",
+      "transitionNoticeTitle": "Ahora guías a {{childNames}}",
+      "transitionNoticeBody": "Toca Inicio en cualquier momento para ver su progreso y tu aprendizaje.",
       "cards": {
         "checkChild": "Ver cómo le va a {{childName}}",
         "checkChildFallback": "Toca para ver el progreso de esta semana",

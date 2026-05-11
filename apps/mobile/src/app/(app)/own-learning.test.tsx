@@ -13,27 +13,33 @@ type MockActiveProfile = {
 
 let mockActiveProfile: MockActiveProfile | null = null;
 
-jest.mock('../../lib/profile', () => ({
-  useProfile: () => ({
-    activeProfile: mockActiveProfile,
+jest.mock(
+  '../../lib/profile' /* gc1-allow: screen unit test isolates routing from profile provider */,
+  () => ({
+    useProfile: () => ({
+      activeProfile: mockActiveProfile,
+    }),
   }),
-}));
+);
 
 let capturedProps: Record<string, unknown> = {};
 
-jest.mock('../../components/home', () => {
-  const { Text, View } = require('react-native');
-  return {
-    LearnerScreen: (props: Record<string, unknown>) => {
-      capturedProps = props;
-      return (
-        <View testID="learner-screen">
-          <Text>LearnerScreen</Text>
-        </View>
-      );
-    },
-  };
-});
+jest.mock(
+  '../../components/home' /* gc1-allow: screen unit test isolates routing from heavy subtree */,
+  () => {
+    const { Text, View } = require('react-native');
+    return {
+      LearnerScreen: (props: Record<string, unknown>) => {
+        capturedProps = props;
+        return (
+          <View testID="learner-screen">
+            <Text>LearnerScreen</Text>
+          </View>
+        );
+      },
+    };
+  },
+);
 
 const OwnLearningScreen = require('./own-learning').default;
 

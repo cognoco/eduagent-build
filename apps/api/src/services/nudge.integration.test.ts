@@ -4,7 +4,7 @@
  * Covers:
  *   1. Happy-path end-to-end insert
  *   2. Rate-limit BREAK test: 5th createNudge from same parent throws RateLimitedError
- *   3. Per-parent-per-child dimension: parent A at limit, parent B can still send
+ *   3. Per-recipient dimension BREAK test: child at limit, parent B also blocked
  *   4. Concurrency BREAK test: count=2, 5 concurrent calls, at most 1 succeeds
  *   5. IDOR BREAK: markNudgeRead with wrong profileId returns 0
  *   6. IDOR BREAK: markAllNudgesRead with wrong profileId returns 0
@@ -265,31 +265,22 @@ describeIfDb('nudge service (integration)', () => {
     expect(count).toHaveLength(4);
   });
 
-  // ── 3. Per-parent-per-child dimension (I1 dimension fix) ──────────────────
+  // ── 3. Per-recipient dimension (I1 spec: max 4/day per child, any sender) ─
 
-  it('[BREAK] parent B can send when parent A has hit the per-parent limit', async () => {
+  it('[BREAK] parent B cannot send when child has received 4 nudges from any parent', async () => {
     const now = new Date();
     await seedNudgeRow(parentAProfileId, childXProfileId, now);
     await seedNudgeRow(parentAProfileId, childXProfileId, now);
     await seedNudgeRow(parentAProfileId, childXProfileId, now);
     await seedNudgeRow(parentAProfileId, childXProfileId, now);
 
-    const result = await createNudge(db, {
-      fromProfileId: parentBProfileId,
-      toProfileId: childXProfileId,
-      template: 'thinking_of_you',
-    });
-
-    expect(result.nudge.fromProfileId).toBe(parentBProfileId);
-    expect(result.nudge.toProfileId).toBe(childXProfileId);
-
-    const rows = await db.query.nudges.findMany({
-      where: and(
-        eq(nudges.fromProfileId, parentBProfileId),
-        eq(nudges.toProfileId, childXProfileId),
-      ),
-    });
-    expect(rows).toHaveLength(1);
+    await expect(
+      createNudge(db, {
+        fromProfileId: parentBProfileId,
+        toProfileId: childXProfileId,
+        template: 'thinking_of_you',
+      }),
+    ).rejects.toThrow(RateLimitedError);
   });
 
   // ── 4. Concurrency BREAK test (I1 atomicity) ──────────────────────────────

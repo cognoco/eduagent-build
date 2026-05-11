@@ -18,6 +18,7 @@
     "back": "Voltar",
     "search": "Buscar",
     "noResults": "Nenhum resultado encontrado",
+    "and": "e",
     "retryHint": "Toque para repetir",
     "usageMeter": {
       "questionsUsed": "{{used}} / {{limit}} perguntas usadas"
@@ -152,8 +153,8 @@
       "greeting": "Oi, {{displayName}}",
       "intentHeader": "O que voce precisa agora?",
       "encouragementNote": "Nudges sao incentivos breves e gentis, sem resposta obrigatoria.",
-      "transitionNoticeTitle": "Agora você também é responsável",
-      "transitionNoticeBody": "Esta é a sua tela inicial – progresso das crianças e seu próprio aprendizado em um só lugar.",
+      "transitionNoticeTitle": "Agora você orienta {{childNames}}",
+      "transitionNoticeBody": "Toque em Início a qualquer momento para ver o progresso e seu aprendizado.",
       "cards": {
         "checkChild": "Ver como {{childName}} esta indo",
         "checkChildFallback": "Toque para ver o progresso desta semana",

@@ -36,29 +36,35 @@ describe('ParentTransitionNotice', () => {
   });
 
   it('returns null when profileId is undefined', async () => {
-    render(<ParentTransitionNotice profileId={undefined} />);
+    render(
+      <ParentTransitionNotice profileId={undefined} childNames="TestKid" />,
+    );
 
     await waitFor(() => {
       expect(screen.queryByTestId('parent-transition-notice')).toBeNull();
     });
   });
 
-  it('shows notice when SecureStore has no value for the key', async () => {
+  it('shows notice with child name when SecureStore has no value for the key', async () => {
     mockGetItemAsync.mockResolvedValue(null);
 
-    render(<ParentTransitionNotice profileId="profile-abc" />);
+    render(
+      <ParentTransitionNotice profileId="profile-abc" childNames="TestKid" />,
+    );
 
     await waitFor(() => {
       screen.getByTestId('parent-transition-notice');
     });
 
-    screen.getByText("You're a parent now too");
+    screen.getByText("You're now mentoring TestKid");
   });
 
   it('hides notice when SecureStore has true for the key', async () => {
     mockGetItemAsync.mockResolvedValue('true');
 
-    render(<ParentTransitionNotice profileId="profile-abc" />);
+    render(
+      <ParentTransitionNotice profileId="profile-abc" childNames="TestKid" />,
+    );
 
     await waitFor(() => {
       expect(screen.queryByTestId('parent-transition-notice')).toBeNull();
@@ -68,7 +74,9 @@ describe('ParentTransitionNotice', () => {
   it('dismiss button writes to SecureStore and hides the notice', async () => {
     mockGetItemAsync.mockResolvedValue(null);
 
-    render(<ParentTransitionNotice profileId="profile-abc" />);
+    render(
+      <ParentTransitionNotice profileId="profile-abc" childNames="TestKid" />,
+    );
 
     await waitFor(() => {
       screen.getByTestId('parent-transition-notice-dismiss');

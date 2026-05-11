@@ -11,8 +11,10 @@ export function parentHomeSeenKey(profileId: string): string {
 
 export function ParentTransitionNotice({
   profileId,
+  childNames,
 }: {
   profileId: string | undefined;
+  childNames: string;
 }): React.ReactElement | null {
   const { t } = useTranslation();
   const [state, setState] = useState<'pending' | 'show' | 'hide'>('pending');
@@ -52,7 +54,7 @@ export function ParentTransitionNotice({
       accessibilityRole="alert"
     >
       <Text className="text-body font-semibold text-text-primary">
-        {t('home.parent.transitionNoticeTitle')}
+        {t('home.parent.transitionNoticeTitle', { childNames })}
       </Text>
       <Text className="text-body-sm text-text-secondary mt-1">
         {t('home.parent.transitionNoticeBody')}

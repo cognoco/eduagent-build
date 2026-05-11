@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -17,8 +16,6 @@ import {
 import { getGreeting } from '../../lib/greeting';
 import { platformAlert } from '../../lib/platform-alert';
 import { useLinkedChildren } from '../../lib/profile';
-import { useThemeColors } from '../../lib/theme';
-import { FamilyOrientationCue } from '../family/FamilyOrientationCue';
 import { WithdrawalCountdownBanner } from '../family/WithdrawalCountdownBanner';
 import { NudgeActionSheet } from '../nudge/NudgeActionSheet';
 import { ChildQuotaLine } from './ChildQuotaLine';
@@ -65,7 +62,6 @@ export function ParentHomeScreen({
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const colors = useThemeColors();
   const role = useActiveProfileRole();
   const linkedChildren = useLinkedChildren();
   const { data: dashboard } = useDashboard();
@@ -78,6 +74,15 @@ export function ParentHomeScreen({
   const { subtitle } = getGreeting(activeProfile?.displayName ?? '', now);
   const firstName = activeProfile?.displayName?.split(' ')[0] ?? 'there';
   const sheetChild = linkedChildren.find((child) => child.id === sheetChildId);
+  const childNames = useMemo(() => {
+    const names = linkedChildren.map(
+      (c) => c.displayName?.split(' ')[0] ?? c.displayName,
+    );
+    if (names.length === 0) return '';
+    if (names.length === 1) return names[0] ?? '';
+    if (names.length === 2) return `${names[0]} ${t('common.and')} ${names[1]}`;
+    return `${names.slice(0, -1).join(', ')} ${t('common.and')} ${names[names.length - 1]}`;
+  }, [linkedChildren, t]);
   const showAddChild = isAdultOwner({
     role,
     birthYear: activeProfile?.birthYear,
@@ -134,17 +139,11 @@ export function ParentHomeScreen({
   }, [subscription, familyData, router, t]);
 
   function pushChildDetail(childProfileId: string): void {
-    router.push({
-      pathname: '/(app)/child/[profileId]',
-      params: { profileId: childProfileId },
-    } as never);
+    router.push(`/(app)/child/${childProfileId}` as never);
   }
 
   function pushChildReports(childProfileId: string): void {
-    router.push({
-      pathname: '/(app)/child/[profileId]/reports',
-      params: { profileId: childProfileId },
-    } as never);
+    router.push(`/(app)/child/${childProfileId}/reports` as never);
   }
 
   return (
@@ -170,7 +169,10 @@ export function ParentHomeScreen({
         <View className="mt-4">
           <WithdrawalCountdownBanner />
         </View>
-        <ParentTransitionNotice profileId={activeProfile?.id} />
+        <ParentTransitionNotice
+          profileId={activeProfile?.id}
+          childNames={childNames}
+        />
 
         <Text className="text-h3 font-bold text-text-primary mt-5 mb-3">
           {t('home.parent.intentHeader')}
@@ -241,27 +243,9 @@ export function ParentHomeScreen({
             title={t('home.parent.cards.continueOwn')}
             subtitle={ownLearningSubtitle}
             icon="school-outline"
+            variant="accent"
             onPress={() => router.push('/(app)/own-learning' as never)}
           />
-        </View>
-
-        <View className="mt-3">
-          <FamilyOrientationCue />
-        </View>
-
-        <View
-          className="mt-3 flex-row items-center"
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
-        >
-          <Ionicons
-            name="shield-checkmark-outline"
-            size={16}
-            color={colors.textSecondary}
-          />
-          <Text className="text-caption text-text-secondary ml-2">
-            {t('home.parent.encouragementNote')}
-          </Text>
         </View>
 
         {sheetChild ? (

@@ -18,6 +18,7 @@
     "back": "Wstecz",
     "search": "Szukaj",
     "noResults": "Nie znaleziono wyników",
+    "and": "i",
     "retryHint": "Stuknij, by ponowić",
     "usageMeter": {
       "questionsUsed": "{{used}} / {{limit}} wykorzystanych pytań"
@@ -152,8 +153,8 @@
       "greeting": "Cześć {{displayName}}",
       "intentHeader": "Czego teraz potrzebujesz?",
       "encouragementNote": "Zachęty to krótkie, łagodne wiadomości w jedną stronę.",
-      "transitionNoticeTitle": "Jesteś teraz także rodzicem",
-      "transitionNoticeBody": "To jest twój ekran główny – postępy dzieci i twoja nauka w jednym miejscu.",
+      "transitionNoticeTitle": "Teraz mentorujesz {{childNames}}",
+      "transitionNoticeBody": "Naciśnij Start w dowolnym momencie, aby sprawdzić postępy i swoją naukę.",
       "cards": {
         "checkChild": "Sprawdź, jak idzie {{childName}}",
         "checkChildFallback": "Dotknij, aby zobaczyć postępy z tego tygodnia",

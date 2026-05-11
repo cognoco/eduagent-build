@@ -81,13 +81,6 @@ jest.mock(
 );
 
 jest.mock(
-  '../family/FamilyOrientationCue' /* gc1-allow: depends on its own hook tree — isolated here to keep test focused */,
-  () => ({
-    FamilyOrientationCue: () => null,
-  }),
-);
-
-jest.mock(
   '../family/WithdrawalCountdownBanner' /* gc1-allow: depends on its own hook tree — isolated here to keep test focused */,
   () => ({
     WithdrawalCountdownBanner: () => null,

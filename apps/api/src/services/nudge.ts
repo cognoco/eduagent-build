@@ -85,7 +85,7 @@ export async function createNudge(
   const inserted = await db.transaction(async (tx) => {
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtextextended(${
-        'nudge-rate:' + params.fromProfileId + ':' + params.toProfileId
+        'nudge-rate:' + params.toProfileId
       }, 0))`,
     );
 
@@ -94,7 +94,6 @@ export async function createNudge(
       .from(nudges)
       .where(
         and(
-          eq(nudges.fromProfileId, params.fromProfileId),
           eq(nudges.toProfileId, params.toProfileId),
           gt(nudges.createdAt, windowStart),
         ),
@@ -131,15 +130,23 @@ export async function createNudge(
   ]);
   const parentName = fromProfile?.displayName ?? 'Your parent';
 
-  const account = toProfile?.accountId
-    ? await db.query.accounts.findFirst({
-        where: eq(accounts.id, toProfile.accountId),
-        columns: { timezone: true },
-      })
-    : null;
+  const [childAccount, parentAccount] = await Promise.all([
+    toProfile?.accountId
+      ? db.query.accounts.findFirst({
+          where: eq(accounts.id, toProfile.accountId),
+          columns: { timezone: true },
+        })
+      : null,
+    fromProfile?.accountId
+      ? db.query.accounts.findFirst({
+          where: eq(accounts.id, fromProfile.accountId),
+          columns: { timezone: true },
+        })
+      : null,
+  ]);
 
   let pushSent = false;
-  if (isQuietHours(now, account?.timezone)) {
+  if (isQuietHours(now, childAccount?.timezone ?? parentAccount?.timezone)) {
     logger.info('Nudge push suppressed by quiet hours', {
       event: 'notification.nudge.quiet_hours_suppressed',
       toProfileId: params.toProfileId,

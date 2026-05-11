@@ -18,6 +18,7 @@
     "back": "戻る",
     "search": "検索",
     "noResults": "結果が見つかりません",
+    "and": "と",
     "retryHint": "タップして再試行",
     "usageMeter": {
       "questionsUsed": "{{used}} / {{limit}} 件の質問を使用しました"
@@ -152,8 +153,8 @@
       "greeting": "こんにちは、{{displayName}}",
       "intentHeader": "今なにをしますか？",
       "encouragementNote": "ナッジは短い応援メッセージです。返信は必要ありません。",
-      "transitionNoticeTitle": "保護者としてのホームも使えるようになりました",
-      "transitionNoticeBody": "お子さんの進み具合と自分の学習をここで見られます。",
+      "transitionNoticeTitle": "{{childNames}}のメンターになりました",
+      "transitionNoticeBody": "ホームをタップして、いつでも進捗と自分の学習を確認できます。",
       "cards": {
         "checkChild": "{{childName}}さんの様子を見る",
         "checkChildFallback": "今週の進み具合を見る",

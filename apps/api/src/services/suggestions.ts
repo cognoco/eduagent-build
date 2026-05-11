@@ -33,27 +33,6 @@ function mapBookSuggestion(
   };
 }
 
-export async function getUnpickedBookSuggestions(
-  db: Database,
-  profileId: string,
-  subjectId: string,
-) {
-  const subject = await db.query.subjects.findFirst({
-    where: and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
-  });
-  if (!subject) return [];
-
-  return db
-    .select()
-    .from(bookSuggestions)
-    .where(
-      and(
-        eq(bookSuggestions.subjectId, subjectId),
-        isNull(bookSuggestions.pickedAt),
-      ),
-    );
-}
-
 export async function getAllBookSuggestions(
   db: Database,
   profileId: string,

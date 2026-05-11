@@ -18,6 +18,7 @@
     "back": "Tilbake",
     "search": "Søk",
     "noResults": "Ingen resultater funnet",
+    "and": "og",
     "retryHint": "Trykk for å prøve igjen",
     "usageMeter": {
       "questionsUsed": "{{used}} / {{limit}} spørsmål brukt"
@@ -152,8 +153,8 @@
       "greeting": "Hei {{displayName}}",
       "intentHeader": "Hva trenger du akkurat nå?",
       "encouragementNote": "Nudger er korte, milde oppmuntringer en vei.",
-      "transitionNoticeTitle": "Du er forelder nå også",
-      "transitionNoticeBody": "Dette er hjemmet ditt – barnas fremgang og din egen læring samlet på ett sted.",
+      "transitionNoticeTitle": "Du veileder nå {{childNames}}",
+      "transitionNoticeBody": "Trykk Hjem når som helst for å se fremgangen og din egen læring.",
       "cards": {
         "checkChild": "Se hvordan det går med {{childName}}",
         "checkChildFallback": "Trykk for å se ukens fremgang",
