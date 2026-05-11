@@ -22,7 +22,7 @@ describe('buildCapitalsPrompt', () => {
     expect(prompt).toContain('Paris');
     expect(prompt).toContain('Berlin');
     expect(prompt).toContain('Central Europe');
-    expect(prompt).toContain('11-13');
+    expect(prompt).toContain('13-17');
   });
 
   it('works without a theme preference', () => {
@@ -171,7 +171,7 @@ describe('extractJsonObject', () => {
 
   it('throws UpstreamLlmError when no JSON object is found', () => {
     expect(() => extractJsonObject('No JSON here')).toThrow(
-      'Quiz LLM returned no JSON object'
+      'Quiz LLM returned no JSON object',
     );
   });
 });

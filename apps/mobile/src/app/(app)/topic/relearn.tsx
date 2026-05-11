@@ -17,7 +17,8 @@ import {
   type OverdueSubject,
   type OverdueTopic,
 } from '../../../hooks/use-progress';
-import { useProfile, personaFromBirthYear } from '../../../lib/profile';
+import { computeAgeBracket } from '@eduagent/schemas';
+import { useProfile } from '../../../lib/profile';
 import { goBackOrReplace, homeHrefForReturnTo } from '../../../lib/navigation';
 import { formatApiError } from '../../../lib/format-api-error';
 import { useParentProxy } from '../../../hooks/use-parent-proxy';
@@ -46,7 +47,7 @@ const TEACHING_METHODS = [
   },
 ];
 
-const TEACHING_METHODS_LEARNER = [
+const TEACHING_METHODS_ADOLESCENT = [
   {
     id: 'visual_diagrams' as const,
     label: 'Show Me Pictures',
@@ -79,7 +80,7 @@ const COPY_DEFAULT = {
   usualMethod: 'Usual method',
 } as const;
 
-const COPY_LEARNER = {
+const COPY_ADOLESCENT = {
   topicIntro: 'Pick the topic you want to try again.',
   methodIntro: 'How would you like to learn this time?',
   subjectIntro: 'Which subject should we start with?',
@@ -131,10 +132,13 @@ export default function RelearnScreen() {
   const overdueTopics = useOverdueTopics();
   const { activeProfile } = useProfile();
   const { isParentProxy } = useParentProxy();
-  const persona = personaFromBirthYear(activeProfile?.birthYear);
-  const isLearner = persona === 'learner';
-  const methods = isLearner ? TEACHING_METHODS_LEARNER : TEACHING_METHODS;
-  const copy = isLearner ? COPY_LEARNER : COPY_DEFAULT;
+  const ageBracket =
+    activeProfile?.birthYear != null
+      ? computeAgeBracket(activeProfile.birthYear)
+      : 'adolescent';
+  const isAdolescent = ageBracket === 'adolescent';
+  const methods = isAdolescent ? TEACHING_METHODS_ADOLESCENT : TEACHING_METHODS;
+  const copy = isAdolescent ? COPY_ADOLESCENT : COPY_DEFAULT;
 
   const [phase, setPhase] = useState<Phase>(directEntry ? 'method' : 'topics');
   const [selectedSubject, setSelectedSubject] = useState<OverdueSubject | null>(

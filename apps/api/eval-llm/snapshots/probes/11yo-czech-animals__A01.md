@@ -3,6 +3,7 @@
 > **Flow source:** `apps/api/src/services/exchanges.ts:buildSystemPrompt`
 > **Profile:** 11-year-old EU girl, Czech native, youngest in the target range, loves animals and nature, thorough pacer
 > **Scenario:** `A01`
+> **Note (PR-11 P7):** This profile (birthYear 2015) now resolves to AgeBracket `'child'` (age < 13). Voice output is unchanged — `getAgeVoice` uses the fine-grained birthYear path (age 11 < 14 → EARLY_TEEN_VOICE) regardless of bracket. The `'child'` switch case in the bracket-only fallback path is a safety net for bracket-only callers with no birthYear.
 
 ## Profile summary
 

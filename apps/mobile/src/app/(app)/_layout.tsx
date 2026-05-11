@@ -15,7 +15,8 @@ import { useAuth, useClerk, useUser } from '@clerk/clerk-expo';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from '../../lib/secure-storage';
-import { useProfile, personaFromBirthYear } from '../../lib/profile';
+import { computeAgeBracket } from '@eduagent/schemas';
+import { useProfile } from '../../lib/profile';
 import { useThemeColors, useTokenVars } from '../../lib/theme';
 import { useConsentStatus, useRequestConsent } from '../../hooks/use-consent';
 import {
@@ -640,8 +641,11 @@ function ConsentWithdrawnGate(): React.ReactElement {
       setRefreshing(false);
     }
   };
-  const persona = personaFromBirthYear(activeProfile?.birthYear);
-  const copy = getConsentWithdrawnCopy(persona);
+  const bracket =
+    activeProfile?.birthYear != null
+      ? computeAgeBracket(activeProfile.birthYear)
+      : 'adolescent';
+  const copy = getConsentWithdrawnCopy(bracket);
 
   return (
     <View
@@ -764,8 +768,11 @@ function ConsentPendingGate(): React.ReactElement {
   const { data: consentData } = useConsentStatus();
   const resendMutation = useRequestConsent();
   const { user } = useUser();
-  const persona = personaFromBirthYear(activeProfile?.birthYear);
-  const copy = getConsentPendingCopy(persona);
+  const bracket =
+    activeProfile?.birthYear != null
+      ? computeAgeBracket(activeProfile.birthYear)
+      : 'adolescent';
+  const copy = getConsentPendingCopy(bracket);
   const [checking, setChecking] = React.useState(false);
   const [previewMode, setPreviewMode] = React.useState<
     'subjects' | 'coaching' | null

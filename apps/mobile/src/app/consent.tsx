@@ -106,11 +106,11 @@ export default function ConsentScreen() {
     [fadeAnim, reduceMotion],
   );
 
-  // Hand-off copy uses learner variant (consent screen is always shown to children).
-  const copy = getConsentHandOffCopy('learner');
+  // Hand-off copy uses adolescent variant (consent screen is always shown to children).
+  const copy = getConsentHandOffCopy('adolescent');
 
-  // Regulation text uses the default (non-learner) variant since the PARENT reads it.
-  const regulationCopy = getConsentRequestCopy('parent');
+  // Regulation text uses the adult (default) variant since the PARENT reads it.
+  const regulationCopy = getConsentRequestCopy('adult');
   const regulationText = regulationCopy.regulation;
 
   const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parentEmail);

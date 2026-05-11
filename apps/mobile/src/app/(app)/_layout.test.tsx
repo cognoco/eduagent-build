@@ -91,7 +91,6 @@ jest.mock('expo-speech-recognition', () => ({
 
 jest.mock('../../lib/profile', () => ({
   useProfile: () => mockUseProfile(),
-  personaFromBirthYear: () => 'learner',
 }));
 
 // use-consent uses useApiClient — mocked at the fetch boundary via mockFetch.

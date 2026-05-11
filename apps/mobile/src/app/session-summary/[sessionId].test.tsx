@@ -92,7 +92,6 @@ jest.mock('../../lib/profile', () => ({
     setActiveProfileId: jest.fn(),
     isRestoringId: false,
   }),
-  personaFromBirthYear: () => 'learner',
   isGuardianProfile: () => false,
 }));
 

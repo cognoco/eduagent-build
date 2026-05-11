@@ -1,3 +1,7 @@
+import { type AgeBracket } from '@eduagent/schemas';
+
+export type { AgeBracket };
+
 /**
  * A learner interest with context indicating whether it applies to free time,
  * school activities, or both. Used for prompt personalization across quiz flows.
@@ -57,15 +61,13 @@ export function formatActivityLabel(activityType: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-// Product targets 11+ only — 'child' bracket removed in Agent 2's dead-code
-// cleanup. See docs/specs/2026-04-18-llm-personalization-audit.md.
-export type AgeBracket = 'adolescent' | 'adult';
-
 export function describeAgeBracket(ageBracket: AgeBracket): string {
   switch (ageBracket) {
+    case 'child':
+      return '11-12';
     case 'adolescent':
-      return '11-13';
+      return '13-17';
     default:
-      return '14+';
+      return '18+';
   }
 }

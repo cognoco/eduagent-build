@@ -17,8 +17,7 @@ describe('buildGuessWhoPrompt', () => {
     });
 
     expect(prompt).toContain('4');
-    // AgeBracket 'adolescent' now describes 11-13 after the <11 dead-code cleanup.
-    expect(prompt).toContain('11-13');
+    expect(prompt).toContain('13-17');
     expect(prompt).toContain('Isaac Newton');
     expect(prompt).toContain('Classical mechanics');
     expect(prompt).toContain('History and science');
@@ -68,7 +67,7 @@ describe('clueMentionsGuessWhoName', () => {
       clueMentionsGuessWhoName('Newton wrote about gravity.', [
         'Isaac Newton',
         'Newton',
-      ])
+      ]),
     ).toBe(true);
   });
 
@@ -77,7 +76,7 @@ describe('clueMentionsGuessWhoName', () => {
       clueMentionsGuessWhoName('He developed laws of motion.', [
         'Isaac Newton',
         'Newton',
-      ])
+      ]),
     ).toBe(false);
   });
 });
@@ -251,7 +250,7 @@ describe('validateGuessWhoRound', () => {
     const aliases = validated.questions[0]?.acceptedAliases ?? [];
     // Bare surname "Bell" must be present even though the LLM omitted it.
     expect(aliases.some((alias) => alias.trim().toLowerCase() === 'bell')).toBe(
-      true
+      true,
     );
   });
 
@@ -283,7 +282,7 @@ describe('validateGuessWhoRound', () => {
     expect(validated.questions).toHaveLength(1);
     const aliases = validated.questions[0]?.acceptedAliases ?? [];
     const curieCount = aliases.filter(
-      (alias) => alias.trim().toLowerCase() === 'curie'
+      (alias) => alias.trim().toLowerCase() === 'curie',
     ).length;
     expect(curieCount).toBe(1);
   });
@@ -321,13 +320,13 @@ describe('validateGuessWhoRound', () => {
 describe('appendSurnameAlias [BUG-541]', () => {
   it('appends surname when canonical name is multi-word and surname missing', () => {
     expect(
-      appendSurnameAlias('Alexander Graham Bell', ['inventor of the phone'])
+      appendSurnameAlias('Alexander Graham Bell', ['inventor of the phone']),
     ).toEqual(['inventor of the phone', 'Bell']);
   });
 
   it('does not duplicate surname when already present (case-insensitive)', () => {
     expect(
-      appendSurnameAlias('Marie Curie', ['curie', 'Madame Curie'])
+      appendSurnameAlias('Marie Curie', ['curie', 'Madame Curie']),
     ).toEqual(['curie', 'Madame Curie']);
   });
 
@@ -377,7 +376,7 @@ describe('validateGuessWhoRound — surname inclusion [BUG-541]', () => {
 
     expect(validated.questions).toHaveLength(1);
     expect(validated.questions[0]?.acceptedAliases).toEqual(
-      expect.arrayContaining(['inventor of the telephone', 'Bell'])
+      expect.arrayContaining(['inventor of the telephone', 'Bell']),
     );
   });
 });
@@ -400,7 +399,7 @@ describe('buildGuessWhoDiscoveryQuestions', () => {
             funFact: 'Fact.',
           },
         ],
-      })
+      }),
     ).toEqual([
       {
         type: 'guess_who',
