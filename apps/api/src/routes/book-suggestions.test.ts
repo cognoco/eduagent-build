@@ -70,30 +70,32 @@ jest.mock('../services/profile', () => ({
 // Mock suggestion services — stubs for route handler
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/suggestions', () => {
-  // gc1-allow: isolating LLM-calling suggestion service from route tests
-  const stubSuggestion = {
-    id: 'a0000000-0000-4000-a000-000000000001',
-    subjectId: 'a0000000-0000-4000-a000-000000000201',
-    title: 'Suggested Book',
-    emoji: '📖',
-    description: 'A suggested book',
-    category: null,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    pickedAt: null,
-  };
-  return {
-    getUnpickedBookSuggestionsEnvelope: jest.fn().mockResolvedValue({
-      suggestions: [stubSuggestion],
-      curriculumBookCount: 3,
-    }),
-    getUnpickedBookSuggestionsWithTopup: jest.fn().mockResolvedValue({
-      suggestions: [stubSuggestion],
-      curriculumBookCount: 3,
-    }),
-    getAllBookSuggestions: jest.fn().mockResolvedValue([stubSuggestion]),
-  };
-});
+jest.mock(
+  '../services/suggestions' /* gc1-allow: LLM service boundary */,
+  () => {
+    const stubSuggestion = {
+      id: 'a0000000-0000-4000-a000-000000000001',
+      subjectId: 'a0000000-0000-4000-a000-000000000201',
+      title: 'Suggested Book',
+      emoji: '📖',
+      description: 'A suggested book',
+      category: null,
+      createdAt: '2024-01-01T00:00:00.000Z',
+      pickedAt: null,
+    };
+    return {
+      getUnpickedBookSuggestionsEnvelope: jest.fn().mockResolvedValue({
+        suggestions: [stubSuggestion],
+        curriculumBookCount: 3,
+      }),
+      getUnpickedBookSuggestionsWithTopup: jest.fn().mockResolvedValue({
+        suggestions: [stubSuggestion],
+        curriculumBookCount: 3,
+      }),
+      getAllBookSuggestions: jest.fn().mockResolvedValue([stubSuggestion]),
+    };
+  },
+);
 
 // ---------------------------------------------------------------------------
 // Mock LLM services — registerProvider for llm middleware

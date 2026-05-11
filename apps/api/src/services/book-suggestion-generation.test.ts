@@ -5,14 +5,12 @@
 import { jest } from '@jest/globals';
 
 const routeAndCallMock = jest.fn();
-jest.mock('./llm', () => ({
-  // gc1-allow: LLM external boundary
+jest.mock('./llm' /* gc1-allow: LLM external boundary */, () => ({
   routeAndCall: (...args: unknown[]) => routeAndCallMock(...args),
 }));
 
 const loggerWarnMock = jest.fn();
-jest.mock('./logger', () => ({
-  // gc1-allow: logger structured metric verification
+jest.mock('./logger' /* gc1-allow: metric verification */, () => ({
   createLogger: () => ({
     warn: (...args: unknown[]) => loggerWarnMock(...args),
     info: jest.fn(),

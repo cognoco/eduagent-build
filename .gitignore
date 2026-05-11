@@ -109,6 +109,9 @@ _wip/
 .claude/zdx-tts/
 apps/mobile/.claude/
 
+# Claude Code agent skill definitions (session artifacts)
+.agents/
+
 # Hook log output (Claude Code session_start / user_prompt_submit / session_end)
 /logs/
 apps/mobile/logs/

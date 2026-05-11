@@ -108,8 +108,7 @@ jest.mock(
   }),
 );
 
-jest.mock('./ChildQuotaLine', () => ({
-  // gc1-allow: presentational stub — ChildQuotaLine has own tests
+jest.mock('./ChildQuotaLine' /* gc1-allow: has own test suite */, () => ({
   ChildQuotaLine: () => null,
 }));
 

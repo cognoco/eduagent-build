@@ -6,11 +6,13 @@
 import { jest } from '@jest/globals';
 
 const generateMock = jest.fn();
-jest.mock('./book-suggestion-generation', () => ({
-  // gc1-allow: isolating LLM-calling dependency
-  generateCategorizedBookSuggestions: (...args: unknown[]) =>
-    generateMock(...args),
-}));
+jest.mock(
+  './book-suggestion-generation' /* gc1-allow: LLM dependency */,
+  () => ({
+    generateCategorizedBookSuggestions: (...args: unknown[]) =>
+      generateMock(...args),
+  }),
+);
 
 import {
   getUnpickedBookSuggestionsWithTopup,
