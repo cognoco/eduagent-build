@@ -727,14 +727,14 @@ describe('resolveTabShape', () => {
     ).toBe('guardian');
   });
 
-  it('returns guardian during proxy sessions', () => {
+  it('returns learner during proxy sessions', () => {
     expect(
       resolveTabShape({
         activeProfile: { isOwner: false },
         profiles: [{ isOwner: true }, { isOwner: false }],
         isParentProxy: true,
       }),
-    ).toBe('guardian');
+    ).toBe('learner');
   });
 
   it('returns guardian when activeProfile is null', () => {

@@ -21,15 +21,16 @@ import { goBackOrReplace, homeHrefForReturnTo } from '../../../lib/navigation';
 import { useReviewSummary } from '../../../hooks/use-progress';
 import { useParentProxy } from '../../../hooks/use-parent-proxy';
 import { useAssessmentEligibleTopics } from '../../../hooks/use-assessments';
-import { useThemeColors } from '../../../lib/theme';
+import { useTheme, useThemeColors } from '../../../lib/theme';
 
 const PRACTICE_WEB_MAX_WIDTH = 560;
 
 type PracticeColors = ReturnType<typeof usePracticeColors>;
 
 function usePracticeColors() {
+  const { colorScheme } = useTheme();
   const theme = useThemeColors();
-  const isDark = theme.background !== '#faf5ef';
+  const isDark = colorScheme === 'dark';
   return {
     ink: theme.textPrimary,
     muted: theme.textSecondary,

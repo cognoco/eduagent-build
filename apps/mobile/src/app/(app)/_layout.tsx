@@ -91,7 +91,8 @@ export function resolveTabShape({
   profiles: ReadonlyArray<{ isOwner: boolean }>;
   isParentProxy: boolean;
 }): TabShape {
-  if (!activeProfile || isParentProxy) return 'guardian';
+  if (!activeProfile) return 'guardian';
+  if (isParentProxy) return 'learner';
   if (isGuardianProfile(activeProfile, profiles)) return 'guardian';
   return 'learner';
 }

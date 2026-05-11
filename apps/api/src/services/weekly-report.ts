@@ -18,7 +18,10 @@ import {
   weeklyReportSummarySchema,
 } from '@eduagent/schemas';
 import { assertParentAccess } from './family-access';
+import { createLogger } from './logger';
 import { sumTopicsExplored } from './progress-helpers';
+
+const logger = createLogger();
 
 function safeDelta(current: number, previous: number | undefined): number {
   return Math.max(0, current - (previous ?? 0));
@@ -135,7 +138,15 @@ function mapWeeklyReportRow(
     viewedAt: row.viewedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
   });
-  return result.success ? result.data : null;
+  if (!result.success) {
+    logger.warn('mapWeeklyReportRow: schema validation failed', {
+      reportId: row.id,
+      profileId: row.profileId,
+      error: result.error.message,
+    });
+    return null;
+  }
+  return result.data;
 }
 
 function getWeeklyReportData(row: typeof weeklyReports.$inferSelect): {
