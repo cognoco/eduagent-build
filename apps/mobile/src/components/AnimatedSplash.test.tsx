@@ -1,4 +1,4 @@
-import { render, fireEvent } from '@testing-library/react-native';
+import { render, fireEvent, act } from '@testing-library/react-native';
 import { AnimatedSplash } from './AnimatedSplash';
 
 // Override withTiming in the global reanimated mock so callbacks fire
@@ -7,6 +7,7 @@ import { AnimatedSplash } from './AnimatedSplash';
 // We patch only withTiming here so every other mock stays intact.
 beforeEach(() => {
   const reanimated = require('react-native-reanimated');
+  reanimated.useReducedMotion = () => false;
   reanimated.withTiming = (
     value: unknown,
     _options?: unknown,
@@ -18,6 +19,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  jest.useRealTimers();
   jest.restoreAllMocks();
 });
 
@@ -35,16 +37,12 @@ describe('AnimatedSplash', () => {
   });
 
   it('calls onComplete when reduced motion is enabled', () => {
-    const reanimated = require('react-native-reanimated');
-    const original = reanimated.useReducedMotion;
-    reanimated.useReducedMotion = () => true;
+    require('react-native-reanimated').useReducedMotion = () => true;
 
     const onComplete = jest.fn();
     render(<AnimatedSplash onComplete={onComplete} />);
 
     expect(onComplete).toHaveBeenCalledTimes(1);
-
-    reanimated.useReducedMotion = original;
   });
 
   it('uses dark background color in dark mode', () => {
@@ -81,5 +79,22 @@ describe('AnimatedSplash', () => {
     // The Pressable wraps the full splash area — press on the root
     fireEvent.press(getByTestId('animated-splash'));
     expect(onComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops accepting touches when the fade-out phase begins', () => {
+    jest.useFakeTimers();
+    require('react-native-reanimated').withTiming = (value: unknown) => value;
+
+    const onComplete = jest.fn();
+    const { getByTestId } = render(<AnimatedSplash onComplete={onComplete} />);
+    const root = getByTestId('animated-splash');
+
+    expect(root.props.pointerEvents).toBe('auto');
+
+    act(() => {
+      jest.advanceTimersByTime(2500);
+    });
+
+    expect(getByTestId('animated-splash').props.pointerEvents).toBe('none');
   });
 });

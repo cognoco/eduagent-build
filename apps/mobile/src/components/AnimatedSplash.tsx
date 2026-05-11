@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react';
-import { useEffect, useCallback, useRef, useMemo } from 'react';
+import { useEffect, useCallback, useRef, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -149,19 +149,25 @@ export function AnimatedSplash({ onComplete }: AnimatedSplashProps) {
   const ringOp = useSharedValue(0);
   const wordOp = useSharedValue(0);
   const fade = useSharedValue(1);
+  const [acceptsTouches, setAcceptsTouches] = useState(true);
 
   // Use a ref so the effect closure always calls the latest onComplete
   // without re-triggering the animation choreography on prop identity changes.
   const onCompleteRef = useRef(onComplete);
+  const completionDeliveredRef = useRef(false);
   onCompleteRef.current = onComplete;
   const done = useCallback(() => {
+    if (completionDeliveredRef.current) return;
+    completionDeliveredRef.current = true;
     if (__DEV__)
       console.log('[Splash] done() called — animation completed normally');
+    setAcceptsTouches(false);
     onCompleteRef.current();
   }, []);
 
   // Tap to skip
   const skip = useCallback(() => {
+    setAcceptsTouches(false);
     fade.value = withTiming(0, { duration: 200 }, (finished) => {
       if (finished) runOnJS(done)();
     });
@@ -179,6 +185,7 @@ export function AnimatedSplash({ onComplete }: AnimatedSplashProps) {
     if (!_splashAnimationAvailable) {
       if (__DEV__)
         console.warn('[Splash] Animation unavailable — completing immediately');
+      setAcceptsTouches(false);
       done();
       return;
     }
@@ -187,6 +194,7 @@ export function AnimatedSplash({ onComplete }: AnimatedSplashProps) {
     if (reduceMotion) {
       if (__DEV__)
         console.warn('[Splash] reduceMotion=true — skipping animation');
+      setAcceptsTouches(false);
       fade.value = withTiming(0, { duration: 200 }, (finished) => {
         if (finished) runOnJS(done)();
       });
@@ -253,6 +261,10 @@ export function AnimatedSplash({ onComplete }: AnimatedSplashProps) {
         if (finished) runOnJS(done)();
       }),
     );
+    const touchRelease = setTimeout(() => {
+      setAcceptsTouches(false);
+    }, 2500);
+    return () => clearTimeout(touchRelease);
     // The reanimated SharedValues below are listed for the linter; their
     // identity is stable across renders (useSharedValue), so including them
     // does not change the effect's run cadence — it still fires only when
@@ -393,6 +405,7 @@ export function AnimatedSplash({ onComplete }: AnimatedSplashProps) {
     <Animated.View
       style={[styles.container, { backgroundColor: C.bg }, containerStyle]}
       testID="animated-splash"
+      pointerEvents={acceptsTouches ? 'auto' : 'none'}
     >
       <Pressable onPress={skip} style={styles.pressable}>
         <Svg width={ICON_SIZE} height={ICON_SIZE} viewBox="-5 -15 130 130">
