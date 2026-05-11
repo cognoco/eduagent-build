@@ -280,8 +280,8 @@
       "subtitle": "Aplica-se às suas próprias sessões de aprendizado.",
       "subtitleWithChildren": "Aplica-se às suas próprias sessões. Para mudar a de uma criança, abra o perfil dela no painel.",
       "childPreferencesAccessLabel": "Abrir preferências de perfil de {{name}}",
-      "childPreferencesLink": "Para mudar as preferências de {{name}}, abra o perfil dele →",
-      "familyPreferencesLink": "Para mudar as preferências de uma criança, abra Família →",
+      "childPreferencesLink": "Para alterar as preferências de {{name}}, toque no perfil na tela Início →",
+      "familyPreferencesLink": "Para alterar as preferências de uma criança, toque no perfil na tela Início →",
       "sheetTitle": "Modo de aprendizagem",
       "sheetEffectMessage": "Entra em vigor a partir da tua próxima mensagem.",
       "casual": {
@@ -294,10 +294,10 @@
       }
     },
     "accommodation": {
-      "sectionHeader": "A sua acomodação de aprendizagem",
-      "viewAndManage": "Ver e gerir",
+      "sectionHeader": "Sua acomodação de aprendizagem",
+      "viewAndManage": "Ver e gerenciar",
       "screenTitle": "Acomodação de aprendizagem",
-      "notSureWhichToPick": "Não sabe qual escolher?",
+      "notSureWhichToPick": "Não tem certeza de qual escolher?",
       "guideActive": "Ativo"
     },
     "learningPreferences": {

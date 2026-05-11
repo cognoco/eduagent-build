@@ -255,8 +255,8 @@
       "subtitle": "Gjelder for dine egne læringsøkter.",
       "subtitleWithChildren": "Gjelder for dine egne økter. For å endre et barns, åpne profilen deres fra dashbordet.",
       "childPreferencesAccessLabel": "Åpne {{name}}s profilinnstillinger",
-      "childPreferencesLink": "For å endre {{name}}s preferanser, åpne profilen deres →",
-      "familyPreferencesLink": "For å endre et barns preferanser, åpne Familie →",
+      "childPreferencesLink": "For å endre {{name}}s innstillinger, trykk på profilen deres på Hjem →",
+      "familyPreferencesLink": "For å endre et barns innstillinger, trykk på profilen deres på Hjem →",
       "sheetTitle": "Læringsmodus",
       "sheetEffectMessage": "Gjelder fra neste melding.",
       "casual": {
@@ -270,9 +270,9 @@
     },
     "accommodation": {
       "sectionHeader": "Din læringstilpasning",
-      "viewAndManage": "Se og administrer",
+      "viewAndManage": "Vis og administrer",
       "screenTitle": "Læringstilpasning",
-      "notSureWhichToPick": "Usikker på hva du skal velge?",
+      "notSureWhichToPick": "Ikke sikker på hvilken du skal velge?",
       "guideActive": "Aktiv"
     },
     "learningPreferences": {

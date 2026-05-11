@@ -255,8 +255,8 @@
       "subtitle": "ご自身の学習セッションに適用されます。",
       "subtitleWithChildren": "ご自身のセッションに適用されます。お子様の設定を変更するには、ダッシュボードからプロフィールを開いてください。",
       "childPreferencesAccessLabel": "{{name}}さんのプロフィール設定を開く",
-      "childPreferencesLink": "{{name}}さんの設定を変更するには、プロフィールを開いてください →",
-      "familyPreferencesLink": "お子様の設定を変更するには、ファミリーを開いてください →",
+      "childPreferencesLink": "{{name}}さんの設定を変更するには、ホームでプロフィールをタップしてください →",
+      "familyPreferencesLink": "お子様の設定を変更するには、ホームでプロフィールをタップしてください →",
       "sheetTitle": "学習モード",
       "sheetEffectMessage": "次のメッセージから反映されます。",
       "casual": {
@@ -269,11 +269,11 @@
       }
     },
     "accommodation": {
-      "sectionHeader": "あなたの学習サポート設定",
-      "viewAndManage": "確認・管理",
+      "sectionHeader": "あなたの学習サポート",
+      "viewAndManage": "表示・管理",
       "screenTitle": "学習サポート設定",
-      "notSureWhichToPick": "どれを選べばいい？",
-      "guideActive": "有効"
+      "notSureWhichToPick": "どれを選べばいいかわからない？",
+      "guideActive": "アクティブ"
     },
     "learningPreferences": {
       "rowLabel": "学習設定",

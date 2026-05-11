@@ -280,8 +280,8 @@
       "subtitle": "Dotyczy Twoich własnych sesji nauki.",
       "subtitleWithChildren": "Dotyczy Twoich własnych sesji. Aby zmienić ustawienia dziecka, otwórz jego profil z pulpitu.",
       "childPreferencesAccessLabel": "Otwórz preferencje profilu {{name}}",
-      "childPreferencesLink": "Aby zmienić preferencje {{name}}, otwórz jego profil →",
-      "familyPreferencesLink": "Aby zmienić preferencje dziecka, otwórz Rodzina →",
+      "childPreferencesLink": "Aby zmienić ustawienia {{name}}, dotknij profilu na ekranie głównym →",
+      "familyPreferencesLink": "Aby zmienić ustawienia dziecka, dotknij profilu na ekranie głównym →",
       "sheetTitle": "Tryb nauki",
       "sheetEffectMessage": "Zadziała od Twojej następnej wiadomości.",
       "casual": {
@@ -295,9 +295,9 @@
     },
     "accommodation": {
       "sectionHeader": "Twoje dostosowanie nauki",
-      "viewAndManage": "Zobacz i zarządzaj",
+      "viewAndManage": "Wyświetl i zarządzaj",
       "screenTitle": "Dostosowanie nauki",
-      "notSureWhichToPick": "Nie wiesz, co wybrać?",
+      "notSureWhichToPick": "Nie wiesz, które wybrać?",
       "guideActive": "Aktywny"
     },
     "learningPreferences": {

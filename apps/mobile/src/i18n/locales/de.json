@@ -255,8 +255,8 @@
       "subtitle": "Gilt für deine eigenen Lernsitzungen.",
       "subtitleWithChildren": "Gilt für deine eigenen Sitzungen. Um die eines Kindes zu ändern, öffne dessen Profil im Dashboard.",
       "childPreferencesAccessLabel": "Profileinstellungen von {{name}} öffnen",
-      "childPreferencesLink": "Um {{name}}s Einstellungen zu ändern, öffne sein Profil →",
-      "familyPreferencesLink": "Um die Einstellungen eines Kindes zu ändern, öffne Familie →",
+      "childPreferencesLink": "Um {{name}}s Einstellungen zu ändern, tippe auf das Profil auf der Startseite →",
+      "familyPreferencesLink": "Um die Einstellungen eines Kindes zu ändern, tippe auf das Profil auf der Startseite →",
       "sheetTitle": "Lernmodus",
       "sheetEffectMessage": "Gilt ab deiner nächsten Nachricht.",
       "casual": {
@@ -270,9 +270,9 @@
     },
     "accommodation": {
       "sectionHeader": "Deine Lernanpassung",
-      "viewAndManage": "Ansehen & verwalten",
+      "viewAndManage": "Anzeigen & verwalten",
       "screenTitle": "Lernanpassung",
-      "notSureWhichToPick": "Nicht sicher, was du wählen sollst?",
+      "notSureWhichToPick": "Nicht sicher, welche du wählen sollst?",
       "guideActive": "Aktiv"
     },
     "learningPreferences": {
