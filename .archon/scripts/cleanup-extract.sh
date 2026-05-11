@@ -51,7 +51,7 @@ cluster_num="$(echo "$cluster_raw" | grep -oE 'C[0-9]+' | head -1)"
 [[ -n "$cluster_num" ]] || { echo "ERROR: cannot parse cluster from '$cluster_raw'" >&2; exit 1; }
 
 # Parse phase list: P1+P2 → array
-IFS='+' read -ra phase_ids <<< "$(echo "$phases_raw" | grep -oE 'P[0-9]+(\+P[0-9]+)*' | head -1)"
+IFS='+' read -ra phase_ids <<< "$(echo "$phases_raw" | grep -oE 'P[0-9]+[a-z]*(\+P[0-9]+[a-z]*)*' | head -1)"
 [[ ${#phase_ids[@]} -gt 0 ]] || { echo "ERROR: cannot parse phases from '$phases_raw'" >&2; exit 1; }
 
 echo "  Cluster: ${cluster_num} / Phases: ${phase_ids[*]} / Summary: ${summary_raw:0:80}..."
@@ -186,7 +186,7 @@ ${deps_section}
 | File | Phase |
 |------|-------|
 $(for f in ${all_files_claimed[@]+"${all_files_claimed[@]}"}; do
-    phase_for_file="$(echo "$phase_details" | grep -B5 "\`$f\`" | grep -oE 'Phase P[0-9]+' | head -1 | sed 's/Phase //' || echo "?")"
+    phase_for_file="$(echo "$phase_details" | grep -B5 "\`$f\`" | grep -oE 'Phase P[0-9]+[a-z]*' | head -1 | sed 's/Phase //' || echo "?")"
     echo "| \`$f\` | ${phase_for_file} |"
 done)
 

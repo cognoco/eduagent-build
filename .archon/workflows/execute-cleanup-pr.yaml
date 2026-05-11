@@ -68,6 +68,7 @@ nodes:
 
   - id: install
     depends_on: [extract]
+    timeout: 300000
     bash: |
       ./.archon/scripts/install.sh
       git rev-parse HEAD > "$ARTIFACTS_DIR/.pre-implement-sha"
@@ -161,7 +162,7 @@ nodes:
   - id: review-scope
     command: cleanup-pr-review-scope
     depends_on: [risk-class, validate]
-    trigger_rule: all_done   # don't block when validate is skipped (tiny)
+    trigger_rule: one_success   # risk-class succeeds even for tiny PRs; blocks when entire upstream chain is skipped/failed
     context: fresh
     idle_timeout: 300000
     provider: claude
