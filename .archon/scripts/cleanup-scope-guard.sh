@@ -87,6 +87,13 @@ if ! changed_files="$(git diff --name-only "${base}..HEAD" 2>/dev/null)"; then
     exit 1
 fi
 
+# Write name-only cache for risk-class (post-implement invocation only; the review/
+# dir doesn't exist yet at that point). Post-fix runs after fix-locally commits and
+# has no downstream consumer of this cache.
+if [[ ! -d "${artifacts_dir}/review" ]]; then
+    printf '%s\n' "$changed_files" > "${artifacts_dir}/.diff-impl-names"
+fi
+
 if [[ -z "$changed_files" ]]; then
     echo "Scope guard: clean — no files changed relative to ${base}"
     exit 0

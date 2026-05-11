@@ -54,16 +54,22 @@ fi
 # do NOT silently produce zero counts (which would classify as 'tiny' and
 # skip code-review + test-coverage via the workflow's `when:` gates). Force
 # 'risky' so all reviewers run on a misconfigured run.
-diff_err="$(mktemp)"
-if ! changed_files="$(git diff --name-only "${base_sha}..HEAD" 2>"$diff_err")"; then
-    echo "ERROR: cleanup-risk-class: git diff failed (base=${base_sha}); forcing risky" >&2
-    cat "$diff_err" >&2
+diff_cache="${artifacts_dir}/.diff-impl-names"
+if [[ -f "$diff_cache" ]]; then
+    changed_files="$(cat "$diff_cache")"
+    echo "INFO: cleanup-risk-class: using cached name-only diff written by scope-guard" >&2
+else
+    diff_err="$(mktemp)"
+    if ! changed_files="$(git diff --name-only "${base_sha}..HEAD" 2>"$diff_err")"; then
+        echo "ERROR: cleanup-risk-class: git diff failed (base=${base_sha}); forcing risky" >&2
+        cat "$diff_err" >&2
+        rm -f "$diff_err"
+        echo "risky" > "${artifacts_dir}/risk-class.txt"
+        echo "risky"
+        exit 0
+    fi
     rm -f "$diff_err"
-    echo "risky" > "${artifacts_dir}/risk-class.txt"
-    echo "risky"
-    exit 0
 fi
-rm -f "$diff_err"
 
 if [[ -z "$changed_files" ]]; then
     file_count=0

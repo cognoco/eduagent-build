@@ -1,0 +1,284 @@
+name: execute-cleanup-pr-merged
+description: |
+  Execute a cleanup-plan.md work package by PR number.
+  Usage: archon workflow run execute-cleanup-pr-merged --branch cleanup-pr-XX "PR-16"
+  Input: PR identifier (e.g. "PR-08", "PR-15", "08", "15")
+  Output: GitHub PR ready for human review.
+
+  DRAFT — not yet replacing execute-cleanup-pr-{claude,codex}.yaml.
+  Replaces the dual-flavor bake-off with a single merged flow.
+  Audit + rationale: .archon/workflow-audit.md (Phase D).
+
+  Provider/model selection (verify with audit doc):
+  - implement: Codex synthesizes; fix-locally: Claude fixes
+    (Codex floor was higher in the bake-off; Claude catches Codex's
+    scope-creep failure mode via adversarial-review).
+  - validate/re-validate: Claude sonnet/low (Codex variance was very
+    high; mean 631s vs Claude 430s).
+  - code-review/test-coverage: Claude sonnet/medium (lower variance,
+    similar quality per bake-off).
+  - adversarial-review: Claude opus-4-6/high (preserves cross-provider
+    catch on Codex's failure modes).
+  - ci-watch-and-fix: Claude sonnet/medium (Codex max wallclock was
+    much lower here, 636s vs 1648s — but Claude's median is identical
+    and we keep model-family consistency with reviewers).
+
+  Structural change vs current flavors:
+  - `risk-class` runs BEFORE `validate`. `validate` is now gated by
+    `risk-class != 'tiny'`, mirroring code-review/test-coverage.
+    Saves ~$0.22 + 120s per tiny PR.
+
+  Flow:
+  1. Parse cleanup-plan.md → deterministic extraction (shell)
+  2. Install dependencies in worktree
+  3. Plan-review (LLM pre-flight; verifies claimed files exist)
+  4. Implement (codex/gpt-5.5/high) — loop ≤15
+  5. Scope guard (hard stop on file drift) → risk-class → validate (gated)
+  6. Parallel review on local worktree (no PR yet):
+     code-review + test-coverage (claude/sonnet) + adversarial-review (claude/opus)
+  7. Synthesize (jq) → fix-locally (claude/opus) → scope guard + re-validate
+  8. Push branch + create PR
+  9. Post consolidated review + fix report as PR comments
+  10. CI-watch-and-fix (claude/sonnet, loop ≤3)
+  11. Final summary
+
+  NOT for: Non-cleanup work, feature development, or PRs not in cleanup-plan.md.
+
+provider: claude
+model: claude-sonnet-4-6
+
+worktree:
+  enabled: true
+
+nodes:
+  # ── PHASE 0: INIT ────────────────────────────────────────────────────
+
+  - id: init-tracing
+    bash: ./.archon/scripts/init-tracing.sh --workflow execute-cleanup-pr-merged "$ARGUMENTS"
+
+  # ── PHASE 1: EXTRACT ─────────────────────────────────────────────────
+  # Deterministic shell parser. Produces work-order.md, patterns.md,
+  # rules-digest.md.
+
+  - id: extract
+    depends_on: [init-tracing]
+    bash: ./.archon/scripts/cleanup-extract.sh "$ARGUMENTS" "$ARTIFACTS_DIR"
+
+  # ── PHASE 1b: INSTALL ────────────────────────────────────────────────
+
+  - id: install
+    depends_on: [extract]
+    bash: |
+      ./.archon/scripts/install.sh
+      git rev-parse HEAD > "$ARTIFACTS_DIR/.pre-implement-sha"
+      echo "Saved pre-implement SHA: $(cat "$ARTIFACTS_DIR/.pre-implement-sha")"
+
+  # ── PHASE 1c: PLAN-REVIEW (pre-implement gate) ──────────────────────
+  # Mechanical: claude/sonnet/medium. Median 138s in bake-off Claude flavor.
+
+  - id: plan-review
+    command: cleanup-plan-review
+    depends_on: [install]
+    context: fresh
+    provider: claude
+    model: sonnet
+    modelReasoningEffort: medium
+
+  # ── PHASE 2: IMPLEMENT ───────────────────────────────────────────────
+  # Codex/gpt-5.5/high. Bake-off floor: Codex's `implement` had 1 real
+  # bug-loss vs Claude's 2. Codex's high cache hit rate (94 %) makes the
+  # loop affordable on retries. Adversarial review (Claude opus, below)
+  # is positioned exactly to catch Codex's scope-creep failure mode
+  # (which is why PR-03 went to Claude in the bake-off).
+
+  - id: implement
+    depends_on: [plan-review]
+    context: fresh
+    idle_timeout: 600000
+    provider: codex
+    model: gpt-5.5
+    modelReasoningEffort: high
+    loop:
+      prompt: |
+        Read and execute the instructions in `.archon/commands/cleanup-implement-phase.md`.
+        The artifacts directory is: $ARTIFACTS_DIR
+      until: ALL_PHASES_COMPLETE
+      until_bash: |
+        work_order_phases=$(rg --no-filename -oP '^### Phase \K[A-Z0-9]+(?=:)' \
+          "$ARTIFACTS_DIR/work-order.md" | sort -u)
+        done_phases=$(
+            rg --no-filename -oP '^## Phase \K[A-Z0-9]+(?=:)' \
+              "$ARTIFACTS_DIR/progress.md" 2>/dev/null
+            rg --no-filename -oP '^## BLOCKED:\K[A-Z0-9]+$' \
+              "$ARTIFACTS_DIR/blocked.md" 2>/dev/null
+        )
+        done_phases=$(echo "$done_phases" | sort -u)
+        remaining=$(comm -23 <(echo "$work_order_phases") <(echo "$done_phases"))
+        [[ -z "$remaining" ]]
+      max_iterations: 15
+      fresh_context: true
+
+  # ── PHASE 2.5: SCOPE GUARD (post-implement) ──────────────────────────
+  # Catch file-list drift before validation burns tokens on out-of-scope code.
+
+  - id: scope-guard-post-implement
+    depends_on: [implement]
+    bash: ./.archon/scripts/cleanup-scope-guard.sh "$ARTIFACTS_DIR"
+
+  # ── PHASE 3a: RISK CLASSIFICATION (moved BEFORE validate) ────────────
+  # Audit Phase D.2: `risk-class` is a 1-second shell step that classifies
+  # tiny/normal/risky. Today validate (mean 430s/630s, max 47min) runs
+  # unconditionally and risk-class runs after it. Inverting lets tiny PRs
+  # skip validate entirely, mirroring the existing code-review/test-coverage
+  # gating. Saves ~$0.22 + 120s per tiny run (~20% hit rate observed).
+
+  - id: risk-class
+    depends_on: [scope-guard-post-implement]
+    bash: ./.archon/scripts/cleanup-risk-class.sh "$ARTIFACTS_DIR"
+
+  # ── PHASE 3b: VALIDATE (gated by risk-class != 'tiny') ───────────────
+  # Claude/sonnet/low. Bake-off variance was the deciding factor here:
+  # Codex's `validate` p99 was 2209s and mean 631s vs Claude's 2846s
+  # max but 430s mean — Claude's distribution is tighter for a low-effort
+  # verification pass. The idle_timeout caps catastrophic outliers (the
+  # PR-01 Claude run that took 47 minutes here would now fail at 5min
+  # and surface for retry via ci-watch's classifier).
+
+  - id: validate
+    command: cleanup-validate
+    depends_on: [risk-class]
+    when: "$risk-class.output != 'tiny'"
+    context: fresh
+    idle_timeout: 300000
+    provider: claude
+    model: sonnet
+    modelReasoningEffort: low
+
+  # ── PHASE 4: PARALLEL REVIEW ──────────────────────────────────────────
+  # review-scope runs first; the three reviewers fan out from it.
+  # Verified parallel via SQLite event timestamps in audit Phase B.
+
+  - id: review-scope
+    command: cleanup-pr-review-scope
+    depends_on: [risk-class, validate]
+    trigger_rule: all_done   # don't block when validate is skipped (tiny)
+    context: fresh
+    idle_timeout: 300000
+    provider: claude
+    model: sonnet
+    modelReasoningEffort: medium
+
+  - id: code-review
+    command: cleanup-code-review-agent
+    depends_on: [review-scope]
+    when: "$risk-class.output != 'tiny'"
+    context: fresh
+    idle_timeout: 600000
+    provider: claude
+    model: sonnet
+    modelReasoningEffort: medium
+
+  - id: test-coverage
+    command: cleanup-test-coverage-agent
+    depends_on: [review-scope]
+    when: "$risk-class.output != 'tiny'"
+    context: fresh
+    idle_timeout: 600000
+    provider: claude
+    model: sonnet
+    modelReasoningEffort: medium
+
+  # adversarial-review preserves the cross-provider catch on Codex's
+  # implement failure modes (scope-creep PR-03; underspecified mocks PR-06).
+  # Claude/opus-4-6/high matches the current Codex-flavor choice.
+
+  - id: adversarial-review
+    command: cleanup-adversarial-review
+    depends_on: [review-scope]
+    context: fresh
+    idle_timeout: 600000
+    provider: claude
+    model: claude-opus-4-6
+    modelReasoningEffort: high
+
+  # ── PHASE 5: SYNTHESIZE + FIX ─────────────────────────────────────────
+  # synthesize is now a pure jq aggregator (no LLM).
+  # fix-locally: Claude/opus-4-6/high — biggest cosmetic win in the audit.
+  # Codex was 3.7×-5.5× slower than Claude on this step (median 345s vs 92s,
+  # max 2155s vs 239s) with no quality advantage in the bake-off.
+
+  - id: synthesize
+    depends_on: [code-review, test-coverage, adversarial-review]
+    trigger_rule: one_success
+    bash: ./.archon/scripts/cleanup-synthesize.sh "$ARTIFACTS_DIR"
+
+  - id: fix-locally
+    command: cleanup-fix-locally
+    depends_on: [synthesize]
+    context: fresh
+    idle_timeout: 600000
+    provider: claude
+    model: claude-opus-4-6
+    modelReasoningEffort: high
+
+  # ── PHASE 5.5: SCOPE GUARD + RE-VALIDATE (post-fix) ──────────────────
+  # Same idle_timeout cap on re-validate as on validate.
+
+  - id: scope-guard-post-fix
+    depends_on: [fix-locally]
+    bash: ./.archon/scripts/cleanup-scope-guard.sh "$ARTIFACTS_DIR"
+
+  - id: re-validate
+    command: cleanup-validate
+    depends_on: [scope-guard-post-fix]
+    context: fresh
+    idle_timeout: 300000
+    provider: claude
+    model: sonnet
+    modelReasoningEffort: low
+
+  # ── PHASE 6: PUSH + CREATE PR ─────────────────────────────────────────
+
+  - id: push
+    depends_on: [re-validate]
+    bash: ./.archon/scripts/push.sh
+
+  - id: create-pr
+    depends_on: [push]
+    bash: |
+      ./.archon/scripts/cleanup-create-pr-body.sh "$ARTIFACTS_DIR"
+      TITLE=$(cat "$ARTIFACTS_DIR/.pr-title" 2>/dev/null || echo "refactor: Cleanup PR")
+      ./.archon/scripts/create-pr.sh "$ARTIFACTS_DIR/.pr-body.md" "$TITLE"
+
+  # ── PHASE 7: POST REVIEW COMMENTS ─────────────────────────────────────
+
+  - id: post-review-comments
+    depends_on: [create-pr]
+    bash: ./.archon/scripts/post-review-comments.sh "$ARTIFACTS_DIR"
+
+  # ── PHASE 7.5: CI WATCH & AUTO-FIX ────────────────────────────────────
+  # Claude/sonnet/medium. Median identical to Codex (385s vs 371s) but
+  # the wall-clock outlier was lower in Codex (max 636s vs Claude 1648s);
+  # however the Claude outlier was driven by repeated targeted fixes (PR-10),
+  # not iteration count, so the model choice doesn't change that.
+
+  - id: ci-watch-and-fix
+    depends_on: [post-review-comments]
+    context: fresh
+    idle_timeout: 1800000
+    provider: claude
+    model: sonnet
+    modelReasoningEffort: medium
+    loop:
+      prompt: |
+        Read and execute the instructions in `.archon/commands/cleanup-ci-watch-and-fix.md`.
+        Artifacts directory: $ARTIFACTS_DIR
+      until: ALL_CHECKS_GREEN_OR_GIVEUP
+      max_iterations: 3
+      fresh_context: true
+
+  # ── PHASE 8: SUMMARY ──────────────────────────────────────────────────
+
+  - id: summary
+    depends_on: [ci-watch-and-fix]
+    bash: ./.archon/scripts/cleanup-summary.sh "$ARTIFACTS_DIR"

@@ -26,10 +26,17 @@ echo ""
 echo "=== Changed Files ==="
 git diff --name-only "${base}...HEAD"
 
+# Cache the full patch on first call so the rg pipeline below doesn't re-run git.
+# If this script is invoked again in the same run (e.g. by multiple review agents),
+# subsequent callers skip the git invocation entirely.
+_diff_cache="${artifacts_dir}/.diff"
+if [[ ! -f "$_diff_cache" ]]; then
+    git diff "${base}...HEAD" > "$_diff_cache"
+fi
+
 echo ""
 echo "=== New Abstractions ==="
-git diff "${base}...HEAD" \
-    | rg '^\+' \
+rg '^\+' "$_diff_cache" \
     | rg '(export )?(interface |type |abstract class )' \
     || echo "(none found)"
 
