@@ -152,6 +152,14 @@
     "parent": {
       "greeting": "Hey {{displayName}}",
       "intentHeader": "What do you need right now?",
+      "tonight": {
+        "title": "Tonight",
+        "promptWithTopic": "Ask {{childName}}: what made {{topic}} click today?",
+        "promptNoActivity": "Ask {{childName}}: what would make starting feel easy tonight?",
+        "promptFallback": "Ask {{childName}}: what felt easier today than yesterday?"
+      },
+      "childrenHeader": "Children",
+      "familyToolsHeader": "Family tools",
       "encouragementNote": "Nudges are gentle one-way encouragements.",
       "transitionNoticeTitle": "You're now mentoring {{childNames}}",
       "transitionNoticeBody": "Tap Home anytime to check in on their progress and your own learning.",
@@ -170,6 +178,20 @@
         "noActivity": "No activity this week",
         "sessions_one": "{{count}} session this week",
         "sessions_other": "{{count}} sessions this week"
+      },
+      "childCard": {
+        "statusLine": "{{activity}} · {{focus}} · {{signal}}",
+        "minutesThisWeek_one": "{{count}} min this week",
+        "minutesThisWeek_other": "{{count}} min this week",
+        "readyToStart": "Ready to start",
+        "statusPending": "Checking in",
+        "statusUpdating": "updating",
+        "confidenceImproving": "confidence improving",
+        "needsEncouragement": "needs encouragement",
+        "steady": "steady",
+        "progressAction": "Progress",
+        "recapAction": "Recap",
+        "nudgeAction": "Nudge"
       }
     }
   },

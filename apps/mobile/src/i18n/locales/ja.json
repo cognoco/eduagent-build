@@ -170,6 +170,28 @@
         "noActivity": "今週の活動はありません",
         "sessions_one": "今週 {{count}} セッション",
         "sessions_other": "今週 {{count}} セッション"
+      },
+      "tonight": {
+        "title": "Tonight",
+        "promptWithTopic": "Ask {{childName}}: what made {{topic}} click today?",
+        "promptNoActivity": "Ask {{childName}}: what would make starting feel easy tonight?",
+        "promptFallback": "Ask {{childName}}: what felt easier today than yesterday?"
+      },
+      "childrenHeader": "Children",
+      "familyToolsHeader": "Family tools",
+      "childCard": {
+        "statusLine": "{{activity}} · {{focus}} · {{signal}}",
+        "minutesThisWeek_one": "{{count}} min this week",
+        "minutesThisWeek_other": "{{count}} min this week",
+        "readyToStart": "Ready to start",
+        "statusPending": "Checking in",
+        "statusUpdating": "updating",
+        "confidenceImproving": "confidence improving",
+        "needsEncouragement": "needs encouragement",
+        "steady": "steady",
+        "progressAction": "Progress",
+        "recapAction": "Recap",
+        "nudgeAction": "Nudge"
       }
     }
   },

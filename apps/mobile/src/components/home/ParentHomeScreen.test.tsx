@@ -4,7 +4,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react-native';
-import type { Profile } from '@eduagent/schemas';
+import type { DashboardData, Profile } from '@eduagent/schemas';
 
 import { ParentHomeScreen } from './ParentHomeScreen';
 
@@ -32,6 +32,7 @@ jest.mock(
 );
 
 let mockLinkedChildren: Profile[] = [];
+let mockDashboardData: DashboardData | undefined;
 
 jest.mock(
   '../../lib/profile' /* gc1-allow: profile context requires full ProfileProvider setup */,
@@ -50,7 +51,7 @@ jest.mock(
 jest.mock(
   '../../hooks/use-dashboard' /* gc1-allow: external hook boundary — wraps TanStack query that requires QueryClient */,
   () => ({
-    useDashboard: () => ({ data: undefined }),
+    useDashboard: () => ({ data: mockDashboardData }),
   }),
 );
 
@@ -146,6 +147,7 @@ describe('ParentHomeScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockLinkedChildren = [];
+    mockDashboardData = undefined;
   });
 
   it('renders greeting with profile first name', () => {
@@ -158,7 +160,7 @@ describe('ParentHomeScreen', () => {
     screen.getByText('Hey Alex');
   });
 
-  it('renders child intent cards for each linked child', () => {
+  it('renders one command card per linked child with actions inside it', () => {
     mockLinkedChildren = [CHILD_A, CHILD_B];
 
     render(<ParentHomeScreen activeProfile={makeProfile()} />);
@@ -169,13 +171,56 @@ describe('ParentHomeScreen', () => {
     screen.getByTestId('parent-home-weekly-report-child-b');
     screen.getByTestId('parent-home-send-nudge-child-a');
     screen.getByTestId('parent-home-send-nudge-child-b');
+    screen.getByText('Children');
   });
 
-  it('renders own-learning card', () => {
+  it('keeps own learning out of parent Home because it has its own tab', () => {
     render(<ParentHomeScreen activeProfile={makeProfile()} />);
 
-    screen.getByTestId('parent-home-own-learning');
-    screen.getByText('Continue your own learning');
+    expect(screen.queryByTestId('parent-home-own-learning')).toBeNull();
+    expect(screen.queryByText('Continue your own learning')).toBeNull();
+  });
+
+  it('shows tonight prompts and compact status from dashboard data', () => {
+    mockLinkedChildren = [CHILD_A];
+    mockDashboardData = {
+      children: [
+        {
+          profileId: 'child-a',
+          displayName: 'Emma',
+          consentStatus: null,
+          respondedAt: null,
+          summary: 'Emma is building confidence.',
+          sessionsThisWeek: 2,
+          sessionsLastWeek: 1,
+          totalTimeThisWeek: 18,
+          totalTimeLastWeek: 8,
+          exchangesThisWeek: 10,
+          exchangesLastWeek: 5,
+          trend: 'up',
+          subjects: [
+            { subjectId: 'subject-a', name: 'Math', retentionStatus: 'strong' },
+          ],
+          guidedVsImmediateRatio: 0.5,
+          retentionTrend: 'improving',
+          totalSessions: 4,
+          weeklyHeadline: undefined,
+          currentlyWorkingOn: ['Fractions'],
+          progress: null,
+          currentStreak: 0,
+          longestStreak: 0,
+          totalXp: 0,
+        },
+      ],
+      pendingNotices: [],
+      demoMode: false,
+    };
+
+    render(<ParentHomeScreen activeProfile={makeProfile()} />);
+
+    screen.getByTestId('parent-home-tonight-section');
+    screen.getByText('Ask Emma: what made Fractions click today?');
+    screen.getByText('18 min this week · Fractions · confidence improving');
   });
 
   it('shows ParentTransitionNotice', async () => {

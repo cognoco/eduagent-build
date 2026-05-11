@@ -17,7 +17,7 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: "parent-multi-child"
+      SEED_SCENARIO: 'parent-multi-child'
       API_URL: ${API_URL}
 
 # 2. Parent owners land on LearnerScreen; enter the Family dashboard.
@@ -26,10 +26,13 @@ tags:
 
 # ── Visual integrity: parent home screen ───────────────────────────────
 - assertVisible:
-    id: "parent-home-screen"
+    id: 'parent-home-screen'
 
 - assertVisible:
-    text: "What do you need right now?"
+    text: 'Tonight'
+
+- assertVisible:
+    text: 'Children'
 
 - takeScreenshot: multi-child-01-dashboard
 
@@ -37,20 +40,20 @@ tags:
 # Child 1: Emma (teen, Mathematics, 10 exchanges completed)
 - extendedWaitUntil:
     visible:
-      id: "parent-home-check-child-${CHILD1_PROFILE_ID}"
+      id: 'parent-home-check-child-${CHILD1_PROFILE_ID}'
     timeout: 10000
 
 # Child 2: Lucas (learner, Science, 5 exchanges completed)
 - scrollUntilVisible:
     element:
-      id: "parent-home-check-child-${CHILD2_PROFILE_ID}"
+      id: 'parent-home-check-child-${CHILD2_PROFILE_ID}'
     direction: DOWN
     timeout: 10000
 
 # Child 3: Sofia (teen, History, no sessions yet)
 - scrollUntilVisible:
     element:
-      id: "parent-home-check-child-${CHILD3_PROFILE_ID}"
+      id: 'parent-home-check-child-${CHILD3_PROFILE_ID}'
     direction: DOWN
     timeout: 10000
 
@@ -59,22 +62,22 @@ tags:
 # ── Drill into Child 1 (Emma) ─────────────────────────────────────────
 - scrollUntilVisible:
     element:
-      id: "parent-home-check-child-${CHILD1_PROFILE_ID}"
+      id: 'parent-home-check-child-${CHILD1_PROFILE_ID}'
     direction: UP
     timeout: 10000
 
 - tapOn:
-    id: "parent-home-check-child-${CHILD1_PROFILE_ID}"
+    id: 'parent-home-check-child-${CHILD1_PROFILE_ID}'
 
 # Wait for child detail screen
 - extendedWaitUntil:
     visible:
-      text: "Emma"
+      text: 'Emma'
     timeout: 10000
 
 # Verify subject info — Mathematics is seeded for Emma
 - assertVisible:
-    text: "Mathematics"
+    text: 'Mathematics'
 
 - takeScreenshot: multi-child-03-emma-detail
 
@@ -85,27 +88,27 @@ tags:
 # Wait for parent home to reload
 - extendedWaitUntil:
     visible:
-      id: "parent-home-screen"
+      id: 'parent-home-screen'
     timeout: 10000
 
 # ── Drill into Child 2 (Lucas) ────────────────────────────────────────
 - scrollUntilVisible:
     element:
-      id: "parent-home-check-child-${CHILD2_PROFILE_ID}"
+      id: 'parent-home-check-child-${CHILD2_PROFILE_ID}'
     direction: DOWN
     timeout: 10000
 
 - tapOn:
-    id: "parent-home-check-child-${CHILD2_PROFILE_ID}"
+    id: 'parent-home-check-child-${CHILD2_PROFILE_ID}'
 
 - extendedWaitUntil:
     visible:
-      text: "Lucas"
+      text: 'Lucas'
     timeout: 10000
 
 # Verify subject info — Science is seeded for Lucas
 - assertVisible:
-    text: "Science"
+    text: 'Science'
 
 - takeScreenshot: multi-child-04-lucas-detail
 
@@ -115,27 +118,27 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: "parent-home-screen"
+      id: 'parent-home-screen'
     timeout: 10000
 
 # ── Drill into Child 3 (Sofia — no sessions) ─────────────────────────
 - scrollUntilVisible:
     element:
-      id: "parent-home-check-child-${CHILD3_PROFILE_ID}"
+      id: 'parent-home-check-child-${CHILD3_PROFILE_ID}'
     direction: DOWN
     timeout: 10000
 
 - tapOn:
-    id: "parent-home-check-child-${CHILD3_PROFILE_ID}"
+    id: 'parent-home-check-child-${CHILD3_PROFILE_ID}'
 
 - extendedWaitUntil:
     visible:
-      text: "Sofia"
+      text: 'Sofia'
     timeout: 10000
 
 # Verify subject info — History is seeded for Sofia
 - assertVisible:
-    text: "History"
+    text: 'History'
 
 - takeScreenshot: multi-child-05-sofia-detail
 
@@ -145,7 +148,7 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: "parent-home-screen"
+      id: 'parent-home-screen'
     timeout: 10000
 
 - takeScreenshot: multi-child-06-complete

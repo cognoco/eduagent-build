@@ -16,66 +16,70 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: "parent-with-children"
+      SEED_SCENARIO: 'parent-with-children'
       API_URL: ${API_URL}
 
 # 2. Parent owners land on parent Home.
 - extendedWaitUntil:
     visible:
-      id: "parent-home-screen"
+      id: 'parent-home-screen'
     timeout: 15000
 
 # ── Visual integrity: parent tab bar ───────────────────────────────────
 - assertVisible:
-    id: "tab-home"
+    id: 'tab-home'
 - assertVisible:
-    id: "tab-library"
+    id: 'tab-my-learning'
 - assertVisible:
-    id: "tab-progress"
+    id: 'tab-library'
 - assertVisible:
-    id: "tab-more"
+    id: 'tab-progress'
+- assertVisible:
+    id: 'tab-more'
 
 # ── Visual integrity: parent Home heading ──────────────────────────────
 - assertVisible:
-    id: "parent-home-screen"
+    id: 'parent-home-screen'
 - assertVisible:
-    text: "What do you need right now?"
+    text: 'Tonight'
+- assertVisible:
+    text: 'Children'
 
 # 3. Verify child intent card is visible — wait for API data to load
 - extendedWaitUntil:
     visible:
-      text: "Test Teen"
+      text: 'Test Teen'
     timeout: 10000
 
 # 4. Look for child card element via per-child parent Home testID
 # CHILD_PROFILE_ID is injected by the seed-and-sign-in helper
 - assertVisible:
-    id: "parent-home-check-child-${CHILD_PROFILE_ID}"
+    id: 'parent-home-check-child-${CHILD_PROFILE_ID}'
 
 # 5. Tap on child card to view detail
 - tapOn:
-    id: "parent-home-check-child-${CHILD_PROFILE_ID}"
+    id: 'parent-home-check-child-${CHILD_PROFILE_ID}'
 
 # 6. Fallback: tap on child name text
 # optional: only fires if testID-based tap in step 5 did not navigate (e.g. testID not rendered)
 - tapOn:
-    text: "Test Teen"
+    text: 'Test Teen'
     optional: true
 
 # 7. Wait for child detail view
 - extendedWaitUntil:
     visible:
-      text: "Sessions"
+      text: 'Sessions'
     timeout: 10000
 
 # 8. Verify session count or time information is visible
 - assertVisible:
-    text: "sessions"
+    text: 'sessions'
 
 # 9. Navigate back to parent Home
 # optional: back button only present if we navigated into child detail (step 7)
 - tapOn:
-    id: "back-button"
+    id: 'back-button'
     optional: true
 
 # 10. Screenshot

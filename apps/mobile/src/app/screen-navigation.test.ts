@@ -35,8 +35,11 @@ const EXEMPT_SCREENS: string[] = [
   'index.tsx',
   // Legacy redirect — no UI, preserved for old /dashboard deep links
   '(app)/dashboard.tsx',
+  // Onboarding entry — pure <Redirect /> to /(app)/onboarding/pronouns; no UI
+  '(app)/onboarding/index.tsx',
   // Tab screens — bottom tab navigation provides navigation
   '(app)/home.tsx',
+  '(app)/own-learning.tsx', // Visible bottom tab (parent's "My Learning" tab)
   '(app)/library.tsx',
   '(app)/more/index.tsx',
   '(app)/more/notifications.tsx', // Native Stack header provides back

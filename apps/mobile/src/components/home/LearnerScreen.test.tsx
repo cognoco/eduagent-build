@@ -334,8 +334,10 @@ describe('LearnerScreen', () => {
     await waitFor(() => {
       screen.getByTestId('parent-home-screen');
       screen.getByTestId('parent-home-check-child-child-id');
-      screen.getByText('See how Emma is doing');
-      screen.getByText('12 words learned — up from 5 last week');
+      screen.getByText('Children');
+      screen.getByText(
+        '24 min this week · Ready to start · up from 5 last week',
+      );
       screen.getByText(/7 questions left today.*84 left this month/);
     });
   });
