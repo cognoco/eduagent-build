@@ -82,7 +82,7 @@ Read the phase description (and title) and classify by keyword presence (case-in
 | Keywords in description (any) | Phase intent | Effect on file checks |
 |---|---|---|
 | `create`, `add`, `new`, `author`, `introduce` | creates new files | Missing file on `origin/main` is **expected**, not a finding |
-| `delete`, `remove`, `drop`, `kill` | deletes existing files | File present on `origin/main` is required (deleting a file that's already gone is a `BLOCK`) |
+| `delete`, `remove`, `drop`, `kill`, `drain`, `deprecate` | deletes existing files | File present on `origin/main` is required (deleting a file that's already gone is a `BLOCK`). Triggers the cross-cutting reference scan in 2.6. |
 | `rename`, `move` | both | Skip the existence check entirely; flag as `WARN` if no claimed files exist |
 | (none of the above) — e.g. `wrap`, `migrate`, `convert`, `replace`, `update`, `refactor`, `fix` | edits existing files | Missing file on `origin/main` is a `BLOCK` |
 
@@ -136,6 +136,57 @@ For each phase's verification command, **do not run it**. Just sanity-check the 
 
 A bad-shape command (typo, missing tool, bogus path on an edit phase) is a `WARN`, not a `BLOCK` — the validate step has its own retry budget. Only escalate to `BLOCK` if the verification command is structurally garbage (e.g., empty, or claims to invoke something completely unrelated to the touched packages).
 
+### 2.6 Cross-cutting reference scan (delete-intent phases only)
+
+This scan exists to catch the "drain the allowlist" / "delete this surface" class of phase where the human plan author enumerated the obvious target files but missed config or fixture files that reference those targets by name. Empirically (see Stage 3 outcomes and the PR-06 failures), the unclaimed reference is typically a static allowlist, a registry, or a glob fixture that lists the claimed file by basename.
+
+**Only runs on phases whose intent (from 2.2) is `delete` AND that have at least one claimed file.** Edit, create, and rename phases skip this check entirely — false-positive surface there would be too high.
+
+For each claimed file, build a basename set:
+
+- **Full basename**, e.g. `session-summary.integration.test.ts`
+- **Short basename** (strip the rightmost extension), e.g. `session-summary.integration`
+
+The short form catches allowlist entries that omit the `.test.ts` suffix or that reference the file by import-style identifier. Both forms are searched; deduplicate hits.
+
+For each basename, run from the repo root:
+
+```bash
+rg --fixed-strings --files-with-matches "$basename" \
+    --glob '!.archon/**' \
+    --glob '!docs/**' \
+    --glob '!node_modules/**' \
+    --glob '!dist/**' \
+    --glob '!.next/**' \
+    --glob '!.turbo/**' \
+    --glob '!*.lock' \
+    --glob '!pnpm-lock.yaml' \
+    2>/dev/null || true
+```
+
+From the resulting paths, subtract:
+
+- The claimed file itself (it trivially contains its own basename).
+- Any other file claimed by this same phase.
+
+Any remaining paths are **cross-cutting references in unclaimed files**. They become per-file `WARN` findings on this phase. Record up to 5 hit paths per claimed file with `…and N more` truncation if there are more.
+
+**Verdict effect:** if any phase produces ≥1 cross-cutting finding, the whole-run verdict escalates to `BLOCK`. This is intentional: a delete/drain phase that touches files unnamed in the work order will almost always trip `scope-guard` later. Escalating here gets the reasoning artifact attached to the PR (via the `BLOCK` → `risky` → full-reviewer-fan-out pipe) and gives the human reviewing the eventual scope violation a head-start on amending the work order.
+
+The finding is **informational, not a correctness claim**. A false positive looks like: a claimed file's basename happens to appear in a fixture file that the exclude list missed. A true positive looks like PR-06: the GC1 ratchet's `KNOWN_OFFENDERS` allowlist enumerates the offender by name and must be edited as part of draining the offender. The artifact lets the human distinguish.
+
+Record per phase, under the existing findings list:
+
+```markdown
+- Cross-cutting refs: <N basenames searched; M unclaimed hits>
+  - `<claimed-file-path>` → basename `<basename>` referenced in:
+    - `<unclaimed-hit-path>`
+    - `<unclaimed-hit-path>`
+    - …and N more
+```
+
+If a phase has intent=delete but zero cross-cutting hits, record one line: `- Cross-cutting refs: scanned N basenames; no unclaimed hits`.
+
 ---
 
 ## Step 3: Emit artifacts
@@ -174,6 +225,10 @@ Write `$ARTIFACTS_DIR/plan-review.md`. Use this template — one section per pha
 - Semantic: <or "no mismatch detected">
   - MISMATCH (BLOCK): `<path>` — phase claims "<excerpt of phase desc>", file head shows `<literal one-liner from head -40>`
 - Verify command: <`runnable` | `WARN: <why>`>
+- Cross-cutting refs: <only for delete-intent phases; omit otherwise>
+  - `<claimed-path>` → basename `<basename>` referenced in:
+    - `<unclaimed-hit-path>`
+    - …and N more
 
 (repeat for each phase)
 ```
@@ -240,3 +295,39 @@ Record under that phase:
 ## Worked example — what OK looks like
 
 All phases parse, every claimed file's existence matches the phase intent, no head-sample mismatch is glaring, every verification command references a real tool/path. Verdict file: `OK`. Final stdout line: `OK`. Exit 0.
+
+---
+
+## Worked example — what cross-cutting BLOCK looks like
+
+PR-06 / C2 / P3 — "AUDIT-TESTS-2C — **Drain** LLM allowlist". Phase intent is classified `delete` (keyword `drain`). Claimed files:
+
+- `apps/api/src/services/session-summary.integration.test.ts`
+- `apps/api/src/services/quiz/vocabulary.integration.test.ts`
+
+Existence and semantic checks pass: both files exist on `origin/main`, both reference LLM mocks. So far the verdict would be `OK`.
+
+Section 2.6 then runs, deriving short basenames `session-summary.integration` and `vocabulary.integration`:
+
+```bash
+rg --fixed-strings --files-with-matches 'session-summary.integration' \
+    --glob '!.archon/**' --glob '!docs/**' --glob '!node_modules/**'
+# Hits: apps/api/src/services/session-summary.integration.test.ts  (claimed — subtract)
+#       apps/api/src/services/llm/integration-mock-guard.test.ts   (unclaimed — FLAG)
+```
+
+Same scan on `vocabulary.integration` also returns `integration-mock-guard.test.ts` — it lists both offenders in its `KNOWN_OFFENDERS` allowlist array.
+
+Record under P3:
+
+- **Severity**: BLOCK
+- Existence: 2/2 OK
+- Semantic: no mismatch detected
+- Verify command: runnable
+- Cross-cutting refs: 2 basenames searched; 1 unclaimed hit
+  - `apps/api/src/services/session-summary.integration.test.ts` → basename `session-summary.integration` referenced in:
+    - `apps/api/src/services/llm/integration-mock-guard.test.ts`
+  - `apps/api/src/services/quiz/vocabulary.integration.test.ts` → basename `vocabulary.integration` referenced in:
+    - `apps/api/src/services/llm/integration-mock-guard.test.ts`
+
+`Verdict` becomes `BLOCK` because P3 has cross-cutting findings. Write `BLOCK` to the verdict file. risk-class promotes the run to `risky` and the reasoning artifact lands on the PR. The human reviewing the eventual scope-guard rejection (or, ideally, reading the PR-attached artifact first) can amend `docs/audit/cleanup-plan.md`'s P3 row to claim `integration-mock-guard.test.ts` before the next run.
