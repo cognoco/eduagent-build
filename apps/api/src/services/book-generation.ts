@@ -7,7 +7,7 @@ import {
   type BookTopicGenerationResult,
 } from '@eduagent/schemas';
 
-const AGE_STYLE_GUIDANCE = `Audience and naming style:
+export const AGE_STYLE_GUIDANCE = `Audience and naming style:
 - Use the learner age as a curriculum register, not as a gimmick.
 - For ages 18+, use clear adult-learning titles: direct, specific, and calm.
 - For ages 11-17, use accessible school-age language, but never preschool, early-reader, or babyish wording.
@@ -67,7 +67,7 @@ function extractJson(response: string): unknown {
 
 export async function detectSubjectType(
   subjectName: string,
-  learnerAge: number
+  learnerAge: number,
 ): Promise<BookGenerationResult> {
   // [PROMPT-INJECT-8] subjectName is learner-owned free text. Wrap in a
   // named tag and sanitize so a crafted value cannot break the string or
@@ -90,14 +90,14 @@ export async function detectSubjectType(
     throw new Error(
       `LLM returned invalid JSON for subject detection: ${
         error instanceof Error ? error.message : String(error)
-      }`
+      }`,
     );
   }
 
   const validated = bookGenerationResultSchema.safeParse(parsed);
   if (!validated.success) {
     throw new Error(
-      `LLM returned unexpected subject detection structure: ${validated.error.message}`
+      `LLM returned unexpected subject detection structure: ${validated.error.message}`,
     );
   }
 
@@ -108,7 +108,7 @@ export async function generateBookTopics(
   bookTitle: string,
   bookDescription: string,
   learnerAge: number,
-  priorKnowledge?: string
+  priorKnowledge?: string,
 ): Promise<BookTopicGenerationResult> {
   // [PROMPT-INJECT-8] bookTitle and bookDescription are learner- or LLM-
   // generated stored text; priorKnowledge is raw learner text. Wrap each in
@@ -144,14 +144,14 @@ export async function generateBookTopics(
     throw new Error(
       `LLM returned invalid JSON for book topic generation: ${
         error instanceof Error ? error.message : String(error)
-      }`
+      }`,
     );
   }
 
   const validated = bookTopicGenerationResultSchema.safeParse(parsed);
   if (!validated.success) {
     throw new Error(
-      `LLM returned unexpected book topic structure: ${validated.error.message}`
+      `LLM returned unexpected book topic structure: ${validated.error.message}`,
     );
   }
 

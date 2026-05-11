@@ -68,6 +68,10 @@ export const subjects = pgTable(
       withTimezone: true,
     }),
     urgencyBoostReason: text('urgency_boost_reason'),
+    bookSuggestionsLastGenerationAttemptedAt: timestamp(
+      'book_suggestions_last_generation_attempted_at',
+      { withTimezone: true },
+    ),
   },
   (table) => [
     index('subjects_profile_id_idx').on(table.profileId),
@@ -242,6 +246,11 @@ export const curriculumAdaptations = pgTable('curriculum_adaptations', {
     .defaultNow(),
 });
 
+export const bookSuggestionCategoryEnum = pgEnum('book_suggestion_category', [
+  'related',
+  'explore',
+]);
+
 export const bookSuggestions = pgTable(
   'book_suggestions',
   {
@@ -254,12 +263,21 @@ export const bookSuggestions = pgTable(
     title: text('title').notNull(),
     emoji: text('emoji'),
     description: text('description'),
+    category: bookSuggestionCategoryEnum('category'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
     pickedAt: timestamp('picked_at', { withTimezone: true }),
   },
-  (table) => [index('book_suggestions_subject_id_idx').on(table.subjectId)],
+  (table) => [
+    index('book_suggestions_subject_id_idx').on(table.subjectId),
+    // Race-safe dedup: partial unique index on (subject_id, lower(title))
+    // WHERE picked_at IS NULL is declared in the generated migration only —
+    // drizzle's index() builder does not support expression-based indexes
+    // with a WHERE predicate. Migration name:
+    //   00XX_book_suggestion_category_and_cooldown.sql
+    // index name: book_suggestions_subject_title_unique_unpicked
+  ],
 );
 
 export const topicSuggestions = pgTable(

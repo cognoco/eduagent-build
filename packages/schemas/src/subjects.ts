@@ -247,6 +247,28 @@ export type BookTopicGenerationResult = z.infer<
   typeof bookTopicGenerationResultSchema
 >;
 
+export const bookSuggestionCategorySchema = z.enum(['related', 'explore']);
+export type BookSuggestionCategory = z.infer<
+  typeof bookSuggestionCategorySchema
+>;
+
+export const bookSuggestionGenerationItemSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  description: z.string().trim().min(1),
+  emoji: z.string().trim().min(1),
+  category: bookSuggestionCategorySchema,
+});
+export type BookSuggestionGenerationItem = z.infer<
+  typeof bookSuggestionGenerationItemSchema
+>;
+
+export const bookSuggestionGenerationResultSchema = z.object({
+  suggestions: z.array(bookSuggestionGenerationItemSchema),
+});
+export type BookSuggestionGenerationResult = z.infer<
+  typeof bookSuggestionGenerationResultSchema
+>;
+
 export const bookTopicGenerateInputSchema = z.object({
   priorKnowledge: z.string().max(2000).optional(),
 });
@@ -401,14 +423,23 @@ export const bookSuggestionSchema = z.object({
   title: z.string(),
   emoji: z.string().nullable(),
   description: z.string().nullable(),
+  category: bookSuggestionCategorySchema.nullable(),
   createdAt: isoDateField,
   pickedAt: z.union([isoDateField, z.null()]),
 });
 export type BookSuggestion = z.infer<typeof bookSuggestionSchema>;
 
-export const bookSuggestionsResponseSchema = z.array(bookSuggestionSchema);
+export const bookSuggestionsResponseSchema = z.object({
+  suggestions: z.array(bookSuggestionSchema),
+  curriculumBookCount: z.number().int().nonnegative(),
+});
 export type BookSuggestionsResponse = z.infer<
   typeof bookSuggestionsResponseSchema
+>;
+
+export const bookSuggestionsArrayResponseSchema = z.array(bookSuggestionSchema);
+export type BookSuggestionsArrayResponse = z.infer<
+  typeof bookSuggestionsArrayResponseSchema
 >;
 
 export const topicSuggestionSchema = z.object({

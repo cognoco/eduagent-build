@@ -161,7 +161,10 @@ const DEFAULT_SUBJECTS = [{ id: 'sub-1', name: 'Mathematics' }];
 function resetRoutes() {
   // Most-specific first to avoid prefix collision:
   // '/book-suggestions' before '/books', '/subjects/sub-1/books' before '/subjects'
-  mockFetch.setRoute('/book-suggestions', []);
+  mockFetch.setRoute('/book-suggestions', {
+    suggestions: [],
+    curriculumBookCount: 2,
+  });
   mockFetch.setRoute('/subjects/sub-1/books', { books: DEFAULT_BOOKS });
   mockFetch.setRoute('/subjects', { subjects: DEFAULT_SUBJECTS });
   mockFetch.setRoute('/filing', {
@@ -494,20 +497,23 @@ describe('ShelfScreen', () => {
     // the empty state used to say "Your curriculum is still being built.
     // Check back soon." — contradicting the cards the user can already tap.
     mockFetch.setRoute('/subjects/sub-1/books', { books: [] });
-    mockFetch.setRoute('/book-suggestions', [
-      {
-        id: 'sugg-1',
-        title: 'Geometry Foundations',
-        emoji: '📐',
-        description: 'Triangles, lines, angles.',
-      },
-      {
-        id: 'sugg-2',
-        title: 'Calculus: The Basics',
-        emoji: '∫',
-        description: 'Limits and derivatives.',
-      },
-    ]);
+    mockFetch.setRoute('/book-suggestions', {
+      suggestions: [
+        {
+          id: 'sugg-1',
+          title: 'Geometry Foundations',
+          emoji: '📐',
+          description: 'Triangles, lines, angles.',
+        },
+        {
+          id: 'sugg-2',
+          title: 'Calculus: The Basics',
+          emoji: '∫',
+          description: 'Limits and derivatives.',
+        },
+      ],
+      curriculumBookCount: 0,
+    });
 
     const { getByTestId, queryByTestId, getByText } = render(<ShelfScreen />, {
       wrapper: TestWrapper,
@@ -548,7 +554,10 @@ describe('ShelfScreen', () => {
   // Suggestion cards
   // -----------------------------------------------------------------------
   it('[BUG-SHELF-BOOK-CTA] shows an add-book path after existing books when there are no suggestions', async () => {
-    mockFetch.setRoute('/book-suggestions', []);
+    mockFetch.setRoute('/book-suggestions', {
+      suggestions: [],
+      curriculumBookCount: 2,
+    });
 
     const { getByTestId, getByText } = render(<ShelfScreen />, {
       wrapper: TestWrapper,
@@ -570,11 +579,14 @@ describe('ShelfScreen', () => {
   });
 
   it('labels the choose-book path as browse all when extra suggestions exist', async () => {
-    mockFetch.setRoute('/book-suggestions', [
-      { id: 'sug-1', title: 'Number Theory' },
-      { id: 'sug-2', title: 'Calculus Intro' },
-      { id: 'sug-3', title: 'Statistics' },
-    ]);
+    mockFetch.setRoute('/book-suggestions', {
+      suggestions: [
+        { id: 'sug-1', title: 'Number Theory' },
+        { id: 'sug-2', title: 'Calculus Intro' },
+        { id: 'sug-3', title: 'Statistics' },
+      ],
+      curriculumBookCount: 2,
+    });
 
     const { getByTestId, getByText } = render(<ShelfScreen />, {
       wrapper: TestWrapper,
@@ -587,10 +599,13 @@ describe('ShelfScreen', () => {
   });
 
   it('shows book suggestion cards when suggestions exist', async () => {
-    mockFetch.setRoute('/book-suggestions', [
-      { id: 'sug-1', title: 'Number Theory' },
-      { id: 'sug-2', title: 'Calculus Intro' },
-    ]);
+    mockFetch.setRoute('/book-suggestions', {
+      suggestions: [
+        { id: 'sug-1', title: 'Number Theory' },
+        { id: 'sug-2', title: 'Calculus Intro' },
+      ],
+      curriculumBookCount: 2,
+    });
 
     const { getByTestId } = render(<ShelfScreen />, { wrapper: TestWrapper });
 
@@ -601,9 +616,10 @@ describe('ShelfScreen', () => {
   });
 
   it('picking a book suggestion calls filing and navigates to new book', async () => {
-    mockFetch.setRoute('/book-suggestions', [
-      { id: 'sug-1', title: 'Number Theory', emoji: '🔢' },
-    ]);
+    mockFetch.setRoute('/book-suggestions', {
+      suggestions: [{ id: 'sug-1', title: 'Number Theory', emoji: '🔢' }],
+      curriculumBookCount: 2,
+    });
     mockFetch.setRoute('/filing', {
       shelfId: 'sub-1',
       bookId: 'book-new',
@@ -645,9 +661,10 @@ describe('ShelfScreen', () => {
   it('[BUG-692] Skip during filing prevents stale onSuccess navigation', async () => {
     jest.useFakeTimers();
 
-    mockFetch.setRoute('/book-suggestions', [
-      { id: 'sug-1', title: 'Number Theory', emoji: '🔢' },
-    ]);
+    mockFetch.setRoute('/book-suggestions', {
+      suggestions: [{ id: 'sug-1', title: 'Number Theory', emoji: '🔢' }],
+      curriculumBookCount: 2,
+    });
 
     // Delay the filing response so we can press Skip while it's in flight
     let resolveFilingResponse!: (r: Response) => void;
@@ -737,9 +754,10 @@ describe('ShelfScreen', () => {
   });
 
   it('shows ErrorFallback overlay when picking a book suggestion fails', async () => {
-    mockFetch.setRoute('/book-suggestions', [
-      { id: 'sug-1', title: 'Number Theory', emoji: '🔢' },
-    ]);
+    mockFetch.setRoute('/book-suggestions', {
+      suggestions: [{ id: 'sug-1', title: 'Number Theory', emoji: '🔢' }],
+      curriculumBookCount: 2,
+    });
     mockFetch.setRoute('/filing', () =>
       Promise.resolve(
         new Response(JSON.stringify({ message: 'Filing failed' }), {

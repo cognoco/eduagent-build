@@ -8,7 +8,7 @@
  * No Hono imports — pure business logic.
  */
 
-import { eq, and, isNull, inArray } from 'drizzle-orm';
+import { eq, and, isNull, inArray, sql } from 'drizzle-orm';
 import type { Database } from '@eduagent/database';
 import {
   bookSuggestions,
@@ -16,11 +16,12 @@ import {
   subjects,
   curriculumBooks,
 } from '@eduagent/database';
+import type { BookSuggestion } from '@eduagent/schemas';
 
 export async function getUnpickedBookSuggestions(
   db: Database,
   profileId: string,
-  subjectId: string
+  subjectId: string,
 ) {
   const subject = await db.query.subjects.findFirst({
     where: and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
@@ -33,15 +34,15 @@ export async function getUnpickedBookSuggestions(
     .where(
       and(
         eq(bookSuggestions.subjectId, subjectId),
-        isNull(bookSuggestions.pickedAt)
-      )
+        isNull(bookSuggestions.pickedAt),
+      ),
     );
 }
 
 export async function getAllBookSuggestions(
   db: Database,
   profileId: string,
-  subjectId: string
+  subjectId: string,
 ) {
   const subject = await db.query.subjects.findFirst({
     where: and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
@@ -57,7 +58,7 @@ export async function getAllBookSuggestions(
 export async function markBookSuggestionPicked(
   db: Database,
   profileId: string,
-  suggestionId: string
+  suggestionId: string,
 ): Promise<boolean> {
   // Atomic ownership check + update — closes TOCTOU window
   const rows = await db
@@ -71,9 +72,9 @@ export async function markBookSuggestionPicked(
           db
             .select({ id: subjects.id })
             .from(subjects)
-            .where(eq(subjects.profileId, profileId))
-        )
-      )
+            .where(eq(subjects.profileId, profileId)),
+        ),
+      ),
     )
     .returning({ id: bookSuggestions.id });
   return rows.length > 0;
@@ -83,7 +84,7 @@ export async function getUnusedTopicSuggestions(
   db: Database,
   profileId: string,
   bookId: string,
-  subjectId?: string
+  subjectId?: string,
 ) {
   const book = await db.query.curriculumBooks.findFirst({
     where: eq(curriculumBooks.id, bookId),
@@ -94,7 +95,7 @@ export async function getUnusedTopicSuggestions(
   const subject = await db.query.subjects.findFirst({
     where: and(
       eq(subjects.id, book.subjectId),
-      eq(subjects.profileId, profileId)
+      eq(subjects.profileId, profileId),
     ),
   });
   if (!subject) return [];
@@ -103,14 +104,14 @@ export async function getUnusedTopicSuggestions(
     .select()
     .from(topicSuggestions)
     .where(
-      and(eq(topicSuggestions.bookId, bookId), isNull(topicSuggestions.usedAt))
+      and(eq(topicSuggestions.bookId, bookId), isNull(topicSuggestions.usedAt)),
     );
 }
 
 export async function markTopicSuggestionUsed(
   db: Database,
   profileId: string,
-  suggestionId: string
+  suggestionId: string,
 ): Promise<boolean> {
   // Atomic ownership check + update — closes TOCTOU window
   // Chain: topicSuggestions → curriculumBooks → subjects.profileId
@@ -126,10 +127,89 @@ export async function markTopicSuggestionUsed(
             .select({ id: curriculumBooks.id })
             .from(curriculumBooks)
             .innerJoin(subjects, eq(curriculumBooks.subjectId, subjects.id))
-            .where(eq(subjects.profileId, profileId))
-        )
-      )
+            .where(eq(subjects.profileId, profileId)),
+        ),
+      ),
     )
     .returning({ id: topicSuggestions.id });
   return rows.length > 0;
+}
+
+export async function getUnpickedBookSuggestionsEnvelope(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+): Promise<{ suggestions: BookSuggestion[]; curriculumBookCount: number }> {
+  const subject = await db.query.subjects.findFirst({
+    where: and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
+  });
+  if (!subject) return { suggestions: [], curriculumBookCount: 0 };
+
+  const unpicked = await db
+    .select()
+    .from(bookSuggestions)
+    .where(
+      and(
+        eq(bookSuggestions.subjectId, subjectId),
+        isNull(bookSuggestions.pickedAt),
+      ),
+    );
+
+  const bookCountRows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(curriculumBooks)
+    .where(eq(curriculumBooks.subjectId, subjectId));
+  const curriculumBookCount = bookCountRows[0]?.count ?? 0;
+
+  return {
+    suggestions: unpicked as unknown as BookSuggestion[],
+    curriculumBookCount,
+  };
+}
+
+export async function getUnpickedBookSuggestionsWithTopup(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+): Promise<{ suggestions: BookSuggestion[]; curriculumBookCount: number }> {
+  const subject = await db.query.subjects.findFirst({
+    where: and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
+  });
+  if (!subject) return { suggestions: [], curriculumBookCount: 0 };
+
+  let unpicked = await db
+    .select()
+    .from(bookSuggestions)
+    .where(
+      and(
+        eq(bookSuggestions.subjectId, subjectId),
+        isNull(bookSuggestions.pickedAt),
+      ),
+    );
+
+  if (unpicked.length < 4) {
+    const { generateCategorizedBookSuggestions } =
+      await import('./book-suggestion-generation');
+    await generateCategorizedBookSuggestions(db, profileId, subjectId);
+    unpicked = await db
+      .select()
+      .from(bookSuggestions)
+      .where(
+        and(
+          eq(bookSuggestions.subjectId, subjectId),
+          isNull(bookSuggestions.pickedAt),
+        ),
+      );
+  }
+
+  const bookCountRows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(curriculumBooks)
+    .where(eq(curriculumBooks.subjectId, subjectId));
+  const curriculumBookCount = bookCountRows[0]?.count ?? 0;
+
+  return {
+    suggestions: unpicked as unknown as BookSuggestion[],
+    curriculumBookCount,
+  };
 }

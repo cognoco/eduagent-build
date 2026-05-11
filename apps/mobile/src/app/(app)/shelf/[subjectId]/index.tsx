@@ -37,8 +37,8 @@ export default function ShelfScreen() {
   const subject = subjectsQuery.data?.find((s) => s.id === subjectId);
   const shelfTint = useSubjectTint(subject?.name ?? subjectId ?? 'shelf');
 
-  const { data: rawBookSuggestions } = useBookSuggestions(subjectId);
-  const bookSuggestions = rawBookSuggestions ?? [];
+  const { data: suggestionsData } = useBookSuggestions(subjectId);
+  const bookSuggestions = suggestionsData?.suggestions ?? [];
   const filing = useFiling();
 
   const handleBack = useCallback(() => {

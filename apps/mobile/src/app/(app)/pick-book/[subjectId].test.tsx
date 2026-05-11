@@ -70,15 +70,29 @@ jest.mock('expo-router', () => ({
 // Default API route responses
 // ---------------------------------------------------------------------------
 
-const DEFAULT_SUGGESTIONS = [
-  {
-    id: 'sug-1',
-    title: 'Europe',
-    emoji: null,
-    description: 'European geography',
-  },
-  { id: 'sug-2', title: 'Asia', emoji: null, description: 'Asian geography' },
-];
+const DEFAULT_SUGGESTIONS = {
+  suggestions: [
+    {
+      id: 'sug-1',
+      title: 'Europe',
+      emoji: null,
+      description: 'European geography',
+      category: null,
+      createdAt: '2024-01-01T00:00:00.000Z',
+      pickedAt: null,
+    },
+    {
+      id: 'sug-2',
+      title: 'Asia',
+      emoji: null,
+      description: 'Asian geography',
+      category: null,
+      createdAt: '2024-01-01T00:00:00.000Z',
+      pickedAt: null,
+    },
+  ],
+  curriculumBookCount: 0,
+};
 
 const DEFAULT_SUBJECTS = [{ id: 'sub-1', name: 'Geography' }];
 
@@ -331,7 +345,10 @@ describe('PickBookScreen', () => {
   });
 
   it('auto-opens custom input when suggestions are empty', async () => {
-    mockFetch.setRoute('/book-suggestions', []);
+    mockFetch.setRoute('/book-suggestions', {
+      suggestions: [],
+      curriculumBookCount: 0,
+    });
 
     const { getByTestId } = render(<PickBookScreen />, {
       wrapper: TestWrapper,

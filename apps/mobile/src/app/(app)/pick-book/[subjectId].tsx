@@ -35,7 +35,7 @@ export default function PickBookScreen(): React.ReactElement {
   const colors = useThemeColors();
   const { subjectId } = useLocalSearchParams<{ subjectId: string }>();
 
-  const suggestionsQuery = useBookSuggestions(subjectId);
+  const suggestionsQuery = useBookSuggestions(subjectId, { topup: true });
   const { data: subjects } = useSubjects();
   const filing = useFiling();
 
@@ -104,7 +104,8 @@ export default function PickBookScreen(): React.ReactElement {
     return () => clearTimeout(timer);
   }, [suggestionsQuery.isLoading]);
 
-  const suggestions = suggestionsQuery.data ?? [];
+  const suggestionsData = suggestionsQuery.data;
+  const suggestions = suggestionsData?.suggestions ?? [];
   const subject = subjects?.find((s) => s.id === subjectId);
 
   // BUG-318: Auto-open custom input when suggestions load empty — the user

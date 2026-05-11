@@ -70,30 +70,29 @@ jest.mock('../services/profile', () => ({
 // Mock suggestion services — stubs for route handler
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/suggestions', () => ({
-  getUnpickedBookSuggestions: jest.fn().mockResolvedValue([
-    {
-      id: TEST_BOOK_ID,
-      subjectId: 'a0000000-0000-4000-a000-000000000201',
-      title: 'Suggested Book',
-      emoji: '📖',
-      description: 'A suggested book',
-      createdAt: '2024-01-01T00:00:00.000Z',
-      pickedAt: null,
-    },
-  ]),
-  getAllBookSuggestions: jest.fn().mockResolvedValue([
-    {
-      id: TEST_BOOK_ID,
-      subjectId: 'a0000000-0000-4000-a000-000000000201',
-      title: 'Suggested Book',
-      emoji: '📖',
-      description: 'A suggested book',
-      createdAt: '2024-01-01T00:00:00.000Z',
-      pickedAt: null,
-    },
-  ]),
-}));
+jest.mock('../services/suggestions', () => {
+  const stubSuggestion = {
+    id: 'a0000000-0000-4000-a000-000000000001',
+    subjectId: 'a0000000-0000-4000-a000-000000000201',
+    title: 'Suggested Book',
+    emoji: '📖',
+    description: 'A suggested book',
+    category: null,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    pickedAt: null,
+  };
+  return {
+    getUnpickedBookSuggestionsEnvelope: jest.fn().mockResolvedValue({
+      suggestions: [stubSuggestion],
+      curriculumBookCount: 3,
+    }),
+    getUnpickedBookSuggestionsWithTopup: jest.fn().mockResolvedValue({
+      suggestions: [stubSuggestion],
+      curriculumBookCount: 3,
+    }),
+    getAllBookSuggestions: jest.fn().mockResolvedValue([stubSuggestion]),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Mock LLM services — registerProvider for llm middleware
@@ -157,23 +156,27 @@ describe('book-suggestions routes', () => {
       const res = await app.request(
         '/v1/subjects/some-subject-id/book-suggestions',
         {},
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
     });
 
-    it('returns 200 with auth', async () => {
+    it('returns 200 with auth (envelope shape)', async () => {
       const res = await app.request(
         '/v1/subjects/some-subject-id/book-suggestions',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
 
-      const body = await res.json();
-      expect(Array.isArray(body)).toBe(true);
+      const body = (await res.json()) as {
+        suggestions: unknown[];
+        curriculumBookCount: number;
+      };
+      expect(Array.isArray(body.suggestions)).toBe(true);
+      expect(typeof body.curriculumBookCount).toBe('number');
     });
   });
 
@@ -186,7 +189,7 @@ describe('book-suggestions routes', () => {
       const res = await app.request(
         '/v1/subjects/some-subject-id/book-suggestions/all',
         {},
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -196,7 +199,7 @@ describe('book-suggestions routes', () => {
       const res = await app.request(
         '/v1/subjects/some-subject-id/book-suggestions/all',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
