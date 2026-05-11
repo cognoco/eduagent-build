@@ -275,7 +275,7 @@ export const bookSuggestions = pgTable(
     // WHERE picked_at IS NULL is declared in the generated migration only —
     // drizzle's index() builder does not support expression-based indexes
     // with a WHERE predicate. Migration name:
-    //   00XX_book_suggestion_category_and_cooldown.sql
+    //   0070_omniscient_landau.sql
     // index name: book_suggestions_subject_title_unique_unpicked
   ],
 );

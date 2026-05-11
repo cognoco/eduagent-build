@@ -4,6 +4,7 @@ export const notificationTypeSchema = z.enum([
   'review_reminder',
   'daily_reminder',
   'trial_expiry',
+  'streak_warning',
   'consent_request',
   'consent_reminder',
   'consent_warning',
@@ -19,6 +20,7 @@ export const notificationTypeSchema = z.enum([
   'struggle_resolved',
   'dictation_review',
   'session_filing_failed',
+  'interview_ready',
   'nudge',
 ]);
 

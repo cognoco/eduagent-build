@@ -70,6 +70,7 @@ export class RateLimitedError extends Error {
   }
 }
 
+export const CONSENT_REQUIRED_ERROR_NAME = 'ConsentRequiredError' as const;
 export class ConsentRequiredError extends Error {
   readonly errorCode = 'CONSENT_REQUIRED' as const;
   readonly code: string | undefined;
@@ -79,7 +80,7 @@ export class ConsentRequiredError extends Error {
     code?: string,
   ) {
     super(message);
-    this.name = 'ConsentRequiredError';
+    this.name = CONSENT_REQUIRED_ERROR_NAME;
     this.code = code;
     Object.setPrototypeOf(this, ConsentRequiredError.prototype);
   }

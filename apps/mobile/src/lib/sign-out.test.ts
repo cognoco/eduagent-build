@@ -23,23 +23,23 @@ jest.mock('@sentry/react-native', () => ({
   setUser: jest.fn(),
 }));
 
-jest.mock('./sign-out-cleanup', () => ({
-  // gc1-allow: external boundary — SecureStore/AsyncStorage I/O; exercised exhaustively in sign-out-cleanup.test.ts
+// prettier-ignore
+jest.mock('./sign-out-cleanup', () => ({ // gc1-allow: SecureStore I/O boundary
   clearProfileSecureStorageOnSignOut: jest.fn().mockResolvedValue(undefined),
 }));
 
-jest.mock('./auth-transition', () => ({
-  // gc1-allow: thin nav-state helper; no testable state relevant to this suite
+// prettier-ignore
+jest.mock('./auth-transition', () => ({ // gc1-allow: nav-state helper
   clearTransitionState: jest.fn(),
 }));
 
-jest.mock('./pending-auth-redirect', () => ({
-  // gc1-allow: thin nav-state helper; no testable state relevant to this suite
+// prettier-ignore
+jest.mock('./pending-auth-redirect', () => ({ // gc1-allow: nav-state helper
   clearPendingAuthRedirect: jest.fn(),
 }));
 
-jest.mock('./api-client', () => ({
-  // gc1-allow: module-level identity setters; exercised in sign-out ordering assertions here
+// prettier-ignore
+jest.mock('./api-client', () => ({ // gc1-allow: identity setters for ordering
   setActiveProfileId: jest.fn(),
   setProxyMode: jest.fn(),
 }));
