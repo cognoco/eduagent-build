@@ -1255,7 +1255,6 @@
     },
     "monthlyReport": {
       "highlightsTitle": "ハイライト",
-      "nextStepsTitle": "次にすること",
       "empty": {
         "child": "最初の月間まとめは{{month}}の終わりに届きます。",
         "adult": "最初の月間まとめは{{month}}の終わりに届きます。"
@@ -2186,6 +2185,50 @@
       "title": "{{fromDisplayName}}さんからナッジが届きました",
       "unreadCount": "{{count}}件の新着",
       "modalTitle": "新しいナッジ"
+    }
+  },
+  "practiceHub": {
+    "title": "Test yourself",
+    "subtitle": "Pick a quick win. Every round helps your memory stick.",
+    "xpLabel": "{{xp}} XP",
+    "sections": {
+      "bestNextStep": "Best next step",
+      "quiz": "Quiz",
+      "otherPractice": "Other practice",
+      "recentProgress": "Recent progress"
+    },
+    "review": {
+      "title": "Today's review",
+      "startReview": "Start review",
+      "topicsReady": "{{count}} topic(s) ready",
+      "allCaughtUp": "All caught up",
+      "nextReviewIn": "Your next review is in {{time}}",
+      "completeATopic": "Complete a topic to start reviewing",
+      "browseTopics": "Browse your topics"
+    },
+    "assessment": {
+      "title": "Prove I know this",
+      "topicsReady": "{{count}} topic(s) ready to test",
+      "afterFinishTopic": "Available after you finish a topic"
+    },
+    "quiz": {
+      "title": "Quick quiz",
+      "capitals": "Capitals",
+      "guessWho": "Who's who",
+      "defaultSubtitle": "Test yourself with multiple choice questions · {{xp}} XP"
+    },
+    "recitation": {
+      "title": "Recite from memory (Beta)",
+      "subtitle": "Recite a poem or text from memory"
+    },
+    "dictation": {
+      "title": "Dictation",
+      "subtitle": "Practice writing what you hear"
+    },
+    "history": {
+      "title": "Quiz history",
+      "roundsPlayed": "{{count}} round(s) played",
+      "noRoundsYet": "No rounds yet"
     }
   }
 }

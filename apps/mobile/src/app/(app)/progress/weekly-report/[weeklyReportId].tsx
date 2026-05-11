@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { ErrorFallback } from '../../../../components/common';
 import { MetricCard } from '../../../../components/progress';
 import { classifyApiError } from '../../../../lib/format-api-error';
+import { formatMinutes } from '../../../../lib/format-relative-date';
 import { goBackOrReplace } from '../../../../lib/navigation';
 import { useProfileWeeklyReportDetail } from '../../../../hooks/use-progress';
 
@@ -116,7 +117,9 @@ export default function ProgressWeeklyReportDetail(): React.ReactElement {
               />
               <MetricCard
                 label={t('parentView.weeklyReport.timeOnApp')}
-                value={String(report.reportData.thisWeek.totalActiveMinutes)}
+                value={formatMinutes(
+                  report.reportData.thisWeek.totalActiveMinutes,
+                )}
               />
             </View>
           </>

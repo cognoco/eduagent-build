@@ -194,7 +194,7 @@ describe('ProgressMonthlyReportDetail', () => {
     screen.getByText('Sessions');
     screen.getByText('8');
     screen.getByText('Time on app');
-    screen.getByText('120');
+    screen.getByText('2h');
   });
 
   it('renders highlights when the report includes them', () => {

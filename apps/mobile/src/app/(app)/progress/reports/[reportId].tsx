@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { ErrorFallback } from '../../../../components/common';
 import { MetricCard } from '../../../../components/progress';
 import { classifyApiError } from '../../../../lib/format-api-error';
+import { formatMinutes } from '../../../../lib/format-relative-date';
 import { goBackOrReplace } from '../../../../lib/navigation';
 import { useProfileReportDetail } from '../../../../hooks/use-progress';
 
@@ -90,7 +91,9 @@ export default function ProgressMonthlyReportDetail(): React.ReactElement {
               />
               <MetricCard
                 label={t('parentView.report.timeOnApp')}
-                value={String(report.reportData.thisMonth.totalActiveMinutes)}
+                value={formatMinutes(
+                  report.reportData.thisMonth.totalActiveMinutes,
+                )}
               />
             </View>
 

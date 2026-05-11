@@ -9,12 +9,17 @@
  * Only the external auth boundary (CLERK_JWKS_URL → fetch) is intercepted.
  * All internal services, DB queries, and the profile-scope middleware run real.
  *
- * Attack surface:
+ * Attack surface (self-view):
  *   GET /v1/progress/reports/:reportId         → getMonthlyReportForProfile
  *   GET /v1/progress/weekly-reports/:reportId  → getWeeklyReportForProfile
  *
- * Both service functions scope on `childProfileId = profileId` so a report
+ * Attack surface (parent-child dashboard):
+ *   GET /v1/dashboard/children/:profileId/reports/:reportId
+ *   GET /v1/dashboard/children/:profileId/weekly-reports/:reportId
+ *
+ * Self-view services scope on `childProfileId = profileId` so a report
  * owned by profile B must not be readable when the active profile is A.
+ * Dashboard routes guard via assertParentAccess (familyLinks table).
  */
 
 import { resolve } from 'path';
@@ -22,6 +27,7 @@ import { like } from 'drizzle-orm';
 import {
   accounts,
   createDatabase,
+  familyLinks,
   generateUUIDv7,
   monthlyReports,
   profiles,
@@ -176,17 +182,23 @@ async function cleanupTestAccounts(): Promise<void> {
 describeIfDb(
   'Progress report detail endpoints — cross-profile security scoping (integration)',
   () => {
+    let accountAId: string;
     let profileAId: string;
     let profileBId: string;
     let monthlyReportBId: string;
     let weeklyReportBId: string;
+
+    // Dashboard (parent-child) test state
+    let childProfileCId: string;
+    let dashboardMonthlyReportId: string;
+    let dashboardWeeklyReportId: string;
 
     beforeAll(async () => {
       db = createDatabase(process.env.DATABASE_URL!);
       installTestJwksInterceptor();
 
       // Seed two independent accounts, each with one owner profile
-      const { profileId: aId } = await seedAccountAndProfile(
+      const { accountId: aAccId, profileId: aId } = await seedAccountAndProfile(
         CLERK_ID_A,
         EMAIL_A,
       );
@@ -194,6 +206,7 @@ describeIfDb(
         CLERK_ID_B,
         EMAIL_B,
       );
+      accountAId = aAccId;
       profileAId = aId;
       profileBId = bId;
 
@@ -201,6 +214,34 @@ describeIfDb(
       // profileId === childProfileId, both set to profileBId)
       monthlyReportBId = await seedMonthlyReport(profileBId, profileBId);
       weeklyReportBId = await seedWeeklyReport(profileBId, profileBId);
+
+      // --- Dashboard (parent-child) setup ---
+      // Child profile C belongs to account A; A is the parent via familyLinks.
+      const [childProfile] = await db
+        .insert(profiles)
+        .values({
+          accountId: accountAId,
+          displayName: `Test Child ${RUN_ID}`,
+          birthYear: new Date().getFullYear() - 12,
+          isOwner: false,
+        })
+        .returning({ id: profiles.id });
+      childProfileCId = childProfile!.id;
+
+      await db.insert(familyLinks).values({
+        parentProfileId: profileAId,
+        childProfileId: childProfileCId,
+      });
+
+      // Reports for the parent-child pair (profileId = parent, childProfileId = child)
+      dashboardMonthlyReportId = await seedMonthlyReport(
+        profileAId,
+        childProfileCId,
+      );
+      dashboardWeeklyReportId = await seedWeeklyReport(
+        profileAId,
+        childProfileCId,
+      );
     });
 
     afterAll(async () => {
@@ -290,6 +331,90 @@ describeIfDb(
       it('nonexistent weekly report ID → 404', async () => {
         const res = await app.request(
           `/v1/progress/weekly-reports/${generateUUIDv7()}`,
+          { headers: authHeaders(CLERK_ID_A, EMAIL_A, profileAId) },
+          TEST_ENV,
+        );
+
+        expect(res.status).toBe(404);
+      });
+    });
+
+    // -------------------------------------------------------------------------
+    // GET /v1/dashboard/children/:profileId/reports/:reportId — parent-child
+    // -------------------------------------------------------------------------
+
+    describe('GET /v1/dashboard/children/:profileId/reports/:reportId', () => {
+      // Break test: profile B (no familyLink to child C) requests child C's
+      // monthly report via dashboard → assertParentAccess → 403.
+      it('[BREAK] unrelated profile B cannot read child C monthly report → 403', async () => {
+        const res = await app.request(
+          `/v1/dashboard/children/${childProfileCId}/reports/${dashboardMonthlyReportId}`,
+          { headers: authHeaders(CLERK_ID_B, EMAIL_B, profileBId) },
+          TEST_ENV,
+        );
+
+        expect(res.status).toBe(403);
+      });
+
+      // Happy-path: parent A (has familyLink to C) reads child C's report → 200.
+      it('parent A can read child C monthly report → 200', async () => {
+        const res = await app.request(
+          `/v1/dashboard/children/${childProfileCId}/reports/${dashboardMonthlyReportId}`,
+          { headers: authHeaders(CLERK_ID_A, EMAIL_A, profileAId) },
+          TEST_ENV,
+        );
+
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as { report: { id: string } };
+        expect(body.report.id).toBe(dashboardMonthlyReportId);
+      });
+
+      // Sanity: parent A, nonexistent report ID → 404
+      it('parent A, nonexistent report ID → 404', async () => {
+        const res = await app.request(
+          `/v1/dashboard/children/${childProfileCId}/reports/${generateUUIDv7()}`,
+          { headers: authHeaders(CLERK_ID_A, EMAIL_A, profileAId) },
+          TEST_ENV,
+        );
+
+        expect(res.status).toBe(404);
+      });
+    });
+
+    // -------------------------------------------------------------------------
+    // GET /v1/dashboard/children/:profileId/weekly-reports/:reportId — parent-child
+    // -------------------------------------------------------------------------
+
+    describe('GET /v1/dashboard/children/:profileId/weekly-reports/:reportId', () => {
+      // Break test: profile B (no familyLink to child C) requests child C's
+      // weekly report via dashboard → assertParentAccess → 403.
+      it('[BREAK] unrelated profile B cannot read child C weekly report → 403', async () => {
+        const res = await app.request(
+          `/v1/dashboard/children/${childProfileCId}/weekly-reports/${dashboardWeeklyReportId}`,
+          { headers: authHeaders(CLERK_ID_B, EMAIL_B, profileBId) },
+          TEST_ENV,
+        );
+
+        expect(res.status).toBe(403);
+      });
+
+      // Happy-path: parent A (has familyLink to C) reads child C's report → 200.
+      it('parent A can read child C weekly report → 200', async () => {
+        const res = await app.request(
+          `/v1/dashboard/children/${childProfileCId}/weekly-reports/${dashboardWeeklyReportId}`,
+          { headers: authHeaders(CLERK_ID_A, EMAIL_A, profileAId) },
+          TEST_ENV,
+        );
+
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as { report: { id: string } };
+        expect(body.report.id).toBe(dashboardWeeklyReportId);
+      });
+
+      // Sanity: parent A, nonexistent weekly report ID → 404
+      it('parent A, nonexistent weekly report ID → 404', async () => {
+        const res = await app.request(
+          `/v1/dashboard/children/${childProfileCId}/weekly-reports/${generateUUIDv7()}`,
           { headers: authHeaders(CLERK_ID_A, EMAIL_A, profileAId) },
           TEST_ENV,
         );

@@ -9,6 +9,7 @@ import {
   goBackOrReplace,
 } from '../../../../../lib/navigation';
 import { classifyApiError } from '../../../../../lib/format-api-error';
+import { formatMinutes } from '../../../../../lib/format-relative-date';
 import { ErrorFallback } from '../../../../../components/common';
 import {
   useChildWeeklyReportDetail,
@@ -211,7 +212,9 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
               />
               <MetricCard
                 label={t('parentView.weeklyReport.timeOnApp')}
-                value={String(report.reportData.thisWeek.totalActiveMinutes)}
+                value={formatMinutes(
+                  report.reportData.thisWeek.totalActiveMinutes,
+                )}
                 testID="child-weekly-report-metric-minutes"
               />
             </View>

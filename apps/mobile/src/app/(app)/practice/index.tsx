@@ -1,14 +1,9 @@
 import React from 'react';
-import {
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-  type GestureResponderEvent,
-} from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 
 import type { QuizActivityType, QuizStats } from '@eduagent/schemas';
 
@@ -31,10 +26,6 @@ function formatTimeUntil(isoDate: string): string {
 
   const days = Math.floor(hours / 24);
   return `${days} day${days === 1 ? '' : 's'}`;
-}
-
-function formatTopicCount(count: number, noun = 'topic'): string {
-  return `${count} ${noun}${count === 1 ? '' : 's'}`;
 }
 
 function getActivityCue(
@@ -61,6 +52,7 @@ function getActivityCue(
 }
 
 export default function PracticeScreen(): React.ReactElement {
+  const { t } = useTranslation();
   const router = useRouter();
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const insets = useSafeAreaInsets();
@@ -76,10 +68,10 @@ export default function PracticeScreen(): React.ReactElement {
   const reviewSubtitle = reviewError
     ? 'Could not load review status'
     : hasOverdue
-      ? `${formatTopicCount(reviewDueCount)} ready`
+      ? t('practiceHub.review.topicsReady', { count: reviewDueCount })
       : reviewSummary?.nextUpcomingReviewAt
-        ? 'All caught up'
-        : 'Complete a topic to start reviewing';
+        ? t('practiceHub.review.allCaughtUp')
+        : t('practiceHub.review.completeATopic');
   // [F-034] Aggregate stats across ALL activity types so Guess Who / Vocabulary
   // players also see their stats on the Practice hub card.
   const bestActivity = quizStats
@@ -109,35 +101,37 @@ export default function PracticeScreen(): React.ReactElement {
   const quizSubtitle = statsError
     ? 'Could not load quiz stats'
     : bestPct
-      ? [bestPct, `Played: ${totalRoundsPlayed}`, `${totalXp} XP`]
+      ? [
+          bestPct,
+          `Played: ${totalRoundsPlayed}`,
+          t('practiceHub.xpLabel', { xp: totalXp }),
+        ]
           .filter(Boolean)
           .join(' · ')
       : totalRoundsPlayed > 0
-        ? [`Played: ${totalRoundsPlayed}`, `${totalXp} XP`].join(' · ')
-        : `Test yourself with multiple choice questions · ${totalXp} XP`;
+        ? [
+            `Played: ${totalRoundsPlayed}`,
+            t('practiceHub.xpLabel', { xp: totalXp }),
+          ].join(' · ')
+        : t('practiceHub.quiz.defaultSubtitle', { xp: totalXp });
   const assessmentCount = assessmentTopics?.length ?? 0;
   const assessmentSubtitle = assessmentTopicsError
     ? 'Could not load assessment topics'
     : assessmentCount > 0
-      ? `${formatTopicCount(assessmentCount)} ready to test`
-      : 'Available after you finish a topic';
+      ? t('practiceHub.assessment.topicsReady', { count: assessmentCount })
+      : t('practiceHub.assessment.afterFinishTopic');
   const capitalsCue = getActivityCue(quizStats, 'capitals');
   const guessWhoCue = getActivityCue(quizStats, 'guess_who');
   const progressCue =
     totalRoundsPlayed > 0
-      ? `${totalRoundsPlayed} round${totalRoundsPlayed === 1 ? '' : 's'} played`
-      : 'No rounds yet';
+      ? t('practiceHub.history.roundsPlayed', { count: totalRoundsPlayed })
+      : t('practiceHub.history.noRoundsYet');
 
   const handleBack = () => {
     goBackOrReplace(router, homeHrefForReturnTo(returnTo));
   };
 
   const openQuiz = () => router.push('/(app)/quiz' as never);
-
-  const openQuizFromPreview = (event?: GestureResponderEvent) => {
-    event?.stopPropagation();
-    openQuiz();
-  };
 
   const openAssessment = () => {
     router.push(
@@ -164,22 +158,22 @@ export default function PracticeScreen(): React.ReactElement {
           onPress={handleBack}
           className="mr-3 min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('common.goBack')}
           testID="practice-back"
         >
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </Pressable>
         <View className="flex-1">
           <Text className="text-h2 font-bold text-text-primary">
-            Test yourself
+            {t('practiceHub.title')}
           </Text>
           <Text className="text-body-sm text-text-secondary mt-1">
-            Pick a quick win. Every round helps your memory stick.
+            {t('practiceHub.subtitle')}
           </Text>
         </View>
         <View className="ml-3 rounded-full bg-primary-soft px-3 py-1.5">
           <Text className="text-caption font-semibold text-primary">
-            {totalXp} XP
+            {t('practiceHub.xpLabel', { xp: totalXp })}
           </Text>
         </View>
       </View>
@@ -187,7 +181,7 @@ export default function PracticeScreen(): React.ReactElement {
       <View className="gap-6">
         <View className="gap-3">
           <Text className="text-caption font-semibold text-text-secondary">
-            Best next step
+            {t('practiceHub.sections.bestNextStep')}
           </Text>
           <Pressable
             className="rounded-card bg-surface-elevated px-5 py-5 active:opacity-80"
@@ -200,7 +194,7 @@ export default function PracticeScreen(): React.ReactElement {
               } as never)
             }
             accessibilityRole="button"
-            accessibilityLabel="Today's review"
+            accessibilityLabel={t('practiceHub.review.title')}
             accessibilityHint="Opens review topics"
             testID="practice-review"
           >
@@ -215,7 +209,7 @@ export default function PracticeScreen(): React.ReactElement {
               <View className="flex-1">
                 <View className="flex-row items-center">
                   <Text className="text-h2 font-bold text-text-primary flex-1">
-                    Today's review
+                    {t('practiceHub.review.title')}
                   </Text>
                   {!reviewError &&
                   hasOverdue &&
@@ -235,7 +229,7 @@ export default function PracticeScreen(): React.ReactElement {
                 </Text>
                 <View className="mt-4 self-start rounded-full bg-primary px-4 py-2">
                   <Text className="text-body-sm font-semibold text-text-inverse">
-                    Start review
+                    {t('practiceHub.review.startReview')}
                   </Text>
                 </View>
               </View>
@@ -249,16 +243,17 @@ export default function PracticeScreen(): React.ReactElement {
               {reviewSummary.nextUpcomingReviewAt ? (
                 <>
                   <Text className="text-body font-semibold text-text-primary">
-                    All caught up
+                    {t('practiceHub.review.allCaughtUp')}
                   </Text>
                   <Text className="text-body-sm text-text-secondary mt-1">
-                    Your next review is in{' '}
-                    {formatTimeUntil(reviewSummary.nextUpcomingReviewAt)}
+                    {t('practiceHub.review.nextReviewIn', {
+                      time: formatTimeUntil(reviewSummary.nextUpcomingReviewAt),
+                    })}
                   </Text>
                 </>
               ) : (
                 <Text className="text-body text-text-secondary">
-                  Complete a topic to start reviewing
+                  {t('practiceHub.review.completeATopic')}
                 </Text>
               )}
               <Pressable
@@ -267,7 +262,7 @@ export default function PracticeScreen(): React.ReactElement {
                 onPress={() => router.push('/(app)/library' as never)}
               >
                 <Text className="text-body-sm text-primary font-semibold">
-                  Browse your topics
+                  {t('practiceHub.review.browseTopics')}
                 </Text>
               </Pressable>
             </View>
@@ -276,7 +271,7 @@ export default function PracticeScreen(): React.ReactElement {
             className="rounded-card bg-surface px-4 py-3 active:opacity-80"
             onPress={openAssessment}
             accessibilityRole="button"
-            accessibilityLabel="Prove I know this"
+            accessibilityLabel={t('practiceHub.assessment.title')}
             accessibilityHint={
               assessmentCount > 0
                 ? 'Opens the assessment picker'
@@ -294,7 +289,7 @@ export default function PracticeScreen(): React.ReactElement {
               </View>
               <View className="flex-1">
                 <Text className="text-body font-semibold text-text-primary">
-                  Prove I know this
+                  {t('practiceHub.assessment.title')}
                 </Text>
                 <Text className="text-body-sm text-text-secondary mt-0.5">
                   {assessmentSubtitle}
@@ -306,13 +301,13 @@ export default function PracticeScreen(): React.ReactElement {
 
         <View className="gap-3">
           <Text className="text-caption font-semibold text-text-secondary">
-            Quiz
+            {t('practiceHub.sections.quiz')}
           </Text>
           <Pressable
             className="rounded-card bg-surface-elevated px-5 py-5 active:opacity-80"
             onPress={openQuiz}
             accessibilityRole="button"
-            accessibilityLabel="Quick quiz"
+            accessibilityLabel={t('practiceHub.quiz.title')}
             accessibilityHint="Opens quiz choices"
             testID="practice-quiz"
           >
@@ -326,7 +321,7 @@ export default function PracticeScreen(): React.ReactElement {
               </View>
               <View className="flex-1">
                 <Text className="text-h2 font-bold text-text-primary">
-                  Quick quiz
+                  {t('practiceHub.quiz.title')}
                 </Text>
                 <Text className="text-body text-text-secondary mt-2">
                   {quizSubtitle}
@@ -334,13 +329,13 @@ export default function PracticeScreen(): React.ReactElement {
                 <View className="mt-4 flex-row gap-3">
                   <Pressable
                     className="flex-1 rounded-card bg-surface px-3 py-3 active:opacity-80"
-                    onPress={openQuizFromPreview}
+                    onPress={openQuiz}
                     accessibilityRole="button"
-                    accessibilityLabel="Capitals"
+                    accessibilityLabel={t('practiceHub.quiz.capitals')}
                     testID="practice-quiz-capitals"
                   >
                     <Text className="text-body-sm font-semibold text-text-primary">
-                      Capitals
+                      {t('practiceHub.quiz.capitals')}
                     </Text>
                     {capitalsCue ? (
                       <Text className="text-caption text-text-secondary mt-1">
@@ -350,13 +345,13 @@ export default function PracticeScreen(): React.ReactElement {
                   </Pressable>
                   <Pressable
                     className="flex-1 rounded-card bg-surface px-3 py-3 active:opacity-80"
-                    onPress={openQuizFromPreview}
+                    onPress={openQuiz}
                     accessibilityRole="button"
-                    accessibilityLabel="Who's who"
+                    accessibilityLabel={t('practiceHub.quiz.guessWho')}
                     testID="practice-quiz-guess-who"
                   >
                     <Text className="text-body-sm font-semibold text-text-primary">
-                      Who's who
+                      {t('practiceHub.quiz.guessWho')}
                     </Text>
                     {guessWhoCue ? (
                       <Text className="text-caption text-text-secondary mt-1">
@@ -372,11 +367,11 @@ export default function PracticeScreen(): React.ReactElement {
 
         <View className="gap-3">
           <Text className="text-caption font-semibold text-text-secondary">
-            Other practice
+            {t('practiceHub.sections.otherPractice')}
           </Text>
           <IntentCard
-            title="Recite from memory (Beta)"
-            subtitle="Recite a poem or text from memory"
+            title={t('practiceHub.recitation.title')}
+            subtitle={t('practiceHub.recitation.subtitle')}
             icon="mic-outline"
             onPress={() =>
               router.push({
@@ -387,8 +382,8 @@ export default function PracticeScreen(): React.ReactElement {
             testID="practice-recitation"
           />
           <IntentCard
-            title="Dictation"
-            subtitle="Practice writing what you hear"
+            title={t('practiceHub.dictation.title')}
+            subtitle={t('practiceHub.dictation.subtitle')}
             icon="create-outline"
             onPress={() => router.push('/(app)/dictation' as never)}
             testID="practice-dictation"
@@ -397,18 +392,18 @@ export default function PracticeScreen(): React.ReactElement {
 
         <View className="gap-3">
           <Text className="text-caption font-semibold text-text-secondary">
-            Recent progress
+            {t('practiceHub.sections.recentProgress')}
           </Text>
           <Pressable
             className="min-h-[52px] flex-row items-center py-2 active:opacity-80"
             onPress={() => router.push('/(app)/quiz/history' as never)}
             accessibilityRole="button"
-            accessibilityLabel="Quiz history"
+            accessibilityLabel={t('practiceHub.history.title')}
             accessibilityHint="Opens quiz history"
             testID="practice-quiz-history"
           >
             <Text className="text-body font-semibold text-text-primary flex-1">
-              Quiz history
+              {t('practiceHub.history.title')}
             </Text>
             <Text className="text-body-sm text-text-secondary">
               {progressCue}

@@ -1,5 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
+jest.mock(
+  'react-i18next',
+  () => require('../../../test-utils/mock-i18n').i18nMock,
+);
+
 const mockPush = jest.fn();
 const mockGoBackOrReplace = jest.fn();
 const mockUseReviewSummary = jest.fn();

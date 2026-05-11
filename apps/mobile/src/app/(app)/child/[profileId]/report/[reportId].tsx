@@ -8,6 +8,7 @@ import {
   goBackOrReplace,
 } from '../../../../../lib/navigation';
 import { classifyApiError } from '../../../../../lib/format-api-error';
+import { formatMinutes } from '../../../../../lib/format-relative-date';
 import { ErrorFallback } from '../../../../../components/common';
 import {
   useChildReportDetail,
@@ -157,7 +158,9 @@ export default function ChildReportDetailScreen(): React.ReactElement {
               />
               <MetricCard
                 label={t('parentView.report.timeOnApp')}
-                value={String(report.reportData.thisMonth.totalActiveMinutes)}
+                value={formatMinutes(
+                  report.reportData.thisMonth.totalActiveMinutes,
+                )}
                 testID="child-report-metric-minutes"
               />
             </View>
