@@ -19,12 +19,12 @@ export const consentRequestSchema = z.object({
 
 export type ConsentRequest = z.infer<typeof consentRequestSchema>;
 
-export const consentResponseSchema = z.object({
+export const consentRespondRequestSchema = z.object({
   token: z.string(),
   approved: z.boolean(),
 });
 
-export type ConsentResponse = z.infer<typeof consentResponseSchema>;
+export type ConsentRespondRequest = z.infer<typeof consentRespondRequestSchema>;
 
 // Consent request result — response after submitting a consent request
 

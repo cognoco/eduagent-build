@@ -6,7 +6,7 @@
  *
  * Mocked boundaries:
  * - Stripe signature verification
- * - Inngest transport bootstrapping / send
+ * - Inngest event HTTP API — via fetch interceptor
  */
 
 import { eq } from 'drizzle-orm';
@@ -17,27 +17,13 @@ import {
   cleanupAccounts,
   createIntegrationDb,
 } from './helpers';
+import { getCapturedInngestEvents, mockInngestEvents } from './mocks';
+import { clearFetchCalls } from './fetch-interceptor';
 
 const mockVerifyWebhookSignature = jest.fn();
-const mockInngestSend = jest.fn();
-const mockInngestCreateFunction = jest.fn().mockImplementation((config) => {
-  const id = config?.id ?? 'mock-inngest-function';
-  const fn = jest.fn();
-  (fn as { getConfig: () => unknown[] }).getConfig = () => [
-    { id, name: id, triggers: [], steps: {} },
-  ];
-  return fn;
-});
 
 jest.mock('../../apps/api/src/services/stripe', () => ({
   verifyWebhookSignature: mockVerifyWebhookSignature,
-}));
-
-jest.mock('../../apps/api/src/inngest/client', () => ({
-  inngest: {
-    send: mockInngestSend,
-    createFunction: mockInngestCreateFunction,
-  },
 }));
 
 import { app } from '../../apps/api/src/index';
@@ -59,6 +45,10 @@ const TEST_ENV = {
 const seededEmails = new Set<string>();
 const seededClerkUserIds = new Set<string>();
 let seedCounter = 0;
+
+beforeAll(() => {
+  mockInngestEvents();
+});
 
 function nextSeed(prefix: string) {
   seedCounter += 1;
@@ -139,8 +129,8 @@ async function seedSubscriptionState(input: {
         input.lastStripeEventTimestamp === undefined
           ? null
           : input.lastStripeEventTimestamp
-          ? new Date(input.lastStripeEventTimestamp)
-          : null,
+            ? new Date(input.lastStripeEventTimestamp)
+            : null,
     })
     .returning();
 
@@ -167,7 +157,7 @@ async function seedSubscriptionState(input: {
 function buildStripeEvent(
   type: string,
   dataObject: Record<string, unknown>,
-  overrides?: { created?: number }
+  overrides?: { created?: number },
 ) {
   return {
     id: `evt_${type.replace(/\W+/g, '_')}_${Date.now()}`,
@@ -223,8 +213,7 @@ function readKvPayload() {
 
 beforeEach(async () => {
   mockVerifyWebhookSignature.mockReset();
-  mockInngestSend.mockReset();
-  mockInngestSend.mockResolvedValue({ ids: [] });
+  clearFetchCalls();
   mockKvPut.mockClear();
   mockKvGet.mockClear();
   await cleanupSeededAccounts();
@@ -243,7 +232,7 @@ describe('Integration: Stripe Webhook guards', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -256,7 +245,7 @@ describe('Integration: Stripe Webhook guards', () => {
     const res = await app.request(
       '/v1/stripe/webhook',
       buildWebhookRequest({}),
-      buildIntegrationEnv()
+      buildIntegrationEnv(),
     );
 
     expect(res.status).toBe(500);
@@ -266,13 +255,13 @@ describe('Integration: Stripe Webhook guards', () => {
 
   it('returns 400 when webhook signature verification fails', async () => {
     mockVerifyWebhookSignature.mockRejectedValueOnce(
-      new Error('Invalid signature')
+      new Error('Invalid signature'),
     );
 
     const res = await app.request(
       '/v1/stripe/webhook',
       buildWebhookRequest({ invalid: true }),
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -291,7 +280,7 @@ describe('Integration: Stripe Webhook guards', () => {
           data: [{ current_period_start: 1700000000, current_period_end: 1 }],
         },
       },
-      { created: Math.floor(Date.now() / 1000) - 49 * 60 * 60 }
+      { created: Math.floor(Date.now() / 1000) - 49 * 60 * 60 },
     );
 
     mockVerifyWebhookSignature.mockResolvedValueOnce(staleEvent);
@@ -299,7 +288,7 @@ describe('Integration: Stripe Webhook guards', () => {
     const res = await app.request(
       '/v1/stripe/webhook',
       buildWebhookRequest(staleEvent),
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -311,9 +300,8 @@ describe('Integration: Stripe Webhook guards', () => {
 
 describe('Integration: Stripe Webhook event handling', () => {
   it('checkout.session.completed creates and activates a paid subscription', async () => {
-    const { account, stripeSubscriptionId } = await seedAccount(
-      'stripe-checkout'
-    );
+    const { account, stripeSubscriptionId } =
+      await seedAccount('stripe-checkout');
 
     const event = buildStripeEvent('checkout.session.completed', {
       id: 'cs_checkout_completed',
@@ -326,7 +314,7 @@ describe('Integration: Stripe Webhook event handling', () => {
     const res = await app.request(
       '/v1/stripe/webhook',
       buildWebhookRequest(event),
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -388,7 +376,7 @@ describe('Integration: Stripe Webhook event handling', () => {
     const res = await app.request(
       '/v1/stripe/webhook',
       buildWebhookRequest(event),
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -398,10 +386,10 @@ describe('Integration: Stripe Webhook event handling', () => {
     expect(updatedSubscription!.tier).toBe('family');
     expect(updatedSubscription!.status).toBe('active');
     expect(updatedSubscription!.currentPeriodStart?.toISOString()).toBe(
-      new Date(periodStart * 1000).toISOString()
+      new Date(periodStart * 1000).toISOString(),
     );
     expect(updatedSubscription!.currentPeriodEnd?.toISOString()).toBe(
-      new Date(periodEnd * 1000).toISOString()
+      new Date(periodEnd * 1000).toISOString(),
     );
 
     const quotaPool = await loadQuotaPool(subscription.id);
@@ -444,7 +432,7 @@ describe('Integration: Stripe Webhook event handling', () => {
     const res = await app.request(
       '/v1/stripe/webhook',
       buildWebhookRequest(event),
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -497,7 +485,7 @@ describe('Integration: Stripe Webhook event handling', () => {
     const res = await app.request(
       '/v1/stripe/webhook',
       buildWebhookRequest(event),
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -515,7 +503,7 @@ describe('Integration: Stripe Webhook event handling', () => {
       usedThisMonth: 5,
     });
 
-    expect(mockInngestSend).toHaveBeenCalledWith(
+    expect(getCapturedInngestEvents()).toEqual([
       expect.objectContaining({
         name: 'app/payment.failed',
         data: expect.objectContaining({
@@ -524,8 +512,8 @@ describe('Integration: Stripe Webhook event handling', () => {
           accountId: account.id,
           attempt: 2,
         }),
-      })
-    );
+      }),
+    ]);
   });
 
   it('invoice.payment_succeeded restores the subscription to active', async () => {
@@ -550,7 +538,7 @@ describe('Integration: Stripe Webhook event handling', () => {
     const res = await app.request(
       '/v1/stripe/webhook',
       buildWebhookRequest(event),
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);

@@ -11,17 +11,8 @@ import {
   type Database,
 } from '@eduagent/database';
 import { and, eq, like } from 'drizzle-orm';
-
-// EXTERNAL boundary mock — routeAndCall is the LLM provider HTTP call. Per C1 D-MOCK-1 this is the formalized LLM external boundary.
-const mockRouteAndCall = jest.fn();
-
-jest.mock('./llm', () => {
-  const actual = jest.requireActual('./llm') as Record<string, unknown>;
-  return {
-    ...actual,
-    routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
-  };
-});
+import type { ChatMessage, LLMProvider, ModelConfig } from './llm';
+import { _clearProviders, _resetCircuits, registerProvider } from './llm';
 
 import {
   closeSession,
@@ -34,9 +25,27 @@ import {
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
 let db: Database;
+let llmResponse = '';
+const llmProviderCalls: Array<{
+  messages: ChatMessage[];
+  config: ModelConfig;
+}> = [];
 
 const RUN_ID = generateUUIDv7();
 let seedCounter = 0;
+
+function createSessionSummaryProvider(): LLMProvider {
+  return {
+    id: 'gemini',
+    async chat(messages, config) {
+      llmProviderCalls.push({ messages, config });
+      return { content: llmResponse, stopReason: 'stop' };
+    },
+    chatStream() {
+      throw new Error('session summary integration test does not stream');
+    },
+  };
+}
 
 async function seedProfile(): Promise<{
   accountId: string;
@@ -82,25 +91,24 @@ beforeAll(async () => {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
     throw new Error(
-      'DATABASE_URL is not set for session summary integration tests'
+      'DATABASE_URL is not set for session summary integration tests',
     );
   }
 
   db = createDatabase(databaseUrl);
+  _clearProviders();
+  _resetCircuits();
+  registerProvider(createSessionSummaryProvider());
 });
 
 beforeEach(() => {
-  jest.clearAllMocks();
-  mockRouteAndCall.mockResolvedValue({
-    response: JSON.stringify({
-      feedback: 'Great summary! You captured the key idea.',
-      hasUnderstandingGaps: false,
-      gapAreas: [],
-      isAccepted: true,
-    }),
-    provider: 'mock',
-    model: 'mock',
-    latencyMs: 1,
+  llmProviderCalls.length = 0;
+  _resetCircuits();
+  llmResponse = JSON.stringify({
+    feedback: 'Great summary! You captured the key idea.',
+    hasUnderstandingGaps: false,
+    gapAreas: [],
+    isAccepted: true,
   });
 });
 
@@ -108,6 +116,8 @@ afterAll(async () => {
   await db
     .delete(accounts)
     .where(like(accounts.clerkUserId, `clerk_session_summary_${RUN_ID}%`));
+  _clearProviders();
+  _resetCircuits();
 });
 
 describe('session summary integration', () => {
@@ -195,7 +205,7 @@ describe('session summary integration', () => {
     const storedSummary = await db.query.sessionSummaries.findFirst({
       where: and(
         eq(sessionSummaries.sessionId, session.id),
-        eq(sessionSummaries.profileId, profileId)
+        eq(sessionSummaries.profileId, profileId),
       ),
     });
     const learningModeRow = await db.query.learningModes.findFirst({
@@ -207,7 +217,7 @@ describe('session summary integration', () => {
         sessionId: session.id,
         status: 'accepted',
         aiFeedback: 'Great summary! You captured the key idea.',
-      })
+      }),
     );
     expect(storedSummary).toEqual(
       expect.objectContaining({
@@ -215,9 +225,30 @@ describe('session summary integration', () => {
           'Plants use sunlight, water, and carbon dioxide to make the food they need.',
         aiFeedback: 'Great summary! You captured the key idea.',
         status: 'accepted',
-      })
+      }),
     );
     expect(learningModeRow?.consecutiveSummarySkips).toBe(0);
-    expect(mockRouteAndCall).toHaveBeenCalled();
+    expect(llmProviderCalls).toHaveLength(1);
+    expect(llmProviderCalls[0]!.config.model).toBe('gemini-2.5-flash');
+    expect(llmProviderCalls[0]!.messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          role: 'system',
+          content: expect.stringContaining('summary evaluator'),
+        }),
+        expect.objectContaining({
+          role: 'user',
+          content: expect.stringContaining(
+            '<topic_title>Science</topic_title>',
+          ),
+        }),
+      ]),
+    );
+    const userPrompt = llmProviderCalls[0]!.messages.find(
+      (message) => message.role === 'user',
+    )!.content;
+    expect(userPrompt).toContain(
+      '<learner_summary>Plants use sunlight, water, and carbon dioxide to make the food they need.</learner_summary>',
+    );
   });
 });

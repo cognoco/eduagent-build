@@ -84,7 +84,7 @@ describe('buildLibraryIndex', () => {
 describe('formatLibraryIndexForPrompt', () => {
   it('returns "(empty library)" for empty index', () => {
     expect(formatLibraryIndexForPrompt({ shelves: [] })).toBe(
-      '(empty library)'
+      '(empty library)',
     );
   });
 
@@ -143,7 +143,7 @@ describe('fileToLibrary', () => {
         selectedSuggestion: 'European Rivers',
       },
       index,
-      mockRouteAndCall
+      mockRouteAndCall,
     );
 
     expect(result.topic.title).toBe('Danube');
@@ -190,7 +190,7 @@ describe('fileToLibrary — post-session variant', () => {
         sessionMode: 'freeform',
       },
       index,
-      mockRouteAndCall
+      mockRouteAndCall,
     );
 
     expect(result.extracted).toBe('European rivers and the Danube');
@@ -203,9 +203,9 @@ describe('fileToLibrary — post-session variant', () => {
   });
 
   // [BUG-849] Break test — LLM returns valid JSON but missing required schema
-  // fields. The cast `JSON.parse(jsonStr) as FilingResponse` would silently
+  // fields. The cast `JSON.parse(jsonStr) as FilingLlmOutput` would silently
   // produce a malformed object that crashes downstream destructuring.
-  // filingResponseSchema.parse() must throw a ZodError instead.
+  // filingLlmOutputSchema.parse() must throw a ZodError instead.
   it('[BUG-849] throws ZodError when LLM response is missing required fields', async () => {
     const mockRouteAndCall = jest.fn().mockResolvedValue({
       response: JSON.stringify({
@@ -226,7 +226,7 @@ describe('fileToLibrary — post-session variant', () => {
     const index: LibraryIndex = { shelves: [] };
 
     await expect(
-      fileToLibrary({ rawInput: 'Danube' }, index, mockRouteAndCall)
+      fileToLibrary({ rawInput: 'Danube' }, index, mockRouteAndCall),
     ).rejects.toThrow();
   });
 });
@@ -295,7 +295,7 @@ describe('buildFallbackFilingResponse [BUG-871]', () => {
     const result = buildFallbackFilingResponse(
       SUBJECT_ID,
       'Geometry Foundations',
-      'Geometry Foundations'
+      'Geometry Foundations',
     );
     if ('id' in result.book) {
       throw new Error('expected book to be a name-form ref');
@@ -328,7 +328,7 @@ describe('buildFallbackFilingResponse [BUG-871]', () => {
     const result = buildFallbackFilingResponse(
       SUBJECT_ID,
       'raw fallback name',
-      'Picked Suggestion'
+      'Picked Suggestion',
     );
     if ('id' in result.book) {
       throw new Error('expected book to be a name-form ref');
@@ -340,7 +340,7 @@ describe('buildFallbackFilingResponse [BUG-871]', () => {
     const result = buildFallbackFilingResponse(
       SUBJECT_ID,
       'rawInput',
-      '   Geometry   '
+      '   Geometry   ',
     );
     if ('id' in result.book) {
       throw new Error('expected book to be a name-form ref');

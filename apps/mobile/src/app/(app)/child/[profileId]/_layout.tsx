@@ -35,6 +35,10 @@ export default function ChildDetailLayout() {
         name="topic/[topicId]"
         getId={({ params }) => params?.topicId}
       />
+      <Stack.Screen
+        name="weekly-report/[weeklyReportId]"
+        getId={({ params }) => params?.weeklyReportId}
+      />
     </Stack>
   );
 }

@@ -3,8 +3,7 @@ export * from './common';
 export * from './errors';
 export * from './age';
 
-// Auth & Profiles
-export * from './auth';
+// Profiles
 export * from './profiles';
 export * from './consent';
 export * from './account';

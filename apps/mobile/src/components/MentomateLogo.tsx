@@ -20,9 +20,6 @@ type MentomateLogoProps = {
 /**
  * Brand-fixed wordmark colors matching the canonical SVGs
  * (logo-icon-light.svg, logo-icon-dark.svg) and AnimatedSplash.
- *
- * These are hardcoded so the brand identity stays consistent
- * regardless of persona or accent preset.
  */
 const BRAND = {
   light: {

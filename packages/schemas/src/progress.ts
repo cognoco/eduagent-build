@@ -355,13 +355,6 @@ export const pendingNoticeSchema = z.object({
 });
 export type PendingNotice = z.infer<typeof pendingNoticeSchema>;
 
-export const coachingCardCelebrationResponseSchema = z.object({
-  pendingCelebrations: z.array(pendingCelebrationSchema),
-});
-export type CoachingCardCelebrationResponse = z.infer<
-  typeof coachingCardCelebrationResponseSchema
->;
-
 // Dashboard data — parent view wrapper
 
 export const dashboardDataSchema = z.object({
@@ -540,12 +533,6 @@ export const homeCardSchema = z.object({
   topicName: z.string().optional(),
 });
 export type HomeCard = z.infer<typeof homeCardSchema>;
-
-export const homeCardsResponseSchema = z.object({
-  cards: z.array(homeCardSchema),
-  coldStart: z.boolean(),
-});
-export type HomeCardsResponse = z.infer<typeof homeCardsResponseSchema>;
 
 export const homeCardInteractionTypeSchema = z.enum(['tap', 'dismiss']);
 export type HomeCardInteractionType = z.infer<

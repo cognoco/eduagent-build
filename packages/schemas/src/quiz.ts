@@ -177,18 +177,6 @@ export const quizRoundResponseSchema = z.object({
 });
 export type QuizRoundResponse = z.infer<typeof quizRoundResponseSchema>;
 
-// Server-internal round response — full question data for DB/service use
-export const internalQuizRoundResponseSchema = z.object({
-  id: z.string().uuid(),
-  activityType: quizActivityTypeSchema,
-  theme: z.string(),
-  questions: z.array(quizQuestionSchema),
-  total: z.number().int().positive(),
-});
-export type InternalQuizRoundResponse = z.infer<
-  typeof internalQuizRoundResponseSchema
->;
-
 export const validatedQuestionResultSchema = z.object({
   questionIndex: z.number().int().min(0),
   correct: z.boolean(),

@@ -14,6 +14,7 @@ import {
   ConflictError,
   ForbiddenError,
   NotFoundError,
+  QuotaExceededError,
   RateLimitedError,
   ResourceGoneError,
   SafetyFilterError,
@@ -24,6 +25,18 @@ import {
   PersistCurriculumError,
   classifyOrphanError,
 } from './errors.js';
+import type { QuotaExceededDetails } from './errors.js';
+
+const QUOTA_DETAILS: QuotaExceededDetails = {
+  tier: 'free',
+  reason: 'monthly',
+  monthlyLimit: 100,
+  usedThisMonth: 100,
+  dailyLimit: 10,
+  usedToday: 5,
+  topUpCreditsRemaining: 0,
+  upgradeOptions: [],
+};
 
 describe('typed error classes [BUG-644]', () => {
   it('NotFoundError carries the resource name in the message', () => {
@@ -74,6 +87,17 @@ describe('typed error classes [BUG-644]', () => {
     expect(err).toBeInstanceOf(SafetyFilterError);
     expect(err.name).toBe('SafetyFilterError');
     expect(err.errorCode).toBe('SAFETY_FILTER');
+  });
+
+  it('QuotaExceededError exposes stable codes and quota details [BUG-947]', () => {
+    const err = new QuotaExceededError('Quota exceeded', QUOTA_DETAILS);
+    expect(err).toBeInstanceOf(Error);
+    expect(err).toBeInstanceOf(QuotaExceededError);
+    expect(err.name).toBe('QuotaExceededError');
+    expect(err.code).toBe('QUOTA_EXCEEDED');
+    expect(err.errorCode).toBe('QUOTA_EXCEEDED');
+    expect(err.details).toBe(QUOTA_DETAILS);
+    expect(err.message).toBe('Quota exceeded');
   });
 
   it('ResourceGoneError exposes stable errorCode and optional code/details [BUG-1010]', () => {

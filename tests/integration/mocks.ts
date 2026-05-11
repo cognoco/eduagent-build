@@ -1,45 +1,86 @@
 /**
- * Inngest client mock for integration tests.
+ * Shared integration-test HTTP boundary stubs.
  *
- * INTENTIONALLY mocks an internal module. Unlike other internal mocks
- * (which have been migrated to fetch interceptors), this prevents real
- * Inngest event dispatch during tests. The alternative — letting events
- * dispatch to a real/dev Inngest server — would make tests flaky and
- * environment-dependent.
- *
- * The Inngest functions themselves are tested directly (session-completed,
- * trial-expiry, etc.) by calling the handler with a mock step runner.
- *
- * Usage:
- *   import { inngestClientMock } from './mocks';
- *   jest.mock('../../apps/api/src/inngest/client', () => inngestClientMock());
+ * Keep app modules real here. These helpers register fetch-interceptor
+ * handlers for external transports that the app reaches through HTTP.
  */
 
-/**
- * Mock `../../apps/api/src/inngest/client`.
- *
- * The `inngest.createFunction()` call happens at import time for every Inngest
- * function module. The `serve()` handler calls `fn.getConfig()` during setup.
- * This factory satisfies both requirements.
- *
- * @param sendMock - Optional pre-created jest.fn() for `inngest.send` (useful
- *   when tests need to assert on sent events).
- */
-export function inngestClientMock(sendMock?: jest.Mock): {
-  inngest: Record<string, jest.Mock>;
-} {
-  let fnCounter = 0;
+import {
+  addFetchHandler,
+  getFetchCalls,
+  jsonResponse,
+  type FetchHandler,
+} from './fetch-interceptor';
+
+export interface MockHandle {
+  /**
+   * Override the response for the next matching fetch call only.
+   * After one use, reverts to the default response.
+   */
+  nextResponse: (responseFn: () => Response) => void;
+  /**
+   * Replace the default response factory permanently (until changed again).
+   *
+   * Accepts a factory function because Response bodies are single-use.
+   */
+  setDefault: (responseFn: () => Response) => void;
+}
+
+export interface CapturedInngestEvent {
+  name: string;
+  data?: Record<string, unknown>;
+  id?: string;
+  ts?: number;
+}
+
+function createMockHandle(
+  pattern: string | RegExp,
+  defaultResponseFn: () => Response,
+): MockHandle {
+  let oneShot: (() => Response) | null = null;
+  let customDefault: (() => Response) | null = null;
+
+  const handler: FetchHandler = () => {
+    if (oneShot) {
+      const factory = oneShot;
+      oneShot = null;
+      return factory();
+    }
+    return customDefault ? customDefault() : defaultResponseFn();
+  };
+
+  addFetchHandler(pattern, handler);
+
   return {
-    inngest: {
-      send: sendMock ?? jest.fn().mockResolvedValue({ ids: [] }),
-      createFunction: jest.fn().mockImplementation((config) => {
-        const id = config?.id ?? `mock-fn-${fnCounter++}`;
-        const fn = jest.fn();
-        (fn as any).getConfig = () => [
-          { id, name: id, triggers: [], steps: {} },
-        ];
-        return fn;
-      }),
+    nextResponse: (responseFn: () => Response) => {
+      oneShot = responseFn;
+    },
+    setDefault: (responseFn: () => Response) => {
+      customDefault = responseFn;
     },
   };
+}
+
+/**
+ * Intercepts the real Inngest client's event transport.
+ *
+ * The application imports and uses the real `inngest` client. This handler
+ * stubs only the outbound Inngest HTTP event API so integration tests can
+ * assert on dispatched payloads without mocking the internal client module.
+ */
+export function mockInngestEvents(): MockHandle {
+  return createMockHandle('inn.gs/e/', () =>
+    jsonResponse({ ids: ['mock-inngest-event-id'], status: 200 }),
+  );
+}
+
+export function getCapturedInngestEvents(): CapturedInngestEvent[] {
+  return getFetchCalls('inn.gs/e/').flatMap((call) => {
+    if (!call.body) {
+      return [];
+    }
+
+    const body = JSON.parse(call.body) as CapturedInngestEvent[];
+    return Array.isArray(body) ? body : [body];
+  });
 }

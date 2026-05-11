@@ -16,7 +16,7 @@ interface LivingBookProps {
   exchangeCount: number;
   /** True when interview/session is finished. */
   isComplete: boolean;
-  /** When true, shows sparkle animations and larger icon. Callers map persona → boolean. */
+  /** When true, shows sparkle animations and larger icon. */
   isExpressive?: boolean;
   /** Optional press handler — makes the book tappable (e.g. navigate on completion). */
   onPress?: () => void;
@@ -72,7 +72,6 @@ export function LivingBook({
         withSpring(1, { damping: 10, stiffness: 150 }),
       );
 
-      // Sparkle (learner only)
       if (isExpressive) {
         sparkleOpacity.value = withSequence(
           withTiming(1, { duration: 150 }),
@@ -168,7 +167,6 @@ export function LivingBook({
             color={isComplete ? colors.primary : colors.textSecondary}
           />
 
-          {/* Sparkle (learner only) */}
           {isExpressive && (
             <Animated.View
               style={sparkleAnimatedStyle}

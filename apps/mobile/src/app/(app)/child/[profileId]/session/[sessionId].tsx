@@ -14,6 +14,7 @@ import { useChildSessionDetail } from '../../../../../hooks/use-dashboard';
 import { goBackOrReplace } from '../../../../../lib/navigation';
 import { EngagementChip } from '../../../../../components/parent/EngagementChip';
 import { MetricInfoDot } from '../../../../../components/parent/MetricInfoDot';
+import { useThemeColors } from '../../../../../lib/theme';
 let Clipboard: typeof import('expo-clipboard') | null = null;
 try {
   Clipboard = require('expo-clipboard');
@@ -40,6 +41,7 @@ export default function SessionDetailScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>(
     'idle',
   );
@@ -128,7 +130,7 @@ export default function SessionDetailScreen() {
         testID="session-not-found"
         className="flex-1 items-center justify-center bg-background px-6"
       >
-        <Ionicons name="document-text-outline" size={48} color="#888" />
+        <Ionicons name="document-text-outline" size={48} color={colors.muted} />
         <Text className="text-text-secondary mt-4 text-center text-base">
           {t('parentView.session.sessionNoLongerAvailable')}
         </Text>

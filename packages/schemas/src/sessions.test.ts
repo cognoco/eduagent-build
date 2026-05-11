@@ -1,7 +1,7 @@
 import {
   extractedInterviewSignalsSchema,
   firstCurriculumSessionStartSchema,
-  learnerRecapResponseSchema,
+  learnerRecapLlmOutputSchema,
   sessionMessageSchema,
 } from './sessions.js';
 
@@ -112,7 +112,7 @@ describe('extractedInterviewSignalsSchema — fast-path fields', () => {
   });
 });
 
-describe('learnerRecapResponseSchema [BUG-1011]', () => {
+describe('learnerRecapLlmOutputSchema [BUG-1011]', () => {
   const validRecap = {
     closingLine: 'Great session today!',
     takeaways: ['Learned about loops', 'Practiced recursion'],
@@ -120,12 +120,12 @@ describe('learnerRecapResponseSchema [BUG-1011]', () => {
   };
 
   it('accepts a valid recap with closingLine, takeaways, and nextTopicReason', () => {
-    const result = learnerRecapResponseSchema.safeParse(validRecap);
+    const result = learnerRecapLlmOutputSchema.safeParse(validRecap);
     expect(result.success).toBe(true);
   });
 
   it('accepts nullable nextTopicReason', () => {
-    const result = learnerRecapResponseSchema.safeParse({
+    const result = learnerRecapLlmOutputSchema.safeParse({
       ...validRecap,
       nextTopicReason: null,
     });
@@ -133,7 +133,7 @@ describe('learnerRecapResponseSchema [BUG-1011]', () => {
   });
 
   it('accepts 1 takeaway (minimum)', () => {
-    const result = learnerRecapResponseSchema.safeParse({
+    const result = learnerRecapLlmOutputSchema.safeParse({
       ...validRecap,
       takeaways: ['Single takeaway'],
     });
@@ -141,7 +141,7 @@ describe('learnerRecapResponseSchema [BUG-1011]', () => {
   });
 
   it('accepts 4 takeaways (maximum)', () => {
-    const result = learnerRecapResponseSchema.safeParse({
+    const result = learnerRecapLlmOutputSchema.safeParse({
       ...validRecap,
       takeaways: ['One', 'Two', 'Three', 'Four'],
     });
@@ -149,7 +149,7 @@ describe('learnerRecapResponseSchema [BUG-1011]', () => {
   });
 
   it('rejects empty closingLine', () => {
-    const result = learnerRecapResponseSchema.safeParse({
+    const result = learnerRecapLlmOutputSchema.safeParse({
       ...validRecap,
       closingLine: '',
     });
@@ -157,7 +157,7 @@ describe('learnerRecapResponseSchema [BUG-1011]', () => {
   });
 
   it('rejects closingLine exceeding 150 characters', () => {
-    const result = learnerRecapResponseSchema.safeParse({
+    const result = learnerRecapLlmOutputSchema.safeParse({
       ...validRecap,
       closingLine: 'x'.repeat(151),
     });
@@ -165,7 +165,7 @@ describe('learnerRecapResponseSchema [BUG-1011]', () => {
   });
 
   it('rejects 0 takeaways (too few)', () => {
-    const result = learnerRecapResponseSchema.safeParse({
+    const result = learnerRecapLlmOutputSchema.safeParse({
       ...validRecap,
       takeaways: [],
     });
@@ -173,7 +173,7 @@ describe('learnerRecapResponseSchema [BUG-1011]', () => {
   });
 
   it('rejects more than 4 takeaways', () => {
-    const result = learnerRecapResponseSchema.safeParse({
+    const result = learnerRecapLlmOutputSchema.safeParse({
       ...validRecap,
       takeaways: ['One', 'Two', 'Three', 'Four', 'Five'],
     });
@@ -181,7 +181,7 @@ describe('learnerRecapResponseSchema [BUG-1011]', () => {
   });
 
   it('rejects a takeaway exceeding 200 characters', () => {
-    const result = learnerRecapResponseSchema.safeParse({
+    const result = learnerRecapLlmOutputSchema.safeParse({
       ...validRecap,
       takeaways: ['y'.repeat(201)],
     });
@@ -189,7 +189,7 @@ describe('learnerRecapResponseSchema [BUG-1011]', () => {
   });
 
   it('rejects an empty takeaway string', () => {
-    const result = learnerRecapResponseSchema.safeParse({
+    const result = learnerRecapLlmOutputSchema.safeParse({
       ...validRecap,
       takeaways: [''],
     });
@@ -197,7 +197,7 @@ describe('learnerRecapResponseSchema [BUG-1011]', () => {
   });
 
   it('rejects nextTopicReason exceeding 120 characters', () => {
-    const result = learnerRecapResponseSchema.safeParse({
+    const result = learnerRecapLlmOutputSchema.safeParse({
       ...validRecap,
       nextTopicReason: 'z'.repeat(121),
     });
@@ -205,12 +205,12 @@ describe('learnerRecapResponseSchema [BUG-1011]', () => {
   });
 
   it('rejects missing required fields', () => {
-    expect(learnerRecapResponseSchema.safeParse({}).success).toBe(false);
+    expect(learnerRecapLlmOutputSchema.safeParse({}).success).toBe(false);
     expect(
-      learnerRecapResponseSchema.safeParse({ closingLine: 'Hi' }).success,
+      learnerRecapLlmOutputSchema.safeParse({ closingLine: 'Hi' }).success,
     ).toBe(false);
     expect(
-      learnerRecapResponseSchema.safeParse({ takeaways: ['A'] }).success,
+      learnerRecapLlmOutputSchema.safeParse({ takeaways: ['A'] }).success,
     ).toBe(false);
   });
 });

@@ -9,20 +9,15 @@ import { resolve } from 'node:path';
 // prompt drift, envelope contract drift, and shape-of-response bugs.
 //
 // This guard fails if ANY new *.integration.test.ts file adds a jest.mock for
-// the internal LLM router (`./llm`, `../llm`, `services/llm`). Two pre-
-// existing offenders are listed in KNOWN_OFFENDERS pending migration to
-// HTTP-boundary mocking (see weekly-progress-push.integration.test.ts for
-// the right pattern — intercept globalThis.fetch instead).
+// the internal LLM router (`./llm`, `../llm`, `services/llm`). The right
+// pattern is to intercept globalThis.fetch for HTTP SDKs, or register a
+// provider in the LLM provider registry when the service boundary is the router.
 
 const KNOWN_OFFENDERS = new Set<string>([
-  // BUG-743 follow-up: migrate to HTTP-boundary mocking (see Expo Push pattern
-  // in src/inngest/functions/weekly-progress-push.integration.test.ts).
-  'apps/api/src/services/session-summary.integration.test.ts',
-  'apps/api/src/services/quiz/vocabulary.integration.test.ts',
   // PR #211: book-suggestion generation mocks `./llm` to stub routeAndCall.
   // The inline `gc1-allow` annotation exempts it from the GC1 ratchet but not
   // BUG-743 — that's deliberate; BUG-743's invariant is HTTP-boundary mocking
-  // specifically. Convert in a follow-up PR alongside the other two.
+  // specifically. Convert in a follow-up PR.
   'apps/api/src/services/book-suggestion-generation.integration.test.ts',
 ]);
 
