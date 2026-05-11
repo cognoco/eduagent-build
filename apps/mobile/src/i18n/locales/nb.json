@@ -269,7 +269,11 @@
       }
     },
     "accommodation": {
-      "sectionHeader": "{{name}}s læringstilpasning"
+      "sectionHeader": "Din læringstilpasning",
+      "viewAndManage": "Se og administrer",
+      "screenTitle": "Læringstilpasning",
+      "notSureWhichToPick": "Usikker på hva du skal velge?",
+      "guideActive": "Aktiv"
     },
     "learningPreferences": {
       "rowLabel": "Læringsinnstillinger",

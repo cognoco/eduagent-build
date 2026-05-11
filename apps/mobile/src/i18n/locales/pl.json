@@ -294,7 +294,11 @@
       }
     },
     "accommodation": {
-      "sectionHeader": "Dostosowanie nauki dla {{name}}"
+      "sectionHeader": "Twoje dostosowanie nauki",
+      "viewAndManage": "Zobacz i zarządzaj",
+      "screenTitle": "Dostosowanie nauki",
+      "notSureWhichToPick": "Nie wiesz, co wybrać?",
+      "guideActive": "Aktywny"
     },
     "learningPreferences": {
       "rowLabel": "Preferencje nauki",

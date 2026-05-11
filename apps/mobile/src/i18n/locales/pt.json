@@ -294,7 +294,11 @@
       }
     },
     "accommodation": {
-      "sectionHeader": "Acomodação de Aprendizagem de {{name}}"
+      "sectionHeader": "A sua acomodação de aprendizagem",
+      "viewAndManage": "Ver e gerir",
+      "screenTitle": "Acomodação de aprendizagem",
+      "notSureWhichToPick": "Não sabe qual escolher?",
+      "guideActive": "Ativo"
     },
     "learningPreferences": {
       "rowLabel": "Preferências de aprendizagem",

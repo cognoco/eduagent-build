@@ -269,7 +269,11 @@
       }
     },
     "accommodation": {
-      "sectionHeader": "{{name}}さんの学習サポート"
+      "sectionHeader": "あなたの学習サポート設定",
+      "viewAndManage": "確認・管理",
+      "screenTitle": "学習サポート設定",
+      "notSureWhichToPick": "どれを選べばいい？",
+      "guideActive": "有効"
     },
     "learningPreferences": {
       "rowLabel": "学習設定",

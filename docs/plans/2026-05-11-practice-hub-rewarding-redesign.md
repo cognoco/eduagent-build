@@ -33,6 +33,8 @@ This is functional, but it makes very different actions look equivalent. `Quiz h
 | **D-PH-6** | Forward-only guard: do not add streak copy to this screen. (The current screen has none; this prevents future drift.) Keep only a compact total XP pill near the heading. |
 | **D-PH-7** | Add small cues only where backed by real data: review due count (`reviewSummary.totalOverdue`), assessment-eligible count (`useAssessmentEligibleTopics().length`), rounds played (`quizStats.roundsPlayed`), best score percentage (`bestScore/bestTotal`), and `totalXp`. Do not show hardcoded `+N XP` or `N min` cues — neither `ReviewSummary` nor `useAssessmentEligibleTopics` exposes per-round duration or expected XP, and XP per round is variable. |
 | **D-PH-8** | All quiz entry paths (parent card + nested sub-options) route to `/(app)/quiz`. Direct-launch via `?activityType=` is rejected because: (a) `useQuizFlow()` is layout-scoped (`apps/mobile/src/app/(app)/quiz/_layout.tsx:107-124`), (b) consuming the param inside `quiz/index.tsx` causes a render flash before `router.push('/quiz/launch')`, and (c) `router.back()` from `quiz/launch` lands on `quiz/index`, not Practice. Skipping the quiz index also hides per-language vocabulary cards. |
+| **D-PH-9** | This is a visual redesign, not only a label/IA change. The implementation must carry over the mockup's card hierarchy, tinting, chips, spacing, and centered composition. |
+| **D-PH-10** | On web/tablet widths, constrain the Practice content to a phone-like readable max width and center it. Do not let cards stretch across the full browser surface. |
 
 ## Proposed Information Architecture
 
@@ -67,6 +69,35 @@ This is functional, but it makes very different actions look equivalent. `Quiz h
      - `No rounds yet` when `0`
    - Do not promise a "Last score" cue — `QuizStats` (`packages/schemas/src/quiz.ts:223-234`) exposes only `bestScore`, not last-round score, and backend changes are out of scope.
 
+## Visual Acceptance Criteria
+
+The implementation should be compared against the mockup, not only checked for the right text.
+
+| Area | Must match | Current miss to avoid |
+| --- | --- | --- |
+| Page composition | Content is centered with a readable max width on web/tablet; mobile keeps normal horizontal padding. | Wide web rendering that feels left-heavy and stretched. |
+| Header | Back button, title/subtitle, and XP pill are visually balanced. XP pill is compact but strong enough to feel like a reward. | XP pill floating far right while the title block feels off-center. |
+| Section labels | Small uppercase/semibold treatment with consistent spacing above sections. | Plain text labels that feel like default headings. |
+| Today's review | Primary card has a distinct soft success tint, subtle border, cue chips, badge/count, and a deliberate CTA treatment. | Beige card with one floating button and no reward/time/topic chips. |
+| Prove I know this | Compact row below review, secondary but polished; includes icon, concise cue line, and clear affordance. | Large peer card or plain white row that feels disconnected. |
+| Quick quiz | One large tinted card with nested option cards for `Capitals` and `Who's who`; parent card has description and stats cue. | Large beige block with two plain white rectangles and little visual affordance. |
+| Quiz options | Each nested option has enough affordance: icon/tint, title, short cue, and score/played state when available. | Options only show title + best score. |
+| Dictation / Recite | Two smaller tinted cards with distinct colors, icons, XP/Beta chips, and short descriptions. | Hidden below the fold with only the `Other practice` heading visible above the tab bar. |
+| Quiz history | Quiet `Recent progress` row, visually separate from action choices. | History presented as another action button. |
+| Bottom spacing | Last content clears the tab bar/safe area and remains reachable without feeling cut off. | The tab bar swallows the bottom section. |
+
+## Screenshot Comparison Notes
+
+The 2026-05-11 browser screenshot of the current implementation shows the IA landed but not the visual design:
+
+- The page uses the existing beige/elevated card language, while the mockup relies on distinct soft tints per action group.
+- `Today's review` is missing the cue chips and the mockup's stronger primary-card treatment.
+- The quiz card does not make `Capitals` / `Who's who` feel like real tappable modes; they read as plain sub-cards.
+- `Other practice` is pushed below the tab bar fold, so Dictation and Recite are not visible when the section heading appears.
+- The content is not centered like the mockup on the wide web viewport.
+
+Treat these as implementation bugs, not taste differences.
+
 ## File Structure
 
 ### Modified
@@ -96,6 +127,8 @@ This is functional, but it makes very different actions look equivalent. `Quiz h
 - [ ] Keep the existing back behavior and parent-proxy redirect.
 - [ ] Add compact XP pill near the header using the existing aggregated quiz `totalXp`.
 - [ ] Do not add streak messaging.
+- [ ] Add a web/tablet content wrapper with a max width matching the mockup's phone-like density. Keep native mobile full width with standard padding.
+- [ ] Do not rely on `IntentCard` for the new primary cards if it prevents matching the mockup hierarchy. Build local card markup or a small Practice-specific component.
 
 ### Task 2: Update review and challenge copy
 
@@ -117,6 +150,7 @@ This is functional, but it makes very different actions look equivalent. `Quiz h
   - Else if `roundsPlayed > 0`: `Played {roundsPlayed}`
   - Else: no cue (no fake-precision duration)
 - [ ] Card-level cue: aggregated stats line already computed in `practice/index.tsx:49-81` (`Best: {pct}% · Played: {N} · {totalXp} XP`). Keep one cue level visible at a time to avoid overloading.
+- [ ] Style `Capitals` and `Who's who` as real tappable option cards with icon/tint, short explanatory copy, and score/played chips. They should not look like plain white boxes inside a beige parent.
 
 ### Task 4: Quiz navigation behavior (resolved)
 
@@ -165,6 +199,15 @@ Decision: all quiz entry paths route to `/(app)/quiz`. Direct-launch via `?activ
   - Dictation opens `/(app)/dictation`.
   - Quiz history opens `/(app)/quiz/history`.
 - [ ] No E2E YAML changes required — `practice-quiz` and `practice-quiz-history` testIDs preserved.
+
+### Task 7: Visual QA pass
+
+- [ ] Open the Practice screen in the same web viewport used for review.
+- [ ] Compare side by side against `docs/visual-artefacts/practice-hub-rewarding-mockup.html`.
+- [ ] Confirm the page is centered, not stretched.
+- [ ] Confirm `Dictation` and `Recite` cards are visible or clearly reachable after the `Other practice` heading without being swallowed by the tab bar.
+- [ ] Confirm the nested quiz options include the same information density as the mockup.
+- [ ] Capture a screenshot and attach it to the PR or plan notes before marking the story done.
 
 ## Failure Modes
 

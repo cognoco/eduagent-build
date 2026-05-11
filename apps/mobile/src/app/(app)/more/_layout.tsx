@@ -25,6 +25,7 @@ export default function MoreLayout(): React.JSX.Element {
         name="learning-preferences"
         options={{ headerShown: false }}
       />
+      <Stack.Screen name="accommodation" options={{ headerShown: false }} />
       <Stack.Screen
         name="notifications"
         options={{ title: t('more.subscreens.notifications') }}

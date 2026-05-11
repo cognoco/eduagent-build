@@ -183,7 +183,15 @@ describe('PracticeScreen', () => {
   it('shows quiz XP in the header and quick quiz cue before any XP is earned', () => {
     render(<PracticeScreen />);
 
-    screen.getByText('0 XP');
+    // XP appears in both the header pill and the quiz card; target by testID
+    expect(
+      screen
+        .getByTestId('practice-xp-header')
+        .findByProps({ children: '0 XP' }),
+    ).toBeTruthy();
+    expect(
+      screen.getByTestId('practice-quiz-xp').findByProps({ children: '0 XP' }),
+    ).toBeTruthy();
     screen.getByText('Test yourself with multiple choice questions · 0 XP');
   });
 
@@ -263,7 +271,12 @@ describe('PracticeScreen', () => {
 
     screen.getByText('Best 4/5');
     screen.getByText('Played 2');
-    screen.getByText('200 XP');
+    // 200 XP appears in both header pill and quiz card; target the quiz card chip
+    expect(
+      screen
+        .getByTestId('practice-quiz-xp')
+        .findByProps({ children: '200 XP' }),
+    ).toBeTruthy();
   });
 
   it('places recitation and dictation after the main review and test actions', () => {
@@ -297,8 +310,8 @@ describe('PracticeScreen', () => {
       'practice-review',
       'practice-assessment',
       'practice-quiz',
-      'practice-recitation',
       'practice-dictation',
+      'practice-recitation',
       'practice-quiz-history',
     ]);
   });
@@ -307,7 +320,7 @@ describe('PracticeScreen', () => {
     render(<PracticeScreen />);
 
     const quizHistoryRow = screen.getByTestId('practice-quiz-history');
-    expect(quizHistoryRow.props.className).toContain('min-h-[52px]');
+    expect(quizHistoryRow.props.className).toContain('min-h-[56px]');
     screen.getByText('No rounds yet');
   });
 });

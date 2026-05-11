@@ -269,7 +269,11 @@
       }
     },
     "accommodation": {
-      "sectionHeader": "{{name}}s Lernanpassung"
+      "sectionHeader": "Deine Lernanpassung",
+      "viewAndManage": "Ansehen & verwalten",
+      "screenTitle": "Lernanpassung",
+      "notSureWhichToPick": "Nicht sicher, was du wählen sollst?",
+      "guideActive": "Aktiv"
     },
     "learningPreferences": {
       "rowLabel": "Lernpräferenzen",

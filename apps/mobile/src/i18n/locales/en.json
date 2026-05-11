@@ -255,8 +255,8 @@
       "subtitle": "Applies to your own learning sessions.",
       "subtitleWithChildren": "Applies to your own sessions. To change a child's, open their profile from the dashboard.",
       "childPreferencesAccessLabel": "Open {{name}}'s profile preferences",
-      "childPreferencesLink": "To change {{name}}'s preferences, open their profile →",
-      "familyPreferencesLink": "To change a child's preferences, open Family →",
+      "childPreferencesLink": "To change {{name}}'s preferences, tap their profile on Home →",
+      "familyPreferencesLink": "To change a child's preferences, tap their profile on Home →",
       "sheetTitle": "Learning mode",
       "sheetEffectMessage": "Takes effect from your next message.",
       "casual": {
@@ -269,11 +269,15 @@
       }
     },
     "accommodation": {
-      "sectionHeader": "{{name}}'s Learning Accommodation"
+      "sectionHeader": "Your learning accommodation",
+      "viewAndManage": "View & manage",
+      "screenTitle": "Learning accommodation",
+      "notSureWhichToPick": "Not sure which to pick?",
+      "guideActive": "Active"
     },
     "learningPreferences": {
       "rowLabel": "Learning preferences",
-      "screenTitle": "Learning preferences"
+      "screenTitle": "Your learning preferences"
     },
     "mentorMemory": {
       "sectionHeader": "What your mentor knows",
