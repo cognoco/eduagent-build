@@ -33,7 +33,9 @@ import {
   useProgressHistory,
   useProgressInventory,
   useProgressMilestones,
+  useProfileReports,
   useProfileSessions,
+  useProfileWeeklyReports,
   useRefreshProgressSnapshot,
 } from '../../../hooks/use-progress';
 import { pushLearningResumeTarget } from '../../../lib/navigation';
@@ -242,6 +244,12 @@ export default function ProgressScreen(): React.ReactElement {
   const profileSessionsQuery = useProfileSessions(
     selectedProfileId || activeProfile?.id,
   );
+  const monthlyReportsQuery = useProfileReports(
+    selectedProfileId || activeProfile?.id,
+  );
+  const weeklyReportsQuery = useProfileWeeklyReports(
+    selectedProfileId || activeProfile?.id,
+  );
   const resumeTargetQuery = useLearningResumeTarget();
   const milestonesQuery = useProgressMilestones(5);
   const refreshSnapshot = useRefreshProgressSnapshot();
@@ -276,6 +284,8 @@ export default function ProgressScreen(): React.ReactElement {
     await Promise.all([
       inventoryQuery.refetch(),
       historyQuery.refetch(),
+      monthlyReportsQuery.refetch(),
+      weeklyReportsQuery.refetch(),
       ...(isViewingSelf ? [milestonesQuery.refetch()] : []),
     ]);
   };
@@ -299,6 +309,11 @@ export default function ProgressScreen(): React.ReactElement {
     !!inventory &&
     inventory.global.totalSessions === 0 &&
     inventory.subjects.length === 0;
+  const hasAnyReports =
+    (monthlyReportsQuery.data?.length ?? 0) > 0 ||
+    (weeklyReportsQuery.data?.length ?? 0) > 0;
+  const reportsAreLoading =
+    monthlyReportsQuery.isLoading || weeklyReportsQuery.isLoading;
   const sessionCount =
     profileSessionsQuery.data?.length ?? inventory?.global.totalSessions ?? 0;
   const lastSessionAt =
@@ -312,6 +327,14 @@ export default function ProgressScreen(): React.ReactElement {
     !!inventory &&
     !profileSessionsQuery.isLoading &&
     isProfileStale({ sessionCount, lastSessionAt });
+  const progressSurfaceState: 'empty' | 'awaiting' | 'ready' | 'ineligible' =
+    isEmpty || isStale
+      ? 'empty'
+      : hasAnyReports
+        ? 'ready'
+        : reportsAreLoading
+          ? 'awaiting'
+          : 'awaiting';
 
   const hasLanguageSubject = inventory?.subjects?.some(
     (s) => s.pedagogyMode === 'four_strands',
@@ -378,7 +401,7 @@ export default function ProgressScreen(): React.ReactElement {
             }}
             testID="progress-error-state"
           />
-        ) : isEmpty || isStale ? (
+        ) : progressSurfaceState === 'empty' ? (
           <View className="bg-coaching-card rounded-card p-5">
             <Text className="text-h3 font-semibold text-text-primary">
               {t('progress.empty.title')}
@@ -446,9 +469,7 @@ export default function ProgressScreen(): React.ReactElement {
                       })}
                     </Text>
                   </View>
-                  {/* [F-012] Show vocabulary pill for language subjects only.
-                      Gate by pedagogyMode so non-language users don't see
-                      a misleading "Vocabulary →" link. */}
+                  {/* [F-012] Show vocabulary pill for language subjects only. */}
                   {hasLanguageSubject ? (
                     <Pressable
                       onPress={() =>
@@ -494,14 +515,6 @@ export default function ProgressScreen(): React.ReactElement {
               ) : null}
             </View>
 
-            {inventory?.currentlyWorkingOn?.length ? (
-              <CurrentlyWorkingOnCard
-                items={inventory.currentlyWorkingOn}
-                register={register}
-                testID="progress-currently-working-on"
-              />
-            ) : null}
-
             {selectedProfileId ? (
               <>
                 <TrackedView
@@ -544,6 +557,22 @@ export default function ProgressScreen(): React.ReactElement {
                   />
                 </TrackedView>
               </>
+            ) : null}
+
+            {selectedProfileId && progressSurfaceState === 'ready' ? (
+              <ReportsListCard
+                profileId={selectedProfileId}
+                interactive
+                selfView={isViewingSelf}
+              />
+            ) : null}
+
+            {inventory?.currentlyWorkingOn?.length ? (
+              <CurrentlyWorkingOnCard
+                items={inventory.currentlyWorkingOn}
+                register={register}
+                testID="progress-currently-working-on"
+              />
             ) : null}
 
             <View className="mt-6">
@@ -647,10 +676,6 @@ export default function ProgressScreen(): React.ReactElement {
                   />
                 </Pressable>
               </>
-            ) : null}
-
-            {selectedProfileId ? (
-              <ReportsListCard profileId={selectedProfileId} />
             ) : null}
 
             {isViewingSelf ? (

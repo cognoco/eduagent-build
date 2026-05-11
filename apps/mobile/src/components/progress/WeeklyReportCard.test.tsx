@@ -14,6 +14,18 @@ jest.mock('react-i18next', () => ({
     t: (key: string, opts?: Record<string, unknown>) => {
       if (key === 'progress.weeklyReport.thisWeekSoFar')
         return 'This week so far';
+      if (key === 'progress.weeklyReport.chips.time')
+        return `${opts?.time ?? ''} spent`;
+      if (key === 'progress.weeklyReport.chips.topics')
+        return `${opts?.count ?? 0} topics started`;
+      if (key === 'progress.weeklyReport.chips.streak')
+        return `${opts?.count ?? 0}-day streak`;
+      if (key === 'progress.weeklyReport.practiceTitle')
+        return 'Practice highlights';
+      if (key === 'progress.weeklyReport.practice.quizzes')
+        return 'quizzes completed';
+      if (key === 'progress.weeklyReport.practice.reviews')
+        return 'reviews finished';
       if (key === 'progress.weeklyReport.mini.sessions')
         return `${opts?.count ?? 0} sessions`;
       if (key === 'progress.weeklyReport.mini.words')
@@ -54,6 +66,18 @@ describe('WeeklyReportCard', () => {
           label: 'Topics explored',
           comparison: '3 new this week',
         },
+        thisWeek: {
+          totalSessions: 2,
+          totalActiveMinutes: 45,
+          topicsMastered: 0,
+          topicsExplored: 3,
+          vocabularyTotal: 0,
+          streakBest: 8,
+        },
+        practiceSummary: {
+          quizzesCompleted: 3,
+          reviewsCompleted: 5,
+        },
       },
     ]);
 
@@ -61,6 +85,14 @@ describe('WeeklyReportCard', () => {
 
     screen.getByText('3 Topics explored');
     screen.getByText('3 new this week');
+    screen.getByTestId('weekly-report-chip-time');
+    screen.getByText('3 topics started');
+    screen.getByText('8-day streak');
+    screen.getByText('Practice highlights');
+    screen.getByText('3');
+    screen.getByText('quizzes completed');
+    screen.getByText('5');
+    screen.getByText('reviews finished');
   });
 
   it('uses the live mini-summary when no weekly report exists', () => {

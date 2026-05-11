@@ -1261,6 +1261,17 @@
       "empty": {
         "child": "Seu primeiro resumo semanal está a caminho.",
         "adult": "Seu primeiro resumo semanal chega depois de uma semana completa de aprendizado."
+      },
+      "practiceTitle": "Practice highlights",
+      "chips": {
+        "time": "{{time}} spent",
+        "topics": "{{count}} topic started",
+        "topics_other": "{{count}} topics started",
+        "streak": "{{count}}-day streak"
+      },
+      "practice": {
+        "quizzes": "quizzes completed",
+        "reviews": "reviews finished"
       }
     },
     "monthlyReport": {
@@ -1269,6 +1280,12 @@
       "empty": {
         "child": "Seu primeiro resumo mensal chega no fim de {{month}}.",
         "adult": "Seu primeiro resumo mensal chega no fim de {{month}}."
+      },
+      "nextStepTitle": "Next step",
+      "bars": {
+        "sessions": "Sessions",
+        "time": "Time",
+        "topics": "Topics"
       }
     },
     "newLearner": {
@@ -1459,6 +1476,11 @@
         "wordsAdded": "palavras adicionadas",
         "vocabularyGrowth": "crescimento de vocabulário"
       }
+    },
+    "previousReports": {
+      "title": "Previous reports",
+      "subtitle": "Weekly and monthly snapshots from your learning.",
+      "viewAll": "View all reports"
     }
   },
   "onboarding": {

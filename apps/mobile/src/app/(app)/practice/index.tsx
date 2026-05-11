@@ -1,8 +1,17 @@
 import React from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import {
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+  type GestureResponderEvent,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import type { QuizActivityType, QuizStats } from '@eduagent/schemas';
+
 import { IntentCard } from '../../../components/home/IntentCard';
 import { useQuizStats } from '../../../hooks/use-quiz';
 import { goBackOrReplace, homeHrefForReturnTo } from '../../../lib/navigation';
@@ -24,6 +33,33 @@ function formatTimeUntil(isoDate: string): string {
   return `${days} day${days === 1 ? '' : 's'}`;
 }
 
+function formatTopicCount(count: number, noun = 'topic'): string {
+  return `${count} ${noun}${count === 1 ? '' : 's'}`;
+}
+
+function getActivityCue(
+  quizStats: QuizStats[] | undefined,
+  activityType: QuizActivityType,
+): string | null {
+  const stats = quizStats?.find((stat) => stat.activityType === activityType);
+
+  if (!stats) return null;
+
+  if (
+    stats.bestScore != null &&
+    stats.bestTotal != null &&
+    stats.bestTotal > 0
+  ) {
+    return `Best ${stats.bestScore}/${stats.bestTotal}`;
+  }
+
+  if ((stats.roundsPlayed ?? 0) > 0) {
+    return `Played ${stats.roundsPlayed}`;
+  }
+
+  return null;
+}
+
 export default function PracticeScreen(): React.ReactElement {
   const router = useRouter();
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
@@ -40,10 +76,10 @@ export default function PracticeScreen(): React.ReactElement {
   const reviewSubtitle = reviewError
     ? 'Could not load review status'
     : hasOverdue
-      ? `${reviewDueCount} ${
-          reviewDueCount === 1 ? 'topic' : 'topics'
-        } ready for review`
-      : 'Nothing to review right now';
+      ? `${formatTopicCount(reviewDueCount)} ready`
+      : reviewSummary?.nextUpcomingReviewAt
+        ? 'All caught up'
+        : 'Complete some topics first to unlock review';
   // [F-034] Aggregate stats across ALL activity types so Guess Who / Vocabulary
   // players also see their stats on the Practice hub card.
   const bestActivity = quizStats
@@ -83,13 +119,32 @@ export default function PracticeScreen(): React.ReactElement {
   const assessmentSubtitle = assessmentTopicsError
     ? 'Could not load assessment topics'
     : assessmentCount > 0
-      ? `${assessmentCount} ${
-          assessmentCount === 1 ? 'topic' : 'topics'
-        } ready to test`
-      : 'Study a topic first';
+      ? `${formatTopicCount(assessmentCount)} ready to test`
+      : 'Available after you finish a topic';
+  const capitalsCue = getActivityCue(quizStats, 'capitals');
+  const guessWhoCue = getActivityCue(quizStats, 'guess_who');
+  const progressCue =
+    totalRoundsPlayed > 0
+      ? `${totalRoundsPlayed} round${totalRoundsPlayed === 1 ? '' : 's'} played`
+      : 'No rounds yet';
 
   const handleBack = () => {
     goBackOrReplace(router, homeHrefForReturnTo(returnTo));
+  };
+
+  const openQuiz = () => router.push('/(app)/quiz' as never);
+
+  const openQuizFromPreview = (event?: GestureResponderEvent) => {
+    event?.stopPropagation();
+    openQuiz();
+  };
+
+  const openAssessment = () => {
+    router.push(
+      assessmentCount > 0
+        ? ('/(app)/practice/assessment-picker' as never)
+        : ('/(app)/library' as never),
+    );
   };
 
   if (isParentProxy) return <Redirect href="/(app)/home" />;
@@ -119,107 +174,247 @@ export default function PracticeScreen(): React.ReactElement {
             Test yourself
           </Text>
           <Text className="text-body-sm text-text-secondary mt-1">
-            Review what is fading, then check yourself.
+            Pick a quick win. Every round helps your memory stick.
+          </Text>
+        </View>
+        <View className="ml-3 rounded-full bg-primary-soft px-3 py-1.5">
+          <Text className="text-caption font-semibold text-primary">
+            {totalXp} XP
           </Text>
         </View>
       </View>
 
-      <View className="gap-4">
-        <IntentCard
-          title="Refresh topics"
-          subtitle={reviewSubtitle}
-          icon="refresh-outline"
-          // Keep the badge aligned with the review-summary API, but let the
-          // relearn screen own topic selection and empty states.
-          badge={
-            !reviewError && hasOverdue && reviewSummary?.nextReviewTopic
-              ? reviewDueCount
-              : undefined
-          }
-          onPress={() =>
-            router.push({
-              pathname: '/(app)/topic/relearn',
-              params: {
-                ...(returnTo ? { returnTo } : {}),
-              },
-            } as never)
-          }
-          testID="practice-review"
-        />
-        {!reviewError && !hasOverdue && reviewSummary ? (
-          <View
-            testID="review-empty-state"
-            className="bg-surface-elevated rounded-card px-4 py-4 -mt-1"
+      <View className="gap-6">
+        <View className="gap-3">
+          <Text className="text-caption font-semibold uppercase text-text-secondary">
+            Best next step
+          </Text>
+          <Pressable
+            className="rounded-card bg-surface-elevated px-5 py-5 active:opacity-80"
+            onPress={() =>
+              router.push({
+                pathname: '/(app)/topic/relearn',
+                params: {
+                  ...(returnTo ? { returnTo } : {}),
+                },
+              } as never)
+            }
+            accessibilityRole="button"
+            accessibilityLabel="Today's review"
+            accessibilityHint="Opens review topics"
+            testID="practice-review"
           >
-            {reviewSummary.nextUpcomingReviewAt ? (
-              <>
-                <Text className="text-body font-semibold text-text-primary">
-                  All caught up
+            <View className="flex-row items-start">
+              <View className="mr-4 min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-primary-soft">
+                <Ionicons
+                  name="refresh-outline"
+                  size={24}
+                  color={colors.primary}
+                />
+              </View>
+              <View className="flex-1">
+                <View className="flex-row items-center">
+                  <Text className="text-h2 font-bold text-text-primary flex-1">
+                    Today's review
+                  </Text>
+                  {!reviewError &&
+                  hasOverdue &&
+                  reviewSummary?.nextReviewTopic ? (
+                    <View
+                      className="ml-3 rounded-full bg-primary-soft px-2.5 py-1"
+                      testID="practice-review-badge"
+                    >
+                      <Text className="text-caption font-semibold text-primary">
+                        {reviewDueCount}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+                <Text className="text-body text-text-secondary mt-2">
+                  {reviewSubtitle}
                 </Text>
-                <Text className="text-body-sm text-text-secondary mt-1">
-                  Your next review is in{' '}
-                  {formatTimeUntil(reviewSummary.nextUpcomingReviewAt)}
-                </Text>
-              </>
-            ) : (
-              <Text className="text-body text-text-secondary">
-                Complete some topics first to unlock review
-              </Text>
-            )}
-            <Pressable
-              testID="review-empty-browse"
-              className="mt-3"
-              onPress={() => router.push('/(app)/library' as never)}
+                <View className="mt-4 self-start rounded-full bg-primary px-4 py-2">
+                  <Text className="text-body-sm font-semibold text-text-inverse">
+                    Start review
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </Pressable>
+          {!reviewError && !hasOverdue && reviewSummary ? (
+            <View
+              testID="review-empty-state"
+              className="bg-surface-elevated rounded-card px-4 py-4 -mt-1"
             >
-              <Text className="text-body-sm text-primary font-semibold">
-                Browse your topics
-              </Text>
-            </Pressable>
-          </View>
-        ) : null}
-        <IntentCard
-          title="Quiz yourself"
-          subtitle={quizSubtitle}
-          icon="help-circle-outline"
-          onPress={() => router.push('/(app)/quiz' as never)}
-          testID="practice-quiz"
-        />
-        <IntentCard
-          title="Prove I know this"
-          subtitle={assessmentSubtitle}
-          icon="checkmark-circle-outline"
-          onPress={() =>
-            router.push('/(app)/practice/assessment-picker' as never)
-          }
-          testID="practice-assessment"
-        />
-        <IntentCard
-          title="Recite from memory (Beta)"
-          subtitle="Recite a poem or text from memory"
-          icon="mic-outline"
-          onPress={() =>
-            router.push({
-              pathname: '/(app)/session',
-              params: { mode: 'recitation' },
-            } as never)
-          }
-          testID="practice-recitation"
-        />
-        <IntentCard
-          title="Dictation"
-          subtitle="Practice writing what you hear"
-          icon="create-outline"
-          onPress={() => router.push('/(app)/dictation' as never)}
-          testID="practice-dictation"
-        />
-        <IntentCard
-          title="Quiz history"
-          subtitle="View past quiz rounds"
-          variant="subtle"
-          icon="time-outline"
-          onPress={() => router.push('/(app)/quiz/history' as never)}
-          testID="practice-quiz-history"
-        />
+              {reviewSummary.nextUpcomingReviewAt ? (
+                <>
+                  <Text className="text-body font-semibold text-text-primary">
+                    All caught up
+                  </Text>
+                  <Text className="text-body-sm text-text-secondary mt-1">
+                    Your next review is in{' '}
+                    {formatTimeUntil(reviewSummary.nextUpcomingReviewAt)}
+                  </Text>
+                </>
+              ) : (
+                <Text className="text-body text-text-secondary">
+                  Complete some topics first to unlock review
+                </Text>
+              )}
+              <Pressable
+                testID="review-empty-browse"
+                className="mt-3"
+                onPress={() => router.push('/(app)/library' as never)}
+              >
+                <Text className="text-body-sm text-primary font-semibold">
+                  Browse your topics
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
+          <Pressable
+            className="rounded-card bg-surface px-4 py-3 active:opacity-80"
+            onPress={openAssessment}
+            accessibilityRole="button"
+            accessibilityLabel="Prove I know this"
+            accessibilityHint={
+              assessmentCount > 0
+                ? 'Opens the assessment picker'
+                : 'Opens the library'
+            }
+            testID="practice-assessment"
+          >
+            <View className="flex-row items-center">
+              <View className="mr-3">
+                <Ionicons
+                  name="checkmark-circle-outline"
+                  size={22}
+                  color={colors.primary}
+                />
+              </View>
+              <View className="flex-1">
+                <Text className="text-body font-semibold text-text-primary">
+                  Prove I know this
+                </Text>
+                <Text className="text-body-sm text-text-secondary mt-0.5">
+                  {assessmentSubtitle}
+                </Text>
+              </View>
+            </View>
+          </Pressable>
+        </View>
+
+        <View className="gap-3">
+          <Text className="text-caption font-semibold uppercase text-text-secondary">
+            Quiz
+          </Text>
+          <Pressable
+            className="rounded-card bg-surface-elevated px-5 py-5 active:opacity-80"
+            onPress={openQuiz}
+            accessibilityRole="button"
+            accessibilityLabel="Quick quiz"
+            accessibilityHint="Opens quiz choices"
+            testID="practice-quiz"
+          >
+            <View className="flex-row items-start">
+              <View className="mr-4 min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-primary-soft">
+                <Ionicons
+                  name="help-circle-outline"
+                  size={24}
+                  color={colors.secondary}
+                />
+              </View>
+              <View className="flex-1">
+                <Text className="text-h2 font-bold text-text-primary">
+                  Quick quiz
+                </Text>
+                <Text className="text-body text-text-secondary mt-2">
+                  {quizSubtitle}
+                </Text>
+                <View className="mt-4 flex-row gap-3">
+                  <Pressable
+                    className="flex-1 rounded-card bg-surface px-3 py-3 active:opacity-80"
+                    onPress={openQuizFromPreview}
+                    accessibilityRole="button"
+                    accessibilityLabel="Capitals"
+                    testID="practice-quiz-capitals"
+                  >
+                    <Text className="text-body-sm font-semibold text-text-primary">
+                      Capitals
+                    </Text>
+                    {capitalsCue ? (
+                      <Text className="text-caption text-text-secondary mt-1">
+                        {capitalsCue}
+                      </Text>
+                    ) : null}
+                  </Pressable>
+                  <Pressable
+                    className="flex-1 rounded-card bg-surface px-3 py-3 active:opacity-80"
+                    onPress={openQuizFromPreview}
+                    accessibilityRole="button"
+                    accessibilityLabel="Who's who"
+                    testID="practice-quiz-guess-who"
+                  >
+                    <Text className="text-body-sm font-semibold text-text-primary">
+                      Who's who
+                    </Text>
+                    {guessWhoCue ? (
+                      <Text className="text-caption text-text-secondary mt-1">
+                        {guessWhoCue}
+                      </Text>
+                    ) : null}
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          </Pressable>
+        </View>
+
+        <View className="gap-3">
+          <Text className="text-caption font-semibold uppercase text-text-secondary">
+            Other practice
+          </Text>
+          <IntentCard
+            title="Recite from memory (Beta)"
+            subtitle="Recite a poem or text from memory"
+            icon="mic-outline"
+            onPress={() =>
+              router.push({
+                pathname: '/(app)/session',
+                params: { mode: 'recitation' },
+              } as never)
+            }
+            testID="practice-recitation"
+          />
+          <IntentCard
+            title="Dictation"
+            subtitle="Practice writing what you hear"
+            icon="create-outline"
+            onPress={() => router.push('/(app)/dictation' as never)}
+            testID="practice-dictation"
+          />
+        </View>
+
+        <View className="gap-3">
+          <Text className="text-caption font-semibold uppercase text-text-secondary">
+            Recent progress
+          </Text>
+          <Pressable
+            className="min-h-[52px] flex-row items-center py-2 active:opacity-80"
+            onPress={() => router.push('/(app)/quiz/history' as never)}
+            accessibilityRole="button"
+            accessibilityLabel="Quiz history"
+            accessibilityHint="Opens quiz history"
+            testID="practice-quiz-history"
+          >
+            <Text className="text-body font-semibold text-text-primary flex-1">
+              Quiz history
+            </Text>
+            <Text className="text-body-sm text-text-secondary">
+              {progressCue}
+            </Text>
+          </Pressable>
+        </View>
       </View>
     </ScrollView>
   );

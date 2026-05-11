@@ -4,6 +4,7 @@ const mockPush = jest.fn();
 const mockGoBackOrReplace = jest.fn();
 const mockUseReviewSummary = jest.fn();
 const mockUseQuizStats = jest.fn();
+const mockUseAssessmentEligibleTopics = jest.fn();
 let mockSearchParams: Record<string, string> = {};
 
 jest.mock('expo-router', () => ({
@@ -37,7 +38,7 @@ jest.mock('../../../hooks/use-quiz', () => ({
 }));
 
 jest.mock('../../../hooks/use-assessments', () => ({
-  useAssessmentEligibleTopics: () => ({ data: [], isError: false }),
+  useAssessmentEligibleTopics: () => mockUseAssessmentEligibleTopics(),
 }));
 
 const PracticeScreen = require('./index').default;
@@ -63,6 +64,17 @@ describe('PracticeScreen', () => {
       isError: false,
     });
     mockUseQuizStats.mockReturnValue({ data: [], isError: false });
+    mockUseAssessmentEligibleTopics.mockReturnValue({
+      data: [
+        {
+          topicId: 'topic-1',
+          subjectId: 'subject-1',
+          subjectName: 'Math',
+          topicTitle: 'Algebra',
+        },
+      ],
+      isError: false,
+    });
   });
 
   afterEach(() => {
@@ -73,10 +85,15 @@ describe('PracticeScreen', () => {
     render(<PracticeScreen />);
 
     screen.getByText('Test yourself');
-    screen.getByText('Review what is fading, then check yourself.');
-    screen.getByText('Refresh topics');
-    screen.getByText('Quiz yourself');
+    screen.getByText('Pick a quick win. Every round helps your memory stick.');
+    screen.getByText("Today's review");
     screen.getByText('Prove I know this');
+    screen.getByText('Quick quiz');
+    screen.getByText('Capitals');
+    screen.getByText("Who's who");
+    screen.getByText('Recite from memory (Beta)');
+    screen.getByText('Dictation');
+    screen.getByText('Quiz history');
   });
 
   it('routes the back button to home', () => {
@@ -138,7 +155,7 @@ describe('PracticeScreen', () => {
     render(<PracticeScreen />);
 
     screen.getByTestId('review-empty-state');
-    screen.getByText('Nothing to review right now');
+    screen.getAllByText('All caught up');
     screen.getByText('Your next review is in 3 hours');
   });
 
@@ -158,10 +175,90 @@ describe('PracticeScreen', () => {
     expect(mockPush).toHaveBeenCalledWith('/(app)/library');
   });
 
-  it('shows quiz XP even before any XP is earned', () => {
+  it('shows quiz XP in the header and quick quiz cue before any XP is earned', () => {
     render(<PracticeScreen />);
 
+    screen.getByText('0 XP');
     screen.getByText('Test yourself with multiple choice questions · 0 XP');
+  });
+
+  it('navigates to the assessment picker when assessment topics are available', () => {
+    render(<PracticeScreen />);
+
+    fireEvent.press(screen.getByTestId('practice-assessment'));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/practice/assessment-picker');
+  });
+
+  it('routes the assessment row to library when no topics are ready', () => {
+    mockUseAssessmentEligibleTopics.mockReturnValue({
+      data: [],
+      isError: false,
+    });
+
+    render(<PracticeScreen />);
+
+    screen.getByText('Available after you finish a topic');
+    fireEvent.press(screen.getByTestId('practice-assessment'));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/library');
+  });
+
+  it('routes every quiz entry point to the quiz index', () => {
+    render(<PracticeScreen />);
+
+    fireEvent.press(screen.getByTestId('practice-quiz'));
+    fireEvent.press(screen.getByTestId('practice-quiz-capitals'));
+    fireEvent.press(screen.getByTestId('practice-quiz-guess-who'));
+
+    expect(mockPush).toHaveBeenCalledTimes(3);
+    expect(mockPush).toHaveBeenNthCalledWith(1, '/(app)/quiz');
+    expect(mockPush).toHaveBeenNthCalledWith(2, '/(app)/quiz');
+    expect(mockPush).toHaveBeenNthCalledWith(3, '/(app)/quiz');
+  });
+
+  it('routes recitation, dictation, and quiz history to their flows', () => {
+    render(<PracticeScreen />);
+
+    fireEvent.press(screen.getByTestId('practice-recitation'));
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/session',
+      params: { mode: 'recitation' },
+    });
+
+    fireEvent.press(screen.getByTestId('practice-dictation'));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/dictation');
+
+    fireEvent.press(screen.getByTestId('practice-quiz-history'));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/quiz/history');
+  });
+
+  it('shows per-option quiz cues from activity stats', () => {
+    mockUseQuizStats.mockReturnValue({
+      data: [
+        {
+          activityType: 'capitals',
+          languageCode: null,
+          roundsPlayed: 3,
+          bestScore: 4,
+          bestTotal: 5,
+          totalXp: 120,
+        },
+        {
+          activityType: 'guess_who',
+          languageCode: null,
+          roundsPlayed: 2,
+          bestScore: null,
+          bestTotal: null,
+          totalXp: 80,
+        },
+      ],
+      isError: false,
+    });
+
+    render(<PracticeScreen />);
+
+    screen.getByText('Best 4/5');
+    screen.getByText('Played 2');
+    screen.getByText('200 XP');
   });
 
   it('places recitation and dictation after the main review and test actions', () => {
@@ -182,8 +279,8 @@ describe('PracticeScreen', () => {
       .filter((testID: string) =>
         [
           'practice-review',
-          'practice-quiz',
           'practice-assessment',
+          'practice-quiz',
           'practice-recitation',
           'practice-dictation',
           'practice-quiz-history',
@@ -193,20 +290,19 @@ describe('PracticeScreen', () => {
 
     expect(uniqueCardOrder).toEqual([
       'practice-review',
-      'practice-quiz',
       'practice-assessment',
+      'practice-quiz',
       'practice-recitation',
       'practice-dictation',
       'practice-quiz-history',
     ]);
   });
 
-  it('renders quiz history with a quieter visual treatment', () => {
+  it('renders quiz history as a quiet recent-progress row', () => {
     render(<PracticeScreen />);
 
-    const quizHistoryCard = screen.getByTestId('practice-quiz-history');
-    expect(quizHistoryCard.props.className).toContain(
-      'bg-surface border-border',
-    );
+    const quizHistoryRow = screen.getByTestId('practice-quiz-history');
+    expect(quizHistoryRow.props.className).toContain('min-h-[52px]');
+    screen.getByText('No rounds yet');
   });
 });

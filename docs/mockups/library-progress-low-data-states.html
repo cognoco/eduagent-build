@@ -264,6 +264,88 @@
         margin-top: 5px;
       }
 
+      .badge-row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 14px;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border-radius: 999px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        padding: 8px 10px;
+        color: var(--text-primary);
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .bar-list {
+        display: grid;
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .bar-row {
+        display: grid;
+        grid-template-columns: 82px 1fr 44px;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .bar-label,
+      .bar-value {
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .bar-value {
+        text-align: right;
+      }
+
+      .bar-track {
+        height: 8px;
+        border-radius: 999px;
+        background: #e8e0d4;
+        overflow: hidden;
+      }
+
+      .bar-fill {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: var(--primary);
+      }
+
+      .practice-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        margin-top: 12px;
+      }
+
+      .practice-tile {
+        border-radius: 14px;
+        background: var(--surface);
+        padding: 12px;
+      }
+
+      .practice-tile strong {
+        display: block;
+        font-size: 20px;
+      }
+
+      .practice-tile span {
+        color: var(--text-secondary);
+        display: block;
+        font-size: 12px;
+        margin-top: 3px;
+      }
+
       .mini-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
@@ -319,6 +401,34 @@
         font-size: 15px;
         font-weight: 800;
         margin-top: 14px;
+      }
+
+      .report-list {
+        display: grid;
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .report-list-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border-radius: 14px;
+        background: var(--background);
+        padding: 13px 14px;
+      }
+
+      .report-list-item strong {
+        display: block;
+        font-size: 14px;
+      }
+
+      .report-list-item span {
+        display: block;
+        color: var(--text-secondary);
+        font-size: 12px;
+        margin-top: 3px;
       }
 
       .tabbar {
@@ -405,6 +515,10 @@
                 <span>this week</span>
               </div>
             </div>
+            <div class="badge-row">
+              <span class="badge">8-day streak</span>
+              <span class="badge">3 stars earned</span>
+            </div>
           </div>
 
           <div class="report-card">
@@ -421,6 +535,18 @@
                 <span class="chip">1 topic started</span>
                 <span class="chip">8-day streak</span>
               </div>
+              <div class="soft-divider"></div>
+              <h3>Practice highlights</h3>
+              <div class="practice-grid">
+                <div class="practice-tile">
+                  <strong>3</strong>
+                  <span>quizzes completed</span>
+                </div>
+                <div class="practice-tile">
+                  <strong>5</strong>
+                  <span>reviews finished</span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -433,6 +559,28 @@
                 Most of this month has gone into building consistency and
                 getting Italian started.
               </p>
+              <div class="bar-list">
+                <div class="bar-row">
+                  <span class="bar-label">Sessions</span>
+                  <span class="bar-track"><span class="bar-fill" style="width: 88%"></span></span>
+                  <span class="bar-value">28</span>
+                </div>
+                <div class="bar-row">
+                  <span class="bar-label">Time</span>
+                  <span class="bar-track"><span class="bar-fill" style="width: 72%"></span></span>
+                  <span class="bar-value">31h</span>
+                </div>
+                <div class="bar-row">
+                  <span class="bar-label">Quizzes</span>
+                  <span class="bar-track"><span class="bar-fill" style="width: 42%"></span></span>
+                  <span class="bar-value">3</span>
+                </div>
+                <div class="bar-row">
+                  <span class="bar-label">Reviews</span>
+                  <span class="bar-track"><span class="bar-fill" style="width: 58%"></span></span>
+                  <span class="bar-value">5</span>
+                </div>
+              </div>
               <div class="soft-divider"></div>
               <h3>Highlights</h3>
               <div class="preview">
@@ -462,6 +610,33 @@
                 </div>
               </div>
             </div>
+          </div>
+
+          <div class="report-card">
+            <div class="row">
+              <div class="row-main">
+                <h2>Previous reports</h2>
+                <p class="subtitle">A short history of what changed over time.</p>
+              </div>
+              <div class="chevron">&gt;</div>
+            </div>
+            <div class="report-list">
+              <div class="report-list-item">
+                <div>
+                  <strong>April monthly report</strong>
+                  <span>12 sessions completed</span>
+                </div>
+                <div class="chevron">&gt;</div>
+              </div>
+              <div class="report-list-item">
+                <div>
+                  <strong>Week of Apr 28</strong>
+                  <span>4 sessions this week</span>
+                </div>
+                <div class="chevron">&gt;</div>
+              </div>
+            </div>
+            <div class="link-row">View all reports -&gt;</div>
           </div>
 
           <div class="section warm-card">

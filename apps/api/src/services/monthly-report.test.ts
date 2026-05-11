@@ -19,8 +19,10 @@ import {
   generateReportHighlights,
   listMonthlyReportsForParentChild,
   getMonthlyReportForParentChild,
+  getMonthlyReportForProfile,
   markMonthlyReportViewed,
 } from './monthly-report';
+import { extractDrizzleParamValues } from '../test-utils/drizzle-introspection';
 
 const mockRouteAndCall = routeAndCall as jest.MockedFunction<
   typeof routeAndCall
@@ -1200,6 +1202,23 @@ describe('getMonthlyReportForParentChild', () => {
     );
 
     expect(result?.viewedAt).toBe(viewedDate.toISOString());
+  });
+});
+
+describe('getMonthlyReportForProfile', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('scopes self-view monthly report lookup by child profile id [HIGH-3]', async () => {
+    const db = createMockDb({ findFirstResult: undefined });
+
+    await getMonthlyReportForProfile(db, UUID.child, UUID.report);
+
+    const findFirst = db.query.monthlyReports.findFirst as jest.Mock;
+    const params = extractDrizzleParamValues(findFirst.mock.calls[0]?.[0]);
+    expect(params).toEqual(expect.arrayContaining([UUID.report, UUID.child]));
+    expect(params).not.toContain(UUID.parent);
   });
 });
 

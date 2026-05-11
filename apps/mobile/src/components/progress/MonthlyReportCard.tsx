@@ -1,6 +1,7 @@
 import { Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useProfileReports } from '../../hooks/use-progress';
+import { formatMinutes } from '../../lib/format-relative-date';
 import type { CopyRegister } from '../../lib/copy-register';
 
 type ReportingComponentProps = {
@@ -53,6 +54,66 @@ function ReportLines({
   );
 }
 
+function ReportBars({
+  metrics,
+}: {
+  metrics: {
+    totalSessions: number;
+    totalActiveMinutes: number;
+    topicsExplored: number;
+  };
+}): React.ReactElement {
+  const { t } = useTranslation();
+  const values = [
+    {
+      key: 'sessions',
+      label: t('progress.monthlyReport.bars.sessions'),
+      value: metrics.totalSessions,
+      display: String(metrics.totalSessions),
+    },
+    {
+      key: 'time',
+      label: t('progress.monthlyReport.bars.time'),
+      value: metrics.totalActiveMinutes,
+      display: formatMinutes(metrics.totalActiveMinutes),
+    },
+    {
+      key: 'topics',
+      label: t('progress.monthlyReport.bars.topics'),
+      value: metrics.topicsExplored,
+      display: String(metrics.topicsExplored),
+    },
+  ];
+  const maxValue = Math.max(...values.map((item) => item.value), 1);
+
+  return (
+    <View className="border-t border-border pt-3 mt-3" testID="monthly-bars">
+      <View className="gap-2">
+        {values.map((item) => (
+          <View key={item.key}>
+            <View className="flex-row justify-between mb-1">
+              <Text className="text-caption text-text-secondary">
+                {item.label}
+              </Text>
+              <Text className="text-caption font-semibold text-text-primary">
+                {item.display}
+              </Text>
+            </View>
+            <View className="h-2 rounded-full bg-surface overflow-hidden">
+              <View
+                className="h-2 rounded-full bg-primary"
+                style={{
+                  width: `${Math.max(8, (item.value / maxValue) * 100)}%`,
+                }}
+              />
+            </View>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 export function MonthlyReportCard({
   profileId,
   title,
@@ -62,7 +123,7 @@ export function MonthlyReportCard({
   const reportsQuery = useProfileReports(profileId);
   const latest = reportsQuery.data?.[0];
   const highlights = latest?.highlights?.slice(0, 3) ?? [];
-  const nextSteps = latest?.nextSteps?.slice(0, 2) ?? [];
+  const nextStep = latest?.nextSteps?.[0];
 
   return (
     <View className="bg-surface rounded-card p-4 mt-4" testID="monthly-report">
@@ -88,14 +149,21 @@ export function MonthlyReportCard({
           <Text className="text-body-sm text-text-secondary mt-1">
             {latest.headlineStat.comparison}
           </Text>
+          {latest.thisMonth ? <ReportBars metrics={latest.thisMonth} /> : null}
           <ReportLines
             title={t('progress.monthlyReport.highlightsTitle')}
             lines={highlights}
           />
-          <ReportLines
-            title={t('progress.monthlyReport.nextStepsTitle')}
-            lines={nextSteps}
-          />
+          {nextStep ? (
+            <View className="border-t border-border pt-3 mt-3">
+              <Text className="text-body-sm font-semibold text-text-primary">
+                {t('progress.monthlyReport.nextStepTitle')}
+              </Text>
+              <Text className="text-body-sm text-text-secondary mt-2">
+                {nextStep}
+              </Text>
+            </View>
+          ) : null}
         </View>
       ) : (
         <Text className="text-body-sm text-text-secondary mt-2">

@@ -10,6 +10,7 @@ import type {
   WeeklyReportRecord,
   WeeklyReportSummary,
   ProgressMetrics,
+  ReportPracticeSummary,
 } from '@eduagent/schemas';
 import {
   weeklyReportDataSchema,
@@ -136,6 +137,40 @@ function mapWeeklyReportRow(
   });
 }
 
+function getWeeklyReportData(row: typeof weeklyReports.$inferSelect): {
+  headlineStat: WeeklyReportData['headlineStat'];
+  thisWeek: WeeklyReportData['thisWeek'] | undefined;
+  practiceSummary: ReportPracticeSummary | undefined;
+} {
+  const reportData = row.reportData as Partial<WeeklyReportData>;
+  return {
+    headlineStat: reportData.headlineStat ?? {
+      label: 'Progress',
+      value: 0,
+      comparison: '',
+    },
+    thisWeek: reportData.thisWeek,
+    practiceSummary: reportData.practiceSummary,
+  };
+}
+
+function mapWeeklyReportSummary(
+  row: typeof weeklyReports.$inferSelect,
+): WeeklyReportSummary {
+  const reportData = getWeeklyReportData(row);
+  return weeklyReportSummarySchema.parse({
+    id: row.id,
+    reportWeek: row.reportWeek,
+    viewedAt: row.viewedAt?.toISOString() ?? null,
+    createdAt: row.createdAt.toISOString(),
+    headlineStat: reportData.headlineStat,
+    ...(reportData.thisWeek ? { thisWeek: reportData.thisWeek } : {}),
+    ...(reportData.practiceSummary
+      ? { practiceSummary: reportData.practiceSummary }
+      : {}),
+  });
+}
+
 export async function listWeeklyReportsForParentChild(
   db: Database,
   parentProfileId: string,
@@ -151,19 +186,7 @@ export async function listWeeklyReportsForParentChild(
     limit: 12,
   });
 
-  return rows.map((row) =>
-    weeklyReportSummarySchema.parse({
-      id: row.id,
-      reportWeek: row.reportWeek,
-      viewedAt: row.viewedAt?.toISOString() ?? null,
-      createdAt: row.createdAt.toISOString(),
-      headlineStat: (row.reportData as WeeklyReportData).headlineStat ?? {
-        label: 'Progress',
-        value: 0,
-        comparison: '',
-      },
-    }),
-  );
+  return rows.map(mapWeeklyReportSummary);
 }
 
 export async function listWeeklyReportsForProfile(
@@ -176,19 +199,22 @@ export async function listWeeklyReportsForProfile(
     limit: 12,
   });
 
-  return rows.map((row) =>
-    weeklyReportSummarySchema.parse({
-      id: row.id,
-      reportWeek: row.reportWeek,
-      viewedAt: row.viewedAt?.toISOString() ?? null,
-      createdAt: row.createdAt.toISOString(),
-      headlineStat: (row.reportData as WeeklyReportData).headlineStat ?? {
-        label: 'Progress',
-        value: 0,
-        comparison: '',
-      },
-    }),
-  );
+  return rows.map(mapWeeklyReportSummary);
+}
+
+export async function getWeeklyReportForProfile(
+  db: Database,
+  profileId: string,
+  reportId: string,
+): Promise<WeeklyReportRecord | null> {
+  const row = await db.query.weeklyReports.findFirst({
+    where: and(
+      eq(weeklyReports.id, reportId),
+      eq(weeklyReports.childProfileId, profileId),
+    ),
+  });
+
+  return row ? mapWeeklyReportRow(row) : null;
 }
 
 export async function getWeeklyReportForParentChild(

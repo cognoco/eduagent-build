@@ -1168,7 +1168,7 @@
   },
   "progress": {
     "pageTitle": "My Learning Journey",
-    "pageSubtitle": "Progress that reflects what you actually know.",
+    "pageSubtitle": "Reports and signals from your recent learning.",
     "ownProfilePill": "Mine",
     "startLearning": "Start learning",
     "keepLearning": "Keep learning",
@@ -1177,7 +1177,7 @@
     "hero": {
       "sessionsCompleted": "{{count}} session completed",
       "sessionsCompleted_other": "{{count}} sessions completed",
-      "sessionsCompletedSubtitle": "Topics mastered and vocabulary will appear as you progress.",
+      "sessionsCompletedSubtitle": "Your learning rhythm is visible here, even before mastery catches up.",
       "buildingLanguage": "You're building your language",
       "buildingLanguageSubtitle_one": "{{count}} word and counting.",
       "buildingLanguageSubtitle_other": "{{count}} words and counting.",
@@ -1225,6 +1225,17 @@
     },
     "weeklyReport": {
       "thisWeekSoFar": "This week so far",
+      "practiceTitle": "Practice highlights",
+      "chips": {
+        "time": "{{time}} spent",
+        "topics": "{{count}} topic started",
+        "topics_other": "{{count}} topics started",
+        "streak": "{{count}}-day streak"
+      },
+      "practice": {
+        "quizzes": "quizzes completed",
+        "reviews": "reviews finished"
+      },
       "mini": {
         "sessions": "{{count}} session",
         "sessions_other": "{{count}} sessions",
@@ -1241,10 +1252,21 @@
     "monthlyReport": {
       "highlightsTitle": "Highlights",
       "nextStepsTitle": "What's next",
+      "nextStepTitle": "Next step",
+      "bars": {
+        "sessions": "Sessions",
+        "time": "Time",
+        "topics": "Topics"
+      },
       "empty": {
         "child": "Your first monthly summary lands at the end of {{month}}.",
         "adult": "Your first monthly summary lands at the end of {{month}}."
       }
+    },
+    "previousReports": {
+      "title": "Previous reports",
+      "subtitle": "Weekly and monthly snapshots from your learning.",
+      "viewAll": "View all reports"
     },
     "newLearner": {
       "title": "You've completed {{count}} session. Keep going!",

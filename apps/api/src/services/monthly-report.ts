@@ -5,6 +5,7 @@ import type {
   MonthlyReportRecord,
   MonthlyReportSummary,
   ProgressMetrics,
+  ReportPracticeSummary,
 } from '@eduagent/schemas';
 import {
   monthlyReportDataSchema,
@@ -233,6 +234,46 @@ function mapMonthlyReportRow(
   });
 }
 
+function getMonthlyReportData(row: typeof monthlyReports.$inferSelect): {
+  headlineStat: MonthlyReportData['headlineStat'];
+  highlights: string[];
+  nextSteps: string[];
+  thisMonth: MonthlyReportData['thisMonth'] | undefined;
+  practiceSummary: ReportPracticeSummary | undefined;
+} {
+  const reportData = row.reportData as Partial<MonthlyReportData>;
+  return {
+    headlineStat: reportData.headlineStat ?? {
+      label: 'Progress',
+      value: 0,
+      comparison: '',
+    },
+    highlights: coerceStringArray(reportData.highlights).slice(0, 3),
+    nextSteps: coerceStringArray(reportData.nextSteps).slice(0, 2),
+    thisMonth: reportData.thisMonth,
+    practiceSummary: reportData.practiceSummary,
+  };
+}
+
+function mapMonthlyReportSummary(
+  row: typeof monthlyReports.$inferSelect,
+): MonthlyReportSummary {
+  const reportData = getMonthlyReportData(row);
+  return monthlyReportSummarySchema.parse({
+    id: row.id,
+    reportMonth: row.reportMonth,
+    viewedAt: row.viewedAt?.toISOString() ?? null,
+    createdAt: row.createdAt.toISOString(),
+    headlineStat: reportData.headlineStat,
+    highlights: reportData.highlights,
+    nextSteps: reportData.nextSteps,
+    ...(reportData.thisMonth ? { thisMonth: reportData.thisMonth } : {}),
+    ...(reportData.practiceSummary
+      ? { practiceSummary: reportData.practiceSummary }
+      : {}),
+  });
+}
+
 export async function listMonthlyReportsForParentChild(
   db: Database,
   parentProfileId: string,
@@ -247,25 +288,7 @@ export async function listMonthlyReportsForParentChild(
     orderBy: desc(monthlyReports.reportMonth),
   });
 
-  return rows.map((row) =>
-    monthlyReportSummarySchema.parse({
-      id: row.id,
-      reportMonth: row.reportMonth,
-      viewedAt: row.viewedAt?.toISOString() ?? null,
-      createdAt: row.createdAt.toISOString(),
-      headlineStat: (row.reportData as MonthlyReportData).headlineStat ?? {
-        label: 'Progress',
-        value: 0,
-        comparison: '',
-      },
-      highlights: coerceStringArray(
-        (row.reportData as { highlights?: unknown }).highlights,
-      ).slice(0, 3),
-      nextSteps: coerceStringArray(
-        (row.reportData as { nextSteps?: unknown }).nextSteps,
-      ).slice(0, 2),
-    }),
-  );
+  return rows.map(mapMonthlyReportSummary);
 }
 
 export async function listMonthlyReportsForProfile(
@@ -277,25 +300,22 @@ export async function listMonthlyReportsForProfile(
     orderBy: desc(monthlyReports.reportMonth),
   });
 
-  return rows.map((row) =>
-    monthlyReportSummarySchema.parse({
-      id: row.id,
-      reportMonth: row.reportMonth,
-      viewedAt: row.viewedAt?.toISOString() ?? null,
-      createdAt: row.createdAt.toISOString(),
-      headlineStat: (row.reportData as MonthlyReportData).headlineStat ?? {
-        label: 'Progress',
-        value: 0,
-        comparison: '',
-      },
-      highlights: coerceStringArray(
-        (row.reportData as { highlights?: unknown }).highlights,
-      ).slice(0, 3),
-      nextSteps: coerceStringArray(
-        (row.reportData as { nextSteps?: unknown }).nextSteps,
-      ).slice(0, 2),
-    }),
-  );
+  return rows.map(mapMonthlyReportSummary);
+}
+
+export async function getMonthlyReportForProfile(
+  db: Database,
+  profileId: string,
+  reportId: string,
+): Promise<MonthlyReportRecord | null> {
+  const row = await db.query.monthlyReports.findFirst({
+    where: and(
+      eq(monthlyReports.id, reportId),
+      eq(monthlyReports.childProfileId, profileId),
+    ),
+  });
+
+  return row ? mapMonthlyReportRow(row) : null;
 }
 
 export async function getMonthlyReportForParentChild(

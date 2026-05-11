@@ -1261,6 +1261,17 @@
       "empty": {
         "child": "Twoje pierwsze tygodniowe podsumowanie jest w drodze.",
         "adult": "Twoje pierwsze tygodniowe podsumowanie pojawi się po pełnym tygodniu nauki."
+      },
+      "practiceTitle": "Practice highlights",
+      "chips": {
+        "time": "{{time}} spent",
+        "topics": "{{count}} topic started",
+        "topics_other": "{{count}} topics started",
+        "streak": "{{count}}-day streak"
+      },
+      "practice": {
+        "quizzes": "quizzes completed",
+        "reviews": "reviews finished"
       }
     },
     "monthlyReport": {
@@ -1269,6 +1280,12 @@
       "empty": {
         "child": "Twoje pierwsze miesięczne podsumowanie pojawi się pod koniec {{month}}.",
         "adult": "Twoje pierwsze miesięczne podsumowanie pojawi się pod koniec {{month}}."
+      },
+      "nextStepTitle": "Next step",
+      "bars": {
+        "sessions": "Sessions",
+        "time": "Time",
+        "topics": "Topics"
       }
     },
     "newLearner": {
@@ -1459,6 +1476,11 @@
         "wordsAdded": "dodane słowa",
         "vocabularyGrowth": "wzrost słownictwa"
       }
+    },
+    "previousReports": {
+      "title": "Previous reports",
+      "subtitle": "Weekly and monthly snapshots from your learning.",
+      "viewAll": "View all reports"
     }
   },
   "onboarding": {

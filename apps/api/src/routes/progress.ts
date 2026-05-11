@@ -13,12 +13,17 @@ import {
   childSessionsResponseSchema,
   childReportsResponseSchema,
   weeklyReportsResponseSchema,
+  childReportDetailResponseSchema,
+  weeklyReportDetailResponseSchema,
 } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import { notFound } from '../errors';
 import { getProfileSessions } from '../services/dashboard';
-import { listMonthlyReportsForProfile } from '../services/monthly-report';
+import {
+  getMonthlyReportForProfile,
+  listMonthlyReportsForProfile,
+} from '../services/monthly-report';
 import { getOverdueTopicsGrouped } from '../services/overdue-topics';
 import {
   getSubjectProgress,
@@ -30,7 +35,10 @@ import {
   resolveTopicSubject,
 } from '../services/progress';
 import { getProfileOverdueCount } from '../services/retention-data';
-import { listWeeklyReportsForProfile } from '../services/weekly-report';
+import {
+  getWeeklyReportForProfile,
+  listWeeklyReportsForProfile,
+} from '../services/weekly-report';
 
 type ProgressRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -86,7 +94,7 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
         totalOverdue: overdueCount,
         nextReviewTopic,
         nextUpcomingReviewAt,
-      })
+      }),
     );
   })
 
@@ -117,6 +125,19 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
     return c.json(childReportsResponseSchema.parse({ reports }));
   })
 
+  // Get a monthly report for the active profile. The service filters on
+  // childProfileId = active profile, so self-view links cannot read another
+  // profile's report by guessing an ID.
+  .get('/progress/reports/:reportId', async (c) => {
+    const db = c.get('db');
+    const profileId = requireProfileId(c.get('profileId'));
+    const reportId = c.req.param('reportId');
+
+    const report = await getMonthlyReportForProfile(db, profileId, reportId);
+    if (!report) return notFound(c, 'Report not found');
+    return c.json(childReportDetailResponseSchema.parse({ report }));
+  })
+
   // List weekly reports for the active profile.
   .get('/progress/weekly-reports', async (c) => {
     const db = c.get('db');
@@ -124,6 +145,17 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
 
     const reports = await listWeeklyReportsForProfile(db, profileId);
     return c.json(weeklyReportsResponseSchema.parse({ reports }));
+  })
+
+  // Get a weekly report for the active profile.
+  .get('/progress/weekly-reports/:weeklyReportId', async (c) => {
+    const db = c.get('db');
+    const profileId = requireProfileId(c.get('profileId'));
+    const reportId = c.req.param('weeklyReportId');
+
+    const report = await getWeeklyReportForProfile(db, profileId, reportId);
+    if (!report) return notFound(c, 'Report not found');
+    return c.json(weeklyReportDetailResponseSchema.parse({ report }));
   })
 
   // Get active/paused session for a specific topic [F-4]

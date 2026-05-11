@@ -1236,6 +1236,17 @@
       "empty": {
         "child": "最初の週間まとめはもうすぐ届きます。",
         "adult": "最初の週間まとめは、1週間の学習後に届きます。"
+      },
+      "practiceTitle": "Practice highlights",
+      "chips": {
+        "time": "{{time}} spent",
+        "topics": "{{count}} topic started",
+        "topics_other": "{{count}} topics started",
+        "streak": "{{count}}-day streak"
+      },
+      "practice": {
+        "quizzes": "quizzes completed",
+        "reviews": "reviews finished"
       }
     },
     "monthlyReport": {
@@ -1244,6 +1255,12 @@
       "empty": {
         "child": "最初の月間まとめは{{month}}の終わりに届きます。",
         "adult": "最初の月間まとめは{{month}}の終わりに届きます。"
+      },
+      "nextStepTitle": "Next step",
+      "bars": {
+        "sessions": "Sessions",
+        "time": "Time",
+        "topics": "Topics"
       }
     },
     "newLearner": {
@@ -1434,6 +1451,11 @@
         "wordsAdded": "追加された単語",
         "vocabularyGrowth": "語彙の成長"
       }
+    },
+    "previousReports": {
+      "title": "Previous reports",
+      "subtitle": "Weekly and monthly snapshots from your learning.",
+      "viewAll": "View all reports"
     }
   },
   "onboarding": {
