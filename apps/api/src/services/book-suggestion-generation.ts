@@ -27,7 +27,10 @@ type FailureReason =
   | 'cooldown'
   | 'language_subject'
   | 'no_subject'
+  | 'all_filtered'
   | 'unknown';
+
+export type GenerationOutcome = 'success' | FailureReason;
 
 function emitFailureMetric(
   profileId: string,
@@ -46,25 +49,25 @@ export async function generateCategorizedBookSuggestions(
   db: Database,
   profileId: string,
   subjectId: string,
-): Promise<void> {
+): Promise<GenerationOutcome> {
   const subject = await db.query.subjects.findFirst({
     where: and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
   });
   if (!subject) {
     emitFailureMetric(profileId, subjectId, 'no_subject');
-    return;
+    return 'no_subject';
   }
   if (subject.pedagogyMode === 'four_strands') {
     emitFailureMetric(profileId, subjectId, 'language_subject');
-    return;
+    return 'language_subject';
   }
   const last = subject.bookSuggestionsLastGenerationAttemptedAt;
   if (last && Date.now() - last.getTime() < COOLDOWN_MS) {
     emitFailureMetric(profileId, subjectId, 'cooldown');
-    return;
+    return 'cooldown';
   }
 
-  await db.transaction(async (tx) => {
+  return db.transaction(async (tx): Promise<GenerationOutcome> => {
     const lockKey = `book_suggestions:${profileId}:${subjectId}`;
     const lockResult = await tx.execute(
       sql`SELECT pg_try_advisory_xact_lock(hashtextextended(${lockKey}, 0)) AS got`,
@@ -75,7 +78,7 @@ export async function generateCategorizedBookSuggestions(
     const got = Array.isArray(rows) ? rows[0]?.got : false;
     if (!got) {
       emitFailureMetric(profileId, subjectId, 'lock_loser');
-      return;
+      return 'lock_loser';
     }
 
     const unpickedNow = await tx
@@ -87,7 +90,7 @@ export async function generateCategorizedBookSuggestions(
           isNull(bookSuggestions.pickedAt),
         ),
       );
-    if (unpickedNow.length >= 4) return;
+    if (unpickedNow.length >= 4) return 'success';
 
     await tx
       .update(subjects)
@@ -149,13 +152,13 @@ export async function generateCategorizedBookSuggestions(
       const validated = bookSuggestionGenerationResultSchema.safeParse(json);
       if (!validated.success) {
         emitFailureMetric(profileId, subjectId, 'parse');
-        return;
+        return 'parse';
       }
       parsed = validated.data;
     } catch (error) {
       const reason = classifyError(error);
       emitFailureMetric(profileId, subjectId, reason);
-      return;
+      return reason;
     }
 
     const blockedTitles = [...existingBookTitles, ...existingSuggestionTitles];
@@ -168,7 +171,10 @@ export async function generateCategorizedBookSuggestions(
       seen.add(lower);
       return true;
     });
-    if (filtered.length === 0) return;
+    if (filtered.length === 0) {
+      emitFailureMetric(profileId, subjectId, 'all_filtered');
+      return 'all_filtered';
+    }
 
     try {
       await tx.insert(bookSuggestions).values(
@@ -180,8 +186,9 @@ export async function generateCategorizedBookSuggestions(
           category: s.category,
         })),
       );
+      return 'success';
     } catch (error) {
-      if (isUniqueViolation(error)) return;
+      if (isUniqueViolation(error)) return 'success';
       throw error;
     }
   });

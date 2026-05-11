@@ -144,7 +144,11 @@ describe('getUnpickedBookSuggestionsEnvelope', () => {
       SUBJECT_ID,
     );
 
-    expect(result).toEqual({ suggestions: [], curriculumBookCount: 0 });
+    expect(result).toEqual({
+      suggestions: [],
+      curriculumBookCount: 0,
+      topupOutcome: 'skipped',
+    });
   });
 });
 
@@ -219,7 +223,11 @@ describe('getUnpickedBookSuggestionsWithTopup', () => {
       SUBJECT_ID,
     );
 
-    expect(result).toEqual({ suggestions: [], curriculumBookCount: 0 });
+    expect(result).toEqual({
+      suggestions: [],
+      curriculumBookCount: 0,
+      topupOutcome: 'no_subject',
+    });
     expect(generateMock).not.toHaveBeenCalled();
   });
 });

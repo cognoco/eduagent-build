@@ -450,7 +450,7 @@ describe('generateCategorizedBookSuggestions', () => {
   // Task 6 — LLM failure emits metric and does not throw
   // -------------------------------------------------------------------------
   describe('LLM failure handling', () => {
-    it('does not throw when routeAndCall rejects', async () => {
+    it('does not throw when routeAndCall rejects — returns classified outcome', async () => {
       const subject = makeSubject();
       routeAndCallMock.mockRejectedValue(new Error('LLM network error'));
 
@@ -459,7 +459,7 @@ describe('generateCategorizedBookSuggestions', () => {
 
       await expect(
         generateCategorizedBookSuggestions(db, PROFILE_ID, SUBJECT_ID),
-      ).resolves.toBeUndefined();
+      ).resolves.toBe('network');
     });
 
     it('emits a structured metric via logger.warn on LLM rejection', async () => {
@@ -542,7 +542,7 @@ describe('generateCategorizedBookSuggestions', () => {
       );
     });
 
-    it('swallows unique constraint violations (23505) without rethrowing', async () => {
+    it('swallows unique constraint violations (23505) without rethrowing — treats race-loss as success', async () => {
       const subject = makeSubject();
       routeAndCallMock.mockResolvedValue(
         makeLlmResult([makeSuggestion('Unique Book')]),
@@ -554,9 +554,13 @@ describe('generateCategorizedBookSuggestions', () => {
       const { tx } = makeTx({ insertRejects: uniqueError });
       const { db } = makeDb(subject, async (cb) => cb(tx));
 
+      // A 23505 collision means a concurrent inserter beat us — the partial
+      // unique index `(subject_id, lower(title)) WHERE picked_at IS NULL`
+      // guarantees at least one suggestion landed for the user, so report
+      // 'success' to the caller rather than a failure reason.
       await expect(
         generateCategorizedBookSuggestions(db, PROFILE_ID, SUBJECT_ID),
-      ).resolves.toBeUndefined();
+      ).resolves.toBe('success');
     });
 
     it('rethrows non-unique constraint DB errors', async () => {

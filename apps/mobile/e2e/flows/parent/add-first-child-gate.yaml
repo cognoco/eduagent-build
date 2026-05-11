@@ -1,7 +1,7 @@
 # Flow: Add-First-Child Gate — Parent owner with no children can add a child
-# Validates: solo parent (owner, no children) lands on LearnerScreen,
-#            navigates to More tab, taps "Add a child", and lands on
-#            the create-profile screen.
+# Validates: solo parent (owner, no children) lands on parent Home's
+#            add-first-child state, taps the CTA, and lands on the
+#            create-profile screen.
 # Tags: weekly, parent
 #
 # Journey: UX Journey 4 (Parent Oversight — onboarding entry)
@@ -10,19 +10,15 @@
 #               (scenario: parent-solo)
 #
 # Seed analysis (test-seed.ts):
-#   parent-solo: isOwner=true, no children → hasLinkedChildren=false →
-#   Family tab is hidden (computeVisibleTabs gate); home renders
-#   LearnerScreen with intent cards. The single "add first child" entry
-#   point lives in the More tab → add-child-link Pressable (gated on
-#   isAdultOwner so under-18s and non-owners never see it).
+#   parent-solo: isOwner=true, no children, family-tier subscription →
+#   home renders ParentHomeScreen with a zero-state family dashboard.
 #
 # testID mapping:
-#   more.tsx:
-#     - add-child-link                  -> "Add a child" Pressable in Family section
+#   ParentHomeScreen.tsx:
+#     - add-first-child-screen          -> zero-state family dashboard card
+#     - add-first-child-cta             -> primary "Add your first child" CTA
 #   create-profile.tsx:
 #     - create-profile-name             -> child name input (confirms navigation)
-#   _layout.tsx tabs:
-#     - tab-more                        -> More tab bar button
 appId: com.mentomate.app
 tags:
   - weekly
@@ -32,54 +28,39 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: "parent-solo"
+      SEED_SCENARIO: 'parent-solo'
       API_URL: ${API_URL}
 
-# parent-solo has no children → renders LearnerScreen
+# parent-solo has no children → renders parent Home zero state
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: 'parent-home-screen'
     timeout: 15000
 
 - takeScreenshot: add-first-child-01-home
 
-# ── Part 1: Navigate to More tab ─────────────────────────────────────
-- tapOn:
-    id: "tab-more"
-
 - extendedWaitUntil:
     visible:
-      id: "learning-accommodation-section-header"
-    timeout: 10000
-
-- takeScreenshot: add-first-child-02-more-screen
-
-# ── Part 2: Assert add-child-link in More tab ─────────────────────────
-# add-child-link is visible whenever isAdultOwner=true — parent-solo is
-# an adult owner so this button renders.
-- scrollUntilVisible:
-    element:
-      id: "add-child-link"
-    direction: DOWN
+      id: 'add-first-child-screen'
     timeout: 10000
 
 - assertVisible:
-    id: "add-child-link"
+    id: 'add-first-child-cta'
 
-- takeScreenshot: add-first-child-03-more-section
+- takeScreenshot: add-first-child-02-zero-state
 
-# ── Part 3: Tap add-child CTA → create-profile ────────────────────────
+# ── Part 1: Tap add-first-child CTA → create-profile ──────────────────
 - tapOn:
-    id: "add-child-link"
+    id: 'add-first-child-cta'
 
 # handleAddChild() checks tier (family/pro allowed) then pushes /create-profile?for=child.
 # parent-solo has a family-tier active subscription so no gate alert fires.
 - extendedWaitUntil:
     visible:
-      id: "create-profile-name"
+      id: 'create-profile-name'
     timeout: 10000
 
 - assertVisible:
-    id: "create-profile-name"
+    id: 'create-profile-name'
 
-- takeScreenshot: add-first-child-04-create-profile-reached
+- takeScreenshot: add-first-child-03-create-profile-reached

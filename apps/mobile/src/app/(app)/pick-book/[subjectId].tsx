@@ -3,7 +3,10 @@ import { View, Text, ScrollView, TextInput, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import type { BookSuggestion } from '@eduagent/schemas';
+import type {
+  BookSuggestion,
+  BookSuggestionsTopupOutcome,
+} from '@eduagent/schemas';
 import { useBookSuggestions } from '../../../hooks/use-book-suggestions';
 import { useFiling } from '../../../hooks/use-filing';
 import { useStickyLoading } from '../../../hooks/use-sticky-loading';
@@ -30,6 +33,52 @@ const LOADING_MESSAGES = [
 ];
 
 const SLOW_LOADING_HINT_MS = 5_000;
+
+// Maps the API's topup outcome to user-facing empty-state copy. The reason
+// codes mirror `BookSuggestionsTopupOutcome` in `@eduagent/schemas`. Each
+// branch picks copy that tells the user (a) whether to wait, retry, or
+// switch to typing a topic, and (b) avoids over-promising recovery.
+function emptyStateMessage(
+  outcome: BookSuggestionsTopupOutcome | undefined,
+): string {
+  switch (outcome) {
+    case 'cooldown':
+      return "We just tried to load fresh suggestions and they're not ready yet. Try again in a few minutes, or type a book or topic to add.";
+    case 'quota':
+    case 'network':
+    case 'timeout':
+    case 'unknown':
+      return "We couldn't load suggestions right now. Try again, or type a book or topic to add.";
+    case 'parse':
+      return "Suggestions didn't come through cleanly. Try again, or type a book or topic to add.";
+    case 'lock_loser':
+      return 'Another request is already loading suggestions. Try again in a moment.';
+    case 'language_subject':
+      return 'This subject uses a different learning flow. Type the book or topic you want to study.';
+    case 'all_filtered':
+      return "We've used up the obvious suggestions for this subject. Type the next book or topic you want to add.";
+    case 'no_subject':
+    case 'skipped':
+    case 'not_needed':
+    case 'success':
+    default:
+      return 'No suggestions yet. Type a book or topic you want to add.';
+  }
+}
+
+function isRetriableTopupOutcome(
+  outcome: BookSuggestionsTopupOutcome,
+): boolean {
+  return (
+    outcome === 'cooldown' ||
+    outcome === 'quota' ||
+    outcome === 'network' ||
+    outcome === 'timeout' ||
+    outcome === 'unknown' ||
+    outcome === 'parse' ||
+    outcome === 'lock_loser'
+  );
+}
 
 export default function PickBookScreen(): React.ReactElement {
   const router = useRouter();
@@ -449,15 +498,32 @@ export default function PickBookScreen(): React.ReactElement {
           </View>
         )}
 
-        {/* Empty state for suggestions */}
+        {/* Empty state for suggestions — copy varies with topup outcome so
+            users (and us, in OTA-built APKs without log access) can tell
+            whether suggestions are loading, cooling down, or genuinely
+            failing rather than seeing one silent dead-end string. */}
         {suggestions.length === 0 && (
           <View
             className="bg-surface rounded-card px-4 py-6 items-center mb-6"
             testID="pick-book-empty"
           >
             <Text className="text-body text-text-secondary text-center">
-              No suggestions yet. Type a book or topic you want to add.
+              {emptyStateMessage(suggestionsData?.topupOutcome)}
             </Text>
+            {suggestionsData?.topupOutcome &&
+            isRetriableTopupOutcome(suggestionsData.topupOutcome) ? (
+              <Pressable
+                onPress={() => void suggestionsQuery.refetch()}
+                className="mt-3 px-4 py-2 min-h-[40px] justify-center"
+                testID="pick-book-empty-retry"
+                accessibilityRole="button"
+                accessibilityLabel="Try again"
+              >
+                <Text className="text-body font-semibold text-primary">
+                  Try again
+                </Text>
+              </Pressable>
+            ) : null}
           </View>
         )}
 

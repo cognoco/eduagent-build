@@ -16,7 +16,13 @@ import {
   subjects,
   curriculumBooks,
 } from '@eduagent/database';
-import type { BookSuggestion } from '@eduagent/schemas';
+import type {
+  BookSuggestion,
+  BookSuggestionsTopupOutcome,
+} from '@eduagent/schemas';
+import { createLogger } from './logger';
+
+const logger = createLogger();
 
 function mapBookSuggestion(
   row: typeof bookSuggestions.$inferSelect,
@@ -129,15 +135,22 @@ export async function markTopicSuggestionUsed(
   return rows.length > 0;
 }
 
+type Envelope = {
+  suggestions: BookSuggestion[];
+  curriculumBookCount: number;
+  topupOutcome?: BookSuggestionsTopupOutcome;
+};
+
 export async function getUnpickedBookSuggestionsEnvelope(
   db: Database,
   profileId: string,
   subjectId: string,
-): Promise<{ suggestions: BookSuggestion[]; curriculumBookCount: number }> {
+): Promise<Envelope> {
   const subject = await db.query.subjects.findFirst({
     where: and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
   });
-  if (!subject) return { suggestions: [], curriculumBookCount: 0 };
+  if (!subject)
+    return { suggestions: [], curriculumBookCount: 0, topupOutcome: 'skipped' };
 
   const unpicked = await db
     .select()
@@ -158,6 +171,7 @@ export async function getUnpickedBookSuggestionsEnvelope(
   return {
     suggestions: unpicked.map(mapBookSuggestion),
     curriculumBookCount,
+    topupOutcome: 'skipped',
   };
 }
 
@@ -165,11 +179,16 @@ export async function getUnpickedBookSuggestionsWithTopup(
   db: Database,
   profileId: string,
   subjectId: string,
-): Promise<{ suggestions: BookSuggestion[]; curriculumBookCount: number }> {
+): Promise<Envelope> {
   const subject = await db.query.subjects.findFirst({
     where: and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
   });
-  if (!subject) return { suggestions: [], curriculumBookCount: 0 };
+  if (!subject)
+    return {
+      suggestions: [],
+      curriculumBookCount: 0,
+      topupOutcome: 'no_subject',
+    };
 
   let unpicked = await db
     .select()
@@ -181,11 +200,17 @@ export async function getUnpickedBookSuggestionsWithTopup(
       ),
     );
 
+  let topupOutcome: BookSuggestionsTopupOutcome = 'not_needed';
+
   if (unpicked.length < 4) {
     try {
       const { generateCategorizedBookSuggestions } =
         await import('./book-suggestion-generation');
-      await generateCategorizedBookSuggestions(db, profileId, subjectId);
+      topupOutcome = await generateCategorizedBookSuggestions(
+        db,
+        profileId,
+        subjectId,
+      );
       unpicked = await db
         .select()
         .from(bookSuggestions)
@@ -195,8 +220,19 @@ export async function getUnpickedBookSuggestionsWithTopup(
             isNull(bookSuggestions.pickedAt),
           ),
         );
-    } catch {
-      // LLM topup failed — return pre-topup suggestions rather than 500
+    } catch (error) {
+      // generateCategorizedBookSuggestions catches its known failure paths
+      // and returns a reason; reaching here means an unexpected throw (DB
+      // outage, schema drift). Emit a structured metric so the recovery is
+      // not invisible — CLAUDE.md "Silent recovery without escalation is
+      // banned" — and surface 'unknown' to the caller.
+      logger.warn('book_suggestion_topup_unhandled', {
+        metric: 'book_suggestion_topup_unhandled',
+        profileId,
+        subjectId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      topupOutcome = 'unknown';
     }
   }
 
@@ -209,5 +245,6 @@ export async function getUnpickedBookSuggestionsWithTopup(
   return {
     suggestions: unpicked.map(mapBookSuggestion),
     curriculumBookCount,
+    topupOutcome,
   };
 }

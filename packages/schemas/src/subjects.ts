@@ -429,9 +429,37 @@ export const bookSuggestionSchema = z.object({
 });
 export type BookSuggestion = z.infer<typeof bookSuggestionSchema>;
 
+// Outcome of the inline LLM top-up. Mirrors the FailureReason union in
+// `apps/api/src/services/book-suggestion-generation.ts` plus a 'success'
+// (LLM ran and inserted) and 'not_needed' (already had ≥4 unpicked).
+// 'skipped' is used when the caller did not request top-up.
+//
+// Surfaces to the picker so the user can be told *why* there are no
+// suggestions rather than seeing a silent dead end. Required for the
+// CLAUDE.md "Silent recovery without escalation is banned" rule.
+export const bookSuggestionsTopupOutcomeSchema = z.enum([
+  'success',
+  'not_needed',
+  'skipped',
+  'cooldown',
+  'lock_loser',
+  'language_subject',
+  'no_subject',
+  'quota',
+  'network',
+  'parse',
+  'timeout',
+  'all_filtered',
+  'unknown',
+]);
+export type BookSuggestionsTopupOutcome = z.infer<
+  typeof bookSuggestionsTopupOutcomeSchema
+>;
+
 export const bookSuggestionsResponseSchema = z.object({
   suggestions: z.array(bookSuggestionSchema),
   curriculumBookCount: z.number().int().nonnegative(),
+  topupOutcome: bookSuggestionsTopupOutcomeSchema.optional(),
 });
 export type BookSuggestionsResponse = z.infer<
   typeof bookSuggestionsResponseSchema
