@@ -322,6 +322,28 @@ describe('ChildDetailScreen — accommodation guide', () => {
     fireEvent.press(screen.getByTestId('accommodation-guide-toggle'));
     expect(screen.queryByTestId('accommodation-guide-content')).toBeNull();
   });
+
+  it('marks the guide row whose recommendation matches the active accommodation mode', () => {
+    mockUseChildLearnerProfile.mockReturnValue({
+      data: {
+        accommodationMode: 'audio-first',
+        memoryConsentStatus: 'granted',
+        updatedAt: null,
+      },
+      isLoading: false,
+    });
+
+    render(<ChildDetailScreen />);
+    fireEvent.press(screen.getByTestId('accommodation-guide-toggle'));
+
+    const activeRow = screen.getByTestId('guide-pick-audio-first');
+    expect(activeRow.props.accessibilityState?.selected).toBe(true);
+    expect(activeRow).toHaveTextContent(/parentView\.index\.active/);
+
+    const inactiveRow = screen.getByTestId('guide-pick-short-burst');
+    expect(inactiveRow.props.accessibilityState?.selected).toBe(false);
+    expect(inactiveRow).not.toHaveTextContent(/parentView\.index\.active/);
+  });
 });
 
 describe('ChildDetailScreen — new sections', () => {

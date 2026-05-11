@@ -693,11 +693,21 @@ describe('computeVisibleTabs', () => {
 });
 
 describe('shouldUseStudentHomeOnlyTabs', () => {
-  it('uses Home-only tabs for a pure student account with no linked profiles', () => {
+  it('gives full tabs to a solo learner (owner with no linked profiles)', () => {
     expect(
       shouldUseStudentHomeOnlyTabs({
         activeProfile: { isOwner: true },
         profiles: [{ isOwner: true }],
+        isParentProxy: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('uses Home-only tabs for a child profile', () => {
+    expect(
+      shouldUseStudentHomeOnlyTabs({
+        activeProfile: { isOwner: false },
+        profiles: [{ isOwner: true }, { isOwner: false }],
         isParentProxy: false,
       }),
     ).toBe(true);

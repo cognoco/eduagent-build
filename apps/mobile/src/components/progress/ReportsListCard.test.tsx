@@ -1,14 +1,14 @@
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import { ReportsListCard } from './ReportsListCard';
 import {
   useProfileReports,
   useProfileWeeklyReports,
 } from '../../hooks/use-progress';
 
-const push = jest.fn();
+const mockPush = jest.fn();
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push }),
+  useRouter: () => ({ push: mockPush }),
 }));
 
 jest.mock(
@@ -85,8 +85,8 @@ describe('ReportsListCard', () => {
   it('routes self-view rows to progress report paths', () => {
     render(<ReportsListCard profileId="profile-1" interactive selfView />);
 
-    screen.getByTestId('weekly-report-card-weekly-1').props.onPress();
-    expect(push).toHaveBeenCalledWith({
+    fireEvent.press(screen.getByTestId('weekly-report-card-weekly-1'));
+    expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/progress/weekly-report/[weeklyReportId]',
       params: { weeklyReportId: 'weekly-1' },
     });

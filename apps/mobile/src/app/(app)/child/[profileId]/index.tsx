@@ -541,33 +541,39 @@ export default function ChildDetailScreen() {
           className="bg-surface rounded-card px-4 py-3 mb-3"
           testID="accommodation-guide-content"
         >
-          {ACCOMMODATION_GUIDE.map((row) => (
-            <View
-              key={row.recommendation}
-              className="flex-row items-center justify-between py-2"
-            >
-              <Text className="text-body-sm text-text-secondary flex-1 me-3">
-                {row.condition}
-              </Text>
-              <Pressable
-                onPress={() => {
-                  handleAccommodationChange(row.recommendation);
-                  setShowAccommodationGuide(false);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={t('parentView.index.pickAccommodation', {
-                  mode: row.recommendation,
-                })}
-                testID={`guide-pick-${row.recommendation}`}
+          {ACCOMMODATION_GUIDE.map((row) => {
+            const isActive = row.recommendation === currentAccommodationMode;
+            const recommendationTitle =
+              ACCOMMODATION_OPTIONS.find((o) => o.mode === row.recommendation)
+                ?.title ?? row.recommendation;
+            return (
+              <View
+                key={row.recommendation}
+                className="flex-row items-center justify-between py-2"
               >
-                <Text className="text-primary text-body-sm font-semibold">
-                  {ACCOMMODATION_OPTIONS.find(
-                    (o) => o.mode === row.recommendation,
-                  )?.title ?? row.recommendation}
+                <Text className="text-body-sm text-text-secondary flex-1 me-3">
+                  {row.condition}
                 </Text>
-              </Pressable>
-            </View>
-          ))}
+                <Pressable
+                  onPress={() => {
+                    handleAccommodationChange(row.recommendation);
+                    setShowAccommodationGuide(false);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('parentView.index.pickAccommodation', {
+                    mode: row.recommendation,
+                  })}
+                  accessibilityState={{ selected: isActive }}
+                  testID={`guide-pick-${row.recommendation}`}
+                >
+                  <Text className="text-primary text-body-sm font-semibold">
+                    {recommendationTitle}
+                    {isActive ? ` · ${t('parentView.index.active')}` : ''}
+                  </Text>
+                </Pressable>
+              </View>
+            );
+          })}
         </View>
       )}
       {ACCOMMODATION_OPTIONS.map((opt) => (

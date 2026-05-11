@@ -271,6 +271,10 @@
     "accommodation": {
       "sectionHeader": "{{name}}s læringstilpasning"
     },
+    "learningPreferences": {
+      "rowLabel": "Læringsinnstillinger",
+      "screenTitle": "Læringsinnstillinger"
+    },
     "mentorMemory": {
       "sectionHeader": "Hva mentoren din vet",
       "viewAndManage": "Se og administrer"

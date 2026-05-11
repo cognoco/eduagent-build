@@ -3,9 +3,6 @@ import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mockPush = jest.fn();
-const mockTrack = jest.fn();
-const mockAccommodationMutate = jest.fn();
-const mockCelebrationLevelMutate = jest.fn();
 const mockPlatformAlert = jest.fn();
 let mockSubscription: { tier: string } | null = { tier: 'family' };
 let mockFamilySubscription: {
@@ -22,13 +19,7 @@ let mockActiveProfile = {
   birthYear: 1990,
 };
 let mockProfiles = [mockActiveProfile];
-let mockLearnerProfile: { accommodationMode?: string } | null = {
-  accommodationMode: 'none',
-};
-let mockLearnerProfileError = false;
 let mockIsParentProxy = false;
-let mockCelebrationLevel: 'all' | 'big_only' | 'off' | undefined = 'big_only';
-const mockLearnerProfileRefetch = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
@@ -76,31 +67,8 @@ jest.mock(
 );
 
 jest.mock(
-  '../../../hooks/use-learner-profile' /* gc1-allow: unit test boundary */,
-  () => ({
-    useLearnerProfile: () => ({
-      data: mockLearnerProfile,
-      isError: mockLearnerProfileError,
-      refetch: mockLearnerProfileRefetch,
-    }),
-    useUpdateAccommodationMode: () => ({
-      mutate: mockAccommodationMutate,
-      isPending: false,
-    }),
-  }),
-);
-
-jest.mock(
   '../../../hooks/use-settings' /* gc1-allow: unit test boundary */,
   () => ({
-    useCelebrationLevel: () => ({
-      data: mockCelebrationLevel,
-      isLoading: false,
-    }),
-    useUpdateCelebrationLevel: () => ({
-      mutate: mockCelebrationLevelMutate,
-      isPending: false,
-    }),
     useFamilyPoolBreakdownSharing: () => ({
       data: false,
       isLoading: false,
@@ -112,10 +80,6 @@ jest.mock(
   }),
 );
 
-jest.mock('../../../lib/analytics' /* gc1-allow: unit test boundary */, () => ({
-  track: (...args: unknown[]) => mockTrack(...args),
-}));
-
 jest.mock(
   '../../../lib/platform-alert' /* gc1-allow: unit test boundary */,
   () => ({
@@ -125,13 +89,6 @@ jest.mock(
 
 jest.mock('@clerk/clerk-expo', () => ({
   useAuth: () => ({ signOut: jest.fn() }),
-  useUser: () => ({
-    user: {
-      fullName: 'Alex',
-      firstName: 'Alex',
-      primaryEmailAddress: { emailAddress: 'alex@example.com' },
-    },
-  }),
 }));
 
 function createWrapper() {
@@ -161,24 +118,31 @@ describe('MoreScreen landing', () => {
       birthYear: 1990,
     };
     mockProfiles = [mockActiveProfile];
-    mockLearnerProfile = { accommodationMode: 'none' };
-    mockLearnerProfileError = false;
     mockIsParentProxy = false;
-    mockCelebrationLevel = 'big_only';
   });
 
   it('renders the master/detail landing rows', () => {
     render(<MoreScreen />, { wrapper: createWrapper() });
 
-    screen.getByTestId('learning-accommodation-section-header');
-    screen.getByTestId('mentor-memory-link');
+    screen.getByTestId('more-row-learning-preferences');
     screen.getByTestId('add-child-link');
     screen.getByTestId('more-row-notifications');
     screen.getByTestId('more-row-account');
     screen.getByTestId('more-row-privacy');
     screen.getByTestId('more-row-help');
     screen.getByTestId('sign-out-button');
-    expect(screen.queryByTestId('notifications-section-header')).toBeNull();
+    expect(
+      screen.queryByTestId('learning-accommodation-section-header'),
+    ).toBeNull();
+    expect(screen.queryByTestId('mentor-memory-link')).toBeNull();
+  });
+
+  it('navigates to the learning-preferences screen', () => {
+    render(<MoreScreen />, { wrapper: createWrapper() });
+
+    fireEvent.press(screen.getByTestId('more-row-learning-preferences'));
+
+    expect(mockPush).toHaveBeenCalledWith('/(app)/more/learning-preferences');
   });
 
   it('navigates to the four More sub-screens', () => {
@@ -193,34 +157,6 @@ describe('MoreScreen landing', () => {
     expect(mockPush).toHaveBeenCalledWith('/(app)/more/account');
     expect(mockPush).toHaveBeenCalledWith('/(app)/more/privacy');
     expect(mockPush).toHaveBeenCalledWith('/(app)/more/help');
-  });
-
-  it('shows the inline celebration follow-up only for short-burst and predictable accommodations', () => {
-    mockLearnerProfile = { accommodationMode: 'short-burst' };
-    const { rerender } = render(<MoreScreen />, { wrapper: createWrapper() });
-
-    screen.getByTestId('celebration-followup-short-burst');
-    screen.getByTestId('celebration-level-big-only');
-
-    mockLearnerProfile = { accommodationMode: 'predictable' };
-    rerender(<MoreScreen />);
-    screen.getByTestId('celebration-followup-predictable');
-
-    mockLearnerProfile = { accommodationMode: 'audio-first' };
-    rerender(<MoreScreen />);
-    expect(screen.queryByTestId('celebration-level-big-only')).toBeNull();
-  });
-
-  it('updates celebration level from the inline follow-up', () => {
-    mockLearnerProfile = { accommodationMode: 'predictable' };
-    render(<MoreScreen />, { wrapper: createWrapper() });
-
-    fireEvent.press(screen.getByTestId('celebration-level-off'));
-
-    expect(mockCelebrationLevelMutate).toHaveBeenCalledWith(
-      'off',
-      expect.objectContaining({ onError: expect.any(Function) }),
-    );
   });
 
   it('hides Add a child for minor owners and unknown birth years', () => {
@@ -253,22 +189,6 @@ describe('MoreScreen landing', () => {
     fireEvent.press(screen.getByTestId('add-child-link'));
 
     expect(mockPush).toHaveBeenCalledWith('/create-profile?for=child');
-  });
-
-  it('keeps child preference cross-links for owner profiles with children', () => {
-    mockProfiles = [
-      mockActiveProfile,
-      { id: 'child-1', displayName: 'Mia', isOwner: false, birthYear: 2014 },
-    ];
-
-    render(<MoreScreen />, { wrapper: createWrapper() });
-
-    fireEvent.press(screen.getByTestId('accommodation-mode-child-link'));
-
-    expect(mockTrack).toHaveBeenCalledWith('child_progress_navigated', {
-      source: 'more_preferences_link',
-    });
-    expect(mockPush).toHaveBeenCalledWith('/(app)/home');
   });
 
   it('hides sign out in impersonation', () => {

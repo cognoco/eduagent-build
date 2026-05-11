@@ -9,39 +9,23 @@ import {
 import { useState, useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useAuth, useUser } from '@clerk/clerk-expo';
-import {
-  isAdultOwner,
-  type AccommodationMode,
-  type CelebrationLevel,
-  type KnowledgeInventory,
-} from '@eduagent/schemas';
+import { useAuth } from '@clerk/clerk-expo';
+import { isAdultOwner } from '@eduagent/schemas';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useProfile } from '../../../lib/profile';
 import { useActiveProfileRole } from '../../../hooks/use-active-profile-role';
-import { isNewLearner } from '../../../lib/progressive-disclosure';
-import {
-  useLearnerProfile,
-  useUpdateAccommodationMode,
-} from '../../../hooks/use-learner-profile';
 import {
   useFamilySubscription,
   useSubscription,
 } from '../../../hooks/use-subscription';
 import {
-  useCelebrationLevel,
   useFamilyPoolBreakdownSharing,
-  useUpdateCelebrationLevel,
   useUpdateFamilyPoolBreakdownSharing,
 } from '../../../hooks/use-settings';
-import { ACCOMMODATION_OPTIONS } from '../../../lib/accommodation-options';
-import { track } from '../../../lib/analytics';
-import { FAMILY_HOME_PATH } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
 import { signOutWithCleanup } from '../../../lib/sign-out';
 import {
-  LearningModeOption,
   SectionHeader,
   SettingsRow,
 } from '../../../components/more/settings-rows';
@@ -50,7 +34,6 @@ export default function MoreScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { signOut } = useAuth();
-  const { user } = useUser();
   const { activeProfile, profiles } = useProfile();
   // [BUG-915] When the parent is impersonating a child profile, the More tab
   // must hide account-level destructive actions (Sign out, Delete account,
@@ -63,59 +46,18 @@ export default function MoreScreen() {
   const role = useActiveProfileRole();
   const isImpersonating = role === 'impersonated-child';
   const queryClient = useQueryClient();
-  const cachedInventory = queryClient.getQueryData<KnowledgeInventory>([
-    'progress',
-    'inventory',
-    activeProfile?.id,
-  ]);
-  const hideMentorMemory = isNewLearner(cachedInventory?.global.totalSessions);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const { data: subscription } = useSubscription();
   const { data: familyData } = useFamilySubscription(
     subscription?.tier === 'family' || subscription?.tier === 'pro',
   );
-  const { data: celebrationLevel = 'big_only', isLoading: celebrationLoading } =
-    useCelebrationLevel();
-  const updateCelebrationLevel = useUpdateCelebrationLevel();
   const {
     data: familyPoolBreakdownSharing,
     isLoading: breakdownSharingLoading,
   } = useFamilyPoolBreakdownSharing();
   const updateFamilyPoolBreakdownSharing =
     useUpdateFamilyPoolBreakdownSharing();
-  const {
-    data: learnerProfile,
-    isError: learnerProfileError,
-    refetch: refetchLearnerProfile,
-  } = useLearnerProfile();
-  const updateAccommodation = useUpdateAccommodationMode();
   const { t } = useTranslation();
-
-  const handleSelectAccommodation = useCallback(
-    (mode: AccommodationMode) => {
-      if (mode === (learnerProfile?.accommodationMode ?? 'none')) return;
-      updateAccommodation.mutate(
-        { accommodationMode: mode },
-        {
-          onError: () => {
-            platformAlert(
-              t('more.errors.couldNotSaveSetting'),
-              t('more.errors.tryAgain'),
-            );
-          },
-        },
-      );
-    },
-    [learnerProfile?.accommodationMode, updateAccommodation, t],
-  );
-
-  const handleChildProgressNavigation = useCallback(
-    (href: string) => {
-      track('child_progress_navigated', { source: 'more_preferences_link' });
-      router.push(href as never);
-    },
-    [router],
-  );
 
   const handleAddChild = useCallback(() => {
     if (!subscription) {
@@ -174,25 +116,6 @@ export default function MoreScreen() {
     role,
     birthYear: activeProfile?.birthYear,
   });
-  const displayName =
-    activeProfile?.displayName ??
-    user?.fullName ??
-    user?.firstName ??
-    user?.primaryEmailAddress?.emailAddress ??
-    'User';
-
-  const handleSelectCelebrationLevel = (nextLevel: CelebrationLevel): void => {
-    if (celebrationLevel === nextLevel) return;
-    updateCelebrationLevel.mutate(nextLevel, {
-      onError: () => {
-        platformAlert(
-          t('more.errors.couldNotSaveSetting'),
-          t('more.errors.tryAgain'),
-        );
-      },
-    });
-  };
-
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="px-5 pt-4 pb-2">
@@ -206,170 +129,13 @@ export default function MoreScreen() {
         keyboardShouldPersistTaps="handled"
         testID="more-scroll"
       >
-        {/* 1. Learning Accommodation */}
-        <Text
-          className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-1 mt-6"
-          testID="learning-accommodation-section-header"
-        >
-          {t('more.accommodation.sectionHeader', { name: displayName })}
-        </Text>
-        <Text className="text-caption text-text-secondary mb-2">
-          {activeProfile?.isOwner && linkedChildren.length > 0
-            ? t('more.learningMode.subtitleWithChildren')
-            : t('more.learningMode.subtitle')}
-        </Text>
-        {activeProfile?.isOwner && linkedChildren.length === 1 ? (
-          <Pressable
-            onPress={() => {
-              handleChildProgressNavigation(FAMILY_HOME_PATH);
-            }}
-            className="self-start mb-3"
-            accessibilityRole="button"
-            accessibilityLabel={t(
-              'more.learningMode.childPreferencesAccessLabel',
-              {
-                name:
-                  linkedChildren[0]?.displayName ?? t('more.family.yourChild'),
-              },
-            )}
-            testID="accommodation-mode-child-link"
-          >
-            <Text className="text-caption font-semibold text-primary">
-              {t('more.learningMode.childPreferencesLink', {
-                name:
-                  linkedChildren[0]?.displayName ?? t('more.family.yourChild'),
-              })}
-            </Text>
-          </Pressable>
-        ) : null}
-        {activeProfile?.isOwner && linkedChildren.length >= 2 ? (
-          <Pressable
-            onPress={() => handleChildProgressNavigation(FAMILY_HOME_PATH)}
-            className="self-start mb-3"
-            accessibilityRole="button"
-            accessibilityLabel={t(
-              'more.family.openFamilyPreferencesAccessLabel',
-            )}
-            testID="accommodation-mode-family-link"
-          >
-            <Text className="text-caption font-semibold text-primary">
-              {t('more.learningMode.familyPreferencesLink')}
-            </Text>
-          </Pressable>
-        ) : null}
-        {!learnerProfile ? (
-          learnerProfileError ? (
-            <View className="bg-surface rounded-card px-4 py-4 mb-2">
-              <Text className="text-body-sm text-text-secondary">
-                {t('session.mentorMemory.loadError')}
-              </Text>
-              <Pressable
-                onPress={() => void refetchLearnerProfile()}
-                className="self-start mt-3"
-                accessibilityRole="button"
-                testID="accommodation-mode-retry"
-              >
-                <Text className="text-caption font-semibold text-primary">
-                  {t('common.retry')}
-                </Text>
-              </Pressable>
-            </View>
-          ) : (
-            <View className="bg-surface rounded-card px-4 py-4 mb-2">
-              <Text className="text-body-sm text-text-secondary">
-                {t('common.loading')}
-              </Text>
-            </View>
-          )
-        ) : (
-          <>
-            {learnerProfileError ? (
-              <Pressable
-                onPress={() => void refetchLearnerProfile()}
-                className="self-start mb-3"
-                accessibilityRole="button"
-                testID="accommodation-mode-retry-stale"
-              >
-                <Text className="text-caption font-semibold text-primary">
-                  {t('common.retry')}
-                </Text>
-              </Pressable>
-            ) : null}
-            {ACCOMMODATION_OPTIONS.map((opt) => {
-              const selected = learnerProfile.accommodationMode === opt.mode;
-              const showsCelebrationFollowup =
-                selected &&
-                (opt.mode === 'short-burst' || opt.mode === 'predictable');
-
-              return (
-                <View key={opt.mode}>
-                  <LearningModeOption
-                    title={opt.title}
-                    description={opt.description}
-                    selected={selected}
-                    disabled={updateAccommodation.isPending}
-                    onPress={() => handleSelectAccommodation(opt.mode)}
-                    testID={`accommodation-mode-${opt.mode}`}
-                  />
-                  {showsCelebrationFollowup ? (
-                    <View
-                      className="ml-4 mb-2 border-l-2 border-primary/30 pl-3"
-                      testID={`celebration-followup-${opt.mode}`}
-                    >
-                      <Text className="text-caption font-semibold text-text-primary mb-2">
-                        {t('more.celebrations.inlinePrompt')}
-                      </Text>
-                      <LearningModeOption
-                        title={t('more.celebrations.allTitle')}
-                        description={t('more.celebrations.allDescription')}
-                        selected={celebrationLevel === 'all'}
-                        disabled={
-                          celebrationLoading || updateCelebrationLevel.isPending
-                        }
-                        onPress={() => handleSelectCelebrationLevel('all')}
-                        testID="celebration-level-all"
-                      />
-                      <LearningModeOption
-                        title={t('more.celebrations.bigOnlyTitle')}
-                        description={t('more.celebrations.bigOnlyDescription')}
-                        selected={celebrationLevel === 'big_only'}
-                        disabled={
-                          celebrationLoading || updateCelebrationLevel.isPending
-                        }
-                        onPress={() => handleSelectCelebrationLevel('big_only')}
-                        testID="celebration-level-big-only"
-                      />
-                      <LearningModeOption
-                        title={t('more.celebrations.offTitle')}
-                        description={t('more.celebrations.offDescription')}
-                        selected={celebrationLevel === 'off'}
-                        disabled={
-                          celebrationLoading || updateCelebrationLevel.isPending
-                        }
-                        onPress={() => handleSelectCelebrationLevel('off')}
-                        testID="celebration-level-off"
-                      />
-                    </View>
-                  ) : null}
-                </View>
-              );
-            })}
-          </>
-        )}
-
-        {/* 2. Live product configuration */}
-        {!hideMentorMemory ? (
-          <>
-            <SectionHeader testID="mentor-memory-section-header">
-              {t('more.mentorMemory.sectionHeader')}
-            </SectionHeader>
-            <SettingsRow
-              label={t('more.mentorMemory.viewAndManage')}
-              onPress={() => router.push('/(app)/mentor-memory?returnTo=more')}
-              testID="mentor-memory-link"
-            />
-          </>
-        ) : null}
+        <View className="mt-6">
+          <SettingsRow
+            label={t('more.learningPreferences.rowLabel')}
+            onPress={() => router.push('/(app)/more/learning-preferences')}
+            testID="more-row-learning-preferences"
+          />
+        </View>
 
         {showAddChild ? (
           <>

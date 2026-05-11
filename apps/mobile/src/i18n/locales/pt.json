@@ -296,6 +296,10 @@
     "accommodation": {
       "sectionHeader": "Acomodação de Aprendizagem de {{name}}"
     },
+    "learningPreferences": {
+      "rowLabel": "Preferências de aprendizagem",
+      "screenTitle": "Preferências de aprendizagem"
+    },
     "mentorMemory": {
       "sectionHeader": "O que seu mentor sabe",
       "viewAndManage": "Ver e gerenciar"

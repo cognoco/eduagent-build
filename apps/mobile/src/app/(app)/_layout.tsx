@@ -88,6 +88,7 @@ export function shouldUseStudentHomeOnlyTabs({
   isParentProxy: boolean;
 }): boolean {
   if (!activeProfile || isParentProxy) return false;
+  if (activeProfile.isOwner) return false;
   return !isGuardianProfile(activeProfile, profiles);
 }
 

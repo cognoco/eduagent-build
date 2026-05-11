@@ -271,6 +271,10 @@
     "accommodation": {
       "sectionHeader": "{{name}}さんの学習サポート"
     },
+    "learningPreferences": {
+      "rowLabel": "学習設定",
+      "screenTitle": "学習設定"
+    },
     "mentorMemory": {
       "sectionHeader": "メンターが知っていること",
       "viewAndManage": "表示と管理"

@@ -214,6 +214,10 @@ export default function MentorMemoryScreen() {
   const resolvedReturnTo = Array.isArray(returnTo) ? returnTo[0] : returnTo;
 
   const handleBack = useCallback(() => {
+    if (resolvedReturnTo === 'learning-preferences') {
+      router.replace('/(app)/more/learning-preferences');
+      return;
+    }
     if (resolvedReturnTo === 'more') {
       router.replace('/(app)/more');
       return;

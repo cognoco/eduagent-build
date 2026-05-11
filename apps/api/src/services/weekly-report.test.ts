@@ -1,5 +1,16 @@
-import { generateWeeklyReportData } from './weekly-report';
+import type { Database } from '@eduagent/database';
 import type { ProgressMetrics } from '@eduagent/schemas';
+import {
+  generateWeeklyReportData,
+  getWeeklyReportForProfile,
+} from './weekly-report';
+import { extractDrizzleParamValues } from '../test-utils/drizzle-introspection';
+
+const UUID = {
+  parent: 'a0000000-0000-4000-8000-000000000001',
+  child: 'a0000000-0000-4000-8000-000000000002',
+  report: 'a0000000-0000-4000-8000-000000000003',
+} as const;
 
 function metrics(over: Partial<ProgressMetrics>): ProgressMetrics {
   return {
@@ -26,6 +37,16 @@ function metrics(over: Partial<ProgressMetrics>): ProgressMetrics {
     subjects: [],
     ...over,
   };
+}
+
+function createMockDb(): Database {
+  return {
+    query: {
+      weeklyReports: {
+        findFirst: jest.fn().mockResolvedValue(undefined),
+      },
+    },
+  } as unknown as Database;
 }
 
 describe('generateWeeklyReportData', () => {
@@ -87,5 +108,18 @@ describe('generateWeeklyReportData', () => {
     // safeDelta clamps at 0 — this week mastered 0 new (relative). The
     // existing comparison string is the unchanged historical behavior.
     expect(result.headlineStat.comparison).toMatch(/last week/);
+  });
+});
+
+describe('getWeeklyReportForProfile', () => {
+  it('scopes self-view weekly report lookup by child profile id [HIGH-3]', async () => {
+    const db = createMockDb();
+
+    await getWeeklyReportForProfile(db, UUID.child, UUID.report);
+
+    const findFirst = db.query.weeklyReports.findFirst as jest.Mock;
+    const params = extractDrizzleParamValues(findFirst.mock.calls[0]?.[0]);
+    expect(params).toEqual(expect.arrayContaining([UUID.report, UUID.child]));
+    expect(params).not.toContain(UUID.parent);
   });
 });
