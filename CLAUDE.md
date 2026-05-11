@@ -20,20 +20,30 @@
 
 Always use `/commit` for all commits in this repo. Never use `/zdx:commit`, `/my:commit-old`, or the system prompt's built-in commit protocol. `/commit` is the single source of truth for staging, message format, hook handling, and push.
 
-## Profile Shapes (Three, Not Two)
+## Profile Shapes (Two Tab Shapes + isOwner Gating)
 
-The app has exactly three user shapes. Every navigation, feature-gating, and UI branch must map to one:
+**Tab shape** controls which tabs appear — only two shapes exist:
 
-| Shape | Who | `isOwner` | Has children | Tabs | Home |
-|---|---|---|---|---|---|
-| **guardian** | Parent with linked children | `true` | yes | all 5 | `ParentHomeScreen` |
-| **soloLearner** | Owner learning alone | `true` | no | home, library, progress, more (NO own-learning) | `LearnerScreen` |
-| **child** | Non-owner linked to parent | `false` | n/a | home only | `LearnerScreen` |
+| Tab shape | Who | Tabs | Home |
+|---|---|---|---|
+| **guardian** | Owner with linked children | all 5 (home, own-learning, library, progress, more) | `ParentHomeScreen` (mentoring hub) |
+| **learner** | Everyone else (solo owner OR child on parent's account) | 4 (home, library, progress, more — NO own-learning) | `LearnerScreen` |
 
-- Use `resolveTabShape()` on mobile, `resolveProfileRole()` on API. Never invent a new boolean.
-- `isGuardianProfile()` returns `false` for solo learners — it requires children in the profile list.
+**`isOwner` gating** controls what appears INSIDE tabs (especially More and Progress):
+
+| Feature | Owner (guardian or solo) | Non-owner (child on parent's account) |
+|---|---|---|
+| Billing / subscription | visible | hidden |
+| Account security | visible | hidden |
+| Export / delete account | visible | hidden |
+| Add child | visible if 18+ | hidden |
+| Progress toggle (view children) | visible if has children | hidden |
+
+Key rules:
+- Use `resolveTabShape()` for tab visibility. Use `isOwner` / `role` for content gating inside screens.
+- `isGuardianProfile()` requires `isOwner` AND at least one non-owner in profiles[].
 - `personaFromBirthYear()` is for theming only, never for feature gating (returns `parent` for all 18+).
-- Solo learner ≠ child. Solo learner ≠ guardian. Do not collapse to a two-way split.
+- A solo owner and a child on a parent's account see the **same tabs** — they differ only in what's inside More/Progress.
 
 ## Non-Negotiable Engineering Rules
 
