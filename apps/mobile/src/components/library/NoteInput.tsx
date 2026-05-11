@@ -120,7 +120,7 @@ export function NoteInput({
             accessibilityLabel="Save note"
           >
             {saving ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color={themeColors.textInverse} />
             ) : (
               <Text className="text-body text-text-primary">Save</Text>
             )}

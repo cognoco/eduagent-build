@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useProfile, isGuardianProfile } from '../lib/profile';
 import { goBackOrReplace } from '../lib/navigation';
+import { useThemeColors } from '../lib/theme';
 import {
   useSubscription,
   useFamilySubscription,
@@ -27,6 +28,7 @@ export default function ProfilesScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { t } = useTranslation();
+  const colors = useThemeColors();
   const { profiles, activeProfile, switchProfile, isLoading } = useProfile();
   const { data: subscription } = useSubscription();
   const { data: familyData } = useFamilySubscription(
@@ -387,7 +389,7 @@ export default function ProfilesScreen() {
                 selectTextOnFocus
                 returnKeyType="done"
                 className="bg-background rounded-card px-4 py-3 text-body text-text-primary mb-4"
-                placeholderTextColor="#999"
+                placeholderTextColor={colors.muted}
                 placeholder="Name"
                 testID="rename-input"
                 accessibilityLabel="Profile name"
