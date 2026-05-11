@@ -683,7 +683,11 @@ export default function ChildDetailScreen() {
         >
           {child.currentStreak > 0 && (
             <View className="flex-row items-center gap-1">
-              <Ionicons name="flame-outline" size={16} color="#f97316" />
+              <Ionicons
+                name="flame-outline"
+                size={16}
+                color={colors.retentionWeak}
+              />
               <Text className="text-text-secondary text-sm">
                 {t('parentView.index.dayStreak', {
                   count: child.currentStreak,
@@ -693,7 +697,7 @@ export default function ChildDetailScreen() {
           )}
           {child.totalXp > 0 && (
             <View className="flex-row items-center gap-1">
-              <Ionicons name="star-outline" size={16} color="#eab308" />
+              <Ionicons name="star-outline" size={16} color={colors.warning} />
               <Text className="text-text-secondary text-sm">
                 {child.totalXp} XP
               </Text>
