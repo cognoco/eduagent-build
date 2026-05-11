@@ -229,5 +229,26 @@ describe('session summary integration', () => {
     );
     expect(learningModeRow?.consecutiveSummarySkips).toBe(0);
     expect(llmProviderCalls).toHaveLength(1);
+    expect(llmProviderCalls[0]!.config.model).toBe('gemini-2.5-flash');
+    expect(llmProviderCalls[0]!.messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          role: 'system',
+          content: expect.stringContaining('summary evaluator'),
+        }),
+        expect.objectContaining({
+          role: 'user',
+          content: expect.stringContaining(
+            '<topic_title>Science</topic_title>',
+          ),
+        }),
+      ]),
+    );
+    const userPrompt = llmProviderCalls[0]!.messages.find(
+      (message) => message.role === 'user',
+    )!.content;
+    expect(userPrompt).toContain(
+      '<learner_summary>Plants use sunlight, water, and carbon dioxide to make the food they need.</learner_summary>',
+    );
   });
 });

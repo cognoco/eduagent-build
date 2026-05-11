@@ -285,10 +285,14 @@ describe('vocabulary quiz round lifecycle (integration)', () => {
         }),
       ]),
     );
+    expect(llmProviderCalls[0]!.config.model).toBe('gemini-2.5-flash');
     const [systemPrompt] = llmProviderCalls[0]!.messages as Array<{
       role: string;
       content: string;
     }>;
+    expect(systemPrompt.content).toContain(
+      'You are an educational AI assistant for young learners.',
+    );
     expect(systemPrompt.content).toContain(
       `Maximum CEFR level: ${context.cefrCeiling}`,
     );
