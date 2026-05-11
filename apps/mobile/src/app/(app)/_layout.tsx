@@ -18,6 +18,7 @@ import * as SecureStore from '../../lib/secure-storage';
 import { useProfile, personaFromBirthYear } from '../../lib/profile';
 import { useThemeColors, useTokenVars } from '../../lib/theme';
 import { useConsentStatus, useRequestConsent } from '../../hooks/use-consent';
+import { useNotificationResponseHandler } from '../../hooks/use-notification-response-handler';
 import { usePushTokenRegistration } from '../../hooks/use-push-token-registration';
 import { useRevenueCatIdentity } from '../../hooks/use-revenuecat';
 import {
@@ -1379,6 +1380,7 @@ export default function AppLayout() {
     role,
   );
   usePushTokenRegistration();
+  useNotificationResponseHandler();
 
   // [BUG-923] Previously fired on every render of the (app) layout, drowning
   // signal in noise during debugging sessions. Log only when isLoaded or

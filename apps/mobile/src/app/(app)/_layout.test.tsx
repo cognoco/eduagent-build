@@ -69,6 +69,10 @@ jest.mock('expo-notifications', () => ({
     .fn()
     .mockResolvedValue({ data: 'ExponentPushToken[mock]' }),
   setNotificationChannelAsync: jest.fn(),
+  setNotificationHandler: jest.fn(),
+  addNotificationResponseReceivedListener: jest.fn(() => ({
+    remove: jest.fn(),
+  })),
   AndroidImportance: { DEFAULT: 3 },
 }));
 

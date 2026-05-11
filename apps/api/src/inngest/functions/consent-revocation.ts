@@ -10,6 +10,7 @@ import {
   getProfileDisplayName,
 } from '../../services/consent';
 import { deleteProfile } from '../../services/deletion';
+import { markAllNudgesRead } from '../../services/nudge';
 import { sendPushNotification } from '../../services/notifications';
 import {
   getRecentNotificationCount,
@@ -43,6 +44,14 @@ export const consentRevocation = inngest.createFunction(
   async ({ event, step }) => {
     const { childProfileId, parentProfileId } = event.data;
 
+    // Immediately soft-clear all unread nudges to the child so they don't
+    // see stale encouragements during the 7-day grace period.
+    await step.run('clear-unread-nudges', async () => {
+      const db = getStepDatabase();
+      const cleared = await markAllNudgesRead(db, childProfileId);
+      return { cleared };
+    });
+
     await step.sleep('warning-mark', '6d');
 
     await step.run('send-warning-push', async () => {
@@ -56,7 +65,7 @@ export const consentRevocation = inngest.createFunction(
         db,
         parentProfileId,
         'consent_warning',
-        24
+        24,
       );
       if (recentCount > 0) {
         return { sent: false, reason: 'dedup_24h' };
@@ -100,11 +109,11 @@ export const consentRevocation = inngest.createFunction(
       const ownerProfileId = await getFamilyOwnerProfileId(
         db,
         childProfileId,
-        parentProfileId
+        parentProfileId,
       );
       const preference = await getWithdrawalArchivePreference(
         db,
-        ownerProfileId
+        ownerProfileId,
       );
       const age = calculateAge(childProfile.birthYear);
       return {
@@ -133,10 +142,10 @@ export const consentRevocation = inngest.createFunction(
             .update(profiles)
             .set({ archivedAt: new Date() })
             .where(
-              and(eq(profiles.id, childProfileId), isNull(profiles.archivedAt))
+              and(eq(profiles.id, childProfileId), isNull(profiles.archivedAt)),
             );
           return { archived: true };
-        }
+        },
       );
       if (
         archiveResult &&
@@ -158,7 +167,7 @@ export const consentRevocation = inngest.createFunction(
           db,
           parentProfileId,
           'consent_archived',
-          24
+          24,
         );
         if (recentCount > 0) {
           return { sent: false, reason: 'dedup_24h' };
@@ -199,7 +208,7 @@ export const consentRevocation = inngest.createFunction(
         db,
         childProfileId,
         'consent_expired',
-        24
+        24,
       );
       if (recentCount > 0) {
         return { sent: false, reason: 'dedup_24h' };
@@ -228,7 +237,7 @@ export const consentRevocation = inngest.createFunction(
         db,
         parentProfileId,
         'consent_expired',
-        24
+        24,
       );
       if (recentCount > 0) {
         return { sent: false, reason: 'dedup_24h' };
@@ -247,7 +256,7 @@ export const consentRevocation = inngest.createFunction(
       const ownerProfileId = await getFamilyOwnerProfileId(
         db,
         childProfileId,
-        parentProfileId
+        parentProfileId,
       );
       await recordPendingNotice(db, {
         ownerProfileId,
@@ -257,5 +266,5 @@ export const consentRevocation = inngest.createFunction(
     });
 
     return { status: 'deleted', childProfileId };
-  }
+  },
 );

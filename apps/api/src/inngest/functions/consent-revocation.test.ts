@@ -62,7 +62,8 @@ jest.mock('../../services/settings', () => ({
 }));
 
 const mockRecordPendingNotice = jest.fn().mockResolvedValue(undefined);
-jest.mock('../../services/notices', () => ({ // gc1-allow: stubs recordPendingNotice — real notices service inserts to DB, integration test would need real DB setup
+jest.mock('../../services/notices', () => ({
+  // gc1-allow: stubs recordPendingNotice — real notices service inserts to DB, integration test would need real DB setup
   recordPendingNotice: (...args: unknown[]) => mockRecordPendingNotice(...args),
 }));
 
@@ -125,7 +126,7 @@ describe('consentRevocation', () => {
     expect(triggers).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ event: 'app/consent.revoked' }),
-      ])
+      ]),
     );
   });
 
@@ -149,7 +150,7 @@ describe('consentRevocation', () => {
       expect.anything(),
       'parent-001',
       'consent_warning',
-      24
+      24,
     );
     expect(mockSendPushNotification).toHaveBeenCalledWith(
       expect.anything(),
@@ -157,7 +158,7 @@ describe('consentRevocation', () => {
         profileId: 'parent-001',
         type: 'consent_warning',
         body: "Liam's account closes tomorrow. You can still reverse.",
-      })
+      }),
     );
   });
 
@@ -171,7 +172,7 @@ describe('consentRevocation', () => {
 
     expect(mockSendPushNotification).not.toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ type: 'consent_warning' })
+      expect.objectContaining({ type: 'consent_warning' }),
     );
   });
 
@@ -185,7 +186,7 @@ describe('consentRevocation', () => {
 
     expect(mockSendPushNotification).not.toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ type: 'consent_warning' })
+      expect.objectContaining({ type: 'consent_warning' }),
     );
   });
 
@@ -223,7 +224,7 @@ describe('consentRevocation', () => {
         expect.objectContaining({
           profileId: 'parent-001',
           type: 'consent_warning',
-        })
+        }),
       );
       // Child push
       expect(mockSendPushNotification).toHaveBeenNthCalledWith(
@@ -232,12 +233,12 @@ describe('consentRevocation', () => {
         expect.objectContaining({
           profileId: 'child-001',
           type: 'consent_expired',
-        })
+        }),
       );
       // Profile deletion
       expect(mockDeleteProfile).toHaveBeenCalledWith(
         expect.anything(),
-        'child-001'
+        'child-001',
       );
       // Parent push
       expect(mockSendPushNotification).toHaveBeenNthCalledWith(
@@ -246,12 +247,13 @@ describe('consentRevocation', () => {
         expect.objectContaining({
           profileId: 'parent-001',
           type: 'consent_expired',
-        })
+        }),
       );
 
       // Step ordering: notify-child before delete-child-profile before notify-parent
       const stepNames = mockStep.run.mock.calls.map((c) => c[0]);
       expect(stepNames).toEqual([
+        'clear-unread-nudges',
         'send-warning-push',
         'check-restoration',
         'load-child-profile',
@@ -279,7 +281,7 @@ describe('consentRevocation', () => {
     });
     expect(mockDeleteProfile).toHaveBeenCalledWith(
       expect.anything(),
-      'child-boundary'
+      'child-boundary',
     );
   });
 
@@ -301,13 +303,13 @@ describe('consentRevocation', () => {
         expect.anything(),
         'child-dup',
         'consent_expired',
-        24
+        24,
       );
       // Warning + parent expired should have fired.
       expect(mockSendPushNotification).toHaveBeenCalledTimes(2);
       expect(mockSendPushNotification).toHaveBeenCalledWith(
         expect.anything(),
-        expect.objectContaining({ profileId: 'parent-001' })
+        expect.objectContaining({ profileId: 'parent-001' }),
       );
     });
 
@@ -327,13 +329,13 @@ describe('consentRevocation', () => {
         expect.anything(),
         'parent-dup',
         'consent_expired',
-        24
+        24,
       );
       // Warning + child expired should have fired.
       expect(mockSendPushNotification).toHaveBeenCalledTimes(2);
       expect(mockSendPushNotification).toHaveBeenCalledWith(
         expect.anything(),
-        expect.objectContaining({ profileId: 'child-001' })
+        expect.objectContaining({ profileId: 'child-001' }),
       );
     });
 
@@ -356,12 +358,12 @@ describe('consentRevocation', () => {
       expect(mockSendPushNotification).toHaveBeenCalledTimes(1);
       expect(mockSendPushNotification).toHaveBeenCalledWith(
         expect.anything(),
-        expect.objectContaining({ type: 'consent_warning' })
+        expect.objectContaining({ type: 'consent_warning' }),
       );
       // Profile deletion proceeds regardless of push dedup.
       expect(mockDeleteProfile).toHaveBeenCalledWith(
         expect.anything(),
-        'child-dup'
+        'child-dup',
       );
     });
 
@@ -408,7 +410,7 @@ describe('archive path — auto preference, age 14', () => {
           profileId: 'child-014',
           parentProfileId: 'parent-001',
         }),
-      })
+      }),
     );
 
     // delete must NOT have been called
@@ -430,7 +432,7 @@ describe('archive path — auto preference, age 14', () => {
       expect.objectContaining({
         ownerProfileId: 'owner-profile-001',
         type: 'consent_archived',
-      })
+      }),
     );
   });
 });
