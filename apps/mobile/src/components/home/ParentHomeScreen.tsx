@@ -200,11 +200,12 @@ function buildTonightPrompts(
   dashboard: DashboardData | undefined,
   t: (key: string, opts?: Record<string, unknown>) => string,
 ): TonightPrompt[] {
-  if (children.length === 0) return [];
+  const first = children[0];
+  if (!first) return [];
   if (children.length === 1) {
     return buildSingleChildPrompts(
-      children[0]!,
-      findDashboardChild(dashboard, children[0]!.id),
+      first,
+      findDashboardChild(dashboard, first.id),
       t,
     );
   }

@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Library and Progress Low-Data States</title>
+    <title>Progress Low-Data State</title>
     <style>
       :root {
         --background: #faf5ee;
@@ -67,13 +67,6 @@
         padding: 24px 20px 88px;
       }
 
-      .screen-title {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 16px;
-      }
-
       h1,
       h2,
       h3,
@@ -107,30 +100,6 @@
 
       .subtitle {
         margin-top: 6px;
-      }
-
-      .manage {
-        border: 0;
-        background: var(--surface-elevated);
-        color: var(--primary);
-        border-radius: 999px;
-        padding: 9px 14px;
-        font-size: 13px;
-        font-weight: 700;
-        white-space: nowrap;
-      }
-
-      .search {
-        margin: 20px 0 12px;
-        min-height: 46px;
-        border-radius: 16px;
-        background: var(--surface);
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 0 14px;
-        color: var(--text-secondary);
-        font-size: 14px;
       }
 
       .section {
@@ -228,18 +197,6 @@
         margin-top: 14px;
         font-weight: 800;
         font-size: 15px;
-      }
-
-      .secondary-action {
-        width: 100%;
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        background: var(--surface);
-        color: var(--text-primary);
-        min-height: 44px;
-        margin-top: 10px;
-        font-weight: 800;
-        font-size: 14px;
       }
 
       .progress-hero {
@@ -357,86 +314,6 @@
   </head>
   <body>
     <main class="canvas">
-      <section class="phone" aria-label="Library low-data mockup">
-        <div class="screen">
-          <div class="screen-title">
-            <div>
-              <h1>Library</h1>
-              <p class="subtitle">1 subject ready when you are.</p>
-            </div>
-            <button class="manage">Manage</button>
-          </div>
-
-          <div class="search">Search subjects, books, notes</div>
-
-          <div class="card row">
-            <div class="icon">L</div>
-            <div class="row-main">
-              <h3>Spanish</h3>
-              <p>1 book &middot; 2 of 10 topics explored</p>
-            </div>
-            <div class="chevron">&gt;</div>
-          </div>
-
-          <div class="section warm-card">
-            <div class="eyebrow">Next up</div>
-            <h2>Keep going with Greetings</h2>
-            <p class="subtitle">
-              You already started the first conversation set. A short session
-              here will make the rest of the shelf feel less blank.
-            </p>
-            <div class="chip-row">
-              <span class="chip">5 min</span>
-              <span class="chip">Speaking practice</span>
-              <span class="chip">A1</span>
-            </div>
-            <button class="action">Continue lesson</button>
-          </div>
-
-          <div class="section card">
-            <div class="row">
-              <div class="icon purple">R</div>
-              <div class="row-main">
-                <h2>Recent lesson</h2>
-                <p>Greetings and introductions &middot; Yesterday</p>
-              </div>
-            </div>
-            <div class="soft-divider"></div>
-            <div class="preview">
-              <div class="preview-line">
-                <span class="dot"></span>
-                <p>Practiced hello, goodbye, and saying your name.</p>
-              </div>
-              <div class="preview-line">
-                <span class="dot"></span>
-                <p>Next lesson can add a tiny role-play instead of starting over.</p>
-              </div>
-            </div>
-          </div>
-
-          <div class="section card row">
-            <div class="icon amber">N</div>
-            <div class="row-main">
-              <h3>Add one small goal</h3>
-              <p>
-                Pick a topic you want to use this week. The shelf will fill in
-                around that choice.
-              </p>
-            </div>
-          </div>
-          <button class="secondary-action">Browse Spanish shelf</button>
-        </div>
-
-        <nav class="tabbar" aria-label="Library tabs">
-          <div class="tab"><span class="tab-icon"></span><span>Home</span></div>
-          <div class="tab active">
-            <span class="tab-icon"></span><strong>Library</strong>
-          </div>
-          <div class="tab"><span class="tab-icon"></span><span>Progress</span></div>
-          <div class="tab"><span class="tab-icon"></span><span>More</span></div>
-        </nav>
-      </section>
-
       <section class="phone" aria-label="Progress low-data mockup">
         <div class="screen">
           <div>

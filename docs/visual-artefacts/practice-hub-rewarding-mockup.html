@@ -77,6 +77,13 @@
       color: var(--ink);
     }
 
+    .heading-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
     h1,
     h2,
     p {
@@ -96,40 +103,16 @@
       color: var(--muted);
     }
 
-    .streak {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 16px;
-      align-items: center;
-      padding: 16px;
-      border-radius: 22px;
-      background: #12352a;
-      color: white;
-      margin-bottom: 14px;
-    }
-
-    .streak strong {
-      display: block;
-      font-size: 17px;
-      line-height: 1.2;
-    }
-
-    .streak span {
-      display: block;
-      margin-top: 5px;
-      color: rgba(255, 255, 255, 0.76);
-      font-size: 13px;
-      line-height: 1.35;
-    }
-
     .xp-pill {
       min-width: 78px;
       padding: 10px 12px;
       border-radius: 18px;
-      background: rgba(255, 255, 255, 0.14);
+      background: #12352a;
+      color: white;
       text-align: center;
       font-weight: 800;
       font-size: 16px;
+      flex: 0 0 auto;
     }
 
     .xp-pill small {
@@ -218,10 +201,86 @@
       font-weight: 820;
     }
 
+    .challenge-row {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 12px;
+      margin-top: 10px;
+      padding: 14px;
+      border: 1px solid rgba(47, 156, 106, 0.18);
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.68);
+    }
+
+    .challenge-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 18px;
+      display: grid;
+      place-items: center;
+      color: white;
+      background: var(--mint-strong);
+      font-weight: 900;
+    }
+
+    .challenge-title {
+      font-size: 15px;
+      line-height: 1.15;
+      font-weight: 820;
+    }
+
+    .challenge-body {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.3;
+    }
+
     .grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 10px;
+    }
+
+    .quiz-card {
+      display: grid;
+      gap: 14px;
+      padding: 18px;
+      border: 1px solid rgba(56, 109, 190, 0.22);
+      border-radius: 24px;
+      background: linear-gradient(180deg, #ffffff, var(--blue));
+    }
+
+    .quiz-options {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .quiz-option {
+      min-height: 112px;
+      padding: 12px;
+      border: 1px solid rgba(22, 32, 27, 0.08);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.72);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .quiz-option-title {
+      font-size: 15px;
+      line-height: 1.15;
+      font-weight: 820;
+    }
+
+    .quiz-option-body {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.3;
     }
 
     .mini-card {
@@ -236,11 +295,6 @@
       gap: 12px;
     }
 
-    .mini-card.quiz {
-      background: linear-gradient(180deg, #ffffff, var(--blue));
-      border-color: rgba(56, 109, 190, 0.22);
-    }
-
     .mini-card.recite {
       background: linear-gradient(180deg, #ffffff, var(--violet));
       border-color: rgba(112, 88, 200, 0.22);
@@ -249,11 +303,6 @@
     .mini-card.dictation {
       background: linear-gradient(180deg, #ffffff, var(--amber));
       border-color: rgba(180, 111, 0, 0.2);
-    }
-
-    .mini-card.history {
-      background: linear-gradient(180deg, #ffffff, var(--rose));
-      border-color: rgba(182, 74, 98, 0.2);
     }
 
     .icon {
@@ -267,7 +316,15 @@
       font-size: 16px;
     }
 
-    .quiz .icon {
+    .quiz-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 18px;
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+      color: white;
+      font-size: 16px;
       background: var(--blue-strong);
     }
 
@@ -277,10 +334,6 @@
 
     .dictation .icon {
       background: var(--amber-strong);
-    }
-
-    .history .icon {
-      background: var(--rose-strong);
     }
 
     .mini-title {
@@ -326,6 +379,48 @@
       font-size: 15px;
     }
 
+    .history-row {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 12px;
+      margin-top: 12px;
+      padding: 14px;
+      border: 1px solid rgba(182, 74, 98, 0.18);
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.68);
+    }
+
+    .history-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 18px;
+      display: grid;
+      place-items: center;
+      color: white;
+      background: var(--rose-strong);
+      font-weight: 900;
+    }
+
+    .history-title {
+      font-size: 15px;
+      line-height: 1.15;
+      font-weight: 820;
+    }
+
+    .history-body {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.3;
+    }
+
+    .chevron {
+      color: var(--muted);
+      font-size: 22px;
+      font-weight: 700;
+    }
+
     @media (max-width: 420px) {
       body {
         padding: 0;
@@ -351,19 +446,14 @@
     <section class="screen">
       <header class="topbar">
         <div class="back" aria-hidden="true">&lt;</div>
-        <div>
-          <h1>Test yourself</h1>
-          <p class="subtitle">Pick a quick win. Every round helps your memory stick.</p>
+        <div class="heading-row">
+          <div>
+            <h1>Test yourself</h1>
+            <p class="subtitle">Pick a quick win. Every round helps your memory stick.</p>
+          </div>
+          <div class="xp-pill">420<small>XP</small></div>
         </div>
       </header>
-
-      <section class="streak" aria-label="Practice progress summary">
-        <div>
-          <strong>3-day practice streak</strong>
-          <span>One short round today keeps it alive.</span>
-        </div>
-        <div class="xp-pill">420<small>XP</small></div>
-      </section>
 
       <div class="section-label">Best next step</div>
       <section class="review-card">
@@ -382,20 +472,69 @@
         <button class="button">Start review</button>
       </section>
 
-      <div class="section-label">Choose a mode</div>
+      <section class="challenge-row">
+        <div class="challenge-icon" aria-hidden="true">✓</div>
+        <div>
+          <h2 class="challenge-title">Prove I know this</h2>
+          <p class="challenge-body">6 topics ready · 5 min · +40 XP</p>
+        </div>
+        <div class="chevron" aria-hidden="true">&gt;</div>
+      </section>
+
+      <div class="section-label">Quiz</div>
+      <section class="quiz-card">
+        <div class="review-head">
+          <div>
+            <h2 class="title">Quick quiz</h2>
+            <p class="body">Pick a quiz style and do a short scored round.</p>
+          </div>
+          <span class="cue strong">+20 XP</span>
+        </div>
+        <div class="quiz-options">
+          <article class="quiz-option">
+            <div class="row-head">
+              <div class="quiz-icon" aria-hidden="true">?</div>
+              <span class="tiny-cue">2 min</span>
+            </div>
+            <div>
+              <h2 class="quiz-option-title">Capitals</h2>
+              <p class="quiz-option-body">Countries, capitals, and places.</p>
+            </div>
+            <div class="tiny-cues">
+              <span class="tiny-cue">Best 8/10</span>
+            </div>
+          </article>
+
+          <article class="quiz-option">
+            <div class="row-head">
+              <div class="quiz-icon" aria-hidden="true">W</div>
+              <span class="tiny-cue">3 min</span>
+            </div>
+            <div>
+              <h2 class="quiz-option-title">Who's who</h2>
+              <p class="quiz-option-body">Guess the person from clues.</p>
+            </div>
+            <div class="tiny-cues">
+              <span class="tiny-cue">Clues</span>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <div class="section-label">Other practice</div>
       <section class="grid">
-        <article class="mini-card quiz">
+        <article class="mini-card dictation">
           <div class="row-head">
-            <div class="icon" aria-hidden="true">?</div>
-            <span class="tiny-cue">+20 XP</span>
+            <div class="icon" aria-hidden="true">D</div>
+            <span class="tiny-cue">+25 XP</span>
           </div>
           <div>
-            <h2 class="mini-title">Quick quiz</h2>
-            <p class="mini-body">Fast questions from things you have studied.</p>
+            <h2 class="mini-title">Dictation</h2>
+            <p class="mini-body">Listen, write, then check your accuracy.</p>
           </div>
           <div class="tiny-cues">
-            <span class="tiny-cue">2 min</span>
-            <span class="tiny-cue">Best 80%</span>
+            <span class="tiny-cue">5 min</span>
+            <span class="tiny-cue">Writing</span>
           </div>
         </article>
 
@@ -413,40 +552,16 @@
             <span class="tiny-cue">Voice</span>
           </div>
         </article>
-
-        <article class="mini-card dictation">
-          <div class="row-head">
-            <div class="icon" aria-hidden="true">D</div>
-            <span class="tiny-cue">+25 XP</span>
-          </div>
-          <div>
-            <h2 class="mini-title">Dictation</h2>
-            <p class="mini-body">Listen, write, then check your accuracy.</p>
-          </div>
-          <div class="tiny-cues">
-            <span class="tiny-cue">5 min</span>
-            <span class="tiny-cue">Writing</span>
-          </div>
-        </article>
-
-        <article class="mini-card history">
-          <div class="row-head">
-            <div class="icon" aria-hidden="true">H</div>
-            <span class="tiny-cue">12 rounds</span>
-          </div>
-          <div>
-            <h2 class="mini-title">Quiz history</h2>
-            <p class="mini-body">See scores, XP, and what improved.</p>
-          </div>
-          <div class="tiny-cues">
-            <span class="tiny-cue">Last: 9/10</span>
-          </div>
-        </article>
       </section>
 
-      <section class="locked">
-        <h2 class="title">Challenge check</h2>
-        <p class="body">Finish one more topic to unlock a bigger "I know this" test.</p>
+      <div class="section-label">Recent progress</div>
+      <section class="history-row">
+        <div class="history-icon" aria-hidden="true">H</div>
+        <div>
+          <h2 class="history-title">Quiz history</h2>
+          <p class="history-body">12 rounds played · Last score 9/10 · 180 XP earned</p>
+        </div>
+        <div class="chevron" aria-hidden="true">&gt;</div>
       </section>
     </section>
   </main>
