@@ -2120,7 +2120,8 @@
     },
     "error": {
       "rateLimit": "Has enviado suficiente animo por ahora - {{childName}} lo vera la proxima vez que abra la app.",
-      "consentPending": "El consentimiento de {{childName}} esta pendiente - los animos funcionaran cuando termine la configuracion."
+      "consentPending": "El consentimiento de {{childName}} esta pendiente - los animos funcionaran cuando termine la configuracion.",
+      "forbidden": "No tienes permiso para enviar un nudge a {{childName}}."
     },
     "banner": {
       "title": "{{fromDisplayName}} te envio un nudge",

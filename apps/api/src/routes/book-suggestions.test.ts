@@ -71,6 +71,7 @@ jest.mock('../services/profile', () => ({
 // ---------------------------------------------------------------------------
 
 jest.mock('../services/suggestions', () => {
+  // gc1-allow: isolating LLM-calling suggestion service from route tests
   const stubSuggestion = {
     id: 'a0000000-0000-4000-a000-000000000001',
     subjectId: 'a0000000-0000-4000-a000-000000000201',

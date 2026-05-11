@@ -2120,7 +2120,8 @@
     },
     "error": {
       "rateLimit": "Du hast fürs Erste genug Ermutigung gesendet - {{childName}} sieht sie beim nächsten Öffnen der App.",
-      "consentPending": "Die Zustimmung für {{childName}} steht noch aus - Ermutigungen funktionieren, sobald alles eingerichtet ist."
+      "consentPending": "Die Zustimmung für {{childName}} steht noch aus - Ermutigungen funktionieren, sobald alles eingerichtet ist.",
+      "forbidden": "Du hast keine Berechtigung, {{childName}} einen Nudge zu senden."
     },
     "banner": {
       "title": "{{fromDisplayName}} hat dir einen Nudge gesendet",

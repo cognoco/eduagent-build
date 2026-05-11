@@ -189,7 +189,8 @@
     },
     "error": {
       "rateLimit": "Na razie wysłano wystarczająco zachęt - {{childName}} zobaczy ją przy następnym otwarciu aplikacji.",
-      "consentPending": "Zgoda profilu {{childName}} jest w toku - zachęty zadziałają po zakończeniu konfiguracji."
+      "consentPending": "Zgoda profilu {{childName}} jest w toku - zachęty zadziałają po zakończeniu konfiguracji.",
+      "forbidden": "Nie masz uprawnień do wysyłania zachęty do {{childName}}."
     },
     "banner": {
       "title": "{{fromDisplayName}} wysłał(a) ci zachętę",

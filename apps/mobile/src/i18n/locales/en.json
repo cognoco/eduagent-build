@@ -2120,7 +2120,8 @@
     },
     "error": {
       "rateLimit": "You've sent enough encouragement for now - {{childName}} will see it next time they open the app.",
-      "consentPending": "{{childName}}'s consent is pending - encouragement will work once they're set up."
+      "consentPending": "{{childName}}'s consent is pending - encouragement will work once they're set up.",
+      "forbidden": "You don't have permission to send {{childName}} a nudge."
     },
     "banner": {
       "title": "{{fromDisplayName}} sent you a nudge",

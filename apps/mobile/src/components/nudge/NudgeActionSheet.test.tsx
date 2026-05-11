@@ -7,6 +7,7 @@ import {
 
 import {
   ConsentRequiredError,
+  ForbiddenError,
   NetworkError,
   RateLimitedError,
 } from '../../lib/api-errors';
@@ -128,6 +129,19 @@ describe('NudgeActionSheet', () => {
       screen.getByText(
         "Emma's consent is pending - encouragement will work once they're set up.",
       );
+    });
+  });
+
+  it('on ForbiddenError shows forbidden error copy', async () => {
+    mockMutateAsync.mockRejectedValue(
+      new ForbiddenError('Not a parent of this child'),
+    );
+
+    render(<NudgeActionSheet {...defaultProps} childName="Emma" />);
+    fireEvent.press(screen.getByTestId('nudge-template-you_got_this'));
+
+    await waitFor(() => {
+      screen.getByText("You don't have permission to send Emma a nudge.");
     });
   });
 

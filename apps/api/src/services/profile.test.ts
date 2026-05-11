@@ -59,7 +59,7 @@ function mockProfileRow(
     location: 'EU' | 'US' | 'OTHER' | null;
     isOwner: boolean;
     hasPremiumLlm: boolean;
-  }>
+  }>,
 ) {
   return {
     id: overrides?.id ?? 'profile-1',
@@ -91,6 +91,7 @@ function createMockDb({
     insert: jest.fn().mockReturnValue({
       values: jest.fn().mockReturnValue({
         returning: jest.fn().mockResolvedValue(insertReturning),
+        onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
       }),
     }),
     update: jest.fn().mockReturnValue({
@@ -169,7 +170,7 @@ describe('createProfile', () => {
       db,
       'account-123',
       { displayName: 'Owner', birthYear: 1990 },
-      true
+      true,
     );
 
     expect(result.isOwner).toBe(true);
@@ -231,7 +232,7 @@ describe('createProfile', () => {
       db,
       'account-123',
       { displayName: 'Child', birthYear: 2016 },
-      false
+      false,
     );
 
     expect(checkConsentRequired).toHaveBeenCalledWith(2016);
@@ -251,7 +252,7 @@ describe('createProfile', () => {
       db,
       'account-123',
       { displayName: 'Adult', birthYear: 1990 },
-      false
+      false,
     );
 
     expect(createPendingConsentState).not.toHaveBeenCalled();
@@ -273,17 +274,57 @@ describe('createProfile', () => {
       'account-123',
       { displayName: 'Child Added By Parent', birthYear: 2013 },
       false,
-      'parent-profile-id'
+      'parent-profile-id',
     );
 
     expect(createGrantedConsentState).toHaveBeenCalledWith(
       db,
       row.id,
       'GDPR',
-      'parent-profile-id'
+      'parent-profile-id',
     );
     expect(createPendingConsentState).not.toHaveBeenCalled();
     expect(result.consentStatus).toBe('CONSENTED');
+  });
+
+  it('[BREAK] creates family link when parent adds child aged 17+ (consent not required)', async () => {
+    (checkConsentRequired as jest.Mock).mockReturnValueOnce({
+      required: false,
+      consentType: null,
+      age: 17,
+    });
+    const row = mockProfileRow({ id: 'child-17' });
+    const db = createMockDb({ insertReturning: [row] });
+
+    await createProfile(
+      db,
+      'account-123',
+      { displayName: 'Older Teen', birthYear: 2009 },
+      false,
+      'parent-profile-id',
+    );
+
+    expect(db.insert).toHaveBeenCalledTimes(2);
+    expect(createGrantedConsentState).not.toHaveBeenCalled();
+  });
+
+  it('does not create family link when no parentProfileId', async () => {
+    (checkConsentRequired as jest.Mock).mockReturnValueOnce({
+      required: false,
+      consentType: null,
+      age: 30,
+    });
+    const row = mockProfileRow();
+    const db = createMockDb({ insertReturning: [row] });
+
+    await createProfile(
+      db,
+      'account-123',
+      { displayName: 'Solo User', birthYear: 1996 },
+      false,
+    );
+
+    expect(db.insert).toHaveBeenCalledTimes(1);
   });
 
   // BUG-239: Child self-registering (no parentProfileId) still gets PENDING
@@ -301,7 +342,7 @@ describe('createProfile', () => {
       'account-123',
       { displayName: 'Self-Registering Child', birthYear: 2013 },
       false,
-      undefined
+      undefined,
     );
 
     expect(createPendingConsentState).toHaveBeenCalledWith(db, row.id, 'GDPR');

@@ -2120,7 +2120,8 @@
     },
     "error": {
       "rateLimit": "今は十分に応援を送りました。{{childName}}さんは次にアプリを開いたときに見られます。",
-      "consentPending": "{{childName}}さんの同意がまだ完了していません。設定が終わるとナッジを送れます。"
+      "consentPending": "{{childName}}さんの同意がまだ完了していません。設定が終わるとナッジを送れます。",
+      "forbidden": "{{childName}}さんにナッジを送る権限がありません。"
     },
     "banner": {
       "title": "{{fromDisplayName}}さんからナッジが届きました",

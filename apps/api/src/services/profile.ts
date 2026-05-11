@@ -201,13 +201,24 @@ export async function createProfile(
     })
     .returning();
 
+  if (!row) throw new Error('Insert profile did not return a row');
+
+  // Always create family link when a parent adds a child, regardless of
+  // consent requirements. Without this, children aged 17+ (consent not
+  // required) get no family_links row and assertParentAccess rejects nudges,
+  // proxy mode, and all parent-scoped operations.
+  if (parentProfileId) {
+    await db
+      .insert(familyLinks)
+      .values({ parentProfileId, childProfileId: row.id })
+      .onConflictDoNothing();
+  }
+
   // Server-side consent determination: if consent is required, record it.
   // When a parent creates a child (parentProfileId set), consent is GRANTED
   // immediately — the parent IS the consenting adult (BUG-239 fix).
   // Otherwise (child self-registering), create PENDING state for the
   // email-based consent request flow.
-  if (!row) throw new Error('Insert profile did not return a row');
-
   let consentStatus: Profile['consentStatus'] = null;
   if (consentCheck?.required && consentCheck.consentType) {
     if (parentProfileId) {

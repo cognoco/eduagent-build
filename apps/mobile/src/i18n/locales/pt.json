@@ -189,7 +189,8 @@
     },
     "error": {
       "rateLimit": "Você já enviou incentivo suficiente por enquanto - {{childName}} verá na próxima vez que abrir o app.",
-      "consentPending": "O consentimento de {{childName}} está pendente - os incentivos funcionarão quando a configuração estiver pronta."
+      "consentPending": "O consentimento de {{childName}} está pendente - os incentivos funcionarão quando a configuração estiver pronta.",
+      "forbidden": "Você não tem permissão para enviar um nudge para {{childName}}."
     },
     "banner": {
       "title": "{{fromDisplayName}} enviou um incentivo para você",

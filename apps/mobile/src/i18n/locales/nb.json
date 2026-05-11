@@ -2120,7 +2120,8 @@
     },
     "error": {
       "rateLimit": "Du har sendt nok oppmuntring for nå - {{childName}} ser den neste gang appen åpnes.",
-      "consentPending": "Samtykket til {{childName}} venter fortsatt - oppmuntringer fungerer når kontoen er klar."
+      "consentPending": "Samtykket til {{childName}} venter fortsatt - oppmuntringer fungerer når kontoen er klar.",
+      "forbidden": "Du har ikke tillatelse til å sende {{childName}} en nudge."
     },
     "banner": {
       "title": "{{fromDisplayName}} sendte deg en nudge",

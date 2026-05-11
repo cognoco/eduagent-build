@@ -109,6 +109,7 @@ jest.mock(
 );
 
 jest.mock('./ChildQuotaLine', () => ({
+  // gc1-allow: presentational stub — ChildQuotaLine has own tests
   ChildQuotaLine: () => null,
 }));
 

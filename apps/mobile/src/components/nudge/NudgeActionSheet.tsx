@@ -7,6 +7,7 @@ import type { NudgeTemplate } from '@eduagent/schemas';
 import { useSendNudge } from '../../hooks/use-nudges';
 import {
   ConsentRequiredError,
+  ForbiddenError,
   NetworkError,
   RateLimitedError,
 } from '../../lib/api-errors';
@@ -21,7 +22,7 @@ const TEMPLATES: readonly NudgeTemplate[] = [
   'thinking_of_you',
 ];
 
-type InlineError = 'rate' | 'consent' | 'network' | 'unknown';
+type InlineError = 'rate' | 'consent' | 'forbidden' | 'network' | 'unknown';
 
 interface NudgeActionSheetProps {
   childName: string;
@@ -57,6 +58,8 @@ export function NudgeActionSheet({
         setInlineError('rate');
       } else if (err instanceof ConsentRequiredError) {
         setInlineError('consent');
+      } else if (err instanceof ForbiddenError) {
+        setInlineError('forbidden');
       } else if (err instanceof NetworkError) {
         setInlineError('network');
       } else {
@@ -75,11 +78,13 @@ export function NudgeActionSheet({
       ? t('nudge.error.rateLimit', { childName })
       : inlineError === 'consent'
         ? t('nudge.error.consentPending', { childName })
-        : inlineError === 'network'
-          ? t('errors.networkError')
-          : inlineError === 'unknown'
-            ? t('errors.generic')
-            : null;
+        : inlineError === 'forbidden'
+          ? t('nudge.error.forbidden', { childName })
+          : inlineError === 'network'
+            ? t('errors.networkError')
+            : inlineError === 'unknown'
+              ? t('errors.generic')
+              : null;
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
