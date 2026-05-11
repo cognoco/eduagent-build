@@ -10,3 +10,4 @@ export { RecentSessionsList } from './RecentSessionsList';
 export { ReportsListCard } from './ReportsListCard';
 export { WeeklyReportCard } from './WeeklyReportCard';
 export { WeeklyDeltaChip, type WeeklyDeltaMetric } from './WeeklyDeltaChip';
+export { MetricCard } from './MetricCard';

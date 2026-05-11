@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { ErrorFallback } from '../../../../components/common';
+import { MetricCard } from '../../../../components/progress';
 import { classifyApiError } from '../../../../lib/format-api-error';
 import { goBackOrReplace } from '../../../../lib/navigation';
 import { useProfileWeeklyReportDetail } from '../../../../hooks/use-progress';
@@ -24,23 +25,6 @@ function formatWeeklyReportRange(weekStart: string): string {
     timeZone: 'UTC',
   });
   return `${startLabel} - ${endLabel}`;
-}
-
-function MetricCard({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}): React.ReactElement {
-  return (
-    <View className="bg-background rounded-card p-4 flex-1">
-      <Text className="text-caption text-text-secondary">{label}</Text>
-      <Text className="text-h3 font-semibold text-text-primary mt-2">
-        {value}
-      </Text>
-    </View>
-  );
 }
 
 export default function ProgressWeeklyReportDetail(): React.ReactElement {

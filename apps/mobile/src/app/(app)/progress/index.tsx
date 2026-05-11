@@ -312,8 +312,6 @@ export default function ProgressScreen(): React.ReactElement {
   const hasAnyReports =
     (monthlyReportsQuery.data?.length ?? 0) > 0 ||
     (weeklyReportsQuery.data?.length ?? 0) > 0;
-  const reportsAreLoading =
-    monthlyReportsQuery.isLoading || weeklyReportsQuery.isLoading;
   const sessionCount =
     profileSessionsQuery.data?.length ?? inventory?.global.totalSessions ?? 0;
   const lastSessionAt =
@@ -327,15 +325,10 @@ export default function ProgressScreen(): React.ReactElement {
     !!inventory &&
     !profileSessionsQuery.isLoading &&
     isProfileStale({ sessionCount, lastSessionAt });
-  // TODO: D-RP-5 Phase 2 — add 'ineligible' once API provides the discriminator
+  // TODO: D-RP-5 Phase 2 — add 'ineligible' once API provides the discriminator.
+  // Until then, no-reports-yet and truly-ineligible both collapse to 'awaiting'.
   const progressSurfaceState: 'empty' | 'awaiting' | 'ready' =
-    isEmpty || isStale
-      ? 'empty'
-      : hasAnyReports
-        ? 'ready'
-        : reportsAreLoading
-          ? 'awaiting'
-          : 'awaiting';
+    isEmpty || isStale ? 'empty' : hasAnyReports ? 'ready' : 'awaiting';
 
   const hasLanguageSubject = inventory?.subjects?.some(
     (s) => s.pedagogyMode === 'four_strands',
